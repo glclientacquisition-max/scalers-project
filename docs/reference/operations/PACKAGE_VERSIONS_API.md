@@ -172,18 +172,53 @@ Result: `{ "version_id", "discarded": true }`. Audit action `discard_package_ver
 
 ### `move_subscribers`
 
-Moves a business that is already on a paid billing mode onto another published version of the same package. Refuses when billing status is beta or billing enforcement is off (`a beta business is not moved onto a package version`). 1 to 200 tenant ids. Does not change billing status, included minutes, or enforcement, and does not create an invoice. Current businesses stay on free beta, so this action does not apply to them. A new subscription does not use this action: the insert pins the latest published version.
+An explicit admin move. `confirm` must be `true`. Moves any business onto any published version, including a different plan, and including a business whose billing status is beta or whose billing enforcement is off. 1 to 200 tenant ids. Copies `minutes_included` from the version (and `seat_included` when that column exists). Leaves `billing_status` and `billing_enforcement` unchanged, so a beta business stays free and is metered against the new minutes. Does not create an invoice. A business with no subscription gets one, status beta, enforcement untouched.
+
+A direct database update, and `system_move_subscribers_to_package_version` (renewals, trial expiry, cron), still skip a beta business or one with enforcement off. The skip writes audit action `skip_package_version`. Nothing in those paths turns enforcement on.
 
 ```json
 {
   "action": "move_subscribers",
   "version_id": "uuid",
   "tenant_ids": ["uuid"],
-  "reason": "Move this business onto version 2"
+  "reason": "Move this business onto version 2",
+  "confirm": true
 }
 ```
 
-Result: `{ "version_id", "moved", "version" }`. One audit row per business, action `move_package_version`.
+Result: `{ "version_id", "moved", "version" }`. One audit row per business, action `move_package_version`. The row stores actor, tenant, reason, `moved_at`, from version, to version, and billing status and enforcement before and after. `created_at` on `billing_audit_log` is the timestamp.
+
+### `set_billing_mode`
+
+Beta and billing enforcement are separate from the plan. This is the only action that turns enforcement on, and only with `confirm: true`. `billing_status` is `beta` or `active`. `enforcement` is `off`, `soft`, or `hard`. Taking a beta business to `active` while enforcement is `off` is refused (`set billing mode before active`). The plan, the version, and the minutes stay put. Does not create an invoice.
+
+```json
+{
+  "action": "set_billing_mode",
+  "tenant_id": "uuid",
+  "billing_status": "beta",
+  "enforcement": "soft",
+  "reason": "Turn billing on and keep beta",
+  "confirm": true
+}
+```
+
+Audit action `set_tenant_billing_mode`, with status and enforcement before and after.
+
+### `set_new_signup_trial`
+
+Turns `new_signup_trial_enabled` on or off. `confirm` must be `true`. Does not change an existing business and does not turn enforcement on.
+
+```json
+{
+  "action": "set_new_signup_trial",
+  "enabled": false,
+  "reason": "Leave new signups without a trial",
+  "confirm": true
+}
+```
+
+Audit action `set_new_signup_trial`.
 
 ### `set_price_approval_threshold`
 
@@ -208,7 +243,7 @@ Result: `{ "version_id", "moved", "version" }`. One audit row per business, acti
 
 `message` on 400 and 409 is the database text, capitalized, at most 180 characters. It does not name vendors, SQL files, or environment variables.
 
-Checks the database enforces, in addition to the route: no negative numbers, reason required, actor required, trial length only on `trial`, every feature key once, discount 0 to 100, notes at most 500 characters, `message_credits` set before an editor publish, cannot archive the only published version, move stays on the same package, a beta business is not moved, a move does not create an invoice.
+Checks the database enforces, in addition to the route: no negative numbers, reason required, actor required, trial length only on `trial`, every feature key once, discount 0 to 100, notes at most 500 characters, `message_credits` set before an editor publish, cannot archive the only published version, an admin move needs `confirm: true`, a system move skips a beta business, a move does not change billing status or enforcement, and a move does not create an invoice.
 
 ## What publish does not do
 

@@ -63,6 +63,23 @@ async function runEditorCommand(actor: string, command: EditorCommand) {
         p_tenant_ids: command.tenantIds,
         p_actor: actor,
         p_reason: command.reason,
+        p_confirm: command.confirm,
+      });
+    case "set_billing_mode":
+      return callEditor("admin_set_tenant_billing_mode", {
+        p_tenant_id: command.tenantId,
+        p_billing_status: command.billingStatus,
+        p_enforcement: command.enforcement,
+        p_actor: actor,
+        p_reason: command.reason,
+        p_confirm: command.confirm,
+      });
+    case "set_new_signup_trial":
+      return callEditor("admin_set_new_signup_trial", {
+        p_enabled: command.enabled,
+        p_actor: actor,
+        p_reason: command.reason,
+        p_confirm: command.confirm,
       });
     case "set_price_approval_threshold":
       return callEditor("admin_set_price_approval_threshold", {

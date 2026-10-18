@@ -32,7 +32,9 @@ export type EditorCommand =
   | { action: "archive"; versionId: string; reason: string }
   | { action: "discard_draft"; versionId: string; reason: string }
   | { action: "approve"; versionId: string; reason: string }
-  | { action: "move_subscribers"; versionId: string; tenantIds: string[]; reason: string }
+  | { action: "move_subscribers"; versionId: string; tenantIds: string[]; reason: string; confirm: true }
+  | { action: "set_billing_mode"; tenantId: string; billingStatus: "beta" | "active"; enforcement: "off" | "soft" | "hard"; reason: string; confirm: true }
+  | { action: "set_new_signup_trial"; enabled: boolean; reason: string; confirm: true }
   | { action: "set_price_approval_threshold"; thresholdKes: number | null; reason: string };
 
 export type ParsedEditorCommand =
@@ -80,6 +82,13 @@ export function packageVersionEditorHttpStatus(message: string): { status: numbe
     text.includes("message credits") ||
     text.includes("on-demand setting") ||
     text.includes("beta business") ||
+    text.includes("confirm the move") ||
+    text.includes("confirm the billing change") ||
+    text.includes("confirm the signup setting") ||
+    text.includes("set billing mode before active") ||
+    text.includes("billing status") ||
+    text.includes("billing enforcement") ||
+    text.includes("new signup trial") ||
     text.includes("must not create an invoice")
   ) {
     return { status: 400, error: "invalid" };
@@ -219,13 +228,45 @@ export function parseEditorCommand(body: unknown): ParsedEditorCommand {
       return { ok: false, error: "Choose at least one business." };
     }
     if (body.tenant_ids.length > 200) return { ok: false, error: "Too many businesses in one move." };
+    if (body.confirm !== true) return { ok: false, error: "Confirm the move." };
     const tenantIds: string[] = [];
     for (const id of body.tenant_ids) {
       const tenantId = uuidOf(id);
       if (!tenantId) return { ok: false, error: "Business not found." };
       tenantIds.push(tenantId);
     }
-    return { ok: true, command: { action, versionId, tenantIds, reason } };
+    return { ok: true, command: { action, versionId, tenantIds, reason, confirm: true } };
+  }
+
+  if (action === "set_billing_mode") {
+    const tenantId = uuidOf(body.tenant_id);
+    if (!tenantId) return { ok: false, error: "Business not found." };
+    if (body.billing_status !== "beta" && body.billing_status !== "active") {
+      return { ok: false, error: "Billing status must be beta or active." };
+    }
+    if (body.enforcement !== "off" && body.enforcement !== "soft" && body.enforcement !== "hard") {
+      return { ok: false, error: "Billing enforcement must be off, soft, or hard." };
+    }
+    if (body.confirm !== true) return { ok: false, error: "Confirm the billing change." };
+    return {
+      ok: true,
+      command: {
+        action,
+        tenantId,
+        billingStatus: body.billing_status,
+        enforcement: body.enforcement,
+        reason,
+        confirm: true,
+      },
+    };
+  }
+
+  if (action === "set_new_signup_trial") {
+    if (typeof body.enabled !== "boolean") {
+      return { ok: false, error: "New signup trial must be on or off." };
+    }
+    if (body.confirm !== true) return { ok: false, error: "Confirm the signup setting." };
+    return { ok: true, command: { action, enabled: body.enabled, reason, confirm: true } };
   }
 
   if (action === "set_price_approval_threshold") {

@@ -311,11 +311,12 @@ begin
         where p.sku = 'starter' and v.version = 2),
       array['11111111-1111-1111-1111-111111111111']::uuid[],
       'ada',
-      'move one grandfathered business'
+      'move one grandfathered business',
+      false
     );
-    raise exception 'beta move was allowed';
+    raise exception 'unconfirmed move was allowed';
   exception when others then
-    if sqlerrm not like '%not moved onto a package version%' then raise; end if;
+    if sqlerrm not like '%confirm the move%' then raise; end if;
   end;
   select v.version into v_legacy
   from public.tenant_subscriptions s
@@ -338,7 +339,7 @@ begin
      )
      or exists (select 1 from public.invoices)
   then
-    raise exception 'beta move changed billing, wrote an audit, or created an invoice';
+    raise exception 'unconfirmed move changed billing, wrote an audit, or created an invoice';
   end if;
 
   v_growth := (public.admin_draft_package_version('growth', 'ada', 'a later growth')) ->> 'version_id';
@@ -410,7 +411,8 @@ begin
       where p.sku = 'starter' and v.version = 2),
     array['99999999-9999-9999-9999-999999999993']::uuid[],
     'ada',
-    'move one paid business'
+    'move one paid business',
+    true
   );
   select v.version into v_paid
   from public.tenant_subscriptions s
@@ -673,8 +675,11 @@ begin
       and actor = 'ada'
       and tenant_id = '99999999-9999-9999-9999-999999999993'
       and detail ->> 'reason' = 'move one paid business'
-      and detail -> 'before' ->> 'package_version_id' is not null
-      and detail -> 'after' ->> 'package_version_id' is not null
+      and detail ->> 'from_version_id' is not null
+      and detail ->> 'to_version_id' is not null
+      and detail ->> 'billing_enforcement_before' = 'soft'
+      and detail ->> 'billing_enforcement_after' = 'soft'
+      and detail ? 'moved_at'
   ) then
     raise exception 'move audit row missing';
   end if;
@@ -825,4 +830,144 @@ begin
   update public.billing_lifecycle_settings
   set new_signup_trial_enabled = false
   where id = 1;
+end $$;
+
+-- An admin can move a beta business onto any published version. The business
+-- stays beta, enforcement stays off, and minutes follow the new version.
+-- A system move skips that business and writes its own audit row.
+do $$
+declare
+  v_growth uuid;
+  v_starter uuid;
+  v_minutes integer;
+  v_status text;
+  v_enf text;
+  v_sku text;
+  v_version integer;
+  v_invoices integer;
+begin
+  select v.id into v_growth
+  from public.billing_package_versions v
+  join public.billing_packages p on p.id = v.package_id
+  where p.sku = 'growth' and v.status = 'published' and v.version = 2;
+  select v.id into v_starter
+  from public.billing_package_versions v
+  join public.billing_packages p on p.id = v.package_id
+  where p.sku = 'starter' and v.status = 'published' and v.version = 2;
+  select count(*) into v_invoices from public.invoices;
+
+  perform public.admin_move_subscribers_to_package_version(
+    v_growth,
+    array['11111111-1111-1111-1111-111111111111']::uuid[],
+    'ada',
+    'move the beta business onto growth',
+    true
+  );
+  select p.sku, v.version, s.billing_status, t.billing_enforcement, t.minutes_included
+    into v_sku, v_version, v_status, v_enf, v_minutes
+  from public.tenant_subscriptions s
+  join public.tenants t on t.id = s.tenant_id
+  join public.billing_packages p on p.id = s.package_id
+  join public.billing_package_versions v on v.id = s.package_version_id
+  where s.tenant_id = '11111111-1111-1111-1111-111111111111';
+  if v_sku <> 'growth' or v_version <> 2 or v_status <> 'beta' or v_enf <> 'off'
+     or v_minutes <> (select minutes from public.billing_package_versions where id = v_growth)
+     or (select count(*) from public.invoices) <> v_invoices
+     or not exists (
+       select 1 from public.billing_audit_log
+       where action = 'move_package_version'
+         and actor = 'ada'
+         and tenant_id = '11111111-1111-1111-1111-111111111111'
+         and detail ->> 'reason' = 'move the beta business onto growth'
+         and detail ->> 'from_sku' = 'starter'
+         and detail ->> 'to_sku' = 'growth'
+         and (detail ->> 'to_version')::int = 2
+         and detail ->> 'billing_status_before' = 'beta'
+         and detail ->> 'billing_status_after' = 'beta'
+         and detail ->> 'billing_enforcement_before' = 'off'
+         and detail ->> 'billing_enforcement_after' = 'off'
+         and detail ? 'moved_at'
+     )
+  then
+    raise exception 'admin move of a beta business did not stay beta (% % % % %)',
+      v_sku, v_version, v_status, v_enf, v_minutes;
+  end if;
+
+  perform public.system_move_subscribers_to_package_version(
+    v_starter,
+    array['11111111-1111-1111-1111-111111111111']::uuid[],
+    'cron',
+    'renewal tried to move a beta business'
+  );
+  select p.sku, v.version, t.billing_enforcement
+    into v_sku, v_version, v_enf
+  from public.tenant_subscriptions s
+  join public.tenants t on t.id = s.tenant_id
+  join public.billing_packages p on p.id = s.package_id
+  join public.billing_package_versions v on v.id = s.package_version_id
+  where s.tenant_id = '11111111-1111-1111-1111-111111111111';
+  if v_sku <> 'growth' or v_version <> 2 or v_enf <> 'off'
+     or not exists (
+       select 1 from public.billing_audit_log
+       where action = 'skip_package_version'
+         and actor = 'cron'
+         and tenant_id = '11111111-1111-1111-1111-111111111111'
+         and detail ->> 'skipped' = 'beta'
+         and detail ->> 'billing_status_before' = 'beta'
+         and detail ->> 'billing_status_after' = 'beta'
+         and detail ->> 'billing_enforcement_before' = 'off'
+         and detail ->> 'billing_enforcement_after' = 'off'
+         and detail ? 'moved_at'
+     )
+  then
+    raise exception 'system move did not skip the beta business';
+  end if;
+
+  begin
+    perform public.admin_set_tenant_billing_mode(
+      '11111111-1111-1111-1111-111111111111',
+      'active',
+      'soft',
+      'ada',
+      'turn billing on without confirm',
+      false
+    );
+    raise exception 'unconfirmed billing change was allowed';
+  exception when others then
+    if sqlerrm not like '%confirm the billing change%' then raise; end if;
+  end;
+  perform public.admin_set_tenant_billing_mode(
+    '11111111-1111-1111-1111-111111111111',
+    'beta',
+    'soft',
+    'ada',
+    'turn billing on and keep beta',
+    true
+  );
+  if (select billing_status from public.tenant_subscriptions where tenant_id = '11111111-1111-1111-1111-111111111111') <> 'beta'
+     or (select billing_enforcement from public.tenants where id = '11111111-1111-1111-1111-111111111111') <> 'soft'
+     or (select p.sku from public.billing_packages p
+         join public.tenant_subscriptions s on s.package_id = p.id
+         where s.tenant_id = '11111111-1111-1111-1111-111111111111') <> 'growth'
+     or not exists (
+       select 1 from public.billing_audit_log
+       where action = 'set_tenant_billing_mode'
+         and actor = 'ada'
+         and tenant_id = '11111111-1111-1111-1111-111111111111'
+         and detail ->> 'billing_status_before' = 'beta'
+         and detail ->> 'billing_status_after' = 'beta'
+         and detail ->> 'billing_enforcement_before' = 'off'
+         and detail ->> 'billing_enforcement_after' = 'soft'
+     )
+  then
+    raise exception 'billing switch changed the plan or left beta';
+  end if;
+  perform public.admin_set_tenant_billing_mode(
+    '11111111-1111-1111-1111-111111111111',
+    'beta',
+    'off',
+    'ada',
+    'turn billing back off',
+    true
+  );
 end $$;

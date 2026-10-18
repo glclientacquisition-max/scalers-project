@@ -257,8 +257,10 @@ $$;
 -- A new row pins the latest published version of its package. An existing row
 -- does not. Changing its package keeps the same version number on the new
 -- package, so a business already on version 1 cannot land on a later price.
--- Changing the version on a beta business (status beta, or enforcement off)
--- is refused here as well as in the move function.
+-- A direct or system version change on a beta business (status beta, or
+-- enforcement off) is refused. An explicit admin move sets
+-- scalers.billing_admin_move and is allowed. It does not change beta or
+-- enforcement.
 create or replace function public.tenant_subscriptions_b_pin_version()
 returns trigger
 language plpgsql
@@ -270,6 +272,9 @@ declare
 begin
   if new.billing_status is null then
     new.billing_status := 'beta';
+  end if;
+  if current_setting('scalers.billing_admin_move', true) = '1' then
+    return new;
   end if;
   if tg_op = 'INSERT' then
     if new.package_version_id is null then
@@ -309,7 +314,7 @@ end;
 $$;
 
 comment on column public.tenant_subscriptions.package_version_id is
-  'Pinned on insert to the latest published version. An existing row keeps that version. A package change keeps the same version number. A beta business is not moved onto a later version.';
+  'Pinned on insert to the latest published version. An existing row keeps that version unless an admin confirms a move. A package change keeps the same version number. A system move skips a beta business.';
 
 -- ---------------------------------------------------------------------------
 -- 2. Second-admin approvals. Append-only.
@@ -1222,7 +1227,180 @@ begin
 end;
 $$;
 
+-- Applies one confirmed move. Caller has already decided this tenant is eligible.
+-- Sets the plan and the version, and copies minutes (and seats when that column
+-- exists) from the version. billing_status and billing_enforcement stay as they were.
+create or replace function public._apply_package_version_move(
+  p_version public.billing_package_versions,
+  p_tenant uuid,
+  p_actor text,
+  p_reason text,
+  p_source text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_sub public.tenant_subscriptions%rowtype;
+  v_from_sku text;
+  v_from_version integer;
+  v_to_sku text;
+  v_status_before text;
+  v_status_after text;
+  v_enf_before text;
+  v_enf_after text;
+  v_minutes_before integer;
+  v_minutes_after integer;
+begin
+  if not exists (select 1 from public.tenants where id = p_tenant) then
+    raise exception 'business not found';
+  end if;
+  v_sub := null;
+  select * into v_sub from public.tenant_subscriptions where tenant_id = p_tenant for update;
+  select sku into v_to_sku from public.billing_packages where id = p_version.package_id;
+  select minutes_included, billing_enforcement
+    into v_minutes_before, v_enf_before
+  from public.tenants where id = p_tenant;
+  if v_sub.tenant_id is not null then
+    v_status_before := v_sub.billing_status;
+    select p.sku, v.version into v_from_sku, v_from_version
+    from public.billing_packages p
+    join public.billing_package_versions v on v.id = v_sub.package_version_id
+    where p.id = v_sub.package_id;
+  end if;
+
+  perform set_config('scalers.billing_admin_move', '1', true);
+  perform set_config('scalers.billing_version_move', '1', true);
+  perform set_config('scalers.wallet_write', '1', true);
+  if v_sub.tenant_id is null then
+    insert into public.tenant_subscriptions (
+      tenant_id, package_id, package_version_id, status, billing_status
+    ) values (
+      p_tenant, p_version.package_id, p_version.id, 'active', 'beta'
+    );
+    v_status_before := null;
+  else
+    update public.tenant_subscriptions
+    set
+      package_id = p_version.package_id,
+      package_version_id = p_version.id,
+      updated_at = now()
+    where tenant_id = p_tenant;
+  end if;
+  update public.tenants
+  set minutes_included = p_version.minutes
+  where id = p_tenant;
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'tenants' and column_name = 'seat_included'
+  ) then
+    execute 'update public.tenants set seat_included = $1 where id = $2'
+      using p_version.seats, p_tenant;
+  end if;
+
+  select billing_status into v_status_after
+  from public.tenant_subscriptions where tenant_id = p_tenant;
+  select minutes_included, billing_enforcement
+    into v_minutes_after, v_enf_after
+  from public.tenants where id = p_tenant;
+  if v_sub.tenant_id is not null and (
+       v_status_after is distinct from v_status_before
+       or v_enf_after is distinct from v_enf_before
+     )
+  then
+    raise exception 'a version move must not change billing status or enforcement';
+  end if;
+  if v_enf_after is distinct from v_enf_before then
+    raise exception 'a version move must not change billing status or enforcement';
+  end if;
+
+  perform public._billing_audit(
+    btrim(p_actor),
+    'move_package_version',
+    p_tenant,
+    jsonb_build_object(
+      'reason', btrim(p_reason),
+      'source', p_source,
+      'confirm', p_source = 'admin',
+      'from_version_id', v_sub.package_version_id,
+      'from_version', v_from_version,
+      'from_sku', v_from_sku,
+      'to_version_id', p_version.id,
+      'to_version', p_version.version,
+      'to_sku', v_to_sku,
+      'billing_status_before', v_status_before,
+      'billing_status_after', v_status_after,
+      'billing_enforcement_before', v_enf_before,
+      'billing_enforcement_after', v_enf_after,
+      'minutes_before', v_minutes_before,
+      'minutes_after', v_minutes_after,
+      'moved_at', now()
+    )
+  );
+end;
+$$;
+
+drop function if exists public.admin_move_subscribers_to_package_version(uuid, uuid[], text, text);
+
 create or replace function public.admin_move_subscribers_to_package_version(
+  p_version_id uuid,
+  p_tenant_ids uuid[],
+  p_actor text,
+  p_reason text,
+  p_confirm boolean
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_version public.billing_package_versions%rowtype;
+  v_tenant uuid;
+  v_moved integer := 0;
+  v_invoices integer;
+begin
+  perform public._package_editor_open();
+  perform public._package_editor_actor(p_actor, p_reason);
+  if p_confirm is distinct from true then
+    raise exception 'confirm the move';
+  end if;
+  if p_tenant_ids is null or coalesce(array_length(p_tenant_ids, 1), 0) < 1 then
+    raise exception 'choose at least one business';
+  end if;
+  if array_length(p_tenant_ids, 1) > 200 then
+    raise exception 'too many businesses in one move';
+  end if;
+  select * into v_version from public.billing_package_versions where id = p_version_id;
+  if not found or v_version.status <> 'published' then
+    raise exception 'move businesses onto a published version';
+  end if;
+  select count(*) into v_invoices from public.invoices;
+  foreach v_tenant in array p_tenant_ids
+  loop
+    perform public._apply_package_version_move(v_version, v_tenant, p_actor, p_reason, 'admin');
+    v_moved := v_moved + 1;
+  end loop;
+  if (select count(*) from public.invoices) is distinct from v_invoices then
+    raise exception 'a version move must not create an invoice';
+  end if;
+  perform set_config('scalers.billing_admin_move', '0', true);
+  perform set_config('scalers.billing_version_move', '0', true);
+  perform set_config('scalers.wallet_write', '0', true);
+  return jsonb_build_object(
+    'version_id', p_version_id,
+    'moved', v_moved,
+    'version', public._package_version_json(p_version_id)
+  );
+end;
+$$;
+
+-- Renewals, trial expiry, and other jobs call this. A beta business, or one
+-- with billing enforcement off, is left where it is and the skip is audited.
+-- It never turns enforcement on.
+create or replace function public.system_move_subscribers_to_package_version(
   p_version_id uuid,
   p_tenant_ids uuid[],
   p_actor text,
@@ -1235,78 +1413,225 @@ set search_path = public
 as $$
 declare
   v_version public.billing_package_versions%rowtype;
-  v_sku text;
   v_tenant uuid;
   v_sub public.tenant_subscriptions%rowtype;
-  v_moved integer := 0;
   v_status text;
-  v_minutes integer;
   v_enforcement text;
+  v_from_sku text;
+  v_from_version integer;
+  v_to_sku text;
+  v_moved integer := 0;
+  v_skipped integer := 0;
   v_invoices integer;
 begin
-  perform public._package_editor_open();
-  perform public._package_editor_actor(p_actor, p_reason);
   if p_tenant_ids is null or coalesce(array_length(p_tenant_ids, 1), 0) < 1 then
     raise exception 'choose at least one business';
-  end if;
-  if array_length(p_tenant_ids, 1) > 200 then
-    raise exception 'too many businesses in one move';
   end if;
   select * into v_version from public.billing_package_versions where id = p_version_id;
   if not found or v_version.status <> 'published' then
     raise exception 'move businesses onto a published version';
   end if;
-  select sku into v_sku from public.billing_packages where id = v_version.package_id;
+  select sku into v_to_sku from public.billing_packages where id = v_version.package_id;
   select count(*) into v_invoices from public.invoices;
   foreach v_tenant in array p_tenant_ids
   loop
-    select * into v_sub from public.tenant_subscriptions where tenant_id = v_tenant for update;
-    if not found then
+    if not exists (select 1 from public.tenants where id = v_tenant) then
       raise exception 'business not found';
     end if;
-    if v_sub.package_id is distinct from v_version.package_id then
-      raise exception 'that business is not on this package';
-    end if;
+    v_sub := null;
+    select * into v_sub from public.tenant_subscriptions where tenant_id = v_tenant;
+    select billing_enforcement into v_enforcement from public.tenants where id = v_tenant;
     v_status := v_sub.billing_status;
-    select minutes_included, billing_enforcement into v_minutes, v_enforcement
-    from public.tenants where id = v_tenant;
-    if v_status = 'beta' or coalesce(v_enforcement, 'off') = 'off' then
-      raise exception 'a beta business is not moved onto a package version';
-    end if;
-    perform set_config('scalers.billing_version_move', '1', true);
-    update public.tenant_subscriptions
-    set package_version_id = p_version_id
-    where tenant_id = v_tenant;
-    if (select billing_status from public.tenant_subscriptions where tenant_id = v_tenant) is distinct from v_status
-       or (select minutes_included from public.tenants where id = v_tenant) is distinct from v_minutes
-       or (select billing_enforcement from public.tenants where id = v_tenant) is distinct from v_enforcement
+    if v_sub.tenant_id is null
+       or v_status = 'beta'
+       or coalesce(v_enforcement, 'off') = 'off'
     then
-      raise exception 'a version move must not change billing status or minutes';
+      select p.sku, v.version into v_from_sku, v_from_version
+      from public.billing_packages p
+      join public.billing_package_versions v on v.id = v_sub.package_version_id
+      where p.id = v_sub.package_id;
+      perform public._billing_audit(
+        coalesce(nullif(btrim(p_actor), ''), 'system'),
+        'skip_package_version',
+        v_tenant,
+        jsonb_build_object(
+          'reason', btrim(coalesce(p_reason, '')),
+          'source', 'system',
+          'skipped', case
+            when v_sub.tenant_id is null then 'no subscription'
+            when v_status = 'beta' then 'beta'
+            else 'enforcement off'
+          end,
+          'from_version_id', v_sub.package_version_id,
+          'from_version', v_from_version,
+          'from_sku', v_from_sku,
+          'to_version_id', v_version.id,
+          'to_version', v_version.version,
+          'to_sku', v_to_sku,
+          'billing_status_before', v_status,
+          'billing_status_after', v_status,
+          'billing_enforcement_before', v_enforcement,
+          'billing_enforcement_after', v_enforcement,
+          'moved_at', now()
+        )
+      );
+      v_skipped := v_skipped + 1;
+    else
+      perform public._apply_package_version_move(
+        v_version, v_tenant, coalesce(nullif(btrim(p_actor), ''), 'system'), p_reason, 'system'
+      );
+      v_moved := v_moved + 1;
     end if;
-    perform public._billing_audit(
-      btrim(p_actor),
-      'move_package_version',
-      v_tenant,
-      jsonb_build_object(
-        'reason', btrim(p_reason),
-        'package_sku', v_sku,
-        'version', v_version.version,
-        'version_id', p_version_id,
-        'before', jsonb_build_object('package_version_id', v_sub.package_version_id),
-        'after', jsonb_build_object('package_version_id', p_version_id)
-      )
-    );
-    v_moved := v_moved + 1;
   end loop;
   if (select count(*) from public.invoices) is distinct from v_invoices then
     raise exception 'a version move must not create an invoice';
   end if;
+  perform set_config('scalers.billing_admin_move', '0', true);
   perform set_config('scalers.billing_version_move', '0', true);
-  return jsonb_build_object(
-    'version_id', p_version_id,
-    'moved', v_moved,
-    'version', public._package_version_json(p_version_id)
+  perform set_config('scalers.wallet_write', '0', true);
+  return jsonb_build_object('version_id', p_version_id, 'moved', v_moved, 'skipped', v_skipped);
+end;
+$$;
+
+-- Beta and billing enforcement are separate from the plan. This is the only
+-- writer that turns enforcement on, and only when an admin confirms.
+create or replace function public.admin_set_tenant_billing_mode(
+  p_tenant_id uuid,
+  p_billing_status text,
+  p_enforcement text,
+  p_actor text,
+  p_reason text,
+  p_confirm boolean
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_before_status text;
+  v_after_status text;
+  v_before_enf text;
+  v_after_enf text;
+  v_version uuid;
+  v_minutes integer;
+  v_invoices integer;
+begin
+  perform public._package_editor_open();
+  perform public._package_editor_actor(p_actor, p_reason);
+  if p_confirm is distinct from true then
+    raise exception 'confirm the billing change';
+  end if;
+  if p_billing_status not in ('beta', 'active') then
+    raise exception 'billing status must be beta or active';
+  end if;
+  if p_enforcement not in ('off', 'soft', 'hard') then
+    raise exception 'billing enforcement must be off, soft, or hard';
+  end if;
+  if not exists (select 1 from public.tenants where id = p_tenant_id) then
+    raise exception 'business not found';
+  end if;
+  select billing_status, package_version_id into v_before_status, v_version
+  from public.tenant_subscriptions where tenant_id = p_tenant_id for update;
+  if v_before_status is null then
+    raise exception 'business not found';
+  end if;
+  if v_before_status not in ('beta', 'active') and v_before_status is distinct from p_billing_status then
+    raise exception 'billing status is not beta or active';
+  end if;
+  if p_billing_status = 'active' and p_enforcement = 'off' and v_before_status = 'beta' then
+    raise exception 'set billing mode before active';
+  end if;
+  select billing_enforcement, minutes_included into v_before_enf, v_minutes
+  from public.tenants where id = p_tenant_id;
+  select count(*) into v_invoices from public.invoices;
+
+  perform set_config('scalers.wallet_write', '1', true);
+  update public.tenants
+  set billing_enforcement = p_enforcement
+  where id = p_tenant_id;
+
+  if v_before_status is distinct from p_billing_status then
+    perform set_config('scalers.billing_transition', '1', true);
+    update public.tenant_subscriptions
+    set billing_status = p_billing_status, billing_status_changed_at = now()
+    where tenant_id = p_tenant_id;
+  end if;
+
+  select billing_status into v_after_status
+  from public.tenant_subscriptions where tenant_id = p_tenant_id;
+  select billing_enforcement into v_after_enf from public.tenants where id = p_tenant_id;
+  if (select package_version_id from public.tenant_subscriptions where tenant_id = p_tenant_id) is distinct from v_version
+     or (select minutes_included from public.tenants where id = p_tenant_id) is distinct from v_minutes
+     or (select count(*) from public.invoices) is distinct from v_invoices
+  then
+    raise exception 'a billing change must not change the plan';
+  end if;
+  perform public._billing_audit(
+    btrim(p_actor),
+    'set_tenant_billing_mode',
+    p_tenant_id,
+    jsonb_build_object(
+      'reason', btrim(p_reason),
+      'confirm', true,
+      'billing_status_before', v_before_status,
+      'billing_status_after', v_after_status,
+      'billing_enforcement_before', v_before_enf,
+      'billing_enforcement_after', v_after_enf,
+      'package_version_id', v_version,
+      'changed_at', now()
+    )
   );
+  perform set_config('scalers.wallet_write', '0', true);
+  perform set_config('scalers.billing_transition', '0', true);
+  return jsonb_build_object(
+    'tenant_id', p_tenant_id,
+    'billing_status', v_after_status,
+    'billing_enforcement', v_after_enf
+  );
+end;
+$$;
+
+create or replace function public.admin_set_new_signup_trial(
+  p_enabled boolean,
+  p_actor text,
+  p_reason text,
+  p_confirm boolean
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_before boolean;
+begin
+  perform public._package_editor_open();
+  perform public._package_editor_actor(p_actor, p_reason);
+  if p_confirm is distinct from true then
+    raise exception 'confirm the signup setting';
+  end if;
+  if p_enabled is null then
+    raise exception 'new signup trial must be on or off';
+  end if;
+  select new_signup_trial_enabled into v_before
+  from public.billing_lifecycle_settings where id = 1;
+  update public.billing_lifecycle_settings
+  set new_signup_trial_enabled = p_enabled, updated_at = now()
+  where id = 1;
+  perform public._billing_audit(
+    btrim(p_actor),
+    'set_new_signup_trial',
+    null,
+    jsonb_build_object(
+      'reason', btrim(p_reason),
+      'confirm', true,
+      'before', v_before,
+      'after', p_enabled,
+      'changed_at', now()
+    )
+  );
+  return jsonb_build_object('new_signup_trial_enabled', p_enabled);
 end;
 $$;
 
@@ -1651,7 +1976,11 @@ revoke all on function public.admin_approve_package_version(uuid, text, text) fr
 revoke all on function public.admin_publish_package_version(uuid, timestamptz, text, text) from public, anon, authenticated;
 revoke all on function public.admin_archive_package_version(uuid, text, text) from public, anon, authenticated;
 revoke all on function public.admin_discard_package_version_draft(uuid, text, text) from public, anon, authenticated;
-revoke all on function public.admin_move_subscribers_to_package_version(uuid, uuid[], text, text) from public, anon, authenticated;
+revoke all on function public._apply_package_version_move(public.billing_package_versions, uuid, text, text, text) from public, anon, authenticated;
+revoke all on function public.admin_move_subscribers_to_package_version(uuid, uuid[], text, text, boolean) from public, anon, authenticated;
+revoke all on function public.system_move_subscribers_to_package_version(uuid, uuid[], text, text) from public, anon, authenticated;
+revoke all on function public.admin_set_tenant_billing_mode(uuid, text, text, text, text, boolean) from public, anon, authenticated;
+revoke all on function public.admin_set_new_signup_trial(boolean, text, text, boolean) from public, anon, authenticated;
 revoke all on function public.admin_set_price_approval_threshold(numeric, text, text) from public, anon, authenticated;
 revoke all on function public.admin_export_package_version(uuid) from public, anon, authenticated;
 revoke all on function public.admin_import_promoted_package_version(jsonb, text, text) from public, anon, authenticated;
@@ -1675,7 +2004,11 @@ grant execute on function public.admin_approve_package_version(uuid, text, text)
 grant execute on function public.admin_publish_package_version(uuid, timestamptz, text, text) to service_role;
 grant execute on function public.admin_archive_package_version(uuid, text, text) to service_role;
 grant execute on function public.admin_discard_package_version_draft(uuid, text, text) to service_role;
-grant execute on function public.admin_move_subscribers_to_package_version(uuid, uuid[], text, text) to service_role;
+grant execute on function public._apply_package_version_move(public.billing_package_versions, uuid, text, text, text) to service_role;
+grant execute on function public.admin_move_subscribers_to_package_version(uuid, uuid[], text, text, boolean) to service_role;
+grant execute on function public.system_move_subscribers_to_package_version(uuid, uuid[], text, text) to service_role;
+grant execute on function public.admin_set_tenant_billing_mode(uuid, text, text, text, text, boolean) to service_role;
+grant execute on function public.admin_set_new_signup_trial(boolean, text, text, boolean) to service_role;
 grant execute on function public.admin_set_price_approval_threshold(numeric, text, text) to service_role;
 grant execute on function public.admin_export_package_version(uuid) to service_role;
 grant execute on function public.admin_import_promoted_package_version(jsonb, text, text) to service_role;

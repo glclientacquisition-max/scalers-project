@@ -155,11 +155,31 @@ describe("package version editor commands", () => {
     const sql = read("docs/supabase/package_version_editor.sql");
     assert.match(sql, /message credits are required/);
     assert.match(sql, /a beta business is not moved onto a package version/);
+    assert.match(sql, /confirm the move/);
+    assert.match(sql, /system_move_subscribers_to_package_version/);
+    assert.match(sql, /admin_set_tenant_billing_mode/);
     assert.match(sql, /a package change keeps the current version/);
     assert.match(sql, /new_signup_trial_enabled boolean not null default false/);
     assert.match(sql, /tenants_a_new_signup_trial/);
-    assert.doesNotMatch(sql, /billing_enforcement\s*=/);
     assert.doesNotMatch(sql, /insert into public\.invoices/i);
+    const move = mod.parseEditorCommand({
+      action: "move_subscribers",
+      version_id: "11111111-1111-1111-1111-111111111111",
+      tenant_ids: ["22222222-2222-2222-2222-222222222222"],
+      reason: "move a beta business",
+    });
+    assert.equal(move.ok, false);
+    const confirmed = mod.parseEditorCommand({
+      action: "move_subscribers",
+      version_id: "11111111-1111-1111-1111-111111111111",
+      tenant_ids: ["22222222-2222-2222-2222-222222222222"],
+      reason: "move a beta business",
+      confirm: true,
+    });
+    assert.equal(confirmed.ok, true);
+    if (confirmed.ok && confirmed.command.action === "move_subscribers") {
+      assert.equal(confirmed.command.confirm, true);
+    }
     assert.match(sql, /sms_kes = v_sms_burn/);
     assert.match(sql, /message_credits stays null/);
     assert.equal(mod.packageEditorWritesAllowed({
