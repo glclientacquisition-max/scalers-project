@@ -491,6 +491,55 @@ async function checkPackageUsageAlertsForCall(callId) {
   }
 }
 
+/** Package SMS usage for the 80% / 100% ops notice (tenants counter = sent + pending holds). */
+async function getTenantSmsUsage(tenantId) {
+  if (!tenantId) return null;
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('id, business_name, sms_included_units, sms_used_units, on_demand_usage_enabled, billing_enforcement')
+    .eq('id', tenantId)
+    .maybeSingle();
+  if (error) {
+    if (!/sms_included_units|sms_used_units|column|schema cache/i.test(error.message || '')) {
+      console.warn('[db] getTenantSmsUsage:', error.message);
+    }
+    return { error: error.message || 'lookup_failed' };
+  }
+  if (!data) return null;
+  let periodStart = null;
+  try {
+    const { data: sub, error: subErr } = await supabase
+      .from('tenant_subscriptions')
+      .select('current_period_start')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (!subErr) periodStart = sub?.current_period_start || null;
+  } catch {
+    periodStart = null;
+  }
+  return {
+    tenantId: data.id,
+    businessName: data.business_name || null,
+    smsIncluded: Number(data.sms_included_units) || 0,
+    smsUsed: Number(data.sms_used_units) || 0,
+    onDemand: Boolean(data.on_demand_usage_enabled),
+    enforcement: data.billing_enforcement || 'off',
+    periodStart,
+  };
+}
+
+/** Fire-and-forget after a tenant SMS reservation: 80% / 100% package SMS ops notice. */
+async function checkSmsUsageAlertsForTenant(tenantId) {
+  try {
+    const usage = await getTenantSmsUsage(tenantId);
+    if (!usage || usage.error) return;
+    const { maybeAlertSmsUsage } = require('./billing/smsUsageAlerts');
+    await maybeAlertSmsUsage(usage);
+  } catch (err) {
+    console.warn('[db] sms usage alert:', err?.message || err);
+  }
+}
+
 async function upsertCall({
   callSid,
   fromNumber,
@@ -2813,6 +2862,8 @@ module.exports = {
   chargeCallToWallet,
   packageInboundOpen,
   getTenantPackageUsage,
+  getTenantSmsUsage,
+  checkSmsUsageAlertsForTenant,
   hasPlatformOpsMarker,
   putPlatformOpsMarker,
   uploadRecordingBuffer,
