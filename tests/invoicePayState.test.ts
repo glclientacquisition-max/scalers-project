@@ -1,5 +1,5 @@
 /**
- * Invoice pay copy. Paid is a server status. No token, no Pay button. No /pay route.
+ * Invoice pay copy. Paid is a server status. The Desk never builds a pay URL; it follows the one the API returns.
  * Run: node --experimental-strip-types --test tests/invoicePayState.test.ts
  */
 import { describe, it } from "node:test";
@@ -49,7 +49,7 @@ describe("invoicePayState", () => {
     assert.equal(invoicePayState({ status: "draft" }).hidden, true);
   });
 
-  it("does not let the client set paid, and does not ship /pay", () => {
+  it("does not let the client set paid", () => {
     const check = fs.readFileSync(
       path.join(root, "dashboard/src/components/plan/PaymentCheck.tsx"),
       "utf8",
@@ -59,12 +59,18 @@ describe("invoicePayState", () => {
     const state = fs.readFileSync(path.join(root, "dashboard/src/lib/invoicePayState.ts"), "utf8");
     assert.doesNotMatch(state, /\/pay\/\$\{/);
     assert.doesNotMatch(state, /pay_token|payToken|credit_kes/);
-    assert.equal(fs.existsSync(path.join(root, "dashboard/src/app/pay")), false);
-    assert.equal(fs.existsSync(path.join(root, "dashboard/src/app/(desk)/pay")), false);
     const actions = fs.readFileSync(
       path.join(root, "dashboard/src/app/(desk)/settings/plan/planActions.ts"),
       "utf8",
     );
     assert.doesNotMatch(actions, /ok:\s*true/);
+  });
+
+  it("sends Pay to the pay URL the API returns, never one the Desk builds", () => {
+    const list = fs.readFileSync(path.join(root, "dashboard/src/components/plan/BillingHistory.tsx"), "utf8");
+    assert.match(list, /fetch\(item\.payLinkPath, \{ method: "POST"/);
+    assert.match(list, /const dest = payLinkDestination\(body\);/);
+    assert.match(list, /window\.location\.assign\(dest\.href\)/);
+    assert.doesNotMatch(list, /["'`]\/pay\//);
   });
 });
