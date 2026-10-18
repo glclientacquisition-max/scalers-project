@@ -67,6 +67,9 @@ Earlier merges since 9 Oct (see git log for detail):
 
 ### Ops changes (not code), 18 Oct
 
+- **Prod Desk ops mail env enabled** (11:00 EAT): added Production env `RESEND_API_KEY` (sensitive; same value as Railway Voice prod), `OPS_EMAIL_FROM=Scalers ops <platform@ops.scalers.co.ke>`, and `SCALERS_OPS_ALERT_EMAILS=yegonalvin20@gmail.com`. Why: Desk `opsMail.ts` was silently skipping every platform ops email (`ops_mail_unconfigured`) while still marking notices notified. Redeploy: `dpl_Hms48Q2MoZ9NKDecHQ56mD5rXtz6` (same commit `4c3d8932`, env-only). Rollback: remove those three Production env vars and redeploy the prior production deployment. Approved by Alvin in Ops-Billing chat at 10:46 EAT 18 Oct 2026. Test send to yegonalvin20@gmail.com via Resend from sandbox egress (box IP is CF-blocked to api.resend.com): message id `01a14e08-e91d-782d-b258-4d05f4091125`, HTTP 200.
+
+
 - **SMS counter reconcile applied on prod** (09:10 EAT): Esga 440 → 193, Aris 207 → 147, SBS 8 → 4 (counter set to sent units from the ledger). Pre-snapshot and rollback (not applied) are on the box: `/workspace/scalers/ops/2026-10-18_sms_counter_reconcile_pre.txt` and `/workspace/scalers/ops/2026-10-18_sms_counter_reconcile_rollback.sql`.
 - **SautiKit `events_url` fixed on prod** (*per team notes*, read back after the change). Aris pointed at a dead host (`scalers-production-production…`, typo), so every Aris event, including recording ready, got 404. Esga pointed at `/`, so its call events reached the incoming-call handler. Both now use `https://scalers-project-production.up.railway.app/voice/events`. Voice webhooks and number mapping unchanged (both still `/`).
 - **Staging Jirani +254709221537 not fixed.** It is in the separate staging workspace; Alvin sets `events_url` to `https://scalers-staging-staging.up.railway.app/voice/events` in the dashboard.
