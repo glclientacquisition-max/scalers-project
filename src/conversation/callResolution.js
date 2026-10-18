@@ -173,8 +173,17 @@ function resultOk(results, actions) {
  * Hangup persist intent: saved work outranks the last spoken turn.
  * Live NBA still uses last-turn intent so a follow-up FAQ can be answered.
  */
-function highWaterPrimaryIntent({ liveIntent, results = [] } = {}) {
-  if (resultOk(results, ['escalate'])) return 'human';
+function highWaterPrimaryIntent({ liveIntent, results = [], askedForPerson = false } = {}) {
+  if (resultOk(results, ['escalate'])) {
+    // BRAIN_CALL_FIXES_D199 (17 Oct audit): an escalate keeps what the caller
+    // asked ("price"); "human" only when they asked for a person.
+    const fixesD199 = require('./callFixesD199');
+    if (fixesD199.callFixesD199Enabled() && !askedForPerson) {
+      const asked = normalizePrimaryIntent(liveIntent);
+      return asked && asked !== 'general_enquiry' ? fixesD199.callerAskIntent(asked) : 'human';
+    }
+    return 'human';
+  }
 
   const visitOk = (Array.isArray(results) ? results : []).some(
     (row) =>
@@ -271,6 +280,40 @@ function ownerMustReturnCall(state) {
   return openSlot || !name;
 }
 
+/** Only enquiry or callback rows were written: no hold, order, or visit. */
+function ownerActionOnly(results) {
+  if (!require('./callFixesD199').callFixesD199Enabled()) return false;
+  const rows = (Array.isArray(results) ? results : []).filter(
+    (r) =>
+      (r.action === 'create_service_request' ||
+        r.action === 'create_appointment' ||
+        r.action === 'update_appointment') &&
+      (r.status === 'succeeded' || r.status === 'updated')
+  );
+  if (!rows.length) return false;
+  return rows.every((r) => {
+    if (r.action !== 'create_service_request') return false;
+    const type = String(r.requestType || r.value?.type || '').toLowerCase();
+    return type === 'enquiry' || type === 'callback';
+  });
+}
+
+/** Brain heard at least one caller line (or a goal). Without one, the need is unknown. */
+function callerLinesKnown(state) {
+  const lines = Array.isArray(state?.conversation?.answersReceived) ? state.conversation.answersReceived : [];
+  return lines.some((line) => String(line || '').trim()) || Boolean(String(state?.goal?.description || '').trim());
+}
+
+/** Any caller line on this call (or the goal) asked or wanted something. */
+function callerHadNeed(state) {
+  const { callerHadNeed: hadNeed } = require('./callFixesD199');
+  const lines = [
+    ...(Array.isArray(state?.conversation?.answersReceived) ? state.conversation.answersReceived : []),
+    state?.goal?.description || '',
+  ];
+  return hadNeed(lines);
+}
+
 function deriveCallResolution(opts = {}) {
   const state = opts.brainState || {};
   const results = hangupResults(state, opts.toolResults);
@@ -283,6 +326,7 @@ function deriveCallResolution(opts = {}) {
   const intent = highWaterPrimaryIntent({
     liveIntent: rawIntent,
     results,
+    askedForPerson: state.conversation?.askedForPerson === true,
   });
 
   const requestOk = results.some(
@@ -320,6 +364,12 @@ function deriveCallResolution(opts = {}) {
     note = escalateOk
       ? 'Escalated to the team'
       : 'Caller needed a human';
+  } else if (requestOk && ownerActionOnly(results)) {
+    // BRAIN_CALL_FIXES_D199 (17 Oct audit, HD_e6d2aca7886c): only an enquiry
+    // or callback row was written. The owner still has to answer or call
+    // back, so the call needs a person; the intent stays the caller's ask.
+    resolution = 'needs_human';
+    note = holdHonestyNote(results);
   } else if (requestOk) {
     // Receptionist finished the save. Needs you still owns Confirm / Hold Done.
     // Resolution stays an existing outcome; the note must not claim a closed book.
@@ -363,7 +413,17 @@ function deriveCallResolution(opts = {}) {
     // topic that was answered, not a prompt reason.
     const fixesD199 = require('./callFixesD199');
     if (fixesD199.callFixesD199Enabled()) {
-      note = fixesD199.answeredTopicNote(state) || note;
+      // 17 Oct audit: the next-best-action reason is prompt text for the
+      // model and is never the note (HD_a4b0a3d6f512, HD_e4573ff2f3ad).
+      note =
+        fixesD199.answeredTopicNote(state) ||
+        (intent ? `Answered ${intent}` : 'Caller question answered');
+      // Only greetings or a fragment (HD_a4b0a3d6f512 "Halo", HD_30a3970034a4
+      // "Okay, listen—"): nothing was asked, so nothing was resolved.
+      if (callerLinesKnown(state) && !callerHadNeed(state)) {
+        resolution = 'abandoned';
+        note = fixesD199.NO_NEED_NOTE;
+      }
     }
   } else if (turnCount <= 1) {
     resolution = 'abandoned';
@@ -374,6 +434,7 @@ function deriveCallResolution(opts = {}) {
   } else if (state.resolution?.status === 'unresolved') {
     resolution = 'unresolved';
     note = clean(state.resolution?.reason || 'Goal not completed', 200);
+    if (require('./callFixesD199').callFixesD199Enabled()) note = 'Goal not completed';
   }
 
   // VOICE_SPOKEN_OUTCOME (HD_cd0c01f28b05): with nothing written, "Answered"

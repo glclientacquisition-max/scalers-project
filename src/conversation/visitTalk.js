@@ -8,6 +8,11 @@ function looksLikeExistingVisitTalk(value) {
 }
 
 function looksLikePastBookingTalk(value) {
+  // BRAIN_CALL_FIXES_D199 (HD_7522f9a7ba06): "niliitisha", "nilibook",
+  // "what did I order" ask about this caller's own earlier request.
+  // eslint-disable-next-line global-require
+  const fixesD199 = require('./callFixesD199');
+  if (fixesD199.callFixesD199Enabled() && fixesD199.looksLikeOwnPastRequest(value)) return true;
   return /\b(last (time|visit|job|booking|appointment|hold|order)|previous (visit|booking|job|hold|order|ones?)|my previous|last time you (came|were)|ile mara|mara ya mwisho)\b/i.test(
     String(value || '')
   );
