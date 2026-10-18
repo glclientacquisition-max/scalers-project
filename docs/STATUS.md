@@ -97,6 +97,7 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 - **#737** (Desk Suspend/Archive/Purge): the functions are on staging and on production. Production recorded `admin_business_suspend_737`, `archive_tenant_billing_737` and `purge_archived_tenants_737` at 12:06 EAT on 18 Oct, before the 12:10 EAT merge. Staging has the functions. Those three names are not in staging's migration list. The purge schedule is not applied on either database.
 - Caller files memory v2 SQL (#673) is applied on **staging only** (carried from 14 Oct).
 - **#762** (Desk call setup per account): `tenants.call_setup` + `save_call_setup()` applied on staging 18 Oct 13:34 EAT; re-applied 14:19 EAT with the test phone fields (`test_from`, `test_started_at`) and the test-call check. Additive, 0 rows changed. **Also on prod since 18 Oct 14:59 EAT** (see Ops changes); the #762 code is not on prod yet.
+- **Billing data layer** (`docs/supabase/billing_data_layer.sql`) on staging only, 18 Oct. Live starter/growth/scale prices seeded as version 1, plus an inactive trial (20 minutes, 14 days). Existing subscriptions grandfathered; enforcement, line status, minutes, seconds, and the package clock were unchanged (checksum `e87e060fd7a7f217fbe3fd3325104853` before and after). `voicemail_until` is null on real rows. A synthetic probe rolled back: escalation allowed while trialing, a minute cap does not open voicemail, the trial-ended notice stayed pending, payment replay held, and a quarantined number could not be marked available. Re-applied the same day for Chief's review: expired quarantine can be assigned again, a sending notice older than 15 minutes can be claimed again, and a sent notice stays sent. That probe rolled back too (0 rows left; tenant row hash `ed560e5d36dec3cd055e5c37fe1045b7` unchanged; 6 businesses, 2 pool rows). Not on prod.
 
 ---
 
@@ -117,6 +118,10 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | #762 | Desk | Call setup per account (follow-up to #755): picks saved on the account (one-time copy from the browser); "Forwarding works" only when a call from the owner's named test phone arrives within 30 minutes of starting the test (other calls only show "Calls are reaching your assistant"); fix checklist when the test fails; Settings > Calls & forwarding; Overview note after 7 days without a call. | **Pending ship (18 Oct).** GO Alvin 14:55 EAT. Prod SQL applied 14:59 EAT (Ops changes). Code merges in the next Voice deploy slot, right after #758. Until then prod Desk keeps using browser storage. |
 
 **Ops-Billing (dated per the STATUS rule):**
+
+- **18 Oct 2026, in flight: #775** billing data layer (`cursor/billing-data-layer-cc4b`). Staging SQL only (section 3). No charges, no send-path change, no prod SQL.
+
+
 
 - **18 Oct 2026, SHIPPED: #748** (squash merge of branch `ops-billing/rollover-audit-sms-alerts`, head `7e8ecff5`; merge SHA `0f280504e0a706b6efc81b70a50bfbda48549eea`). Approved by Alvin, GO 14:11 EAT; Scalers Voice granted the prod slot 14:16 EAT. **#748 shipped after D199 (flipped 13:31, Railway 67413ba8)**, so Brain can separate the effects.
   - *What it changes:* (1) `package_period_rollover.sql`: a catch-up roll (jumps more than one period, or the new period already has usage) rebuilds `seconds_used` from `calls.package_seconds_applied` and `sms_used_units` from `notify_sms_billable` (+ pending holds) for the new period instead of zeroing; an on-time roll still zeroes. (2) New `on_demand_usage_audit.sql`: `set_tenant_on_demand_usage` writes an `ops_audit_log` row (`set_on_demand_usage`, actor, before, after). (3) `package_state_rules.sql`: assign/unassign Activity rows carry `detail.before` / `detail.after` `{package_sku, package_name, period, period_start, period_end, status}`; existing fields kept. (4) Voice: package SMS 80%/100% ops email (`src/billing/smsUsageAlerts.js`), deduped like the minute notices. (5) `docs/supabase/staging/dnd_usage_counter_reconcile.sql` (staging only).
@@ -191,7 +196,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **Admin:** Suspend/Archive shipped (#737, 18 Oct). Purge schedule not applied. Still to do: business edit / members / owner reset, package catalogue, billing period card, invoices.
 - **Settings / onboarding**: shipped (#656, #667, #672). GIGO P1/P2 follow-ups remain.
 - **UI/UX sweep** across Desk and Admin.
-- **Packages**: state rules and rollover shipped (#631, #650); package catalogue and invoices remain.
+- **Packages**: state rules and rollover shipped (#631, #650). Staging has the billing data layer (versions, `billing_status` NOT NULL, invoices, notices, `tenant_escalation_allowed`, number quarantine). A draft invoice cannot take a number. Notice sends stay off unless `BILLING_NOTICES_SEND=on`, and a reclaimed notice reuses its idempotency key. No charges and no prod SQL. Package catalogue UI and a pay action remain.
 - **Landing page** (#492 parked until its turn).
 - **Legal pack draft #653** (Terms, Privacy, DPA, call notice, beta terms). Parked; call notice ties to the recording decision.
 - **WhatsApp as the assistant doing work** (not just alerts).

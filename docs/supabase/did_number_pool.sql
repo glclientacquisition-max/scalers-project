@@ -2,6 +2,10 @@
 -- Run after multi_tenant_onboarding.sql (needs public.tenants).
 -- Then seed available numbers (see docs/PRODUCTION_DID_POOL.md).
 --
+-- After billing_data_layer.sql, do not re-apply assign_did_from_pool or
+-- assign_specific_did_to_tenant from this file. That script replaces them so
+-- a quarantined number is not assigned, and it must not be overwritten.
+--
 -- MVP: pre-buy DIDs in SautiKit console, point voice/events webhooks at Railway,
 -- insert them here as status='available'. Signup assigns the next free DID.
 
