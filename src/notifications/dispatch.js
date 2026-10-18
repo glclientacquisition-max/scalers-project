@@ -29,6 +29,7 @@ const {
   releaseInstanceFlight,
   sendReserved,
 } = require('./sendLedger');
+const { escalationHold, noteInboxOnly } = require('./escalationGate');
 
 function whatsAppSenderReady() {
   return isWhatsAppConfigured();
@@ -95,6 +96,18 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
   const gate = await beginInstanceSend(ledger, dests);
   if (!gate.ok) {
     return { channel: null, reason: gate.reason };
+  }
+  // #775: voicemails and call updates stay in the Inbox while the business is
+  // out of usage. Missing RPC or an error sends as today (escalationGate.js).
+  const hold = await escalationHold(ledger);
+  if (hold) {
+    releaseInstanceFlight(gate.key);
+    await noteInboxOnly(ledger, hold.reason);
+    console.warn(
+      `[notify] held for Inbox (${hold.reason}) kind=${(ledger && ledger.kind) || kind || 'unknown'}` +
+        (ledger?.callSid ? ` call=${ledger.callSid}` : '')
+    );
+    return { channel: null, reason: 'escalation_held', held: hold.reason };
   }
 
   // Reserve -> send -> settle under ONE per-person key. A failed or refused
