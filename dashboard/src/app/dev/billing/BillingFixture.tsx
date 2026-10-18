@@ -6,6 +6,7 @@ import { BillingNote } from "@/components/DeskBillingBanner";
 import { HomeUsageSection } from "@/components/HomeUsageSection";
 import { MembersPanel } from "@/components/MembersPanel";
 import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
+import { BillingHistory } from "@/components/plan/BillingHistory";
 import { BetaInvoicesEmpty, BetaPlanSummary, betaPlanRows } from "@/components/plan/BetaPlanSummary";
 import { OwnerInvoiceList } from "@/components/plan/OwnerInvoiceList";
 import { PlanPicker } from "@/components/plan/PlanPicker";
@@ -324,7 +325,7 @@ export function BillingFixture({ view }: { view: BillingPreview }) {
     case "billing-empty":
       return (
         <SettingsPlanFrame title="Billing" activePath="/settings/billing">
-          <OwnerInvoiceList invoices={[]} />
+          <BillingHistory fromPay={false} />
         </SettingsPlanFrame>
       );
     case "usage-paid":

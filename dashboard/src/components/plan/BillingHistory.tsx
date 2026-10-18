@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { OwnerInvoiceList } from "@/components/plan/OwnerInvoiceList";
 import { PaymentCheck } from "@/components/plan/PaymentCheck";
-import { mapBillingHistory, payLinkDestination, type BillingHistoryBody, type MappedInvoice } from "@/lib/billingHistory";
+import {
+  invoiceLoadOutcome,
+  mapBillingHistory,
+  payLinkDestination,
+  type BillingHistoryBody,
+  type MappedInvoice,
+} from "@/lib/billingHistory";
 
 export function BillingHistory({ fromPay }: { fromPay: boolean }) {
   const [items, setItems] = useState<MappedInvoice[] | null>(null);
@@ -16,8 +22,14 @@ export function BillingHistory({ fromPay }: { fromPay: boolean }) {
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/billing/invoices", { cache: "no-store" });
-      if (!res.ok) {
+      const outcome = invoiceLoadOutcome(res.status);
+      if (outcome === "error") {
         setFailed(true);
+        return;
+      }
+      if (outcome === "empty") {
+        setFailed(false);
+        setItems([]);
         return;
       }
       const body = (await res.json()) as BillingHistoryBody;

@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { kshCents, mapBillingHistory, nextPart, payLinkDestination, splitParts } from "../dashboard/src/lib/billingHistory.ts";
+import { invoiceLoadOutcome, kshCents, mapBillingHistory, nextPart, payLinkDestination, splitParts } from "../dashboard/src/lib/billingHistory.ts";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -113,6 +113,21 @@ describe("billing history", () => {
     const [row] = mapBillingHistory({ invoices: [{ ...open, status: "void", pay_link_path: null }] }, { fromPay: false });
     assert.equal(row?.statusLabel, "Void");
     assert.equal(row?.payLabel, null);
+  });
+
+  it("reads a missing invoice route as no invoices, and keeps the error for real failures", () => {
+    assert.equal(invoiceLoadOutcome(200), "list");
+    assert.equal(invoiceLoadOutcome(404), "empty");
+    assert.equal(invoiceLoadOutcome(500), "error");
+    assert.equal(invoiceLoadOutcome(502), "error");
+    assert.equal(invoiceLoadOutcome(401), "error");
+    assert.equal(invoiceLoadOutcome(null), "error");
+    assert.deepEqual(mapBillingHistory({ invoices: [] }, { fromPay: false }), []);
+    const history = fs.readFileSync(path.join(root, "dashboard/src/components/plan/BillingHistory.tsx"), "utf8");
+    assert.match(history, /invoiceLoadOutcome\(res\.status\)/);
+    assert.match(history, /outcome === "empty"[\s\S]*setItems\(\[\]\)/);
+    assert.match(history, /Could not load invoices\./);
+    assert.match(fs.readFileSync(path.join(root, "dashboard/src/components/plan/OwnerInvoiceList.tsx"), "utf8"), /title="No invoices yet"/);
   });
 
   it("follows only the pay path the POST returns", () => {

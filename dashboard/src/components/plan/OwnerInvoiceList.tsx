@@ -14,7 +14,7 @@ export type OwnerInvoiceListItem = {
 
 export function OwnerInvoiceList({ invoices }: { invoices: OwnerInvoiceListItem[] }) {
   if (invoices.length === 0) {
-    return <Empty title="No invoices" line="They show here when one is issued." />;
+    return <Empty title="No invoices yet" line="They show here when one is issued." />;
   }
   return (
     <ul className="mt-4 overflow-hidden rounded-2xl border border-hairline bg-surface">

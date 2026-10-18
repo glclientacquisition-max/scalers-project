@@ -125,6 +125,17 @@ export function mapBillingHistory(
     .map((item) => item.row);
 }
 
+/**
+ * What the Billing list shows for a GET /api/billing/invoices response.
+ * 404 means the invoice routes are not deployed yet, which reads as no invoices.
+ * Other failures (5xx, auth, network) keep the error and Retry.
+ */
+export function invoiceLoadOutcome(status: number | null): "list" | "empty" | "error" {
+  if (status == null) return "error";
+  if (status >= 200 && status < 300) return "list";
+  return status === 404 ? "empty" : "error";
+}
+
 /** Redirect only to the one-time path the pay-link POST returns. */
 export function payLinkDestination(body: { pay_path?: unknown; reason?: unknown } | null): {
   href?: string;
