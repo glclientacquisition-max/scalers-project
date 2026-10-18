@@ -129,11 +129,11 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 
 ## 5. Known broken / open issues
 
-- **Prod call recording is off.** `VOICE_STREAM_RECORD` is unset on prod, so prod has never recorded. Turning it on waits on Alvin's consent decision (spoken recording notice or not, Kenya Data Protection Act), then one env change and the `events_url` fix above (*per team notes*).
+- **Prod call recording is off.** `VOICE_STREAM_RECORD` is unset on prod (Railway variable list, 18 Oct), so prod has never recorded. Turning it on waits on Alvin's consent decision (spoken recording notice or not, Kenya Data Protection Act), then one env change.
 - **SautiKit media degradation, 17 Oct 21:52 EAT.** Calls `HD_ad18fd9088e0` and `HD_60e56c6acc88`: media socket opened 4.5–6 s after answer (about 1 s normally), inbound audio jitter about ±0.3 s then stalled, both sockets closed 1006, Completed webhooks 13–25 s late. Our server was idle. Ticket drafted; **Alvin to send.** These calls could not sign off #734 (*per team notes*).
 - **Aris redial 22:00–22:25 EAT, 17 Oct, never reached SautiKit.** No call in SautiKit's log or ours. Failure sits between the caller's carrier and SautiKit. Add to the ticket and ask for their ingress logs (*per team notes*).
 - **#734 not signed off.** On "Saa ngapi" the assistant gave opening hours instead of the time; fix is #741.
-- **Webhook signature checks off** on prod and staging (`SAUTIKIT_VALIDATE_WEBHOOKS` unset): unsigned POSTs get 200. SautiKit has two secrets and it is unclear which signs voice and `events_url` posts. Plan: #743 shadow mode on staging, then enforce on staging, then prod after a clean call (Alvin's GO, 18 Oct). Question for SautiKit is in the ticket.
+- **Webhook signature checks off** on prod and staging (`SAUTIKIT_VALIDATE_WEBHOOKS` unset; not in prod's Railway variable list, 18 Oct): unsigned POSTs get 200. SautiKit has two secrets and it is unclear which signs voice and `events_url` posts. Plan: #743 shadow mode on staging, then enforce on staging, then prod after a clean call (Alvin's GO, 18 Oct). Question for SautiKit is in the ticket.
 - **`/ws/media` is unguarded.** Anyone with a call ID could inject audio or start paid STT. Needs a per-call stream token (later).
 - **WhatsApp template (alert) sends fail with SautiKit 502.** Session text works. Alerts go by SMS.
 - **Staging Jirani `events_url`** still wrong (section 2, ops).
@@ -183,8 +183,8 @@ Public copy never mentions unbuilt features.
 ## 8. Rules
 
 - **Billing.** Packages + on-demand only; beta charging off; no prepaid wallet; no waive overage.
-- **Prod flags** (*per team notes*): `FACT_HASH_MODE` unset on prod; native functions off on Aris until speech-hold is staging-tested; `VOICE_STREAM_RECORD` unset until the consent decision.
-- **Deploys.** One deploy at a time. After each: check prod `/healthz` (SHA and `ok`), then an Aris check before the next one.
+- **Prod flags:** `FACT_HASH_MODE` and `VOICE_STREAM_RECORD` are unset on prod (Railway variable list, 18 Oct); keep `VOICE_STREAM_RECORD` unset until the consent decision. Native functions stay off on Aris until speech-hold is staging-tested (*per team notes*).
+- **Deploys.** One deploy at a time. After each: check prod `/healthz` (SHA and `ok`), then an Aris check before the next one. Prod Voice has **no watch paths** (Railway service config, 18 Oct; `railway.toml` sets none), so every merge to `main`, docs-only included, rebuilds and restarts prod Voice and drops live calls. Merge when no call is active.
 - **DID.** Never release, reassign or re-point **+254709221536** (Aris).
 - **Model.** Use an economical model by default; a bigger one only when the task needs it.
 - **Lanes.** Stay in your lane's owns paths ([`AGENTS.md`](../AGENTS.md), `.cursor/rules/*.mdc`). Schema, RPC, and auth changes go to Platform first.
