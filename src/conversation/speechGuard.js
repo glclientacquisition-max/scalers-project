@@ -326,12 +326,65 @@ function sentenceHasUnsaidClock(sentence, allowed) {
 
 // fileHoursFacts lives in trustedFacts.js with the other prompt-injected facts.
 
-/** An answer to an hours ask whose clocks and numbers are all the hours on file. */
-function sentenceStatesFileHours(sentence, hoursFacts) {
+// HD_49d726c3dc9b (prod Aris, 18 Oct 2026): "Uh, Tuesday at what time will
+// you be open?" missed the text check, so three correct file-hours answers
+// were dropped as unsaid_number. Brain's turn intent is the second signal,
+// and a bare "at what time?" right after an hours ask is the same ask.
+const TIME_FOLLOW_UP = /^(?:(?:uh|um|er|eh|like|so|and|okay|ok|sorry|but|yaani|sasa|at)\s+)*(?:(?:what|which)\s+time|saa\s+ngapi)\b/;
+const HOURS_WORD = /(?:open|close|closing|opening|hours|wazi|fungua|funga|masaa)/i;
+
+function isTimeFollowUp(text) {
+  const flat = String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z\s']/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return TIME_FOLLOW_UP.test(flat);
+}
+
+/**
+ * How the hours on file may be spoken this turn: 'ask' (the caller's own
+ * words are an hours ask), 'context' (Brain's intent is hours, or a bare
+ * "what time?" follows an hours ask), or '' (not an hours turn).
+ */
+function hoursAskInPlay(ctx = {}) {
+  const turns = (Array.isArray(ctx.callerTurns) ? ctx.callerTurns : []).map((t) => String(t || ''));
+  const last = turns[turns.length - 1] || '';
+  if (looksLikeHoursAsk(last)) return 'ask';
+  const intent = String(ctx.intent || ctx.state?.intent || '').toLowerCase();
+  if (intent === 'hours' || intent === 'hours_open' || intent === 'opening_hours') return 'context';
+  if (isTimeFollowUp(last) && turns.slice(-3, -1).some((t) => looksLikeHoursAsk(t))) {
+    return 'context';
+  }
+  return '';
+}
+
+/**
+ * The caller words the grounded hours line is built from. A context turn
+ * ("at what time?") reuses the recent hours ask, so its day still counts.
+ */
+function hoursAskText(ctx = {}, mode = '') {
+  const turns = (Array.isArray(ctx.callerTurns) ? ctx.callerTurns : []).map((t) => String(t || ''));
+  const last = turns[turns.length - 1] || '';
+  if (mode === 'ask') return last;
+  if (mode !== 'context') return last;
+  // Intent-only turns keep the model's file-hours sentence but never add a
+  // grounded hours line of their own (the dropped sentence may be anything).
+  return turns.slice(-3, -1).reverse().find((t) => looksLikeHoursAsk(t)) || '';
+}
+
+/**
+ * An answer to an hours ask whose clocks and numbers are all the hours on file.
+ * opts.needHoursSignal (context turns): the sentence must also carry a clock
+ * or an open/close word, so "We have 30 notebooks" never rides on the minute
+ * of a 9:30 opening.
+ */
+function sentenceStatesFileHours(sentence, hoursFacts, opts = {}) {
   if (!hoursFacts) return false;
   const clocks = clockKeys(sentence);
   const numbers = numbersIn(sentence);
   if (!clocks.size && !numbers.size) return false;
+  if (opts.needHoursSignal && !clocks.size && !HOURS_WORD.test(sentence)) return false;
   for (const key of clocks) if (!hoursFacts.clocks.has(key)) return false;
   for (const number of numbers) if (!hoursFacts.numbers.has(number)) return false;
   return true;
@@ -654,7 +707,9 @@ function guardSpokenReply(text, ctx = {}) {
   let droppedJob = false;
   let droppedUnboundFile = false;
   const lastCallerTurn = String((ctx.callerTurns || []).slice(-1)[0] || '');
-  const hoursFacts = looksLikeHoursAsk(lastCallerTurn) ? fileHoursFacts(ctx.profile || {}) : null;
+  const hoursMode = hoursAskInPlay(ctx);
+  const hoursFacts = hoursMode ? fileHoursFacts(ctx.profile || {}) : null;
+  const hoursOpts = { needHoursSignal: hoursMode === 'context' };
   const heldName = heldCallerName(ctx.state);
   let droppedNameAsk = false;
   const coverageGate = confirmedCoverageEnabled();
@@ -766,7 +821,7 @@ function guardSpokenReply(text, ctx = {}) {
       continue;
     }
     if (
-      !sentenceStatesFileHours(sentence, hoursFacts) &&
+      !sentenceStatesFileHours(sentence, hoursFacts, hoursOpts) &&
       (sentenceHasUnsaidClock(sentence, clocks) || sentenceHasNewNumber(sentence, known)) &&
       !factKind
     ) {
@@ -840,7 +895,7 @@ function guardSpokenReply(text, ctx = {}) {
   // (hours on file do not authorize a model clock, #489). Speak the file's
   // hours line instead of "not on file" or a bare "Okay." (HD_ee813bcf6248).
   const groundedHours =
-    !groundedPrice && droppedNumber ? hoursAskLine(lastCallerTurn, ctx.profile || {}, ctx.language) : '';
+    !groundedPrice && droppedNumber ? hoursAskLine(hoursAskText(ctx, hoursMode), ctx.profile || {}, ctx.language) : '';
   if (groundedHours) {
     out = !out || NOT_ON_FILE.test(out) ? groundedHours : `${groundedHours} ${out}`;
   }
@@ -899,6 +954,7 @@ module.exports = {
   narratesInternalAction,
   logSpokenFilterDrop,
   guardSpokenReply,
+  hoursAskInPlay,
   groundFilePriceLine,
   dropSpeechSlop,
   sentenceIsSpeechSlop,
