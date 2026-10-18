@@ -93,9 +93,12 @@ describe('Tool outcome drops the redundant "Okay" after an ack', () => {
 describe('server.js wiring', () => {
   it('speakToolHold checks the same-turn ack before speaking a hold', () => {
     const start = SERVER.indexOf('async function speakToolHold(');
-    const body = SERVER.slice(start, start + 900);
+    const body = SERVER.slice(start, start + 1800);
     assert.match(body, /thinkingAckTurn === activeTurnTiming/);
-    assert.match(body, /holdSpeaksAfterAck\(/);
+    // planHoldTiming wraps holdSpeaksAfterAck; a recent ack defers the hold
+    // until the tool has run TOOL_HOLD_SLOW_MS instead of dropping it.
+    assert.match(body, /planHoldTiming\(/);
+    assert.match(body, /toolStillRunningAfter\(spoken\.toolSettled/);
     assert.match(body, /tool hold skipped after thinking-ack/);
   });
 

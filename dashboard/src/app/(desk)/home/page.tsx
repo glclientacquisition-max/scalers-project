@@ -44,13 +44,18 @@ import { LivePing } from "@/components/ui/deskRow";
 import { Stamp } from "@/components/ui/Stamp";
 import { HomeCapture } from "@/components/HomeCapture";
 import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
+import { HomeCallSetupCard } from "@/components/HomeCallSetupCard";
+import { toLocal07 } from "@/lib/callForwarding";
 import { getTenantCompletenessScore, getTenantHoldGate } from "@/lib/deskProvenance";
+import { captureFilledDomains } from "@/lib/completenessStub";
 import { homeStakes, shopStakes } from "@/lib/baStakes";
 import { capabilityGates } from "@/lib/capabilityGates";
 import { CapabilityGatesPanel } from "@/components/CapabilityGatesPanel";
 import { parseHoursSchedule } from "@/lib/hoursSchedule";
 import { isBetaBilling } from "@/lib/wallet";
 import { loadOwnerPackageMeter, remainingCount } from "@/lib/packageCatalog";
+import { loadOwnerBillingView } from "@/lib/billingStateLoad";
+import { coverageDisplayList } from "@/lib/coverageAreas";
 import { homeMinuteStatus } from "@/lib/usageCap";
 import { createDeskTimer } from "@/lib/deskTiming";
 import { DeskPageGate } from "@/components/DeskPageGate";
@@ -104,14 +109,14 @@ async function HomeOverviewBody() {
   const vertical = tenant.vertical;
   const copy = nicheCopy(vertical);
 
-  const [todayRes, inbox, pack, score, hold, insights] = await Promise.all([
+  const [todayRes, inbox, billing, score, hold, insights] = await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenant.id)
       .gte("created_at", dayStart),
     loadCachedInboxItems(tenant.id, vertical),
-    loadOwnerPackageMeter(tenant.id),
+    loadOwnerBillingView(tenant.id),
     getTenantCompletenessScore(tenant.id),
     getTenantHoldGate(tenant.id),
     loadCallInsights(client, tenant.id, 30, tenant.faqs),
@@ -121,16 +126,26 @@ async function HomeOverviewBody() {
   if (inbox.error) {
     return <DeskLoadError>Could not load Overview.</DeskLoadError>;
   }
-  const minutesLeft = remainingCount(pack.minutesIncluded, pack.minutesUsed);
-  const packLabel = pack.packageName
-    ? `${pack.packageName}${pack.period ? ` / ${pack.period}` : ""}`
-    : "No package";
-  const minuteStatus = homeMinuteStatus({
-    isBeta,
-    onDemand: Boolean(tenant.on_demand_usage_enabled),
-    minutesIncluded: pack.minutesIncluded,
-    minutesLeft,
-  });
+  // tenant_billing_state first (Ops-Billing #650); tenant counters only before it exists.
+  const pack = billing ? null : await loadOwnerPackageMeter(tenant.id);
+  const minutesIncluded = billing ? billing.minutesIncluded : pack?.minutesIncluded ?? 0;
+  const minutesLeft = billing
+    ? billing.minutesLeft
+    : remainingCount(pack?.minutesIncluded ?? 0, pack?.minutesUsed ?? 0);
+  const packLabel = billing
+    ? billing.shortLabel
+    : pack?.packageName
+      ? `${pack.packageName}${pack.period ? ` / ${pack.period}` : ""}`
+      : "No package";
+  const minuteStatus = billing?.lowNotice
+    ? null
+    : homeMinuteStatus({
+        isBeta,
+        onDemand: Boolean(tenant.on_demand_usage_enabled),
+        minutesIncluded,
+        minutesLeft,
+      });
+  const lowNotice = billing?.lowNotice || null;
   const digest = inbox.callsTruncated
     ? null
     : homeDigestLine(inbox.items, dayStart, vertical);
@@ -189,10 +204,15 @@ async function HomeOverviewBody() {
             label: copy.jobFilter,
             href: callsHref({ purpose: "job" }),
             count: work.toConfirm,
+            // Count is every open visit (requested + booked), the same 22 as the
+            // Inbox Visits tab. The part still to confirm is named so it matches
+            // the briefing ("21 to confirm"): "22 · 21 to confirm".
             unit:
               work.requested > 0 && work.requested === work.toConfirm
                 ? homeQueueUnit(work.toConfirm, copy.jobUnit, jobSample)
-                : "",
+                : work.requested > 0
+                  ? `· ${work.requested} ${copy.jobUnit}`
+                  : "",
           },
         ]
       : []),
@@ -341,7 +361,7 @@ async function HomeOverviewBody() {
                       message={followUpWhatsAppMessage({
                         businessName: business,
                         name: nextReturn.callerName,
-                        reason: nextReturnReason,
+                        topic: nextReturn.lead?.topic,
                       })}
                       variant="icon"
                       callId={nextReturn.callId}
@@ -382,7 +402,7 @@ async function HomeOverviewBody() {
                     message={followUpWhatsAppMessage({
                       businessName: business,
                       name: nextReturn.callerName,
-                      reason: nextReturnReason,
+                      topic: nextReturn.lead?.topic,
                     })}
                     variant="ghost"
                     label="Reply on WhatsApp"
@@ -394,6 +414,7 @@ async function HomeOverviewBody() {
             </>
           ) : null}
         </section>
+        <HomeCallSetupCard tenantId={tenant.id} numberReady={toLocal07(tenant.sautikit_virtual_number) !== null} />
         <DataChecksCard checks={dataChecksFor(tenant)} />
         {insights ? (
           <CallInsights insights={insights} />
@@ -403,6 +424,7 @@ async function HomeOverviewBody() {
             tenantId={tenant.id}
             vertical={vertical}
             score={score}
+            filled={captureFilledDomains(tenant)}
             stakes={
               vertical === "home_services"
                 ? homeStakes({
@@ -418,9 +440,8 @@ async function HomeOverviewBody() {
                       };
                     }),
                     // Areas served only: where the business is located is not where it goes.
-                    coverage: [...(tenant.business_policies?.coverage_areas || [])]
-                      .filter(Boolean)
-                      .join(", "),
+                    // Directory ids ("county:nairobi") become place names; never show the raw id.
+                    coverage: coverageDisplayList(tenant.business_policies?.coverage_areas),
                     bookingSlotsAllowed: Boolean(slotsGate?.allowed),
                   })
                 : shopStakes({
@@ -479,7 +500,10 @@ async function HomeOverviewBody() {
               {minuteStatus ? (
                 <p className="mt-0.5 text-meta font-medium text-ink">{minuteStatus}</p>
               ) : null}
-              {minuteStatus && !isBeta ? (
+              {lowNotice ? (
+                <p role="status" className="mt-1 text-meta font-medium text-warn">{lowNotice}</p>
+              ) : null}
+              {lowNotice || (minuteStatus && !isBeta) ? (
                 <Link
                   href="/wallet"
                   className={`mt-1 inline-flex min-h-11 items-center text-body font-medium text-warn hover:underline ${focusRingVisible}`}

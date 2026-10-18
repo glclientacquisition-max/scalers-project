@@ -1,0 +1,543 @@
+{
+  "schema": "scalers.voice.fixture",
+  "schemaVersion": 1,
+  "callId": "HD_95e6745c0df1",
+  "tenantId": "24ca3d5e-db5c-4cc3-b745-a87a68cf3ce0",
+  "businessName": "Aris Kenya",
+  "agentName": "Lynn",
+  "vertical": "retail",
+  "callerName": "Alvin Yegon",
+  "nameOnFile": false,
+  "hoursSchedule": {
+    "days": {
+      "mon": {
+        "open": "09:30",
+        "close": "18:00"
+      },
+      "tue": {
+        "open": "09:30",
+        "close": "18:00"
+      },
+      "wed": {
+        "open": "09:30",
+        "close": "18:00"
+      },
+      "thu": {
+        "open": "09:30",
+        "close": "18:00"
+      },
+      "fri": {
+        "open": "09:30",
+        "close": "18:00"
+      },
+      "sat": null,
+      "sun": null
+    },
+    "timezone": "Africa/Nairobi"
+  },
+  "promptClock": "2026-10-17T12:51:18.305Z",
+  "source": "Prod voice_turn_traces (fjxcdccgyhnvnnlnovcl, read-only), call b9343819-04c1-44a1-a39d-927214352d8a, 17 Oct 2026 15:51 EAT, release main 74eff40e. promptClock is the call start, when the prompt's CURRENT TIME IN KENYA line was built (3:51 PM). turn.at is the trace time of each caller final. prod.tts / prod.polish are what prod spoke and what the speech guard removed.",
+  "turns": [
+    {
+      "turn": 1,
+      "at": "2026-10-17T12:51:34.972Z",
+      "caller": "Ah, nilikuwa nataka ku- ku- kumake an order, sijui kama mnaweza kunisaidia nyinyi.",
+      "soniox": "sw",
+      "canned": {
+        "path": "file_name_ask",
+        "text": "Je, naongea na Alvin Yegon?"
+      },
+      "outcome": "early_return",
+      "prod": {
+        "tts": [
+          "Je, naongea na Alvin Yegon?"
+        ],
+        "polish": []
+      }
+    },
+    {
+      "turn": 2,
+      "at": "2026-10-17T12:51:43.457Z",
+      "caller": "Yeah, you're speaking with Tajiri. This is Alvin Yegon.",
+      "soniox": "en",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Karibu Alvin. Which item would you like to order today?"
+      },
+      "filler": "Mm-hmm.",
+      "outcome": "ok",
+      "prod": {
+        "tts": [
+          "Karibu Alvin.",
+          "Which item would you like to order today?"
+        ],
+        "polish": []
+      }
+    },
+    {
+      "turn": 3,
+      "at": "2026-10-17T12:51:52.667Z",
+      "caller": "Tuli- tuliachia wapi?",
+      "soniox": "sw",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Tulikuwa na callback request kuhusu order na inquiry yako. Je, ungependa tuweke order gani leo?"
+      },
+      "filler": "Sawa.",
+      "outcome": "ok",
+      "prod": {
+        "tts": [
+          "Sina hiyo kwenye orodha ya sasa. Naweza kuhifadhi ombi la quotation badala yake."
+        ],
+        "polish": []
+      }
+    },
+    {
+      "turn": 4,
+      "at": "2026-10-17T12:52:04.313Z",
+      "caller": "Like, tuliachia wapi na wewe?",
+      "soniox": "en",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "###TOOL###\n{\"save_caller_info\":{\"name\":\"Alvin Yegon\",\"reason\":\"Checking previous order and inquiry status\"}}\n###ENDTOOL###\nTulikuwa tumeandika callback request kuhusu order na inquiry yako ya zamani. Ungependa kuitisha nini leo ndio nikuwekee order?"
+      },
+      "filler": "Alright.",
+      "outcome": "stream_fallback_full",
+      "prod": {
+        "tts": [
+          "Tulikuwa tumeandika callback request kuhusu order na inquiry yako ya zamani. Ungependa kuitisha nini leo ndio nikuwekee order?"
+        ],
+        "polish": []
+      }
+    },
+    {
+      "turn": 5,
+      "at": "2026-10-17T12:52:20.748Z",
+      "caller": "Ah, si tufanye aje?",
+      "soniox": "sw",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Unaiweza kuniambia tu bidhaa unayotaka kuagiza, kisha nitaiweka kwenye mfumo mara moja. Unahitaji nini leo?"
+      },
+      "filler": "Sawa.",
+      "outcome": "barge_in",
+      "prod": {
+        "tts": [
+          "Unaiweza kuniambia tu bidhaa unayotaka kuagiza, kisha nitaiweka kwenye mfumo mara moja.",
+          "Unahitaji nini leo?"
+        ],
+        "polish": []
+      }
+    },
+    {
+      "turn": 6,
+      "at": "2026-10-17T12:52:24.824Z",
+      "caller": "Tuangalie",
+      "soniox": "sw",
+      "filler": "Mm.",
+      "outcome": "barge_in",
+      "prod": {
+        "tts": [],
+        "polish": []
+      }
+    },
+    {
+      "turn": 7,
+      "at": "2026-10-17T12:52:29.260Z",
+      "caller": "Tuangalie, tuangalie ile vitu tunazo za engineering.",
+      "soniox": "sw",
+      "filler": "Mm.",
+      "outcome": "barge_in",
+      "prod": {
+        "tts": [],
+        "polish": []
+      }
+    },
+    {
+      "turn": 8,
+      "at": "2026-10-17T12:52:30.235Z",
+      "caller": "Tafadhali.",
+      "soniox": "sw",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Tuko na Big engineering drawing set, 35cm set squares, architectural scale ruler, na adjustable set square. Ungependa kuagiza gani kati ya hizi?"
+      },
+      "filler": "Mm.",
+      "outcome": "ok",
+      "prod": {
+        "tts": [
+          "Tuko na Big engineering drawing set, 35cm set squares, architectural scale ruler, na adjustable set square.",
+          "Ungependa kuagiza gani kati ya hizi?"
+        ],
+        "polish": []
+      }
+    },
+    {
+      "turn": 9,
+      "at": "2026-10-17T12:52:48.603Z",
+      "caller": "an- ani.",
+      "soniox": "en",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sijakusikia vizuri Alvin, ungependa kuagiza bidhaa gani ya engineering?"
+      },
+      "filler": "Mm-hmm.",
+      "outcome": "ok",
+      "prod": {
+        "tts": [
+          "Sijakusikia vizuri Alvin, ungependa kuagiza bidhaa gani ya engineering?"
+        ],
+        "polish": []
+      }
+    },
+    {
+      "turn": 10,
+      "at": "2026-10-17T12:52:59.801Z",
+      "caller": "Like, ni— do you know, like, the prices?",
+      "soniox": "en",
+      "filler": "Alright.",
+      "outcome": "barge_in",
+      "prod": {
+        "tts": [],
+        "polish": []
+      }
+    },
+    {
+      "turn": 11,
+      "at": "2026-10-17T12:53:01.428Z",
+      "caller": "Do you have the prices here?",
+      "soniox": "en",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Sina bei kamili hapa kwa mfumo sasa hivi. Nikuandikie enquiry kisha timu yetu ikupigie simu na bei kamili?"
+      },
+      "filler": "Alright.",
+      "outcome": "ok",
+      "prod": {
+        "tts": [
+          "Sina bei kamili hapa kwa mfumo sasa hivi.",
+          "Nikuandikie enquiry kisha timu yetu ikupigie simu na bei kamili?"
+        ],
+        "polish": []
+      }
+    },
+    {
+      "turn": 12,
+      "at": "2026-10-17T12:53:16.348Z",
+      "caller": "Ah, parachon, bwana.",
+      "soniox": "sw",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "###TOOL###\n{\"create_service_request\":{\"type\":\"enquiry\",\"name\":\"Alvin Yegon\",\"item\":\"Engineering items price check\",\"notes\":\"Caller asking for engineering items price list\"}}\n###ENDTOOL###"
+      },
+      "filler": "Mm.",
+      "outcome": "speech_repair",
+      "prod": {
+        "tts": [
+          "Sawa, nimehifadhi ombi lako."
+        ],
+        "polish": []
+      }
+    },
+    {
+      "turn": 13,
+      "at": "2026-10-17T12:53:25.811Z",
+      "caller": "Sawa.",
+      "soniox": "sw",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Asante sana Alvin. Mfumo wetu umeshahifadhi ombi lako. Siku njema!"
+      },
+      "filler": "Mm.",
+      "outcome": "barge_in",
+      "prod": {
+        "tts": [
+          "Asante sana Alvin.",
+          "Mfumo wetu umeshahifadhi ombi lako.",
+          "Siku njema."
+        ],
+        "polish": []
+      }
+    },
+    {
+      "turn": 14,
+      "at": "2026-10-17T12:53:29.273Z",
+      "caller": "Si nili- nilikuwa naongea. Eh?",
+      "soniox": "sw",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Pole sana Alvin, niko hapa. Tuliachia hapo kwa bei za vitu za engineering, unasemaje kuhusu hizo?"
+      },
+      "filler": "Sawa.",
+      "outcome": "ok",
+      "prod": {
+        "tts": [
+          "Pole sana Alvin, niko hapa.",
+          "Tuliachia hapo kwa bei za vitu za engineering, unasemaje kuhusu hizo?"
+        ],
+        "polish": []
+      }
+    },
+    {
+      "turn": 15,
+      "at": "2026-10-17T12:53:44.041Z",
+      "caller": "Ah, si ni sawa tu basi, si they're just.",
+      "soniox": "sw",
+      "filler": "Mm.",
+      "outcome": "barge_in",
+      "prod": {
+        "tts": [],
+        "polish": []
+      }
+    },
+    {
+      "turn": 16,
+      "at": "2026-10-17T12:53:46.200Z",
+      "caller": "Call me, ama? Si watanipikia?",
+      "soniox": "sw",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Ndiyo Alvin, timu yetu itakupigia simu hivi karibuni kukupa bei kamili. Shukrani na uwe na siku njema!"
+      },
+      "filler": "Sawa.",
+      "outcome": "barge_in",
+      "prod": {
+        "tts": [
+          "Shukrani na uwe na siku njema."
+        ],
+        "polish": [
+          {
+            "before": "Ndiyo Alvin, timu yetu itakupigia simu hivi karibuni kukupa bei kamili.",
+            "after": "",
+            "reason": "unbound_place"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 17,
+      "at": "2026-10-17T12:53:49.001Z",
+      "caller": "Ama? Ama they'll text me about— about it?",
+      "soniox": "en",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Ndiyo Alvin, wanaweza kukupigia au kukutumia ujumbe kwa simu yako. Kuna kitu kingine ningekusaidia nacho?"
+      },
+      "filler": "Alright.",
+      "outcome": "ok",
+      "prod": {
+        "tts": [
+          "Ndiyo Alvin, wanaweza kukupigia au kukutumia ujumbe kwa simu yako.",
+          "Kuna kitu kingine ningekusaidia nacho?"
+        ],
+        "polish": []
+      }
+    },
+    {
+      "turn": 18,
+      "at": "2026-10-17T12:54:03.660Z",
+      "caller": "Ah, I'm so excited and",
+      "soniox": null,
+      "outcome": "hold",
+      "prod": {
+        "tts": [],
+        "polish": []
+      }
+    },
+    {
+      "turn": 19,
+      "at": "2026-10-17T12:54:06.831Z",
+      "caller": "Ah, I'm so excited and Receive their call. Let them call me and I'll be able to talk to them, right?",
+      "soniox": "en",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "###TOOL###\n{\"escalate\":{\"teammate\":\"Alvin Kiprotich Yegon\",\"name\":\"Alvin Yegon\",\"reason\":\"Caller wants a direct call back from the team regarding engineering item prices\"}}\n###ENDTOOL###"
+      },
+      "filler": "Alright.",
+      "outcome": "ok",
+      "prod": {
+        "tts": [
+          "They'll call you back."
+        ],
+        "polish": []
+      }
+    },
+    {
+      "turn": 20,
+      "at": "2026-10-17T12:54:13.669Z",
+      "caller": "Ah, goodbye.",
+      "soniox": "sw",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Kwaheri Alvin, uwe na siku njema!"
+      },
+      "filler": "Mm.",
+      "outcome": "ok",
+      "prod": {
+        "tts": [
+          "Kwaheri Alvin, uwe na siku njema."
+        ],
+        "polish": []
+      }
+    },
+    {
+      "turn": 21,
+      "at": "2026-10-17T12:54:19.072Z",
+      "caller": "And it's a ngapi time?",
+      "soniox": "en",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Saa hivi ni saa tisa na dakika hamsini na moja alasiri. Kuna kitu kingine, Alvin?"
+      },
+      "filler": "Alright.",
+      "outcome": "barge_in",
+      "prod": {
+        "tts": [
+          "I don't have that on file. I can note it for the team.",
+          "Kuna kitu kingine, Alvin?"
+        ],
+        "polish": [
+          {
+            "before": "Saa hivi ni saa tisa na dakika hamsini na moja alasiri.",
+            "after": "I don't have that on file. I can note it for the team.",
+            "reason": "unsaid_number"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 22,
+      "at": "2026-10-17T12:54:22.070Z",
+      "caller": "What's the time?",
+      "soniox": "en",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Saahivi ni saa tisa na dakika hamsini na moja alasiri. Kuna kitu kingine, Alvin?"
+      },
+      "filler": "Alright.",
+      "outcome": "ok",
+      "prod": {
+        "tts": [
+          "Kuna kitu kingine, Alvin?"
+        ],
+        "polish": [
+          {
+            "before": "Saahivi ni saa tisa na dakika hamsini na moja alasiri.",
+            "after": "",
+            "reason": "unsaid_number"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 23,
+      "at": "2026-10-17T12:54:27.946Z",
+      "caller": "What's the time?",
+      "soniox": "en",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Saa hivi ni saa tisa na dakika hamsini na moja alasiri (3:51 PM EAT). Kuna kitu kingine nikutengenezee, Alvin?"
+      },
+      "filler": "Alright.",
+      "outcome": "ok",
+      "prod": {
+        "tts": [
+          "Kuna kitu kingine nikutengenezee, Alvin?"
+        ],
+        "polish": [
+          {
+            "before": "Saa hivi ni saa tisa na dakika hamsini na moja alasiri (3:51 PM EAT).",
+            "after": "",
+            "reason": "unsaid_number"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 24,
+      "at": "2026-10-17T12:54:36.467Z",
+      "caller": "And what's the time?",
+      "soniox": "en",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Ni saa tisa na dakika hamsini na moja alasiri (3:51 PM). Kuna jingine, Alvin?"
+      },
+      "filler": "Alright.",
+      "outcome": "ok",
+      "prod": {
+        "tts": [
+          "Kuna jingine, Alvin?"
+        ],
+        "polish": [
+          {
+            "before": "Ni saa tisa na dakika hamsini na moja alasiri (3:51 PM).",
+            "after": "",
+            "reason": "unsaid_number"
+          }
+        ]
+      }
+    },
+    {
+      "turn": 25,
+      "at": "2026-10-17T12:54:45.842Z",
+      "caller": "I just want to know the time.",
+      "soniox": "en",
+      "model": {
+        "provider": "gemini",
+        "model": "recorded",
+        "promptId": "voice.system",
+        "outputText": "Ni saa tisa na dakika hamsini na moja alasiri (3:51 PM). Uwe na siku njema, Alvin!"
+      },
+      "filler": "Alright.",
+      "outcome": "ok",
+      "prod": {
+        "tts": [
+          "Uwe na siku njema, Alvin."
+        ],
+        "polish": [
+          {
+            "before": "Ni saa tisa na dakika hamsini na moja alasiri (3:51 PM).",
+            "after": "",
+            "reason": "unsaid_number"
+          }
+        ]
+      }
+    }
+  ]
+}

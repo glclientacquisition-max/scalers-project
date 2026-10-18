@@ -438,7 +438,7 @@ describe("business settings craft", () => {
     );
     assert.match(catalogScan, /settingsActionClass/);
     assert.doesNotMatch(catalogScan, /settingsPrimaryButtonClass/);
-    assert.match(form, /Saves live - no sticky Save/);
+    assert.match(form, /Changes save as you go/);
     assert.doesNotMatch(form, /panel === "pronunciation" \? undefined/);
     assert.match(coach, /btnPrimary|<Button\b/); // kit Button replaced the one-off class
     assert.match(coach, /fixHasUsePrimary/);

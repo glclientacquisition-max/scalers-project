@@ -136,3 +136,20 @@ export function inboxPileHref(
   }
   return `/calls?${q.toString()}`;
 }
+
+/**
+ * A chip tap that can switch the pile on the client: filter the loaded list at
+ * once (goPile) and sync the URL, instead of waiting on a server render of the
+ * whole inbox. Only in list mode, only for piles the page gave an href for,
+ * never Archived (its own fetch), never a Work/Week board link.
+ */
+export function canClientSwitchPile(
+  key: string,
+  href: string | undefined,
+  hrefs: Partial<Record<string, string>>,
+  listMode: boolean
+): boolean {
+  if (!listMode || !href || key === "archived") return false;
+  if (!Object.prototype.hasOwnProperty.call(hrefs, key)) return false;
+  return !/[?&]view=/.test(href);
+}

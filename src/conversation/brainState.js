@@ -575,7 +575,11 @@ function observeCallerTurn(state, input = {}) {
         profile: input.profile,
         state: state || next,
       }),
-      fileNameJustAsked: Boolean(askedFileName),
+      // A deferred ask was never spoken: a "yes" now answers something else.
+      // A spoken ask (code or model, see lastAgentText) still binds.
+      fileNameJustAsked:
+        Boolean(askedFileName) &&
+        !(state?.caller?.fileNameAskDeferred === true && state?.caller?.fileNameAskSpoken !== true),
       pendingFileName:
         askedFileName ||
         input.profile?.callerMemory?.fileOwnerName ||
@@ -1242,6 +1246,12 @@ function formatNameConfirmForPrompt(state) {
     if (pending) {
       if (state?.caller?.fileNameAskSpoken === true) {
         return `- File name already asked: ${pending}. Use ${pending}. Do not ask for a name. Do not say May I have your name. Continue the next missing slot (day, time, place). A yes or "my name is ${pending}" locks it. Do not read open visits, holds, or callbacks unless they ask. Do not say nothing is open.`;
+      }
+      // HD_cd0c01f28b05: a caller question owns its turn; the ask waits.
+      const latest = String((state?.conversation?.answersReceived || []).slice(-1)[0] || '');
+      const qf = require('./questionFirst');
+      if (qf.questionBeforeNameEnabled() && qf.questionOwnsTurn(latest)) {
+        return `- They just asked a question. Answer it first, in their language. Do not ask for a name on this turn. Do not say Am I speaking with ${pending} yet; that waits for a later turn. Do not greet them as that name. Do not talk about visits yet. Do not say nothing is open.`;
       }
       return `- Ask once, in these words: Am I speaking with ${pending}? Do not greet them as that name. Do not talk about visits yet. Do not say nothing is open. A yes means ${pending}.`;
     }

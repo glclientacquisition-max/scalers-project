@@ -98,7 +98,9 @@ async function notePlatformOpsDegrade(kind, detail = {}) {
       lead: { reason: `Platform ${key} degraded`, businessName: null },
       // Email only for now. No SMS or WhatsApp for platform ops alerts.
       channels: { sms: false, whatsapp: false, email: true },
-      ledger: { kind: ledgerKind(key) },
+      // Recorded as a platform row (tenant null) under one key per incident:
+      // ops:<kind>:<incident start ms>:<person>. Was dropped as invalid before.
+      ledger: { kind: ledgerKind(key), keyBase: `ops:${ledgerKind(key)}:${now}` },
     });
     const hit = sent.find((row) => row.channel);
     if (!hit) {
@@ -115,6 +117,54 @@ async function notePlatformOpsDegrade(kind, detail = {}) {
   } catch (err) {
     alertedAt.delete(key);
     console.warn('[platform-ops] alert failed:', err?.message || err);
+    return { ok: false, reason: 'send_failed' };
+  }
+}
+
+/**
+ * One-off ops notice (not a degraded/recovered lane), e.g. package usage.
+ * Same Admin recipients and email-only channel as notePlatformOpsDegrade.
+ * Callers own dedupe.
+ *
+ * @param {{ kind: string, subject: string, body: string }} event
+ */
+async function notePlatformOpsEvent({ kind, subject, body } = {}) {
+  const ledgerKindName = String(kind || 'platform_ops_event');
+  const { recipients, source } = await platformOpsRecipients();
+  if (!recipients.length) {
+    console.error(
+      `[platform-ops] ${ledgerKindName} not sent: no ops list (add an email in Super Admin > Escalate, or set SCALERS_OPS_ALERT_EMAILS)`
+    );
+    return { ok: false, reason: 'no_ops_recipients', source };
+  }
+  if (String(process.env.VOICE_PLATFORM_OPS_DRY_RUN || '').toLowerCase() === 'true') {
+    console.warn(
+      `[platform-ops] DRY_RUN kind=${ledgerKindName} recipients=${recipients.length} subject=${JSON.stringify(subject)} body=${JSON.stringify(body)}`
+    );
+    return { ok: true, channel: 'dry_run', recipients: recipients.length };
+  }
+  try {
+    const dispatch = dispatchOverride || dispatchToStaff;
+    const { sent, errors } = await dispatch({
+      recipients,
+      body,
+      subject,
+      lead: { reason: subject, businessName: null },
+      // Email only for now. No SMS or WhatsApp for platform ops alerts.
+      channels: { sms: false, whatsapp: false, email: true },
+      ledger: { kind: ledgerKindName },
+    });
+    const hit = sent.find((row) => row.channel);
+    if (!hit) {
+      console.warn(`[platform-ops] ${ledgerKindName} not sent errors=${errors.join(';')}`);
+      return { ok: false, reason: 'not_sent', errors };
+    }
+    console.warn(
+      `[platform-ops] sent kind=${ledgerKindName} channel=${hit.channel} dest=${hit.to || hit.email || '?'}`
+    );
+    return { ok: true, channel: hit.channel, sent: sent.length };
+  } catch (err) {
+    console.warn(`[platform-ops] ${ledgerKindName} failed:`, err?.message || err);
     return { ok: false, reason: 'send_failed' };
   }
 }
@@ -145,6 +195,7 @@ function setPlatformOpsDispatch(fn) {
 
 module.exports = {
   notePlatformOpsDegrade,
+  notePlatformOpsEvent,
   notePlatformOpsRecovered,
   isPlatformOpsDegraded,
   buildPlatformOpsBody,

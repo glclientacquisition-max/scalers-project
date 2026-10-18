@@ -108,6 +108,8 @@ import {
   HOLD_HOURS_OPTIONS,
   holdRulesValue,
   normalizeBusinessPolicies,
+  seedStarterPolicies,
+  type StarterPolicyKey,
   readBookingMode,
   readHoldRules,
   POLICY_FIELDS,
@@ -438,6 +440,26 @@ function TenantFormInner({
   const [policies, setPolicies] = useState<BusinessPolicies>(() =>
     normalizeBusinessPolicies(tenant.business_policies)
   );
+  const [starterClear, setStarterClear] = useState<StarterPolicyKey | null>(null);
+  const starterPolicies = seedStarterPolicies(policies);
+  const markPolicyOwner = (key: StarterPolicyKey, clear: boolean) => {
+    queueOwnerPath(`policies.${key}`);
+    setPolicies((prev) => {
+      const next: BusinessPolicies = {
+        ...prev,
+        provenance: { ...prev.provenance, [key]: { source: "owner", confirmed: true } },
+      };
+      if (clear) {
+        next[key] = "";
+        if (prev.rules && key in prev.rules) {
+          const rules = { ...prev.rules };
+          delete (rules as Record<string, unknown>)[key];
+          next.rules = rules;
+        }
+      }
+      return next;
+    });
+  };
   const [agentTools, setAgentTools] = useState<AgentTools>(() =>
     parseAgentTools(tenant.agent_tools)
   );
@@ -964,7 +986,7 @@ function TenantFormInner({
             action={
               panel === "pronunciation" ? (
                 <p className="max-w-[11rem] text-right text-meta leading-snug text-ink-2">
-                  Saves live - no sticky Save
+                  Changes save as you go
                 </p>
               ) : (
                 <TenantSettingsSaveButton pending={pending} />
@@ -1969,7 +1991,7 @@ function TenantFormInner({
         ) : (
           <div id="holds" className="scroll-mt-24">
             <SettingsGroup title="Holds">
-              <SettingsRow label="Hold items for customers" control="switch" hint="Your Business Assistant can hold a holdable item and alerts you each time.">
+              <SettingsRow label="Hold items for customers" control="switch" hint="Your Business Assistant can hold an item for a caller and alerts you each time.">
                 <ToolSwitch
                   checked={readHoldRules(policies.holds).allowed === "yes"}
                   label="Hold items for customers"
@@ -2039,6 +2061,45 @@ function TenantFormInner({
             </SettingsGroup>
           </div>
         )}
+
+        {starterPolicies.length ? (
+          <SettingsGroup title="Starter text">
+            <div className="space-y-3 px-4 py-3">
+              <p className="text-body text-ink-2">
+                We added this text to get you started. Your Business Assistant does not use it until you keep it or
+                replace it with your own words.
+              </p>
+              {starterPolicies.map((row) => (
+                <div key={row.key} className="space-y-2 border-t border-hairline pt-3 first:border-t-0 first:pt-0">
+                  <p className="text-meta text-ink-2">{row.label} · not used yet</p>
+                  <p className="text-body text-ink">{row.text}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" className={settingsGhostButtonClass} onClick={() => markPolicyOwner(row.key, false)}>
+                      Keep it
+                    </button>
+                    <button type="button" className={settingsGhostButtonClass} onClick={() => setStarterClear(row.key)}>
+                      Replace
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SettingsGroup>
+        ) : null}
+        <ConfirmSheet
+          open={starterClear !== null}
+          title="Remove the starter text?"
+          confirmLabel="Remove"
+          onClose={() => setStarterClear(null)}
+          onConfirm={() => {
+            if (starterClear) markPolicyOwner(starterClear, true);
+            setStarterClear(null);
+          }}
+        >
+          <p className="text-body text-ink-2">
+            The field will be empty so you can write your own. Callers hear that you will confirm it until you do.
+          </p>
+        </ConfirmSheet>
 
         <PolicyRulesEditor
           rules={policies.rules ?? {}}
@@ -2265,8 +2326,8 @@ function TenantFormInner({
       >
         <div className="flex flex-wrap items-end justify-between gap-2 px-1">
           <p className={settingsBlockTitleClass} aria-live="polite">
-            FAQs
-            <span className="ml-2 font-medium normal-case tracking-normal text-ink-2">
+            FAQs{" "}
+            <span className="ml-1 font-medium normal-case tracking-normal text-ink-2">
               {filledFaqCount} of {FAQ_MAX}
             </span>
           </p>

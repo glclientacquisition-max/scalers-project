@@ -2,6 +2,17 @@ import type { CallResolution, LeadStatus } from "@/lib/supabase";
 import type { Lead } from "@/lib/callsTriage";
 import { nicheCopy, purposeFilters, showsVisitQueue } from "@/lib/inboxNiche";
 import { storedPhoneCandidates, storedPhoneJoinKey } from "@/lib/handoffMode";
+import {
+  deskWorkCounts,
+  isHoldRequestType,
+  itemIsOpenHold,
+  itemIsOpenVisit,
+  itemIsToReturn,
+  itemIsVisitToConfirm,
+  itemNeedsYouNow,
+} from "@/lib/inboxCounts";
+
+export { isHoldRequestType };
 
 export type InboxPurpose = "job" | "hold" | "human" | "missed" | "answered" | "live";
 
@@ -186,7 +197,7 @@ export function purposeLabel(purpose: InboxPurpose, vertical?: string | null): s
     case "hold":
       return "Hold";
     case "human":
-      return "Human asked";
+      return "Call back";
     case "missed":
       return "Missed";
     default:
@@ -243,15 +254,11 @@ export function inboxCaption(
   vertical?: string | null
 ): string {
   const copy = nicheCopy(vertical);
-  const live = items.filter((item) => !itemIsArchived(item));
-  const needs = live.filter((item) => item.needsYou).length;
+  const counts = deskWorkCounts(items);
+  const needs = counts.needs;
   if (needs === 0) return "Clear";
-  const toConfirm = live.filter(
-    (item) => item.job && String(item.job.status || "").toLowerCase() === "requested"
-  ).length;
-  const toFulfill = live.filter(
-    (item) => item.hold && String(item.hold.status || "").toLowerCase() === "open"
-  ).length;
+  const toConfirm = counts.visitsToConfirm;
+  const toFulfill = counts.holds;
   if (toConfirm === needs) {
     return `${toConfirm} ${copy.jobUnit}`;
   }
@@ -370,13 +377,7 @@ export function homeDigestLine(
   return bits.length ? `Today: ${bits.join(", ")}.` : null;
 }
 
-const HOLD_REQUEST_TYPES = new Set(["hold", "order", "hold_or_pickup"]);
-
-/** service_requests.request_type values that are a hold or an order (not an enquiry or callback). */
-export function isHoldRequestType(type: unknown): boolean {
-  return HOLD_REQUEST_TYPES.has(String(type || "").trim().toLowerCase());
-}
-
+/** Home's queues. Same predicates as the Inbox tabs and the nav badge (lib/inboxCounts). */
 export function summarizeInboxWork(items: InboxItem[]): {
   needs: number;
   toReturn: number;
@@ -387,33 +388,19 @@ export function summarizeInboxWork(items: InboxItem[]): {
   nextHold: InboxItem | null;
   nextJob: InboxItem | null;
 } {
-  const live = items.filter((item) => !itemIsArchived(item));
-  const needs = live.filter((item) => item.needsYou);
-  const visits = live.filter((item) => {
-    const status = String(item.job?.status || "").toLowerCase();
-    return status === "requested" || status === "confirmed";
-  });
-  const requested = visits.filter(
-    (item) => String(item.job?.status || "").toLowerCase() === "requested"
-  );
-  const openRequest = (item: InboxItem) => String(item.hold?.status || "").toLowerCase() === "open";
-  // Only a real hold or order is something to fulfil. An open enquiry or callback
-  // request is a caller to get back to: counting it as a hold made Overview show
-  // "1 Hold" while holds were locked (Aris Kenya, Oct 2026).
-  const toFulfill = live.filter((item) => openRequest(item) && isHoldRequestType(item.hold?.request_type));
-  const toReturn = live.filter(
-    (item) =>
-      item.purpose === "human" ||
-      item.purpose === "missed" ||
-      (openRequest(item) && !isHoldRequestType(item.hold?.request_type))
-  );
+  const now = Date.now();
+  const counts = deskWorkCounts(items, now);
+  const toReturn = items.filter((item) => itemIsToReturn(item, now));
+  const toFulfill = items.filter((item) => itemIsOpenHold(item));
+  const visits = items.filter((item) => itemIsOpenVisit(item));
+  const requested = items.filter((item) => itemIsVisitToConfirm(item));
   return {
-    needs: needs.length,
-    toReturn: toReturn.length,
-    toFulfill: toFulfill.length,
-    toConfirm: visits.length,
-    requested: requested.length,
-    nextReturn: toReturn.find((item) => item.needsYou) || toReturn[0] || null,
+    needs: counts.needs,
+    toReturn: counts.toReturn,
+    toFulfill: counts.holds,
+    toConfirm: counts.visits,
+    requested: counts.visitsToConfirm,
+    nextReturn: toReturn[0] || null,
     nextHold: toFulfill[0] || null,
     nextJob: requested[0] || visits[0] || null,
   };
@@ -502,7 +489,10 @@ function ownerLine(raw: string): string {
 export function holdHeadline(hold: InboxHold, vertical?: string | null): string {
   const item = hold.item?.trim();
   if (item) {
-    return hold.quantity ? `${item} x${hold.quantity}` : item;
+    // "x" only for a number: "Pencils x5", never "xMbalimbali".
+    const qty = String(hold.quantity ?? "").trim();
+    if (!qty) return item;
+    return /^\d+(?:[.,]\d+)?$/.test(qty) ? `${item} x${qty}` : `${item} (${qty})`;
   }
   return holdTypeLabel(hold.request_type, vertical);
 }
@@ -699,7 +689,7 @@ export function itemIsArchived(item: InboxItem): boolean {
 
 /** Same set as `countInboxPurposes(items).needs` and the Inbox nav badge. */
 export function itemInNeedsYouPile(item: InboxItem): boolean {
-  return Boolean(item.needsYou) && !itemIsArchived(item);
+  return itemNeedsYouNow(item);
 }
 
 export function itemMatchesPurpose(
@@ -710,41 +700,25 @@ export function itemMatchesPurpose(
   if (itemIsArchived(item)) return false;
   if (filter === "all") return true;
   if (filter === "needs") return itemInNeedsYouPile(item);
-  if (filter === "hold") {
-    return String(item.hold?.status || "").toLowerCase() === "open";
-  }
-  if (filter === "job") {
-    const status = String(item.job?.status || "").toLowerCase();
-    return status === "requested" || status === "confirmed";
-  }
-  if (filter === "human") return item.purpose === "human" || item.purpose === "missed";
+  if (filter === "hold") return itemIsOpenHold(item);
+  if (filter === "job") return itemIsOpenVisit(item);
+  if (filter === "human") return itemIsToReturn(item);
   if (filter === "answered") return item.purpose === "answered";
   return true;
 }
 
+/** Tab counts. One selector (deskWorkCounts) for Home, Inbox tabs and the badge. */
 export function countInboxPurposes(items: InboxItem[]): Record<InboxPurposeFilterId, number> {
-  const counts: Record<InboxPurposeFilterId, number> = {
-    needs: 0,
-    hold: 0,
-    job: 0,
-    human: 0,
-    answered: 0,
-    archived: 0,
-    all: 0,
+  const c = deskWorkCounts(items);
+  return {
+    needs: c.needs,
+    hold: c.holds,
+    job: c.visits,
+    human: c.toReturn,
+    answered: c.answered,
+    archived: c.archived,
+    all: c.all,
   };
-  for (const item of items) {
-    if (itemIsArchived(item)) {
-      counts.archived += 1;
-      continue;
-    }
-    counts.all += 1;
-    if (itemInNeedsYouPile(item)) counts.needs += 1;
-    if (itemMatchesPurpose(item, "hold")) counts.hold += 1;
-    if (itemMatchesPurpose(item, "job")) counts.job += 1;
-    if (item.purpose === "human" || item.purpose === "missed") counts.human += 1;
-    if (item.purpose === "answered") counts.answered += 1;
-  }
-  return counts;
 }
 
 export function itemMatchesQuery(item: InboxItem, q: string): boolean {

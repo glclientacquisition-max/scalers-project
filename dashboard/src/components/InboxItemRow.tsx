@@ -53,7 +53,7 @@ function inboxCopy(
   const message = followUpWhatsAppMessage({
     businessName,
     name: item.callerName,
-    reason: item.headline,
+    topic: item.lead?.topic,
   });
   const openHref = item.callId
     ? inboxRecordHref(item.callId, ret || { purpose })

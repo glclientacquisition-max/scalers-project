@@ -480,3 +480,39 @@ export function reconcileCatalogScore(
     );
   return { ...live, domains: { ...live.domains, catalog }, next_gaps };
 }
+
+/**
+ * Which setup areas have something saved, whoever wrote it (owner, import, seed).
+ * The score above only counts owner-confirmed values, so an imported catalogue
+ * scored 0% and Home read "Catalogue 0%" on a full catalogue (owner review,
+ * 18 Oct 2026). Home shows Filled-but-unconfirmed as "To check", not 0%.
+ */
+export function captureFilledDomains(tenant: ScoreTenant): Record<string, boolean> {
+  const policies = policyRecord(tenant.business_policies);
+  const languages = Array.isArray(tenant.voice_languages) ? tenant.voice_languages.length : 0;
+  return {
+    identity: Boolean(textOf(tenant.business_name)) && Boolean(textOf(tenant.vertical)),
+    catalog: hasNamedCatalog(tenant),
+    hours: hasStructuredHours(tenant.hours_schedule) || Boolean(textOf(tenant.business_hours)),
+    locations: hasLocations(tenant, policies),
+    payments: Boolean(textOf(policies.payment) || textOf(policies.deposit)),
+    policies: Boolean(
+      textOf(policies.returns) ||
+        textOf(policies.delivery) ||
+        textOf(policies.other) ||
+        textOf(policies.warranty) ||
+        textOf(policies.cancellation)
+    ),
+    faqs: rows(tenant.faqs).some((item) => textOf(item.question) && textOf(item.answer)),
+    team_notify: hasVerifiedNotify(tenant),
+    assistant: Boolean(textOf(tenant.agent_name)) || languages > 0,
+    bulletin: Array.isArray(tenant.daily_bulletin) && tenant.daily_bulletin.length > 0,
+  };
+}
+
+export type CaptureRowState = "confirmed" | "check" | "missing";
+
+export function captureRowState(pct: number, filled: boolean): CaptureRowState {
+  if (pct >= 100) return "confirmed";
+  return filled || pct > 0 ? "check" : "missing";
+}

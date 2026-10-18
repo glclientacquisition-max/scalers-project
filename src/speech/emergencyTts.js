@@ -175,8 +175,68 @@ async function synthesizeEmergencyPcm(text, opts = {}) {
   return null;
 }
 
+function withDeadline(promise, ms, label) {
+  let timer = null;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timeout ${ms}ms`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * Speak one written reply line Soniox lost mid-call (VOICE_TTS_RESPEAK).
+ * Order: a local clip of this exact line (cached filler / greeting PCM),
+ * then espeak-ng, then Gemini TTS. Never the downtime clip: that says the
+ * line is down, which is not what the caller was about to hear.
+ * @param {string} text
+ * @param {{ language?: string, localPcm?: () => (Buffer|null), geminiMs?: number }} [opts]
+ * @returns {Promise<{ pcm: Buffer, source: string }|null>}
+ */
+async function synthesizeLinePcm(text, opts = {}) {
+  const language = opts.language || 'en';
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return null;
+
+  try {
+    const local = typeof opts.localPcm === 'function' ? opts.localPcm() : null;
+    if (local && local.length) return { pcm: local, source: 'local_clip' };
+  } catch (err) {
+    console.warn(`[emergency-tts] local clip lookup failed:`, err?.message || err);
+  }
+
+  try {
+    const pcm = await module.exports.synthesizeWithEspeak(clean, language);
+    if (pcm?.length) return { pcm, source: 'espeak' };
+  } catch (err) {
+    if (err && err.code !== 'ENOENT') {
+      console.warn(`[emergency-tts] espeak-ng line failed:`, err?.message || err);
+    }
+  }
+
+  try {
+    const geminiMs =
+      Number(opts.geminiMs) > 0
+        ? Number(opts.geminiMs)
+        : Number(process.env.VOICE_TTS_FALLBACK_GEMINI_MS) > 0
+          ? Number(process.env.VOICE_TTS_FALLBACK_GEMINI_MS)
+          : 6000;
+    const pcm = await withDeadline(
+      module.exports.synthesizeWithGemini(clean, language),
+      geminiMs,
+      'gemini tts'
+    );
+    if (pcm?.length) return { pcm, source: 'gemini' };
+  } catch (err) {
+    console.warn(`[emergency-tts] gemini line failed:`, err?.message || err);
+  }
+  return null;
+}
+
 module.exports = {
   SAMPLE_RATE,
+  synthesizeLinePcm,
   OUTAGE_LINE_EN,
   OUTAGE_LINE_SW,
   pickSpeechOutageLine,

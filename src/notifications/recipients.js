@@ -26,7 +26,11 @@ async function dispatchToStaff({
         lead,
         subject,
         channels,
-        ledger,
+        // Per-person ledger key (stable across SMS -> WhatsApp -> email).
+        ledger:
+          ledger && typeof ledger === 'object'
+            ? { ...ledger, recipientId: ledger.recipientId || person.id || null }
+            : ledger,
       });
       if (result?.channel) {
         sent.push({
@@ -36,6 +40,9 @@ async function dispatchToStaff({
         });
       } else if (result?.reason) {
         errors.push(`${person.name || 'staff'}:${result.reason}`);
+        for (const e of Array.isArray(result.errors) ? result.errors : []) {
+          errors.push(`${person.name || 'staff'}:${e}`);
+        }
       }
     } catch (err) {
       errors.push(`${person.name || 'staff'}:${err?.message || err}`);

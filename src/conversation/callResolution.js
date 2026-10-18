@@ -437,12 +437,32 @@ function deriveCallResolution(opts = {}) {
     if (require('./callFixesD199').callFixesD199Enabled()) note = 'Goal not completed';
   }
 
+  // VOICE_SPOKEN_OUTCOME (HD_cd0c01f28b05): with nothing written, "Answered"
+  // must mean an agent line the caller heard answered the question. The goal
+  // text says what they wanted, not what was said. Read the spoken transcript
+  // (post-guard rows) when the caller passes it.
+  let ledger = null;
+  const spokenTurns = Array.isArray(opts.spokenTurns) ? opts.spokenTurns : null;
+  if (spokenTurns && spokenTurns.length && !requestOk && !escalateOk && !handoff) {
+    const spoken = require('./spokenAnswers');
+    if (spoken.spokenOutcomeEnabled()) {
+      ledger = spoken.spokenQuestionLedger(spokenTurns);
+      if (ledger.asked.length && resolution === 'resolved') {
+        if (!ledger.answered.length) resolution = 'unresolved';
+        note = spoken.spokenOutcomeNote(ledger) || note;
+      }
+    }
+  }
+
   if (!RESOLUTIONS.has(resolution)) resolution = 'unknown';
 
   return {
     resolution,
     primaryIntent: intent,
     resolutionNote: note || null,
+    ...(ledger
+      ? { answeredQuestions: ledger.answered, unansweredQuestions: ledger.unanswered }
+      : {}),
   };
 }
 

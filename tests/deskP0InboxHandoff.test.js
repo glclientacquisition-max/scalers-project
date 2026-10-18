@@ -138,7 +138,7 @@ describe("P0 #5 desk ping teammate", () => {
 
   it("pings Escalate-flagged people only through the voice notify path", () => {
     assert.match(ticket, /InboxTicketActionDock/);
-    assert.match(ping, /Ping teammate/);
+    assert.match(ping, /Alert a teammate/);
     assert.match(ping, /variant === "dock"/);
     assert.match(action, /receives_escalation === true/);
     assert.match(action, /Escalate is off for that person/);

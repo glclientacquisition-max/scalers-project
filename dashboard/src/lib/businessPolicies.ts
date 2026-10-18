@@ -1,3 +1,4 @@
+import { isPackPolicyText } from "./provenance";
 import { formatCoverageList, parseCoverageAreas } from "./coverageAreas";
 import { cleanPayments, normalizePayments, paymentsHaveContent, paymentsSentence, validatePayments, type Payments } from "./payments";
 import { normalizeRules, policyTextFromRules, validateRules, type PolicyRules } from "./policyRules";
@@ -275,4 +276,43 @@ export function readBookingMode(policies: { booking_mode?: unknown } | null | un
 /** booking_mode plus the owner meta confirmedSlotEnabled reads. */
 export function bookingModePatch(mode: BookingMode): { booking_mode: string; booking: Record<string, unknown> } {
   return { booking_mode: mode, booking: { source: "owner", confirmed: true } };
+}
+
+const STARTER_KEYS = [
+  ["returns", "Returns"],
+  ["delivery", "Delivery"],
+  ["payment", "Payment"],
+  ["deposit", "Deposit"],
+  ["cancellation", "Cancellation"],
+  ["warranty", "Warranty"],
+  ["other", "Other rules"],
+] as const;
+
+export type StarterPolicyKey = (typeof STARTER_KEYS)[number][0];
+
+/**
+ * Policy text we wrote (source=seed, e.g. a roadmap backfill, or an unmarked
+ * starter sentence such as Esga's delivery line) that the owner has not confirmed. The assistant does not use it as fact, so Settings shows it as
+ * starter text with a keep / replace choice instead of passing it off as theirs.
+ */
+export function seedStarterPolicies(
+  policies: BusinessPolicies
+): Array<{ key: StarterPolicyKey; label: string; text: string }> {
+  const prov = policies.provenance || {};
+  const out: Array<{ key: StarterPolicyKey; label: string; text: string }> = [];
+  for (const [key, label] of STARTER_KEYS) {
+    const text = String(policies[key] || "").trim();
+    if (!text) continue;
+    const row = prov[key];
+    if (row) {
+      // Marked: seed and not confirmed is starter; anything else is the owner's.
+      if (String(row.source || "").toLowerCase() !== "seed" || row.confirmed === true) continue;
+    } else if (!isPackPolicyText(text)) {
+      // Unmarked text is the owner's unless it is a starter sentence word for word
+      // (punctuation ignored). Brain treats those as seed too, flag on or off.
+      continue;
+    }
+    out.push({ key, label, text });
+  }
+  return out;
 }

@@ -55,7 +55,7 @@ export async function signInAndAcceptAction(
     if (/not confirmed/i.test(error?.message || "")) {
       return { error: `Confirm your email first. Open the link we sent to ${g.invite.email}.` };
     }
-    return { error: "That password didn't work. Try again, or reset it from the sign-in page." };
+    return { error: "That password didn't work. Try again, or reset your password below." };
   }
   return acceptFor(data.user.id, token);
 }

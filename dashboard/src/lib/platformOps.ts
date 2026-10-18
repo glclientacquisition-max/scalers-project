@@ -232,10 +232,16 @@ async function mailKinds(
   for (const kind of kinds) {
     const signal = byKind.get(kind);
     const detail = recovered ? `${kindLabel(kind)} recovered` : signal?.detail || kindLabel(kind);
+    const state = recovered ? "recovered" : "open";
     await sendOpsMail({
       to: emails,
       subject: opsMailSubject(kind, recovered),
       text: `${detail}\n\nOpen Platform: /admin/platform`,
+      // Platform notify_sends row; one per notice state per hour.
+      ledger: {
+        kind: `platform_ops_${kind}`,
+        key: `ops:desk:${kind}:${state}:${new Date().toISOString().slice(0, 13)}`,
+      },
     });
   }
 }

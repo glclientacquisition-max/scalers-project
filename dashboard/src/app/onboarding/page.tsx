@@ -6,7 +6,8 @@ import { BrandWordmark } from "@/components/brand/BrandMark";
 import { AppearanceFooter } from "@/components/ThemePicker";
 import { getAuthUser, isAuthenticated, isLegacyAuthenticated } from "@/lib/auth";
 import { tenantNeedsOnboarding } from "@/lib/onboarding";
-import { getCurrentTenant } from "@/lib/tenant";
+import { getCurrentTenant, getDeskShellTenant } from "@/lib/tenant";
+import { WorkspaceClosed } from "@/components/WorkspaceClosed";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import { OnboardingWizard } from "./OnboardingWizard";
 import { memberCan } from "@/lib/requireMember";
@@ -72,6 +73,9 @@ export default async function OnboardingPage({
   }
 
   if (ctx.kind === "ready") {
+    // Archived by a Super Admin: same closed screen as the Desk.
+    const shell = await getDeskShellTenant();
+    if (shell?.archived) return <WorkspaceClosed businessName={shell.business_name || null} />;
     if (ctx.row.setup_completed_at) redirect("/home");
     if (!(await memberCan("settings.edit"))) {
       return <WorkspaceNotReady businessName={ctx.row.business_name || null} />;
