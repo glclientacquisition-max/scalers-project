@@ -71,6 +71,13 @@ Earlier merges since 9 Oct (see git log for detail):
 - **SautiKit `events_url` fixed on prod** (*per team notes*, read back after the change). Aris pointed at a dead host (`scalers-production-production…`, typo), so every Aris event, including recording ready, got 404. Esga pointed at `/`, so its call events reached the incoming-call handler. Both now use `https://scalers-project-production.up.railway.app/voice/events`. Voice webhooks and number mapping unchanged (both still `/`).
 - **Staging Jirani +254709221537 not fixed.** It is in the separate staging workspace; Alvin sets `events_url` to `https://scalers-staging-staging.up.railway.app/voice/events` in the dashboard.
 
+### Ship log (prod ships, SQL applies, flag flips)
+
+One dated line per event: SHA, change, rollback, approver. Newest first. Times in EAT.
+
+- 2026-10-17 21:57 EAT — #738 closed-tenant send guard (VOICE_CLOSED_TENANT_GUARD, default on) merged b568c288, Railway ef9bea89; rollback: set VOICE_CLOSED_TENANT_GUARD=off or revert b568c288; approved by Alvin via Chief of Scalers.
+- 2026-10-17 ~21:55 EAT — #737 Desk Suspend/Archive/Purge SQL applied on **staging only** (SQL files from cd8db691); not applied on prod, purge schedule not applied; rollback: not recorded; approver: not recorded (*per team notes*).
+
 ---
 
 ## 3. On staging now (not on prod)
@@ -192,5 +199,6 @@ Public copy never mentions unbuilt features.
 - **Secrets.** Never print, paste, or commit a secret. Docs list variable names only. Secrets go in through masked secret cards entered by Alvin.
 - **Git identity.** Never set git config. Commit with `git -c user.name='Alvin Yegon' -c user.email='alvin@scalers.co.ke'`.
 - **Test gates** (Node 22): `npm run test:voice`, `npm run test:brain`, `npm run test:mvp`, and `cd dashboard && npm run lint && npm run build`. Stage-PR changes: `npm run test:stage-pr`.
+- **Ship log.** Every prod ship, SQL apply (prod or staging) and flag flip gets a dated line in "Ship log" (section 2): SHA, change, rollback, approver.
 - **Docs-only PRs** must not change runtime code. Say "docs-only" in the PR body.
 - **Before you finish:** update sections 1 to 5 of this file in the same PR when it changes what's live, in flight, or broken. Every merge to `main` updates section 2.
