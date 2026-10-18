@@ -6,7 +6,7 @@ import { withRoleGate } from "@/components/DeskRole";
 import { CharCount as KitCharCount, FieldCard, TextAreaField, TextField } from "@/components/ui/TextField";
 import { POLICY_TEXT_MAX } from "@/lib/lengthLimits";
 import { normalizeContactPhone } from "@/lib/teamValidation";
-import { useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import {
@@ -1539,8 +1539,8 @@ function TenantFormInner({
                     const priceError = catalogPriceError(state.fields, service.name);
                     const priceFields = catalogPriceInputsFromRow(service);
                     return (
-                      <>
-                        <tr key={`service-${index}`} className="align-top">
+                      <Fragment key={`service-${index}`}>
+                        <tr className="align-top">
                           <td className="min-w-0 px-3 py-2">
                             <label className="sr-only" htmlFor={`svc-name-${index}`}>
                               Service name
@@ -1605,7 +1605,7 @@ function TenantFormInner({
                             </button>
                           </td>
                         </tr>
-                        <tr key={`service-price-${index}`} className="border-b border-hairline">
+                        <tr className="border-b border-hairline">
                           <td colSpan={4} className="px-3 pb-3 pt-0">
                             <CatalogPriceEditor
                               idPrefix={`svc-price-${index}`}
@@ -1630,7 +1630,7 @@ function TenantFormInner({
                             ) : null}
                           </td>
                         </tr>
-                      </>
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -1836,8 +1836,8 @@ function TenantFormInner({
                       const priceError = catalogPriceError(state.fields, product.name);
                       const priceFields = catalogPriceInputsFromRow(product);
                       return (
-                        <>
-                          <tr key={`product-${index}`} className="align-top">
+                        <Fragment key={`product-${index}`}>
+                          <tr className="align-top">
                             <td className="min-w-0 px-3 py-2">
                               <label className="sr-only" htmlFor={`prod-name-${index}`}>
                                 Product name
@@ -1911,7 +1911,7 @@ function TenantFormInner({
                               </button>
                             </td>
                           </tr>
-                          <tr key={`product-price-${index}`} className="border-b border-hairline">
+                          <tr className="border-b border-hairline">
                             <td colSpan={4} className="px-3 pb-3 pt-0">
                               <CatalogPriceEditor
                                 idPrefix={`prod-price-${index}`}
@@ -1936,7 +1936,7 @@ function TenantFormInner({
                               ) : null}
                             </td>
                           </tr>
-                        </>
+                        </Fragment>
                       );
                     })}
                   </tbody>

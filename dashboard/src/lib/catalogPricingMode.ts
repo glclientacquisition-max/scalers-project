@@ -1,6 +1,6 @@
 /**
  * Structured catalogue prices for Desk: pricing_mode / price / price_max (+ legacy text).
- * JSON catalogue rows and normalized catalogue_items share these field names.
+ * JSON catalogue rows on tenants (services_catalog / product_catalog) use these field names.
  */
 import { parseAmount, parsePriceText, priceFromSetup, type StructuredPrice } from "./structuredData";
 

@@ -5,6 +5,13 @@ import { join } from "node:path";
 const OUT = "/opt/cursor/artifacts/catalogue-prices";
 const CATALOG = "/dev/settings-jobs?tab=train&panel=catalog";
 
+function widthTag(width: number): string | null {
+  if (width >= 1200) return "1280";
+  if (width >= 700 && width < 1200) return "768";
+  if (width >= 380 && width < 700) return "390";
+  return null;
+}
+
 test.describe("catalogue price form screenshots", () => {
   test.beforeAll(() => {
     mkdirSync(OUT, { recursive: true });
@@ -12,7 +19,10 @@ test.describe("catalogue price form screenshots", () => {
 
   test("capture price types and validation", async ({ page }, testInfo) => {
     const width = page.viewportSize()?.width ?? 390;
-    const tag = width >= 1000 ? "1280" : "390";
+    const tag = widthTag(width);
+    test.skip(tag === null, "Only 390, 768, and 1280 viewports");
+
+    await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
     await page.goto(CATALOG, { waitUntil: "networkidle" });
     await page.waitForTimeout(400);
     const priceGroup = page.getByRole("radiogroup", { name: "Price type" }).first();
@@ -39,7 +49,7 @@ test.describe("catalogue price form screenshots", () => {
     await shot("price-from");
     await pickKind(/^Range$/);
     await shot("price-range");
-    await pickKind(/Quote on request/);
+    await pickKind(/^Quote$/);
     await shot("price-quote");
 
     await pickKind(/^Fixed$/);
