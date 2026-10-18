@@ -65,8 +65,8 @@ function mixedCatalogProfile() {
       { name: 'Empty row', price_range: '', source: 'owner', confirmed: true },
       {
         name: 'Structured quote',
-        price_kind: 'quote',
-        price_min: null,
+        pricing_mode: 'quote',
+        price_range: '',
         price_max: null,
         source: 'owner',
         confirmed: true,
@@ -97,7 +97,12 @@ test('normalisePrice: legacy placeholders and mixed numeric forms', () => {
     max: 1500,
     currency: 'KES',
   });
-  assert.deepEqual(normalisePrice({ price_kind: 'quote' }), { kind: 'quote', currency: 'KES' });
+  assert.deepEqual(normalisePrice({ pricing_mode: 'quote', price_range: '' }), { kind: 'quote', currency: 'KES' });
+  assert.deepEqual(normalisePrice({ pricing_mode: 'ask', price_range: '' }), { kind: 'quote', currency: 'KES' });
+  assert.deepEqual(
+    normalisePrice({ pricing_mode: 'quote', price_range: '2,000' }),
+    { kind: 'quote', currency: 'KES' }
+  );
   assert.deepEqual(normalisePrice({ pricing_mode: 'range', price: '300', price_max: '600' }), {
     kind: 'range',
     min: 300,

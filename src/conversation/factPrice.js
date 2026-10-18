@@ -1,7 +1,6 @@
 'use strict';
 // Single source of truth for catalogue price parsing and speech-safe rendering.
-// Desk may add structured columns price_kind, price_min, price_max; until then
-// legacy free-text and setup wizard fields (pricing_mode, price, price_max) work.
+// Desk contract: pricing_mode + price + price_max; display text in price_range (services) or price (products).
 
 const MAX_KSH = 100_000_000;
 
@@ -28,15 +27,6 @@ function parseAmount(raw) {
   return Math.round(n);
 }
 
-function numericField(raw) {
-  if (raw == null || raw === '') return null;
-  if (typeof raw === 'number' && Number.isFinite(raw)) {
-    const n = Math.round(raw);
-    return n >= 0 && n <= MAX_KSH ? n : null;
-  }
-  return parseAmount(raw);
-}
-
 /**
  * @typedef {{ kind: 'fixed'|'from'|'range'|'quote'|'unknown', min?: number, max?: number, currency: 'KES' }} NormalisedPrice
  */
@@ -48,17 +38,6 @@ function numericField(raw) {
 function normalisePrice(item) {
   const currency = 'KES';
   const row = item && typeof item === 'object' ? item : {};
-
-  const kindCol = String(row.price_kind ?? row.priceKind ?? '').trim().toLowerCase();
-  const minCol = numericField(row.price_min ?? row.priceMin);
-  const maxCol = numericField(row.price_max ?? row.priceMax);
-
-  if (kindCol === 'quote') return { kind: 'quote', currency };
-  if (kindCol === 'fixed' && minCol != null) return { kind: 'fixed', min: minCol, max: minCol, currency };
-  if (kindCol === 'from' && minCol != null) return { kind: 'from', min: minCol, currency };
-  if (kindCol === 'range' && minCol != null && maxCol != null && maxCol >= minCol) {
-    return { kind: 'range', min: minCol, max: maxCol, currency };
-  }
 
   const mode = String(row.pricing_mode ?? row.pricingMode ?? '').trim().toLowerCase();
   const legacyLo = row.price ?? row.price_range ?? row.priceRange ?? '';
