@@ -195,5 +195,10 @@ describe("saved picks and the Overview card", () => {
     }
     const step = readFileSync(files[0], "utf8");
     assert.match(step, /It can&apos;t put a caller through to you during the call/);
+    // Research: codes are standard but not confirmed on every network (Telkom medium, **004* untested).
+    assert.doesNotMatch(step, /same codes work on all/i);
+    assert.match(step, /These are the standard codes\. If one doesn&apos;t work on your line, try the one-at-a-time codes below or\s+ask your network\./);
+    // "Recommended" on the all-in-one card stays static (no network or phone condition).
+    assert.match(step, /choice="all"[\s\S]{0,200}?recommended\s/);
   });
 });

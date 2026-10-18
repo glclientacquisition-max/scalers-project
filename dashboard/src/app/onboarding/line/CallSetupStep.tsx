@@ -260,7 +260,10 @@ export function CallSetupStep({
                 className="w-full"
               />
             </div>
-            <p className="mt-2 text-meta text-ink-2">The same codes work on all three networks.</p>
+            <p className="mt-2 text-meta text-ink-2">
+              These are the standard codes. If one doesn&apos;t work on your line, try the one-at-a-time codes below or
+              ask your network.
+            </p>
             {phone === "iphone" ? (
               <ul className="mt-2 grid gap-1 text-meta text-ink-2">
                 <li>iPhone blocks links that turn on call forwarding, so type the code in Phone, then Keypad.</li>
