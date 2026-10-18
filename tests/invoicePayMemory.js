@@ -46,6 +46,9 @@ function createMemoryLedger(opts = {}) {
       amountPaidKes: invoice.amountPaidKes,
       dueAt: invoice.dueAt,
       enforcement: tenant.billingEnforcement,
+      ownerName: tenant.businessName || null,
+      ownerEmail: tenant.alertEmail || null,
+      ownerPhone: tenant.phone && !String(tenant.phone).startsWith("pending:") ? tenant.phone : null,
     };
   }
 
@@ -107,14 +110,11 @@ function createMemoryLedger(opts = {}) {
       const next = nextPart(splitKes(lookup.totalKes), lookup.amountPaidKes);
       if (!next) throw new Error("invoice has nothing left to pay");
       if (toCents(input.amountKes) !== toCents(next.amountKes)) throw new Error("pay amount does not match the next part");
-      const fresh = attempts.find(
-        (a) =>
-          a.invoiceId === lookup.invoiceId &&
-          a.status === "pending" &&
-          a.partIndex === next.index &&
-          a.checkoutUrl &&
-          now - new Date(a.createdAt).getTime() < 30 * 60 * 1000
-      );
+      const fresh = attempts.find((a) => {
+        if (a.invoiceId !== lookup.invoiceId || a.status !== "pending" || a.partIndex !== next.index) return false;
+        if (!a.checkoutUrl || !a.expiresAt) return false;
+        return new Date(a.expiresAt).getTime() > now;
+      });
       if (fresh) {
         return {
           id: fresh.id,
@@ -137,6 +137,7 @@ function createMemoryLedger(opts = {}) {
         partCount: next.count,
         checkoutSessionId: null,
         checkoutUrl: null,
+        expiresAt: null,
         providerAmount: null,
         providerCurrency: null,
         feeAmount: null,
@@ -160,6 +161,7 @@ function createMemoryLedger(opts = {}) {
       if (!row || row.status !== "pending") throw new Error("pay attempt is not pending");
       row.checkoutSessionId = created.checkoutId;
       row.checkoutUrl = created.checkoutUrl;
+      row.expiresAt = created.expiresAt || null;
     },
     async findAttemptByCheckout(checkoutId) {
       const row = [...attempts].reverse().find((a) => a.checkoutSessionId === checkoutId);

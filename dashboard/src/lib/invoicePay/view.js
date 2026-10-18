@@ -1,14 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- node:test loads this file with require() */
 const { formatDue, formatKsh, nextPart, splitKes, toCents } = require("./money");
 
-function vatCents(lookup) {
-  const total = toCents(lookup.totalKes);
-  const sub = toCents(lookup.subtotalKes);
-  if (total == null || sub == null) return 0n;
-  const vat = total - sub;
-  return vat > 0n ? vat : 0n;
-}
-
 function facts(lookup) {
   const parts = splitKes(lookup.totalKes);
   const next = nextPart(parts, lookup.amountPaidKes);
@@ -16,7 +8,6 @@ function facts(lookup) {
     businessName: lookup.businessName || "",
     invoiceNumber: lookup.invoiceNumber || "",
     totalLabel: formatKsh(toCents(lookup.totalKes)),
-    vatLabel: `VAT ${formatKsh(vatCents(lookup))}`,
     dueLabel: lookup.dueAt ? `Due ${formatDue(lookup.dueAt)}` : null,
     partLabel: next && next.count > 1 ? `Part ${next.index} of ${next.count}` : null,
     payLabel: next ? `Pay ${formatKsh(toCents(next.amountKes))}` : null,
@@ -39,7 +30,6 @@ function payView(input) {
       businessName: "",
       invoiceNumber: "",
       totalLabel: null,
-      vatLabel: null,
       dueLabel: null,
       partLabel: null,
       payLabel: null,
@@ -89,4 +79,4 @@ function payView(input) {
   return { ...base, state: "payable", title: lookup.businessName || "Invoice" };
 }
 
-module.exports = { payView, vatCents };
+module.exports = { payView };

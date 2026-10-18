@@ -23,6 +23,8 @@ describe("invoice pay SQL", () => {
     await db.exec(read("docs/supabase/billing_data_layer.sql"));
     await db.exec(read("docs/supabase/invoice_pay.sql"));
     await db.exec(read("docs/supabase/invoice_pay.sql"));
+    await db.exec(read("docs/supabase/invoice_documents.sql"));
+    await db.exec(read("docs/supabase/invoice_documents.sql"));
   });
 
   it("splits the same way as the page", async () => {
@@ -195,5 +197,96 @@ describe("invoice pay SQL", () => {
     assert.deepEqual(after.rows, before.rows);
     assert.ok(report.rows.some((row) => row.kind === "pending_timeout"));
     assert.ok(report.rows.some((row) => row.kind === "issue"));
+  });
+
+  it("numbers issued invoices SCL- without a gap and leaves drafts unnumbered", async () => {
+    const tenant = "66666666-6666-4666-8666-666666666666";
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement, alert_email)
+       values ($1, 'Example Business', 'pending:pay-docs', 'soft', 'example@example.com')`,
+      [tenant]
+    );
+    const first = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes, tax_kes)
+       values ($1, 7000, 7000, null) returning id, invoice_number, status, tax_kes`,
+      [tenant]
+    );
+    assert.equal(first.rows[0].invoice_number, null);
+    assert.equal(first.rows[0].status, "draft");
+    assert.equal(first.rows[0].tax_kes, null);
+    const issued = await q("select invoice_number, status from public.finalize_invoice($1)", [first.rows[0].id]);
+    const year = await q("select extract(year from (now() at time zone 'Africa/Nairobi'))::int as y");
+    assert.match(issued.rows[0].invoice_number, new RegExp(`^SCL-${year.rows[0].y}-\\d{6}$`));
+    assert.equal(issued.rows[0].status, "open");
+    const second = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 1000, 1000) returning id, invoice_number`,
+      [tenant]
+    );
+    assert.equal(second.rows[0].invoice_number, null);
+    const issued2 = await q("select invoice_number from public.finalize_invoice($1)", [second.rows[0].id]);
+    const n1 = Number(issued.rows[0].invoice_number.slice(-6));
+    const n2 = Number(issued2.rows[0].invoice_number.slice(-6));
+    assert.equal(n2, n1 + 1);
+    const notice = await q(
+      `select kind, body, delivery_status, billed_to from public.billing_notices
+       where tenant_id = $1 and kind = 'platform_billing_invoice_issued'`,
+      [tenant]
+    );
+    assert.equal(notice.rows.length, 2);
+    assert.equal(notice.rows[0].delivery_status, "pending");
+    assert.equal(notice.rows[0].billed_to, "platform");
+    assert.match(notice.rows[0].body, /Business Assistant/);
+    assert.match(notice.rows[0].body, /KSh/);
+    assert.doesNotMatch(notice.rows[0].body, /VAT/);
+  });
+
+  it("issues a receipt when a payment is recorded and flags an overpaid webhook", async () => {
+    const tenant = "66666666-6666-4666-8666-666666666666";
+    const invoice = await q(
+      `select id from public.invoices where tenant_id = $1 and status = 'open' order by created_at limit 1`,
+      [tenant]
+    );
+    const invoiceId = invoice.rows[0].id;
+    await q("select public.mint_invoice_pay_token($1, false)", [invoiceId]);
+    const applied = await q(
+      `select id, match_status from public.apply_payment(
+         'bachs', 'chk_docs_1', 7000, $1, $2, now(), 'bachs-webhook',
+         '{"data":{"status":"OVERPAID"}}'::jsonb
+       )`,
+      [tenant, invoiceId]
+    );
+    assert.equal(applied.rows[0].match_status, "matched");
+    const receipt = await q(
+      "select receipt_number, method, provider_ref, amount_kes from public.invoice_receipts where payment_id = $1",
+      [applied.rows[0].id]
+    );
+    assert.match(receipt.rows[0].receipt_number, /^RCT-\d{4}-\d{6}$/);
+    assert.equal(receipt.rows[0].method, "M-Pesa");
+    assert.equal(receipt.rows[0].provider_ref, "chk_docs_1");
+    const again = await q("select receipt_number from public.issue_invoice_receipt($1)", [applied.rows[0].id]);
+    const count = await q("select count(*)::int as n from public.invoice_receipts where payment_id = $1", [
+      applied.rows[0].id,
+    ]);
+    assert.equal(count.rows[0].n, 1);
+    assert.equal(again.rows[0].receipt_number, receipt.rows[0].receipt_number);
+    const report = await q(
+      `insert into public.payment_attempts (tenant_id, invoice_id, provider, checkout_session_id, status, amount_kes)
+       values ($1, $2, 'bachs', 'chk_docs_1', 'succeeded', 7000)`,
+      [tenant, invoiceId]
+    );
+    assert.ok(report);
+    const rows = await q(
+      "select kind from public.billing_payment_reconciliation() where invoice_id = $1 and kind = 'overpaid'",
+      [invoiceId]
+    );
+    assert.equal(rows.rows.length, 1);
+    const mail = await q(
+      `select body, delivery_status from public.billing_notices
+       where tenant_id = $1 and kind = 'platform_billing_payment_received'`,
+      [tenant]
+    );
+    assert.equal(mail.rows[0].delivery_status, "pending");
+    assert.match(mail.rows[0].body, /Receipt RCT-/);
+    assert.doesNotMatch(mail.rows[0].body, /VAT/);
   });
 });

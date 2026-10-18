@@ -58,14 +58,14 @@ describe("Bachs signature", () => {
     );
   });
 
-  it("accepts the 6 hour retry and rejects an older replay", () => {
+  it("accepts a signature within 300 seconds and rejects an older one", () => {
     const raw = "{}";
     const sent = 1760000000;
     const signed = signBachsBody(SECRET, raw, sent);
-    const sixHours = sent * 1000 + 6 * 60 * 60 * 1000;
-    const eightHours = sent * 1000 + 8 * 60 * 60 * 1000;
-    assert.equal(verifyBachsRequest({ rawBody: raw, headers: signed.headers, secret: SECRET, now: sixHours }), true);
-    assert.equal(verifyBachsRequest({ rawBody: raw, headers: signed.headers, secret: SECRET, now: eightHours }), false);
+    const within = sent * 1000 + 300 * 1000;
+    const past = sent * 1000 + 301 * 1000;
+    assert.equal(verifyBachsRequest({ rawBody: raw, headers: signed.headers, secret: SECRET, now: within }), true);
+    assert.equal(verifyBachsRequest({ rawBody: raw, headers: signed.headers, secret: SECRET, now: past }), false);
   });
 
   it("accepts signature v2 when one of the v1 secrets matches", () => {
@@ -266,8 +266,8 @@ describe("mock checkout end to end", () => {
     });
     assert.equal(after.title, "Payment received");
     assert.equal(after.totalLabel, "KSh 2,320");
-    assert.equal(after.vatLabel, "VAT KSh 320");
     assert.equal(after.dueLabel, "Due 25 Oct 2026");
+    assert.equal(after.vatLabel, undefined);
     assert.equal(ledger.invoices.get("inv1").status, "paid");
   });
 
@@ -313,6 +313,8 @@ describe("provider mode", () => {
     const body = JSON.parse(called.init.body);
     assert.deepEqual(body.pricing, { currency: "KES", amount: "2320" });
     assert.deepEqual(body.payment_method_types, ["MOMO_KES"]);
+    assert.equal(body.expires_in_minutes, 60);
+    assert.equal(body.customer, undefined);
     assert.equal(called.init.headers.Authorization, "Bearer sk_sandbox_test");
     assert.equal(new URL(called.url).host, "sandbox-api.bachs.io");
   });
@@ -352,6 +354,7 @@ describe("pay page copy", () => {
     assert.match(card, /from "@\/components\/ui\/Button"/);
     assert.doesNotMatch(card, /#[0-9a-fA-F]{3,8}/);
     assert.doesNotMatch(card, /[—–]/);
+    assert.doesNotMatch(card, /VAT/);
     assert.doesNotMatch(`${card}\n${page}\n${panel}`, /KES/);
     assert.match(panel, /\/api\/pay\//);
     const payable = payView({
@@ -369,5 +372,189 @@ describe("pay page copy", () => {
     assert.equal(payable.title, "Jirani Cleaning");
     assert.equal(payable.payLabel, "Pay KSh 2,320");
     assert.equal(formatKsh(toCents("150000")), "KSh 150,000");
+  });
+});
+
+describe("Bachs sandbox fields", () => {
+  const { readPayReturn } = require("../dashboard/src/lib/invoicePay/returnUrl");
+  const { decidePayment } = require("../dashboard/src/lib/invoicePay/webhook");
+
+  it("reads processing_fee_currency and keeps a query string on the success URL", () => {
+    const charge = extractCharge({
+      amount: "100.00",
+      currency: "KES",
+      processing_fee: "3.50",
+      processing_fee_currency: "KES",
+      fee_currency: "USD",
+    });
+    assert.equal(charge.feeAmount, "3.50");
+    assert.equal(charge.feeCurrency, "KES");
+    const provider = new MockPayProvider();
+    return provider
+      .createCheckout({
+        amountKes: "100.00",
+        successUrl: "https://app.scalers.co.ke/pay/pay_x?return=1",
+        cancelUrl: "https://app.scalers.co.ke/pay/pay_x",
+        reference: "attempt-1",
+      })
+      .then((created) => {
+        const url = new URL(created.checkoutUrl);
+        assert.equal(url.searchParams.get("return"), "1");
+        assert.equal(url.searchParams.get("checkout_id"), created.checkoutId);
+        assert.equal((created.checkoutUrl.match(/\?/g) || []).length, 1);
+        const event = provider.paidEvent(created.checkoutId, { secret: SECRET, now: NOW, fee: "3.50", feeCurrency: "KES" });
+        const payload = JSON.parse(event.rawBody);
+        assert.equal(payload.data.processing_fee_currency, "KES");
+        assert.equal(payload.data.fee_currency, undefined);
+        assert.deepEqual(readPayReturn({ return: `1?checkout_id=${created.checkoutId}` }), {
+          return: "1",
+          checkout_id: created.checkoutId,
+        });
+      });
+  });
+
+  it("records ACCEPTED and OVERPAID, and applies checkout.completed only when payment_status is paid", async () => {
+    const accepted = decidePayment({
+      type: "collection.succeeded",
+      status: "ACCEPTED",
+      paymentStatus: null,
+      attempt: { amountKes: "100.00" },
+      charge: { kes: { amount: "100.00", currency: "KES" }, other: null },
+    });
+    assert.equal(accepted.action, "apply");
+    const over = decidePayment({
+      type: "collection.succeeded",
+      status: "OVERPAID",
+      attempt: { amountKes: "100.00" },
+      charge: { kes: { amount: "150.00", currency: "KES" }, other: null },
+    });
+    assert.equal(over.action, "apply_overpaid");
+    const unpaid = decidePayment({
+      type: "checkout.completed",
+      status: "SUCCEEDED",
+      paymentStatus: "unpaid",
+      attempt: { amountKes: "100.00" },
+      charge: { kes: { amount: "100.00", currency: "KES" }, other: null },
+    });
+    assert.equal(unpaid.action, "wait");
+    const paid = decidePayment({
+      type: "checkout.completed",
+      status: "SUCCEEDED",
+      paymentStatus: "paid",
+      attempt: { amountKes: "100.00" },
+      charge: { kes: { amount: "100.00", currency: "KES" }, other: null },
+    });
+    assert.equal(paid.action, "apply");
+
+    const { ledger, token } = seedPayable("100.00", "100.00");
+    const provider = new MockPayProvider();
+    const started = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    const event = provider.paidEvent(started.checkoutId, {
+      secret: SECRET,
+      now: NOW,
+      status: "OVERPAID",
+      amountKes: "100.00",
+    });
+    const applied = await handlePayWebhook({ ...event, secret: SECRET, ledger, now: NOW });
+    assert.equal(applied.body.overpaid, true);
+    assert.equal(ledger.invoices.get("inv1").status, "paid");
+    const rows = reconciliationReport({
+      attempts: ledger.attempts,
+      invoices: [],
+      payments: ledger.payments,
+      now: NOW,
+    });
+    assert.ok(rows.some((row) => row.kind === "overpaid"));
+  });
+
+  it("mints a new reference after the checkout expires and sends the customer", async () => {
+    const { ledger, token } = seedPayable("100.00", "100.00");
+    ledger.tenants.get("t1").alertEmail = "owner@example.com";
+    ledger.tenants.get("t1").phone = "+254700000001";
+    const seen = [];
+    const provider = {
+      async createCheckout(request) {
+        seen.push(request);
+        return {
+          checkoutId: `chk_${seen.length}`,
+          checkoutUrl: `https://checkout.example/${seen.length}`,
+          expiresAt: new Date(NOW + 60 * 60 * 1000).toISOString(),
+        };
+      },
+    };
+    const first = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    const again = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    assert.equal(again.reused, true);
+    assert.equal(again.checkoutId, first.checkoutId);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].customer.email, "owner@example.com");
+    assert.equal(seen[0].customer.phone_number, "+254700000001");
+    assert.equal(seen[0].expiresInMinutes, 60);
+    ledger.setNow(NOW + 61 * 60 * 1000);
+    const fresh = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    assert.equal(fresh.reused, false);
+    assert.notEqual(fresh.reference, seen[0].reference);
+    assert.equal(seen[1].reference, fresh.reference);
+  });
+
+  it("logs the Bachs error code and request id", async () => {
+    const lines = [];
+    const original = console.error;
+    console.error = (line) => lines.push(String(line));
+    try {
+      const provider = new BachsPayProvider({
+        apiKey: "sk_sandbox_test",
+        fetchImpl: async () => ({
+          ok: false,
+          status: 422,
+          headers: { get: (name) => (name === "x-request-id" ? "req_123" : null) },
+          json: async () => ({ error_code: "amount_invalid", message: "no" }),
+        }),
+      });
+      await assert.rejects(
+        provider.createCheckout({
+          amountKes: "10.00",
+          successUrl: "https://app.scalers.co.ke/pay/x",
+          cancelUrl: "https://app.scalers.co.ke/pay/x",
+          reference: "ref-1",
+          idempotencyKey: "pay-1",
+        }),
+        /bachs checkout failed/
+      );
+    } finally {
+      console.error = original;
+    }
+    const logged = lines.join("\n");
+    assert.match(logged, /amount_invalid/);
+    assert.match(logged, /req_123/);
+    assert.doesNotMatch(logged, /sk_sandbox_test/);
+  });
+
+  it("reads payment_status from getCheckout and ignores checkout_url", async () => {
+    let url = "";
+    const provider = new BachsPayProvider({
+      apiKey: "sk_sandbox_test",
+      fetchImpl: async (input) => {
+        url = String(input);
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => null },
+          json: async () => ({
+            checkout_id: "chk_1",
+            status: "open",
+            payment_status: "paid",
+            checkout_url: "https://checkout.bachs.io/secret",
+            charge: { id: "ch_1" },
+          }),
+        };
+      },
+    });
+    const row = await provider.getCheckout("chk_1");
+    assert.equal(row.paymentStatus, "paid");
+    assert.equal(row.charge.id, "ch_1");
+    assert.equal(row.checkoutUrl, undefined);
+    assert.equal(row.status, undefined);
+    assert.match(url, /\/v1\/checkout-sessions\/chk_1$/);
   });
 });

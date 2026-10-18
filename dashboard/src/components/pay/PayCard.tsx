@@ -6,7 +6,6 @@ export type PayCardModel = {
   businessName: string;
   invoiceNumber: string;
   totalLabel: string | null;
-  vatLabel: string | null;
   dueLabel: string | null;
   partLabel: string | null;
   payLabel: string | null;
@@ -51,7 +50,6 @@ export function PayCard({
         {showMoney ? (
           <div className="mt-4">
             <p className="text-display tabular-nums text-ink">{view.totalLabel}</p>
-            {view.vatLabel ? <p className="mt-1 text-body tabular-nums text-ink-2">{view.vatLabel}</p> : null}
             {view.dueLabel ? <p className="mt-1 text-body text-ink-2">{view.dueLabel}</p> : null}
           </div>
         ) : null}

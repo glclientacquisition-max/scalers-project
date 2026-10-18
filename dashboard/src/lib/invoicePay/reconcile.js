@@ -3,7 +3,7 @@ const { PROD_REF } = require("./provider");
 
 const PENDING_MS = 30 * 60 * 1000;
 
-const SUCCESS = new Set(["succeeded", "paid", "complete", "completed", "success"]);
+const SUCCESS = new Set(["succeeded", "paid", "complete", "completed", "success", "accepted", "overpaid"]);
 
 /**
  * Report only. Does not change attempts, payments, or invoices.
@@ -67,7 +67,8 @@ function reconciliationReport(input) {
     }
     const providerStatus = attempt.checkoutSessionId ? providerStatuses[attempt.checkoutSessionId] : null;
     if (providerStatus) {
-      const providerPaid = SUCCESS.has(String(providerStatus).toLowerCase());
+      const normalized = String(providerStatus).toLowerCase();
+      const providerPaid = SUCCESS.has(normalized);
       const localPaid = attempt.status === "succeeded";
       if (providerPaid !== localPaid && attempt.status !== "issue") {
         rows.push({
@@ -75,9 +76,29 @@ function reconciliationReport(input) {
           attemptId: attempt.id,
           invoiceId: attempt.invoiceId,
           paymentId: null,
-          detail: `Provider status ${providerStatus} does not match ${attempt.status}`,
+          detail: `Provider payment status ${providerStatus} does not match ${attempt.status}`,
         });
       }
+      if (normalized === "overpaid") {
+        rows.push({
+          kind: "overpaid",
+          attemptId: attempt.id,
+          invoiceId: attempt.invoiceId,
+          paymentId: paymentForCheckout(attempt.checkoutSessionId)?.id || null,
+          detail: "Payer sent more than the checkout",
+        });
+      }
+    }
+    const payment = paymentForCheckout(attempt.checkoutSessionId);
+    const rawStatus = payment && payment.raw && payment.raw.data && payment.raw.data.status;
+    if (String(rawStatus || "").toLowerCase() === "overpaid" && !rows.some((row) => row.kind === "overpaid" && row.attemptId === attempt.id)) {
+      rows.push({
+        kind: "overpaid",
+        attemptId: attempt.id,
+        invoiceId: attempt.invoiceId,
+        paymentId: payment.id,
+        detail: "Payer sent more than the checkout",
+      });
     }
   }
 

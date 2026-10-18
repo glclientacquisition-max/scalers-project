@@ -21,7 +21,7 @@ Prod DID **+254709221536** is Aris, the live paying customer: **never release, r
 
 **Product is callbacks only (#658, 11 Oct).** There is no live call transfer: the assistant takes a message and alerts a teammate. [`LIVE_TRANSFER.md`](archive/LIVE_TRANSFER.md) is archived as history.
 
-Billing is **packages + on-demand only**; beta charging is off; no prepaid wallet; no waive overage. Metering is live. Invoices and payments are not on prod. A pay-link draft is in flight (section 4) and is not applied on staging. Bachs is the chosen payment provider. Prices are about to be raised. The new prices are not decided. Detail in [Billing](#billing).
+Billing is **packages + on-demand only**; beta charging is off; no prepaid wallet; no waive overage. Metering is live. Invoices and payments are not on prod. Invoice pay SQL is on staging only (section 3). The pay page stays in #780. Bachs is the chosen payment provider. Prices are about to be raised. The new prices are not decided. Detail in [Billing](#billing).
 
 **Gate right now:** the next step is a clean, scored Aris call on prod. Until then, nothing else ships except live-call voice fixes Alvin approves (see section 4).
 
@@ -98,6 +98,7 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 - Caller files memory v2 SQL (#673) is applied on **staging only** (carried from 14 Oct).
 - **#762** (Desk call setup per account): `tenants.call_setup` + `save_call_setup()` applied on staging 18 Oct 13:34 EAT; re-applied 14:19 EAT with the test phone fields (`test_from`, `test_started_at`) and the test-call check. Additive, 0 rows changed. **Also on prod since 18 Oct 14:59 EAT** (see Ops changes); the #762 code is not on prod yet.
 - **Billing data layer** (`docs/supabase/billing_data_layer.sql`) on staging only, 18 Oct. Live starter/growth/scale prices seeded as version 1, plus an inactive trial (20 minutes, 14 days). Existing subscriptions grandfathered; enforcement, line status, minutes, seconds, and the package clock were unchanged (checksum `e87e060fd7a7f217fbe3fd3325104853` before and after). `voicemail_until` is null on real rows. A synthetic probe rolled back: escalation allowed while trialing, a minute cap does not open voicemail, the trial-ended notice stayed pending, payment replay held, and a quarantined number could not be marked available. Re-applied the same day for Chief's review: expired quarantine can be assigned again, a sending notice older than 15 minutes can be claimed again, and a sent notice stays sent. That probe rolled back too (0 rows left; tenant row hash `ed560e5d36dec3cd055e5c37fe1045b7` unchanged; 6 businesses, 2 pool rows). Not on prod.
+- **Invoice pay** (`docs/supabase/invoice_pay.sql`, `docs/supabase/invoice_documents.sql`) on staging only, 18 Oct. Migration names: `invoice_pay`, `invoice_pay_functions`, `invoice_pay_attempt`, `invoice_pay_settle`, `invoice_pay_issue_report`, `invoice_documents`, `invoice_documents_notices`, `invoice_documents_numbers`, `invoice_documents_receipts`. Verified: `invoice_pay_tokens`, `invoice_receipts`, `billing_receipt_counters`, `invoices.tax_kes`, `payment_attempts.checkout_expires_at`, `payment_attempts.client_reference`, `finalize_invoice` assigns `SCL-`, payments `match_status` includes `issue`, notice kinds include issued, due soon, payment received, and overdue, and `payments_issue_receipt` is present. 0 invoices, 0 pay tokens, 0 receipts. VAT stays unused (`tax_kes` null). Not on prod. No Bachs keys.
 
 ---
 
@@ -120,7 +121,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 **Ops-Billing (dated per the STATUS rule):**
 
 - **18 Oct 2026, in flight: #775** billing data layer (`cursor/billing-data-layer-cc4b`). Staging SQL only (section 3). No charges, no send-path change, no prod SQL.
-- **18 Oct 2026, in flight: #780** invoice pay (`cursor/invoice-pay-0c16`), stacked on #775. Pay tokens, public `/pay/<token>`, mock Bachs checkout, webhook inbox, split parts above KSh 150,000, and a report-only reconciliation. SQL is `docs/supabase/invoice_pay.sql`. Not applied on staging or prod. No keys. Live mode is refused. Desk handoff: [`INVOICE_PAY.md`](reference/operations/INVOICE_PAY.md).
+- **18 Oct 2026, in flight: #780** invoice pay (`cursor/invoice-pay-0c16`), stacked on #775. Pay tokens, public `/pay/<token>`, mock Bachs checkout, webhook inbox, split parts above KSh 150,000, report-only reconciliation, `SCL-` invoice numbers, invoice and receipt PDF/HTML, and an owner billing history API. SQL is applied on staging only (section 3). Not on prod. No keys. Live mode is refused. `BILLING_NOTICES_SEND` stays off. Desk handoff: [`INVOICE_PAY.md`](reference/operations/INVOICE_PAY.md).
 
 
 
@@ -196,7 +197,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **Admin:** Suspend/Archive shipped (#737, 18 Oct). Purge schedule not applied. Still to do: business edit / members / owner reset, package catalogue, billing period card, invoices.
 - **Settings / onboarding**: shipped (#656, #667, #672). GIGO P1/P2 follow-ups remain.
 - **UI/UX sweep** across Desk and Admin.
-- **Packages**: state rules and rollover shipped (#631, #650). Staging has the billing data layer (versions, `billing_status`, invoices, notices, `tenant_escalation_allowed`, number quarantine). No charges and no prod SQL. Package catalogue UI remains. A public pay page is drafted (section 4) and is not applied.
+- **Packages**: state rules and rollover shipped (#631, #650). Staging has the billing data layer (versions, `billing_status`, invoices, notices, `tenant_escalation_allowed`, number quarantine) and the invoice pay SQL (section 3). No charges and no prod SQL. Package catalogue UI remains. The public pay page is in #780 and is not on prod.
 - **Landing page** (#492 parked until its turn).
 - **Legal pack draft #653** (Terms, Privacy, DPA, call notice, beta terms). Parked; call notice ties to the recording decision.
 - **WhatsApp as the assistant doing work** (not just alerts).
@@ -208,9 +209,9 @@ Public copy never mentions unbuilt features.
 
 ## Billing
 
-Metering is live: packages, usage caps, the SMS reserve, send and settle ledger, and monthly rollover. Invoices and payments exist on staging as the #775 data layer only. They are not on prod. The pay page and Bachs adapter are drafted and not applied (section 4). Bachs is the chosen payment provider (collection per invoice; Scalers keeps the subscription record). Prices are about to be raised. The new prices are not decided, so none are written here.
+Metering is live: packages, usage caps, the SMS reserve, send and settle ledger, and monthly rollover. Invoices and payments exist on staging as the #775 data layer. Invoice pay SQL from #780 is on staging only (section 3). They are not on prod. The pay page and Bachs adapter are in #780. Bachs is the chosen payment provider (collection per invoice; Scalers keeps the subscription record). Prices are about to be raised. The new prices are not decided, so none are written here.
 
-This is Phase 0 of the 18 Oct 2026 ops and billing plan: correct the #737 and #643 migration records, and revoke anon execute on the seat functions. That seat revoke is on staging (`20261018164459`) and production (`20261018180156`). `create_tenant_invite`, `accept_tenant_invite`, and `transfer_tenant_ownership` allowed the anon role on both databases. Each revoke keeps `service_role` only. Create is on staging (`20261018180447`). Accept and transfer are on staging (`20261018180648`). Production waits for the owner's OK. The admin billing console is not started. Invoice pay is drafted and not applied.
+This is Phase 0 of the 18 Oct 2026 ops and billing plan: correct the #737 and #643 migration records, and revoke anon execute on the seat functions. That seat revoke is on staging (`20261018164459`) and production (`20261018180156`). `create_tenant_invite`, `accept_tenant_invite`, and `transfer_tenant_ownership` allowed the anon role on both databases. Each revoke keeps `service_role` only. Create is on staging (`20261018180447`). Accept and transfer are on staging (`20261018180648`). Production waits for the owner's OK. The admin billing console is not started. Invoice pay SQL is on staging. The page is not on prod. VAT and KRA eTIMS stay off. `tax_kes` is nullable for later.
 
 Paid-mode copy on Usage still says "next invoice". That wording is a Desk hand-off (`billingStateModel.ts`, `usageCap.ts`). Do not ship it as a promise until invoices exist.
 
@@ -224,6 +225,7 @@ Paid-mode copy on Usage still says "next invoice". That wording is a Desk hand-o
 4. **Set staging Jirani `events_url`** in the SautiKit dashboard (staging workspace `1f85601c`).
 5. **GO or no** for Brain #733 (#732 merged 18 Oct 14:48).
 6. **Carried:** top up TextSMS; staging full-scope SautiKit key for Railway staging Voice (masked card); Meta WhatsApp currency (131042).
+7. **Invoice company details** before a customer invoice: legal name if it is not Scalers, physical address, city, KRA PIN, phone, billing email. Set `BACHS_MODE=sandbox`, `BACHS_API_KEY`, and `BACHS_WEBHOOK_SECRET` on Vercel Preview. Leave `BILLING_NOTICES_SEND` off.
 
 ---
 

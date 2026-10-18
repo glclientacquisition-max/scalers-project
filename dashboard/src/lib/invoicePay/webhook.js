@@ -12,16 +12,17 @@ const KES_PAIRS = [
 ];
 
 function feeOf(data) {
-  const raw = data.fee ?? data.fees ?? data.processing_fee ?? data.fee_usd ?? null;
+  const raw = data.processing_fee ?? data.fee ?? data.fees ?? data.fee_usd ?? null;
+  const namedCurrency = data.processing_fee_currency || data.fee_currency || null;
   if (raw && typeof raw === "object") {
     return {
       amount: raw.amount ?? raw.processing_fee ?? null,
-      currency: raw.currency || data.fee_currency || (data.fee_usd != null ? "USD" : null),
+      currency: raw.currency || namedCurrency || (data.fee_usd != null ? "USD" : null),
     };
   }
   if (raw == null || raw === "") return { amount: null, currency: null };
-  let currency = data.fee_currency || null;
-  if (!currency && data.fee_usd != null && data.fee == null && data.fees == null && data.processing_fee == null) {
+  let currency = namedCurrency;
+  if (!currency && data.fee_usd != null && data.processing_fee == null && data.fee == null && data.fees == null) {
     currency = "USD";
   }
   return { amount: raw, currency };
@@ -63,31 +64,49 @@ function extractCharge(data) {
   return { kes, other, settledAmount, settledCurrency, feeAmount: fee.amount, feeCurrency: fee.currency };
 }
 
-function successStatus(status, type) {
-  if (!status) return type === "collection.succeeded" || type === "checkout.completed";
-  const s = String(status).toLowerCase();
-  return s === "succeeded" || s === "paid" || s === "complete" || s === "completed";
+function collectionOutcome(status) {
+  const s = String(status || "").toLowerCase();
+  if (s === "overpaid") return "overpaid";
+  if (s === "succeeded" || s === "accepted" || s === "paid" || s === "complete" || s === "completed") return "paid";
+  return null;
 }
 
 /**
- * @param {{ attempt: { amountKes: string }, charge: ReturnType<typeof extractCharge>, type: string, status?: unknown }} input
- * @returns {{ action: 'apply' | 'issue' | 'wait' | 'ignore', reason?: string }}
+ * collection.succeeded records SUCCEEDED, ACCEPTED, and OVERPAID.
+ * OVERPAID still records the payment, and the reconciliation report flags it.
+ * checkout.completed applies only when payment_status is paid.
+ * @param {{ attempt: { amountKes: string }, charge: ReturnType<typeof extractCharge>, type: string, status?: unknown, paymentStatus?: unknown }} input
+ * @returns {{ action: 'apply' | 'apply_overpaid' | 'issue' | 'wait' | 'ignore', reason?: string }}
  */
 function decidePayment(input) {
   const type = input.type;
   if (type === "collection.underpaid") return { action: "issue", reason: "underpaid" };
   if (type !== "collection.succeeded" && type !== "checkout.completed") return { action: "ignore" };
-  if (!successStatus(input.status, type)) return { action: "ignore" };
 
   const terminal = type === "collection.succeeded";
+  let overpaid = false;
+  if (type === "checkout.completed") {
+    if (String(input.paymentStatus || "").toLowerCase() !== "paid") return { action: "wait" };
+  } else {
+    const outcome = collectionOutcome(input.status);
+    if (!outcome) return { action: "ignore" };
+    overpaid = outcome === "overpaid";
+  }
+
   const kes = input.charge.kes;
   if (!kes) {
+    if (overpaid) return { action: "issue", reason: "overpaid" };
     if (terminal) return { action: "issue", reason: input.charge.other ? "currency" : "amount" };
     return { action: "wait" };
   }
   const got = toCents(kes.amount);
   const expected = toCents(input.attempt.amountKes);
-  if (got == null || expected == null || got !== expected) {
+  if (got == null || got <= 0n) {
+    if (terminal || overpaid) return { action: "issue", reason: overpaid ? "overpaid" : "amount" };
+    return { action: "wait" };
+  }
+  if (overpaid) return { action: "apply_overpaid", reason: "overpaid" };
+  if (expected == null || got !== expected) {
     if (terminal) return { action: "issue", reason: "amount" };
     return { action: "wait" };
   }
@@ -151,7 +170,13 @@ async function handlePayWebhook(input) {
   }
 
   const charge = extractCharge(data);
-  const decision = decidePayment({ attempt, charge, type, status: data.status });
+  const decision = decidePayment({
+    attempt,
+    charge,
+    type,
+    status: data.status,
+    paymentStatus: data.payment_status,
+  });
   if (decision.action === "wait" || decision.action === "ignore") {
     return { status: 200, body: { ok: true, action: decision.action, duplicate: recorded.attempts > 1 } };
   }
@@ -183,10 +208,11 @@ async function handlePayWebhook(input) {
     attemptId: attempt.id,
   };
 
-  if (decision.action === "apply") {
+  if (decision.action === "apply" || decision.action === "apply_overpaid") {
+    const amountKes = decision.action === "apply_overpaid" && charge.kes ? String(charge.kes.amount) : attempt.amountKes;
     await input.ledger.applyPayment({
       ...common,
-      amountKes: attempt.amountKes,
+      amountKes,
     });
     await input.ledger.markAttempt(attempt.id, {
       status: "succeeded",
@@ -196,7 +222,10 @@ async function handlePayWebhook(input) {
       feeCurrency: common.feeCurrency,
       raw: payload,
     });
-    return { status: 200, body: { ok: true, action: "apply" } };
+    return {
+      status: 200,
+      body: { ok: true, action: "apply", overpaid: decision.action === "apply_overpaid" },
+    };
   }
 
   const issueAmount = charge.kes ? String(charge.kes.amount) : null;

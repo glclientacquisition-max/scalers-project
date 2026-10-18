@@ -1,8 +1,11 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- node:test loads this file with require() */
 const crypto = require("node:crypto");
 
-/** Covers Bachs' longest retry (about 6 hours) plus clock skew. */
-const DEFAULT_MAX_SKEW_MS = 7 * 60 * 60 * 1000;
+/**
+ * Each retry is signed again. Bachs stops retrying about 80 minutes after the
+ * first try, so 300 seconds of clock skew is enough. An old timestamp is rejected.
+ */
+const DEFAULT_MAX_SKEW_MS = 300 * 1000;
 
 /**
  * HMAC-SHA256 of `${timestamp}.${rawBody}`, hex, compared in constant time.

@@ -26,7 +26,7 @@ async function startInvoiceCheckout(input) {
     partIndex: next.index,
     partCount: next.count,
   });
-  if (attempt.checkoutUrl && attempt.checkoutSessionId) {
+  if (attempt.reused && attempt.checkoutUrl && attempt.checkoutSessionId) {
     return {
       checkoutUrl: attempt.checkoutUrl,
       checkoutId: attempt.checkoutSessionId,
@@ -36,6 +36,10 @@ async function startInvoiceCheckout(input) {
 
   const successUrl = `${input.origin}/pay/${encodeURIComponent(input.token)}?return=1`;
   const cancelUrl = `${input.origin}/pay/${encodeURIComponent(input.token)}`;
+  const customer = {};
+  if (lookup.ownerEmail) customer.email = lookup.ownerEmail;
+  if (lookup.ownerName) customer.name = lookup.ownerName;
+  if (lookup.ownerPhone) customer.phone_number = lookup.ownerPhone;
   let created;
   try {
     created = await input.provider.createCheckout({
@@ -52,6 +56,8 @@ async function startInvoiceCheckout(input) {
       },
       idempotencyKey: `pay-${attempt.id}`,
       paymentMethodTypes: ["MOMO_KES"],
+      expiresInMinutes: 60,
+      customer: Object.keys(customer).length ? customer : undefined,
     });
   } catch (err) {
     await input.ledger.markAttempt(attempt.id, { status: "failed" });
@@ -60,8 +66,9 @@ async function startInvoiceCheckout(input) {
   await input.ledger.attachCheckout(attempt.id, {
     checkoutId: created.checkoutId,
     checkoutUrl: created.checkoutUrl,
+    expiresAt: created.expiresAt || null,
   });
-  return { checkoutUrl: created.checkoutUrl, checkoutId: created.checkoutId, reused: false };
+  return { checkoutUrl: created.checkoutUrl, checkoutId: created.checkoutId, reused: false, reference: attempt.id };
 }
 
 module.exports = { startInvoiceCheckout };

@@ -1,5 +1,6 @@
 import { invoicePayLedger } from "./ledger";
 import { payView } from "./view";
+import { readPayReturn } from "./returnUrl";
 
 export async function loadPayView(
   token: string,
@@ -8,8 +9,9 @@ export async function loadPayView(
 ) {
   const ledger = invoicePayLedger(env);
   const lookup = await ledger.lookup(token);
-  const checkoutId = search.checkout_id || "";
-  const returning = search.return === "1" && Boolean(checkoutId);
+  const normalized = readPayReturn(search);
+  const checkoutId = normalized.checkout_id || "";
+  const returning = normalized.return === "1" && Boolean(checkoutId);
   let checkout = null;
   if (returning) {
     const attempt = await ledger.findAttemptByCheckout(checkoutId);

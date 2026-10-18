@@ -15,8 +15,9 @@ Select is allowed. Insert and update are not, except marking a notice read.
 | --- | --- |
 | `billing_subscription_read` | Pinned package version, `billing_status`, `voicemail_until`, grandfathered `version_monthly_price_kes`. Price is the version, not the live catalogue row. |
 | `tenant_subscriptions` | Same facts, plus the package clock `status` (`active` or `cancelled`). Do not treat that clock as paid or unpaid. |
-| `invoices`, `invoice_lines` | Own invoices. Currency is KES. |
-| `billing_notices` | Own billing messages (invoice due, trial ending, past due, trial ended, line suspended). `mark_billing_notice_read(id)` sets `read_at` once. |
+| `invoices`, `invoice_lines` | Own invoices. Currency is KES. `tax_kes` stays null while VAT is off. Drafts have no invoice number. Issued invoices are `SCL-YYYY-000001`. |
+| `invoice_receipts` | Own receipts (`RCT-YYYY-000001`) after a recorded payment. The owner history API also returns the receipt number, amount, method, reference, and date. |
+| `billing_notices` | Own billing messages (invoice issued, due soon, payment received, overdue, invoice due, trial ending, past due, trial ended, line suspended). `mark_billing_notice_read(id)` sets `read_at` once. Invoice mail is queued. It is not sent unless `BILLING_NOTICES_SEND=on`. |
 | `billing_package_versions` | Published versions only. |
 
 `billing_status` values: `beta`, `trialing`, `active`, `past_due`, `grace`, `suspended`, `cancelled`, `archived`. Current businesses with billing mode off are `beta`. That is not "active".
@@ -29,7 +30,7 @@ Payments, payment attempts, credits, pay tokens, and the audit log are not owner
 
 ## Public pay page
 
-`/pay/<token>` is not an owner read and not an admin screen. The Desk server calls `pay_invoice_by_token` with the service role. `invoice_pay_tokens` stores the sha256 hex only. Anon and authenticated cannot mint or read tokens. A business with `billing_enforcement` off has no pay link. The page never marks an invoice paid. See [`INVOICE_PAY.md`](./INVOICE_PAY.md). The SQL is not applied yet.
+`/pay/<token>` is not an owner read and not an admin screen. The Desk server calls `pay_invoice_by_token` with the service role. `invoice_pay_tokens` stores the sha256 hex only. Anon and authenticated cannot mint or read tokens. A business with `billing_enforcement` off has no pay link. The page never marks an invoice paid. The signed-in owner history API is `GET /api/billing/invoices` and `GET /api/billing/receipts/:id`. A pay link is `POST /api/billing/invoices/:id/pay-link`, once. See [`INVOICE_PAY.md`](./INVOICE_PAY.md). The SQL is on staging. It is not on prod.
 
 ## Admin (service role)
 

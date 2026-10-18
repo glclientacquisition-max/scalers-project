@@ -50,6 +50,8 @@ alter table public.payment_attempts
   add column if not exists fee_amount numeric,
   add column if not exists fee_currency text,
   add column if not exists checkout_url text,
+  add column if not exists checkout_expires_at timestamptz,
+  add column if not exists client_reference text,
   add column if not exists updated_at timestamptz not null default now(),
   add column if not exists raw jsonb not null default '{}'::jsonb;
 
@@ -269,6 +271,8 @@ declare
   v_inv public.invoices%rowtype;
   v_name text;
   v_enf text;
+  v_email text;
+  v_phone text;
   v_state text;
 begin
   if nullif(btrim(p_token), '') is null then
@@ -281,8 +285,13 @@ begin
   end if;
 
   select * into v_inv from public.invoices where id = v_token.invoice_id;
-  select business_name, coalesce(billing_enforcement, 'off')
-    into v_name, v_enf
+  select business_name, coalesce(billing_enforcement, 'off'),
+         nullif(btrim(alert_email), ''),
+         case
+           when nullif(btrim(whatsapp_notification_number), '') like 'pending:%' then null
+           else nullif(btrim(whatsapp_notification_number), '')
+         end
+    into v_name, v_enf, v_email, v_phone
   from public.tenants where id = v_token.tenant_id;
 
   if v_inv.status = 'paid' then
@@ -310,7 +319,10 @@ begin
     'total_kes', v_inv.total_kes,
     'amount_paid_kes', v_inv.amount_paid_kes,
     'due_at', v_inv.due_at,
-    'enforcement', v_enf
+    'enforcement', v_enf,
+    'owner_name', v_name,
+    'owner_email', v_email,
+    'owner_phone', v_phone
   );
 end;
 $$;
@@ -322,7 +334,9 @@ revoke all on function public.pay_invoice_by_token(text) from public, anon, auth
 grant execute on function public.pay_invoice_by_token(text) to service_role;
 
 -- ---------------------------------------------------------------------------
--- Reserve the next part. Reuses a pending checkout from the last 30 minutes.
+-- Reserve the next part. Reuses a checkout only while checkout_expires_at
+-- is still in the future. A new attempt gets a new id, and that id is the
+-- Bachs reference. A reference is single-use, including after expiry.
 -- ---------------------------------------------------------------------------
 create or replace function public.create_invoice_pay_attempt(p_token text, p_amount_kes numeric)
 returns jsonb
@@ -367,7 +381,8 @@ begin
     and status = 'pending'
     and part_index = v_part.part_index
     and checkout_url is not null
-    and created_at > now() - interval '30 minutes'
+    and checkout_expires_at is not null
+    and checkout_expires_at > now()
   order by created_at desc
   limit 1;
   if found then
@@ -389,6 +404,11 @@ begin
   )
   returning * into v_row;
 
+  update public.payment_attempts
+  set client_reference = v_row.id::text
+  where id = v_row.id
+  returning * into v_row;
+
   return jsonb_build_object(
     'id', v_row.id,
     'checkout_session_id', v_row.checkout_session_id,
@@ -404,10 +424,13 @@ $$;
 revoke all on function public.create_invoice_pay_attempt(text, numeric) from public, anon, authenticated;
 grant execute on function public.create_invoice_pay_attempt(text, numeric) to service_role;
 
+drop function if exists public.attach_invoice_pay_checkout(uuid, text, text);
+
 create or replace function public.attach_invoice_pay_checkout(
   p_attempt_id uuid,
   p_checkout_session_id text,
-  p_checkout_url text
+  p_checkout_url text,
+  p_expires_at timestamptz default null
 )
 returns void
 language plpgsql
@@ -421,9 +444,13 @@ begin
   if p_checkout_url !~ '^https?://' then
     raise exception 'checkout url refused';
   end if;
+  if p_expires_at is null then
+    raise exception 'checkout expiry is required';
+  end if;
   update public.payment_attempts
   set checkout_session_id = p_checkout_session_id,
       checkout_url = p_checkout_url,
+      checkout_expires_at = p_expires_at,
       updated_at = now()
   where id = p_attempt_id
     and status = 'pending';
@@ -433,8 +460,8 @@ begin
 end;
 $$;
 
-revoke all on function public.attach_invoice_pay_checkout(uuid, text, text) from public, anon, authenticated;
-grant execute on function public.attach_invoice_pay_checkout(uuid, text, text) to service_role;
+revoke all on function public.attach_invoice_pay_checkout(uuid, text, text, timestamptz) from public, anon, authenticated;
+grant execute on function public.attach_invoice_pay_checkout(uuid, text, text, timestamptz) to service_role;
 
 create or replace function public.invoice_pay_attempt_by_checkout(p_checkout_id text)
 returns jsonb
@@ -675,7 +702,18 @@ as $$
       select 1 from public.payment_attempts a
       where a.status = 'issue'
         and a.checkout_session_id = p.provider_ref
-    );
+    )
+  union all
+  select
+    'overpaid',
+    a.id,
+    a.invoice_id,
+    p.id,
+    'Payer sent more than the checkout'
+  from public.payment_attempts a
+  join public.payments p
+    on p.provider_ref = a.checkout_session_id
+  where lower(coalesce(p.raw #>> '{data,status}', '')) = 'overpaid';
 $$;
 
 comment on function public.billing_payment_reconciliation() is

@@ -69,8 +69,8 @@ async function main() {
       const checkoutId = attempt.data?.checkout_session_id;
       if (!checkoutId) continue;
       const remote = await provider.getCheckout(checkoutId);
-      if (!remote?.status) continue;
-      providerStatuses[checkoutId] = remote.status;
+      if (!remote?.paymentStatus) continue;
+      providerStatuses[checkoutId] = remote.paymentStatus;
       attempts.push({
         id: row.attemptId,
         invoiceId: row.invoiceId,

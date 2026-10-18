@@ -25,6 +25,9 @@ export type PayLookup = {
   amountPaidKes?: string;
   dueAt?: string | null;
   enforcement?: string;
+  ownerName?: string;
+  ownerEmail?: string;
+  ownerPhone?: string;
 };
 
 export function mapLookup(data: unknown): PayLookup {
@@ -42,6 +45,9 @@ export function mapLookup(data: unknown): PayLookup {
     amountPaidKes: text(row.amount_paid_kes || "0"),
     dueAt: row.due_at ? text(row.due_at) : null,
     enforcement: text(row.enforcement),
+    ownerName: row.owner_name ? text(row.owner_name) : "",
+    ownerEmail: row.owner_email ? text(row.owner_email) : "",
+    ownerPhone: row.owner_phone ? text(row.owner_phone) : "",
   };
 }
 
@@ -97,11 +103,15 @@ export function invoicePayLedger(env: NodeJS.ProcessEnv = process.env) {
       };
     },
 
-    async attachCheckout(attemptId: string, created: { checkoutId: string; checkoutUrl: string }) {
+    async attachCheckout(
+      attemptId: string,
+      created: { checkoutId: string; checkoutUrl: string; expiresAt?: string | null }
+    ) {
       const { error } = await admin.rpc("attach_invoice_pay_checkout", {
         p_attempt_id: attemptId,
         p_checkout_session_id: created.checkoutId,
         p_checkout_url: created.checkoutUrl,
+        p_expires_at: created.expiresAt || null,
       });
       if (error) throw rpcError(error, "attach failed");
     },

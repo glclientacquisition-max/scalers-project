@@ -5,6 +5,34 @@ const { signBachsBody } = require("./signature");
 
 const SANDBOX_API = "https://sandbox-api.bachs.io";
 const PROD_REF = "fjxcdccgyhnvnnlnovcl";
+const DEFAULT_EXPIRES_MINUTES = 60;
+const MAX_EXPIRES_MINUTES = 1440;
+
+function expiresInMinutes(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_EXPIRES_MINUTES;
+  return Math.min(MAX_EXPIRES_MINUTES, Math.floor(n));
+}
+
+function customerBody(customer) {
+  if (!customer || typeof customer !== "object") return null;
+  const email = String(customer.email || "").trim();
+  const name = String(customer.name || "").trim();
+  const phone = String(customer.phone_number || customer.phone || "").trim();
+  if (phone.startsWith("pending:")) return null;
+  const out = {};
+  if (email) out.email = email;
+  if (name) out.name = name;
+  if (phone) out.phone_number = phone;
+  return Object.keys(out).length ? out : null;
+}
+
+/** Logs the Bachs error code and request id. Never logs the key or the body. */
+function logBachsError(res, json) {
+  const requestId = typeof res.headers?.get === "function" ? res.headers.get("x-request-id") : null;
+  const errorCode = json && (json.error_code || (json.error && json.error.code)) || null;
+  console.error(JSON.stringify({ source: "bachs", error_code: errorCode, request_id: requestId, status: res.status }));
+}
 
 /**
  * @param {NodeJS.ProcessEnv} [env]
@@ -56,20 +84,29 @@ class MockPayProvider {
     const checkoutId = `chk_mock_${crypto.randomBytes(9).toString("hex")}`;
     const url = new URL(request.successUrl);
     url.searchParams.set("checkout_id", checkoutId);
+    const minutes = expiresInMinutes(request.expiresInMinutes);
+    const expiresAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
     const row = {
       checkoutId,
       checkoutUrl: url.toString(),
       status: "open",
+      paymentStatus: "",
+      charge: null,
+      expiresAt,
       request,
     };
     this.checkouts.set(checkoutId, row);
-    return { checkoutId, checkoutUrl: row.checkoutUrl, status: "open" };
+    return { checkoutId, checkoutUrl: row.checkoutUrl, status: "open", expiresAt };
   }
 
   async getCheckout(checkoutId) {
     const row = this.checkouts.get(checkoutId);
     if (!row) return null;
-    return { checkoutId: row.checkoutId, status: row.status, checkoutUrl: row.checkoutUrl };
+    return {
+      checkoutId: row.checkoutId,
+      paymentStatus: row.paymentStatus || "",
+      charge: row.charge || null,
+    };
   }
 
   setStatus(checkoutId, status) {
@@ -94,8 +131,8 @@ class MockPayProvider {
       amount: amountKes,
       currency: opts.currency || "KES",
     };
-    if (opts.fee != null) data.fee = opts.fee;
-    if (opts.feeCurrency) data.fee_currency = opts.feeCurrency;
+    if (opts.fee != null) data.processing_fee = opts.fee;
+    if (opts.feeCurrency) data.processing_fee_currency = opts.feeCurrency;
     if (opts.settledAmount != null) {
       data.settlement_amount = opts.settledAmount;
       data.settlement_currency = opts.settledCurrency || "USD";
@@ -147,7 +184,10 @@ class BachsPayProvider {
       cancel_url: request.cancelUrl,
       reference: String(request.reference || "").slice(0, 128),
       metadata: request.metadata || {},
+      expires_in_minutes: expiresInMinutes(request.expiresInMinutes),
     };
+    const customer = customerBody(request.customer);
+    if (customer) body.customer = customer;
     const res = await this.fetchImpl(`${this.baseUrl}/v1/checkout-sessions`, {
       method: "POST",
       headers: {
@@ -162,6 +202,7 @@ class BachsPayProvider {
     const checkoutId = json.checkout_id || json.id;
     const checkoutUrl = json.checkout_url || json.url;
     if (!res.ok || !checkoutId || !checkoutUrl) {
+      logBachsError(res, json);
       const err = new Error("bachs checkout failed");
       err.code = "bachs_checkout";
       throw err;
@@ -171,7 +212,12 @@ class BachsPayProvider {
       err.code = "bachs_checkout";
       throw err;
     }
-    return { checkoutId: String(checkoutId), checkoutUrl: String(checkoutUrl), status: json.status || "open" };
+    return {
+      checkoutId: String(checkoutId),
+      checkoutUrl: String(checkoutUrl),
+      status: json.status || "open",
+      expiresAt: json.expires_at || null,
+    };
   }
 
   async getCheckout(checkoutId) {
@@ -183,14 +229,15 @@ class BachsPayProvider {
     if (res.status === 404) return null;
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
+      logBachsError(res, json);
       const err = new Error("bachs checkout read failed");
       err.code = "bachs_checkout";
       throw err;
     }
     return {
       checkoutId: String(json.checkout_id || checkoutId),
-      status: String(json.status || ""),
-      checkoutUrl: json.checkout_url || null,
+      paymentStatus: String(json.payment_status || ""),
+      charge: json.charge || null,
     };
   }
 }
@@ -209,6 +256,9 @@ function payProviderFromEnv(env = process.env, opts = {}) {
 module.exports = {
   SANDBOX_API,
   PROD_REF,
+  DEFAULT_EXPIRES_MINUTES,
+  MAX_EXPIRES_MINUTES,
+  expiresInMinutes,
   bachsMode,
   assertBachsAllowed,
   MockPayProvider,
