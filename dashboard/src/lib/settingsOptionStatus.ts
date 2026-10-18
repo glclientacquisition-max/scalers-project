@@ -27,7 +27,7 @@ export type SettingsStatusTenant = {
 };
 
 type SettingsStatusTarget =
-  | { tab: "catalog" | "import" | "test" | "alerts" }
+  | { tab: "catalog" | "import" | "test" | "calls" | "alerts" }
   | { tab: "train"; panel: string };
 
 const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;

@@ -16,6 +16,7 @@ import {
   MapPinIcon,
   MicrophoneIcon,
   PhoneArrowUpRightIcon,
+  PhoneIcon,
   QuestionMarkCircleIcon,
   ShoppingBagIcon,
   UsersIcon,
@@ -79,6 +80,7 @@ const SETTINGS_ICON: Record<string, typeof ClockIcon> = {
   "train:tools": MicrophoneIcon,
   "train:pronunciation": LanguageIcon,
   test: PhoneArrowUpRightIcon,
+  calls: PhoneIcon,
   "train:team": UsersIcon,
   alerts: BellIcon,
 };
@@ -220,6 +222,7 @@ export function BusinessSettingsShell({
   liveTransferExecutor = false,
   membersSlot = null,
   structuredSlot = null,
+  callsSlot = null,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
@@ -229,6 +232,8 @@ export function BusinessSettingsShell({
   liveTransferExecutor?: boolean;
   membersSlot?: ReactNode;
   structuredSlot?: Partial<Record<"identity" | "catalog", ReactNode>> | null;
+  /** Calls & forwarding (server-built: reads tenants.call_setup and the calls table). */
+  callsSlot?: ReactNode;
 }) {
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
@@ -327,6 +332,7 @@ export function BusinessSettingsShell({
                   showBack
                   title={heading}
                 />
+                {tab === "calls" ? callsSlot : null}
                 {tab === "import" || tab === "test" ? (
                   <SettingsPanelBody
                     tab={tab}

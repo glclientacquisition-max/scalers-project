@@ -1,3 +1,5 @@
+import { emptyCallSetup } from "@/lib/callSetupStore";
+import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { HomeOverviewHeader } from "@/components/HomeOverviewHeader";
@@ -18,7 +20,20 @@ import type { TenantRow } from "@/lib/supabase";
 /**
  * Local Overview identity harness (no desk login). DASHBOARD_OPEN=true only.
  */
-export default async function DevHomePage({ searchParams }: { searchParams: Promise<{ vertical?: string; tenant?: string }> }) {
+function devCallSetupFixture(state: string | undefined, now: number) {
+  const ago = (days: number) => new Date(now - days * 86_400_000).toISOString();
+  const base = { ...emptyCallSetup(), option: "forward" as const, network: "safaricom" as const };
+  if (state === "pending") return { setup: { ...base, opened_at: ago(0.05) }, activity: { firstCallAfterOpenAt: null, lastCallAt: null } };
+  if (state === "auto") return { setup: { ...base, opened_at: ago(2) }, activity: { firstCallAfterOpenAt: ago(1), lastCallAt: ago(1) } };
+  if (state === "nudge")
+    return {
+      setup: { ...base, opened_at: ago(12), tested_at: ago(10), tested_via: "manual" as const },
+      activity: { firstCallAfterOpenAt: null, lastCallAt: ago(9) },
+    };
+  return null;
+}
+
+export default async function DevHomePage({ searchParams }: { searchParams: Promise<{ vertical?: string; tenant?: string; calls?: string }> }) {
   if (process.env.DASHBOARD_OPEN !== "true") {
     notFound();
   }
@@ -26,6 +41,8 @@ export default async function DevHomePage({ searchParams }: { searchParams: Prom
   const home = sp.vertical === "home_services";
   // Same localStorage key as /dev/setup/line?tenant=x, so "I tested it" there hides the card here.
   const callSetupTenant = `dev-tenant${sp.tenant ? `-${sp.tenant.replace(/[^a-z0-9-]/gi, "").slice(0, 24)}` : ""}`;
+  // ?calls=pending|auto|nudge: account-backed card states (no DB in the fixture).
+  const callFixture = devCallSetupFixture(sp.calls, Date.now());
   const gates = capabilityGates(
     home
       ? { vertical: "home_services", services_catalog: [{ name: "Sofa cleaning", source: "owner" }] }
@@ -95,7 +112,12 @@ export default async function DevHomePage({ searchParams }: { searchParams: Prom
                   : shopStakes({ products: [], hoursText: "", holdsAllowed: false })
               }
             />
-            <HomeCallSetupCard tenantId={callSetupTenant} numberReady />
+            <HomeCallSetupCard
+              tenantId={callSetupTenant}
+              numberReady
+              supported={Boolean(callFixture)}
+              status={callFixture ? resolveCallSetupStatus({ numberReady: true, ...callFixture, now: Date.now() }) : null}
+            />
             <CapabilityGatesPanel gates={gates} />
             <HomeReviewSettingsNudge
               tenantId="dev-home-live-nudge"

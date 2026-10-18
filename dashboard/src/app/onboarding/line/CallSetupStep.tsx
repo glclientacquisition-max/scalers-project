@@ -26,9 +26,11 @@ import {
   type NetworkId,
   type PhoneKind,
 } from "@/lib/callForwarding";
+import { saveCallSetupAction } from "./callSetupActions";
 import {
   browserCallSetupStore,
   emptyCallSetup,
+  migrateLocalToDb,
   testIncludesBusy,
   type CallSetup,
   type CallSetupOption,
@@ -162,6 +164,7 @@ export function CallSetupStep({
   number,
   pretty,
   initialOption = null,
+  server = null,
 }: {
   tenantId: string;
   /** Scalers number in local 07 form, digits only. */
@@ -169,17 +172,47 @@ export function CallSetupStep({
   pretty: string;
   /** Dev fixture only: open on an option when nothing is saved. */
   initialOption?: CallSetupOption | null;
+  /** Account value. Null or unsupported: browser storage only (fixture, or before the column exists). */
+  server?: { supported: boolean; setup: CallSetup | null } | null;
 }) {
   const store = useRef(browserCallSetupStore());
-  const [setup, setSetup] = useState<CallSetup>(() => ({ ...emptyCallSetup(), option: initialOption }));
+  const dbRef = useRef(Boolean(server?.supported));
+  // Saves run one at a time so two quick taps can't overwrite each other.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const persist = (patch: Partial<CallSetup>) => {
+    if (!dbRef.current) return;
+    queue.current = queue.current.then(() =>
+      saveCallSetupAction(tenantId, patch, { opened: true })
+        .then((res) => {
+          if (!res.ok && res.unsupported) dbRef.current = false;
+        })
+        .catch(() => undefined)
+    );
+  };
+  const [setup, setSetup] = useState<CallSetup>(() => ({
+    ...(server?.setup ?? emptyCallSetup()),
+    option: server?.setup?.option ?? initialOption,
+  }));
   const [loaded, setLoaded] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
-    const saved = store.current.load(tenantId);
-    const phone = saved.phone ?? phoneFromUserAgent(navigator.userAgent);
-    setSetup({ ...saved, option: saved.option ?? initialOption, phone });
+    const local = store.current.load(tenantId);
+    const ua = phoneFromUserAgent(navigator.userAgent);
+    if (!dbRef.current) {
+      setSetup({ ...local, option: local.option ?? initialOption, phone: local.phone ?? ua });
+      setLoaded(true);
+      return;
+    }
+    const db = server?.setup ?? null;
+    // One-time copy of the v1 browser value; otherwise just stamp "opened" once.
+    const copy = migrateLocalToDb(db, local, new Date().toISOString());
+    const shown = copy ?? db ?? emptyCallSetup();
+    setSetup({ ...shown, option: shown.option ?? initialOption, phone: shown.phone ?? ua });
     setLoaded(true);
+    if (copy || !db?.opened_at) persist(copy ?? {});
+    // Server value is read once on mount; later edits are local first.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, initialOption]);
 
   function update(patch: Partial<CallSetup>) {
@@ -188,6 +221,7 @@ export function CallSetupStep({
       store.current.save(tenantId, next);
       return next;
     });
+    persist(patch);
   }
 
   const ring = ringSeconds(setup.ring_seconds);
@@ -359,7 +393,7 @@ export function CallSetupStep({
                     ? "Missed calls now go to your assistant."
                     : `Calls to ${pretty} go to your assistant.`}
                 </p>
-                <Button type="button" variant="ghost" size="md" className="mt-2 -ml-4" onClick={() => update({ tested_at: null })}>
+                <Button type="button" variant="ghost" size="md" className="mt-2 -ml-4" onClick={() => update({ tested_at: null, tested_via: null })}>
                   Test again
                 </Button>
               </div>
@@ -378,7 +412,7 @@ export function CallSetupStep({
                   </p>
                 )}
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button type="button" variant="primary" onClick={() => update({ tested_at: new Date().toISOString() })}>
+                  <Button type="button" variant="primary" onClick={() => update({ tested_at: new Date().toISOString(), tested_via: "manual" })}>
                     I tested it
                   </Button>
                   <Button type="button" variant="ghost" aria-expanded={helpOpen} onClick={() => setHelpOpen(true)}>

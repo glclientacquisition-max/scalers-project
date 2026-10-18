@@ -15,6 +15,7 @@ export type BusinessSettingsTab =
   | "train"
   | "import"
   | "test"
+  | "calls"
   | "alerts";
 
 const TRAIN_PANEL_ALIAS = new Set<string>([
@@ -42,6 +43,7 @@ export function parseBusinessSettingsTab(
     raw === "train" ||
     raw === "import" ||
     raw === "test" ||
+    raw === "calls" ||
     raw === "alerts"
   ) {
     return raw;
@@ -121,6 +123,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
       { label: "Voice", description: "How your Business Assistant sounds", target: { tab: "train", panel: "tools" } },
       { label: "Pronunciation", description: "Names and words it should say a certain way", target: { tab: "train", panel: "pronunciation" } },
       { label: "Test", description: "Call your line and hear it answer", target: { tab: "test" } },
+      { label: "Calls & forwarding", description: "How calls reach your assistant", target: { tab: "calls" } },
     ],
   },
   {
@@ -172,6 +175,7 @@ export function settingsPanelHeading(
       : "Import knowledge";
   }
   if (tab === "test") return "Test";
+  if (tab === "calls") return "Calls & forwarding";
   if (tab !== "train") return null;
   const item = settingsNavItems().find(
     (entry) => entry.target.tab === "train" && entry.target.panel === trainPanel
