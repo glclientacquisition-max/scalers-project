@@ -1232,8 +1232,10 @@ revoke all on function public.owner_set_extra_seats(uuid, uuid, integer, text) f
 grant execute on function public.owner_set_extra_seats(uuid, uuid, integer, text) to service_role;
 
 -- ---------------------------------------------------------------------------
--- 5. Spend limit. Null soft_spend_limit_kes means 50 percent of the pinned
---    monthly price. Enforcement off never blocks.
+-- 5. Spend limit. Null soft_spend_limit_kes means the pinned monthly price
+--    times spend_limit_share_percent. That column is added by the package
+--    version editor. When it is absent or null, the share is 50. Enforcement
+--    off never blocks. A stored soft_spend_limit_kes still wins.
 -- ---------------------------------------------------------------------------
 create or replace function public.billing_spend_limit_kes(p_tenant_id uuid)
 returns numeric
@@ -1245,6 +1247,7 @@ as $$
 declare
   v_tenant public.tenants%rowtype;
   v_monthly numeric;
+  v_share numeric := 50;
 begin
   select * into v_tenant from public.tenants where id = p_tenant_id;
   if not found then
@@ -1256,19 +1259,37 @@ begin
   if v_tenant.soft_spend_limit_kes is not null then
     return round(v_tenant.soft_spend_limit_kes, 0);
   end if;
-  select v.monthly_price_kes into v_monthly
-  from public.tenant_subscriptions s
-  join public.billing_package_versions v on v.id = s.package_version_id
-  where s.tenant_id = p_tenant_id;
+  if exists (
+    select 1
+    from pg_catalog.pg_attribute
+    where attrelid = 'public.billing_package_versions'::regclass
+      and attname = 'spend_limit_share_percent'
+      and attnum > 0
+      and not attisdropped
+  ) then
+    execute
+      'select v.monthly_price_kes, v.spend_limit_share_percent
+         from public.tenant_subscriptions s
+         join public.billing_package_versions v on v.id = s.package_version_id
+        where s.tenant_id = $1'
+      into v_monthly, v_share
+      using p_tenant_id;
+    v_share := coalesce(v_share, 50);
+  else
+    select v.monthly_price_kes into v_monthly
+    from public.tenant_subscriptions s
+    join public.billing_package_versions v on v.id = s.package_version_id
+    where s.tenant_id = p_tenant_id;
+  end if;
   if v_monthly is null then
     return null;
   end if;
-  return round(v_monthly * 0.5, 0);
+  return round(v_monthly * v_share / 100, 0);
 end;
 $$;
 
 comment on function public.billing_spend_limit_kes(uuid) is
-  'On-demand spend cap for the usage period. The stored column when set, otherwise half the pinned monthly price. Null when billing is off.';
+  'On-demand spend cap for the usage period. The stored column when set, otherwise the pinned monthly price times spend_limit_share_percent. The share is 50 when that column is absent or null. Null when billing is off.';
 
 revoke all on function public.billing_spend_limit_kes(uuid) from public, anon, authenticated;
 grant execute on function public.billing_spend_limit_kes(uuid) to service_role;
@@ -1501,7 +1522,7 @@ begin
       'soft_spend_limit_kes', v_limit,
       'effective_limit_kes', public.billing_spend_limit_kes(p_tenant_id),
       'message', case
-        when v_limit is null then 'The spend limit is half the plan price.'
+        when v_limit is null then 'The spend limit follows the plan.'
         else 'The spend limit is saved.'
       end
     ));

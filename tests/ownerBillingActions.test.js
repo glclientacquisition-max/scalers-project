@@ -85,6 +85,15 @@ describe("owner billing sql contract", () => {
     assert.equal(prod, BANNER + sql);
   });
 
+  it("reads the version spend share and falls back to 50", () => {
+    const fn = sql.slice(sql.indexOf("function public.billing_spend_limit_kes"));
+    const body = fn.slice(0, fn.indexOf("comment on function public.billing_spend_limit_kes"));
+    assert.match(body, /spend_limit_share_percent/);
+    assert.match(body, /attisdropped/);
+    assert.match(body, /coalesce\(v_share, 50\)/);
+    assert.match(body, /v_monthly \* v_share \/ 100/);
+  });
+
   it("hooks spend checks into consume, reserve, and escalation", () => {
     const call = sql.slice(sql.indexOf("function public.consume_call_seconds"));
     assert.match(call.slice(0, 4000), /billing_spend_allows_charge/);

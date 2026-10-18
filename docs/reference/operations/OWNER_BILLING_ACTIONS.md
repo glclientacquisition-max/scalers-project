@@ -108,7 +108,7 @@ Plus the shared gate codes.
 
 ## owner_set_spend_limit(tenant, actor, limit_kes, idempotency_key)
 
-Null or 0 stores null and means half the pinned monthly price. A number is rounded to a whole shilling and must be from 500 to 1,000,000.
+Null or 0 stores null. The cap is then the pinned monthly price times the version share. A number is rounded to a whole shilling and must be from 500 to 1,000,000.
 
 | Code | ok | Extra fields |
 | --- | --- | --- |
@@ -118,7 +118,7 @@ Null or 0 stores null and means half the pinned monthly price. A number is round
 
 ## Spend limit and usage
 
-`billing_spend_limit_kes(tenant)` is null when billing is off. Otherwise the stored `soft_spend_limit_kes`, or half the pinned monthly price when that column is null.
+`billing_spend_limit_kes(tenant)` is null when billing is off. Otherwise the stored `soft_spend_limit_kes`. When that is null, the cap is the pinned monthly price times `spend_limit_share_percent` on the pinned version. The share is 50 when that column is absent or null, so this works before and after the package version editor. A stored limit still wins over the share.
 
 `billing_period_on_demand_kes` sums on-demand `call_charge` and `sms_charge` rows in the current usage period (`wallet_ledger.metadata.on_demand` = `true`).
 

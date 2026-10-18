@@ -406,6 +406,35 @@ begin
     raise exception 'clearing the spend limit returned %', v_res;
   end if;
 
+  -- The package version editor adds this column. Absent above, so 50 applied.
+  -- Null falls back to 50. A set share is a percent of the pinned monthly price.
+  -- A stored tenant limit still wins.
+  alter table public.billing_package_versions
+    add column spend_limit_share_percent numeric;
+  if public.billing_spend_limit_kes(v_spend) <> 3500 then
+    raise exception 'a null share was not 50 percent of 7000';
+  end if;
+  update public.billing_package_versions
+  set spend_limit_share_percent = 40
+  where id = (select package_version_id from public.tenant_subscriptions where tenant_id = v_spend);
+  if public.billing_spend_limit_kes(v_spend) <> 2800 then
+    raise exception 'share 40 of 7000 was %', public.billing_spend_limit_kes(v_spend);
+  end if;
+  v_res := public.owner_set_spend_limit(v_spend, v_owner, 800, 'limit-share-800');
+  if (v_res->>'effective_limit_kes')::numeric <> 800 then
+    raise exception 'stored limit lost to the version share %', v_res;
+  end if;
+  v_res := public.owner_set_spend_limit(v_spend, v_owner, null, 'limit-share-clear');
+  if (v_res->>'effective_limit_kes')::numeric <> 2800 then
+    raise exception 'clearing the stored limit ignored share 40 %', v_res;
+  end if;
+  update public.billing_package_versions
+  set spend_limit_share_percent = null
+  where id = (select package_version_id from public.tenant_subscriptions where tenant_id = v_spend);
+  if public.billing_spend_limit_kes(v_spend) <> 3500 then
+    raise exception 'clearing the share did not fall back to 50';
+  end if;
+
   perform public._test_owner_tenant(v_beta_spend, '+254700010009', 'starter', 2, 'month', v_owner, 'owner', 1, false, true);
   if public.billing_spend_allows_charge(v_beta_spend, 99999) is not true
      or public.billing_spend_limit_kes(v_beta_spend) is not null
