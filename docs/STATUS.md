@@ -95,7 +95,7 @@ Brain scores the next Aris call against D199; #643 and #731 stay frozen until th
 
 ### 2.4 Admin lifecycle (#737), end to end
 
-- **17 Oct ~21:55:** SQL applied on **staging only** (files from `cd8db691`); staging test on Test Archive Co (`51a6c7c6`): suspend, refused second suspend, restore, archive, dry-run purge. Approver and rollback for the staging apply: not recorded (*per team notes*).
+- **17 Oct ~21:55:** SQL applied on **staging only** (files from `cd8db691`); staging test on Test Archive Co (`51a6c7c6`): suspend, refused second suspend, restore, archive, dry-run purge. Approver: Desk, under its staging design authority (no Alvin GO needed for staging). Rollback: **`TBD: rollback from Desk`** (`/workspace/reports/admin-lifecycle/staging/` holds only `pre-sql-20261017T215433.txt` and `post-qa-20261017T215618.txt`, no rollback script; the prod script `prod/rollback-737-prod.sql` is for prod).
 - **18 Oct 12:06:** prod SQL (2.3). **12:10:** code merged `fbef28a8` (2.1).
 - **Not live:** the purge schedule (`purge_archived_tenants_schedule.sql`) is applied nowhere. A real purge needs `p_days >= 30` and skips any business that still has recordings in `call-recordings` (Storage blocks deletes from SQL), so it waits for a recordings deletion route. `ARCHIVE_RESTORE_DAYS = 30`.
 
@@ -182,7 +182,7 @@ Brain puts each STATUS line in its own PR (no separate docs merge).
 | #766 (`voice/contact-name-lock`, head `9fe2b8a0`) | `VOICE_CONTACT_NAME_LOCK` (off) | **In progress.** In `src/db.js` `upsertContact`: when `contacts.metadata.name_locked` (or `single_person`) is set, skip the name and alternate merge; never re-add a name in `metadata.alternate_names_dismissed`; keep other metadata keys. Alvin GO 15:09 EAT for staging, draft, no merge. Brain builds the near-spelling fold (`brain/name-fold`, `BRAIN_NAME_FOLD`) and lock-aware caller memory; Desk builds the toggle and remove button. Chief ruling 15:08: STT near-spellings are one person. |
 | Fact-guard stack (`voice/guard-replay-suite` and follow-ups, no PR yet) | `VOICE_FACT_GUARD`, `VOICE_FACT_REPAIR`, `VOICE_LOCAL_HOURS_CONTEXT`, `VOICE_FACT_GUARD_PRICES`, `VOICE_PLACE_TENANT_FIRST`, `BRAIN_PRICE_CONFIRM_GATE` (all off) | **In progress**, staging first (section 4a). |
 
-**Docs PRs folded into this closing PR, #768** (docs merge under Alvin's standing docs rule, 18 Oct 09:40, Chief's chat; slot released by Chief; Chief checks it before merge). Close these after it merges: #750 (ship log), #753 (Desk ops mail env), #756 (#754 merge + recovery template), #764 (#732 lines).
+**Docs PRs folded into this closing PR, #768** (merge approved: Alvin "okay go" 15:20 EAT via Chief; docs merge under his standing docs rule, 18 Oct 09:40, Chief's chat; slot released by Chief; merges after Brain's #733, #751 and #761). Close these after it merges: #750 (ship log), #753 (Desk ops mail env), #756 (#754 merge + recovery template), #764 (#732 lines).
 
 **Other open PRs:**
 
