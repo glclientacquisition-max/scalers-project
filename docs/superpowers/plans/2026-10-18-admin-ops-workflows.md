@@ -35,16 +35,16 @@
 
 ## Phase 2 — Clarity (Desk)
 
-- [ ] Nav label Calls → Quality; Today section "Volume" vs quality tab  
-- [ ] Today spark/delta on call count rows when data exists  
-- [ ] `AdminPageHeader` on remaining admin index pages
+- [x] Nav label Calls → Quality; Today section "Volume" vs quality tab  
+- [x] Today spark/delta on call count rows when data exists  
+- [x] `AdminPageHeader` on remaining admin index pages
 
 ## Phase 3 — Auth (Platform)
 
-- [ ] Stop setting legacy cookie on admin login when Better Auth succeeds  
-- [ ] Fail closed on missing `BETTER_AUTH_SECRET` in production  
-- [ ] Document `ADMIN_OPERATORS` for prod  
-- [ ] Tests in `adminAuth.test.js`
+- [x] Stop setting legacy cookie on admin login when Better Auth succeeds  
+- [x] Fail closed on missing `BETTER_AUTH_SECRET` in production  
+- [x] Document `ADMIN_OPERATORS` for prod  
+- [x] Tests in `adminAuth.test.js`
 
 ## Phase 4 — Search (Desk)
 
