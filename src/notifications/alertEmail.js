@@ -5,6 +5,8 @@
 // Table layout, inline CSS, system fonts, no images. Colours are the Desk
 // MASTER tokens (dashboard/src/app/globals.css), light with a dark override.
 // Billing, wallet and ops emails do not use this file.
+// The recording row renders only when the model has recordingUrl; staffAlert()
+// leaves it null while STAFF_ALERT_RECORDING_LINK (templates.js) is false.
 // Callbacks only: never imply a live transfer or a confirmed booking.
 
 const BRAND = 'Scalers Business Assistant';

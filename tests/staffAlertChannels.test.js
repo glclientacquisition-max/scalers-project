@@ -7,7 +7,7 @@
 // reason and details). Callbacks only.
 const { describe, it, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { staffAlert, renderStaffSms, renderStaffWhatsApp, staffSmsTemplateLines, telHref, SMS_MAX } = require('../src/notifications/templates');
+const { staffAlert, renderStaffSms, renderStaffWhatsApp, staffSmsTemplateLines, telHref, SMS_MAX, STAFF_ALERT_RECORDING_LINK } = require('../src/notifications/templates');
 const { smsSegments } = require('../src/notifications/sendLedger');
 const { renderStaffAlertEmail, ALERT_EMAIL_BRAND } = require('../src/notifications/alertEmail');
 const { setShortCodeLookup } = require('../src/notifications/callShortLink');
@@ -135,7 +135,7 @@ describe('alert email', () => {
     assert.match(mail.html, new RegExp(`<a href="${LINK}"[^>]*>Open call</a>`));
     assert.equal((mail.html.match(/>Open call<\/a>/g) || []).length, 1, 'one primary button');
     assert.match(mail.html, /<a href="tel:\+254712345678"[^>]*>0712 345 678<\/a>/);
-    assert.match(mail.html, new RegExp(`<a href="${REC}"[^>]*>Play recording</a>`));
+    assert.doesNotMatch(mail.html, /recording/i, 'recordings paused');
     assert.equal(
       mail.text,
       [
@@ -145,8 +145,6 @@ describe('alert email', () => {
         '0712 345 678',
         '',
         'Wants 13kg gas refill to Kahawa West today, asked regulator price',
-        '',
-        `Recording: ${REC}`,
         '',
         `Open call: ${LINK}`,
         '',
@@ -198,6 +196,63 @@ describe('alert email', () => {
   it('not a staff call alert: no model (billing, wallet, ops keep their text)', () => {
     for (const kind of ['wallet_low', 'platform_billing_suspended', 'outage_speech', 'missed_textback']) {
       assert.equal(staffAlert({ kind, lead: { businessName: 'B' }, body: 'x' }), null, kind);
+    }
+  });
+});
+
+describe('recordings paused: no recording link on any staff alert channel', () => {
+  it('the flag is off', () => {
+    assert.equal(STAFF_ALERT_RECORDING_LINK, false);
+  });
+  for (const [name, spec] of Object.entries(SAMPLES)) {
+    it(`${name}: SMS, WhatsApp text, template variables and email carry no recording`, () => {
+      assert.ok(spec.body.includes(REC) || !spec.lead.recordingUrl, 'fixture has a recording to leak');
+      const parts = [
+        renderStaffSms({ ...spec, shortCode: CODE, deskBase: 'https://app.scalers.co.ke' }),
+        renderStaffWhatsApp({ ...spec, shortCode: CODE, deskBase: 'https://app.scalers.co.ke' }),
+        ...staffSmsTemplateLines(spec),
+      ];
+      const mail = renderStaffAlertEmail(alertOf(spec));
+      parts.push(mail.subject, mail.preheader, mail.text, mail.html);
+      for (const part of parts) {
+        assert.ok(!part.includes(REC), `${name}: ${part.slice(0, 80)}`);
+        assert.doesNotMatch(part, /recording/i);
+      }
+    });
+  }
+  it('the email row still renders if a model carries a recording (for re-enabling)', () => {
+    const mail = renderStaffAlertEmail({ ...alertOf(SAMPLES.lead), recordingUrl: REC });
+    assert.match(mail.html, new RegExp(`<a href="${REC}"[^>]*>Play recording</a>`));
+    assert.match(mail.text, new RegExp(`Recording: ${REC}`));
+  });
+  it('dispatch: WhatsApp template and email for a lead with a recording carry none', async () => {
+    const saved = {};
+    const env = { SAUTIKIT_API_KEY: 'k', SAUTIKIT_WHATSAPP_NUMBER_ID: 'num-1', RESEND_API_KEY: 'k', ALERT_EMAIL_FROM: 'a@example.test', TEXTSMS_API_KEY: undefined };
+    for (const [k, v] of Object.entries(env)) {
+      saved[k] = process.env[k];
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    const realFetch = global.fetch;
+    const sent = [];
+    global.fetch = async (url, init) => {
+      sent.push({ url: String(url), body: init.body });
+      return new Response(JSON.stringify({ id: 'x1' }), { status: 202, headers: { 'content-type': 'application/json' } });
+    };
+    try {
+      const { dispatchAlert } = require('../src/notifications/dispatch');
+      for (const channels of [{ sms: false, whatsapp: true, email: false }, { sms: false, whatsapp: false, email: true }]) {
+        await dispatchAlert({ to: '+254711000000', email: 'o@example.test', body: SAMPLES.lead.body, lead: SAMPLES.lead.lead, kind: 'lead', channels });
+        resetInstanceFlights();
+      }
+      assert.ok(sent.length >= 2);
+      for (const s of sent) assert.ok(!s.body.includes(REC) && !/recording/i.test(s.body), s.url);
+    } finally {
+      global.fetch = realFetch;
+      for (const [k, v] of Object.entries(saved)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
     }
   });
 });

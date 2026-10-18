@@ -389,6 +389,10 @@ const STAFF_DETAIL_ROWS = Object.freeze([
   ['Notes', 'Notes'],
   ['Caller asked for', 'Asked for'],
 ]);
+// Recordings are paused (no call has recording_url yet). Staff alerts on every
+// channel (SMS, WhatsApp text and template, email) carry no recording link.
+// Set to true to show "Play recording" in the email again (alertEmail.js).
+const STAFF_ALERT_RECORDING_LINK = false;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function plainLine(text) {
@@ -477,7 +481,8 @@ function staffAlert({ kind, lead = {}, body = '', shortCode = null, deskBase = n
     tel: telHref(rawPhone),
     reason,
     details,
-    recordingUrl: /^https?:\/\//i.test(String(l.recordingUrl || '')) ? String(l.recordingUrl).trim() : null,
+    recordingUrl:
+      STAFF_ALERT_RECORDING_LINK && /^https?:\/\//i.test(String(l.recordingUrl || '')) ? String(l.recordingUrl).trim() : null,
     link: short ? `https://${short}` : callUrlFrom({ body, callId, deskBase }),
     shortLink: Boolean(short),
   };
@@ -523,6 +528,7 @@ function staffSmsTemplateLines({ kind, lead = {} } = {}) {
 module.exports = {
   SHORT_CODE_RE,
   SMS_MAX,
+  STAFF_ALERT_RECORDING_LINK,
   STAFF_SMS_KINDS,
   isGsm7Basic,
   renderStaffSms,
