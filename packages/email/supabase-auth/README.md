@@ -4,7 +4,7 @@ Branded versions of the six Supabase Auth emails, in the same layout as the rest
 Generated from `src/supabase-auth.ts` by `npm run export:auth`. **Don't edit the HTML by hand**: change the
 source, re-export, commit. `test/supabase-auth.test.ts` fails if the files drift from the source.
 
-**Not applied anywhere yet.** Applying them changes live auth email and needs Alvin's GO.
+**Applied on prod** (`fjxcdccgyhnvnnlnovcl`): all six on 18 Oct 12:03 EAT, reset password link updated 13:02 EAT. Not on staging (free tier with the built-in mailer refuses template edits). Changes need Alvin's GO.
 
 | Supabase template (Dashboard name) | File | Subject | Management API keys |
 | --- | --- | --- | --- |
@@ -21,7 +21,8 @@ Supabase sends HTML only).
 ## Variables used
 
 `{{ .ConfirmationURL }}` (button and copyable fallback link), `{{ .Email }}`, `{{ .NewEmail }}` (change email only),
-`{{ .Token }}` (reauthentication code). Nothing else.
+`{{ .Token }}` (reauthentication code). Reset password uses `{{ .SiteURL }}/auth/callback?next=/reset-password&token_hash={{ .TokenHash }}&type=recovery`
+instead of `{{ .ConfirmationURL }}`, so the link works on any device (Desk verifies the token hash). Nothing else.
 
 ## Why these differ from the other templates
 
