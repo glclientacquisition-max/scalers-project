@@ -148,7 +148,7 @@ async function WalletBody({ searchParams }: WalletPageProps) {
         beta={extras.freeBeta}
         planLine={planLine}
         rows={usageRows}
-        showChangePlan={canChangePlan}
+        showChangePlan={canChangePlan && !extras.freeBeta}
       />
       {extras.freeBeta || extras.onDemandLocked ? null : (
         <div className="max-w-2xl">

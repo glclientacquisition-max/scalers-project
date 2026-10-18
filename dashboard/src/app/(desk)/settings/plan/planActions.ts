@@ -31,15 +31,20 @@ export async function confirmPlanChange(
   return closed(await planChangePort().changePlan({ sku, cycle: cycle as PlanCycle }));
 }
 
-export async function confirmSeatPurchase(
+/** Total extra seats, 0 to 100. Same bound as owner_set_extra_seats. */
+const EXTRA_SEAT_TOTAL_MAX = 100;
+
+export async function setExtraSeatsAction(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
   const denied = await memberDenied("billing.manage");
   if (denied) return denied;
-  const quantity = Number(formData.get("quantity"));
-  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
+  const extraSeats = Number(formData.get("extra_seats"));
+  const idempotencyKey = String(formData.get("idempotency_key") || "").trim();
+  if (!Number.isInteger(extraSeats) || extraSeats < 0 || extraSeats > EXTRA_SEAT_TOTAL_MAX) {
     return { ok: false, error: "Choose how many seats." };
   }
-  return closed(await planChangePort().addSeats({ quantity }));
+  if (!idempotencyKey) return { ok: false, error: "Try again." };
+  return closed(await planChangePort().setExtraSeats({ extraSeats, idempotencyKey }));
 }

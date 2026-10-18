@@ -44,7 +44,7 @@ const EXPECT: Record<string, Array<"admin" | "staff" | "viewer">> = {
   loadPronunciationReviewQueueAction: ["admin", "viewer"], geminiScanRecentCallsAction: ["admin"], approveGeminiScanCandidateAction: ["admin"], dismissGeminiScanCandidateAction: ["admin"], queueGeminiCandidateForRecordingAction: ["admin"],
   inviteMemberAction: ["admin"], resendInviteAction: ["admin"], revokeInviteAction: ["admin"], changeMemberRoleAction: ["admin"], removeMemberAction: ["admin"], transferOwnershipAction: [],
   saveOnDemandUsage: ["admin"],
-  confirmPlanChange: ["admin"], confirmSeatPurchase: ["admin"], markBillingNoticeRead: ["admin"],
+  confirmPlanChange: ["admin"], setExtraSeatsAction: ["admin"], markBillingNoticeRead: ["admin"],
 };
 
 it("every guarded action is in the expected matrix (and vice versa)", () => {

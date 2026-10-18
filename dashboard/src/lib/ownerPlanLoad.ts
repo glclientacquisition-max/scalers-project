@@ -2,7 +2,14 @@ import { isMissingTableError } from "@/lib/adminErrors";
 import { createWorkspaceDataClient } from "@/lib/tenant";
 import { isFreeBeta, ownerBillingSurface, type OwnerBillingSurface } from "@/lib/betaBilling";
 import { nairobiDay, pickBillingBanner, type BillingBanner } from "@/lib/billingBanner";
-import { annualPriceKes, annualSavingKes } from "@/lib/planPricing";
+import {
+  annualPriceKes,
+  annualSavingKes,
+  emptySeatOffer,
+  nairobiPeriodDays,
+  seatUnitKes,
+  type SeatOffer,
+} from "@/lib/planPricing";
 import { trialRemaining } from "@/lib/trialRemaining";
 
 const SELL = ["starter", "growth", "scale"] as const;
@@ -60,6 +67,10 @@ export type OwnerPlanModel = {
   periodEndLabel: string | null;
   dayOfPeriod: number | null;
   daysInPeriod: number | null;
+  daysLeft: number | null;
+  extraSeatMonthlyKes: number | null;
+  extraSeats: number;
+  seatUnitKes: number | null;
   banner: BillingBanner | null;
 };
 
@@ -73,9 +84,21 @@ export type UsageBillingExtras = {
   onDemandLocked: boolean;
 };
 
-const VERSION_WITH_CREDITS =
-  "id, package_id, version, monthly_price_kes, seats, minutes, dids, inbound_kes_per_second, outbound_kes_per_second, annual_discount_percent, message_credits";
-const VERSION_BASE = VERSION_WITH_CREDITS.replace(", message_credits", "");
+const VERSION_CORE = [
+  "id",
+  "package_id",
+  "version",
+  "monthly_price_kes",
+  "seats",
+  "minutes",
+  "dids",
+  "inbound_kes_per_second",
+  "outbound_kes_per_second",
+  "annual_discount_percent",
+];
+const VERSION_OPTIONAL = ["message_credits", "extra_seat_monthly_kes", "trial_days"];
+const SUB_CORE = ["billing_status", "period", "package_version_id", "current_period_start", "current_period_end"];
+const SUB_OPTIONAL = ["term_start", "term_end", "extra_seats"];
 const INVOICE_WITH_TOKEN =
   "id, invoice_number, status, total_kes, due_at, issued_at, period_start, period_end, pay_token";
 const INVOICE_BASE = INVOICE_WITH_TOKEN.replace(", pay_token", "");
@@ -103,6 +126,10 @@ function betaModel(): OwnerPlanModel {
     periodEndLabel: null,
     dayOfPeriod: null,
     daysInPeriod: null,
+    daysLeft: null,
+    extraSeatMonthlyKes: null,
+    extraSeats: 0,
+    seatUnitKes: null,
     banner: null,
   };
 }
@@ -163,25 +190,106 @@ function mapPlans(packages: Record<string, unknown>[], versions: VersionRow[]): 
 type DataClient = NonNullable<Awaited<ReturnType<typeof createWorkspaceDataClient>>>["client"];
 
 type LooseRows = { data: VersionRow[] | null; error: { message?: string; code?: string } | null };
+type LooseOne = { data: VersionRow | null; error: { message?: string; code?: string } | null };
 
 async function selectRows(query: PromiseLike<unknown>): Promise<LooseRows> {
   return (await query) as LooseRows;
 }
 
+async function selectOne(query: PromiseLike<unknown>): Promise<LooseOne> {
+  return (await query) as LooseOne;
+}
+
+function dropOptional(fields: string[], optional: string[], message: string): string[] | null {
+  const lower = message.toLowerCase();
+  const hit = fields.filter((name) => optional.includes(name) && lower.includes(name));
+  if (!hit.length) return null;
+  return fields.filter((name) => !hit.includes(name));
+}
+
 async function publishedVersions(
   client: DataClient,
 ): Promise<{ rows: VersionRow[]; missing: boolean; failed: boolean }> {
+  let fields = [...VERSION_CORE, ...VERSION_OPTIONAL];
   let res = await selectRows(
-    client.from("billing_package_versions").select(VERSION_WITH_CREDITS).eq("status", "published"),
+    client.from("billing_package_versions").select(fields.join(", ")).eq("status", "published"),
   );
-  if (res.error && /message_credits/i.test(String(res.error.message || ""))) {
+  for (let attempt = 0; attempt < VERSION_OPTIONAL.length && res.error; attempt += 1) {
+    if (isMissingTableError(res.error)) return { rows: [], missing: true, failed: false };
+    const next = dropOptional(fields, VERSION_OPTIONAL, String(res.error.message || ""));
+    if (!next) break;
+    fields = next;
     res = await selectRows(
-      client.from("billing_package_versions").select(VERSION_BASE).eq("status", "published"),
+      client.from("billing_package_versions").select(fields.join(", ")).eq("status", "published"),
     );
   }
   if (isMissingTableError(res.error)) return { rows: [], missing: true, failed: false };
   if (res.error) return { rows: [], missing: false, failed: true };
   return { rows: (res.data || []) as VersionRow[], missing: false, failed: false };
+}
+
+function nullableKes(raw: unknown): number | null {
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n);
+}
+
+/** Pinned version seat price and the days left in this period. Missing columns hide the seat control. */
+export async function loadPinnedSeatOffer(client: DataClient, tenantId: string): Promise<SeatOffer> {
+  const empty = emptySeatOffer();
+  if (!tenantId) return empty;
+  try {
+    let fields = [...SUB_CORE, ...SUB_OPTIONAL];
+    let sub = await selectOne(
+      client.from("tenant_subscriptions").select(fields.join(", ")).eq("tenant_id", tenantId).maybeSingle(),
+    );
+    for (let attempt = 0; attempt < SUB_OPTIONAL.length && sub.error && !isMissingTableError(sub.error); attempt += 1) {
+      const next = dropOptional(fields, SUB_OPTIONAL, String(sub.error.message || ""));
+      if (!next) break;
+      fields = next;
+      sub = await selectOne(
+        client.from("tenant_subscriptions").select(fields.join(", ")).eq("tenant_id", tenantId).maybeSingle(),
+      );
+    }
+    if (sub.error || !sub.data) return empty;
+    const row = sub.data;
+    const status = String(row.billing_status || "");
+    if (status !== "active") return empty;
+    const cycle = row.period === "year" ? "year" : "month";
+    const extraSeats = Math.max(0, Math.round(num(row.extra_seats)));
+    const versionId = row.package_version_id ? String(row.package_version_id) : "";
+    if (!versionId) return { ...empty, extraSeats, cycle };
+    let versionFields = [...VERSION_CORE, ...VERSION_OPTIONAL];
+    let version = await selectOne(
+      client.from("billing_package_versions").select(versionFields.join(", ")).eq("id", versionId).maybeSingle(),
+    );
+    for (let attempt = 0; attempt < VERSION_OPTIONAL.length && version.error && !isMissingTableError(version.error); attempt += 1) {
+      const next = dropOptional(versionFields, VERSION_OPTIONAL, String(version.error.message || ""));
+      if (!next) break;
+      versionFields = next;
+      version = await selectOne(
+        client.from("billing_package_versions").select(versionFields.join(", ")).eq("id", versionId).maybeSingle(),
+      );
+    }
+    if (version.error || !version.data) return { ...empty, extraSeats, cycle };
+    const price = nullableKes(version.data.extra_seat_monthly_kes);
+    const clock = nairobiPeriodDays(
+      row.term_start ? String(row.term_start) : row.current_period_start ? String(row.current_period_start) : null,
+      row.term_end ? String(row.term_end) : row.current_period_end ? String(row.current_period_end) : null,
+      new Date(),
+    );
+    return {
+      extraSeatMonthlyKes: price,
+      extraSeats,
+      cycle,
+      daysLeft: clock?.daysLeft ?? null,
+      daysInPeriod: clock?.daysInPeriod ?? null,
+      seatUnitKes: price == null ? null : seatUnitKes(price, cycle, num(version.data.annual_discount_percent)),
+    };
+  } catch {
+    return empty;
+  }
 }
 
 function pauseOn(row: Record<string, unknown>): string | null {
@@ -288,6 +396,7 @@ export async function loadOwnerPlan(tenantId: string): Promise<{ ok: true; model
     if (notices.error && !isMissingTableError(notices.error)) return { ok: false };
 
     const plans = mapPlans((packs.data || []) as Record<string, unknown>[], versions.rows);
+    const seatOffer = await loadPinnedSeatOffer(ws.client, tenantId);
     const open = invoices.rows.find((item) => item.status === "open") || null;
     const now = new Date();
     const trial =
@@ -326,8 +435,15 @@ export async function loadOwnerPlan(tenantId: string): Promise<{ ok: true; model
         invoices: invoices.rows,
         notices: noticeRows,
         periodEndLabel: nairobiDay(row.paid_through ? String(row.paid_through) : null),
-        dayOfPeriod: null,
-        daysInPeriod: null,
+        dayOfPeriod:
+          seatOffer.daysLeft != null && seatOffer.daysInPeriod != null
+            ? seatOffer.daysInPeriod - seatOffer.daysLeft
+            : null,
+        daysInPeriod: seatOffer.daysInPeriod,
+        daysLeft: seatOffer.daysLeft,
+        extraSeatMonthlyKes: seatOffer.extraSeatMonthlyKes,
+        extraSeats: seatOffer.extraSeats,
+        seatUnitKes: seatOffer.seatUnitKes,
         banner: bannerFrom(row, open ? { totalKes: open.totalKes, payToken: open.payToken } : null, now),
       },
     };

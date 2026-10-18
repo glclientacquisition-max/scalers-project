@@ -10,7 +10,8 @@ export type PlanCycle = "month" | "year";
 
 export type PlanChangePort = {
   changePlan: (input: { sku: string; cycle: PlanCycle }) => Promise<PlanChangeResult>;
-  addSeats: (input: { quantity: number }) => Promise<PlanChangeResult>;
+  /** `extraSeats` is the new total, matching owner_set_extra_seats. */
+  setExtraSeats: (input: { extraSeats: number; idempotencyKey: string }) => Promise<PlanChangeResult>;
 };
 
 const CLOSED: PlanChangeResult = { ok: false, message: "Plan changes open soon" };
@@ -19,7 +20,7 @@ const closedPort: PlanChangePort = {
   async changePlan() {
     return CLOSED;
   },
-  async addSeats() {
+  async setExtraSeats() {
     return CLOSED;
   },
 };

@@ -16,7 +16,7 @@ import { seatSummary } from "@/lib/invites";
 import { invoicePayState } from "@/lib/invoicePayState";
 import type { MembersData } from "@/lib/membersLoad";
 import type { OwnerInvoiceRow, OwnerPlanModel, PlanCycle, PlanSku, PublishedPlan } from "@/lib/ownerPlanLoad";
-import { annualPriceKes, annualSavingKes, formatKsh } from "@/lib/planPricing";
+import { annualPriceKes, annualSavingKes, formatKsh, type SeatOffer } from "@/lib/planPricing";
 import { trialRemaining } from "@/lib/trialRemaining";
 
 const PREVIEW_NOW = new Date("2026-10-18T09:00:00+03:00");
@@ -69,6 +69,10 @@ function growthModel(cycle: PlanCycle, trialText: string | null = null): OwnerPl
     periodEndLabel: "31 Oct",
     dayOfPeriod: 10,
     daysInPeriod: 30,
+    daysLeft: 20,
+    extraSeatMonthlyKes: 500,
+    extraSeats: 0,
+    seatUnitKes: 500,
     banner: null,
   };
 }
@@ -170,7 +174,7 @@ function UsagePreview({ kind }: { kind: "beta" | "paid" }) {
         beta={beta}
         planLine={beta ? null : "Growth · KSh 18,000 a month"}
         rows={rows}
-        showChangePlan
+        showChangePlan={!beta}
       />
       {beta ? null : (
         <div className="max-w-2xl">
@@ -195,6 +199,14 @@ const fullTeam: MembersData = {
   seats: seatSummary({ members: 3, invites: [], included: 3 }),
   totals: { members: 3, invites: 0 },
   limits: { members: 20, invites: 20 },
+  seatOffer: {
+    extraSeatMonthlyKes: 500,
+    extraSeats: 0,
+    cycle: "month",
+    daysLeft: 20,
+    daysInPeriod: 30,
+    seatUnitKes: 500,
+  } satisfies SeatOffer,
 };
 
 export type BillingPreview =
