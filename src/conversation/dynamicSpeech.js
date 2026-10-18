@@ -519,8 +519,41 @@ function wholeSentenceClaims(text, opts, dropReasons) {
     kept.push(stripped);
   }
   const joined = kept.join(' ').trim();
-  if (!joined) return confirmationLanguage(opts.language) === 'en' ? 'Okay.' : 'Sawa.';
+  if (!joined) {
+    // The guard cut a fact claim (coverage, price, pay): the caller asked
+    // something, so they get the team callback line, never a bare "Okay",
+    // which sounds like a yes (staging call 2026-10-19, "We cover <place>").
+    if (cutFactClaim(dropReasons)) return cannotAnswerLine(opts);
+    if (Array.isArray(dropReasons) && dropReasons.includes('glued_words') && opts.spokenThisTurn !== true) {
+      return cannotAnswerLine(opts);
+    }
+    if (Array.isArray(dropReasons) && dropReasons.includes('glued_words')) return '';
+    return confirmationLanguage(opts.language) === 'en' ? 'Okay.' : 'Sawa.';
+  }
   return joined;
+}
+
+// Guard drops that removed a factual claim the caller may have asked about.
+const FACT_CLAIM_DROPS = new Set([
+  'coverage',
+  'unbound_place',
+  'placeholder_price',
+  'unsaid_number',
+  'hold_payment',
+  'fact_ref_confirm',
+  'pay_number_unknown',
+]);
+
+function cutFactClaim(dropReasons) {
+  return Array.isArray(dropReasons) && dropReasons.some((reason) => FACT_CLAIM_DROPS.has(reason));
+}
+
+function cannotAnswerLine(opts = {}) {
+  const factSheet = require('./factSheet');
+  const line = factSheet.pickUnknownAnswerLine(opts.profile || {}, opts.language).text;
+  if (factSheet.callbackSafeLine(line)) return line;
+  const sw = String(opts.language || '').toLowerCase();
+  return factSheet.TEAM_DEFAULT_LINE[sw === 'sw' || sw === 'sheng' ? 'sw' : 'en'];
 }
 
 /** Lookup speech is already the answer. Never re-parse it, never log the sentence. */
@@ -586,6 +619,21 @@ function polishSpokenDetail(text, opts = {}) {
       logSpokenFilterDrop('pay_number_unknown', lastCaller, opts);
     }
   }
+  // Run-together words (staging call 2026-10-19): split them with the word list, or
+  // drop the sentence, before the guard and the lint read it.
+  if (lookupsOn && spoken) {
+    const { repairGluedWords, profileWords } = require('../speech/glueRepair');
+    const glue = repairGluedWords(spoken, {
+      language: opts.language,
+      extraWords: profileWords(opts.profile || {}),
+    });
+    if (glue.split) noteDrop(dropReasons, 'glue_split');
+    if (glue.dropped.length) {
+      noteDrop(dropReasons, 'glued_words');
+      logSpokenFilterDrop('glued_words', glue.dropped.join(' '), opts);
+    }
+    spoken = glue.text;
+  }
   // Guard whole sentences first. Stripping a verb phrase after the fact would
   // leave a fragment ("that for you.") that the guard can no longer see.
   if (opts.state || opts.profile) {
@@ -631,19 +679,19 @@ function polishSpokenDetail(text, opts = {}) {
     const { lintSentence, sentencesOf } = require('../knowledge/sentenceLint');
     const parts = sentencesOf(out);
     let failed = false;
-    const fallback = require('./factSheet').pickUnknownAnswerLine(opts.profile || {}, opts.language).text;
     const fixed = [];
     for (const sentence of parts) {
       if (!lintSentence(sentence)) {
         fixed.push(sentence);
         continue;
       }
+      // A fragment is dropped. It is never swapped for an unrelated line.
       failed = true;
-      if (!fixed.includes(fallback)) fixed.push(fallback);
     }
     if (failed) {
       noteDrop(dropReasons, 'sentence_fragment');
       out = fixed.join(' ').trim();
+      if (!out && opts.spokenThisTurn !== true) out = cannotAnswerLine(opts);
     }
   }
   const before = String(text || '').trim();

@@ -542,6 +542,26 @@ function weekSpeech(parsed) {
   return both(`We're open ${en}.`, `Tuko wazi ${sw}.`);
 }
 
+// leo / kesho / today / tomorrow, read on the Nairobi date (eatParts). At
+// 02:25 EAT on a Monday "kesho" is Tuesday; the answer names the day so the
+// caller can correct it.
+const RELATIVE_DAY = [
+  { offset: 2, re: /\b(kesho kutwa|day after tomorrow)\b/i, en: 'The day after tomorrow', sw: 'Kesho kutwa' },
+  { offset: 1, re: /\b(kesho|tomorrow)\b/i, en: 'Tomorrow', sw: 'Kesho' },
+  { offset: 0, re: /\b(leo|today|tonight|this (?:morning|afternoon|evening))\b/i, en: 'Today', sw: 'Leo' },
+];
+
+function relativeDayAsked(query, now) {
+  const text = typeof query === 'string' ? query : '';
+  for (const rel of RELATIVE_DAY) {
+    if (!rel.re.test(text)) continue;
+    const today = eatParts(now).weekday;
+    const key = DAY_ORDER[(DAY_ORDER.indexOf(today) + rel.offset) % 7];
+    return { key, en: rel.en, sw: rel.sw };
+  }
+  return null;
+}
+
 function dayAsked(query) {
   const text = String(query || '');
   for (const [key, re] of Object.entries(DAY_WORD)) {
@@ -553,9 +573,12 @@ function dayAsked(query) {
 function hoursScope(query) {
   if (query && typeof query === 'object') return String(query.scope || 'week');
   const text = String(query || '');
-  if (/\b(what time is it|what(?:'s| is) the time|time now|saa ngapi)\b/i.test(text) && !/\b(mnafungua|mnafunga|open|close|hours|kazi)\b/i.test(text)) {
+  // "Na kesho, saa ngapi?" asks for that day's hours, not the clock.
+  const namesDay = RELATIVE_DAY.some((rel) => rel.re.test(text)) && !/\b(today|leo)\b/i.test(text);
+  if (/\b(what time is it|what(?:'s| is) the time|time now|saa ngapi)\b/i.test(text) && !/\b(mnafungua|mnafunga|open|close|hours|kazi)\b/i.test(text) && !namesDay && !dayAsked(text)) {
     return 'clock';
   }
+  if (RELATIVE_DAY.some((rel) => rel.re.test(text))) return 'day';
   if (/\b(are you open|open now|mko wazi|uko wazi|are you closed)\b/i.test(text)) return 'open';
   if (dayAsked(text)) return 'day';
   return 'week';
@@ -595,14 +618,18 @@ function lookupHours(query, ctx) {
     }, profile);
   }
   if (scope === 'day') {
-    const key = (query && query.day) || dayAsked(query) || eatParts(now).weekday;
+    const rel = typeof query === 'string' ? relativeDayAsked(query, now) : null;
+    const key = (query && query.day) || (rel && rel.key) || dayAsked(query) || eatParts(now).weekday;
     const day = parsed.days[key];
+    // Always name the day. A relative ask leads with the word the caller used.
+    const enLead = rel ? `${rel.en}, ${EN_DAY[key]},` : `On ${EN_DAY[key]}`;
+    const swLead = rel ? `${rel.sw}, ${SW_DAY[key]},` : `Siku ya ${SW_DAY[key]}`;
     if (!day) {
       return resultOf('found', {
         id: `hours.${key}`,
         value: 'closed',
         source: 'owner',
-        speech: both(`On ${EN_DAY[key]} we are closed.`, `Siku ya ${SW_DAY[key]} tumefunga.`),
+        speech: both(`${enLead} we are closed.`, `${swLead} tumefunga.`),
       }, profile);
     }
     return resultOf('found', {
@@ -610,8 +637,8 @@ function lookupHours(query, ctx) {
       value: `${day.open}-${day.close}`,
       source: 'owner',
       speech: both(
-        `On ${EN_DAY[key]} we are open from ${enClock(day.open)} to ${enClock(day.close)}.`,
-        `Siku ya ${SW_DAY[key]} tunafungua kutoka ${swClock(day.open)} hadi ${swClock(day.close)}.`,
+        `${enLead} we are open from ${enClock(day.open)} to ${enClock(day.close)}.`,
+        `${swLead} tunafungua kutoka ${swClock(day.open)} hadi ${swClock(day.close)}.`,
       ),
     }, profile);
   }

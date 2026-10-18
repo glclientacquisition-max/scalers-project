@@ -89,7 +89,7 @@ function applyTopic(topic, kind, found, cutoff) {
 
 function answerOne(text, ctx, topic) {
   const hit = classify(text);
-  if (!hit) return followUpAnswer(text, ctx);
+  if (!hit) return followUpAnswer(text, ctx, topic);
   if (!ctx.kinds.has(hit.kind === 'fee' ? 'fee' : hit.kind)) return null;
   const bareFee = hit.kind === 'fee' && hit.bare && topic.areaId;
   const barePrice = hit.kind === 'price' && hit.bare && topic.serviceId;
@@ -114,7 +114,83 @@ function answerOne(text, ctx, topic) {
   return { kind: hit.kind, found, query, cutoff: hit.cutoff };
 }
 
-function followUpAnswer(text, ctx) {
+// A coverage ask that names a known place, whatever the verb: "do you do
+// Kileleshwa", "mnafanya Kileleshwa?" (staging call 2026-10-19).
+const ASK_FORM = /\?\s*$|\b(do you|does|can you|are you|will you|would you|is there|know if|wanted to know|want to know|nauliza|nataka kujua|ningependa kujua|je|mna\w*|mko|una(?:fanya|enda|fika|kuja))\b/i;
+const PLACE_STOP = new Set([
+  'athi', 'biashara', 'chache', 'daima', 'holds', 'hotel', 'imara', 'junction', 'kubwa', 'mbili', 'mtaa',
+  'ndogo', 'point', 'range', 'state', 'sukari', 'tayari', 'total', 'wangu', 'kenya', 'mara', 'kuku',
+  'office', 'carpet', 'market', 'station', 'centre', 'center', 'estate', 'road', 'river', 'hill',
+]);
+let PLACES = null;
+function placeIndex() {
+  if (!PLACES) {
+    try {
+      PLACES = require('./data/kenyaPlaceCounties.json').places || {};
+    } catch {
+      PLACES = {};
+    }
+  }
+  return PLACES;
+}
+
+function catalogueWords(profile) {
+  const words = new Set();
+  for (const name of [profile?.business_name, profile?.name, profile?.agent_name, profile?.owner_name]) {
+    for (const w of String(name || '').toLowerCase().split(/[^a-z]+/)) if (w) words.add(w);
+  }
+  for (const item of Array.isArray(profile?.services) ? profile.services : []) {
+    const name = typeof item === 'string' ? item : item?.name;
+    for (const w of String(name || '').toLowerCase().split(/[^a-z]+/)) if (w) words.add(w);
+  }
+  return words;
+}
+
+/** The known place a turn names, or ''. Capitalised names count; lowercase ones need 6+ letters. */
+function namedPlace(text, profile) {
+  const places = placeIndex();
+  const skip = catalogueWords(profile);
+  const tokens = String(text || '').split(/[^A-Za-z']+/).filter(Boolean);
+  for (let i = 0; i < tokens.length; i += 1) {
+    for (const span of [2, 1]) {
+      const raw = tokens.slice(i, i + span);
+      if (raw.length < span) continue;
+      const key = raw.join(' ').toLowerCase();
+      if (!places[key] || PLACE_STOP.has(key) || raw.some((w) => skip.has(w.toLowerCase()))) continue;
+      const capital = /^[A-Z]/.test(raw[0]);
+      if (key.length < 4) continue;
+      if (capital && i > 0) return key;
+      if (key.length >= 6) return key;
+    }
+  }
+  return '';
+}
+
+function placeAnswer(text, ctx) {
+  if (!ctx.kinds.has('fee') || !ASK_FORM.test(text)) return null;
+  const place = namedPlace(text, ctx.lookupCtx.profile);
+  if (!place) return null;
+  const found = lookup('area_fee', text, ctx.lookupCtx);
+  return { kind: 'fee', found, query: text, cutoff: false, via: 'place' };
+}
+
+// A short follow-up to an hours answer: "Na kesho?", "And Saturday?".
+const DAY_WORD = /\b(leo|kesho|today|tomorrow|tonight|weekend|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jumatatu|jumanne|jumatano|alhamisi|ijumaa|jumamosi|jumapili)\b/i;
+function hoursFollowUp(text, topic, ctx) {
+  if (topic.intent !== 'hours' || !ctx.kinds.has('hours')) return null;
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  if (!words.length || words.length > 5 || !DAY_WORD.test(text)) return null;
+  // "Na kesho, saa ngapi?" asks for hours on that day, not the clock.
+  const query = String(text).replace(/\b(saa ngapi|what time)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+  const found = lookup('hours', query, ctx.lookupCtx);
+  return { kind: 'hours', found, query, cutoff: false, via: 'follow_up' };
+}
+
+function followUpAnswer(text, ctx, topic = blankTopic()) {
+  const hours = hoursFollowUp(text, topic, ctx);
+  if (hours) return hours;
+  const place = placeAnswer(text, ctx);
+  if (place) return place;
   if (!ctx.kinds.has('price')) return null;
   const query = matchCatalogueFollowUp(text, ctx.lookupCtx.profile);
   if (!query) return null;
