@@ -53,7 +53,7 @@ type DraftForm = {
 };
 
 function money(amount: number) {
-  return `KES ${formatKes(amount)}`;
+  return `KSh ${formatKes(amount)}`;
 }
 
 function planPreview(version: PackageVersionRow) {
