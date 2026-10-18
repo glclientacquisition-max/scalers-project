@@ -42,6 +42,18 @@
 -- Beta (billing_enforcement off, or billing_status beta) returns code beta.
 -- No proration invoice, no seat line, no spend-limit hold.
 --
+-- Issued invoices are numbered SCL-YYYY-000001 inside finalize_invoice.
+-- That update sets scalers.billing_write so invoices_freeze allows the
+-- number and the status. A negative draft writes tenant_credits with key
+-- invoice-credit:<id>, then a paid zero invoice. Plan changes call
+-- finalize_invoice. They do not write the number themselves. Re-applying
+-- this file keeps SCL-. When billing_company and the issuer columns exist,
+-- this file keeps that snapshot and the issued notice, and adds the same
+-- flag and credit key. It does not replace a body that already has both.
+-- An active subscription must keep a package_version_id. The trigger below
+-- refuses the row when billing_status is active and the pin is null. It
+-- does not depend on the package editor.
+--
 -- Desk screens stay behind DESK_PLAN_CHANGE (exact value on). This file does
 -- not read that flag. The Desk server action does, and it refuses production.
 
@@ -1172,6 +1184,141 @@ grant execute on function public._owner_next_invoice_line(uuid, text, numeric, t
 
 -- Issue. A negative draft (a seat credit) becomes one tenant_credits row.
 -- The issued invoice is then paid at 0, so the credit is not also an amount due.
+-- Number and status change only here, with scalers.billing_write set, so
+-- invoices_freeze allows the write. The number is SCL-YYYY-000001.
+-- A database that already has billing_company keeps the issuer snapshot.
+do $install_owner_finalize$
+declare
+  v_docs boolean;
+  v_ready boolean;
+begin
+  v_docs := to_regclass('public.billing_company') is not null
+    and exists (
+      select 1 from pg_catalog.pg_attribute
+      where attrelid = 'public.invoices'::regclass
+        and attname = 'issuer_legal_name'
+        and attnum > 0 and not attisdropped
+    );
+  v_ready := exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'finalize_invoice'
+      and pg_get_functiondef(p.oid) like '%scalers.billing_write%'
+      and pg_get_functiondef(p.oid) like '%invoice-credit:%'
+      and pg_get_functiondef(p.oid) like '%SCL-%'
+  );
+  if v_docs and v_ready then
+    raise notice 'finalize_invoice already numbers SCL- with the freeze flag and the credit key';
+    return;
+  end if;
+
+  if v_docs then
+    execute $docs$
+create or replace function public.finalize_invoice(p_invoice_id uuid)
+returns public.invoices
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_inv public.invoices%rowtype;
+  v_co public.billing_company%rowtype;
+  v_year integer;
+  v_n integer;
+  v_number text;
+  v_body text;
+  v_credit boolean;
+begin
+  select * into v_inv from public.invoices where id = p_invoice_id for update;
+  if not found then
+    raise exception 'invoice not found';
+  end if;
+  if v_inv.status <> 'draft' then
+    raise exception 'only a draft invoice can be finalized';
+  end if;
+  if exists (
+    select 1 from public.tenant_subscriptions s
+    where s.tenant_id = v_inv.tenant_id
+      and s.billing_status = 'beta'
+  ) then
+    raise exception 'beta tenants have no pay link';
+  end if;
+
+  select * into v_co from public.billing_company where id = 1;
+  if not found then
+    raise exception 'billing company is not set';
+  end if;
+  if nullif(btrim(v_co.legal_name), '') is null then
+    raise exception 'billing company is not set';
+  end if;
+
+  v_credit := coalesce(v_inv.total_kes, 0) < 0;
+  if v_credit then
+    insert into public.tenant_credits (tenant_id, amount_kes, reason, idempotency_key)
+    values (
+      v_inv.tenant_id,
+      -v_inv.total_kes,
+      'invoice_credit',
+      'invoice-credit:' || v_inv.id::text
+    )
+    on conflict (idempotency_key) do nothing;
+  end if;
+
+  v_year := extract(year from (now() at time zone 'Africa/Nairobi'))::integer;
+  insert into public.billing_invoice_counters (year, last_number)
+  values (v_year, 0)
+  on conflict (year) do nothing;
+  update public.billing_invoice_counters
+  set last_number = last_number + 1
+  where year = v_year
+  returning last_number into v_n;
+  v_number := 'SCL-' || v_year::text || '-' || lpad(v_n::text, 6, '0');
+
+  perform set_config('scalers.billing_write', '1', true);
+  update public.invoices
+  set status = case when v_credit then 'paid' else 'open' end,
+      invoice_number = v_number,
+      issued_at = coalesce(issued_at, now()),
+      subtotal_kes = case when v_credit then 0 else subtotal_kes end,
+      total_kes = case when v_credit then 0 else total_kes end,
+      paid_at = case when v_credit then coalesce(paid_at, now()) else paid_at end,
+      issuer_legal_name = nullif(btrim(v_co.legal_name), ''),
+      issuer_product = coalesce(nullif(btrim(v_co.product), ''), 'Business Assistant'),
+      issuer_phone = nullif(btrim(v_co.phone), ''),
+      issuer_email = nullif(btrim(v_co.email), ''),
+      issuer_address = nullif(btrim(v_co.address), ''),
+      issuer_city = nullif(btrim(v_co.city), ''),
+      issuer_kra_pin = nullif(btrim(v_co.kra_pin), ''),
+      updated_at = now()
+  where id = p_invoice_id
+  returning * into v_inv;
+  perform set_config('scalers.billing_write', '', true);
+
+  if not found then
+    raise exception 'invoice not found';
+  end if;
+
+  if not v_credit then
+    v_body := 'Your Business Assistant invoice ' || v_number
+      || ' for KSh ' || trim(to_char(v_inv.total_kes, 'FM999999990.00')) || ' is ready.';
+    perform public.enqueue_billing_notice(
+      v_inv.tenant_id,
+      'platform_billing_invoice_issued',
+      'platform_billing_invoice_issued:' || v_inv.id::text,
+      'Invoice ' || v_number,
+      v_body
+    );
+  end if;
+  return v_inv;
+end;
+$$;
+$docs$;
+    return;
+  end if;
+
+  execute $plain$
 create or replace function public.finalize_invoice(p_invoice_id uuid)
 returns public.invoices
 language plpgsql
@@ -1214,8 +1361,11 @@ begin
   set last_number = last_number + 1
   where year = v_year
   returning last_number into v_n;
-  v_number := 'SC-' || v_year::text || '-' || lpad(v_n::text, 6, '0');
+  v_number := 'SCL-' || v_year::text || '-' || lpad(v_n::text, 6, '0');
 
+  -- invoices_freeze rejects a draft whose number or status changes unless
+  -- this flag is set for the update. Clear it before returning.
+  perform set_config('scalers.billing_write', '1', true);
   update public.invoices
   set status = case when v_credit then 'paid' else 'open' end,
       invoice_number = v_number,
@@ -1226,6 +1376,7 @@ begin
       updated_at = now()
   where id = p_invoice_id
   returning * into v_inv;
+  perform set_config('scalers.billing_write', '', true);
 
   if not v_credit then
     v_body := 'Your Business Assistant invoice ' || v_number
@@ -1241,9 +1392,12 @@ begin
   return v_inv;
 end;
 $$;
+$plain$;
+end
+$install_owner_finalize$;
 
 comment on function public.finalize_invoice(uuid) is
-  'Assigns SC-YYYY-000001 for the Africa/Nairobi year. A negative draft becomes one tenant_credits row (idempotency key invoice-credit:<id>) and a paid zero invoice. A positive draft queues platform_billing_invoice_due. Does not charge.';
+  'Assigns SCL-YYYY-000001 for the Africa/Nairobi year. Sets scalers.billing_write so invoices_freeze allows the number and status. A negative draft becomes one tenant_credits row (idempotency key invoice-credit:<id>) and a paid zero invoice. A positive draft queues the invoice notice. When the billing company row exists, the issuer snapshot stays on the invoice. Does not charge.';
 
 revoke all on function public.finalize_invoice(uuid) from public, anon, authenticated;
 grant execute on function public.finalize_invoice(uuid) to service_role;
@@ -1716,6 +1870,28 @@ create trigger tenant_subscriptions_clear_spend_hold
   before update on public.tenant_subscriptions
   for each row execute function public.tenant_subscriptions_clear_spend_hold();
 
+-- Active billing needs a pinned package version. Named after
+-- tenant_subscriptions_b_pin_version so the pin trigger runs first and can
+-- fill a null pin on insert. A check constraint would reject rows already
+-- stored. This trigger only refuses the next write. It does not call the
+-- package editor, so it still applies when that editor is absent.
+create or replace function public.tenant_subscriptions_c_require_version_pin()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.billing_status = 'active' and new.package_version_id is null then
+    raise exception 'active billing requires a pinned package version';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists tenant_subscriptions_c_require_version_pin on public.tenant_subscriptions;
+create trigger tenant_subscriptions_c_require_version_pin
+  before insert or update on public.tenant_subscriptions
+  for each row execute function public.tenant_subscriptions_c_require_version_pin();
+
 -- PATCHED_FUNCTIONS_BELOW
 
 -- ---------------------------------------------------------------------------
@@ -1830,8 +2006,11 @@ begin
   elsif v_overage > 0 and v_ondemand then
     -- branch: on_demand debit overage seconds from the pinned version.
     -- No rate-card fallback when a version is pinned. Older databases may
-    -- lack the per-second columns, so feature-detect them.
+    -- lack the per-second columns, so feature-detect them. A null pin, a
+    -- null column, or a missing column is rate_missing. A published 0 stays
+    -- a legal rate and still meters the seconds.
     v_reason := 'on_demand';
+    v_rate := null;
     if exists (
       select 1 from pg_catalog.pg_attribute
       where attrelid = 'public.billing_package_versions'::regclass
@@ -1852,7 +2031,18 @@ begin
         into v_rate
         using p_direction, v_call.tenant_id;
     end if;
-    v_rate := coalesce(v_rate, 0);
+    if v_rate is null then
+      metered := false;
+      reason := 'rate_missing';
+      seconds_applied := v_applied;
+      overage_seconds := v_overage;
+      amount_kes := 0;
+      seconds_used := v_used;
+      minutes_included := v_tenant.minutes_included;
+      already_applied := false;
+      return next;
+      return;
+    end if;
     if v_rate < 0 then
       v_rate := 0;
     end if;
@@ -1927,7 +2117,7 @@ end;
 $$;
 
 comment on function public.consume_call_seconds(uuid, integer, text) is
-  'Meter talk seconds into the package pool. Overage is 0 when enforcement is off or billing_status is beta. Otherwise the per-second rate is the pinned package version. Debit only when the spend limit still has room.';
+  'Meter talk seconds into the package pool. Overage is 0 when enforcement is off or billing_status is beta. Otherwise the per-second rate is the pinned package version. An active on-demand business with a null pinned rate returns rate_missing and does not meter those seconds. A published rate of 0 still meters. Debit only when the spend limit still has room.';
 
 revoke all on function public.consume_call_seconds(uuid, integer, text)
   from public, anon, authenticated;
@@ -2176,7 +2366,12 @@ begin
   if p_tenant_id is null and v_billed <> 'platform' then
     raise exception 'tenant_id required for tenant-billed sends';
   end if;
-  v_units := case when v_channel = 'sms' then greatest(coalesce(p_units, 1), 1) else 1 end;
+  -- Desk reserves caller SMS with the member JWT, so authenticated keeps
+  -- execute. Cap a claim at 30 segments, the same ceiling as consume_sms_units.
+  v_units := case
+    when v_channel = 'sms' then least(greatest(coalesce(p_units, 1), 1), 30)
+    else 1
+  end;
   v_metered := p_tenant_id is not null and v_billed = 'tenant' and v_channel = 'sms';
 
   -- Desk (authenticated) may only reserve caller SMS for its own tenant.
@@ -2342,7 +2537,7 @@ end;
 $$;
 
 comment on function public.reserve_notify_send(uuid, text, text, text, text, text, integer, uuid, text, text, text, boolean) is
-  'Reserve one notify send: pending notify_sends row + SMS units in one transaction. Idempotent by key; failed/refused keys re-arm. Overage SMS stops when the spend limit would be exceeded.';
+  'Reserve one notify send: pending notify_sends row + SMS units in one transaction. SMS units are capped at 30. Authenticated may reserve caller SMS for its own tenant. Idempotent by key; failed/refused keys re-arm. Overage SMS stops when the spend limit would be exceeded.';
 
 revoke all on function public.reserve_notify_send(uuid, text, text, text, text, text, integer, uuid, text, text, text, boolean)
   from public, anon;

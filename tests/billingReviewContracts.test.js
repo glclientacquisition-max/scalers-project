@@ -31,7 +31,28 @@ describe("owner billing actions SQL", () => {
     const body = functionBody(sql, "consume_call_seconds");
     assert.match(body, /billing_package_versions/);
     assert.match(body, /billing_status = 'beta'/);
+    assert.match(body, /rate_missing/);
+    assert.doesNotMatch(body, /v_rate := coalesce\(v_rate, 0\)/);
     assert.doesNotMatch(body, /from public\.billing_rate_card/);
+  });
+
+  it("issues SCL- invoices through finalize_invoice with the freeze flag", () => {
+    const body = functionBody(sql, "finalize_invoice");
+    assert.match(body, /set_config\('scalers\.billing_write', '1', true\)/);
+    assert.match(body, /'SCL-' \|\|/);
+    assert.match(body, /invoice-credit:/);
+    assert.doesNotMatch(body, /'SC-' \|\|/);
+    assert.match(sql, /billing_company/);
+    assert.match(sql, /issuer_legal_name/);
+    const proration = functionBody(sql, "_owner_open_proration_invoice");
+    assert.match(proration, /finalize_invoice/);
+    assert.doesNotMatch(proration, /invoice_number/);
+  });
+
+  it("refuses active billing without a pinned version", () => {
+    const body = functionBody(sql, "tenant_subscriptions_c_require_version_pin");
+    assert.match(body, /billing_status = 'active'/);
+    assert.match(body, /package_version_id is null/);
   });
 
   it("disables the editor freeze while backfilling extra_seat_monthly_kes", () => {
@@ -60,6 +81,16 @@ describe("member wallet debit and period roll", () => {
   it("keeps a seat-removal credit on the draft invoice total", () => {
     const body = functionBody(actions, "_owner_next_invoice_line");
     assert.doesNotMatch(body, /greatest\(v_sum, 0\)/);
+  });
+
+  it("caps reserve_notify_send SMS units and keeps the desk grant", () => {
+    const body = functionBody(actions, "reserve_notify_send");
+    assert.match(body, /least\(greatest\(coalesce\(p_units, 1\), 1\), 30\)/);
+    const grants = actions.slice(actions.indexOf("function public.reserve_notify_send"));
+    assert.match(
+      grants,
+      /grant execute on function public\.reserve_notify_send\(uuid, text, text, text, text, text, integer, uuid, text, text, text, boolean\)\s+to authenticated, service_role/
+    );
   });
 
   it("rolls allowances from the pinned package version", () => {

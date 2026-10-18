@@ -1,6 +1,6 @@
 ---
 owner: ops-billing
-last_reviewed: 2026-10-18
+last_reviewed: 2026-10-19
 ---
 
 # Owner billing actions
@@ -81,7 +81,7 @@ Read only. No idempotency key. Same classification as the write.
 
 Monthly to annual applies now. Annual to monthly waits for `term_end`, which is after the current usage month, so the monthly rollover does not apply it early.
 
-`upgraded` also returns `credit_kes`, `charge_kes`, `total_kes`, `days_left`, `days_in_period`, `package_sku`, `period`. The invoice is finalized (`status` open, number `SC-YYYY-NNNNNN`) and has a negative credit line and a positive charge line. `billing_source` is `proration`. Finalizing queues an invoice-due notice. It does not collect money.
+`upgraded` also returns `credit_kes`, `charge_kes`, `total_kes`, `days_left`, `days_in_period`, `package_sku`, `period`. The invoice is finalized (`status` open, number `SCL-YYYY-000001`) and has a negative credit line and a positive charge line. `billing_source` is `proration`. Finalizing sets `scalers.billing_write` for that update so the invoice freeze allows the number and the status, then clears the flag. It queues an invoice notice. It does not collect money. When `billing_company` and the issuer columns already exist, the same issue keeps that snapshot and the issued notice. A negative draft still writes `tenant_credits` with key `invoice-credit:<invoice id>` and a paid zero invoice, with no notice.
 
 ## owner_cancel_plan_change(tenant, actor, idempotency_key)
 
@@ -128,8 +128,10 @@ Null or 0 stores null. The cap is then the pinned monthly price times the versio
 
 The stop matches on-demand off:
 
-- `consume_call_seconds` still meters the call already in progress and does not debit once the limit would be passed. The next inbound call is refused after the directory sees `spend_limit_blocked`. The amount is 0 when enforcement is off or `billing_status` is `beta`. Otherwise the per-second rate is `inbound_kes_per_second` or `outbound_kes_per_second` on the pinned version. There is no rate-card price once those columns exist.
-- `consume_sms_units` is service role only. A Desk caller text that still uses it goes through the service role, not the member JWT. `p_units` is capped at 30, the most segments in a 2,000-character message. Enforcement off or `billing_status` beta meters and does not debit. `reserve_notify_send` does not take an overage SMS past the spend limit.
+- `consume_call_seconds` still meters the call already in progress and does not debit once the limit would be passed. The next inbound call is refused after the directory sees `spend_limit_blocked`. The amount is 0 when enforcement is off or `billing_status` is `beta`. Otherwise the per-second rate is `inbound_kes_per_second` or `outbound_kes_per_second` on the pinned version. There is no rate-card price once those columns exist. An active on-demand business whose pinned rate is null returns `rate_missing` and does not add the seconds. A published rate of 0 is legal and still meters, at amount 0.
+- `consume_sms_units` is service role only. A Desk caller text that still uses it goes through the service role, not the member JWT. `p_units` is capped at 30, the most segments in a 2,000-character message. Enforcement off or `billing_status` beta meters and does not debit. `reserve_notify_send` keeps `authenticated` because Desk reserves caller SMS with the member JWT. Its SMS `p_units` is capped at 30. It does not take an overage SMS past the spend limit.
+
+Active billing requires a pinned package version. `tenant_subscriptions_c_require_version_pin` runs after the pin trigger and refuses a write that would leave `billing_status` active with `package_version_id` null. Rows already stored are left until the next write. The trigger does not call the package editor.
 - `tenant_escalation_allowed` stays `(uuid) returns (allowed boolean, reason text)`. Past the minute allowance, a closed spend limit returns `minutes_cap`, so WhatsApp and call updates stay in the Inbox. Billing notices are not gated by it.
 - Inbound answering inside the included minutes is unchanged. A missing `spend_limit_blocked` column fails open to the previous on-demand flag.
 

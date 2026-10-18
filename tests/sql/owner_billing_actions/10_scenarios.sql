@@ -1,5 +1,33 @@
 \set ON_ERROR_STOP 1
 
+-- The data-layer freeze that rejects a draft number or status change unless
+-- scalers.billing_write is set. Installed here so this file proves
+-- owner_change_plan against that freeze even when the local data-layer
+-- copy still allows every draft update.
+create or replace function public.invoices_freeze()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'DELETE' and current_setting('scalers.billing_purge', true) = '1' then
+    return old;
+  end if;
+  if current_setting('scalers.billing_write', true) = '1' then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' and old.status = 'draft' then
+    if new.invoice_number is not null or new.status is distinct from 'draft' then
+      raise exception 'invoice number and status are set only by finalize_invoice';
+    end if;
+    return new;
+  end if;
+  if tg_op = 'DELETE' and old.status = 'draft' then
+    return old;
+  end if;
+  raise exception 'invoice % is frozen', coalesce(old.invoice_number, old.id::text);
+end;
+$$;
+
 -- Locked prices live on version 2. Version 1 stays the seeded catalogue.
 insert into public.billing_package_versions (
   package_id, version, status, monthly_price_kes, seats, minutes, sms, email, staff_wa, dids,
@@ -93,7 +121,12 @@ declare
   v_credit uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbc4';
   v_call_beta uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbc5';
   v_call_on uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbc6';
+  v_unpin uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbc7';
+  v_zero uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbc8';
+  v_reserve uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbc9';
   v_amount numeric;
+  v_rate numeric;
+  v_secs integer;
   v_res jsonb;
   v_quote jsonb;
   v_old uuid;
@@ -219,7 +252,7 @@ begin
   end if;
   select status, invoice_number, total_kes into v_status, v_number, v_total
   from public.invoices where id = (v_res->>'invoice_id')::uuid;
-  if v_status <> 'open' or v_number not like 'SC-%' or v_total <> (v_res->>'total_kes')::numeric then
+  if v_status <> 'open' or v_number not like 'SCL-%' or v_total <> (v_res->>'total_kes')::numeric then
     raise exception 'proration invoice was not opened';
   end if;
   if (select count(*) from public.invoice_lines where invoice_id = (v_res->>'invoice_id')::uuid and amount_kes < 0) <> 1
@@ -510,7 +543,8 @@ begin
      or (select amount_kes from public.tenant_credits
          where idempotency_key = 'invoice-credit:' || (v_res->>'invoice_id')) <> -v_total
      or (select total_kes from public.invoices where id = (v_res->>'invoice_id')::uuid) <> 0
-     or (select status from public.invoices where id = (v_res->>'invoice_id')::uuid) <> 'paid' then
+     or (select status from public.invoices where id = (v_res->>'invoice_id')::uuid) <> 'paid'
+     or (select invoice_number from public.invoices where id = (v_res->>'invoice_id')::uuid) not like 'SCL-%' then
     raise exception 'issue did not turn the seat credit into one credit row';
   end if;
 
@@ -563,6 +597,85 @@ begin
      or position('billing_spend_allows_charge' in (select prosrc from pg_proc where proname = 'reserve_notify_send')) = 0
      or position('billing_on_demand_open' in (select prosrc from pg_proc where proname = 'tenant_escalation_allowed')) = 0 then
     raise exception 'usage functions lost the spend hook';
+  end if;
+
+  -- Active billing cannot drop its pin. The pin trigger does not refill a
+  -- version that this update clears, so this is the editor-absent case.
+  perform public._test_owner_tenant(v_unpin, '+254700010016', 'starter', 2, 'month', v_owner, 'owner', 1, true, true);
+  begin
+    perform set_config('scalers.billing_transition', '1', true);
+    update public.tenant_subscriptions
+    set package_version_id = null
+    where tenant_id = v_unpin;
+    raise exception 'active without a pin was allowed';
+  exception when others then
+    if sqlerrm not like '%pinned package version%' then
+      raise;
+    end if;
+  end;
+  perform set_config('scalers.billing_transition', '', true);
+
+  -- A row that is already active with no pin must not be metered at 0.
+  alter table public.tenant_subscriptions disable trigger tenant_subscriptions_c_require_version_pin;
+  perform set_config('scalers.billing_transition', '1', true);
+  update public.tenant_subscriptions
+  set package_version_id = null
+  where tenant_id = v_unpin;
+  perform set_config('scalers.billing_transition', '', true);
+  alter table public.tenant_subscriptions enable trigger tenant_subscriptions_c_require_version_pin;
+  perform set_config('scalers.wallet_write', '1', true);
+  update public.tenants set minutes_included = 0, seconds_used = 0 where id = v_unpin;
+  perform set_config('scalers.wallet_write', '', true);
+  insert into public.calls (id, tenant_id) values ('dddddddd-dddd-dddd-dddd-ddddddddddd4', v_unpin);
+  select c.reason into v_reason
+  from public.consume_call_seconds('dddddddd-dddd-dddd-dddd-ddddddddddd4', 10, 'inbound') c;
+  if v_reason <> 'rate_missing'
+     or (select seconds_used from public.tenants where id = v_unpin) <> 0
+     or (select package_seconds_applied from public.calls where id = 'dddddddd-dddd-dddd-dddd-ddddddddddd4') <> 0 then
+    raise exception 'missing rate was metered %', v_reason;
+  end if;
+
+  -- A published rate of 0 is legal and still meters.
+  perform public._test_owner_tenant(v_zero, '+254700010017', 'starter', 2, 'month', v_owner, 'owner', 1, true, true);
+  select v.inbound_kes_per_second into v_rate
+  from public.billing_package_versions v
+  join public.tenant_subscriptions s on s.package_version_id = v.id
+  where s.tenant_id = v_zero;
+  alter table public.billing_package_versions disable trigger billing_package_versions_freeze;
+  update public.billing_package_versions v
+  set inbound_kes_per_second = 0
+  where v.id = (select package_version_id from public.tenant_subscriptions where tenant_id = v_zero);
+  alter table public.billing_package_versions enable trigger billing_package_versions_freeze;
+  perform set_config('scalers.wallet_write', '1', true);
+  update public.tenants set minutes_included = 0, seconds_used = 0 where id = v_zero;
+  perform set_config('scalers.wallet_write', '', true);
+  insert into public.calls (id, tenant_id) values ('dddddddd-dddd-dddd-dddd-ddddddddddd3', v_zero);
+  select c.amount_kes, c.reason, c.seconds_used into v_amount, v_reason, v_secs
+  from public.consume_call_seconds('dddddddd-dddd-dddd-dddd-ddddddddddd3', 10, 'inbound') c;
+  if v_reason <> 'on_demand' or v_amount <> 0 or v_secs <> 10 then
+    raise exception 'a published zero rate must still meter % % %', v_amount, v_reason, v_secs;
+  end if;
+  alter table public.billing_package_versions disable trigger billing_package_versions_freeze;
+  update public.billing_package_versions
+  set inbound_kes_per_second = v_rate
+  where id = (select package_version_id from public.tenant_subscriptions where tenant_id = v_zero);
+  alter table public.billing_package_versions enable trigger billing_package_versions_freeze;
+
+  perform public._test_owner_tenant(v_reserve, '+254700010018', 'starter', 2, 'month', v_owner, 'owner', 1, false, false);
+  select r.units, r.allowed into v_n, v_allowed
+  from public.reserve_notify_send(
+    v_reserve, 'cap-1', 'lead', 'sms', '+254700000000', 'hi', 1000,
+    null, null, 'caller', 'tenant', false
+  ) r;
+  if v_n <> 30 or v_allowed is not true then
+    raise exception 'reserve cap returned % %', v_n, v_allowed;
+  end if;
+  if not has_function_privilege(
+    'authenticated',
+    'public.reserve_notify_send(uuid, text, text, text, text, text, integer, uuid, text, text, text, boolean)',
+    'execute'
+  ) then
+    raise exception 'reserve_notify_send dropped the desk grant';
   end if;
 end $$;
 
