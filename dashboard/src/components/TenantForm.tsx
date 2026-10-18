@@ -157,6 +157,11 @@ import {
   TenantSettingsSaveButton,
   TENANT_SETTINGS_FORM_ID,
 } from "@/components/TenantSettingsSaveButton";
+import { UnknownAnswerSpokenFields } from "@/components/UnknownAnswerSpokenFields";
+import {
+  UNKNOWN_ANSWER_DEFAULT_EN,
+  parseUnknownAnswerSpoken,
+} from "@/lib/unknownAnswerSpoken";
 import {
   parseTtsLexicon,
   lexiconForStorage,
@@ -427,6 +432,16 @@ function TenantFormInner({
   const [unknownFallback, setUnknownFallback] = useState(
     tenant.unknown_answer_fallback || ""
   );
+  const [spokenEn, setSpokenEn] = useState(
+    () => parseUnknownAnswerSpoken(tenant.unknown_answer_spoken)?.en ?? ""
+  );
+  const [spokenSw, setSpokenSw] = useState(
+    () => parseUnknownAnswerSpoken(tenant.unknown_answer_spoken)?.sw ?? ""
+  );
+  const [spokenSource, setSpokenSource] = useState(
+    () => parseUnknownAnswerSpoken(tenant.unknown_answer_spoken)?.source ?? ""
+  );
+  const [spokenTouched, setSpokenTouched] = useState(false);
   const [agentName, setAgentName] = useState(tenant.agent_name || "");
   const [spokenName, setSpokenName] = useState(tenant.spoken_name || "");
   const [greetingInvite, setGreetingInvite] = useState(tenant.greeting_invite || "");
@@ -649,6 +664,15 @@ function TenantFormInner({
       }),
     [hoursSchedule, locationNotes]
   );
+
+  useEffect(() => {
+    if (!state.ok || !Object.prototype.hasOwnProperty.call(state, "unknownAnswerSpoken")) return;
+    const next = state.unknownAnswerSpoken;
+    setSpokenEn(next?.en ?? "");
+    setSpokenSw(next?.sw ?? "");
+    setSpokenSource(next?.source ?? "");
+    setSpokenTouched(false);
+  }, [state]);
 
   useEffect(() => {
     // Compile finished before ok - owners should hear the line was trained, not only "Saved".
@@ -1047,6 +1071,9 @@ function TenantFormInner({
       <input type="hidden" name="greeting_invite" value={greetingInvite} />
       <input type="hidden" name="agent_tone" value={tone} />
       <input type="hidden" name="unknown_answer_fallback" value={unknownFallback} />
+      <input type="hidden" name="unknown_answer_spoken_en" value={spokenEn} />
+      <input type="hidden" name="unknown_answer_spoken_sw" value={spokenSw} />
+      <input type="hidden" name="unknown_answer_spoken_touched" value={spokenTouched ? "1" : "0"} />
       <input type="hidden" name="team_directory" value={teamJson} />
       <input type="hidden" name="faqs" value={faqsJson} />
       <input type="hidden" name="owner_field_paths" value={JSON.stringify(ownerPaths)} />
@@ -2225,9 +2252,22 @@ function TenantFormInner({
               id="unknown_answer_fallback"
               value={unknownFallback}
               onChange={setUnknownFallback}
-              placeholder="A teammate will call you back today."
+              placeholder={UNKNOWN_ANSWER_DEFAULT_EN}
             />
           </SettingsStack>
+          <UnknownAnswerSpokenFields
+            english={spokenEn}
+            swahili={spokenSw}
+            updating={pending && unknownFallback.trim() !== spokenSource}
+            onEnglish={(value) => {
+              setSpokenEn(value);
+              setSpokenTouched(true);
+            }}
+            onSwahili={(value) => {
+              setSpokenSw(value);
+              setSpokenTouched(true);
+            }}
+          />
         </SettingsGroup>
       </section>
 

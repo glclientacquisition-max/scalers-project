@@ -29,6 +29,9 @@ import {
   type StepKey,
 } from "@/lib/setupFlow";
 import { compileReceptionistPrompt } from "@/lib/promptCompiler";
+import { resolveUnknownAnswerSpoken } from "@/lib/unknownAnswerSpoken";
+import { generateUnknownAnswerSpoken } from "@/lib/unknownAnswerSpokenModel";
+import { withoutUnknownSpokenColumn } from "@/lib/peelMissingColumns";
 import { compilePromptLocally, tenantNeedsOnboarding, type OnboardingAnswers } from "@/lib/onboarding";
 import { formatLocationsForCompiler } from "@/lib/businessLocations";
 import { formatProductsForCompiler, normalizeProductCatalog } from "@/lib/productCatalog";
@@ -180,6 +183,10 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
     email: alerts.emailOn ? alerts.email : null,
   });
   const unknownAnswerFallback = "I'll check with the owner and get back to you.";
+  const spokenPromise = resolveUnknownAnswerSpoken({
+    fallback: unknownAnswerFallback,
+    generate: generateUnknownAnswerSpoken,
+  });
   const voice = draft.voice;
 
   // The local prompt is instant and complete; the model-written one (seconds) replaces it
@@ -212,6 +219,7 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
       productsText,
     });
 
+  const unknownAnswerSpoken = await spokenPromise;
   const tPrep = Date.now();
   const fromFaqs = policiesFromFaqs(faqs.map((f) => ({ question: String(f.question || ""), answer: String(f.answer || "") })), vertical);
   const patch: Record<string, unknown> = {
@@ -230,6 +238,7 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
     agent_tools: { escalate: true, end_call: true },
     after_hours_mode: "serve",
     unknown_answer_fallback: unknownAnswerFallback,
+    unknown_answer_spoken: unknownAnswerSpoken,
     whatsapp_notification_number: alerts.phone || null,
     alert_email: alerts.email || null,
     notify_channels: notifyChannelsFor(alerts),
@@ -250,13 +259,25 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
     };
   }
 
-  const { data: updated, error } = await auth.client
+  let { data: updated, error } = await auth.client
     .from("tenants")
     .update(patch)
     .eq("id", row.id)
     .is("setup_completed_at", null)
     .eq("onboarding_draft_version", input.version)
     .select("id, sautikit_virtual_number");
+  if (error) {
+    const peeled = withoutUnknownSpokenColumn(error.message, patch);
+    if (peeled) {
+      ({ data: updated, error } = await auth.client
+        .from("tenants")
+        .update(peeled)
+        .eq("id", row.id)
+        .is("setup_completed_at", null)
+        .eq("onboarding_draft_version", input.version)
+        .select("id, sautikit_virtual_number"));
+    }
+  }
   bustTenantCache(row.id);
   if (error) {
     console.error("[setup] finish:", error.code, error.message);

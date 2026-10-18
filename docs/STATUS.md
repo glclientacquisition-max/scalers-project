@@ -151,6 +151,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | #644, #646 | Voice | **Closed, not merged** (18 Oct 09:41 EAT): superseded by #731 (main cut). No longer open. |
 | #602, #611, #615 | Platform/Desk | Quality read APIs; catalogue import preview; Stage-PR skip-staging filter. |
 | #773 | Desk | QA copy and small layout fixes from `main` @ `408ad368`: Business Assistant in full, callbacks only, no invoice or area-price promises, free-beta Usage in KSh, Nairobi times, login redirect. Draft. No SQL. Area-price sentence returns when #709 ships. The `+N more` import line covers only the 8-row slice of #611. Paste list saves ask wording such as "price depends on size" and still saves the other rows when one price cannot be saved. |
+| `cursor/unknown-answer-spoken-d7b0` | Desk | Save-time spoken rewrite of "When unsure, what to say": `tenants.unknown_answer_spoken` (`20261018233000_unknown_answer_spoken.sql`, not applied). English and Kiswahili lines, callbacks only. Voice reads them in #783. |
 | #587, #597, #614, #584, #583, #537 | Voice | Parked (`skip-staging`). |
 | #653, #492, #560, #440, #434, #356 | Various | Legal pack, landing, docs, ops, tester lane: parked. |
 | #639, #642 | Voice | **Closed, not merged** (18 Oct 09:41 EAT): superseded by #651 (line-unavailable gate) and the clips on SautiKit. No longer open. |
@@ -189,7 +190,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 **Build order:** Admin → Settings/onboarding → UI/UX sweep → Packages → Landing → Voice/Brain on real calls. Live-call voice fixes ship any time, one at a time.
 
 - **Admin:** Suspend/Archive shipped (#737, 18 Oct). Purge schedule not applied. Still to do: business edit / members / owner reset, package catalogue, billing period card, invoices.
-- **Settings / onboarding**: shipped (#656, #667, #672). GIGO P1/P2 follow-ups remain.
+- **Settings / onboarding**: shipped (#656, #667, #672). GIGO P1/P2 follow-ups remain. In flight: spoken English and Kiswahili for "When unsure" (`unknown_answer_spoken`, migration not applied).
 - **UI/UX sweep** across Desk and Admin.
 - **Packages**: state rules and rollover shipped (#631, #650); package catalogue and invoices remain.
 - **Landing page** (#492 parked until its turn).
