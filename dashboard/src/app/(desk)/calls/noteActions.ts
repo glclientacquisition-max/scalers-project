@@ -183,6 +183,7 @@ async function sendOwnerCallerSms(
     version: keyParts.version || null,
   });
   if (!sent.ok) {
+    if (sent.message) return { error: sent.message };
     if (sent.reason === "sms_not_configured") return { error: "Text is unavailable." };
     if (sent.reason === "sms_allowance_exhausted") {
       return { error: "Included SMS used. Enable on-demand on Wallet." };

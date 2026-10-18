@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { deskLineState } from "@/lib/tenantLineState";
 import { cacheLife, cacheTag } from "next/cache";
 import { tenantCacheTag } from "@/lib/tenantCache";
 import { cookies } from "next/headers";
@@ -145,6 +146,8 @@ const SHELL_SELECT =
   "id, business_name, vertical, services_offered, business_hours, agent_tone";
 /** Adds the setup flag (migration 20261011150000). Falls back to SHELL_SELECT before it is applied. */
 const SHELL_SELECT_SETUP = `${SHELL_SELECT}, setup_completed_at`;
+/** Adds archived_at (admin_business_archive.sql): an archived business blocks owner sign-in. */
+const SHELL_SELECT_ARCHIVE = `${SHELL_SELECT_SETUP}, archived_at, is_active, line_status`;
 
 export type DeskShellTenant = {
   id: string;
@@ -156,6 +159,10 @@ export type DeskShellTenant = {
   llm_system_prompt: string | null;
   /** Present (string or null) once the setup migration is applied; undefined before. */
   setup_completed_at?: string | null;
+  /** True when a Super Admin archived the business. The Desk shows a closed screen instead. */
+  archived?: boolean;
+  /** True while the line is suspended: Desk opens read-only for sends, with a banner. */
+  linePaused?: boolean;
 };
 
 function shellProfileComplete(row: {
@@ -183,9 +190,25 @@ export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null
 
   let { data, error } = await supabase
     .from("tenants")
-    .select(SHELL_SELECT_SETUP)
+    .select(SHELL_SELECT_ARCHIVE)
     .eq("id", tenantId)
     .maybeSingle();
+
+  if (error && /line_status/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from("tenants")
+      .select(`${SHELL_SELECT_SETUP}, archived_at, is_active`)
+      .eq("id", tenantId)
+      .maybeSingle());
+  }
+
+  if (error && /archived_at/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from("tenants")
+      .select(SHELL_SELECT_SETUP)
+      .eq("id", tenantId)
+      .maybeSingle());
+  }
 
   if (error && /setup_completed_at/i.test(error.message)) {
     ({ data, error } = await supabase
@@ -206,7 +229,13 @@ export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null
   if (error) throw error;
   if (!data?.id) return null;
 
-  const row = data as Partial<DeskShellTenant> & { id: string; business_name?: string | null };
+  const row = data as Partial<DeskShellTenant> & {
+    id: string;
+    business_name?: string | null;
+    archived_at?: string | null;
+    is_active?: boolean | null;
+    line_status?: string | null;
+  };
   const shell: DeskShellTenant = {
     id: row.id,
     business_name: row.business_name || "",
@@ -215,6 +244,8 @@ export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null
     business_hours: row.business_hours ?? null,
     agent_tone: row.agent_tone ?? null,
     llm_system_prompt: null,
+    archived: deskLineState(row) === "closed",
+    linePaused: deskLineState(row) === "paused",
   };
   if (row.setup_completed_at !== undefined) {
     shell.setup_completed_at = row.setup_completed_at ?? null;

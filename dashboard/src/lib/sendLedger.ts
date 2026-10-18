@@ -5,6 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendDeskCallerSms } from "@/lib/callerSms";
+import { outboundSendBlock } from "@/lib/tenantLine";
 
 export type CallerLedgerKind =
   | "caller_appointment_confirmed"
@@ -273,7 +274,10 @@ export async function sendRecordedDeskCallerSms(opts: {
   replyId?: string | null;
   /** Status version / note id: key becomes row:<tenant>:<id>:<kind>:<version>. */
   version?: string | null;
-}): Promise<{ ok: boolean; reason?: string; overage?: boolean }> {
+}): Promise<{ ok: boolean; reason?: string; overage?: boolean; message?: string }> {
+  // Paused or closed line: nothing goes out, nothing is recorded or charged.
+  const blocked = await outboundSendBlock(opts.client, opts.tenantId);
+  if (blocked) return { ok: false, reason: blocked.reason, message: blocked.message };
   // Reserve -> send -> settle. A TextSMS failure releases the units and leaves
   // a `failed` row (was: units consumed, no row, no refund).
   const key = deskSendKey(opts);
