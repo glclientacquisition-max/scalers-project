@@ -440,6 +440,8 @@ const {
   createVoiceTurnTiming,
   createCallTranscript,
   logConnectToGreetingPcm,
+  transcriptOrderEnabled,
+  speakWithTranscriptSlot,
 } = require('./src/speech/voiceTiming');
 const { isDefaultShopName } = require('./src/conversation/businessAssistantIntro');
 const {
@@ -5350,8 +5352,14 @@ mediaWss.on('connection', (ws, req) => {
           text: greetingLine,
           language: callLanguage,
         });
-        await playCachedFillerPcm(found.pcm, { text: greetingLine, trace: false });
-        callTranscript.pushAgent(greetingLine);
+        await speakWithTranscriptSlot({
+          transcript: callTranscript,
+          line: greetingLine,
+          enabled: transcriptOrderEnabled(),
+          run: () => playCachedFillerPcm(found.pcm, { text: greetingLine, trace: false }),
+          // Unchanged: the cached greeting was always kept once played.
+          keep: () => true,
+        });
         messages.push({ role: 'assistant', content: greetingLine, local: true });
         if (!greetingInterrupted) markGreetingFileNameAsk(greetingLine);
       } else {
@@ -5393,13 +5401,20 @@ mediaWss.on('connection', (ws, req) => {
           // even if this greeting is cut short (cancelled renders are not kept).
           void greetingWarmer.warmTenant(brainProfile.id);
         }
-        const spoken = await speakGreetingSentences(greetingLine, {
-          greetingCacheKey: found.key,
-          extraLexicon: found.extraLexicon,
+        const spoken = await speakWithTranscriptSlot({
+          transcript: callTranscript,
+          line: greetingLine,
+          enabled: transcriptOrderEnabled(),
+          run: () =>
+            speakGreetingSentences(greetingLine, {
+              greetingCacheKey: found.key,
+              extraLexicon: found.extraLexicon,
+            }),
+          // Kept only when spoken and no outage (same rule as before).
+          keep: (r) => Boolean(r?.ok) && !r?.outage && !speechOutageStarted,
         });
         if (spoken?.outage || speechOutageStarted) return;
         if (spoken?.ok) {
-          callTranscript.pushAgent(greetingLine);
           messages.push({ role: 'assistant', content: greetingLine, local: true });
           if (!greetingInterrupted && !spoken.cancelled) markGreetingFileNameAsk(greetingLine);
         }

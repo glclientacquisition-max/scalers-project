@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-167 variables.
+168 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -169,6 +169,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_PUBLIC_BASE_URL` | desk | `dashboard/src/lib/sautikit.ts`<br>`dashboard/src/lib/voicePublicBase.js` |
 | `VOICE_TELEPHONY_WALLET_PROBE` | voice | `src/sautikit/walletProbe.js` |
 | `VOICE_TELEPHONY_WALLET_PROBE_MS` | voice | `src/sautikit/walletProbe.js` |
+| `VOICE_TRANSCRIPT_ORDER` | voice | `src/db.js` |
 | `VOICE_TRANSFER_TIMEOUT_S` | voice | `src/sautikit/pendingLiveTransfer.js` |
 | `VOICE_TTS_FALLBACK_GEMINI_MS` | voice | `src/speech/emergencyTts.js` |
 | `VOICE_TTS_IDLE_RECYCLE_MS` | voice | `src/speech/sonioxTts.js` |
