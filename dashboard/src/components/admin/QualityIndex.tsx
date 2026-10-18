@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { QualityEmpty } from "@/components/admin/QualityEmpty";
 import { DeltaMark, DroppingMark, QualitySpark, Unlogged, formatCallWhen } from "@/components/admin/QualityBits";
 import { ButtonLink } from "@/components/ui/Button";
@@ -72,10 +73,7 @@ export function QualityIndex({
   return (
     <div className="space-y-8">
       <section>
-        <header className="px-4 pb-3">
-          <h1 className="text-page text-ink">Quality</h1>
-          <p className="mt-0.5 text-meta text-ink-2">Traced calls, worst first.</p>
-        </header>
+        <AdminPageHeader title="Quality" subtitle="Traced calls, worst first." />
         <div className="px-4 pb-2">
           <Input
             id="quality-search"

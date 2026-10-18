@@ -68,7 +68,10 @@ describe("Super Admin Today: numbers from calls only", () => {
     );
     assert.deepEqual(rows.map((r) => r.title), ["Calls today", "Needed a person", "Caller hung up early", "Couldn't answer"]);
     assert.equal(rows[0].value, "14");
+    assert.equal(rows[0].delta, 3);
     assert.equal(rows[0].detail, "Last Friday by now: 11");
+    assert.equal(rows[2].delta, 2);
+    assert.equal(rows[2].lowerIsBetter, true);
     assert.equal(rows[1].available, false);
     assert.equal(rows[1].value, "");
     assert.equal(rows[2].value, "2");

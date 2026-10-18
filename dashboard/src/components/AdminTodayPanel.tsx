@@ -1,3 +1,5 @@
+import { DeltaMark } from "@/components/admin/QualityBits";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ButtonLink } from "@/components/ui/Button";
 import { Empty } from "@/components/ui/Empty";
 import { ListRow } from "@/components/ui/ListRow";
@@ -33,10 +35,11 @@ export function AdminTodayPanel({
 
   return (
     <div className="space-y-8">
+      <AdminPageHeader title="Today" subtitle={dayLabel} />
       <section aria-labelledby="today-status">
-        <h1 id="today-status" className="px-4 text-caption text-ink-3">
-          Today · {dayLabel}
-        </h1>
+        <h2 id="today-status" className="px-4 text-caption text-ink-3">
+          Platform
+        </h2>
         <ul className="divide-y divide-hairline">
           <ListRow href="/admin/platform" title={status.text} preview="Platform" stamp={statusStamp} />
         </ul>
@@ -84,7 +87,14 @@ export function AdminTodayPanel({
               href={row.href}
               title={row.title}
               preview={row.detail}
-              when={row.available ? <span className="text-body text-ink">{row.value}</span> : undefined}
+              when={
+                row.available ? (
+                  <span className="inline-flex items-baseline gap-2 tabular-nums">
+                    <span className="text-body text-ink">{row.value}</span>
+                    <DeltaMark delta={row.delta} lowerIsBetter={row.lowerIsBetter} />
+                  </span>
+                ) : undefined
+              }
               stamp={row.available ? undefined : <Stamp tone="neutral">{row.href ? "Open" : "Not yet"}</Stamp>}
             />
           ))}

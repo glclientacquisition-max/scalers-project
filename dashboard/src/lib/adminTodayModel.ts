@@ -55,6 +55,10 @@ export type TodayNumberRow = {
   detail: string;
   /** False when the data does not exist yet. The row says why instead of showing a number. */
   available: boolean;
+  /** Today minus same stretch last week; null when the count is missing. */
+  delta: number | null;
+  /** When true, a negative delta is good (fewer needs-human or abandoned calls). */
+  lowerIsBetter?: boolean;
   href?: string;
 };
 
@@ -67,20 +71,35 @@ function compareLine(count: { today: number; lastWeek: number }, weekday: string
  */
 export function todayNumberRows(counts: CallCounts, now: Date): TodayNumberRow[] {
   const weekday = WEEKDAYS[new Date(now.getTime() + EAT_OFFSET_MS).getUTCDay()];
-  const row = (key: string, title: string, count: CallCount, missing: string): TodayNumberRow =>
+  const row = (
+    key: string,
+    title: string,
+    count: CallCount,
+    missing: string,
+    lowerIsBetter = false,
+  ): TodayNumberRow =>
     count
-      ? { key, title, value: String(count.today), detail: compareLine(count, weekday), available: true }
-      : { key, title, value: "", detail: missing, available: false };
+      ? {
+          key,
+          title,
+          value: String(count.today),
+          detail: compareLine(count, weekday),
+          available: true,
+          delta: count.today - count.lastWeek,
+          lowerIsBetter,
+        }
+      : { key, title, value: "", detail: missing, available: false, delta: null };
   return [
     row("calls", "Calls today", counts.total, "Could not count calls."),
-    row("needs-human", "Needed a person", counts.needsHuman, "Call outcomes are not recorded here yet."),
-    row("abandoned", "Caller hung up early", counts.abandoned, "Call outcomes are not recorded here yet."),
+    row("needs-human", "Needed a person", counts.needsHuman, "Call outcomes are not recorded here yet.", true),
+    row("abandoned", "Caller hung up early", counts.abandoned, "Call outcomes are not recorded here yet.", true),
     {
       key: "couldnt-answer",
       title: "Couldn't answer",
       value: "",
       detail: "Per business on Quality. Traced calls only.",
       available: false,
+      delta: null,
       href: "/admin/quality",
     },
   ];
