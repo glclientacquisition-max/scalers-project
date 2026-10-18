@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-171 variables.
+172 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -33,6 +33,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
 | `DATABASE_URL` | scripts | `scripts/verify-staging-schema.js` |
+| `DESK_PLAN_CHANGE` | desk | `dashboard/src/lib/ownerBilling.ts` |
 | `DESK_PUBLIC_URL` | voice | `server.js` |
 | `DOCS_STALE_DAYS` | scripts | `scripts/docs/check-docs.js` |
 | `FACT_HASH_MODE` | desk, scripts, voice | `dashboard/src/lib/tenantFieldProvenance.ts`<br>`scripts/replay-voice-suite.js`<br>`scripts/smoke-mvp-retail.js`<br>+1 more |
