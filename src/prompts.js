@@ -345,3 +345,54 @@ module.exports = {
   VOICE_SYSTEM_PROMPT_ID,
   VOICE_SYSTEM_PROMPT_VERSION,
 };
+
+// VOICE_FACT_REFS (default off). Wraps the prompt builders without touching
+// their bodies (so #779's prompt order merges cleanly):
+// - the Desk-compiled llm_system_prompt is persona only; its facts are removed
+//   (factSheet.personaOnlyPrompt). Facts come from LIVE GROUND TRUTH and the
+//   FACT CARD (liveKnowledge.js).
+// - money and clock times are written as digits or fact IDs, never as words:
+//   the speech check reads digits exactly and the renderer words them in the
+//   caller's language (spokenForms.js).
+const FACT_REFS_RULES = [
+  [
+    '- Say money as words when you can ("five thousand shillings" / "shilingi elfu tano"), not "KES 5,000".',
+    '- Write money as digits ("KSh 5,000"), never as words. For a price, fee, hour or payment number on the FACT CARD, write its ID instead ({price.example}). The system reads it aloud in the caller\'s language.',
+  ],
+  [
+    '- Say times clearly ("3 P M" / "saa 3 jioni"), not "15:00" or "3pm" jammed together.',
+    '- Write clock times as digits with AM or PM ("3:00 PM"), never as words, in every language. The system reads them aloud the right way.',
+  ],
+];
+
+function factRefsProfile(profile) {
+  const { factRefsEnabled, personaOnlyPrompt } = require('./conversation/factSheet');
+  if (!factRefsEnabled() || !profile || !String(profile.llmSystemPrompt || '').trim()) return profile;
+  return { ...profile, llmSystemPrompt: personaOnlyPrompt(profile.llmSystemPrompt) };
+}
+
+function factRefsRules(text) {
+  const { factRefsEnabled } = require('./conversation/factSheet');
+  if (!factRefsEnabled()) return text;
+  let out = String(text);
+  for (const [from, to] of FACT_REFS_RULES) out = out.split(from).join(to);
+  return out;
+}
+
+function withFactRefs(build) {
+  return function factRefsPrompt(profile = {}, opts = {}) {
+    const built = build(factRefsProfile(profile), opts);
+    if (typeof built === 'string') return factRefsRules(built);
+    if (built && typeof built === 'object') {
+      const out = {};
+      for (const [key, value] of Object.entries(built)) out[key] = typeof value === 'string' ? factRefsRules(value) : value;
+      return out;
+    }
+    return built;
+  };
+}
+
+module.exports.buildSystemPrompt = withFactRefs(buildSystemPrompt);
+if (typeof module.exports.buildSystemPromptParts === 'function') {
+  module.exports.buildSystemPromptParts = withFactRefs(module.exports.buildSystemPromptParts);
+}

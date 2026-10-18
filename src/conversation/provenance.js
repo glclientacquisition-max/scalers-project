@@ -540,10 +540,17 @@ function confirmedSlotEnabled(profile = {}) {
   ).fact;
 }
 
+function teamWording() {
+  return require('./factSheet').factRefsEnabled();
+}
+
 function formatUnknownSection(topics) {
   const list = [...new Set((topics || []).map((t) => String(t || '').trim()).filter(Boolean))];
   const lines = [
-    'UNKNOWN (not confirmed by the owner. Do not state these as fact. Say you will confirm with the owner):',
+    // VOICE_FACT_REFS: the owner's cannot-answer wording (team, not owner).
+    teamWording()
+      ? 'UNKNOWN (not confirmed by the owner. Do not state these as fact. Say you will check with the team):'
+      : 'UNKNOWN (not confirmed by the owner. Do not state these as fact. Say you will confirm with the owner):',
   ];
   if (!list.length) {
     lines.push('- (none)');
@@ -551,7 +558,9 @@ function formatUnknownSection(topics) {
   }
   for (const topic of list) lines.push(`- ${topic}`);
   lines.push(
-    'For an UNKNOWN topic: admit you do not have it. Say: "Let me confirm with the owner." Do not guess, and do not use a pack seed as the answer.',
+    `For an UNKNOWN topic: admit you do not have it. Say: "${
+      teamWording() ? 'Let me check with the team and get back to you.' : 'Let me confirm with the owner.'
+    }" Do not guess, and do not use a pack seed as the answer.`,
     'A fact stated elsewhere in this brief (hours, coverage, services, prices, payment) wins over an UNKNOWN line on the same topic.'
   );
   return lines.join('\n');

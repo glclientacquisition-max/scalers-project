@@ -447,13 +447,18 @@ const SW_LANGS = new Set(['sw', 'sheng']);
 function unknownFactLine({ topic = '', language = 'en', afterHoursMode = 'serve' } = {}) {
   const sw = SW_LANGS.has(String(language || '').toLowerCase());
   const message = isMessageOnlyMode(afterHoursMode);
+  // VOICE_FACT_REFS: serve mode uses the team default cannot-answer line
+  // (owner decision, 18 Oct). Message mode is unchanged.
+  const team = !message && require('../factSheet').factRefsEnabled();
   if (sw) {
+    if (team) return `Sina habari hiyo kwa uhakika. ${require('../factSheet').TEAM_DEFAULT_LINE.sw}`;
     return message
       ? 'Sina habari hiyo kwa uhakika. Naweza kuchukua ujumbe kwa mwenye biashara.'
       : 'Sina habari hiyo kwa uhakika. Nitathibitisha na mwenye biashara.';
   }
   const what = String(topic || '').trim().toLowerCase();
   const lead = what ? `I don't have the ${what} confirmed.` : "I don't have that confirmed.";
+  if (team) return `${lead} ${require('../factSheet').TEAM_DEFAULT_LINE.en}`;
   return message ? `${lead} I can take a message for the owner.` : `${lead} Let me confirm with the owner.`;
 }
 

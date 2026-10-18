@@ -262,6 +262,15 @@ function buildLiveGroundTruth(profile = {}) {
     faqs.length ? formatFaqsBlock(faqs) : '(none confirmed)'
   );
 
+  // VOICE_FACT_REFS: the FACT CARD (IDs for prices, area fees, hours and
+  // payment numbers). No clock and no caller data, so it stays in the
+  // cacheable part of the prompt (#779 puts this block first).
+  const factSheet = require('./factSheet');
+  if (factSheet.factRefsEnabled()) {
+    const card = factSheet.formatFactCard(factSheet.factSheetFor(profile));
+    if (card) parts.push('', card);
+  }
+
   if (tools.escalate) {
     parts.push(
       '',
