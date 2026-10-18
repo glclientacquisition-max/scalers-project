@@ -7,7 +7,7 @@ last_reviewed: 2026-10-19
 
 How Desk pays an open invoice, and how the owner reads invoices and receipts. The pay page needs no login. The token is the capability. A business with `billing_enforcement` off, or `billing_status` beta, gets no link.
 
-SQL is [`docs/supabase/invoice_pay.sql`](../../supabase/invoice_pay.sql), then [`docs/supabase/invoice_documents.sql`](../../supabase/invoice_documents.sql), then [`docs/supabase/billing_company.sql`](../../supabase/billing_company.sql). Applied on staging (`sgcdncjxauhsbunobmob`) as of 18 Oct. Not on production. Production waits for a backup and Alvin's GO.
+SQL is [`docs/supabase/invoice_pay.sql`](../../supabase/invoice_pay.sql), then [`docs/supabase/invoice_documents.sql`](../../supabase/invoice_documents.sql), then [`docs/supabase/billing_company.sql`](../../supabase/billing_company.sql), then [`docs/supabase/invoice_pay_session.sql`](../../supabase/invoice_pay_session.sql). Staging (`sgcdncjxauhsbunobmob`) has all four. Production has the first three as of commit `553f1830`. The session file is the next production apply.
 
 VAT and KRA eTIMS are off. `invoices.tax_kes` stays null. The page, the invoice, and the receipt do not show a tax line.
 

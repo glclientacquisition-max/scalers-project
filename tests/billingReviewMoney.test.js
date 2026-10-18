@@ -326,14 +326,17 @@ describe("billing notice sends", () => {
 
 describe("pay attempt SQL", () => {
   it("locks the invoice and treats a pending attempt as in flight before a checkout url exists", () => {
-    const sql = fs.readFileSync(path.join(ROOT, "docs/supabase/invoice_pay.sql"), "utf8");
-    const start = sql.indexOf("function public.create_invoice_pay_attempt");
-    const end = sql.indexOf("$$;", start);
-    const body = sql.slice(start, end);
+    const pay = fs.readFileSync(path.join(ROOT, "docs/supabase/invoice_pay.sql"), "utf8");
+    const session = fs.readFileSync(path.join(ROOT, "docs/supabase/invoice_pay_session.sql"), "utf8");
+    const start = session.indexOf("function public.create_invoice_pay_attempt");
+    const end = session.indexOf("$$;", start);
+    const body = session.slice(start, end);
     assert.match(body, /for update/);
     assert.doesNotMatch(body, /and checkout_url is not null/);
+    assert.match(pay, /where status = 'pending'/);
+    assert.doesNotMatch(pay, /pending_unattached/);
     assert.match(
-      sql,
+      session,
       /create unique index[\s\S]{0,240}payment_attempts[\s\S]{0,240}where status in \('pending', 'pending_unattached'\)/i
     );
   });

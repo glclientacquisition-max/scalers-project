@@ -124,7 +124,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_notice_when` | `docs/supabase/billing_data_layer.sql` |
 | `billing_notices_guard` | `docs/supabase/billing_data_layer.sql` |
 | `billing_package_versions_freeze` | `docs/supabase/billing_data_layer.sql` |
-| `billing_payment_reconciliation` | `docs/supabase/invoice_pay.sql` |
+| `billing_payment_reconciliation` | `docs/supabase/invoice_pay.sql`<br>`docs/supabase/invoice_pay_session.sql` |
 | `billing_quarantine_placeholder_days` | `docs/supabase/billing_data_layer.sql` |
 | `call_setup_valid` | `supabase/migrations/20261018130000_tenant_call_setup.sql` |
 | `charge_call_to_wallet` | `docs/supabase/fix_charge_call_wallet_ambiguous.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_on_demand_alerts.sql` |
@@ -135,7 +135,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `consume_call_seconds` | `docs/supabase/package_minute_consume.sql` |
 | `consume_sms_units` | `docs/supabase/package_minute_consume.sql`<br>`docs/supabase/sms_allowance.sql` |
 | `correct_call_facts` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012210000_three_features.sql` |
-| `create_invoice_pay_attempt` | `docs/supabase/invoice_pay.sql` |
+| `create_invoice_pay_attempt` | `docs/supabase/invoice_pay.sql`<br>`docs/supabase/invoice_pay_session.sql` |
 | `create_tenant_invite` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `credit_cancelled_collection` | `docs/supabase/invoice_pay.sql` |
 | `current_member_role` | `supabase/migrations/20261011000000_team_invites.sql` |
@@ -155,7 +155,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `invoice_lines_freeze` | `docs/supabase/billing_data_layer.sql` |
 | `invoice_lines_tenant` | `docs/supabase/billing_data_layer.sql` |
 | `invoice_next_pay_part` | `docs/supabase/invoice_pay.sql` |
-| `invoice_pay_attempt_by_checkout` | `docs/supabase/invoice_pay.sql` |
+| `invoice_pay_attempt_by_checkout` | `docs/supabase/invoice_pay.sql`<br>`docs/supabase/invoice_pay_session.sql` |
 | `invoices_freeze` | `docs/supabase/billing_data_layer.sql` |
 | `is_e164` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `issue_invoice_receipt` | `docs/supabase/invoice_documents.sql` |
@@ -166,7 +166,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `member_can_write` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `mint_invoice_pay_token` | `docs/supabase/invoice_pay.sql` |
 | `notify_sends_deny_mutation` | `docs/supabase/notify_send_ledger.sql`<br>`docs/supabase/notify_send_reserve_settle.sql`<br>`docs/supabase/purge_archived_tenants.sql` |
-| `park_invoice_pay_attempt` | `docs/supabase/invoice_pay.sql` |
+| `park_invoice_pay_attempt` | `docs/supabase/invoice_pay_session.sql` |
 | `parse_payments_text` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `parse_price_ksh` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `pay_invoice_by_return` | `docs/supabase/invoice_pay.sql` |
@@ -199,7 +199,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `set_tenant_soft_spend_limit` | `docs/supabase/wallet_soft_spend_limit.sql` |
 | `set_voicemail_hold_days` | `docs/supabase/billing_data_layer.sql` |
 | `settle_billing_notice` | `docs/supabase/billing_data_layer.sql` |
-| `settle_invoice_pay_attempt` | `docs/supabase/invoice_pay.sql` |
+| `settle_invoice_pay_attempt` | `docs/supabase/invoice_pay.sql`<br>`docs/supabase/invoice_pay_session.sql` |
 | `settle_notify_send` | `docs/supabase/notify_send_reserve_settle.sql` |
 | `sms_counter_drift` | `docs/supabase/notify_send_reserve_settle.sql` |
 | `sms_counter_drift_log` | `docs/supabase/notify_send_reserve_settle.sql` |

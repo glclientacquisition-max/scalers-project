@@ -27,6 +27,8 @@ describe("invoice pay SQL", () => {
     await db.exec(read("docs/supabase/invoice_documents.sql"));
     await db.exec(read("docs/supabase/billing_company.sql"));
     await db.exec(read("docs/supabase/billing_company.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_session.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_session.sql"));
   });
 
   it("splits the same way as the page", async () => {

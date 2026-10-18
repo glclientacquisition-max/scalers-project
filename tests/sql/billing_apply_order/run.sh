@@ -34,6 +34,10 @@ echo "P7 package_version_editor.sql"
 $PSQL -d "$DB" -f "$WORK/p7.sql"
 echo "P8 billing_company.sql"
 $PSQL -d "$DB" -f docs/supabase/billing_company.sql
+echo "P9 invoice_pay_session.sql"
+$PSQL -d "$DB" -f docs/supabase/invoice_pay_session.sql
+$PSQL -d "$DB" -f docs/supabase/invoice_pay_session.sql
+$PSQL -d "$DB" -c "select position('pending_unattached' in pg_get_indexdef('public.payment_attempts_one_pending_part'::regclass)) > 0 as session_index, to_regprocedure('public.park_invoice_pay_attempt(uuid,text,text,timestamptz)') is not null as park;"
 echo "proof"
 $PSQL -d "$DB" -f tests/sql/billing_apply_order/proof.sql
 echo "re-apply P1 finalize installer after P8"
