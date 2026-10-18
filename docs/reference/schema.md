@@ -17,7 +17,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_packages` | `dids`, `email`, `id`, `is_active`, `minutes`, `monthly_price_kes`, `name`, `seats`, `sku`, `sms`, `sort_order`, `staff_wa`, `updated_at` | `docs/supabase/package_catalog.sql` |
 | `billing_rate_card` | `annual_discount_percent`, `email_kes`, `id`, `inbound_kes_per_second`, `outbound_kes_per_second`, `sms_kes`, `updated_at`, `whatsapp_kes` | `docs/supabase/package_catalog.sql` |
 | `call_facts` | `call_id`, `caller_area`, `competitor_mentioned`, `confidence`, `created_at`, `dow`, `est_value_ksh`, `hour_eat`, `intent`, `language`, `lost_reason`, `model`, `objection_price_ksh`, `outcome`, `owner_corrected_at`, `owner_corrected_by`, `price_objection`, `products_mentioned`, `review_snapshot`, `secondary_intents`, `sentiment`, `source`, `tenant_id`, `time_of_day`, `unanswered_question`, `updated_at` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
-| `calls` | `ai_processing_minutes`, `caller_number`, `created_at`, `duration_seconds`, `id`, `inbox_assignee`, `inbox_assignee_name`, `inbox_assignee_phone`, `inbox_labels`, `inbox_muted`, `inbox_pinned_at`, `inbox_read_at`, `inbox_snoozed_until`, `lead_status`, `package_seconds_applied`, `primary_intent`, `recording_url`, `resolution`, `resolution_note`, `sautikit_call_sid`, `sentiment`, `status`, `summary`, `tenant_id` | `docs/supabase/call_resolution.sql`<br>`docs/supabase/calls_inbox_assignee.sql`<br>`docs/supabase/foundation_bootstrap.sql`<br>`docs/supabase/inbox_triage.sql`<br>`docs/supabase/lead_status.sql`<br>`docs/supabase/package_minute_consume.sql`<br>`docs/supabase/wallet_metering.sql` |
+| `calls` | `ai_processing_minutes`, `caller_number`, `created_at`, `duration_seconds`, `id`, `inbox_assignee`, `inbox_assignee_name`, `inbox_assignee_phone`, `inbox_labels`, `inbox_muted`, `inbox_pinned_at`, `inbox_read_at`, `inbox_snoozed_until`, `lead_status`, `package_seconds_applied`, `primary_intent`, `recording_url`, `resolution`, `resolution_note`, `sautikit_call_sid`, `sentiment`, `short_code`, `status`, `summary`, `tenant_id` | `docs/supabase/call_resolution.sql`<br>`docs/supabase/calls_inbox_assignee.sql`<br>`docs/supabase/foundation_bootstrap.sql`<br>`docs/supabase/inbox_triage.sql`<br>`docs/supabase/lead_status.sql`<br>`docs/supabase/package_minute_consume.sql`<br>`docs/supabase/wallet_metering.sql`<br>`supabase/migrations/20261018230000_call_short_code.sql` |
 | `catalogue_price_history` | `amount_ksh`, `confirmed`, `effective_from`, `id`, `in_stock`, `item_key`, `item_name`, `kind`, `max_ksh`, `min_ksh`, `mode`, `source`, `tenant_id`, `unit` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `contacts` | `created_at`, `id`, `last_reason`, `metadata`, `name`, `notes`, `phone`, `tenant_id`, `updated_at` | `docs/supabase/contacts_and_requests.sql` |
 | `data_quality_snapshots` | `report`, `taken_on`, `tenant_id` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
@@ -52,7 +52,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `notify_sms_billable` | `docs/supabase/notify_send_reserve_settle.sql` |
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 
-## Functions (104)
+## Functions (107)
 
 | Function | Defined in |
 | --- | --- |
@@ -95,6 +95,9 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_add_months` | `docs/supabase/package_state_rules.sql` |
 | `billing_grant_minutes_for_period` | `docs/supabase/package_state_rules.sql` |
 | `call_setup_valid` | `supabase/migrations/20261018130000_tenant_call_setup.sql` |
+| `call_short_code_new` | `supabase/migrations/20261018230000_call_short_code.sql` |
+| `call_short_code_random` | `supabase/migrations/20261018230000_call_short_code.sql` |
+| `calls_set_short_code` | `supabase/migrations/20261018230000_call_short_code.sql` |
 | `charge_call_to_wallet` | `docs/supabase/fix_charge_call_wallet_ambiguous.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_on_demand_alerts.sql` |
 | `claim_wallet_balance_alerts` | `docs/supabase/wallet_on_demand_alerts.sql` |
 | `confirm_tenant_field` | `docs/supabase/tenant_field_provenance.sql` |

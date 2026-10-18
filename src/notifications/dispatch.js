@@ -30,7 +30,8 @@ const {
   sendReserved,
 } = require('./sendLedger');
 const { escalationHold, noteInboxOnly } = require('./escalationGate');
-const { renderStaffSms, toGsm7 } = require('./templates');
+const { STAFF_SMS_KINDS, renderStaffSms, toGsm7 } = require('./templates');
+const { callShortCode } = require('./callShortLink');
 
 function whatsAppSenderReady() {
   return isWhatsAppConfigured();
@@ -67,14 +68,18 @@ function deskBaseUrl() {
     'https://app.scalers.co.ke';
 }
 
-/** SMS body: explicit smsBody, else the one-segment staff alert, else the full text. */
-function staffSmsText({ smsBody, text, lead, ledger, kind } = {}) {
+/**
+ * SMS body: explicit smsBody, else the one-segment staff alert (with the
+ * short call link when calls.short_code is set), else the full text.
+ */
+async function staffSmsText({ smsBody, text, lead, ledger, kind } = {}) {
   if (smsBody && String(smsBody).trim()) return toGsm7(smsBody);
   const k = kind || (ledger && ledger.kind);
+  if (!STAFF_SMS_KINDS.has(String(k || '').trim())) return text;
   const short = renderStaffSms({
     kind: k,
     lead: lead && typeof lead === 'object' ? lead : {},
-    callId: ledger && ledger.callId,
+    shortCode: await callShortCode(ledger),
     deskBase: deskBaseUrl(),
   });
   return short || text;
@@ -109,7 +114,7 @@ async function dispatchAlert({ to, email, body, smsBody, lead = {}, subject, cha
   const text = body || buildLeadText(lead);
   // Staff call alerts go out on SMS as one GSM-7 segment (templates.js
   // renderStaffSms). WhatsApp and email keep the full text.
-  const smsText = staffSmsText({ smsBody, text, lead, ledger, kind });
+  const smsText = await staffSmsText({ smsBody, text, lead, ledger, kind });
   const errors = [];
   const prefs = parseNotifyChannels(channels);
   const dests = [normalizeSmsTo(to), normalizeWhatsAppTo(to), normalizeEmail(email)].filter(

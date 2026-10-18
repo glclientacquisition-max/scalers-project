@@ -259,23 +259,25 @@ function escalationBody({
 const SMS_MAX = 160;
 const STAFF_SMS_KINDS = new Set(['lead', 'escalation', 'service_request', 'appointment', 'voicemail', 'callback']);
 const STAFF_SMS_LABELS = Object.freeze({
-  lead: 'Missed call',
-  escalation: 'Call back',
-  service_request: 'Request',
-  appointment: 'Visit request, to confirm',
-  voicemail: 'Voicemail',
-  callback: 'Callback request',
+  lead: 'missed call',
+  escalation: 'call back',
+  service_request: 'request',
+  appointment: 'visit request - to confirm',
+  voicemail: 'voicemail',
+  callback: 'callback request',
 });
 // Titles that serviceRequestTitle / appointmentTitle put in front of the reason.
 const STAFF_SMS_TITLE_LABELS = Object.freeze({
-  'ENQUIRY': 'Enquiry',
-  'HOLD / PICKUP': 'Hold request',
-  'ORDER': 'Order request',
-  'CALLBACK': 'Callback request',
-  'VISIT REQUEST': 'Visit request, to confirm',
-  'VISIT UPDATED': 'Visit changed, to confirm',
-  'VISIT CANCELLED': 'Visit cancelled',
+  'ENQUIRY': 'enquiry',
+  'HOLD / PICKUP': 'hold request',
+  'ORDER': 'order request',
+  'CALLBACK': 'callback request',
+  'VISIT REQUEST': 'visit request - to confirm',
+  'VISIT UPDATED': 'visit changed - to confirm',
+  'VISIT CANCELLED': 'visit cancelled',
 });
+// Short call link code (calls.short_code): no 0/O/1/I/L.
+const SHORT_CODE_RE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{6,8}$/;
 
 // Basic GSM 03.38 characters that are also ASCII (extension chars [ ] { } ~ ^ | \ count double).
 const GSM7_BASIC_RE = /^[A-Za-z0-9 \n\r!"#$%&'()*+,\-./:;<=>?@_]*$/;
@@ -319,20 +321,41 @@ function clip(text, max) {
   return `${cut.replace(/[\s.,;:&/+-]+$/, '')}...`;
 }
 
-function deskCallLink(callId, deskBase) {
-  const id = String(callId || '').trim();
-  if (!id || !/^[A-Za-z0-9-]{1,64}$/.test(id)) return null;
-  const base = String(deskBase || '').trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
-  if (!base || !isGsm7Basic(base)) return null;
-  return `${base}/calls/${id}`;
+/** Kenyan mobile / landline-mobile as 07xx xxx xxx or 01xx xxx xxx; anything else as given. */
+function smsPhone(raw) {
+  const t = oneLine(raw);
+  const digits = t.replace(/[\s()-]/g, '');
+  const m = /^(?:\+?254|0)([17]\d{8})$/.exec(digits);
+  if (m) {
+    const n = `0${m[1]}`;
+    return `${n.slice(0, 4)} ${n.slice(4, 7)} ${n.slice(7)}`;
+  }
+  return clip(t, 16);
+}
+
+/** host/c/<code>, or null when there is no valid short code (no link then). */
+function shortCallLink(shortCode, deskBase) {
+  const code = String(shortCode || '').trim();
+  if (!SHORT_CODE_RE.test(code)) return null;
+  const base = String(deskBase || 'app.scalers.co.ke').trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+  if (!base || !isGsm7Basic(base) || /\s/.test(base)) return null;
+  return `${base}/c/${code}`;
 }
 
 /**
  * One-segment SMS for a staff call alert, or null when kind is not one
  * (caller texts, billing notices, wallet / ops alerts keep their own text).
- * @param {{ kind: string, lead?: { businessName?: string, name?: string, reason?: string, callerNumber?: string }, callId?: string|null, deskBase?: string|null }} opts
+ *
+ *   Mama Njeri Gas: missed call
+ *   Wanjiku Kamau, 0712 345 678
+ *   Wants 13kg gas refill to Kahawa West today, asked regulator price
+ *   app.scalers.co.ke/c/K7P2QX
+ *
+ * Business 24 chars, name 20, number 16; the reason gets the rest (with
+ * "..."). The short link is always kept when the call has a code.
+ * @param {{ kind: string, lead?: { businessName?: string, name?: string, reason?: string, callerNumber?: string }, shortCode?: string|null, deskBase?: string|null }} opts
  */
-function renderStaffSms({ kind, lead = {}, callId = null, deskBase = null } = {}) {
+function renderStaffSms({ kind, lead = {}, shortCode = null, deskBase = null } = {}) {
   const k = String(kind || '').trim();
   if (!STAFF_SMS_KINDS.has(k)) return null;
   let label = STAFF_SMS_LABELS[k];
@@ -342,34 +365,28 @@ function renderStaffSms({ kind, lead = {}, callId = null, deskBase = null } = {}
     label = STAFF_SMS_TITLE_LABELS[m[1].trim()];
     detail = detail.slice(m[0].length).trim();
   }
-  // Fixed caps: business 20, caller name 20, number 16. The detail (what
-  // they want) gets the rest. The Desk link is 60 chars (no short route
-  // yet): it is added only when the detail still fits whole or keeps 50+
-  // chars beside it.
-  const biz = clip(oneLine(lead && lead.businessName), 20);
+  const biz = clip(oneLine(lead && lead.businessName), 24);
   const name = clip(oneLine(lead && lead.name) || 'Caller', 20);
-  const phone = clip(oneLine(lead && lead.callerNumber), 16);
-  const link = deskCallLink(callId, deskBase);
-  const head = biz ? `${label} - ${biz}` : label;
-  const who = [name, phone].filter(Boolean).join(' ');
-  const base = `${head}\n${who}`;
-  const room = SMS_MAX - base.length - 1; // newline before the detail
-  const parts = [base];
-  if (link && room - 1 - link.length >= Math.min(detail.length || 0, 50)) {
-    if (detail) parts.push(clip(detail, room - 1 - link.length));
-    parts.push(link);
-  } else if (detail) {
-    parts.push(clip(detail, room));
-  }
-  const out = parts.join('\n');
+  const phone = smsPhone(lead && lead.callerNumber);
+  let link = shortCallLink(shortCode, deskBase);
+  const lines = [biz ? `${biz}: ${label}` : label, phone ? `${name}, ${phone}` : name];
+  if (link && lines.join('\n').length + link.length + 1 > SMS_MAX) link = null; // odd DESK_PUBLIC_URL
+  const fixed = lines.join('\n').length + (link ? link.length + 1 : 0);
+  const room = SMS_MAX - fixed - 1; // newline before the reason
+  if (detail && room > 3) lines.push(clip(detail, room));
+  if (link) lines.push(link);
+  const out = lines.join('\n');
   return out.length <= SMS_MAX ? out : clip(out, SMS_MAX);
 }
 
 module.exports = {
+  SHORT_CODE_RE,
   SMS_MAX,
   STAFF_SMS_KINDS,
   isGsm7Basic,
   renderStaffSms,
+  shortCallLink,
+  smsPhone,
   toGsm7,
   STAFF_ACTIONS,
   STAFF_TITLES,
