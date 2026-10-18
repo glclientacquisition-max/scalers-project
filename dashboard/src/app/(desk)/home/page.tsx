@@ -44,6 +44,8 @@ import { LivePing } from "@/components/ui/deskRow";
 import { Stamp } from "@/components/ui/Stamp";
 import { HomeCapture } from "@/components/HomeCapture";
 import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
+import { HomeCallSetupCard } from "@/components/HomeCallSetupCard";
+import { toLocal07 } from "@/lib/callForwarding";
 import { getTenantCompletenessScore, getTenantHoldGate } from "@/lib/deskProvenance";
 import { homeStakes, shopStakes } from "@/lib/baStakes";
 import { capabilityGates } from "@/lib/capabilityGates";
@@ -394,6 +396,7 @@ async function HomeOverviewBody() {
             </>
           ) : null}
         </section>
+        <HomeCallSetupCard tenantId={tenant.id} numberReady={toLocal07(tenant.sautikit_virtual_number) !== null} />
         <DataChecksCard checks={dataChecksFor(tenant)} />
         {insights ? (
           <CallInsights insights={insights} />
