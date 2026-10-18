@@ -156,9 +156,9 @@ export async function buyNumberIntoPool(inventoryId: string): Promise<DidPoolRow
 }
 
 /**
- * Return an assigned or reserved pool number to Available.
- * A living business goes through release_did_from_business (DID Available, business waits).
- * If the business row is already gone, the pool row is freed directly.
+ * Add a number to the pool as available.
+ * A released number is not available: release quarantines it
+ * (see billing_data_layer.sql). Quarantine is not Available.
  */
 export async function addDidToPool(opts: {
   e164: string;

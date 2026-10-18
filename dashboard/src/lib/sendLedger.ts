@@ -5,6 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendDeskCallerSms } from "@/lib/callerSms";
+import { getSupabaseAdmin } from "@/lib/supabase";
 import { outboundSendBlock } from "@/lib/tenantLine";
 
 export type CallerLedgerKind =
@@ -85,13 +86,14 @@ export function deskCallerLedgerRow(opts: {
 }
 
 export async function claimDeskSms(
-  client: SupabaseClient,
+  _client: SupabaseClient,
   tenantId: string,
   body: string
 ): Promise<{ allowed: boolean; reason: string; overage: boolean }> {
   if (!tenantId) return { allowed: true, reason: "no_tenant", overage: false };
   const need = Math.max(1, smsSegments(body) || 1);
-  const { data, error } = await client.rpc("consume_sms_units", {
+  // Service role. consume_sms_units is not granted to a signed-in member.
+  const { data, error } = await getSupabaseAdmin().rpc("consume_sms_units", {
     p_tenant_id: tenantId,
     p_units: need,
   });
