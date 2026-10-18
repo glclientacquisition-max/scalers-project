@@ -19,6 +19,11 @@ const MODES = new Set(['visit', 'delivery', 'pickup']);
 const FEE_MODES = new Set(['free', 'fixed', 'ask']);
 const MAX_KSH = 1000000;
 
+/** VOICE_AREA_FEES=on|1|true|yes turns area fees on. Default off. */
+function areaFeesEnabled(env) {
+  return /^(1|true|on|yes)$/i.test(String((env ? env.VOICE_AREA_FEES : process.env.VOICE_AREA_FEES) || '').trim());
+}
+
 function titleName(name) {
   if (name === 'muranga') return "Murang'a";
   return String(name || '').replace(/\b[a-z]+/g, (w) => (w === 'cbd' ? 'CBD' : w.charAt(0).toUpperCase() + w.slice(1)));
@@ -53,6 +58,9 @@ function feeKind(vertical, mode) {
  * @returns {{ areas: Array<{ id: string, name: string, mode: string, kind: 'travel'|'delivery', feeMode: string, feeKsh: number|null, eta: string|null, trusted: boolean }> } | null}
  */
 function readAreaTerms(raw, opts = {}) {
+  // VOICE_AREA_FEES (default off): off reads no terms, so every caller of
+  // profile.areaTerms behaves exactly as before #769.
+  if (!areaFeesEnabled(opts.env)) return null;
   const obj = asObject(raw);
   if (!obj || !Array.isArray(obj.areas)) return null;
   const valid = new Set(parseCoverageAreas(obj.areas.map((a) => (a && typeof a === 'object' ? a.id : null))));
@@ -182,6 +190,7 @@ function speakableAreaFacts(terms) {
 }
 
 module.exports = {
+  areaFeesEnabled,
   readAreaTerms,
   matchArea,
   feeKind,

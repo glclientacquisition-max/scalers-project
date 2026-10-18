@@ -50,6 +50,16 @@ function numberReadingText(text) {
   return String(text || '').replace(GLUED_CLOCK, '$1 ').replace(GLUED_SHILLINGS, '$1 ').replace(GLUED_AMOUNT, '$1 ');
 }
 
+// Compound amounts ("mia tatu" = 300) are read only when area fees
+// (VOICE_AREA_FEES) or fact references (VOICE_FACT_REFS) are on. Off: each
+// number word is read on its own, exactly as before.
+const FLAG_ON = /^(1|true|on|yes)$/i;
+function compoundNumbersEnabled(env) {
+  const fees = env ? env.VOICE_AREA_FEES : process.env.VOICE_AREA_FEES;
+  const refs = env ? env.VOICE_FACT_REFS : process.env.VOICE_FACT_REFS;
+  return FLAG_ON.test(String(fees || '').trim()) || FLAG_ON.test(String(refs || '').trim());
+}
+
 function wordVal(tok) {
   const t = String(tok || '').toLowerCase();
   if (Object.prototype.hasOwnProperty.call(NUMBER_WORDS, t)) return NUMBER_WORDS[t];
@@ -253,6 +263,13 @@ function numbersIn(text) {
     out.add(String(Number(hit[1])));
   }
 
+  if (!compoundNumbersEnabled()) {
+    for (const hit of raw.match(NUMBER_WORD_RE) || []) {
+      out.add(String(NUMBER_WORDS[hit.toLowerCase()]));
+    }
+    return out;
+  }
+
   const compounds = compoundNumbersIn(raw);
   for (const v of compounds.values) out.add(v);
 
@@ -276,6 +293,8 @@ function quantityWord(text) {
 
 module.exports = {
   NUMBER_WORDS,
+  compoundNumbersEnabled,
+  compoundNumbersIn,
   QUANTITY_WORDS,
   numbersIn,
   numberReadingText,

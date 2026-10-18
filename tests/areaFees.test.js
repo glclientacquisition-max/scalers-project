@@ -6,6 +6,8 @@
 // say "delivery fee". The production speech check must keep a confirmed fee
 // (KSh 300 for Kileleshwa) whether the model reads it from the prompt or the
 // line comes from the coverage lookup, and must still strip an unconfirmed one.
+// VOICE_AREA_FEES gates this behaviour; the flag-off contract is at the end.
+process.env.VOICE_AREA_FEES = 'on';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
@@ -241,3 +243,18 @@ for (const d199 of [undefined, 'on']) {
     assert.doesNotMatch(wrong, /mia tano|500/);
   }));
 }
+
+test('VOICE_AREA_FEES off: no area terms, no fee in the prompt, a Swahili fee word is read word by word as before', () => {
+  const prev = process.env.VOICE_AREA_FEES;
+  process.env.VOICE_AREA_FEES = 'off';
+  try {
+    const profile = tenantProfileFromRow(homeRow);
+    assert.equal(profile.areaTerms, null);
+    const prompt = buildSystemPrompt(profile, { now: new Date('2026-10-18T09:00:00Z') });
+    assert.doesNotMatch(prompt, /KSh 300/);
+    const { numbersIn } = require('../src/conversation/numberWords');
+    assert.deepEqual([...numbersIn('ada ni shilingi mia tatu')].sort(), ['100', '3']);
+  } finally {
+    process.env.VOICE_AREA_FEES = prev;
+  }
+});

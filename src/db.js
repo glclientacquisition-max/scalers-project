@@ -1508,7 +1508,10 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
 
   return tenantProfileFromRow(row, {
     openAppointments: await listOpenAppointments(row.id),
-    serviceAreas: row.service_areas !== undefined ? undefined : await getTenantServiceAreas(row.id),
+    serviceAreas:
+      row.service_areas !== undefined || !require('./conversation/areaTerms').areaFeesEnabled()
+        ? undefined
+        : await getTenantServiceAreas(row.id),
     ...(await loadProvenanceForProfile(row.id)),
   });
 }
