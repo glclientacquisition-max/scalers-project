@@ -20,9 +20,11 @@ const COUNT_KEYS = [
 ] as const;
 const MONEY_KEYS = [
   "monthly_price_kes",
+  "annual_price_kes",
+  "credit_kes",
+  "spend_limit_share_percent",
   "inbound_kes_per_second",
   "outbound_kes_per_second",
-  "annual_discount_percent",
 ] as const;
 
 export type EditorCommand =
@@ -74,6 +76,8 @@ export function packageVersionEditorHttpStatus(message: string): { status: numbe
     text.includes("not on this package") ||
     text.includes("business not found") ||
     text.includes("discount") ||
+    text.includes("annual price") ||
+    text.includes("spend limit") ||
     text.includes("notes must") ||
     text.includes("promote file") ||
     text.includes("say who") ||
@@ -156,7 +160,19 @@ function patchOf(value: unknown): Record<string, unknown> | null {
     if (n === null) return null;
     patch[key] = n;
   }
-  if ((patch.annual_discount_percent as number) > 100) return null;
+  if ((patch.spend_limit_share_percent as number) > 100) return null;
+  const monthly = patch.monthly_price_kes as number;
+  const annual = patch.annual_price_kes as number;
+  if (monthly === 0 ? annual !== 0 : annual > monthly * 12) return null;
+  if ("extra_seat_monthly_kes" in value) {
+    if (value.extra_seat_monthly_kes === null) {
+      patch.extra_seat_monthly_kes = null;
+    } else {
+      const extra = moneyValue(value.extra_seat_monthly_kes);
+      if (extra === null) return null;
+      patch.extra_seat_monthly_kes = extra;
+    }
+  }
   if (!("trial_days" in value)) return null;
   if (value.trial_days === null) {
     patch.trial_days = null;

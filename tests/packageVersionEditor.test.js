@@ -80,7 +80,9 @@ describe("package version editor commands", () => {
         dids: 1,
         inbound_kes_per_second: 0,
         outbound_kes_per_second: 0,
-        annual_discount_percent: 0,
+        annual_price_kes: 0,
+        credit_kes: 1,
+        spend_limit_share_percent: 50,
         trial_days: null,
         allowances_placeholder: false,
         on_demand_allowed: true,
@@ -105,7 +107,10 @@ describe("package version editor commands", () => {
         dids: 1,
         inbound_kes_per_second: 0.1,
         outbound_kes_per_second: 0.15,
-        annual_discount_percent: 17,
+        annual_price_kes: 10000,
+        credit_kes: 1,
+        spend_limit_share_percent: 50,
+        extra_seat_monthly_kes: null,
         trial_days: null,
         allowances_placeholder: true,
         on_demand_allowed: false,
@@ -116,8 +121,30 @@ describe("package version editor commands", () => {
     assert.equal(pool.command.patch.message_credits, 111);
     assert.equal(pool.command.patch.on_demand_allowed, false);
     assert.equal(pool.command.patch.sms_credit_burn, 1);
+    assert.equal(pool.command.patch.annual_price_kes, 10000);
+    assert.equal(pool.command.patch.credit_kes, 1);
+    assert.equal(pool.command.patch.spend_limit_share_percent, 50);
+    assert.equal(pool.command.patch.extra_seat_monthly_kes, null);
+    assert.equal("annual_discount_percent" in pool.command.patch, false);
     assert.equal("sms" in pool.command.patch, false);
     assert.equal("sms_kes" in pool.command.patch, false);
+    const panel = read("dashboard/src/components/AdminPackageVersionsPanel.tsx");
+    assert.match(panel, /Annual price/);
+    assert.match(panel, /Implied discount/);
+    assert.match(panel, /Credit price/);
+    assert.match(panel, /Spend limit %/);
+    assert.match(panel, /Extra seat \(KSh \/ month\)/);
+    assert.match(panel, /extraSeatSupported/);
+    assert.match(panel, /Trial minutes/);
+    assert.match(panel, /Trial credits/);
+    assert.doesNotMatch(panel, /Annual discount %/);
+    const sql = read("docs/supabase/package_version_editor.sql");
+    assert.match(sql, /add column if not exists annual_price_kes numeric/);
+    assert.match(sql, /credit_kes numeric not null default 1/);
+    assert.match(sql, /spend_limit_share_percent numeric not null default 50/);
+    assert.match(sql, /_package_version_has_column\('extra_seat_monthly_kes'\)/);
+    assert.match(sql, /then 500/);
+    assert.doesNotMatch(sql, /add column if not exists extra_seat_monthly_kes/);
   });
 
   it("keeps the actor out of the parsed command", async () => {

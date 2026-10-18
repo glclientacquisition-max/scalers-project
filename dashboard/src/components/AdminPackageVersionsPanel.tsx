@@ -44,7 +44,11 @@ type DraftForm = {
   emailBurn: string;
   inboundMin: string;
   outboundMin: string;
-  discount: string;
+  annual: string;
+  creditKes: string;
+  spendShare: string;
+  extraSeat: string;
+  hasExtraSeat: boolean;
   trialDays: string;
   onDemand: boolean;
   notes: string;
@@ -54,6 +58,15 @@ type DraftForm = {
 
 function money(amount: number) {
   return `KSh ${formatKes(amount)}`;
+}
+
+function impliedDiscount(monthly: string, annual: string): string {
+  const month = Number(monthly);
+  const year = Number(annual);
+  if (!Number.isFinite(month) || !Number.isFinite(year) || month <= 0 || year < 0) return "0";
+  const percent = (1 - year / (month * 12)) * 100;
+  if (!Number.isFinite(percent)) return "0";
+  return String(Math.round(percent * 100) / 100);
 }
 
 function planPreview(version: PackageVersionRow) {
@@ -70,7 +83,12 @@ function draftOf(pack: VersionPackage): PackageVersionRow | null {
   return pack.versions.find((version) => version.status === "draft") || null;
 }
 
-function formFrom(pack: VersionPackage, version: PackageVersionRow, features: VersionFeature[]): DraftForm {
+function formFrom(
+  pack: VersionPackage,
+  version: PackageVersionRow,
+  features: VersionFeature[],
+  extraSeatSupported: boolean,
+): DraftForm {
   const enabled = new Map(version.features.map((feature) => [feature.key, feature.enabled]));
   return {
     versionId: version.id,
@@ -86,7 +104,11 @@ function formFrom(pack: VersionPackage, version: PackageVersionRow, features: Ve
     emailBurn: version.emailCreditBurn === null ? "1" : String(version.emailCreditBurn),
     inboundMin: String(inboundKesPerMinute(version.inboundKesPerSecond)),
     outboundMin: String(outboundKesPerMinute(version.outboundKesPerSecond)),
-    discount: String(version.annualDiscountPercent),
+    annual: String(version.annualPriceKes),
+    creditKes: String(version.creditKes),
+    spendShare: String(version.spendLimitSharePercent),
+    extraSeat: version.extraSeatMonthlyKes === null ? "" : String(version.extraSeatMonthlyKes),
+    hasExtraSeat: extraSeatSupported,
     trialDays: version.trialDays === null ? "" : String(version.trialDays),
     onDemand: version.onDemandAllowed,
     notes: version.notes || "",
@@ -110,7 +132,12 @@ function patchFrom(form: DraftForm) {
     email_credit_burn: Number(form.emailBurn),
     inbound_kes_per_second: kesPerSecondFromMinute(Number(form.inboundMin)),
     outbound_kes_per_second: kesPerSecondFromMinute(Number(form.outboundMin)),
-    annual_discount_percent: Number(form.discount),
+    annual_price_kes: Number(form.annual),
+    credit_kes: Number(form.creditKes),
+    spend_limit_share_percent: Number(form.spendShare),
+    ...(form.hasExtraSeat
+      ? { extra_seat_monthly_kes: form.extraSeat.trim() === "" ? null : Number(form.extraSeat) }
+      : {}),
     trial_days: form.sku === "trial" ? Number(form.trialDays) : null,
     allowances_placeholder: form.allowancesPlaceholder,
     on_demand_allowed: form.onDemand,
@@ -124,17 +151,29 @@ function changedLines(before: PackageVersionRow, form: DraftForm): string[] {
   const add = (label: string, from: string, to: string) => {
     if (from !== to) lines.push(`${label}: ${from} to ${to}`);
   };
+  const minuteLabel = form.sku === "trial" ? "Trial minutes" : "Minutes";
+  const creditLabel = form.sku === "trial" ? "Trial credits" : "Credits";
   add("Monthly", money(before.monthlyPriceKes), money(Number(form.monthly)));
-  add("Minutes", String(before.minutes), form.minutes);
+  add("Annual", money(before.annualPriceKes), money(Number(form.annual)));
+  add("Implied discount", `${before.annualDiscountPercent}%`, `${impliedDiscount(form.monthly, form.annual)}%`);
+  add(minuteLabel, String(before.minutes), form.minutes);
   add("Seats", String(before.seats), form.seats);
+  add(creditLabel, before.messageCredits === null ? "Not set" : String(before.messageCredits), form.credits || "Not set");
   add("Numbers", String(before.dids), form.dids);
-  add("Credits", before.messageCredits === null ? "Not set" : String(before.messageCredits), form.credits || "Not set");
+  if (form.hasExtraSeat) {
+    add(
+      "Extra seat",
+      before.extraSeatMonthlyKes === null ? "Not set" : money(before.extraSeatMonthlyKes),
+      form.extraSeat.trim() === "" ? "Not set" : money(Number(form.extraSeat)),
+    );
+  }
   add("SMS burn", String(before.smsCreditBurn ?? ""), form.smsBurn);
   add("WhatsApp burn", String(before.whatsappCreditBurn ?? ""), form.whatsappBurn);
   add("Email burn", String(before.emailCreditBurn ?? ""), form.emailBurn);
   add("Inbound", `${inboundKesPerMinute(before.inboundKesPerSecond)} / min`, `${form.inboundMin} / min`);
   add("Outbound", `${outboundKesPerMinute(before.outboundKesPerSecond)} / min`, `${form.outboundMin} / min`);
-  add("Annual discount", `${before.annualDiscountPercent}%`, `${form.discount}%`);
+  add("Credit price", money(before.creditKes), money(Number(form.creditKes)));
+  add("Spend limit", `${before.spendLimitSharePercent}%`, `${form.spendShare}%`);
   if (form.sku === "trial") {
     add("Trial days", String(before.trialDays ?? ""), form.trialDays);
   }
@@ -205,7 +244,7 @@ export function AdminPackageVersionsPanel({
   function openEdit(pack: VersionPackage, version: PackageVersionRow) {
     setError(null);
     setReason("");
-    setForm(formFrom(pack, version, featureCatalog.length ? featureCatalog : version.features));
+    setForm(formFrom(pack, version, featureCatalog.length ? featureCatalog : version.features, catalog.extraSeatSupported));
     setSheet("edit");
   }
 
@@ -508,13 +547,18 @@ export function AdminPackageVersionsPanel({
                 <Input {...props} inputMode="decimal" value={form.monthly} onChange={(event) => setForm({ ...form, monthly: event.target.value })} />
               )}
             </Field>
+            <Field id="version-annual" label="Annual price" hint={`Implied discount ${impliedDiscount(form.monthly, form.annual)}%`} required>
+              {(props) => (
+                <Input {...props} inputMode="decimal" value={form.annual} onChange={(event) => setForm({ ...form, annual: event.target.value })} />
+              )}
+            </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field id="version-minutes" label="Minutes" required>
+              <Field id="version-minutes" label={form.sku === "trial" ? "Trial minutes" : "Minutes"} required>
                 {(props) => (
                   <Input {...props} inputMode="numeric" value={form.minutes} onChange={(event) => setForm({ ...form, minutes: event.target.value })} />
                 )}
               </Field>
-              <Field id="version-credits" label="Credits" required>
+              <Field id="version-credits" label={form.sku === "trial" ? "Trial credits" : "Credits"} required>
                 {(props) => (
                   <Input {...props} inputMode="numeric" value={form.credits} onChange={(event) => setForm({ ...form, credits: event.target.value })} />
                 )}
@@ -530,8 +574,15 @@ export function AdminPackageVersionsPanel({
                 )}
               </Field>
             </div>
+            {form.hasExtraSeat ? (
+              <Field id="version-extra-seat" label="Extra seat (KSh / month)">
+                {(props) => (
+                  <Input {...props} inputMode="decimal" value={form.extraSeat} onChange={(event) => setForm({ ...form, extraSeat: event.target.value })} />
+                )}
+              </Field>
+            ) : null}
             <div className="grid grid-cols-3 gap-3">
-              <Field id="version-sms" label="SMS burn" hint="1 credit = KSh 1">
+              <Field id="version-sms" label="SMS burn" hint={`1 credit = ${money(Number(form.creditKes) || 0)}`}>
                 {(props) => (
                   <Input {...props} inputMode="numeric" value={form.smsBurn} onChange={(event) => setForm({ ...form, smsBurn: event.target.value })} />
                 )}
@@ -558,12 +609,17 @@ export function AdminPackageVersionsPanel({
                   <Input {...props} inputMode="decimal" value={form.outboundMin} onChange={(event) => setForm({ ...form, outboundMin: event.target.value })} />
                 )}
               </Field>
+              <Field id="version-credit-kes" label="Credit price">
+                {(props) => (
+                  <Input {...props} inputMode="decimal" value={form.creditKes} onChange={(event) => setForm({ ...form, creditKes: event.target.value })} />
+                )}
+              </Field>
+              <Field id="version-spend" label="Spend limit %" hint="Share of the monthly price">
+                {(props) => (
+                  <Input {...props} inputMode="decimal" value={form.spendShare} onChange={(event) => setForm({ ...form, spendShare: event.target.value })} />
+                )}
+              </Field>
             </div>
-            <Field id="version-discount" label="Annual discount %">
-              {(props) => (
-                <Input {...props} inputMode="decimal" value={form.discount} onChange={(event) => setForm({ ...form, discount: event.target.value })} />
-              )}
-            </Field>
             {form.sku === "trial" ? (
               <Field id="version-days" label="Trial days" required>
                 {(props) => (

@@ -24,16 +24,29 @@
 -- write a new commercial price. The owner price table is
 -- package_version_owner_prices.sql. Run that after this file, on staging only.
 --
--- Messages are one shared allowance: message_credits. 1 credit = KSh 1 at the
--- on-demand rate. sms_credit_burn, whatsapp_credit_burn, and email_credit_burn
--- are credits per SMS segment, WhatsApp message, and email. The editor writes
--- those burns into sms_kes, whatsapp_kes, and email_kes so the stored rate
--- matches. It does not edit the old sms, email, and staff_wa included columns.
--- Seeded versions leave message_credits null. An admin sets the pool on the
--- draft. Owner defaults, still editable on a draft: SMS segment 1, WhatsApp
--- alert 2, email 1. A draft copies the burns from the version it starts from.
--- on_demand_allowed is true on a paid version. The trial version can lock it
--- off. Metering still reads the old buckets until a later change.
+-- Messages are one shared allowance: message_credits. credit_kes is the KSh
+-- price of one credit (default 1). sms_credit_burn, whatsapp_credit_burn, and
+-- email_credit_burn are credits per SMS segment, WhatsApp message, and email.
+-- The editor writes those burns into sms_kes, whatsapp_kes, and email_kes so
+-- the stored rate matches. It does not edit the old sms, email, and staff_wa
+-- included columns. Seeded versions leave message_credits null. An admin sets
+-- the pool on the draft. Owner defaults, still editable on a draft: SMS
+-- segment 1, WhatsApp alert 2, email 1. A draft copies the burns from the
+-- version it starts from. on_demand_allowed is true on a paid version. The
+-- trial version can lock it off. Metering still reads the old buckets until
+-- a later change.
+--
+-- annual_price_kes is stored. annual_discount_percent is the implied discount
+-- and is rewritten from the annual price on every draft save, so a later
+-- extra-seat annualization that reads the percent stays in step.
+-- spend_limit_share_percent is the default on-demand cap as a percent of the
+-- monthly price (default 50). Desk reads it from the version row.
+-- extra_seat_monthly_kes belongs to the owner billing actions file. This file
+-- does not add that column. When it is already there, a draft copies it and
+-- the editor can change it. A null on a new paid draft becomes 500. A
+-- published value is not rewritten. Trial stays null.
+-- Trial minutes are minutes on sku trial. Trial credits are message_credits
+-- on sku trial. Trial length is trial_days.
 
 -- ---------------------------------------------------------------------------
 -- 1. Editor settings and version bookkeeping.
@@ -52,7 +65,7 @@ alter table public.billing_lifecycle_settings
   );
 
 comment on column public.billing_lifecycle_settings.price_change_approval_threshold_kes is
-  'Null: a publish does not need a second admin. Set: a monthly price move above this amount, or any overage rate or annual discount change, needs a second admin. Zero means any monthly price change.';
+  'Null: a publish does not need a second admin. Set: a monthly price move above this amount, or any call rate, credit price, annual price, spend-limit share, or extra-seat price change, needs a second admin. Zero means any monthly price change.';
 
 comment on column public.billing_lifecycle_settings.package_editor_enabled is
   'When false, draft, edit, publish, archive, approve, and move are refused. Import of a promoted version still runs. Staging stays true.';
@@ -107,6 +120,160 @@ comment on column public.billing_package_versions.email_credit_burn is
 comment on column public.billing_package_versions.on_demand_allowed is
   'When false, this version does not offer on-demand minutes or credits. The trial locks it off. Editable on a draft.';
 
+alter table public.billing_package_versions
+  add column if not exists annual_price_kes numeric,
+  add column if not exists credit_kes numeric not null default 1,
+  add column if not exists spend_limit_share_percent numeric not null default 50;
+
+update public.billing_package_versions
+set annual_price_kes = round(monthly_price_kes * 12 * (1 - annual_discount_percent / 100))
+where annual_price_kes is null;
+
+alter table public.billing_package_versions
+  alter column annual_price_kes set not null;
+
+alter table public.billing_package_versions
+  drop constraint if exists billing_package_versions_desk_terms_check;
+alter table public.billing_package_versions
+  add constraint billing_package_versions_desk_terms_check check (
+    annual_price_kes >= 0
+    and credit_kes >= 0
+    and spend_limit_share_percent >= 0
+    and spend_limit_share_percent <= 100
+  );
+
+comment on column public.billing_package_versions.annual_price_kes is
+  'Annual price in KSh, stored. The implied discount is annual_discount_percent, rewritten from this price and the monthly price.';
+
+comment on column public.billing_package_versions.credit_kes is
+  'KSh price of one message credit. Default 1. Editable on a draft. Burn rates stay in credits.';
+
+comment on column public.billing_package_versions.spend_limit_share_percent is
+  'Default on-demand spend cap as a percent of monthly_price_kes. Default 50. Editable on a draft. Desk reads this column. billing_spend_limit_kes from the owner billing actions file still uses 50 percent until that function reads this column.';
+
+create or replace function public._package_version_has_column(p_column text)
+returns boolean
+language sql
+stable
+as $$
+  select exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'billing_package_versions'
+      and column_name = p_column
+  )
+$$;
+
+create or replace function public._package_annual_discount(p_monthly numeric, p_annual numeric)
+returns numeric
+language plpgsql
+immutable
+as $$
+begin
+  if p_monthly is null or p_monthly < 0 or p_annual is null or p_annual < 0 then
+    raise exception 'package numbers must be zero or more';
+  end if;
+  if p_monthly = 0 then
+    if p_annual <> 0 then
+      raise exception 'annual price is above twelve months';
+    end if;
+    return 0;
+  end if;
+  if p_annual > p_monthly * 12 then
+    raise exception 'annual price is above twelve months';
+  end if;
+  return round((1 - (p_annual / (p_monthly * 12))) * 100, 2);
+end;
+$$;
+
+create or replace function public._package_version_copy_extra_seat(p_target uuid, p_source uuid)
+returns void
+language plpgsql
+as $$
+begin
+  if not public._package_version_has_column('extra_seat_monthly_kes') then
+    return;
+  end if;
+  execute $sql$
+    update public.billing_package_versions d
+    set extra_seat_monthly_kes = case
+      when s.extra_seat_monthly_kes is null and p.sku <> 'trial' and d.status = 'draft' then 500
+      else s.extra_seat_monthly_kes
+    end
+    from public.billing_package_versions s
+    join public.billing_packages p on p.id = s.package_id
+    where d.id = $1 and s.id = $2
+  $sql$
+  using p_target, p_source;
+end;
+$$;
+
+-- Returns true when the stored extra-seat price changes. No-op when the
+-- column is absent or the patch does not mention it.
+create or replace function public._package_version_apply_extra_seat(p_id uuid, p_patch jsonb)
+returns boolean
+language plpgsql
+as $$
+declare
+  v_old numeric;
+  v_new numeric;
+begin
+  if not public._package_version_has_column('extra_seat_monthly_kes') then
+    return false;
+  end if;
+  if p_patch is null or not (p_patch ? 'extra_seat_monthly_kes') then
+    return false;
+  end if;
+  execute 'select extra_seat_monthly_kes from public.billing_package_versions where id = $1'
+    into v_old
+    using p_id;
+  if jsonb_typeof(p_patch -> 'extra_seat_monthly_kes') = 'null' then
+    if v_old is null then
+      return false;
+    end if;
+    execute 'update public.billing_package_versions set extra_seat_monthly_kes = null where id = $1'
+      using p_id;
+    return true;
+  end if;
+  if jsonb_typeof(p_patch -> 'extra_seat_monthly_kes') <> 'number' then
+    raise exception 'package numbers must be zero or more';
+  end if;
+  v_new := (p_patch ->> 'extra_seat_monthly_kes')::numeric;
+  if v_new < 0 or v_new > 100000000 then
+    raise exception 'package numbers must be zero or more';
+  end if;
+  if v_old is not distinct from v_new then
+    return false;
+  end if;
+  execute 'update public.billing_package_versions set extra_seat_monthly_kes = $1 where id = $2'
+    using v_new, p_id;
+  return true;
+end;
+$$;
+
+create or replace function public._package_version_fill_extra_seat()
+returns void
+language plpgsql
+as $$
+begin
+  if not public._package_version_has_column('extra_seat_monthly_kes') then
+    return;
+  end if;
+  execute $sql$
+    update public.billing_package_versions v
+    set extra_seat_monthly_kes = 500
+    from public.billing_packages p
+    where v.package_id = p.id
+      and p.sku <> 'trial'
+      and v.status = 'draft'
+      and v.extra_seat_monthly_kes is null
+  $sql$;
+end;
+$$;
+
+select public._package_version_fill_extra_seat();
+
 do $$
 begin
   alter table public.billing_package_versions
@@ -154,6 +321,10 @@ begin
      or new.sms_kes is distinct from old.sms_kes
      or new.email_kes is distinct from old.email_kes
      or new.annual_discount_percent is distinct from old.annual_discount_percent
+     or new.annual_price_kes is distinct from old.annual_price_kes
+     or new.credit_kes is distinct from old.credit_kes
+     or new.spend_limit_share_percent is distinct from old.spend_limit_share_percent
+     or (to_jsonb(new) -> 'extra_seat_monthly_kes') is distinct from (to_jsonb(old) -> 'extra_seat_monthly_kes')
      or new.trial_days is distinct from old.trial_days
      or new.allowances_placeholder is distinct from old.allowances_placeholder
      or new.active_from is distinct from old.active_from
@@ -466,11 +637,15 @@ stable
 as $$
   select jsonb_build_object(
     'annual_discount_percent', v.annual_discount_percent,
+    'annual_price_kes', v.annual_price_kes,
+    'credit_kes', v.credit_kes,
     'email_kes', v.email_kes,
+    'extra_seat_monthly_kes', to_jsonb(v) -> 'extra_seat_monthly_kes',
     'inbound_kes_per_second', v.inbound_kes_per_second,
     'monthly_price_kes', v.monthly_price_kes,
     'outbound_kes_per_second', v.outbound_kes_per_second,
     'sms_kes', v.sms_kes,
+    'spend_limit_share_percent', v.spend_limit_share_percent,
     'whatsapp_kes', v.whatsapp_kes,
     'sms_credit_burn', v.sms_credit_burn,
     'whatsapp_credit_burn', v.whatsapp_credit_burn,
@@ -536,6 +711,10 @@ begin
      or v_draft.whatsapp_credit_burn is distinct from v_current.whatsapp_credit_burn
      or v_draft.email_credit_burn is distinct from v_current.email_credit_burn
      or v_draft.annual_discount_percent is distinct from v_current.annual_discount_percent
+     or v_draft.annual_price_kes is distinct from v_current.annual_price_kes
+     or v_draft.credit_kes is distinct from v_current.credit_kes
+     or v_draft.spend_limit_share_percent is distinct from v_current.spend_limit_share_percent
+     or (to_jsonb(v_draft) -> 'extra_seat_monthly_kes') is distinct from (to_jsonb(v_current) -> 'extra_seat_monthly_kes')
   then
     return true;
   end if;
@@ -573,6 +752,15 @@ begin
     'active_from', to_char(v_active at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
     'allowances_placeholder', (p_terms ->> 'allowances_placeholder')::boolean,
     'annual_discount_percent', (p_terms ->> 'annual_discount_percent')::numeric,
+    'annual_price_kes', case
+      when p_terms ? 'annual_price_kes' and jsonb_typeof(p_terms -> 'annual_price_kes') <> 'null'
+        then (p_terms ->> 'annual_price_kes')::numeric
+      else round(
+        (p_terms ->> 'monthly_price_kes')::numeric * 12
+        * (1 - (p_terms ->> 'annual_discount_percent')::numeric / 100)
+      )
+    end,
+    'credit_kes', coalesce((p_terms ->> 'credit_kes')::numeric, 1),
     'dids', (p_terms ->> 'dids')::integer,
     'email', (p_terms ->> 'email')::integer,
     'email_credit_burn', (p_terms ->> 'email_credit_burn')::numeric,
@@ -598,11 +786,17 @@ begin
     'sms', (p_terms ->> 'sms')::integer,
     'sms_credit_burn', (p_terms ->> 'sms_credit_burn')::numeric,
     'sms_kes', (p_terms ->> 'sms_kes')::numeric,
+    'spend_limit_share_percent', coalesce((p_terms ->> 'spend_limit_share_percent')::numeric, 50),
     'staff_wa', (p_terms ->> 'staff_wa')::integer,
     'trial_days', v_trial,
     'whatsapp_credit_burn', (p_terms ->> 'whatsapp_credit_burn')::numeric,
     'whatsapp_kes', (p_terms ->> 'whatsapp_kes')::numeric
   );
+  if p_terms ? 'extra_seat_monthly_kes' then
+    v_payload := v_payload || jsonb_build_object(
+      'extra_seat_monthly_kes', p_terms -> 'extra_seat_monthly_kes'
+    );
+  end if;
   return public._package_version_sha256(v_payload::text);
 end;
 $$;
@@ -620,7 +814,7 @@ as $$
     'version', v.version,
     'status', v.status,
     'monthly_price_kes', v.monthly_price_kes,
-    'annual_price_kes', round(v.monthly_price_kes * 12 * (1 - v.annual_discount_percent / 100)),
+    'annual_price_kes', v.annual_price_kes,
     'seats', v.seats,
     'minutes', v.minutes,
     'message_credits', v.message_credits,
@@ -638,6 +832,9 @@ as $$
     'sms_kes', v.sms_kes,
     'email_kes', v.email_kes,
     'annual_discount_percent', v.annual_discount_percent,
+    'credit_kes', v.credit_kes,
+    'spend_limit_share_percent', v.spend_limit_share_percent,
+    'extra_seat_monthly_kes', to_jsonb(v) -> 'extra_seat_monthly_kes',
     'trial_days', v.trial_days,
     'allowances_placeholder', v.allowances_placeholder,
     'active_from', v.active_from,
@@ -692,6 +889,7 @@ as $$
     'price_change_approval_threshold_kes', s.price_change_approval_threshold_kes,
     'package_editor_enabled', s.package_editor_enabled,
     'new_signup_trial_enabled', s.new_signup_trial_enabled,
+    'extra_seat_supported', public._package_version_has_column('extra_seat_monthly_kes'),
     'features', coalesce((
       select jsonb_agg(jsonb_build_object('key', f.key, 'label', f.label) order by f.key)
       from public.billing_features f
@@ -761,7 +959,8 @@ begin
   insert into public.billing_package_versions (
     package_id, version, status, monthly_price_kes, seats, minutes, sms, email, staff_wa, dids,
     inbound_kes_per_second, outbound_kes_per_second, whatsapp_kes, sms_kes, email_kes,
-    annual_discount_percent, trial_days, allowances_placeholder, active_from,
+    annual_discount_percent, annual_price_kes, credit_kes, spend_limit_share_percent,
+    trial_days, allowances_placeholder, active_from,
     copied_from_id, notes, price_set_by,
     message_credits, sms_credit_burn, whatsapp_credit_burn, email_credit_burn,
     on_demand_allowed
@@ -771,12 +970,14 @@ begin
     v_source.staff_wa, v_source.dids,
     v_source.inbound_kes_per_second, v_source.outbound_kes_per_second, v_source.whatsapp_kes,
     v_source.sms_kes, v_source.email_kes, v_source.annual_discount_percent,
+    v_source.annual_price_kes, v_source.credit_kes, v_source.spend_limit_share_percent,
     v_source.trial_days, v_source.allowances_placeholder, v_source.active_from,
     v_source.id, null, null,
     v_source.message_credits, v_source.sms_credit_burn, v_source.whatsapp_credit_burn, v_source.email_credit_burn,
     v_source.on_demand_allowed
   )
   returning id into v_id;
+  perform public._package_version_copy_extra_seat(v_id, v_source.id);
   insert into public.billing_package_version_features (package_version_id, feature_key, enabled)
   select v_id, f.feature_key, f.enabled
   from public.billing_package_version_features f
@@ -869,12 +1070,16 @@ declare
   v_dids integer;
   v_inbound numeric;
   v_outbound numeric;
+  v_annual numeric;
   v_discount numeric;
+  v_credit numeric;
+  v_share numeric;
   v_trial integer;
   v_placeholder boolean;
   v_notes text;
   v_price_set_by text;
   v_price_changed boolean;
+  v_extra_changed boolean;
 begin
   perform public._package_editor_open();
   perform public._package_editor_actor(p_actor, p_reason);
@@ -894,9 +1099,12 @@ begin
   v_dids := public._package_editor_count(p_patch, 'dids');
   v_inbound := public._package_editor_money(p_patch, 'inbound_kes_per_second');
   v_outbound := public._package_editor_money(p_patch, 'outbound_kes_per_second');
-  v_discount := public._package_editor_money(p_patch, 'annual_discount_percent');
-  if v_discount > 100 then
-    raise exception 'discount must be 0 to 100';
+  v_annual := public._package_editor_money(p_patch, 'annual_price_kes');
+  v_discount := public._package_annual_discount(v_monthly, v_annual);
+  v_credit := public._package_editor_money(p_patch, 'credit_kes');
+  v_share := public._package_editor_money(p_patch, 'spend_limit_share_percent');
+  if v_share > 100 then
+    raise exception 'spend limit must be 0 to 100';
   end if;
   if p_patch -> 'trial_days' is null then
     raise exception 'trial length is required';
@@ -934,6 +1142,7 @@ begin
     v_notes := v_old.notes;
   end if;
   perform public._package_editor_apply_features(p_version_id, p_patch -> 'features');
+  v_extra_changed := public._package_version_apply_extra_seat(p_version_id, p_patch);
   v_price_changed :=
     v_monthly is distinct from v_old.monthly_price_kes
     or v_inbound is distinct from v_old.inbound_kes_per_second
@@ -941,7 +1150,11 @@ begin
     or v_sms_burn is distinct from v_old.sms_credit_burn
     or v_whatsapp_burn is distinct from v_old.whatsapp_credit_burn
     or v_email_burn is distinct from v_old.email_credit_burn
-    or v_discount is distinct from v_old.annual_discount_percent;
+    or v_annual is distinct from v_old.annual_price_kes
+    or v_discount is distinct from v_old.annual_discount_percent
+    or v_credit is distinct from v_old.credit_kes
+    or v_share is distinct from v_old.spend_limit_share_percent
+    or v_extra_changed;
   if v_price_changed then
     v_price_set_by := btrim(p_actor);
   else
@@ -962,7 +1175,10 @@ begin
     whatsapp_kes = v_whatsapp_burn,
     sms_kes = v_sms_burn,
     email_kes = v_email_burn,
+    annual_price_kes = v_annual,
     annual_discount_percent = v_discount,
+    credit_kes = v_credit,
+    spend_limit_share_percent = v_share,
     trial_days = v_trial,
     allowances_placeholder = v_placeholder,
     on_demand_allowed = v_on_demand,
@@ -1704,6 +1920,8 @@ begin
     'active_from', to_char(v.active_from at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
     'allowances_placeholder', v.allowances_placeholder,
     'annual_discount_percent', v.annual_discount_percent,
+    'annual_price_kes', v.annual_price_kes,
+    'credit_kes', v.credit_kes,
     'dids', v.dids,
     'email', v.email,
     'email_credit_burn', v.email_credit_burn,
@@ -1718,11 +1936,17 @@ begin
     'sms', v.sms,
     'sms_credit_burn', v.sms_credit_burn,
     'sms_kes', v.sms_kes,
+    'spend_limit_share_percent', v.spend_limit_share_percent,
     'staff_wa', v.staff_wa,
     'trial_days', v.trial_days,
     'whatsapp_credit_burn', v.whatsapp_credit_burn,
     'whatsapp_kes', v.whatsapp_kes
   );
+  if public._package_version_has_column('extra_seat_monthly_kes') then
+    v_terms := v_terms || jsonb_build_object(
+      'extra_seat_monthly_kes', to_jsonb(v) -> 'extra_seat_monthly_kes'
+    );
+  end if;
   v_fingerprint := public.package_version_fingerprint(v_sku, v_terms, v_features);
   return jsonb_build_object(
     'format', 'scalers.package_version.v1',
@@ -1814,11 +2038,12 @@ begin
   insert into public.billing_package_versions (
     package_id, version, status, monthly_price_kes, seats, minutes, sms, email, staff_wa, dids,
     inbound_kes_per_second, outbound_kes_per_second, whatsapp_kes, sms_kes, email_kes,
-    annual_discount_percent, trial_days, allowances_placeholder, active_from,
+    annual_discount_percent, annual_price_kes, credit_kes, spend_limit_share_percent,
+    trial_days, allowances_placeholder, active_from,
     promote_fingerprint
   ) values (
     v_package.id, v_next, 'draft', 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, null, false, v_active, v_fingerprint
+    0, 0, 0, 0, 0, 0, 0, 1, 50, null, false, v_active, v_fingerprint
   )
   returning id into v_id;
   -- The editor may be off on the target. Numbers still go through the same checks.
@@ -1866,6 +2091,24 @@ begin
       when v_terms -> 'on_demand_allowed' is null or jsonb_typeof(v_terms -> 'on_demand_allowed') = 'null' then true
       else (v_terms ->> 'on_demand_allowed')::boolean
     end,
+    annual_price_kes = case
+      when v_terms ? 'annual_price_kes' and jsonb_typeof(v_terms -> 'annual_price_kes') <> 'null'
+        then public._package_editor_money(v_terms, 'annual_price_kes')
+      else round(
+        public._package_editor_money(v_terms, 'monthly_price_kes') * 12
+        * (1 - public._package_editor_money(v_terms, 'annual_discount_percent') / 100)
+      )
+    end,
+    credit_kes = case
+      when v_terms ? 'credit_kes' and jsonb_typeof(v_terms -> 'credit_kes') <> 'null'
+        then public._package_editor_money(v_terms, 'credit_kes')
+      else 1
+    end,
+    spend_limit_share_percent = case
+      when v_terms ? 'spend_limit_share_percent' and jsonb_typeof(v_terms -> 'spend_limit_share_percent') <> 'null'
+        then public._package_editor_money(v_terms, 'spend_limit_share_percent')
+      else 50
+    end,
     annual_discount_percent = public._package_editor_money(v_terms, 'annual_discount_percent'),
     allowances_placeholder = (v_terms ->> 'allowances_placeholder')::boolean,
     trial_days = case
@@ -1880,9 +2123,13 @@ begin
   elsif (select trial_days from public.billing_package_versions where id = v_id) is not null then
     raise exception 'only a trial version has a trial length';
   end if;
-  if (select annual_discount_percent from public.billing_package_versions where id = v_id) > 100 then
-    raise exception 'discount must be 0 to 100';
+  update public.billing_package_versions
+  set annual_discount_percent = public._package_annual_discount(monthly_price_kes, annual_price_kes)
+  where id = v_id;
+  if (select spend_limit_share_percent from public.billing_package_versions where id = v_id) > 100 then
+    raise exception 'spend limit must be 0 to 100';
   end if;
+  perform public._package_version_apply_extra_seat(v_id, v_terms);
   update public.billing_package_versions
   set status = 'published', published_at = now(), active_from = v_active
   where id = v_id;
@@ -1968,6 +2215,11 @@ revoke all on function public._package_version_price_snapshot(uuid) from public,
 revoke all on function public._package_version_current_id(uuid) from public, anon, authenticated;
 revoke all on function public._package_version_needs_approval(uuid) from public, anon, authenticated;
 revoke all on function public._package_version_json(uuid) from public, anon, authenticated;
+revoke all on function public._package_version_has_column(text) from public, anon, authenticated;
+revoke all on function public._package_annual_discount(numeric, numeric) from public, anon, authenticated;
+revoke all on function public._package_version_copy_extra_seat(uuid, uuid) from public, anon, authenticated;
+revoke all on function public._package_version_apply_extra_seat(uuid, jsonb) from public, anon, authenticated;
+revoke all on function public._package_version_fill_extra_seat() from public, anon, authenticated;
 revoke all on function public.package_version_fingerprint(text, jsonb, jsonb) from public, anon, authenticated;
 revoke all on function public.admin_list_package_versions() from public, anon, authenticated;
 revoke all on function public.admin_draft_package_version(text, text, text) from public, anon, authenticated;

@@ -16,7 +16,11 @@ export type PackageVersionRow = {
   emailCreditBurn: number | null;
   inboundKesPerSecond: number;
   outboundKesPerSecond: number;
+  annualPriceKes: number;
   annualDiscountPercent: number;
+  creditKes: number;
+  spendLimitSharePercent: number;
+  extraSeatMonthlyKes: number | null;
   trialDays: number | null;
   onDemandAllowed: boolean;
   allowancesPlaceholder: boolean;
@@ -36,6 +40,7 @@ export type VersionPackage = {
 export type PackageVersionCatalog = {
   packageEditorEnabled: boolean;
   newSignupTrialEnabled: boolean;
+  extraSeatSupported: boolean;
   features: { key: string; label: string }[];
   packages: VersionPackage[];
 };
@@ -85,7 +90,11 @@ function versionFromJson(raw: Record<string, unknown>): PackageVersionRow {
     emailCreditBurn: numOrNull(raw.email_credit_burn),
     inboundKesPerSecond: num(raw.inbound_kes_per_second),
     outboundKesPerSecond: num(raw.outbound_kes_per_second),
+    annualPriceKes: num(raw.annual_price_kes),
     annualDiscountPercent: num(raw.annual_discount_percent),
+    creditKes: raw.credit_kes === undefined ? 1 : num(raw.credit_kes),
+    spendLimitSharePercent: raw.spend_limit_share_percent === undefined ? 50 : num(raw.spend_limit_share_percent),
+    extraSeatMonthlyKes: numOrNull(raw.extra_seat_monthly_kes),
     trialDays: numOrNull(raw.trial_days),
     onDemandAllowed: raw.on_demand_allowed === true,
     allowancesPlaceholder: raw.allowances_placeholder === true,
@@ -107,6 +116,7 @@ function catalogFromJson(raw: unknown): PackageVersionCatalog {
   return {
     packageEditorEnabled: body.package_editor_enabled !== false,
     newSignupTrialEnabled: body.new_signup_trial_enabled === true,
+    extraSeatSupported: body.extra_seat_supported === true,
     features: featureRows.flatMap((item) => {
       if (!item || typeof item !== "object") return [];
       const row = item as Record<string, unknown>;

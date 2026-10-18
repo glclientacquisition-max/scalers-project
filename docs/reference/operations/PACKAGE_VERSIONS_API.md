@@ -9,7 +9,7 @@ Desk builds the Packages screens. This is the server contract. The live catalogu
 
 A package version is what a Business Assistant package includes: monthly price, included minutes, one shared message-credit allowance, a burn rate for SMS, WhatsApp, and email, seats, numbers, call overage rates, features, and (for the trial only) trial length in days. Published versions are frozen. A new subscription pins the latest published version of the package on that insert. An existing business keeps its version. Current businesses stay on free beta: billing enforcement off, usage metered only. This editor does not move them, turn enforcement on, or create an invoice.
 
-Messages are one allowance. 1 credit = KSh 1 at the on-demand rate. The owner defaults are 1 credit per SMS segment, 2 credits per WhatsApp alert, and 1 credit per email. A draft copies those burns. An admin can change each one. Changing a burn is a price change.
+Messages are one allowance. `credit_kes` is the price of one credit and defaults to KSh 1. The owner defaults are 1 credit per SMS segment, 2 credits per WhatsApp alert, and 1 credit per email. A draft copies those burns. An admin can change each one. Changing a burn or the credit price is a price change.
 
 The trial is the package with sku `trial`. It is not on the public catalogue (`is_active` is false). Version 1 is 20 minutes and 14 days. SMS 20 and email 30 on that version are placeholders (`allowances_placeholder` true) and are not the credit pool. Version 1 leaves `message_credits` null. Edit the trial the same way as Starter, Growth, and Scale.
 
@@ -35,6 +35,7 @@ Writes also refuse when the configured database URL is production, unless `ADMIN
   "price_change_approval_threshold_kes": null,
   "package_editor_enabled": true,
   "new_signup_trial_enabled": false,
+  "extra_seat_supported": false,
   "features": [{ "key": "calls", "label": "Calls" }],
   "packages": [
     {
@@ -48,7 +49,7 @@ Writes also refuse when the configured database URL is production, unless `ADMIN
 }
 ```
 
-`price_change_approval_threshold_kes` is null when a second admin is not required. `package_editor_enabled` false means the database refuses editor writes (import of a promoted version still works). `new_signup_trial_enabled` defaults false. While it is false, creating a business does not add a subscription.
+`price_change_approval_threshold_kes` is null when a second admin is not required. `package_editor_enabled` false means the database refuses editor writes (import of a promoted version still works). `new_signup_trial_enabled` defaults false. While it is false, creating a business does not add a subscription. `extra_seat_supported` is true only when `billing_package_versions.extra_seat_monthly_kes` already exists. This editor does not add that column. When it is false, hide the extra-seat field.
 
 `features` is the catalogue. A draft patch must include every key once. Keys today: `calls`, `inbox`, `voicemail`, `bookings`, `catalogue`, `sms_alerts`, `whatsapp_alerts`, `email_alerts`, `staff`.
 
@@ -58,15 +59,20 @@ Each version:
 | --- | --- |
 | `id`, `package_id`, `sku`, `name`, `version` | Identity. `version` is 1, 2, 3 on that package. |
 | `status` | `draft`, `published`, or `retired`. Archive sets `retired`. |
-| `monthly_price_kes` | Monthly price in KES. |
-| `annual_price_kes` | Computed: monthly times 12 times (1 minus `annual_discount_percent` / 100), rounded. Not stored. |
-| `seats`, `minutes`, `dids` | Included counts the editor can change. Integers, zero or more. |
-| `message_credits` | One shared allowance for SMS, WhatsApp, and email. Null on a seeded version. An editor publish requires a number, zero or more. |
-| `sms_credit_burn`, `whatsapp_credit_burn`, `email_credit_burn` | Credits burned per SMS segment, WhatsApp alert, and email. Integers, zero or more. Defaults 1, 2, and 1. Editable on a draft. 1 credit = KSh 1. |
+| `monthly_price_kes` | Monthly price in KSh. Stored. |
+| `annual_price_kes` | Annual price in KSh. Stored. A draft patch sends this, not the discount. |
+| `annual_discount_percent` | Implied discount, 0 to 100. Rewritten from `annual_price_kes` and `monthly_price_kes` on each draft save. Not sent in the patch. |
+| `seats` | Included seats. Integer, zero or more. |
+| `minutes` | Included minutes. On sku `trial` these are the trial minutes. |
+| `dids` | Phone numbers included. Integer, zero or more. |
+| `message_credits` | One shared allowance for SMS, WhatsApp, and email. Null on a seeded version. An editor publish requires a number, zero or more. On sku `trial` these are the trial credits. |
+| `sms_credit_burn`, `whatsapp_credit_burn`, `email_credit_burn` | Credits burned per SMS segment, WhatsApp alert, and email. Integers, zero or more. Defaults 1, 2, and 1. Editable on a draft. |
+| `credit_kes` | KSh price of one message credit. Default 1. Zero or more. Editable on a draft. |
+| `spend_limit_share_percent` | Default on-demand spend cap as a percent of `monthly_price_kes`. Default 50. 0 to 100. Desk reads this column. `billing_spend_limit_kes` from the owner billing actions file still uses 50 percent until that function reads this column. |
+| `extra_seat_monthly_kes` | Extra seat price in KSh per month. Present in the JSON only as null when the column is absent. When the column exists, a draft copies it. A null on a new paid draft becomes 500. A published value is not rewritten. Null is allowed (the trial stays null). Omit the key from the patch when `extra_seat_supported` is false. |
 | `sms`, `email`, `staff_wa` | Old included buckets. Shown so the seeded numbers stay visible. The editor does not change them. |
-| `inbound_kes_per_second`, `outbound_kes_per_second` | Call overage rates. Zero or more. |
+| `inbound_kes_per_second`, `outbound_kes_per_second` | Call overage rates, stored per second. The editor shows them per minute. Zero or more. |
 | `whatsapp_kes`, `sms_kes`, `email_kes` | Stored on-demand rates. The editor writes the burn into the matching rate. A patch does not send these fields. |
-| `annual_discount_percent` | 0 to 100. |
 | `trial_days` | 1 to 90 on sku `trial`. Null on every other package. |
 | `on_demand_allowed` | False locks on-demand off for that version. The trial version is false. Paid versions are true. Editable on a draft. |
 | `allowances_placeholder` | True while the old SMS and email numbers are not a product decision. |
@@ -114,7 +120,9 @@ Replace the commercial fields of a draft. Send the whole patch. Counts are integ
     "dids": 1,
     "inbound_kes_per_second": 0.1,
     "outbound_kes_per_second": 0.15,
-    "annual_discount_percent": 17,
+    "annual_price_kes": 49800,
+    "credit_kes": 1,
+    "spend_limit_share_percent": 50,
     "trial_days": null,
     "allowances_placeholder": false,
     "on_demand_allowed": true,
@@ -124,9 +132,9 @@ Replace the commercial fields of a draft. Send the whole patch. Counts are integ
 }
 ```
 
-`message_credits` and the three burn rates are required. Do not send `sms`, `email`, `staff_wa`, `sms_kes`, `email_kes`, or `whatsapp_kes`. The editor copies each burn into the matching KSh rate because 1 credit = KSh 1. It leaves the old included buckets as they were on the copied version.
+`message_credits`, the three burn rates, `annual_price_kes`, `credit_kes`, and `spend_limit_share_percent` are required. Do not send `annual_discount_percent`, `sms`, `email`, `staff_wa`, `sms_kes`, `email_kes`, or `whatsapp_kes`. The editor copies each burn into the matching KSh rate and rewrites `annual_discount_percent` from the annual price. An annual price above twelve times the monthly price is refused. It leaves the old included buckets as they were on the copied version. Send `extra_seat_monthly_kes` only when `extra_seat_supported` is true. Null clears it. A number is zero or more.
 
-`trial_days` is required in the patch: null for a paid package, 1 to 90 for `trial`. `on_demand_allowed` is required: true on a paid version, false when on-demand is locked off. `notes` is optional, at most 500 characters. The `features` array above shows the shape of one row. Send every catalogue key. Changing a price, a call rate, a burn, or the annual discount sets `price_set_by` to the actor. Changing `message_credits` does not. Audit action `update_package_version_draft`.
+`trial_days` is required in the patch: null for a paid package, 1 to 90 for `trial`. `on_demand_allowed` is required: true on a paid version, false when on-demand is locked off. `notes` is optional, at most 500 characters. The `features` array above shows the shape of one row. Send every catalogue key. Changing a price, a call rate, a burn, the annual price, the credit price, the spend-limit share, or the extra-seat price sets `price_set_by` to the actor. Changing `message_credits` does not. Audit action `update_package_version_draft`.
 
 Price, seats, minutes, call rates, burns, and the discount above are the live Starter version 1, except `message_credits`. 111 is a fixture shape, not a Scalers allowance. Seeded versions leave that field null. Tests use 1111 and 2222 the same way. Do not invent a commercial price or a credit pool in the client.
 
@@ -257,7 +265,7 @@ Checks the database enforces, in addition to the route: no negative numbers, rea
 
 [`package_version_owner_prices.sql`](../../supabase/package_version_owner_prices.sql) publishes the locked prices (ex-VAT, KSh) through the editor functions. Staging only. It does not move a business, change billing enforcement, or create an invoice. Current businesses stay on free beta. The new versions apply only when a new subscription is inserted. It does not change `billing_packages` or `billing_rate_card`, so the public catalogue screen keeps the previous prices until Desk reads versions. A second run does not publish another version. It refuses when the editor is off, when a second-admin threshold is set, or when a draft is already open. It also refuses if a pin, a billing mode, or an invoice count changed during the run.
 
-These figures are the seeded version 2 rows. Message credits are 1,000 on Starter, 2,500 on Growth, 5,500 on Scale, and 70 on the trial. Burn rates on version 2 are SMS 1, WhatsApp 2, and email 1. 1 credit = KSh 1. Inbound overage is 26, 25, and 24 per minute. Outbound overage is 34 per minute on all four, including the trial. The trial version is 14 days, 20 minutes, 70 credits, and on-demand is locked off.
+These figures are the seeded version 2 rows. Message credits are 1,000 on Starter, 2,500 on Growth, 5,500 on Scale, and 70 on the trial. Burn rates on version 2 are SMS 1, WhatsApp 2, and email 1. `credit_kes` is 1. Inbound overage is 26, 25, and 24 per minute. Outbound overage is 34 per minute on all four, including the trial. The trial version is 14 days, 20 minutes, 70 credits, and on-demand is locked off. `spend_limit_share_percent` is 50 on each version.
 
 Annual price is the usual rounding of monthly times 12 times (1 minus the discount). Starter discount is 17 percent. Growth and Scale are 10 percent. Call rates are stored per second at 5 decimals, the same rounding the desk uses, so the minute figures below display back as written.
 

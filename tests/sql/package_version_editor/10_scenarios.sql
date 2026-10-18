@@ -32,7 +32,9 @@ as $$
     'dids', v.dids,
     'inbound_kes_per_second', v.inbound_kes_per_second,
     'outbound_kes_per_second', v.outbound_kes_per_second,
-    'annual_discount_percent', v.annual_discount_percent,
+    'annual_price_kes', v.annual_price_kes,
+    'credit_kes', v.credit_kes,
+    'spend_limit_share_percent', v.spend_limit_share_percent,
     'trial_days', v.trial_days,
     'allowances_placeholder', v.allowances_placeholder,
     'on_demand_allowed', coalesce(v.on_demand_allowed, true),
@@ -546,7 +548,7 @@ begin
   v_draft := (public.admin_draft_package_version('growth', 'ada', 'growth draft')) ->> 'version_id';
   perform public.admin_update_package_version_draft(
     v_draft::uuid,
-    pg_temp.version_patch(v_draft::uuid, '{"monthly_price_kes": 1111}'::jsonb),
+    pg_temp.version_patch(v_draft::uuid, '{"monthly_price_kes": 1111, "annual_price_kes": 0}'::jsonb),
     'ada',
     'fixture price'
   );
@@ -639,7 +641,7 @@ begin
   v_draft := (public.admin_draft_package_version('scale', 'ada', 'scale price draft')) ->> 'version_id';
   perform public.admin_update_package_version_draft(
     v_draft::uuid,
-    pg_temp.version_patch(v_draft::uuid, '{"monthly_price_kes": 2222}'::jsonb),
+    pg_temp.version_patch(v_draft::uuid, '{"monthly_price_kes": 2222, "annual_price_kes": 0}'::jsonb),
     'ada',
     'fixture scale price'
   );
@@ -970,4 +972,130 @@ begin
     'turn billing back off',
     true
   );
+end $$;
+
+-- Annual price, credit price, and spend-limit share are stored on the version.
+-- Extra seat stays hidden until that column exists, then a draft can edit it.
+-- 200000 and 40 are fixtures, not Scalers prices.
+do $$
+declare
+  v_id uuid;
+  v_json jsonb;
+  v_annual numeric;
+  v_starter uuid;
+begin
+  if public.admin_list_package_versions() ->> 'extra_seat_supported' <> 'false' then
+    raise exception 'extra seat should be hidden when the column is absent';
+  end if;
+  select v.id, v.annual_price_kes into v_starter, v_annual
+  from public.billing_package_versions v
+  join public.billing_packages p on p.id = v.package_id
+  where p.sku = 'starter' and v.version = 1;
+  if v_annual <> round(5000 * 12 * (1 - 17::numeric / 100)) then
+    raise exception 'starter annual price was not stored from the discount';
+  end if;
+  if (select credit_kes from public.billing_package_versions where id = v_starter) <> 1
+     or (select spend_limit_share_percent from public.billing_package_versions where id = v_starter) <> 50
+  then
+    raise exception 'credit price or spend limit default is wrong';
+  end if;
+  v_json := public._package_version_json(v_starter);
+  if jsonb_typeof(v_json -> 'extra_seat_monthly_kes') <> 'null' then
+    raise exception 'missing extra seat column should read as null';
+  end if;
+
+  v_id := (public.admin_draft_package_version('scale', 'ada', 'desk terms draft')) ->> 'version_id';
+  begin
+    perform public.admin_update_package_version_draft(
+      v_id::uuid,
+      pg_temp.version_patch(v_id::uuid, '{"monthly_price_kes": 25000, "annual_price_kes": 300001}'::jsonb),
+      'ada',
+      'annual above twelve months'
+    );
+    raise exception 'annual price above twelve months was saved';
+  exception when others then
+    if sqlerrm not like '%annual price is above twelve months%' then raise; end if;
+  end;
+  begin
+    perform public.admin_update_package_version_draft(
+      v_id::uuid,
+      pg_temp.version_patch(v_id::uuid, '{"spend_limit_share_percent": 101}'::jsonb),
+      'ada',
+      'spend limit above 100'
+    );
+    raise exception 'spend limit above 100 was saved';
+  exception when others then
+    if sqlerrm not like '%spend limit must be 0 to 100%' then raise; end if;
+  end;
+  perform public.admin_update_package_version_draft(
+    v_id::uuid,
+    pg_temp.version_patch(v_id::uuid, jsonb_build_object(
+      'monthly_price_kes', 25000,
+      'annual_price_kes', 200000,
+      'credit_kes', 2,
+      'spend_limit_share_percent', 40,
+      'extra_seat_monthly_kes', 900
+    )),
+    'ada',
+    'store annual price, credit price, and spend limit'
+  );
+  v_json := public._package_version_json(v_id::uuid);
+  if (v_json ->> 'annual_price_kes')::numeric <> 200000
+     or (v_json ->> 'annual_discount_percent')::numeric <> 33.33
+     or (v_json ->> 'credit_kes')::numeric <> 2
+     or (v_json ->> 'spend_limit_share_percent')::numeric <> 40
+  then
+    raise exception 'draft did not store annual price, credit price, or spend limit';
+  end if;
+  perform public.admin_discard_package_version_draft(v_id::uuid, 'ada', 'drop the desk terms draft');
+
+  alter table public.billing_package_versions
+    add column extra_seat_monthly_kes numeric;
+  alter table public.billing_package_versions
+    drop constraint if exists billing_package_versions_extra_seat_check;
+  alter table public.billing_package_versions
+    add constraint billing_package_versions_extra_seat_check
+    check (extra_seat_monthly_kes is null or extra_seat_monthly_kes >= 0);
+  perform public._package_version_fill_extra_seat();
+  if public.admin_list_package_versions() ->> 'extra_seat_supported' <> 'true' then
+    raise exception 'extra seat should show once the column exists';
+  end if;
+  if (select extra_seat_monthly_kes from public.billing_package_versions where id = v_starter) is not null then
+    raise exception 'a published extra seat price should stay as stored';
+  end if;
+  if (
+    select v.extra_seat_monthly_kes
+    from public.billing_package_versions v
+    join public.billing_packages p on p.id = v.package_id
+    where p.sku = 'trial' and v.version = 1
+  ) is not null then
+    raise exception 'trial extra seat should stay unset';
+  end if;
+  begin
+    update public.billing_package_versions
+    set extra_seat_monthly_kes = 9
+    where id = v_starter;
+    raise exception 'published extra seat update should have failed';
+  exception when others then
+    if sqlerrm not like '%frozen%' then raise; end if;
+  end;
+
+  v_id := (public.admin_draft_package_version('scale', 'ada', 'extra seat draft')) ->> 'version_id';
+  if (
+    select extra_seat_monthly_kes from public.billing_package_versions where id = v_id::uuid
+  ) is distinct from 500 then
+    raise exception 'draft did not copy the extra seat price';
+  end if;
+  perform public.admin_update_package_version_draft(
+    v_id::uuid,
+    pg_temp.version_patch(v_id::uuid, '{"extra_seat_monthly_kes": 750}'::jsonb),
+    'ada',
+    'set the extra seat price'
+  );
+  if (
+    select extra_seat_monthly_kes from public.billing_package_versions where id = v_id::uuid
+  ) is distinct from 750 then
+    raise exception 'draft did not store the extra seat price';
+  end if;
+  perform public.admin_discard_package_version_draft(v_id::uuid, 'ada', 'drop the extra seat draft');
 end $$;

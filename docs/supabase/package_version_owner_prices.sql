@@ -11,8 +11,10 @@
 -- It does not change billing_packages or billing_rate_card. The public
 -- catalogue screen keeps reading those tables until Desk reads package versions.
 --
--- Annual price is not stored. It is round(monthly * 12 * (1 - discount/100)):
--- Starter 17% is 69,720. Growth and Scale 10% are 194,400 and 378,000.
+-- Annual price is stored as annual_price_kes. The seed still takes a discount
+-- and writes the rounded annual price. The editor rewrites the implied
+-- discount from that price. Starter 17% is 69,720. Growth and Scale 10% are
+-- 194,400 and 378,000. Credit price stays KSh 1. Spend-limit share stays 50.
 -- Call rates are stored per second at 5 decimals, matching the desk:
 -- round((per_minute / 60) * 100000) / 100000.
 -- Trial on-demand is locked off. Trial inbound stays the copied rate.
@@ -53,6 +55,7 @@ declare
   v_dids integer;
   v_inbound numeric;
   v_outbound numeric;
+  v_annual numeric;
   v_features jsonb;
   v_patch jsonb;
   v_reason text := 'Staging seed of the owner price table. Does not move a business.';
@@ -92,6 +95,7 @@ begin
     v_inbound := pg_temp.owner_kes_per_second(p_inbound_per_minute);
   end if;
   v_outbound := pg_temp.owner_kes_per_second(34);
+  v_annual := round(p_monthly * 12 * (1 - p_discount / 100));
   if p_sku = 'trial' and (v_row.seats is distinct from 2 or v_row.dids is distinct from 1) then
     raise exception 'trial seats or numbers changed from the copied version; the owner table did not set them';
   end if;
@@ -118,7 +122,9 @@ begin
     'dids', v_dids,
     'inbound_kes_per_second', v_inbound,
     'outbound_kes_per_second', v_outbound,
-    'annual_discount_percent', p_discount,
+    'annual_price_kes', v_annual,
+    'credit_kes', 1,
+    'spend_limit_share_percent', 50,
     'allowances_placeholder', false,
     'on_demand_allowed', p_on_demand,
     'notes', p_notes,
@@ -224,9 +230,17 @@ begin
     join owner_price_seed_ids i on i.version_id = v.id
     where i.sku = v_sku;
     select * into v_source from public.billing_package_versions where id = v_row.copied_from_id;
-    v_annual := round(v_row.monthly_price_kes * 12 * (1 - v_row.annual_discount_percent / 100));
+    v_annual := v_row.annual_price_kes;
     if v_row.status <> 'published'
        or v_annual <> v_expect_annual
+       or v_row.annual_discount_percent is distinct from (
+         case
+           when v_row.monthly_price_kes = 0 then 0
+           else round((1 - (v_annual / (v_row.monthly_price_kes * 12))) * 100, 2)
+         end
+       )
+       or v_row.credit_kes is distinct from 1
+       or v_row.spend_limit_share_percent is distinct from 50
        or v_row.inbound_kes_per_second is distinct from v_expect_inbound
        or v_row.outbound_kes_per_second is distinct from v_expect_outbound
        or v_row.sms_credit_burn is distinct from 1
