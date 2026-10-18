@@ -4,6 +4,7 @@ import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
+import { catalogImportPriceLabel } from "@/lib/catalogPricingMode";
 import { productImportWarnings, type ProductItem } from "@/lib/productCatalog";
 import type { SocialHandles } from "@/lib/socialHandles";
 import { socialHandlesHaveContent } from "@/lib/socialHandles";
@@ -244,7 +245,7 @@ function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
                     p.name
                   )
                 }
-                hint={[p.price, p.category, p.in_stock ? `stock ${p.in_stock}` : ""]
+                hint={[catalogImportPriceLabel(p), p.category, p.in_stock ? `stock ${p.in_stock}` : ""]
                   .filter(Boolean)
                   .join(" · ")}
                 control="switch"

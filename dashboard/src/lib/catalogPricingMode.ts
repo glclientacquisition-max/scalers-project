@@ -80,6 +80,9 @@ export function parseCataloguePriceText(raw: unknown): ParsedCataloguePrice {
   return { kind: "quote", price: null, priceMax: null };
 }
 
+/** Import docs name; same parser as Desk structured prices. */
+export const parseCatalogPricingMode = parseCataloguePriceText;
+
 export function numericPriceInputError(raw: string, opts: { required?: boolean } = {}): string | null {
   const text = String(raw ?? "").trim();
   if (!text) return opts.required ? "Enter an amount above 0, like 1500." : null;
@@ -220,6 +223,33 @@ export function applyCatalogPriceFields<T extends CatalogPriceRow>(
     [textKey]: legacy,
     pricing,
   } as T;
+}
+
+/** Apply parseCataloguePriceText to a pasted/import row (services: price_range, products: price). */
+export function structureImportedCatalogRow<T extends CatalogPriceRow>(
+  row: T,
+  textKey: "price" | "price_range"
+): T {
+  const text = String(row[textKey] ?? "").trim();
+  const parsed = parseCataloguePriceText(text);
+  const minInput = parsed.price != null ? String(parsed.price) : "";
+  const maxInput = parsed.priceMax != null ? String(parsed.priceMax) : "";
+  const withStructured = applyCatalogPriceFields(row, parsed.kind, minInput, maxInput, textKey);
+  return hydrateCatalogPriceFields(withStructured);
+}
+
+/** Preview line for import UIs: Quote, From KSh 1,500, KSh 500–800, etc. */
+export function catalogImportPriceLabel(row: CatalogPriceRow): string {
+  const hydrated = hydrateCatalogPriceFields(row);
+  const kind = pricingModeToKind(hydrated.pricing_mode ?? hydrated.price_mode) ?? "fixed";
+  if (kind === "quote") return "Quote";
+  const display = usesPriceAsDisplayColumn(hydrated)
+    ? String(hydrated.price ?? "").trim()
+    : String(hydrated.price_range ?? "").trim();
+  if (display) return display;
+  const price = readStoredPrice(hydrated);
+  const priceMax = readStoredMax(hydrated);
+  return formatCatalogueLegacyPrice(kind, price, priceMax) || "Quote";
 }
 
 export function catalogPriceInputsFromRow(row: CatalogPriceRow): {

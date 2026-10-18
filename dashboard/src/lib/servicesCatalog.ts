@@ -1,4 +1,4 @@
-import { hydrateCatalogPriceFields } from "./catalogPricingMode";
+import { hydrateCatalogPriceFields, structureImportedCatalogRow } from "./catalogPricingMode";
 import { isAskPriceWording } from "./catalogValidation";
 import { parsePriceText, sanitizePricing, type StructuredPrice } from "./structuredData";
 import { stableRowId } from "@/lib/factHash";
@@ -300,5 +300,6 @@ export function parseBulkServices(raw: string): ServiceItem[] {
     .map((line) => line.trim())
     .filter((line) => line && !/^services?\s*:?$/i.test(line))
     .map(parseBulkServiceLine)
-    .filter((row): row is ServiceItem => Boolean(row?.name));
+    .filter((row): row is ServiceItem => Boolean(row?.name))
+    .map((row) => structureImportedCatalogRow(row, "price_range"));
 }

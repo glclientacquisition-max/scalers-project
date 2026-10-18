@@ -366,7 +366,7 @@ export function parseBulkProducts(raw: string): ProductItem[] {
   if (looksDelimitedTable(text)) {
     return parseProductCsv(text);
   }
-  return text
+  const loose = text
     .split("\n")
     .map((line) => line.replace(/^[-*•]\s*/, "").trim())
     .filter((line) => line && !/^products?\s*:?$/i.test(line))
@@ -381,8 +381,8 @@ export function parseBulkProducts(raw: string): ProductItem[] {
       }
       return { ...emptyProduct(), name: line };
     })
-    .filter((p) => p.name)
-    .slice(0, PRODUCT_CATALOG_MAX);
+    .filter((p) => p.name);
+  return normalizeProductCatalog(loose).slice(0, PRODUCT_CATALOG_MAX);
 }
 
 const nameKey = (p: ProductItem) => p.name.trim().toLowerCase();

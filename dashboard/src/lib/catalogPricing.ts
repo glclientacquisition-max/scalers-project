@@ -8,7 +8,7 @@
  *
  * Pure and browser-safe. Relative imports only so node tests can load it.
  */
-import { hydrateCatalogPriceFields } from "./catalogPricingMode";
+import { hydrateCatalogPriceFields, structureImportedCatalogRow } from "./catalogPricingMode";
 import { isUnpriced, sanitizePricing, stockBool, syncPricing, type StructuredPrice } from "./structuredData";
 import { stableRowId } from "./factHash";
 
@@ -154,14 +154,14 @@ export function patchCatalogItem<T extends Row>(rows: T[], target: { id?: string
 
 /** Typed price for an imported item that has none yet (import and pasted lists). */
 export function withImportedPricing<T extends Row>(row: T, kind: CatalogKind, source: "owner" | "parsed" = "parsed"): T {
-  if (sanitizePricing(row.pricing)) return row;
-  const text = norm(row[textKeyFor(kind)]);
-  if (!text) return row;
-  const p = syncPricing({ pricing: null, unit: norm(row.unit) }, text, row.in_stock);
+  const key = textKeyFor(kind);
+  const structured = structureImportedCatalogRow(row as Row, key) as T;
+  const text = norm(structured[key]);
+  const p = syncPricing({ pricing: null, unit: norm(structured.unit) }, text, structured.in_stock);
   // An import is read from someone else's text: keep it unconfirmed so the owner gets "Is this right?".
   const pricing: StructuredPrice =
     source === "owner" ? p : { ...p, source: "parsed", confirmed: false, parsed_from: text.slice(0, 120) };
-  return { ...row, pricing } as T;
+  return { ...structured, pricing } as T;
 }
 
 /** catalog.<kind>.<key>.price for the row at `index` (service: stable id, product: sku, else its position). */
