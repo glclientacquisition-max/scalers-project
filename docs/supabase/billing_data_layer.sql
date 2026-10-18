@@ -7,7 +7,14 @@
 --            did_number_pool.sql, super_admin_ops.sql, notify_channels.sql,
 --            alert_email.sql, admin_business_archive.sql, admin_business_suspend.sql,
 --            wallet_security_beta.sql (ops_audit_log).
--- Idempotent. Safe to re-run.
+-- Idempotent. Safe to re-run until invoice_documents.sql (#780) has been applied.
+-- After that file, do not re-run this one: it would put the older
+-- finalize_invoice and enqueue_billing_notice bodies back. The
+-- finalize_invoice block below refuses to replace a body that already
+-- numbers SCL-. billing_status NOT NULL is a separate short script,
+-- billing_data_layer_billing_status_not_null.sql, so this file does not
+-- hold an exclusive lock across index builds. Rollback:
+-- billing_data_layer_down.sql.
 --
 -- DO NOT RUN on production fjxcdccgyhnvnnlnovcl until a backup and Alvin's GO.
 -- Staging project is sgcdncjxauhsbunobmob. This file is the production script.
@@ -33,7 +40,10 @@
 --     Claim with claim_billing_notices, send on the existing notify path,
 --     then settle_billing_notice. Pass billed_to = 'platform' and
 --     audience = 'staff' (both stored on the row) and the stored
---     idempotency_key. Do not gate these on tenant_escalation_allowed.
+--     idempotency_key as the notify ledger keyBase. A reclaimed notice
+--     then cannot send twice. A replay whose notify ledger already shows
+--     that send settles sent, not failed. The sender runs only when
+--     BILLING_NOTICES_SEND=on. Do not gate these on tenant_escalation_allowed.
 --     claim sets claimed_at and reclaims a sending row whose claimed_at is
 --     null or older than 15 minutes. It does not change idempotency_key.
 --     settle_billing_notice leaves a sent row unchanged.
@@ -352,6 +362,10 @@ on conflict (package_version_id, feature_key) do nothing;
 -- 3. Subscription billing status. Does not touch the package clock
 --    (tenant_subscriptions.status is still active|cancelled).
 -- ---------------------------------------------------------------------------
+-- New columns on this existing table are nullable and have no default.
+-- ADD COLUMN ... DEFAULT now() would rewrite every row: now() is volatile.
+-- A constant default is metadata-only, and it is set in its own statement
+-- after the add. Do not fold a volatile default into the ADD COLUMN.
 alter table public.tenant_subscriptions
   add column if not exists package_version_id uuid references public.billing_package_versions (id),
   add column if not exists billing_status text,
@@ -448,8 +462,13 @@ begin
   end if;
 end $$;
 
-alter table public.tenant_subscriptions
-  alter column billing_status set not null;
+-- NOT NULL is not set here. SET NOT NULL takes ACCESS EXCLUSIVE for the
+-- scan, and this file goes on to build indexes in the same transaction, so
+-- the exclusive lock would cover those builds. Run
+-- billing_data_layer_billing_status_not_null.sql on its own after this
+-- file. It adds a NOT VALID check, validates it (writes continue), then
+-- sets NOT NULL from that proof so PostgreSQL 12+ does not scan again.
+-- Lock notes and the rollback are in that file and billing_data_layer_down.sql.
 
 create or replace function public.tenant_subscriptions_b_pin_version()
 returns trigger
@@ -745,6 +764,9 @@ begin
     return new;
   end if;
   if tg_op = 'UPDATE' and old.status = 'draft' then
+    if new.invoice_number is not null or new.status is distinct from 'draft' then
+      raise exception 'invoice number and status are set only by finalize_invoice';
+    end if;
     return new;
   end if;
   if tg_op = 'DELETE' and old.status = 'draft' then
@@ -1425,6 +1447,7 @@ comment on function public.transition_subscription_billing_status(uuid, text, te
 revoke all on function public.transition_subscription_billing_status(uuid, text, text, text, integer) from public, anon, authenticated;
 grant execute on function public.transition_subscription_billing_status(uuid, text, text, text, integer) to service_role;
 
+-- finalize_invoice (data-layer numbering).
 -- SC- is the data-layer number only. billing_company.sql (P8) owns the
 -- canonical SCL- body. Re-applying this file must not put SC- back over it.
 -- A body that already contains SCL- is left as it is. The SC- body still sets
@@ -1475,6 +1498,8 @@ begin
   returning last_number into v_n;
   v_number := 'SC-' || v_year::text || '-' || lpad(v_n::text, 6, '0');
 
+  -- invoices_freeze rejects a draft row whose number or status changes
+  -- unless this flag is set. Direct updates cannot set the flag.
   perform set_config('scalers.billing_write', '1', true);
   update public.invoices
   set status = 'open',

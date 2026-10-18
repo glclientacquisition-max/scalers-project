@@ -197,7 +197,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **Admin:** Suspend/Archive shipped (#737, 18 Oct). Purge schedule not applied. Still to do: business edit / members / owner reset, package catalogue, billing period card, invoices.
 - **Settings / onboarding**: shipped (#656, #667, #672). GIGO P1/P2 follow-ups remain.
 - **UI/UX sweep** across Desk and Admin.
-- **Packages**: state rules and rollover shipped (#631, #650). Staging has the billing data layer (versions, `billing_status`, invoices, notices, `tenant_escalation_allowed`, number quarantine) and the invoice pay SQL (section 3). No charges and no prod SQL. Package catalogue UI remains. The public pay page is in #780 and is not on prod.
+- **Packages**: state rules and rollover shipped (#631, #650). Staging has the billing data layer (versions, `billing_status` NOT NULL, invoices, notices, `tenant_escalation_allowed`, number quarantine) and the invoice pay SQL (section 3). A draft invoice cannot take a number. Notice sends stay off unless `BILLING_NOTICES_SEND=on`, and a reclaimed notice reuses its idempotency key. No charges and no prod SQL. Package catalogue UI remains. The public pay page is in #780 and is not on prod.
 - **Landing page** (#492 parked until its turn).
 - **Legal pack draft #653** (Terms, Privacy, DPA, call notice, beta terms). Parked; call notice ties to the recording decision.
 - **WhatsApp as the assistant doing work** (not just alerts).
