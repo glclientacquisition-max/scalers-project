@@ -1,0 +1,15 @@
+{
+  "id": "stale_prompt",
+  "bug": "B",
+  "profile": "stale",
+  "language": "en",
+  "turns": [
+    {
+      "caller": "How much is deep cleaning?",
+      "mustSay": ["two thousand five hundred"],
+      "mustNotSay": ["9,500", "nine thousand"],
+      "value": 2500,
+      "status": "found"
+    }
+  ]
+}

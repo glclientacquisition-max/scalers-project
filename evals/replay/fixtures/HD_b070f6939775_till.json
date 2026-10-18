@@ -1,0 +1,14 @@
+{
+  "id": "HD_b070f6939775_till",
+  "bug": "D",
+  "profile": "carry",
+  "language": "en",
+  "turns": [
+    {
+      "caller": "What is your till number?",
+      "mustSay": ["I'll check with the team and they'll call you back."],
+      "mustNotSay": ["given when you pay", "after the job"],
+      "status": "not_on_file"
+    }
+  ]
+}
