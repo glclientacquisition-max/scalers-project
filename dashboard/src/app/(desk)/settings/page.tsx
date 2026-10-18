@@ -23,6 +23,11 @@ import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
 import { DeskPageGate } from "@/components/DeskPageGate";
+import { CallsForwardingPanel } from "@/components/CallsForwardingPanel";
+import { loadCallSetupState } from "@/lib/callSetupServer";
+import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
+import { toLocal07 } from "@/lib/callForwarding";
+import { formatKenyaNumber } from "@/lib/setupFlow";
 
 /** Allow URL fetch + Gemini extract/compile without premature platform cutoffs. */
 export const maxDuration = 60;
@@ -56,7 +61,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   if (!tenant) {
     return <DeskNoWorkspace />;
   }
-  const tab = parseBusinessSettingsTab(tabRaw);
+  const tab = parseBusinessSettingsTab(tabRaw, panelRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
   const needsVoices = tab === "test" || (tab === "train" && trainPanel === "tools");
 
@@ -97,6 +102,28 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     });
   }
 
+  let callsSlot = null;
+  if (tab === "calls") {
+    const number = toLocal07(tenant.sautikit_virtual_number);
+    const state = number ? await loadCallSetupState(tenant.id) : null;
+    const status = resolveCallSetupStatus({
+      numberReady: Boolean(number),
+      setup: state?.setup ?? null,
+      activity: state?.activity ?? null,
+      now: Date.now(),
+    });
+    callsSlot = (
+      <CallsForwardingPanel
+        tenantId={tenant.id}
+        number={number}
+        pretty={formatKenyaNumber(tenant.sautikit_virtual_number)}
+        supported={Boolean(state?.supported)}
+        setup={state?.setup ?? null}
+        status={status}
+      />
+    );
+  }
+
   const navTargets = SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target));
 
   return (
@@ -109,6 +136,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
       liveTransferExecutor={deskLiveTransferExecutorEnabled()}
       membersSlot={membersSlot}
       structuredSlot={structuredSlot}
+      callsSlot={callsSlot}
     />
   );
 }

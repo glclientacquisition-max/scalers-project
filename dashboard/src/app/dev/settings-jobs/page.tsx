@@ -1,6 +1,9 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { BusinessSettingsShell } from "@/components/BusinessSettingsShell";
+import { CallsForwardingPanel } from "@/components/CallsForwardingPanel";
+import { emptyCallSetup } from "@/lib/callSetupStore";
+import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
 import { DeskPhonePull } from "@/components/PhonePullSurface";
 import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { defaultHoursSchedule } from "@/lib/hoursSchedule";
@@ -62,6 +65,17 @@ const homeTenant = {
   },
 } as TenantRow;
 
+/** ?policies=messy: starter lines, a line written for the assistant, and old text with stray punctuation. */
+const messyPolicies = {
+  ...tenant.business_policies,
+  payment: "M-Pesa and cash. Confirm other methods with the team if asked.",
+  payments: parsePaymentsText("M-Pesa and cash. Confirm other methods with the team if asked."),
+  delivery: "Same-day Nairobi delivery for stocked items when available; countrywide shipping on request.",
+  deposit: "We can hold items for pickup when we have the caller name and pickup time.",
+  cancellation: ": Orders can be cancelled before we print..",
+  warranty: "The receptionist should route the caller to Amina for warranty questions.",
+};
+
 type DevSettingsJobsProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
@@ -73,9 +87,10 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
   const params = (await searchParams) || {};
   const tabRaw = Array.isArray(params.tab) ? params.tab[0] : params.tab;
   const panelRaw = Array.isArray(params.panel) ? params.panel[0] : params.panel;
-  const tab = parseBusinessSettingsTab(tabRaw);
+  const tab = parseBusinessSettingsTab(tabRaw, panelRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
-  const t = params.vertical === "home_services" ? homeTenant : tenant;
+  const base = params.vertical === "home_services" ? homeTenant : tenant;
+  const t = params.policies === "messy" ? ({ ...base, business_policies: messyPolicies } as TenantRow) : base;
 
   const curatedVoices = [
     {
@@ -86,6 +101,38 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
     { id: "dev-voice-clear", description: "Clear and brief" },
     { id: "dev-voice-calm", description: "Calm and slow" },
   ];
+
+  // Calls & forwarding (?tab=calls): forwarding on Airtel, proven by a test call 2 days ago.
+  const now = Date.now();
+  const callSetup = {
+    ...emptyCallSetup(),
+    option: "forward" as const,
+    network: "airtel" as const,
+    opened_at: new Date(now - 3 * 86_400_000).toISOString(),
+    // "Forwarding works": the test call from a teammate's phone came in 2 days ago.
+    test_from: "+254722000111",
+    test_started_at: new Date(now - 2 * 86_400_000 - 120_000).toISOString(),
+  };
+  const callsSlot =
+    tab === "calls" ? (
+      <CallsForwardingPanel
+        tenantId={t.id}
+        number="0700000000"
+        pretty="+254 700 000 000"
+        supported
+        setup={callSetup}
+        status={resolveCallSetupStatus({
+          numberReady: true,
+          setup: callSetup,
+          activity: {
+            testMatchAt: new Date(now - 2 * 86_400_000).toISOString(),
+            firstCallAfterOpenAt: new Date(now - 2 * 86_400_000).toISOString(),
+            lastCallAt: new Date(now - 86_400_000).toISOString(),
+          },
+          now,
+        })}
+      />
+    ) : null;
 
   return (
     <div className={deskShellClass}>
@@ -100,6 +147,7 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             tab={tab}
             trainPanel={trainPanel}
             curatedVoices={curatedVoices}
+            callsSlot={callsSlot}
             optionStatus={settingsIndexStatuses(
               t,
               curatedVoices,
