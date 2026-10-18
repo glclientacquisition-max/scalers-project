@@ -203,6 +203,57 @@ $$;
 revoke all on function public._tenant_set_allowances(uuid, uuid, integer) from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
+-- 2b. Activity snapshot: the package state Admin Activity shows as
+--     detail.before / detail.after on assign_package / unassign_package rows
+--     (dashboard/src/lib/adminBillingCopy.ts billingAuditDetail,
+--      dashboard/src/lib/adminActivityModel.ts changeLines).
+--     { package_sku, package_name, period, period_start, period_end, status }
+--     status: 'active' (on a package) | 'none' (no package: no row or cancelled).
+--     _billing_package_snapshot_of builds the same shape for a state that is
+--     scheduled, not current (downgrade / period change / unassign at period end).
+-- ---------------------------------------------------------------------------
+create or replace function public._billing_package_snapshot_of(
+  p_package_id uuid,
+  p_period text,
+  p_start timestamptz,
+  p_end timestamptz,
+  p_status text
+)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'package_sku', case when p_status = 'active' then p.sku end,
+    'package_name', case when p_status = 'active' then p.name end,
+    'period', case when p_status = 'active' then p_period end,
+    'period_start', p_start,
+    'period_end', p_end,
+    'status', case when p_status = 'active' then 'active' else 'none' end)
+  from (select 1) one
+  left join public.billing_packages p on p.id = p_package_id;
+$$;
+
+create or replace function public._billing_package_snapshot(p_tenant_id uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (select public._billing_package_snapshot_of(
+              s.package_id, s.period, s.current_period_start, s.current_period_end, s.status)
+     from public.tenant_subscriptions s where s.tenant_id = p_tenant_id),
+    public._billing_package_snapshot_of(null, null, null, null, 'none'));
+$$;
+
+revoke all on function public._billing_package_snapshot_of(uuid, text, timestamptz, timestamptz, text) from public, anon, authenticated;
+revoke all on function public._billing_package_snapshot(uuid) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------
 -- 3. assign_tenant_package with change rules
 -- ---------------------------------------------------------------------------
 drop function if exists public.assign_tenant_package(uuid, uuid, text);
@@ -246,6 +297,8 @@ declare
   v_after integer;
   v_upgrade boolean;
   v_repeat boolean := false;
+  v_before jsonb;
+  v_after_snap jsonb;
 begin
   if p_tenant_id is null or p_package_id is null then
     raise exception 'tenant and package required';
@@ -268,6 +321,7 @@ begin
   select s.* into v_sub
   from public.tenant_subscriptions s where s.tenant_id = p_tenant_id for update;
   v_has_sub := found;
+  v_before := public._billing_package_snapshot(p_tenant_id);
 
   if not v_has_sub or v_sub.status <> 'active' then
     -- Rule 5: start from no package.
@@ -388,8 +442,18 @@ begin
   select t.minutes_included into v_after from public.tenants t where t.id = p_tenant_id;
 
   if v_kind <> 'same' and not v_repeat then
+    -- after = the state this change produces: now, or at effective_at when scheduled.
+    if v_kind in ('downgrade_scheduled', 'period_change_scheduled') then
+      v_after_snap := public._billing_package_snapshot_of(
+        p_package_id, v_period, v_effective, public.billing_add_months(v_effective, 1), 'active');
+    else
+      v_after_snap := public._billing_package_snapshot(p_tenant_id);
+    end if;
     insert into public.ops_audit_log (actor, action, tenant_id, amount_kes, detail)
     values (v_actor, 'assign_package', p_tenant_id, null, jsonb_build_object(
+      'before', v_before,
+      'after', v_after_snap,
+      'scheduled', v_kind in ('downgrade_scheduled', 'period_change_scheduled'),
       'change_kind', v_kind,
       'package_id', p_package_id,
       'package_sku', v_pack.sku,
@@ -445,6 +509,7 @@ declare
   v_after integer;
   v_effective timestamptz;
   v_state text;
+  v_before jsonb;
 begin
   if p_tenant_id is null then
     raise exception 'tenant required';
@@ -472,6 +537,7 @@ begin
     return next;
     return;
   end if;
+  v_before := public._billing_package_snapshot(p_tenant_id);
 
   if v_when = 'period_end' then
     if v_sub.current_period_end is null then
@@ -488,7 +554,11 @@ begin
       insert into public.ops_audit_log (actor, action, tenant_id, amount_kes, detail)
       values (v_actor, 'unassign_package', p_tenant_id, null, jsonb_build_object(
         'when', 'period_end', 'package_id', v_sub.package_id,
-        'effective_at', v_effective, 'note', v_note));
+        'effective_at', v_effective, 'note', v_note,
+        'before', v_before,
+        'after', public._billing_package_snapshot_of(
+          null, null, v_effective, public.billing_add_months(v_effective, 1), 'none'),
+        'scheduled', true));
     end if;
     v_state := 'active';
   else
@@ -503,7 +573,10 @@ begin
     insert into public.ops_audit_log (actor, action, tenant_id, amount_kes, detail)
     values (v_actor, 'unassign_package', p_tenant_id, null, jsonb_build_object(
       'when', 'now', 'package_id', v_sub.package_id, 'grant_minutes_kept', v_grants,
-      'note', v_note));
+      'note', v_note,
+      'before', v_before,
+      'after', public._billing_package_snapshot(p_tenant_id),
+      'scheduled', false));
     v_state := 'none';
     v_effective := now();
   end if;
