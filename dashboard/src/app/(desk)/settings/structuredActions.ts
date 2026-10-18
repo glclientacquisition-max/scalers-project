@@ -15,7 +15,7 @@ import {
   isIntent,
   isLostReason,
   isOutcome,
-  priceLabel,
+  confirmPriceFields,
   sanitizePricing,
   type StructuredPrice,
 } from "@/lib/structuredData";
@@ -41,8 +41,8 @@ async function restampPriceHash(
 ): Promise<void> {
   const path = catalogPricePath(kind, rows, findCatalogItem(rows, target));
   if (!path) return;
-  // The save rewrites price_range/price to priceLabel(), which is part of the
-  // row's .name value, so re-stamp .name too or a "yes, unchanged" goes stale.
+  // The save may rewrite price/price_range. That text is part of the row's
+  // .name value, so re-stamp .name too or a "yes, unchanged" goes stale.
   const namePath = path.replace(/\.price$/, ".name");
   const column = kind === "product" ? "product_catalog" : "services_catalog";
   try {
@@ -77,13 +77,14 @@ export async function confirmPriceAction(input: { kind: "product" | "service"; i
   const fresh = await readCatalogFresh(ws.client, ws.tenant.id);
   if (!fresh) return { ok: false, error: SAVE_FAILED };
   const rows = Array.isArray(fresh[column]) ? (fresh[column] as Array<Record<string, unknown>>) : [];
-  const label = priceLabel(pricing);
-  const next = patchCatalogItem(rows, { id: input.id, name: input.name }, (row) => ({
-    ...row,
-    pricing: { ...pricing, parsed_from: label },
-    [textKey]: label,
-    source: "owner",
-  }));
+  const next = patchCatalogItem(rows, { id: input.id, name: input.name }, (row) => {
+    const decided = confirmPriceFields({
+      storedText: String(row[textKey] ?? ""),
+      storedPricing: sanitizePricing(row.pricing),
+      incoming: pricing,
+    });
+    return { ...row, pricing: decided.pricing, [textKey]: decided.text, source: "owner" };
+  });
   if (!next) return { ok: false, error: "That item is no longer in your catalogue." };
   const { error } = await ws.client.from("tenants").update({ [column]: next }).eq("id", ws.tenant.id);
   bustTenantCache(ws.tenant.id);
