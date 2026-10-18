@@ -1,0 +1,16 @@
+Subject: You're invited to join Scalers
+Preheader: Accept the invite to set your password and join your team.
+
+You're invited to Scalers
+
+You've been invited to join a team on Scalers as {{ .Email }}. Accept the invite to set your password and see the calls your team handles.
+
+The link works once and expires in 1 hour. If it runs out, ask the person who invited you to send a new one.
+
+If you didn't ask for this, you can ignore this email. Nothing changes unless you accept.
+
+Accept invite: {{ .ConfirmationURL }}
+
+--
+This is an account email from Scalers. We only send it when someone asks for it.
+Need help? Write to support@scalers.co.ke.

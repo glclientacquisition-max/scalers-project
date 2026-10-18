@@ -3,7 +3,7 @@ import { inlineText, type EmailSpec } from "./spec.ts";
 /** Hand-shaped plain-text part from the same spec as the HTML, so copy can't drift. */
 export function specToText(
   spec: EmailSpec,
-  footer: { support: string; unsubscribeUrl?: string; alertsUrl?: string },
+  footer: { support: string; unsubscribeUrl?: string; alertsUrl?: string; noReply?: boolean },
 ): string {
   const out: string[] = [];
   out.push(spec.pill ? `${spec.heading} [${spec.pill.text}]` : spec.heading, "");
@@ -35,6 +35,11 @@ export function specToText(
       case "h2":
         out.push(b.count != null ? `${b.text} (${b.count})` : b.text, "-".repeat(b.text.length));
         break;
+      case "code":
+        out.push(b.label ? `${b.label} ${b.code}` : b.code, "");
+        break;
+      case "rawlink":
+        break;
       case "list":
         for (const it of b.items) out.push(`- ${inlineText(it.text)}${it.meta ? ` (${it.meta})` : ""}${it.link ? ` ${it.link.label}: ${it.link.href}` : ""}`);
         out.push("");
@@ -42,9 +47,10 @@ export function specToText(
     }
   }
   if (spec.cta) out.push(`${spec.cta.label}: ${spec.cta.href}`);
+  for (const b of spec.blocks) if (b.t === "rawlink" && (!spec.cta || b.href !== spec.cta.href)) out.push(`${b.label} ${b.href}`);
   if (spec.secondary) out.push(`${spec.secondary.label}: ${spec.secondary.href}`);
   out.push("", "--", spec.reason);
-  if (spec.audience === "owner") out.push(`Questions? Reply to this email or write to ${footer.support}.`);
+  if (spec.audience === "owner") out.push(footer.noReply ? `Need help? Write to ${footer.support}.` : `Questions? Reply to this email or write to ${footer.support}.`);
   if (!spec.essential && footer.unsubscribeUrl) {
     out.push(`Unsubscribe: ${footer.unsubscribeUrl}`);
     if (footer.alertsUrl) out.push(`Choose which emails you get: ${footer.alertsUrl}`);

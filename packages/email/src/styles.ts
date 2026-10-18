@@ -21,6 +21,8 @@ a { color:${light.accent}; }
   .stat-v { font-size:22px !important; line-height:28px !important; }
   .stat-c { padding:12px 10px !important; }
   .hide-sm { display:none !important; }
+  .btn-t { width:100% !important; }
+  .code { font-size:28px !important; letter-spacing:6px !important; }
 }
 @media (prefers-color-scheme: dark) {
   .bg-canvas { background-color:${dark.canvas} !important; }
@@ -32,6 +34,7 @@ a { color:${light.accent}; }
   .tx-ink3 { color:${dark.ink3} !important; }
   .tx-link { color:${dark.accent} !important; }
   .btn { background-color:${dark.accent} !important; color:${dark.accentOn} !important; }
+  .btn-c { background-color:${dark.accent} !important; }
   .bg-info { background-color:${dark.accentTonal} !important; }
   .bg-ok { background-color:${dark.okTonal} !important; }
   .bg-att { background-color:${dark.attentionTonal} !important; }

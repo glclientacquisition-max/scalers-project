@@ -8,7 +8,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
-    "render": "tsx scripts/render.tsx"
+    "render": "tsx scripts/render.tsx",
+    "export:auth": "tsx scripts/export-supabase-auth.tsx",
+    "check:auth-go": "go run supabase-auth/check/main.go supabase-auth"
   },
   "engines": {
     "node": ">=20"

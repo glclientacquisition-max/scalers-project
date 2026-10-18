@@ -5,7 +5,14 @@ import { buttonHtml } from "./button.ts";
 import { headCss } from "./styles.ts";
 import { fontStack, layout, light, toneColors, type Tone } from "./tokens.ts";
 
-type FooterProps = { support: string; unsubscribeUrl?: string; alertsUrl?: string; assets: string };
+type FooterProps = {
+  support: string;
+  unsubscribeUrl?: string;
+  alertsUrl?: string;
+  assets: string;
+  /** Sent from a no-reply address: the footer points at the support inbox instead of "Reply to this email". */
+  noReply?: boolean;
+};
 
 const t = {
   ink: { color: light.ink },
@@ -264,10 +271,46 @@ function BlockView({ b, compact }: { b: Block; compact: boolean }) {
       );
     case "list":
       return <List b={b} />;
+    case "code":
+      return (
+        <T style={{ margin: "4px 0 20px" }}>
+          <tr>
+            <td align="center" className="bg-surface2" bgcolor={light.surface2} style={{ backgroundColor: light.surface2, borderRadius: 10, padding: "18px 16px" }}>
+              {b.label && (
+                <div className="tx-ink2" style={{ ...t.ink2, fontFamily: fontStack, fontSize: 13, lineHeight: "18px", marginBottom: 6 }}>
+                  {b.label}
+                </div>
+              )}
+              <div className="tx-ink code" style={{ ...t.ink, fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, "Courier New", monospace', fontSize: 32, lineHeight: "40px", fontWeight: 700, letterSpacing: "8px" }}>
+                {b.code}
+              </div>
+            </td>
+          </tr>
+        </T>
+      );
+    case "rawlink":
+      return (
+        <p className="tx-ink2" style={{ ...P_STYLE, ...t.ink2, fontSize: 13, lineHeight: "19px", margin: "20px 0 0" }}>
+          {b.label}
+          <br />
+          <a href={b.href} className="tx-link" style={{ color: light.accent, textDecoration: "underline", wordBreak: "break-all" }}>
+            {b.href}
+          </a>
+        </p>
+      );
   }
 }
 
-export function EmailLayout({ spec, footer }: { spec: EmailSpec; footer: FooterProps }) {
+export function EmailLayout({
+  spec,
+  footer,
+  button = buttonHtml,
+}: {
+  spec: EmailSpec;
+  footer: FooterProps;
+  /** Primary button renderer. Defaults to the VML bulletproof button. */
+  button?: (label: string, href: string) => string;
+}) {
   const ops = spec.audience === "ops";
   const pad = ops ? 24 : layout.cardPadding;
   return (
@@ -316,12 +359,15 @@ export function EmailLayout({ spec, footer }: { spec: EmailSpec; footer: FooterP
                   <h1 className="tx-ink h1" style={{ ...t.ink, fontFamily: fontStack, margin: "0 0 16px", fontSize: ops ? 19 : 24, lineHeight: ops ? "26px" : "30px", fontWeight: 700, letterSpacing: "-0.01em" }}>
                     {spec.heading}
                   </h1>
-                  {spec.blocks.map((b, i) => (
+                  {spec.blocks.filter((b) => b.t !== "rawlink").map((b, i) => (
                     <BlockView key={i} b={b} compact={ops} />
                   ))}
                   {spec.cta && (
-                    <div style={{ margin: ops ? "8px 0 0" : "12px 0 0" }} dangerouslySetInnerHTML={{ __html: buttonHtml(spec.cta.label, spec.cta.href) }} />
+                    <div style={{ margin: ops ? "8px 0 0" : "12px 0 0" }} dangerouslySetInnerHTML={{ __html: button(spec.cta.label, spec.cta.href) }} />
                   )}
+                  {spec.blocks.filter((b) => b.t === "rawlink").map((b, i) => (
+                    <BlockView key={`raw${i}`} b={b} compact={ops} />
+                  ))}
                   {spec.secondary && (
                     <p className="tx-ink2" style={{ ...P_STYLE, ...t.ink2, fontSize: 15, margin: "16px 0 0" }}>
                       <a href={spec.secondary.href} className="tx-link" style={{ color: light.accent, textDecoration: "underline", fontWeight: 500 }}>
@@ -341,7 +387,7 @@ export function EmailLayout({ spec, footer }: { spec: EmailSpec; footer: FooterP
                   </p>
                   {!ops && (
                     <p className="tx-ink3" style={{ ...P_STYLE, ...t.ink3, fontSize: 13, lineHeight: "19px", margin: "0 0 6px" }}>
-                      Questions? Reply to this email or write to{" "}
+                      {footer.noReply ? "Need help? Write to" : "Questions? Reply to this email or write to"}{" "}
                       <a href={`mailto:${footer.support}`} className="tx-link" style={{ color: light.ink2, textDecoration: "underline" }}>
                         {footer.support}
                       </a>

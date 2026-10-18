@@ -12,6 +12,10 @@ export type Block =
   | { t: "table"; caption?: string; rows: { label: string; value: string; tone?: Tone }[] }
   | { t: "steps"; title?: string; items: Rich[] }
   | { t: "h2"; text: string; count?: number }
+  /** One-time code, shown large and spaced (auth emails). */
+  | { t: "code"; code: string; label?: string }
+  /** Fallback URL printed as text so it can be copied when the button fails. */
+  | { t: "rawlink"; label: string; href: string }
   | { t: "list"; items: { text: Rich; meta?: string; tone?: Tone; link?: { label: string; href: string } }[] };
 
 export type Cta = { label: string; href: string };

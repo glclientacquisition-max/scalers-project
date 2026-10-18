@@ -26,3 +26,20 @@ export function buttonHtml(label: string, href: string): string {
     `<!--<![endif]-->`,
   ].join("");
 }
+
+/**
+ * Comment-free bulletproof button for templates that pass through Go
+ * html/template (Supabase Auth), which strips HTML comments and so would drop
+ * the VML/MSO conditionals above. The colour sits on the table cell, so Outlook
+ * desktop still paints a solid 48px button; the padded link is the tap target.
+ */
+export function tableButtonHtml(label: string, href: string): string {
+  const l = esc(label);
+  const u = esc(href);
+  return [
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" class="btn-t" style="border-collapse:separate;">`,
+    `<tr><td align="center" bgcolor="${light.accent}" class="btn-c" style="background-color:${light.accent};border-radius:8px;mso-padding-alt:14px 28px;">`,
+    `<a href="${u}" class="btn" target="_blank" style="display:inline-block;background-color:${light.accent};color:${light.accentOn};font-family:${esc(fontStack)};font-size:16px;font-weight:600;line-height:20px;text-decoration:none;text-align:center;padding:14px 28px;border-radius:8px;min-width:120px;">${l}</a>`,
+    `</td></tr></table>`,
+  ].join("");
+}

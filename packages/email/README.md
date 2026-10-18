@@ -72,9 +72,18 @@ cd packages/email && npm ci
 npm run typecheck
 npm test
 npm run render -- --copy /workspace/scalers/email-previews   # HTML, .txt, desktop 680px + mobile 375px PNGs into out/
+npm run export:auth -- --copy /workspace/scalers/email-previews   # Supabase Auth templates + auth-*.png previews
+npm run check:auth-go   # Go html/template parse check (needs Go)
 ```
 
 `render` uses `playwright-core` with a local Chrome (`CHROME_PATH`, or `/usr/bin/google-chrome`).
+
+## Supabase Auth templates
+
+`supabase-auth/` holds static, comment-free HTML for the six Supabase Auth emails (confirm signup, invite, magic link,
+reset password, change email, reauthentication) with Supabase Go-template variables left in place. Source:
+`src/supabase-auth.ts`; export with `npm run export:auth`. See `supabase-auth/README.md` for subjects and apply steps.
+Not applied to any project yet.
 
 ## Not done here
 
