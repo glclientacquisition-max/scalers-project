@@ -393,7 +393,8 @@ describe('HD_7522f9a7ba06: "huduma gani nilikuwa nimeitisha" is the caller file,
       const nba = determineNextBestAction({ state, capabilities: {} });
       assert.doesNotMatch(nba.reason, /services catalogue/);
       assert.equal(offerCatalogueLine(T4, profile, 'sw'), '');
-      assert.match(state.conversation.fileReadSentence, /^Una Carpet Cleaning \(per room\), Saturday 10 October 2026, 1 PM, Kitengela, Grace Apartments\./);
+      // #733 paged visit read: the sw fact line names the visit and the day relative to the call.
+      assert.match(state.conversation.fileReadSentence, /^Una ziara ya Carpet Cleaning \(per room\), kesho, 1 PM, Kitengela, Grace Apartments\./);
     }));
 
   it('on: before the name is confirmed, the name gate comes first', () =>
