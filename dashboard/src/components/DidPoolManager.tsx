@@ -23,7 +23,7 @@ function waitingPreview(count: number) {
 
 function statusTone(status: string): StampTone {
   if (status === "available") return "ok";
-  if (status === "disabled" || status === "reserved") return "attention";
+  if (status === "disabled" || status === "reserved" || status === "quarantine") return "attention";
   return "neutral";
 }
 
@@ -32,6 +32,7 @@ function statusLabel(status: string) {
   if (status === "assigned") return "Assigned";
   if (status === "disabled") return "Disabled";
   if (status === "reserved") return "Reserved";
+  if (status === "quarantine") return "Quarantine";
   return status;
 }
 

@@ -1,6 +1,6 @@
 ---
 owner: platform
-last_reviewed: 2026-10-11
+last_reviewed: 2026-10-18
 ---
 
 # Migration ledger
@@ -294,3 +294,23 @@ CLI version timestamps are **INFERRED** from version string `YYYYMMDDHHMMSS` (UT
 | File | Purpose | Status |
 | --- | --- | --- |
 | `supabase/migrations/20261011000000_team_invites.sql` | Roles owner/admin/staff/viewer (member→staff), one owner per tenant, `tenant_invites`, `tenant_member_audit`, seat/invite/accept/transfer RPCs, restrictive RLS (owner/admin settings; viewer read-only), signup trigger skips invitees. | **Not applied.** Staging first. App flag `TEAM_INVITES_ENABLED` default off. Re-check `handle_new_user_tenant` body against production before applying. |
+
+---
+
+## Recorded drift (18 Oct 2026)
+
+Checked against `supabase_migrations.schema_migrations` and object names only. No tenant rows. This section is the repo record. It does not insert history rows into either database.
+
+| ID | What | Staging | Production | CLI / schema_migrations | Notes |
+| --- | --- | --- | --- | --- | --- |
+| LEDGER-643-WALLET-ALERT | Tables `voice_wallet_alert_state` and `voice_webhook_events`. Functions `voice_wallet_alert_observe` and `voice_wallet_alert_release`. | Objects present. Not in the migration list. | Objects present. Not in the migration list. | NO on both | SQL stays on open draft #643 (`voice/wallet-low-balance-alert`). Not copied here and not applied by this change. |
+| LEDGER-737-LIFECYCLE | `admin_set_business_suspended`, `archive_tenant_billing`, `unarchive_tenant_billing`, `purge_archived_tenants`. | Functions present. Names `admin_business_suspend_737`, `archive_tenant_billing_737`, `purge_archived_tenants_737` are absent from the migration list. | Recorded 18 Oct 2026 12:06 EAT, before merge `fbef28a8` at 12:10 EAT. Versions `20261018090636` `admin_business_suspend_737`, `20261018090641` `archive_tenant_billing_737`, `20261018090646` `purge_archived_tenants_737` (09:06 UTC). | Prod YES. Staging NO. | Purge schedule is on neither list. History rows were not inserted on staging. |
+| LEDGER-SEAT-ANON-REVOKE | `revoke` execute on `tenant_seats_used(uuid)` and `tenant_seat_available(uuid)` from `PUBLIC` and `anon`. Keep `authenticated` and `service_role`. | YES 18 Oct 2026. Version `20261018164459`, name `revoke_anon_seat_execute`. Anon call denied. `authenticated` and `service_role` still succeed. | YES 18 Oct 2026. Version `20261018180156`, same name. Anon denied on both functions. | Staging YES (`20261018164459`). Production YES (`20261018180156`). | `supabase/migrations/20261018180000_revoke_anon_seat_execute.sql`. Usage calls `tenant_seats_used` with the service role. |
+| LEDGER-INVITE-ANON-REVOKE | `revoke` execute on `create_tenant_invite(uuid, text, text, text, uuid)` from `PUBLIC` and `anon`. Keep `service_role` only. | YES 18 Oct 2026. Version `20261018180447`, name `revoke_anon_create_tenant_invite`. Anon call denied. `service_role` still reaches the function. `authenticated` stays denied. | NO. Same file, after the owner's OK and a backup. Confirmed absent from the production migration list after the staging apply. | Staging YES (`20261018180447`). Production NO. | `supabase/migrations/20261018210000_revoke_anon_create_tenant_invite.sql`. Desk invite uses `getSupabaseAdmin()`. `team_invites.sql` already revoked `PUBLIC` and `authenticated`; the leftover grant is the direct `anon` grant. |
+| LEDGER-ACCEPT-TRANSFER-ANON-REVOKE | `revoke` execute on `accept_tenant_invite(text, uuid)` and `transfer_tenant_ownership(uuid, uuid, uuid)` from `PUBLIC` and `anon`. Keep `service_role` only. | YES 18 Oct 2026. Version `20261018180648`, name `revoke_anon_accept_transfer`. Anon denied on both. `service_role` still reaches both. `authenticated` stays denied. | NO. Same file, after the owner's OK and a backup. Confirmed absent from the production migration list after the staging apply. | Staging YES (`20261018180648`). Production NO. | `supabase/migrations/20261018220000_revoke_anon_accept_transfer.sql`. Accept is `inviteAccept.ts`. Transfer is `membersActions.ts`. Both use `getSupabaseAdmin()`. |
+
+## Pending production: billing data layer
+
+| ID | What | Why | Where | Introduced commit | Staging | Production | CLI | Verification |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| LEDGER-BILLING-DATA-LAYER | Package versions, `billing_status`, invoices, payments, credits, `billing_notices`, `tenant_escalation_allowed`, DID `quarantine` | Billing data layer. No charges, no send, no voice routing. | `billing_data_layer.sql` | this PR | YES (2026-10-18, scalers-staging `sgcdncjxauhsbunobmob` only). Chief fixes re-applied the same day (`billing_data_layer_chief_fixes`, `_fns`, `_did`). | NO | NO | Local `tests/sql/billing_data_layer/run.sh` (applied twice). Staging checksum `e87e060fd7a7f217fbe3fd3325104853` unchanged on the first apply. Chief-fix probe rolled back (0 rows left): expired quarantine assigned by both paths, stale `sending` reclaimed, sent notice stayed sent. Tenant row hash `ed560e5d36dec3cd055e5c37fe1045b7` unchanged, 6 businesses, 2 pool rows. Prod file is the same script. Production `information_schema` (read-only, 18 Oct 2026) already has every tenants column this script reads. Do not run on `fjxcdccgyhnvnnlnovcl` until a backup and Alvin's GO. |
