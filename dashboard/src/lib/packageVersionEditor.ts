@@ -90,6 +90,8 @@ export function packageVersionEditorHttpStatus(message: string): { status: numbe
     text.includes("confirm the billing change") ||
     text.includes("confirm the signup setting") ||
     text.includes("set billing mode before active") ||
+    text.includes("billing stays off") ||
+    text.includes("billing mode must be") ||
     text.includes("billing status") ||
     text.includes("billing enforcement") ||
     text.includes("new signup trial") ||
@@ -262,6 +264,15 @@ export function parseEditorCommand(body: unknown): ParsedEditorCommand {
     }
     if (body.enforcement !== "off" && body.enforcement !== "soft" && body.enforcement !== "hard") {
       return { ok: false, error: "Billing enforcement must be off, soft, or hard." };
+    }
+    const legalPair =
+      (body.billing_status === "beta" && body.enforcement === "off") ||
+      (body.billing_status === "active" && (body.enforcement === "soft" || body.enforcement === "hard"));
+    if (!legalPair) {
+      return {
+        ok: false,
+        error: "Billing mode must be beta with enforcement off, or active with enforcement soft or hard.",
+      };
     }
     if (body.confirm !== true) return { ok: false, error: "Confirm the billing change." };
     return {

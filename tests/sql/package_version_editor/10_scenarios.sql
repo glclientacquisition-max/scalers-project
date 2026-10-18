@@ -938,15 +938,41 @@ begin
   exception when others then
     if sqlerrm not like '%confirm the billing change%' then raise; end if;
   end;
+  begin
+    perform public.admin_set_tenant_billing_mode(
+      '11111111-1111-1111-1111-111111111111',
+      'beta',
+      'soft',
+      'ada',
+      'turn billing on and keep beta',
+      true
+    );
+    raise exception 'beta with enforcement on was allowed';
+  exception when others then
+    if sqlerrm not like '%billing stays off while the business is on beta%' then raise; end if;
+  end;
+  begin
+    perform public.admin_set_tenant_billing_mode(
+      '11111111-1111-1111-1111-111111111111',
+      'active',
+      'off',
+      'ada',
+      'leave active with billing off',
+      true
+    );
+    raise exception 'active with enforcement off was allowed';
+  exception when others then
+    if sqlerrm not like '%billing mode must be beta with enforcement off%' then raise; end if;
+  end;
   perform public.admin_set_tenant_billing_mode(
     '11111111-1111-1111-1111-111111111111',
-    'beta',
+    'active',
     'soft',
     'ada',
-    'turn billing on and keep beta',
+    'turn billing on',
     true
   );
-  if (select billing_status from public.tenant_subscriptions where tenant_id = '11111111-1111-1111-1111-111111111111') <> 'beta'
+  if (select billing_status from public.tenant_subscriptions where tenant_id = '11111111-1111-1111-1111-111111111111') <> 'active'
      or (select billing_enforcement from public.tenants where id = '11111111-1111-1111-1111-111111111111') <> 'soft'
      or (select p.sku from public.billing_packages p
          join public.tenant_subscriptions s on s.package_id = p.id
@@ -956,13 +982,14 @@ begin
        where action = 'set_tenant_billing_mode'
          and actor = 'ada'
          and tenant_id = '11111111-1111-1111-1111-111111111111'
+         and detail ->> 'confirm' = 'true'
          and detail ->> 'billing_status_before' = 'beta'
-         and detail ->> 'billing_status_after' = 'beta'
+         and detail ->> 'billing_status_after' = 'active'
          and detail ->> 'billing_enforcement_before' = 'off'
          and detail ->> 'billing_enforcement_after' = 'soft'
      )
   then
-    raise exception 'billing switch changed the plan or left beta';
+    raise exception 'billing switch did not land on active with enforcement soft';
   end if;
   perform public.admin_set_tenant_billing_mode(
     '11111111-1111-1111-1111-111111111111',
@@ -972,6 +999,11 @@ begin
     'turn billing back off',
     true
   );
+  if (select billing_status from public.tenant_subscriptions where tenant_id = '11111111-1111-1111-1111-111111111111') <> 'beta'
+     or (select billing_enforcement from public.tenants where id = '11111111-1111-1111-1111-111111111111') <> 'off'
+  then
+    raise exception 'billing did not return to beta with enforcement off';
+  end if;
 end $$;
 
 -- Annual price, credit price, and spend-limit share are stored on the version.

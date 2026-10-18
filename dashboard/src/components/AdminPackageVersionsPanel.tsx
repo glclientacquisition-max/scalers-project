@@ -370,15 +370,18 @@ export function AdminPackageVersionsPanel({
   }
 
   function openBilling(row: BusinessPlanRow, beta: boolean, enforcement: "off" | "soft" | "hard") {
+    const pair = beta
+      ? { beta: true as const, enforcement: "off" as const }
+      : { beta: false as const, enforcement: enforcement === "hard" ? "hard" as const : "soft" as const };
     setBusinessId(row.tenantId);
-    setNextBeta(beta);
-    setNextEnforcement(enforcement);
+    setNextBeta(pair.beta);
+    setNextEnforcement(pair.enforcement);
     setReason("");
     setError(null);
     setSheet("billing");
   }
 
-  const billingBlocked = !nextBeta && nextEnforcement === "off" && business?.billingStatus === "beta";
+  const hardBilling = business?.billingEnforcement === "hard" || nextEnforcement === "hard";
   const baselinePack = form ? packs.find((pack) => pack.sku === form.sku) : null;
   const baseline = baselinePack ? publishedOf(baselinePack) : null;
   const diff = form && baseline ? changedLines(baseline, form) : [];
@@ -507,7 +510,7 @@ export function AdminPackageVersionsPanel({
                   <Button
                     variant="tonal"
                     size="sm"
-                    onClick={() => openBilling(row, row.billingStatus === "beta", row.billingEnforcement)}
+                    onClick={() => openBilling(row, row.billingStatus === "beta" || row.billingEnforcement === "off", row.billingEnforcement)}
                   >
                     Beta
                   </Button>
@@ -757,7 +760,11 @@ export function AdminPackageVersionsPanel({
               <Button
                 variant="tonal"
                 size="sm"
-                onClick={() => openBilling(business, business.billingStatus !== "beta", business.billingEnforcement)}
+                onClick={() => openBilling(
+                  business,
+                  !(business.billingStatus === "beta" || business.billingEnforcement === "off"),
+                  business.billingEnforcement === "off" ? "soft" : business.billingEnforcement,
+                )}
               >
                 Change beta
               </Button>
@@ -772,29 +779,35 @@ export function AdminPackageVersionsPanel({
         theme="admin"
         pending={pending}
         confirmLabel="Save"
-        confirmDisabled={!reason.trim() || billingBlocked}
+        confirmDisabled={!reason.trim()}
         onClose={closeSheet}
         onConfirm={() => void saveBilling()}
       >
         {error ? <p className="pb-3 text-body text-attention" role="alert">{error}</p> : null}
         <p>
-          {nextBeta ? "Beta stays on." : "Beta turns off."} Billing {nextEnforcement === "off" ? "stays off" : "turns on"}.
-          {" "}The plan does not change.
+          {nextBeta ? "Beta on. Billing off." : "Beta off. Billing on."} The plan does not change.
         </p>
-        {billingBlocked ? (
-          <p className="mt-2 text-attention">Turn billing on before taking this business off beta.</p>
-        ) : null}
         <div className="mt-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <p className="text-body text-ink">Beta</p>
-            <Switch checked={nextBeta} label="Beta" onCheckedChange={setNextBeta} />
+            <Switch
+              checked={nextBeta}
+              label="Beta"
+              onCheckedChange={(on) => {
+                setNextBeta(on);
+                setNextEnforcement(on ? "off" : hardBilling ? "hard" : "soft");
+              }}
+            />
           </div>
           <div className="flex items-center justify-between gap-3">
             <p className="text-body text-ink">Billing</p>
             <Switch
               checked={nextEnforcement !== "off"}
               label="Billing"
-              onCheckedChange={(on) => setNextEnforcement(on ? (business?.billingEnforcement === "hard" ? "hard" : "soft") : "off")}
+              onCheckedChange={(on) => {
+                setNextBeta(!on);
+                setNextEnforcement(on ? (hardBilling ? "hard" : "soft") : "off");
+              }}
             />
           </div>
           <Field id="billing-reason" label="Reason" required>

@@ -185,6 +185,37 @@ describe("package version editor commands", () => {
     assert.match(sql, /confirm the move/);
     assert.match(sql, /system_move_subscribers_to_package_version/);
     assert.match(sql, /admin_set_tenant_billing_mode/);
+    assert.match(
+      sql,
+      /if p_billing_status = 'beta' and p_enforcement is distinct from 'off' then\s+raise exception/,
+    );
+    const betaSoft = mod.parseEditorCommand({
+      action: "set_billing_mode",
+      tenant_id: "11111111-1111-1111-1111-111111111111",
+      billing_status: "beta",
+      enforcement: "soft",
+      reason: "keep beta and charge",
+      confirm: true,
+    });
+    assert.equal(betaSoft.ok, false);
+    const activeOff = mod.parseEditorCommand({
+      action: "set_billing_mode",
+      tenant_id: "11111111-1111-1111-1111-111111111111",
+      billing_status: "active",
+      enforcement: "off",
+      reason: "leave active with billing off",
+      confirm: true,
+    });
+    assert.equal(activeOff.ok, false);
+    const activeSoft = mod.parseEditorCommand({
+      action: "set_billing_mode",
+      tenant_id: "11111111-1111-1111-1111-111111111111",
+      billing_status: "active",
+      enforcement: "soft",
+      reason: "turn billing on",
+      confirm: true,
+    });
+    assert.equal(activeSoft.ok, true);
     assert.match(sql, /a package change keeps the current version/);
     assert.match(sql, /new_signup_trial_enabled boolean not null default false/);
     assert.match(sql, /tenants_a_new_signup_trial/);

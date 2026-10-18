@@ -198,20 +198,20 @@ Result: `{ "version_id", "moved", "version" }`. One audit row per business, acti
 
 ### `set_billing_mode`
 
-Beta and billing enforcement are separate from the plan. This is the only action that turns enforcement on, and only with `confirm: true`. `billing_status` is `beta` or `active`. `enforcement` is `off`, `soft`, or `hard`. Taking a beta business to `active` while enforcement is `off` is refused (`set billing mode before active`). The plan, the version, and the minutes stay put. Does not create an invoice.
+Beta and billing are one switch. The only pairs are `billing_status` `beta` with `enforcement` `off`, and `billing_status` `active` with `enforcement` `soft` or `hard`. Any other pair is refused. `confirm` must be `true`. The plan, the version, and the minutes stay put. Does not create an invoice.
 
 ```json
 {
   "action": "set_billing_mode",
   "tenant_id": "uuid",
-  "billing_status": "beta",
+  "billing_status": "active",
   "enforcement": "soft",
-  "reason": "Turn billing on and keep beta",
+  "reason": "Turn billing on",
   "confirm": true
 }
 ```
 
-Audit action `set_tenant_billing_mode`, with status and enforcement before and after.
+Audit action `set_tenant_billing_mode`, with status and enforcement before and after. `POST /api/admin/billing` uses this same call: mode `off` is beta with enforcement off, and mode `soft` or `hard` is active with that enforcement. The older `set_tenant_billing_mode` refuses to turn enforcement on while the subscription is still beta, and it does not change `billing_status`.
 
 ### `set_new_signup_trial`
 

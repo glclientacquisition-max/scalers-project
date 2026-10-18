@@ -1709,8 +1709,9 @@ begin
 end;
 $$;
 
--- Beta and billing enforcement are separate from the plan. This is the only
--- writer that turns enforcement on, and only when an admin confirms.
+-- Beta and billing are one confirmed switch. The only pairs are beta with
+-- enforcement off, and active with enforcement soft or hard. Anything else
+-- raises. This is the only writer that turns enforcement on.
 create or replace function public.admin_set_tenant_billing_mode(
   p_tenant_id uuid,
   p_billing_status text,
@@ -1744,6 +1745,15 @@ begin
   if p_enforcement not in ('off', 'soft', 'hard') then
     raise exception 'billing enforcement must be off, soft, or hard';
   end if;
+  if p_billing_status = 'beta' and p_enforcement is distinct from 'off' then
+    raise exception 'billing stays off while the business is on beta';
+  end if;
+  if not (
+    (p_billing_status = 'beta' and p_enforcement = 'off')
+    or (p_billing_status = 'active' and p_enforcement in ('soft', 'hard'))
+  ) then
+    raise exception 'billing mode must be beta with enforcement off, or active with enforcement soft or hard';
+  end if;
   if not exists (select 1 from public.tenants where id = p_tenant_id) then
     raise exception 'business not found';
   end if;
@@ -1754,9 +1764,6 @@ begin
   end if;
   if v_before_status not in ('beta', 'active') and v_before_status is distinct from p_billing_status then
     raise exception 'billing status is not beta or active';
-  end if;
-  if p_billing_status = 'active' and p_enforcement = 'off' and v_before_status = 'beta' then
-    raise exception 'set billing mode before active';
   end if;
   select billing_enforcement, minutes_included into v_before_enf, v_minutes
   from public.tenants where id = p_tenant_id;
