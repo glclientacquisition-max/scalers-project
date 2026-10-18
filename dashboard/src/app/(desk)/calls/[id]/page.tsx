@@ -19,6 +19,7 @@ import {
 } from "@/lib/callSummarySentence";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { playableCallRecordingUrl } from "@/lib/recordingPlayback";
+import { recordingDeletedByRetention } from "@/lib/recordingSource";
 import { InboxTicketView } from "@/components/InboxTicketView";
 import { LiveTicket } from "@/components/LiveTicket";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
@@ -186,6 +187,7 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
   console.info(timer.line("call-detail"));
   const meta = parseSummary(row.summary);
   // Row is already scoped to this tenant above; re-sign its private recording.
+  const recordingRetentionDeleted = recordingDeletedByRetention(meta);
   const recordingUrl = await playableCallRecordingUrl(row, meta);
   const summaryName = typeof meta.name === "string" ? meta.name.trim() : "";
   const contactName = person?.name?.trim() || "";
@@ -305,6 +307,7 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
         hold={hold}
         turns={turns}
         recordingUrl={recordingUrl}
+        recordingRetentionDeleted={recordingRetentionDeleted}
         durationLabel={row.duration_seconds != null ? `${row.duration_seconds}s` : "N/A"}
         assistLabel={
           row.resolution != null || row.resolution_note

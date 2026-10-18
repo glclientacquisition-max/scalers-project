@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import {
   RECORDINGS_BUCKET,
   RECORDING_PLAYBACK_TTL_SECONDS,
+  recordingDeletedByRetention,
   recordingStoragePath,
   usableRecordingUrl,
 } from "@/lib/recordingSource";
@@ -28,6 +29,7 @@ export async function playableCallRecordingUrl(
   meta: Record<string, unknown> | null | undefined,
   client?: SignClient
 ): Promise<string | null> {
+  if (recordingDeletedByRetention(meta)) return null;
   const path = recordingStoragePath(meta, row.sautikit_call_sid);
   if (path) {
     try {

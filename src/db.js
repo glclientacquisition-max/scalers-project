@@ -21,6 +21,7 @@ const WALLET_RATE_KES_PER_MINUTE = Number(process.env.WALLET_RATE_KES_PER_MINUTE
 const { envTransferRateKesPerMin } = require('./billing/liveTransferLegs');
 const { billableTalkSeconds, inboundOpen, effectiveOnDemand } = require('./billing/packageOverage');
 const recordingCopy = require('./sautikit/recordingCopy');
+const recordingEncode = require('./sautikit/recordingEncode');
 
 function throwIfError(context, error) {
   if (error) {
@@ -892,16 +893,33 @@ async function uploadRecordingBuffer({
   contentType = 'audio/mpeg',
   extension = 'mp3',
 }) {
-  const objectPath = `${callSid}/${recordingSid || Date.now()}.${extension}`;
+  const prepared = await recordingEncode.prepareRecordingForUpload(buffer, contentType, extension);
+  if (prepared.encodeError) {
+    console.warn(
+      `[recording-copy] MP3 encode failed callSid=${callSid}, uploading WAV:`,
+      prepared.encodeError.message
+    );
+  }
+  const objectPath = `${callSid}/${recordingSid || Date.now()}.${prepared.extension}`;
 
   const { error: uploadError } = await supabase.storage
     .from(RECORDINGS_BUCKET)
-    .upload(objectPath, buffer, {
-      contentType,
+    .upload(objectPath, prepared.buffer, {
+      contentType: prepared.contentType,
       upsert: true,
     });
 
   throwIfError('uploadRecordingBuffer', uploadError);
+
+  if (prepared.extension === 'mp3' && recordingSid) {
+    const wavPath = `${callSid}/${recordingSid}.wav`;
+    if (wavPath !== objectPath) {
+      const { error: removeError } = await supabase.storage.from(RECORDINGS_BUCKET).remove([wavPath]);
+      if (removeError) {
+        console.warn(`[recording-copy] could not remove old WAV ${wavPath}:`, removeError.message);
+      }
+    }
+  }
 
   const { data: signed, error: signError } = await supabase.storage
     .from(RECORDINGS_BUCKET)
@@ -1380,6 +1398,81 @@ async function listPendingRecordingCopies({ limit = 20 } = {}) {
     .limit(limit);
   throwIfError('listPendingRecordingCopies', error);
   return data || [];
+}
+
+function recordingRetentionCutoffIso(olderThanDays) {
+  const days = Math.max(1, Number(olderThanDays) || 30);
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+/**
+ * Calls older than the retention window that still have a recording pointer.
+ * Skips rows already purged (summary.recording_deleted_at).
+ */
+async function listCallsForRecordingRetentionPurge({ olderThanDays, limit = 50 } = {}) {
+  const cutoff = recordingRetentionCutoffIso(olderThanDays);
+  const { data, error } = await supabase
+    .from('calls')
+    .select('id, tenant_id, sautikit_call_sid, recording_url, summary, created_at')
+    .lt('created_at', cutoff)
+    .or('recording_url.not.is.null,summary.like.%recording_path%')
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  throwIfError('listCallsForRecordingRetentionPurge', error);
+  return (data || []).filter((row) => {
+    const meta = parseSummary(row.summary);
+    if (meta.recording_deleted_at) return false;
+    return Boolean(row.recording_url || meta.recording_path);
+  });
+}
+
+/**
+ * Remove Storage object(s), clear recording_url / recording_path, stamp deleted_at.
+ * Idempotent when the row is already purged.
+ */
+async function purgeCallRecordingRetention({
+  callSid,
+  tenantId,
+  recordingPath,
+  deletedAt = new Date().toISOString(),
+} = {}) {
+  if (!callSid) return { purged: false, reason: 'no_call_sid' };
+  const existing = await getCall(callSid);
+  if (!existing) return { purged: false, reason: 'missing_call' };
+  if (tenantId && existing.tenant_id && String(existing.tenant_id) !== String(tenantId)) {
+    return { purged: false, reason: 'tenant_mismatch' };
+  }
+  const meta = parseSummary(existing.summary);
+  if (meta.recording_deleted_at && !existing.recording_url && !meta.recording_path) {
+    return { purged: false, reason: 'already_purged', deletedAt: meta.recording_deleted_at };
+  }
+  const path =
+    recordingPath ||
+    (typeof meta.recording_path === 'string' ? meta.recording_path.trim() : '') ||
+    null;
+  const pathsToRemove = [];
+  if (path && !path.includes('..') && !path.startsWith('/')) {
+    pathsToRemove.push(path);
+    if (path.endsWith('.mp3')) pathsToRemove.push(path.replace(/\.mp3$/i, '.wav'));
+    if (path.endsWith('.wav')) pathsToRemove.push(path.replace(/\.wav$/i, '.mp3'));
+  }
+  if (pathsToRemove.length) {
+    const { error: removeError } = await supabase.storage.from(RECORDINGS_BUCKET).remove(pathsToRemove);
+    if (removeError) {
+      console.warn(`[recording-retention] storage remove failed ${callSid}:`, removeError.message);
+    }
+  }
+  delete meta.recording_path;
+  delete meta.recording_status;
+  delete meta.recording_copy_attempts;
+  delete meta.recording_copy_last_error;
+  meta.recording_deleted_at = deletedAt;
+  const { error } = await supabase
+    .from('calls')
+    .update({ recording_url: null, summary: serializeSummary(meta) })
+    .eq('sautikit_call_sid', callSid);
+  throwIfError('purgeCallRecordingRetention', error);
+  return { purged: true, deletedAt, pathsRemoved: pathsToRemove };
 }
 
 // Line-state columns tried on top of each getTenantById select, newest first.
@@ -2888,6 +2981,9 @@ async function getTenantCatalogue(tenantId) {
 module.exports = {
   copyRecordingToStorage,
   listPendingRecordingCopies,
+  listCallsForRecordingRetentionPurge,
+  purgeCallRecordingRetention,
+  recordingRetentionCutoffIso,
   upsertCallFacts,
   getTenantCatalogue,
   resolveTenantId,

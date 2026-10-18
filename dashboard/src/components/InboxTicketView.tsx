@@ -206,6 +206,7 @@ export function InboxTicketView({
   hold,
   turns,
   recordingUrl,
+  recordingRetentionDeleted = false,
   durationLabel,
   assistLabel,
   assistNote,
@@ -238,6 +239,7 @@ export function InboxTicketView({
   hold: InboxHold | null;
   turns: TranscriptRow[];
   recordingUrl: string | null;
+  recordingRetentionDeleted?: boolean;
   durationLabel: string;
   assistLabel: string | null;
   assistNote: string | null;
@@ -586,7 +588,10 @@ export function InboxTicketView({
                   {liveConnectLine}
                 </p>
               ) : null}
-              <CallRecording recordingUrl={recordingUrl} />
+              <CallRecording
+                recordingUrl={recordingUrl}
+                retentionDeleted={recordingRetentionDeleted}
+              />
               {factsSlot ? <div className="pt-2">{factsSlot}</div> : null}
             </div>
           </aside>

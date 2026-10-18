@@ -19,6 +19,20 @@ export function recordingPlaybackKind(value: unknown): "player" | "empty" {
 
 export const NO_RECORDING_COPY = "No recording available for this call.";
 
+/** Matches Voice RECORDING_RETENTION_DAYS (src/lib/recordingRetention.js). */
+export const RECORDING_RETENTION_DAYS = 30;
+
+export const RECORDING_RETENTION_DELETED_COPY = `Recording deleted after ${RECORDING_RETENTION_DAYS} days`;
+
+export const RECORDING_RETENTION_NOTE = `Recordings are kept for ${RECORDING_RETENTION_DAYS} days.`;
+
+export function recordingDeletedByRetention(
+  meta: Record<string, unknown> | null | undefined
+): boolean {
+  const at = meta?.recording_deleted_at;
+  return typeof at === "string" && at.trim().length > 0;
+}
+
 /** Storage bucket Voice copies recordings into (src/db.js RECORDINGS_BUCKET). */
 export const RECORDINGS_BUCKET = "call-recordings";
 
