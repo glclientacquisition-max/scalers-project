@@ -8,7 +8,9 @@
 -- DO NOT RUN on production fjxcdccgyhnvnnlnovcl until a backup and Alvin's GO.
 -- Staging project is sgcdncjxauhsbunobmob. This file is the production script.
 --
--- A pay token is random. Only its sha256 hex is stored. Rotating revokes the
+-- A pay token is random. Only its sha256 hex is stored. pgcrypto lives in
+-- extensions on Supabase and in public under PGlite, so the token functions
+-- search both. Rotating revokes the
 -- previous token. Beta tenants (billing_enforcement off) cannot be minted a link.
 --
 -- M-Pesa's cap is KSh 150,000 per transaction. invoice_kes_parts splits a larger
@@ -172,7 +174,7 @@ create or replace function public.mint_invoice_pay_token(
 returns table (token text, expires_at timestamptz, invoice_id uuid)
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   v_inv public.invoices%rowtype;
@@ -259,7 +261,7 @@ create or replace function public.pay_invoice_by_token(p_token text)
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   v_hash text;
