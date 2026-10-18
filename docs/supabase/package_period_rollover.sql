@@ -9,13 +9,34 @@
 --
 -- Run after: admin_business_archive.sql (tenants.archived_at), package_state_rules.sql, package_catalog.sql (tenant_subscriptions, counters,
 --            tenants_protect_wallet_columns), wallet_security_beta.sql
---            (ops_audit_log). Requires the pg_cron extension.
+--            (ops_audit_log), package_minute_consume.sql
+--            (calls.package_seconds_applied), notify_send_reserve_settle.sql
+--            (notify_sends.status/held_units, notify_sms_billable).
+--            Requires the pg_cron extension.
 -- ASCII-only (safe for Supabase SQL Editor).
 --
 -- Idempotent: a row only rolls when current_period_end <= now(). After the
 -- roll its end is in the future, so a second run in the same hour is a no-op.
--- A row several periods behind catches up in one run (loop), and counters are
--- zeroed once.
+-- A row several periods behind catches up in one run (loop).
+--
+-- Counters at the roll (fix 18 Oct 2026):
+--   * On-time roll (the new period has no usage yet): counters start at 0.
+--   * CATCH-UP (the roll jumps more than one period, or the new period already
+--     has usage, e.g. the cron was off or the row was stale): the new period's
+--     counters are REBUILT from the ledgers instead of zeroed:
+--       seconds_used   = sum(calls.package_seconds_applied), calls created in
+--                        [new_start, new_end)
+--       sms_used_units = sum(notify_sms_billable.units) in [new_start, new_end)
+--                        + held_units of pending SMS reservations in that window
+--                        (the counter holds pending units too; see
+--                        sms_counter_drift(), so drift stays 0)
+--     email/whatsapp counters still start at 0 (no billed ledger for them yet).
+--   Before this fix a stale row was zeroed even when the new period already
+--   had usage: staging Done and Dusted rolled Sep -> Oct at 17 Oct 22:05 EAT
+--   and lost 17,792 s and 150 SMS of October usage (reconcile:
+--   docs/supabase/staging/dnd_usage_counter_reconcile.sql).
+--   The tenant row is locked before the sums are read, so a call or SMS being
+--   metered at the same moment either lands before the sum or on top of it.
 --
 -- Today (9 Oct 2026) nothing resets these counters: assign_tenant_package
 -- moves the period but leaves *_used alone, and no job exists.
@@ -79,7 +100,10 @@ returns table (
   applied_change text,
   package_id_after uuid,
   minutes_included_after integer,
-  term_end_after timestamptz
+  term_end_after timestamptz,
+  catch_up boolean,
+  seconds_used_after integer,
+  sms_used_after integer
 )
 language plpgsql
 security definer
@@ -98,6 +122,10 @@ declare
   v_grants integer;
   v_term_start timestamptz;
   v_term_end timestamptz;
+  v_steps integer;
+  v_secs integer;
+  v_sms integer;
+  v_catch_up boolean;
 begin
   for r in
     select s.tenant_id, s.period, s.status, s.package_id,
@@ -130,10 +158,35 @@ begin
     -- Usage always rolls one calendar month (EAT), for monthly and annual terms.
     v_start := r.current_period_end;
     v_end := public.billing_add_months(v_start, 1);
+    v_steps := 1;
     while v_end <= now() loop
       v_start := v_end;
       v_end := public.billing_add_months(v_start, 1);
+      v_steps := v_steps + 1;
     end loop;
+
+    -- Usage already in the new period (catch-up). Lock the tenant first so a
+    -- concurrent consume_call_seconds / reserve_notify_send serialises with us.
+    if not p_dry_run then
+      perform 1 from public.tenants t where t.id = r.tenant_id for update;
+    end if;
+    select coalesce(sum(c.package_seconds_applied), 0)::integer into v_secs
+    from public.calls c
+    where c.tenant_id = r.tenant_id
+      and c.created_at >= v_start and c.created_at < v_end;
+    select (coalesce((select sum(b.units) from public.notify_sms_billable b
+                      where b.tenant_id = r.tenant_id
+                        and b.created_at >= v_start and b.created_at < v_end), 0)
+          + coalesce((select sum(n.held_units) from public.notify_sends n
+                      where n.tenant_id = r.tenant_id
+                        and n.channel = 'sms' and n.billed_to = 'tenant' and n.status = 'pending'
+                        and n.created_at >= v_start and n.created_at < v_end), 0))::integer
+      into v_sms;
+    v_catch_up := v_steps > 1 or v_secs > 0 or v_sms > 0;
+    if not v_catch_up then
+      v_secs := 0;
+      v_sms := 0;
+    end if;
 
     -- Billing term: a term switch starts a new term with the new usage month;
     -- otherwise the term moves only once it has ended.
@@ -170,6 +223,9 @@ begin
     package_id_after := case when v_status = 'active' then v_package end;
     minutes_included_after := v_minutes;
     term_end_after := v_term_end;
+    catch_up := v_catch_up;
+    seconds_used_after := v_secs;
+    sms_used_after := v_sms;
 
     if not p_dry_run then
       update public.tenant_subscriptions s
@@ -194,9 +250,10 @@ begin
       if found then
         -- Counters are wallet-protected; same flag the billing RPCs use.
         perform set_config('scalers.wallet_write', '1', true);
+        -- On time: 0. Catch-up: rebuilt from calls + the SMS ledger (header).
         update public.tenants t
-          set seconds_used = 0,
-              sms_used_units = 0,
+          set seconds_used = v_secs,
+              sms_used_units = v_sms,
               email_used_units = 0,
               whatsapp_used_units = 0
           where t.id = r.tenant_id;
@@ -227,7 +284,12 @@ begin
             'seconds_used', r.seconds_used,
             'sms_used_units', r.sms_used_units,
             'email_used_units', r.email_used_units,
-            'whatsapp_used_units', r.whatsapp_used_units
+            'whatsapp_used_units', r.whatsapp_used_units,
+            'catch_up', v_catch_up,
+            'periods_rolled', v_steps,
+            'counters_source', case when v_catch_up then 'rebuilt_from_ledger' else 'zero' end,
+            'seconds_used_after', v_secs,
+            'sms_used_units_after', v_sms
           )
         );
       end if;
@@ -239,7 +301,7 @@ end;
 $$;
 
 comment on function public.roll_package_periods(boolean) is
-  'Roll ended tenant_subscriptions periods forward, apply pending changes, zero *_used counters, rebuild minutes_included (package + grants for the new period). p_dry_run=true reports only.';
+  'Roll ended tenant_subscriptions periods forward, apply pending changes, reset *_used counters (0 on time; rebuilt from calls + notify_sms_billable on a catch-up), rebuild minutes_included (package + grants for the new period). p_dry_run=true reports only.';
 
 revoke all on function public.roll_package_periods(boolean) from public, anon, authenticated;
 grant execute on function public.roll_package_periods(boolean) to service_role;

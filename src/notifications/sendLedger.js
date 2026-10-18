@@ -514,6 +514,11 @@ async function reserveSend({ ledger, key, kind, channel, to, body, strict } = {}
     }
     return { mode: 'skip', allowed: true, reason: 'ledger_unavailable' };
   }
+  if (!res.replayed && channel === 'sms' && cls.billed_to === 'tenant' && tenantId) {
+    // 80% / 100% package SMS ops notice (src/billing/smsUsageAlerts.js).
+    // Fire-and-forget: never delays or fails the send. Refused reserves check too.
+    noteSmsUsage(db, tenantId);
+  }
   return {
     mode: 'reserved',
     id: res.id,
@@ -522,6 +527,17 @@ async function reserveSend({ ledger, key, kind, channel, to, body, strict } = {}
     reason: res.reason,
     overage: Boolean(res.overage),
   };
+}
+
+function noteSmsUsage(db, tenantId) {
+  if (typeof db?.checkSmsUsageAlertsForTenant !== 'function') return;
+  try {
+    void Promise.resolve(db.checkSmsUsageAlertsForTenant(tenantId)).catch((err) => {
+      console.warn('[notify-ledger] sms usage alert failed:', err?.message || err);
+    });
+  } catch (err) {
+    console.warn('[notify-ledger] sms usage alert failed:', err?.message || err);
+  }
 }
 
 /** Settle a reservation. Never throws. No-op unless mode is 'reserved'. */

@@ -28,6 +28,8 @@ const ACTIONS: Record<string, string> = {
   assign_package: "Changed package",
   unassign_package: "Removed package",
   sms_counter_drift: "SMS counter drift",
+  set_on_demand_usage: "Changed on-demand",
+  usage_counter_reconcile: "Corrected usage counters",
   save_package: "Edited package",
   save_rates: "Changed rates",
   grant_package_minutes: "Granted minutes",

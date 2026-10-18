@@ -52,10 +52,12 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `notify_sms_billable` | `docs/supabase/notify_send_reserve_settle.sql` |
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 
-## Functions (95)
+## Functions (97)
 
 | Function | Defined in |
 | --- | --- |
+| `_billing_package_snapshot` | `docs/supabase/package_state_rules.sql` |
+| `_billing_package_snapshot_of` | `docs/supabase/package_state_rules.sql` |
 | `_catalogue_item_key` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `_data_quality_rows` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `_record_catalogue_prices` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
@@ -129,7 +131,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `save_onboarding_step` | `supabase/migrations/20261011150000_onboarding_setup.sql` |
 | `service_areas_valid` | `supabase/migrations/20261012150000_locations_service_areas.sql`<br>`supabase/migrations/20261013090000_outside_areas.sql` |
 | `set_tenant_billing_mode` | `docs/supabase/wallet_security_beta.sql` |
-| `set_tenant_on_demand_usage` | `docs/supabase/wallet_on_demand_alerts.sql` |
+| `set_tenant_on_demand_usage` | `docs/supabase/on_demand_usage_audit.sql`<br>`docs/supabase/wallet_on_demand_alerts.sql` |
 | `set_tenant_soft_spend_limit` | `docs/supabase/wallet_soft_spend_limit.sql` |
 | `settle_notify_send` | `docs/supabase/notify_send_reserve_settle.sql` |
 | `sms_counter_drift` | `docs/supabase/notify_send_reserve_settle.sql` |

@@ -104,6 +104,13 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | #737 | Desk | Admin Suspend/Restore, Archive/Unarchive, scheduled purge. | Prod SQL and merge wait for a scored Aris call. Purge schedule not applied until a recordings deletion route exists. |
 | #732, #733 | Brain | Outcome labels past booking; D199 visit read (last one only, paged). | Need Alvin's GO. |
 
+**Pending Ops-Billing (dated per the STATUS rule):**
+
+- **18 Oct 2026, PENDING, needs Alvin's GO: #PRNUM** (draft, branch `ops-billing/rollover-audit-sms-alerts`, SHA filled in at merge). Nothing applied, nothing merged.
+  - *What it changes:* (1) `package_period_rollover.sql`: a catch-up roll (jumps more than one period, or the new period already has usage) rebuilds `seconds_used` from `calls.package_seconds_applied` and `sms_used_units` from `notify_sms_billable` (+ pending holds) for the new period instead of zeroing; an on-time roll still zeroes. (2) New `on_demand_usage_audit.sql`: `set_tenant_on_demand_usage` writes an `ops_audit_log` row (`set_on_demand_usage`, actor, before, after). (3) `package_state_rules.sql`: assign/unassign Activity rows carry `detail.before` / `detail.after` `{package_sku, package_name, period, period_start, period_end, status}`; existing fields kept. (4) Voice: package SMS 80%/100% ops email (`src/billing/smsUsageAlerts.js`), deduped like the minute notices. (5) `docs/supabase/staging/dnd_usage_counter_reconcile.sql` (staging only, not run): puts back Done and Dusted's October counters (0 → 17,792 s, 0 → 150 SMS) that the 17 Oct 22:05 EAT catch-up roll zeroed.
+  - *Rollback:* SQL: re-run the previous versions of `package_period_rollover.sql` and `package_state_rules.sql` from `main` and section 5 of `wallet_on_demand_alerts.sql` (functions only; no table or data changes, audit rows stay). Reconcile: the rollback block at the bottom of the script (restores the values in its audit row). Code: revert the squash commit (SMS notices stop; nothing else depends on them).
+  - *Approver:* Alvin, GO in the Ops-Billing chat, per step. Scalers Voice grants the prod deploy slot before the merge; combined CI green on latest `main` first.
+
 **Live-call voice fixes** (`hold-staging`, flags default off):
 
 | PR | Flag | What |
@@ -145,6 +152,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **`/ws/media` is unguarded.** Anyone with a call ID could inject audio or start paid STT. Needs a per-call stream token (later).
 - **WhatsApp template (alert) sends fail with SautiKit 502.** Session text works. Alerts go by SMS.
 - **Staging Jirani `events_url`** still wrong (section 2, ops).
+- **Rollover catch-up zeroed usage (fix pending, #PRNUM).** A roll that catches up a stale period zeroes the counters even when the new period already has usage. Hit staging Done and Dusted on 17 Oct 22:05 EAT (Admin/Desk show 0 minutes used for October). Prod has not rolled yet and its counters match the ledgers (read-only check, 18 Oct 09:55 EAT); the first prod roll is 1 Nov 00:05 EAT, so this fix should be live before then.
 - **Staging data:** two "Jirani Cleaning Services" tenants (`78386574` has the line, `da25c497` does not); placeholder tenants without a line (prod "Grok Test", two staging QA tenants). Clean up or keep: Alvin to decide (*per team notes*).
 
 *Carried from 14 Oct, not re-verified on 18 Oct. Lane owners: confirm or delete.*
