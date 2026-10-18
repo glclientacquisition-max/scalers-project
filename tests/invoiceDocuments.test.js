@@ -1,14 +1,13 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const {
-  EXAMPLE_COMPANY,
-  OWNER_SUPPLIED_DETAILS,
   invoiceModel,
   renderInvoiceHtml,
   renderReceiptHtml,
 } = require("../dashboard/src/lib/invoicePay/documents");
+const { letterheadFromCompanyRow, letterheadFromInvoice, letterheadForInvoice } = require("../dashboard/src/lib/invoicePay/company");
 const { renderInvoicePdf, renderReceiptPdf } = require("../dashboard/src/lib/invoicePay/pdf");
-const { invoiceDocumentFor, shapeBillingHistory } = require("../dashboard/src/lib/invoicePay/history");
+const { invoiceDocumentFor, receiptDocumentFor, shapeBillingHistory } = require("../dashboard/src/lib/invoicePay/history");
 const { openInvoice, paidInvoice, receiptDoc, splitInvoice } = require("../dashboard/src/lib/invoicePay/samples");
 const {
   issuedNotice,
@@ -23,10 +22,21 @@ function sampleDocs() {
 }
 
 describe("invoice documents", () => {
-  it("shows the example company, the locked prices, and no VAT", () => {
+  it("shows the confirmed letterhead, the locked prices, and no VAT", () => {
     const { invoice, receipt } = sampleDocs();
-    assert.equal(invoice.company.address, EXAMPLE_COMPANY.address);
-    assert.match(invoice.company.kraPin, /^example/);
+    assert.equal(invoice.company.legalName, "Scalers Ventures");
+    assert.equal(invoice.company.phone, "+254119774470");
+    assert.equal(invoice.company.email, "support@scalers.co.ke");
+    assert.equal(invoice.company.address, "");
+    assert.equal(invoice.company.city, "");
+    assert.equal(invoice.company.kraPin, "");
+    assert.deepEqual(invoice.from, [
+      "Scalers Ventures",
+      "Business Assistant",
+      "+254119774470",
+      "support@scalers.co.ke",
+    ]);
+    assert.equal(invoice.footerContact, "support@scalers.co.ke · +254119774470");
     assert.equal(invoice.statusLabel, "Open");
     assert.equal(invoice.lines.length, 5);
     assert.equal(invoice.lines[0].label, "Growth plan, monthly (Business Assistant)");
@@ -44,23 +54,28 @@ describe("invoice documents", () => {
     assert.equal(invoice.partLabel, "");
     assert.match(invoice.payUrl, /\/pay\/example-token$/);
     const html = renderInvoiceHtml(invoice).replace(/src="data:image[^"]*"/, 'src=""');
-    const receiptHtml = renderReceiptHtml(receipt);
+    const receiptHtml = renderReceiptHtml(receipt).replace(/src="data:image[^"]*"/, 'src=""');
+    const fromBlock = html.slice(html.indexOf("<h2>From</h2>"), html.indexOf("<h2>Bill to</h2>"));
     assert.match(html, /<h1>Invoice<\/h1>/);
     assert.match(html, /class="pill">Open</);
-    assert.match(html, /<h2>From<\/h2>[\s\S]*example address/);
+    assert.match(fromBlock, /Scalers Ventures/);
+    assert.match(fromBlock, /\+254119774470/);
+    assert.match(fromBlock, /support@scalers\.co\.ke/);
+    assert.doesNotMatch(fromBlock, /example|KRA PIN|address|city/i);
     assert.match(html, /<h2>Bill to<\/h2>/);
     assert.match(
       html,
       /Unit price[\s\S]*Growth plan, monthly \(Business Assistant\)[\s\S]*1 Oct 2026 to 1 Nov 2026[\s\S]*Amount due[\s\S]*Pay KSh 20,000[\s\S]*Page 1 of 1/
     );
-    assert.match(html, /example KRA PIN/);
+    assert.match(html, /support@scalers\.co\.ke/);
     assert.match(html, /Pay with M-Pesa/);
     assert.doesNotMatch(html, /VAT/);
     assert.doesNotMatch(receiptHtml, /VAT/);
     assert.match(receiptHtml, /Paid KSh 20,000 on 18 Oct 2026/);
     assert.match(receiptHtml, /example-bachs-ref/);
     assert.match(receiptHtml, /Extra seats/);
-    assert.ok(OWNER_SUPPLIED_DETAILS.some((line) => /KRA PIN/.test(line)));
+    assert.match(receiptHtml, /Scalers Ventures/);
+    assert.doesNotMatch(receiptHtml, /example address|example city|example KRA PIN/);
     const pdf = renderInvoicePdf(invoice);
     const receiptPdf = renderReceiptPdf(receipt);
     const raw = pdf.toString("latin1");
@@ -93,6 +108,103 @@ describe("invoice documents", () => {
     assert.equal(split.partLabel, "Part 1 of 2");
     assert.match(renderInvoiceHtml(split), /Part 1 of 2/);
     assert.match(renderInvoicePdf(split).toString("latin1"), /Part 1 of 2/);
+  });
+
+  it("omits a blank address and KRA PIN, and prints them once they are set", () => {
+    const shown = invoiceModel({
+      now: "2026-10-18T08:00:00Z",
+      company: {
+        legalName: "Scalers Ventures",
+        address: "Westlands",
+        city: "Nairobi",
+        kraPin: "A123456789B",
+        phone: "+254119774470",
+        email: "support@scalers.co.ke",
+      },
+      invoice: { number: "SCL-2026-000003", status: "open", totalKes: "10", subtotalKes: "10", amountPaidKes: "0" },
+    });
+    assert.deepEqual(shown.from, [
+      "Scalers Ventures",
+      "Business Assistant",
+      "Westlands",
+      "Nairobi",
+      "A123456789B",
+      "+254119774470",
+      "support@scalers.co.ke",
+    ]);
+    const html = renderInvoiceHtml(shown);
+    assert.match(html, /Westlands/);
+    assert.match(html, /A123456789B/);
+    assert.doesNotMatch(html, /KRA PIN|example address/);
+  });
+
+  it("renders an issued invoice from its snapshot and leaves a draft to the live row", async () => {
+    const issued = invoiceDocumentFor(
+      {
+        invoice_number: "SCL-2026-000004",
+        status: "open",
+        subtotal_kes: "10",
+        total_kes: "10",
+        amount_paid_kes: "0",
+        issuer_legal_name: "Scalers Ventures",
+        issuer_product: "Business Assistant",
+        issuer_phone: "+254119774470",
+        issuer_email: "support@scalers.co.ke",
+        issuer_address: null,
+        issuer_kra_pin: null,
+      },
+      [],
+      { businessName: "example business" },
+      ""
+    );
+    assert.equal(issued.company.legalName, "Scalers Ventures");
+    assert.equal(issued.company.address, "");
+    assert.equal(issued.company.kraPin, "");
+    const receipt = receiptDocumentFor(
+      {
+        receipt_number: "RCT-2026-000004",
+        amount_kes: "10",
+        method: "M-Pesa",
+        provider_ref: "ref",
+        paid_at: "2026-10-18T12:00:00Z",
+      },
+      { businessName: "example business" },
+      {
+        invoice_number: "SCL-2026-000004",
+        issuer_legal_name: "Old Letterhead",
+        issuer_phone: "+254119774470",
+        issuer_email: "support@scalers.co.ke",
+      },
+      []
+    );
+    assert.equal(receipt.company.legalName, "Old Letterhead");
+    const live = {
+      legal_name: "Scalers Ventures",
+      product: "Business Assistant",
+      phone: "+254119774470",
+      email: "support@scalers.co.ke",
+      address: null,
+      city: "  ",
+      kra_pin: "",
+    };
+    assert.equal(letterheadFromInvoice({ status: "draft" }), null);
+    assert.equal(letterheadFromCompanyRow(live).city, null);
+    assert.equal(letterheadFromCompanyRow(live).kraPin, null);
+    const admin = {
+      from() {
+        return {
+          select() {
+            return { eq() { return { maybeSingle: async () => ({ data: live }) }; } };
+          },
+        };
+      },
+    };
+    const draft = await letterheadForInvoice(admin, { status: "draft", issuer_legal_name: null });
+    assert.equal(draft.legalName, "Scalers Ventures");
+    assert.equal(draft.address, null);
+    const kept = await letterheadForInvoice(admin, { issuer_legal_name: "Old Letterhead", issuer_phone: "+254700000000" });
+    assert.equal(kept.legalName, "Old Letterhead");
+    assert.equal(kept.phone, "+254700000000");
   });
 
   it("derives Overdue from an open invoice past its due date", () => {

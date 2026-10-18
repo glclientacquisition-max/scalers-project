@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- node:test loads this file with require() */
 const { invoiceModel, receiptModel } = require("./documents");
+const { letterheadFromInvoice } = require("./company");
 const { formatKsh, toCents } = require("./money");
 
 function ksh(amount) {
@@ -72,7 +73,7 @@ function documentLines(lines) {
   }));
 }
 
-function invoiceDocumentFor(row, lines, billTo, payUrl) {
+function invoiceDocumentFor(row, lines, billTo, payUrl, company) {
   return invoiceModel({
     invoice: {
       number: row.invoice_number,
@@ -89,10 +90,11 @@ function invoiceDocumentFor(row, lines, billTo, payUrl) {
     lines: documentLines(lines),
     billTo,
     payUrl,
+    company: company || letterheadFromInvoice(row) || undefined,
   });
 }
 
-function receiptDocumentFor(row, billTo, invoice, lines) {
+function receiptDocumentFor(row, billTo, invoice, lines, company) {
   const source = invoice && typeof invoice === "object" ? invoice : { invoice_number: invoice || "" };
   return receiptModel({
     receipt: {
@@ -112,6 +114,7 @@ function receiptDocumentFor(row, billTo, invoice, lines) {
     },
     lines: documentLines(lines),
     billTo,
+    company: company || letterheadFromInvoice(source) || undefined,
   });
 }
 

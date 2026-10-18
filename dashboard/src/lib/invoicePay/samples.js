@@ -5,10 +5,18 @@ const { invoiceModel, receiptModel } = require("./documents");
  * Sample documents only. These are the prices the owner locked for the examples:
  * Growth monthly KSh 18,000, extra seats KSh 500, inbound KSh 25 a minute,
  * message credits KSh 1. The package catalogue is unchanged.
- * Credits applied, proration, the bill-to, and the company address stay example.
+ * Credits applied, proration, and the bill-to stay example.
+ * The letterhead is the billing_company seed. Address, city, and KRA PIN are unset.
  */
 const NOW = "2026-10-18T08:00:00Z";
 const PAY_URL = "https://app.scalers.co.ke/pay/example-token";
+
+const company = {
+  legalName: "Scalers Ventures",
+  product: "Business Assistant",
+  phone: "+254119774470",
+  email: "support@scalers.co.ke",
+};
 
 const billTo = {
   businessName: "example business",
@@ -43,7 +51,7 @@ const openInvoiceRow = {
 };
 
 function openInvoice() {
-  return invoiceModel({ now: NOW, payUrl: PAY_URL, billTo, lines: openLines, invoice: openInvoiceRow });
+  return invoiceModel({ now: NOW, payUrl: PAY_URL, billTo, company, lines: openLines, invoice: openInvoiceRow });
 }
 
 function paidInvoice() {
@@ -51,6 +59,7 @@ function paidInvoice() {
     now: NOW,
     payUrl: PAY_URL,
     billTo,
+    company,
     lines: openLines,
     invoice: { ...openInvoiceRow, status: "paid", amountPaidKes: "20000.00" },
   });
@@ -59,6 +68,7 @@ function paidInvoice() {
 function receiptDoc() {
   return receiptModel({
     billTo,
+    company,
     lines: openLines,
     invoice: {
       ...period,
@@ -82,6 +92,7 @@ function splitInvoice() {
     now: NOW,
     payUrl: PAY_URL,
     billTo,
+    company,
     lines: [
       { kind: "plan", description: "Growth plan, monthly (Business Assistant)", quantity: "1", unitAmountKes: "18000.00", amountKes: "18000.00" },
       { kind: "extra_minutes", description: "Extra minutes, inbound", quantity: "5600", unitAmountKes: "25.00", amountKes: "140000.00" },

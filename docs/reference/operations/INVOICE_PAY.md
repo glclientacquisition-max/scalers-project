@@ -7,13 +7,13 @@ last_reviewed: 2026-10-18
 
 How Desk pays an open invoice, and how the owner reads invoices and receipts. The pay page needs no login. The token is the capability. A business with `billing_enforcement` off (beta) gets no link.
 
-SQL is [`docs/supabase/invoice_pay.sql`](../../supabase/invoice_pay.sql) then [`docs/supabase/invoice_documents.sql`](../../supabase/invoice_documents.sql). Both are applied on staging (`sgcdncjxauhsbunobmob`) as of 18 Oct. They are not on production. Production waits for a backup and Alvin's GO.
+SQL is [`docs/supabase/invoice_pay.sql`](../../supabase/invoice_pay.sql), then [`docs/supabase/invoice_documents.sql`](../../supabase/invoice_documents.sql), then [`docs/supabase/billing_company.sql`](../../supabase/billing_company.sql). Applied on staging (`sgcdncjxauhsbunobmob`) as of 18 Oct. Not on production. Production waits for a backup and Alvin's GO.
 
 VAT and KRA eTIMS are off. `invoices.tax_kes` stays null. The page, the invoice, and the receipt do not show a tax line.
 
 ## Numbers
 
-`finalize_invoice` assigns `SCL-YYYY-000001` for the Africa/Nairobi year. The counter moves only when a draft is issued. Drafts stay unnumbered. A recorded payment (`matched`, `partial`, or `over`) issues `RCT-YYYY-000001` once and queues a payment-received notice. An issue payment does not get a receipt.
+`finalize_invoice` assigns `SCL-YYYY-000001` for the Africa/Nairobi year and copies `billing_company` onto the invoice. The counter moves only when a draft is issued. Drafts stay unnumbered. A recorded payment (`matched`, `partial`, or `over`) issues `RCT-YYYY-000001` once and queues a payment-received notice. An issue payment does not get a receipt.
 
 ## Token
 
@@ -106,16 +106,37 @@ An issued invoice has an HTML view and a PDF. Both are A4. The header has the Sc
 
 A receipt uses the same frame. It leads with Paid KSh X on the payment date, then the method (M-Pesa), the reference, the invoice it settles, and the same line items.
 
-Sample renders use the prices the owner locked for those examples: Growth monthly KSh 18,000, extra seats KSh 500, inbound minutes KSh 25, message credits KSh 1. Proration, credits applied, the bill-to, and the company address on the samples stay example. The package catalogue is unchanged. The sample pay link is `https://app.scalers.co.ke/pay/example-token`.
+Sample renders use the prices the owner locked for those examples: Growth monthly KSh 18,000, extra seats KSh 500, inbound minutes KSh 25, message credits KSh 1. Proration, credits applied, and the bill-to on the samples stay example. The package catalogue is unchanged. The sample pay link is `https://app.scalers.co.ke/pay/example-token`.
 
-Company lines that are not in the repo are labelled example: address, city, KRA PIN, phone, and billing email. The owner supplies these before a customer invoice:
+## Letterhead
 
-- Legal company name, if it is not Scalers
-- Physical address
-- City
-- KRA PIN
-- Phone
-- Billing email
+One row, `billing_company` where `id = 1`, is the only place the letterhead is edited. It is not an environment variable. `finalize_invoice` is SQL and cannot see Vercel env, and a later edit must not rewrite invoices that are already issued.
+
+Confirmed values, seeded by `billing_company.sql` (a re-run does not overwrite a later edit):
+
+| Field | Value |
+| --- | --- |
+| Legal name | Scalers Ventures |
+| Product | Business Assistant |
+| Phone | +254119774470 |
+| Email | support@scalers.co.ke |
+| Address | unset |
+| City | unset |
+| KRA PIN | unset |
+
+Address, city, and KRA PIN are omitted from the invoice and the receipt while they are blank. There is no placeholder and no empty label. Once a value is stored, the next issued invoice prints it as its own line. The order is legal name, product, address, city, KRA PIN, phone, email. The footer is the email and the phone.
+
+Issuing copies the row onto `invoices.issuer_legal_name`, `issuer_product`, `issuer_phone`, `issuer_email`, `issuer_address`, `issuer_city`, and `issuer_kra_pin`. The PDF and the HTML render that snapshot. A draft has those columns null and shows the current row, which is what will be copied. A receipt uses the same snapshot as its invoice.
+
+Change it in the SQL editor. No code change. The next issued invoice picks it up. Invoices already issued keep the old snapshot.
+
+```sql
+update public.billing_company
+set address = '...', city = '...', kra_pin = '...', updated_at = now()
+where id = 1;
+```
+
+`legal_name`, `product`, `phone`, and `email` use the same update. The table is service role only. Owners read the snapshot on their own invoices.
 
 ## Notices
 
@@ -152,7 +173,7 @@ Desk builds the Billing screen. This API does not.
 4. The webhook signing secret as `BACHS_WEBHOOK_SECRET`.
 5. The webhook URL above, for the events listed.
 6. `BACHS_MODE=sandbox` on Vercel Preview. Never `live` from this draft.
-7. The company details listed under Documents.
+7. Address, city, and KRA PIN, when those exist. Legal name, phone, and billing email are already on `billing_company`. See Letterhead. Update that row. Do not change issued invoices by hand.
 
 ## Desk later
 

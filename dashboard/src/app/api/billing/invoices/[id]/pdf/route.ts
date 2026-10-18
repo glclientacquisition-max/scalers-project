@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { billToFromTenant, requireBillingRead } from "@/lib/invoicePay/billingRead";
+import { ISSUER_COLUMNS, letterheadForInvoice } from "@/lib/invoicePay/company";
 import { invoiceDocumentFor } from "@/lib/invoicePay/history";
 import { renderInvoicePdf } from "@/lib/invoicePay/pdf";
 
@@ -11,7 +12,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const invoice = await admin
     .from("invoices")
     .select(
-      "id, invoice_number, status, issued_at, due_at, period_start, period_end, subtotal_kes, credits_applied_kes, total_kes, amount_paid_kes"
+      `id, invoice_number, status, issued_at, due_at, period_start, period_end, subtotal_kes, credits_applied_kes, total_kes, amount_paid_kes, ${ISSUER_COLUMNS}`
     )
     .eq("tenant_id", tenant.id)
     .eq("id", id)
@@ -25,7 +26,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     .eq("invoice_id", id)
     .order("sort_order", { ascending: true });
   if (lines.error) return NextResponse.json({ error: "Could not load this invoice." }, { status: 503 });
-  const doc = invoiceDocumentFor(invoice.data, lines.data || [], billToFromTenant(tenant), "");
+  const company = await letterheadForInvoice(admin, invoice.data);
+  const doc = invoiceDocumentFor(invoice.data, lines.data || [], billToFromTenant(tenant), "", company);
   const pdf = renderInvoicePdf(doc);
   const name = invoice.data.invoice_number || "invoice";
   return new NextResponse(new Uint8Array(pdf), {

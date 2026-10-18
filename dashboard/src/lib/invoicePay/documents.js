@@ -2,29 +2,6 @@
 const { formatKsh, toCents, splitKes, nextPart } = require("./money");
 const { dataUri } = require("./wordmark");
 
-/**
- * Real company details are not in the repo. Every stand-in starts with "example".
- * The owner supplies the real values before an invoice goes to a customer.
- */
-const EXAMPLE_COMPANY = {
-  legalName: "Scalers",
-  product: "Business Assistant",
-  address: "example address",
-  city: "example city",
-  kraPin: "example KRA PIN",
-  phone: "example phone",
-  email: "example email",
-};
-
-const OWNER_SUPPLIED_DETAILS = [
-  "Legal company name, if it is not Scalers",
-  "Physical address",
-  "City",
-  "KRA PIN",
-  "Phone",
-  "Billing email",
-];
-
 const KIND_LABEL = {
   plan: "Plan",
   extra_minutes: "Extra minutes",
@@ -96,10 +73,35 @@ function payOffer(totalKes, paidKes) {
   };
 }
 
+function line(value) {
+  return String(value ?? "").trim();
+}
+
+function companyOf(company) {
+  const source = company || {};
+  return {
+    legalName: line(source.legalName),
+    product: line(source.product),
+    address: line(source.address),
+    city: line(source.city),
+    kraPin: line(source.kraPin),
+    phone: line(source.phone),
+    email: line(source.email),
+  };
+}
+
 function partyLines(company) {
-  return [company.legalName, company.product, company.address, company.city, company.kraPin, company.phone, company.email].filter(
-    Boolean
-  );
+  const legalName = line(company.legalName);
+  const product = line(company.product) || (legalName ? "Business Assistant" : "");
+  return [
+    legalName,
+    product,
+    line(company.address),
+    line(company.city),
+    line(company.kraPin),
+    line(company.phone),
+    line(company.email),
+  ].filter(Boolean);
 }
 
 function billLines(billTo) {
@@ -130,7 +132,7 @@ function periodOf(invoice) {
  * @param {object} input
  */
 function invoiceModel(input) {
-  const company = { ...EXAMPLE_COMPANY, ...(input.company || {}) };
+  const company = companyOf(input.company);
   const invoice = input.invoice || {};
   const period = periodOf(invoice);
   const credits = invoice.creditsAppliedKes;
@@ -170,7 +172,7 @@ function invoiceModel(input) {
 }
 
 function receiptModel(input) {
-  const company = { ...EXAMPLE_COMPANY, ...(input.company || {}) };
+  const company = companyOf(input.company);
   const receipt = input.receipt || {};
   const invoice = input.invoice || {};
   const amount = money(receipt.amountKes || "0");
@@ -387,8 +389,6 @@ function renderReceiptHtml(model) {
 }
 
 module.exports = {
-  EXAMPLE_COMPANY,
-  OWNER_SUPPLIED_DETAILS,
   invoiceModel,
   receiptModel,
   renderInvoiceHtml,

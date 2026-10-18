@@ -25,6 +25,8 @@ describe("invoice pay SQL", () => {
     await db.exec(read("docs/supabase/invoice_pay.sql"));
     await db.exec(read("docs/supabase/invoice_documents.sql"));
     await db.exec(read("docs/supabase/invoice_documents.sql"));
+    await db.exec(read("docs/supabase/billing_company.sql"));
+    await db.exec(read("docs/supabase/billing_company.sql"));
   });
 
   it("splits the same way as the page", async () => {
@@ -214,16 +216,51 @@ describe("invoice pay SQL", () => {
     assert.equal(first.rows[0].invoice_number, null);
     assert.equal(first.rows[0].status, "draft");
     assert.equal(first.rows[0].tax_kes, null);
-    const issued = await q("select invoice_number, status from public.finalize_invoice($1)", [first.rows[0].id]);
+    const issued = await q(
+      `select invoice_number, status, issuer_legal_name, issuer_product, issuer_phone, issuer_email,
+              issuer_address, issuer_city, issuer_kra_pin
+       from public.finalize_invoice($1)`,
+      [first.rows[0].id]
+    );
     const year = await q("select extract(year from (now() at time zone 'Africa/Nairobi'))::int as y");
     assert.match(issued.rows[0].invoice_number, new RegExp(`^SCL-${year.rows[0].y}-\\d{6}$`));
     assert.equal(issued.rows[0].status, "open");
+    assert.equal(issued.rows[0].issuer_legal_name, "Scalers Ventures");
+    assert.equal(issued.rows[0].issuer_product, "Business Assistant");
+    assert.equal(issued.rows[0].issuer_phone, "+254119774470");
+    assert.equal(issued.rows[0].issuer_email, "support@scalers.co.ke");
+    assert.equal(issued.rows[0].issuer_address, null);
+    assert.equal(issued.rows[0].issuer_city, null);
+    assert.equal(issued.rows[0].issuer_kra_pin, null);
+    await q(
+      `update public.billing_company
+       set legal_name = 'Scalers Ventures Ltd', phone = '  +254700000000  ',
+           address = 'Westlands', city = 'Nairobi', kra_pin = 'A123456789B', updated_at = now()
+       where id = 1`
+    );
     const second = await q(
       `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 1000, 1000) returning id, invoice_number`,
       [tenant]
     );
     assert.equal(second.rows[0].invoice_number, null);
-    const issued2 = await q("select invoice_number from public.finalize_invoice($1)", [second.rows[0].id]);
+    const issued2 = await q(
+      `select invoice_number, issuer_legal_name, issuer_phone, issuer_address, issuer_city, issuer_kra_pin
+       from public.finalize_invoice($1)`,
+      [second.rows[0].id]
+    );
+    assert.equal(issued2.rows[0].issuer_legal_name, "Scalers Ventures Ltd");
+    assert.equal(issued2.rows[0].issuer_phone, "+254700000000");
+    assert.equal(issued2.rows[0].issuer_address, "Westlands");
+    assert.equal(issued2.rows[0].issuer_city, "Nairobi");
+    assert.equal(issued2.rows[0].issuer_kra_pin, "A123456789B");
+    const firstStill = await q(
+      `select issuer_legal_name, issuer_phone, issuer_address, issuer_kra_pin from public.invoices where id = $1`,
+      [first.rows[0].id]
+    );
+    assert.equal(firstStill.rows[0].issuer_legal_name, "Scalers Ventures");
+    assert.equal(firstStill.rows[0].issuer_phone, "+254119774470");
+    assert.equal(firstStill.rows[0].issuer_address, null);
+    assert.equal(firstStill.rows[0].issuer_kra_pin, null);
     const n1 = Number(issued.rows[0].invoice_number.slice(-6));
     const n2 = Number(issued2.rows[0].invoice_number.slice(-6));
     assert.equal(n2, n1 + 1);
@@ -238,6 +275,27 @@ describe("invoice pay SQL", () => {
     assert.match(notice.rows[0].body, /Business Assistant/);
     assert.match(notice.rows[0].body, /KSh/);
     assert.doesNotMatch(notice.rows[0].body, /VAT/);
+  });
+
+  it("does not issue or burn a number when the company row is missing", async () => {
+    const tenant = "66666666-6666-4666-8666-666666666666";
+    const before = await q("select coalesce(max(last_number), 0)::int as n from public.billing_invoice_counters");
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 10, 10) returning id`,
+      [tenant]
+    );
+    await q("delete from public.billing_company where id = 1");
+    await assert.rejects(() => q("select public.finalize_invoice($1)", [draft.rows[0].id]), /billing company is not set/);
+    const still = await q("select status, invoice_number from public.invoices where id = $1", [draft.rows[0].id]);
+    assert.equal(still.rows[0].status, "draft");
+    assert.equal(still.rows[0].invoice_number, null);
+    const after = await q("select coalesce(max(last_number), 0)::int as n from public.billing_invoice_counters");
+    assert.equal(Number(after.rows[0].n), Number(before.rows[0].n));
+    await q(
+      `insert into public.billing_company (id, legal_name, product, phone, email)
+       values (1, 'Scalers Ventures', 'Business Assistant', '+254119774470', 'support@scalers.co.ke')
+       on conflict (id) do nothing`
+    );
   });
 
   it("issues a receipt when a payment is recorded and flags an overpaid webhook", async () => {
