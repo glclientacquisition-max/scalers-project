@@ -5,7 +5,7 @@ import { memberDenied } from "@/lib/requireMember";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { bustTenantCache } from "@/lib/tenantCache";
-import { isMissingCallSetup } from "@/lib/callSetupServer";
+import { isMissingCallSetup, loadCallSetupState } from "@/lib/callSetupServer";
 import { mergeCallSetup, parseCallSetup, type CallSetup } from "@/lib/callSetupStore";
 
 export type CallSetupSaveResult =
@@ -65,4 +65,25 @@ export async function saveCallSetupAction(
   bustTenantCache(tenant.id);
   revalidatePath("/home");
   return { ok: true, setup: parseCallSetup(saved ?? next) };
+}
+
+export type CallSetupTestCheck =
+  | { ok: true; matchedAt: string | null; setup: CallSetup | null }
+  | { ok: false; error: string };
+
+/**
+ * Poll while the test window is open: did a call from the test phone come in?
+ * On a match, saves tested_via "auto" (save_call_setup checks the call exists).
+ */
+export async function checkCallSetupTestAction(tenantId: string): Promise<CallSetupTestCheck> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return { ok: false, error: denied.error };
+  const tenant = await getCurrentTenant();
+  if (!tenant || tenant.id !== tenantId) return { ok: false, error: "That business isn't open. Reload the page." };
+  const state = await loadCallSetupState(tenant.id);
+  if (!state.supported || !state.setup) return { ok: true, matchedAt: null, setup: state.setup };
+  const matchedAt = state.activity?.testMatchAt ?? null;
+  if (!matchedAt || state.setup.tested_at) return { ok: true, matchedAt, setup: state.setup };
+  const saved = await saveCallSetupAction(tenant.id, { tested_at: matchedAt, tested_via: "auto" });
+  return { ok: true, matchedAt, setup: saved.ok ? saved.setup : state.setup };
 }

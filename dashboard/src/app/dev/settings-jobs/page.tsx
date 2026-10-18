@@ -90,15 +90,16 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
     { id: "dev-voice-calm", description: "Calm and slow" },
   ];
 
-  // Calls & forwarding (?tab=calls): forwarding on Airtel, tested by the owner 2 days ago.
+  // Calls & forwarding (?tab=calls): forwarding on Airtel, proven by a test call 2 days ago.
   const now = Date.now();
   const callSetup = {
     ...emptyCallSetup(),
     option: "forward" as const,
     network: "airtel" as const,
     opened_at: new Date(now - 3 * 86_400_000).toISOString(),
-    tested_at: new Date(now - 2 * 86_400_000).toISOString(),
-    tested_via: "manual" as const,
+    // "Forwarding works": the test call from a teammate's phone came in 2 days ago.
+    test_from: "+254722000111",
+    test_started_at: new Date(now - 2 * 86_400_000 - 120_000).toISOString(),
   };
   const callsSlot =
     tab === "calls" ? (
@@ -111,7 +112,11 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
         status={resolveCallSetupStatus({
           numberReady: true,
           setup: callSetup,
-          activity: { firstCallAfterOpenAt: null, lastCallAt: new Date(now - 86_400_000).toISOString() },
+          activity: {
+            testMatchAt: new Date(now - 2 * 86_400_000).toISOString(),
+            firstCallAfterOpenAt: new Date(now - 2 * 86_400_000).toISOString(),
+            lastCallAt: new Date(now - 86_400_000).toISOString(),
+          },
           now,
         })}
       />

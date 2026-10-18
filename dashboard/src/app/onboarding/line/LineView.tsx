@@ -13,6 +13,7 @@ export function LineView({
   raw,
   initialOption = null,
   server = null,
+  testFromSuggestion = null,
 }: {
   businessName: string;
   tenantId: string;
@@ -21,6 +22,8 @@ export function LineView({
   initialOption?: CallSetupOption | null;
   /** Account call setup (tenants.call_setup); null in the dev fixture. */
   server?: { supported: boolean; setup: CallSetup | null } | null;
+  /** Teammate's number (+254) to pre-fill the test phone. */
+  testFromSuggestion?: string | null;
 }) {
   const pending = numberPending(raw);
   const pretty = formatKenyaNumber(raw);
@@ -57,7 +60,7 @@ export function LineView({
           </section>
         )}
 
-        {local ? <CallSetupStep tenantId={tenantId} number={local} pretty={pretty} initialOption={initialOption} server={server} /> : null}
+        {local ? <CallSetupStep tenantId={tenantId} number={local} pretty={pretty} initialOption={initialOption} server={server} testFromSuggestion={testFromSuggestion} /> : null}
 
         <ButtonLink href="/home" prefetch variant={local ? "tonal" : "primary"} size="lg" block className="mt-8">
           Go to Overview

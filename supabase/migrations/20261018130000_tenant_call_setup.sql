@@ -3,7 +3,10 @@
 --   { option: 'main_number'|'forward'|null, network: 'safaricom'|'airtel'|'telkom'|null,
 --     phone: 'android'|'iphone'|null, choices: ['all'|'no_answer'|'busy'|'off'],
 --     ring_seconds: 15|20|30, tested_at, tested_via: 'manual'|'auto'|null, opened_at,
+--     test_from: '+2547XXXXXXXX'|'+2541XXXXXXXX'|null, test_started_at,
 --     nudge_dismissed_at, auto_seen_at, updated_at }   (times are ISO 8601 strings)
+-- tested_via 'auto' = a call from test_from reached the assistant within 30 minutes of
+-- test_started_at. save_call_setup checks that call exists before it accepts 'auto'.
 -- Owners and admins write it only through save_call_setup (membership checked here);
 -- no column UPDATE grant for authenticated. Members read it with the tenants row (RLS).
 -- ADDITIVE: one nullable column, a check, two functions. No data changes. Safe to re-run.
@@ -30,8 +33,10 @@ returns boolean language sql immutable set search_path = public as $$
       ) c where c not in ('all', 'no_answer', 'busy', 'off'))
     and coalesce(v->>'ring_seconds', '20') in ('15', '20', '30')
     and coalesce(v->>'tested_via', 'manual') in ('manual', 'auto')
+    and coalesce(v->>'test_from', '+254700000000') ~ '^\+254[17]\d{8}$'
+    and (coalesce(v->>'tested_via', '') <> 'auto' or (v->>'test_from' is not null and v->>'test_started_at' is not null))
     and not exists (
-      select 1 from unnest(array['tested_at', 'opened_at', 'nudge_dismissed_at', 'auto_seen_at', 'updated_at']) k
+      select 1 from unnest(array['tested_at', 'opened_at', 'test_started_at', 'nudge_dismissed_at', 'auto_seen_at', 'updated_at']) k
       where v->>k is not null and (v->>k) !~ '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}')
   );
 $$;
@@ -45,6 +50,7 @@ create or replace function public.save_call_setup(p_tenant uuid, p_next jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v jsonb;
+  prev jsonb;
 begin
   if auth.uid() is null or not public.member_can_admin(p_tenant) then
     raise exception 'not allowed for this business' using errcode = '42501';
@@ -55,6 +61,24 @@ begin
   v := p_next || jsonb_build_object('updated_at', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'));
   if not public.call_setup_valid(v) then
     raise exception 'call setup is not valid' using errcode = '22023';
+  end if;
+  -- A new automatic test must point at a real call from the test phone in its window.
+  select call_setup into prev from public.tenants where id = p_tenant;
+  if v->>'tested_via' = 'auto'
+     and (prev->>'tested_via' is distinct from 'auto' or prev->>'tested_at' is distinct from v->>'tested_at') then
+    if not exists (
+      select 1
+      from public.calls c
+      cross join lateral (select regexp_replace(coalesce(c.caller_number, ''), '\D', '', 'g') as d) n
+      where c.tenant_id = p_tenant
+        -- 07.., 7.., 254.. and +254.. caller forms all compare as +254..
+        and '+' || case when n.d ~ '^254' then n.d when n.d ~ '^0' then '254' || substr(n.d, 2) else '254' || n.d end
+            = v->>'test_from'
+        and c.created_at >= (v->>'test_started_at')::timestamptz
+        and c.created_at <= (v->>'test_started_at')::timestamptz + interval '30 minutes'
+    ) then
+      raise exception 'no test call from that phone yet' using errcode = '22023';
+    end if;
   end if;
   update public.tenants set call_setup = v where id = p_tenant;
   if not found then

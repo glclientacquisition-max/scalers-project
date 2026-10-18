@@ -11,6 +11,7 @@ import {
   FORWARD_CHOICES,
   NETWORKS,
   ringSeconds,
+  toKenyaMobileE164,
   type ForwardChoice,
   type NetworkId,
   type PhoneKind,
@@ -29,8 +30,12 @@ export type CallSetup = {
   /** ISO time setup was marked done (owner pressed "I tested it"). */
   tested_at: string | null;
   tested_via: CallSetupTestedVia | null;
-  /** First time the owner opened the step. Auto-detect counts calls after this. */
+  /** First time the owner opened the step. A call after this shows "Calls are reaching your assistant". */
   opened_at: string | null;
+  /** Phone the owner tests from (+254 E.164). Only its call, in the test window, proves forwarding. */
+  test_from: string | null;
+  /** When the owner pressed "Start test". The window is 30 minutes from here. */
+  test_started_at: string | null;
   /** "Check your call setup" note dismissed at. */
   nudge_dismissed_at: string | null;
   /** "Calls are coming through" note seen at. */
@@ -50,6 +55,8 @@ export function emptyCallSetup(): CallSetup {
     tested_at: null,
     tested_via: null,
     opened_at: null,
+    test_from: null,
+    test_started_at: null,
     nudge_dismissed_at: null,
     auto_seen_at: null,
     updated_at: null,
@@ -100,6 +107,8 @@ export function parseCallSetup(raw: unknown): CallSetup {
     // v1 values only knew the button.
     tested_via: tested ? via ?? "manual" : null,
     opened_at: isoOrNull(row.opened_at),
+    test_from: toKenyaMobileE164(row.test_from),
+    test_started_at: isoOrNull(row.test_started_at),
     nudge_dismissed_at: isoOrNull(row.nudge_dismissed_at),
     auto_seen_at: isoOrNull(row.auto_seen_at),
     updated_at: isoOrNull(row.updated_at),

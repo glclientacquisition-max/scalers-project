@@ -25,11 +25,6 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-/**
- * Settings > Calls & forwarding. Read-only summary of the account's call setup,
- * "Change setup" (opens the setup step) and the code that turns every forward off.
- * Before tenants.call_setup exists (`supported` false) it reads this browser's copy.
- */
 /** Short labels so the Copy and Dial row fits at 360. */
 const SHORT_LABEL: Record<ForwardChoice, string> = {
   all: "No answer, busy or phone off",
@@ -38,6 +33,11 @@ const SHORT_LABEL: Record<ForwardChoice, string> = {
   off: "When my phone is off",
 };
 
+/**
+ * Settings > Calls & forwarding. Read-only summary of the account's call setup,
+ * "Change setup" (opens the setup step) and the code that turns every forward off.
+ * Before tenants.call_setup exists (`supported` false) it reads this browser's copy.
+ */
 export function CallsForwardingPanel({
   tenantId,
   number,
@@ -52,7 +52,7 @@ export function CallsForwardingPanel({
   pretty: string;
   supported: boolean;
   setup: CallSetup | null;
-  status: Pick<CallSetupStatus, "tested" | "testedVia" | "testedAt">;
+  status: Pick<CallSetupStatus, "tested" | "testedVia" | "testedAt" | "testFrom" | "reaching" | "option">;
 }) {
   const [setup, setSetup] = useState<CallSetup | null>(serverSetup);
   const [phone, setPhone] = useState<PhoneKind | null>(null);
@@ -64,9 +64,9 @@ export function CallsForwardingPanel({
   }, [supported, tenantId, serverSetup]);
 
   const localTested = !supported && setup?.tested_at
-    ? { tested: true, testedVia: "manual" as const, testedAt: setup.tested_at }
+    ? { tested: true, testedVia: "manual" as const, testedAt: setup.tested_at, testFrom: null, reaching: false }
     : null;
-  const shownStatus = localTested ?? status;
+  const line = testedLine({ ...(localTested ?? status), option: setup?.option ?? status.option });
   const option = setup?.option ?? null;
   const ring = ringSeconds(setup?.ring_seconds);
   const choices = setup?.choices?.length ? setup.choices : ["all" as const];
@@ -96,7 +96,8 @@ export function CallsForwardingPanel({
             </>
           ) : null}
           <Row label="Status">
-            <span className={shownStatus.tested ? "text-ok" : "text-ink-2"}>{testedLine(shownStatus)}</span>
+            <span className={line.ok ? "text-ok" : "text-ink"}>{line.title}</span>
+            {line.detail ? <span className="block text-meta font-normal text-ink-2">{line.detail}</span> : null}
           </Row>
         </dl>
       </section>

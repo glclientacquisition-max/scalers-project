@@ -5,7 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Button, buttonClass } from "@/components/ui/Button";
 import { saveCallSetupAction } from "@/app/onboarding/line/callSetupActions";
 import { browserCallSetupStore, showFinishCallsCard } from "@/lib/callSetupStore";
-import { callSetupCardMode, shortDay, type CallSetupCardMode, type CallSetupStatus } from "@/lib/callSetupStatus";
+import { callSetupCardMode, shortDay, worksTitle, type CallSetupCardMode, type CallSetupStatus } from "@/lib/callSetupStatus";
 
 export const CALLS_SETTINGS_HREF = "/settings?tab=calls";
 
@@ -65,15 +65,34 @@ export function HomeCallSetupCard({
     );
   }
 
+  if (mode === "reaching") {
+    // A call came in, but not from the test phone: it may have been a direct call.
+    return (
+      <section aria-labelledby="calls-card" className={cardClass} data-home-call-setup="reaching">
+        <div className="min-w-0">
+          <h2 id="calls-card" className="text-body font-semibold text-ink">
+            Calls are reaching your assistant
+          </h2>
+          <p className="mt-0.5 text-meta text-ink-2">
+            {status?.option === "main_number" ? "To finish setup, run the test call." : "Forwarding isn't tested yet. Run the test call to finish."}
+          </p>
+        </div>
+        <Link href="/onboarding/line" className={buttonClass({ variant: "tonal", size: "md" })}>
+          Test
+        </Link>
+      </section>
+    );
+  }
+
   if (mode === "auto") {
     return (
       <section aria-labelledby="calls-card" className={cardClass} data-home-call-setup="auto">
         <div className="min-w-0">
           <h2 id="calls-card" className="text-body font-semibold text-ok">
-            Calls are reaching your assistant
+            {worksTitle(status?.option ?? null)}
           </h2>
           <p className="mt-0.5 text-meta text-ink-2">
-            Your first call after setup came in on {shortDay(status?.testedAt ?? null)}. Setup is done.
+            Your test call came in on {shortDay(status?.testedAt ?? null)}. Setup is done.
           </p>
         </div>
         <Button type="button" variant="ghost" size="md" disabled={pending} onClick={() => close("auto_seen_at")}>

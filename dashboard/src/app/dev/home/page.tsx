@@ -23,12 +23,19 @@ import type { TenantRow } from "@/lib/supabase";
 function devCallSetupFixture(state: string | undefined, now: number) {
   const ago = (days: number) => new Date(now - days * 86_400_000).toISOString();
   const base = { ...emptyCallSetup(), option: "forward" as const, network: "safaricom" as const };
-  if (state === "pending") return { setup: { ...base, opened_at: ago(0.05) }, activity: { firstCallAfterOpenAt: null, lastCallAt: null } };
-  if (state === "auto") return { setup: { ...base, opened_at: ago(2) }, activity: { firstCallAfterOpenAt: ago(1), lastCallAt: ago(1) } };
+  const none = { testMatchAt: null, firstCallAfterOpenAt: null, lastCallAt: null };
+  if (state === "pending") return { setup: { ...base, opened_at: ago(0.05) }, activity: none };
+  // A call came in, but not from the test phone: reaching, forwarding not proven.
+  if (state === "reaching") return { setup: { ...base, opened_at: ago(2) }, activity: { ...none, firstCallAfterOpenAt: ago(1), lastCallAt: ago(1) } };
+  if (state === "auto")
+    return {
+      setup: { ...base, opened_at: ago(2), test_from: "+254722000111", test_started_at: ago(1.01) },
+      activity: { testMatchAt: ago(1), firstCallAfterOpenAt: ago(1), lastCallAt: ago(1) },
+    };
   if (state === "nudge")
     return {
       setup: { ...base, opened_at: ago(12), tested_at: ago(10), tested_via: "manual" as const },
-      activity: { firstCallAfterOpenAt: null, lastCallAt: ago(9) },
+      activity: { ...none, lastCallAt: ago(9) },
     };
   return null;
 }

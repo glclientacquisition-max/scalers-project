@@ -39,6 +39,19 @@ export function toLocal07(raw: unknown): string | null {
   return null;
 }
 
+/** Kenyan mobile in any common form (07.., 01.., 7.., 254.., +254..) to +2547XXXXXXXX, else null. */
+export function toKenyaMobileE164(raw: unknown): string | null {
+  const d = String(raw ?? "").replace(/[\s\-().]/g, "");
+  const m = /^(?:\+?254|0)?([17]\d{8})$/.exec(d) ?? /^\+?2540([17]\d{8})$/.exec(d);
+  return m ? `+254${m[1]}` : null;
+}
+
+/** +254712345678 to "0712 345 678", how Kenyans read a number out. */
+export function kenyaMobileDisplay(e164: string | null | undefined): string {
+  const m = /^\+254(\d{3})(\d{3})(\d{3})$/.exec(String(e164 || ""));
+  return m ? `0${m[1]} ${m[2]} ${m[3]}` : String(e164 || "");
+}
+
 export function ringSeconds(value: unknown): RingSeconds {
   const n = Number(value);
   return (RING_OPTIONS as readonly number[]).includes(n) ? (n as RingSeconds) : DEFAULT_RING;
