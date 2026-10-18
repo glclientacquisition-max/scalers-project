@@ -263,6 +263,26 @@ export function structureImportedCatalogRow<T extends CatalogPriceRow>(
   } as T;
 }
 
+const IMPORT_PRICE_TYPE_LABELS: Record<PriceKind, string> = {
+  fixed: "Fixed",
+  from: "From",
+  range: "Range",
+  quote: "Quote",
+};
+
+/** Muted type chip text for import previews (Fixed, From, Range, Quote). */
+export function catalogImportPriceTypeLabel(row: CatalogPriceRow): string {
+  const hydrated = hydrateCatalogPriceFields(row);
+  let kind = pricingModeToKind(hydrated.pricing_mode ?? hydrated.price_mode);
+  if (!kind) {
+    const display = usesPriceAsDisplayColumn(hydrated)
+      ? String(hydrated.price ?? "").trim()
+      : String(hydrated.price_range ?? "").trim();
+    kind = parseCataloguePriceText(display).kind;
+  }
+  return IMPORT_PRICE_TYPE_LABELS[kind];
+}
+
 /** Preview line for import UIs; shows owner display text when present. */
 export function catalogImportPriceLabel(row: CatalogPriceRow): string {
   const hydrated = hydrateCatalogPriceFields(row);

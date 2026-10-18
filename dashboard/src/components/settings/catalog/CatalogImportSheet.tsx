@@ -6,7 +6,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Switch } from "@/components/ui/Switch";
 import type { ProductItem } from "@/lib/productCatalog";
 import type { ServiceItem } from "@/lib/servicesCatalog";
-import { catalogImportPriceLabel } from "@/lib/catalogPricingMode";
+import { CatalogImportPriceLine } from "@/components/settings/catalog/CatalogImportPriceLine";
 import type { CatalogSuggestMeta } from "@/lib/catalogSuggest";
 
 type PreviewRow = (ServiceItem | ProductItem) & CatalogSuggestMeta;
@@ -148,7 +148,7 @@ export function CatalogImportSheet({
                     </span>
                   ) : null}
                 </div>
-                <p className="truncate text-meta text-ink-2">{catalogImportPriceLabel(row)}</p>
+                <CatalogImportPriceLine row={row} />
               </li>
             ))}
             {previewRows.length > 8 ? (

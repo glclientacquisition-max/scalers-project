@@ -4,7 +4,7 @@ import { withRoleGate } from "@/components/DeskRole";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
-import { catalogImportPriceLabel } from "@/lib/catalogPricingMode";
+import { catalogImportPriceHintText } from "@/components/settings/catalog/CatalogImportPriceLine";
 import { productImportWarnings, type ProductItem } from "@/lib/productCatalog";
 import type { SocialHandles } from "@/lib/socialHandles";
 import { socialHandlesHaveContent } from "@/lib/socialHandles";
@@ -245,7 +245,7 @@ function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
                     p.name
                   )
                 }
-                hint={[catalogImportPriceLabel(p), p.category, p.in_stock ? `stock ${p.in_stock}` : ""]
+                hint={[catalogImportPriceHintText(p), p.category, p.in_stock ? `stock ${p.in_stock}` : ""]
                   .filter(Boolean)
                   .join(" · ")}
                 control="switch"

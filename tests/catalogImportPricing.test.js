@@ -15,6 +15,7 @@ const jiti = (jitiModule.createJiti || jitiModule)(__filename, {
 
 const {
   catalogImportPriceLabel,
+  catalogImportPriceTypeLabel,
   parseCatalogPricingMode,
   structureImportedCatalogRow,
 } = jiti(path.join(root, "dashboard/src/lib/catalogPricingMode.ts"));
@@ -112,6 +113,68 @@ test("paste import keeps unit suffixes on price_range", () => {
     assert.equal(row.price, String(amount), line);
     if (mode === "range") assert.equal(row.price_max, 800, line);
   }
+});
+
+test("paste add and save stores pricing_mode and amounts with display unchanged", () => {
+  const serviceCases = [
+    {
+      line: "Carpet wash - KSh 60 per sq ft",
+      pricing_mode: "fixed",
+      price: "60",
+      price_range: "KSh 60 per sq ft",
+      price_max: null,
+    },
+    {
+      line: "Rooms - from KSh 1,500",
+      pricing_mode: "from",
+      price: "1500",
+      price_range: "from KSh 1,500",
+      price_max: null,
+    },
+    {
+      line: "Hourly cleaning - 500-800 per hour",
+      pricing_mode: "range",
+      price: "500",
+      price_range: "500-800 per hour",
+      price_max: 800,
+    },
+    {
+      line: "Consult - Ask",
+      pricing_mode: "quote",
+      price: "",
+      price_range: "Ask",
+      price_max: null,
+    },
+  ];
+
+  for (const c of serviceCases) {
+    const [row] = suggestImportedServices(parseBulkServices(c.line), null);
+    assert.equal(row.pricing_mode, c.pricing_mode, c.line);
+    assert.equal(row.price, c.price, c.line);
+    assert.equal(row.price_range, c.price_range, c.line);
+    assert.equal(row.price_max ?? null, c.price_max, c.line);
+  }
+
+  const [product] = suggestImportedProducts(parseBulkProducts("Notebook - KSh 2,000"));
+  assert.equal(product.pricing_mode, "fixed");
+  assert.equal(product.price, "KSh 2,000");
+  assert.equal(product.price_max ?? null, null);
+});
+
+test("catalogImportPriceTypeLabel matches parser kind", () => {
+  const row = structureImportedCatalogRow(
+    {
+      name: "Test",
+      price_range: "KSh 60 per sq ft",
+      notes: "",
+      out_of_scope: "",
+      in_stock: "",
+      category: "",
+    },
+    "price_range"
+  );
+  assert.equal(catalogImportPriceTypeLabel(row), "Fixed");
+  assert.equal(catalogImportPriceLabel(row), "KSh 60 per sq ft");
 });
 
 test("structureImportedCatalogRow preview labels", () => {
