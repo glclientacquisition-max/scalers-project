@@ -6,8 +6,9 @@
 // {hours.<day>}, {pay.<method>}. The prompt's FACT CARD lists the IDs. The model
 // writes the ID; code puts in the owner's value in the caller's language. A
 // fact the owner has not confirmed, or an ID that does not exist, is never
-// spoken as a value: that sentence becomes "let me confirm that with the owner
-// and get back to you".
+// spoken as a value: that sentence becomes the cannot-answer line (the
+// business's own line, or "Let me check with the team and get back to
+// you").
 //
 // Facts come only from live Desk data: Catalogue (services_catalog,
 // product_catalog), Locations (service_areas via areaTerms, #769), hours
@@ -26,9 +27,19 @@ function factRefsEnabled(env) {
   return FLAG_ON.test(String((env ? env.VOICE_FACT_REFS : process.env.VOICE_FACT_REFS) || '').trim());
 }
 
-const CONFIRM_LINE = {
-  en: 'Let me confirm that with the owner and get back to you.',
-  sw: 'Wacha nithibitishe hilo na mwenye biashara kisha nikujulishe.',
+// Owner decision, 18 Oct: the line spoken when the Business Assistant cannot
+// answer (an unconfirmed or unknown fact ID), picked in this order:
+//   1. tenants.unknown_answer_spoken {en, sw, source, updated_at}: the caller's
+//      language, when `source` still equals the trimmed unknown_answer_fallback
+//      (the Desk rewrite is for the current fallback, not an old one);
+//   2. unknown_answer_fallback as written, when it is clearly in the caller's
+//      language;
+//   3. the team default below.
+// Every candidate passes the callbacks-only check first: no transfer, no
+// booking or saved-work claim, no "we're on our way".
+const TEAM_DEFAULT_LINE = {
+  en: 'Let me check with the team and get back to you.',
+  sw: 'Wacha niulize timu kisha nikujulishe.',
 };
 
 function langKey(language) {
@@ -36,9 +47,60 @@ function langKey(language) {
   return l === 'sw' || l === 'sheng' ? 'sw' : 'en';
 }
 
-/** The owner-confirm line in the caller's language. Never empty. */
-function confirmWithOwnerLine(language) {
-  return CONFIRM_LINE[langKey(language)];
+const BOOKING_CLAIM =
+  /\b(?:booked|book(?:ing)? (?:is )?confirmed|confirmed (?:your|the) (?:booking|visit|appointment)|appointment is (?:set|confirmed)|nimekubook|imethibitishwa|nimethibitisha|tumekubook)\b/i;
+
+/** True when a fallback line keeps the callbacks-only rule. */
+function callbackSafeLine(text) {
+  const line = String(text || '').trim();
+  if (!line || line.length > 240 || /[{}]/.test(line)) return false;
+  const guard = require('./speechGuard');
+  if (guard.TRANSFER_CLAIM && guard.TRANSFER_CLAIM.test(line)) return false;
+  if (guard.SAVED_CLAIM && guard.SAVED_CLAIM.test(line)) return false;
+  if (guard.JOB_CLOSE && guard.JOB_CLOSE.test(line)) return false;
+  return !BOOKING_CLAIM.test(line);
+}
+
+function clearlyInLanguage(text, key) {
+  const { analyzeCallerLanguage } = require('./language');
+  const res = analyzeCallerLanguage(String(text || ''));
+  const detected = res.language === 'sheng' ? 'sw' : res.language;
+  return detected === key && Number(res.confidence || 0) >= 0.5;
+}
+
+function parseSpoken(raw) {
+  let obj = raw;
+  if (typeof obj === 'string') {
+    try {
+      obj = JSON.parse(obj);
+    } catch {
+      return null;
+    }
+  }
+  return obj && typeof obj === 'object' && !Array.isArray(obj) ? obj : null;
+}
+
+/**
+ * The cannot-answer line for this business in the caller's language.
+ * `source` says which branch won (spoken | fallback | default).
+ */
+function pickUnknownAnswerLine(profile, language) {
+  const key = langKey(language);
+  const fallback = String(profile?.unknownAnswerFallback || '').trim();
+  const spoken = parseSpoken(profile?.unknownAnswerSpoken);
+  if (spoken && fallback && String(spoken.source || '').trim() === fallback) {
+    const text = String(spoken[key] || '').trim();
+    if (callbackSafeLine(text)) return { text, source: 'spoken' };
+  }
+  if (fallback && clearlyInLanguage(fallback, key) && callbackSafeLine(fallback)) {
+    return { text: fallback, source: 'fallback' };
+  }
+  return { text: TEAM_DEFAULT_LINE[key], source: 'default' };
+}
+
+/** The cannot-answer line (see pickUnknownAnswerLine). Never empty. */
+function unknownAnswerLine(language, profile = null) {
+  return pickUnknownAnswerLine(profile || {}, language).text;
 }
 
 function slug(raw) {
@@ -244,7 +306,7 @@ function buildFactSheet(profile = {}) {
   areaFeeFacts(facts, profile);
   hoursFacts(facts, profile);
   paymentFacts(facts, profile);
-  return { facts };
+  return { facts, profile };
 }
 
 const SHEETS = new WeakMap();
@@ -288,9 +350,9 @@ function priceText(value, sw) {
 }
 
 /** A whole sentence stating one fact, for repair when the model's sentence was dropped. */
-function factSentence(fact, language) {
+function factSentence(fact, language, profile = null) {
   const sw = langKey(language) === 'sw';
-  if (!fact || !fact.confirmed) return confirmWithOwnerLine(language);
+  if (!fact || !fact.confirmed) return unknownAnswerLine(language, profile);
   const value = renderFact(fact, language);
   switch (fact.kind) {
     case 'price':
@@ -306,13 +368,13 @@ function factSentence(fact, language) {
     case 'pay':
       return sw ? `${fact.label} ni ${value}.` : `The ${fact.label} is ${value}.`;
     default:
-      return confirmWithOwnerLine(language);
+      return unknownAnswerLine(language, profile);
   }
 }
 
 function cardLine(fact) {
   const id = `{${fact.id}}`;
-  if (!fact.confirmed) return `${id} ${fact.label}: (owner to confirm)`;
+  if (!fact.confirmed) return `${id} ${fact.label}: (team to confirm)`;
   switch (fact.kind) {
     case 'fee':
       return `${id} ${fact.label} ${fact.feeKind} fee: ${renderFact(fact, 'en')}`;
@@ -340,8 +402,8 @@ function formatFactCard(sheet) {
   const lines = [
     'FACT CARD (prices, fees, hours and payment numbers: use these IDs):',
     'To say one of these, write its ID in braces exactly as listed, for example "It is {price.example}." The system speaks the value in the caller\'s language.',
-    'Never write these amounts, times or numbers yourself, in digits or in words. An ID marked (owner to confirm) is spoken as a promise to confirm with the owner.',
-    'If a price, fee, time or number is not listed here, say you will confirm it with the owner. Write the ID only inside a full sentence.',
+    'Never write these amounts, times or numbers yourself, in digits or in words. An ID marked (team to confirm) is spoken as a promise to check with the team.',
+    'If a price, fee, time or number is not listed here, say you will check with the team. Write the ID only inside a full sentence.',
   ];
   for (const [kind, title] of CARD_SECTIONS) {
     const rows = facts.filter((f) => f.kind === kind);
@@ -365,7 +427,7 @@ function splitSentences(text) {
 /**
  * Put values in for every {kind.id} reference. A sentence holding an
  * unconfirmed or unknown reference (or any other brace text) is dropped and
- * the owner-confirm line is spoken once instead.
+ * the cannot-answer line is spoken once instead.
  * @returns {{ text: string, used: string[], unconfirmed: string[], unknown: string[], factText: string, changed: boolean }}
  */
 function renderFactRefs(text, sheet, opts = {}) {
@@ -382,7 +444,7 @@ function renderFactRefs(text, sheet, opts = {}) {
       continue;
     }
     let bad = false;
-    const rendered = sentence.replace(REF_RE, (match, kind, name) => {
+    const rendered = sentence.replace(REF_RE, (match, kind, name, offset) => {
       const id = `${kind.toLowerCase()}.${name.toLowerCase()}`;
       const fact = facts.get(id);
       if (!fact) {
@@ -395,7 +457,7 @@ function renderFactRefs(text, sheet, opts = {}) {
         bad = true;
         return match;
       }
-      const value = renderFact(fact, opts.language);
+      const value = dropRepeatedLead(sentence.slice(0, offset), renderFact(fact, opts.language));
       result.used.push(id);
       values.push(value);
       return value;
@@ -403,7 +465,7 @@ function renderFactRefs(text, sheet, opts = {}) {
     if (bad || ANY_BRACE_RE.test(rendered) || /[{}]/.test(rendered)) {
       if (!bad) result.unknown.push('malformed');
       // The confirm line takes the dropped sentence's place, once.
-      if (!needConfirm) kept.push(confirmWithOwnerLine(opts.language));
+      if (!needConfirm) kept.push(unknownAnswerLine(opts.language, sheet?.profile));
       needConfirm = true;
       continue;
     }
@@ -413,6 +475,17 @@ function renderFactRefs(text, sheet, opts = {}) {
   result.factText = values.join(' ');
   result.changed = result.text !== raw;
   return result;
+}
+
+// "starts from {price.x}" with a "from KSh 2,500" value would say "from"
+// twice (HD_9939ca74d492): drop the value's lead word when the sentence
+// already says it right before the ID.
+const LEAD_BEFORE_REF = /\b(from|starting at|starting from|starts at|starts from|kuanzia|inaanzia|zinaanzia)\s*$/i;
+const VALUE_LEAD = /^(from|kuanzia)\s+/i;
+function dropRepeatedLead(before, value) {
+  const text = String(value || '');
+  if (!LEAD_BEFORE_REF.test(String(before || ''))) return text;
+  return text.replace(VALUE_LEAD, '');
 }
 
 function words(text) {
@@ -514,6 +587,9 @@ module.exports = {
   renderFactRefs,
   factSentence,
   findFactFor,
-  confirmWithOwnerLine,
+  unknownAnswerLine,
+  pickUnknownAnswerLine,
+  callbackSafeLine,
+  TEAM_DEFAULT_LINE,
   personaOnlyPrompt,
 };

@@ -11,11 +11,22 @@ last_reviewed: 2026-10-18
 
 - `src/conversation/factSheet.js` builds a fact sheet from live data only: Catalogue prices, area fees (`profile.areaTerms`, needs `VOICE_AREA_FEES` from #769), hours (`hours_schedule`) and payment numbers (`business_policies.payments`).
 - The FACT CARD sits inside LIVE GROUND TRUTH (`liveKnowledge.js`), so it travels with the cacheable prefix when #779 lands.
-- The model writes IDs such as `{price.sofa_cleaning}`. Code renders the value in the caller's language. An unconfirmed or unknown ID becomes the confirm line: "Let me confirm that with the owner and get back to you." / "Wacha nithibitishe hilo na mwenye biashara kisha nikujulishe."
+- The model writes IDs such as `{price.sofa_cleaning}`. Code renders the value in the caller's language. An unconfirmed or unknown ID becomes the cannot-answer line (below).
+- A local answer the Business Assistant already spoke (for example an area fee) is folded into the next model turn as "already answered aloud", so the model does not say it again.
 - `llm_system_prompt` is kept for persona only; its amounts, clocks, phone numbers and fact sections are stripped (`personaOnlyPrompt`).
-- The speech check (`speechGuard.js`) repairs a dropped number sentence with the matching file fact, or the confirm line, never silence. It also accepts compound Swahili numbers and saves made earlier in the call.
+- The speech check (`speechGuard.js`) repairs a dropped number sentence with the matching file fact, or the cannot-answer line, never silence. It also accepts compound Swahili numbers and saves made earlier in the call.
 
 The flag-off path is byte-identical to main (tests in `tests/factSheet.test.js` check both).
+
+## The cannot-answer line
+
+Owner decision, 18 Oct 2026. `factSheet.pickUnknownAnswerLine(profile, language)` picks, in this order:
+
+1. `tenants.unknown_answer_spoken` (jsonb `{en, sw, source, updated_at}`, written by the Desk): the caller's language, only while `source` equals the trimmed `unknown_answer_fallback`.
+2. `unknown_answer_fallback` as written, only when it is clearly in the caller's language (`analyzeCallerLanguage`, confidence 0.5 or more; Sheng counts as Swahili).
+3. The team default: "Let me check with the team and get back to you." / "Wacha niulize timu kisha nikujulishe."
+
+Every candidate passes `callbackSafeLine` first: no transfer (`TRANSFER_CLAIM`), no saved or booked claim (`SAVED_CLAIM`, booking words), no job-close line. A line that fails falls to the next step. The column is read in its own query, only with the flag on (`loadUnknownAnswerSpoken` in `db.js`); a missing column or any error gives null. With the flag on, the GIGO unknown-fact line (serve mode) and the prompt's UNKNOWN block also use the team wording instead of "confirm with the owner".
 
 ## Replay eval
 

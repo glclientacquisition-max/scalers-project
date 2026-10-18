@@ -53,6 +53,7 @@ function tenantProfileFromRow(row, extras = {}) {
     faqs: row.faqs || [],
     teamDirectory: row.team_directory || [],
     unknownAnswerFallback: row.unknown_answer_fallback || null,
+    unknownAnswerSpoken: extras.unknownAnswerSpoken ?? row.unknown_answer_spoken ?? null,
     dailyBulletin: row.daily_bulletin || [],
     agentTools: parseAgentTools(row.agent_tools),
     ttsLexicon: parseLexiconOverrides(row.tts_lexicon),

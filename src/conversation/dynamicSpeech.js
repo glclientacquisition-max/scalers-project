@@ -389,11 +389,32 @@ const HEDGE_OPENER =
 const HEDGE_PHRASE =
   /\b(let me check|one moment please|take your time|sawa nakucheckia|nakucheckia)\b/gi;
 
+// VOICE_FACT_REFS: a hedge that runs on into its own clause ("Let me check
+// with the owner to confirm it for you.") is a promise, not filler. Cutting
+// only the hedge left "with the owner to confirm it for you." on
+// HD_9939ca74d492. With the flag on, a hedge is removed only when it stands
+// alone (end of text, or followed by punctuation or a new sentence).
+function stripHedgeAlone(raw, re) {
+  return raw.replace(re, (match, ...rest) => {
+    const offset = rest[rest.length - 2];
+    const whole = rest[rest.length - 1];
+    // The opener also eats the spaces and punctuation after the hedge.
+    const hedge = match.replace(/[\s,.]+$/, '');
+    const tail = whole.slice(offset + hedge.length);
+    return /^\s+[a-z]/.test(tail) ? match : '';
+  });
+}
+
 function stripSpokenHedges(text, opts = {}) {
   let raw = String(text || '').trim();
   if (!raw) return raw;
-  raw = raw.replace(HEDGE_OPENER, '');
-  raw = raw.replace(HEDGE_PHRASE, '');
+  if (require('./factSheet').factRefsEnabled()) {
+    raw = stripHedgeAlone(raw, HEDGE_OPENER);
+    raw = stripHedgeAlone(raw, HEDGE_PHRASE).replace(/\s*,\s*([.!?])/g, '$1');
+  } else {
+    raw = raw.replace(HEDGE_OPENER, '');
+    raw = raw.replace(HEDGE_PHRASE, '');
+  }
   raw = raw.replace(/\s+/g, ' ').replace(/^[,.]+\s*/, '').trim();
   if (!raw) {
     return confirmationLanguage(opts.language) === 'en' ? 'Okay.' : 'Sawa.';
@@ -426,7 +447,7 @@ function polishSpokenDetail(text, opts = {}) {
   // VOICE_FACT_REFS: put the owner's values in for {price.x} / {fee.x} /
   // {hours.x} / {pay.x} before the guard reads the sentence. The values are
   // passed on as allowed facts; an unconfirmed or unknown ID became the
-  // owner-confirm line (factSheet.renderFactRefs).
+  // cannot-answer line (factSheet.renderFactRefs).
   let factText = '';
   if ((opts.state || opts.profile) && spoken.includes('{')) {
     const factSheet = require('./factSheet');
@@ -439,6 +460,9 @@ function polishSpokenDetail(text, opts = {}) {
         factText = rendered.factText;
         if (rendered.unconfirmed.length || rendered.unknown.length) {
           dropReasons.push('fact_ref_confirm');
+          // Say which kind in the trace: unconfirmed (owner/hash) or unknown ID.
+          if (rendered.unconfirmed.length) dropReasons.push('fact_ref_unconfirmed');
+          if (rendered.unknown.length) dropReasons.push('fact_ref_unknown');
           logSpokenFilterDrop('fact_ref_confirm', [...rendered.unconfirmed, ...rendered.unknown].join(','), opts);
         }
       }

@@ -891,7 +891,7 @@ function guardSpokenReply(text, ctx = {}) {
   const askedNumber = callerAskedNumber(lastCallerTurn, trusted);
   // VOICE_FACT_REFS: a dropped number sentence is repaired with the owner's
   // saved value for the fact it was about (or the caller asked about), in the
-  // caller's language. An unconfirmed fact gets the owner-confirm line. Once
+  // caller's language. An unconfirmed fact gets the cannot-answer line. Once
   // per caller turn: streamed sentences each pass through here.
   let groundedFact = '';
   if (factRefsOn && droppedNumber && !groundedPrice && !groundedHours && !groundedClock) {
@@ -904,11 +904,11 @@ function guardSpokenReply(text, ctx = {}) {
     // number or nothing else is left to say. An unasked guess is just dropped,
     // and the current time is never an owner fact.
     const line = fact
-      ? factSheet.factSentence(fact, answerLanguage)
+      ? factSheet.factSentence(fact, answerLanguage, ctx.profile)
       : clockAsk || callerClockAsk(lastCallerTurn)
         ? ''
         : askedNumber || !out.trim()
-          ? factSheet.confirmWithOwnerLine(answerLanguage)
+          ? factSheet.unknownAnswerLine(answerLanguage, ctx.profile)
           : '';
     if (line && !out.includes(line) && onceThisTurn(ctx, 'factRepairTurn')) groundedFact = line;
   }
