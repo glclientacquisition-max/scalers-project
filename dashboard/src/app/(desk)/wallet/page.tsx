@@ -3,12 +3,10 @@ import { memberCan } from "@/lib/requireMember";
 import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
 import { getCurrentTenant, createWorkspaceDataClient } from "@/lib/tenant";
 import { getTenantUsageSummary } from "@/lib/wallet";
-import {
-  inboundKesPerMinute,
-  loadOwnerPackageMeter,
-  remainingCount,
-} from "@/lib/packageCatalog";
-import { usageCapNotice } from "@/lib/usageCap";
+import { inboundKesPerMinute, loadOwnerPackageMeter } from "@/lib/packageCatalog";
+import { loadOwnerBillingView } from "@/lib/billingStateLoad";
+import { ownerBillingView } from "@/lib/billingStateModel";
+import { createDeskTimer } from "@/lib/deskTiming";
 import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
@@ -63,73 +61,86 @@ async function WalletBody({ searchParams }: WalletPageProps) {
     return <DeskError>Not signed in.</DeskError>;
   }
 
+  const timer = createDeskTimer();
   let usage;
+  let billing;
+  let pack;
   try {
-    usage = await getTenantUsageSummary(workspace.client, tenant.id, {
-      ledgerPage: page,
-      ledgerPageSize: DEFAULT_PAGE_SIZE,
-      billingEnforcement: tenant.billing_enforcement,
-      softSpendLimitEnabled: tenant.soft_spend_limit_enabled,
-      softSpendLimitKes: tenant.soft_spend_limit_kes,
-    });
+    [usage, billing, pack] = await Promise.all([
+      getTenantUsageSummary(workspace.client, tenant.id, {
+        ledgerPage: page,
+        ledgerPageSize: DEFAULT_PAGE_SIZE,
+        billingEnforcement: tenant.billing_enforcement,
+        softSpendLimitEnabled: tenant.soft_spend_limit_enabled,
+        softSpendLimitKes: tenant.soft_spend_limit_kes,
+        // The Usage page reads minutes from tenant_billing_state, not from call rows.
+        skipCallRows: true,
+      }),
+      loadOwnerBillingView(tenant.id),
+      loadOwnerPackageMeter(tenant.id),
+    ]);
   } catch {
     return <DeskLoadError>Could not load Usage.</DeskLoadError>;
   }
+  timer.mark("data");
+  console.info(timer.line("usage"));
 
-  const pack = await loadOwnerPackageMeter(tenant.id);
-  const minutesLeft = remainingCount(pack.minutesIncluded, pack.minutesUsed);
-  const smsLeft = remainingCount(pack.smsIncluded, pack.smsUsed);
-  const emailLeft = remainingCount(pack.emailIncluded, pack.emailUsed);
-  const waLeft = remainingCount(pack.waIncluded, pack.waUsed);
-  const inboundMin = inboundKesPerMinute(pack.rates.inboundKesPerSecond);
-  const capNotice = usageCapNotice({
-    isBeta: usage.isBeta,
-    onDemand: Boolean(tenant.on_demand_usage_enabled),
-    minutesIncluded: pack.minutesIncluded,
-    minutesLeft,
-    smsIncluded: pack.smsIncluded,
-    smsLeft,
-    emailIncluded: pack.emailIncluded,
-    emailLeft,
-    waIncluded: pack.waIncluded,
-    waLeft,
-  });
+  // Before tenant_billing_state exists: same wording from the tenant counters.
+  const view =
+    billing ||
+    ownerBillingView({
+      state: pack.packageName
+        ? {
+            package_state: "active",
+            package_name: pack.packageName,
+            included_minutes: pack.minutesIncluded,
+            used_minutes: pack.minutesUsed,
+            sms_included: pack.smsIncluded,
+            sms_used: pack.smsUsed,
+            on_demand_enabled: Boolean(tenant.on_demand_usage_enabled),
+            mode_label: usage.isBeta ? "beta" : tenant.on_demand_usage_enabled ? "metered" : "capped",
+          }
+        : null,
+      monthlyPriceKes: null,
+      smsMessages: null,
+      seatsIncluded: pack.seatsIncluded,
+      seatsUsed: pack.seatsUsed,
+      alerts: {
+        email: { included: pack.emailIncluded, used: pack.emailUsed },
+        whatsapp: { included: pack.waIncluded, used: pack.waUsed },
+      },
+    });
 
   const safePage = clampListPage(page, usage.ledgerTotal, DEFAULT_PAGE_SIZE);
   if (safePage !== page) {
     redirect(safePage > 1 ? `/wallet?page=${safePage}` : "/wallet");
   }
 
-  const packLabel = pack.packageName
-    ? `${pack.packageName}${pack.period ? ` / ${pack.period}` : ""}`
-    : "No package";
-  const minuteMax = Math.max(0, pack.minutesIncluded);
+  const inboundMin = inboundKesPerMinute(pack.rates.inboundKesPerSecond);
+  const minutesLeft = view.minutesLeft;
+  const minuteMax = Math.max(0, view.minutesIncluded);
   const minuteLeftPct = minuteMax > 0 ? Math.min(100, Math.round((minutesLeft / minuteMax) * 100)) : 0;
-  const buckets = [
-    { label: "Minutes", left: minutesLeft, used: pack.minutesUsed },
-    { label: "SMS", left: smsLeft, used: pack.smsUsed },
-    { label: "Email", left: emailLeft, used: pack.emailUsed },
-    { label: "WhatsApp", left: waLeft, used: pack.waUsed },
-    { label: "Seats", left: remainingCount(pack.seatsIncluded, pack.seatsUsed), used: pack.seatsUsed },
-  ];
 
   return (
     <div className="max-w-3xl">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <header>
         <h1 className={deskListTitleClass}>Usage</h1>
-        <p className="text-body text-ink-2">{packLabel}</p>
+        <p className="mt-2 text-body text-ink-2">{view.headline}</p>
       </header>
 
-      {usage.isBeta ? <p className="mt-3 text-body text-ink-2">Free beta</p> : null}
-
-      {capNotice ? (
-        <p className="mt-4 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-body text-warn">
-          {capNotice}
+      {view.lowNotice ? (
+        <p
+          role="status"
+          className="mt-4 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-body text-warn"
+        >
+          {view.lowNotice}
         </p>
       ) : null}
 
       <section className="mt-6 rounded-2xl border border-hairline bg-surface p-5">
-        <p className="text-body text-ink-2">Minutes left</p>
+        <p className="text-body text-ink-2">
+          Minutes left{view.periodEndLabel ? ` until ${view.periodEndLabel}` : ""}
+        </p>
         <p className="mt-1 font-display text-display tabular-nums text-ink">
           {count(minutesLeft)}
         </p>
@@ -149,20 +160,25 @@ async function WalletBody({ searchParams }: WalletPageProps) {
         )}
 
         <table className="mt-6 w-full text-left text-body">
-          <caption className="sr-only">Included amounts</caption>
+          <caption className="sr-only">What your package includes this month</caption>
           <thead className="border-b border-hairline text-ink-2">
             <tr>
-              <th scope="col" className="py-2 pr-3 font-medium">Included</th>
-              <th scope="col" className="px-3 py-2 text-right font-medium">Left</th>
-              <th scope="col" className="py-2 pl-3 text-right font-medium">Used</th>
+              <th scope="col" className="py-2 pr-3 font-medium">This month</th>
+              <th scope="col" className="px-2 py-2 text-right font-medium">Included</th>
+              <th scope="col" className="px-2 py-2 text-right font-medium">Used</th>
+              <th scope="col" className="py-2 pl-2 text-right font-medium">Left</th>
             </tr>
           </thead>
           <tbody>
-            {buckets.map((row) => (
-              <tr key={row.label} className="border-b border-hairline">
-                <th scope="row" className="py-3 pr-3 font-normal text-ink">{row.label}</th>
-                <td className="px-3 py-3 text-right font-medium tabular-nums text-ink">{count(row.left)}</td>
-                <td className="py-3 pl-3 text-right tabular-nums text-ink-2">{count(row.used)}</td>
+            {view.rows.map((row) => (
+              <tr key={row.key} className="border-b border-hairline">
+                <th scope="row" className="py-3 pr-3 font-normal text-ink">
+                  {row.label}
+                  {row.note ? <span className="block text-meta text-ink-2">{row.note}</span> : null}
+                </th>
+                <td className="px-2 py-3 text-right tabular-nums text-ink-2">{count(row.included)}</td>
+                <td className="px-2 py-3 text-right tabular-nums text-ink-2">{count(row.used)}</td>
+                <td className="py-3 pl-2 text-right font-medium tabular-nums text-ink">{count(row.left)}</td>
               </tr>
             ))}
           </tbody>
@@ -173,21 +189,22 @@ async function WalletBody({ searchParams }: WalletPageProps) {
         <OnDemandUsagePanel
           tenantId={tenant.id}
           enabled={Boolean(tenant.on_demand_usage_enabled)}
+          hint={view.onDemandHint}
         />
       </div>
 
       <section className="mt-6 rounded-2xl border border-hairline bg-surface p-5">
-        <h2 className="font-display text-title tracking-tight text-ink">On-demand rates</h2>
+        <h2 className="font-display text-title tracking-tight text-ink">{view.ratesTitle}</h2>
         <table className="mt-3 w-full text-left text-body">
-          <caption className="sr-only">Prices past the included amounts</caption>
+          <caption className="sr-only">{view.ratesTitle}</caption>
           <tbody>
             <tr className="border-b border-hairline">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">Calls</th>
-              <td className="py-3 text-right tabular-nums text-ink">KES {kes(inboundMin)}/min</td>
+              <td className="py-3 text-right tabular-nums text-ink">KES {kes(inboundMin)} a minute</td>
             </tr>
             <tr className="border-b border-hairline">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">SMS</th>
-              <td className="py-3 text-right tabular-nums text-ink">KES {kes(pack.rates.smsKes)}</td>
+              <td className="py-3 text-right tabular-nums text-ink">KES {kes(pack.rates.smsKes)} a credit</td>
             </tr>
             <tr className="border-b border-hairline">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">Email</th>
@@ -205,7 +222,7 @@ async function WalletBody({ searchParams }: WalletPageProps) {
         <h2 className="px-4 pt-4 font-display text-title tracking-tight text-ink">Activity</h2>
         {usage.recentLedger.length === 0 ? (
           <p className="px-4 py-3 text-body text-ink-2">
-            {usage.isBeta ? "No charges during beta." : "No charges yet."}
+            {usage.isBeta ? "Nothing charged during beta." : "No charges yet."}
           </p>
         ) : (
           <table className="mt-2 w-full text-left text-body">

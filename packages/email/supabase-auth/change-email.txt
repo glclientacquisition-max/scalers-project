@@ -1,0 +1,16 @@
+Subject: Confirm your new email for Scalers
+Preheader: Confirm the change so account emails reach the right inbox.
+
+Confirm your new email [Account security]
+
+You asked to change the email on your Scalers account from {{ .Email }} to {{ .NewEmail }}. Tap the button to confirm.
+
+The link works once and expires in 1 hour. Until you confirm, you keep signing in with your current email.
+
+If you didn't ask for this, you can ignore this email. Your email stays the same. If you think someone else knows your password, change it soon.
+
+Confirm new email: {{ .ConfirmationURL }}
+
+--
+This is an account email from Scalers. We only send it when someone asks for it.
+Need help? Write to support@scalers.co.ke.

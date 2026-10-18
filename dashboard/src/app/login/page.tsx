@@ -54,6 +54,11 @@ export default async function LoginPage({
           <Field id="password" label="Password">
             {(p) => <Input {...p} name="password" type="password" required autoComplete="current-password" />}
           </Field>
+          <p className="-mt-2 flex justify-end">
+            <Link href="/forgot-password" className="inline-flex min-h-11 items-center text-meta font-medium text-accent-deep underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
+              Forgot password?
+            </Link>
+          </p>
           <PendingSubmit label="Sign in" pendingLabel="Signing in…" />
         </form>
 

@@ -1,6 +1,6 @@
 ---
 owner: voice
-last_reviewed: 2026-10-08
+last_reviewed: 2026-10-17
 ---
 
 # Voice lane contract
@@ -73,6 +73,8 @@ Legacy `/ws/relay` (ConversationRelay) may still exist — do not expand it; pro
 13. SautiKit / DID down is a **telephony** outage. No webhook reaches Voice. Do not try to speak. Follow the bridge playbook in [`VOICE_DOWNTIME_AT_SCALE.md`](../../explanation/voice/VOICE_DOWNTIME_AT_SCALE.md#telephony-down-bridge-playbook): notify owner once, forward or re-point the DID, verify one test call before marking it back.
 14. A presented number that matches no business is rejected with `<Reject/>`. Do not answer as another tenant. The first-active-tenant fallback runs only when the webhook carried no number. `TENANT_ID` still pins a single-tenant host.
 15. When `isTelephonyBillingExhausted()` is true, a new `POST /` or `POST /voice/incoming` returns `<Reject/>` before Stream. No `/ws/media`. The caller hears the carrier reject. The flag is set only by an empty prepaid balance or wallet HTTP 402 (`walletProbe.js`). Probe HTTP errors, including 403, timeouts, and never-probed state do not set it, so the gate stays open until `SAUTIKIT_API_KEY` can read `GET /v1/wallet`. A later healthy probe clears the flag so calls resume without a restart. `/healthz` `telephony.lastError.billingExhausted` is that flag. In-flight lifecycle webhooks still return empty `<Response/>` and do not re-Stream.
+16. A Soniox TTS socket close or transient stream error mid-line never leaves a written reply unspoken (`VOICE_TTS_RESPEAK`, on by default). `src/speech/sonioxTts.js` reconnects once (bounded by `VOICE_TTS_RESPEAK_CONNECT_MS`, 1500) and speaks that same line again from the start under the same stream id, unless the caller barged in or the call ended. If the reconnect fails, the line goes through `src/speech/ttsRespeak.js`: a cached clip of that exact line, then espeak-ng, then Gemini TTS. Never the downtime clip. A close after `audio_end` is not re-spoken. At most `VOICE_TTS_RESPEAK_MAX` (2) re-speaks per call, one per line, and one `respeak` log line per event. A socket quiet longer than `VOICE_TTS_IDLE_RECYCLE_MS` (8000) is replaced before the next line, because Soniox closes it at about 10 s with 1001 Timeout. A TTS line promise must never reject unhandled: on 13 Oct (HD_116ff6a67508, HD_1e4e3e955169) that crashed the Voice process.
+17. A closed business (archived, suspended, or `is_active = false`; `isTenantLineInactive`) gets nothing from Voice outside a call either (`VOICE_CLOSED_TENANT_GUARD`, on by default). `db.tenantLineClosed(tenantId)` (cached about 60 s, same rules as the inbound gate) is checked by `sendLedger.beginInstanceSend`, so every SMS, WhatsApp and email with a tenant id returns `tenant_line_closed` (sends with no tenant id still pass). `/internal/desk/escalate` answers 409 with `reason: 'tenant_line_closed'`. Brain tool writes come back `disabled` / `line_closed`, `maybeQueueLiveTransfer` does not Dial, and the greeting warm sweep and `/internal/greeting-warm` skip the tenant. The profile carries `lineState`. A lookup error fails open with a log, like the inbound gate. Off restores the old behaviour.
 
 ## Env knobs (Voice)
 
@@ -89,6 +91,8 @@ See `.env.example` — key ones:
 - `VOICE_LLM_STREAM`, `VOICE_STREAM_EARLY_CHARS` / `WORDS` (default 0: sentence-only TTS flush)
 - `VOICE_FLUSH_MIN_MS`, `VOICE_FLUSH_MAX_MS`, `VOICE_IDLE_NUDGE_MS` (default 10000; not armed until the caller has spoken)
 - `VOICE_BARGE_GRACE_MS`, `VOICE_BARGE_EARLY_MS`, `VOICE_BARGE_MIN_CHARS`
+- `VOICE_TTS_RESPEAK` (default on), `VOICE_TTS_RESPEAK_CONNECT_MS`, `VOICE_TTS_RESPEAK_MAX`, `VOICE_TTS_IDLE_RECYCLE_MS`, `VOICE_TTS_FALLBACK_GEMINI_MS` (invariant 16)
+- `VOICE_CLOSED_TENANT_GUARD` (default on; invariant 17)
 - Soniox endpointing: `SONIOX_MAX_ENDPOINT_DELAY_MS`, `SONIOX_ENDPOINT_SENSITIVITY`, …
 
 ## Caller file on the call

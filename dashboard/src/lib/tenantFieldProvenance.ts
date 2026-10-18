@@ -145,15 +145,25 @@ export function factHashModeFromEnv(): boolean {
   return process.env.FACT_HASH_MODE === "on";
 }
 
+/**
+ * BRAIN_CALL_FIXES_D199, on only when exactly 'on' (same name and rule as Voice).
+ * Drives the seed/instruction policy filter so the stored prompt matches call-time Brain.
+ * Server only. Set it on Desk wherever it is set on Voice.
+ */
+export function brainCallFixesD199FromEnv(): boolean {
+  return String(process.env.BRAIN_CALL_FIXES_D199 || "").trim() === "on";
+}
+
 /** Index meta rows and the hold gate for compile. Null fields keep the pack heuristic. */
 export async function loadCompileProvenance(tenantId: string) {
-  if (!tenantId) return { fieldMeta: indexFieldMeta(null, { hashMode: factHashModeFromEnv() }), holdGate: null };
+  const seedFilter = brainCallFixesD199FromEnv();
+  if (!tenantId) return { fieldMeta: indexFieldMeta(null, { hashMode: factHashModeFromEnv(), seedFilter }), holdGate: null };
   const [rows, gate] = await Promise.all([
     listTenantFieldMeta(tenantId),
     getTenantHoldGate(tenantId),
   ]);
   // Server-side default for confirm v2 hash mode. Client code passes hashMode in.
-  const fieldMeta = indexFieldMeta(rows, { hashMode: factHashModeFromEnv() });
+  const fieldMeta = indexFieldMeta(rows, { hashMode: factHashModeFromEnv(), seedFilter });
   const reasons = Array.isArray(gate?.reasons) ? gate.reasons.map((reason) => String(reason)) : [];
   const holdGate =
     gate && typeof gate.allowed === "boolean" && !reasons.includes("provenance_rpc_missing")

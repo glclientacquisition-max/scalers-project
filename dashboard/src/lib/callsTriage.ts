@@ -1,3 +1,4 @@
+import { followUpWhatsAppText, summaryTopic } from "./ownerTopic";
 import { pickCallOwnerReason } from "@/lib/callSummarySentence";
 import { applyOwnerFacts, type OwnerFacts } from "@/lib/ownerCallFacts";
 import {
@@ -19,6 +20,8 @@ export type Lead = {
   leadStatus: LeadStatus;
   resolution: CallResolution;
   primaryIntent: string | null;
+  /** summary.topic (or owner_review.topic) from Brain. Null when null or missing; never built from the reason. */
+  topic?: string | null;
   /** Owner's corrected Wanted / Result labels, when they fixed this call. */
   ownerWanted?: string | null;
   ownerResult?: string | null;
@@ -46,7 +49,8 @@ export function toLead(call: CallRow, facts?: OwnerFacts | null): Lead {
     call,
     name: typeof meta.name === "string" ? meta.name : null,
     reason: pickCallOwnerReason(meta),
-    notified: Boolean(meta.whatsapp_sent),
+    topic: summaryTopic(meta),
+    notified: Boolean(meta.owner_notified || meta.whatsapp_sent),
     urgent: String(call.sentiment || "").toLowerCase() === "urgent",
     leadStatus: parseLeadStatus(call.lead_status),
     resolution: owned.resolution as CallResolution,
@@ -199,17 +203,15 @@ export function sanitizeSearchQuery(raw: string | undefined): string {
     .replace(/[%_,.()]/g, " ");
 }
 
-/** Prefilled WhatsApp opener for Kenyan SME follow-up. */
+/**
+ * Prefilled WhatsApp opener for Kenyan SME follow-up. Uses summary.topic only
+ * (Brain #751 contract); the reason sentence is never pasted in.
+ */
 export function followUpWhatsAppMessage(opts: {
   businessName: string;
   name: string | null;
-  reason: string | null;
+  topic: string | null | undefined;
 }): string {
-  const who = opts.name?.trim() || "there";
-  const biz = opts.businessName.trim() || "us";
-  if (opts.reason?.trim()) {
-    return `Hi ${who}, this is ${biz}. Thanks for calling about ${opts.reason.trim().replace(/\.$/, "")}. How can we help you next?`;
-  }
-  return `Hi ${who}, this is ${biz}. Thanks for calling. How can we help you?`;
+  return followUpWhatsAppText(opts);
 }
 

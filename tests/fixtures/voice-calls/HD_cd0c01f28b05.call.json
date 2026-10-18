@@ -1,0 +1,137 @@
+{
+  "note": "HD_cd0c01f28b05: staging Jirani, 17 Oct 2026 20:00 EAT, pin 1510b2b0 (main 0340e46e + #734 8c5aa25a + #735 + #736). Built from staging Railway deploy logs and the transcripts rows (no voice_turn_traces rows for this call). Caller texts are the Soniox finals. spokenLive is what the transcript saved. Turn 5 modelText is reconstructed from the log: the guard dropped 'Right now in Kenya, it is 8:00 PM.' (reason=unbound_place) and spoke 'Thank you for clarifying, Alvin. How can I help you today?'. Gemini logged chars=189, so the rest of the model text is not recorded.",
+  "callId": "HD_cd0c01f28b05",
+  "callRowId": "63f24644-86fe-4615-be2f-2030c92a1f0c",
+  "startedAt": "2026-10-17T17:00:10.608Z",
+  "tenantFixture": "tenants/jirani-staging.json",
+  "businessName": "Jirani Cleaning Services",
+  "vertical": "home_services",
+  "callerFile": {
+    "contact": {
+      "id": "cd3af7df-27a0-4e21-963e-2dcd33d98a86",
+      "name": "Alwyn",
+      "notes": null,
+      "last_reason": null,
+      "metadata": {}
+    },
+    "requests": [],
+    "openAppointments": []
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "at": "2026-10-17T17:00:27.488Z",
+      "caller": "Hello.",
+      "language": "en",
+      "live": {
+        "path": "bare_greeting_reinvite",
+        "spoken": [
+          "Hi, this is Wanjiru at Jirani Cleaning Services. How can I help?"
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "at": "2026-10-17T17:00:35.408Z",
+      "caller": "What time is it?",
+      "language": "en",
+      "live": {
+        "path": "file_name_ask",
+        "outcome": "early_return",
+        "spoken": [
+          "Am I speaking with Alwyn?"
+        ]
+      }
+    },
+    {
+      "turn": 3,
+      "at": "2026-10-17T17:00:43.461Z",
+      "caller": "Yeah, my name is— is not Alwyn.",
+      "language": "en",
+      "live": {
+        "path": "barge_in",
+        "spoken": []
+      }
+    },
+    {
+      "turn": 4,
+      "at": "2026-10-17T17:00:46.326Z",
+      "caller": "It is Alwyn, A-L -V.",
+      "language": "en",
+      "live": {
+        "modelText": "Am I speaking with Alwyn?",
+        "drop": "name_ask_repeat",
+        "path": "hear_again",
+        "spoken": [
+          "Sorry, say that again?"
+        ]
+      }
+    },
+    {
+      "turn": 5,
+      "at": "2026-10-17T17:00:54.140Z",
+      "caller": "A-L-V-I-N, Alwyn.",
+      "language": "en",
+      "live": {
+        "modelText": "Thank you for clarifying, Alvin. Right now in Kenya, it is 8:00 PM. How can I help you today?",
+        "drop": "unbound_place",
+        "dropped": "Right now in Kenya, it is 8:00 PM.",
+        "toolResults": [
+          {
+            "action": "save_caller_info",
+            "status": "succeeded",
+            "name": "Alvin",
+            "reason": "correct name spelling"
+          }
+        ],
+        "spoken": [
+          "Thank you for clarifying, Alvin. How can I help you today?"
+        ]
+      }
+    }
+  ],
+  "transcript": [
+    {
+      "speaker": "agent",
+      "text": "Good evening, Jirani Cleaning Services, this is Wanjiru. You can speak in English or Kiswahili. We're closed now. Nikusaidie vipi?"
+    },
+    {
+      "speaker": "agent",
+      "text": "Hi, this is Wanjiru at Jirani Cleaning Services. How can I help?"
+    },
+    {
+      "speaker": "caller",
+      "text": "What time is it?"
+    },
+    {
+      "speaker": "agent",
+      "text": "Am I speaking with Alwyn?"
+    },
+    {
+      "speaker": "caller",
+      "text": "Yeah, my name is— is not Alwyn."
+    },
+    {
+      "speaker": "caller",
+      "text": "It is Alwyn, A-L"
+    },
+    {
+      "speaker": "agent",
+      "text": "Sorry, say that again?"
+    },
+    {
+      "speaker": "caller",
+      "text": "A-L-V-I-N, Alwyn."
+    },
+    {
+      "speaker": "agent",
+      "text": "Thank you for clarifying, Alvin. How can I help you today?"
+    }
+  ],
+  "after": {
+    "resolution": "resolved",
+    "resolutionNote": "Answered: What time is it.",
+    "leadReason": "correct name spelling",
+    "summaryReason": "Alvin asked about what time it is."
+  }
+}

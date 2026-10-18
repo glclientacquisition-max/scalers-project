@@ -14,9 +14,12 @@ const initial: OnDemandUsageState = {};
 export function OnDemandUsagePanel({
   tenantId,
   enabled: initialEnabled,
+  hint,
 }: {
   tenantId: string;
   enabled: boolean;
+  /** What the saved setting means right now (billing mode aware). */
+  hint?: string | null;
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(saveOnDemandUsage, initial);
@@ -32,7 +35,8 @@ export function OnDemandUsagePanel({
 
   return (
     <section>
-      <h2 className="font-display text-title tracking-tight text-ink">On-demand</h2>
+      <h2 className="font-display text-title tracking-tight text-ink">Extra usage</h2>
+      {hint ? <p className="mt-1 text-body text-ink-2">{hint}</p> : null}
 
       <form action={formAction} data-pull-dirty-guard="" className="mt-3 space-y-4">
         <input type="hidden" name="tenant_id" value={tenantId} />
@@ -46,22 +50,21 @@ export function OnDemandUsagePanel({
             onChange={(e) => setEnabled(e.target.checked)}
           />
           <span className="text-ink">
-            Charge on-demand rates for minutes and SMS past included
+            Allow calls and SMS past what&apos;s included, at the rates below
           </span>
         </label>
 
         {state.error ? <p className="text-body text-warn">{state.error}</p> : null}
         {state.ok ? (
           <p className="text-body text-ok">
-            {state.enabled ? "On-demand enabled." : "On-demand disabled."}
+            {state.enabled ? "Extra usage is on." : "Extra usage is off."}
           </p>
         ) : null}
 
         <Button
           type="submit"
-          disabled={pending}
-         
-         className="gap-2">
+          disabled={pending || enabled === initialEnabled}
+          className="gap-2">
           {pending ? (
             <>
               <span aria-hidden="true" className={pendingSpinnerClass} />

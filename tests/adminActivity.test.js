@@ -16,7 +16,8 @@ const SELF_AUDITING = {
   releasePoolNumber: "dashboard/src/lib/adminBusinessActions.ts",
   archiveBusiness: "dashboard/src/lib/adminBusinessActions.ts",
   restoreBusiness: "dashboard/src/lib/adminBusinessActions.ts",
-  deleteArchivedBusiness: "dashboard/src/lib/adminBusinessActions.ts",
+  suspendBusiness: "dashboard/src/lib/adminBusinessActions.ts",
+  unsuspendBusiness: "dashboard/src/lib/adminBusinessActions.ts",
   // These call billing RPCs that insert into ops_audit_log themselves.
   grantTenantPackageMinutes: "rpc:grant_tenant_package_minutes",
   setTenantBillingMode: "rpc:set_tenant_billing_mode",
@@ -84,7 +85,7 @@ describe("Activity: every admin write is recorded", () => {
 
   it("number assign and release, archive, and package changes carry before and after", () => {
     const actions = read("dashboard/src/lib/adminBusinessActions.ts");
-    for (const action of ["release_number", "archive_business", "restore_business", "delete_business"]) {
+    for (const action of ["release_number", "archive_business", "restore_business", "suspend_business", "unsuspend_business"]) {
       const at = actions.indexOf(`action: "${action}"`);
       assert.ok(at >= 0, action);
       assert.match(actions.slice(at, at + 400), /before:/, action);
@@ -97,11 +98,6 @@ describe("Activity: every admin write is recorded", () => {
       /recordAdminAction\(\{ actor, action: "assign_package", businessId, before, after \}\)/,
     );
     assert.match(read("dashboard/src/app/api/did-pool/route.ts"), /action: "assign_number"[\s\S]{0,300}after:/);
-  });
-
-  it("the delete row is written before the business is gone", () => {
-    const body = fnBody(read("dashboard/src/lib/adminBusinessActions.ts"), "deleteArchivedBusiness");
-    assert.ok(body.indexOf("recordAdminAction(") < body.indexOf("remove_business_and_release_did"));
   });
 });
 

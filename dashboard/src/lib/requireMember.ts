@@ -3,6 +3,7 @@ import { cache } from "react";
 import { getCurrentTenant, memberRowsForUser } from "@/lib/tenant";
 import { can, deniedMessage, normalizeRole, type Action, type Role } from "@/lib/permissions";
 import { teamInvitesEnabled } from "@/lib/teamInvitesFlag";
+import { BUSINESS_CLOSED_ERROR, deskLineState } from "@/lib/tenantLineState";
 
 export class AccessDeniedError extends Error {
   constructor(public action: Action, role?: Role | null) {
@@ -12,6 +13,28 @@ export class AccessDeniedError extends Error {
 }
 
 export type DeniedResult = { ok: false; error: string; denied: true };
+
+/** Thrown by requireMember when the business is archived. */
+export class WorkspaceClosedError extends Error {
+  constructor() {
+    super(BUSINESS_CLOSED_ERROR);
+    this.name = "WorkspaceClosedError";
+  }
+}
+
+/**
+ * True when the signed-in owner's business is archived (or switched off). Every server action
+ * and owner API route goes through memberDenied / requireMember, so this blocks all writes for a
+ * closed business. The closed screen reads through getDeskShellTenant and is not affected.
+ * A suspended (paused) line is not closed: the owner can still read and edit; sends are blocked
+ * separately (outboundSendBlock).
+ */
+export const currentTenantClosed = cache(async (): Promise<boolean> => {
+  const user = await getAuthUser();
+  if (!user) return false;
+  const tenant = await getCurrentTenant();
+  return deskLineState(tenant) === "closed";
+});
 
 /** Light role lookup for the desk shell (no getCurrentTenant; flag off => owner, no query). */
 export const deskMemberRole = cache(async (tenantId: string | null | undefined): Promise<Role | null> => {
@@ -40,6 +63,7 @@ export const currentMemberRole = cache(async (): Promise<Role | null> => {
  * an authenticated member without the permission gets AccessDeniedError.
  */
 export async function requireMember(action: Action): Promise<Role | null> {
+  if (await currentTenantClosed()) throw new WorkspaceClosedError();
   const role = await currentMemberRole();
   if (role === null) return null;
   if (!can(role, action)) throw new AccessDeniedError(action, role);
@@ -53,6 +77,7 @@ export async function requireMember(action: Action): Promise<Role | null> {
  * Signed-out / no-workspace callers return null so the action's own handling runs.
  */
 export async function memberDenied(action: Action): Promise<DeniedResult | null> {
+  if (await currentTenantClosed()) return { ok: false, error: BUSINESS_CLOSED_ERROR, denied: true };
   const role = await currentMemberRole();
   if (role === null || can(role, action)) return null;
   return { ok: false, error: deniedMessage(role, action), denied: true };

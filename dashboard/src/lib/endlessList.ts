@@ -21,6 +21,13 @@ export function nextShown(shown: number, total: number, pageSize: number): numbe
   return Math.min(cap, base + size);
 }
 
+/** Visible fallback under a long list: "Show more · 35 left". */
+export function showMoreLabel(shown: number, total: number): string | null {
+  const left = Math.max(0, Math.floor(total) - Math.floor(shown));
+  if (left <= 0) return null;
+  return `Show more · ${left} left`;
+}
+
 const PULL_REFRESH_PX = 64;
 
 /** Same slack as the ticket "away from latest" control. */

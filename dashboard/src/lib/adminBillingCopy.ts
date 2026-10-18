@@ -127,10 +127,14 @@ export type BillingAuditInput = {
   detail: Record<string, unknown> | null;
 };
 
+/** Reads both shapes: the Desk route's { packageName, period } and the SQL snapshot
+ *  { package_name, period, status } written by assign/unassign_tenant_package. */
 function packageText(value: unknown): string {
   if (!value || typeof value !== "object") return "None";
-  const v = value as { packageName?: unknown; period?: unknown };
-  const name = typeof v.packageName === "string" && v.packageName ? v.packageName : "None";
+  const v = value as { packageName?: unknown; package_name?: unknown; period?: unknown; status?: unknown };
+  if (v.status === "none") return "None";
+  const raw = typeof v.packageName === "string" && v.packageName ? v.packageName : v.package_name;
+  const name = typeof raw === "string" && raw ? raw : "None";
   const period = v.period === "year" ? " / year" : v.period === "month" ? " / month" : "";
   return name === "None" ? "None" : `${name}${period}`;
 }
@@ -140,8 +144,11 @@ export function billingAuditDetail(row: BillingAuditInput): string | null {
   const detail = row.detail || {};
   const note = [detail.note, detail.reason].find((v) => typeof v === "string" && v.trim()) as string | undefined;
   const parts: string[] = [];
-  if (row.action === "assign_package") {
+  if (row.action === "assign_package" || row.action === "unassign_package") {
     parts.push(`${packageText(detail.before)} → ${packageText(detail.after)}`);
+  } else if (row.action === "set_on_demand_usage") {
+    const after = detail.after as { on_demand_usage_enabled?: unknown } | undefined;
+    if (typeof after?.on_demand_usage_enabled === "boolean") parts.push(after.on_demand_usage_enabled ? "On-demand on" : "On-demand off");
   } else if (row.action === "set_billing_mode") {
     const mode = detail.mode;
     if (mode === "off" || mode === "soft" || mode === "hard") parts.push(`Now ${modeName(mode)}`);

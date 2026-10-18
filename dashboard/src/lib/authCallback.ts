@@ -1,4 +1,4 @@
-/** Signup email confirmation: where the link returns to, and safe "next" handling. Pure. */
+/** Signup and password reset email links: where they return to, and safe "next" handling. Pure. */
 
 /** Only same-site relative paths; anything else falls back. */
 export function safeNext(raw: unknown, fallback = "/onboarding"): string {
@@ -21,10 +21,26 @@ export function signupConfirmUrl(origin: string, next = "/onboarding"): string {
   return `${origin.replace(/\/+$/, "")}/auth/callback?next=${encodeURIComponent(safeNext(next))}`;
 }
 
+/** Page that sets a new password after a reset link. */
+export const RESET_PASSWORD_PATH = "/reset-password";
+
+/** True when a callback is finishing a password reset link. */
+export function isResetNext(next: string | null | undefined): boolean {
+  const s = String(next || "");
+  return s === RESET_PASSWORD_PATH || s.startsWith(`${RESET_PASSWORD_PATH}?`);
+}
+
+/** Link target for a password reset email: /auth/callback, then the new password page. */
+export function resetPasswordRedirectUrl(origin: string): string {
+  return signupConfirmUrl(origin, RESET_PASSWORD_PATH);
+}
+
 /** Where to send someone whose link could not sign them in. */
-export function callbackFailurePath(errorCode: string | null | undefined): string {
+export function callbackFailurePath(errorCode: string | null | undefined, next?: string | null): string {
   const code = String(errorCode || "");
-  if (/expired/i.test(code)) return "/login?link=expired";
+  const expired = /expired/i.test(code);
+  if (isResetNext(next)) return `${RESET_PASSWORD_PATH}?link=${expired ? "expired" : "invalid"}`;
+  if (expired) return "/login?link=expired";
   return "/login?link=confirmed";
 }
 

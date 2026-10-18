@@ -21,7 +21,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `catalogue_price_history` | `amount_ksh`, `confirmed`, `effective_from`, `id`, `in_stock`, `item_key`, `item_name`, `kind`, `max_ksh`, `min_ksh`, `mode`, `source`, `tenant_id`, `unit` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `contacts` | `created_at`, `id`, `last_reason`, `metadata`, `name`, `notes`, `phone`, `tenant_id`, `updated_at` | `docs/supabase/contacts_and_requests.sql` |
 | `data_quality_snapshots` | `report`, `taken_on`, `tenant_id` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
-| `notify_sends` | `audience`, `billed_to`, `body`, `call_id`, `call_sid`, `channel`, `created_at`, `error`, `id`, `idempotency_key`, `kind`, `overage`, `provider_message_id`, `recipient`, `status`, `tenant_id`, `units` | `docs/supabase/notify_send_ledger.sql`<br>`docs/supabase/notify_sends_status.sql`<br>`docs/supabase/sms_allowance.sql` |
+| `notify_sends` | `attempts`, `audience`, `billed_to`, `body`, `call_id`, `call_sid`, `channel`, `created_at`, `error`, `failure_reason`, `held_units`, `id`, `idempotency_key`, `kind`, `outcome`, `overage`, `provider_message_id`, `recipient`, `reserved_at`, `settled_at`, `status`, `tenant_id`, `units` | `docs/supabase/notify_send_ledger.sql`<br>`docs/supabase/notify_send_reserve_settle.sql`<br>`docs/supabase/notify_sends_status.sql`<br>`docs/supabase/sms_allowance.sql` |
 | `ops_audit_log` | `action`, `actor`, `amount_kes`, `created_at`, `detail`, `id`, `tenant_id` | `docs/supabase/wallet_security_beta.sql` |
 | `platform_ops_notices` | `acked_at`, `detail`, `id`, `kind`, `notified_at`, `opened_at`, `resolved_at`, `status` | `docs/supabase/platform_ops_notices.sql` |
 | `platform_ops_settings` | `emails`, `id`, `kinds`, `people`, `sautikit_warn_minor`, `updated_at` | `docs/supabase/platform_ops_notices.sql`<br>`docs/supabase/platform_ops_people.sql` |
@@ -35,8 +35,8 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_member_audit` | `action`, `actor`, `created_at`, `from_role`, `id`, `target_email`, `target_user`, `tenant_id`, `to_role` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `tenant_members` | `created_at`, `id`, `invited_by`, `role`, `tenant_id`, `updated_at`, `user_id` | `docs/supabase/multi_tenant_onboarding.sql`<br>`supabase/migrations/20261011000000_team_invites.sql` |
 | `tenant_minute_grants` | `actor`, `created_at`, `id`, `idempotency_key`, `minutes`, `note`, `period_end`, `period_start`, `tenant_id` | `docs/supabase/fix_grant_package_minutes.sql` |
-| `tenant_subscriptions` | `current_period_end`, `current_period_start`, `package_id`, `period`, `started_at`, `status`, `tenant_id`, `updated_at` | `docs/supabase/package_catalog.sql` |
-| `tenants` | `after_hours_mode`, `agent_name`, `agent_tone`, `agent_tools`, `ai_wallet_balance_usd`, `alert_email`, `archived_at`, `archived_by`, `beta_expires_at`, `beta_notes`, `billing_enforcement`, `business_category`, `business_hours`, `business_locations`, `business_name`, `business_policies`, `business_type`, `created_at`, `daily_bulletin`, `email_included_units`, `email_used_units`, `escalation_enabled`, `faqs`, `greeting_invite`, `handoff_mode`, `hours_schedule`, `id`, `is_active`, `line_grace_days`, `line_paid_through`, `line_status`, `llm_system_prompt`, `minutes_included`, `notify_channels`, `on_demand_usage_enabled`, `onboarding_draft`, `onboarding_draft_version`, `onboarding_step`, `owner_user_id`, `product_catalog`, `pronunciation_gemini_scan_logs`, `pronunciation_review_queue`, `pronunciation_scan_dismissals`, `sautikit_virtual_number`, `seat_included`, `seconds_used`, `service_areas`, `services_catalog`, `services_offered`, `setup_completed_at`, `sms_included_units`, `sms_used_units`, `social_handles`, `soft_spend_limit_enabled`, `soft_spend_limit_kes`, `soniox_voice_id`, `soniox_voice_label`, `spoken_name`, `team_directory`, `telecom_wallet_balance_kes`, `tts_lexicon`, `unknown_answer_fallback`, `vertical`, `voice_language_other`, `voice_languages`, `wallet_balance_kes`, `wallet_empty_alert_sent_at`, `wallet_low_alert_sent_at`, `wallet_low_balance_kes`, `whatsapp_included_units`, `whatsapp_notification_number`, `whatsapp_used_units` | `docs/supabase/admin_business_archive.sql`<br>`docs/supabase/after_hours_mode.sql`<br>`docs/supabase/agent_tools.sql`<br>`docs/supabase/alert_email.sql`<br>`docs/supabase/business_operating_model.sql`<br>`docs/supabase/daily_bulletin.sql`<br>`docs/supabase/employee_training.sql`<br>`docs/supabase/foundation_bootstrap.sql`<br>`docs/supabase/greeting_spoken_name.sql`<br>`docs/supabase/hours_schedule.sql`<br>`docs/supabase/knowledge_acquisition_phase1.sql`<br>`docs/supabase/line_rental_grace.sql`<br>`docs/supabase/multi_tenant_onboarding.sql`<br>`docs/supabase/notify_channels.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/package_catalog.sql`<br>`docs/supabase/package_entitlements.sql`<br>`docs/supabase/product_catalog_and_social.sql`<br>`docs/supabase/pronunciation_gemini_scan.sql`<br>`docs/supabase/services_catalog.sql`<br>`docs/supabase/sms_allowance.sql`<br>`docs/supabase/soniox_voice_id.sql`<br>`docs/supabase/tenant_business_profile.sql`<br>`docs/supabase/tts_lexicon.sql`<br>`docs/supabase/voice_languages.sql`<br>`docs/supabase/wallet_metering.sql`<br>`docs/supabase/wallet_on_demand_alerts.sql`<br>`docs/supabase/wallet_security_beta.sql`<br>`docs/supabase/wallet_soft_spend_limit.sql`<br>`supabase/migrations/20261011150000_onboarding_setup.sql`<br>`supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012150000_locations_service_areas.sql` |
+| `tenant_subscriptions` | `current_period_end`, `current_period_start`, `ended_at`, `package_id`, `pending_actor`, `pending_change`, `pending_effective_at`, `pending_package_id`, `pending_period`, `pending_set_at`, `period`, `started_at`, `status`, `tenant_id`, `term_end`, `term_start`, `updated_at` | `docs/supabase/package_catalog.sql`<br>`docs/supabase/package_state_rules.sql` |
+| `tenants` | `after_hours_mode`, `agent_name`, `agent_tone`, `agent_tools`, `ai_wallet_balance_usd`, `alert_email`, `archived_at`, `archived_by`, `beta_expires_at`, `beta_notes`, `billing_enforcement`, `business_category`, `business_hours`, `business_locations`, `business_name`, `business_policies`, `business_type`, `created_at`, `daily_bulletin`, `email_included_units`, `email_used_units`, `escalation_enabled`, `faqs`, `greeting_invite`, `handoff_mode`, `hours_schedule`, `id`, `is_active`, `line_grace_days`, `line_paid_through`, `line_status`, `llm_system_prompt`, `minutes_included`, `notify_channels`, `on_demand_usage_enabled`, `onboarding_draft`, `onboarding_draft_version`, `onboarding_step`, `owner_user_id`, `product_catalog`, `pronunciation_gemini_scan_logs`, `pronunciation_review_queue`, `pronunciation_scan_dismissals`, `sautikit_virtual_number`, `seat_included`, `seconds_used`, `service_areas`, `services_catalog`, `services_offered`, `setup_completed_at`, `sms_included_units`, `sms_used_units`, `social_handles`, `soft_spend_limit_enabled`, `soft_spend_limit_kes`, `soniox_voice_id`, `soniox_voice_label`, `spoken_name`, `suspended_at`, `suspended_by`, `team_directory`, `telecom_wallet_balance_kes`, `tts_lexicon`, `unknown_answer_fallback`, `vertical`, `voice_language_other`, `voice_languages`, `wallet_balance_kes`, `wallet_empty_alert_sent_at`, `wallet_low_alert_sent_at`, `wallet_low_balance_kes`, `whatsapp_included_units`, `whatsapp_notification_number`, `whatsapp_used_units` | `docs/supabase/admin_business_archive.sql`<br>`docs/supabase/admin_business_suspend.sql`<br>`docs/supabase/after_hours_mode.sql`<br>`docs/supabase/agent_tools.sql`<br>`docs/supabase/alert_email.sql`<br>`docs/supabase/business_operating_model.sql`<br>`docs/supabase/daily_bulletin.sql`<br>`docs/supabase/employee_training.sql`<br>`docs/supabase/foundation_bootstrap.sql`<br>`docs/supabase/greeting_spoken_name.sql`<br>`docs/supabase/hours_schedule.sql`<br>`docs/supabase/knowledge_acquisition_phase1.sql`<br>`docs/supabase/line_rental_grace.sql`<br>`docs/supabase/multi_tenant_onboarding.sql`<br>`docs/supabase/notify_channels.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/package_catalog.sql`<br>`docs/supabase/package_entitlements.sql`<br>`docs/supabase/product_catalog_and_social.sql`<br>`docs/supabase/pronunciation_gemini_scan.sql`<br>`docs/supabase/services_catalog.sql`<br>`docs/supabase/sms_allowance.sql`<br>`docs/supabase/soniox_voice_id.sql`<br>`docs/supabase/tenant_business_profile.sql`<br>`docs/supabase/tts_lexicon.sql`<br>`docs/supabase/voice_languages.sql`<br>`docs/supabase/wallet_metering.sql`<br>`docs/supabase/wallet_on_demand_alerts.sql`<br>`docs/supabase/wallet_security_beta.sql`<br>`docs/supabase/wallet_soft_spend_limit.sql`<br>`supabase/migrations/20261011150000_onboarding_setup.sql`<br>`supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012150000_locations_service_areas.sql` |
 | `transcripts` | `call_id`, `created_at`, `id`, `latency_ms`, `speaker`, `text_content` | `docs/supabase/foundation_bootstrap.sql` |
 | `voice_platform_audio` | `expires_at`, `file_sha256`, `key`, `last_error`, `last_error_at`, `mime_type`, `size_bytes`, `updated_at`, `uploaded_at`, `url` | `docs/supabase/voice_platform_audio.sql` |
 | `voice_turn_traces` | `call_id`, `checks`, `created_at`, `diagnosis`, `id`, `payload`, `pii`, `record_kind`, `release`, `schema_version`, `score`, `tenant_id`, `turn_index` | `docs/supabase/voice_turn_traces.sql` |
@@ -44,16 +44,20 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `whatsapp_messages` | `body`, `created_at`, `direction`, `id`, `msg_type`, `payload`, `status`, `thread_id`, `wamid` | `docs/supabase/whatsapp_threads.sql` |
 | `whatsapp_threads` | `contact_name`, `contact_wa_id`, `created_at`, `e164`, `id`, `identity`, `last_inbound_at`, `last_outbound_at`, `phone_number_id`, `sautikit_number_id`, `updated_at` | `docs/supabase/whatsapp_threads.sql` |
 
-## Views (1)
+## Views (3)
 
 | View | Defined in |
 | --- | --- |
 | `data_quality_daily` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
+| `notify_sms_billable` | `docs/supabase/notify_send_reserve_settle.sql` |
+| `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 
-## Functions (79)
+## Functions (97)
 
 | Function | Defined in |
 | --- | --- |
+| `_billing_package_snapshot` | `docs/supabase/package_state_rules.sql` |
+| `_billing_package_snapshot_of` | `docs/supabase/package_state_rules.sql` |
 | `_catalogue_item_key` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `_data_quality_rows` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `_record_catalogue_prices` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
@@ -71,14 +75,20 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `_tenant_holds_allowed` | `docs/supabase/tenant_field_provenance.sql` |
 | `_tenant_number_assigned` | `supabase/migrations/20261011170000_completeness_matches_onboarding.sql` |
 | `_tenant_owner_holdable_product` | `docs/supabase/tenant_field_provenance.sql` |
+| `_tenant_set_allowances` | `docs/supabase/package_state_rules.sql` |
 | `_wallet_apply_delta` | `docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_security_beta.sql` |
 | `accept_tenant_invite` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `adjust_tenant_wallet` | `docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_metering.sql`<br>`docs/supabase/wallet_security_beta.sql` |
+| `admin_set_business_suspended` | `docs/supabase/admin_business_suspend.sql` |
 | `apply_line_rental` | `docs/supabase/line_rental_grace.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_security_beta.sql` |
+| `archive_tenant_billing` | `docs/supabase/archive_tenant_billing.sql` |
+| `archived_tenant_recording_objects` | `docs/supabase/purge_archived_tenants.sql` |
 | `assign_did_from_pool` | `docs/supabase/did_number_pool.sql` |
 | `assign_specific_did_to_tenant` | `docs/supabase/did_number_pool.sql` |
-| `assign_tenant_package` | `docs/supabase/package_catalog.sql` |
+| `assign_tenant_package` | `docs/supabase/package_catalog.sql`<br>`docs/supabase/package_state_rules.sql` |
 | `backfill_tenant_field_meta_seed` | `docs/supabase/tenant_field_provenance.sql` |
+| `billing_add_months` | `docs/supabase/package_state_rules.sql` |
+| `billing_grant_minutes_for_period` | `docs/supabase/package_state_rules.sql` |
 | `charge_call_to_wallet` | `docs/supabase/fix_charge_call_wallet_ambiguous.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_on_demand_alerts.sql` |
 | `claim_wallet_balance_alerts` | `docs/supabase/wallet_on_demand_alerts.sql` |
 | `confirm_tenant_field` | `docs/supabase/tenant_field_provenance.sql` |
@@ -101,34 +111,44 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `ke_mobile_valid` | `supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `member_can_admin` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `member_can_write` | `supabase/migrations/20261011000000_team_invites.sql` |
-| `notify_sends_deny_mutation` | `docs/supabase/notify_send_ledger.sql` |
+| `notify_sends_deny_mutation` | `docs/supabase/notify_send_ledger.sql`<br>`docs/supabase/notify_send_reserve_settle.sql`<br>`docs/supabase/purge_archived_tenants.sql` |
 | `parse_payments_text` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `parse_price_ksh` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `payments_to_v2` | `supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `payments_valid` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `platform_soniox_voices_enforce_single_default` | `docs/supabase/soniox_voice_id.sql` |
 | `policy_rules_valid` | `supabase/migrations/20261012090000_payments_policies_v2.sql` |
+| `purge_archived_tenants` | `docs/supabase/purge_archived_tenants.sql` |
 | `purge_voice_turn_traces` | `docs/supabase/voice_turn_traces.sql` |
-| `refresh_line_status` | `docs/supabase/line_rental_grace.sql` |
+| `refresh_line_status` | `docs/supabase/admin_business_suspend.sql`<br>`docs/supabase/line_rental_grace.sql` |
 | `release_did_from_business` | `docs/supabase/super_admin_ops.sql` |
+| `release_stale_notify_sends` | `docs/supabase/notify_send_reserve_settle.sql` |
 | `remove_business_and_release_did` | `docs/supabase/super_admin_ops.sql` |
 | `reopen_tenant_field` | `docs/supabase/tenant_field_confirm_v2.sql` |
+| `reserve_notify_send` | `docs/supabase/notify_send_reserve_settle.sql` |
+| `roll_package_periods` | `docs/supabase/package_period_rollover.sql` |
 | `save_daily_bulletin` | `supabase/migrations/20261012210000_three_features.sql` |
 | `save_onboarding_step` | `supabase/migrations/20261011150000_onboarding_setup.sql` |
 | `service_areas_valid` | `supabase/migrations/20261012150000_locations_service_areas.sql`<br>`supabase/migrations/20261013090000_outside_areas.sql` |
 | `set_tenant_billing_mode` | `docs/supabase/wallet_security_beta.sql` |
-| `set_tenant_on_demand_usage` | `docs/supabase/wallet_on_demand_alerts.sql` |
+| `set_tenant_on_demand_usage` | `docs/supabase/on_demand_usage_audit.sql`<br>`docs/supabase/wallet_on_demand_alerts.sql` |
 | `set_tenant_soft_spend_limit` | `docs/supabase/wallet_soft_spend_limit.sql` |
+| `settle_notify_send` | `docs/supabase/notify_send_reserve_settle.sql` |
+| `sms_counter_drift` | `docs/supabase/notify_send_reserve_settle.sql` |
+| `sms_counter_drift_log` | `docs/supabase/notify_send_reserve_settle.sql` |
 | `snapshot_data_quality` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
-| `suspend_line_for_nonpayment` | `docs/supabase/line_rental_grace.sql` |
+| `suspend_line_for_nonpayment` | `docs/supabase/admin_business_suspend.sql`<br>`docs/supabase/line_rental_grace.sql` |
 | `tenant_completeness_score` | `docs/supabase/tenant_field_provenance.sql`<br>`supabase/migrations/20261011170000_completeness_matches_onboarding.sql` |
 | `tenant_hold_gate` | `docs/supabase/tenant_field_provenance.sql` |
 | `tenant_member_directory` | `supabase/migrations/20261011140000_team_scale.sql` |
 | `tenant_seat_available` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `tenant_seats_used` | `supabase/migrations/20261011000000_team_invites.sql` |
+| `tenants_archived_billing_guard` | `docs/supabase/archive_tenant_billing.sql` |
 | `tenants_protect_wallet_columns` | `docs/supabase/foundation_bootstrap.sql`<br>`docs/supabase/line_rental_grace.sql`<br>`docs/supabase/package_catalog.sql`<br>`docs/supabase/package_entitlements.sql`<br>`docs/supabase/sms_allowance.sql`<br>`docs/supabase/wallet_on_demand_alerts.sql`<br>`docs/supabase/wallet_security_beta.sql`<br>`docs/supabase/wallet_soft_spend_limit.sql` |
 | `to_e164_ke` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `transfer_tenant_ownership` | `supabase/migrations/20261011000000_team_invites.sql` |
+| `unarchive_tenant_billing` | `docs/supabase/archive_tenant_billing.sql` |
+| `unassign_tenant_package` | `docs/supabase/package_state_rules.sql` |
 | `upsert_tenant_field_meta` | `docs/supabase/tenant_field_provenance.sql` |
 | `voice_platform_audio_touch` | `docs/supabase/voice_platform_audio.sql` |
 | `waive_tenant_overage` | `docs/supabase/admin_billing_ops.sql` |

@@ -1,0 +1,355 @@
+{
+  "_note": "Staging Jirani Cleaning Services tenant row (sgcdncjxauhsbunobmob), read-only snapshot 2026-10-17 20:20 EAT. Team contacts removed.",
+  "tenant": {
+    "after_hours_mode": "serve",
+    "agent_name": "Wanjiru",
+    "agent_tone": "warm",
+    "agent_tools": {
+      "end_call": true,
+      "escalate": true
+    },
+    "business_hours": "Mon-Fri: 07:30-18:00 EAT; Sat: 08:00-16:00 EAT; Sun: closed. Location: Kilimani · Argwings Kodhek Road",
+    "business_locations": [
+      {
+        "hours": "",
+        "label": "Office",
+        "address": "Argwings Kodhek Road",
+        "area_id": "place:kilimani",
+        "landmark": "Near Yaya Centre",
+        "directions": "",
+        "coverage_notes": ""
+      }
+    ],
+    "business_name": "Jirani Cleaning Services",
+    "business_policies": {
+      "other": "",
+      "booking": {
+        "source": "owner",
+        "confirmed": true
+      },
+      "deposit": "No deposit for homes under 4 bedrooms.",
+      "payment": "M-Pesa (Till) or cash after the job. No payment before the team arrives.",
+      "returns": "",
+      "delivery": "Home visits in Kilimani (no travel fee), Kileleshwa, Lavington and Westlands (KSh 300 travel fee), and Karen (KSh 800 travel fee).",
+      "warranty": "If something was missed, tell us within 24 hours and we come back to redo it free.",
+      "booking_mode": "request",
+      "cancellation": "Free to reschedule up to 12 hours before the visit.",
+      "coverage_areas": [
+        "place:kilimani",
+        "place:kileleshwa",
+        "place:lavington",
+        "place:westlands",
+        "place:karen"
+      ],
+      "coverage_outside": null
+    },
+    "daily_bulletin": [],
+    "faqs": [
+      {
+        "answer": "Every room top to bottom: dusting walls and ceilings, inside windows, kitchen cabinets inside and out, oven and fridge, scrubbing bathrooms and tiles, mopping and disinfecting floors, and wiping doors and switches.",
+        "source": "owner",
+        "status": "confirmed",
+        "question": "What is included in a deep clean?",
+        "confirmed": true
+      },
+      {
+        "answer": "Yes. Our team brings all supplies and equipment, including the vacuum and steam cleaner.",
+        "source": "owner",
+        "status": "confirmed",
+        "question": "Do you bring your own cleaning supplies?",
+        "confirmed": true
+      },
+      {
+        "answer": "About 4 hours for a 1 bedroom, 5 to 6 hours for a 2 bedroom, and about 7 hours for a 3 bedroom.",
+        "source": "owner",
+        "status": "confirmed",
+        "question": "How long does a deep clean take?",
+        "confirmed": true
+      },
+      {
+        "answer": "Yes. You pay by M-Pesa, to our Till number, once the job is done and you are happy with it. Cash is fine too. We never ask for payment before the team arrives.",
+        "source": "owner",
+        "status": "confirmed",
+        "question": "Do you take M-Pesa?",
+        "confirmed": true
+      },
+      {
+        "answer": "Someone should let the team in and check the work at the end. You don't need to stay the whole time.",
+        "source": "owner",
+        "status": "confirmed",
+        "question": "Do I need to be home during the clean?",
+        "confirmed": true
+      }
+    ],
+    "greeting_invite": "Nikusaidie vipi?",
+    "handoff_mode": "callback",
+    "hours_schedule": {
+      "days": {
+        "fri": {
+          "open": "07:30",
+          "close": "18:00"
+        },
+        "mon": {
+          "open": "07:30",
+          "close": "18:00"
+        },
+        "sat": {
+          "open": "08:00",
+          "close": "16:00"
+        },
+        "sun": null,
+        "thu": {
+          "open": "07:30",
+          "close": "18:00"
+        },
+        "tue": {
+          "open": "07:30",
+          "close": "18:00"
+        },
+        "wed": {
+          "open": "07:30",
+          "close": "18:00"
+        }
+      },
+      "location": "Kilimani · Argwings Kodhek Road",
+      "timezone": "Africa/Nairobi"
+    },
+    "id": "78386574-aeb0-4b34-9296-00c5424cdd0e",
+    "llm_system_prompt": null,
+    "product_catalog": [],
+    "sautikit_virtual_number": "+254709221537",
+    "services_catalog": [
+      {
+        "name": "Deep clean, 1 bedroom",
+        "notes": "Whole home top to bottom. Team of 2, about 4 hours.",
+        "source": "owner",
+        "pricing": {
+          "mode": "fixed",
+          "unit": null,
+          "source": "owner",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": true,
+          "amount_ksh": 6500,
+          "parsed_from": "KSh 6,500"
+        },
+        "category": "Deep cleaning",
+        "in_stock": "",
+        "price_range": "KSh 6,500",
+        "out_of_scope": "",
+        "pricing_mode": "fixed",
+        "site_visit_required": false
+      },
+      {
+        "name": "Deep clean, 2 bedroom",
+        "notes": "Whole home top to bottom. Team of 3, about 5 to 6 hours.",
+        "source": "owner",
+        "pricing": {
+          "mode": "fixed",
+          "unit": null,
+          "source": "owner",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": true,
+          "amount_ksh": 9500,
+          "parsed_from": "KSh 9,500"
+        },
+        "category": "Deep cleaning",
+        "in_stock": "",
+        "price_range": "KSh 9,500",
+        "out_of_scope": "",
+        "pricing_mode": "fixed",
+        "site_visit_required": false
+      },
+      {
+        "name": "Deep clean, 3 bedroom",
+        "notes": "Whole home top to bottom. Team of 3, about 7 hours.",
+        "source": "owner",
+        "pricing": {
+          "mode": "fixed",
+          "unit": null,
+          "source": "owner",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": true,
+          "amount_ksh": 13500,
+          "parsed_from": "KSh 13,500"
+        },
+        "category": "Deep cleaning",
+        "in_stock": "",
+        "price_range": "KSh 13,500",
+        "out_of_scope": "",
+        "pricing_mode": "fixed",
+        "site_visit_required": false
+      },
+      {
+        "name": "Standard clean, 2 bedroom",
+        "notes": "Regular tidy-up: floors, surfaces, kitchen, bathrooms.",
+        "source": "owner",
+        "pricing": {
+          "mode": "fixed",
+          "unit": null,
+          "source": "owner",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": true,
+          "amount_ksh": 4500,
+          "parsed_from": "KSh 4,500"
+        },
+        "category": "Regular cleaning",
+        "in_stock": "",
+        "price_range": "KSh 4,500",
+        "out_of_scope": "",
+        "pricing_mode": "fixed",
+        "site_visit_required": false
+      },
+      {
+        "name": "Sofa cleaning",
+        "notes": "Shampoo and extraction. 5-seater from KSh 2,500.",
+        "source": "owner",
+        "pricing": {
+          "mode": "from",
+          "unit": null,
+          "source": "owner",
+          "max_ksh": null,
+          "min_ksh": 2500,
+          "in_stock": null,
+          "confirmed": true,
+          "amount_ksh": 2500,
+          "parsed_from": "From KSh 2,500"
+        },
+        "category": "Upholstery",
+        "in_stock": "",
+        "price_range": "From KSh 2,500",
+        "out_of_scope": "",
+        "pricing_mode": "from",
+        "site_visit_required": false
+      },
+      {
+        "name": "Carpet cleaning",
+        "notes": "Price depends on size. The team confirms it on a callback.",
+        "source": "owner",
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "owner",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": true,
+          "amount_ksh": null,
+          "parsed_from": ""
+        },
+        "category": "Upholstery",
+        "in_stock": "",
+        "price_range": "",
+        "out_of_scope": "",
+        "pricing_mode": "ask",
+        "site_visit_required": false
+      },
+      {
+        "name": "Move-out clean",
+        "notes": "Quoted after a site visit.",
+        "source": "owner",
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "owner",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": true,
+          "amount_ksh": null,
+          "parsed_from": ""
+        },
+        "category": "Deep cleaning",
+        "in_stock": "",
+        "price_range": "",
+        "out_of_scope": "",
+        "pricing_mode": "ask",
+        "site_visit_required": true
+      }
+    ],
+    "social_handles": {},
+    "spoken_name": "Jirani Cleaning Services",
+    "team_directory": [],
+    "unknown_answer_fallback": "I'll check with the team and they'll call you back.",
+    "vertical": "home_services",
+    "service_areas": {
+      "areas": [
+        {
+          "id": "place:kilimani",
+          "eta": "Same day",
+          "modes": [
+            "visit"
+          ],
+          "source": "owner",
+          "fee_ksh": null,
+          "fee_mode": "free",
+          "confirmed": true,
+          "min_order_ksh": null
+        },
+        {
+          "id": "place:kileleshwa",
+          "eta": "Same day",
+          "modes": [
+            "visit"
+          ],
+          "source": "owner",
+          "fee_ksh": 300,
+          "fee_mode": "fixed",
+          "confirmed": true,
+          "min_order_ksh": null
+        },
+        {
+          "id": "place:lavington",
+          "eta": "Same day",
+          "modes": [
+            "visit"
+          ],
+          "source": "owner",
+          "fee_ksh": 300,
+          "fee_mode": "fixed",
+          "confirmed": true,
+          "min_order_ksh": null
+        },
+        {
+          "id": "place:westlands",
+          "eta": "Same day",
+          "modes": [
+            "visit"
+          ],
+          "source": "owner",
+          "fee_ksh": 300,
+          "fee_mode": "fixed",
+          "confirmed": true,
+          "min_order_ksh": null
+        },
+        {
+          "id": "place:karen",
+          "eta": "Next day",
+          "modes": [
+            "visit"
+          ],
+          "source": "owner",
+          "fee_ksh": 800,
+          "fee_mode": "fixed",
+          "confirmed": true,
+          "min_order_ksh": null
+        }
+      ],
+      "reach": "visit",
+      "version": 1,
+      "rider_paid": null,
+      "no_premises": false,
+      "delivered_by": [],
+      "anywhere_kenya": false,
+      "outside_fee_ksh": null
+    }
+  },
+  "field_meta": []
+}

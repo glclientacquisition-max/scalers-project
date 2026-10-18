@@ -354,6 +354,11 @@ function validateCallerInfo(parsed, { agentName = '', businessName = '', knownNa
     name: canonicalCallerName(parsed?.name, knownNames),
     reason: clean(parsed?.reason, 400),
   };
+  // HD_cd0c01f28b05: "correct name spelling" is the name detour, not why they
+  // called. It is never saved as the call reason (it went out on the lead).
+  if (value.reason && require('./leadReason').isNameDetourReason(value.reason)) {
+    value.reason = '';
+  }
   if (value.name && isReservedCallerName(value.name, { agentName, businessName })) {
     // Keep reason-only capture; drop the bad name so we don't poison the lead.
     value.name = '';
@@ -673,8 +678,41 @@ function applyHeldCallerName(parsed, held) {
   return next;
 }
 
+/**
+ * Whether a parsed tool plan would write or send anything (a request, a visit,
+ * a caller-info save, an escalation). Read-only plans skip the line lookup.
+ */
+function brainToolsWantWrite(parsed) {
+  if (!parsed || typeof parsed !== 'object') return false;
+  if (parsed.serviceRequest || parsed.appointment || parsed.appointmentUpdate || parsed.escalate) {
+    return true;
+  }
+  return Boolean(clean(parsed.name, 120) || clean(parsed.reason, 240));
+}
+
+const LINE_CLOSED_REASON = 'This business line is closed. Nothing can be saved or sent.';
+
+/**
+ * Closed line (archived, suspended, is_active=false; VOICE_CLOSED_TENANT_GUARD):
+ * one 'disabled' result per write the plan asked for, and no handler runs.
+ */
+function lineClosedResults(parsed, lineClosed) {
+  const out = [];
+  const refuse = (action) =>
+    out.push({ action, status: 'disabled', code: 'line_closed', lineState: String(lineClosed), reason: LINE_CLOSED_REASON });
+  if (parsed?.serviceRequest) refuse('create_service_request');
+  if (parsed?.appointment) refuse('create_appointment');
+  if (parsed?.appointmentUpdate) refuse('update_appointment');
+  if (clean(parsed?.name, 120) || clean(parsed?.reason, 240)) {
+    refuse('save_caller_info');
+  }
+  if (parsed?.escalate) refuse('escalate');
+  return out;
+}
+
 async function executeBrainTools({
   parsed,
+  lineClosed = null,
   capabilities = {},
   handlers = {},
   completedFingerprints = [],
@@ -715,6 +753,11 @@ async function executeBrainTools({
         reason: clean(error?.message || 'Invalid tool request.', 300),
       });
     }
+  }
+
+  if (lineClosed) {
+    results.push(...lineClosedResults(parsed, lineClosed));
+    return { results, shouldEndCall: false };
   }
 
   if (parsed?.serviceRequest && capabilities.messageOnly) {
@@ -1543,6 +1586,8 @@ function formatToolConfirmation(results = [], language = 'en') {
 }
 
 module.exports = {
+  brainToolsWantWrite,
+  lineClosedResults,
   REQUEST_TYPES,
   RESERVED_CALLER_NAMES,
   stableFingerprint,

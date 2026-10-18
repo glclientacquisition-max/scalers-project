@@ -231,6 +231,58 @@ export function isPackPolicyText(text: any) {
   return PACK_POLICY_KEYS.has(norm(text));
 }
 
+// Twin of Brain BRAIN_CALL_FIXES_D199 (#751, 18 Oct owner review 5): starter
+// policy lines the owner never rewrote. A line telling the receptionist what to
+// do is an instruction, not a fact for the caller; a line that is the starter
+// sentence with a word or two changed (or only punctuation) is still the starter.
+// Keep the regex and the 0.85 threshold lockstep with src/conversation/provenance.js.
+export const RECEPTIONIST_INSTRUCTION =
+  /\b(?:the|our|this) (?:receptionist|assistant|agent|ai|bot)\b[^.]*\b(?:should|must|will|shall|needs? to|is to)\b|\b(?:it|she|he|they) should (?:route|redirect|transfer|refer|direct) the caller\b|\broute the caller\b/i;
+
+export function isReceptionistInstruction(text: any) {
+  return RECEPTIONIST_INSTRUCTION.test(String(text || ''));
+}
+
+function tokenSet(value: any) {
+  return new Set(norm(value).split(' ').filter(Boolean));
+}
+
+/** Token Jaccard >= 0.85 with a starter line of similar length (punctuation ignored). */
+export function isNearPackPolicyText(text: any) {
+  const mine = tokenSet(text);
+  if (mine.size < 4) return false;
+  for (const pack of PACK_POLICY_TEXTS) {
+    const theirs = tokenSet(pack);
+    let shared = 0;
+    for (const word of mine) if (theirs.has(word)) shared += 1;
+    const union = mine.size + theirs.size - shared;
+    if (union && shared / union >= 0.85) return true;
+  }
+  return false;
+}
+
+/**
+ * Filter on: exact starter, near-duplicate starter, or a receptionist instruction.
+ * Filter off: exact starter only (Brain flag off). This file never reads env:
+ * the server sets it from BRAIN_CALL_FIXES_D199 (see tenantFieldProvenance.ts).
+ */
+export function isSeedPolicyText(text: any, { seedFilter = false }: { seedFilter?: boolean } = {}) {
+  if (isPackPolicyText(text)) return true;
+  if (!seedFilter) return false;
+  return isNearPackPolicyText(text) || isReceptionistInstruction(text);
+}
+
+function seedFilterOf(fieldMeta: any): boolean {
+  return Boolean(fieldMeta && typeof fieldMeta === 'object' && fieldMeta.seedFilter === true);
+}
+
+/** Carry the seed filter on fieldMeta like hashMode, so every classify call sees it. */
+export function withSeedFilter(fieldMeta: any, seedFilter?: boolean): any {
+  if (typeof seedFilter !== 'boolean') return fieldMeta;
+  if (!fieldMeta) return seedFilter ? { loaded: false, byPath: {}, seedFilter: true } : null;
+  return { ...fieldMeta, seedFilter };
+}
+
 export function isPackService(row: any) {
   if (!row || typeof row !== 'object') return false;
   const price = row.price_range || row.priceRange || row.price || '';
@@ -243,11 +295,15 @@ export function isPackService(row: any) {
  * this tenant has no rows, so each missing path still uses the heuristic.
  * @param {Array<{ field_path?: string, source?: string }>|null|undefined} rows
  */
-export function indexFieldMeta(rows: any, { hashMode }: { hashMode?: boolean } = {}) {
+export function indexFieldMeta(
+  rows: any,
+  { hashMode, seedFilter }: { hashMode?: boolean; seedFilter?: boolean } = {}
+) {
   if (!Array.isArray(rows)) {
     // Hash mode with no table loaded: every path is unconfirmed, so carry the
     // mode on an empty index instead of returning null (null = P0 heuristic).
-    return hashMode === true ? { loaded: false, hashMode: true, byPath: {} } : null;
+    const empty = hashMode === true ? { loaded: false, hashMode: true, byPath: {} } : null;
+    return seedFilter === true ? withSeedFilter(empty, true) : empty;
   }
   const byPath: Record<string, any> = {};
   for (const row of rows) {
@@ -270,6 +326,7 @@ export function indexFieldMeta(rows: any, { hashMode }: { hashMode?: boolean } =
   }
   const out: Record<string, any> = { loaded: true, byPath };
   if (typeof hashMode === 'boolean') out.hashMode = hashMode;
+  if (seedFilter === true) out.seedFilter = true;
   return out;
 }
 
@@ -359,7 +416,7 @@ export function classifyFaq(faq: any, fieldMeta: any = null, fieldPath: any = ''
 export function classifyPolicyValue(text: any, meta: any, fieldMeta: any = null, fieldPath: any = '') {
   const value = String(text || '').trim();
   if (!value) return { source: '', confirmed: false, fact: false, status: 'suggested', empty: true };
-  const packSeed = isPackPolicyText(value);
+  const packSeed = isSeedPolicyText(value, { seedFilter: seedFilterOf(fieldMeta) });
   const base = meta && typeof meta === 'object' && Object.keys(meta).length
     ? meta
     : { source: packSeed ? 'seed' : '' };
@@ -584,6 +641,7 @@ export function buildCompileSections({
   fieldMeta = null,
   holdGate = null,
   hashMode = undefined,
+  seedFilter = undefined,
 }: {
   faqs?: unknown[];
   policiesText?: string;
@@ -595,8 +653,10 @@ export function buildCompileSections({
   holdGate?: unknown;
   /** Pass from the server (FACT_HASH_MODE); client code never reads env. */
   hashMode?: boolean;
+  /** Pass from the server (BRAIN_CALL_FIXES_D199); otherwise read from fieldMeta.seedFilter. */
+  seedFilter?: boolean;
 } = {}) {
-  fieldMeta = withHashMode(fieldMeta, hashMode);
+  fieldMeta = withSeedFilter(withHashMode(fieldMeta, hashMode), seedFilter);
   const faqRows = asArray(faqs)
     .map((faq, index) => classifyFaq(faq, fieldMeta, faqFieldPath(index)))
     .filter((row) => row.question && row.answer);
@@ -618,7 +678,7 @@ export function buildCompileSections({
     const kept: string[] = [];
     for (const line of policyBody.split('\n')) {
       const match = line.match(/^-\s*([^:]+):\s*(.+)$/);
-      if (match && isPackPolicyText(match[2])) {
+      if (match && isSeedPolicyText(match[2], { seedFilter: seedFilterOf(fieldMeta) })) {
         const label = match[1].trim();
         if (!unknown.includes(label)) unknown.push(label);
         continue;

@@ -3,9 +3,12 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { adminLoginHref, hostOnlyCookieOptions } from "@/lib/adminHost";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 import { welcomeHomePath } from "@/lib/authRedirect";
+import { createDeskTimer } from "@/lib/deskTiming";
 import { acceptPendingInvitesForUser, DESK_TENANT_COOKIE, deskTenantCookieOptions } from "@/lib/inviteAccept";
 
 export async function POST(request: NextRequest) {
+  // Sign-in timing (preview 18 Oct: first submit to /home took 17.2s, later 1.8s).
+  const timer = createDeskTimer();
   const form = await request.formData();
   const email = String(form.get("email") || "")
     .trim()
@@ -48,7 +51,9 @@ export async function POST(request: NextRequest) {
   });
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  timer.mark("auth");
   if (error) {
+    console.info(timer.line("login") + " result=denied");
     return NextResponse.redirect(new URL("/login?error=1", request.url), 303);
   }
 
@@ -60,6 +65,8 @@ export async function POST(request: NextRequest) {
       res.cookies.set(DESK_TENANT_COOKIE, joined.tenantId, deskTenantCookieOptions);
     }
   }
+  timer.mark("invites");
+  console.info(timer.line("login") + " result=ok");
 
   return res;
 }
