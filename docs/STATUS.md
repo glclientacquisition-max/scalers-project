@@ -121,7 +121,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 **Ops-Billing (dated per the STATUS rule):**
 
 - **18 Oct 2026, in flight: #775** billing data layer (`cursor/billing-data-layer-cc4b`). Staging SQL only (section 3). No charges, no send-path change, no prod SQL.
-- **18 Oct 2026, in flight:** admin package version editor (`cursor/admin-package-versions-b52e`), stacked on #775. Server API only. Desk still builds the Packages screen. Contract: [`PACKAGE_VERSIONS_API.md`](reference/operations/PACKAGE_VERSIONS_API.md). Staging SQL in section 3. No prod SQL. Do not run the promote script against production.
+- **18 Oct 2026, in flight: #778** admin package version editor (`cursor/admin-package-versions-b52e`), stacked on #775. Server API only. Desk still builds the Packages screen. Contract: [`PACKAGE_VERSIONS_API.md`](reference/operations/PACKAGE_VERSIONS_API.md). Staging SQL in section 3. No prod SQL. Do not run the promote script against production.
 
 
 
@@ -197,7 +197,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **Admin:** Suspend/Archive shipped (#737, 18 Oct). Purge schedule not applied. Still to do: business edit / members / owner reset, package catalogue, billing period card, invoices.
 - **Settings / onboarding**: shipped (#656, #667, #672). GIGO P1/P2 follow-ups remain.
 - **UI/UX sweep** across Desk and Admin.
-- **Packages**: state rules and rollover shipped (#631, #650). Staging has the billing data layer (versions, `billing_status`, invoices, notices, `tenant_escalation_allowed`, number quarantine). The admin package version editor API is in flight on `cursor/admin-package-versions-b52e` (stacked on #775): draft, publish, archive, grandfather, audit. Desk still builds the screen. No charges and no prod SQL. A pay action remains.
+- **Packages**: state rules and rollover shipped (#631, #650). Staging has the billing data layer (versions, `billing_status`, invoices, notices, `tenant_escalation_allowed`, number quarantine). The admin package version editor API is in flight on #778 (`cursor/admin-package-versions-b52e`, stacked on #775): draft, publish, archive, grandfather, audit. Desk still builds the screen. No charges and no prod SQL. A pay action remains.
 - **Landing page** (#492 parked until its turn).
 - **Legal pack draft #653** (Terms, Privacy, DPA, call notice, beta terms). Parked; call notice ties to the recording decision.
 - **WhatsApp as the assistant doing work** (not just alerts).
