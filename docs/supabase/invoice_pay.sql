@@ -53,9 +53,40 @@ alter table public.payment_attempts
   add column if not exists checkout_url text,
   add column if not exists checkout_expires_at timestamptz,
   add column if not exists client_reference text,
-  add column if not exists updated_at timestamptz not null default now(),
   add column if not exists raw jsonb not null default '{}'::jsonb,
-  add column if not exists return_id text;
+  add column if not exists return_id text,
+  add column if not exists return_expires_at timestamptz;
+
+-- updated_at has no volatile default on ADD. now() is volatile, so
+-- ADD COLUMN ... NOT NULL DEFAULT now() rewrites every row under
+-- ACCESS EXCLUSIVE. This block does not.
+--
+-- Lock expectations (PostgreSQL 11+, including 16):
+--   ADD COLUMN without a default is a catalog update. ACCESS EXCLUSIVE, no rewrite.
+--   UPDATE ... WHERE updated_at IS NULL takes ROW EXCLUSIVE and rewrites only
+--   the null rows. On 18 Oct 2026 staging, payment_attempts was empty.
+--   SET DEFAULT now() stores the expression and does not rewrite existing rows.
+--   SET NOT NULL scans under ACCESS EXCLUSIVE. On a populated table, run that
+--   statement in its own transaction so the lock does not cover a long scan.
+--   Staging is empty, so one script is a short lock. Do not fold this column
+--   back into the ADD list above with DEFAULT now().
+alter table public.payment_attempts
+  add column if not exists updated_at timestamptz;
+
+update public.payment_attempts
+set updated_at = coalesce(updated_at, created_at, now())
+where updated_at is null;
+
+alter table public.payment_attempts
+  alter column updated_at set default now();
+
+alter table public.payment_attempts
+  alter column updated_at set not null;
+
+update public.payment_attempts
+set return_expires_at = created_at + interval '24 hours'
+where return_id is not null
+  and return_expires_at is null;
 
 create unique index if not exists payment_attempts_return_uidx
   on public.payment_attempts (return_id)
@@ -68,7 +99,7 @@ create unique index if not exists payment_attempts_one_pending_part
 alter table public.payment_attempts drop constraint if exists payment_attempts_status_check;
 alter table public.payment_attempts
   add constraint payment_attempts_status_check
-  check (status in ('pending', 'succeeded', 'failed', 'issue', 'cancelled'));
+  check (status in ('pending', 'succeeded', 'failed', 'issue', 'cancelled', 'superseded'));
 
 create index if not exists payment_attempts_invoice_idx
   on public.payment_attempts (invoice_id, created_at);
@@ -356,10 +387,13 @@ revoke all on function public.pay_invoice_by_token(text) from public, anon, auth
 grant execute on function public.pay_invoice_by_token(text) to service_role;
 
 -- ---------------------------------------------------------------------------
--- Reserve the next part. Locks the invoice, keeps one pending row per part,
--- and cancels an expired checkout before a new row is inserted. The caller
--- cancels the Bachs session between those two calls. A null checkout URL is
--- still in flight. A reference is single-use, including after expiry.
+-- Reserve the next part. Locks the invoice, keeps one pending row per part.
+-- An expired checkout stays pending and returns cancel=true. The caller
+-- cancels the Bachs session, then marks this row cancelled, then calls again.
+-- If that cancel fails and the session is still open, the caller keeps this
+-- row and does not insert another. A null checkout URL is still in flight.
+-- A reference is single-use, including after expiry. The return id expires
+-- 24 hours after the row is inserted.
 -- ---------------------------------------------------------------------------
 create or replace function public.create_invoice_pay_attempt(p_token text, p_amount_kes numeric)
 returns jsonb
@@ -414,9 +448,6 @@ begin
   limit 1;
   if found then
     if v_existing.checkout_expires_at is not null and v_existing.checkout_expires_at <= now() then
-      update public.payment_attempts
-      set status = 'cancelled', updated_at = now()
-      where id = v_existing.id;
       return jsonb_build_object(
         'id', v_existing.id,
         'checkout_session_id', v_existing.checkout_session_id,
@@ -446,9 +477,11 @@ begin
 
   v_return := 'ret_' || rtrim(translate(encode(gen_random_bytes(32), 'base64'), '+/', '-_'), '=');
   insert into public.payment_attempts (
-    tenant_id, invoice_id, provider, status, amount_kes, currency, part_index, part_count, return_id, client_reference
+    tenant_id, invoice_id, provider, status, amount_kes, currency, part_index, part_count,
+    return_id, return_expires_at, client_reference
   ) values (
-    v_tenant, v_invoice, 'bachs', 'pending', v_part.amount_kes, 'KES', v_part.part_index, v_part.part_count, v_return, null
+    v_tenant, v_invoice, 'bachs', 'pending', v_part.amount_kes, 'KES', v_part.part_index, v_part.part_count,
+    v_return, now() + interval '24 hours', null
   )
   returning * into v_row;
 
@@ -591,7 +624,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if p_status not in ('pending', 'succeeded', 'failed', 'issue', 'cancelled') then
+  if p_status not in ('pending', 'succeeded', 'failed', 'issue', 'cancelled', 'superseded') then
     raise exception 'unknown attempt status';
   end if;
   update public.payment_attempts
@@ -738,10 +771,15 @@ as $$
     'Invoice paid without a matched payment'
   from public.invoices i
   where i.status = 'paid'
+    and i.total_kes > 0
     and not exists (
       select 1 from public.payments p
       where p.invoice_id = i.id
         and p.match_status in ('matched', 'partial', 'over')
+    )
+    and not exists (
+      select 1 from public.tenant_credits c
+      where c.idempotency_key = 'invoice-credit:' || i.id::text
     )
   union all
   select
@@ -788,7 +826,39 @@ as $$
   from public.payment_attempts a
   join public.payments p
     on p.provider_ref = a.checkout_session_id
-  where lower(coalesce(p.raw #>> '{data,status}', '')) = 'overpaid';
+  where lower(coalesce(p.raw #>> '{data,status}', '')) = 'overpaid'
+  union all
+  select
+    'credited_cancelled',
+    a.id,
+    a.invoice_id,
+    p.id,
+    'Collected on a cancelled checkout and credited'
+  from public.payment_attempts a
+  join public.payments p
+    on p.provider = a.provider
+   and p.provider_ref = a.checkout_session_id
+  join public.tenant_credits c
+    on c.idempotency_key = 'cancelled:' || p.provider || ':' || p.provider_ref
+  where a.status in ('cancelled', 'superseded')
+  union all
+  select
+    'status_disagreement',
+    a.id,
+    a.invoice_id,
+    p.id,
+    'Collected on a cancelled checkout with no credit'
+  from public.payment_attempts a
+  join public.payments p
+    on p.provider = a.provider
+   and p.provider_ref = a.checkout_session_id
+  where a.status in ('cancelled', 'superseded')
+    and p.match_status = 'issue'
+    and p.amount_kes > 0
+    and not exists (
+      select 1 from public.tenant_credits c
+      where c.idempotency_key = 'cancelled:' || p.provider || ':' || p.provider_ref
+    );
 $$;
 
 comment on function public.billing_payment_reconciliation() is
@@ -799,6 +869,7 @@ grant execute on function public.billing_payment_reconciliation() to service_rol
 
 -- ---------------------------------------------------------------------------
 -- Return id. Display only. It is not a pay token and cannot start a checkout.
+-- It expires 24 hours after the attempt is created. A missing expiry is expired.
 -- ---------------------------------------------------------------------------
 create or replace function public.pay_invoice_by_return(p_return_id text)
 returns jsonb
@@ -823,6 +894,14 @@ begin
   where return_id = btrim(p_return_id);
   if not found then
     return jsonb_build_object('found', false);
+  end if;
+  if v_attempt.return_expires_at is null or v_attempt.return_expires_at <= now() then
+    return jsonb_build_object(
+      'found', true,
+      'state', 'expired',
+      'invoice_id', v_attempt.invoice_id,
+      'tenant_id', v_attempt.tenant_id
+    );
   end if;
   select * into v_inv from public.invoices where id = v_attempt.invoice_id;
   select business_name, coalesce(billing_enforcement, 'off')
@@ -861,7 +940,75 @@ $$;
 revoke all on function public.pay_invoice_by_return(text) from public, anon, authenticated;
 grant execute on function public.pay_invoice_by_return(text) to service_role;
 
+-- Money collected on a cancelled or superseded checkout becomes one credit.
+-- The key is the provider ref, so a retry does not insert a second row.
+-- The issue payment stays. Reconciliation lists the credit, and a missing
+-- credit is a disagreement. Writes an ops audit row on the first insert.
+create or replace function public.credit_cancelled_collection(
+  p_provider text,
+  p_provider_ref text,
+  p_amount_kes numeric,
+  p_tenant_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_key text;
+  v_id uuid;
+  v_payment uuid;
+begin
+  if nullif(btrim(p_provider), '') is null or nullif(btrim(p_provider_ref), '') is null then
+    raise exception 'provider and provider ref are required';
+  end if;
+  if p_amount_kes is null or p_amount_kes <= 0 then
+    raise exception 'payment amount must be positive';
+  end if;
+  v_key := 'cancelled:' || p_provider || ':' || p_provider_ref;
+  select id into v_payment
+  from public.payments
+  where provider = p_provider and provider_ref = p_provider_ref;
+  insert into public.tenant_credits (tenant_id, amount_kes, reason, idempotency_key, payment_id)
+  values (p_tenant_id, p_amount_kes, 'cancelled_checkout', v_key, v_payment)
+  on conflict (idempotency_key) do nothing
+  returning id into v_id;
+  if v_id is null then
+    return;
+  end if;
+  perform public._billing_audit(
+    'system',
+    'cancelled_checkout_credit',
+    p_tenant_id,
+    jsonb_build_object(
+      'provider', p_provider,
+      'provider_ref', p_provider_ref,
+      'amount_kes', p_amount_kes,
+      'credit_id', v_id
+    )
+  );
+  if to_regclass('public.platform_ops_notices') is not null then
+    begin
+      insert into public.platform_ops_notices (kind, detail)
+      values (
+        'cancelled_checkout:' || p_provider || ':' || p_provider_ref,
+        'Collected KSh ' || trim(to_char(p_amount_kes, 'FM999999990.00'))
+          || ' on a cancelled checkout. Credited.'
+      );
+    exception
+      when unique_violation then
+        null;
+    end;
+  end if;
+end;
+$$;
+
+revoke all on function public.credit_cancelled_collection(text, text, numeric, uuid) from public, anon, authenticated;
+grant execute on function public.credit_cancelled_collection(text, text, numeric, uuid) to service_role;
+
 -- A later OVERPAID on the same checkout raises the stored amount and credits the difference.
+-- The receipt trigger on UPDATE keeps the same receipt number and stores the new amount.
 create or replace function public.adjust_payment_overpay(
   p_provider text,
   p_provider_ref text,

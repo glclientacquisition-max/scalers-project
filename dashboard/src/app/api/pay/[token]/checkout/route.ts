@@ -32,7 +32,11 @@ export async function POST(request: Request, context: { params: Promise<{ token:
       maxAge: 60 * 60,
     });
     return response;
-  } catch {
+  } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code || "") : "";
+    if (code === "previous_processing") {
+      return NextResponse.json({ error: "Previous payment still processing." }, { status: 409 });
+    }
     return NextResponse.json({ error: "Could not start payment." }, { status: 400 });
   }
 }

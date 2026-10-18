@@ -378,4 +378,127 @@ describe("invoice pay SQL", () => {
       /checkout url refused/
     );
   });
+
+  it("turns a negative draft into one credit and a paid zero invoice", async () => {
+    const tenant = "88888888-8888-4888-8888-888888888888";
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Credit Shop', 'pending:credit', 'soft')`,
+      [tenant]
+    );
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, -400, -400) returning id`,
+      [tenant]
+    );
+    const issued = await q(
+      `select status, total_kes, subtotal_kes, invoice_number, paid_at from public.finalize_invoice($1)`,
+      [draft.rows[0].id]
+    );
+    assert.equal(issued.rows[0].status, "paid");
+    assert.equal(Number(issued.rows[0].total_kes), 0);
+    assert.equal(Number(issued.rows[0].subtotal_kes), 0);
+    assert.match(issued.rows[0].invoice_number, /^SCL-\d{4}-\d{6}$/);
+    assert.ok(issued.rows[0].paid_at);
+    const credits = await q(
+      `select amount_kes, reason from public.tenant_credits where idempotency_key = $1`,
+      [`invoice-credit:${draft.rows[0].id}`]
+    );
+    assert.equal(credits.rows.length, 1);
+    assert.equal(Number(credits.rows[0].amount_kes), 400);
+    assert.equal(credits.rows[0].reason, "invoice_credit");
+    const receipts = await q("select count(*)::int as n from public.invoice_receipts where invoice_id = $1", [
+      draft.rows[0].id,
+    ]);
+    assert.equal(receipts.rows[0].n, 0);
+    const notice = await q(
+      `select count(*)::int as n from public.billing_notices
+       where idempotency_key = $1`,
+      [`platform_billing_invoice_issued:${draft.rows[0].id}`]
+    );
+    assert.equal(notice.rows[0].n, 0);
+    const body = await q("select pg_get_functiondef('public.finalize_invoice(uuid)'::regprocedure) as def");
+    assert.match(body.rows[0].def, /scalers\.billing_write/);
+    assert.match(body.rows[0].def, /invoice-credit:/);
+    assert.match(body.rows[0].def, /SCL-/);
+    assert.doesNotMatch(read("docs/supabase/invoice_documents.sql"), /function public\.finalize_invoice/);
+  });
+
+  it("updates one receipt when the collected amount rises", async () => {
+    const tenant = "88888888-8888-4888-8888-888888888888";
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 500, 500) returning id`,
+      [tenant]
+    );
+    const issued = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+    const applied = await q(
+      `select id, amount_kes from public.apply_payment('bachs', 'chk_over_1', 500, $1, $2)`,
+      [tenant, issued.rows[0].id]
+    );
+    const before = await q(
+      "select receipt_number, amount_kes from public.invoice_receipts where payment_id = $1",
+      [applied.rows[0].id]
+    );
+    await q("select public.adjust_payment_overpay('bachs', 'chk_over_1', 700, $1)", [tenant]);
+    const after = await q(
+      "select receipt_number, amount_kes from public.invoice_receipts where payment_id = $1",
+      [applied.rows[0].id]
+    );
+    assert.equal(after.rows.length, 1);
+    assert.equal(after.rows[0].receipt_number, before.rows[0].receipt_number);
+    assert.equal(Number(after.rows[0].amount_kes), 700);
+  });
+
+  it("expires a return id and credits a cancelled collection once", async () => {
+    const tenant = "88888888-8888-4888-8888-888888888888";
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 2320, 2320) returning id`,
+      [tenant]
+    );
+    const invoice = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+    await q(
+      `insert into public.payment_attempts (
+         tenant_id, invoice_id, provider, checkout_session_id, status, amount_kes, return_id, return_expires_at
+       ) values ($1, $2, 'bachs', 'chk_cancel_1', 'cancelled', 500, 'ret_old', now() - interval '1 hour')`,
+      [tenant, invoice.rows[0].id]
+    );
+    const stale = await q("select public.pay_invoice_by_return('ret_old') as row");
+    assert.equal(stale.rows[0].row.state, "expired");
+    await q(
+      `insert into public.payment_attempts (
+         tenant_id, invoice_id, provider, status, amount_kes, return_id, return_expires_at
+       ) values ($1, $2, 'bachs', 'pending', 500, 'ret_fresh', now() + interval '1 hour')`,
+      [tenant, invoice.rows[0].id]
+    );
+    const fresh = await q("select public.pay_invoice_by_return('ret_fresh') as row");
+    assert.equal(fresh.rows[0].row.found, true);
+    assert.notEqual(fresh.rows[0].row.state, "expired");
+    await q("select public.record_payment_issue('bachs', 'chk_cancel_1', 500, $1, $2, '{}'::jsonb, null, null, null, 'cancelled')", [
+      tenant,
+      invoice.rows[0].id,
+    ]);
+    await q("select public.credit_cancelled_collection('bachs', 'chk_cancel_1', 500, $1)", [tenant]);
+    await q("select public.credit_cancelled_collection('bachs', 'chk_cancel_1', 500, $1)", [tenant]);
+    const credits = await q(
+      "select count(*)::int as n from public.tenant_credits where idempotency_key = 'cancelled:bachs:chk_cancel_1'"
+    );
+    assert.equal(credits.rows[0].n, 1);
+    const audits = await q(
+      "select count(*)::int as n from public.billing_audit_log where action = 'cancelled_checkout_credit'"
+    );
+    assert.equal(audits.rows[0].n, 1);
+    const report = await q(
+      "select kind, detail from public.billing_payment_reconciliation() where invoice_id = $1",
+      [invoice.rows[0].id]
+    );
+    assert.ok(report.rows.some((row) => row.kind === "credited_cancelled"));
+    assert.ok(!report.rows.some((row) => row.detail === "Collected on a cancelled checkout with no credit"));
+    const column = await q(
+      `select is_nullable, column_default
+       from information_schema.columns
+       where table_schema = 'public' and table_name = 'payment_attempts' and column_name = 'updated_at'`
+    );
+    assert.equal(column.rows[0].is_nullable, "NO");
+    assert.match(column.rows[0].column_default, /now\(\)/);
+    assert.doesNotMatch(read("docs/supabase/invoice_pay.sql"), /updated_at timestamptz not null default now\(\)/);
+  });
 });

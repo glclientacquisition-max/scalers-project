@@ -36,9 +36,11 @@ export function PayPanel({ token, initial }: { token: string; initial: PayCardMo
     setError(null);
     try {
       const res = await fetch(`/api/pay/${encodeURIComponent(token)}/checkout`, { method: "POST" });
-      const body = (await res.json().catch(() => ({}))) as { checkoutUrl?: string };
+      const body = (await res.json().catch(() => ({}))) as { checkoutUrl?: string; error?: string };
       if (!res.ok || !body.checkoutUrl) {
-        setError("Could not start payment.");
+        setError(
+          body.error === "Previous payment still processing." ? body.error : "Could not start payment."
+        );
         setPending(false);
         return;
       }

@@ -23,11 +23,74 @@ async function waitForAttached(ledger, attemptInput) {
   throw err;
 }
 
+const CLOSED_CHECKOUT = new Set([
+  "cancelled",
+  "canceled",
+  "expired",
+  "complete",
+  "completed",
+  "failed",
+  "succeeded",
+  "paid",
+]);
+
+function checkoutIsOpen(row) {
+  if (!row) return false;
+  const status = String(row.status || "").toLowerCase();
+  const pay = String(row.paymentStatus || row.payment_status || "").toLowerCase();
+  if (CLOSED_CHECKOUT.has(status) || CLOSED_CHECKOUT.has(pay)) return false;
+  return status === "open" || status === "pending" || status === "" || pay === "unpaid" || pay === "pending" || pay === "open" || pay === "";
+}
+
+/**
+ * Cancel the old Bachs session before a replacement row. If the cancel fails,
+ * read the session. A session that is still open is returned as-is. An unread
+ * session blocks. A closed session is replaced.
+ * @param {{ ledger: object, provider: { cancelCheckout?: Function, getCheckout?: Function } }} input
+ * @param {object} attempt
+ * @param {object} attemptInput
+ */
+async function replaceExpiredAttempt(input, attempt, attemptInput) {
+  const sessionId = attempt.checkoutSessionId;
+  if (sessionId && typeof input.provider.cancelCheckout === "function") {
+    try {
+      await input.provider.cancelCheckout(sessionId);
+    } catch {
+      let row = null;
+      let readable = false;
+      if (typeof input.provider.getCheckout === "function") {
+        try {
+          row = await input.provider.getCheckout(sessionId);
+          readable = true;
+        } catch {
+          readable = false;
+        }
+      }
+      if (!readable || checkoutIsOpen(row)) {
+        if (readable && checkoutIsOpen(row) && attempt.checkoutUrl) {
+          return {
+            kept: true,
+            checkoutUrl: attempt.checkoutUrl,
+            checkoutId: sessionId,
+            reused: true,
+          };
+        }
+        const err = new Error("previous payment still processing");
+        err.code = "previous_processing";
+        throw err;
+      }
+    }
+  }
+  await input.ledger.markAttempt(attempt.id, { status: "cancelled" });
+  return input.ledger.createAttempt(attemptInput);
+}
+
 /**
  * Start one hosted checkout for the next unpaid part.
  * The redirect does not mark the invoice paid.
  * A second click while the first session is still being created waits for it.
  * An expired session is cancelled before a new one is minted.
+ * A failed cancel does not open a second payable session.
  * @param {{ token: string, origin: string, ledger: object, provider: { createCheckout: Function, cancelCheckout?: Function } }} input
  */
 async function startInvoiceCheckout(input) {
@@ -52,26 +115,18 @@ async function startInvoiceCheckout(input) {
   };
   let attempt = await input.ledger.createAttempt(attemptInput);
   if (attempt.cancel) {
-    if (typeof input.provider.cancelCheckout === "function" && attempt.checkoutSessionId) {
-      try {
-        await input.provider.cancelCheckout(attempt.checkoutSessionId);
-      } catch {
-        /* The attempt is already cancelled. A Bachs cancel failure must not open a second live row. */
-      }
+    attempt = await replaceExpiredAttempt(input, attempt, attemptInput);
+    if (attempt.kept) {
+      return { checkoutUrl: attempt.checkoutUrl, checkoutId: attempt.checkoutId, reused: true };
     }
-    attempt = await input.ledger.createAttempt(attemptInput);
   }
   if (attempt.inFlight) {
     attempt = await waitForAttached(input.ledger, attemptInput);
     if (attempt.cancel) {
-      if (typeof input.provider.cancelCheckout === "function" && attempt.checkoutSessionId) {
-        try {
-          await input.provider.cancelCheckout(attempt.checkoutSessionId);
-        } catch {
-          /* same as above */
-        }
+      attempt = await replaceExpiredAttempt(input, attempt, attemptInput);
+      if (attempt.kept) {
+        return { checkoutUrl: attempt.checkoutUrl, checkoutId: attempt.checkoutId, reused: true };
       }
-      attempt = await input.ledger.createAttempt(attemptInput);
     }
   }
   if (attempt.reused && attempt.checkoutUrl && attempt.checkoutSessionId) {

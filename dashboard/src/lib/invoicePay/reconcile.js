@@ -14,6 +14,7 @@ function reconciliationReport(input) {
   const payments = input.payments || [];
   const invoices = input.invoices || [];
   const attempts = input.attempts || [];
+  const credits = input.credits || [];
   const providerStatuses = input.providerStatuses || {};
   const rows = [];
 
@@ -89,6 +90,31 @@ function reconciliationReport(input) {
         });
       }
     }
+    if (attempt.status === "cancelled" || attempt.status === "superseded") {
+      const cancelledPayment = paymentForCheckout(attempt.checkoutSessionId);
+      const credited = credits.some(
+        (credit) =>
+          credit.providerRef === attempt.checkoutSessionId ||
+          credit.idempotencyKey === `cancelled:bachs:${attempt.checkoutSessionId}`
+      );
+      if (credited) {
+        rows.push({
+          kind: "credited_cancelled",
+          attemptId: attempt.id,
+          invoiceId: attempt.invoiceId,
+          paymentId: cancelledPayment ? cancelledPayment.id : null,
+          detail: "Collected on a cancelled checkout and credited",
+        });
+      } else if (cancelledPayment && cancelledPayment.matchStatus === "issue") {
+        rows.push({
+          kind: "status_disagreement",
+          attemptId: attempt.id,
+          invoiceId: attempt.invoiceId,
+          paymentId: cancelledPayment.id,
+          detail: "Collected on a cancelled checkout with no credit",
+        });
+      }
+    }
     const payment = paymentForCheckout(attempt.checkoutSessionId);
     const rawStatus = payment && payment.raw && payment.raw.data && payment.raw.data.status;
     if (String(rawStatus || "").toLowerCase() === "overpaid" && !rows.some((row) => row.kind === "overpaid" && row.attemptId === attempt.id)) {
@@ -106,7 +132,8 @@ function reconciliationReport(input) {
     const matched = payments.some(
       (p) => p.invoiceId === invoice.id && ["matched", "partial", "over"].includes(p.matchStatus)
     );
-    if (invoice.status === "paid" && !matched) {
+    const zeroCredit = credits.some((credit) => credit.idempotencyKey === `invoice-credit:${invoice.id}`);
+    if (invoice.status === "paid" && !matched && !zeroCredit && Number(invoice.totalKes) > 0) {
       rows.push({
         kind: "status_disagreement",
         attemptId: null,

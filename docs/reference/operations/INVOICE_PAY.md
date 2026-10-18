@@ -1,6 +1,6 @@
 ---
 owner: ops-billing
-last_reviewed: 2026-10-18
+last_reviewed: 2026-10-19
 ---
 
 # Invoice pay
@@ -13,7 +13,7 @@ VAT and KRA eTIMS are off. `invoices.tax_kes` stays null. The page, the invoice,
 
 ## Numbers
 
-`finalize_invoice` assigns `SCL-YYYY-000001` for the Africa/Nairobi year and copies `billing_company` onto the invoice. The counter moves only when a draft is issued. Drafts stay unnumbered. A recorded payment (`matched`, `partial`, or `over`) issues `RCT-YYYY-000001` once and queues a payment-received notice. An issue payment does not get a receipt.
+`finalize_invoice` in `billing_company.sql` is the only copy that should remain after the P1–P8 apply order. It sets `scalers.billing_write`, assigns `SCL-YYYY-NNNNNN` for the Africa/Nairobi year, and copies `billing_company` onto the invoice. It refuses a beta tenant. A negative draft becomes one `tenant_credits` row (`invoice-credit:<id>`) and a paid zero invoice, with no receipt. The counter moves only when a draft is issued. Drafts stay unnumbered. A recorded payment (`matched`, `partial`, or `over`) issues `RCT-YYYY-000001` once and queues a payment-received notice. A later overpay updates that receipt's amount and keeps the number. An issue payment does not get a receipt.
 
 ## Token
 
@@ -38,7 +38,7 @@ It shows the business name, the invoice number, the KSh total, and the due date 
 
 One filled button: `Pay KSh X`. X is the next unpaid part. Above KSh 150,000 the page also shows `Part 1 of N`. M-Pesa's per-transaction cap is KSh 150,000. Parts sum to the invoice. The invoice is paid when the paid total reaches the invoice total.
 
-The button starts a hosted checkout. Bachs success and cancel URLs use a one-time return id (`/pay/return/<id>`), not the pay token. The return id cannot start a charge. The pay page cookie keeps the token on this browser so a split invoice can still take the next part. Bachs may append `?checkout_id=` onto the success query. The page reads `checkout_id` from either shape and ignores a checkout that belongs to another invoice. That screen says `Checking payment` until money is on this invoice. `Payment received` appears when this invoice has a payment applied, including a paid part of a split. The return never marks the invoice paid by itself.
+The button starts a hosted checkout. Bachs success and cancel URLs use a return id (`/pay/return/<id>`), not the pay token. The return id expires 24 hours after the attempt is created. It cannot start a charge. After that, the page says `This link has expired`. The pay page cookie keeps the token on this browser so a split invoice can still take the next part. Bachs may append `?checkout_id=` onto the success query. The page reads `checkout_id` from either shape and ignores a checkout that belongs to another invoice. That screen says `Checking payment` until money is on this invoice. `Payment received` appears only when the invoice is fully paid. A paid part of a split says `Part 1 of 2 received, KSh X still due` and keeps the next Pay button. The return never marks the invoice paid by itself.
 
 Other states, with no pay button:
 
@@ -56,7 +56,7 @@ A failed or cancelled checkout stays payable and says `Payment was not completed
 
 ## Checkout
 
-Create sends `expires_in_minutes` (60, capped at 1440), `reference` (the attempt id), and `customer` `{email, name, phone_number}` when any of those are known. If the response omits `expires_at`, it is derived from `expires_in_minutes` before the attempt is attached. A failed attach marks the attempt failed and cancels the session. One pending attempt per invoice part is locked with the invoice row. A second tap while that row has no URL yet waits for it. An expired pending attempt is cancelled, and its Bachs session is cancelled, before a new attempt is inserted. A reference is single-use, including after expiry. The checkout URL must be https.
+Create sends `expires_in_minutes` (60, capped at 1440), `reference` (the attempt id), and `customer` `{email, name, phone_number}` when any of those are known. If the response omits `expires_at`, it is derived from `expires_in_minutes` before the attempt is attached. A failed attach marks the attempt failed and cancels the session. One pending attempt per invoice part is locked with the invoice row. A second tap while that row has no URL yet waits for it. An expired pending attempt stays pending until its Bachs session is cancelled. If that cancel fails, the page reads the old checkout. A session that is still open is reused. A session that cannot be read blocks with `Previous payment still processing.` A closed session is then marked cancelled and a new attempt is inserted. A reference is single-use, including after expiry. The checkout URL must be https.
 
 `getCheckout` returns `payment_status` and `charge`. It does not return `checkout_url`. Reconciliation reads `payment_status`.
 
@@ -68,11 +68,11 @@ Checks `X-Bachs-Timestamp` and `X-Bachs-Signature` (or `X-Bachs-Signature-V2`) a
 
 `apply_payment` runs once for an applied checkout id. A second event for the same checkout does not pay again. An issue row is not that key: a later exact KES event on the same checkout still applies. A collection on a cancelled attempt is stored as an issue and does not raise `amount_paid_kes`.
 
-A terminal collection whose KES is at least the part applies the part and credits the extra. `collection.underpaid` with KES above 0 applies that amount as a partial. `OVERPAID` below the part takes the same partial path. `checkout.completed` then a larger `OVERPAID` updates the payment to the larger amount and credits the difference.
+A terminal collection whose KES is at least the part applies the part and credits the extra. A short terminal `SUCCEEDED` applies that KES as a partial, the same way `collection.underpaid` does when the amount is above 0. `OVERPAID` below the part takes the same partial path. `checkout.completed` then a larger `OVERPAID` updates the payment to the larger amount, credits the difference, and updates the existing receipt to the amount collected. The receipt number does not change.
 
 `checkout.completed` applies only when `payment_status` is `paid` and the KES amount is at least the part. Any other `payment_status` waits, so a later `collection.succeeded` can still apply.
 
-A KES amount below the part on `collection.succeeded`, or a collection that is only USD, is an issue (`record_payment_issue`, `match_status = issue`). The invoice stays open. A payment against a void, uncollectible, or draft invoice is stored the same way and the webhook answers 200. The route logs the error message and does not log the body or the secret.
+A collection that is only USD is an issue (`record_payment_issue`, `match_status = issue`). The invoice stays open. A payment against a void, uncollectible, or draft invoice is stored the same way and the webhook answers 200. Money that lands on a cancelled or superseded attempt is stored as an issue and also becomes one `tenant_credits` row keyed `cancelled:<provider>:<provider ref>`. A retry does not insert a second credit. The first insert writes `cancelled_checkout_credit` to the billing audit and, when the table exists, a staff notice. Reconciliation lists that credit. A cancelled collection with no credit is a disagreement. The route logs the error message and does not log the body or the secret.
 
 The KES charged is `payments.amount_kes`. When Bachs also sends a USD settlement, that is `settled_amount_minor` and `settled_currency`. The fee is `processing_fee` and `processing_fee_currency`. A fee is stored only when the payload includes one. The 3.5% mobile-money rate is not invented.
 

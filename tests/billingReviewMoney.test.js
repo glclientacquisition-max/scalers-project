@@ -219,7 +219,7 @@ describe("a collected shilling must reduce the invoice", () => {
       ledger,
     });
     assert.equal(result.status, 200);
-    assert.equal(result.body.action, "apply");
+    assert.equal(result.body.action, "apply_partial");
     assert.equal(ledger.invoices.get("inv1").status, "open");
     assert.equal(ledger.invoices.get("inv1").amountPaidKes, "400");
   });

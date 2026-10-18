@@ -46,6 +46,8 @@ function createMemoryLedger(opts = {}) {
   const attempts = [];
   const events = new Map();
   const payments = [];
+  const credits = [];
+  const alerts = [];
   let seq = 0;
   const id = () => `id-${++seq}`;
 
@@ -138,7 +140,6 @@ function createMemoryLedger(opts = {}) {
       if (pending) {
         const expired = pending.expiresAt && new Date(pending.expiresAt).getTime() <= now;
         if (expired) {
-          pending.status = "cancelled";
           return attemptResult(pending, { cancel: true });
         }
         return attemptResult(pending, {
@@ -159,6 +160,7 @@ function createMemoryLedger(opts = {}) {
         checkoutUrl: null,
         expiresAt: null,
         returnId: newReturnId(),
+        returnExpiresAt: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
         providerAmount: null,
         providerCurrency: null,
         feeAmount: null,
@@ -210,6 +212,21 @@ function createMemoryLedger(opts = {}) {
       );
       return row ? { id: row.id, amountKes: row.amountKes, matchStatus: row.matchStatus } : null;
     },
+    async creditCancelled(input) {
+      const key = `cancelled:${input.provider}:${input.providerRef}`;
+      if (credits.some((row) => row.idempotencyKey === key)) return { duplicate: true };
+      credits.push({
+        id: id(),
+        tenantId: input.tenantId,
+        invoiceId: input.invoiceId,
+        amountKes: input.amountKes,
+        reason: "cancelled_checkout",
+        idempotencyKey: key,
+        providerRef: input.providerRef,
+      });
+      alerts.push({ action: "cancelled_checkout_credit", providerRef: input.providerRef, amountKes: input.amountKes });
+      return { duplicate: false };
+    },
     async adjustOverpay(input) {
       const row = payments.find(
         (p) => p.provider === input.provider && p.providerRef === input.providerRef && p.matchStatus !== "issue"
@@ -225,6 +242,9 @@ function createMemoryLedger(opts = {}) {
     async lookupReturn(returnId) {
       const row = attempts.find((a) => a.returnId === returnId);
       if (!row) return { found: false };
+      if (!row.returnExpiresAt || new Date(row.returnExpiresAt).getTime() <= now) {
+        return { found: true, state: "expired", invoiceId: row.invoiceId, tenantId: row.tenantId };
+      }
       const invoice = invoices.get(row.invoiceId);
       const tenant = tenants.get(row.tenantId);
       let state = "closed";
@@ -306,6 +326,8 @@ function createMemoryLedger(opts = {}) {
       }
       return { id: null, duplicate: false };
     },
+    credits,
+    alerts,
   };
 }
 

@@ -1425,12 +1425,31 @@ comment on function public.transition_subscription_billing_status(uuid, text, te
 revoke all on function public.transition_subscription_billing_status(uuid, text, text, text, integer) from public, anon, authenticated;
 grant execute on function public.transition_subscription_billing_status(uuid, text, text, text, integer) to service_role;
 
+-- SC- is the data-layer number only. billing_company.sql (P8) owns the
+-- canonical SCL- body. Re-applying this file must not put SC- back over it.
+-- A body that already contains SCL- is left as it is. The SC- body still sets
+-- scalers.billing_write so a draft number and status write can pass invoices_freeze.
+do $install_finalize_invoice$
+begin
+  if exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'finalize_invoice'
+      and pg_get_functiondef(p.oid) like '%SCL-%'
+  ) then
+    raise notice 'finalize_invoice already numbers SCL-; leaving the billing_company.sql body in place';
+    return;
+  end if;
+
+  execute $fn$
 create or replace function public.finalize_invoice(p_invoice_id uuid)
 returns public.invoices
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $body$
 declare
   v_inv public.invoices%rowtype;
   v_year integer;
@@ -1456,6 +1475,7 @@ begin
   returning last_number into v_n;
   v_number := 'SC-' || v_year::text || '-' || lpad(v_n::text, 6, '0');
 
+  perform set_config('scalers.billing_write', '1', true);
   update public.invoices
   set status = 'open',
       invoice_number = v_number,
@@ -1475,13 +1495,15 @@ begin
   );
   return v_inv;
 end;
-$$;
+$body$;
+$fn$;
 
-comment on function public.finalize_invoice(uuid) is
-  'Assigns SC-YYYY-000001 for the Africa/Nairobi year and queues platform_billing_invoice_due once per invoice. Does not charge.';
-
-revoke all on function public.finalize_invoice(uuid) from public, anon, authenticated;
-grant execute on function public.finalize_invoice(uuid) to service_role;
+  execute $c$comment on function public.finalize_invoice(uuid) is
+  'Assigns SC-YYYY-000001 for the Africa/Nairobi year and queues platform_billing_invoice_due once per invoice. Does not charge. Sets scalers.billing_write so the freeze allows the number and status. Do not run this file after billing_company.sql.'$c$;
+  execute 'revoke all on function public.finalize_invoice(uuid) from public, anon, authenticated';
+  execute 'grant execute on function public.finalize_invoice(uuid) to service_role';
+end
+$install_finalize_invoice$;
 
 create or replace function public.apply_payment(
   p_provider text,

@@ -114,7 +114,7 @@ function decidePayment(input) {
     return { action: "apply" };
   }
   if (overpaid) return { action: "apply_partial" };
-  if (terminal) return { action: "issue", reason: "amount" };
+  if (terminal && got > 0n) return { action: "apply_partial", reason: "amount" };
   return { action: "wait" };
 }
 
@@ -194,7 +194,7 @@ async function handlePayWebhook(input) {
     attemptId: attempt.id,
   };
 
-  if (attempt.status === "cancelled") {
+  if (attempt.status === "cancelled" || attempt.status === "superseded") {
     const amountKes = charge.kes ? String(charge.kes.amount) : null;
     if (amountKes && toCents(amountKes) != null && toCents(amountKes) > 0n) {
       await input.ledger.recordIssue({
@@ -202,8 +202,17 @@ async function handlePayWebhook(input) {
         amountKes,
         reason: "cancelled",
       });
+      if (typeof input.ledger.creditCancelled === "function") {
+        await input.ledger.creditCancelled({
+          provider: "bachs",
+          providerRef,
+          amountKes,
+          tenantId: attempt.tenantId,
+          invoiceId: attempt.invoiceId,
+        });
+      }
     }
-    return { status: 200, body: { ok: true, action: "issue", reason: "cancelled" } };
+    return { status: 200, body: { ok: true, action: "credit", reason: "cancelled" } };
   }
 
   const decision = decidePayment({
@@ -264,7 +273,10 @@ async function handlePayWebhook(input) {
       feeCurrency: common.feeCurrency,
       raw: payload,
     });
-    const body = { ok: true, action: "apply" };
+    const body = {
+      ok: true,
+      action: decision.action === "apply_partial" ? "apply_partial" : "apply",
+    };
     if (decision.action === "apply_overpaid") body.overpaid = true;
     return { status: 200, body };
   }

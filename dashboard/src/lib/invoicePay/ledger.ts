@@ -177,6 +177,16 @@ export function invoicePayLedger(env: NodeJS.ProcessEnv = process.env) {
       };
     },
 
+    async creditCancelled(input: { provider: string; providerRef: string; amountKes: string; tenantId: string }) {
+      const { error } = await admin.rpc("credit_cancelled_collection", {
+        p_provider: input.provider,
+        p_provider_ref: input.providerRef,
+        p_amount_kes: input.amountKes,
+        p_tenant_id: input.tenantId,
+      });
+      if (error) throw rpcError(error, "cancelled credit failed");
+    },
+
     async adjustOverpay(input: { provider: string; providerRef: string; amountKes: string; tenantId: string }) {
       const { error } = await admin.rpc("adjust_payment_overpay", {
         p_provider: input.provider,

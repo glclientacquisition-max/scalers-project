@@ -104,6 +104,7 @@ class MockPayProvider {
     if (!row) return null;
     return {
       checkoutId: row.checkoutId,
+      status: row.status || "",
       paymentStatus: row.paymentStatus || "",
       charge: row.charge || null,
     };
@@ -238,6 +239,9 @@ class BachsPayProvider {
     if (res.ok || res.status === 404 || res.status === 409) return;
     const json = await res.json().catch(() => ({}));
     logBachsError(res, json);
+    const err = new Error("bachs cancel failed");
+    err.code = "bachs_cancel";
+    throw err;
   }
 
   async getCheckout(checkoutId) {
@@ -256,6 +260,7 @@ class BachsPayProvider {
     }
     return {
       checkoutId: String(json.checkout_id || checkoutId),
+      status: String(json.status || ""),
       paymentStatus: String(json.payment_status || ""),
       charge: json.charge || null,
     };
