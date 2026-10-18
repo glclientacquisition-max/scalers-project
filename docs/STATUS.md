@@ -118,6 +118,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 
 | PR | Lane | What |
 | --- | --- | --- |
+| "Desk: Settings quick fixes" (`desk/settings-quick-fixes`, draft) | Desk | **18 Oct, pending ship.** Owner review fixes Alvin approved 13:21 EAT: "Add prices"/"Check prices" open the Catalogue; Policies hide prompt text, starter text shows once, "Holds and deposits" label, "Tap" only on touch; Back gesture asks before dropping edits; remove place/area asks first; forgiving catalogue import (headers, semicolons, "2,500", file picker, row warnings, Update prices); visible phone service labels; honest "Add to catalogue" toast; Identity placeholder and toast; 44 px "Yes, this is right". No schema, prompt or call-field change. |
 | #709 (ready, not draft) | Business Assistant | Business Assistant: area travel fees on calls, alert titles, request footers, enquiry mapping. |
 | #640 | Platform | Ops alerts on Vercel cron instead of page load. |
 | #712–#716, #719–#725 | Voice/Brain | NLU-first intent, outage debounce, Swahili verb lock, booking outranks list, regression-9 pack and fixes (R6–R9). |

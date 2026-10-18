@@ -56,7 +56,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   if (!tenant) {
     return <DeskNoWorkspace />;
   }
-  const tab = parseBusinessSettingsTab(tabRaw);
+  const tab = parseBusinessSettingsTab(tabRaw, panelRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
   const needsVoices = tab === "test" || (tab === "train" && trainPanel === "tools");
 

@@ -47,7 +47,8 @@ import {
   formatProductsForCompiler,
   normalizeProductCatalog,
   parseBulkProducts,
-  PRODUCT_CATALOG_MAX,
+  mergeProductCatalog,
+  productImportWarnings,
   type ProductItem,
 } from "@/lib/productCatalog";
 import {
@@ -271,6 +272,8 @@ async function saveSettingsSafely(
 
 const tableFieldClass = settingsTableFieldClass;
 const denseFieldClass = settingsDenseFieldClass;
+/** Phone service rows: labels stay visible (no placeholder-only fields at 360/390). */
+const serviceMobileLabelClass = "mb-1 block text-meta text-ink-2";
 
 const STOCK_OPTIONS = [
   { value: "yes", label: "In stock" },
@@ -394,6 +397,7 @@ function TenantFormInner({
   const [servicesImportOpen, setServicesImportOpen] = useState(false);
   const [productsImportOpen, setProductsImportOpen] = useState(false);
   const [bulkProductsText, setBulkProductsText] = useState("");
+  const [bulkProductsUpdate, setBulkProductsUpdate] = useState(false);
   const [bulkProductsError, setBulkProductsError] = useState<string | null>(null);
   const [servicePage, setServicePage] = useState(0);
   const [productPage, setProductPage] = useState(0);
@@ -442,6 +446,10 @@ function TenantFormInner({
   );
   const [starterClear, setStarterClear] = useState<StarterPolicyKey | null>(null);
   const starterPolicies = seedStarterPolicies(policies);
+  // Starter text shows once, in the Starter text group; not again as an old rule line,
+  // a payment quote, or the Hold note.
+  const starterKeys = new Set<string>(starterPolicies.map((row) => row.key));
+  const ownerLegacy = (key: StarterPolicyKey) => (starterKeys.has(key) ? undefined : policies[key]);
   const markPolicyOwner = (key: StarterPolicyKey, clear: boolean) => {
     queueOwnerPath(`policies.${key}`);
     setPolicies((prev) => {
@@ -869,14 +877,13 @@ function TenantFormInner({
       );
       return;
     }
-    setProducts((prev) => {
-      const existing = prev.filter((p) => p.name.trim());
-      const map = new Map(existing.map((p) => [p.name.toLowerCase(), p]));
-      for (const p of parsed) {
-        if (!map.has(p.name.toLowerCase())) map.set(p.name.toLowerCase(), p);
-      }
-      return [...map.values()].slice(0, PRODUCT_CATALOG_MAX);
-    });
+    setProducts((prev) =>
+      mergeProductCatalog(
+        prev.filter((p) => p.name.trim()),
+        parsed,
+        bulkProductsUpdate ? "update" : "merge"
+      )
+    );
     saveAfterPasteRef.current = true;
     setBulkProductsText("");
     setBulkProductsError(null);
@@ -1074,7 +1081,7 @@ function TenantFormInner({
               id="spoken_name"
               value={spokenName}
               onChange={(e) => setSpokenName(e.target.value)}
-              placeholder="Done and Dusted"
+              placeholder={businessName.trim() || "Your business name"}
               maxLength={40}
               title={spokenName || undefined}
               className={settingsValueFieldClass}
@@ -1383,13 +1390,13 @@ function TenantFormInner({
             {visibleServices.map((service, localIndex) => {
               const index = serviceIdx[safeServicePage * SERVICE_PAGE_SIZE + localIndex];
               return (
-                <div key={`service-m-${index}`} className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_2.75rem] items-center gap-2 px-3 py-2">
+                <div key={`service-m-${index}`} className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_2.75rem] items-end gap-x-2 gap-y-2 px-3 py-2.5">
                   <div className="min-w-0">
-                    <label className="sr-only" htmlFor={`svc-name-m-${index}`}>Name</label>
+                    <label className={serviceMobileLabelClass} htmlFor={`svc-name-m-${index}`}>Service</label>
                     <input id={`svc-name-m-${index}`} value={service.name} onChange={(e) => updateService(index, "name", e.target.value)} placeholder={vertical === "retail" ? "Book sourcing / special orders" : "Home cleaning"} className={denseFieldClass} />
                   </div>
                   <div className="min-w-0">
-                    <label className="sr-only" htmlFor={`svc-price-m-${index}`}>Price</label>
+                    <label className={serviceMobileLabelClass} htmlFor={`svc-price-m-${index}`}>Price</label>
                     <input id={`svc-price-m-${index}`} value={service.price_range} onChange={(e) => updateService(index, "price_range", e.target.value)} placeholder="from 2,500 KES" className={denseFieldClass} />
                   </div>
                   <button
@@ -1413,11 +1420,11 @@ function TenantFormInner({
                     <TrashIcon className="h-4 w-4" />
                   </button>
                   <div className="min-w-0">
-                    <label className="sr-only" htmlFor={`svc-notes-m-${index}`}>Notes</label>
+                    <label className={serviceMobileLabelClass} htmlFor={`svc-notes-m-${index}`}>Notes</label>
                     <input id={`svc-notes-m-${index}`} value={service.notes} onChange={(e) => updateService(index, "notes", e.target.value)} placeholder="Free quotation" className={denseFieldClass} />
                   </div>
                   <div className="col-span-2 min-w-0">
-                    <label className="sr-only" htmlFor={`svc-oos-m-${index}`}>Out of scope</label>
+                    <label className={serviceMobileLabelClass} htmlFor={`svc-oos-m-${index}`}>Not offered</label>
                     <input id={`svc-oos-m-${index}`} value={service.out_of_scope} onChange={(e) => updateService(index, "out_of_scope", e.target.value)} placeholder="No commercial offices" className={denseFieldClass} />
                   </div>
                 </div>
@@ -1601,6 +1608,8 @@ function TenantFormInner({
             previewRows={bulkProductPreview}
             onApply={applyBulkProducts}
             applyLabel="Add and save"
+            warningsFor={(row) => productImportWarnings(row as ProductItem)}
+            updateExisting={{ checked: bulkProductsUpdate, onChange: setBulkProductsUpdate }}
           />
           {bulkProductsError ? (
             <p className="text-body text-warn" role="alert">
@@ -1961,7 +1970,8 @@ function TenantFormInner({
         {panel === "policies" ? (
           <PaymentsEditor
             value={policies.payments ?? null}
-            legacyText={policies.payment}
+            legacyText={ownerLegacy("payment")}
+            quoteSource={!starterKeys.has("payment")}
             errors={state.fields}
             onChange={(payments) => {
               queueOwnerPath("policies.payment");
@@ -2041,7 +2051,7 @@ function TenantFormInner({
                   </SettingsRow>
                 </>
               ) : null}
-              {policies.deposit ? (
+              {policies.deposit && !starterKeys.has("deposit") ? (
                 <SettingsStack label="Hold note" htmlFor="policy-deposit">
                   <PolicyTextarea
                     id="policy-deposit"
@@ -2103,7 +2113,12 @@ function TenantFormInner({
 
         <PolicyRulesEditor
           rules={policies.rules ?? {}}
-          legacy={{ returns: policies.returns, delivery: policies.delivery, cancellation: policies.cancellation, warranty: policies.warranty }}
+          legacy={{
+            returns: ownerLegacy("returns"),
+            delivery: ownerLegacy("delivery"),
+            cancellation: ownerLegacy("cancellation"),
+            warranty: ownerLegacy("warranty"),
+          }}
           vertical={vertical}
           errors={state.fields}
           onChange={(rules) => {

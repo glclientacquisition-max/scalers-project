@@ -82,7 +82,7 @@ export async function saveBusinessCategoryAction(category: string): Promise<Stru
   bustTenantCache(ws.tenant.id);
   if (error) return { ok: false, error: SAVE_FAILED };
   revalidatePath("/settings");
-  return { ok: true, message: "Business type saved." };
+  return { ok: true, message: "Saved what you sell." };
 }
 
 /** Owner correction of a call's intent/outcome. Stored as source=owner: trusted over the model. */
