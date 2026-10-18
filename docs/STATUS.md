@@ -98,6 +98,7 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 - Caller files memory v2 SQL (#673) is applied on **staging only** (carried from 14 Oct).
 - **#762** (Desk call setup per account): `tenants.call_setup` + `save_call_setup()` applied on staging 18 Oct 13:34 EAT; re-applied 14:19 EAT with the test phone fields (`test_from`, `test_started_at`) and the test-call check. Additive, 0 rows changed. **Also on prod since 18 Oct 14:59 EAT** (see Ops changes); the #762 code is not on prod yet.
 - **Billing data layer** (`docs/supabase/billing_data_layer.sql`) on staging only, 18 Oct. Live starter/growth/scale prices seeded as version 1, plus an inactive trial (20 minutes, 14 days). Existing subscriptions grandfathered; enforcement, line status, minutes, seconds, and the package clock were unchanged (checksum `e87e060fd7a7f217fbe3fd3325104853` before and after). `voicemail_until` is null on real rows. A synthetic probe rolled back: escalation allowed while trialing, a minute cap does not open voicemail, the trial-ended notice stayed pending, payment replay held, and a quarantined number could not be marked available. Re-applied the same day for Chief's review: expired quarantine can be assigned again, a sending notice older than 15 minutes can be claimed again, and a sent notice stays sent. That probe rolled back too (0 rows left; tenant row hash `ed560e5d36dec3cd055e5c37fe1045b7` unchanged; 6 businesses, 2 pool rows). Not on prod.
+- **Package version editor** (`docs/supabase/package_version_editor.sql`) on staging only, 18 Oct, after the billing data layer. Editor flag on. Second-admin threshold unset. Trial version 1 still 0 KES, 20 minutes, 14 days, SMS 20 and email 30 as placeholders. Starter 5,000 / 300, Growth 12,000 / 800, Scale 25,000 / 2,000, each still the only published version. Owners cannot call the editor functions. A starter draft and future publish saw the one starter subscriber stay on version 1, then rolled back: no version 2 and no probe audit row. Editing minutes on published starter stayed frozen. Trial export returned `scalers.package_version.v1` and a fingerprint. Promote import was not run. Not on prod. Re-apply this file after any re-apply of the data layer.
 
 ---
 
@@ -120,6 +121,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 **Ops-Billing (dated per the STATUS rule):**
 
 - **18 Oct 2026, in flight: #775** billing data layer (`cursor/billing-data-layer-cc4b`). Staging SQL only (section 3). No charges, no send-path change, no prod SQL.
+- **18 Oct 2026, in flight:** admin package version editor (`cursor/admin-package-versions-b52e`), stacked on #775. Server API only. Desk still builds the Packages screen. Contract: [`PACKAGE_VERSIONS_API.md`](reference/operations/PACKAGE_VERSIONS_API.md). Staging SQL in section 3. No prod SQL. Do not run the promote script against production.
 
 
 
@@ -195,7 +197,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **Admin:** Suspend/Archive shipped (#737, 18 Oct). Purge schedule not applied. Still to do: business edit / members / owner reset, package catalogue, billing period card, invoices.
 - **Settings / onboarding**: shipped (#656, #667, #672). GIGO P1/P2 follow-ups remain.
 - **UI/UX sweep** across Desk and Admin.
-- **Packages**: state rules and rollover shipped (#631, #650). Staging has the billing data layer (versions, `billing_status`, invoices, notices, `tenant_escalation_allowed`, number quarantine). No charges and no prod SQL. Package catalogue UI and a pay action remain.
+- **Packages**: state rules and rollover shipped (#631, #650). Staging has the billing data layer (versions, `billing_status`, invoices, notices, `tenant_escalation_allowed`, number quarantine). The admin package version editor API is in flight on `cursor/admin-package-versions-b52e` (stacked on #775): draft, publish, archive, grandfather, audit. Desk still builds the screen. No charges and no prod SQL. A pay action remains.
 - **Landing page** (#492 parked until its turn).
 - **Legal pack draft #653** (Terms, Privacy, DPA, call notice, beta terms). Parked; call notice ties to the recording decision.
 - **WhatsApp as the assistant doing work** (not just alerts).

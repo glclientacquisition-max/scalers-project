@@ -56,6 +56,7 @@ Use for packages catalog, on-demand rate card, DID pool assign/release, phone-li
 ## Test / verify
 
 - SQL apply order per [`docs/supabase/README.md`](../../supabase/README.md); no owner-forgable credit paths
+- Package versions (draft, publish, grandfather, audit): [`PACKAGE_VERSIONS_API.md`](../operations/PACKAGE_VERSIONS_API.md). Desk owns the screen. Staging SQL is `package_version_editor.sql`. Do not promote a version to prod without Alvin's go.
 - Admin: seed DID → assign → release → remove business paths still work
 - Owner **Usage** page (`/wallet`): package remaining, on-demand opt-in, charge history; beta badge when enforcement off
 - If touching voice charge hook: smoke a completed-call path without double-billing
