@@ -3,11 +3,12 @@ import { createWorkspaceDataClient } from "@/lib/tenant";
 import { isFreeBeta, ownerBillingSurface, type OwnerBillingSurface } from "@/lib/betaBilling";
 import { nairobiDay, pickBillingBanner, type BillingBanner } from "@/lib/billingBanner";
 import {
-  annualPriceKes,
-  annualSavingKes,
+  annualPriceFromVersion,
   emptySeatOffer,
+  nairobiMonthName,
   nairobiPeriodDays,
   seatUnitKes,
+  spendLimitDisplayKes,
   type SeatOffer,
 } from "@/lib/planPricing";
 import { trialRemaining } from "@/lib/trialRemaining";
@@ -39,7 +40,6 @@ export type OwnerInvoiceRow = {
   dueAt: string | null;
   periodStart: string | null;
   periodEnd: string | null;
-  payToken: string | null;
 };
 
 export type OwnerNoticeRow = {
@@ -71,6 +71,8 @@ export type OwnerPlanModel = {
   extraSeatMonthlyKes: number | null;
   extraSeats: number;
   seatUnitKes: number | null;
+  periodEndMonth: string | null;
+  nextPeriodStartLabel: string | null;
   banner: BillingBanner | null;
 };
 
@@ -81,6 +83,8 @@ export type UsageBillingExtras = {
   messageCredits: number | null;
   inboundPerMinuteKes: number | null;
   outboundPerMinuteKes: number | null;
+  /** Default when the owner has not saved a limit. Not a per-credit price. */
+  spendLimitKes: number | null;
   onDemandLocked: boolean;
 };
 
@@ -96,12 +100,17 @@ const VERSION_CORE = [
   "outbound_kes_per_second",
   "annual_discount_percent",
 ];
-const VERSION_OPTIONAL = ["message_credits", "extra_seat_monthly_kes", "trial_days"];
+const VERSION_OPTIONAL = [
+  "message_credits",
+  "extra_seat_monthly_kes",
+  "trial_days",
+  "annual_price_kes",
+  "spend_limit_share_percent",
+];
 const SUB_CORE = ["billing_status", "period", "package_version_id", "current_period_start", "current_period_end"];
 const SUB_OPTIONAL = ["term_start", "term_end", "extra_seats"];
-const INVOICE_WITH_TOKEN =
-  "id, invoice_number, status, total_kes, due_at, issued_at, period_start, period_end, pay_token";
-const INVOICE_BASE = INVOICE_WITH_TOKEN.replace(", pay_token", "");
+const INVOICE_FIELDS =
+  "id, invoice_number, status, total_kes, due_at, issued_at, period_start, period_end";
 
 function num(raw: unknown): number {
   const n = Number(raw);
@@ -130,6 +139,8 @@ function betaModel(): OwnerPlanModel {
     extraSeatMonthlyKes: null,
     extraSeats: 0,
     seatUnitKes: null,
+    periodEndMonth: null,
+    nextPeriodStartLabel: null,
     banner: null,
   };
 }
@@ -142,6 +153,7 @@ function emptyExtras(): UsageBillingExtras {
     messageCredits: null,
     inboundPerMinuteKes: null,
     outboundPerMinuteKes: null,
+    spendLimitKes: null,
     onDemandLocked: false,
   };
 }
@@ -166,6 +178,12 @@ function mapPlans(packages: Record<string, unknown>[], versions: VersionRow[]): 
     if (!version) continue;
     const monthly = num(version.monthly_price_kes);
     const discount = num(version.annual_discount_percent);
+    const storedAnnual = version.annual_price_kes;
+    const annual = annualPriceFromVersion(
+      monthly,
+      discount,
+      storedAnnual == null || storedAnnual === "" ? null : num(storedAnnual),
+    );
     const creditsRaw = version.message_credits;
     const messageCredits =
       creditsRaw == null || creditsRaw === "" ? null : Math.round(num(creditsRaw));
@@ -173,8 +191,8 @@ function mapPlans(packages: Record<string, unknown>[], versions: VersionRow[]): 
       sku: pack.sku,
       name: String(pack.name || pack.sku),
       monthlyKes: monthly,
-      annualKes: annualPriceKes(monthly, discount),
-      savingKes: annualSavingKes(monthly, discount),
+      annualKes: annual,
+      savingKes: Math.round(monthly * 12 - annual),
       minutes: Math.round(num(version.minutes)),
       seats: Math.round(num(version.seats)),
       dids: Math.round(num(version.dids)),
@@ -274,9 +292,14 @@ export async function loadPinnedSeatOffer(client: DataClient, tenantId: string):
     }
     if (version.error || !version.data) return { ...empty, extraSeats, cycle };
     const price = nullableKes(version.data.extra_seat_monthly_kes);
+    const periodEnd = row.term_end
+      ? String(row.term_end)
+      : row.current_period_end
+        ? String(row.current_period_end)
+        : null;
     const clock = nairobiPeriodDays(
       row.term_start ? String(row.term_start) : row.current_period_start ? String(row.current_period_start) : null,
-      row.term_end ? String(row.term_end) : row.current_period_end ? String(row.current_period_end) : null,
+      periodEnd,
       new Date(),
     );
     return {
@@ -286,6 +309,8 @@ export async function loadPinnedSeatOffer(client: DataClient, tenantId: string):
       daysLeft: clock?.daysLeft ?? null,
       daysInPeriod: clock?.daysInPeriod ?? null,
       seatUnitKes: price == null ? null : seatUnitKes(price, cycle, num(version.data.annual_discount_percent)),
+      periodEndMonth: nairobiMonthName(periodEnd),
+      nextPeriodStartLabel: nairobiDay(periodEnd),
     };
   } catch {
     return empty;
@@ -300,7 +325,7 @@ function pauseOn(row: Record<string, unknown>): string | null {
   return new Date(t + 8 * 86_400_000).toISOString();
 }
 
-function bannerFrom(row: Record<string, unknown>, open: { totalKes: number; payToken: string | null } | null, now: Date): BillingBanner | null {
+function bannerFrom(row: Record<string, unknown>, open: { totalKes: number } | null, now: Date): BillingBanner | null {
   const status = String(row.billing_status || "");
   const trial =
     status === "trialing"
@@ -318,7 +343,6 @@ function bannerFrom(row: Record<string, unknown>, open: { totalKes: number; payT
       pauseOn: pauseOn(row),
       trialEnded: Boolean(trial?.ended),
       openInvoiceKes: open?.totalKes ?? null,
-      payToken: open?.payToken ?? null,
     },
     now,
   );
@@ -328,24 +352,14 @@ async function loadInvoices(
   client: DataClient,
   tenantId: string,
 ): Promise<{ rows: OwnerInvoiceRow[]; missing: boolean; failed: boolean }> {
-  let res = await selectRows(
+  const res = await selectRows(
     client
       .from("invoices")
-      .select(INVOICE_WITH_TOKEN)
+      .select(INVOICE_FIELDS)
       .eq("tenant_id", tenantId)
       .neq("status", "draft")
       .order("issued_at", { ascending: false }),
   );
-  if (res.error && /pay_token/i.test(String(res.error.message || ""))) {
-    res = await selectRows(
-      client
-        .from("invoices")
-        .select(INVOICE_BASE)
-        .eq("tenant_id", tenantId)
-        .neq("status", "draft")
-        .order("issued_at", { ascending: false }),
-    );
-  }
   if (isMissingTableError(res.error)) return { rows: [], missing: true, failed: false };
   if (res.error) return { rows: [], missing: false, failed: true };
   const rows = ((res.data || []) as Record<string, unknown>[]).map((row) => ({
@@ -356,7 +370,6 @@ async function loadInvoices(
     dueAt: row.due_at ? String(row.due_at) : null,
     periodStart: row.period_start ? String(row.period_start) : null,
     periodEnd: row.period_end ? String(row.period_end) : null,
-    payToken: row.pay_token ? String(row.pay_token) : null,
   }));
   return { rows, missing: false, failed: false };
 }
@@ -444,7 +457,9 @@ export async function loadOwnerPlan(tenantId: string): Promise<{ ok: true; model
         extraSeatMonthlyKes: seatOffer.extraSeatMonthlyKes,
         extraSeats: seatOffer.extraSeats,
         seatUnitKes: seatOffer.seatUnitKes,
-        banner: bannerFrom(row, open ? { totalKes: open.totalKes, payToken: open.payToken } : null, now),
+        periodEndMonth: seatOffer.periodEndMonth,
+        nextPeriodStartLabel: seatOffer.nextPeriodStartLabel,
+        banner: bannerFrom(row, open ? { totalKes: open.totalKes } : null, now),
       },
     };
   } catch {
@@ -469,7 +484,7 @@ export async function loadDeskBillingBanner(tenantId: string): Promise<BillingBa
     if (isFreeBeta(String(row.billing_status || ""))) return null;
     const invoices = await loadInvoices(ws.client, tenantId);
     const open = invoices.rows.find((item) => item.status === "open") || null;
-    return bannerFrom(row, open ? { totalKes: open.totalKes, payToken: open.payToken } : null, new Date());
+    return bannerFrom(row, open ? { totalKes: open.totalKes } : null, new Date());
   } catch {
     return null;
   }
@@ -492,6 +507,7 @@ export async function loadUsageBillingExtras(tenantId: string): Promise<UsageBil
     let messageCredits: number | null = null;
     let inbound: number | null = null;
     let outbound: number | null = null;
+    let share: number | null = null;
     if (row.package_version_id) {
       const versions = await publishedVersions(ws.client);
       const match = versions.rows.find((item) => String(item.id) === String(row.package_version_id));
@@ -501,15 +517,19 @@ export async function loadUsageBillingExtras(tenantId: string): Promise<UsageBil
         }
         inbound = num(match.inbound_kes_per_second) * 60;
         outbound = num(match.outbound_kes_per_second) * 60;
+        const shareRaw = match.spend_limit_share_percent;
+        if (shareRaw != null && shareRaw !== "") share = num(shareRaw);
       }
     }
+    const monthlyPriceKes = row.version_monthly_price_kes == null ? null : num(row.version_monthly_price_kes);
     return {
       billingStatus: status,
       freeBeta: false,
-      monthlyPriceKes: row.version_monthly_price_kes == null ? null : num(row.version_monthly_price_kes),
+      monthlyPriceKes,
       messageCredits,
       inboundPerMinuteKes: inbound,
       outboundPerMinuteKes: outbound,
+      spendLimitKes: spendLimitDisplayKes(null, monthlyPriceKes, share),
       onDemandLocked: status === "trialing",
     };
   } catch {

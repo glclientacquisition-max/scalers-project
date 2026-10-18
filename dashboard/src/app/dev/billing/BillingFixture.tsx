@@ -73,13 +73,15 @@ function growthModel(cycle: PlanCycle, trialText: string | null = null): OwnerPl
     extraSeatMonthlyKes: 500,
     extraSeats: 0,
     seatUnitKes: 500,
+    periodEndMonth: "October",
+    nextPeriodStartLabel: "31 Oct",
     banner: null,
   };
 }
 
 function invoiceItems(invoices: OwnerInvoiceRow[]) {
   return invoices.flatMap((invoice) => {
-    const pay = invoicePayState({ status: invoice.status, payToken: invoice.payToken });
+    const pay = invoicePayState({ status: invoice.status, payLinkPath: null });
     if (pay.hidden) return [];
     const statusLabel =
       pay.label === "Paid" || pay.label === "Checking payment"
@@ -93,7 +95,7 @@ function invoiceItems(invoices: OwnerInvoiceRow[]) {
         number: invoice.number,
         totalLabel: formatKsh(invoice.totalKes),
         statusLabel,
-        payHref: pay.showPayButton ? pay.payHref : null,
+        payHref: null,
         payLabel: pay.showPayButton ? `Pay ${formatKsh(invoice.totalKes)}` : null,
       },
     ];
@@ -109,7 +111,6 @@ const sampleInvoices: OwnerInvoiceRow[] = [
     dueAt: "9 Oct",
     periodStart: "1 Oct",
     periodEnd: "31 Oct",
-    payToken: null,
   },
   {
     id: "inv-1038",
@@ -119,7 +120,6 @@ const sampleInvoices: OwnerInvoiceRow[] = [
     dueAt: "9 Sep",
     periodStart: "1 Sep",
     periodEnd: "30 Sep",
-    payToken: null,
   },
 ];
 
@@ -206,6 +206,8 @@ const fullTeam: MembersData = {
     daysLeft: 20,
     daysInPeriod: 30,
     seatUnitKes: 500,
+    periodEndMonth: "October",
+    nextPeriodStartLabel: "31 Oct",
   } satisfies SeatOffer,
 };
 
@@ -270,7 +272,6 @@ export function BillingFixture({ view }: { view: BillingPreview }) {
         billingStatus: "suspended",
         voicemailUntil: "2026-10-25T18:00:00+03:00",
         openInvoiceKes: 8120,
-        payToken: null,
       },
       PREVIEW_NOW,
     );

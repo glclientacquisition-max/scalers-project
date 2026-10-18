@@ -12,6 +12,10 @@ export type SeatOffer = {
   daysInPeriod: number | null;
   /** One extra seat for this cycle, before proration. Null when the version has no seat price. */
   seatUnitKes: number | null;
+  /** Long month of the period end in Africa/Nairobi, e.g. October. */
+  periodEndMonth: string | null;
+  /** Day the next period starts, e.g. 31 Oct. Same instant as the period end. */
+  nextPeriodStartLabel: string | null;
 };
 
 export function emptySeatOffer(): SeatOffer {
@@ -22,6 +26,8 @@ export function emptySeatOffer(): SeatOffer {
     daysLeft: null,
     daysInPeriod: null,
     seatUnitKes: null,
+    periodEndMonth: null,
+    nextPeriodStartLabel: null,
   };
 }
 
@@ -32,6 +38,16 @@ export function formatKsh(amount: number): string {
 /** Annual = round(monthly × 12 × (1 − discount/100)). Discount is a percent, 17 not 0.17. */
 export function annualPriceKes(monthlyKes: number, discountPercent: number): number {
   return Math.round((monthlyKes * 12 * (100 - discountPercent)) / 100);
+}
+
+/** Stored `annual_price_kes` when the version has one. Otherwise the discount formula. */
+export function annualPriceFromVersion(
+  monthlyKes: number,
+  discountPercent: number,
+  storedKes: number | null | undefined,
+): number {
+  if (storedKes != null && Number.isFinite(storedKes) && storedKes >= 0) return Math.round(storedKes);
+  return annualPriceKes(monthlyKes, discountPercent);
 }
 
 export function annualSavingKes(monthlyKes: number, discountPercent: number): number {
@@ -103,16 +119,67 @@ export function proratedPortionKes(amountKes: number, daysLeft: number, daysInPe
   return Math.round((amountKes * left) / daysInPeriod);
 }
 
+const nairobiMonth = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Africa/Nairobi",
+  month: "long",
+});
+
+/** Long month name of an instant in Africa/Nairobi. */
+export function nairobiMonthName(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return null;
+  return nairobiMonth.format(new Date(t));
+}
+
 /**
- * Saved limit, or half the pinned monthly price when the owner has not set one.
- * `monthlyKes` is the version row. This does not store a shilling default.
+ * Seats being added. Today is the prorated unit. Then is the version monthly
+ * price times the quantity.
+ */
+export function seatIncreaseCopy(input: {
+  quantity: number;
+  monthlyKes: number;
+  unitKes: number;
+  daysLeft: number;
+  daysInPeriod: number;
+  periodMonth: string | null;
+}): string | null {
+  if (!(input.quantity > 0)) return null;
+  const due = proratedPortionKes(input.unitKes * input.quantity, input.daysLeft, input.daysInPeriod);
+  const later = Math.round(input.monthlyKes * input.quantity);
+  const then = `${formatKsh(later)} a month`;
+  if (!input.periodMonth) return `${formatKsh(due)} today, then ${then}.`;
+  return `${formatKsh(due)} today for the rest of ${input.periodMonth}, then ${then}.`;
+}
+
+/** Seats being removed. The new extra-seat total starts with the next period. */
+export function seatReductionCopy(input: {
+  seats: number;
+  monthlyKes: number;
+  nextPeriodStart: string | null;
+}): string | null {
+  if (input.seats < 0) return null;
+  const later = Math.round(input.monthlyKes * input.seats);
+  const pay = `${formatKsh(later)} a month for extra seats`;
+  if (!input.nextPeriodStart) return `You pay ${pay}.`;
+  return `From ${input.nextPeriodStart} you pay ${pay}.`;
+}
+
+/**
+ * Saved limit, or the version share of the monthly price when the owner has not set one.
+ * A missing share uses 50, the column default. This does not store a shilling default.
  */
 export function spendLimitDisplayKes(
   savedKes: number | null | undefined,
   monthlyKes: number | null | undefined,
+  sharePercent?: number | null,
 ): number | null {
   if (savedKes != null && savedKes > 0) return Math.round(savedKes);
-  if (monthlyKes != null && monthlyKes > 0) return Math.round(monthlyKes * 0.5);
+  if (monthlyKes != null && monthlyKes > 0) {
+    const share =
+      sharePercent == null || !Number.isFinite(sharePercent) ? 50 : Math.min(100, Math.max(0, sharePercent));
+    return Math.round((monthlyKes * share) / 100);
+  }
   return null;
 }
 

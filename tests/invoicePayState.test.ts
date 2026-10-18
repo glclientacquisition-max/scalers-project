@@ -19,20 +19,30 @@ describe("invoicePayState", () => {
   });
 
   it("says Checking payment after a return until the webhook marks it paid", () => {
-    const view = invoicePayState({ status: "open", returnedFromPay: true, payToken: "tok" });
+    const view = invoicePayState({
+      status: "open",
+      returnedFromPay: true,
+      payLinkPath: "/api/billing/invoices/1/pay-link",
+    });
     assert.equal(view.label, "Checking payment");
     assert.equal(view.showPayButton, false);
     assert.equal(invoicePayState({ status: "paid", returnedFromPay: true }).label, "Paid");
   });
 
-  it("hides Pay KSh X when there is no token", () => {
-    const view = invoicePayState({ status: "open", payToken: null });
-    assert.equal(view.showPayButton, false);
-    assert.equal(view.payHref, null);
-    assert.equal(view.note, null);
-    const withToken = invoicePayState({ status: "open", payToken: "abc" });
-    assert.equal(withToken.showPayButton, true);
-    assert.equal(withToken.payHref, "/pay/abc");
+  it("shows Pay only when a pay link exists and the account is not beta", () => {
+    const hidden = invoicePayState({ status: "open", payLinkPath: null });
+    assert.equal(hidden.showPayButton, false);
+    assert.equal(hidden.payLinkPath, null);
+    const beta = invoicePayState({
+      status: "open",
+      payLinkPath: "/api/billing/invoices/1/pay-link",
+      beta: true,
+    });
+    assert.equal(beta.showPayButton, false);
+    const ready = invoicePayState({ status: "open", payLinkPath: "/api/billing/invoices/1/pay-link" });
+    assert.equal(ready.showPayButton, true);
+    assert.equal(ready.payLinkPath, "/api/billing/invoices/1/pay-link");
+    assert.equal(invoicePayState({ status: "paid", payLinkPath: "/api/billing/invoices/1/pay-link" }).showPayButton, false);
   });
 
   it("hides drafts", () => {
@@ -46,6 +56,9 @@ describe("invoicePayState", () => {
     );
     assert.match(check, /router\.refresh/);
     assert.doesNotMatch(check, /status:\s*["']paid["']|setStatus\(|paid:\s*true/);
+    const state = fs.readFileSync(path.join(root, "dashboard/src/lib/invoicePayState.ts"), "utf8");
+    assert.doesNotMatch(state, /\/pay\/\$\{/);
+    assert.doesNotMatch(state, /pay_token|payToken|credit_kes/);
     assert.equal(fs.existsSync(path.join(root, "dashboard/src/app/pay")), false);
     assert.equal(fs.existsSync(path.join(root, "dashboard/src/app/(desk)/pay")), false);
     const actions = fs.readFileSync(

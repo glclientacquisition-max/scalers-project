@@ -14,8 +14,9 @@ import {
 } from "@/app/(desk)/settings/plan/planActions";
 import {
   formatKsh,
-  proratedPortionKes,
   proratedUpgradeKes,
+  seatIncreaseCopy,
+  seatReductionCopy,
   splitPayNote,
 } from "@/lib/planPricing";
 import type { OwnerPlanModel, PlanCycle, PlanSku, PublishedPlan } from "@/lib/ownerPlanLoad";
@@ -28,21 +29,27 @@ function numberWord(count: number, one: string, many: string): string {
 
 function SeatChangeNote({ model, next }: { model: OwnerPlanModel; next: number }) {
   const delta = next - model.extraSeats;
-  if (delta === 0) return null;
+  if (delta === 0 || model.extraSeatMonthlyKes == null) return null;
   if (delta < 0) {
-    return <p className="mt-3 text-body text-ink-2">Takes effect on the next bill.</p>;
+    const line = seatReductionCopy({
+      seats: next,
+      monthlyKes: model.extraSeatMonthlyKes,
+      nextPeriodStart: model.nextPeriodStartLabel,
+    });
+    return line ? <p className="mt-3 text-body text-ink-2">{line}</p> : null;
   }
-  const due =
+  const line =
     model.seatUnitKes != null && model.daysLeft != null && model.daysInPeriod != null
-      ? proratedPortionKes(model.seatUnitKes * delta, model.daysLeft, model.daysInPeriod)
+      ? seatIncreaseCopy({
+          quantity: delta,
+          monthlyKes: model.extraSeatMonthlyKes,
+          unitKes: model.seatUnitKes,
+          daysLeft: model.daysLeft,
+          daysInPeriod: model.daysInPeriod,
+          periodMonth: model.periodEndMonth,
+        })
       : null;
-  return (
-    <p className="mt-3 text-body text-ink-2">
-      {due != null
-        ? `${formatKsh(due)} for the rest of this period.`
-        : "Added to the next bill for the days left in this period."}
-    </p>
-  );
+  return line ? <p className="mt-3 text-body text-ink-2">{line}</p> : null;
 }
 
 function inclusionLines(plan: PublishedPlan): string[] {
@@ -174,7 +181,7 @@ export function PlanPicker({
                       <li key={line}>{line}</li>
                     ))}
                   </ul>
-                  {cycle === "year" ? (
+                  {cycle === "year" && plan.savingKes > 0 ? (
                     <span className="mt-3 block text-meta text-ink-2">
                       Save {formatKsh(plan.savingKes)} a year
                     </span>
@@ -252,7 +259,7 @@ export function PlanPicker({
           model.extraSeatMonthlyKes != null ? `${formatKsh(model.extraSeatMonthlyKes)} a month each` : undefined
         }
         footer={
-          <form action={seatAction}>
+          <form action={seatAction} className="w-full">
             <input type="hidden" name="extra_seats" value={seats} />
             <input type="hidden" name="idempotency_key" value={seatKey} />
             <Button type="submit" variant="tonal" block pending={seatPending} disabled={seats === model.extraSeats}>

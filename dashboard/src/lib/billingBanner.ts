@@ -1,5 +1,4 @@
 import { isFreeBeta } from "./betaBilling";
-import { formatKsh } from "./planPricing";
 
 export type BillingBannerKind =
   | "line_closed"
@@ -23,7 +22,6 @@ export type BannerSub = {
   pauseOn?: string | null;
   trialEnded?: boolean;
   openInvoiceKes?: number | null;
-  payToken?: string | null;
 };
 
 export function nairobiDay(iso: string | null | undefined): string | null {
@@ -37,11 +35,7 @@ export function nairobiDay(iso: string | null | undefined): string | null {
   });
 }
 
-function payAction(sub: BannerSub): BillingBannerAction | null {
-  const amount = sub.openInvoiceKes;
-  if (amount != null && amount > 0 && sub.payToken) {
-    return { label: `Pay ${formatKsh(amount)}`, href: `/pay/${sub.payToken}` };
-  }
+function payAction(): BillingBannerAction {
   return { label: "View invoice", href: "/settings/billing" };
 }
 
@@ -51,7 +45,7 @@ export function pickBillingBanner(sub: BannerSub | null | undefined, _now: Date)
   const open = sub.openInvoiceKes != null && sub.openInvoiceKes > 0;
   if (sub.billingStatus === "active" && !open) return null;
 
-  const action = payAction(sub);
+  const action = payAction();
   const status = sub.billingStatus;
 
   if (status === "suspended") {

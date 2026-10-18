@@ -26,7 +26,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { Input, Select } from "@/components/ui/Field";
 import { Sheet } from "@/components/ui/Sheet";
 import { notify } from "@/components/ui/DeskNotice";
-import { formatKsh, proratedPortionKes } from "@/lib/planPricing";
+import { formatKsh, seatIncreaseCopy } from "@/lib/planPricing";
 import { SettingsGroup, settingsFieldClass, settingsGroupTitleClass } from "@/components/settingsUi";
 
 type Pending = {
@@ -91,9 +91,20 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
   const canInvite = roles.length > 0;
   const { seats, totals, limits } = data;
   const canBuySeat = Boolean(seats.full && seatPrice != null && maxAdd >= 1);
-  const seatDue =
-    canBuySeat && seatOffer?.seatUnitKes != null && seatOffer.daysLeft != null && seatOffer.daysInPeriod != null
-      ? proratedPortionKes(seatOffer.seatUnitKes * seatQty, seatOffer.daysLeft, seatOffer.daysInPeriod)
+  const seatLine =
+    canBuySeat &&
+    seatOffer?.seatUnitKes != null &&
+    seatOffer.daysLeft != null &&
+    seatOffer.daysInPeriod != null &&
+    seatPrice != null
+      ? seatIncreaseCopy({
+          quantity: seatQty,
+          monthlyKes: seatPrice,
+          unitKes: seatOffer.seatUnitKes,
+          daysLeft: seatOffer.daysLeft,
+          daysInPeriod: seatOffer.daysInPeriod,
+          periodMonth: seatOffer.periodEndMonth,
+        })
       : null;
 
   /** Runs one action at a time and always shows the outcome: inline + desk toast (survives a re-render). */
@@ -402,11 +413,7 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
               <PlusIcon />
             </IconButton>
           </div>
-          <p className="mt-3 text-body text-ink-2">
-            {seatDue != null
-              ? `${formatKsh(seatDue)} for the rest of this period.`
-              : "Added to the next bill for the days left in this period."}
-          </p>
+          {seatLine ? <p className="mt-3 text-body text-ink-2">{seatLine}</p> : null}
           <div className="mt-4">
             <label className="mb-1.5 block text-meta font-medium text-ink" htmlFor="seat-invite-email">
               Email
