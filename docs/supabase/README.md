@@ -1,6 +1,6 @@
 ---
 owner: platform
-last_reviewed: 2026-10-09
+last_reviewed: 2026-10-18
 ---
 
 # Supabase SQL apply order
@@ -140,6 +140,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 24k.1 | [`fix_grant_package_minutes.sql`](./fix_grant_package_minutes.sql) | `package_catalog.sql`, `admin_billing_ops.sql` | Hotfix: `grant_tenant_package_minutes` raised 42702 (OUT param `minutes_included` shadowed the column) on every call. Adds `tenant_minute_grants` (period-scoped, idempotent per key) + audit row. Safe to re-run. |
 | 24k.2 | [`package_state_rules.sql`](./package_state_rules.sql) | `fix_grant_package_minutes.sql`, `package_catalog.sql` | DRAFT. Explicit no package (`status = cancelled`, never unlimited), `unassign_tenant_package`, upgrade now (prorated, grants kept) / downgrade + period change at next period (`pending_*`), single grant-expiry rule `billing_grant_minutes_for_period`. Re-run `package_period_rollover.sql` after it. |
 | 24k.3 | [`tenant_billing_state.sql`](./tenant_billing_state.sql) | `package_state_rules.sql`, `owner_rls.sql` | DRAFT. `tenant_billing_state` view (security invoker) for the Admin period card and Desk banners, plus owner read policies. Re-run after `notify_send_reserve_settle.sql` to bill SMS from the ledger. |
+| 24k.4 | [`billing_data_layer.sql`](./billing_data_layer.sql) | `package_state_rules.sql`, `tenant_billing_state.sql`, `did_number_pool.sql`, `super_admin_ops.sql` | Versioned packages, billing status, invoices, payments, credits, billing notice outbox, `tenant_escalation_allowed`, DID quarantine. Does not charge and does not send. Replaces assign/release. Do not re-apply those functions from the older files after this. Staging first. Prod only after a backup and Alvin's GO. The file is the prod script. |
 | 24l | [`platform_ops_notices.sql`](./platform_ops_notices.sql) | none (staff tables) | Staff notice settings + open notices. Service role only. Applied on scalers-staging 2026-10-05. |
 | 24m | [`platform_ops_people.sql`](./platform_ops_people.sql) | `platform_ops_notices.sql` | Escalate people jsonb (name, phone, email). Applied on scalers-staging with the Platform rebuild. |
 | 24n | [`voice_turn_traces.sql`](./voice_turn_traces.sql) | `platform_ops_people.sql` | Per-turn voice traces (`voice_turn_traces`) plus call `score`, `checks`, `diagnosis`, and `release`. Service role only. Not applied by deploy. Apply the whole file on staging before `VOICE_TRACE` can persist. Re-running it adds the score columns if an earlier draft of the table is already there. |

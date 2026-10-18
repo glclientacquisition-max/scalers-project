@@ -1,6 +1,6 @@
 ---
 owner: platform
-last_reviewed: 2026-10-04
+last_reviewed: 2026-10-18
 ---
 
 # Database apply order
@@ -169,6 +169,7 @@ This document is the **executable** apply sequence for greenfield / full staging
 | 33f | `package_entitlements.sql` | `sms_allowance.sql` |
 | 33g | `whatsapp_threads.sql` | `notify_send_ledger.sql` |
 | 33h | `package_minute_consume.sql` | `package_catalog.sql` (README 24g) |
+| 33i | `billing_data_layer.sql` | `package_state_rules.sql`, `did_number_pool.sql`, `super_admin_ops.sql` (README 24k.4). Staging first. Prod after a backup and Alvin's GO. |
 
 **Blocker:** `appointments.sql` before `contacts_and_requests.sql` → `relation "public.contacts" does not exist`.
 `realtime_inbox.sql` adds `calls`, `service_requests`, `appointments`, `tenants`, `wallet_ledger`, and `transcripts` to `supabase_realtime`. Apply that file by hand. Deploy does not run it. `realtime_inbox_replica_identity.sql` sets `REPLICA IDENTITY FULL` so `tenant_id` filters match hangup UPDATEs.
