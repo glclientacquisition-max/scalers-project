@@ -155,7 +155,7 @@ async function CallsBody({ searchParams }: CallsPageProps) {
       }
       enableSelect={!boardView && !holdTodayView}
     >
-    <div>
+    <div className="min-w-0">
       <InboxPileSelectChrome>
       <InboxToolbar
         active={activeFilter}

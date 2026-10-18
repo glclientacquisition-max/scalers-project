@@ -12,8 +12,8 @@ export const AFTER_HOURS_OPTIONS: {
   },
   {
     id: "serve",
-    label: "Full assistant",
-    blurb: "Answer, book, and change a visit.",
+    label: "Full Business Assistant",
+    blurb: "Answer questions and take a message.",
   },
 ];
 

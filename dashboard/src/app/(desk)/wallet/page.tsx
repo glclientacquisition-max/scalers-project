@@ -5,7 +5,7 @@ import { getCurrentTenant, createWorkspaceDataClient } from "@/lib/tenant";
 import { getTenantUsageSummary } from "@/lib/wallet";
 import { inboundKesPerMinute, loadOwnerPackageMeter } from "@/lib/packageCatalog";
 import { loadOwnerBillingView } from "@/lib/billingStateLoad";
-import { ownerBillingView } from "@/lib/billingStateModel";
+import { ownerBillingView, presentFreeBeta } from "@/lib/billingStateModel";
 import { createDeskTimer } from "@/lib/deskTiming";
 import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
 import { DeskError } from "@/components/ui/DeskError";
@@ -33,6 +33,18 @@ function count(n: number): string {
 
 function kes(n: number): string {
   return n.toLocaleString("en-KE", { maximumFractionDigits: 2 });
+}
+
+function nairobiWhen(iso: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return iso;
+  return at.toLocaleString("en-KE", {
+    timeZone: "Africa/Nairobi",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 type WalletPageProps = {
@@ -86,7 +98,7 @@ async function WalletBody({ searchParams }: WalletPageProps) {
   console.info(timer.line("usage"));
 
   // Before tenant_billing_state exists: same wording from the tenant counters.
-  const view =
+  const view = presentFreeBeta(
     billing ||
     ownerBillingView({
       state: pack.packageName
@@ -101,6 +113,7 @@ async function WalletBody({ searchParams }: WalletPageProps) {
             mode_label: usage.isBeta ? "beta" : tenant.on_demand_usage_enabled ? "metered" : "capped",
           }
         : null,
+      isBeta: usage.isBeta,
       monthlyPriceKes: null,
       smsMessages: null,
       seatsIncluded: pack.seatsIncluded,
@@ -109,7 +122,9 @@ async function WalletBody({ searchParams }: WalletPageProps) {
         email: { included: pack.emailIncluded, used: pack.emailUsed },
         whatsapp: { included: pack.waIncluded, used: pack.waUsed },
       },
-    });
+    }),
+    usage.isBeta,
+  );
 
   const safePage = clampListPage(page, usage.ledgerTotal, DEFAULT_PAGE_SIZE);
   if (safePage !== page) {
@@ -120,6 +135,8 @@ async function WalletBody({ searchParams }: WalletPageProps) {
   const minutesLeft = view.minutesLeft;
   const minuteMax = Math.max(0, view.minutesIncluded);
   const minuteLeftPct = minuteMax > 0 ? Math.min(100, Math.round((minutesLeft / minuteMax) * 100)) : 0;
+  const minutesUsed = view.rows.find((row) => row.key === "minutes")?.used ?? 0;
+  const freeBeta = view.mode === "none";
 
   return (
     <div className="max-w-3xl">
@@ -139,12 +156,12 @@ async function WalletBody({ searchParams }: WalletPageProps) {
 
       <section className="mt-6 rounded-2xl border border-hairline bg-surface p-5">
         <p className="text-body text-ink-2">
-          Minutes left{view.periodEndLabel ? ` until ${view.periodEndLabel}` : ""}
+          {freeBeta ? "Minutes used" : `Minutes left${view.periodEndLabel ? ` until ${view.periodEndLabel}` : ""}`}
         </p>
         <p className="mt-1 font-display text-display tabular-nums text-ink">
-          {count(minutesLeft)}
+          {count(freeBeta ? minutesUsed : minutesLeft)}
         </p>
-        {minuteMax > 0 ? (
+        {freeBeta ? null : minuteMax > 0 ? (
           <div
             className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2"
             role="meter"
@@ -159,7 +176,16 @@ async function WalletBody({ searchParams }: WalletPageProps) {
           <p className="mt-2 text-body text-ink-2">No package minutes</p>
         )}
 
-        <table className="mt-6 w-full text-left text-body">
+        {freeBeta ? (
+          <ul className="mt-6 space-y-2">
+            {view.rows.filter((row) => row.used > 0).map((row) => (
+              <li key={row.key} className="flex items-baseline justify-between gap-3 text-body text-ink">
+                <span>{row.label}</span>
+                <span className="tabular-nums">{count(row.used)} used</span>
+              </li>
+            ))}
+          </ul>
+        ) : <table className="mt-6 w-full text-left text-body">
           <caption className="sr-only">What your package includes this month</caption>
           <thead className="border-b border-hairline text-ink-2">
             <tr>
@@ -182,7 +208,7 @@ async function WalletBody({ searchParams }: WalletPageProps) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table>}
       </section>
 
       <div className="mt-6">
@@ -200,19 +226,19 @@ async function WalletBody({ searchParams }: WalletPageProps) {
           <tbody>
             <tr className="border-b border-hairline">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">Calls</th>
-              <td className="py-3 text-right tabular-nums text-ink">KES {kes(inboundMin)} a minute</td>
+              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(inboundMin)} a minute</td>
             </tr>
             <tr className="border-b border-hairline">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">SMS</th>
-              <td className="py-3 text-right tabular-nums text-ink">KES {kes(pack.rates.smsKes)} a credit</td>
+              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(pack.rates.smsKes)} a credit</td>
             </tr>
             <tr className="border-b border-hairline">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">Email</th>
-              <td className="py-3 text-right tabular-nums text-ink">KES {kes(pack.rates.emailKes)}</td>
+              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(pack.rates.emailKes)}</td>
             </tr>
             <tr className="border-b border-hairline">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">WhatsApp</th>
-              <td className="py-3 text-right tabular-nums text-ink">KES {kes(pack.rates.whatsappKes)}</td>
+              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(pack.rates.whatsappKes)}</td>
             </tr>
           </tbody>
         </table>
@@ -238,7 +264,7 @@ async function WalletBody({ searchParams }: WalletPageProps) {
                   scope="col"
                   className="px-4 py-2 text-right text-meta font-semibold"
                 >
-                  KES
+                  KSh
                 </th>
               </tr>
             </thead>
@@ -248,7 +274,7 @@ async function WalletBody({ searchParams }: WalletPageProps) {
                 return (
                   <tr key={row.id} className="border-t border-hairline/70">
                     <td className="whitespace-nowrap px-4 py-2 text-ink-2">
-                      {new Date(row.created_at).toLocaleString("en-KE")}
+                      {nairobiWhen(row.created_at)}
                     </td>
                     <td className={`${deskPreviewCellClass} px-4 py-2`}>
                       <p className={deskPreviewClass}>

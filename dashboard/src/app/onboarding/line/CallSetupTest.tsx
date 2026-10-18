@@ -118,7 +118,7 @@ export function CallSetupTest({
         <p className="text-body font-semibold text-ok">{auto ? worksTitle(option) : "You're all set."}</p>
         <p className="mt-1 text-body text-ink-2">
           {auto && from ? `We saw your test call from ${from}. ` : ""}
-          {option === "forward" ? "Missed calls now go to your assistant." : `Calls to ${pretty} go to your assistant.`}
+          {option === "forward" ? "Missed calls now go to your Business Assistant." : `Calls to ${pretty} go to your Business Assistant.`}
         </p>
         <Button
           type="button"
@@ -144,7 +144,7 @@ export function CallSetupTest({
           </p>
         ) : (
           <p className="text-body text-ink-2">
-            Call <span className="font-semibold tabular-nums text-ink">{pretty}</span> and listen to your assistant.
+            Call <span className="font-semibold tabular-nums text-ink">{pretty}</span> and listen to your Business Assistant.
           </p>
         )}
 
@@ -203,7 +203,7 @@ export function CallSetupTest({
       {option === "main_number" && (saidNo || missed) ? (
         <p role="status" className="mt-3 rounded-2xl border border-hairline bg-surface px-4 py-3 text-meta text-ink-2">
           <span className="font-semibold text-ink">No answer? </span>
-          Check you dialled {pretty}, wait a minute and call again. If your assistant still doesn&apos;t answer, reply to any
+          Check you dialled {pretty}, wait a minute and call again. If your Business Assistant still doesn&apos;t answer, reply to any
           Scalers email and we&apos;ll check your line.
         </p>
       ) : null}
@@ -326,7 +326,7 @@ function FixChecklist({
           ) : null}
           <p>
             <span className="font-semibold text-ink">You used voicemail before? </span>
-            These codes replace it, so missed calls go to your assistant instead.
+            These codes replace it, so missed calls go to your Business Assistant instead.
           </p>
           <p>
             <span className="font-semibold text-ink">Still stuck? </span>
