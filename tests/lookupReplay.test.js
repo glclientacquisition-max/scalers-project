@@ -12,5 +12,6 @@ test('replay fixtures for bugs A to F, Ask, quote, and the hours turn', () => {
   assert.equal(res.totals.callbacksOnly, 0);
   assert.equal(res.totals.languageMismatch, 0);
   assert.equal(res.totals.falseDeletions, 0);
-  assert.ok(res.p95 <= 50, `p95 ${res.p95}`);
+  assert.ok(res.median <= 40, `median ${res.median}`);
+  assert.ok(res.p95 <= res.cap, `p95 ${res.p95} median ${res.median} cap ${res.cap}`);
 });

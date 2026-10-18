@@ -31,6 +31,12 @@ Price speech calls `normalisePrice` in `src/conversation/factPrice.js` and speak
 
 `quote`, `unknown`, and a non-numeric price such as "Ask" are never spoken. They use the cannot-answer line.
 
+A lookup result is `found`, `not_found_in_list`, or `no_data`. `no_data` means the list was never saved (no areas, no catalogue, no hours, no payment numbers). That is the cannot-answer line. It is never "we don't come there" or "we don't offer that". `not_found_in_list` means the list exists and this item is not on it. That is also the cannot-answer line, unless the business opted out of anything off the list (`service_areas.decline_unlisted` for fees, or `lookupOptOut`). Only that opt-out may say we don't cover it.
+
+Every kind asks `factIsConfirmed` before it speaks. That is the same field-meta and fact-hash check the catalogue rows use. Hours use `hours.weekly_grid`. A travel fee uses `service_areas.<id>`. With `FACT_HASH_MODE=on` and no matching stamp, English and Swahili both get the cannot-answer line. Opening hours are grouped when the days match: "Monday to Saturday, nine AM to seven PM; closed Sunday."
+
+The services list is the live catalogue, in that order, spoken in lower case, four names then "and more". A short follow-up that names a catalogue row ("And sofa cleaning?", "Na sofa je?", "Na curtain cleaning?") is a price for that row.
+
 ## Not on file
 
 `pickUnknownAnswerLine` chooses, in order: `unknown_answer_spoken` when its source matches, then `unknown_answer_fallback` in the caller's language, then "Let me check with the team and get back to you." / "Wacha niulize timu kisha nikujulishe." Every line passes the callbacks-only check. A held tenant (`holdGate.allowed === false`, other than a missing provenance RPC) gets that line for every kind.
@@ -47,6 +53,6 @@ Transfer, booking, names, holds, privacy and language checks stay. The payment-n
 
 ## Gate
 
-`npm run eval:release` replays the fact-refs set with lookups forced off, then the fixtures in `evals/replay/fixtures/` with lookups on. False deletions may not rise above `evals/replay/baseline.json`. Invented facts, a wrong not-on-file line, a callbacks-only break, and a Swahili language miss must stay at zero. Lookup brain time p95 must stay at or under 50 ms.
+`npm run eval:release` replays the fact-refs set with lookups forced off, then the fixtures in `evals/replay/fixtures/` with lookups on. False deletions may not rise above `evals/replay/baseline.json`. Invented facts, a wrong not-on-file line, a callbacks-only break, and a Swahili language miss must stay at zero. Lookup brain time drops the warm-up calls, then keeps the median at or under 40 ms and p95 at or under the greater of 80 ms and four times that median.
 
 `npm run test:lookups` is part of `npm run test:voice`.

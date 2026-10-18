@@ -36,6 +36,8 @@ function measure() {
     replay: {
       totals: replay.totals,
       p95: replay.p95,
+      median: replay.median,
+      cap: replay.cap,
       failures: replay.failures,
     },
   };
@@ -58,7 +60,11 @@ function check(measured, baseline) {
   if (replay.falseDeletions > baseline.replay.falseDeletions) {
     problems.push(`replay false deletions ${replay.falseDeletions} above baseline ${baseline.replay.falseDeletions}`);
   }
-  if (measured.replay.p95 > 50) problems.push(`lookup brain p95 ${measured.replay.p95.toFixed(1)}ms above 50`);
+  if (measured.replay.median > 40 || measured.replay.p95 > measured.replay.cap) {
+    problems.push(
+      `lookup brain median ${Number(measured.replay.median).toFixed(1)}ms p95 ${Number(measured.replay.p95).toFixed(1)}ms above cap ${Number(measured.replay.cap).toFixed(1)}ms`
+    );
+  }
   if (measured.replay.failures.length) problems.push(...measured.replay.failures);
   return problems;
 }

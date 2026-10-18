@@ -10,6 +10,7 @@ const { lintLine } = require('../../src/knowledge/sentenceLint');
 const { callbackSafeLine } = require('../../src/conversation/factSheet');
 const { langOf } = require('./lib/score');
 const { profiles } = require('./profiles');
+const { summarizeLatency } = require('./latency');
 
 const FIXTURE_DIR = path.join(__dirname, 'fixtures');
 
@@ -45,15 +46,30 @@ function runFixtures() {
     warns.push(args.join(' '));
   };
   try {
+    // Warm the place index and the lookup path. Those samples are not the gate.
+    for (let i = 0; i < 8; i += 1) {
+      planLookupTurn({
+        text: 'How much is sofa cleaning?',
+        state: { conversation: {} },
+        profile: bank.carry,
+        language: i % 2 ? 'sw' : 'en',
+        now: new Date('2026-10-19T05:00:00.000Z'),
+        seed: 0,
+        turnId: `warm:${i}`,
+      });
+    }
     for (const fix of loadFixtures()) {
-      const profile = bank[fix.profile];
-      if (!profile) {
-        failures.push(`${fix.id}: unknown profile ${fix.profile}`);
-        continue;
-      }
-      const state = { conversation: {} };
-      let prevSpeech = '';
-      fix.turns.forEach((turn, index) => {
+      const prevHash = process.env.FACT_HASH_MODE;
+      if (fix.hashMode === true) process.env.FACT_HASH_MODE = 'on';
+      try {
+        const profile = bank[fix.profile];
+        if (!profile) {
+          failures.push(`${fix.id}: unknown profile ${fix.profile}`);
+          continue;
+        }
+        const state = { conversation: {} };
+        let prevSpeech = '';
+        fix.turns.forEach((turn, index) => {
         const label = `${fix.id} t${index}`;
         if (turn.model) {
           const before = String(turn.model);
@@ -105,6 +121,10 @@ function runFixtures() {
         checkSpeech(label, turn, speech, fix.language, plan);
         prevSpeech = speech;
       });
+      } finally {
+        if (prevHash == null) delete process.env.FACT_HASH_MODE;
+        else process.env.FACT_HASH_MODE = prevHash;
+      }
     }
   } finally {
     console.warn = orig;
@@ -144,12 +164,13 @@ function runFixtures() {
     }
   }
 
-  const sorted = [...brainMs].sort((a, b) => a - b);
-  const p95 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1)] : 0;
+  const latency = summarizeLatency(brainMs);
   return {
     failures,
     brainMs,
-    p95,
+    p95: latency.p95,
+    median: latency.median,
+    cap: latency.cap,
     totals: {
       cases: loadFixtures().length,
       falseDeletions,

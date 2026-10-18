@@ -45,6 +45,13 @@ test('positives answer this turn, and chatter stays with the model', () => {
   assert.equal(turn('Uh, okay', state), null);
   assert.equal(turn('I need your help', state), null);
   assert.equal(turn('how much is the travel fee?', { conversation: {} }), null);
+
+  const follow = turn('And sofa cleaning?', { conversation: {} }, profiles().menu);
+  assert.match(follow.speech, /two thousand five hundred/);
+  const sw = turn('Na sofa je?', { conversation: {} }, profiles().menu, 'sw');
+  assert.match(sw.speech, /elfu mbili|mia tano|2,500|shilingi/);
+  const curtain = turn('Na curtain cleaning?', { conversation: {} }, profiles().menu);
+  assert.match(curtain.speech, /one thousand eight hundred/);
 });
 
 test('a bare price with an empty slot lists services', () => {

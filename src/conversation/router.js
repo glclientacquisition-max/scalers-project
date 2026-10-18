@@ -7,7 +7,7 @@
 // write topic state.
 
 const { enabledKinds } = require('../knowledge/flags');
-const { lookup, speechOf } = require('../knowledge/lookup');
+const { lookup, speechOf, matchCatalogueFollowUp } = require('../knowledge/lookup');
 
 const PAY = /\b(till|pay\s?bill|paybill|pochi|namba ya (?:till|malipo|akaunti)|how (?:do|can) i pay|lipa na|account number|bank account|\bcard\b)\b/i;
 const FEE = /\b(travel fee|delivery fee|ada ya usafiri|ada ya delivery|mnafika|mnakuja|do you come to|do you (?:cover|reach|go to)|come to|fee to|usafiri hadi|travel to)\b/i;
@@ -89,7 +89,7 @@ function applyTopic(topic, kind, found, cutoff) {
 
 function answerOne(text, ctx, topic) {
   const hit = classify(text);
-  if (!hit) return null;
+  if (!hit) return followUpAnswer(text, ctx);
   if (!ctx.kinds.has(hit.kind === 'fee' ? 'fee' : hit.kind)) return null;
   const bareFee = hit.kind === 'fee' && hit.bare && topic.areaId;
   const barePrice = hit.kind === 'price' && hit.bare && topic.serviceId;
@@ -105,12 +105,22 @@ function answerOne(text, ctx, topic) {
   if (barePrice) query = topic.serviceId.replace(/^price\./, '').replace(/_/g, ' ');
   const lookupKind = hit.kind === 'fee' ? 'area_fee' : hit.kind;
   const found = lookup(lookupKind, query, ctx.lookupCtx);
-  if (hit.kind === 'price' && found.status === 'not_on_file' && !barePrice && scoreMightBeEmpty(text)) {
+  const absent = found.status === 'not_on_file' || found.status === 'no_data' || found.status === 'not_found_in_list';
+  if (hit.kind === 'price' && absent && !barePrice && scoreMightBeEmpty(text)) {
     // "how much" with no named service is the model path, unless it is the cut-off.
     return null;
   }
-  if (hit.kind === 'fee' && found.status === 'not_on_file' && !placeish(text)) return null;
+  if (hit.kind === 'fee' && absent && !placeish(text)) return null;
   return { kind: hit.kind, found, query, cutoff: hit.cutoff };
+}
+
+function followUpAnswer(text, ctx) {
+  if (!ctx.kinds.has('price')) return null;
+  const query = matchCatalogueFollowUp(text, ctx.lookupCtx.profile);
+  if (!query) return null;
+  const found = lookup('price', query, ctx.lookupCtx);
+  if (found.status === 'no_data' || found.status === 'not_found_in_list') return null;
+  return { kind: 'price', found, query, cutoff: false };
 }
 
 function scoreMightBeEmpty(text) {

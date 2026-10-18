@@ -109,6 +109,43 @@ function profiles() {
       hoursSchedule: week('08:00', '18:00', false),
     }),
     rongai: base(),
+    nowhere: {
+      businessName: 'Usafi Mtaa',
+      agentName: 'Akinyi',
+      vertical: 'home_services',
+      unknownAnswerFallback: FALLBACK,
+      servicesCatalog: [service('Sofa cleaning', 'KSh 2,500')],
+    },
+    grouped: base({
+      hoursSchedule: {
+        timezone: 'Africa/Nairobi',
+        days: {
+          mon: day('09:00', '19:00'),
+          tue: day('09:00', '19:00'),
+          wed: day('09:00', '19:00'),
+          thu: day('09:00', '19:00'),
+          fri: day('09:00', '19:00'),
+          sat: day('09:00', '19:00'),
+          sun: null,
+        },
+      },
+    }),
+    menu: base({
+      servicesCatalog: [
+        service('Sofa cleaning', 'KSh 2,500'),
+        service('Carpet cleaning', 'KSh 1,500'),
+        service('Mattress Cleaning', 'KSh 3,000'),
+        service('Curtain cleaning', 'KSh 1,800'),
+        service('Oven cleaning', 'KSh 2,000'),
+      ],
+    }),
+    optout: (() => {
+      const row = base();
+      return {
+        ...row,
+        service_areas: { ...row.service_areas, decline_unlisted: true },
+      };
+    })(),
   };
 }
 
