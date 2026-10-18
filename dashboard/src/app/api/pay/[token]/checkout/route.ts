@@ -20,10 +20,18 @@ export async function POST(request: Request, context: { params: Promise<{ token:
       ledger: invoicePayLedger(env),
       provider: payProviderFromEnv(env),
     });
-    return NextResponse.json(
+    const response = NextResponse.json(
       { checkoutUrl: result.checkoutUrl, checkoutId: result.checkoutId },
       { headers: { "Cache-Control": "no-store" } }
     );
+    response.cookies.set("scalers_pay", token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: origin.startsWith("https://"),
+      path: "/pay",
+      maxAge: 60 * 60,
+    });
+    return response;
   } catch {
     return NextResponse.json({ error: "Could not start payment." }, { status: 400 });
   }

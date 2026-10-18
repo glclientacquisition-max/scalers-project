@@ -71,6 +71,13 @@ begin
   if v_inv.status <> 'draft' then
     raise exception 'only a draft invoice can be finalized';
   end if;
+  if exists (
+    select 1 from public.tenant_subscriptions s
+    where s.tenant_id = v_inv.tenant_id
+      and s.billing_status = 'beta'
+  ) then
+    raise exception 'beta tenants have no pay link';
+  end if;
 
   select * into v_co from public.billing_company where id = 1;
   if not found then

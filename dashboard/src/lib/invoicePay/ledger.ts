@@ -99,7 +99,10 @@ export function invoicePayLedger(env: NodeJS.ProcessEnv = process.env) {
         amountKes: text(row.amount_kes),
         partIndex: Number(row.part_index || 0),
         partCount: Number(row.part_count || 0),
+        returnId: row.return_id ? text(row.return_id) : null,
         reused: row.reused === true,
+        inFlight: row.in_flight === true,
+        cancel: row.cancel === true,
       };
     },
 
@@ -161,13 +164,40 @@ export function invoicePayLedger(env: NodeJS.ProcessEnv = process.env) {
     async findPaymentByRef(provider: string, providerRef: string) {
       const { data, error } = await admin
         .from("payments")
-        .select("id")
+        .select("id, amount_kes, match_status")
         .eq("provider", provider)
         .eq("provider_ref", providerRef)
         .maybeSingle();
       if (error) throw rpcError(error, "payment lookup failed");
-      if (!data?.id) return null;
-      return { id: String(data.id) };
+      if (!data?.id || data.match_status === "issue") return null;
+      return {
+        id: String(data.id),
+        amountKes: text(data.amount_kes),
+        matchStatus: text(data.match_status),
+      };
+    },
+
+    async adjustOverpay(input: { provider: string; providerRef: string; amountKes: string; tenantId: string }) {
+      const { error } = await admin.rpc("adjust_payment_overpay", {
+        p_provider: input.provider,
+        p_provider_ref: input.providerRef,
+        p_amount_kes: input.amountKes,
+        p_tenant_id: input.tenantId,
+      });
+      if (error) throw rpcError(error, "overpay adjust failed");
+    },
+
+    async lookupReturn(returnId: string) {
+      const { data, error } = await admin.rpc("pay_invoice_by_return", { p_return_id: returnId });
+      if (error) throw rpcError(error, "return lookup failed");
+      const row = asObject(data);
+      if (!row || row.found !== true) return { found: false as const };
+      return {
+        found: true as const,
+        ...mapLookup(data),
+        checkoutSessionId: row.checkout_session_id ? text(row.checkout_session_id) : null,
+        attemptStatus: row.attempt_status ? text(row.attempt_status) : null,
+      };
     },
 
     async applyPayment(input: {

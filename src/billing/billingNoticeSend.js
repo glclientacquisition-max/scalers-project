@@ -29,7 +29,7 @@ async function sendClaimedBillingNotices(input) {
         body: row.body,
         subject: row.title,
         kind: row.kind,
-        ledger: { tenantId: row.tenant_id, kind: row.kind },
+        ledger: { tenantId: row.tenant_id, kind: row.kind, keyBase: row.idempotency_key },
       });
       const ok = Boolean(result && result.channel);
       await input.settle(row.id, ok ? "sent" : "failed", result && result.notifySendId, ok ? null : "not sent");

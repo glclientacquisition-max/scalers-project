@@ -212,12 +212,32 @@ class BachsPayProvider {
       err.code = "bachs_checkout";
       throw err;
     }
+    const minutes = expiresInMinutes(request.expiresInMinutes);
+    const expiresAt = json.expires_at || new Date(Date.now() + minutes * 60 * 1000).toISOString();
     return {
       checkoutId: String(checkoutId),
       checkoutUrl: String(checkoutUrl),
       status: json.status || "open",
-      expiresAt: json.expires_at || null,
+      expiresAt,
     };
+  }
+
+  async cancelCheckout(checkoutId) {
+    const res = await this.fetchImpl(
+      `${this.baseUrl}/v1/checkout-sessions/${encodeURIComponent(checkoutId)}/cancel`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+        signal: AbortSignal.timeout(15000),
+      }
+    );
+    if (res.ok || res.status === 404 || res.status === 409) return;
+    const json = await res.json().catch(() => ({}));
+    logBachsError(res, json);
   }
 
   async getCheckout(checkoutId) {

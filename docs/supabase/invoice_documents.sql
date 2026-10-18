@@ -431,6 +431,9 @@ begin
 end;
 $$;
 
+revoke all on function public.payments_issue_receipt() from public, anon, authenticated;
+grant execute on function public.payments_issue_receipt() to service_role;
+
 drop trigger if exists payments_issue_receipt on public.payments;
 create trigger payments_issue_receipt
   after insert on public.payments

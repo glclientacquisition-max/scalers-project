@@ -9,9 +9,29 @@ function stateFor(invoice, tenant, tokenRow, now) {
   if (invoice.status === "paid") return "paid";
   if (invoice.status === "void") return "void";
   if (tokenRow.revokedAt || new Date(tokenRow.expiresAt).getTime() <= now) return "expired";
-  if ((tenant.billingEnforcement || "off") === "off") return "unavailable";
+  if ((tenant.billingEnforcement || "off") === "off" || tenant.billingStatus === "beta") return "unavailable";
   if (invoice.status === "open") return "payable";
   return "closed";
+}
+
+function newReturnId() {
+  return `ret_${crypto.randomBytes(32).toString("base64url")}`;
+}
+
+function attemptResult(row, extra) {
+  return {
+    id: row.id,
+    checkoutSessionId: row.checkoutSessionId,
+    checkoutUrl: row.checkoutUrl,
+    amountKes: row.amountKes,
+    partIndex: row.partIndex,
+    partCount: row.partCount,
+    returnId: row.returnId,
+    reused: false,
+    inFlight: false,
+    cancel: false,
+    ...extra,
+  };
 }
 
 /**
@@ -84,7 +104,9 @@ function createMemoryLedger(opts = {}) {
       if (!invoice || invoice.status !== "open") throw new Error("only an open invoice can have a pay link");
       if (toCents(invoice.amountPaidKes) >= toCents(invoice.totalKes)) throw new Error("invoice has nothing left to pay");
       if (tenant.archivedAt) throw new Error("archived businesses have no pay link");
-      if ((tenant.billingEnforcement || "off") === "off") throw new Error("beta tenants have no pay link");
+      if ((tenant.billingEnforcement || "off") === "off" || tenant.billingStatus === "beta") {
+        throw new Error("beta tenants have no pay link");
+      }
       const active = tokens.find((t) => t.invoiceId === invoiceId && !t.revokedAt);
       if (active && !rotate) throw new Error("pay link already exists");
       if (rotate) {
@@ -110,21 +132,19 @@ function createMemoryLedger(opts = {}) {
       const next = nextPart(splitKes(lookup.totalKes), lookup.amountPaidKes);
       if (!next) throw new Error("invoice has nothing left to pay");
       if (toCents(input.amountKes) !== toCents(next.amountKes)) throw new Error("pay amount does not match the next part");
-      const fresh = attempts.find((a) => {
-        if (a.invoiceId !== lookup.invoiceId || a.status !== "pending" || a.partIndex !== next.index) return false;
-        if (!a.checkoutUrl || !a.expiresAt) return false;
-        return new Date(a.expiresAt).getTime() > now;
-      });
-      if (fresh) {
-        return {
-          id: fresh.id,
-          checkoutSessionId: fresh.checkoutSessionId,
-          checkoutUrl: fresh.checkoutUrl,
-          amountKes: fresh.amountKes,
-          partIndex: fresh.partIndex,
-          partCount: fresh.partCount,
+      const pending = attempts.find(
+        (a) => a.invoiceId === lookup.invoiceId && a.status === "pending" && a.partIndex === next.index
+      );
+      if (pending) {
+        const expired = pending.expiresAt && new Date(pending.expiresAt).getTime() <= now;
+        if (expired) {
+          pending.status = "cancelled";
+          return attemptResult(pending, { cancel: true });
+        }
+        return attemptResult(pending, {
           reused: true,
-        };
+          inFlight: !pending.checkoutUrl || !pending.checkoutSessionId,
+        });
       }
       const row = {
         id: id(),
@@ -138,6 +158,7 @@ function createMemoryLedger(opts = {}) {
         checkoutSessionId: null,
         checkoutUrl: null,
         expiresAt: null,
+        returnId: newReturnId(),
         providerAmount: null,
         providerCurrency: null,
         feeAmount: null,
@@ -146,15 +167,7 @@ function createMemoryLedger(opts = {}) {
         raw: {},
       };
       attempts.push(row);
-      return {
-        id: row.id,
-        checkoutSessionId: null,
-        checkoutUrl: null,
-        amountKes: row.amountKes,
-        partIndex: row.partIndex,
-        partCount: row.partCount,
-        reused: false,
-      };
+      return attemptResult(row);
     },
     async attachCheckout(attemptId, created) {
       const row = attempts.find((a) => a.id === attemptId);
@@ -192,13 +205,58 @@ function createMemoryLedger(opts = {}) {
       return { attempts: 1 };
     },
     async findPaymentByRef(provider, providerRef) {
-      const row = payments.find((p) => p.provider === provider && p.providerRef === providerRef);
-      return row ? { id: row.id } : null;
+      const row = payments.find(
+        (p) => p.provider === provider && p.providerRef === providerRef && p.matchStatus !== "issue"
+      );
+      return row ? { id: row.id, amountKes: row.amountKes, matchStatus: row.matchStatus } : null;
+    },
+    async adjustOverpay(input) {
+      const row = payments.find(
+        (p) => p.provider === input.provider && p.providerRef === input.providerRef && p.matchStatus !== "issue"
+      );
+      if (!row) throw new Error("payment not found");
+      const prev = toCents(row.amountKes);
+      const next = toCents(input.amountKes);
+      if (prev == null || next == null || next <= prev) return { updated: false };
+      row.amountKes = String(input.amountKes);
+      row.matchStatus = "over";
+      return { updated: true };
+    },
+    async lookupReturn(returnId) {
+      const row = attempts.find((a) => a.returnId === returnId);
+      if (!row) return { found: false };
+      const invoice = invoices.get(row.invoiceId);
+      const tenant = tenants.get(row.tenantId);
+      let state = "closed";
+      if (invoice.status === "paid") state = "paid";
+      else if (invoice.status === "void") state = "void";
+      else if ((tenant.billingEnforcement || "off") === "off" || tenant.billingStatus === "beta") state = "unavailable";
+      else if (invoice.status === "open") state = "payable";
+      return {
+        found: true,
+        state,
+        businessName: tenant.businessName,
+        invoiceNumber: invoice.invoiceNumber,
+        invoiceId: invoice.id,
+        tenantId: invoice.tenantId,
+        totalKes: invoice.totalKes,
+        amountPaidKes: invoice.amountPaidKes,
+        dueAt: invoice.dueAt,
+        checkoutSessionId: row.checkoutSessionId,
+        attemptStatus: row.status,
+      };
     },
     async applyPayment(input) {
       const existing = payments.find((p) => p.provider === input.provider && p.providerRef === input.providerRef);
-      if (existing) return { id: existing.id, duplicate: true };
+      if (existing && existing.matchStatus !== "issue") return { id: existing.id, duplicate: true };
+      if (existing && existing.matchStatus === "issue") {
+        payments.splice(payments.indexOf(existing), 1);
+      }
       const invoice = invoices.get(input.invoiceId);
+      if (!invoice || invoice.status === "void" || invoice.status === "uncollectible") {
+        throw new Error("invoice cannot be paid");
+      }
+      if (invoice.status === "draft") throw new Error("draft invoices are not payable");
       const paid = toCents(invoice.amountPaidKes) + toCents(input.amountKes);
       const total = toCents(invoice.totalKes);
       let match = "partial";
@@ -220,7 +278,7 @@ function createMemoryLedger(opts = {}) {
       payments.push(row);
       if (match === "partial") invoice.amountPaidKes = fromCents(paid);
       else {
-        invoice.amountPaidKes = invoice.totalKes;
+        invoice.amountPaidKes = fromCents(total);
         invoice.status = "paid";
       }
       return { id: row.id, duplicate: false, match };

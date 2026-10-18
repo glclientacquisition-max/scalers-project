@@ -9,7 +9,7 @@ export function PayPanel({ token, initial }: { token: string; initial: PayCardMo
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (view.state !== "checking" || !view.checkoutId) return;
+    if (view.state !== "checking" || !view.checkoutId || !token) return;
     let stop = false;
     const tick = async () => {
       try {

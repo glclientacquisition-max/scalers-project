@@ -29,6 +29,15 @@ function seedPayable(totalKes, subtotalKes = "2000.00") {
   return { ledger, token };
 }
 
+describe("money", () => {
+  it("rejects a JavaScript number in toCents", () => {
+    assert.equal(toCents(1.005), null);
+    assert.equal(toCents(1000), null);
+    assert.equal(toCents("1000.00"), 100000n);
+    assert.equal(toCents("1000.005"), null);
+  });
+});
+
 describe("Bachs signature", () => {
   it("accepts a hex HMAC of timestamp.raw body", () => {
     const raw = JSON.stringify({ id: "evt_1", type: "collection.succeeded" });
@@ -492,9 +501,13 @@ describe("Bachs sandbox fields", () => {
     assert.equal(seen[0].expiresInMinutes, 60);
     ledger.setNow(NOW + 61 * 60 * 1000);
     const fresh = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    const previous = ledger.attempts.find((row) => row.checkoutSessionId === first.checkoutId);
+    assert.equal(previous.status, "cancelled");
     assert.equal(fresh.reused, false);
     assert.notEqual(fresh.reference, seen[0].reference);
     assert.equal(seen[1].reference, fresh.reference);
+    assert.equal(seen[0].successUrl.includes(token), false);
+    assert.equal(seen[0].cancelUrl.includes(token), false);
   });
 
   it("logs the Bachs error code and request id", async () => {

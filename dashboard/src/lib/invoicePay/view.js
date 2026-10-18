@@ -17,8 +17,9 @@ function facts(lookup) {
 }
 
 /**
- * Page model. Paid, void, and expired are plain. "Payment received" is only
- * set when the returned checkout is already confirmed.
+ * Page model. Paid, void, and expired are plain. "Payment received" is set
+ * when this invoice has money applied, or when the invoice itself is paid.
+ * A succeeded checkout with nothing applied stays on Checking payment.
  * @param {{ lookup: object | null, checkout?: { id?: string, status?: string, returning?: boolean } | null }} input
  */
 function payView(input) {
@@ -66,7 +67,11 @@ function payView(input) {
       return { ...base, state: "checking", title: "Checking payment", payLabel: null };
     }
     if (checkout.status === "succeeded") {
-      return { ...base, state: "received", title: "Payment received" };
+      const applied = (toCents(lookup.amountPaidKes) || 0n) > 0n;
+      if (lookup.state === "paid" || applied) {
+        return { ...base, state: "received", title: "Payment received" };
+      }
+      return { ...base, state: "checking", title: "Checking payment", payLabel: null };
     }
     if (checkout.status === "issue") {
       return { ...base, state: "issue", title: "This payment needs a check" };

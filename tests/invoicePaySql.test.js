@@ -347,4 +347,35 @@ describe("invoice pay SQL", () => {
     assert.match(mail.rows[0].body, /Receipt RCT-/);
     assert.doesNotMatch(mail.rows[0].body, /VAT/);
   });
+
+  it("refuses a pay link and finalize while billing_status is beta, and refuses an http checkout url", async () => {
+    const tenant = "77777777-7777-4777-8777-777777777777";
+    await q("select set_config('scalers.wallet_write', '1', false)");
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Beta Status Shop', 'pending:beta-status', 'soft')`,
+      [tenant]
+    );
+    const pkg = await q("select id from public.billing_packages order by sort_order limit 1");
+    await q(
+      `insert into public.tenant_subscriptions (tenant_id, package_id, billing_status)
+       values ($1, $2, 'beta')`,
+      [tenant, pkg.rows[0].id]
+    );
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 1000, 1000) returning id`,
+      [tenant]
+    );
+    await assert.rejects(q("select public.finalize_invoice($1)", [draft.rows[0].id]), /beta tenants have no pay link/);
+    await q(`update public.invoices set status = 'open', invoice_number = 'SCL-2026-000077' where id = $1`, [
+      draft.rows[0].id,
+    ]);
+    await assert.rejects(q("select * from public.mint_invoice_pay_token($1, false)", [draft.rows[0].id]), /beta tenants have no pay link/);
+    await assert.rejects(
+      q(
+        "select public.attach_invoice_pay_checkout('00000000-0000-4000-8000-000000000099', 'cs_http', 'http://example.test/c', now())"
+      ),
+      /checkout url refused/
+    );
+  });
 });
