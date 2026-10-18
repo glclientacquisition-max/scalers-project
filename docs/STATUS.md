@@ -202,7 +202,7 @@ Public copy never mentions unbuilt features.
 
 Metering is live: packages, usage caps, the SMS reserve, send and settle ledger, and monthly rollover. There are no invoices and no payments. Bachs is the chosen payment provider (collection per invoice later; Scalers keeps the subscription record). Prices are about to be raised. The new prices are not decided, so none are written here.
 
-This is Phase 0 of the 18 Oct 2026 ops and billing plan: correct the #737 and #643 migration records, and revoke anon execute on the seat functions (staging only). Later phases (invoices, Bachs checkout, the admin billing console) are not started.
+This is Phase 0 of the 18 Oct 2026 ops and billing plan: correct the #737 and #643 migration records, and revoke anon execute on the seat functions. That seat revoke is on staging (`20261018164459`) and production (`20261018180156`). `create_tenant_invite` still allows the anon role on both databases. The follow-up revoke keeps `service_role` only and is applied on staging first. Production waits for the owner's OK. Later phases (invoices, Bachs checkout, the admin billing console) are not started.
 
 Paid-mode copy on Usage still says "next invoice". That wording is a Desk hand-off (`billingStateModel.ts`, `usageCap.ts`). Do not ship it as a promise until invoices exist.
 
