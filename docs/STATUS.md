@@ -87,6 +87,7 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 
 - **#737** (Desk Suspend/Archive/Purge): SQL applied on **staging only** (*per team notes*).
 - Caller files memory v2 SQL (#673) is applied on **staging only** (carried from 14 Oct).
+- **#762** (Desk call setup per account): `tenants.call_setup` + `save_call_setup()` applied on **staging only**, 18 Oct 13:34 EAT. Additive, 0 rows changed.
 
 ---
 
@@ -103,6 +104,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | #731 | Voice | One owner alert per call, goodbye hangs up, 10 s no-audio close (main cut of #644 + #646). | GO'd, frozen. |
 | #737 | Desk | Admin Suspend/Restore, Archive/Unarchive, scheduled purge. | Prod SQL and merge wait for a scored Aris call. Purge schedule not applied until a recordings deletion route exists. |
 | #732, #733 | Brain | Outcome labels past booking; D199 visit read (last one only, paged). | Need Alvin's GO. |
+| #762 | Desk | Call setup per account (follow-up to #755): picks saved on the account (one-time copy from the browser), tested automatically by the first call after setup, Settings > Calls & forwarding, Overview note after 7 days without a call. | **Pending ship (18 Oct).** Merges in the Voice slot after #752 ships and the D199 flip. SQL on staging only; prod migration `20261018130000_tenant_call_setup.sql` needs Alvin's GO (safe order: SQL, then merge; before the SQL the Desk keeps using browser storage). |
 
 **Live-call voice fixes** (`hold-staging`, flags default off):
 
