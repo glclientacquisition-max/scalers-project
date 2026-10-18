@@ -1,6 +1,6 @@
 ---
 owner: platform
-last_reviewed: 2026-10-11
+last_reviewed: 2026-10-18
 ---
 
 # Migration ledger
@@ -294,3 +294,15 @@ CLI version timestamps are **INFERRED** from version string `YYYYMMDDHHMMSS` (UT
 | File | Purpose | Status |
 | --- | --- | --- |
 | `supabase/migrations/20261011000000_team_invites.sql` | Roles owner/admin/staff/viewer (member→staff), one owner per tenant, `tenant_invites`, `tenant_member_audit`, seat/invite/accept/transfer RPCs, restrictive RLS (owner/admin settings; viewer read-only), signup trigger skips invitees. | **Not applied.** Staging first. App flag `TEAM_INVITES_ENABLED` default off. Re-check `handle_new_user_tenant` body against production before applying. |
+
+---
+
+## Recorded drift (18 Oct 2026)
+
+Checked against `supabase_migrations.schema_migrations` and object names only. No tenant rows. This section is the repo record. It does not insert history rows into either database.
+
+| ID | What | Staging | Production | CLI / schema_migrations | Notes |
+| --- | --- | --- | --- | --- | --- |
+| LEDGER-643-WALLET-ALERT | Tables `voice_wallet_alert_state` and `voice_webhook_events`. Functions `voice_wallet_alert_observe` and `voice_wallet_alert_release`. | Objects present. Not in the migration list. | Objects present. Not in the migration list. | NO on both | SQL stays on open draft #643 (`voice/wallet-low-balance-alert`). Not copied here and not applied by this change. |
+| LEDGER-737-LIFECYCLE | `admin_set_business_suspended`, `archive_tenant_billing`, `unarchive_tenant_billing`, `purge_archived_tenants`. | Functions present. Names `admin_business_suspend_737`, `archive_tenant_billing_737`, `purge_archived_tenants_737` are absent from the migration list. | Recorded 18 Oct 2026 12:06 EAT, before merge `fbef28a8` at 12:10 EAT. Versions `20261018090636` `admin_business_suspend_737`, `20261018090641` `archive_tenant_billing_737`, `20261018090646` `purge_archived_tenants_737` (09:06 UTC). | Prod YES. Staging NO. | Purge schedule is on neither list. History rows were not inserted on staging. |
+| LEDGER-SEAT-ANON-REVOKE | `revoke` execute on `tenant_seats_used(uuid)` and `tenant_seat_available(uuid)` from `PUBLIC` and `anon`. Keep `authenticated` and `service_role`. | YES 18 Oct 2026. Version `20261018164459`, name `revoke_anon_seat_execute`. Anon call denied. `authenticated` and `service_role` still succeed. | NO. Same file, after the owner's OK and a backup. Confirmed absent from the production migration list after the staging apply. | Staging YES (`20261018164459`). Production NO. | `supabase/migrations/20261018180000_revoke_anon_seat_execute.sql`. Usage calls `tenant_seats_used` with the service role. |
