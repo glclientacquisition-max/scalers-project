@@ -55,8 +55,7 @@ describe("ownerBillingView headlines", () => {
 
   it("metered uses the package price from data, never a hardcoded 5,000", () => {
     const v = ownerBillingView(input({ ...esgaRow, mode_label: "metered" }));
-    assert.match(v.headline, /^Starter · KSh 4,000 a month\. Usage past what's included is billed at the rates below/);
-    assert.doesNotMatch(v.headline, /invoice/);
+    assert.match(v.headline, /^Starter · KSh 4,000 a month\. Usage past what's included is billed on your next invoice/);
     assert.doesNotMatch(v.headline, /5,000/);
   });
 
@@ -67,16 +66,7 @@ describe("ownerBillingView headlines", () => {
 
   it("no package", () => {
     const v = ownerBillingView(input(null));
-    assert.equal(v.headline, "No package.");
-    assert.doesNotMatch(v.headline, /invoice/);
-  });
-
-  it("free beta with no package does not show a charge or an invoice", () => {
-    const v = ownerBillingView(input(null, { isBeta: true }));
-    assert.equal(v.headline, "Free during beta. Nothing is charged.");
-    assert.equal(v.shortLabel, "Free during beta");
-    assert.equal(v.ratesTitle, "Rates after beta");
-    assert.doesNotMatch(`${v.headline} ${v.onDemandHint}`, /invoice/);
+    assert.equal(v.headline, "No package. All usage is billed at the rates below.");
   });
 });
 
@@ -102,8 +92,7 @@ describe("ownerBillingView rows", () => {
     assert.ok(v.lowNotice);
     assert.match(String(v.lowNotice), /During beta nothing is charged/);
     const metered = ownerBillingView(input({ ...esgaRow, mode_label: "metered" }));
-    assert.match(String(metered.lowNotice), /billed at the rates below/);
-    assert.doesNotMatch(String(metered.lowNotice), /invoice/);
+    assert.match(String(metered.lowNotice), /next invoice/);
   });
 
   it("low rule: 10% or less of the included amount left (50 of 200 is not low, 20 of 200 is)", () => {

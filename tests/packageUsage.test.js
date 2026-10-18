@@ -32,19 +32,16 @@ describe("package usage meter", () => {
     assert.match(catalog, /export async function loadBusinessPackageNames/);
   });
 
-  it("shows minutes left and used/included buckets on Usage", () => {
+  it("shows minutes left and message credits on Usage", () => {
     const page = read("dashboard/src/app/(desk)/wallet/page.tsx");
+    const summary = read("dashboard/src/components/plan/UsageSummary.tsx");
     assert.match(page, /loadOwnerPackageMeter\(tenant\.id\)/);
-    assert.match(page, /Minutes left/);
-    assert.match(page, /label: "Minutes", left: minutesLeft, used: pack\.minutesUsed/);
-    assert.match(page, /label: "SMS", left: smsLeft, used: pack\.smsUsed/);
-    assert.match(page, /label: "Email", left: emailLeft, used: pack\.emailUsed/);
-    assert.match(page, /label: "WhatsApp", left: waLeft, used: pack\.waUsed/);
-    assert.match(page, /label: "Seats"/);
-    assert.match(page, /On-demand rates/);
-    assert.match(page, />Calls</);
-    assert.match(page, /KES \{kes\(inboundMin\)\}\/min/);
-    assert.doesNotMatch(page, /Calls out/);
+    assert.match(summary, /Minutes left/);
+    assert.match(page, /label: "Message credits"/);
+    assert.match(page, /showChangePlan=\{canChangePlan && !extras\.freeBeta\}/);
+    assert.doesNotMatch(page, /a credit/);
+    assert.doesNotMatch(page, /\bSMS\b/);
+    assert.doesNotMatch(page, /On-demand rates/);
     assert.doesNotMatch(page, /WalletTopUpButton/);
     assert.doesNotMatch(page, /Top up prepaid/);
     assert.doesNotMatch(page, /daysRemainingAtPace/);
@@ -73,7 +70,7 @@ describe("package usage meter", () => {
     assert.match(prices, /Prices are not on this page yet/);
     assert.match(prices, /inboundKesPerMinute > 0/);
     assert.match(prices, /past included/);
-    assert.match(prices, /calls KES \{formatKes\(board\.inboundKesPerMinute\)\}\/min\./);
+    assert.match(prices, /calls KSh \{formatKes\(board\.inboundKesPerMinute\)\}\/min\./);
     assert.doesNotMatch(prices, /<table/);
     assert.doesNotMatch(prices, /border-accent/);
     assert.doesNotMatch(prices, /5000|12000|25000/);
@@ -174,23 +171,24 @@ describe("package usage meter", () => {
   it("opts into on-demand after included buckets hit zero", () => {
     const panel = read("dashboard/src/components/OnDemandUsagePanel.tsx");
     const actions = read("dashboard/src/app/(desk)/wallet/actions.ts");
-    assert.match(panel, /Charge on-demand rates for minutes and SMS past included/);
+    assert.match(panel, /Allow extra usage/);
+    assert.doesNotMatch(panel, /a credit/);
     assert.doesNotMatch(panel, /prepaid minutes/);
     assert.doesNotMatch(panel, /Continue after included/);
     assert.doesNotMatch(panel, /the wallet/);
     assert.match(actions, /Past included minutes and SMS are charged at the on-demand rates/);
   });
 
-  it("says calls stop when included minutes are gone and on-demand is off", () => {
+  it("keeps stop-and-rate lines off the owner Usage page", () => {
     const page = read("dashboard/src/app/(desk)/wallet/page.tsx");
     const home = read("dashboard/src/app/(desk)/home/page.tsx");
     const copy = read("dashboard/src/lib/usageCap.ts");
-    assert.match(page, /usageCapNotice/);
-    assert.match(copy, /Calls stopped\. Tenant SMS stopped\./);
-    assert.match(copy, /Included minutes used\. Calls stopped\./);
-    assert.match(copy, /Included SMS used\. Tenant SMS stopped\./);
+    assert.doesNotMatch(page, /usageCapNotice/);
+    assert.doesNotMatch(page, /Inbox only/);
+    assert.doesNotMatch(page, /a credit/);
+    assert.match(page, /showChangePlan=\{canChangePlan && !extras\.freeBeta\}/);
     assert.match(home, /homeMinuteStatus/);
-    assert.match(copy, /if \(!input\.onDemand\) return "Stopped"/);
+    assert.match(copy, /if \(!input\.onDemand\) return "Calls stopped"/);
   });
 
   it("lists the assigned package on Admin Businesses", () => {

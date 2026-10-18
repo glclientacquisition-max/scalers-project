@@ -28,6 +28,8 @@ function loadHelper() {
       contactImport: isDeskNestedPath("/contacts/import"),
       devContactFile: isDeskNestedPath("/dev/contacts/file"),
       wallet: isDeskNestedPath("/wallet"),
+      plan: isDeskNestedPath("/settings/plan"),
+      billing: isDeskNestedPath("/settings/billing"),
       settingsHub: isDeskNestedPath("/settings"),
       settingsHubSearch: isDeskNestedPath("/settings", ""),
       settingsMenu: isDeskNestedPath("/settings", "tab=menu"),
@@ -78,6 +80,8 @@ describe("desk nested tab hide", () => {
     assert.equal(got.contactImport, true);
     assert.equal(got.devContactFile, true);
     assert.equal(got.wallet, false);
+    assert.equal(got.plan, true);
+    assert.equal(got.billing, true);
     assert.equal(got.settingsHub, false);
     assert.equal(got.settingsHubSearch, false);
     assert.equal(got.settingsMenu, false);
