@@ -2101,6 +2101,13 @@ server.on('upgrade', (req, socket, head) => {
       // VOICE_ENDED_CALL_GUARD (HD_49d726c3dc9b): SautiKit re-opened
       // /ws/media 1.2 s after our end_call closed it. A call that is over is
       // closed at once: no prompt load, no greeting, no finalize.
+      // Off (unset, the default): the upgrade runs synchronously, as before.
+      if (!endedCalls.endedCallGuardEnabled()) {
+        mediaWss.handleUpgrade(req, socket, head, (ws) => {
+          mediaWss.emit('connection', ws, req);
+        });
+        return;
+      }
       const mediaSid = mediaSidFromUrl(req.url);
       endedCalls
         .checkMediaConnect(mediaSid, {

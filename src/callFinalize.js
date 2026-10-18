@@ -4,12 +4,12 @@
 // finalize work (resolution and summary, first-forward judge, text-back).
 // Built as a factory so the orchestration is testable without server.js.
 //
-// VOICE_ENDED_CALL_GUARD on (default; src/speech/endedCalls.js): finalize runs
+// VOICE_ENDED_CALL_GUARD=on (off by default; src/speech/endedCalls.js): finalize runs
 // once per call. While a media session for the sid is open here, webhooks
 // write status/duration only and leave finalize to the media close. A row
 // already marked finalized (another replica, or before a restart) is not
 // finalized again. updateCallStatus never shortens a longer duration.
-// Off: the CALL_FINALIZE_ONCE behaviour from #692, unchanged.
+// Off (unset, the default): the CALL_FINALIZE_ONCE behaviour from #692, unchanged.
 
 function createCallFinalizer(deps) {
   const {

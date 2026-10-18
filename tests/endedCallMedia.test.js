@@ -1,6 +1,6 @@
 'use strict';
 
-// VOICE_ENDED_CALL_GUARD (default on). HD_49d726c3dc9b (prod Aris, 18 Oct
+// VOICE_ENDED_CALL_GUARD (off by default; only 'on' enables). HD_49d726c3dc9b (prod Aris, 18 Oct
 // 2026 13:14 EAT, build ae8508ea): 1.2 s after our end_call closed /ws/media
 // with code 1000, SautiKit opened a second /ws/media for the same call. It
 // loaded the prompt, played the cached greeting and finalized again (duration
@@ -94,9 +94,16 @@ function finalizerFor(db) {
 
 const TURNS = Array.from({ length: 14 }, (_, i) => ({ role: 'caller', text: `turn ${i + 1}` }));
 
+// Guard-on suites set VOICE_ENDED_CALL_GUARD=on; the off-path suite unsets it.
+const GUARD_BEFORE = process.env.VOICE_ENDED_CALL_GUARD;
 beforeEach(() => {
   endedCalls.resetEndedCalls();
   lifecycle.forgetCallTerminal(SID);
+  process.env.VOICE_ENDED_CALL_GUARD = 'on';
+});
+process.on('exit', () => {
+  if (GUARD_BEFORE == null) delete process.env.VOICE_ENDED_CALL_GUARD;
+  else process.env.VOICE_ENDED_CALL_GUARD = GUARD_BEFORE;
 });
 
 describe('media reconnect after the call ended', () => {
@@ -185,13 +192,13 @@ describe('media reconnect after the call ended', () => {
     assert.equal(slow.source, 'db_timeout');
   });
 
-  it('VOICE_ENDED_CALL_GUARD=off never refuses', async () => {
-    endedCalls.noteMediaOpen(SID, OPEN_AT);
-    endedCalls.noteMediaClose(SID, { ended: true, reason: 'end_call' });
-    const verdict = await withEnv('VOICE_ENDED_CALL_GUARD', 'off', () => endedCalls.checkMediaConnect(SID));
-    assert.equal(verdict.refuse, false);
-    assert.equal(endedCalls.endedCallGuardEnabled({}), true);
-    assert.equal(endedCalls.endedCallGuardEnabled({ VOICE_ENDED_CALL_GUARD: '0' }), false);
+  it('flag parsing: off by default, only the exact value "on" enables', () => {
+    assert.equal(endedCalls.endedCallGuardEnabled({}), false);
+    assert.equal(endedCalls.endedCallGuardEnabled({ VOICE_ENDED_CALL_GUARD: '' }), false);
+    for (const v of ['off', '0', 'false', '1', 'true', 'yes', 'ON', 'On', ' on']) {
+      assert.equal(endedCalls.endedCallGuardEnabled({ VOICE_ENDED_CALL_GUARD: v }), false, v);
+    }
+    assert.equal(endedCalls.endedCallGuardEnabled({ VOICE_ENDED_CALL_GUARD: 'on' }), true);
   });
 });
 
@@ -296,16 +303,46 @@ describe('finalize once per call', () => {
     assert.equal(calls.textback, 2);
   });
 
-  it('VOICE_ENDED_CALL_GUARD=off restores the #692 behaviour (every event finalizes)', async () => {
-    const db = fakeDb();
-    const { mark, calls } = finalizerFor(db);
-    await withEnv('VOICE_ENDED_CALL_GUARD', 'off', async () => {
-      await mark({ callSid: SID, status: 'complete', durationSeconds: 165, source: 'ws/media', turns: TURNS });
-      await mark({ callSid: SID, status: 'completed', durationSeconds: 167, source: 'voice/incoming' });
+});
+
+describe('guard off (unset, the default): today\'s code path', () => {
+  for (const value of [null, 'off', '1', 'true']) {
+    const label = value == null ? 'unset' : `=${value}`;
+    it(`${label}: the HD_49d726c3dc9b reconnect is not refused`, async () => {
+      await withEnv('VOICE_ENDED_CALL_GUARD', value, async () => {
+        endedCalls.noteMediaOpen(SID, OPEN_AT);
+        endedCalls.noteMediaClose(SID, { ended: true, reason: 'end_call' });
+        let reads = 0;
+        const verdict = await endedCalls.checkMediaConnect(SID, {
+          terminalSince: lifecycle.callTerminalSince,
+          getCall: async () => {
+            reads += 1;
+            return { status: 'complete', summary: '{"finalized_at":"x"}' };
+          },
+        });
+        assert.equal(verdict.refuse, false);
+        assert.equal(reads, 0, 'no DB read when off');
+      });
     });
-    assert.equal(calls.resolution.length, 2);
-    assert.deepEqual(calls.judge, [165, 167]);
-  });
+    it(`${label}: every terminal event finalizes as before (#692 path, no marker, no defer)`, async () => {
+      await withEnv('VOICE_ENDED_CALL_GUARD', value, async () => {
+        const db = fakeDb();
+        const { mark, calls } = finalizerFor(db);
+        endedCalls.noteMediaOpen(SID, OPEN_AT);
+        // A webhook while the socket is open still finalizes when off.
+        await mark({ callSid: SID, status: 'completed', durationSeconds: 167, source: 'voice/incoming' });
+        endedCalls.noteMediaClose(SID, { ended: true, reason: 'end_call' });
+        await mark({ callSid: SID, status: 'complete', durationSeconds: 165, source: 'ws/media', turns: TURNS });
+        await mark({ callSid: SID, status: 'completed', durationSeconds: 167, source: 'voice/events' });
+        await mark({ callSid: SID, status: 'complete', durationSeconds: 1, source: 'ws/media', turns: [] });
+        assert.equal(calls.resolution.length, 4);
+        assert.deepEqual(calls.judge, [167, 165, 167, 1], 'judge gets each event\'s own duration, as today');
+        assert.equal(JSON.parse(db.row.summary).finalized_at, undefined, 'no marker written when off');
+        // The row still never shortens (existing updateCallStatus rule).
+        assert.equal(db.row.duration_seconds, 167);
+      });
+    });
+  }
 });
 
 describe('db.updateCallStatus never shortens a longer duration', () => {
@@ -356,9 +393,11 @@ describe('server.js wiring', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   it('the /ws/media upgrade checks for an ended call before any session starts', () => {
     const at = src.indexOf("if (pathname === '/ws/media') {");
-    const block = src.slice(at, at + 1600);
+    const block = src.slice(at, at + 2000);
+    // Off: the old synchronous upgrade runs first and untouched.
+    assert.match(block, /if \(!endedCalls\.endedCallGuardEnabled\(\)\) \{\s*mediaWss\.handleUpgrade\(req, socket, head, \(ws\) => \{\s*mediaWss\.emit\('connection', ws, req\);/);
     assert.match(block, /endedCalls\s*\.checkMediaConnect\(mediaSid/);
-    assert.ok(block.indexOf('refuseEndedMedia(ws') < block.indexOf("mediaWss.emit('connection'"));
+    assert.ok(block.indexOf('refuseEndedMedia(ws') < block.lastIndexOf("mediaWss.emit('connection'"));
     assert.match(src, /ws\.close\(1000, 'call_already_ended'\)/);
     assert.match(src, /refused media reconnect for ended call/);
   });

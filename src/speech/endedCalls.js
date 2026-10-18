@@ -1,7 +1,8 @@
 'use strict';
 
 // Ended-call registry: refuse a media reconnect for a call that is over, and
-// finalize each call once (VOICE_ENDED_CALL_GUARD, on by default).
+// finalize each call once (VOICE_ENDED_CALL_GUARD, OFF by default: only the
+// exact value 'on' enables it; unset or anything else keeps today's path).
 //
 // HD_49d726c3dc9b (prod Aris, 18 Oct 2026 13:14 EAT, build ae8508ea): 1.2 s
 // after our end_call closed /ws/media with code 1000, SautiKit opened a second
@@ -25,14 +26,14 @@
 //   which holds the live turns. An abnormal media close (no end evidence)
 //   finalizes provisionally, so a resumed session can still finalize last.
 
-const OFF = /^(0|false|off|no)$/i;
 const TTL_MS = 15 * 60 * 1000;
 const TERMINAL = new Set(['complete', 'completed', 'failed', 'no_answer']);
 const FINALIZED_META_KEY = 'finalized_at';
 const FINALIZED_PROVISIONAL_META_KEY = 'finalized_provisional';
 
+/** Only VOICE_ENDED_CALL_GUARD=on enables the guard. Unset = today's path. */
 function endedCallGuardEnabled(env = process.env) {
-  return !OFF.test(String(env.VOICE_ENDED_CALL_GUARD ?? '').trim());
+  return env.VOICE_ENDED_CALL_GUARD === 'on';
 }
 
 function key(callSid) {
