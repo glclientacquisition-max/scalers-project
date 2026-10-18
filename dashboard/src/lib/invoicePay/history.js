@@ -8,9 +8,13 @@ function ksh(amount) {
   return formatKsh(cents == null ? 0n : cents);
 }
 
-function balanceLabel(total, paid) {
+function owedCents(total, paid) {
   const left = (toCents(total) || 0n) - (toCents(paid) || 0n);
-  return formatKsh(left > 0n ? left : 0n);
+  return left > 0n ? left : 0n;
+}
+
+function balanceLabel(total, paid) {
+  return formatKsh(owedCents(total, paid));
 }
 
 /**
@@ -38,7 +42,10 @@ function shapeBillingHistory(input) {
       tax_kes: row.tax_kes == null ? null : String(row.tax_kes),
       pdf_path: `/api/billing/invoices/${row.id}/pdf`,
       html_path: `/api/billing/invoices/${row.id}?format=html`,
-      pay_link_path: row.status === "open" ? `/api/billing/invoices/${row.id}/pay-link` : null,
+      pay_link_path:
+        row.status === "open" && owedCents(row.total_kes, row.amount_paid_kes) > 0n
+          ? `/api/billing/invoices/${row.id}/pay-link`
+          : null,
       lines: lines
         .filter((line) => line.invoice_id === row.id)
         .map((line) => ({

@@ -150,7 +150,7 @@ Signed-in owner, own business only. The server uses the service role filtered by
 
 | Method | Path | What Desk gets |
 | --- | --- | --- |
-| GET | `/api/billing/invoices` | Invoices, lines, and receipts. Money is `KSh 7,000`. Open invoices include `pay_link_path`. |
+| GET | `/api/billing/invoices` | Invoices, lines, and receipts. Money is `KSh 7,000`. A credit total is `KSh -1,000`. Amount due is floored at `KSh 0`, and `pay_link_path` is omitted when nothing is owed. |
 | GET | `/api/billing/invoices/:id` | One invoice. `?format=html` is the invoice page. |
 | GET | `/api/billing/invoices/:id/pdf` | Invoice PDF. |
 | POST | `/api/billing/invoices/:id/pay-link` | `{ pay_path: "/pay/<token>" }` once. A second call is 409 `Pay link already issued`. |

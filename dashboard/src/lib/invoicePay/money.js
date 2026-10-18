@@ -12,11 +12,12 @@ function toCents(amount) {
   // A JS number rounds through toFixed and can drop a cent (1.005 -> "1.00").
   if (typeof amount === "number") return null;
   const s = String(amount ?? "").trim();
-  const m = /^(\d+)(?:\.(\d+))?$/.exec(s);
+  const m = /^(-)?(\d+)(?:\.(\d+))?$/.exec(s);
   if (!m) return null;
-  const frac = m[2] || "";
+  const frac = m[3] || "";
   if (frac.length > 2) return null;
-  return BigInt(m[1]) * 100n + BigInt((frac + "00").slice(0, 2));
+  const cents = BigInt(m[2]) * 100n + BigInt((frac + "00").slice(0, 2));
+  return m[1] ? -cents : cents;
 }
 
 /** @param {bigint} cents */

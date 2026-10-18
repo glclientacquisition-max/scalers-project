@@ -89,11 +89,24 @@ function payView(input) {
       return { ...base, state: "issue", title: "This payment needs a check" };
     }
     if (checkout.status === "failed" || checkout.status === "cancelled") {
-      return { ...base, state: "payable", title: lookup.businessName, notice: "Payment was not completed." };
+      return payableView(base, lookup, { notice: "Payment was not completed." });
     }
   }
 
-  return { ...base, state: "payable", title: lookup.businessName || "Invoice" };
+  return payableView(base, lookup, {});
+}
+
+function payableView(base, lookup, extra) {
+  if (!base.payLabel) {
+    return {
+      ...base,
+      state: "unavailable",
+      title: "This invoice cannot be paid here",
+      payLabel: null,
+      notice: null,
+    };
+  }
+  return { ...base, ...extra, state: "payable", title: lookup.businessName || "Invoice" };
 }
 
 module.exports = { payView };

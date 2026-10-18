@@ -299,6 +299,73 @@ describe("invoice documents", () => {
     assert.equal(history.receipts[0].pdf_path, "/api/billing/receipts/rct-1/pdf");
     assert.equal(history.invoices[0].lines[0].description, "Business Assistant plan");
   });
+
+  it("keeps a credit total negative and does not offer pay", () => {
+    const history = shapeBillingHistory({
+      invoices: [
+        {
+          id: "inv-credit",
+          invoice_number: null,
+          status: "open",
+          subtotal_kes: "-1000.00",
+          credits_applied_kes: null,
+          total_kes: "-1000.00",
+          amount_paid_kes: "0",
+          tax_kes: null,
+        },
+        {
+          id: "inv-zero",
+          status: "open",
+          subtotal_kes: "0.00",
+          total_kes: "0.00",
+          amount_paid_kes: "0",
+        },
+      ],
+      lines: [
+        {
+          invoice_id: "inv-credit",
+          kind: "extra_seats",
+          description: "Seat removed",
+          quantity: "1",
+          unit_amount_kes: "-1000.00",
+          amount_kes: "-1000.00",
+        },
+      ],
+      receipts: [],
+    });
+    assert.equal(history.invoices[0].subtotal, "KSh -1,000");
+    assert.equal(history.invoices[0].total_due, "KSh -1,000");
+    assert.equal(history.invoices[0].balance, "KSh 0");
+    assert.equal(history.invoices[0].pay_link_path, null);
+    assert.equal(history.invoices[0].lines[0].unit_price, "KSh -1,000");
+    assert.equal(history.invoices[0].lines[0].amount, "KSh -1,000");
+    assert.equal(history.invoices[1].total_due, "KSh 0");
+    assert.equal(history.invoices[1].balance, "KSh 0");
+    assert.equal(history.invoices[1].pay_link_path, null);
+    const doc = invoiceModel({
+      invoice: {
+        number: "",
+        status: "draft",
+        subtotalKes: "-1000.00",
+        totalKes: "-1000.00",
+        amountPaidKes: "0",
+      },
+      lines: [
+        {
+          kind: "extra_seats",
+          description: "Seat removed",
+          quantity: "1",
+          unitAmountKes: "-1000.00",
+          amountKes: "-1000.00",
+        },
+      ],
+    });
+    assert.equal(doc.lines[0].amount, "KSh -1,000");
+    assert.equal(doc.totals.find((row) => row.label === "Total").value, "KSh -1,000");
+    assert.equal(doc.totals.find((row) => row.label === "Amount due").value, "KSh 0");
+    assert.equal(doc.payLabel, "");
+    assert.equal(doc.payUrl, "");
+  });
 });
 
 describe("billing notice templates", () => {

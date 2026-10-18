@@ -33,8 +33,19 @@ describe("money", () => {
   it("rejects a JavaScript number in toCents", () => {
     assert.equal(toCents(1.005), null);
     assert.equal(toCents(1000), null);
+    assert.equal(toCents(-1000), null);
     assert.equal(toCents("1000.00"), 100000n);
     assert.equal(toCents("1000.005"), null);
+  });
+
+  it("reads a negative decimal string and floors a pay amount at zero", () => {
+    assert.equal(toCents("-1000"), -100000n);
+    assert.equal(toCents("-1000.50"), -100050n);
+    assert.equal(toCents("-1000.005"), null);
+    assert.equal(formatKsh(toCents("-1000")), "KSh -1,000");
+    assert.deepEqual(splitKes("-1000"), []);
+    assert.deepEqual(splitKes("0"), []);
+    assert.equal(nextPart(splitKes("-1000"), "0"), null);
   });
 });
 
@@ -380,6 +391,18 @@ describe("pay page copy", () => {
     assert.equal(payable.title, "Jirani Cleaning");
     assert.equal(payable.payLabel, "Pay KSh 2,320");
     assert.equal(formatKsh(toCents("150000")), "KSh 150,000");
+    const credit = payView({
+      lookup: {
+        found: true,
+        state: "payable",
+        businessName: "Jirani Cleaning",
+        totalKes: "-1000.00",
+        amountPaidKes: "0",
+      },
+    });
+    assert.equal(credit.totalLabel, "KSh -1,000");
+    assert.equal(credit.payLabel, null);
+    assert.equal(credit.state, "unavailable");
   });
 });
 

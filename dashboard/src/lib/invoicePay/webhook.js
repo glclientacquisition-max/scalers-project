@@ -120,7 +120,7 @@ function decidePayment(input) {
 
 function minorUnits(amount) {
   const cents = toCents(amount);
-  if (cents == null) return null;
+  if (cents == null || cents < 0n) return null;
   if (cents > BigInt(2147483647)) return null;
   return Number(cents);
 }
