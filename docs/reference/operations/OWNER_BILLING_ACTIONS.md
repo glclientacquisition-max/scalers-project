@@ -36,7 +36,7 @@ Day proration uses Africa/Nairobi dates. `days_in_period` is the end date minus 
 
 An upgrade credits the unused part of the current term and charges the new plan for those same days. Monthly to annual credits the unused days of the current month and charges the full annual price, because the new year starts today. Extra seats already on the business are included in both prices.
 
-Reference numbers, not constants in the functions: Starter 7,000 a month, Growth 18,000, Scale 35,000. Annual 69,720 / 194,400 / 378,000 (17 percent, 10 percent, 10 percent). Seats 3 / 8 / 20. Extra seat 1,000 a month on the version row (`extra_seat_monthly_kes`).
+Reference numbers, not constants in the functions: Starter 7,000 a month, Growth 18,000, Scale 35,000. Annual 69,720 / 194,400 / 378,000 (17 percent, 10 percent, 10 percent). Seats 3 / 8 / 20. Extra seat 500 a month on the version row (`extra_seat_monthly_kes`).
 
 Worked example, 10 of 30 days, 7,000 to 18,000: credit 2,333, charge 6,000, net 3,667.
 

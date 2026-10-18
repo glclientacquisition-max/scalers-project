@@ -20,7 +20,7 @@
 -- Prices are read from billing_package_versions. Nothing in the functions
 -- hard-codes Starter, Growth, or Scale. The locked commercial numbers, for
 -- reference only, are Starter 7,000/mo, Growth 18,000, Scale 35,000; annual
--- 69,720 / 194,400 / 378,000; seats 3 / 8 / 20; extra seat 1,000/mo.
+-- 69,720 / 194,400 / 378,000; seats 3 / 8 / 20; extra seat 500/mo.
 -- Annual price = round(monthly_price_kes * 12 * (100 - annual_discount_percent) / 100)
 -- to a whole shilling. 17 percent off 7,000 is 69,720. 10 percent off 18,000
 -- is 194,400. 10 percent off 35,000 is 378,000. The discount lives on the
@@ -45,7 +45,7 @@
 -- ---------------------------------------------------------------------------
 -- 0. Columns. Pending change and the billing term already exist where
 --    package_state_rules.sql has been applied. Extra seats and the spend hold
---    are new. The seat price lives on the version, default 1000 (the locked
+--    are new. The seat price lives on the version, default 500 (the locked
 --    extra-seat price). The function reads the row.
 -- ---------------------------------------------------------------------------
 alter table public.billing_package_versions
@@ -58,17 +58,17 @@ alter table public.billing_package_versions
   check (extra_seat_monthly_kes is null or extra_seat_monthly_kes >= 0);
 
 update public.billing_package_versions v
-set extra_seat_monthly_kes = 1000
+set extra_seat_monthly_kes = 500
 from public.billing_packages p
 where p.id = v.package_id
   and p.sku in ('starter', 'growth', 'scale')
   and v.extra_seat_monthly_kes is null;
 
 alter table public.billing_package_versions
-  alter column extra_seat_monthly_kes set default 1000;
+  alter column extra_seat_monthly_kes set default 500;
 
 comment on column public.billing_package_versions.extra_seat_monthly_kes is
-  'KSh per extra seat per month. Read by owner seat changes. Seeded at 1000 for Starter, Growth, and Scale. A published row cannot change it.';
+  'KSh per extra seat per month. Read by owner seat changes. Seeded at 500 for Starter, Growth, and Scale. A published row cannot change it.';
 
 -- Freeze the seat price once the version is not a draft. Separate from
 -- billing_package_versions_freeze so a later editor rewrite does not drop it.

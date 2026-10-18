@@ -8,7 +8,7 @@ insert into public.billing_package_versions (
 )
 select p.id, 2, 'published', x.price, x.seats, x.minutes, p.sms, p.email, p.staff_wa, p.dids,
   r.inbound_kes_per_second, r.outbound_kes_per_second, r.whatsapp_kes, r.sms_kes, r.email_kes,
-  x.discount, false, now(), now(), 1000
+  x.discount, false, now(), now(), 500
 from public.billing_packages p
 cross join public.billing_rate_card r
 join (
@@ -109,8 +109,8 @@ begin
   end if;
   if (select v.extra_seat_monthly_kes from public.billing_package_versions v
       join public.billing_packages p on p.id = v.package_id
-      where p.sku = 'starter' and v.version = 1) <> 1000 then
-    raise exception 'starter v1 seat price is not 1000';
+      where p.sku = 'starter' and v.version = 1) <> 500 then
+    raise exception 'starter v1 seat price is not 500';
   end if;
 
   begin
@@ -314,11 +314,11 @@ begin
 
   perform public._test_owner_tenant(v_seats, '+254700010007', 'starter', 2, 'month', v_owner, 'owner', 1, true, false);
   v_res := public.owner_set_extra_seats(v_seats, v_owner, 2, 'seats-2');
-  if v_res->>'code' <> 'seats_updated' or (v_res->>'unit_kes')::numeric <> 1000 then
+  if v_res->>'code' <> 'seats_updated' or (v_res->>'unit_kes')::numeric <> 500 then
     raise exception 'extra seats returned %', v_res;
   end if;
   if (v_res->>'amount_kes')::numeric <> public.billing_prorate_kes(
-       2000, (v_res->>'days_left')::int, (v_res->>'days_in_period')::int) then
+       1000, (v_res->>'days_left')::int, (v_res->>'days_in_period')::int) then
     raise exception 'seat proration was %', v_res;
   end if;
   select status, invoice_number, total_kes into v_status, v_number, v_total
