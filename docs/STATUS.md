@@ -132,8 +132,11 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | #741 | `VOICE_TIME_ANSWER_ENFORCE` | Speak the current time on a time question; keep unresolved outcomes. |
 | #742 | `VOICE_MEDIA_PACING` | Pace outbound audio in 20 ms frames, plus always-on media link logs. |
 | #743 | `SAUTIKIT_VALIDATE_WEBHOOKS=shadow` | Webhook signature shadow mode: two secrets, raw bytes, log which matched, fail open on missing secret. |
+| (this PR) | `VOICE_CONTACT_NAME_LOCK` | Owner contact-identity lock on `upsertContact`: locked / single_person keeps the file name; dismissed alternates never return. Draft, staging, flag off. Desk toggle + Brain near-spelling fold set the metadata keys. |
 
 **Other open PRs:**
+
+- **18 Oct 2026 (draft): Voice contact name lock** (`VOICE_CONTACT_NAME_LOCK`, off by default; VOICE.md invariant 20). `upsertContact` keeps an owner-locked / `single_person` name and never re-adds `alternate_names_dismissed`. Staging only until Alvin flips the flag. Desk (`DESK_CONTACT_NAME_LOCK`) and Brain (`BRAIN_NAME_FOLD`) set the metadata keys. Rollback: unset the flag (or leave unset).
 
 | PR | Lane | What |
 | --- | --- | --- |
