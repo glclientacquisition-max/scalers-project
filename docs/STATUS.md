@@ -5,7 +5,7 @@ last_reviewed: 2026-10-18
 
 # Scalers status and handoff (start here)
 
-**Last updated Sun 18 Oct 2026, 10:00 EAT.** Checked against `main` (`b66e1661`), `gh pr list`, main's first-parent log, and prod/staging `/healthz` on 18 Oct. Items marked *per team notes* come from lane agents and Alvin, not from the repo. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule)).
+**Last updated Sun 18 Oct 2026, 23:30 EAT.** Checked against `main` (`29452e8e`), PR #787 branch, and local gates (`test:mvp`, `docs:check`, Desk lint/build) on 18 Oct. Items marked *per team notes* come from lane agents and Alvin, not from the repo. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule)).
 
 New agent or new human: read this whole page before you touch code.
 
@@ -43,6 +43,7 @@ Times EAT. SHAs are the squash commits on `main` (first-parent log). Older histo
 
 | PR | SHA | Merged | What |
 | --- | --- | --- | --- |
+| #787 | *(merge SHA on squash)* | 18 Oct ~23:30 | Desk Super Admin ops workflows: shop hub at `/admin/businesses/[id]`, unified waiting model, global search (`md+`), shop people and owner ops (profile edit, password reset, transfer owner), Better Auth-only admin session in prod when configured, Today volume clarity, Quality nav label. No Voice or SQL. Prod admin login needs `BETTER_AUTH_SECRET` (or `DASHBOARD_SECRET`) and `ADMIN_OPERATORS`. Rollback = revert. Approved by Alvin 18 Oct (ship to staging and prod). |
 | #763 | `2842c4f4` | 18 Oct 14:59 | Voice: speech guard reads glued clocks and shillings ("KSh500", "from9:30 AM") like the spaced form, for checking only; streamed model stages record where model text loses spaces (VOICE.md invariant 19). No flag. Railway `c4a235da` SUCCESS, `/healthz` ok on `2842c4f4`. Rollback = revert. Approved by Alvin 14:33 EAT via Chief. |
 | #760 | `2cb6e075` | 18 Oct 14:57 | Voice: an ended call gets no new media session; every call is finalized once (`VOICE_ENDED_CALL_GUARD`, VOICE.md invariant 18). Merged with the flag off (no behaviour change); flag turned on 15:01 (see below). Railway `508601d2` SUCCESS, `/healthz` ok on `2cb6e075`. Rollback = revert (or flag off). Approved by Alvin 14:33 EAT via Chief. |
 | #732 | `13ddf19d` | 18 Oct 14:48 | Brain: a past-booking question in sw/Sheng/en goes to the visit read; honest outcome labels. Live under `BRAIN_CALL_FIXES_D199` (on in prod). Railway `d458494a` SUCCESS, Vercel `dpl_7WNEx3Up` READY. |
@@ -142,7 +143,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 | #640 | Platform | Ops alerts on Vercel cron instead of page load. |
 | #712–#716, #719–#725 | Voice/Brain | NLU-first intent, outage debounce, Swahili verb lock, booking outranks list, regression-9 pack and fixes (R6–R9). |
 | #695, #698, #701, #706, #707, #702, #705, #727 | Voice/Brain/Platform | Mouth lock, no-answer-delete, v2 catalogue, TurnArbiter, spoken catalogue (`hold-staging`). |
-| #691, #696, #699, #697, #704 | Platform/Desk | Write receipts, graceful drain, provider-health page, Admin cleanup, smart import. |
+| #691, #696, #699, #704 | Platform/Desk | Write receipts, graceful drain, provider-health page, smart import. **#697 closed** (superseded by #787 admin ops spec). |
 | #673, #678, #684 | Platform/Brain | Caller files memory v2; trust P1; fact hash contract. **#684 is folded into #771** (cherry-pick onto `main`). Do not merge #684 as well. |
 | #771 | Desk/Platform | Price units on confirm (#685). Yes keeps the owner's price line, including per sq ft, per job, per day, a month, /kg, and wording the label cannot cover. Forward migration `20261018200000_price_unit_preserve.sql` is **not applied**. Staging first, needs backup before prod. |
 | #675, #676, #677 | Voice | Silent-caller prompt + stall watchdog; repair-who + carrier-drop callback; language hysteresis. |
@@ -188,7 +189,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 
 **Build order:** Admin → Settings/onboarding → UI/UX sweep → Packages → Landing → Voice/Brain on real calls. Live-call voice fixes ship any time, one at a time.
 
-- **Admin:** Suspend/Archive shipped (#737, 18 Oct). Purge schedule not applied. Still to do: business edit / members / owner reset, package catalogue, billing period card, invoices.
+- **Admin:** Suspend/Archive (#737, 18 Oct). Shop hub, global search, profile edit, owner reset, and transfer owner shipped (#787, 18 Oct). Purge schedule not applied. Still to do: package catalogue, billing period card, invoices; mobile entry for global search.
 - **Settings / onboarding**: shipped (#656, #667, #672). GIGO P1/P2 follow-ups remain.
 - **UI/UX sweep** across Desk and Admin.
 - **Packages**: state rules and rollover shipped (#631, #650); package catalogue and invoices remain.
