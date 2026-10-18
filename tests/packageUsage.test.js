@@ -38,7 +38,7 @@ describe("package usage meter", () => {
     assert.match(page, /loadOwnerPackageMeter\(tenant\.id\)/);
     assert.match(summary, /Minutes left/);
     assert.match(page, /label: "Message credits"/);
-    assert.match(page, /showChangePlan/);
+    assert.match(page, /showChangePlan=\{canChangePlan && !extras\.freeBeta\}/);
     assert.doesNotMatch(page, /a credit/);
     assert.doesNotMatch(page, /\bSMS\b/);
     assert.doesNotMatch(page, /On-demand rates/);
@@ -186,7 +186,7 @@ describe("package usage meter", () => {
     assert.doesNotMatch(page, /usageCapNotice/);
     assert.doesNotMatch(page, /Inbox only/);
     assert.doesNotMatch(page, /a credit/);
-    assert.match(page, /showChangePlan/);
+    assert.match(page, /showChangePlan=\{canChangePlan && !extras\.freeBeta\}/);
     assert.match(home, /homeMinuteStatus/);
     assert.match(copy, /if \(!input\.onDemand\) return "Calls stopped"/);
   });

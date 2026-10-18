@@ -9,12 +9,12 @@ import { Sheet } from "@/components/ui/Sheet";
 import { cx } from "@/lib/cx";
 import {
   confirmPlanChange,
-  confirmSeatPurchase,
+  setExtraSeatsAction,
   type PlanActionState,
 } from "@/app/(desk)/settings/plan/planActions";
 import {
-  EXTRA_SEAT_MONTHLY_KES,
   formatKsh,
+  proratedPortionKes,
   proratedUpgradeKes,
   splitPayNote,
 } from "@/lib/planPricing";
@@ -24,6 +24,25 @@ const idle: PlanActionState = { ok: false };
 
 function numberWord(count: number, one: string, many: string): string {
   return `${count.toLocaleString("en-KE")} ${count === 1 ? one : many}`;
+}
+
+function SeatChangeNote({ model, next }: { model: OwnerPlanModel; next: number }) {
+  const delta = next - model.extraSeats;
+  if (delta === 0) return null;
+  if (delta < 0) {
+    return <p className="mt-3 text-body text-ink-2">Takes effect on the next bill.</p>;
+  }
+  const due =
+    model.seatUnitKes != null && model.daysLeft != null && model.daysInPeriod != null
+      ? proratedPortionKes(model.seatUnitKes * delta, model.daysLeft, model.daysInPeriod)
+      : null;
+  return (
+    <p className="mt-3 text-body text-ink-2">
+      {due != null
+        ? `${formatKsh(due)} for the rest of this period.`
+        : "Added to the next bill for the days left in this period."}
+    </p>
+  );
 }
 
 function inclusionLines(plan: PublishedPlan): string[] {
@@ -51,9 +70,7 @@ export function PlanPicker({
   const upgradeSku =
     model.plans.find((plan) => plan.monthlyKes > (model.plans.find((row) => row.sku === model.currentSku)?.monthlyKes ?? 0))
       ?.sku ?? model.currentSku;
-  const [sku, setSku] = useState<PlanSku | null>(
-    startConfirm ? upgradeSku : model.trialText ? null : model.currentSku,
-  );
+  const [sku, setSku] = useState<PlanSku | null>(startConfirm ? upgradeSku : null);
   const [cycle, setCycle] = useState<PlanCycle>(model.cycle);
   const [confirmOpen, setConfirmOpen] = useState(false);
   useEffect(() => {
@@ -61,9 +78,10 @@ export function PlanPicker({
     setConfirmOpen(true);
   }, [startConfirm]);
   const [seatOpen, setSeatOpen] = useState(openSeat);
-  const [seats, setSeats] = useState(1);
+  const [seats, setSeats] = useState(model.extraSeats);
+  const [seatKey, setSeatKey] = useState(() => (openSeat ? crypto.randomUUID() : ""));
   const [planState, planAction, planPending] = useActionState(confirmPlanChange, idle);
-  const [seatState, seatAction, seatPending] = useActionState(confirmSeatPurchase, idle);
+  const [seatState, seatAction, seatPending] = useActionState(setExtraSeatsAction, idle);
 
   const selected = model.plans.find((plan) => plan.sku === sku) || null;
   const committedSku = model.trialText ? null : model.currentSku;
@@ -124,22 +142,23 @@ export function PlanPicker({
           <legend className="sr-only">Plan</legend>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {model.plans.map((plan) => {
-              const active = plan.sku === sku;
+              const picked = plan.sku === sku;
               const price = cycle === "year" ? plan.annualKes : plan.monthlyKes;
-              const showCurrent = !model.trialText && plan.sku === model.currentSku;
+              const showCurrent = plan.sku === committedSku;
+              const selected = picked && !showCurrent;
               return (
                 <label
                   key={plan.sku}
                   className={cx(
                     "flex min-h-11 cursor-pointer flex-col rounded-2xl border p-4 focus-within:ring-2 focus-within:ring-brand",
-                    active ? "border-accent bg-accent-tonal" : "border-hairline bg-surface",
+                    selected ? "border-accent bg-accent-tonal" : "border-hairline bg-surface",
                   )}
                 >
                   <input
                     type="radio"
                     name="plan"
                     className="sr-only"
-                    checked={active}
+                    checked={selected}
                     onChange={() => setSku(plan.sku)}
                   />
                   <span className="flex items-baseline gap-2">
@@ -171,11 +190,21 @@ export function PlanPicker({
         </fieldset>
       )}
 
-      <div className="mt-6">
-        <Button type="button" variant="ghost" onClick={() => setSeatOpen(true)}>
-          Extra seat, {formatKsh(EXTRA_SEAT_MONTHLY_KES)} a month
-        </Button>
-      </div>
+      {model.extraSeatMonthlyKes != null && !model.trialText ? (
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={() => {
+              setSeats(model.extraSeats);
+              setSeatKey(crypto.randomUUID());
+              setSeatOpen(true);
+            }}
+            className="flex min-h-11 w-full items-center justify-between gap-3 rounded-2xl border border-hairline bg-surface px-4 text-start text-body text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          >
+            <span>Extra seats: {model.extraSeats}</span>
+          </button>
+        </div>
+      ) : null}
 
       <div className="sticky bottom-0 z-20 mt-auto border-t border-hairline bg-canvas pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <Button type="button" block disabled={!dirty} onClick={() => setConfirmOpen(true)}>
@@ -218,26 +247,30 @@ export function PlanPicker({
       <Sheet
         open={seatOpen}
         onOpenChange={setSeatOpen}
-        title="Extra seat"
-        description={`${formatKsh(EXTRA_SEAT_MONTHLY_KES)} a month each`}
+        title="Extra seats"
+        description={
+          model.extraSeatMonthlyKes != null ? `${formatKsh(model.extraSeatMonthlyKes)} a month each` : undefined
+        }
         footer={
           <form action={seatAction}>
-            <input type="hidden" name="quantity" value={seats} />
-            <Button type="submit" variant="tonal" block pending={seatPending}>
+            <input type="hidden" name="extra_seats" value={seats} />
+            <input type="hidden" name="idempotency_key" value={seatKey} />
+            <Button type="submit" variant="tonal" block pending={seatPending} disabled={seats === model.extraSeats}>
               Confirm
             </Button>
           </form>
         }
       >
         <div className="flex items-center gap-3">
-          <IconButton label="Fewer seats" onClick={() => setSeats((n) => Math.max(1, n - 1))} disabled={seats <= 1}>
+          <IconButton label="Fewer seats" onClick={() => setSeats((n) => Math.max(0, n - 1))} disabled={seats <= 0}>
             <MinusIcon />
           </IconButton>
           <span className="min-w-8 text-center text-title tabular-nums text-ink">{seats}</span>
-          <IconButton label="More seats" onClick={() => setSeats((n) => Math.min(20, n + 1))} disabled={seats >= 20}>
+          <IconButton label="More seats" onClick={() => setSeats((n) => Math.min(100, n + 1))} disabled={seats >= 100}>
             <PlusIcon />
           </IconButton>
         </div>
+        <SeatChangeNote model={model} next={seats} />
         {seatState.message || seatState.error ? (
           <p className="mt-3 text-body text-ink">{seatState.message || seatState.error}</p>
         ) : null}

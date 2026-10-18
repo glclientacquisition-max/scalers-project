@@ -8,7 +8,10 @@ import {
   annualPriceKes,
   annualSavingKes,
   downgradeStartsOn,
+  nairobiPeriodDays,
+  proratedPortionKes,
   proratedUpgradeKes,
+  seatUnitKes,
   splitPayNote,
 } from "../dashboard/src/lib/planPricing.ts";
 import { planChangePort } from "../dashboard/src/lib/deskPlanChange.ts";
@@ -33,6 +36,15 @@ describe("plan pricing", () => {
     assert.equal(proratedUpgradeKes(7000, 18000, 10, 30), 7333);
   });
 
+  it("prorates an extra seat from the version price and the days left", () => {
+    const clock = nairobiPeriodDays("2026-10-01T00:00:00+03:00", "2026-10-31T00:00:00+03:00", new Date("2026-10-11T09:00:00+03:00"));
+    assert.deepEqual(clock, { daysInPeriod: 30, daysLeft: 20 });
+    const unit = seatUnitKes(500, "month", 10);
+    assert.equal(unit, 500);
+    assert.equal(proratedPortionKes(unit, clock!.daysLeft, clock!.daysInPeriod), 333);
+    assert.equal(seatUnitKes(500, "year", 10), annualPriceKes(500, 10));
+  });
+
   it("starts a downgrade at the period end", () => {
     const end = new Date("2026-10-31T21:00:00Z");
     assert.equal(downgradeStartsOn(end).toISOString(), end.toISOString());
@@ -47,7 +59,7 @@ describe("plan change port", () => {
       const off = await planChangePort().changePlan({ sku: "growth", cycle: "year" });
       assert.deepEqual(off, { ok: false, message: "Plan changes open soon" });
       process.env.DESK_PLAN_CHANGE = "true";
-      const on = await planChangePort().addSeats({ quantity: 2 });
+      const on = await planChangePort().setExtraSeats({ extraSeats: 2, idempotencyKey: "seat-key" });
       assert.equal(on.ok, false);
       assert.equal(on.message, "Plan changes open soon");
     } finally {
