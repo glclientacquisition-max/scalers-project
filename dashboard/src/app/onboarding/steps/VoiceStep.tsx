@@ -73,7 +73,7 @@ export function VoiceStep({
           value="callback"
           onChange={(handoff) => onChange({ ...value, handoff })}
           options={[
-            { value: "callback", title: "Take a message for a callback", detail: "Your Business Assistant takes their name and reason, then alerts you by text or email to call back." },
+            { value: "callback", title: "Take a message for a callback", detail: "Your Business Assistant takes their name and reason, then alerts you on WhatsApp, with SMS as backup." },
           ]}
         />
       </section>

@@ -54,10 +54,10 @@ const TOOLS = businessSettingsHref("train", "tools");
 export const REQUIREMENT_COPY: Record<RequirementId, { label: string; href: string | null; fixLabel: string }> = {
   holds_policy_on: { label: "Say you hold items for customers", href: `${POLICIES}#holds`, fixLabel: "Open Policies" },
   holdable_item: { label: "Mark at least one catalogue item as holdable", href: `${CATALOG}#holdable`, fixLabel: "Open Catalogue" },
-  verified_alert: { label: "Set up text or email alerts so you hear about each hold", href: ALERTS, fixLabel: "Open Alerts" },
+  verified_alert: { label: "Set up WhatsApp alerts, with SMS as backup, so you hear about each hold", href: ALERTS, fixLabel: "Open Alerts" },
   owner_service: { label: "Add at least one service you offer", href: CATALOG, fixLabel: "Open Catalogue" },
   booking_mode_confirmed: { label: "Note the time callers ask for", href: `${POLICIES}#bookings`, fixLabel: "Open Policies" },
-  callback_contact: { label: "Add a team contact with a phone or email who gets callback alerts", href: TEAM, fixLabel: "Open Team" },
+  callback_contact: { label: "Add a team contact with WhatsApp or email. Alerts go to WhatsApp, with SMS as backup.", href: TEAM, fixLabel: "Open Team" },
   escalate_on: { label: "Allow the Business Assistant to alert you", href: TOOLS, fixLabel: "Open Voice" },
 };
 
@@ -194,7 +194,7 @@ export function capabilityGates(
   }
 
   // Scalers does not put callers through live. The Business Assistant takes the
-  // caller's name and reason, and the team is alerted by text or email to call back.
+  // caller's name and reason, and the team is alerted on WhatsApp, with SMS as backup, to call back.
   const callbackMissing: RequirementId[] = [];
   if (!teamHasCallbackContact(tenant.team_directory)) callbackMissing.push("callback_contact");
   if (!escalateOn(tenant.agent_tools)) callbackMissing.push("escalate_on");
