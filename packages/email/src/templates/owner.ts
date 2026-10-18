@@ -82,12 +82,13 @@ export function lineLive(p: LineLiveProps, ctx: Ctx): EmailSpec {
       {
         t: "steps",
         items: [
-          ["On the phone your customers call, type ", { strong: forwardCode(p.dialNumber, s) }, " and press call. It works on Safaricom, Airtel and Telkom."],
+          ["On the phone your customers call, type ", { strong: forwardCode(p.dialNumber, s) }, " and press call. Tested on Safaricom and Airtel."],
           `Your phone rings for about ${s} seconds first. If you don't answer, are busy, or your phone is off, the assistant answers.`,
           "Test it: ask a friend to call your business number and don't pick up.",
         ],
       },
       { t: "note", tone: "attention", text: ["Forwarding needs airtime, minutes or a talk-time bundle on that line. Your network charges each forwarded call to you at your normal call rate."] },
+      { t: "p", muted: true, text: "On Telkom? We haven't tested it yet. If the code shows an error, your Desk has other choices." },
       { t: "p", muted: true, text: ["Want other choices, a different ring time, or to turn it off? Your Desk has every option. To turn forwarding off, dial ", { strong: FORWARD_OFF_CODE }, "."] },
       ...betaNote(p),
     ],

@@ -93,6 +93,9 @@ test("line live: two options, one recommended code with ring time, airtime note,
   assert.match(e.text, /Option 1: Use this as your business number/);
   assert.match(e.text, /Option 2: Forward your current number/);
   assert.match(e.text, /airtime, minutes or a talk-time bundle/);
+  // **004*N**20# tested on Safaricom and Airtel by Alvin, 18 Oct 2026. Telkom stays hedged.
+  assert.match(e.text, /Tested on Safaricom and Airtel\./);
+  assert.match(e.text, /On Telkom\? We haven't tested it yet\./);
   assert.ok(e.text.includes(`https://app.scalers.co.ke${deskRoutes.lineSetup}`), "button must go to the Desk setup page");
   // Keep the email short: the individual codes live in Desk.
   assert.ok(!/\*\*6[127]\*/.test(e.text), "individual codes belong in Desk, not the email");
