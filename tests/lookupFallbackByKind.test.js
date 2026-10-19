@@ -153,3 +153,57 @@ test('quote price lookup never speaks the row amount', () => {
   assert.doesNotMatch(speechOf(result, 'en'), /four thousand|4,?500|4500/i);
   delete process.env.VOICE_FALLBACK_BY_KIND;
 });
+
+// --- Pay default is callback-only; quote-style owner lines are price-only ---
+const fs = require('fs');
+const path = require('path');
+const { lineForKind, generalFitsFallbackKind } = require('../src/conversation/unknownAnswerByKind');
+const { callbackSafeLine } = require('../src/conversation/factSheet');
+
+const QUOTE_CANNOT =
+  'We cannot quote exact prices on the spot. Our team can prepare a formal quote for you.';
+
+test('pay default is callback-only in both languages and passes the callback guard', () => {
+  for (const lang of ['en', 'sw']) {
+    const line = DEFAULT_BY_KIND.pay[lang];
+    assert.ok(callbackSafeLine(line), `pay ${lang} must pass callbackSafeLine`);
+    assert.doesNotMatch(line, /\bsend\b|itakutumia|tutakutumia/i, `pay ${lang} must not promise a send`);
+    assert.equal(isQuoteStyleFallbackLine(line), false);
+  }
+  assert.match(DEFAULT_BY_KIND.pay.en, /call you back/i);
+  assert.match(DEFAULT_BY_KIND.pay.sw, /kukupigia|itakupigia/i);
+});
+
+test('isQuoteStyleFallbackLine catches cannot quote / formal quote wording', () => {
+  assert.equal(isQuoteStyleFallbackLine(QUOTE_CANNOT), true);
+  assert.equal(isQuoteStyleFallbackLine("Sorry, we can't quote that on the phone."), true);
+  assert.equal(isQuoteStyleFallbackLine('The team will prepare a formal quote.'), true);
+  assert.equal(isQuoteStyleFallbackLine(GENERIC_GENERAL), false);
+});
+
+test('quote-style owner line is used for price only, never pay/hours/fee/general', () => {
+  const byKind = { general: { en: QUOTE_CANNOT, sw: null } };
+  const profile = { unknownAnswerFallback: QUOTE_CANNOT };
+  assert.equal(lineForKind(byKind, 'price', 'en', profile), QUOTE_CANNOT);
+  for (const kind of ['pay', 'hours', 'fee', 'general']) {
+    assert.notEqual(lineForKind(byKind, kind, 'en', profile), QUOTE_CANNOT, kind);
+    assert.equal(generalFitsFallbackKind(QUOTE_CANNOT, kind), false, kind);
+  }
+  assert.equal(lineForKind(byKind, 'pay', 'en', profile), DEFAULT_BY_KIND.pay.en);
+  assert.equal(lineForKind(byKind, 'pay', 'sw', profile), DEFAULT_BY_KIND.pay.sw);
+});
+
+test('fallback-by-kind speech snapshot (tests/fixtures/fallbackByKindSpeech.json)', () => {
+  const snap = JSON.parse(
+    fs.readFileSync(path.join(__dirname, 'fixtures/fallbackByKindSpeech.json'), 'utf8'),
+  );
+  const profiles = {
+    quote_owner: { byKind: { general: { en: QUOTE_CANNOT, sw: null } }, profile: { unknownAnswerFallback: QUOTE_CANNOT } },
+    generic_owner: { byKind: { general: { en: GENERIC_GENERAL, sw: null } }, profile: { unknownAnswerFallback: GENERIC_GENERAL } },
+    no_owner_line: { byKind: null, profile: {} },
+  };
+  for (const row of snap.cases) {
+    const p = profiles[row.profile];
+    assert.equal(lineForKind(p.byKind, row.kind, row.language, p.profile), row.line, `${row.profile} ${row.kind} ${row.language}`);
+  }
+});
