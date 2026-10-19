@@ -504,13 +504,12 @@ describe("inbox verb workflows: surfaces as shipped", () => {
     assert.match(board, /showArchivedEntry/);
   });
 
-  it("dock verbs stay Confirm, hold Done, Call, WhatsApp. They are not overflow verbs", () => {
+  it("list dock verbs stay Confirm and hold Done. Call and WhatsApp live in the opened item", () => {
     const row = read("dashboard/src/components/InboxItemRow.tsx");
     const overflow = read("dashboard/src/components/InboxRowOverflow.tsx");
     assert.match(row, /InboxJobActions/);
     assert.match(row, /RequestStatusToggle/);
-    assert.match(row, /CallLink/);
-    assert.match(row, /WhatsAppLink/);
+    assert.doesNotMatch(row, /CallLink|WhatsAppLink/);
     assert.match(row, /inboxListDockRecipe\(item\)/);
     assert.match(row, /inboxNeedsYouNextStep\(item, vertical\)/);
     assert.doesNotMatch(overflow, /Confirm/);

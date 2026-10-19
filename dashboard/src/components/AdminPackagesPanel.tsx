@@ -1,34 +1,29 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Empty } from "@/components/ui/Empty";
 import { Field, Input } from "@/components/ui/Field";
 import { ListRow } from "@/components/ui/ListRow";
-import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { Stamp } from "@/components/ui/Stamp";
 import { Switch } from "@/components/ui/Switch";
 import {
   inboundKesPerMinute,
   kesPerSecondFromMinute,
-  minutesUsedFromSeconds,
   outboundKesPerMinute,
   type BillingPackage,
   type BillingRateCard,
   type TenantSubscriptionRow,
 } from "@/lib/packageCatalog";
 import { formatKes } from "@/lib/packagePriceLabel";
-import { usedOfIncluded } from "@/lib/packageUsageAlign";
 import { requestErrorText } from "@/lib/adminBillingCopy";
 
-type Tab = "packages" | "shops";
 type SheetKind = "rates" | "sku";
 
-/** Packages are assigned on the business's Billing page, behind one confirm. */
-function billingHref(tenantId: string) {
-  return `/admin/billing/${tenantId}`;
+function shopMoneyHref(tenantId: string) {
+  return `/admin/businesses/${tenantId}?money=1`;
 }
 
 function SheetNote({ error }: { error: string | null }) {
@@ -38,17 +33,6 @@ function SheetNote({ error }: { error: string | null }) {
       {error}
     </p>
   );
-}
-
-function shopPreview(row: TenantSubscriptionRow) {
-  if (row.gap) return row.gap;
-  if (row.packageName) return "Matches package";
-  return "No package";
-}
-
-function shopWhen(row: TenantSubscriptionRow) {
-  const pack = row.packageName || "None";
-  return row.period ? `${pack} / ${row.period}` : pack;
 }
 
 function adminMoney(amount: number) {
@@ -77,10 +61,8 @@ export function AdminPackagesPanel({
   const [packs, setPacks] = useState(initialPackages);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("packages");
   const [sheet, setSheet] = useState<SheetKind | null>(null);
   const [skuId, setSkuId] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
 
   const inboundMin = inboundKesPerMinute(rates.inboundKesPerSecond);
   const outboundMin = outboundKesPerMinute(rates.outboundKesPerSecond);
@@ -88,16 +70,6 @@ export function AdminPackagesPanel({
   const sku = packs.find((pack) => pack.id === skuId) || null;
   const skuIndex = packs.findIndex((pack) => pack.id === skuId);
   const needsYou = businesses.filter((row) => !row.packageName);
-
-  const shopRows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return businesses;
-    return businesses.filter(
-      (row) =>
-        row.businessName.toLowerCase().includes(q) ||
-        (row.packageName || "").toLowerCase().includes(q),
-    );
-  }, [businesses, query]);
 
   function patchPack(index: number, patch: Partial<BillingPackage>) {
     setPacks((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -144,7 +116,7 @@ export function AdminPackagesPanel({
                 title={row.businessName}
                 preview={row.gap || "No package. Open to assign one."}
                 unread
-                href={billingHref(row.tenantId)}
+                href={shopMoneyHref(row.tenantId)}
               />
             ))}
           </ul>
@@ -163,17 +135,7 @@ export function AdminPackagesPanel({
       </section>
 
       <section>
-        <p className="px-4 text-caption text-ink-3">{tab === "packages" ? "Packages" : "Shops"}</p>
-        {catalogOnly ? null : (
-          <Segmented
-            label="Packages filter"
-            items={[
-              { key: "packages", label: "Packages", count: packs.length, active: tab === "packages" },
-              { key: "shops", label: "Shops", count: businesses.length, active: tab === "shops" },
-            ]}
-            onSelect={(key) => setTab(key as Tab)}
-          />
-        )}
+        <p className="px-4 text-caption text-ink-3">Packages</p>
         {error && !sheet ? (
           <p className="px-4 text-body text-attention" role="alert">
             {error}
@@ -185,61 +147,21 @@ export function AdminPackagesPanel({
           </p>
         ) : null}
 
-        {tab === "packages" || catalogOnly ? (
-          packs.length === 0 ? (
-            <Empty title="No packages." line="Add a SKU in the catalogue." />
-          ) : (
-            <ul className="divide-y divide-hairline">
-              {packs.map((pack) => (
-                <ListRow
-                  key={pack.id}
-                  title={pack.name}
-                  preview={skuPreview(pack)}
-                  when={`${pack.minutes.toLocaleString("en-KE")} min`}
-                  stamp={<Stamp tone={pack.isActive ? "live" : "neutral"}>{pack.isActive ? "Live" : "Hidden"}</Stamp>}
-                  onOpen={() => openSku(pack.id)}
-                />
-              ))}
-            </ul>
-          )
+        {packs.length === 0 ? (
+          <Empty title="No packages." line="Add a SKU in the catalogue." />
         ) : (
-          <>
-            <div className="px-4 py-2">
-              <Input
-                id="pack-shop-search"
-                type="search"
-                enterKeyHint="search"
-                autoComplete="off"
-                placeholder="Search"
-                aria-label="Search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
+          <ul className="divide-y divide-hairline">
+            {packs.map((pack) => (
+              <ListRow
+                key={pack.id}
+                title={pack.name}
+                preview={skuPreview(pack)}
+                when={`${pack.minutes.toLocaleString("en-KE")} min`}
+                stamp={<Stamp tone={pack.isActive ? "live" : "neutral"}>{pack.isActive ? "Live" : "Hidden"}</Stamp>}
+                onOpen={() => openSku(pack.id)}
               />
-            </div>
-            {shopRows.length === 0 ? (
-              <Empty
-                title={businesses.length === 0 ? "No businesses." : "No match."}
-                line={businesses.length === 0 ? "A business shows up here after signup." : "Try another name."}
-              />
-            ) : (
-              <ul className="divide-y divide-hairline">
-                {shopRows.map((row) => (
-                  <ListRow
-                    key={row.tenantId}
-                    title={row.businessName}
-                    preview={shopPreview(row)}
-                    when={shopWhen(row)}
-                    stamp={
-                      <Stamp tone={row.packageName && !row.gap ? "ok" : "attention"}>
-                        {usedOfIncluded(minutesUsedFromSeconds(row.usage.secondsUsed), row.usage.minutesIncluded)}
-                      </Stamp>
-                    }
-                    href={billingHref(row.tenantId)}
-                  />
-                ))}
-              </ul>
-            )}
-          </>
+            ))}
+          </ul>
         )}
       </section>
 
