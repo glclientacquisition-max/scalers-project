@@ -75,14 +75,40 @@ export function structuredSettingsSlots({
   };
 }
 
-/** Overview checks (same rules as the Settings cards). */
-export function dataChecksFor(tenant: { product_catalog?: unknown; services_catalog?: unknown; business_policies?: unknown }): DataCheck[] {
+/** Overview checks (import-parsed facts only when save = confirm is on). */
+export function dataChecksFor(
+  tenant: { product_catalog?: unknown; services_catalog?: unknown; business_policies?: unknown },
+  opts?: { saveIsConfirm?: boolean }
+): DataCheck[] {
   const out: DataCheck[] = [];
   const prices = pricesToConfirm(tenant).length;
-  if (prices) out.push({ href: businessSettingsHref("catalog"), label: `Check ${prices} price${prices === 1 ? "" : "s"}`, detail: "We read them from your notes. Callers hear these." });
+  if (prices) {
+    out.push({
+      href: businessSettingsHref("catalog"),
+      label: `Check ${prices} price${prices === 1 ? "" : "s"}`,
+      detail: opts?.saveIsConfirm
+        ? "Imported from your notes. Press Save on Catalogue to use it."
+        : "We read them from your notes. Callers hear these.",
+    });
+  }
   const unpriced = unpricedCount(tenant);
-  if (unpriced) out.push({ href: UNPRICED_HREF, label: unpricedLabelText(unpriced), detail: "Add a price, or choose Ask so callers get a call back." });
+  if (unpriced) {
+    out.push({
+      href: UNPRICED_HREF,
+      label: unpricedLabelText(unpriced),
+      detail: "Add a price, or choose Ask so callers get a call back.",
+    });
+  }
   const pay = paymentsFrom(tenant.business_policies);
-  if (pay && !pay.confirmed) out.push({ href: businessSettingsHref("train", "policies"), label: "Check how customers pay", detail: "We read it from your payment notes." });
+  const payNeedsCheck = pay && (opts?.saveIsConfirm ? pay.source === "parsed" && !pay.confirmed : !pay.confirmed);
+  if (payNeedsCheck) {
+    out.push({
+      href: businessSettingsHref("train", "policies"),
+      label: "Check how customers pay",
+      detail: opts?.saveIsConfirm
+        ? "Imported from your payment notes. Press Save on Policies to use it."
+        : "We read it from your payment notes.",
+    });
+  }
   return out;
 }

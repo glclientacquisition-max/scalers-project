@@ -67,6 +67,9 @@ import { homeMinuteStatus } from "@/lib/usageCap";
 import { createDeskTimer } from "@/lib/deskTiming";
 import { DeskPageGate } from "@/components/DeskPageGate";
 import { UNKNOWN_ANSWER_DEFAULT_EN } from "@/lib/unknownAnswerSpoken";
+import { deskAssistantSayPage, factSaveIsConfirm } from "@/lib/deskFeatureFlags";
+import { HomeGetReadyCallsCard } from "@/components/HomeGetReadyCallsCard";
+import { loadReadyChecklist } from "@/lib/assistantSayLoad";
 
 export default function HomeOverviewPage() {
   return (
@@ -94,6 +97,11 @@ async function HomeOverviewBody() {
   const isBeta = isBetaBilling(tenant.billing_enforcement);
   const business = tenant.business_name?.trim() || "your workspace";
   const today = nairobiDateLabel();
+
+  const saveIsConfirm = factSaveIsConfirm();
+  const assistantSayPage = deskAssistantSayPage();
+  const overviewChecks = dataChecksFor(tenant, { saveIsConfirm });
+  const readyChecklist = assistantSayPage ? await loadReadyChecklist(tenant) : null;
 
   const readiness = assessMvpAnswerReadiness({
     businessName: tenant.business_name,
@@ -440,7 +448,10 @@ async function HomeOverviewBody() {
             status={callSetupStatus}
           />
         </RoleGate>
-        <DataChecksCard checks={dataChecksFor(tenant)} />
+        {assistantSayPage && readyChecklist && !readyChecklist.allDone ? (
+          <HomeGetReadyCallsCard items={readyChecklist.items} />
+        ) : null}
+        {overviewChecks.length ? <DataChecksCard checks={overviewChecks} /> : null}
         {insights ? (
           <CallInsights insights={insights} />
         ) : null}

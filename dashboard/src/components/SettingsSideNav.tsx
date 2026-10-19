@@ -67,6 +67,7 @@ const SETTINGS_ICON: Record<string, typeof ClockIcon> = {
   calls: PhoneIcon,
   "train:team": UsersIcon,
   alerts: BellIcon,
+  "assistant-say": DocumentTextIcon,
   "/settings/plan": CreditCardIcon,
   "/settings/billing": ReceiptPercentIcon,
 };
@@ -74,9 +75,10 @@ const SETTINGS_ICON: Record<string, typeof ClockIcon> = {
 /** Statuses that ask the owner to act get the attention colour; the rest stay quiet. */
 const needsAction = (text: string) => /^(needs|not )/i.test(text);
 
-function visibleSections(manageBilling: boolean): SettingsNavSection[] {
+function visibleSections(manageBilling: boolean, assistantSayPage: boolean): SettingsNavSection[] {
   return SETTINGS_NAV.flatMap((section) => {
     const items = section.items.filter((item) => {
+      if ("tab" in item.target && item.target.tab === "assistant-say" && !assistantSayPage) return false;
       if (!("href" in item.target)) return true;
       return manageBilling;
     });
@@ -95,9 +97,11 @@ export function SettingsMenu({
   variant,
   optionStatus,
   activePath,
+  assistantSayPage = false,
 }: {
   tab: BusinessSettingsTab;
   trainPanel: SettingsPanel;
+  assistantSayPage?: boolean;
   variant: "index" | "rail";
   optionStatus: Record<string, SettingsListStatus>;
   /** Live pages use the real pathname. The billing fixture passes the settings path it is standing in for. */
@@ -106,7 +110,7 @@ export function SettingsMenu({
   const pathname = usePathname();
   const path = activePath ?? pathname;
   const manageBilling = useCan("billing.manage");
-  const sections = visibleSections(manageBilling);
+  const sections = visibleSections(manageBilling, assistantSayPage);
   const isRail = variant === "rail";
   const navRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -208,11 +212,13 @@ export function SettingsRail({
   trainPanel = "identity",
   optionStatus = {},
   activePath,
+  assistantSayPage = false,
 }: {
   tab?: BusinessSettingsTab;
   trainPanel?: SettingsPanel;
   optionStatus?: Record<string, SettingsListStatus>;
   activePath?: string;
+  assistantSayPage?: boolean;
 }) {
   return (
     <div className={settingsRailWrapClass}>
@@ -222,6 +228,7 @@ export function SettingsRail({
         variant="rail"
         optionStatus={optionStatus}
         activePath={activePath}
+        assistantSayPage={assistantSayPage}
       />
     </div>
   );
