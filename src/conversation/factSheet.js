@@ -19,6 +19,13 @@
 
 const { factServices, factProducts, factPolicyMap } = require('./provenance');
 const { parseHoursSchedule } = require('./businessHours');
+const {
+  normalisePrice,
+  priceIsSpeakable,
+  formatPriceDisplay,
+  legacyPriceText,
+  factSheetPriceNote,
+} = require('./factPrice');
 
 const FLAG_ON = /^(1|true|on|yes)$/i;
 
@@ -174,15 +181,6 @@ function asObject(raw) {
   return null;
 }
 
-/** Owner price text with a currency so the TTS renderer reads it as money. */
-function priceText(raw) {
-  const text = String(raw || '').replace(/\s+/g, ' ').trim();
-  if (!text) return '';
-  if (/\b(ksh|kes|sh|shillings?|bob)\b|\/=/i.test(text)) return text;
-  if (/^\d[\d,]*(?:\s*[-–]\s*\d[\d,]*)?\b/.test(text)) return `KSh ${text}`;
-  return text;
-}
-
 function clock12(hhmm) {
   const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || ''));
   if (!m) return String(hhmm || '');
@@ -219,15 +217,20 @@ function catalogueFacts(facts, profile) {
   ]);
   for (const { row, kind } of rows) {
     const name = String(row?.name || '').trim();
-    const price = priceText(row?.price || row?.price_range || row?.priceRange || '');
     const id = slug(name);
-    if (!name || !price || !id) continue;
+    if (!name || !id) continue;
+    const priceNorm = normalisePrice(row);
+    const speakable = priceIsSpeakable(priceNorm);
+    const legacy = legacyPriceText(row);
     addFact(facts, {
       id: `price.${id}`,
       kind: 'price',
       source: kind,
       label: name,
-      value: price,
+      value: speakable ? formatPriceDisplay(priceNorm, 'en', legacy) : '',
+      legacyPrice: legacy,
+      priceNorm,
+      speakable,
       confirmed: confirmed.has(rowKey(row)),
     });
   }
@@ -357,6 +360,7 @@ function factSheetFor(profile) {
 function renderFact(fact, language) {
   const sw = langKey(language) === 'sw';
   if (!fact || !fact.confirmed) return '';
+  if (fact.kind === 'price' && fact.speakable === false) return '';
   if (fact.kind === 'fee' && fact.free) return sw ? 'bure' : 'free';
   if (fact.kind === 'hours') {
     if (fact.runs) return weekText(fact.runs, sw);
@@ -367,23 +371,28 @@ function renderFact(fact, language) {
     if (fact.account) return sw ? `${fact.value}, akaunti ${fact.account}` : `${fact.value}, account ${fact.account}`;
     return fact.value;
   }
-  if (fact.kind === 'price') return priceText(fact.value, sw);
+  if (fact.kind === 'price') {
+    const norm = fact.priceNorm || normalisePrice({ price_range: fact.value });
+    const display = formatPriceDisplay(norm, language, fact.legacyPrice || '');
+    return localiseFromLead(display, sw);
+  }
   return fact.value;
 }
 
 // "From KSh 2,500" sits mid-sentence after rendering: lower-case the lead
 // word, and say it in Swahili for a Swahili caller.
-function priceText(value, sw) {
-  const text = String(value || '');
-  const m = text.match(/^(from|starting at|starting from)\s+/i);
-  if (!m) return text;
-  return `${sw ? 'kuanzia' : m[1].toLowerCase()} ${text.slice(m[0].length)}`;
+function localiseFromLead(text, sw) {
+  const value = String(text || '');
+  const m = value.match(/^(from|starting at|starting from|kuanzia)\s+/i);
+  if (!m) return value;
+  return `${sw ? 'kuanzia' : m[1].toLowerCase()} ${value.slice(m[0].length)}`;
 }
 
 /** A whole sentence stating one fact, for repair when the model's sentence was dropped. */
 function factSentence(fact, language, profile = null) {
   const sw = langKey(language) === 'sw';
   if (!fact || !fact.confirmed) return unknownAnswerLine(language, profile);
+  if (fact.kind === 'price' && fact.speakable === false) return unknownAnswerLine(language, profile);
   const value = renderFact(fact, language);
   switch (fact.kind) {
     case 'price': {
@@ -409,6 +418,9 @@ function factSentence(fact, language, profile = null) {
 function cardLine(fact) {
   const id = `{${fact.id}}`;
   if (!fact.confirmed) return `${id} ${fact.label}: (team to confirm)`;
+  if (fact.kind === 'price' && fact.speakable === false) {
+    return `${id} ${fact.label}: ${factSheetPriceNote()}`;
+  }
   switch (fact.kind) {
     case 'fee':
       return `${id} ${fact.label} ${fact.feeKind} fee: ${renderFact(fact, 'en')}`;
@@ -487,7 +499,7 @@ function renderFactRefs(text, sheet, opts = {}) {
         bad = true;
         return match;
       }
-      if (!fact.confirmed) {
+      if (!fact.confirmed || (fact.kind === 'price' && fact.speakable === false)) {
         result.unconfirmed.push(id);
         bad = true;
         return match;

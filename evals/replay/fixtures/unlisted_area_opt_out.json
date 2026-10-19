@@ -1,0 +1,14 @@
+{
+  "id": "unlisted_area_opt_out",
+  "bug": "not_found_in_list_opt_out",
+  "profile": "optout",
+  "language": "en",
+  "turns": [
+    {
+      "caller": "Do you charge a fee to come to Westlands?",
+      "mustSay": ["We don't come to Westlands."],
+      "mustNotSay": ["I'll check with the team"],
+      "status": "not_found_in_list"
+    }
+  ]
+}

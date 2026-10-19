@@ -242,7 +242,7 @@ describe('5. A booking confirmed during a barge-in is still told', () => {
     );
     assert.equal((discards || []).length, 4);
     const owed = SERVER.indexOf('const owedOutcome = takeToolOutcome(brainState);');
-    assert.ok(owed > 0 && owed < SERVER.indexOf('const localReply = resolveLocalReply({'));
+    assert.ok(owed > 0 && owed < SERVER.indexOf('resolveLocalReply({'));
   });
 });
 

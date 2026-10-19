@@ -8,6 +8,13 @@ const {
   unknownFaqTopics,
   formatUnknownSection,
 } = require('./provenance');
+const {
+  normalisePrice,
+  priceIsSpeakable,
+  formatPriceDisplay,
+  legacyPriceText,
+  factSheetPriceNote,
+} = require('./factPrice');
 
 function asArray(raw) {
   if (!raw) return [];
@@ -43,9 +50,15 @@ function normalizeServices(raw) {
       } else if (['unknown', 'maybe', '?'].includes(stockRaw)) {
         in_stock = 'unknown';
       }
+      const norm = normalisePrice(row);
+      const speakable = priceIsSpeakable(norm);
       return {
         name: String(row?.name || '').trim(),
-        price_range: String(row?.price_range || row?.priceRange || '').trim(),
+        price_range: speakable
+          ? formatPriceDisplay(norm, 'en', legacyPriceText(row))
+          : String(row?.price_range || row?.priceRange || '').trim()
+            ? factSheetPriceNote()
+            : '',
         notes: String(row?.notes || '').trim(),
         out_of_scope: String(row?.out_of_scope || row?.outOfScope || '').trim(),
         in_stock,

@@ -674,14 +674,19 @@ function buildCompileSections({
 function speechFactText(profile = {}) {
   const fieldMeta = profile.fieldMeta || null;
   const policies = factPolicyMap(profile.businessPolicies, fieldMeta).policies;
+  const { normalisePrice, priceIsSpeakable, formatPriceDisplay, legacyPriceText } = require('./factPrice');
+  const priceForSpeech = (row) => {
+    const norm = normalisePrice(row);
+    return priceIsSpeakable(norm) ? formatPriceDisplay(norm, 'en', legacyPriceText(row)) : '';
+  };
   const products = factProducts(profile.productCatalog, fieldMeta).map((row) => ({
     name: row.name,
-    price: row.price || row.price_range || row.priceRange || '',
+    price: priceForSpeech(row),
     notes: row.notes || '',
   }));
   const services = factServices(profile.servicesCatalog, fieldMeta).map((row) => ({
     name: row.name,
-    price_range: row.price_range || row.priceRange || '',
+    price_range: priceForSpeech(row),
     notes: row.notes || '',
   }));
   const faqs = factFaqs(profile.faqs, fieldMeta).map((row) => ({
