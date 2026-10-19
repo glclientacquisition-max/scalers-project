@@ -1,0 +1,14 @@
+{
+  "id": "hours_grouped",
+  "bug": "hours_speech",
+  "profile": "grouped",
+  "language": "en",
+  "turns": [
+    {
+      "caller": "What are your opening hours?",
+      "mustSay": ["Monday to Saturday", "nine AM to seven PM", "closed Sunday"],
+      "mustNotSay": ["Tuesday"],
+      "status": "found"
+    }
+  ]
+}

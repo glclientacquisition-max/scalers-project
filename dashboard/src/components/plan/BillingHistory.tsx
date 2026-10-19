@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { OwnerInvoiceList } from "@/components/plan/OwnerInvoiceList";
 import { PaymentCheck } from "@/components/plan/PaymentCheck";
 import {
+  INVOICES_UNAVAILABLE_LINE,
   invoiceLoadOutcome,
   mapBillingHistory,
   payLinkDestination,
@@ -16,17 +17,26 @@ import {
 export function BillingHistory({ fromPay }: { fromPay: boolean }) {
   const [items, setItems] = useState<MappedInvoice[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/billing/invoices", { cache: "no-store" });
-      const outcome = invoiceLoadOutcome(res.status);
+      const errorBody =
+        res.status === 503 ? ((await res.json().catch(() => null)) as { error?: unknown; code?: unknown } | null) : null;
+      const outcome = invoiceLoadOutcome(res.status, errorBody);
       if (outcome === "error") {
         setFailed(true);
         return;
       }
+      if (outcome === "unavailable") {
+        setFailed(false);
+        setUnavailable(true);
+        return;
+      }
+      setUnavailable(false);
       if (outcome === "empty") {
         setFailed(false);
         setItems([]);
@@ -73,6 +83,10 @@ export function BillingHistory({ fromPay }: { fromPay: boolean }) {
         </Button>
       </div>
     );
+  }
+
+  if (unavailable) {
+    return <p className="mt-4 text-body text-ink-2">{INVOICES_UNAVAILABLE_LINE}</p>;
   }
 
   if (!items) {

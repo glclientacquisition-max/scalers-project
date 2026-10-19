@@ -59,6 +59,23 @@ function extractGeminiParts(response) {
   return parts.map(cloneGeminiPart).filter(Boolean);
 }
 
+/** Function calls live on the raw parts. cloneGeminiPart drops them. */
+function extractGeminiFunctionCalls(response) {
+  const parts = response?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return [];
+  const calls = [];
+  for (const part of parts) {
+    const call = part?.functionCall || part?.function_call;
+    if (!call || !call.name) continue;
+    const args = call.args || call.arguments || {};
+    calls.push({
+      name: String(call.name),
+      args: args && typeof args === 'object' ? args : {},
+    });
+  }
+  return calls;
+}
+
 /**
  * Stream chunks may split text and put the thought signature on a later
  * empty part. Keep signed / thought parts intact. Do not merge them.
@@ -308,6 +325,7 @@ module.exports = {
   extractGeminiText,
   extractThoughtSignature,
   extractGeminiParts,
+  extractGeminiFunctionCalls,
   appendGeminiStreamParts,
   modelPartsForHistory,
   buildGeminiContents,

@@ -9,19 +9,14 @@ import {
   saveOnDemandUsage,
   type OnDemandUsageState,
 } from "@/app/(desk)/wallet/actions";
-import { formatKsh } from "@/lib/planPricing";
-
 const initial: OnDemandUsageState = {};
 
 export function OnDemandUsagePanel({
   tenantId,
   enabled: initialEnabled,
-  extraMinuteKes = null,
 }: {
   tenantId: string;
   enabled: boolean;
-  /** Shown once, inside this sheet, and only while extra usage is on. */
-  extraMinuteKes?: number | null;
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(saveOnDemandUsage, initial);
@@ -35,8 +30,6 @@ export function OnDemandUsagePanel({
   useEffect(() => {
     if (state.ok) router.refresh();
   }, [state.ok, router]);
-
-  const showMinutePrice = enabled && extraMinuteKes != null && extraMinuteKes > 0;
 
   return (
     <section>
@@ -73,11 +66,6 @@ export function OnDemandUsagePanel({
             <p className="text-body text-ink">Allow extra usage</p>
             <Switch checked={enabled} label="Allow extra usage" onCheckedChange={setEnabled} />
           </div>
-          {showMinutePrice ? (
-            <p className="mt-3 text-body text-ink-2">
-              Extra minutes are {formatKsh(extraMinuteKes)} each.
-            </p>
-          ) : null}
           {state.error ? <p className="mt-3 text-body text-attention">{state.error}</p> : null}
           {state.ok ? (
             <p className="mt-3 text-body text-ok">

@@ -119,7 +119,6 @@ async function WalletBody({ searchParams }: WalletPageProps) {
         <OnDemandUsagePanel
           tenantId={tenant.id}
           enabled={Boolean(tenant.on_demand_usage_enabled)}
-          extraMinuteKes={extras.inboundPerMinuteKes}
         />
       )}
       {showActivity ? (

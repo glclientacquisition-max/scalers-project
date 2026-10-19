@@ -97,8 +97,8 @@ assert.match(
 
 assert.match(
   source,
-  /const localReply = resolveLocalReply\(\{[\s\S]*?nextBestAction,\s*\}\);/,
-  'every caller turn must pass the one local turn contract (turnPolicy.resolveLocalReply) before Gemini'
+  /const localReply = lookupPlan\?\.handled[\s\S]*?resolveLocalReply\(\{[\s\S]*?nextBestAction,\s*\}\);/,
+  'a turn the lookup does not handle still passes turnPolicy.resolveLocalReply before Gemini'
 );
 
 assert.match(

@@ -11,13 +11,16 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-165 variables.
+182 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
 | `ADMIN_ACCESS_CODE` | desk | `dashboard/src/lib/admin-auth.ts` |
 | `AGENT_NAME` | voice | `server.js`<br>`src/db.js`<br>`src/prompts.js`<br>+1 more |
 | `ALERT_EMAIL_FROM` | voice | `server.js`<br>`src/notifications/email.js` |
+| `BACHS_API_KEY` | desk, scripts | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>`scripts/billing-payment-reconcile.js` |
+| `BACHS_MODE` | desk, scripts | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>`scripts/billing-payment-reconcile.js` |
+| `BACHS_WEBHOOK_SECRET` | desk | `dashboard/src/app/api/billing/bachs/webhook/route.ts` |
 | `BASE_REPO` | scripts | `scripts/stage-pull-request.js` |
 | `BENCH_VERBOSE` | scripts | `scripts/bench-inbound-webhook.js` |
 | `BETTER_AUTH_SECRET` | desk | `dashboard/src/lib/admin-auth.ts` |
@@ -28,12 +31,13 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BUSINESS_KNOWLEDGE` | voice | `src/db.js`<br>`src/prompts.js`<br>`src/tenantProfile.js` |
 | `BUSINESS_NAME` | voice | `server.js`<br>`src/conversation/businessAssistantIntro.js`<br>`src/db.js`<br>+2 more |
 | `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js` |
-| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>`dashboard/src/app/dev/admin-ops/page.tsx`<br>+40 more |
+| `CRON_SECRET` | desk | `dashboard/src/app/api/cron/ops-alerts/route.ts` |
+| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>`dashboard/src/app/dev/admin-ops/page.tsx`<br>+41 more |
 | `DASHBOARD_PASSWORD` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
 | `DATABASE_URL` | scripts | `scripts/verify-staging-schema.js` |
-| `DESK_PLAN_CHANGE` | desk | `dashboard/src/lib/deskPlanChange.ts`<br>`dashboard/src/lib/ownerBilling.ts` |
+| `DESK_PLAN_CHANGE` | desk | `dashboard/src/lib/deskPlanChange.ts` |
 | `DESK_PUBLIC_URL` | voice | `server.js` |
 | `DOCS_STALE_DAYS` | scripts | `scripts/docs/check-docs.js` |
 | `FACT_HASH_MODE` | desk, scripts, voice | `dashboard/src/lib/tenantFieldProvenance.ts`<br>`scripts/replay-voice-suite.js`<br>`scripts/smoke-mvp-retail.js`<br>+1 more |
@@ -61,11 +65,19 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `NEXT_PUBLIC_SITE_URL` | desk | `dashboard/src/app/layout.tsx`<br>`dashboard/src/lib/admin-auth.ts` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | desk | `dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | desk | `dashboard/src/lib/supabase/env.ts` |
-| `NEXT_PUBLIC_SUPABASE_URL` | desk, scripts | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts`<br>+1 more |
+| `NEXT_PUBLIC_SUPABASE_URL` | desk, scripts | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>`dashboard/src/lib/platformOps.ts`<br>+4 more |
 | `NEXT_PUBLIC_WALLET_RATE_KES_PER_MINUTE` | desk | `dashboard/src/lib/wallet.ts` |
 | `NEXT_RUNTIME` | desk | `dashboard/src/lib/adminQuality.ts` |
-| `NODE_ENV` | desk, scripts, voice | `dashboard/src/app/(desk)/tenantActions.ts`<br>`dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/admin-auth.ts`<br>+4 more |
+| `NODE_ENV` | desk, scripts, voice | `dashboard/src/app/(desk)/tenantActions.ts`<br>`dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/admin-auth.ts`<br>+5 more |
+| `OPS_ALERTS_DRY_RUN` | desk | `dashboard/src/lib/opsAlerts.ts` |
+| `OPS_ALERTS_REARM_MARGIN` | desk | `dashboard/src/lib/opsAlerts.ts` |
+| `OPS_ALERTS_SIMULATE_SMS_CREDIT` | desk | `dashboard/src/lib/opsAlerts.ts` |
+| `OPS_ALERTS_SIMULATE_WALLET_MINOR` | desk | `dashboard/src/lib/opsAlerts.ts` |
+| `OPS_ALERTS_STALE_HOURS` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OPS_EMAIL_FROM` | desk | `dashboard/src/lib/opsMail.ts` |
+| `OPS_SMS_CREDIT_CRITICAL_AT` | desk | `dashboard/src/lib/opsAlerts.ts` |
+| `OPS_SMS_CREDIT_WARN_BELOW` | desk | `dashboard/src/lib/opsAlerts.ts` |
+| `OPS_WALLET_ALERT_THRESHOLDS_KES` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OWNER_ALERT_EMAIL` | voice | `server.js` |
 | `PATH` | scripts | `scripts/smoke-recording-webhook.js` |
 | `PLATFORM_WHATSAPP_ACK` | voice | `src/sautikit/whatsappInbound.js` |
@@ -82,6 +94,8 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `PUBLIC_BASE_URL` | desk, voice | `dashboard/src/lib/sautikit.ts`<br>`dashboard/src/lib/voicePublicBase.js`<br>`server.js` |
 | `RAILWAY_GIT_BRANCH` | voice | `server.js` |
 | `RAILWAY_GIT_COMMIT_SHA` | voice | `server.js` |
+| `RECORDING_RETENTION_DAYS` | desk, voice | `dashboard/src/lib/recordingRetentionPolicy.ts`<br>`src/lib/recordingRetention.js`<br>`src/lib/recordingRetentionPolicy.js` |
+| `RECORDING_RETENTION_PURGE` | voice | `src/lib/recordingRetention.js` |
 | `RESEND_API_KEY` | desk, voice | `dashboard/src/lib/opsMail.ts`<br>`src/notifications/email.js` |
 | `SAUTIKIT_ADMIN_OPS_KEY` | desk | `dashboard/src/lib/sautikit.ts` |
 | `SAUTIKIT_API_BASE` | desk, voice | `dashboard/src/lib/sautikit.ts`<br>`src/notifications/whatsapp.js`<br>`src/sautikit/lineUnavailableAudio.js`<br>+3 more |
@@ -125,8 +139,8 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SUPABASE_ANON_KEY` | desk | `dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_PUBLISHABLE_KEY` | desk | `dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_RECORDINGS_BUCKET` | voice | `src/db.js` |
-| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/supabase.ts`<br>`scripts/backfillFactHashes.js`<br>`scripts/bench-inbound-webhook.js`<br>+6 more |
-| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts`<br>+8 more |
+| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/supabase.ts`<br>`scripts/backfillFactHashes.js`<br>`scripts/bench-inbound-webhook.js`<br>+7 more |
+| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>`dashboard/src/lib/platformOps.ts`<br>+11 more |
 | `TENANT_DID` | voice | `server.js`<br>`src/db.js` |
 | `TENANT_ID` | scripts, voice | `scripts/bench-inbound-webhook.js`<br>`scripts/smoke-db.js`<br>`server.js`<br>+1 more |
 | `TEXTSMS_API_KEY` | desk, voice | `dashboard/src/lib/callerSms.ts`<br>`src/notifications/sms.js` |
@@ -135,7 +149,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `TEXTSMS_PARTNER_ID` | desk, voice | `dashboard/src/lib/callerSms.ts`<br>`src/notifications/sms.js` |
 | `TEXTSMS_SHORTCODE` | desk, voice | `dashboard/src/lib/callerSms.ts`<br>`src/notifications/sms.js` |
 | `TTS_LEXICON_OVERRIDES` | voice | `src/speech/pronunciationLexicon.js` |
-| `VERCEL_ENV` | desk | `dashboard/src/lib/platformOps.ts` |
+| `VERCEL_ENV` | desk | `dashboard/src/lib/opsAlerts.ts`<br>`dashboard/src/lib/platformOps.ts` |
 | `VERCEL_TOKEN` | scripts | `scripts/stage-desk-alias.js` |
 | `VOICE_AREA_FEES` | voice | `src/conversation/areaTerms.js`<br>`src/conversation/numberWords.js` |
 | `VOICE_BARGE_EARLY_MS` | voice | `src/speech/turnTaking.js` |
@@ -160,9 +174,12 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_LIVE_TRANSFER_BETA_OUTBOUND` | voice | `src/billing/liveTransferLegs.js` |
 | `VOICE_LIVE_TRANSFER_IGNORE_HOURS` | voice | `src/conversation/liveTransferReady.js` |
 | `VOICE_LLM_STREAM` | voice | `server.js` |
+| `VOICE_LOOKUP_TOOL` | scripts, voice | `scripts/eval-release.js`<br>`src/knowledge/flags.js` |
+| `VOICE_LOOKUPS` | scripts, voice | `scripts/eval-release.js`<br>`src/knowledge/flags.js` |
 | `VOICE_OUTAGE_CLIP_DIR` | voice | `src/speech/outageClips.js` |
 | `VOICE_OUTAGE_OWNER_COOLDOWN_MS` | voice | `src/speech/speechOutageNotify.js` |
 | `VOICE_OUTAGE_TMP_DIR` | voice | `src/speech/outageClips.js` |
+| `VOICE_PERSONA_ONLY_PROMPT` | voice | `src/knowledge/flags.js` |
 | `VOICE_PLATFORM_OPS_COOLDOWN_MS` | voice | `src/notifications/platformOpsAlert.js` |
 | `VOICE_PLATFORM_OPS_DRY_RUN` | voice | `server.js`<br>`src/notifications/platformOpsAlert.js` |
 | `VOICE_PROFILE` | scripts | `scripts/smoke-tts-pace.js` |

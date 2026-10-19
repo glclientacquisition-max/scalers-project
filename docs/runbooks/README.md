@@ -1,6 +1,6 @@
 ---
 owner: ops-billing
-last_reviewed: 2026-10-14
+last_reviewed: 2026-10-18
 ---
 
 # Runbooks
@@ -15,6 +15,7 @@ One runbook per ops alert kind. Sources: Voice `src/notifications/platformOpsAle
 | `audio` | [`audio.md`](audio.md) | voice |
 | `phone_line` | [`phone-line.md`](phone-line.md) | platform |
 | `sautikit_low` | [`sautikit-low.md`](sautikit-low.md) | ops-billing |
+| `sms_credit` | [`sms-credit.md`](sms-credit.md) | ops-billing |
 | `pool_empty` | [`pool-empty.md`](pool-empty.md) | ops-billing |
 | `beta_expired` | [`beta-expired.md`](beta-expired.md) | ops-billing |
 

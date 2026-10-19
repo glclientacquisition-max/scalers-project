@@ -367,7 +367,9 @@ const FACT_REFS_RULES = [
 
 function factRefsProfile(profile) {
   const { factRefsEnabled, personaOnlyPrompt } = require('./conversation/factSheet');
-  if (!factRefsEnabled() || !profile || !String(profile.llmSystemPrompt || '').trim()) return profile;
+  const { personaOnlyFlag } = require('./knowledge/flags');
+  const strip = factRefsEnabled() || personaOnlyFlag();
+  if (!strip || !profile || !String(profile.llmSystemPrompt || '').trim()) return profile;
   return { ...profile, llmSystemPrompt: personaOnlyPrompt(profile.llmSystemPrompt) };
 }
 

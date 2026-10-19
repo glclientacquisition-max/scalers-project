@@ -5,6 +5,13 @@
 
 const { normalizeServices } = require('./liveKnowledge');
 const { factServices } = require('./provenance');
+const {
+  normalisePrice,
+  priceIsSpeakable,
+  formatPriceDisplay,
+  legacyPriceText,
+  midSentencePriceDisplay,
+} = require('./factPrice');
 const { offerCatalogueLine } = require('./knownFacts');
 const { findCatalogMatch, entityValue } = require('./entityExtraction');
 const {
@@ -213,11 +220,16 @@ const FACT_STOP = new Set([
 
 function catalogueFactRows(profile = {}) {
   return factServices(profile.servicesCatalog, profile.fieldMeta || null)
-    .map((row) => ({
-      name: mouthServiceName(row.name),
-      price: String(row.price_range || row.priceRange || row.price || '').trim(),
-      notes: String(row.notes || '').replace(/\s+/g, ' ').trim(),
-    }))
+    .map((row) => {
+      const norm = normalisePrice(row);
+      return {
+        name: mouthServiceName(row.name),
+        price: priceIsSpeakable(norm) ? formatPriceDisplay(norm, 'en', legacyPriceText(row)) : '',
+        norm,
+        notes: String(row.notes || '').replace(/\s+/g, ' ').trim(),
+        raw: row,
+      };
+    })
     .filter((row) => row.name);
 }
 
@@ -321,8 +333,9 @@ function swahili(language) {
 function speakRowFact(row, language) {
   if (!row) return '';
   const sw = swahili(language);
-  if (row.price && /\d/.test(row.price)) {
-    const price = midSentencePrice(row.price);
+  const norm = row.norm || normalisePrice(row.raw || { price_range: row.price });
+  if (priceIsSpeakable(norm)) {
+    const price = midSentencePriceDisplay(norm, language, factRefsOn(), legacyPriceText(row.raw || row));
     return sw ? `${row.name} ni ${price}.` : `${row.name} is ${price}.`;
   }
   if (row.notes) return `${row.name}: ${row.notes}.`;

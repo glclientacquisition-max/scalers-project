@@ -1,7 +1,6 @@
 /**
- * The review checks that belong on owner billing actions.
- * Payment-provider, editor, and invoice-freeze checks stay on the review branch.
- * These read the files in this checkout.
+ * Billing contracts that now live in this checkout: pay path, owner actions,
+ * and the invoice freeze. They read the files here, not another branch.
  */
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
@@ -16,6 +15,48 @@ function functionBody(sql, name) {
   assert.ok(end > start, `unterminated ${name}`);
   return sql.slice(start, end);
 }
+
+describe("legacy billing mode and invoice freeze", () => {
+  it("revokes execute on payments_issue_receipt from public", () => {
+    const sql = fs.readFileSync(path.join(__dirname, "../docs/supabase/invoice_documents.sql"), "utf8");
+    const start = sql.indexOf("function public.payments_issue_receipt");
+    const chunk = sql.slice(start, start + 1200);
+    assert.match(chunk, /revoke all on function public\.payments_issue_receipt\(\) from public, anon, authenticated/);
+  });
+
+  it("keeps the draft number and status guard", () => {
+    const sql = fs.readFileSync(path.join(__dirname, "../docs/supabase/billing_data_layer.sql"), "utf8");
+    assert.match(sql, /invoice number and status are set only by finalize_invoice/);
+  });
+
+  it("sets billing_write inside apply_payment before it writes invoice status", () => {
+    const sql = fs.readFileSync(path.join(__dirname, "../docs/supabase/invoice_pay.sql"), "utf8");
+    const body = functionBody(sql, "apply_payment");
+    const flag = body.indexOf("set_config('scalers.billing_write', '1', true)");
+    const status = body.indexOf("status = 'paid'");
+    assert.ok(flag >= 0 && status > flag);
+  });
+
+  it("refuses enforcement while a subscription is still beta", () => {
+    const sql = fs.readFileSync(path.join(__dirname, "../docs/supabase/billing_mode_legal_pairs.sql"), "utf8");
+    const body = functionBody(sql, "set_tenant_billing_mode");
+    assert.match(body, /billing_status = 'beta'/);
+    assert.match(body, /billing stays off while the business is on beta/);
+    assert.doesNotMatch(body, /set\s+billing_status/);
+  });
+});
+
+describe("Bachs webhook route", () => {
+  it("logs a failed apply and does not answer 500 when the invoice cannot be paid", () => {
+    const route = fs.readFileSync(
+      path.join(__dirname, "../dashboard/src/app/api/billing/bachs/webhook/route.ts"),
+      "utf8"
+    );
+    assert.match(route, /console\.error/);
+    assert.match(route, /invoice cannot be paid/);
+    assert.doesNotMatch(route, /catch \{\s*return NextResponse\.json\(\{ ok: false \}, \{ status: 500 \}\);\s*\}/);
+  });
+});
 
 describe("owner billing actions SQL", () => {
   const sql = fs.readFileSync(path.join(__dirname, "../docs/supabase/owner_billing_actions.sql"), "utf8");

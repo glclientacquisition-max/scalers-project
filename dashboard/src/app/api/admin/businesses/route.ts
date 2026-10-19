@@ -17,6 +17,7 @@ import { requestOrigin, resetPasswordRedirectUrl } from "@/lib/authCallback";
 import { isAdminActionBlocked } from "@/lib/adminBusinessModel";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
+import { saveTenantRecordingRetentionOverride } from "@/lib/recordingRetentionAdmin";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function POST(request: Request) {
@@ -92,6 +93,22 @@ export async function POST(request: Request) {
     if (action === "transfer_owner") {
       await adminTransferOwnership(businessId, actor, String(body.user_id || ""));
       return NextResponse.json({ ok: true });
+    }
+
+    if (action === "save_recording_retention") {
+      const before = { recording_retention_days_override: body.before_override ?? null };
+      const value = await saveTenantRecordingRetentionOverride(
+        businessId,
+        body.recording_retention_days_override,
+      );
+      await recordAdminAction({
+        actor,
+        action: "save_recording_retention",
+        businessId,
+        before,
+        after: { recording_retention_days_override: value },
+      });
+      return NextResponse.json({ ok: true, recording_retention_days_override: value });
     }
 
     // No hard delete from Admin ("remove" and "delete_permanently" are gone).
