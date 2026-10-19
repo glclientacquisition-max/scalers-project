@@ -1,4 +1,5 @@
 import type { AdminBillingClientDetail, AdminBillingOverview } from "@/lib/adminBilling";
+import type { AdminInvoiceDetail, AdminInvoiceListRow, AttentionItem, BachsStatusView } from "@/lib/adminPayCopy";
 
 export const ADMIN_BILLING_DETAIL: AdminBillingClientDetail = {
   row: {
@@ -77,7 +78,18 @@ export const ADMIN_BILLING_DETAIL: AdminBillingClientDetail = {
     },
     gap: null,
   },
-  checkoutReviews: [],
+  checkoutReviews: [
+    {
+      provider: "bachs",
+      providerRef: "checkout-total-review:bachs:cs_demo:missing",
+      getKes: "1400",
+      seenKes: "1000",
+      reason: "collected_identity_missing",
+      invoiceId: "inv-demo",
+    },
+  ],
+  invoiceCount: 2,
+  livePayments: { available: true, enabled: false, beta: true },
 };
 
 export const ADMIN_BILLING_OVERVIEW: AdminBillingOverview = {
@@ -133,4 +145,146 @@ export const ADMIN_BILLING_OVERVIEW: AdminBillingOverview = {
       statusLabel: "Exhausted",
     },
   ],
+};
+
+export const ADMIN_ATTENTION: AttentionItem[] = [
+  {
+    id: "review:demo",
+    kind: "checkout_review",
+    title: "Collected amount has no receipt",
+    preview: "Sample Shop · Reading KSh 1400. Books show KSh 1000.",
+    when: "19 Oct, 09:12",
+    href: "/admin/businesses/biz-demo?money=1",
+    review: {
+      businessId: "biz-demo",
+      businessName: "Sample Shop",
+      providerRef: "checkout-total-review:bachs:cs_demo:missing",
+      getKes: "1400",
+      seenKes: "1000",
+      reason: "collected_identity_missing",
+      invoiceId: "inv-demo",
+    },
+  },
+  {
+    id: "pay:unmatched",
+    kind: "unmatched",
+    title: "Unmatched payment",
+    preview: "Kileleshwa Dental · KSh 2,000",
+    when: "19 Oct, 08:40",
+    href: "/admin/billing/invoices/inv-demo",
+    review: null,
+  },
+  {
+    id: "pay:partial",
+    kind: "partial",
+    title: "Partial payment",
+    preview: "Westlands Auto · KSh 500",
+    when: "18 Oct, 16:02",
+    href: "/admin/billing/invoices/inv-open",
+    review: null,
+  },
+  {
+    id: "held:1",
+    kind: "held",
+    title: "Checkout held",
+    preview: "Sample Shop · KSh 1,400",
+    when: "18 Oct, 11:20",
+    href: "/admin/billing/invoices/inv-demo",
+    review: null,
+  },
+  {
+    id: "retry:1",
+    kind: "retry",
+    title: "Payment read failed",
+    preview: "Waiting to read this checkout again",
+    when: "18 Oct, 10:05",
+    href: "/admin/billing/payments",
+    review: null,
+  },
+];
+
+export const ADMIN_INVOICES: AdminInvoiceListRow[] = [
+  {
+    id: "inv-demo",
+    number: "SCL-2026-000006",
+    businessId: "biz-demo",
+    businessName: "Sample Shop",
+    status: "open",
+    statusLabel: "Open",
+    tone: "attention",
+    total: "KSh 12,000",
+    paid: "KSh 1,000",
+    due: "Due 1 Nov 2026",
+    created: "12 Oct, 09:00",
+  },
+  {
+    id: "inv-paid",
+    number: "SCL-2026-000004",
+    businessId: "biz-2",
+    businessName: "Kileleshwa Dental",
+    status: "paid",
+    statusLabel: "Paid",
+    tone: "ok",
+    total: "KSh 5,000",
+    paid: "KSh 5,000",
+    due: "Due 1 Oct 2026",
+    created: "1 Oct, 08:00",
+  },
+  {
+    id: "inv-draft",
+    number: "Draft",
+    businessId: "biz-3",
+    businessName: "Westlands Auto",
+    status: "draft",
+    statusLabel: "Draft",
+    tone: "neutral",
+    total: "KSh 800",
+    paid: "KSh 0",
+    due: "No due date",
+    created: "18 Oct, 14:10",
+  },
+];
+
+export const ADMIN_INVOICE: AdminInvoiceDetail = {
+  id: "inv-demo",
+  number: "SCL-2026-000006",
+  businessId: "biz-demo",
+  businessName: "Sample Shop",
+  statusLabel: "Open",
+  tone: "attention",
+  total: "KSh 12,000",
+  paid: "KSh 1,000",
+  due: "Due 1 Nov 2026",
+  created: "12 Oct, 09:00",
+  warning: null,
+  lines: [
+    { id: "line-1", title: "Growth, October", preview: "1 × KSh 12,000" },
+  ],
+  payments: [
+    { id: "pay-1", title: "M-Pesa", preview: "KSh 1,000 · Matched", when: "12 Oct, 11:02" },
+  ],
+  attempts: [
+    { id: "att-1", title: "Checkout held", preview: "KSh 1,400 · Part 1 of 1", when: "18 Oct, 11:20" },
+  ],
+  receipts: [
+    { id: "rcpt-1", title: "Receipt", preview: "KSh 1,000", when: "12 Oct, 11:02" },
+  ],
+  audit: [
+    { id: "aud-1", title: "Checkout review", preview: "ada · Booked collected amount · Checked the receipt", when: "19 Oct, 09:20" },
+  ],
+};
+
+export const ADMIN_BACHS_STATUS: BachsStatusView = {
+  modeLabel: "Off",
+  liveSwitch: "Off",
+  keySet: "No",
+  webhookSecretSet: "No",
+  hosting: { modeOn: false, liveMasterOn: false, noticesOn: false, planChangeOn: true },
+  dbFlags: { available: true, packageEditorEnabled: true, signupTrialEnabled: false },
+  liveSummary: "None on the list. Environment list: 0.",
+  liveNames: [],
+  lastWebhook: "None yet",
+  webhooks24h: "0",
+  reconcileAvailable: true,
+  reconcile: [],
 };

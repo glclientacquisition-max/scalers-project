@@ -80,6 +80,10 @@ export function adminParentTarget(pathname: string): { href: string; label: stri
     }
   }
 
+  if (path.startsWith("/admin/billing/invoices/")) {
+    return { href: "/admin/billing/invoices", label: "Invoices" };
+  }
+
   const ranked = ADMIN_LINKS.filter((item) => item.href.startsWith("/admin/") && !item.pending).toSorted(
     (a, b) => b.href.length - a.href.length,
   );
