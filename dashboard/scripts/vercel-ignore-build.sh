@@ -19,13 +19,21 @@
 #     - cursor/staging-voice-468b: skip (only scalers-staging serves it).
 #     - other previews: build only if the commit range touches a Desk path.
 #
-# Desk paths: dashboard/ (the Next app, its own package.json and lockfile,
-# this script and dashboard/vercel.json). Nothing under dashboard/ imports
-# from outside it (checked 2026-10-08; next.config pins outputFileTracingRoot
-# and turbopack.root to dashboard/). Add a path to DESK_PATHS if that changes.
+# Desk paths:
+#   dashboard/  the Next app, its package.json and lockfile, this script,
+#               dashboard/vercel.json, and scripts/voice-modules.cjs (the list
+#               of voice entries the Desk bundles).
+#   src/        Voice modules. Since the assistant-say bridge (2026-10-19) the
+#               Desk server runs voice code: dashboard/scripts/sync-voice-modules.cjs
+#               copies the require closure of VOICE_ENTRIES from src/ into
+#               dashboard/.voice before `next build`. All of src/ is listed (a
+#               superset of that closure) so a voice-only change rebuilds the
+#               Desk preview instead of leaving it on stale voice code.
+# Anything else at the repo root (server.js, scripts/, docs/, tests/) does not
+# ship in the Desk. Add a path to DESK_PATHS if the Desk starts reading it.
 #
 # Env-only changes (e.g. a new Preview var) do not trigger a preview build:
-# this script skips when nothing under dashboard/ changed since the last built
+# this script skips when nothing under DESK_PATHS changed since the last built
 # SHA, and Vercel redeploys run it too. Push a commit touching dashboard/.
 #
 # Local dry run: VERCEL_PROJECT_ID=... VERCEL_ENV=preview \
@@ -37,7 +45,7 @@ set -u
 STAGING_PROJECT_ID="prj_koYxAaXjOZ9QYA7hVB2SUOEAmyoB"
 PRODUCTION_DESK_PROJECT_ID="prj_GYOgX3yjVowvQ1hd7D1c0AWOovpx"
 STAGING_BRANCH="cursor/staging-voice-468b"
-DESK_PATHS="dashboard/"
+DESK_PATHS="dashboard/ src/"
 
 project="${VERCEL_PROJECT_ID:-}"
 env_name="${VERCEL_ENV:-}"

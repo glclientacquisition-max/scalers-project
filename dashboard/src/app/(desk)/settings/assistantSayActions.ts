@@ -1,10 +1,9 @@
 "use server";
 
-import { createRequire } from "node:module";
-import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { memberCan } from "@/lib/requireMember";
 import { voiceProfileForAssistantSay } from "@/lib/assistantSayVoice.server";
+import { requireVoice } from "@/lib/voiceRequire.server";
 import { deskLookupPreview } from "@/lib/deskFeatureFlags";
 import { devChapterOneTenant } from "@/lib/devChapterOneTenant";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -63,8 +62,6 @@ export async function saveUnknownAnswerByKindAction(formData: FormData) {
   revalidatePath("/home");
   return { ok: true as const, byKind: parseUnknownAnswerByKind(payload) };
 }
-
-const requireVoice = createRequire(path.join(process.cwd(), "..", "package.json"));
 
 async function voiceProfileForPreview(tenant: TenantRow) {
   if (process.env.DASHBOARD_OPEN === "true") {
