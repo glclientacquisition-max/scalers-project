@@ -1,0 +1,186 @@
+{
+  "sourceCommit": "f6d7fee9",
+  "generatedAt": "2026-10-19",
+  "cases": [
+    {
+      "fixture": "paybill_with_account",
+      "queryId": "general_en",
+      "language": "en",
+      "query": "How do I pay?",
+      "status": "found",
+      "reason": "match",
+      "speech": "The M-Pesa paybill number is five four two five four two. The account is seven zero seven two two."
+    },
+    {
+      "fixture": "paybill_with_account",
+      "queryId": "general_sw",
+      "language": "sw",
+      "query": "Nalipaje?",
+      "status": "found",
+      "reason": "match",
+      "speech": "Namba ya namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
+    },
+    {
+      "fixture": "paybill_with_account",
+      "queryId": "mpesa_en",
+      "language": "en",
+      "query": "Do you take M-Pesa?",
+      "status": "found",
+      "reason": "match",
+      "speech": "The M-Pesa paybill number is five four two five four two. The account is seven zero seven two two."
+    },
+    {
+      "fixture": "paybill_with_account",
+      "queryId": "mpesa_sw",
+      "language": "sw",
+      "query": "Mnapokea M-Pesa?",
+      "status": "found",
+      "reason": "match",
+      "speech": "Namba ya namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
+    },
+    {
+      "fixture": "till",
+      "queryId": "general_en",
+      "language": "en",
+      "query": "How do I pay?",
+      "status": "found",
+      "reason": "match",
+      "speech": "The M-Pesa till number is one two three four five six."
+    },
+    {
+      "fixture": "till",
+      "queryId": "general_sw",
+      "language": "sw",
+      "query": "Nalipaje?",
+      "status": "found",
+      "reason": "match",
+      "speech": "Namba ya till ya M-Pesa ni moja mbili tatu nne tano sita."
+    },
+    {
+      "fixture": "till",
+      "queryId": "mpesa_en",
+      "language": "en",
+      "query": "Do you take M-Pesa?",
+      "status": "found",
+      "reason": "match",
+      "speech": "The M-Pesa till number is one two three four five six."
+    },
+    {
+      "fixture": "till",
+      "queryId": "mpesa_sw",
+      "language": "sw",
+      "query": "Mnapokea M-Pesa?",
+      "status": "found",
+      "reason": "match",
+      "speech": "Namba ya till ya M-Pesa ni moja mbili tatu nne tano sita."
+    },
+    {
+      "fixture": "pochi",
+      "queryId": "general_en",
+      "language": "en",
+      "query": "How do I pay?",
+      "status": "found",
+      "reason": "match",
+      "speech": "The Pochi la Biashara number is zero seven one two three four five six seven eight."
+    },
+    {
+      "fixture": "pochi",
+      "queryId": "general_sw",
+      "language": "sw",
+      "query": "Nalipaje?",
+      "status": "found",
+      "reason": "match",
+      "speech": "Namba ya namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
+    },
+    {
+      "fixture": "pochi",
+      "queryId": "mpesa_en",
+      "language": "en",
+      "query": "Do you take M-Pesa?",
+      "status": "found",
+      "reason": "match",
+      "speech": "The Pochi la Biashara number is zero seven one two three four five six seven eight."
+    },
+    {
+      "fixture": "pochi",
+      "queryId": "mpesa_sw",
+      "language": "sw",
+      "query": "Mnapokea M-Pesa?",
+      "status": "found",
+      "reason": "match",
+      "speech": "Namba ya namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
+    },
+    {
+      "fixture": "send_money",
+      "queryId": "general_en",
+      "language": "en",
+      "query": "How do I pay?",
+      "status": "found",
+      "reason": "match",
+      "speech": "The M-Pesa send money number is zero seven one two three four five six seven eight."
+    },
+    {
+      "fixture": "send_money",
+      "queryId": "general_sw",
+      "language": "sw",
+      "query": "Nalipaje?",
+      "status": "found",
+      "reason": "match",
+      "speech": "Namba ya namba ya kutuma pesa kwa M-Pesa ni sifuri saba moja mbili tatu nne tano sita saba nane."
+    },
+    {
+      "fixture": "send_money",
+      "queryId": "mpesa_en",
+      "language": "en",
+      "query": "Do you take M-Pesa?",
+      "status": "found",
+      "reason": "match",
+      "speech": "The M-Pesa send money number is zero seven one two three four five six seven eight."
+    },
+    {
+      "fixture": "send_money",
+      "queryId": "mpesa_sw",
+      "language": "sw",
+      "query": "Mnapokea M-Pesa?",
+      "status": "found",
+      "reason": "match",
+      "speech": "Namba ya namba ya kutuma pesa kwa M-Pesa ni sifuri saba moja mbili tatu nne tano sita saba nane."
+    },
+    {
+      "fixture": "airtel",
+      "queryId": "general_en",
+      "language": "en",
+      "query": "How do I pay?",
+      "status": "found",
+      "reason": "match",
+      "speech": "The Airtel Money number is zero seven three four five six seven eight nine zero."
+    },
+    {
+      "fixture": "airtel",
+      "queryId": "general_sw",
+      "language": "sw",
+      "query": "Nalipaje?",
+      "status": "found",
+      "reason": "match",
+      "speech": "Namba ya namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
+    },
+    {
+      "fixture": "airtel",
+      "queryId": "mpesa_en",
+      "language": "en",
+      "query": "Do you take M-Pesa?",
+      "status": "found",
+      "reason": "match",
+      "speech": "The Airtel Money number is zero seven three four five six seven eight nine zero."
+    },
+    {
+      "fixture": "airtel",
+      "queryId": "mpesa_sw",
+      "language": "sw",
+      "query": "Mnapokea M-Pesa?",
+      "status": "found",
+      "reason": "match",
+      "speech": "Namba ya namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
+    }
+  ]
+}

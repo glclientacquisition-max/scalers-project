@@ -887,6 +887,7 @@ function spokenPayMethodLine(pay, methodId) {
 }
 
 function payMethodLines(pay, filterKind) {
+  if (filterKind === 'mpesa') return [];
   const methods = payMethodIds(pay);
   const lines = [];
   for (const id of methods) {

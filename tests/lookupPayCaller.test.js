@@ -120,6 +120,21 @@ test('pay: cash plus blank till is cash only on general pay', () => {
   assert.equal(sw.speech, 'Unaweza kulipa kwa pesa taslimu.');
 });
 
+test('pay: cash plus blank till asked about M-Pesa uses the callback line', () => {
+  const row = confirmedPay({ methods: ['cash', 'mpesa_till'], mpesa_till: '' });
+  const cases = [
+    ['en', 'Do you take M-Pesa?'],
+    ['sw', 'Mnapokea M-Pesa?'],
+  ];
+  for (const [language, query] of cases) {
+    const hit = say('pay', query, row, language);
+    assert.equal(hit.result.status, 'no_data', query);
+    expectCallback(hit, language);
+    assert.doesNotMatch(hit.speech, /You can pay by cash/i);
+    assert.doesNotMatch(hit.speech, /pesa taslimu/i);
+  }
+});
+
 test('pay: bank-only general names bank without account digits', () => {
   const row = confirmedPay({
     methods: ['bank'],

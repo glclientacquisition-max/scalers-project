@@ -2,11 +2,16 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
 const { lookup, speechOf } = require('../src/knowledge/lookup');
-const { loadMainLookup } = require('./helpers/mainLookup');
 const { tenantProfileFromRow } = require('../src/tenantProfile');
 
 const NOW = new Date('2026-10-19T05:00:00.000Z');
+
+const SNAPSHOT = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'fixtures/lookupPayMainSpeech.json'), 'utf8'),
+);
 
 function payRow(payOverrides) {
   return {
@@ -23,78 +28,34 @@ function payRow(payOverrides) {
   };
 }
 
-function sayPay(lookupFn, query, row, language) {
+const FIXTURE_PAY = {
+  paybill_with_account: {
+    methods: ['mpesa_paybill'],
+    mpesa_paybill: { business_no: '542542', account_mode: 'fixed', account: '70722' },
+  },
+  till: { methods: ['mpesa_till'], mpesa_till: '123456' },
+  pochi: { methods: ['pochi'], pochi: { phone: '0712345678' } },
+  send_money: { methods: ['mpesa_send'], mpesa_send: { phone: '0712345678' } },
+  airtel: { methods: ['airtel'], airtel: { phone: '0734567890' } },
+};
+
+function sayPay(query, row, language) {
   const profile = tenantProfileFromRow(row);
-  const result = lookupFn('pay', query, { profile, language, now: NOW, seed: 0 });
-  return { result, speech: speechOf(result, language) };
+  const result = lookup('pay', query, { profile, language, now: NOW, seed: 0 });
+  return {
+    result,
+    speech: speechOf(result, language),
+  };
 }
 
-const MAIN_PARITY_FIXTURES = [
-  {
-    name: 'paybill with account',
-    pay: {
-      methods: ['mpesa_paybill'],
-      mpesa_paybill: { business_no: '542542', account_mode: 'fixed', account: '70722' },
-    },
-  },
-  {
-    name: 'till',
-    pay: { methods: ['mpesa_till'], mpesa_till: '123456' },
-  },
-  {
-    name: 'pochi',
-    pay: { methods: ['pochi'], pochi: { phone: '0712345678' } },
-  },
-  {
-    name: 'send money',
-    pay: { methods: ['mpesa_send'], mpesa_send: { phone: '0712345678' } },
-  },
-  {
-    name: 'airtel',
-    pay: { methods: ['airtel'], airtel: { phone: '0734567890' } },
-  },
-];
-
-const GENERAL_QUERIES = [
-  ['en', 'How do I pay?'],
-  ['sw', 'Nalipaje?'],
-];
-
-const MPESA_QUERIES = [
-  ['en', 'Do you take M-Pesa?'],
-  ['sw', 'Mnapokea M-Pesa?'],
-];
-
-test('pay: general questions match origin/main digit speech (EN and SW)', () => {
-  const main = loadMainLookup();
-  for (const fixture of MAIN_PARITY_FIXTURES) {
-    const row = payRow(fixture.pay);
-    for (const [language, query] of GENERAL_QUERIES) {
-      const mainHit = sayPay(main.lookup, query, row, language);
-      const branchHit = sayPay(lookup, query, row, language);
-      assert.equal(branchHit.result.status, 'found', `${fixture.name} ${language}`);
-      assert.equal(
-        branchHit.speech,
-        mainHit.speech,
-        `${fixture.name} ${language}: ${query}`,
-      );
-    }
-  }
-});
-
-test('pay: M-Pesa acceptance questions match origin/main when a number slot exists', () => {
-  const main = loadMainLookup();
-  for (const fixture of MAIN_PARITY_FIXTURES) {
-    const row = payRow(fixture.pay);
-    for (const [language, query] of MPESA_QUERIES) {
-      const mainHit = sayPay(main.lookup, query, row, language);
-      const branchHit = sayPay(lookup, query, row, language);
-      assert.equal(branchHit.result.status, 'found', `${fixture.name} ${language}`);
-      assert.equal(
-        branchHit.speech,
-        mainHit.speech,
-        `${fixture.name} ${language}: ${query}`,
-      );
-    }
+test('pay: numbered methods match frozen main speech snapshot (f6d7fee9)', () => {
+  for (const expected of SNAPSHOT.cases) {
+    const pay = FIXTURE_PAY[expected.fixture];
+    assert.ok(pay, `unknown fixture ${expected.fixture}`);
+    const row = payRow(pay);
+    const hit = sayPay(expected.query, row, expected.language);
+    assert.equal(hit.result.status, expected.status, `${expected.fixture} ${expected.queryId}`);
+    assert.equal(hit.result.reason, expected.reason, `${expected.fixture} ${expected.queryId} reason`);
+    assert.equal(hit.speech, expected.speech, `${expected.fixture} ${expected.queryId} speech`);
   }
 });
