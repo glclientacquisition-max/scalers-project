@@ -19,7 +19,7 @@ export default async function AdminBillingPage() {
 
   return (
     <div className="space-y-4">
-      <AdminPageHeader title="Billing" subtitle="Packages, minutes, and charges by business." />
+      <AdminPageHeader title="Billing" subtitle="Platform queue, mix, and minutes." />
       <AdminBillingListPanel overview={overview} />
     </div>
   );

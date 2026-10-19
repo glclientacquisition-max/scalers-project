@@ -23,6 +23,7 @@ const SELF_AUDITING = {
   adminTransferOwnership: "dashboard/src/lib/adminBusinessProfile.ts",
   // These call billing RPCs that insert into ops_audit_log themselves.
   grantTenantPackageMinutes: "rpc:grant_tenant_package_minutes",
+  resolveCheckoutTotalReview: "rpc:resolve_checkout_total_review",
   setTenantBillingMode: "rpc:set_tenant_billing_mode",
   confirmTenantBillingMode: "rpc:admin_set_tenant_billing_mode",
 };

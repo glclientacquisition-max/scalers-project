@@ -11,8 +11,10 @@ const copy = require("../dashboard/src/lib/adminBillingCopy.ts");
 const errors = require("../dashboard/src/lib/adminErrors.ts");
 
 const DETAIL = "dashboard/src/components/AdminBillingDetailPanel.tsx";
+const MONEY = "dashboard/src/components/AdminShopMoneyPanel.tsx";
 const LIST = "dashboard/src/components/AdminBillingListPanel.tsx";
 const PACKAGES = "dashboard/src/components/AdminPackagesPanel.tsx";
+const BILLING_REDIRECT = "dashboard/src/app/admin/(console)/billing/[tenantId]/page.tsx";
 const BILLING_API = "dashboard/src/app/api/admin/billing/route.ts";
 const PACKAGES_API = "dashboard/src/app/api/admin/packages/route.ts";
 
@@ -74,10 +76,10 @@ describe("admin billing: charging sheet label", () => {
     assert.equal(copy.chargingAction("off", "soft").label, "Start charging");
     assert.equal(copy.chargingAction("off", "soft").needsConfirm, true);
     assert.equal(copy.chargingAction("soft", "off").label, "Stop charging");
-    assert.equal(copy.chargingAction("soft", "hard").label, "Switch to On-demand hard");
-    const detail = read(DETAIL);
-    assert.doesNotMatch(detail, /mode === "off" \? "Stop charging"/);
-    assert.match(detail, /chargingStep\.label/);
+    assert.equal(copy.chargingAction("soft", "hard").label, "Switch to Charging · Block at cap");
+    const money = read(MONEY);
+    assert.doesNotMatch(money, /mode === "off" \? "Stop charging"/);
+    assert.match(money, /chargingStep\.label/);
   });
 });
 
@@ -107,7 +109,7 @@ describe("admin billing: plain history", () => {
       copy.billingAuditDetail({ action: "set_on_demand_usage", actor: "owner@x", detail: { before: { on_demand_usage_enabled: false }, after: { on_demand_usage_enabled: true } } }),
       "On-demand on",
     );
-    assert.equal(copy.billingAuditDetail({ action: "set_billing_mode", actor: "x", detail: { mode: "soft", note: "pilot" } }), "Now On-demand soft · pilot");
+    assert.equal(copy.billingAuditDetail({ action: "set_billing_mode", actor: "x", detail: { mode: "soft", note: "pilot" } }), "Now Charging · On-demand · pilot");
     assert.equal(copy.billingAuditDetail({ action: "grant_package_minutes", actor: "x", detail: { minutes_granted: 60, note: "comp" } }), "+60 min · comp");
     assert.equal(copy.ledgerKindLabel("call_charge"), "Call charge");
     assert.equal(copy.ledgerKindLabel("some_new_kind"), "Some new kind");
@@ -118,32 +120,38 @@ describe("admin billing: plain history", () => {
     assert.match(lib, /title: actionLabel\(row\.action\)/);
     assert.match(lib, /when: eatStamp\(row\.created_at\)/);
     assert.match(lib, /actor: row\.actor/);
-    const detail = read(DETAIL);
-    assert.doesNotMatch(detail, /entry\.kind|entry\.summary|toLocaleString\("en-KE"\)\} ·/);
-    assert.match(detail, /entry\.when, entry\.actor/);
+    const money = read(MONEY);
+    assert.doesNotMatch(money, /entry\.kind|entry\.summary|toLocaleString\("en-KE"\)\} ·/);
+    assert.match(money, /entry\.when, entry\.actor/);
   });
 });
 
-describe("admin billing: list at 390", () => {
-  it("shows rows as a list below sm and the table from sm up", () => {
+describe("admin billing: list queue", () => {
+  it("uses segmented filters, mix bar, and shop money links", () => {
     const list = read(LIST);
-    assert.match(list, /sm:hidden/);
-    assert.match(list, /hidden overflow-x-auto sm:block/);
-    assert.match(list, /<ListRow/);
+    assert.match(list, /<Segmented/);
+    assert.match(list, /MixBar|Beta vs charging mix/);
+    assert.match(list, /\/admin\/businesses\/\$\{.*\}\?money=1/);
     assert.match(list, /href="\/admin\/packages"/);
-    assert.doesNotMatch(list, /Edit SKUs|Observe every client/);
+    assert.doesNotMatch(list, /admin\/billing\/\$\{/);
   });
 });
 
 describe("admin billing: one assign path", () => {
-  it("Packages no longer assigns; rows open the business's Billing page", () => {
+  it("Packages no longer assigns; rows open shop Money", () => {
     const panel = read(PACKAGES);
     const api = read(PACKAGES_API);
     assert.doesNotMatch(api, /action === "assign"/);
     assert.doesNotMatch(api, /assignBusinessPackage/);
     assert.doesNotMatch(panel, /action: "assign"|openAssign|sheet === "assign"/);
-    assert.match(panel, /\/admin\/billing\/\$\{tenantId\}/);
+    assert.doesNotMatch(panel, /label: "Shops"/);
+    assert.match(panel, /\/admin\/businesses\/\$\{tenantId\}\?money=1/);
     assert.match(read(BILLING_API), /action === "assign_package"/);
+    assert.match(read(BILLING_API), /action === "unassign_package"/);
+    assert.match(read(BILLING_REDIRECT), /redirect\(/);
+    const money = read(MONEY);
+    assert.match(money, /unassign_package/);
+    assert.match(money, /Remove package/);
   });
 });
 
@@ -190,13 +198,39 @@ describe("admin billing: Change package confirm", () => {
   });
 
   it("the package sheet goes through a ConfirmSheet before assign_package", () => {
-    const detail = read(DETAIL);
-    assert.match(detail, /packageConfirmOpen/);
-    assert.match(detail, /Review change/);
-    assert.match(detail, /change\?\.lines\.map/);
-    const sheetFooter = detail.slice(detail.indexOf('title="Package"'), detail.indexOf('title="Charging"'));
+    const money = read(MONEY);
+    assert.match(money, /packageConfirmOpen/);
+    assert.match(money, /Review change/);
+    assert.match(money, /change\?\.lines\.map/);
+    const sheetFooter = money.slice(money.indexOf('title="Package"'), money.indexOf('title="Plan"'));
     assert.doesNotMatch(sheetFooter, /action: "assign_package"/);
-    assert.doesNotMatch(detail, /<dialog|role="dialog"|window\.confirm/);
+    assert.doesNotMatch(money, /<dialog|role="dialog"|window\.confirm/);
+  });
+});
+
+describe("admin billing: checkout review", () => {
+  it("resolves from a confirm with a typed reason and the session actor", () => {
+    const detail = read(DETAIL);
+    const api = read(BILLING_API);
+    assert.match(detail, /resolve_checkout_review/);
+    assert.match(detail, /title="Resolve checkout review"/);
+    assert.match(detail, /A new checkout stays closed until you book this reading or confirm nothing was collected\./);
+    assert.match(detail, /Book collected amount/);
+    assert.match(detail, /Nothing collected/);
+    assert.match(detail, /Confirm nothing collected/);
+    assert.match(detail, /Books the reading up to what is still due\. Anything over that is a credit\./);
+    assert.match(detail, /Leaves the books as they are\. A new checkout can then start for what is still due\./);
+    assert.match(detail, /choice: reviewChoice/);
+    assert.match(detail, /confirmDisabled=\{!reviewChoice \|\| reviewNote\.trim\(\)\.length < 3\}/);
+    assert.doesNotMatch(detail, /This does not move money/);
+    assert.doesNotMatch(detail, /actor:/);
+    assert.match(api, /action === "resolve_checkout_review"/);
+    assert.match(api, /choice !== "book" && choice !== "nothing"/);
+    assert.match(api, /bookTotalForResolve/);
+    assert.match(api, /paymentsClosed/);
+    assert.match(api, /adminActorName\(\)/);
+    assert.match(api, /resolveCheckoutTotalReview/);
+    assert.doesNotMatch(api, /body\.actor/);
   });
 });
 

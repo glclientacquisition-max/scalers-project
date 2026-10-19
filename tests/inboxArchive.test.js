@@ -125,14 +125,10 @@ describe("inbox archive folder and leave verbs", () => {
     const trailing = row.slice(row.indexOf("function InboxTrailingAction"), row.indexOf("export function InboxTableRow"));
     const verbs = read("dashboard/src/lib/inboxListVerbs.ts");
     assert.match(trailing, /inboxListDockRecipe\(item\)/);
-    assert.match(trailing, /CallLink/);
-    assert.match(trailing, /WhatsAppLink/);
-    assert.match(verbs, /if \(itemIsArchived\(item\)\) \{\s*return item.callerPhone \? "call_wa" : "none"/);
+    assert.doesNotMatch(trailing, /CallLink|WhatsAppLink/);
+    assert.match(verbs, /if \(itemIsArchived\(item\)\) return "none"/);
     assert.match(trailing, /recipe === "confirm" \|\| recipe === "visit_done"/);
     assert.match(trailing, /recipe === "hold_done"/);
-    const callWa = trailing.slice(trailing.indexOf('recipe === "call_wa"'));
-    assert.doesNotMatch(callWa, /InboxJobActions/);
-    assert.doesNotMatch(callWa, /RequestStatusToggle/);
   });
 
   it("keeps the Archived folder at 44px and restores the prior pile after search", () => {

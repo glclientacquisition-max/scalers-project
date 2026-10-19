@@ -1,113 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  chargingModeLabel,
-  type AdminBillingClientDetail,
-  type BillingHistoryEntry,
-} from "@/lib/adminBilling";
-import type { BillingMode } from "@/lib/adminWallets";
-import { adminTdClass } from "@/components/AdminIdentityList";
+import { type AdminBillingClientDetail } from "@/lib/adminBilling";
 import { Button } from "@/components/ui/Button";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
-import { btnGhost, deskFieldClass } from "@/components/ui/deskChrome";
-import { DeskSelect } from "@/components/ui/DeskSelect";
-import { Empty } from "@/components/ui/Empty";
 import { Field, Input } from "@/components/ui/Field";
-import { Sheet } from "@/components/ui/Sheet";
-import {
-  inboundKesPerMinute,
-  outboundKesPerMinute,
-} from "@/lib/packageCatalog";
-import { assignmentFromBusiness } from "@/lib/packagePriceLabel";
-import { usedOfIncluded } from "@/lib/packageUsageAlign";
-import { chargingAction, packageChange, requestErrorText } from "@/lib/adminBillingCopy";
+import { ListRow } from "@/components/ui/ListRow";
+import { Segmented } from "@/components/ui/Segmented";
+import { btnGhost } from "@/components/ui/deskChrome";
+import { AdminShopMoneyPanel } from "@/components/AdminShopMoneyPanel";
+import { requestErrorText } from "@/lib/adminBillingCopy";
 
-const MODE_OPTIONS: { value: BillingMode; label: string }[] = [
-  { value: "off", label: "Beta (free), meter only" },
-  { value: "soft", label: "On-demand soft" },
-  { value: "hard", label: "On-demand hard" },
-];
-
-type BillingTask = "package" | "charging" | "grant";
-
-function planConsequence(mode: BillingMode): string {
-  if (mode === "off") {
-    return "Beta: meter the package. On-demand is not charged.";
-  }
-  if (mode === "soft") {
-    return "On-demand past included is charged at the rate card when the business opted in. Calls still connect.";
-  }
-  return "On-demand past included is charged at the rate card when opted in. Inbound block is not wired yet.";
-}
-
-function SheetNote({ error }: { error: string | null }) {
-  if (!error) return null;
-  return (
-    <p className="pb-3 text-body text-attention" role="alert">
-      {error}
-    </p>
-  );
-}
-
-const sheetLabelClass = "mb-1.5 block text-meta font-medium text-ink";
-
+/** Dev fixture and legacy embed: shop Money rows plus checkout review when present. */
 export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClientDetail }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
-  const [task, setTask] = useState<BillingTask | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [chargeOpen, setChargeOpen] = useState(false);
-  const [savingCharge, setSavingCharge] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
-  const [packageConfirmOpen, setPackageConfirmOpen] = useState(false);
-  const [history, setHistory] = useState<BillingHistoryEntry[]>([]);
-  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [reviewRef, setReviewRef] = useState<string | null>(null);
+  const [reviewNote, setReviewNote] = useState("");
+  const [reviewChoice, setReviewChoice] = useState<"" | "book" | "nothing">("");
+  const [savingReview, setSavingReview] = useState(false);
 
-  const sub = detail.subscription;
-  const opening = assignmentFromBusiness(sub ?? undefined);
-  const [packageId, setPackageId] = useState(opening.packageId || detail.packages[0]?.id || "");
-  const [period, setPeriod] = useState<"month" | "year">(opening.period || "month");
-
-  const [grantMinutes, setGrantMinutes] = useState("60");
-  const [grantNote, setGrantNote] = useState("");
-  // One idempotency key per open Sheet: a double click or retry of the same
-  // grant replays instead of granting twice. A fresh key after success.
-  const [grantKey, setGrantKey] = useState(() => crypto.randomUUID());
-
-  const [mode, setMode] = useState<BillingMode>(detail.row.billing_enforcement);
-  const [modeNote, setModeNote] = useState(
-    detail.row.billing_enforcement === "off" ? detail.beta_notes || "Beta program" : `On-demand (${detail.row.billing_enforcement})`
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const res = await fetch(
-        `/api/admin/billing?history_for=${encodeURIComponent(detail.row.id)}`
-      );
-      const json = await res.json().catch(() => ({}));
-      if (cancelled || !res.ok) return;
-      setHistory(json.history || []);
-      setHistoryLoaded(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [detail.row.id]);
-
-  function openTask(next: BillingTask) {
+  async function post(body: Record<string, unknown>) {
     setError(null);
-    setStatus(null);
-    setTask(next);
-  }
-
-  async function post(body: Record<string, unknown>, okText: string) {
-    setError(null);
-    setStatus(null);
     const res = await fetch("/api/admin/billing", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -118,378 +35,126 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
       setError(requestErrorText(json));
       return false;
     }
-    setStatus(okText);
     startTransition(() => router.refresh());
-    const histRes = await fetch(
-      `/api/admin/billing?history_for=${encodeURIComponent(detail.row.id)}`
-    );
-    const histJson = await histRes.json().catch(() => ({}));
-    if (histRes.ok) setHistory(histJson.history || []);
     return true;
   }
 
-  async function submit(body: Record<string, unknown>, okText: string) {
-    setBusy(true);
-    const ok = await post(body, okText);
-    setBusy(false);
-    if (ok) setTask(null);
-    return ok;
-  }
-
-  async function submitCharging() {
-    if (chargingStep.disabled) return;
-    if (chargingStep.needsConfirm) {
-      setTask(null);
-      setChargeOpen(true);
-      return;
-    }
-    await submit(
-      {
-        action: "set_billing_mode",
-        business_id: row.id,
-        mode,
-        note: modeNote.trim(),
-      },
-      `Charging is now ${chargingModeLabel(mode)}.`
-    );
-  }
-
-  async function confirmPackage() {
-    setBusy(true);
+  async function confirmReview() {
+    if (!reviewRef || (reviewChoice !== "book" && reviewChoice !== "nothing") || reviewNote.trim().length < 3) return;
+    setSavingReview(true);
     const ok = await post(
       {
-        action: "assign_package",
-        business_id: row.id,
-        package_id: packageId,
-        period,
+        action: "resolve_checkout_review",
+        business_id: detail.row.id,
+        provider_ref: reviewRef,
+        note: reviewNote.trim(),
+        choice: reviewChoice,
       },
-      `Package is now ${chosenPackage?.name ?? "updated"}.`
     );
-    setBusy(false);
+    setSavingReview(false);
     if (ok) {
-      setPackageConfirmOpen(false);
-      setTask(null);
+      setReviewRef(null);
+      setReviewNote("");
+      setReviewChoice("");
     }
   }
-
-  async function confirmCharge() {
-    setSavingCharge(true);
-    await post(
-      {
-        action: "set_billing_mode",
-        business_id: detail.row.id,
-        mode,
-        note: modeNote.trim(),
-      },
-      `Charging is now ${chargingModeLabel(mode)}.`
-    );
-    setSavingCharge(false);
-    setChargeOpen(false);
-  }
-
-  const row = detail.row;
-  const rates = detail.rates;
-  const minutesLine = usedOfIncluded(row.minutesUsed, row.minutesIncluded);
-  const nowPackage = `Now ${sub?.packageName || "none"}${sub?.period ? ` / ${sub.period}` : ""}`;
-  const chargingStep = chargingAction(row.billing_enforcement, mode);
-  const chosenPackage = detail.packages.find((p) => p.id === packageId) ?? null;
-  const currentPackage = sub?.packageId ? detail.packages.find((p) => p.id === sub.packageId) ?? null : null;
-  const change = chosenPackage
-    ? packageChange({
-        current: currentPackage ? { ...currentPackage, period: sub?.period ?? null } : null,
-        next: chosenPackage,
-        period,
-        minutesIncluded: row.minutesIncluded,
-        minutesUsed: row.minutesUsed,
-      })
-    : null;
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link href="/admin/billing" className={btnGhost}>
-          All clients
+      <div className="flex flex-wrap items-center gap-3 px-4">
+        <Link href={`/admin/businesses/${detail.row.id}?money=1`} className={btnGhost}>
+          Open shop
         </Link>
-        <p className="text-meta text-ink-2">
-          {row.statusLabel} · {chargingModeLabel(row.billing_enforcement)}
-        </p>
+        <Link href="/admin/billing" className={btnGhost}>
+          Billing queue
+        </Link>
       </div>
 
       {error ? (
-        <p className="text-body text-warn" role="alert">
+        <p className="px-4 text-body text-attention" role="alert">
           {error}
         </p>
       ) : null}
-      {status ? (
-        <p className="text-body text-ok" role="status">
-          {status}
-        </p>
-      ) : null}
 
-      <section className="border-b border-hairline/70 pb-6">
-        <h2 className="text-title font-medium text-ink">Package</h2>
-        <p className="mt-1 text-body text-ink-2">{nowPackage}</p>
-        <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("package")}>
-          {sub?.packageId ? "Change package" : "Assign package"}
-        </Button>
-      </section>
-
-      <section className="border-b border-hairline/70 pb-6">
-        <h2 className="text-title font-medium text-ink">Usage</h2>
-        <p className="mt-2 text-body tabular-nums text-ink">
-          Minutes {minutesLine}
-          {sub
-            ? ` · SMS ${usedOfIncluded(sub.usage.smsUsed, sub.usage.smsIncluded)} · Email ${usedOfIncluded(sub.usage.emailUsed, sub.usage.emailIncluded)}`
-            : null}
-        </p>
-        <p className="mt-2 text-body text-ink-2">
-          On-demand rates (read-only): inbound KES {inboundKesPerMinute(rates.inboundKesPerSecond)}/min,
-          outbound KES {outboundKesPerMinute(rates.outboundKesPerSecond)}/min. Owner opted in:{" "}
-          {row.on_demand_usage_enabled ? "Yes" : "No"}.
-        </p>
-        {sub?.gap ? <p className="mt-2 text-body text-attention">{sub.gap}</p> : null}
-      </section>
-
-      <section className="border-b border-hairline/70 pb-6">
-        <h2 className="text-title font-medium text-ink">Charging</h2>
-        <p className="mt-1 text-body text-ink-2">{planConsequence(row.billing_enforcement)}</p>
-        <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("charging")}>
-          Change charging
-        </Button>
-      </section>
-
-      <section className="border-b border-hairline/70 pb-6">
-        <h2 className="text-title font-medium text-ink">Grant minutes</h2>
-        <p className="mt-1 text-body text-ink-2">
-          Adds to included minutes for this period.
-        </p>
-        <Button type="button" variant="tonal" className="mt-4" onClick={() => openTask("grant")}>
-          Grant minutes
-        </Button>
-      </section>
-
-      <section>
-        <h2 className="text-title font-medium text-ink">History</h2>
-        {!historyLoaded ? (
-          <p className="mt-2 text-body text-ink-2">Loading…</p>
-        ) : history.length === 0 ? (
-          <Empty title="No history yet." />
-        ) : (
-          <ul className="mt-4 divide-y divide-hairline/70">
-            {history.map((entry) => (
-              <li key={entry.id} className={`flex justify-between gap-3 py-2 text-body ${adminTdClass}`}>
-                <div className="min-w-0">
-                  <p className="font-medium text-ink">{entry.title}</p>
-                  {entry.detail ? <p className="break-words text-ink">{entry.detail}</p> : null}
-                  <p className="text-meta text-ink-2">
-                    {[entry.when, entry.actor].filter(Boolean).join(" · ")}
-                  </p>
-                </div>
-                {entry.amount_kes != null ? (
-                  <p className="shrink-0 tabular-nums text-ink">
-                    {entry.amount_kes > 0 ? "+" : ""}
-                    {entry.amount_kes.toLocaleString("en-KE")}
-                  </p>
-                ) : null}
-              </li>
+      {detail.checkoutReviews.length > 0 ? (
+        <section className="border-b border-hairline/70 pb-6">
+          <h2 className="px-4 text-title font-medium text-ink">Checkout review</h2>
+          <ul className="mt-2 divide-y divide-hairline">
+            {detail.checkoutReviews.map((review) => (
+              <ListRow
+                key={review.providerRef}
+                title="Checkout total"
+                preview={
+                  <span className="tabular-nums">
+                    Reading KSh {review.getKes}. Books show KSh {review.seenKes}.
+                  </span>
+                }
+                actions={
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="tonal"
+                    onClick={() => {
+                      setError(null);
+                      setReviewNote("");
+                      setReviewChoice("");
+                      setReviewRef(review.providerRef);
+                    }}
+                  >
+                    Resolve
+                  </Button>
+                }
+              />
             ))}
           </ul>
-        )}
+        </section>
+      ) : null}
+
+      <section className="space-y-1">
+        <h2 className="px-4 text-caption text-ink-3">Money</h2>
+        <ul className="divide-y divide-hairline">
+          <AdminShopMoneyPanel detail={detail} />
+        </ul>
       </section>
 
-      <Sheet
-        open={task === "package"}
-        onOpenChange={(next) => {
-          if (!next) setTask(null);
-        }}
-        title="Package"
-        description={nowPackage}
-        theme="admin"
-        footer={
-          <Button
-            type="button"
-            block
-            disabled={!change}
-            onClick={() => {
-              setError(null);
-              setTask(null);
-              setPackageConfirmOpen(true);
-            }}
-          >
-            Review change
-          </Button>
-        }
-      >
-        <SheetNote error={error} />
-        <div className="space-y-4">
-          <div>
-            <span className={sheetLabelClass}>Package</span>
-            <DeskSelect
-              aria-label="Package"
-              className={deskFieldClass}
-              portalThemeClass="admin-theme"
-              value={packageId}
-              onChange={setPackageId}
-              options={detail.packages
-                .filter((p) => p.isActive || p.id === packageId)
-                .map((p) => ({ value: p.id, label: p.name }))}
-            />
-          </div>
-          <div>
-            <span className={sheetLabelClass}>Period</span>
-            <DeskSelect
-              aria-label="Period"
-              className={deskFieldClass}
-              portalThemeClass="admin-theme"
-              value={period}
-              onChange={setPeriod}
-              options={[
-                { value: "month", label: "Month" },
-                { value: "year", label: "Year" },
-              ]}
-            />
-          </div>
-        </div>
-      </Sheet>
-
-      <Sheet
-        open={task === "charging"}
-        onOpenChange={(next) => {
-          if (!next) setTask(null);
-        }}
-        title="Charging"
-        description={`Now ${chargingModeLabel(row.billing_enforcement)}`}
-        theme="admin"
-        footer={
-          <Button
-            type="button"
-            block
-            pending={busy}
-            disabled={chargingStep.disabled || modeNote.trim().length < 3}
-            onClick={() => void submitCharging()}
-          >
-            {chargingStep.label}
-          </Button>
-        }
-      >
-        <SheetNote error={error} />
-        <div className="space-y-4">
-          <div>
-            <span className={sheetLabelClass}>Mode</span>
-            <DeskSelect
-              aria-label="Charging mode"
-              className={deskFieldClass}
-              portalThemeClass="admin-theme"
-              value={mode}
-              onChange={setMode}
-              options={MODE_OPTIONS}
-            />
-          </div>
-          <p className="text-meta text-ink-2">{planConsequence(mode)}</p>
-          <Field id="bill-mode-note" label="Reason" required>
-            {(props) => (
-              <Input {...props} value={modeNote} onChange={(e) => setModeNote(e.target.value)} />
-            )}
-          </Field>
-        </div>
-      </Sheet>
-
-      <Sheet
-        open={task === "grant"}
-        onOpenChange={(next) => {
-          if (!next) setTask(null);
-        }}
-        title="Grant minutes"
-        description="Adds to included minutes for this period."
-        theme="admin"
-        footer={
-          <Button
-            type="button"
-            block
-            pending={busy}
-            disabled={grantNote.trim().length < 3}
-            onClick={() =>
-              void submit(
-                {
-                  action: "grant_minutes",
-                  business_id: row.id,
-                  minutes: Math.floor(Number(grantMinutes)),
-                  note: grantNote.trim(),
-                  idempotency_key: grantKey,
-                },
-                "Minutes granted."
-              ).then((ok) => {
-                if (ok) setGrantKey(crypto.randomUUID());
-              })
-            }
-          >
-            Grant minutes
-          </Button>
-        }
-      >
-        <SheetNote error={error} />
-        <div className="space-y-4">
-          <Field id="bill-grant-minutes" label="Minutes" required>
-            {(props) => (
-              <Input
-                {...props}
-                type="number"
-                min={1}
-                inputMode="numeric"
-                className="tabular-nums"
-                value={grantMinutes}
-                onChange={(e) => setGrantMinutes(e.target.value)}
-              />
-            )}
-          </Field>
-          <Field id="bill-grant-note" label="Reason" required>
-            {(props) => (
-              <Input
-                {...props}
-                value={grantNote}
-                onChange={(e) => setGrantNote(e.target.value)}
-                placeholder="Comp for a dropped call"
-              />
-            )}
-          </Field>
-        </div>
-      </Sheet>
-
       <ConfirmSheet
-        open={chargeOpen}
+        open={reviewRef != null}
         theme="admin"
-        pending={savingCharge}
-        title="Start on-demand charging"
-        confirmLabel="Start charging"
+        pending={savingReview}
+        title="Resolve checkout review"
+        confirmLabel={
+          reviewChoice === "book"
+            ? "Book collected amount"
+            : reviewChoice === "nothing"
+              ? "Confirm nothing collected"
+              : "Resolve"
+        }
+        confirmDisabled={!reviewChoice || reviewNote.trim().length < 3}
         onClose={() => {
-          if (!savingCharge) setChargeOpen(false);
+          if (!savingReview) setReviewRef(null);
         }}
-        onConfirm={() => void confirmCharge()}
+        onConfirm={() => void confirmReview()}
       >
         <div className="space-y-3">
-          <p>Start on-demand charging for {row.business_name}.</p>
-          <p>{planConsequence(mode)}</p>
+          <p>A new checkout stays closed until you book this reading or confirm nothing was collected.</p>
+          <Segmented
+            label="Resolve choice"
+            items={[
+              { key: "book", label: "Book collected amount", active: reviewChoice === "book" },
+              { key: "nothing", label: "Nothing collected", active: reviewChoice === "nothing" },
+            ]}
+            onSelect={(key) => setReviewChoice(key === "nothing" ? "nothing" : "book")}
+          />
+          {reviewChoice === "book" ? (
+            <p>Books the reading up to what is still due. Anything over that is a credit.</p>
+          ) : null}
+          {reviewChoice === "nothing" ? (
+            <p>Leaves the books as they are. A new checkout can then start for what is still due.</p>
+          ) : null}
+          <Field id="bill-review-note" label="Reason" required>
+            {(props) => <Input {...props} value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} />}
+          </Field>
         </div>
-      </ConfirmSheet>
-
-      <ConfirmSheet
-        open={packageConfirmOpen && Boolean(change)}
-        theme="admin"
-        pending={busy}
-        title={change?.title ?? "Change package?"}
-        confirmLabel={change?.confirmLabel ?? "Change package"}
-        onClose={() => {
-          if (!busy) setPackageConfirmOpen(false);
-        }}
-        onConfirm={() => void confirmPackage()}
-      >
-        <SheetNote error={error} />
-        <p className="pb-3">{row.business_name}</p>
-        <ul className="list-disc space-y-2 pl-5">
-          {change?.lines.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
       </ConfirmSheet>
     </div>
   );
