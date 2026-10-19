@@ -111,22 +111,46 @@ function allowlistRaw(env = process.env) {
   return env === process.env ? process.env.BACHS_LIVE_TENANT_ALLOWLIST : env.BACHS_LIVE_TENANT_ALLOWLIST;
 }
 
+function tenantOnEnvAllowlist(tenantId, env = process.env) {
+  const raw = String(allowlistRaw(env) ?? "").trim();
+  if (raw === "*") return true;
+  if (!raw) return false;
+  const allowed = new Set(raw.split(",").map((part) => part.trim()).filter(Boolean));
+  return allowed.has(String(tenantId || "").trim());
+}
+
+function defaultLiveTenantRead(tenantId, env) {
+  const { readBillingLiveTenant } = require("./liveTenant");
+  return readBillingLiveTenant(tenantId, env);
+}
+
 /**
- * Live mode refuses every tenant unless BACHS_LIVE_TENANT_ALLOWLIST is `*`
- * or lists that tenant id. Unset, empty, and whitespace refuse everyone.
+ * Live mode refuses every tenant unless the master switch is on and the
+ * business is enabled in billing_live_tenants or listed in
+ * BACHS_LIVE_TENANT_ALLOWLIST (`*` opens every business).
+ * Unset, empty, and whitespace lists match nobody.
+ * A database read error refuses the business.
+ * The env list is checked first, so a listed business does not wait on the read.
  * Omitting env reads process.env. It does not skip the check.
  * @param {string} tenantId
  * @param {NodeJS.ProcessEnv} [env]
+ * @param {(tenantId: string, env: NodeJS.ProcessEnv) => Promise<boolean>} [reader]
+ * @returns {Promise<void>}
  */
-function assertLiveTenant(tenantId, env = process.env) {
+async function assertLiveTenant(tenantId, env = process.env, reader) {
   if (bachsMode(env) !== "live") return;
   assertBachsAllowed(env);
-  const raw = String(allowlistRaw(env) ?? "").trim();
-  if (raw === "*") return;
-  const allowed = new Set(raw.split(",").map((part) => part.trim()).filter(Boolean));
-  if (!raw || !allowed.has(String(tenantId || "").trim())) {
+  if (tenantOnEnvAllowlist(tenantId, env)) return;
+  const read = typeof reader === "function" ? reader : defaultLiveTenantRead;
+  let allowed = false;
+  try {
+    allowed = await read(String(tenantId || "").trim(), env);
+  } catch (err) {
+    if (err && err.code === "prod_refused") throw err;
     throw refused("live payments are not open for this business", "bachs_live_refused");
   }
+  if (allowed === true) return;
+  throw refused("live payments are not open for this business", "bachs_live_refused");
 }
 
 class MockPayProvider {

@@ -185,7 +185,7 @@ async function startInvoiceCheckout(input) {
     err.code = "not_payable";
     throw err;
   }
-  assertLiveTenant(lookup.tenantId, input.env);
+  await assertLiveTenant(lookup.tenantId, input.env, input.readLiveTenant);
   const next = nextPart(splitKes(lookup.totalKes), lookup.amountPaidKes);
   if (!next) {
     const err = new Error("nothing due");

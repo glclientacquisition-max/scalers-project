@@ -43,6 +43,8 @@ const ACTIONS: Record<string, string> = {
   move_package_version: "Moved to a version",
   set_tenant_billing_mode: "Changed billing mode",
   set_new_signup_trial: "Changed signup trial",
+  set_package_editor_enabled: "Changed package editor",
+  tenant_live_payments_set: "Changed live payments",
   set_price_approval_threshold: "Changed price approval",
   waive_overage: "Waived overage",
   save_voice: "Saved voice",

@@ -31,7 +31,13 @@ export default defineConfig({
         url: `${baseURL}/dev/kit`,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
-        env: { ...process.env, DASHBOARD_OPEN: "true" },
+        env: {
+          ...process.env,
+          DASHBOARD_OPEN: "true",
+          DESK_ASSISTANT_SAY_PAGE: "on",
+          VOICE_FALLBACK_BY_KIND: "on",
+          DESK_LOOKUP_PREVIEW: "on",
+        },
       },
   projects: [
     { name: "phone-360-light", use: { ...devices["Desktop Chrome"], viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, colorScheme: "light" } },

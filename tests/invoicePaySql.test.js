@@ -50,6 +50,8 @@ describe("invoice pay SQL", () => {
     await db.exec(read("docs/supabase/invoice_pay_checkout_review_round8.sql"));
     await db.exec(read("docs/supabase/invoice_pay_checkout_review_round9.sql"));
     await db.exec(read("docs/supabase/invoice_pay_checkout_review_round9.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_live_allowlist.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_live_allowlist.sql"));
   });
 
   it("refuses a draft number or status write unless billing_write is set", async () => {
@@ -1142,5 +1144,75 @@ describe("invoice pay SQL", () => {
       q("select public.resolve_checkout_total_review('bachs', 'checkout-total-review:bachs:chk_rise:x', 'ada', 'Checked the receipt', 'nothing')")
     );
     await q("reset role");
+  });
+
+  it("keeps live payments off for beta and records an enabled business", async () => {
+    const beta = "17171717-1717-4171-8171-171717171717";
+    const live = "27272727-2727-4272-8272-272727272727";
+    await q("select set_config('scalers.wallet_write', '1', false)");
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Beta Shop', 'pending:live-beta', 'off'), ($2, 'Live Shop', 'pending:live-on', 'soft')`,
+      [beta, live]
+    );
+    await q(
+      `insert into public.tenant_subscriptions (tenant_id, package_id, billing_status)
+       select $1, id, 'beta' from public.billing_packages where sku = 'starter'`,
+      [beta]
+    );
+    await q(
+      `insert into public.tenant_subscriptions (tenant_id, package_id, billing_status)
+       select $1, id, 'active' from public.billing_packages where sku = 'starter'`,
+      [live]
+    );
+    await assert.rejects(
+      q("select public.admin_set_tenant_live_payments($1, true, 'open it', 'ada')", [beta]),
+      /beta/
+    );
+    await assert.rejects(
+      q("select public.admin_set_tenant_live_payments($1, true, '   ', 'ada')", [live]),
+      /reason/
+    );
+    const { rows: before } = await q(
+      "select count(*)::int as n from public.billing_audit_log where action = 'tenant_live_payments_set'"
+    );
+    const set = await q(
+      "select public.admin_set_tenant_live_payments($1, true, 'Ready to collect', 'ada') as row",
+      [live]
+    );
+    assert.equal(set.rows[0].row.enabled, true);
+    const allowed = await q("select public.billing_live_tenant_allowed($1) as ok", [live]);
+    assert.equal(allowed.rows[0].ok, true);
+    const denied = await q("select public.billing_live_tenant_allowed($1) as ok", [beta]);
+    assert.equal(denied.rows[0].ok, false);
+    const audit = await q(
+      "select count(*)::int as n from public.billing_audit_log where action = 'tenant_live_payments_set' and tenant_id = $1",
+      [live]
+    );
+    assert.equal(audit.rows[0].n, before[0].n + 1);
+    await q("select public.admin_set_tenant_live_payments($1, false, 'Pause', 'ada')", [live]);
+    const off = await q("select public.billing_live_tenant_allowed($1) as ok", [live]);
+    assert.equal(off.rows[0].ok, false);
+    const empty = await q("select count(*)::int as n from public.billing_live_tenants where enabled");
+    assert.equal(empty.rows[0].n, 0);
+    const locked = await q(
+      `select c.relrowsecurity as rls,
+              has_table_privilege('anon', 'public.billing_live_tenants', 'select') as anon_select,
+              has_table_privilege('authenticated', 'public.billing_live_tenants', 'select') as auth_select,
+              has_table_privilege('service_role', 'public.billing_live_tenants', 'select') as service_select,
+              has_function_privilege('anon', 'public.billing_live_tenant_allowed(uuid)', 'execute') as anon_read,
+              has_function_privilege('anon', 'public.admin_set_tenant_live_payments(uuid,boolean,text,text)', 'execute') as anon_set,
+              has_function_privilege('service_role', 'public.admin_set_tenant_live_payments(uuid,boolean,text,text)', 'execute') as service_set
+       from pg_class c
+       join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public' and c.relname = 'billing_live_tenants'`
+    );
+    assert.equal(locked.rows[0].rls, true);
+    assert.equal(locked.rows[0].anon_select, false);
+    assert.equal(locked.rows[0].auth_select, false);
+    assert.equal(locked.rows[0].service_select, true);
+    assert.equal(locked.rows[0].anon_read, false);
+    assert.equal(locked.rows[0].anon_set, false);
+    assert.equal(locked.rows[0].service_set, true);
   });
 });

@@ -1,5 +1,5 @@
 import { ButtonLink } from "@/components/ui/Button";
-import { DataChecksCard } from "@/components/structured/DataChecksCard";
+import { OverviewDataChecksCard } from "@/components/structured/OverviewDataChecksCard";
 import { CallInsights } from "@/components/insights/CallInsights";
 import { loadCallInsights } from "@/lib/callInsightsLoad";
 import { dataChecksFor } from "@/components/structured/StructuredSettingsSlots";
@@ -67,6 +67,10 @@ import { homeMinuteStatus } from "@/lib/usageCap";
 import { createDeskTimer } from "@/lib/deskTiming";
 import { DeskPageGate } from "@/components/DeskPageGate";
 import { UNKNOWN_ANSWER_DEFAULT_EN } from "@/lib/unknownAnswerSpoken";
+import { deskAssistantSayPage, factSaveIsConfirm } from "@/lib/deskFeatureFlags";
+import { HomeGetReadyCallsCard } from "@/components/HomeGetReadyCallsCard";
+import { loadReadyChecklist } from "@/lib/assistantSayVoice.server";
+import { memberCan } from "@/lib/requireMember";
 
 export default function HomeOverviewPage() {
   return (
@@ -94,6 +98,15 @@ async function HomeOverviewBody() {
   const isBeta = isBetaBilling(tenant.billing_enforcement);
   const business = tenant.business_name?.trim() || "your workspace";
   const today = nairobiDateLabel();
+
+  const saveIsConfirm = factSaveIsConfirm();
+  const assistantSayPage = deskAssistantSayPage();
+  const canEditSettings = await memberCan("settings.edit");
+  const readyChecklist = assistantSayPage ? await loadReadyChecklist(tenant) : null;
+  const overviewChecks = dataChecksFor(tenant, {
+    saveIsConfirm,
+    readyItems: readyChecklist?.items,
+  });
 
   const readiness = assessMvpAnswerReadiness({
     businessName: tenant.business_name,
@@ -440,11 +453,20 @@ async function HomeOverviewBody() {
             status={callSetupStatus}
           />
         </RoleGate>
-        <DataChecksCard checks={dataChecksFor(tenant)} />
+        {assistantSayPage && readyChecklist && !readyChecklist.allDone ? (
+          <HomeGetReadyCallsCard
+            items={readyChecklist.items}
+            checks={overviewChecks}
+            canEdit={canEditSettings}
+          />
+        ) : null}
+        {!assistantSayPage && overviewChecks.length ? (
+          <OverviewDataChecksCard checks={overviewChecks} canEdit={canEditSettings} />
+        ) : null}
         {insights ? (
           <CallInsights insights={insights} />
         ) : null}
-        {score && line !== "live" ? (
+        {score && line !== "live" && !assistantSayPage ? (
           <HomeCapture
             tenantId={tenant.id}
             vertical={vertical}

@@ -43,9 +43,12 @@ describe("admin billing: readable errors", () => {
     const api = read(BILLING_API);
     assert.doesNotMatch(api, /business_id required|off\|soft\|hard|unknown action|min 3 chars/);
     assert.match(api, /adminFacingError\(err, SAVE_FAILED\)/);
-    const detail = read(DETAIL);
-    assert.doesNotMatch(detail, /json\.error \|\|/);
-    assert.match(detail, /requestErrorText\(json\)/);
+    const money = read(MONEY);
+    const resolve = read("dashboard/src/components/CheckoutReviewResolve.tsx");
+    assert.doesNotMatch(money, /json\.error \|\|/);
+    assert.doesNotMatch(resolve, /json\.error \|\|/);
+    assert.match(money, /requestErrorText\(json\)/);
+    assert.match(resolve, /requestErrorText\(json\)/);
   });
 });
 
@@ -137,6 +140,9 @@ describe("admin billing: list queue", () => {
     assert.match(list, /Pick a queue to see shops/);
     assert.match(list, /\/admin\/businesses\/\$\{.*\}\?money=1/);
     assert.match(list, /href="\/admin\/packages"/);
+    assert.match(list, /Needs attention/);
+    assert.match(list, /href="\/admin\/billing\/invoices"/);
+    assert.match(list, /href="\/admin\/billing\/payments"/);
     assert.doesNotMatch(list, /admin\/billing\/\$\{/);
   });
 });
@@ -214,20 +220,23 @@ describe("admin billing: Change package confirm", () => {
 
 describe("admin billing: checkout review", () => {
   it("resolves from a confirm with a typed reason and the session actor", () => {
-    const detail = read(DETAIL);
+    const resolve = read("dashboard/src/components/CheckoutReviewResolve.tsx");
+    const money = read(MONEY);
     const api = read(BILLING_API);
-    assert.match(detail, /resolve_checkout_review/);
-    assert.match(detail, /title="Resolve checkout review"/);
-    assert.match(detail, /A new checkout stays closed until you book this reading or confirm nothing was collected\./);
-    assert.match(detail, /Book collected amount/);
-    assert.match(detail, /Nothing collected/);
-    assert.match(detail, /Confirm nothing collected/);
-    assert.match(detail, /Books the reading up to what is still due\. Anything over that is a credit\./);
-    assert.match(detail, /Leaves the books as they are\. A new checkout can then start for what is still due\./);
-    assert.match(detail, /choice: reviewChoice/);
-    assert.match(detail, /confirmDisabled=\{!reviewChoice \|\| reviewNote\.trim\(\)\.length < 3\}/);
-    assert.doesNotMatch(detail, /This does not move money/);
-    assert.doesNotMatch(detail, /actor:/);
+    assert.match(money, /CheckoutReviewResolve/);
+    assert.match(read(LIST), /CheckoutReviewResolve/);
+    assert.match(resolve, /resolve_checkout_review/);
+    assert.match(resolve, /title="Resolve checkout review"/);
+    assert.match(resolve, /A new checkout stays closed until you book this reading or confirm nothing was collected\./);
+    assert.match(resolve, /Book collected amount/);
+    assert.match(resolve, /Nothing collected/);
+    assert.match(resolve, /Confirm nothing collected/);
+    assert.match(resolve, /Books the reading up to what is still due\. Anything over that is a credit\./);
+    assert.match(resolve, /Leaves the books as they are\. A new checkout can then start for what is still due\./);
+    assert.match(resolve, /choice: reviewChoice/);
+    assert.match(resolve, /confirmDisabled=\{!reviewChoice \|\| reviewNote\.trim\(\)\.length < 3\}/);
+    assert.doesNotMatch(resolve, /This does not move money/);
+    assert.doesNotMatch(resolve, /actor:/);
     assert.match(api, /action === "resolve_checkout_review"/);
     assert.match(api, /choice !== "book" && choice !== "nothing"/);
     assert.match(api, /bookTotalForResolve/);
@@ -240,7 +249,18 @@ describe("admin billing: checkout review", () => {
 
 describe("admin billing copy: no vendor names", () => {
   it("copy module and panels name no supplier or infra", () => {
-    for (const rel of ["dashboard/src/lib/adminBillingCopy.ts", DETAIL, LIST, PACKAGES]) {
+    for (const rel of [
+      "dashboard/src/lib/adminBillingCopy.ts",
+      "dashboard/src/lib/adminPayCopy.ts",
+      DETAIL,
+      LIST,
+      PACKAGES,
+      MONEY,
+      "dashboard/src/components/CheckoutReviewResolve.tsx",
+      "dashboard/src/components/AdminInvoiceList.tsx",
+      "dashboard/src/components/AdminInvoiceDetail.tsx",
+      "dashboard/src/components/AdminPaymentsStatus.tsx",
+    ]) {
       const src = read(rel).replace(/sautikit_virtual_number/g, "");
       assert.doesNotMatch(src, errors.VENDOR_OR_INFRA_PATTERN, rel);
     }

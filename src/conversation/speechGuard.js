@@ -297,6 +297,18 @@ function safeJson(value) {
   }
 }
 
+/**
+ * Profile text the place check may bind to. The raw tenants.service_areas blob
+ * (carried for lookup(), PR5) is left out: its JSON keys, e.g.
+ * "anywhere_kenya": false, would otherwise free "Kenya" as a listed place.
+ * Listed areas still bind through areaTerms / serviceAreas.
+ */
+function profilePlacesJson(profile) {
+  if (!profile || typeof profile !== 'object' || !('service_areas' in profile)) return safeJson(profile);
+  const { service_areas: _raw, ...rest } = profile;
+  return safeJson(rest);
+}
+
 /** Owner-fact text only. Seed prices and payment numbers are not speakable. */
 function profileFacts(profile) {
   return speechFactText(profile).replace(/\b\d{1,2}:\d{2}\b/g, ' ');
@@ -689,7 +701,7 @@ function guardSpokenReply(text, ctx = {}) {
   const holdOpenSlot = !saved && missing.length > 0;
   const allowedPlaces = [
     (Array.isArray(ctx.callerTurns) ? ctx.callerTurns : []).join(' '),
-    safeJson(ctx.profile),
+    profilePlacesJson(ctx.profile),
     safeJson(ctx.state?.entities || {}),
     String(ctx.extra || ''),
   ].join(' ');

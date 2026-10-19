@@ -18,6 +18,8 @@ import { billingAuditDetail, ledgerKindLabel } from "@/lib/adminBillingCopy";
 import { periodEndLabel } from "@/lib/billingStateModel";
 import { earliestPeriodEndLabel, periodEndWithinRolloverWindow } from "@/lib/adminBillingPeriod";
 import type { AdminBillingOverview, AdminBillingRow, AdminBillingStatus } from "@/lib/adminBillingTypes";
+import { reviewReasonFromRaw } from "@/lib/adminPayCopy";
+import { logAdminError, isMissingTableError } from "@/lib/adminErrors";
 
 export type { AdminBillingOverview, AdminBillingRow, AdminBillingStatus } from "@/lib/adminBillingTypes";
 
@@ -212,6 +214,8 @@ export type CheckoutReview = {
   providerRef: string;
   getKes: string;
   seenKes: string;
+  reason: string;
+  invoiceId: string | null;
 };
 
 export type AdminBillingClientDetail = {
@@ -221,6 +225,10 @@ export type AdminBillingClientDetail = {
   packages: BillingPackage[];
   subscription: TenantSubscriptionRow | null;
   checkoutReviews: CheckoutReview[];
+  /** Null when the invoice table could not be read. */
+  invoiceCount: number | null;
+  /** Live payment row for this business. Unavailable when the table cannot be read. */
+  livePayments: { available: boolean; enabled: boolean; beta: boolean };
 };
 
 function reviewText(raw: unknown, key: "get_kes" | "seen_kes"): string {
@@ -234,7 +242,7 @@ async function loadOpenCheckoutReviews(tenantId: string): Promise<CheckoutReview
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("payments")
-    .select("provider, provider_ref, raw")
+    .select("provider, provider_ref, raw, invoice_id")
     .eq("tenant_id", tenantId)
     .eq("match_status", "issue")
     .like("provider_ref", "checkout-total-review:%");
@@ -248,6 +256,8 @@ async function loadOpenCheckoutReviews(tenantId: string): Promise<CheckoutReview
       providerRef: String(row.provider_ref),
       getKes: reviewText(raw, "get_kes"),
       seenKes: reviewText(raw, "seen_kes"),
+      reason: reviewReasonFromRaw(raw),
+      invoiceId: row.invoice_id ? String(row.invoice_id) : null,
     }];
   });
 }
@@ -287,7 +297,51 @@ export async function loadAdminBillingClient(tenantId: string): Promise<AdminBil
     packages: catalog.packages,
     subscription,
     checkoutReviews: await loadOpenCheckoutReviews(tenantId),
+    invoiceCount: await countInvoices(tenantId),
+    livePayments: await loadLivePayments(tenantId, row.billing_enforcement),
   };
+}
+
+async function loadLivePayments(
+  tenantId: string,
+  enforcement: BillingMode,
+): Promise<AdminBillingClientDetail["livePayments"]> {
+  const admin = getSupabaseAdmin();
+  const sub = await admin
+    .from("tenant_subscriptions")
+    .select("billing_status")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  let beta = enforcement === "off";
+  if (!sub.error) {
+    const status = typeof sub.data?.billing_status === "string" ? sub.data.billing_status : "beta";
+    if (status === "beta") beta = true;
+  } else if (!isMissingTableError(sub.error)) {
+    logAdminError("billing-live-status", sub.error);
+  }
+
+  const live = await admin.from("billing_live_tenants").select("enabled").eq("tenant_id", tenantId).maybeSingle();
+  if (live.error) {
+    const missing =
+      isMissingTableError(live.error) || /column .+ does not exist/i.test(String(live.error.message || ""));
+    if (!missing) logAdminError("billing-live-tenant", live.error);
+    return { available: false, enabled: false, beta };
+  }
+  return { available: true, enabled: live.data?.enabled === true, beta };
+}
+
+async function countInvoices(tenantId: string): Promise<number | null> {
+  const admin = getSupabaseAdmin();
+  const { count, error } = await admin
+    .from("invoices")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId);
+  if (error) {
+    const missing = isMissingTableError(error) || /column .+ does not exist/i.test(String(error.message || ""));
+    if (!missing) logAdminError("billing-invoice-count", error);
+    return null;
+  }
+  return count ?? 0;
 }
 
 export async function loadCheckoutReviewReading(opts: {

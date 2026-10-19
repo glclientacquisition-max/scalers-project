@@ -44,7 +44,7 @@ async function totalForBookedResolve(
   const liveOpen = bachsMode() === "live" && !paymentsClosed();
   if (!liveOpen) return decidedBook(bookTotalForResolve({ live: false, storedKes: reading.getKes }));
   try {
-    assertLiveTenant(businessId);
+    await assertLiveTenant(businessId);
   } catch (err) {
     const code = err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code || "") : "";
     if (code === "bachs_live_refused") {

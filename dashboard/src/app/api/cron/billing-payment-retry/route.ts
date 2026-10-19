@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { retryStoredReads } from "@/lib/invoicePay/retryReads";
 import { invoicePayLedger } from "@/lib/invoicePay/ledger";
+import { billingCronAllows } from "@/lib/invoicePay/cronAuth";
 import { assertBachsAllowed, bachsMode, payProviderFromEnv } from "@/lib/invoicePay/provider";
 import { getSupabaseAdmin } from "@/lib/supabase";
+
+/** Bearer CRON_SECRET. An empty secret refuses every caller. */
+export function billingPaymentCronOk(header: string | null): boolean {
+  return billingCronAllows(header, process.env.CRON_SECRET || "");
+}
 
 /**
  * Retries stored unreadable Bachs reads. Vercel does not call this until a
@@ -11,9 +17,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
  * an allowlisted business. A closed gate does not call Bachs.
  */
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET || "";
-  const header = request.headers.get("authorization") || "";
-  if (!secret || header !== `Bearer ${secret}`) {
+  if (!billingPaymentCronOk(request.headers.get("authorization"))) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
