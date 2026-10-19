@@ -75,7 +75,7 @@ describe("admin desk standard shell", () => {
     assert.doesNotMatch(adminNav, /overflow-x-auto/);
     assert.doesNotMatch(adminNav, /w-\[4\.5rem\]/);
     assert.deepEqual(loadParents().phoneTabs, ["Today", "Businesses", "Quality", "Billing"]);
-    assert.deepEqual(loadParents().phoneMore, ["Numbers", "Platform", "Activity", "Settings"]);
+    assert.deepEqual(loadParents().phoneMore, ["Numbers", "Platform", "Activity", "Voices"]);
     assert.match(links, /safe-area-inset-top/);
     assert.equal(fs.existsSync(path.join(ROOT, "dashboard/src/app/(desk)/loading.tsx")), false);
     assert.equal(fs.existsSync(path.join(ROOT, "dashboard/src/app/admin/loading.tsx")), false);
@@ -93,7 +93,7 @@ describe("admin desk standard shell", () => {
     assert.equal(got.businesses, null);
     assert.deepEqual(got.nested, { href: "/admin/businesses", label: "Businesses" });
     assert.deepEqual(got.unknown, { href: "/admin", label: "Today" });
-    assert.deepEqual(got.query, { href: "/admin/voices", label: "Settings" });
+    assert.deepEqual(got.query, { href: "/admin/voices", label: "Voices" });
     assert.deepEqual(got.labels, [
       "Today",
       "Businesses",
@@ -102,7 +102,7 @@ describe("admin desk standard shell", () => {
       "Numbers",
       "Platform",
       "Activity",
-      "Settings",
+      "Voices",
     ]);
     assert.ok(!got.labels.includes("Ledger"));
     for (const label of got.labels) {

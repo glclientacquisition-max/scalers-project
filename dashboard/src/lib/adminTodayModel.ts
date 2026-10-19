@@ -90,7 +90,10 @@ export function todayNumberRows(counts: CallCounts, now: Date): TodayNumberRow[]
         }
       : { key, title, value: "", detail: missing, available: false, delta: null };
   return [
-    row("calls", "Calls today", counts.total, "Could not count calls."),
+    {
+      ...row("calls", "Calls today", counts.total, "Could not count calls."),
+      href: "/admin/quality",
+    },
     row("needs-human", "Needed a person", counts.needsHuman, "Call outcomes are not recorded here yet.", true),
     row("abandoned", "Caller hung up early", counts.abandoned, "Call outcomes are not recorded here yet.", true),
     {
@@ -127,6 +130,38 @@ export function statusSentence(signals: StatusSignal[]): { tone: "ok" | "attenti
 
 export type TodayQueueRow = { key: string; title: string; detail: string; href: string; stamp: string };
 
+export type TodayQueueGroup = { key: string; title: string; rows: TodayQueueRow[] };
+
+/** Shop detail. Never the list hash. */
+export function shopHref(id: string): string {
+  return `/admin/businesses/${id}`;
+}
+
+export function todayQueueGroups(rows: TodayQueueRow[]): TodayQueueGroup[] {
+  const buckets: Record<string, TodayQueueRow[]> = {
+    alert: [],
+    line: [],
+    package: [],
+    quality: [],
+    quiet: [],
+  };
+  for (const row of rows) {
+    if (row.stamp === "Open") buckets.alert.push(row);
+    else if (row.stamp === "Waiting" || row.stamp === "Stuck") buckets.line.push(row);
+    else if (row.stamp === "Package") buckets.package.push(row);
+    else if (row.stamp === "Dropping") buckets.quality.push(row);
+    else if (row.stamp === "Quiet") buckets.quiet.push(row);
+    else buckets.alert.push(row);
+  }
+  return [
+    { key: "alert", title: "Alerts", rows: buckets.alert },
+    { key: "line", title: "Line", rows: buckets.line },
+    { key: "package", title: "Package", rows: buckets.package },
+    { key: "quality", title: "Quality", rows: buckets.quality },
+    { key: "quiet", title: "Quiet", rows: buckets.quiet },
+  ].filter((group) => group.rows.length > 0);
+}
+
 export type TodayBusiness = {
   id: string;
   name: string;
@@ -161,7 +196,7 @@ export function todayQueue(input: {
   now: Date;
 }): TodayQueueRow[] {
   const { now } = input;
-  const href = (id: string) => `/admin/businesses#biz-${id}`;
+  const href = (id: string) => shopHref(id);
   const rows: TodayQueueRow[] = [...input.noticeRows];
 
   const waiting = input.businesses

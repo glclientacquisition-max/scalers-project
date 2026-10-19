@@ -19,7 +19,7 @@ export default async function AdminVoicesPage() {
 
   return (
     <div className="space-y-4">
-      <AdminPageHeader title="Settings" subtitle="Platform voice catalog." />
+      <AdminPageHeader title="Voices" subtitle="What the desk hears." />
       <AdminVoicesManager initialVoices={voices} />
     </div>
   );
