@@ -1,5 +1,6 @@
 const crypto = require("node:crypto");
 const { fromCents, nextPart, splitKes, toCents } = require("../dashboard/src/lib/invoicePay/money");
+const { bookTotalForReview } = require("../dashboard/src/lib/invoicePay/webhook");
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -513,22 +514,35 @@ function createMemoryLedger(opts = {}) {
       let appliedKes = "0";
       let excessKes = "0";
       if (!already && choice === "book") {
-        const stored = toCents(row.raw && row.raw.get_kes) || 0n;
-        const passed = input.totalKes == null || String(input.totalKes).trim() === "" ? null : toCents(input.totalKes);
-        if (passed != null && passed < stored) throw new Error("collected total fell");
         const checkoutId = row.raw && row.raw.checkout_id ? String(row.raw.checkout_id) : "";
         if (!checkoutId) throw new Error("pay attempt not found");
-        const totalKes = passed != null ? String(input.totalKes) : String(row.raw.get_kes);
+        const attempt = [...attempts].reverse().find(
+          (item) => item.checkoutSessionId === checkoutId && item.invoiceId === row.invoiceId
+        );
+        const decided = bookTotalForReview({
+          kind: row.raw && row.raw.review_kind,
+          getKes: row.raw && row.raw.get_kes,
+          seenKes: row.raw && row.raw.seen_kes,
+          eventKes: row.raw && row.raw.event_amount_kes,
+          priceKes: attempt && attempt.amountKes,
+          passedKes: input.totalKes,
+        });
+        if (!decided.ok) throw new Error(decided.error);
         const booked = applyCheckoutTotal({
           provider: input.provider,
           checkoutId,
-          totalKes,
+          totalKes: decided.totalKes,
           tenantId: row.tenantId,
           invoiceId: row.invoiceId,
           raw: (row.raw && row.raw.event) || {},
         });
         appliedKes = booked.appliedKes;
         excessKes = booked.excessKes;
+        if (decided.perEvent && attempt && row.raw && row.raw.identity) {
+          const ids = attempt.collectionIds || [];
+          const identity = String(row.raw.identity);
+          if (identity && !ids.includes(identity)) attempt.collectionIds = [...ids, identity];
+        }
       }
       row.raw = { ...(row.raw || {}), review_status: "resolved" };
       alerts.push({

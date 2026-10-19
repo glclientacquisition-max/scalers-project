@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { retryStoredReads } from "@/lib/invoicePay/retryReads";
+import { retryStoredReads, sweepOpenCheckouts } from "@/lib/invoicePay/retryReads";
 import { invoicePayLedger } from "@/lib/invoicePay/ledger";
 import { billingCronAllows } from "@/lib/invoicePay/cronAuth";
 import { assertBachsAllowed, bachsMode, payProviderFromEnv } from "@/lib/invoicePay/provider";
@@ -11,10 +11,10 @@ export function billingPaymentCronOk(header: string | null): boolean {
 }
 
 /**
- * Retries stored unreadable Bachs reads. Vercel does not call this until a
- * cron entry is added. The schedule, once enabled, is minute 7, 22, 37, and
- * 52 of every hour. Live mode settles only those stored events, and only for
- * an allowlisted business. A closed gate does not call Bachs.
+ * Live mode retries stored unreadable Bachs reads, then reads open checkouts
+ * and applies charge.amount_paid as the running total. The schedule is minute
+ * 7, 22, 37, and 52. An allowlisted business is the only one read. A closed
+ * gate does not call Bachs.
  */
 export async function GET(request: Request) {
   if (!billingPaymentCronOk(request.headers.get("authorization"))) {
@@ -44,6 +44,28 @@ export async function GET(request: Request) {
   const ledger = invoicePayLedger();
   const provider = payProviderFromEnv(env);
   try {
+    const sweep = await sweepOpenCheckouts({
+      env,
+      async listAttempts() {
+        const { data, error } = await admin
+          .from("payment_attempts")
+          .select("tenant_id, invoice_id, checkout_session_id, status")
+          .in("status", ["pending", "pending_unattached", "succeeded"])
+          .not("checkout_session_id", "is", null);
+        if (error) throw error;
+        return (data || []).map((row) => ({
+          tenantId: String(row.tenant_id),
+          invoiceId: String(row.invoice_id),
+          checkoutId: String(row.checkout_session_id),
+        }));
+      },
+      getCheckout(checkoutId) {
+        return provider.getCheckout(checkoutId);
+      },
+      settleTotal(input) {
+        return ledger.reconcileCheckoutTotal(input as Parameters<typeof ledger.reconcileCheckoutTotal>[0]);
+      },
+    });
     const result = await retryStoredReads({
       env,
       async listEvents() {
@@ -71,7 +93,11 @@ export async function GET(request: Request) {
         return ledger.settleCheckoutReading(input as Parameters<typeof ledger.settleCheckoutReading>[0]);
       },
     });
-    return NextResponse.json({ ok: true, retried: result.rows.length });
+    return NextResponse.json({
+      ok: true,
+      retried: result.rows.length,
+      swept: sweep.rows.length,
+    });
   } catch {
     return NextResponse.json({ ok: false }, { status: 500 });
   }

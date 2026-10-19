@@ -1,5 +1,5 @@
 #!/bin/bash
-# Throwaway local Postgres proof for the billing P1–P18 apply order.
+# Throwaway local Postgres proof for the billing P1–P19 apply order.
 # Never point this at Supabase. Production is refused by the script's database name.
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
@@ -57,6 +57,10 @@ echo "P18 billing_package_editor_flag.sql"
 $PSQL -d "$DB" -f docs/supabase/billing_package_editor_flag.sql
 $PSQL -d "$DB" -f docs/supabase/billing_package_editor_flag.sql
 $PSQL -d "$DB" -c "do \$\$ begin if to_regprocedure('public.admin_set_package_editor_enabled(boolean,text,text,boolean)') is null or position('_billing_audit' in pg_get_functiondef('public.admin_set_package_editor_enabled(boolean,text,text,boolean)'::regprocedure)) = 0 or position('_package_editor_open' in pg_get_functiondef('public.admin_set_package_editor_enabled(boolean,text,text,boolean)'::regprocedure)) > 0 or position('set_package_editor_enabled' in pg_get_functiondef('public.admin_set_package_editor_enabled(boolean,text,text,boolean)'::regprocedure)) = 0 then raise exception 'P18 did not land'; end if; end \$\$;"
+echo "P19 invoice_pay_amount_paid_either.sql"
+$PSQL -d "$DB" -f docs/supabase/invoice_pay_amount_paid_either.sql
+$PSQL -d "$DB" -f docs/supabase/invoice_pay_amount_paid_either.sql
+$PSQL -d "$DB" -c "do \$\$ begin if position('v_per_event' in pg_get_functiondef('public.resolve_checkout_total_review(text,text,text,text,text,numeric)'::regprocedure)) = 0 or position('short_rise' in pg_get_functiondef('public.resolve_checkout_total_review(text,text,text,text,text,numeric)'::regprocedure)) = 0 then raise exception 'P19 did not land'; end if; end \$\$;"
 echo "proof"
 $PSQL -d "$DB" -f tests/sql/billing_apply_order/proof.sql
 echo "re-apply P1 finalize installer after P8"
