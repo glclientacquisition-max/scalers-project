@@ -1,6 +1,8 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { normalizeRole, type Role } from "@/lib/permissions";
 import { seatSummary, type SeatSummary } from "@/lib/invites";
+import { loadPinnedSeatOffer } from "@/lib/ownerPlanLoad";
+import type { SeatOffer } from "@/lib/planPricing";
 import { INVITES_PAGE, MEMBERS_PAGE, pageLimit } from "@/lib/teamLimits";
 
 export type MemberView = { userId: string; email: string; name: string; role: Role; joinedAt: string };
@@ -11,6 +13,8 @@ export type MembersData = {
   seats: SeatSummary;
   totals: { members: number; invites: number };
   limits: { members: number; invites: number };
+  /** Null when the pinned version has no extra-seat price, or the business is not on an active plan. */
+  seatOffer: SeatOffer | null;
 };
 
 type DirRow = { user_id: string; role: string; created_at: string; email: string | null; name: string | null; total: number };
@@ -59,12 +63,14 @@ export async function loadMembers(
   const inviteTotal = Number(iRes.count ?? invites.length);
   const included = Number((tRes.data as { seat_included?: number } | null)?.seat_included ?? 0);
   const pendingStub = Array.from({ length: inviteTotal }, () => ({ status: "pending", expires_at: "9999-12-31T00:00:00Z" }));
+  const seatOffer = await loadPinnedSeatOffer(admin, tenantId).catch(() => null);
   return {
     members,
     invites,
     seats: seatSummary({ members: memberTotal, invites: pendingStub, included }),
     totals: { members: memberTotal, invites: inviteTotal },
     limits: { members: memberLimit, invites: inviteLimit },
+    seatOffer,
   };
 }
 

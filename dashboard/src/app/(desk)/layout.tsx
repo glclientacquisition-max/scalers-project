@@ -4,6 +4,8 @@ import { can, hiddenDeskHrefs } from "@/lib/permissions";
 import { DeskRoleProvider, ViewOnlyBanner } from "@/components/DeskRole";
 import { WorkspaceClosed } from "@/components/WorkspaceClosed";
 import { LinePausedBanner } from "@/components/LinePausedBanner";
+import { DeskBillingBanner } from "@/components/DeskBillingBanner";
+import { loadDeskBillingBanner } from "@/lib/ownerPlanLoad";
 import { WorkspaceNotReady } from "@/components/WorkspaceNotReady";
 import { redirect } from "next/navigation";
 import { DeskAccountBar } from "@/components/DeskAccountBar";
@@ -23,6 +25,12 @@ import { getDeskShellTenant } from "@/lib/tenant";
 
 // instant = false: owner cookie session must run before chrome. Do not wrap the gate in Suspense.
 export const instant = false;
+
+async function DeskBillingBannerLive({ tenantId }: { tenantId: string }) {
+  const banner = await loadDeskBillingBanner(tenantId);
+  if (!banner) return null;
+  return <DeskBillingBanner banner={banner} />;
+}
 
 async function DeskNeedsCountLive({
   tenantId,
@@ -95,6 +103,11 @@ export default async function AppShell({ children }: { children: React.ReactNode
           <DeskOffline />
           <ViewOnlyBanner />
           {tenant?.linePaused ? <LinePausedBanner /> : null}
+          {tenant ? (
+            <Suspense fallback={null}>
+              <DeskBillingBannerLive tenantId={tenant.id} />
+            </Suspense>
+          ) : null}
           <main data-desk-main="" className={deskMainClass}>
             <Suspense fallback={null}>
               <DeskPhonePull />

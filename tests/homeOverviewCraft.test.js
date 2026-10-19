@@ -95,8 +95,10 @@ describe("home overview craft", () => {
   it("splits the aside into Today, Line, and Usage sections", () => {
     assert.match(page, /aria-label="Today"/);
     assert.match(page, /aria-label="Line"/);
-    assert.match(page, /aria-label="Usage"/);
-    assert.match(page, /min left/);
+    const usage = read("dashboard/src/components/HomeUsageSection.tsx");
+    assert.match(page, /<HomeUsageSection/);
+    assert.match(usage, /aria-label="Usage"/);
+    assert.match(usage, /min left/);
     assert.match(page, /loadOwnerPackageMeter/);
     assert.doesNotMatch(page, /Top up/);
     assert.doesNotMatch(page, /KES \{kes\.toLocaleString/);

@@ -3,48 +3,31 @@ import { memberCan } from "@/lib/requireMember";
 import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
 import { getCurrentTenant, createWorkspaceDataClient } from "@/lib/tenant";
 import { getTenantUsageSummary } from "@/lib/wallet";
-import { inboundKesPerMinute, loadOwnerPackageMeter } from "@/lib/packageCatalog";
-import { loadOwnerBillingView } from "@/lib/billingStateLoad";
-import { ownerBillingView, presentFreeBeta } from "@/lib/billingStateModel";
+import { loadUsageBillingExtras } from "@/lib/ownerPlanLoad";
+import { formatKsh } from "@/lib/planPricing";
+import { loadOwnerUsageView } from "@/lib/ownerUsageLoad";
+import { messageCreditsUsage } from "@/lib/messageCredits";
+import { planEntry } from "@/lib/planEntry";
 import { createDeskTimer } from "@/lib/deskTiming";
 import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
+import { UsageSummary, type UsageListRow } from "@/components/plan/UsageSummary";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { Pagination } from "@/components/ui/Pagination";
-import { deskListTitleClass, deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
+import { deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
 import { clampListPage, DEFAULT_PAGE_SIZE } from "@/lib/listPage";
 
 import { DeskPageGate } from "@/components/DeskPageGate";
 
 function kindLabel(kind: string): string {
   if (kind === "call_charge") return "Call";
-  if (kind === "sms_charge") return "SMS";
+  if (kind === "sms_charge") return "Message";
   if (kind === "line_rental") return "Line fee";
   if (kind === "admin_adjustment") return "Adjustment";
   if (kind === "topup") return "Top-up";
   if (kind === "trial_credit") return "Trial credit";
   return kind;
-}
-
-function count(n: number): string {
-  return n.toLocaleString("en-KE");
-}
-
-function kes(n: number): string {
-  return n.toLocaleString("en-KE", { maximumFractionDigits: 2 });
-}
-
-function nairobiWhen(iso: string): string {
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return iso;
-  return at.toLocaleString("en-KE", {
-    timeZone: "Africa/Nairobi",
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-  });
 }
 
 type WalletPageProps = {
@@ -75,10 +58,11 @@ async function WalletBody({ searchParams }: WalletPageProps) {
 
   const timer = createDeskTimer();
   let usage;
-  let billing;
-  let pack;
+  let view;
+  let extras;
+  let canChangePlan = false;
   try {
-    [usage, billing, pack] = await Promise.all([
+    [usage, view, extras, canChangePlan] = await Promise.all([
       getTenantUsageSummary(workspace.client, tenant.id, {
         ledgerPage: page,
         ledgerPageSize: DEFAULT_PAGE_SIZE,
@@ -88,8 +72,9 @@ async function WalletBody({ searchParams }: WalletPageProps) {
         // The Usage page reads minutes from tenant_billing_state, not from call rows.
         skipCallRows: true,
       }),
-      loadOwnerBillingView(tenant.id),
-      loadOwnerPackageMeter(tenant.id),
+      loadOwnerUsageView(tenant),
+      loadUsageBillingExtras(tenant.id),
+      memberCan("billing.manage"),
     ]);
   } catch {
     return <DeskLoadError>Could not load Usage.</DeskLoadError>;
@@ -97,160 +82,49 @@ async function WalletBody({ searchParams }: WalletPageProps) {
   timer.mark("data");
   console.info(timer.line("usage"));
 
-  // Before tenant_billing_state exists: same wording from the tenant counters.
-  const view = presentFreeBeta(
-    billing ||
-    ownerBillingView({
-      state: pack.packageName
-        ? {
-            package_state: "active",
-            package_name: pack.packageName,
-            included_minutes: pack.minutesIncluded,
-            used_minutes: pack.minutesUsed,
-            sms_included: pack.smsIncluded,
-            sms_used: pack.smsUsed,
-            on_demand_enabled: Boolean(tenant.on_demand_usage_enabled),
-            mode_label: usage.isBeta ? "beta" : tenant.on_demand_usage_enabled ? "metered" : "capped",
-          }
-        : null,
-      isBeta: usage.isBeta,
-      monthlyPriceKes: null,
-      smsMessages: null,
-      seatsIncluded: pack.seatsIncluded,
-      seatsUsed: pack.seatsUsed,
-      alerts: {
-        email: { included: pack.emailIncluded, used: pack.emailUsed },
-        whatsapp: { included: pack.waIncluded, used: pack.waUsed },
-      },
-    }),
-    usage.isBeta,
-  );
-
   const safePage = clampListPage(page, usage.ledgerTotal, DEFAULT_PAGE_SIZE);
   if (safePage !== page) {
     redirect(safePage > 1 ? `/wallet?page=${safePage}` : "/wallet");
   }
 
-  const inboundMin = inboundKesPerMinute(pack.rates.inboundKesPerSecond);
-  const minutesLeft = view.minutesLeft;
-  const minuteMax = Math.max(0, view.minutesIncluded);
-  const minuteLeftPct = minuteMax > 0 ? Math.min(100, Math.round((minutesLeft / minuteMax) * 100)) : 0;
-  const minutesUsed = view.rows.find((row) => row.key === "minutes")?.used ?? 0;
-  const freeBeta = view.mode === "none";
+  const seatsRow = view.rows.find((row) => row.key === "seats");
+  const seats: UsageListRow | null =
+    seatsRow && seatsRow.included > 0
+      ? { key: "seats", label: "Seats", included: seatsRow.included, used: seatsRow.used, left: seatsRow.left }
+      : null;
+  const creditUsage = messageCreditsUsage(extras.messageCredits, extras.creditBurns, view.messageUse);
+  const credits: UsageListRow | null = creditUsage ? { key: "credits", label: "Message credits", ...creditUsage } : null;
+  const planLine =
+    extras.freeBeta || extras.monthlyPriceKes == null
+      ? null
+      : `${view.packageName ? `${view.packageName} · ` : ""}${formatKsh(extras.monthlyPriceKes)} a month`;
+  const entry = planEntry(extras.billingStatus, canChangePlan);
+  const showActivity = !extras.freeBeta && usage.recentLedger.length > 0;
 
   return (
-    <div className="max-w-3xl">
-      <header>
-        <h1 className={deskListTitleClass}>Usage</h1>
-        <p className="mt-2 text-body text-ink-2">{view.headline}</p>
-      </header>
-
-      {view.lowNotice ? (
-        <p
-          role="status"
-          className="mt-4 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-body text-warn"
-        >
-          {view.lowNotice}
-        </p>
-      ) : null}
-
-      <section className="mt-6 rounded-2xl border border-hairline bg-surface p-5">
-        <p className="text-body text-ink-2">
-          {freeBeta ? "Minutes used" : `Minutes left${view.periodEndLabel ? ` until ${view.periodEndLabel}` : ""}`}
-        </p>
-        <p className="mt-1 font-display text-display tabular-nums text-ink">
-          {count(freeBeta ? minutesUsed : minutesLeft)}
-        </p>
-        {freeBeta ? null : minuteMax > 0 ? (
-          <div
-            className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2"
-            role="meter"
-            aria-label="Minutes left"
-            aria-valuemin={0}
-            aria-valuemax={minuteMax}
-            aria-valuenow={minutesLeft}
-          >
-            <div className="h-full bg-accent" style={{ width: `${minuteLeftPct}%` }} />
-          </div>
-        ) : (
-          <p className="mt-2 text-body text-ink-2">No package minutes</p>
-        )}
-
-        {freeBeta ? (
-          <ul className="mt-6 space-y-2">
-            {view.rows.filter((row) => row.used > 0).map((row) => (
-              <li key={row.key} className="flex items-baseline justify-between gap-3 text-body text-ink">
-                <span>{row.label}</span>
-                <span className="tabular-nums">{count(row.used)} used</span>
-              </li>
-            ))}
-          </ul>
-        ) : <table className="mt-6 w-full text-left text-body">
-          <caption className="sr-only">What your package includes this month</caption>
-          <thead className="border-b border-hairline text-ink-2">
-            <tr>
-              <th scope="col" className="py-2 pr-3 font-medium">This month</th>
-              <th scope="col" className="px-2 py-2 text-right font-medium">Included</th>
-              <th scope="col" className="px-2 py-2 text-right font-medium">Used</th>
-              <th scope="col" className="py-2 pl-2 text-right font-medium">Left</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.rows.map((row) => (
-              <tr key={row.key} className="border-b border-hairline">
-                <th scope="row" className="py-3 pr-3 font-normal text-ink">
-                  {row.label}
-                  {row.note ? <span className="block text-meta text-ink-2">{row.note}</span> : null}
-                </th>
-                <td className="px-2 py-3 text-right tabular-nums text-ink-2">{count(row.included)}</td>
-                <td className="px-2 py-3 text-right tabular-nums text-ink-2">{count(row.used)}</td>
-                <td className="py-3 pl-2 text-right font-medium tabular-nums text-ink">{count(row.left)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>}
-      </section>
-
-      <div className="mt-6">
+    <UsageSummary
+      minutesLeft={view.minutesLeft}
+      minutesIncluded={view.minutesIncluded}
+      minutesUsed={view.minutesUsed}
+      minutesUnderOne={view.minutesUnderOne}
+      minutesOverLabel={view.minutesOverLabel}
+      periodEndLabel={view.periodEndLabel}
+      beta={extras.freeBeta}
+      planLine={planLine}
+      entry={entry}
+      seats={seats}
+      credits={credits}
+    >
+      {extras.freeBeta || extras.onDemandLocked ? null : (
         <OnDemandUsagePanel
           tenantId={tenant.id}
           enabled={Boolean(tenant.on_demand_usage_enabled)}
-          hint={view.onDemandHint}
+          extraMinuteKes={extras.inboundPerMinuteKes}
         />
-      </div>
-
-      <section className="mt-6 rounded-2xl border border-hairline bg-surface p-5">
-        <h2 className="font-display text-title tracking-tight text-ink">{view.ratesTitle}</h2>
-        <table className="mt-3 w-full text-left text-body">
-          <caption className="sr-only">{view.ratesTitle}</caption>
-          <tbody>
-            <tr className="border-b border-hairline">
-              <th scope="row" className="py-3 pr-3 font-normal text-ink">Calls</th>
-              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(inboundMin)} a minute</td>
-            </tr>
-            <tr className="border-b border-hairline">
-              <th scope="row" className="py-3 pr-3 font-normal text-ink">SMS</th>
-              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(pack.rates.smsKes)} a credit</td>
-            </tr>
-            <tr className="border-b border-hairline">
-              <th scope="row" className="py-3 pr-3 font-normal text-ink">Email</th>
-              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(pack.rates.emailKes)}</td>
-            </tr>
-            <tr className="border-b border-hairline">
-              <th scope="row" className="py-3 pr-3 font-normal text-ink">WhatsApp</th>
-              <td className="py-3 text-right tabular-nums text-ink">KSh {kes(pack.rates.whatsappKes)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-
-      <section className="mt-6 overflow-hidden rounded-2xl border border-hairline bg-surface">
+      )}
+      {showActivity ? (
+      <section className="overflow-hidden rounded-2xl border border-hairline bg-surface">
         <h2 className="px-4 pt-4 font-display text-title tracking-tight text-ink">Activity</h2>
-        {usage.recentLedger.length === 0 ? (
-          <p className="px-4 py-3 text-body text-ink-2">
-            {usage.isBeta ? "Nothing charged during beta." : "No charges yet."}
-          </p>
-        ) : (
           <table className="mt-2 w-full text-left text-body">
             <thead className="border-b border-hairline text-ink-2">
               <tr>
@@ -274,7 +148,7 @@ async function WalletBody({ searchParams }: WalletPageProps) {
                 return (
                   <tr key={row.id} className="border-t border-hairline/70">
                     <td className="whitespace-nowrap px-4 py-2 text-ink-2">
-                      {nairobiWhen(row.created_at)}
+                      {new Date(row.created_at).toLocaleString("en-KE")}
                     </td>
                     <td className={`${deskPreviewCellClass} px-4 py-2`}>
                       <p className={deskPreviewClass}>
@@ -295,7 +169,6 @@ async function WalletBody({ searchParams }: WalletPageProps) {
               })}
             </tbody>
           </table>
-        )}
         {usage.ledgerTotal > 0 ? (
           <div className="px-4 pb-4">
             <Pagination
@@ -307,6 +180,7 @@ async function WalletBody({ searchParams }: WalletPageProps) {
           </div>
         ) : null}
       </section>
-    </div>
+      ) : null}
+    </UsageSummary>
   );
 }

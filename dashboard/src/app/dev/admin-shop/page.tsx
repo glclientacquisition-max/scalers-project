@@ -47,6 +47,7 @@ const PEOPLE: PeopleData = {
   seats: { used: 3, included: 5, full: false, members: 2, pending: 1 },
   totals: { members: 2, invites: 1 },
   limits: { members: 25, invites: 10 },
+  seatOffer: null,
 };
 
 /** Shop hub fixture for visual review. DASHBOARD_OPEN=true only. */
