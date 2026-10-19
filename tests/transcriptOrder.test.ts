@@ -25,6 +25,15 @@ describe("sortTranscriptTurns", () => {
     assert.deepEqual(sortTranscriptTurns(rows).map((r) => r.id), ["0", "1", "2"]);
   });
 
+  it("keeps an earlier unsequenced greeting ahead of later sequenced turns", () => {
+    const rows = [
+      { id: "c", created_at: "2026-10-17T06:47:40Z", seq: 1, speaker: "caller" },
+      { id: "g", created_at: "2026-10-17T06:47:00Z", seq: null, speaker: "agent" },
+      { id: "a", created_at: "2026-10-17T06:47:20Z", seq: 0, speaker: "agent" },
+    ];
+    assert.deepEqual(sortTranscriptTurns(rows).map((r) => r.id), ["g", "a", "c"]);
+  });
+
   it("detects a missing seq column", () => {
     assert.equal(isMissingSeqColumn({ code: "42703", message: "column transcripts.seq does not exist" }), true);
     assert.equal(isMissingSeqColumn({ message: "permission denied" }), false);

@@ -515,6 +515,29 @@ begin
       raise;
     end if;
   end;
+  begin
+    update public.invoices set invoice_number = 'SC-2026-000006' where id = v_draft;
+    raise exception 'draft number should have failed';
+  exception when others then
+    if sqlerrm not like '%finalize_invoice%' then
+      raise;
+    end if;
+  end;
+  begin
+    update public.invoices set status = 'open' where id = v_draft;
+    raise exception 'draft status should have failed';
+  exception when others then
+    if sqlerrm not like '%finalize_invoice%' then
+      raise;
+    end if;
+  end;
+  update public.invoices set total_kes = 11, subtotal_kes = 11 where id = v_draft;
+  if (select total_kes from public.invoices where id = v_draft) <> 11
+     or (select invoice_number from public.invoices where id = v_draft) is not null
+     or (select status from public.invoices where id = v_draft) <> 'draft'
+  then
+    raise exception 'draft amount update was blocked';
+  end if;
 
   select * into v_event from public.record_payment_event('bachs', 'evt-1', '{"ok":true}'::jsonb);
   select * into v_event from public.record_payment_event('bachs', 'evt-1', '{"ok":true}'::jsonb);
@@ -1087,5 +1110,26 @@ begin
   end if;
   if (select count(*) from public.billing_audit_log where tenant_id = v_id) <> v_audit then
     raise exception 'business delete removed audit rows';
+  end if;
+end $$;
+
+-- billing_status is NOT NULL, and the helper check from the short script is gone.
+do $$
+begin
+  if not exists (
+    select 1 from pg_attribute
+    where attrelid = 'public.tenant_subscriptions'::regclass
+      and attname = 'billing_status'
+      and attnotnull
+      and not attisdropped
+  ) then
+    raise exception 'billing_status is still nullable';
+  end if;
+  if exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.tenant_subscriptions'::regclass
+      and conname = 'tenant_subscriptions_billing_status_not_null'
+  ) then
+    raise exception 'billing_status helper check was left behind';
   end if;
 end $$;

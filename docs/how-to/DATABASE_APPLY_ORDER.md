@@ -1,6 +1,6 @@
 ---
 owner: platform
-last_reviewed: 2026-10-18
+last_reviewed: 2026-10-19
 ---
 
 # Database apply order
@@ -169,9 +169,13 @@ This document is the **executable** apply sequence for greenfield / full staging
 | 33f | `package_entitlements.sql` | `sms_allowance.sql` |
 | 33g | `whatsapp_threads.sql` | `notify_send_ledger.sql` |
 | 33h | `package_minute_consume.sql` | `package_catalog.sql` (README 24g) |
-| 33i | `billing_data_layer.sql` | Run after, in this order: `package_catalog.sql`, `package_state_rules.sql`, `tenant_billing_state.sql`, `did_number_pool.sql`, `super_admin_ops.sql`, `notify_channels.sql`, `alert_email.sql`, `admin_business_archive.sql`, `admin_business_suspend.sql`, `wallet_security_beta.sql` (`ops_audit_log`). README 24k.4. The functions read `tenants.suspended_at`, `archived_at`, `line_status`, `billing_enforcement`, `on_demand_usage_enabled`, `notify_channels`, `alert_email`, `whatsapp_notification_number`, plus `minutes_included` and `seconds_used`. Read-only `information_schema` on production `fjxcdccgyhnvnnlnovcl` (18 Oct 2026) showed every one of those columns, so the script reads them directly. Staging first. Prod after a backup and Alvin's GO. The file is the prod script. |
-| 33j | `invoice_pay.sql` | `billing_data_layer.sql` (README 24k.5). Needs `pgcrypto` (`gen_random_bytes`, `digest`). Pay tokens, split parts, issue rows, `billing_payment_reconciliation`. Does not call a provider. Applied on staging 18 Oct. Not on prod. Prod after a backup and Alvin's GO. The file is the prod script. |
-| 33k | `invoice_documents.sql` | `invoice_pay.sql` (README 24k.6). `SCL-` invoice numbers, nullable `tax_kes`, receipts, and the four invoice notice kinds. Does not send. Applied on staging 18 Oct. Not on prod. |
+| 33i | `billing_data_layer.sql` | P1. Run after, in this order: `package_catalog.sql`, `package_state_rules.sql`, `tenant_billing_state.sql`, `did_number_pool.sql`, `super_admin_ops.sql`, `notify_channels.sql`, `alert_email.sql`, `admin_business_archive.sql`, `admin_business_suspend.sql`, `wallet_security_beta.sql` (`ops_audit_log`). README 24k.4. Do not re-run this file after `invoice_documents.sql`. Production has P1–P8 and the owner-price v2 import. |
+| 33j | `owner_billing_actions.sql` | P3 and P4. `billing_data_layer.sql`. Re-apply after any later re-apply of `package_minute_consume.sql` or `notify_send_reserve_settle.sql`, or the spend-limit hook is dropped. Re-applying it replaces `finalize_invoice`, so re-apply `billing_company.sql` last. Production has this file. |
+| 33k | `invoice_pay.sql` | P5. `billing_data_layer.sql`. Needs `pgcrypto` (`gen_random_bytes`, `digest`). Production has this file as of commit `553f1830`. Do not edit it in place. |
+| 33l | `invoice_documents.sql` | P6. `invoice_pay.sql`. Does not replace `finalize_invoice`. Production has this file as of commit `553f1830`. Do not edit it in place. |
+| 33m | `billing_company.sql` | P8. `invoice_documents.sql`. Canonical `finalize_invoice`. Production has this file as of commit `553f1830`. Do not edit it in place. Re-apply last if `finalize_invoice` changes. |
+| 33n | `invoice_pay_session.sql` | P9. After P8. One live checkout per part, including `pending_unattached`. Does not replace `finalize_invoice`. Staging has it. Not on prod. |
+| 33o | `billing_mode_legal_pairs.sql` | P10. After P9. `set_tenant_billing_mode` refuses enforcement while the subscription is beta. Does not change `billing_status`. Staging has the behavior. Not on prod. Do not re-run `wallet_security_beta.sql` for this check. |
 
 **Blocker:** `appointments.sql` before `contacts_and_requests.sql` → `relation "public.contacts" does not exist`.
 `realtime_inbox.sql` adds `calls`, `service_requests`, `appointments`, `tenants`, `wallet_ledger`, and `transcripts` to `supabase_realtime`. Apply that file by hand. Deploy does not run it. `realtime_inbox_replica_identity.sql` sets `REPLICA IDENTITY FULL` so `tenant_id` filters match hangup UPDATEs.

@@ -29,6 +29,26 @@ function seedPayable(totalKes, subtotalKes = "2000.00") {
   return { ledger, token };
 }
 
+describe("money", () => {
+  it("rejects a JavaScript number in toCents", () => {
+    assert.equal(toCents(1.005), null);
+    assert.equal(toCents(1000), null);
+    assert.equal(toCents(-1000), null);
+    assert.equal(toCents("1000.00"), 100000n);
+    assert.equal(toCents("1000.005"), null);
+  });
+
+  it("reads a negative decimal string and floors a pay amount at zero", () => {
+    assert.equal(toCents("-1000"), -100000n);
+    assert.equal(toCents("-1000.50"), -100050n);
+    assert.equal(toCents("-1000.005"), null);
+    assert.equal(formatKsh(toCents("-1000")), "KSh -1,000");
+    assert.deepEqual(splitKes("-1000"), []);
+    assert.deepEqual(splitKes("0"), []);
+    assert.equal(nextPart(splitKes("-1000"), "0"), null);
+  });
+});
+
 describe("Bachs signature", () => {
   it("accepts a hex HMAC of timestamp.raw body", () => {
     const raw = JSON.stringify({ id: "evt_1", type: "collection.succeeded" });
@@ -129,7 +149,7 @@ describe("split payments", () => {
       lookup: await ledger.lookup(token),
       checkout: { id: first.checkoutId, status: "succeeded", returning: true },
     });
-    assert.equal(mid.title, "Payment received");
+    assert.equal(mid.title, "Part 1 of 2 received, KSh 100,000 still due");
     assert.equal(mid.partLabel, "Part 2 of 2");
     assert.equal(mid.payLabel, "Pay KSh 100,000");
 
@@ -183,18 +203,17 @@ describe("mismatch handling", () => {
       eventId: "evt_short",
     });
     const result = await handlePayWebhook({ ...event, secret: SECRET, ledger, now: NOW });
-    assert.equal(result.body.action, "issue");
-    assert.equal(result.body.reason, "amount");
+    assert.equal(result.body.action, "apply_partial");
     assert.equal(ledger.invoices.get("inv1").status, "open");
-    assert.equal(ledger.invoices.get("inv1").amountPaidKes, "0");
-    assert.equal(ledger.payments[0].matchStatus, "issue");
+    assert.equal(ledger.invoices.get("inv1").amountPaidKes, "2000");
+    assert.equal(ledger.payments[0].matchStatus, "partial");
     assert.equal(ledger.payments[0].amountKes, "2000.00");
     const view = payView({
       lookup: await ledger.lookup(token),
-      checkout: { id: started.checkoutId, status: "issue", returning: true },
+      checkout: { id: started.checkoutId, status: "succeeded", returning: true },
     });
-    assert.equal(view.title, "This payment needs a check");
-    assert.equal(view.payLabel, "Pay KSh 2,320");
+    assert.equal(view.title, "KSh 320 still due");
+    assert.equal(view.payLabel, "Pay KSh 320");
   });
 
   it("waits when checkout.completed has no KES amount, then applies collection.succeeded once", async () => {
@@ -372,6 +391,18 @@ describe("pay page copy", () => {
     assert.equal(payable.title, "Jirani Cleaning");
     assert.equal(payable.payLabel, "Pay KSh 2,320");
     assert.equal(formatKsh(toCents("150000")), "KSh 150,000");
+    const credit = payView({
+      lookup: {
+        found: true,
+        state: "payable",
+        businessName: "Jirani Cleaning",
+        totalKes: "-1000.00",
+        amountPaidKes: "0",
+      },
+    });
+    assert.equal(credit.totalLabel, "KSh -1,000");
+    assert.equal(credit.payLabel, null);
+    assert.equal(credit.state, "unavailable");
   });
 });
 
@@ -492,9 +523,300 @@ describe("Bachs sandbox fields", () => {
     assert.equal(seen[0].expiresInMinutes, 60);
     ledger.setNow(NOW + 61 * 60 * 1000);
     const fresh = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    const previous = ledger.attempts.find((row) => row.checkoutSessionId === first.checkoutId);
+    assert.equal(previous.status, "cancelled");
     assert.equal(fresh.reused, false);
     assert.notEqual(fresh.reference, seen[0].reference);
     assert.equal(seen[1].reference, fresh.reference);
+    assert.equal(seen[0].successUrl.includes(token), false);
+    assert.equal(seen[0].cancelUrl.includes(token), false);
+  });
+
+  it("keeps the open checkout when cancel fails", async () => {
+    const { ledger, token } = seedPayable("100.00", "100.00");
+    let created = 0;
+    const provider = {
+      async createCheckout() {
+        created += 1;
+        return {
+          checkoutId: `chk_${created}`,
+          checkoutUrl: `https://checkout.example/${created}`,
+          expiresAt: new Date(NOW + 60 * 60 * 1000).toISOString(),
+        };
+      },
+      async cancelCheckout() {
+        throw new Error("bachs cancel failed");
+      },
+      async getCheckout(id) {
+        return { checkoutId: id, status: "open", paymentStatus: "unpaid" };
+      },
+    };
+    const first = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    ledger.setNow(NOW + 61 * 60 * 1000);
+    const again = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    assert.equal(again.checkoutId, first.checkoutId);
+    assert.equal(again.reused, true);
+    assert.equal(created, 1);
+    assert.equal(ledger.attempts.filter((row) => row.status === "pending").length, 1);
+  });
+
+  it("blocks a second checkout when the old session cannot be read", async () => {
+    const { ledger, token } = seedPayable("100.00", "100.00");
+    const provider = {
+      async createCheckout() {
+        return {
+          checkoutId: "chk_1",
+          checkoutUrl: "https://checkout.example/1",
+          expiresAt: new Date(NOW + 60 * 60 * 1000).toISOString(),
+        };
+      },
+      async cancelCheckout() {
+        throw new Error("bachs cancel failed");
+      },
+      async getCheckout() {
+        throw new Error("bachs checkout read failed");
+      },
+    };
+    await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    ledger.setNow(NOW + 61 * 60 * 1000);
+    await assert.rejects(
+      startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider }),
+      /previous payment still processing/
+    );
+    assert.equal(ledger.attempts.length, 1);
+    assert.equal(ledger.attempts[0].status, "pending");
+  });
+
+  it("does not open a second session when cancel succeeds and the checkout is still open", async () => {
+    const { ledger, token } = seedPayable("100.00", "100.00");
+    let created = 0;
+    const provider = {
+      async createCheckout() {
+        created += 1;
+        return {
+          checkoutId: `chk_${created}`,
+          checkoutUrl: `https://checkout.example/${created}`,
+          expiresAt: new Date(NOW + 60 * 60 * 1000).toISOString(),
+        };
+      },
+      async cancelCheckout() {},
+      async getCheckout(id) {
+        return { checkoutId: id, status: "open", paymentStatus: "unpaid" };
+      },
+    };
+    const first = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    ledger.setNow(NOW + 61 * 60 * 1000);
+    const again = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    assert.equal(again.checkoutId, first.checkoutId);
+    assert.equal(again.reused, true);
+    assert.equal(created, 1);
+    assert.equal(ledger.attempts.length, 1);
+    assert.equal(ledger.attempts[0].status, "pending");
+  });
+
+  it("blocks when cancel succeeds but the session cannot be read", async () => {
+    const { ledger, token } = seedPayable("100.00", "100.00");
+    const provider = {
+      async createCheckout() {
+        return {
+          checkoutId: "chk_1",
+          checkoutUrl: "https://checkout.example/1",
+          expiresAt: new Date(NOW + 60 * 60 * 1000).toISOString(),
+        };
+      },
+      async cancelCheckout() {},
+      async getCheckout() {
+        throw new Error("bachs checkout read failed");
+      },
+    };
+    await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    ledger.setNow(NOW + 61 * 60 * 1000);
+    await assert.rejects(
+      startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider }),
+      /previous payment still processing/
+    );
+    assert.equal(ledger.attempts.length, 1);
+    assert.equal(ledger.attempts[0].status, "pending");
+  });
+
+  it("replaces the attempt only after cancel and a closed session read", async () => {
+    const { ledger, token } = seedPayable("100.00", "100.00");
+    let created = 0;
+    const provider = {
+      async createCheckout() {
+        created += 1;
+        return {
+          checkoutId: `chk_${created}`,
+          checkoutUrl: `https://checkout.example/${created}`,
+          expiresAt: new Date(NOW + 60 * 60 * 1000).toISOString(),
+        };
+      },
+      async cancelCheckout() {},
+      async getCheckout(id) {
+        return { checkoutId: id, status: "cancelled", paymentStatus: "" };
+      },
+    };
+    const first = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    ledger.setNow(NOW + 61 * 60 * 1000);
+    const fresh = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    const previous = ledger.attempts.find((row) => row.checkoutSessionId === first.checkoutId);
+    assert.equal(previous.status, "cancelled");
+    assert.equal(fresh.reused, false);
+    assert.equal(created, 2);
+  });
+
+  it("keeps an unattached session and reuses it on the next click", async () => {
+    const { ledger, token } = seedPayable("100.00", "100.00");
+    let created = 0;
+    const provider = {
+      async createCheckout() {
+        created += 1;
+        return {
+          checkoutId: `chk_${created}`,
+          checkoutUrl: `https://checkout.example/${created}`,
+          expiresAt: new Date(NOW + 60 * 60 * 1000).toISOString(),
+        };
+      },
+      async cancelCheckout() {
+        throw new Error("bachs cancel failed");
+      },
+      async getCheckout(id) {
+        return { checkoutId: id, status: "open", paymentStatus: "unpaid" };
+      },
+    };
+    ledger.attachCheckout = async () => {
+      throw new Error("attach failed");
+    };
+    await assert.rejects(
+      startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider }),
+      /attach failed/
+    );
+    assert.equal(ledger.attempts.length, 1);
+    assert.equal(ledger.attempts[0].status, "pending_unattached");
+    assert.equal(ledger.attempts[0].checkoutSessionId, "chk_1");
+    const again = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    assert.equal(again.reused, true);
+    assert.equal(again.checkoutId, "chk_1");
+    assert.equal(created, 1);
+    assert.equal(ledger.attempts.filter((row) => row.status === "pending").length, 0);
+  });
+
+  it("blocks the next click when an unattached session cannot be read", async () => {
+    const { ledger, token } = seedPayable("100.00", "100.00");
+    let created = 0;
+    const provider = {
+      async createCheckout() {
+        created += 1;
+        return {
+          checkoutId: "chk_1",
+          checkoutUrl: "https://checkout.example/1",
+          expiresAt: new Date(NOW + 60 * 60 * 1000).toISOString(),
+        };
+      },
+      async cancelCheckout() {
+        throw new Error("bachs cancel failed");
+      },
+      async getCheckout() {
+        throw new Error("bachs checkout read failed");
+      },
+    };
+    ledger.attachCheckout = async () => {
+      throw new Error("attach failed");
+    };
+    await assert.rejects(
+      startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider }),
+      /attach failed/
+    );
+    await assert.rejects(
+      startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider }),
+      /previous payment still processing/
+    );
+    assert.equal(created, 1);
+    assert.equal(ledger.attempts.length, 1);
+    assert.equal(ledger.attempts[0].status, "pending_unattached");
+  });
+
+  it("applies a collection on the live unattached attempt and credits a displaced failed one once", async () => {
+    const { ledger, token } = seedPayable("100.00", "100.00");
+    const provider = new MockPayProvider();
+    const started = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    ledger.attempts[0].status = "pending_unattached";
+    const live = provider.paidEvent(started.checkoutId, { secret: SECRET, now: NOW, eventId: "evt_live_unattached" });
+    const applied = await handlePayWebhook({ ...live, secret: SECRET, ledger, now: NOW });
+    assert.equal(applied.body.action, "apply");
+    assert.equal(ledger.invoices.get("inv1").status, "paid");
+    assert.equal(ledger.credits.length, 0);
+    const replay = await handlePayWebhook({ ...live, secret: SECRET, ledger, now: NOW });
+    assert.equal(replay.body.duplicate, true);
+    assert.equal(ledger.payments.filter((row) => row.matchStatus !== "issue").length, 1);
+
+    const { ledger: open, token: openToken } = seedPayable("100.00", "100.00");
+    const second = new MockPayProvider();
+    const firstCheckout = await startInvoiceCheckout({
+      token: openToken,
+      origin: "https://app.example",
+      ledger: open,
+      provider: second,
+    });
+    open.attempts[0].status = "failed";
+    open.setNow(NOW + 61 * 60 * 1000);
+    await startInvoiceCheckout({ token: openToken, origin: "https://app.example", ledger: open, provider: second });
+    const late = second.paidEvent(firstCheckout.checkoutId, { secret: SECRET, now: NOW, eventId: "evt_displaced" });
+    const credited = await handlePayWebhook({ ...late, secret: SECRET, ledger: open, now: NOW });
+    assert.equal(credited.body.action, "credit");
+    assert.equal(open.invoices.get("inv1").amountPaidKes, "0");
+    assert.equal(open.credits.length, 1);
+    assert.equal(open.credits[0].idempotencyKey, `cancelled:bachs:${firstCheckout.checkoutId}`);
+    const again = await handlePayWebhook({ ...late, secret: SECRET, ledger: open, now: NOW });
+    assert.equal(again.body.action, "credit");
+    assert.equal(open.credits.length, 1);
+    const rows = reconciliationReport({
+      attempts: open.attempts,
+      invoices: [],
+      payments: open.payments,
+      credits: open.credits,
+      now: NOW,
+    });
+    assert.ok(rows.some((row) => row.kind === "credited_cancelled"));
+  });
+
+  it("credits a collection on a cancelled attempt once", async () => {
+    const { ledger, token } = seedPayable("100.00", "100.00");
+    const provider = new MockPayProvider();
+    const started = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    ledger.attempts[0].status = "cancelled";
+    const event = provider.paidEvent(started.checkoutId, { secret: SECRET, now: NOW, eventId: "evt_late" });
+    const first = await handlePayWebhook({ ...event, secret: SECRET, ledger, now: NOW });
+    assert.equal(first.body.action, "credit");
+    assert.equal(ledger.invoices.get("inv1").amountPaidKes, "0");
+    assert.equal(ledger.credits.length, 1);
+    assert.equal(ledger.credits[0].idempotencyKey, `cancelled:bachs:${started.checkoutId}`);
+    assert.equal(ledger.alerts.length, 1);
+    const replay = await handlePayWebhook({ ...event, secret: SECRET, ledger, now: NOW });
+    assert.equal(replay.body.action, "credit");
+    assert.equal(ledger.credits.length, 1);
+    const rows = reconciliationReport({
+      attempts: ledger.attempts,
+      invoices: [],
+      payments: ledger.payments,
+      credits: ledger.credits,
+      now: NOW,
+    });
+    assert.ok(rows.some((row) => row.kind === "credited_cancelled"));
+    assert.ok(!rows.some((row) => row.detail === "Collected on a cancelled checkout with no credit"));
+  });
+
+  it("expires a return id after 24 hours", async () => {
+    const { ledger, token } = seedPayable("100.00", "100.00");
+    const provider = new MockPayProvider();
+    const started = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    const fresh = await ledger.lookupReturn(ledger.attempts[0].returnId);
+    assert.equal(fresh.found, true);
+    assert.equal(fresh.state, "payable");
+    ledger.setNow(NOW + 25 * 60 * 60 * 1000);
+    const stale = await ledger.lookupReturn(ledger.attempts[0].returnId);
+    assert.equal(stale.state, "expired");
+    assert.equal(started.reused, false);
   });
 
   it("logs the Bachs error code and request id", async () => {
@@ -554,7 +876,7 @@ describe("Bachs sandbox fields", () => {
     assert.equal(row.paymentStatus, "paid");
     assert.equal(row.charge.id, "ch_1");
     assert.equal(row.checkoutUrl, undefined);
-    assert.equal(row.status, undefined);
+    assert.equal(row.status, "open");
     assert.match(url, /\/v1\/checkout-sessions\/chk_1$/);
   });
 });

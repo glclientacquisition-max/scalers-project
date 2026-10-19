@@ -53,7 +53,7 @@ Status: **live** = production path in code and used. **partial** = code exists, 
 | Desk wa.me | Owner’s personal WhatsApp to the caller | `dashboard/src/components/WhatsAppLink.tsx`; `logWhatsAppFollowUp` | **live** | Click = opened / followed up. **Not** Meta delivery. Writes `lead_status=resolved` + note. |
 | Platform WhatsApp Cloud | Scalers WABA via SautiKit | `src/notifications/whatsapp.js`; `src/sautikit/whatsappInbound.js`; `docs/supabase/whatsapp_threads.sql` | **partial** | Staff templates + inbound ack only. Sender `+254709221536`. Staging voice is `+254709221537` (Done and Dusted). Prod voice on `+254709221536` is Aris Kenya. No shop inbox. |
 | Instagram / other social | Handles on the tenant profile | `tenants.social_handles`; `src/conversation/socialHandles.js` | **docs-only** as a channel | Brain may *read* a handle. There is no IG inbox, Graph, or send. |
-| Wallet / ledger | One prepaid KES wallet | `docs/supabase/one_wallet_billing.sql`; `src/db.js` `chargeCallToWallet`; desk `/wallet` | **live** (beta meters, does not charge) | Do not show dual USD/KES as the product. M-Pesa top-up is a stub. |
+| Wallet / ledger | One prepaid KES wallet | `docs/supabase/one_wallet_billing.sql`; `src/db.js` `chargeCallToWallet`; desk `/wallet` | **live** (beta meters, does not charge) | Do not show dual USD/KES as the product. Owner top-up is retired. |
 | SMS allowance | Included segments, same on-demand toggle | `docs/supabase/sms_allowance.sql`; `consumeSmsUnits` | **live** if SQL applied; skip tenant SMS if RPC missing | Skip tenant SMS at cap (paid) or `rpc_missing`. Never debit KES for SMS. Never claim sent without a ledger row. |
 | Packages / SKUs | Reserved email + seat columns | `docs/supabase/package_entitlements.sql`; [`../PACKAGES.md`](../operations/PACKAGES.md) | **docs-only** | No shop UI. Do not gate email or invites. |
 | DID pool | Assign / release Kenya numbers | `sautikit_did_pool`; admin APIs; [`../PRODUCTION_DID_POOL.md`](../../how-to/PRODUCTION_DID_POOL.md) | **live** | `+254709221536` must never be `available`. |
@@ -247,7 +247,7 @@ One prepaid **KES** wallet. AI is inside the minute rate. Dual telecom-KES + AI-
 | Alerts | Low / empty via notify (`billed_to=platform`). |
 | On-demand | Owner opt-in. Same toggle for SMS past included. |
 | SMS | Included 200 segments. Not a KES debit. Wallet/outage SMS are platform-paid. |
-| Top-up | `WALLET_TOPUP_ENABLED` + M-Pesa/Paystack **stub**. Desk says online top-up is not enabled. Ops credit is the live path. |
+| Top-up | Owner wallet top-up is retired. Plan changes stay behind `DESK_PLAN_CHANGE` until the Ops RPC. Pay links stay hidden until a pay token exists. |
 | Packages | Reserved columns. No SKU picker. Company Brain pricing is **deferred** until the ops wedge is green. |
 
 Always separate in copy (when Growth unlocks): (1) Scalers subscription, (2) carrier/voice, (3) Meta/BSP WhatsApp fees. Never hide Meta fees inside “unlimited messaging.”

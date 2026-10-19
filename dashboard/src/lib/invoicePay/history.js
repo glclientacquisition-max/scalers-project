@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- node:test loads this file with require() */
 const { invoiceModel, receiptModel } = require("./documents");
+const { letterheadFromInvoice } = require("./company");
 const { formatKsh, toCents } = require("./money");
 
 function ksh(amount) {
@@ -7,9 +8,13 @@ function ksh(amount) {
   return formatKsh(cents == null ? 0n : cents);
 }
 
-function balanceLabel(total, paid) {
+function owedCents(total, paid) {
   const left = (toCents(total) || 0n) - (toCents(paid) || 0n);
-  return formatKsh(left > 0n ? left : 0n);
+  return left > 0n ? left : 0n;
+}
+
+function balanceLabel(total, paid) {
+  return formatKsh(owedCents(total, paid));
 }
 
 /**
@@ -37,7 +42,10 @@ function shapeBillingHistory(input) {
       tax_kes: row.tax_kes == null ? null : String(row.tax_kes),
       pdf_path: `/api/billing/invoices/${row.id}/pdf`,
       html_path: `/api/billing/invoices/${row.id}?format=html`,
-      pay_link_path: row.status === "open" ? `/api/billing/invoices/${row.id}/pay-link` : null,
+      pay_link_path:
+        row.status === "open" && owedCents(row.total_kes, row.amount_paid_kes) > 0n
+          ? `/api/billing/invoices/${row.id}/pay-link`
+          : null,
       lines: lines
         .filter((line) => line.invoice_id === row.id)
         .map((line) => ({
@@ -62,10 +70,21 @@ function shapeBillingHistory(input) {
   };
 }
 
-function invoiceDocumentFor(row, lines, billTo, payUrl) {
+function documentLines(lines) {
+  return (lines || []).map((line) => ({
+    kind: line.kind,
+    description: line.description,
+    quantity: line.quantity,
+    unitAmountKes: line.unit_amount_kes,
+    amountKes: line.amount_kes,
+  }));
+}
+
+function invoiceDocumentFor(row, lines, billTo, payUrl, company) {
   return invoiceModel({
     invoice: {
       number: row.invoice_number,
+      status: row.status,
       issuedAt: row.issued_at,
       dueAt: row.due_at,
       periodStart: row.period_start,
@@ -75,29 +94,34 @@ function invoiceDocumentFor(row, lines, billTo, payUrl) {
       totalKes: row.total_kes,
       amountPaidKes: row.amount_paid_kes,
     },
-    lines: (lines || []).map((line) => ({
-      kind: line.kind,
-      description: line.description,
-      quantity: line.quantity,
-      unitAmountKes: line.unit_amount_kes,
-      amountKes: line.amount_kes,
-    })),
+    lines: documentLines(lines),
     billTo,
     payUrl,
+    company: company || letterheadFromInvoice(row) || undefined,
   });
 }
 
-function receiptDocumentFor(row, billTo, invoiceNumber) {
+function receiptDocumentFor(row, billTo, invoice, lines, company) {
+  const source = invoice && typeof invoice === "object" ? invoice : { invoice_number: invoice || "" };
   return receiptModel({
     receipt: {
       number: row.receipt_number,
-      invoiceNumber,
+      invoiceNumber: source.invoice_number || "",
       reference: row.provider_ref,
       amountKes: row.amount_kes,
       method: row.method,
       paidAt: row.paid_at,
     },
+    invoice: {
+      periodStart: source.period_start,
+      periodEnd: source.period_end,
+      subtotalKes: source.subtotal_kes,
+      creditsAppliedKes: source.credits_applied_kes,
+      totalKes: source.total_kes,
+    },
+    lines: documentLines(lines),
     billTo,
+    company: company || letterheadFromInvoice(source) || undefined,
   });
 }
 

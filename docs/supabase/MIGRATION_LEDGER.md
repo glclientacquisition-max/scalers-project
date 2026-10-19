@@ -1,6 +1,6 @@
 ---
 owner: platform
-last_reviewed: 2026-10-18
+last_reviewed: 2026-10-19
 ---
 
 # Migration ledger
@@ -309,8 +309,10 @@ Checked against `supabase_migrations.schema_migrations` and object names only. N
 | LEDGER-INVITE-ANON-REVOKE | `revoke` execute on `create_tenant_invite(uuid, text, text, text, uuid)` from `PUBLIC` and `anon`. Keep `service_role` only. | YES 18 Oct 2026. Version `20261018180447`, name `revoke_anon_create_tenant_invite`. Anon call denied. `service_role` still reaches the function. `authenticated` stays denied. | NO. Same file, after the owner's OK and a backup. Confirmed absent from the production migration list after the staging apply. | Staging YES (`20261018180447`). Production NO. | `supabase/migrations/20261018210000_revoke_anon_create_tenant_invite.sql`. Desk invite uses `getSupabaseAdmin()`. `team_invites.sql` already revoked `PUBLIC` and `authenticated`; the leftover grant is the direct `anon` grant. |
 | LEDGER-ACCEPT-TRANSFER-ANON-REVOKE | `revoke` execute on `accept_tenant_invite(text, uuid)` and `transfer_tenant_ownership(uuid, uuid, uuid)` from `PUBLIC` and `anon`. Keep `service_role` only. | YES 18 Oct 2026. Version `20261018180648`, name `revoke_anon_accept_transfer`. Anon denied on both. `service_role` still reaches both. `authenticated` stays denied. | NO. Same file, after the owner's OK and a backup. Confirmed absent from the production migration list after the staging apply. | Staging YES (`20261018180648`). Production NO. | `supabase/migrations/20261018220000_revoke_anon_accept_transfer.sql`. Accept is `inviteAccept.ts`. Transfer is `membersActions.ts`. Both use `getSupabaseAdmin()`. |
 
-## Pending production: billing data layer
+## Billing SQL ledger
 
 | ID | What | Why | Where | Introduced commit | Staging | Production | CLI | Verification |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| LEDGER-BILLING-DATA-LAYER | Package versions, `billing_status`, invoices, payments, credits, `billing_notices`, `tenant_escalation_allowed`, DID `quarantine` | Billing data layer. No charges, no send, no voice routing. | `billing_data_layer.sql` | this PR | YES (2026-10-18, scalers-staging `sgcdncjxauhsbunobmob` only). Chief fixes re-applied the same day (`billing_data_layer_chief_fixes`, `_fns`, `_did`). | NO | NO | Local `tests/sql/billing_data_layer/run.sh` (applied twice). Staging checksum `e87e060fd7a7f217fbe3fd3325104853` unchanged on the first apply. Chief-fix probe rolled back (0 rows left): expired quarantine assigned by both paths, stale `sending` reclaimed, sent notice stayed sent. Tenant row hash `ed560e5d36dec3cd055e5c37fe1045b7` unchanged, 6 businesses, 2 pool rows. Prod file is the same script. Production `information_schema` (read-only, 18 Oct 2026) already has every tenants column this script reads. Do not run on `fjxcdccgyhnvnnlnovcl` until a backup and Alvin's GO. |
+| LEDGER-BILLING-DATA-LAYER | Package versions, `billing_status`, invoices, payments, credits, `billing_notices`, `tenant_escalation_allowed`, DID `quarantine` | Billing data layer. No charges, no send, no voice routing. | `billing_data_layer.sql` | #775 `6edbba92` | YES (2026-10-18, scalers-staging). | YES. P1–P8 as of `553f1830`, plus the owner-price v2 import, are on production. | YES on production for P1–P8 | `invoices_freeze` rejects a draft number or status unless `scalers.billing_write` is `1`. Do not re-apply P1 after P6. |
+| LEDGER-INVOICE-PAY-SESSION | One live checkout per part, including `pending_unattached` | P9. Does not replace `finalize_invoice`. | `invoice_pay_session.sql` | this PR | YES. `invoice_pay_session` `20261018233254` on scalers-staging. | NO | NO | After P8. |
+| LEDGER-BILLING-MODE-LEGAL-PAIRS | `set_tenant_billing_mode` refuses enforcement while `billing_status` is beta | P10. Does not change `billing_status`. | `billing_mode_legal_pairs.sql` | this PR | YES. Staging migration `billing_mode_legal_pairs` `20261018212633`, re-applied as `billing_mode_legal_pairs_p10` `20261019002432`. | NO. Production has no `legal_pairs` migration. | NO | After P9. Do not re-run `wallet_security_beta.sql`. |

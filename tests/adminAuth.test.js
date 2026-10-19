@@ -75,6 +75,14 @@ describe("Super Admin Better Auth", () => {
     assert.match(gate, /adminAuth\.api\.getSession/);
     assert.match(gate, /isAdminAuthenticated/);
     assert.match(session, /adminAuth\.handler/);
-    assert.match(session, /SESSION_COOKIE/);
+    assert.doesNotMatch(session, /SESSION_COOKIE/);
+    assert.doesNotMatch(session, /sessionCookieValue/);
+  });
+
+  it("uses a dedicated signing secret in production and fails login when unset", () => {
+    assert.match(auth, /isAdminAuthProperlyConfigured/);
+    assert.match(auth, /unconfigured-super-admin-auth/);
+    assert.match(session, /isAdminAuthProperlyConfigured/);
+    assert.match(session, /NODE_ENV === "production"/);
   });
 });

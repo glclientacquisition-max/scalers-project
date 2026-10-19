@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { KNOWLEDGE_PASTE_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
 import { useMountedPoolPick } from "@/lib/useMountedPoolPick";
 import type { TenantRow } from "@/lib/supabase";
-import { parseVertical } from "@/lib/vertical";
+import { parseVertical, VERTICAL_LABELS, type BusinessVertical } from "@/lib/vertical";
+import { structureImportedCatalogRow } from "@/lib/catalogPricingMode";
+import { catalogImportPriceHintText } from "@/components/settings/catalog/CatalogImportPriceLine";
 import type { IngestDraft } from "@/lib/ingest/extract";
 import { FAQ_ANSWER_MAX, FAQ_QUESTION_MAX } from "@/lib/faqs";
 import { formatHoursForCompiler } from "@/lib/hoursSchedule";
@@ -62,6 +64,26 @@ const applyInitial: IngestApplyState = {};
 
 type SourceMode = "text" | "url" | "csv";
 
+function ingestServicePriceHint(service: { price_range?: string; notes?: string }): string {
+  const structured = structureImportedCatalogRow(
+    {
+      name: "",
+      price_range: service.price_range ?? "",
+      notes: "",
+      out_of_scope: "",
+      in_stock: "",
+      category: "",
+    },
+    "price_range"
+  );
+  return [catalogImportPriceHintText(structured), service.notes].filter(Boolean).join(" · ");
+}
+
+function verticalImportLabel(raw: string): string {
+  const id = parseVertical(raw);
+  return VERTICAL_LABELS[id as BusinessVertical] ?? raw;
+}
+
 function serviceCsvPlaceholder(vertical: string | null | undefined): string {
   if (parseVertical(vertical) === "retail") {
     return "name,price\nA4 paper,500 KES\nBinding,300 KES";
@@ -89,6 +111,7 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
   const [includeContactPhone, setIncludeContactPhone] = useState(false);
   const [renameBusiness, setRenameBusiness] = useState(false);
   const [mergeMode, setMergeMode] = useState<"merge" | "replace_services_faqs">("merge");
+  const [dismissedExtract, setDismissedExtract] = useState<IngestExtractState | null>(null);
 
   const [extractState, extractAction, extractPending] = useActionState(
     extractKnowledgeAction,
@@ -180,7 +203,11 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
   const flash =
     applyState.error ||
     applyState.message ||
-    (!draft ? extractState.error || extractState.message : extractState.error);
+    (!draft
+      ? extractState === dismissedExtract
+        ? null
+        : extractState.error || extractState.message
+      : extractState.error);
   const flashIsError = Boolean(applyState.error || extractState.error);
 
   return (
@@ -302,7 +329,7 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
                 {draft.vertical ? (
                   <SettingsRow
                     label="Business type"
-                    hint={draft.vertical}
+                    hint={verticalImportLabel(draft.vertical)}
                     control="switch"
                   >
                     <ToolSwitch
@@ -402,7 +429,7 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
                   <SettingsRow
                     key={`svc-${i}`}
                     label={s.name}
-                    hint={[s.price_range, s.notes].filter(Boolean).join(" · ")}
+                    hint={ingestServicePriceHint(s)}
                     control="switch"
                   >
                     <ToolSwitch
@@ -589,7 +616,10 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
             <button
               type="button"
               disabled={applyPending}
-              onClick={() => setDraft(null)}
+              onClick={() => {
+                setDismissedExtract(extractState);
+                setDraft(null);
+              }}
               className={settingsActionClass}
             >
               Start over

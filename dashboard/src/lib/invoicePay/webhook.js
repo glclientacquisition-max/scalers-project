@@ -80,10 +80,14 @@ function collectionOutcome(status) {
  */
 function decidePayment(input) {
   const type = input.type;
-  if (type === "collection.underpaid") return { action: "issue", reason: "underpaid" };
+  const terminal = type === "collection.succeeded" || type === "collection.underpaid";
+  if (type === "collection.underpaid") {
+    const got = toCents(input.charge.kes && input.charge.kes.amount);
+    if (got != null && got > 0n) return { action: "apply_partial" };
+    return { action: "issue", reason: "underpaid" };
+  }
   if (type !== "collection.succeeded" && type !== "checkout.completed") return { action: "ignore" };
 
-  const terminal = type === "collection.succeeded";
   let overpaid = false;
   if (type === "checkout.completed") {
     if (String(input.paymentStatus || "").toLowerCase() !== "paid") return { action: "wait" };
@@ -105,17 +109,18 @@ function decidePayment(input) {
     if (terminal || overpaid) return { action: "issue", reason: overpaid ? "overpaid" : "amount" };
     return { action: "wait" };
   }
-  if (overpaid) return { action: "apply_overpaid", reason: "overpaid" };
-  if (expected == null || got !== expected) {
-    if (terminal) return { action: "issue", reason: "amount" };
-    return { action: "wait" };
+  if (expected != null && got >= expected) {
+    if (overpaid || got > expected) return { action: "apply_overpaid", reason: overpaid ? "overpaid" : "amount" };
+    return { action: "apply" };
   }
-  return { action: "apply" };
+  if (overpaid) return { action: "apply_partial" };
+  if (terminal && got > 0n) return { action: "apply_partial", reason: "amount" };
+  return { action: "wait" };
 }
 
 function minorUnits(amount) {
   const cents = toCents(amount);
-  if (cents == null) return null;
+  if (cents == null || cents < 0n) return null;
   if (cents > BigInt(2147483647)) return null;
   return Number(cents);
 }
@@ -170,26 +175,7 @@ async function handlePayWebhook(input) {
   }
 
   const charge = extractCharge(data);
-  const decision = decidePayment({
-    attempt,
-    charge,
-    type,
-    status: data.status,
-    paymentStatus: data.payment_status,
-  });
-  if (decision.action === "wait" || decision.action === "ignore") {
-    return { status: 200, body: { ok: true, action: decision.action, duplicate: recorded.attempts > 1 } };
-  }
-  if (attempt.status === "succeeded" || attempt.status === "issue") {
-    return { status: 200, body: { ok: true, duplicate: true, action: decision.action } };
-  }
-
   const providerRef = String(checkoutId);
-  const existing = await input.ledger.findPaymentByRef("bachs", providerRef);
-  if (existing) {
-    return { status: 200, body: { ok: true, duplicate: true, action: decision.action } };
-  }
-
   const feeMinor = charge.feeAmount == null ? null : minorUnits(charge.feeAmount);
   const settledMinor = charge.settledAmount == null ? null : minorUnits(charge.settledAmount);
   const common = {
@@ -208,12 +194,85 @@ async function handlePayWebhook(input) {
     attemptId: attempt.id,
   };
 
-  if (decision.action === "apply" || decision.action === "apply_overpaid") {
-    const amountKes = decision.action === "apply_overpaid" && charge.kes ? String(charge.kes.amount) : attempt.amountKes;
-    await input.ledger.applyPayment({
-      ...common,
-      amountKes,
-    });
+  const displaced =
+    attempt.status === "cancelled" ||
+    attempt.status === "superseded" ||
+    ((attempt.status === "failed" || attempt.status === "pending_unattached") && attempt.livePart !== true);
+  if (displaced) {
+    const already = await input.ledger.findPaymentByRef("bachs", providerRef);
+    if (already) {
+      return { status: 200, body: { ok: true, duplicate: true, action: "apply" } };
+    }
+    const amountKes = charge.kes ? String(charge.kes.amount) : null;
+    if (amountKes && toCents(amountKes) != null && toCents(amountKes) > 0n) {
+      await input.ledger.recordIssue({
+        ...common,
+        amountKes,
+        reason: "cancelled",
+      });
+      if (typeof input.ledger.creditCancelled === "function") {
+        await input.ledger.creditCancelled({
+          provider: "bachs",
+          providerRef,
+          amountKes,
+          tenantId: attempt.tenantId,
+          invoiceId: attempt.invoiceId,
+        });
+      }
+    }
+    return { status: 200, body: { ok: true, action: "credit", reason: "cancelled" } };
+  }
+
+  const decision = decidePayment({
+    attempt,
+    charge,
+    type,
+    status: data.status,
+    paymentStatus: data.payment_status,
+  });
+  if (decision.action === "wait" || decision.action === "ignore") {
+    return { status: 200, body: { ok: true, action: decision.action, duplicate: recorded.attempts > 1 } };
+  }
+
+  const existing = await input.ledger.findPaymentByRef("bachs", providerRef);
+  const applied = existing && existing.matchStatus !== "issue" ? existing : null;
+  if (applied && decision.action === "apply_overpaid" && charge.kes) {
+    const next = toCents(charge.kes.amount);
+    const prev = toCents(applied.amountKes);
+    if (next != null && prev != null && next > prev && typeof input.ledger.adjustOverpay === "function") {
+      await input.ledger.adjustOverpay({
+        provider: "bachs",
+        providerRef,
+        amountKes: String(charge.kes.amount),
+        tenantId: attempt.tenantId,
+      });
+      return { status: 200, body: { ok: true, action: "apply", overpaid: true } };
+    }
+  }
+  if (attempt.status === "succeeded" || applied) {
+    return { status: 200, body: { ok: true, duplicate: true, action: decision.action } };
+  }
+
+  if (decision.action === "apply" || decision.action === "apply_overpaid" || decision.action === "apply_partial") {
+    const received = charge.kes ? String(charge.kes.amount) : attempt.amountKes;
+    const amountKes = decision.action === "apply" ? attempt.amountKes : received;
+    try {
+      await input.ledger.applyPayment({
+        ...common,
+        amountKes,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("invoice cannot be paid") || message.includes("draft invoices are not payable")) {
+        await input.ledger.recordIssue({
+          ...common,
+          amountKes: received,
+          reason: "invoice cannot be paid",
+        });
+        return { status: 200, body: { ok: true } };
+      }
+      throw err;
+    }
     await input.ledger.markAttempt(attempt.id, {
       status: "succeeded",
       providerAmount: common.providerAmount,
@@ -222,10 +281,12 @@ async function handlePayWebhook(input) {
       feeCurrency: common.feeCurrency,
       raw: payload,
     });
-    return {
-      status: 200,
-      body: { ok: true, action: "apply", overpaid: decision.action === "apply_overpaid" },
+    const body = {
+      ok: true,
+      action: decision.action === "apply_partial" ? "apply_partial" : "apply",
     };
+    if (decision.action === "apply_overpaid") body.overpaid = true;
+    return { status: 200, body };
   }
 
   const issueAmount = charge.kes ? String(charge.kes.amount) : null;

@@ -17,8 +17,10 @@ function facts(lookup) {
 }
 
 /**
- * Page model. Paid, void, and expired are plain. "Payment received" is only
- * set when the returned checkout is already confirmed.
+ * Page model. Paid, void, and expired are plain. "Payment received" is set
+ * only when the invoice itself is paid. A paid part of a split names that
+ * part and the amount still due, and keeps the next Pay button. A succeeded
+ * checkout with nothing applied stays on Checking payment.
  * @param {{ lookup: object | null, checkout?: { id?: string, status?: string, returning?: boolean } | null }} input
  */
 function payView(input) {
@@ -66,17 +68,45 @@ function payView(input) {
       return { ...base, state: "checking", title: "Checking payment", payLabel: null };
     }
     if (checkout.status === "succeeded") {
-      return { ...base, state: "received", title: "Payment received" };
+      const paid = toCents(lookup.amountPaidKes) || 0n;
+      const total = toCents(lookup.totalKes) || 0n;
+      if (paid > 0n && total > paid) {
+        const due = formatKsh(total - paid);
+        const parts = splitKes(lookup.totalKes);
+        const next = nextPart(parts, lookup.amountPaidKes);
+        if (next && next.count > 1 && next.index > 1) {
+          return {
+            ...base,
+            state: "received",
+            title: `Part ${next.index - 1} of ${next.count} received, ${due} still due`,
+          };
+        }
+        return { ...base, state: "received", title: `${due} still due` };
+      }
+      return { ...base, state: "checking", title: "Checking payment", payLabel: null };
     }
     if (checkout.status === "issue") {
       return { ...base, state: "issue", title: "This payment needs a check" };
     }
     if (checkout.status === "failed" || checkout.status === "cancelled") {
-      return { ...base, state: "payable", title: lookup.businessName, notice: "Payment was not completed." };
+      return payableView(base, lookup, { notice: "Payment was not completed." });
     }
   }
 
-  return { ...base, state: "payable", title: lookup.businessName || "Invoice" };
+  return payableView(base, lookup, {});
+}
+
+function payableView(base, lookup, extra) {
+  if (!base.payLabel) {
+    return {
+      ...base,
+      state: "unavailable",
+      title: "This invoice cannot be paid here",
+      payLabel: null,
+      notice: null,
+    };
+  }
+  return { ...base, ...extra, state: "payable", title: lookup.businessName || "Invoice" };
 }
 
 module.exports = { payView };

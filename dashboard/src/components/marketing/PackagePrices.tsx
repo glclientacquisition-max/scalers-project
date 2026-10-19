@@ -96,8 +96,8 @@ export function PackagePrices({
 
       {liveRates(board) ? (
         <p className="mt-6 max-w-xl text-sm leading-relaxed text-ink-soft">
-          On-demand, past included: calls KES {formatKes(board.inboundKesPerMinute)}/min. SMS KES{" "}
-          {formatKes(board.smsKes)}. Email KES {formatKes(board.emailKes)}. WhatsApp KES{" "}
+          On-demand, past included: calls KSh {formatKes(board.inboundKesPerMinute)}/min. SMS KSh{" "}
+          {formatKes(board.smsKes)}. Email KSh {formatKes(board.emailKes)}. WhatsApp KSh{" "}
           {formatKes(board.whatsappKes)}.
         </p>
       ) : null}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { billToFromTenant, requireBillingRead } from "@/lib/invoicePay/billingRead";
+import { ISSUER_COLUMNS, letterheadForInvoice } from "@/lib/invoicePay/company";
 import { invoiceDocumentFor } from "@/lib/invoicePay/history";
 import { renderInvoiceHtml } from "@/lib/invoicePay/documents";
 
@@ -11,7 +12,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const invoice = await admin
     .from("invoices")
     .select(
-      "id, invoice_number, status, issued_at, due_at, period_start, period_end, subtotal_kes, credits_applied_kes, total_kes, amount_paid_kes, tax_kes"
+      `id, invoice_number, status, issued_at, due_at, period_start, period_end, subtotal_kes, credits_applied_kes, total_kes, amount_paid_kes, tax_kes, ${ISSUER_COLUMNS}`
     )
     .eq("tenant_id", tenant.id)
     .eq("id", id)
@@ -27,7 +28,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (lines.error) return NextResponse.json({ error: "Could not load this invoice." }, { status: 503 });
   const url = new URL(request.url);
   if (url.searchParams.get("format") === "html") {
-    const doc = invoiceDocumentFor(invoice.data, lines.data || [], billToFromTenant(tenant), "");
+    const company = await letterheadForInvoice(admin, invoice.data);
+    const doc = invoiceDocumentFor(invoice.data, lines.data || [], billToFromTenant(tenant), "", company);
     return new NextResponse(renderInvoiceHtml(doc), {
       headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
     });

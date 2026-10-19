@@ -20,11 +20,23 @@ export async function POST(request: Request, context: { params: Promise<{ token:
       ledger: invoicePayLedger(env),
       provider: payProviderFromEnv(env),
     });
-    return NextResponse.json(
+    const response = NextResponse.json(
       { checkoutUrl: result.checkoutUrl, checkoutId: result.checkoutId },
       { headers: { "Cache-Control": "no-store" } }
     );
-  } catch {
+    response.cookies.set("scalers_pay", token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: origin.startsWith("https://"),
+      path: "/pay",
+      maxAge: 60 * 60,
+    });
+    return response;
+  } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code || "") : "";
+    if (code === "previous_processing") {
+      return NextResponse.json({ error: "Previous payment still processing." }, { status: 409 });
+    }
     return NextResponse.json({ error: "Could not start payment." }, { status: 400 });
   }
 }

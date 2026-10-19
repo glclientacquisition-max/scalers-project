@@ -30,7 +30,7 @@ Payments, payment attempts, credits, pay tokens, and the audit log are not owner
 
 ## Public pay page
 
-`/pay/<token>` is not an owner read and not an admin screen. The Desk server calls `pay_invoice_by_token` with the service role. `invoice_pay_tokens` stores the sha256 hex only. Anon and authenticated cannot mint or read tokens. A business with `billing_enforcement` off has no pay link. The page never marks an invoice paid. The signed-in owner history API is `GET /api/billing/invoices` and `GET /api/billing/receipts/:id`. A pay link is `POST /api/billing/invoices/:id/pay-link`, once. See [`INVOICE_PAY.md`](./INVOICE_PAY.md). The SQL is on staging. It is not on prod.
+`/pay/<token>` is not an owner read and not an admin screen. The Desk server calls `pay_invoice_by_token` with the service role. `invoice_pay_tokens` stores the sha256 hex only. Anon and authenticated cannot mint or read tokens. A business with `billing_enforcement` off has no pay link. The page never marks an invoice paid. The signed-in owner history API is `GET /api/billing/invoices` and `GET /api/billing/receipts/:id`. A pay link is `POST /api/billing/invoices/:id/pay-link`, once. See [`INVOICE_PAY.md`](./INVOICE_PAY.md). Pay SQL through `553f1830` is on production. The pay page is not on prod. `invoice_pay_session.sql` (P9) is staging only.
 
 ## Admin (service role)
 
@@ -45,11 +45,11 @@ Payments, payment attempts, credits, pay tokens, and the audit log are not owner
 
 `sautikit_did_pool.status = 'quarantine'` is not Available. `quarantine_until` is a reuse hold (30 days is a placeholder, not a decision). It is not the 7-day voicemail window. After `quarantine_until`, the number can be assigned again. `release_did_from_business` and `quarantine_pool_number` both clear `tenant_id` and store the business on `last_tenant_id`. Release also sets the business number to pending. Pool quarantine does not change the business number.
 
-`billing_notice_outbox` includes `sending` rows. The sender claims with `claim_billing_notices` (pending, or sending whose `claimed_at` is null or older than 15 minutes) and settles with `settle_billing_notice`. A notice already sent stays sent. `claimed_at` is for the sender. Owners still read `billing_notices`.
+`billing_notice_outbox` includes `sending` rows. The sender claims with `claim_billing_notices` (pending, or sending whose `claimed_at` is null or older than 15 minutes) and settles with `settle_billing_notice`. A notice already sent stays sent. `claimed_at` is for the sender. Owners still read `billing_notices`. `sendClaimedBillingNotices` passes the notice `idempotency_key` as the notify ledger key, so a reclaimed row cannot send twice. A replay whose notify ledger already shows that send settles the notice sent. The sender does nothing unless `BILLING_NOTICES_SEND=on`.
 
 ## What this layer does not do
 
 - It does not charge a card or a phone.
-- It does not send SMS, WhatsApp, or email. Billing notices wait on the existing sender. Call and voicemail updates are a different check: `tenant_escalation_allowed`. When that is false, those updates stay in the Inbox.
+- It does not send SMS, WhatsApp, or email while `BILLING_NOTICES_SEND` is off (the default). Billing notices wait on `sendClaimedBillingNotices`. Call and voicemail updates are a different check: `tenant_escalation_allowed`. When that is false, those updates stay in the Inbox.
 - It does not answer or refuse a call. Voice reads `voicemail_until` later.
 - Deleting a business still removes its notices, status events, and invoices. A payment or a credit blocks that delete. The billing audit log stays.

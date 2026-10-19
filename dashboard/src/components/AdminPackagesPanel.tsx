@@ -11,7 +11,6 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Stamp } from "@/components/ui/Stamp";
 import { Switch } from "@/components/ui/Switch";
 import {
-  annualPriceKes,
   inboundKesPerMinute,
   kesPerSecondFromMinute,
   minutesUsedFromSeconds,
@@ -20,7 +19,7 @@ import {
   type BillingRateCard,
   type TenantSubscriptionRow,
 } from "@/lib/packageCatalog";
-import { packagePriceLabel } from "@/lib/packagePriceLabel";
+import { formatKes } from "@/lib/packagePriceLabel";
 import { usedOfIncluded } from "@/lib/packageUsageAlign";
 import { requestErrorText } from "@/lib/adminBillingCopy";
 
@@ -52,8 +51,13 @@ function shopWhen(row: TenantSubscriptionRow) {
   return row.period ? `${pack} / ${row.period}` : pack;
 }
 
-function skuPreview(pack: BillingPackage, yearKes: number) {
-  return `${packagePriceLabel(pack.monthlyPriceKes)} · Per year ${packagePriceLabel(yearKes)}`;
+function adminMoney(amount: number) {
+  if (!(amount > 0)) return "Not set";
+  return `KSh ${formatKes(amount)}`;
+}
+
+function skuPreview(pack: BillingPackage) {
+  return `${adminMoney(pack.monthlyPriceKes)} · Per year ${adminMoney(pack.annualPriceKes)}`;
 }
 
 export function AdminPackagesPanel({
@@ -152,7 +156,7 @@ export function AdminPackagesPanel({
         <ul className="divide-y divide-hairline">
           <ListRow
             title="On-demand"
-            preview={`Inbound KES ${inboundMin}/min · Year -${rates.annualDiscountPercent}%`}
+            preview={`Inbound KSh ${formatKes(inboundMin)}/min · Year -${rates.annualDiscountPercent}%`}
             onOpen={openRates}
           />
         </ul>
@@ -190,7 +194,7 @@ export function AdminPackagesPanel({
                 <ListRow
                   key={pack.id}
                   title={pack.name}
-                  preview={skuPreview(pack, annualPriceKes(pack.monthlyPriceKes, rates.annualDiscountPercent))}
+                  preview={skuPreview(pack)}
                   when={`${pack.minutes.toLocaleString("en-KE")} min`}
                   stamp={<Stamp tone={pack.isActive ? "live" : "neutral"}>{pack.isActive ? "Live" : "Hidden"}</Stamp>}
                   onOpen={() => openSku(pack.id)}
@@ -274,7 +278,7 @@ export function AdminPackagesPanel({
       >
         <SheetNote error={error} />
         <div className="space-y-4">
-          <Field id="rate-in" label="Inbound KES / min" hint={`KES ${rates.inboundKesPerSecond}/sec`}>
+          <Field id="rate-in" label="Inbound KSh / min" hint={`KSh ${formatKes(rates.inboundKesPerSecond)}/sec`}>
             {(props) => (
               <Input
                 {...props}
@@ -293,8 +297,8 @@ export function AdminPackagesPanel({
           </Field>
           <Field
             id="rate-out"
-            label="Outbound KES / min"
-            hint={`KES ${rates.outboundKesPerSecond}/sec. Hidden until live transfer.`}
+            label="Outbound KSh / min"
+            hint={`KSh ${formatKes(rates.outboundKesPerSecond)}/sec. Hidden until live transfer.`}
           >
             {(props) => (
               <Input
@@ -312,7 +316,7 @@ export function AdminPackagesPanel({
               />
             )}
           </Field>
-          <Field id="rate-wa" label="WhatsApp KES">
+          <Field id="rate-wa" label="WhatsApp KSh">
             {(props) => (
               <Input
                 {...props}
@@ -324,7 +328,7 @@ export function AdminPackagesPanel({
               />
             )}
           </Field>
-          <Field id="rate-sms" label="SMS KES / segment">
+          <Field id="rate-sms" label="SMS KSh / segment">
             {(props) => (
               <Input
                 {...props}
@@ -336,7 +340,7 @@ export function AdminPackagesPanel({
               />
             )}
           </Field>
-          <Field id="rate-email" label="Email KES">
+          <Field id="rate-email" label="Email KSh">
             {(props) => (
               <Input
                 {...props}
@@ -419,8 +423,8 @@ export function AdminPackagesPanel({
             </Field>
             <Field
               id="sku-month"
-              label="Monthly KES"
-              hint={`Per year ${packagePriceLabel(annualPriceKes(sku.monthlyPriceKes, rates.annualDiscountPercent))}`}
+              label="Monthly KSh"
+              hint={`Per year ${adminMoney(sku.annualPriceKes)}`}
             >
               {(props) => (
                 <Input

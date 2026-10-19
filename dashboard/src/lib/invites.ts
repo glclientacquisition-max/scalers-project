@@ -53,7 +53,7 @@ const RPC_ERRORS: Record<string, string> = {
   bad_role: "Pick a role.",
   already_member: "That person is already a member of this business.",
   already_invited: "There's already a pending invite for that email. Resend it instead.",
-  seats_full: "All your seats are in use. Upgrade your package to invite more people.",
+  seats_full: "All your seats are in use.",
   invalid: "This invite link isn't valid.",
   not_pending: "This invite has already been used or was cancelled.",
   expired: "This invite has expired. Ask for a new one.",

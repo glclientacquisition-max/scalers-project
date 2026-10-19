@@ -19,7 +19,7 @@ const DEFAULT_TENANT_ID = process.env.TENANT_ID || null;
 const WALLET_CHARGING_ENABLED = String(process.env.WALLET_CHARGING_ENABLED || 'true').toLowerCase() !== 'false';
 const WALLET_RATE_KES_PER_MINUTE = Number(process.env.WALLET_RATE_KES_PER_MINUTE || 0);
 const { envTransferRateKesPerMin } = require('./billing/liveTransferLegs');
-const { billableTalkSeconds, inboundOpen } = require('./billing/packageOverage');
+const { billableTalkSeconds, inboundOpen, effectiveOnDemand } = require('./billing/packageOverage');
 const recordingCopy = require('./sautikit/recordingCopy');
 
 function throwIfError(context, error) {
@@ -331,7 +331,7 @@ async function listInboundTenantRows() {
   const selects = [
     // archived_at / line_status drive the closed-line gate (#639/#651).
     // billing_enforcement: beta (off) never rejects at the cap (#631).
-    'id, business_name, sautikit_virtual_number, is_active, archived_at, line_status, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement',
+    'id, business_name, sautikit_virtual_number, is_active, archived_at, line_status, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement, spend_limit_blocked',
     'id, sautikit_virtual_number, is_active, archived_at, line_status, minutes_included, seconds_used, on_demand_usage_enabled',
     'id, sautikit_virtual_number, is_active, archived_at, minutes_included, seconds_used, on_demand_usage_enabled',
     'id, sautikit_virtual_number, is_active, line_status, minutes_included, seconds_used, on_demand_usage_enabled',
@@ -363,11 +363,19 @@ async function listInboundTenantRows() {
  */
 async function getTenantPackageUsage(tenantId) {
   if (!tenantId) return null;
-  const { data, error } = await supabase
+  const baseSelect = 'id, business_name, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement';
+  let { data, error } = await supabase
     .from('tenants')
-    .select('id, business_name, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement')
+    .select(`${baseSelect}, spend_limit_blocked`)
     .eq('id', tenantId)
     .maybeSingle();
+  if (error && /spend_limit_blocked|column|schema cache/i.test(error.message || '')) {
+    ({ data, error } = await supabase
+      .from('tenants')
+      .select(baseSelect)
+      .eq('id', tenantId)
+      .maybeSingle());
+  }
   if (error) {
     if (!/minutes_included|seconds_used|on_demand_usage_enabled|billing_enforcement|column|schema cache/i.test(error.message || '')) {
       console.warn('[db] getTenantPackageUsage:', error.message);
@@ -399,6 +407,7 @@ async function getTenantPackageUsage(tenantId) {
     minutesIncluded: data.minutes_included,
     secondsUsed: data.seconds_used,
     onDemand: Boolean(data.on_demand_usage_enabled),
+    spendLimitBlocked: data.spend_limit_blocked === true,
     enforcement: data.billing_enforcement || 'off',
     periodStart,
     hasPackage,
@@ -434,7 +443,7 @@ async function packageInboundOpen({ toNumber, fromNumber, tenantId } = {}) {
     ...inboundOpen({
       minutesIncluded: usage.minutesIncluded,
       secondsUsed: usage.secondsUsed,
-      onDemand: usage.onDemand,
+      onDemand: effectiveOnDemand(usage.onDemand, usage.spendLimitBlocked),
       enforcement: usage.enforcement,
       hasPackage: usage.hasPackage,
     }),
@@ -1486,6 +1495,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       faqs: [],
       teamDirectory: [],
       unknownAnswerFallback: null,
+      unknownAnswerSpoken: null,
       dailyBulletin: [],
       alertEmail: null,
       notifyChannels: { sms: true, whatsapp: true, email: true, caller_sms: false },
@@ -1508,8 +1518,46 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
 
   return tenantProfileFromRow(row, {
     openAppointments: await listOpenAppointments(row.id),
+    serviceAreas:
+      row.service_areas !== undefined || !require('./conversation/areaTerms').areaFeesEnabled()
+        ? undefined
+        : await getTenantServiceAreas(row.id),
     ...(await loadProvenanceForProfile(row.id)),
+    ...(await loadUnknownAnswerSpoken(row.id)),
   });
+}
+
+/** tenants.service_areas (Locations area terms) when the main select did not read it. Null on an old schema or error. */
+async function getTenantServiceAreas(tenantId) {
+  if (!tenantId) return null;
+  try {
+    const { data, error } = await supabase.from('tenants').select('service_areas').eq('id', tenantId).maybeSingle();
+    if (error) return null;
+    return data?.service_areas ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * tenants.unknown_answer_spoken ({en, sw, source, updated_at}), written by the
+ * Desk. Read only with VOICE_FACT_REFS on, in its own query so a database
+ * without the column (or any error) still loads the call: null, never a throw.
+ */
+async function loadUnknownAnswerSpoken(tenantId) {
+  try {
+    const { factRefsEnabled } = require('./conversation/factSheet');
+    if (!tenantId || !factRefsEnabled()) return {};
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('unknown_answer_spoken')
+      .eq('id', tenantId)
+      .maybeSingle();
+    if (error) return { unknownAnswerSpoken: null };
+    return { unknownAnswerSpoken: data?.unknown_answer_spoken ?? null };
+  } catch {
+    return { unknownAnswerSpoken: null };
+  }
 }
 
 async function loadProvenanceForProfile(tenantId) {

@@ -7,18 +7,29 @@ function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
 }
 
+function walk(rel) {
+  const abs = path.join(__dirname, "..", rel);
+  return fs.readdirSync(abs, { withFileTypes: true }).flatMap((entry) => {
+    const child = path.join(rel, entry.name);
+    if (entry.isDirectory()) return walk(child);
+    return /\.(ts|tsx|js|mjs)$/.test(entry.name) ? [child] : [];
+  });
+}
+
 describe("package usage meter", () => {
-  it("ceils seconds to minutes and never goes negative", () => {
+  it("floors seconds to whole minutes and never goes negative", () => {
     const catalog = read("dashboard/src/lib/packageCatalog.ts");
-    assert.match(catalog, /export function minutesUsedFromSeconds/);
-    assert.match(catalog, /Math\.ceil\(Math\.max\(0, Number\(seconds\) \|\| 0\) \/ 60\)/);
+    const minutes = read("dashboard/src/lib/minutes.ts");
+    assert.match(catalog, /export \{ minutesUsedFromSeconds \}/);
+    assert.match(minutes, /export function minutesUsedFromSeconds/);
+    assert.match(minutes, /Math\.floor\(Math\.max\(0, finite\(seconds\)\) \/ 60\)/);
     assert.match(catalog, /export function remainingCount/);
     assert.match(
       catalog,
       /Math\.max\(0, Math\.floor\(Number\(included\) \|\| 0\) - Math\.max\(0, Number\(used\) \|\| 0\)\)/
     );
-    assert.equal(Math.ceil(90 / 60), 2);
-    assert.equal(Math.max(0, 300 - 2), 298);
+    assert.equal(Math.floor(90 / 60), 1);
+    assert.equal(Math.max(0, 300 - 1), 299);
     assert.equal(Math.max(0, 0 - 5), 0);
   });
 
@@ -32,22 +43,27 @@ describe("package usage meter", () => {
     assert.match(catalog, /export async function loadBusinessPackageNames/);
   });
 
-  it("shows minutes left and used/included buckets on Usage", () => {
+  it("shows minutes left and message credits on Usage", () => {
     const page = read("dashboard/src/app/(desk)/wallet/page.tsx");
-    assert.match(page, /loadOwnerPackageMeter\(tenant\.id\)/);
-    assert.match(page, /Minutes left/);
-    assert.match(page, /label: "Minutes", left: minutesLeft, used: pack\.minutesUsed/);
-    assert.match(page, /label: "SMS", left: smsLeft, used: pack\.smsUsed/);
-    assert.match(page, /label: "Email", left: emailLeft, used: pack\.emailUsed/);
-    assert.match(page, /label: "WhatsApp", left: waLeft, used: pack\.waUsed/);
-    assert.match(page, /label: "Seats"/);
-    assert.match(page, /On-demand rates/);
-    assert.match(page, />Calls</);
-    assert.match(page, /KES \{kes\(inboundMin\)\}\/min/);
-    assert.doesNotMatch(page, /Calls out/);
+    const summary = read("dashboard/src/components/plan/UsageSummary.tsx");
+    assert.match(page, /loadOwnerUsageView\(tenant\)/);
+    assert.match(read("dashboard/src/lib/ownerUsageLoad.ts"), /loadOwnerPackageMeter\(tenant\.id\)/);
+    assert.match(summary, /Minutes left/);
+    assert.match(page, /label: "Message credits"/);
+    assert.match(page, /planEntry\(extras\.billingStatus, canChangePlan\)/);
+    assert.doesNotMatch(page, /a credit/);
+    assert.doesNotMatch(page, /\bSMS\b/);
+    assert.doesNotMatch(page, /On-demand rates/);
     assert.doesNotMatch(page, /WalletTopUpButton/);
     assert.doesNotMatch(page, /Top up prepaid/);
     assert.doesNotMatch(page, /daysRemainingAtPace/);
+  });
+
+  it("stacks each Usage column on its own at lg so the minutes card is not stretched", () => {
+    const summary = read("dashboard/src/components/plan/UsageSummary.tsx");
+    assert.match(summary, /lg:grid lg:grid-cols-12 lg:items-start/);
+    assert.match(summary, /contents lg:col-span-7 lg:flex lg:min-w-0 lg:flex-col lg:gap-6/);
+    assert.doesNotMatch(summary, /lg:row-span-2/);
   });
 
   it("does not list package prices on the landing page", () => {
@@ -73,7 +89,7 @@ describe("package usage meter", () => {
     assert.match(prices, /Prices are not on this page yet/);
     assert.match(prices, /inboundKesPerMinute > 0/);
     assert.match(prices, /past included/);
-    assert.match(prices, /calls KES \{formatKes\(board\.inboundKesPerMinute\)\}\/min\./);
+    assert.match(prices, /calls KSh \{formatKes\(board\.inboundKesPerMinute\)\}\/min\./);
     assert.doesNotMatch(prices, /<table/);
     assert.doesNotMatch(prices, /border-accent/);
     assert.doesNotMatch(prices, /5000|12000|25000/);
@@ -106,7 +122,7 @@ describe("package usage meter", () => {
   it("previews landing prices and sends package changes to the business's Billing page", () => {
     const panel = read("dashboard/src/components/AdminPackagesPanel.tsx");
     const page = read("dashboard/src/app/admin/(console)/packages/page.tsx");
-    assert.match(panel, /packagePriceLabel/);
+    assert.match(panel, /adminMoney/);
     assert.match(panel, /Per year/);
     assert.match(panel, /live on landing/);
     assert.match(panel, /action: "save_package"/);
@@ -174,31 +190,42 @@ describe("package usage meter", () => {
   it("opts into on-demand after included buckets hit zero", () => {
     const panel = read("dashboard/src/components/OnDemandUsagePanel.tsx");
     const actions = read("dashboard/src/app/(desk)/wallet/actions.ts");
-    assert.match(panel, /Charge on-demand rates for minutes and SMS past included/);
+    assert.match(panel, /Allow extra usage/);
+    assert.doesNotMatch(panel, /a credit/);
     assert.doesNotMatch(panel, /prepaid minutes/);
     assert.doesNotMatch(panel, /Continue after included/);
     assert.doesNotMatch(panel, /the wallet/);
     assert.match(actions, /Past included minutes and SMS are charged at the on-demand rates/);
   });
 
-  it("says calls stop when included minutes are gone and on-demand is off", () => {
+  it("keeps stop-and-rate lines off the owner Usage page", () => {
     const page = read("dashboard/src/app/(desk)/wallet/page.tsx");
     const home = read("dashboard/src/app/(desk)/home/page.tsx");
     const copy = read("dashboard/src/lib/usageCap.ts");
-    assert.match(page, /usageCapNotice/);
-    assert.match(copy, /Calls stopped\. Tenant SMS stopped\./);
-    assert.match(copy, /Included minutes used\. Calls stopped\./);
-    assert.match(copy, /Included SMS used\. Tenant SMS stopped\./);
+    assert.doesNotMatch(page, /usageCapNotice/);
+    assert.doesNotMatch(page, /Inbox only/);
+    assert.doesNotMatch(page, /a credit/);
+    assert.match(page, /planEntry\(extras\.billingStatus, canChangePlan\)/);
     assert.match(home, /homeMinuteStatus/);
-    assert.match(copy, /if \(!input\.onDemand\) return "Stopped"/);
+    assert.match(copy, /if \(!input\.onDemand\) return "Calls stopped"/);
   });
 
   it("lists the assigned package on Admin Businesses", () => {
     const admin = read("dashboard/src/lib/admin.ts");
-    const panel = read("dashboard/src/components/AdminBusinessesPanel.tsx");
+    const ui = read("dashboard/src/lib/adminBusinessUi.ts");
     assert.match(admin, /loadBusinessPackageNames/);
     assert.match(admin, /package_name: pack\?\.packageName \|\| null/);
-    assert.match(panel, /b\.package_name/);
-    assert.match(panel, /packLabel/);
+    assert.match(ui, /export function packLabel/);
+    assert.match(ui, /b\.package_name/);
+    const importRe = /import\s*\{([^}]+)\}\s*from\s*"@\/lib\/adminBusinessUi"/g;
+    const callers = walk("dashboard/src").flatMap((rel) => {
+      const source = read(rel);
+      const names = [...source.matchAll(importRe)].map((match) => match[1]).join(",");
+      return /\bpackLabel\b/.test(names) ? [{ rel, source }] : [];
+    });
+    assert.ok(callers.length > 0, "a screen imports packLabel from adminBusinessUi");
+    for (const caller of callers) {
+      assert.match(caller.source, /packLabel\s*\(/, caller.rel);
+    }
   });
 });

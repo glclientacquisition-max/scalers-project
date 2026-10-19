@@ -3,22 +3,21 @@ const MPESA_TX_LIMIT_KES = 150000;
 const LIMIT_CENTS = BigInt(MPESA_TX_LIMIT_KES) * 100n;
 
 /**
- * Whole cents from a decimal string. Rejects more than 2 decimal places.
+ * Whole cents from a decimal string or bigint. Rejects JS numbers and more than 2 decimal places.
  * @param {unknown} amount
  * @returns {bigint | null}
  */
 function toCents(amount) {
   if (typeof amount === "bigint") return amount;
-  if (typeof amount === "number") {
-    if (!Number.isFinite(amount)) return null;
-    return toCents(amount.toFixed(2));
-  }
+  // A JS number rounds through toFixed and can drop a cent (1.005 -> "1.00").
+  if (typeof amount === "number") return null;
   const s = String(amount ?? "").trim();
-  const m = /^(\d+)(?:\.(\d+))?$/.exec(s);
+  const m = /^(-)?(\d+)(?:\.(\d+))?$/.exec(s);
   if (!m) return null;
-  const frac = m[2] || "";
+  const frac = m[3] || "";
   if (frac.length > 2) return null;
-  return BigInt(m[1]) * 100n + BigInt((frac + "00").slice(0, 2));
+  const cents = BigInt(m[2]) * 100n + BigInt((frac + "00").slice(0, 2));
+  return m[1] ? -cents : cents;
 }
 
 /** @param {bigint} cents */

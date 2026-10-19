@@ -2,6 +2,9 @@
 -- Purpose: invoice numbers SCL-YYYY-000001, a nullable tax column, receipts,
 --          and billing notice kinds for issued, due soon, payment received,
 --          and overdue. Does not charge. Does not send.
+--          Does not define finalize_invoice. billing_company.sql (P8) is the
+--          last file and owns that function. Re-applying this file must not
+--          replace it.
 -- Run after: invoice_pay.sql
 -- Idempotent. Safe to re-run.
 --
@@ -226,60 +229,7 @@ $$;
 comment on function public.enqueue_billing_notice(uuid, text, text, text, text) is
   'Queues one billing notice for the existing sender. Invoice mail prefers email. Does not send. Platform billed.';
 
-create or replace function public.finalize_invoice(p_invoice_id uuid)
-returns public.invoices
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_inv public.invoices%rowtype;
-  v_year integer;
-  v_n integer;
-  v_number text;
-  v_body text;
-begin
-  select * into v_inv from public.invoices where id = p_invoice_id for update;
-  if not found then
-    raise exception 'invoice not found';
-  end if;
-  if v_inv.status <> 'draft' then
-    raise exception 'only a draft invoice can be finalized';
-  end if;
-
-  v_year := extract(year from (now() at time zone 'Africa/Nairobi'))::integer;
-  insert into public.billing_invoice_counters (year, last_number)
-  values (v_year, 0)
-  on conflict (year) do nothing;
-  update public.billing_invoice_counters
-  set last_number = last_number + 1
-  where year = v_year
-  returning last_number into v_n;
-  v_number := 'SCL-' || v_year::text || '-' || lpad(v_n::text, 6, '0');
-
-  update public.invoices
-  set status = 'open',
-      invoice_number = v_number,
-      issued_at = coalesce(issued_at, now()),
-      updated_at = now()
-  where id = p_invoice_id
-  returning * into v_inv;
-
-  v_body := 'Your Business Assistant invoice ' || v_number
-    || ' for KSh ' || trim(to_char(v_inv.total_kes, 'FM999999990.00')) || ' is ready.';
-  perform public.enqueue_billing_notice(
-    v_inv.tenant_id,
-    'platform_billing_invoice_issued',
-    'platform_billing_invoice_issued:' || v_inv.id::text,
-    'Invoice ' || v_number,
-    v_body
-  );
-  return v_inv;
-end;
-$$;
-
-comment on function public.finalize_invoice(uuid) is
-  'Assigns SCL-YYYY-000001 for the Africa/Nairobi year. Drafts stay unnumbered. Queues the issued notice once. Does not charge and does not send.';
+-- finalize_invoice lives in billing_company.sql. This file does not replace it.
 
 create or replace function public.enqueue_invoice_due_soon(p_invoice_id uuid)
 returns public.billing_notices
@@ -371,6 +321,12 @@ begin
 
   select * into v_existing from public.invoice_receipts where payment_id = p_payment_id;
   if found then
+    if v_existing.amount_kes is distinct from v_pay.amount_kes then
+      update public.invoice_receipts
+      set amount_kes = v_pay.amount_kes
+      where id = v_existing.id
+      returning * into v_existing;
+    end if;
     return v_existing;
   end if;
 
@@ -409,7 +365,7 @@ end;
 $$;
 
 comment on function public.issue_invoice_receipt(uuid) is
-  'Issues RCT-YYYY-000001 once per payment and queues the payment received notice. Does not send.';
+  'Issues RCT-YYYY-000001 once per payment and queues the payment received notice. A later amount change updates that same receipt and does not mint a second number. The first notice stays (notices are append-only). Does not send.';
 
 revoke all on function public.issue_invoice_receipt(uuid) from public, anon, authenticated;
 grant execute on function public.issue_invoice_receipt(uuid) to service_role;
@@ -431,7 +387,22 @@ begin
 end;
 $$;
 
+revoke all on function public.payments_issue_receipt() from public, anon, authenticated;
+grant execute on function public.payments_issue_receipt() to service_role;
+
 drop trigger if exists payments_issue_receipt on public.payments;
 create trigger payments_issue_receipt
   after insert on public.payments
   for each row execute function public.payments_issue_receipt();
+
+drop trigger if exists payments_issue_receipt_update on public.payments;
+create trigger payments_issue_receipt_update
+  after update of amount_kes on public.payments
+  for each row
+  when (
+    new.amount_kes is distinct from old.amount_kes
+    and new.match_status in ('matched', 'partial', 'over')
+    and new.invoice_id is not null
+    and new.amount_kes > 0
+  )
+  execute function public.payments_issue_receipt();

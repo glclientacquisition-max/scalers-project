@@ -1,10 +1,138 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- node:test loads this file with require() */
 const { nextPart, splitKes } = require("./money");
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Poll until the in-flight attempt has a checkout, or the row is no longer pending.
+ * @param {object} ledger
+ * @param {{ token: string, amountKes: string, partIndex: number, partCount: number }} attemptInput
+ */
+async function waitForAttached(ledger, attemptInput) {
+  for (let i = 0; i < 40; i += 1) {
+    await sleep(25);
+    const again = await ledger.createAttempt(attemptInput);
+    if (again.checkoutUrl && again.checkoutSessionId) return again;
+    if (again.cancel) return again;
+    if (!again.inFlight && !again.reused) return again;
+  }
+  const err = new Error("checkout is still starting");
+  err.code = "in_flight";
+  throw err;
+}
+
+const CLOSED_CHECKOUT = new Set([
+  "cancelled",
+  "canceled",
+  "expired",
+  "complete",
+  "completed",
+  "failed",
+  "succeeded",
+  "paid",
+]);
+
+function checkoutIsOpen(row) {
+  if (!row) return false;
+  const status = String(row.status || "").toLowerCase();
+  const pay = String(row.paymentStatus || row.payment_status || "").toLowerCase();
+  if (CLOSED_CHECKOUT.has(status) || CLOSED_CHECKOUT.has(pay)) return false;
+  return true;
+}
+
+function stillProcessing() {
+  const err = new Error("previous payment still processing");
+  err.code = "previous_processing";
+  return err;
+}
+
+/**
+ * @param {{ provider: { getCheckout?: Function } }} input
+ * @param {string | null} sessionId
+ */
+async function readCheckout(input, sessionId) {
+  if (!sessionId || typeof input.provider.getCheckout !== "function") {
+    return { readable: false, row: null };
+  }
+  try {
+    return { readable: true, row: await input.provider.getCheckout(sessionId) };
+  } catch {
+    return { readable: false, row: null };
+  }
+}
+
+/**
+ * A session we can still pay is reused when we have its URL. Otherwise the
+ * caller is blocked and no second attempt is inserted.
+ * @param {object} attempt
+ * @param {string} sessionId
+ * @param {{ readable: boolean, row: object | null }} read
+ */
+function reuseOrBlock(attempt, sessionId, read) {
+  if (read.readable && checkoutIsOpen(read.row) && attempt.checkoutUrl) {
+    return {
+      kept: true,
+      checkoutUrl: attempt.checkoutUrl,
+      checkoutId: sessionId,
+      reused: true,
+    };
+  }
+  throw stillProcessing();
+}
+
+/**
+ * Cancel the old Bachs session, then read it. A successful cancel is not
+ * proof the session is void. An open or unreadable session is reused or
+ * blocked. A closed session is replaced.
+ * @param {{ ledger: object, provider: { cancelCheckout?: Function, getCheckout?: Function } }} input
+ * @param {object} attempt
+ * @param {object} attemptInput
+ */
+async function replaceExpiredAttempt(input, attempt, attemptInput) {
+  const sessionId = attempt.checkoutSessionId;
+  if (sessionId && typeof input.provider.cancelCheckout === "function") {
+    try {
+      await input.provider.cancelCheckout(sessionId);
+    } catch {
+      /* Read below. A thrown cancel never opens a second session by itself. */
+    }
+    const read = await readCheckout(input, sessionId);
+    if (!read.readable || checkoutIsOpen(read.row)) {
+      return reuseOrBlock(attempt, sessionId, read);
+    }
+  }
+  await input.ledger.markAttempt(attempt.id, { status: "cancelled" });
+  return input.ledger.createAttempt(attemptInput);
+}
+
+/**
+ * The session id is already stored. Read it. Reuse an open checkout, block
+ * when it cannot be read, and replace only when the read says it is closed.
+ * @param {{ ledger: object, provider: { getCheckout?: Function } }} input
+ * @param {object} attempt
+ * @param {object} attemptInput
+ */
+async function resumeUnattached(input, attempt, attemptInput) {
+  const sessionId = attempt.checkoutSessionId;
+  const read = await readCheckout(input, sessionId);
+  if (!read.readable || checkoutIsOpen(read.row)) {
+    return reuseOrBlock(attempt, sessionId, read);
+  }
+  await input.ledger.markAttempt(attempt.id, { status: "cancelled" });
+  return input.ledger.createAttempt(attemptInput);
+}
+
 /**
  * Start one hosted checkout for the next unpaid part.
  * The redirect does not mark the invoice paid.
- * @param {{ token: string, origin: string, ledger: object, provider: { createCheckout: Function } }} input
+ * A second click while the first session is still being created waits for it.
+ * An expired session is cancelled, then read. A session that is still open
+ * is reused or blocked, including when cancel returned success.
+ * A failed attach keeps the session id on the attempt. The next click reads
+ * it and does not open another session while it is still payable.
+ * @param {{ token: string, origin: string, ledger: object, provider: { createCheckout: Function, cancelCheckout?: Function } }} input
  */
 async function startInvoiceCheckout(input) {
   const lookup = await input.ledger.lookup(input.token);
@@ -20,12 +148,34 @@ async function startInvoiceCheckout(input) {
     throw err;
   }
 
-  const attempt = await input.ledger.createAttempt({
+  const attemptInput = {
     token: input.token,
     amountKes: next.amountKes,
     partIndex: next.index,
     partCount: next.count,
-  });
+  };
+  let attempt = await input.ledger.createAttempt(attemptInput);
+  if (attempt.unattached) {
+    attempt = await resumeUnattached(input, attempt, attemptInput);
+    if (attempt.kept) {
+      return { checkoutUrl: attempt.checkoutUrl, checkoutId: attempt.checkoutId, reused: true };
+    }
+  }
+  if (attempt.cancel) {
+    attempt = await replaceExpiredAttempt(input, attempt, attemptInput);
+    if (attempt.kept) {
+      return { checkoutUrl: attempt.checkoutUrl, checkoutId: attempt.checkoutId, reused: true };
+    }
+  }
+  if (attempt.inFlight) {
+    attempt = await waitForAttached(input.ledger, attemptInput);
+    if (attempt.cancel) {
+      attempt = await replaceExpiredAttempt(input, attempt, attemptInput);
+      if (attempt.kept) {
+        return { checkoutUrl: attempt.checkoutUrl, checkoutId: attempt.checkoutId, reused: true };
+      }
+    }
+  }
   if (attempt.reused && attempt.checkoutUrl && attempt.checkoutSessionId) {
     return {
       checkoutUrl: attempt.checkoutUrl,
@@ -34,8 +184,14 @@ async function startInvoiceCheckout(input) {
     };
   }
 
-  const successUrl = `${input.origin}/pay/${encodeURIComponent(input.token)}?return=1`;
-  const cancelUrl = `${input.origin}/pay/${encodeURIComponent(input.token)}`;
+  const returnId = attempt.returnId;
+  if (!returnId) {
+    const err = new Error("missing return id");
+    err.code = "return_id";
+    throw err;
+  }
+  const successUrl = `${input.origin}/pay/return/${encodeURIComponent(returnId)}?return=1`;
+  const cancelUrl = `${input.origin}/pay/return/${encodeURIComponent(returnId)}`;
   const customer = {};
   if (lookup.ownerEmail) customer.email = lookup.ownerEmail;
   if (lookup.ownerName) customer.name = lookup.ownerName;
@@ -63,11 +219,44 @@ async function startInvoiceCheckout(input) {
     await input.ledger.markAttempt(attempt.id, { status: "failed" });
     throw err;
   }
-  await input.ledger.attachCheckout(attempt.id, {
-    checkoutId: created.checkoutId,
-    checkoutUrl: created.checkoutUrl,
-    expiresAt: created.expiresAt || null,
-  });
+  const minutes = 60;
+  const expiresAt = created.expiresAt || new Date(Date.now() + minutes * 60 * 1000).toISOString();
+  try {
+    await input.ledger.attachCheckout(attempt.id, {
+      checkoutId: created.checkoutId,
+      checkoutUrl: created.checkoutUrl,
+      expiresAt,
+    });
+  } catch (err) {
+    if (typeof input.ledger.parkUnattached === "function" && created.checkoutId) {
+      try {
+        await input.ledger.parkUnattached(attempt.id, {
+          checkoutId: created.checkoutId,
+          checkoutUrl: created.checkoutUrl,
+          expiresAt,
+        });
+      } catch {
+        /* Stay pending when the session id cannot be stored. */
+      }
+    }
+    let cancelFailed = true;
+    if (typeof input.provider.cancelCheckout === "function" && created.checkoutId) {
+      try {
+        await input.provider.cancelCheckout(created.checkoutId);
+        cancelFailed = false;
+      } catch {
+        cancelFailed = true;
+      }
+    }
+    if (!cancelFailed) {
+      const read = await readCheckout(input, created.checkoutId);
+      if (read.readable && !checkoutIsOpen(read.row)) {
+        await input.ledger.markAttempt(attempt.id, { status: "failed" });
+        throw err;
+      }
+    }
+    throw err;
+  }
   return { checkoutUrl: created.checkoutUrl, checkoutId: created.checkoutId, reused: false, reference: attempt.id };
 }
 

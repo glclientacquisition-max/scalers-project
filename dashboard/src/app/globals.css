@@ -221,8 +221,9 @@
 }
 
 /*
- * Frosted chrome. Tab bar, rail, sheets, menus, landing header, auth cards.
- * Opaque canvas and list rows stay flat. Reduced transparency snaps to surface.
+ * Frosted chrome. Tab bar, rail, menus, landing header, auth cards.
+ * Sheets stay an opaque surface. Opaque canvas and list rows stay flat.
+ * Reduced transparency snaps the frost to surface.
  */
 .glass-chrome {
   background-color: var(--glass);
@@ -241,22 +242,9 @@
 }
 
 /*
- * Dark sheet is --surface. iOS Safari backdrop-filter milks 58% glass.
- * Tab bar and rail keep frost. One frosted layer, not two.
+ * The sheet is an opaque surface in every theme. Backdrop blur on a
+ * translucent panel lets page buttons show through the amount line.
  */
-:root[data-theme="dark"] .desk-drawer.glass-chrome {
-  background-color: var(--surface);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .desk-drawer.glass-chrome {
-    background-color: var(--surface);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-}
 
 /*
  * Body sits outside .desk-theme, so its `color` is computed from :root --ink
@@ -603,6 +591,9 @@ h3,
  * down the same path it entered. Keyboard and pointer share that exit.
  */
 .desk-drawer {
+  background-color: var(--surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   transform: translateY(calc(var(--drawer-snap-point-offset, 0px) + var(--drawer-swipe-movement-y, 0px)));
   transition: transform var(--sheet-ms) var(--ease-out);
 }

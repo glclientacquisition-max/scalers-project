@@ -1,13 +1,13 @@
 ---
 owner: desk
-last_reviewed: 2026-10-12
+last_reviewed: 2026-10-18
 ---
 
 # Scalers design system (MASTER)
 
 **Status:** Canon for `dashboard/`  
 **Date:** 2026-09-17  
-**Law:** [`FRONTEND_CONSTITUTION.md`](../../explanation/frontend/FRONTEND_CONSTITUTION.md) + `.cursor/rules/scalers-design-ux.mdc`  
+**Law:** [`FRONTEND_2_0_CHARTER.md`](../../explanation/frontend/FRONTEND_2_0_CHARTER.md) wins. [`FRONTEND_CONSTITUTION.md`](../../explanation/frontend/FRONTEND_CONSTITUTION.md) is history. `.cursor/rules/scalers-design-ux.mdc` follows the charter.  
 **Chat client (not shipped):** [`WHATSAPP_BUSINESS_FRONTEND.md`](../../explanation/frontend/WHATSAPP_BUSINESS_FRONTEND.md)
 
 Page notes only record deltas. Do not copy this file into every page spec.
@@ -20,8 +20,9 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 
 | Meaning | CSS | Tailwind |
 | --- | --- | --- |
-| Brand | `--brand` `#0096FF` | `brand` / `accent` |
-| Brand deep / link | `--brand-deep` `#005CCC` | `brand-700` / `accent-deep` |
+| Brand | `--brand` `#0096FF` | Mark, focus ring, and active indicator. Never for text. `brand` |
+| Accent | `--accent` `#005CCC` | The only filled action color. `accent` |
+| Brand deep / link | `--accent-deep` `#005CCC` | `accent-deep` |
 | Navy ink | `--ink` `#0A192F` | `ink` / `brand-900` |
 | Soft ink | `--ink-soft` `#4A5B73` | `ink-soft` |
 | Canvas | `--bg` `#F4F7FB` | `surface-canvas` |
@@ -37,7 +38,7 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 | Desk tab bar | `--desk-tabbar-h` | `4rem` below `md`, `0` from `md`. Phone nested insides (`[data-ticket-chat]`, `[data-desk-nested]`) also set `0`. Matches `DeskTabBar` min-height. |
 | Desk tab clearance | `--desk-tabbar-clearance` | Phone: tab bar plus `safe-area-inset-bottom` plus `1.5rem`. From `md`: `2.5rem`. Phone nested insides: `0`. Phone `main` padding, `scroll-padding-bottom`, and sticky bottom chrome use this. |
 | Max width | | `max-w-desk` (72rem) |
-| Radius | | `rounded-panel` (0.875rem) |
+| Radius | | Chips and tooltips `rounded-md` (6px). Controls, fields, and menus `rounded-xl` (10px). Sheets and cards `rounded-2xl` (16px). Avatars, dots, and icon buttons `rounded-full`. |
 | Motion fast | `--motion-fast` | 150ms named transitions |
 | Motion land | `--motion-land` | 900ms one-shot wash |
 | Motion live | `--motion-live` | 1.4s live ping loop |
@@ -52,7 +53,7 @@ Dark mode is the entire platform: marketing, auth, onboarding, owner desk, Super
 
 - **Token-driven.** Dark redefines the same CSS variables on `:root[data-theme="dark"]` and on `prefers-color-scheme: dark` when the choice is System. Components never write `dark:` variants; they reference tokens and flip for free. Aliases (`--bg`, `--card`, `--accent-fill`) follow `--canvas` / `--surface` / `--accent`.
 - **Not desk-only.** `.desk-theme` and `.admin-theme` still pin `color`, caret, and native `select` / `option`. They do not own the palette. Portals under `body` inherit the document tokens.
-- **Glass chrome.** `.glass-chrome` is the frosted shell for tab bars, rails, menus, the landing header, and auth cards. Lists, canvas, and row surfaces stay opaque. Dark `.desk-drawer` sheets snap to opaque `--surface` so iOS Safari `backdrop-filter` cannot milk them; the tab bar keeps frost. `prefers-reduced-transparency` snaps remaining glass to `--surface`. Overlay dim is `--scrim` (navy in light, black in dark), never `--ink`. Safari `theme-color` follows `--canvas`, not brand. No laser beams, dither grain, or clock dials on the desk. `color-scheme: dark only` / `light only` still pins an explicit pick on `html` and `body`.
+- **Glass chrome.** `.glass-chrome` is the frosted shell for tab bars, rails, menus, the landing header, and auth cards. Lists, canvas, row surfaces, and `.desk-drawer` sheets stay opaque `--surface` with no backdrop blur, so a page button cannot show through a sheet. `prefers-reduced-transparency` snaps remaining glass to `--surface`. Overlay dim is `--scrim` (navy in light, black in dark), never `--ink`. Safari `theme-color` follows `--canvas`, not brand. No laser beams, dither grain, or clock dials on the desk. `color-scheme: dark only` / `light only` still pins an explicit pick on `html` and `body`.
 - **Choice is per-device.** One worded control, never icons: `Appearance · System` (current value shown), opening the kit `SegmentedControl` System / Light / Dark captioned "On this device" (`ThemePicker`). Inside, it is a row in the owner and Super Admin account menu (desktop menu and phone account Sheet alike). Outside (landing, login, signup, invite accept, onboarding, Super Admin login) it is `AppearanceFooter`: a quiet footer text button that opens a `Sheet` on phones and a popover on desktop. Never in a header, never round glyph buttons. The phone account Sheet puts the heading and the switch in one inset card (`border-line bg-canvas`). Segmented options are 44px on touch and below `lg`. All write `localStorage["scalers-desk-theme"]` and a same-named cookie (`system` default) and apply instantly. Never a tenant setting. The cookie is only so the next paint hydrates the saved pick.
 - **Fills invert.** On bright fills (accent, warn, ok, lead) the label is `text-accent-on-fill`: white on deep blue in light, deep navy on bright fills in dark.
 - **Inherited ink.** `.desk-theme` and `.admin-theme` set `color` and `caret-color` from `--ink`. Form controls pin `color` and autofill `-webkit-text-fill-color`. Field class strings include `text-ink`.
@@ -64,7 +65,8 @@ Dark mode is the entire platform: marketing, auth, onboarding, owner desk, Super
 | Ink `--ink` | `#0A192F` | `#E9EFF7` |
 | Soft ink `--ink-soft` | `#4A5B73` | `#9DAFC6` |
 | Line `--line` | `#D5DEE9` | `#24324A` |
-| Accent `--accent` | `#0096FF` | `#2AA8FF` |
+| Brand `--brand` | `#0096FF` | `#2AA8FF` |
+| Accent `--accent` | `#005CCC` | `#3D9BFF` |
 | Link `--accent-deep` | `#005CCC` | `#3D9BFF` |
 | Fill `--accent-fill` | `#005CCC` | `#3D9BFF` |
 | On fill `--accent-on-fill` | `#FFFFFF` | `#071426` |
@@ -100,9 +102,8 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 
 ## Type
 
-- Body: DM Sans
-- Display: Sora on `h1–h3` and `.font-display`
-- Page title: nested records use `pageTitleClass` (`clamp(1.5rem, 2.4vw, 2rem)` semibold). List roots (Inbox, Contacts, Usage) use `deskListTitleClass` (`text-3xl sm:text-4xl` semibold, Sora via `font-display`). Not sticky. Overview is the muted Nairobi date (`text-sm text-ink-soft`). The phone account bar carries a mark-only Scalers lockup (`md:hidden`). The rail keeps its own mark from `md`. Settings keeps a compact `text-xl` hub title.
+- App type: the system UI font. Sora is marketing only. No DM Sans in the app.
+- Page title: nested records use `pageTitleClass` (`clamp(1.5rem, 2.4vw, 2rem)` semibold). List roots (Inbox, Contacts, Usage) use `deskListTitleClass` (`text-page` / `text-display`, system UI). Not sticky. Overview is the muted Nairobi date. The phone account bar carries a mark-only Scalers lockup (`md:hidden`). The rail keeps its own mark from `md`. Settings keeps a compact hub title.
 - Table: `text-sm`
 - Meta: `text-xs uppercase tracking-wide text-ink-soft`
 
@@ -112,9 +113,9 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 
 | Pattern | Implementation |
 | --- | --- |
-| Primary button | `btnPrimary` in `deskChrome.ts`: fill `#005CCC`, `min-h-11`, white label. Focus ring `#0096FF`. Compose taller hits with `btnPrimaryFill` (sticky Save). `settingsPrimaryButtonClass` aliases `btnPrimary`. Action dock: `deskHitClass` + `btnDock` (`h-12 w-12`). |
+| Primary button | Kit `Button`. One filled action per viewport, `#005CCC` (`accent`). Focus ring is `brand` (`#0096FF`), never the label color. Action dock hits are 44px circular `IconButton`s (`rounded-full`), not 48px square tiles. |
 | Ghost / secondary | `btnGhost`: border-line, ink text |
-| Focus | `focusRing`: `focus:outline-none focus:ring-2 focus:ring-[#0096FF]` |
+| Focus | `ring-2 ring-brand` (`#0096FF`). Not a text color. |
 | Filter tabs | Kit `Segmented` underline (`after:bg-brand`, `min-h-11`) for Inbox purpose (`InboxFilterPills`) and Contacts segments All · Recents · Favourites · Saved · Unsaved (`contactFilterPills` on one `InboxFilterPills` row). Inbox List/Work and Today/Week still use `FilterTabs`. Contacts sort is `ContactSortSelect` via `DeskSelect` (Last call · Name). Settings 2 to 3 option enums stay `SettingsSegmented` / `deskRateCardClass`. Inbox purpose nouns stay Inbox-only. |
 | Person-file KPI | `ContactKpiStrip` on `/contacts/[id]`. Flex row. Cards only when sourced. Interactions = ticket/call rows. Visits done = jobs `done`. Customer since = `N mo` from earliest stamp. Hide when unknown or 0 (`0 mo` does not paint). No wallpaper, Online, or mock counts. |
 | List row | `DeskRowHit` in `deskRowHit.tsx`. Parent `relative`. Body `deskRowMutedClass`. Trailing verb `deskRowActionClass`. No Call, Open, or View column. Anatomy: `RowIdentity` circle (neutral, initials or person glyph, never tinted by state), identity plus **one** preview line (`deskPreviewClass` / `truncate`), timestamp right. Needs you rows may add one muted next-step line (`inboxNeedsYouNextStep`) under the preview. Same recipe as the Action dock. Unread (customer event after last open) is `RowStateDot` (fixed 10px leading slot, 8px brand circle, empty when read, same slot with the live ping when live and unread) plus `deskRowWeightClass` (semibold while unread, medium once opened). The dot is `aria-hidden`. The name line exposes Unread. Inbox pin is `InboxPinMark` (muted thumbtack next to time when `inbox_pinned_at` is set). Not a hit. Not Contacts Favourites. Needs you is a pile and nav badge, not the dot. A row that appears while watching uses `DeskLandSurface`. No opacity dimming. Full hangup copy is on the call, not in the list. |
@@ -131,14 +132,14 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 | Owner error | `DeskError` + `ownerFacingError`. Load failures use `DeskLoadError` (Retry calls `router.refresh()`). A call or contact record may add one muted back link. Lists do not. Never SQL files, RLS dumps, repo paths, or minified React errors. Log raw diagnostics with `logDeskError`. |
 | Crash | `DeskCrash` + Try again. `(desk)/error.tsx`, `app/error.tsx`, `global-error.tsx`. Never dump `error.message`. |
 | 404 | Root `app/not-found.tsx`: one link from the session (Home `/`, Overview `/home`, Admin `/admin`). Desk `(desk)/not-found.tsx` stays in the shell and links Overview. A missing call or contact stays in the page slot (Inbox or Contacts). No `(desk)/loading.tsx`. |
-| WhatsApp | Brand-blue fill + white glyph when it is the page CTA (`variant="primary"`). List trailing icon: green glyph on `#25D366`, `h-12 w-12`, `rounded-xl` (`variant="icon"`). No extra WhatsApp mark next to the name. |
-| Inbox Action dock | Trailing cell only. Requested visit: Confirm. Confirmed visit: Done. Open hold: Done. Return or intent-only with a number: Call then WhatsApp. Intent-only never Confirm or Done. Every control is `h-12 w-12`. Icon-only Call, WhatsApp, and More show `DeskHint`. Never Open, View, SMS, email, or Archive in this cell. |
+| WhatsApp | Brand-blue fill + white glyph when it is the page CTA (`variant="primary"`). List trailing icon: green glyph, 44px circular `IconButton`. No extra WhatsApp mark next to the name. |
+| Inbox Action dock | Trailing cell only. Requested visit: Confirm. Confirmed visit: Done. Open hold: Done. Return or intent-only with a number: Call then WhatsApp. Intent-only never Confirm or Done. Call and WhatsApp are 44px circular icon buttons. Confirm and Done are labeled tonal buttons. Icon-only Call, WhatsApp, and More show a visible name on hover and focus. Never Open, View, SMS, email, or Archive in this cell. |
 | Contact strip | `ContactStrip` on `/calls/[id]` header. Same family as the Contacts Phase 1 list row: `RowIdentity`, name or Unsaved / Name this caller, one `contactListSubline` (`deskPreviewClass`). Allowed facts: Unsaved, phone, last call. Identity only. Call + WhatsApp live on the ticket Action dock, not here. No `callId` write-back. No `lead_status` or Needs you invent. No Meta theater. Tap identity opens `/contacts/[id]`. Same row at every width. Never Online, last seen, presence, sent, or delivered. |
 | Ticket Action dock | Full-width row under the split on `/calls/[id]`. Mark done, Call, WhatsApp, Ping teammate. The only Call and WhatsApp on the ticket. Same `deskHitClass` hits plus a visible label. Not in More. Confirm and hold Done stay on their banners. |
 | Ticket thread | One conversation stream on `/calls/[id]`. Alignment is who. Stamp once per Nairobi minute. Keep Critic-true delivery/escalation facts. Drop lifecycle pills and per-bubble speaker labels. FAQ ideas is muted text, not a chip. Contact strip stays #383. |
 | Inbox overflow | md+ More and right-click. Pin / Unpin, Mark done on return calls, Archive or Unarchive. No Select in the overflow menu. From `md` the row checkbox stays visible. Below `md` the resting row keeps it out of the layout. A 400ms long press on the row body enters selection and selects that row. Checkboxes then show on every row in one slot. Ghost Cancel exits and clears. Select all stays on the selection bar. Phone hides More (`hidden md:inline-flex`). Mute, Assign, Label, Delete, Mark unread, and Snooze stay off this list. Archive opens from a list row, not a filter chip. Desktop menu right-aligns to More (`placeInboxOverflowMenu`) so it does not cover the dock. Pinned rows keep `InboxPinMark` next to time. Ticket ⋮ is Archive or Unarchive only, portaled to `document.body`, 44px rows, same placer. |
 | Inbox archived | WhatsApp folder. `InboxArchivedPhoneRow` / `InboxArchivedTableRow` at the top of the list when the count is above zero. Glyph plus Archived plus count. Tap opens `/calls?purpose=archived`. Not in `purposeFilters`. After Archive, `InboxArchiveToast` offers Undo for 5s. No toast on Unarchive. |
-| Call | `CallLink` (`tel:` deep link, the device dialer places the call). List dock, ticket action dock, and contact header. Not the ticket strip. Rounded handset glyph (`data-icon="handset"`), brand `text-accent-deep`, muted tile `h-12 w-12` bordered with a light accent wash. Sits left of WhatsApp. `DeskHint` label Call. Never a filled primary, never a desk-telephone silhouette. |
+| Call | `CallLink` (`tel:` deep link, the device dialer places the call). List dock, ticket action dock, and contact header. Not the ticket strip. Rounded handset glyph (`data-icon="handset"`), 44px circular icon button. Sits left of WhatsApp. Visible name Call. Never a filled primary, never a desk-telephone silhouette. |
 | Ticket split | `InboxTicketView` from `lg`. Summary `18rem` floor, `22rem` default, `32rem` cap. Drag or arrow keys. 1px gutter, 24px hit. Reclamps on resize. Stored in `localStorage["scalers-ticket-split"]`. Double-click resets. Phone and `md` keep one stacked scroller. |
 | Line chip | Live / Pending / Needs training. Never “Online” |
 

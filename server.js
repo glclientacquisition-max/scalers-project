@@ -3971,7 +3971,7 @@ mediaWss.on('connection', (ws, req) => {
           callTranscript.pushAgent(line);
           turnTiming.markFirstSpokenChunk();
           const nameAsk = askingName && line === fileNameAsk;
-          await speakText(
+          const plannedSpoken = await speakText(
             line,
             speakCommit.wasSpoken(line)
               ? { skipFileGate: true, ...(nameAsk ? { tracePath: 'file_name_ask' } : {}) }
@@ -3980,6 +3980,12 @@ mediaWss.on('connection', (ws, req) => {
                 : {}
           );
           spokeThisTurn = true;
+          // VOICE_FACT_REFS: keep a locally spoken answer in the model's
+          // history, so the next turn does not answer it again
+          // (HD_9939ca74d492 repeated the Kileleshwa fee on the hours turn).
+          if (plannedSpoken?.ok && require('./src/conversation/factSheet').factRefsEnabled()) {
+            messages.push({ role: 'assistant', content: line, local: true, spokenAnswer: true });
+          }
         }
         return;
       }

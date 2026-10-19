@@ -38,7 +38,12 @@ export async function POST(request: Request) {
       ledger: invoicePayLedger(env),
     });
     return NextResponse.json(result.body, { status: result.status });
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "webhook failed";
+    console.error(message);
+    if (message.includes("invoice cannot be paid") || message.includes("draft invoices are not payable")) {
+      return NextResponse.json({ ok: true }, { status: 200 });
+    }
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }
