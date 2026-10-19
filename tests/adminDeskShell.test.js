@@ -27,6 +27,9 @@ function loadParents() {
       query: adminParentTarget("/admin/voices/1?x=1"),
       packages: adminParentTarget("/admin/packages"),
       billing: adminParentTarget("/admin/billing"),
+      invoices: adminParentTarget("/admin/billing/invoices"),
+      invoice: adminParentTarget("/admin/billing/invoices/inv-1"),
+      payments: adminParentTarget("/admin/billing/payments"),
       labels: ADMIN_LINKS.map((item) => item.label),
       phoneTabs: adminPhoneTabs().map((item) => item.label),
       phoneMore: adminPhoneMore().map((item) => item.label),
@@ -90,6 +93,9 @@ describe("admin desk standard shell", () => {
     assert.deepEqual(got.ledgerNested, { href: "/admin/billing", label: "Billing" });
     assert.deepEqual(got.packages, { href: "/admin/billing", label: "Billing" });
     assert.equal(got.billing, null);
+    assert.deepEqual(got.invoices, { href: "/admin/billing", label: "Billing" });
+    assert.deepEqual(got.invoice, { href: "/admin/billing/invoices", label: "Invoices" });
+    assert.deepEqual(got.payments, { href: "/admin/billing", label: "Billing" });
     assert.equal(got.businesses, null);
     assert.deepEqual(got.nested, { href: "/admin/businesses", label: "Businesses" });
     assert.deepEqual(got.unknown, { href: "/admin", label: "Today" });

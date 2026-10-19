@@ -51,7 +51,8 @@ describe("desk batch D screen fit and recovery", () => {
     assert.match(confirm, /<Sheet/);
     for (const file of [
       "dashboard/src/components/AdminVoicesManager.tsx",
-      "dashboard/src/components/AdminBillingDetailPanel.tsx",
+      "dashboard/src/components/AdminShopMoneyPanel.tsx",
+      "dashboard/src/components/CheckoutReviewResolve.tsx",
       "dashboard/src/components/BuyNumberPanel.tsx",
     ]) {
       const src = read(file);

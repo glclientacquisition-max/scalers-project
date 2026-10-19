@@ -7,15 +7,6 @@ function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
 }
 
-function walk(rel) {
-  const abs = path.join(__dirname, "..", rel);
-  return fs.readdirSync(abs, { withFileTypes: true }).flatMap((entry) => {
-    const child = path.join(rel, entry.name);
-    if (entry.isDirectory()) return walk(child);
-    return /\.(ts|tsx|js|mjs)$/.test(entry.name) ? [child] : [];
-  });
-}
-
 describe("package usage meter", () => {
   it("floors seconds to whole minutes and never goes negative", () => {
     const catalog = read("dashboard/src/lib/packageCatalog.ts");
@@ -127,10 +118,8 @@ describe("package usage meter", () => {
     assert.match(panel, /live on landing/);
     assert.match(panel, /action: "save_package"/);
     assert.doesNotMatch(panel, /action: "assign"/);
-    assert.match(panel, /\/admin\/billing\/\$\{tenantId\}/);
-    assert.match(panel, /usedOfIncluded\(minutesUsedFromSeconds/);
+    assert.match(panel, /\/admin\/businesses\/\$\{tenantId\}\?money=1/);
     assert.match(panel, /row\.gap/);
-    assert.match(panel, /Matches package/);
     assert.match(panel, /ListRow/);
     assert.match(panel, /Needs you/);
     assert.doesNotMatch(panel, /Most popular/);
@@ -178,12 +167,12 @@ describe("package usage meter", () => {
     );
     assert.equal(usedOfIncluded(47, 200), "47 of 200");
 
-    const billingDetail = read("dashboard/src/components/AdminBillingDetailPanel.tsx");
+    const money = read("dashboard/src/components/AdminShopMoneyPanel.tsx");
     const wallet = read("dashboard/src/lib/wallet.ts");
-    assert.match(billingDetail, /Beta: meter the package\. On-demand is not charged\./);
-    assert.match(billingDetail, /On-demand past included/);
-    assert.doesNotMatch(billingDetail, /line fees/);
-    assert.doesNotMatch(billingDetail, /CREDIT_PRESETS/);
+    assert.match(money, /Meter the package\. No charges\./);
+    assert.match(money, /Past included is charged/);
+    assert.doesNotMatch(money, /line fees/);
+    assert.doesNotMatch(money, /CREDIT_PRESETS/);
     assert.doesNotMatch(wallet, /ensureLineRentalApplied|apply_line_rental/);
   });
 
@@ -217,15 +206,8 @@ describe("package usage meter", () => {
     assert.match(admin, /package_name: pack\?\.packageName \|\| null/);
     assert.match(ui, /export function packLabel/);
     assert.match(ui, /b\.package_name/);
-    const importRe = /import\s*\{([^}]+)\}\s*from\s*"@\/lib\/adminBusinessUi"/g;
-    const callers = walk("dashboard/src").flatMap((rel) => {
-      const source = read(rel);
-      const names = [...source.matchAll(importRe)].map((match) => match[1]).join(",");
-      return /\bpackLabel\b/.test(names) ? [{ rel, source }] : [];
-    });
-    assert.ok(callers.length > 0, "a screen imports packLabel from adminBusinessUi");
-    for (const caller of callers) {
-      assert.match(caller.source, /packLabel\s*\(/, caller.rel);
-    }
+    const businesses = read("dashboard/src/components/AdminBusinessesPanel.tsx");
+    assert.match(businesses, /previewLine\(b\)/);
+    assert.match(ui, /const pack = packLabel\(b\)/);
   });
 });

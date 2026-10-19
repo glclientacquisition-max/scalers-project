@@ -15,6 +15,8 @@ import {
 import type { WalletLedgerRow } from "@/lib/wallet";
 import { actionLabel, eatStamp } from "@/lib/adminActivityModel";
 import { billingAuditDetail, ledgerKindLabel } from "@/lib/adminBillingCopy";
+import { reviewReasonFromRaw } from "@/lib/adminPayCopy";
+import { logAdminError, isMissingTableError } from "@/lib/adminErrors";
 
 export type AdminBillingStatus = "archived" | "ok" | "low_minutes" | "exhausted" | "charging";
 
@@ -194,6 +196,8 @@ export type CheckoutReview = {
   providerRef: string;
   getKes: string;
   seenKes: string;
+  reason: string;
+  invoiceId: string | null;
 };
 
 export type AdminBillingClientDetail = {
@@ -203,6 +207,8 @@ export type AdminBillingClientDetail = {
   packages: BillingPackage[];
   subscription: TenantSubscriptionRow | null;
   checkoutReviews: CheckoutReview[];
+  /** Null when the invoice table could not be read. */
+  invoiceCount: number | null;
 };
 
 function reviewText(raw: unknown, key: "get_kes" | "seen_kes"): string {
@@ -216,7 +222,7 @@ async function loadOpenCheckoutReviews(tenantId: string): Promise<CheckoutReview
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("payments")
-    .select("provider, provider_ref, raw")
+    .select("provider, provider_ref, raw, invoice_id")
     .eq("tenant_id", tenantId)
     .eq("match_status", "issue")
     .like("provider_ref", "checkout-total-review:%");
@@ -230,6 +236,8 @@ async function loadOpenCheckoutReviews(tenantId: string): Promise<CheckoutReview
       providerRef: String(row.provider_ref),
       getKes: reviewText(raw, "get_kes"),
       seenKes: reviewText(raw, "seen_kes"),
+      reason: reviewReasonFromRaw(raw),
+      invoiceId: row.invoice_id ? String(row.invoice_id) : null,
     }];
   });
 }
@@ -269,7 +277,22 @@ export async function loadAdminBillingClient(tenantId: string): Promise<AdminBil
     packages: catalog.packages,
     subscription,
     checkoutReviews: await loadOpenCheckoutReviews(tenantId),
+    invoiceCount: await countInvoices(tenantId),
   };
+}
+
+async function countInvoices(tenantId: string): Promise<number | null> {
+  const admin = getSupabaseAdmin();
+  const { count, error } = await admin
+    .from("invoices")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId);
+  if (error) {
+    const missing = isMissingTableError(error) || /column .+ does not exist/i.test(String(error.message || ""));
+    if (!missing) logAdminError("billing-invoice-count", error);
+    return null;
+  }
+  return count ?? 0;
 }
 
 export async function loadCheckoutReviewReading(opts: {

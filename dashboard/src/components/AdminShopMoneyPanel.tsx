@@ -22,6 +22,7 @@ import { DeskSelect } from "@/components/ui/DeskSelect";
 import { assignmentFromBusiness } from "@/lib/packagePriceLabel";
 import { usedOfIncluded } from "@/lib/packageUsageAlign";
 import { chargingAction, packageChange, requestErrorText } from "@/lib/adminBillingCopy";
+import { CheckoutReviewResolve } from "@/components/CheckoutReviewResolve";
 
 type MoneyTask = "package" | "plan" | "grant" | "charges" | "history" | "remove";
 
@@ -249,6 +250,18 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
         </p>
       ) : null}
 
+      <CheckoutReviewResolve
+        link={false}
+        reviews={detail.checkoutReviews.map((review) => ({
+          businessId: row.id,
+          businessName: row.business_name,
+          providerRef: review.providerRef,
+          getKes: review.getKes,
+          seenKes: review.seenKes,
+          reason: review.reason,
+          invoiceId: review.invoiceId,
+        }))}
+      />
       <ListRow title="Package" preview={packagePreview} onOpen={() => openTask("package")} />
       {sub?.packageId ? (
         <ListRow title="Remove package" preview="Now or end of period" onOpen={() => openTask("remove")} />
@@ -262,6 +275,17 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
         title="History"
         preview={historyLoaded ? `${history.length} recent lines` : "Activity and charges"}
         onOpen={() => openTask("history")}
+      />
+      <ListRow
+        title="Invoices"
+        href={`/admin/billing/invoices?business=${row.id}`}
+        preview={
+          detail.invoiceCount == null
+            ? "Could not load"
+            : detail.invoiceCount === 0
+              ? "None yet"
+              : `${detail.invoiceCount} on file`
+        }
       />
 
       <Sheet

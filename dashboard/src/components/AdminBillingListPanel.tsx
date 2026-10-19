@@ -7,14 +7,16 @@ import {
   type AdminBillingOverview,
   type AdminBillingRow,
 } from "@/lib/adminBilling";
+import { CheckoutReviewResolve } from "@/components/CheckoutReviewResolve";
 import { deskFieldClass } from "@/components/ui/deskChrome";
 import { Empty } from "@/components/ui/Empty";
 import { ListRow } from "@/components/ui/ListRow";
 import { Segmented } from "@/components/ui/Segmented";
 import { numberLabel, searchableNumber } from "@/lib/adminBillingCopy";
+import type { AttentionItem } from "@/lib/adminPayCopy";
 import { usedOfIncluded } from "@/lib/packageUsageAlign";
 
-type BillingFilter = "needs" | "all" | "beta" | "charging";
+type BillingFilter = "needs" | "attention" | "all" | "beta" | "charging";
 
 function shopMoneyHref(id: string) {
   return `/admin/businesses/${id}?money=1`;
@@ -55,9 +57,19 @@ function queuePreview(r: AdminBillingRow): string {
   ].join(" · ");
 }
 
-export function AdminBillingListPanel({ overview }: { overview: AdminBillingOverview }) {
+export function AdminBillingListPanel({
+  overview,
+  attention = [],
+  attentionWarning = null,
+  initialFilter = "needs",
+}: {
+  overview: AdminBillingOverview;
+  attention?: AttentionItem[];
+  attentionWarning?: string | null;
+  initialFilter?: BillingFilter;
+}) {
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<BillingFilter>("needs");
+  const [filter, setFilter] = useState<BillingFilter>(initialFilter);
 
   const noPackageCount = useMemo(
     () => overview.rows.filter((r) => r.status !== "archived" && !r.packageName).length,
@@ -85,6 +97,20 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
     );
   }, [overview.rows, query, filter]);
 
+  const attentionFiltered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return attention;
+    return attention.filter(
+      (item) =>
+        item.title.toLowerCase().includes(q) ||
+        item.preview.toLowerCase().includes(q) ||
+        (item.review?.businessName || "").toLowerCase().includes(q),
+    );
+  }, [attention, query]);
+
+  const reviewRows = attentionFiltered.flatMap((item) => (item.review ? [item.review] : []));
+  const otherAttention = attentionFiltered.filter((item) => !item.review);
+
   return (
     <div className="space-y-6">
       <Segmented
@@ -92,6 +118,7 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
         label="Billing view"
         items={[
           { key: "needs", label: "Needs you", count: attentionRows(overview.rows).length, active: filter === "needs" },
+          { key: "attention", label: "Needs attention", count: attention.length, active: filter === "attention" },
           { key: "all", label: "All", count: overview.rows.filter((r) => r.status !== "archived").length, active: filter === "all" },
           { key: "beta", label: "Beta", count: overview.betaCount, active: filter === "beta" },
           { key: "charging", label: "Charging", count: overview.chargingCount, active: filter === "charging" },
@@ -114,11 +141,19 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
       </section>
 
       <p className="px-4 text-body text-ink-2">
-        Open a business shop for package, plan, and charges. Catalog prices live on{" "}
+        Open a business shop for package, plan, and charges.{" "}
+        <Link href="/admin/billing/invoices" className="font-medium text-accent underline-offset-2 hover:underline">
+          Invoices
+        </Link>
+        ,{" "}
+        <Link href="/admin/billing/payments" className="font-medium text-accent underline-offset-2 hover:underline">
+          Payments
+        </Link>
+        , and{" "}
         <Link href="/admin/packages" className="font-medium text-accent underline-offset-2 hover:underline">
           Catalog
-        </Link>
-        .
+        </Link>{" "}
+        prices sit beside this queue.
       </p>
 
       <label className="block px-4 text-body">
@@ -131,7 +166,14 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
         />
       </label>
 
-      {filtered.length === 0 ? (
+      {filter === "attention" ? (
+        <AttentionQueue
+          warning={attentionWarning}
+          reviews={reviewRows}
+          rows={otherAttention}
+          empty={attentionFiltered.length === 0}
+        />
+      ) : filtered.length === 0 ? (
         <Empty
           title={filter === "needs" ? "Nothing needs you." : "No businesses match."}
           line={filter === "needs" ? "Check All for the full list." : "Widen your filter or search."}
@@ -149,6 +191,42 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function AttentionQueue({
+  warning,
+  reviews,
+  rows,
+  empty,
+}: {
+  warning: string | null;
+  reviews: NonNullable<AttentionItem["review"]>[];
+  rows: AttentionItem[];
+  empty: boolean;
+}) {
+  if (empty && !warning) {
+    return (
+      <Empty
+        title="Nothing needs attention."
+        line="Checkout reviews, unmatched payments, retries, and held checkouts show here."
+      />
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {warning ? (
+        <p className="px-4 text-body text-attention" role="alert">
+          {warning}
+        </p>
+      ) : null}
+      <ul className="divide-y divide-hairline/70 border-y border-hairline/70" aria-label="Needs attention">
+        <CheckoutReviewResolve reviews={reviews} showBusiness />
+        {rows.map((item) => (
+          <ListRow key={item.id} href={item.href} title={item.title} preview={item.preview} when={item.when} />
+        ))}
+      </ul>
     </div>
   );
 }
