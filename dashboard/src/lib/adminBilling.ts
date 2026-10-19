@@ -93,10 +93,15 @@ function billingStatus(input: {
   return { status: "ok", statusLabel: "OK" };
 }
 
+/** Super Admin plan row copy (not owner desk). */
+export function adminModeLabel(mode: BillingMode): string {
+  if (mode === "off") return "Beta · Meter only";
+  if (mode === "soft") return "Charging · On-demand";
+  return "Charging · Block at cap";
+}
+
 export function chargingModeLabel(mode: BillingMode): string {
-  if (mode === "off") return "Beta";
-  if (mode === "soft") return "On-demand soft";
-  return "On-demand hard";
+  return adminModeLabel(mode);
 }
 
 export async function loadAdminBillingOverview(): Promise<AdminBillingOverview> {

@@ -13,21 +13,31 @@ import { Stamp } from "@/components/ui/Stamp";
 
 export const instant = false;
 
-export default async function AdminBusinessPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdminBusinessPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ money?: string }>;
+}) {
   await requireSuperAdmin();
   const { id } = await params;
+  const { money } = await searchParams;
   let business;
   let badges;
   let availableDids;
   let people;
+  let billing;
   try {
     const loaded = await getAdminBusinessById(id);
     if (!loaded) notFound();
     business = loaded.business;
     availableDids = loaded.availableDids;
-    [badges, people] = await Promise.all([
+    const { loadAdminBillingClient } = await import("@/lib/adminBilling");
+    [badges, people, billing] = await Promise.all([
       qualityBadges().catch(noQualityBadges(`business:${id}`)),
       loadAdminShopPeople(id).catch(() => null),
+      loadAdminBillingClient(id).catch(() => null),
     ]);
   } catch (err) {
     logAdminError("business-detail", err);
@@ -47,6 +57,8 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
         badge={badge}
         availableDids={availableDids}
         freeCount={availableDids.length}
+        billing={billing}
+        focusMoney={money === "1"}
       />
       {people ? <AdminShopPeople businessId={business.id} people={people} /> : null}
     </div>
