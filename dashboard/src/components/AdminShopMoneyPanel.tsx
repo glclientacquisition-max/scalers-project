@@ -2,11 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  adminModeLabel,
-  type AdminBillingClientDetail,
-  type BillingHistoryEntry,
-} from "@/lib/adminBilling";
+import { type AdminBillingClientDetail, type BillingHistoryEntry } from "@/lib/adminBilling";
+import { modeName as adminModeLabel } from "@/lib/adminBillingCopy";
 import type { BillingMode } from "@/lib/adminWallets";
 import { chargeAmount, chargeKind, formatCreated } from "@/lib/adminBusinessUi";
 import type { WalletLedgerRow } from "@/lib/wallet";
@@ -24,6 +21,7 @@ import { DeskSelect } from "@/components/ui/DeskSelect";
 import { assignmentFromBusiness } from "@/lib/packagePriceLabel";
 import { usedOfIncluded } from "@/lib/packageUsageAlign";
 import { chargingAction, packageChange, requestErrorText } from "@/lib/adminBillingCopy";
+import { AdminBillingShopInvoices } from "@/components/AdminBillingShopInvoices";
 
 type MoneyTask = "package" | "plan" | "grant" | "charges" | "history" | "remove";
 
@@ -277,6 +275,7 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
         ) : null}
         <p className="mt-2 text-meta text-ink-2">
           {planPreview} · Owner {optInPreview.toLowerCase()} on overage
+          {row.periodEndLabel ? ` · Period ends ${row.periodEndLabel}` : ""}
         </p>
       </div>
 
@@ -289,6 +288,10 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
       <ListRow title="Plan" preview={planPreview} onOpen={() => openTask("plan")} />
       <ListRow title="Usage" preview={usagePreview} />
       <ListRow title="Owner opted in" preview={optInPreview} />
+      <p className="px-4 pb-1 pt-3 text-caption font-medium uppercase tracking-wide text-ink-3">Invoices</p>
+      <div className="px-4 pb-2">
+        <AdminBillingShopInvoices businessId={row.id} />
+      </div>
       <p className="px-4 pb-1 pt-3 text-caption font-medium uppercase tracking-wide text-ink-3">Ledger</p>
       <ListRow title="Charges" preview="Ledger lines this period" onOpen={() => openTask("charges")} />
       <ListRow title="Grant minutes" preview="Adds to included this period" onOpen={() => openTask("grant")} />

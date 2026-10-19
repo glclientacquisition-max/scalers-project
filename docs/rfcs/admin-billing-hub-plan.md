@@ -167,9 +167,9 @@ Run `/no-ai-slop` on all new strings.
 
 - [ ] Phase 1: card-first Needs you merged (#818)
 - [ ] Phase 1: mark PR ready, staging desk when Stage-PR hold clears
-- [ ] Phase 2: period end on overview
-- [ ] Phase 3: invoices on Money + Today overdue
-- [ ] Phase 4: owner Billing/Usage card parity
+- [x] Phase 2: period end on overview (hub chip, rollover queue card)
+- [x] Phase 3: invoices on Money + Today overdue
+- [x] Phase 4: owner Billing summary + platform open-invoice strip
 - [ ] Update `docs/STATUS.md` sections 3, 6, 8 on each merge
 
 ---

@@ -1,6 +1,6 @@
 "use client";
 
-import type { AdminBillingRow } from "@/lib/adminBilling";
+import type { AdminBillingRow } from "@/lib/adminBillingTypes";
 import type { BillingAttentionKind } from "@/lib/adminBillingHub";
 import { cx } from "@/lib/cx";
 
@@ -20,7 +20,7 @@ type Props = {
 /** Hick's level 2: pick one exception queue before seeing shops. */
 export function AdminBillingNeedsCards({ cards, active, onSelect }: Props) {
   return (
-    <div className="grid gap-3 px-4 sm:grid-cols-2 lg:grid-cols-4" role="list" aria-label="Needs you queues">
+    <div className="grid gap-3 px-4 sm:grid-cols-2 lg:grid-cols-4" role="group" aria-label="Needs you queues">
       {cards.map((card) => (
         <NeedsCard
           key={card.kind}
@@ -46,7 +46,6 @@ function NeedsCard({
   return (
     <button
       type="button"
-      role="listitem"
       disabled={empty && card.kind !== "all"}
       onClick={onPress}
       aria-pressed={selected}
@@ -74,15 +73,27 @@ function NeedsCard({
   );
 }
 
-export function buildNeedsCards(needs: AdminBillingRow[]): NeedsCardDef[] {
+export function buildNeedsCards(
+  needs: AdminBillingRow[],
+  rolloverSoonCount: number,
+): NeedsCardDef[] {
   const noPackage = needs.filter((r) => !r.packageName).length;
   const low = needs.filter((r) => r.status === "low_minutes").length;
   const exhausted = needs.filter((r) => r.status === "exhausted").length;
 
-  return [
+  const cards: NeedsCardDef[] = [
     { kind: "no_package", label: "No package", hint: "Assign in shop Money", count: noPackage },
     { kind: "low_minutes", label: "Low minutes", hint: "Grant or upgrade", count: low },
     { kind: "exhausted", label: "Exhausted", hint: "Grant or check opt-in", count: exhausted },
-    { kind: "all", label: "All needs", hint: "Every queue combined", count: needs.length },
   ];
+  if (rolloverSoonCount > 0) {
+    cards.push({
+      kind: "rollover_soon",
+      label: "Period ending",
+      hint: "Rollover in 7 days",
+      count: rolloverSoonCount,
+    });
+  }
+  cards.push({ kind: "all", label: "All needs", hint: "Every queue combined", count: needs.length });
+  return cards;
 }

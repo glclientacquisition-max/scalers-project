@@ -146,7 +146,7 @@ export function todayQueueGroups(rows: TodayQueueRow[]): TodayQueueGroup[] {
     quiet: [],
   };
   for (const row of rows) {
-    if (row.stamp === "Open") buckets.alert.push(row);
+    if (row.stamp === "Open" || row.stamp === "Overdue") buckets.alert.push(row);
     else if (row.stamp === "Waiting" || row.stamp === "Stuck") buckets.line.push(row);
     else if (row.stamp === "Package") buckets.package.push(row);
     else if (row.stamp === "Dropping") buckets.quality.push(row);

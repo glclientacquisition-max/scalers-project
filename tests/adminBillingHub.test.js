@@ -11,6 +11,8 @@ const row = (overrides) => ({
   packageName: "Starter",
   packageSku: "starter",
   period: "month",
+  periodEnd: null,
+  periodEndLabel: null,
   minutesIncluded: 300,
   minutesUsed: 290,
   minutesRemaining: 10,
@@ -38,5 +40,15 @@ describe("admin billing hub", () => {
     ]);
     assert.equal(needs.length, 2);
     assert.equal(hub.filterAttentionKind(needs, "no_package").length, 1);
+  });
+
+  it("filters rollover soon by period end", () => {
+    const now = Date.now();
+    const soon = new Date(now + 2 * 24 * 60 * 60 * 1000).toISOString();
+    const rows = [
+      row({ id: "soon", periodEnd: soon, periodEndLabel: "Soon" }),
+      row({ id: "later", periodEnd: new Date(now + 20 * 24 * 60 * 60 * 1000).toISOString() }),
+    ];
+    assert.equal(hub.filterAttentionKind(rows, "rollover_soon").length, 1);
   });
 });

@@ -15,32 +15,11 @@ import {
 import type { WalletLedgerRow } from "@/lib/wallet";
 import { actionLabel, eatStamp } from "@/lib/adminActivityModel";
 import { billingAuditDetail, ledgerKindLabel } from "@/lib/adminBillingCopy";
+import { periodEndLabel } from "@/lib/billingStateModel";
+import { earliestPeriodEndLabel, periodEndWithinRolloverWindow } from "@/lib/adminBillingPeriod";
+import type { AdminBillingOverview, AdminBillingRow, AdminBillingStatus } from "@/lib/adminBillingTypes";
 
-export type AdminBillingStatus = "archived" | "ok" | "low_minutes" | "exhausted" | "charging";
-
-export type AdminBillingRow = {
-  id: string;
-  business_name: string;
-  sautikit_virtual_number: string;
-  packageName: string | null;
-  packageSku: string | null;
-  period: "month" | "year" | null;
-  minutesIncluded: number;
-  minutesUsed: number;
-  minutesRemaining: number;
-  billing_enforcement: BillingMode;
-  on_demand_usage_enabled: boolean;
-  status: AdminBillingStatus;
-  statusLabel: string;
-};
-
-export type AdminBillingOverview = {
-  rows: AdminBillingRow[];
-  betaCount: number;
-  chargingCount: number;
-  lowMinutesCount: number;
-  exhaustedCount: number;
-};
+export type { AdminBillingOverview, AdminBillingRow, AdminBillingStatus } from "@/lib/adminBillingTypes";
 
 export type OpsAuditRow = {
   id: string;
@@ -104,8 +83,17 @@ export function chargingModeLabel(mode: BillingMode): string {
   return adminModeLabel(mode);
 }
 
+function isMissingBillingState(message: string): boolean {
+  return /tenant_billing_state|does not exist|schema cache/i.test(message);
+}
+
 export async function loadAdminBillingOverview(): Promise<AdminBillingOverview> {
-  const [walletOverview, catalog] = await Promise.all([listAdminWallets(), loadPackageCatalog()]);
+  const { loadPlatformInvoiceStats } = await import("@/lib/adminBillingInvoices");
+  const [walletOverview, catalog, invoiceStats] = await Promise.all([
+    listAdminWallets(),
+    loadPackageCatalog(),
+    loadPlatformInvoiceStats(),
+  ]);
 
   const subByTenant = new Map(
     catalog.businesses.map((b) => [
@@ -142,6 +130,8 @@ export async function loadAdminBillingOverview(): Promise<AdminBillingOverview> 
       packageName: sub?.packageName ?? null,
       packageSku: sub?.packageId ? skuById.get(sub.packageId) ?? null : null,
       period: sub?.period ?? null,
+      periodEnd: null,
+      periodEndLabel: null,
       minutesIncluded,
       minutesUsed,
       minutesRemaining,
@@ -153,6 +143,25 @@ export async function loadAdminBillingOverview(): Promise<AdminBillingOverview> 
   });
 
   const admin = getSupabaseAdmin();
+  const periodRes = await admin
+    .from("tenant_billing_state")
+    .select("tenant_id, period_end")
+    .in(
+      "tenant_id",
+      rows.map((r) => r.id),
+    );
+  if (!periodRes.error) {
+    const endByTenant = new Map(
+      (periodRes.data || []).map((row) => [String(row.tenant_id), row.period_end ? String(row.period_end) : null]),
+    );
+    for (const row of rows) {
+      const periodEnd = endByTenant.get(row.id) ?? null;
+      row.periodEnd = periodEnd;
+      row.periodEndLabel = periodEnd ? periodEndLabel(periodEnd) : null;
+    }
+  } else if (!isMissingBillingState(periodRes.error.message || "")) {
+    throw periodRes.error;
+  }
   const { data: onDemandRows } = await admin
     .from("tenants")
     .select("id, on_demand_usage_enabled")
@@ -179,6 +188,9 @@ export async function loadAdminBillingOverview(): Promise<AdminBillingOverview> 
     row.statusLabel = statusLabel;
   }
 
+  const activePackaged = rows.filter((r) => r.status !== "archived" && r.packageName && r.periodEnd);
+  const rolloverSoonCount = activePackaged.filter((r) => periodEndWithinRolloverWindow(r.periodEnd)).length;
+
   return {
     rows,
     betaCount: rows.filter((r) => r.billing_enforcement === "off" && r.status !== "archived").length,
@@ -186,6 +198,12 @@ export async function loadAdminBillingOverview(): Promise<AdminBillingOverview> 
       .length,
     lowMinutesCount: rows.filter((r) => r.status === "low_minutes").length,
     exhaustedCount: rows.filter((r) => r.status === "exhausted").length,
+    rolloverSoonCount,
+    platformPeriodEndLabel: earliestPeriodEndLabel(activePackaged),
+    openInvoiceCount: invoiceStats.openCount,
+    overdueInvoiceCount: invoiceStats.overdueCount,
+    openInvoiceKesLabel: invoiceStats.openKesLabel,
+    invoicesMissing: invoiceStats.missing,
   };
 }
 

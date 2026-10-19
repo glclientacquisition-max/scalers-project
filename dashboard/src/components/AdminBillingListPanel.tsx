@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { adminModeLabel, type AdminBillingOverview, type AdminBillingRow } from "@/lib/adminBilling";
+import type { AdminBillingOverview, AdminBillingRow } from "@/lib/adminBillingTypes";
+import { modeName as adminModeLabel } from "@/lib/adminBillingCopy";
 import {
   attentionRows,
   filterAttentionKind,
@@ -66,6 +67,33 @@ function HubStat({
   );
 }
 
+function PlatformRevenueStrip({ overview }: { overview: AdminBillingOverview }) {
+  if (overview.invoicesMissing) return null;
+  return (
+    <div className="mx-4 rounded-2xl border border-hairline/70 bg-surface-2/40 px-4 py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-body font-medium text-ink">Open invoices</p>
+        <p className="text-title tabular-nums text-ink">
+          {overview.openInvoiceKesLabel}
+          <span className="ms-2 text-meta font-normal text-ink-2">
+            {overview.openInvoiceCount} open
+            {overview.overdueInvoiceCount > 0 ? ` · ${overview.overdueInvoiceCount} overdue` : ""}
+          </span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function PeriodChip({ label }: { label: string | null }) {
+  if (!label) return null;
+  return (
+    <p className="px-4 text-meta text-ink-2">
+      Usage period ends <span className="font-medium text-ink">{label}</span>
+    </p>
+  );
+}
+
 function AdminBillingSnapshot({
   overview,
   totals,
@@ -107,7 +135,10 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
 
   const totals = useMemo(() => hubTotals(overview.rows), [overview.rows]);
   const needs = useMemo(() => attentionRows(overview.rows), [overview.rows]);
-  const needsCards = useMemo(() => buildNeedsCards(needs), [needs]);
+  const needsCards = useMemo(
+    () => buildNeedsCards(needs, overview.rolloverSoonCount),
+    [needs, overview.rolloverSoonCount],
+  );
 
   const noPackageCount = useMemo(
     () => overview.rows.filter((r) => r.status !== "archived" && !r.packageName).length,
@@ -120,7 +151,10 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
 
     if (filter === "needs") {
       if (!attentionKind) return [];
-      base = filterAttentionKind(needs, attentionKind);
+      base =
+        attentionKind === "rollover_soon"
+          ? filterAttentionKind(overview.rows, "rollover_soon")
+          : filterAttentionKind(needs, attentionKind);
     } else if (filter === "beta") {
       base = base.filter((r) => r.billing_enforcement === "off");
     } else if (filter === "charging") {
@@ -154,11 +188,14 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
 
   return (
     <div className="space-y-5 pb-6">
-      <div className="flex justify-end px-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4">
+        <PeriodChip label={overview.platformPeriodEndLabel} />
         <ButtonLink href="/admin/packages" size="sm" variant="tonal" leading={<Squares2X2Icon className="h-5 w-5" aria-hidden />}>
           Catalog
         </ButtonLink>
       </div>
+
+      <PlatformRevenueStrip overview={overview} />
 
       <Segmented
         className="px-4"

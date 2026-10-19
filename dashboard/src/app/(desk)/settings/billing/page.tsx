@@ -5,6 +5,7 @@ import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { BillingNote } from "@/components/DeskBillingBanner";
 import { BetaInvoicesEmpty } from "@/components/plan/BetaPlanSummary";
 import { BillingHistory } from "@/components/plan/BillingHistory";
+import { BillingOpenSummary } from "@/components/plan/BillingOpenSummary";
 import { NoticeList } from "@/components/plan/NoticeList";
 import { SettingsPlanFrame } from "@/components/plan/SettingsPlanFrame";
 import { memberCan } from "@/lib/requireMember";
@@ -31,6 +32,7 @@ async function BillingBody({ searchParams }: { searchParams: Promise<{ from?: st
   return (
     <SettingsPlanFrame title="Billing" optionStatus={statuses}>
       {model.surface.showDunningBanner && model.banner ? <BillingNote banner={model.banner} /> : null}
+      <BillingOpenSummary periodEndLabel={model.periodEndLabel} invoices={model.invoices} />
       <BillingHistory fromPay={fromPay && model.surface.showPayLinks} />
       <NoticeList notices={model.notices} />
     </SettingsPlanFrame>

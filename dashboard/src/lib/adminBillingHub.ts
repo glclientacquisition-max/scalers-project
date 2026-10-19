@@ -1,6 +1,15 @@
-import type { AdminBillingRow, AdminBillingStatus } from "@/lib/adminBilling";
+import type { AdminBillingRow, AdminBillingStatus } from "./adminBillingTypes";
 
-export type BillingAttentionKind = "all" | "no_package" | "low_minutes" | "exhausted";
+/** Period ends within seven days. Kept here so node tests load this file without ESM extension resolution. */
+export function periodEndWithinRolloverWindow(periodEnd: string | null | undefined, now = Date.now()): boolean {
+  if (!periodEnd) return false;
+  const end = Date.parse(periodEnd);
+  if (!Number.isFinite(end)) return false;
+  const windowMs = 7 * 24 * 60 * 60 * 1000;
+  return end > now && end - now <= windowMs;
+}
+
+export type BillingAttentionKind = "all" | "no_package" | "low_minutes" | "exhausted" | "rollover_soon";
 
 const STATUS_RANK: Record<AdminBillingStatus, number> = {
   exhausted: 0,
@@ -29,7 +38,14 @@ export function filterAttentionKind(rows: AdminBillingRow[], kind: BillingAttent
   if (kind === "all") return rows;
   if (kind === "no_package") return rows.filter((r) => !r.packageName);
   if (kind === "low_minutes") return rows.filter((r) => r.status === "low_minutes");
+  if (kind === "rollover_soon") {
+    return rows.filter((r) => r.status !== "archived" && periodEndWithinRolloverWindow(r.periodEnd));
+  }
   return rows.filter((r) => r.status === "exhausted");
+}
+
+export function rolloverAttentionRows(allRows: AdminBillingRow[]): AdminBillingRow[] {
+  return allRows.filter((r) => r.status !== "archived" && periodEndWithinRolloverWindow(r.periodEnd));
 }
 
 export function attentionRows(rows: AdminBillingRow[]): AdminBillingRow[] {
@@ -40,9 +56,9 @@ export function attentionRows(rows: AdminBillingRow[]): AdminBillingRow[] {
   );
 }
 
-export function stampToneForBillingStatus(status: AdminBillingStatus): "attention" | "ok" | "brand" | "neutral" {
+export function stampToneForBillingStatus(status: AdminBillingStatus): "attention" | "ok" | "live" | "neutral" {
   if (status === "exhausted" || status === "low_minutes") return "attention";
-  if (status === "charging") return "brand";
+  if (status === "charging") return "live";
   if (status === "archived") return "neutral";
   return "ok";
 }
@@ -50,6 +66,7 @@ export function stampToneForBillingStatus(status: AdminBillingStatus): "attentio
 export function rowWhenLabel(r: AdminBillingRow): string {
   if (r.status === "archived") return "Archived";
   if (!r.packageName) return "No package";
+  if (r.periodEndLabel && periodEndWithinRolloverWindow(r.periodEnd)) return `Ends ${r.periodEndLabel}`;
   if (r.minutesIncluded <= 0) return "No cap";
   if (r.minutesRemaining <= 0) return "0 left";
   return `${r.minutesRemaining} left`;
