@@ -99,6 +99,7 @@ export async function POST(request: Request) {
         sku,
         name,
         monthlyPriceKes,
+        annualPriceKes: before?.annualPriceKes ?? 0,
         seats,
         minutes,
         sms,

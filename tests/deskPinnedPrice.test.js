@@ -86,4 +86,38 @@ describe("Desk prices come from the pinned package version", () => {
     assert.ok(nameOnly, "owner meter reads the package name");
     assert.equal(nameOnly[1], "name");
   });
+
+  it("admin Packages and the billing-state loaders do not take prices from the package row or the rate card", () => {
+    const figure = /monthly_price_kes|annual_price_kes|message_credits|extra_seat_monthly_kes|credit_kes|\bminutes\b|\bseats\b|inbound_kes|outbound_kes|annual_discount|\*/;
+    const files = [
+      "dashboard/src/app/admin/(console)/packages/page.tsx",
+      "dashboard/src/components/AdminPackagesPanel.tsx",
+      "dashboard/src/lib/publishedPackagePrice.ts",
+      "dashboard/src/lib/billingStateLoad.ts",
+      "dashboard/src/app/(desk)/wallet/page.tsx",
+    ];
+    const selectRe = /\.from\("(billing_packages|billing_rate_card)"\)\s*\.select\(\s*"([^"]+)"/g;
+    for (const file of files) {
+      const source = read(file);
+      assert.doesNotMatch(source, /annualPriceKes\s*\(/, file);
+      for (const match of source.matchAll(selectRe)) {
+        assert.doesNotMatch(match[2], figure, `${file} selects ${match[2]} from ${match[1]}`);
+      }
+    }
+    const page = read("dashboard/src/app/admin/(console)/packages/page.tsx");
+    assert.match(page, /withPublishedPackagePrices/);
+    const panel = read("dashboard/src/components/AdminPackagesPanel.tsx");
+    assert.match(panel, /pack\.annualPriceKes/);
+    const state = read("dashboard/src/lib/billingStateLoad.ts");
+    assert.match(state, /version_monthly_price_kes/);
+    assert.doesNotMatch(state, /billing_packages|billing_rate_card/);
+    const wallet = read("dashboard/src/app/(desk)/wallet/page.tsx");
+    assert.doesNotMatch(wallet, /extraMinuteKes|inboundPerMinuteKes|billing_rate_card/);
+    const gate = read("dashboard/src/lib/deskPlanChange.ts");
+    const billing = read("dashboard/src/lib/ownerBilling.ts");
+    assert.match(gate, /DESK_PLAN_CHANGE === "on"/);
+    assert.match(billing, /deskPlanChangeOn/);
+    assert.doesNotMatch(gate, /=== "true"/);
+    assert.doesNotMatch(billing, /=== "true"/);
+  });
 });

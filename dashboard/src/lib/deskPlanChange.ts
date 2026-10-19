@@ -2,7 +2,17 @@
  * Plan-change and seat RPCs arrive with Ops' API contract.
  * Both flag states refuse until that port is swapped in below.
  * Never return ok: true from this adapter.
+ * The flag is DESK_PLAN_CHANGE=on, the same check owner billing uses.
  */
+
+export function deskPlanChangeEnabled(): boolean {
+  return process.env.DESK_PLAN_CHANGE === "on";
+}
+
+export function deskPlanChangeOn(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env === process.env) return deskPlanChangeEnabled();
+  return env.DESK_PLAN_CHANGE === "on";
+}
 
 export type PlanChangeResult = { ok: false; message: "Plan changes open soon" };
 
@@ -24,10 +34,6 @@ const closedPort: PlanChangePort = {
     return CLOSED;
   },
 };
-
-export function deskPlanChangeEnabled(): boolean {
-  return process.env.DESK_PLAN_CHANGE === "true";
-}
 
 export function planChangePort(): PlanChangePort {
   if (!deskPlanChangeEnabled()) return closedPort;

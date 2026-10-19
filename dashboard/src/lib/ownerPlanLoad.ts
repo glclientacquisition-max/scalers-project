@@ -95,8 +95,6 @@ export type UsageBillingExtras = {
   messageCredits: number | null;
   /** Credits per text, WhatsApp, and email. Used to count credits; never shown. */
   creditBurns: CreditBurns | null;
-  inboundPerMinuteKes: number | null;
-  outboundPerMinuteKes: number | null;
   /** Default when the owner has not saved a limit. Not a per-credit price. */
   spendLimitKes: number | null;
   onDemandLocked: boolean;
@@ -172,8 +170,6 @@ function emptyExtras(): UsageBillingExtras {
     monthlyPriceKes: null,
     messageCredits: null,
     creditBurns: null,
-    inboundPerMinuteKes: null,
-    outboundPerMinuteKes: null,
     spendLimitKes: null,
     onDemandLocked: false,
   };
@@ -564,8 +560,6 @@ export async function loadUsageBillingExtras(tenantId: string): Promise<UsageBil
     const beta = isFreeBeta(status);
     let messageCredits: number | null = null;
     let creditBurns: CreditBurns | null = null;
-    let inbound: number | null = null;
-    let outbound: number | null = null;
     let share: number | null = null;
     if (row.package_version_id) {
       const match = await versionById(ws.client, String(row.package_version_id));
@@ -574,8 +568,6 @@ export async function loadUsageBillingExtras(tenantId: string): Promise<UsageBil
           messageCredits = Math.round(num(match.message_credits));
         }
         creditBurns = creditBurnsFrom(match);
-        inbound = num(match.inbound_kes_per_second) * 60;
-        outbound = num(match.outbound_kes_per_second) * 60;
         const shareRaw = match.spend_limit_share_percent;
         if (shareRaw != null && shareRaw !== "") share = num(shareRaw);
       }
@@ -588,8 +580,6 @@ export async function loadUsageBillingExtras(tenantId: string): Promise<UsageBil
       monthlyPriceKes,
       messageCredits,
       creditBurns,
-      inboundPerMinuteKes: inbound,
-      outboundPerMinuteKes: outbound,
       spendLimitKes: spendLimitDisplayKes(null, monthlyPriceKes, share),
       onDemandLocked: status === "trialing",
     };

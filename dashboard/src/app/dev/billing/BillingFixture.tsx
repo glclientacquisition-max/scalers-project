@@ -187,7 +187,7 @@ function UsagePreview({ kind }: { kind: "beta" | "paid" }) {
     >
       {beta ? null : (
         <>
-          <OnDemandUsagePanel tenantId="preview" enabled extraMinuteKes={26} />
+          <OnDemandUsagePanel tenantId="preview" enabled />
           <section className="overflow-hidden rounded-2xl border border-hairline bg-surface">
             <h2 className="px-4 pt-4 font-display text-title tracking-tight text-ink">Activity</h2>
             <table className="mt-2 w-full text-left text-body">
