@@ -60,6 +60,47 @@ describe('catalogue price matching (Jirani deep clean bedrooms)', () => {
   });
 });
 
+describe('catalogue price matching: no false positives (Jirani siblings)', () => {
+  const profile = jiraniProfile();
+  const sw = (query) => {
+    const result = lookup('price', query, { profile, language: 'sw', now: NOW, seed: 0 });
+    return { result, speech: speechOf(result, 'sw') };
+  };
+
+  it('tier word picks the right sibling: standard 2 bedroom is not deep 2 bedroom', () => {
+    const hit = price('two bedroom standard clean', profile);
+    assert.equal(hit.result.status, 'found');
+    assert.match(hit.speech, /Standard clean, 2 bedroom/);
+    assert.match(hit.speech, /4,?500|four thousand five hundred/i);
+  });
+
+  it('a size the tenant does not list is never quoted from another size', () => {
+    for (const q of ['How much is Standard clean, 3 bedroom?', 'How much is Deep clean, 4 bedroom?', 'four bedroom deep clean']) {
+      const hit = price(q, profile);
+      assert.notEqual(hit.result.status, 'found', q);
+      assert.doesNotMatch(hit.speech, /shillings/i, q);
+    }
+  });
+
+  it('2 bedroom never resolves to 1 bedroom; with two 2-bedroom rows it asks which', () => {
+    const hit = price('how much is 2 bedroom', profile);
+    assert.equal(hit.result.status, 'ambiguous');
+    assert.deepEqual([...hit.result.options].sort(), ['Deep clean, 2 bedroom', 'Standard clean, 2 bedroom']);
+    assert.doesNotMatch(hit.speech, /1 bedroom/);
+  });
+
+  it('Swahili number word with tier word resolves the sibling', () => {
+    const hit = sw('Bei ya deep clean vyumba mbili?');
+    assert.equal(hit.result.status, 'found');
+    assert.match(hit.speech, /Deep clean, 2 bedroom/);
+  });
+
+  it('two items named in one question still asks which one', () => {
+    const hit = price('How much is sofa cleaning and carpet cleaning?', profile);
+    assert.equal(hit.result.status, 'ambiguous');
+  });
+});
+
 describe('catalogue price matching (products)', () => {
   it('product rows use the same qualifier-aware matcher', () => {
     const profile = tenantProfileFromRow(

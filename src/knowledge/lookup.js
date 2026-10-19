@@ -249,8 +249,10 @@ function scoreLabel(text, label) {
 
 const LABEL_GENERIC = new Set([
   'the', 'and', 'for', 'with', 'from', 'your', 'our', 'how', 'much', 'is', 'what', 'price', 'bei', 'ya', 'ni',
-  'cleaning', 'clean', 'service', 'services', 'deep', 'standard', 'internal',
+  'cleaning', 'clean', 'service', 'services', 'internal',
 ]);
+// NOT generic: 'deep', 'standard' and similar tier words are what tell sibling
+// rows apart ("Deep clean, 2 bedroom" vs "Standard clean, 2 bedroom").
 const EN_NUM_WORD = { one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9' };
 const SW_NUM_WORD = { moja: '1', mbili: '2', tatu: '3', nne: '4', tano: '5', sita: '6', saba: '7', nane: '8', tisa: '9' };
 
@@ -286,28 +288,66 @@ function catalogueMatchTokens(text) {
   return tokens;
 }
 
+function numericTokens(tokens) {
+  return new Set([...tokens].filter((t) => /^\d+$/.test(t)));
+}
+
+/**
+ * True when the question names a different number than this row, or names another
+ * row's word while missing one of this row's own words. A row the question names in
+ * full is never contradicted ("mattress and sofa" still asks which one).
+ */
+function contradictsLabel(qTokens, lTokens, vocab) {
+  const qNums = numericTokens(qTokens);
+  const lNums = numericTokens(lTokens);
+  if (qNums.size && lNums.size && ![...qNums].some((n) => lNums.has(n))) return true;
+  if (!vocab) return false;
+  const namedInFull = [...lTokens].every((t) => qTokens.has(t));
+  if (namedInFull) return false;
+  for (const t of qTokens) if (vocab.has(t) && !lTokens.has(t)) return true;
+  return false;
+}
+
+function catalogueVocab(facts) {
+  const vocab = new Set();
+  for (const f of facts) for (const t of catalogueMatchTokens(f.label)) vocab.add(t);
+  return vocab;
+}
+
 /**
  * Score how well a caller question names a catalogue row. Full normalized names
  * and bedroom/number qualifiers beat shared prefixes like "deep clean".
+ *
+ * A row is ruled out (0) when the question contradicts it:
+ * - the question has a number and the row has a different one ("2 bedroom" never
+ *   matches "1 bedroom");
+ * - the question has a word that names another row but not this one ("standard"
+ *   rules out "Deep clean, 2 bedroom").
+ * `vocab` is the union of all rows' match tokens.
  */
-function scoreCatalogueLabel(query, label) {
+function scoreCatalogueLabel(query, label, vocab = null) {
   const qNorm = normalizeCatalogueText(query);
   const lNorm = normalizeCatalogueText(label);
   if (!lNorm) return 0;
   if (qNorm === lNorm) return 2;
-  if (qNorm.includes(lNorm)) return 1.5;
   const qTokens = catalogueMatchTokens(query);
   const lTokens = catalogueMatchTokens(label);
   if (!lTokens.size) return 0;
+  if (contradictsLabel(qTokens, lTokens, vocab)) return 0;
+  if (qNorm.includes(lNorm)) return 1.5;
   let hits = 0;
   for (const t of lTokens) if (qTokens.has(t)) hits += 1;
   return hits / lTokens.size;
 }
 
+/** Below this a row is not "named" by the question; the legacy scorer decides. */
+const CATALOGUE_MATCH_MIN = 0.5;
+
 function pickPriceFactByLabel(query, facts) {
+  const vocab = catalogueVocab(facts);
   const scored = facts
-    .map((f) => ({ f, score: scoreCatalogueLabel(query, f.label) }))
-    .filter((row) => row.score > 0)
+    .map((f) => ({ f, score: scoreCatalogueLabel(query, f.label, vocab) }))
+    .filter((row) => row.score >= CATALOGUE_MATCH_MIN)
     .sort((a, b) => b.score - a.score);
   if (!scored.length) return { kind: 'none' };
   const top = scored[0].score;
@@ -369,7 +409,12 @@ function lookupPrice(query, ctx, sheet) {
       speech: both(en, sw),
     }, profile, 'price');
   } else {
+    // Legacy word overlap, minus rows the question contradicts, so "Standard
+    // clean, 3 bedroom" cannot quote "Standard clean, 2 bedroom".
+    const vocab = catalogueVocab(facts);
+    const qTokens = catalogueMatchTokens(q);
     const scored = facts
+      .filter((f) => !contradictsLabel(qTokens, catalogueMatchTokens(f.label), vocab))
       .map((f) => ({ f, score: scoreLabel(q, f.label) }))
       .filter((row) => row.score >= 0.5)
       .sort((a, b) => b.score - a.score);
