@@ -67,6 +67,7 @@ test('pay: legacy free-text only uses the callback line', () => {
   for (const language of ['en', 'sw']) {
     const hit = say('pay', 'How do I pay?', row, language);
     assert.equal(hit.result.status, 'no_data', language);
+    assert.equal(hit.result.reason, 'legacy_text_only', language);
     expectCallback(hit, language);
     assert.doesNotMatch(hit.speech, /delivery only/i);
   }

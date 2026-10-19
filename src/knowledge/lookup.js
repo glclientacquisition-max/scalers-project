@@ -850,6 +850,17 @@ function payNothingSaved(pay) {
   return payMethodIds(pay).length === 0;
 }
 
+function legacyPaymentText(profile) {
+  const policies = asObject(profile.businessPolicies) || {};
+  const raw = policies.payment;
+  if (raw == null) return '';
+  return String(raw).trim();
+}
+
+function legacyPayNoData(profile) {
+  return resultOf('no_data', { id: 'pay', reason: 'legacy_text_only' }, profile, 'pay');
+}
+
 function joinOrWords(words, lang) {
   if (!words.length) return '';
   if (words.length === 1) return words[0];
@@ -1072,6 +1083,7 @@ function lookupPay(query, ctx) {
   const profile = ctx.profile || {};
   const pay = payBag(profile);
   if (payNothingSaved(pay)) {
+    if (legacyPaymentText(profile)) return legacyPayNoData(profile);
     return noData(profile, 'pay', 'pay');
   }
   const intent = payQuestionIntent(query);
