@@ -70,6 +70,7 @@ function tenantProfileFromRow(row, extras = {}) {
     ),
     handoffMode: parseHandoffMode(row.handoff_mode),
     businessLocations: row.business_locations || [],
+    service_areas: row.service_areas ?? null,
     businessPolicies: row.business_policies || {},
     billingEnforcement:
       row.billing_enforcement != null ? String(row.billing_enforcement) : null,
