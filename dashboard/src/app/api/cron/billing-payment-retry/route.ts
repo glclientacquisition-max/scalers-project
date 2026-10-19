@@ -12,9 +12,9 @@ export function billingPaymentCronOk(header: string | null): boolean {
 
 /**
  * Live mode retries stored unreadable Bachs reads, then reads open checkouts
- * and applies charge.amount_paid as the running total. The schedule is minute
- * 7, 22, 37, and 52. An allowlisted business is the only one read. A closed
- * gate does not call Bachs.
+ * and applies charge.amount_paid as the running total. Vercel Hobby runs a
+ * cron at most once a day, so the schedule is 03:07 UTC. An allowlisted
+ * business is the only one read. A closed gate does not call Bachs.
  */
 export async function GET(request: Request) {
   if (!billingPaymentCronOk(request.headers.get("authorization"))) {

@@ -179,7 +179,7 @@ Desk builds the Billing screen. This API does not.
 
 `node scripts/billing-payment-reconcile.js` prints that report. Sandbox then settles pending, pending-unattached, and succeeded attempts from `getCheckout` `charge.amount_paid`. It does not read event amounts. An unreadable read is skipped. Live mode does the same sweep, then retries `payment_events` rows with `needs_retry`, and only when `BACHS_LIVE_ALLOWED` is exactly `true` and the business is allowlisted. A business that is not allowlisted is skipped. A second run of the same total does nothing. The sweep applies the running total. It does not add a per-event amount on its own.
 
-`GET /api/cron/billing-payment-retry` is that live sweep plus the same retry. It requires `Authorization: Bearer` matching `CRON_SECRET`. A closed gate returns 200 and does not call Bachs. Sandbox mode returns 200 and does not sweep. The route is in `dashboard/vercel.json` at minute 7, 22, 37, and 52 (`7,22,37,52 * * * *`). Production with payments off does not call Bachs. Go-live steps: [`payments-go-live.md`](../../runbooks/payments-go-live.md).
+`GET /api/cron/billing-payment-retry` is that live sweep plus the same retry. It requires `Authorization: Bearer` matching `CRON_SECRET`. A closed gate returns 200 and does not call Bachs. Sandbox mode returns 200 and does not sweep. The route is in `dashboard/vercel.json` once a day at 03:07 UTC (`7 3 * * *`). This Vercel account is Hobby, so a schedule that runs more than once a day fails the deployment. The earlier `7,22,37,52 * * * *` schedule did that on `5e4813d7`. Production with payments off does not call Bachs. Go-live steps: [`payments-go-live.md`](../../runbooks/payments-go-live.md).
 
 ## Sandbox drill (19 Oct 2026, 02:18 EAT)
 
