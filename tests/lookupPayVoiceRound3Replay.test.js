@@ -60,6 +60,25 @@ test('replay pay r3: airtel-only M-Pesa till or paybill ask is callback (EN and 
   }
 });
 
+test('replay pay r4: send money routing and Swahili number labels (EN and SW)', () => {
+  const tillOnly = confirmedPay({ methods: ['mpesa_till'], mpesa_till: '123456' });
+  const miss = say('Send money number?', tillOnly, 'en');
+  assert.equal(miss.result.status, 'not_found_in_list');
+  expectCallback(miss, 'en');
+  const missSw = say('Namba ya tuma pesa?', tillOnly, 'sw');
+  assert.equal(missSw.result.status, 'not_found_in_list');
+  expectCallback(missSw, 'sw');
+
+  const sendRow = confirmedPay({ methods: ['mpesa_send'], mpesa_send: { phone: '0712345678' } });
+  const hitSw = say('Nalipaje?', sendRow, 'sw');
+  assert.match(hitSw.speech, /^Namba ya kutuma pesa kwa M-Pesa ni /);
+  assert.doesNotMatch(hitSw.speech, /Namba ya namba ya/);
+
+  const airtel = confirmedPay({ methods: ['airtel'], airtel: { phone: '0734567890' } });
+  const swAirtel = say('Nalipaje?', airtel, 'sw');
+  assert.match(swAirtel.speech, /^Namba ya Airtel Money ni /);
+});
+
 test('replay pay r3: paybill plus till resolves named slot (EN and SW)', () => {
   const row = confirmedPay({
     methods: ['mpesa_till', 'mpesa_paybill'],

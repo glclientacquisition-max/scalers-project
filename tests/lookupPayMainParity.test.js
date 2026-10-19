@@ -13,6 +13,9 @@ const SNAPSHOT = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'fixtures/lookupPayMainSpeech.json'), 'utf8'),
 );
 
+// Swahili paybill/pochi/send/airtel rows in the snapshot use the branch fix for
+// "Namba ya namba ya …" (single "Namba ya … ni"). Till SW lines match main.
+
 function payRow(payOverrides) {
   return {
     business_name: 'Pay Co',

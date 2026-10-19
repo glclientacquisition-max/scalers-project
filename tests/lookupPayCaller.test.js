@@ -317,6 +317,42 @@ test('pay: airtel-only uses Airtel wording and rejects M-Pesa till or paybill as
   }
 });
 
+test('pay: send money ask without send slot uses callback; send tenant reads number (EN and SW)', () => {
+  const tillOnly = confirmedPay({ methods: ['mpesa_till'], mpesa_till: '123456' });
+  for (const [language, query] of [
+    ['en', 'Send money number?'],
+    ['sw', 'Namba ya kutuma pesa?'],
+    ['sw', 'Namba ya tuma pesa?'],
+  ]) {
+    const hit = say('pay', query, tillOnly, language);
+    assert.equal(hit.result.status, 'not_found_in_list', query);
+    expectCallback(hit, language);
+    assert.doesNotMatch(hit.speech, /one two three|moja mbili tatu/i);
+  }
+  const sendRow = confirmedPay({ methods: ['mpesa_send'], mpesa_send: { phone: '0712345678' } });
+  const en = say('pay', 'Send money number?', sendRow, 'en');
+  assert.equal(en.result.status, 'found');
+  assert.match(en.speech, /send money number is zero seven one two three four five six seven eight/i);
+  const sw = say('pay', 'Namba ya kutuma pesa?', sendRow, 'sw');
+  assert.equal(sw.result.status, 'found');
+  assert.match(sw.speech, /^Namba ya kutuma pesa kwa M-Pesa ni /);
+  assert.doesNotMatch(sw.speech, /Namba ya namba ya/i);
+});
+
+test('pay: Swahili paybill and pochi lines use single Namba ya prefix', () => {
+  const paybill = confirmedPay({
+    methods: ['mpesa_paybill'],
+    mpesa_paybill: { business_no: '542542', account_mode: 'fixed', account: '70722' },
+  });
+  const swPaybill = say('pay', 'Nalipaje?', paybill, 'sw');
+  assert.match(swPaybill.speech, /^Namba ya paybill ya M-Pesa ni /);
+  assert.doesNotMatch(swPaybill.speech, /Namba ya namba ya/i);
+  const pochi = confirmedPay({ methods: ['pochi'], pochi: { phone: '0712345678' } });
+  const swPochi = say('pay', 'Nalipaje?', pochi, 'sw');
+  assert.match(swPochi.speech, /^Namba ya Pochi la Biashara ni /);
+  assert.doesNotMatch(swPochi.speech, /Namba ya namba ya/i);
+});
+
 test('pay: paybill plus till tenant resolves paybill and till number asks separately', () => {
   const row = confirmedPay({
     methods: ['mpesa_till', 'mpesa_paybill'],

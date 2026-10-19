@@ -18,7 +18,7 @@
       "query": "Nalipaje?",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
+      "speech": "Namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
     },
     {
       "fixture": "paybill_with_account",
@@ -36,7 +36,7 @@
       "query": "Mnapokea M-Pesa?",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
+      "speech": "Namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
     },
     {
       "fixture": "paybill_with_account",
@@ -63,7 +63,7 @@
       "query": "Nicheki namba ya kulipa",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
+      "speech": "Namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
     },
     {
       "fixture": "paybill_with_account",
@@ -72,7 +72,7 @@
       "query": "Nipe namba ya kulipa",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
+      "speech": "Namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
     },
     {
       "fixture": "paybill_with_account",
@@ -90,7 +90,7 @@
       "query": "Malipo?",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
+      "speech": "Namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
     },
     {
       "fixture": "paybill_with_account",
@@ -99,7 +99,7 @@
       "query": "Malipo ni vipi?",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
+      "speech": "Namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
     },
     {
       "fixture": "paybill_with_account",
@@ -108,7 +108,7 @@
       "query": "Nataka kufanya malipo",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
+      "speech": "Namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
     },
     {
       "fixture": "till",
@@ -342,7 +342,7 @@
       "query": "Nalipaje?",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
+      "speech": "Namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
     },
     {
       "fixture": "pochi",
@@ -360,7 +360,7 @@
       "query": "Mnapokea M-Pesa?",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
+      "speech": "Namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
     },
     {
       "fixture": "pochi",
@@ -387,7 +387,7 @@
       "query": "Nicheki namba ya kulipa",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
+      "speech": "Namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
     },
     {
       "fixture": "pochi",
@@ -396,7 +396,7 @@
       "query": "Nipe namba ya kulipa",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
+      "speech": "Namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
     },
     {
       "fixture": "pochi",
@@ -414,7 +414,7 @@
       "query": "Malipo?",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
+      "speech": "Namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
     },
     {
       "fixture": "pochi",
@@ -423,7 +423,7 @@
       "query": "Malipo ni vipi?",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
+      "speech": "Namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
     },
     {
       "fixture": "pochi",
@@ -432,7 +432,7 @@
       "query": "Nataka kufanya malipo",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
+      "speech": "Namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
     },
     {
       "fixture": "till_plus_bank",
@@ -558,7 +558,7 @@
       "query": "Nalipaje?",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya kutuma pesa kwa M-Pesa ni sifuri saba moja mbili tatu nne tano sita saba nane."
+      "speech": "Namba ya kutuma pesa kwa M-Pesa ni sifuri saba moja mbili tatu nne tano sita saba nane."
     },
     {
       "fixture": "send_money",
@@ -576,7 +576,7 @@
       "query": "Mnapokea M-Pesa?",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya kutuma pesa kwa M-Pesa ni sifuri saba moja mbili tatu nne tano sita saba nane."
+      "speech": "Namba ya kutuma pesa kwa M-Pesa ni sifuri saba moja mbili tatu nne tano sita saba nane."
     },
     {
       "fixture": "airtel",
@@ -594,7 +594,7 @@
       "query": "Nalipaje?",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
+      "speech": "Namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
     },
     {
       "fixture": "airtel",
@@ -612,7 +612,7 @@
       "query": "Mnapokea M-Pesa?",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
+      "speech": "Namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
     },
     {
       "fixture": "airtel",
@@ -639,7 +639,7 @@
       "query": "Nicheki namba ya kulipa",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
+      "speech": "Namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
     },
     {
       "fixture": "airtel",
@@ -648,7 +648,7 @@
       "query": "Nipe namba ya kulipa",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
+      "speech": "Namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
     },
     {
       "fixture": "airtel",
@@ -666,7 +666,7 @@
       "query": "Malipo?",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
+      "speech": "Namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
     },
     {
       "fixture": "airtel",
@@ -675,7 +675,7 @@
       "query": "Malipo ni vipi?",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
+      "speech": "Namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
     },
     {
       "fixture": "airtel",
@@ -684,7 +684,7 @@
       "query": "Nataka kufanya malipo",
       "status": "found",
       "reason": "match",
-      "speech": "Namba ya namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
+      "speech": "Namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
     },
     {
       "fixture": "paybill_plus_till",
@@ -839,5 +839,6 @@
       "reason": "no_match",
       "speech": "Wacha niulize timu kisha nikujulishe."
     }
-  ]
+  ],
+  "swSpeechNote": "Swahili paybill, pochi, send_money, and airtel speech rows match main f6d7fee9 except the Namba ya namba ya doubled-word fix (Namba ya … ni)."
 }

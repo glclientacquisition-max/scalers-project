@@ -823,10 +823,10 @@ function payReading(profile, pay) {
 
 const PAY_SLOT_LABEL = {
   till: { en: 'M-Pesa till number', sw: 'till ya M-Pesa' },
-  paybill: { en: 'M-Pesa paybill number', sw: 'namba ya paybill ya M-Pesa' },
-  pochi: { en: 'Pochi la Biashara number', sw: 'namba ya Pochi la Biashara' },
-  send: { en: 'M-Pesa send money number', sw: 'namba ya kutuma pesa kwa M-Pesa' },
-  airtel: { en: 'Airtel Money number', sw: 'namba ya Airtel Money' },
+  paybill: { en: 'M-Pesa paybill number', sw: 'paybill ya M-Pesa' },
+  pochi: { en: 'Pochi la Biashara number', sw: 'Pochi la Biashara' },
+  send: { en: 'M-Pesa send money number', sw: 'kutuma pesa kwa M-Pesa' },
+  airtel: { en: 'Airtel Money number', sw: 'Airtel Money' },
 };
 
 function paySlots(pay) {
@@ -1098,6 +1098,12 @@ function payKindOf(query) {
   if (/pay\s?bill|paybill|business number/i.test(text)) return 'paybill';
   if (/pochi/i.test(text)) return 'pochi';
   if (/airtel/i.test(text)) return 'airtel';
+  if (
+    /\bsend money\b/i.test(text)
+    || /\btuma pesa\b/i.test(text)
+    || /\bkutuma pesa\b/i.test(text)
+    || /namba ya kutuma pesa/i.test(text)
+  ) return 'send';
   if (/\b(bank|account number)\b/i.test(text)) return 'bank';
   if (/\bcard\b/i.test(text)) return 'card';
   if (/till|lipa na|namba ya malipo|namba ya till/i.test(text)) return 'till';
@@ -1196,6 +1202,7 @@ function lookupPayNumber(kind, profile, pay) {
     till: 'till',
     paybill: 'paybill',
     pochi: 'pochi',
+    send: 'send',
     airtel: 'airtel',
     any: '',
   }[kind];
