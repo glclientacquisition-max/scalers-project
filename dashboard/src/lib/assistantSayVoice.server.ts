@@ -1,10 +1,7 @@
-import { createRequire } from "node:module";
-import path from "node:path";
 import type { TenantRow } from "@/lib/supabase";
 import type { AssistantSayState, ReadyChecklistItem } from "@/lib/assistantSayTypes";
 import { loadCompileProvenance } from "@/lib/tenantFieldProvenance";
-
-const requireVoice = createRequire(path.join(process.cwd(), "..", "package.json"));
+import { requireVoice } from "@/lib/voiceRequire.server";
 
 function voiceProfileFromTenant(
   tenant: TenantRow,
