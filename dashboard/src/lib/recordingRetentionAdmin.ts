@@ -62,10 +62,16 @@ export function effectiveRetentionForTenant(
   });
 }
 
+/**
+ * Most call rows the purge preview reads before it reports a capped count.
+ * A row cap, not money; written as a product so it never reads as a plan price.
+ */
+export const RECORDING_PURGE_PREVIEW_MAX_ROWS = 5 * 1000;
+
 /** Rough count of recordings the next purge run would delete. */
 export async function countRecordingPurgeAtNextRun(
   proposedPlatformDays?: number | null,
-  maxScan = 5000,
+  maxScan = RECORDING_PURGE_PREVIEW_MAX_ROWS,
 ): Promise<{ count: number; capped: boolean }> {
   const context = await loadRecordingRetentionContext();
   const admin = getSupabaseAdmin();

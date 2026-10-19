@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-171 variables.
+173 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -85,7 +85,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `PUBLIC_BASE_URL` | desk, voice | `dashboard/src/lib/sautikit.ts`<br>`dashboard/src/lib/voicePublicBase.js`<br>`server.js` |
 | `RAILWAY_GIT_BRANCH` | voice | `server.js` |
 | `RAILWAY_GIT_COMMIT_SHA` | voice | `server.js` |
-| `RECORDING_RETENTION_DAYS` | voice | `src/lib/recordingRetention.js` |
+| `RECORDING_RETENTION_DAYS` | desk, voice | `dashboard/src/lib/recordingRetentionPolicy.ts`<br>`src/lib/recordingRetention.js`<br>`src/lib/recordingRetentionPolicy.js` |
 | `RECORDING_RETENTION_PURGE` | voice | `src/lib/recordingRetention.js` |
 | `RESEND_API_KEY` | desk, voice | `dashboard/src/lib/opsMail.ts`<br>`src/notifications/email.js` |
 | `SAUTIKIT_ADMIN_OPS_KEY` | desk | `dashboard/src/lib/sautikit.ts` |

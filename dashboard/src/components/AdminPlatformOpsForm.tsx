@@ -223,14 +223,10 @@ export function AdminPlatformOpsForm({
       setBusy("save");
       setError("");
       try {
-        const res = await fetch("/api/admin/platform-ops", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "recording_retention_preview",
-            recording_retention_days: next,
-          }),
-        });
+        const res = await fetch(
+          `/api/admin/platform-ops?recording_retention_preview=${encodeURIComponent(String(next))}`,
+          { cache: "no-store" },
+        );
         const json = (await res.json().catch(() => ({}))) as {
           count?: number;
           capped?: boolean;

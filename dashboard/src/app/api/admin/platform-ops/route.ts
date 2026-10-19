@@ -21,9 +21,22 @@ import {
   type OpsNoticeKind,
 } from "@/lib/platformOpsModel";
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await isLegacyAuthenticated())) {
     return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  }
+  // Read-only: how many recordings the next purge would delete at a proposed setting.
+  // A GET, like other admin reads, so it is not an admin write and writes no Activity row.
+  const url = new URL(request.url);
+  if (url.searchParams.has("recording_retention_preview")) {
+    try {
+      const proposed = parseRecordingRetentionDays(url.searchParams.get("recording_retention_preview"));
+      const { count, capped } = await countRecordingPurgeAtNextRun(proposed);
+      return NextResponse.json({ ok: true, count, capped });
+    } catch (err) {
+      logAdminError("platform-ops", err);
+      return NextResponse.json({ error: adminFacingError(err, "Could not preview.") }, { status: 500 });
+    }
   }
   try {
     return NextResponse.json({ ok: true, domain: await getOpsResendDomain() });
@@ -43,12 +56,6 @@ export async function POST(request: Request) {
   const actor = await adminActorName();
 
   try {
-    if (action === "recording_retention_preview") {
-      const proposed = parseRecordingRetentionDays(body.recording_retention_days);
-      const { count, capped } = await countRecordingPurgeAtNextRun(proposed);
-      return NextResponse.json({ ok: true, count, capped });
-    }
-
     if (action === "save_settings") {
       const before = (await loadOpsSettings().catch(() => null))?.settings ?? null;
       const settings = await saveOpsSettings({

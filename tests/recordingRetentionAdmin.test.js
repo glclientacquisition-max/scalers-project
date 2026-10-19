@@ -15,6 +15,10 @@ test('platform ops API is admin-only and supports retention preview', () => {
   const route = read('dashboard/src/app/api/admin/platform-ops/route.ts');
   assert.match(route, /isLegacyAuthenticated/);
   assert.match(route, /recording_retention_preview/);
+  // The preview is a read: served by GET, never a POST action branch (Activity records every POST branch).
+  const get = route.slice(route.indexOf('export async function GET'), route.indexOf('export async function POST'));
+  assert.match(get, /searchParams\.has\("recording_retention_preview"\)/);
+  assert.doesNotMatch(route, /action === "recording_retention_preview"/);
   assert.match(route, /save_recording_retention_platform/);
   assert.match(route, /recording_retention_days/);
 });
@@ -35,7 +39,8 @@ test('admin platform form exposes recording retention control', () => {
 });
 
 test('business detail sheet has per-tenant override', () => {
-  const panel = read('dashboard/src/components/AdminBusinessesPanel.tsx');
+  // #787 moved per-business actions to the shop page (AdminShopPanel).
+  const panel = read('dashboard/src/components/AdminShopPanel.tsx');
   assert.match(panel, /Recording retention/);
   assert.match(panel, /save_recording_retention/);
 });

@@ -23,6 +23,7 @@ const BUSINESS: AdminBusiness = {
   billing_enforcement: "off",
   status: "active",
   pre_archive: null,
+  recording_retention_days_override: null,
 };
 
 const PEOPLE: PeopleData = {
