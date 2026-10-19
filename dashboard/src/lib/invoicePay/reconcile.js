@@ -1,0 +1,125 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- node:test loads this file with require() */
+const { PROD_REF } = require("./provider");
+
+const PENDING_MS = 30 * 60 * 1000;
+
+const SUCCESS = new Set(["succeeded", "paid", "complete", "completed", "success"]);
+
+/**
+ * Report only. Does not change attempts, payments, or invoices.
+ * @param {{ attempts: object[], invoices: object[], payments: object[], providerStatuses?: Record<string, string>, now?: number }} input
+ */
+function reconciliationReport(input) {
+  const now = input.now ?? Date.now();
+  const payments = input.payments || [];
+  const invoices = input.invoices || [];
+  const attempts = input.attempts || [];
+  const providerStatuses = input.providerStatuses || {};
+  const rows = [];
+
+  const paymentForCheckout = (checkoutId) => {
+    if (!checkoutId) return null;
+    return (
+      payments.find((p) => p.providerRef === checkoutId || p.billRef === checkoutId) || null
+    );
+  };
+
+  for (const attempt of attempts) {
+    const created = new Date(attempt.createdAt).getTime();
+    if (attempt.status === "pending" && Number.isFinite(created) && now - created > PENDING_MS) {
+      rows.push({
+        kind: "pending_timeout",
+        attemptId: attempt.id,
+        invoiceId: attempt.invoiceId,
+        paymentId: null,
+        detail: "Pending for more than 30 minutes",
+      });
+    }
+    if (attempt.status === "succeeded" && attempt.checkoutSessionId && !paymentForCheckout(attempt.checkoutSessionId)) {
+      rows.push({
+        kind: "status_disagreement",
+        attemptId: attempt.id,
+        invoiceId: attempt.invoiceId,
+        paymentId: null,
+        detail: "Attempt succeeded with no payment",
+      });
+    }
+    if (attempt.status === "pending" && attempt.checkoutSessionId) {
+      const payment = paymentForCheckout(attempt.checkoutSessionId);
+      if (payment) {
+        rows.push({
+          kind: "status_disagreement",
+          attemptId: attempt.id,
+          invoiceId: attempt.invoiceId,
+          paymentId: payment.id,
+          detail: "Payment recorded while the attempt is still pending",
+        });
+      }
+    }
+    if (attempt.status === "issue") {
+      rows.push({
+        kind: "issue",
+        attemptId: attempt.id,
+        invoiceId: attempt.invoiceId,
+        paymentId: paymentForCheckout(attempt.checkoutSessionId)?.id || null,
+        detail: "Payment needs a check",
+      });
+    }
+    const providerStatus = attempt.checkoutSessionId ? providerStatuses[attempt.checkoutSessionId] : null;
+    if (providerStatus) {
+      const providerPaid = SUCCESS.has(String(providerStatus).toLowerCase());
+      const localPaid = attempt.status === "succeeded";
+      if (providerPaid !== localPaid && attempt.status !== "issue") {
+        rows.push({
+          kind: "provider_disagreement",
+          attemptId: attempt.id,
+          invoiceId: attempt.invoiceId,
+          paymentId: null,
+          detail: `Provider status ${providerStatus} does not match ${attempt.status}`,
+        });
+      }
+    }
+  }
+
+  for (const invoice of invoices) {
+    const matched = payments.some(
+      (p) => p.invoiceId === invoice.id && ["matched", "partial", "over"].includes(p.matchStatus)
+    );
+    if (invoice.status === "paid" && !matched) {
+      rows.push({
+        kind: "status_disagreement",
+        attemptId: null,
+        invoiceId: invoice.id,
+        paymentId: null,
+        detail: "Invoice paid without a matched payment",
+      });
+    }
+    const total = Number(invoice.totalKes);
+    const paid = Number(invoice.amountPaidKes);
+    if (invoice.status === "open" && total > 0 && paid >= total) {
+      rows.push({
+        kind: "status_disagreement",
+        attemptId: null,
+        invoiceId: invoice.id,
+        paymentId: null,
+        detail: "Invoice open but the amount paid covers the total",
+      });
+    }
+  }
+
+  return rows;
+}
+
+function assertNotProductionUrl(url) {
+  if (String(url || "").includes(PROD_REF)) {
+    const err = new Error("refusing production database");
+    err.code = "prod_refused";
+    throw err;
+  }
+}
+
+module.exports = {
+  PENDING_MS,
+  reconciliationReport,
+  assertNotProductionUrl,
+};
