@@ -27,6 +27,8 @@ describe("legacy billing mode and invoice freeze", () => {
   it("keeps the draft number and status guard", () => {
     const sql = fs.readFileSync(path.join(__dirname, "../docs/supabase/billing_data_layer.sql"), "utf8");
     assert.match(sql, /invoice number and status are set only by finalize_invoice/);
+    const body = functionBody(sql, "invoices_freeze");
+    assert.match(body, /new\.invoice_number is not null|new\.status is distinct from 'draft'/);
   });
 
   it("sets billing_write inside apply_payment before it writes invoice status", () => {
@@ -43,6 +45,13 @@ describe("legacy billing mode and invoice freeze", () => {
     assert.match(body, /billing_status = 'beta'/);
     assert.match(body, /billing stays off while the business is on beta/);
     assert.doesNotMatch(body, /set\s+billing_status/);
+  });
+
+  it("refuses to turn enforcement on while billing_status stays beta", () => {
+    const sql = fs.readFileSync(path.join(__dirname, "../docs/supabase/wallet_security_beta.sql"), "utf8");
+    const body = functionBody(sql, "set_tenant_billing_mode");
+    assert.match(body, /billing_status/);
+    assert.match(body, /tenant_subscriptions/);
   });
 });
 
@@ -97,10 +106,26 @@ describe("owner billing actions SQL", () => {
   });
 
   it("disables the editor freeze while backfilling extra_seat_monthly_kes", () => {
+    const editor = fs.readFileSync(path.join(__dirname, "../docs/supabase/package_version_editor.sql"), "utf8");
+    const freeze = functionBody(editor, "billing_package_versions_freeze");
+    assert.match(freeze, /extra_seat_monthly_kes/);
+    assert.match(freeze, /published package version is frozen/);
     const at = sql.indexOf("set extra_seat_monthly_kes = 500");
     assert.ok(at > 0);
     const window = sql.slice(Math.max(0, at - 800), at + 500);
     assert.match(window, /disable trigger\s+billing_package_versions_freeze/i);
+  });
+});
+
+describe("package version editor SQL", () => {
+  const sql = fs.readFileSync(path.join(__dirname, "../docs/supabase/package_version_editor.sql"), "utf8");
+
+  it("refuses billing_status beta unless enforcement is off", () => {
+    const body = functionBody(sql, "admin_set_tenant_billing_mode");
+    assert.match(
+      body,
+      /if p_billing_status = 'beta' and p_enforcement is distinct from 'off' then\s+raise exception/
+    );
   });
 });
 
