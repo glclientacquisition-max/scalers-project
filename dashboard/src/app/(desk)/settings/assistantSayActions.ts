@@ -6,7 +6,9 @@ import { revalidatePath } from "next/cache";
 import { memberCan } from "@/lib/requireMember";
 import { voiceProfileForAssistantSay } from "@/lib/assistantSayVoice.server";
 import { deskLookupPreview } from "@/lib/deskFeatureFlags";
+import { devChapterOneTenant } from "@/lib/devChapterOneTenant";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import type { TenantRow } from "@/lib/supabase";
 import { updateWithColumnPeel } from "@/lib/peelMissingColumns";
 import {
   DEFAULT_BY_KIND,
@@ -64,6 +66,23 @@ export async function saveUnknownAnswerByKindAction(formData: FormData) {
 
 const requireVoice = createRequire(path.join(process.cwd(), "..", "package.json"));
 
+async function voiceProfileForPreview(tenant: TenantRow) {
+  if (process.env.DASHBOARD_OPEN === "true") {
+    const { tenantProfileFromRow } = requireVoice("./src/tenantProfile.js") as {
+      tenantProfileFromRow: (row: unknown, extras: unknown) => unknown;
+    };
+    return tenantProfileFromRow(tenant, {});
+  }
+  return voiceProfileForAssistantSay(tenant);
+}
+
+async function tenantForPreview(): Promise<TenantRow | null> {
+  if (process.env.DASHBOARD_OPEN === "true") {
+    return devChapterOneTenant;
+  }
+  return getCurrentTenant();
+}
+
 export type DeskLookupPreviewResult = {
   status: string;
   reason: string;
@@ -82,12 +101,16 @@ export async function previewDeskLookupAction(
   if (!(await memberCan("settings.view"))) {
     return { ok: false, error: "No permission." };
   }
-  const tenant = await getCurrentTenant();
+  const tenant = await tenantForPreview();
   if (!tenant) return { ok: false, error: "No workspace." };
 
-  const profile = await voiceProfileForAssistantSay(tenant);
+  const profile = await voiceProfileForPreview(tenant);
   const { lookup, speechOf } = requireVoice("./src/knowledge/lookup.js") as {
-    lookup: (kind: string, query: string, ctx: object) => { status: string; reason?: string };
+    lookup: (
+      kind: string,
+      query: string,
+      ctx: object
+    ) => { status: string; reason?: string; speech?: { en?: string; sw?: string } };
     speechOf: (result: { speech?: { en?: string; sw?: string } }, language: string) => string;
   };
   const trimmedQuery = String(query || "").trim() || "sample question";

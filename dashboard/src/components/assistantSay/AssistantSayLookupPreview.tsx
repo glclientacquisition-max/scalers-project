@@ -4,8 +4,7 @@ import { useState, useTransition } from "react";
 import { previewDeskLookupAction } from "@/app/(desk)/settings/assistantSayActions";
 import { Button } from "@/components/ui/Button";
 import { SegmentedControl } from "@/components/ui/Segmented";
-import { Field } from "@/components/ui/Field";
-import { SettingsGroup, settingsFieldClass } from "@/components/settingsUi";
+import { SettingsGroup, SettingsStack, settingsFieldClass } from "@/components/settingsUi";
 import { Stamp } from "@/components/ui/Stamp";
 
 const KINDS = [
@@ -46,7 +45,7 @@ export function AssistantSayLookupPreview() {
           onChange={setKind}
           items={KINDS.map((k) => ({ value: k.id, label: k.label }))}
         />
-        <Field label="Sample question" htmlFor="lookup_preview_query">
+        <SettingsStack label="Sample question" htmlFor="lookup_preview_query">
           <input
             id="lookup_preview_query"
             className={settingsFieldClass}
@@ -54,7 +53,7 @@ export function AssistantSayLookupPreview() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder={PLACEHOLDERS[kind]}
           />
-        </Field>
+        </SettingsStack>
         <Button type="button" variant="tonal" size="sm" onClick={runPreview} disabled={pending}>
           {pending ? "Showing" : "Show answer"}
         </Button>
