@@ -119,7 +119,7 @@ export function AdminActivityPanel({
                 <ListRow
                   title="Business"
                   preview={open.business}
-                  href={open.businessId ? `/admin/businesses#biz-${open.businessId}` : undefined}
+                  href={open.businessId ? `/admin/businesses/${open.businessId}` : undefined}
                 />
               ) : null}
               {open.reason ? <ListRow title="Why" preview={open.reason} /> : null}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminBusiness } from "@/lib/admin";
 import type { QualityBadge } from "@/lib/adminQualityModel";
@@ -167,7 +167,7 @@ export function AdminShopPanel({
   const life = lifecycleOf(b);
 
   return (
-    <>
+    <div className="space-y-8">
       {error ? (
         <p className="px-4 text-body text-attention" role="alert">
           {error}
@@ -179,7 +179,7 @@ export function AdminShopPanel({
         </p>
       ) : null}
 
-      <ul className="divide-y divide-hairline">
+      <ShopBlock title="Line">
         {b.status === "suspended" ? (
           <ListRow title="Status" preview={SUSPENDED_LINE} stamp={<Stamp tone="attention">Suspended</Stamp>} />
         ) : null}
@@ -201,43 +201,6 @@ export function AdminShopPanel({
             }
           />
         ) : null}
-        <ListRow
-          title="Business details"
-          preview={b.business_name}
-          onOpen={() => {
-            setEditName(b.business_name);
-            setEditNotify(b.whatsapp_notification_number);
-            setSheet("edit");
-          }}
-        />
-        <ListRow title="Notify" preview={notifyLabel(b.whatsapp_notification_number)} />
-        <ListRow title="Created" preview={formatCreated(b.created_at)} />
-        <ListRow title="Activity" href={`/admin/activity?business=${b.id}`} preview="Who changed what, and when" />
-        <ListRow
-          title="Package"
-          preview={packLabel(b)}
-          onOpen={() => {
-            setPeriod(b.package_period || "month");
-            setSheet("package");
-            void loadPacks();
-          }}
-        />
-        <ListRow
-          title="Plan"
-          preview={planLabel(b)}
-          onOpen={() => {
-            setPlan(planOf(b));
-            setSheet("plan");
-          }}
-        />
-        <ListRow
-          title="Charges"
-          preview="Calls and line fees"
-          onOpen={() => {
-            setSheet("charges");
-            void loadCharges(b.id);
-          }}
-        />
         {b.status === "waiting" ? (
           <ListRow
             title="Assign"
@@ -271,6 +234,52 @@ export function AdminShopPanel({
             <ListRow title="Release number" preview={b.sautikit_virtual_number} onOpen={() => setSheet("release")} />
           )
         ) : null}
+      </ShopBlock>
+
+      <ShopBlock title="Shop">
+        <ListRow
+          title="Business details"
+          preview={b.business_name}
+          onOpen={() => {
+            setEditName(b.business_name);
+            setEditNotify(b.whatsapp_notification_number);
+            setSheet("edit");
+          }}
+        />
+        <ListRow title="Notify" preview={notifyLabel(b.whatsapp_notification_number)} />
+        <ListRow title="Created" preview={formatCreated(b.created_at)} />
+        <ListRow title="Activity" href={`/admin/activity?business=${b.id}`} preview="Who changed what, and when" />
+      </ShopBlock>
+
+      <ShopBlock title="Money">
+        <ListRow
+          title="Package"
+          preview={packLabel(b)}
+          onOpen={() => {
+            setPeriod(b.package_period || "month");
+            setSheet("package");
+            void loadPacks();
+          }}
+        />
+        <ListRow
+          title="Plan"
+          preview={planLabel(b)}
+          onOpen={() => {
+            setPlan(planOf(b));
+            setSheet("plan");
+          }}
+        />
+        <ListRow
+          title="Charges"
+          preview="Calls and line fees"
+          onOpen={() => {
+            setSheet("charges");
+            void loadCharges(b.id);
+          }}
+        />
+      </ShopBlock>
+
+      <ShopBlock title="Line state">
         {life.state === "archived" ? (
           <ListRow
             title="Unarchive"
@@ -303,7 +312,7 @@ export function AdminShopPanel({
             />
           </>
         )}
-      </ul>
+      </ShopBlock>
 
       <Sheet
         open={sheet === "assign"}
@@ -574,7 +583,16 @@ export function AdminShopPanel({
           )}
         </Field>
       </ConfirmSheet>
-    </>
+    </div>
+  );
+}
+
+function ShopBlock({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="space-y-1">
+      <h2 className="px-4 text-caption text-ink-3">{title}</h2>
+      <ul className="divide-y divide-hairline">{children}</ul>
+    </section>
   );
 }
 

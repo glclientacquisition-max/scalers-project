@@ -4,13 +4,13 @@ import { ButtonLink } from "@/components/ui/Button";
 import { Empty } from "@/components/ui/Empty";
 import { ListRow } from "@/components/ui/ListRow";
 import { Stamp } from "@/components/ui/Stamp";
-import type { TodayNumberRow, TodayQueueRow } from "@/lib/adminTodayModel";
+import { todayQueueGroups, type TodayNumberRow, type TodayQueueRow } from "@/lib/adminTodayModel";
 
 export type TodayStatus = { tone: "ok" | "attention" | "down"; text: string };
 
 /**
- * Super Admin Today. Status line, one merged Needs you queue, then today's calls.
- * Plain rows, no tiles. Every figure comes from recorded calls; gaps say so.
+ * Super Admin Today. Platform, grouped Needs you, then volume.
+ * Every figure comes from recorded calls; gaps say so.
  */
 export function AdminTodayPanel({
   dayLabel,
@@ -31,17 +31,19 @@ export function AdminTodayPanel({
     ) : (
       <Stamp tone="attention">{status.tone === "down" ? "Down" : "Check"}</Stamp>
     );
-  const showAddNumber = queue.length > 0 && needsNumber;
+  const groups = todayQueueGroups(queue);
+  const showAddNumber = queue.some((row) => row.stamp === "Waiting" || row.stamp === "Stuck") && needsNumber;
 
   return (
     <div className="space-y-8">
       <AdminPageHeader title="Today" subtitle={dayLabel} />
+
       <section aria-labelledby="today-status">
         <h2 id="today-status" className="px-4 text-caption text-ink-3">
           Platform
         </h2>
         <ul className="divide-y divide-hairline">
-          <ListRow href="/admin/platform" title={status.text} preview="Platform" stamp={statusStamp} />
+          <ListRow href="/admin/platform" title={status.text} preview="Open notices and line health" stamp={statusStamp} />
         </ul>
       </section>
 
@@ -56,18 +58,25 @@ export function AdminTodayPanel({
             action={needsNumber ? <ButtonLink href="/admin/numbers">Add number</ButtonLink> : undefined}
           />
         ) : (
-          <ul className="divide-y divide-hairline">
-            {queue.map((row) => (
-              <ListRow
-                key={row.key}
-                href={row.href}
-                title={row.title}
-                preview={row.detail || undefined}
-                unread
-                stamp={<Stamp tone="attention">{row.stamp}</Stamp>}
-              />
+          <div className="space-y-5">
+            {groups.map((group) => (
+              <div key={group.key}>
+                <p className="px-4 pb-1 text-meta text-ink-3">{group.title}</p>
+                <ul className="divide-y divide-hairline">
+                  {group.rows.map((row) => (
+                    <ListRow
+                      key={row.key}
+                      href={row.href}
+                      title={row.title}
+                      preview={row.detail || undefined}
+                      unread
+                      stamp={<Stamp tone="attention">{row.stamp}</Stamp>}
+                    />
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
         {showAddNumber ? (
           <div className="px-4 pt-3">
