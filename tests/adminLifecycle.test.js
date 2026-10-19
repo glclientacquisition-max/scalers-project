@@ -285,7 +285,7 @@ describe("unarchive: explicit 'back on as before' choice", () => {
     assert.match(body, /resumeBilling = false/);
     assert.match(body, /if \(resumeBilling && pre\)/);
     assert.match(body, /resume_billing_choice: resumeBilling/);
-    assert.ok(body.indexOf("resumeBillingAfterUnarchive(") < body.indexOf("setTenantBillingMode("));
-    assert.ok(body.indexOf("setTenantBillingMode(") < body.indexOf("recordAdminAction("));
+    assert.ok(body.indexOf("resumeBillingAfterUnarchive(") < body.indexOf("confirmTenantBillingMode("));
+    assert.ok(body.indexOf("confirmTenantBillingMode(") < body.indexOf("recordAdminAction("));
   });
 });

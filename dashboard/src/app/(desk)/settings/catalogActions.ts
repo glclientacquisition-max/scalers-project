@@ -139,10 +139,11 @@ export async function previewCatalogImportAction(
         return { error: "Paste a product list or CSV first." };
       }
       // Prefer CSV parser when header-like or many commas
-      const products =
+      const products = normalizeProductCatalog(
         mode === "csv" || /,|\t|\|/.test(sourceText)
           ? parseProductCsv(sourceText)
-          : parseBulkProducts(sourceText);
+          : parseBulkProducts(sourceText)
+      );
       if (!products.length) {
         return {
           error:
