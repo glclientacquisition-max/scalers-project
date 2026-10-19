@@ -35,16 +35,37 @@ function seedPayable(totalKes) {
 
 function providerFactory() {
   let n = 0;
+  const totals = new Map();
   return {
     count() {
       return n;
     },
+    totals,
     async createCheckout() {
       n += 1;
       return {
         checkoutId: `cs_${n}`,
         checkoutUrl: `https://sandbox-api.bachs.io/c/${n}`,
         expiresAt: new Date(NOW + 60 * 60 * 1000).toISOString(),
+      };
+    },
+    async getCheckout(id) {
+      const spec = totals.get(id);
+      if (spec === "throw") throw new Error("bachs checkout read failed");
+      if (!spec) return { checkoutId: id, status: "open", paymentStatus: "", charge: null };
+      if (spec.currency && spec.currency !== "KES") {
+        return {
+          checkoutId: id,
+          status: "complete",
+          paymentStatus: "succeeded",
+          charge: { amount_paid: spec.amount, currency: spec.currency },
+        };
+      }
+      return {
+        checkoutId: id,
+        status: "complete",
+        paymentStatus: "succeeded",
+        charge: { amount_paid: spec, currency: "KES" },
       };
     },
   };
@@ -141,6 +162,8 @@ describe("pay-link races must not open two live M-Pesa checkouts", () => {
       ledger,
       provider,
     });
+    provider.totals.set(first.checkoutId, "1000.00");
+    provider.totals.set(second.checkoutId, "1000.00");
     for (const [checkoutId, eventId] of [
       [first.checkoutId, "evt_first"],
       [second.checkoutId, "evt_second"],
@@ -157,14 +180,14 @@ describe("pay-link races must not open two live M-Pesa checkouts", () => {
           },
         }),
         ledger,
+        provider,
       });
     }
-    assert.ok(
-      collectedCents(ledger) <= toCents("1000.00"),
-      `collected ${collectedCents(ledger)} cents from two checkouts`
-    );
+    const paid = toCents(ledger.invoices.get("inv1").amountPaidKes);
+    const credits = ledger.credits.reduce((sum, row) => sum + toCents(row.amountKes), 0n);
     assert.equal(ledger.invoices.get("inv1").status, "paid");
-    assert.equal(ledger.invoices.get("inv1").amountPaidKes, "1000");
+    assert.equal(paid, toCents("1000"));
+    assert.equal(paid + credits, toCents("2000"));
   });
 });
 
@@ -178,6 +201,7 @@ describe("a collected shilling must reduce the invoice", () => {
       ledger,
       provider,
     });
+    provider.totals.set(checkout.checkoutId, "1000.01");
     const result = await handlePayWebhook({
       ...signed({
         id: "evt_cent",
@@ -190,6 +214,7 @@ describe("a collected shilling must reduce the invoice", () => {
         },
       }),
       ledger,
+      provider,
     });
     assert.equal(result.status, 200);
     assert.equal(result.body.action, "apply");
@@ -206,6 +231,7 @@ describe("a collected shilling must reduce the invoice", () => {
       ledger,
       provider,
     });
+    provider.totals.set(checkout.checkoutId, "400.00");
     const result = await handlePayWebhook({
       ...signed({
         id: "evt_under",
@@ -217,6 +243,7 @@ describe("a collected shilling must reduce the invoice", () => {
         },
       }),
       ledger,
+      provider,
     });
     assert.equal(result.status, 200);
     assert.equal(result.body.action, "apply_partial");
@@ -233,6 +260,7 @@ describe("a collected shilling must reduce the invoice", () => {
       ledger,
       provider,
     });
+    provider.totals.set(checkout.checkoutId, { amount: "7.60", currency: "USD" });
     await handlePayWebhook({
       ...signed({
         id: "evt_usd",
@@ -245,7 +273,9 @@ describe("a collected shilling must reduce the invoice", () => {
         },
       }),
       ledger,
+      provider,
     });
+    provider.totals.set(checkout.checkoutId, "1000.00");
     const corrected = await handlePayWebhook({
       ...signed({
         id: "evt_kes",
@@ -258,6 +288,7 @@ describe("a collected shilling must reduce the invoice", () => {
         },
       }),
       ledger,
+      provider,
     });
     assert.equal(corrected.body.action, "apply");
     assert.equal(ledger.invoices.get("inv1").status, "paid");
@@ -273,7 +304,8 @@ describe("a collected shilling must reduce the invoice", () => {
       ledger,
       provider,
     });
-    ledger.applyPayment = async () => {
+    provider.totals.set(checkout.checkoutId, "1000.00");
+    ledger.settleCheckoutReading = async () => {
       throw new Error("invoice cannot be paid");
     };
     const result = await handlePayWebhook({
@@ -288,6 +320,7 @@ describe("a collected shilling must reduce the invoice", () => {
         },
       }),
       ledger,
+      provider,
     });
     assert.equal(result.status, 200);
     assert.equal(result.body.ok, true);
@@ -352,6 +385,7 @@ describe("checkout return and overpay", () => {
       ledger,
       provider,
     });
+    provider.totals.set(checkout.checkoutId, "100.00");
     await handlePayWebhook({
       ...signed({
         id: "evt_done",
@@ -364,7 +398,9 @@ describe("checkout return and overpay", () => {
         },
       }),
       ledger,
+      provider,
     });
+    provider.totals.set(checkout.checkoutId, "150.00");
     const over = await handlePayWebhook({
       ...signed({
         id: "evt_over",
@@ -377,6 +413,7 @@ describe("checkout return and overpay", () => {
         },
       }),
       ledger,
+      provider,
     });
     assert.equal(over.body.duplicate, undefined);
     assert.equal(over.body.overpaid, true);

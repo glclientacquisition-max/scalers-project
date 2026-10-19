@@ -1,19 +1,34 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- node:test loads this file with require() */
 const { nextPart, splitKes } = require("./money");
+const { assertLiveTenant } = require("./provider");
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
+ * A parked or held session is resumed here. The waiter must not hand it back
+ * as a finished row, because the caller would open another checkout.
+ * @param {object} input
+ * @param {object} attempt
+ * @param {object} attemptInput
+ */
+async function settleLiveSession(input, attempt, attemptInput) {
+  if (attempt.held) return resumeHeld(input, attempt, attemptInput);
+  return resumeUnattached(input, attempt, attemptInput);
+}
+
+/**
  * Poll until the in-flight attempt has a checkout, or the row is no longer pending.
- * @param {object} ledger
+ * A pending_unattached or held row is resumed or blocked. It is not created again.
+ * @param {object} input
  * @param {{ token: string, amountKes: string, partIndex: number, partCount: number }} attemptInput
  */
-async function waitForAttached(ledger, attemptInput) {
+async function waitForAttached(input, attemptInput) {
   for (let i = 0; i < 40; i += 1) {
     await sleep(25);
-    const again = await ledger.createAttempt(attemptInput);
+    const again = await input.ledger.createAttempt(attemptInput);
+    if (again.unattached || again.held) return settleLiveSession(input, again, attemptInput);
     if (again.checkoutUrl && again.checkoutSessionId) return again;
     if (again.cancel) return again;
     if (!again.inFlight && !again.reused) return again;
@@ -125,6 +140,31 @@ async function resumeUnattached(input, attempt, attemptInput) {
 }
 
 /**
+ * A succeeded part whose Bachs checkout has not expired stays the live session.
+ * An open or unreadable session is reused or blocked. A closed read releases
+ * the hold and lets the next call insert the remainder. The succeeded row is
+ * not cancelled, and its session id stays so a later collection can be credited.
+ * @param {{ ledger: { releaseHeld?: Function, createAttempt: Function }, provider: { getCheckout?: Function } }} input
+ * @param {object} attempt
+ * @param {object} attemptInput
+ */
+async function resumeHeld(input, attempt, attemptInput) {
+  const sessionId = attempt.checkoutSessionId;
+  const read = await readCheckout(input, sessionId);
+  if (!read.readable || checkoutIsOpen(read.row)) {
+    return reuseOrBlock(attempt, sessionId, read);
+  }
+  if (typeof input.ledger.releaseHeld === "function") {
+    await input.ledger.releaseHeld(attempt.id);
+  }
+  return input.ledger.createAttempt(attemptInput);
+}
+
+function sessionAlreadyStored(attempt) {
+  return Boolean(attempt.checkoutSessionId || attempt.unattached || attempt.held);
+}
+
+/**
  * Start one hosted checkout for the next unpaid part.
  * The redirect does not mark the invoice paid.
  * A second click while the first session is still being created waits for it.
@@ -132,7 +172,11 @@ async function resumeUnattached(input, attempt, attemptInput) {
  * is reused or blocked, including when cancel returned success.
  * A failed attach keeps the session id on the attempt. The next click reads
  * it and does not open another session while it is still payable.
- * @param {{ token: string, origin: string, ledger: object, provider: { createCheckout: Function, cancelCheckout?: Function } }} input
+ * A waiter that sees that parked row reads it too. It does not create again.
+ * A thrown create does not mark the row failed while a session id is stored.
+ * After a short collection, the succeeded checkout is reused or blocked until
+ * a read says it is closed.
+ * @param {{ token: string, origin: string, ledger: object, provider: { createCheckout: Function, cancelCheckout?: Function }, env?: NodeJS.ProcessEnv }} input
  */
 async function startInvoiceCheckout(input) {
   const lookup = await input.ledger.lookup(input.token);
@@ -141,6 +185,7 @@ async function startInvoiceCheckout(input) {
     err.code = "not_payable";
     throw err;
   }
+  assertLiveTenant(lookup.tenantId, input.env);
   const next = nextPart(splitKes(lookup.totalKes), lookup.amountPaidKes);
   if (!next) {
     const err = new Error("nothing due");
@@ -155,8 +200,8 @@ async function startInvoiceCheckout(input) {
     partCount: next.count,
   };
   let attempt = await input.ledger.createAttempt(attemptInput);
-  if (attempt.unattached) {
-    attempt = await resumeUnattached(input, attempt, attemptInput);
+  if (attempt.unattached || attempt.held) {
+    attempt = await settleLiveSession(input, attempt, attemptInput);
     if (attempt.kept) {
       return { checkoutUrl: attempt.checkoutUrl, checkoutId: attempt.checkoutId, reused: true };
     }
@@ -168,7 +213,10 @@ async function startInvoiceCheckout(input) {
     }
   }
   if (attempt.inFlight) {
-    attempt = await waitForAttached(input.ledger, attemptInput);
+    attempt = await waitForAttached(input, attemptInput);
+    if (attempt.kept) {
+      return { checkoutUrl: attempt.checkoutUrl, checkoutId: attempt.checkoutId, reused: true };
+    }
     if (attempt.cancel) {
       attempt = await replaceExpiredAttempt(input, attempt, attemptInput);
       if (attempt.kept) {
@@ -216,7 +264,9 @@ async function startInvoiceCheckout(input) {
       customer: Object.keys(customer).length ? customer : undefined,
     });
   } catch (err) {
-    await input.ledger.markAttempt(attempt.id, { status: "failed" });
+    if (!sessionAlreadyStored(attempt)) {
+      await input.ledger.markAttempt(attempt.id, { status: "failed" });
+    }
     throw err;
   }
   const minutes = 60;
@@ -228,7 +278,8 @@ async function startInvoiceCheckout(input) {
       expiresAt,
     });
   } catch (err) {
-    if (typeof input.ledger.parkUnattached === "function" && created.checkoutId) {
+    const alreadyStored = sessionAlreadyStored(attempt);
+    if (!alreadyStored && typeof input.ledger.parkUnattached === "function" && created.checkoutId) {
       try {
         await input.ledger.parkUnattached(attempt.id, {
           checkoutId: created.checkoutId,
@@ -239,6 +290,7 @@ async function startInvoiceCheckout(input) {
         /* Stay pending when the session id cannot be stored. */
       }
     }
+    if (alreadyStored) throw err;
     let cancelFailed = true;
     if (typeof input.provider.cancelCheckout === "function" && created.checkoutId) {
       try {

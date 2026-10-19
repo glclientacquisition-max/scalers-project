@@ -10,6 +10,8 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     ...process.env,
     BACHS_MODE: process.env.BACHS_MODE,
     BACHS_API_KEY: process.env.BACHS_API_KEY,
+    BACHS_LIVE_ALLOWED: process.env.BACHS_LIVE_ALLOWED,
+    BACHS_LIVE_TENANT_ALLOWLIST: process.env.BACHS_LIVE_TENANT_ALLOWLIST,
     SUPABASE_URL: process.env.SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   };
@@ -23,6 +25,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     const result = await startInvoiceCheckout({
       token,
       origin,
+      env,
       ledger: invoicePayLedger(),
       provider: payProviderFromEnv(env),
     });

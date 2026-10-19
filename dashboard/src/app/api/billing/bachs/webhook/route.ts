@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { handlePayWebhook } from "@/lib/invoicePay/webhook";
 import { invoicePayLedger } from "@/lib/invoicePay/ledger";
-import { assertBachsAllowed } from "@/lib/invoicePay/provider";
+import { assertBachsAllowed, payProviderFromEnv } from "@/lib/invoicePay/provider";
 
 export async function POST(request: Request) {
   const env: NodeJS.ProcessEnv = {
@@ -9,6 +9,8 @@ export async function POST(request: Request) {
     BACHS_MODE: process.env.BACHS_MODE,
     BACHS_API_KEY: process.env.BACHS_API_KEY,
     BACHS_WEBHOOK_SECRET: process.env.BACHS_WEBHOOK_SECRET,
+    BACHS_LIVE_ALLOWED: process.env.BACHS_LIVE_ALLOWED,
+    BACHS_LIVE_TENANT_ALLOWLIST: process.env.BACHS_LIVE_TENANT_ALLOWLIST,
     SUPABASE_URL: process.env.SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   };
@@ -34,7 +36,9 @@ export async function POST(request: Request) {
       rawBody,
       headers,
       secret,
+      env,
       ledger: invoicePayLedger(),
+      provider: payProviderFromEnv(env),
     });
     return NextResponse.json(result.body, { status: result.status });
   } catch (err) {

@@ -8,6 +8,12 @@ function ksh(amount) {
   return formatKsh(cents == null ? 0n : cents);
 }
 
+function creditsAppliedLabel(amount) {
+  const cents = toCents(amount);
+  if (cents == null || cents <= 0n) return ksh(amount);
+  return `-${formatKsh(cents)}`;
+}
+
 function owedCents(total, paid) {
   const left = (toCents(total) || 0n) - (toCents(paid) || 0n);
   return left > 0n ? left : 0n;
@@ -35,7 +41,7 @@ function shapeBillingHistory(input) {
       period_start: row.period_start || null,
       period_end: row.period_end || null,
       subtotal: ksh(row.subtotal_kes),
-      credits_applied: row.credits_applied_kes != null ? ksh(row.credits_applied_kes) : null,
+      credits_applied: row.credits_applied_kes != null ? creditsAppliedLabel(row.credits_applied_kes) : null,
       total_due: ksh(row.total_kes),
       amount_paid: ksh(row.amount_paid_kes),
       balance: balanceLabel(row.total_kes, row.amount_paid_kes),
