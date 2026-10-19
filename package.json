@@ -81,7 +81,7 @@
     "docs:reference": "node scripts/docs/gen-reference.js",
     "docs:reference:check": "node scripts/docs/gen-reference.js --check",
     "docs:check": "node scripts/docs/check-docs.js",
-    "test:desk-bundle": "node --test tests/deskVoiceBundle.test.js"
+    "test:desk-bundle": "node --test tests/deskVoiceBundle.test.js tests/smokeStagingDesk.test.js"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
