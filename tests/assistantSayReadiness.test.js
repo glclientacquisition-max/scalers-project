@@ -163,7 +163,7 @@ describe('assistantSayReadiness', () => {
     const retail = tenantProfileFromRow({
       ...devRetailTenant,
       product_catalog: [{ name: 'Fast charger 20W', price_range: '650' }],
-      service_areas: { areas: [{ id: 'westlands', name: 'Westlands', fee_mode: 'flat', fee_ksh: 200 }] },
+      service_areas: { version: 1, areas: [{ id: 'place:westlands', name: 'Westlands', fee_mode: 'fixed', fee_ksh: 200, source: 'owner' }] },
     }, {});
     const q = readinessQuestions(retail);
     assert.deepEqual(q.price, ['How much is A4 print?', 'How much is Fast charger 20W?']);
@@ -172,6 +172,17 @@ describe('assistantSayReadiness', () => {
     assert.deepEqual(q.pay, ['What is your till number?']);
     const all = JSON.stringify(q).toLowerCase();
     for (const foreign of ['sofa', 'kilimani', 'carpet']) assert.ok(!all.includes(foreign), foreign);
+  });
+
+  it('id-only areas are asked by their place name, as voice resolves them', () => {
+    const profile = tenantProfileFromRow({
+      business_name: 'Area Co',
+      service_areas: { version: 1, areas: [{ id: 'place:westlands', fee_mode: 'fixed', fee_ksh: 350, source: 'owner' }] },
+    }, {});
+    assert.deepEqual(readinessQuestions(profile).fee, ['Do you deliver to Westlands?']);
+    assert.equal(previewSampleQuestions(profile).delivery, 'Do you deliver to Westlands?');
+    const row = evaluateAssistantSay(profile, { now: FIXTURE_NOW }).rows.find((r) => r.id === 'delivery');
+    assert.equal(row.willSay, lookupProbeForRowId('delivery', profile, FIXTURE_NOW).status === 'found');
   });
 
   it('a tenant with no catalogue or areas gets no price or delivery question', () => {

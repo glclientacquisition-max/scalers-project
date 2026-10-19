@@ -2,6 +2,7 @@
 
 const { lookup } = require('./lookup');
 const { ownerLookupReason } = require('./lookupOwnerReason');
+const { readAreaTerms } = require('../conversation/areaTerms');
 
 const INTRO =
   'These are the answers your Business Assistant gives callers. Anything it cannot answer, it takes a message and your team calls back.';
@@ -31,11 +32,20 @@ function catalogNames(profile) {
   return [...new Set(rows.map((row) => String(row?.name || '').trim()).filter(Boolean))];
 }
 
-/** The tenant's own saved delivery/service area names. */
+/**
+ * The tenant's own saved delivery/service area names, resolved exactly as voice
+ * fee lookups resolve them (areaTerms), so an id-only row like
+ * {id: 'place:westlands'} is asked about as "Westlands", not its id.
+ */
 function areaNames(profile) {
   const raw = profile?.service_areas || profile?.serviceAreas;
-  const areas = raw && typeof raw === 'object' && !Array.isArray(raw) ? asList(raw.areas) : asList(raw);
-  return [...new Set(areas.map((a) => String(a?.name || a?.id || '').trim()).filter(Boolean))];
+  const terms = profile?.areaTerms?.areas?.length
+    ? profile.areaTerms
+    : raw
+      ? readAreaTerms(raw, { vertical: profile?.vertical, env: { VOICE_AREA_FEES: 'on' } })
+      : null;
+  const names = asList(terms?.areas).map((a) => String(a?.name || '').trim()).filter(Boolean);
+  return [...new Set(names)];
 }
 
 /** Probe caps: enough to find one answer on a long catalogue without a slow page. */
