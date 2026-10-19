@@ -17,6 +17,7 @@ import { btnGhost, deskFieldClass } from "@/components/ui/deskChrome";
 import { DeskSelect } from "@/components/ui/DeskSelect";
 import { Empty } from "@/components/ui/Empty";
 import { Field, Input } from "@/components/ui/Field";
+import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import {
   inboundKesPerMinute,
@@ -67,6 +68,7 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
   const [packageConfirmOpen, setPackageConfirmOpen] = useState(false);
   const [reviewRef, setReviewRef] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState("");
+  const [reviewChoice, setReviewChoice] = useState<"" | "book" | "nothing">("");
   const [savingReview, setSavingReview] = useState(false);
   const [history, setHistory] = useState<BillingHistoryEntry[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -177,7 +179,7 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
   }
 
   async function confirmReview() {
-    if (!reviewRef || reviewNote.trim().length < 3) return;
+    if (!reviewRef || (reviewChoice !== "book" && reviewChoice !== "nothing") || reviewNote.trim().length < 3) return;
     setSavingReview(true);
     const ok = await post(
       {
@@ -185,13 +187,15 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
         business_id: detail.row.id,
         provider_ref: reviewRef,
         note: reviewNote.trim(),
+        choice: reviewChoice,
       },
-      "Checkout review resolved."
+      reviewChoice === "book" ? "Collected amount booked." : "Confirmed nothing collected."
     );
     setSavingReview(false);
     if (ok) {
       setReviewRef(null);
       setReviewNote("");
+      setReviewChoice("");
     }
   }
 
@@ -270,6 +274,7 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
                     onClick={() => {
                       setError(null);
                       setReviewNote("");
+                      setReviewChoice("");
                       setReviewRef(review.providerRef);
                     }}
                   >
@@ -516,15 +521,35 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
         theme="admin"
         pending={savingReview}
         title="Resolve checkout review"
-        confirmLabel="Resolve"
-        confirmDisabled={reviewNote.trim().length < 3}
+        confirmLabel={
+          reviewChoice === "book"
+            ? "Book collected amount"
+            : reviewChoice === "nothing"
+              ? "Confirm nothing collected"
+              : "Resolve"
+        }
+        confirmDisabled={!reviewChoice || reviewNote.trim().length < 3}
         onClose={() => {
           if (!savingReview) setReviewRef(null);
         }}
         onConfirm={() => void confirmReview()}
       >
         <div className="space-y-3">
-          <p>This does not move money. A new checkout can start after this.</p>
+          <p>A new checkout stays closed until you book this reading or confirm nothing was collected.</p>
+          <Segmented
+            label="Resolve choice"
+            items={[
+              { key: "book", label: "Book collected amount", active: reviewChoice === "book" },
+              { key: "nothing", label: "Nothing collected", active: reviewChoice === "nothing" },
+            ]}
+            onSelect={(key) => setReviewChoice(key === "nothing" ? "nothing" : "book")}
+          />
+          {reviewChoice === "book" ? (
+            <p>Books the reading up to what is still due. Anything over that is a credit.</p>
+          ) : null}
+          {reviewChoice === "nothing" ? (
+            <p>Leaves the books as they are. A new checkout can then start for what is still due.</p>
+          ) : null}
           <Field id="bill-review-note" label="Reason" required>
             {(props) => (
               <Input
