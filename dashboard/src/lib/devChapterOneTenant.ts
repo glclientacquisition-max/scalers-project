@@ -48,4 +48,4 @@ export const devChapterOneTenant = {
     extra: { "Minimum order": "KSh 500" },
   },
   is_active: true,
-} as TenantRow;
+} as unknown as TenantRow;
