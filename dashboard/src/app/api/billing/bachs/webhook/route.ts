@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { handlePayWebhook } from "@/lib/invoicePay/webhook";
 import { invoicePayLedger } from "@/lib/invoicePay/ledger";
-import { bachsMode } from "@/lib/invoicePay/provider";
+import { bachsMode, liveAllowed } from "@/lib/invoicePay/provider";
 
 export async function POST(request: Request) {
   let mode: string;
@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
-  if (mode === "live") {
+  if (mode === "live" && !liveAllowed()) {
     return NextResponse.json({ ok: false }, { status: 403 });
   }
 

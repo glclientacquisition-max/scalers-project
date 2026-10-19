@@ -1,6 +1,6 @@
 ---
 owner: ops-billing
-last_reviewed: 2026-10-18
+last_reviewed: 2026-10-19
 ---
 
 # Billing read models for Desk
@@ -30,7 +30,7 @@ Payments, payment attempts, credits, pay tokens, and the audit log are not owner
 
 ## Public pay page
 
-`/pay/<token>` is not an owner read and not an admin screen. The Desk server calls `pay_invoice_by_token` with the service role. `invoice_pay_tokens` stores the sha256 hex only. Anon and authenticated cannot mint or read tokens. A business with `billing_enforcement` off has no pay link. The page never marks an invoice paid. The signed-in owner history API is `GET /api/billing/invoices` and `GET /api/billing/receipts/:id`. A pay link is `POST /api/billing/invoices/:id/pay-link`, once. See [`INVOICE_PAY.md`](./INVOICE_PAY.md). Pay SQL through `553f1830` is on production. The pay page is not on prod. `invoice_pay_session.sql` (P9), `billing_mode_legal_pairs.sql` (P10), and `invoice_pay_held.sql` (P11) are staging only.
+`/pay/<token>` is not an owner read and not an admin screen. The Desk server calls `pay_invoice_by_token` with the service role. `invoice_pay_tokens` stores the sha256 hex only. Anon and authenticated cannot mint or read tokens. A business with `billing_enforcement` off has no pay link. The page never marks an invoice paid. The signed-in owner history API is `GET /api/billing/invoices` and `GET /api/billing/receipts/:id`. A pay link is `POST /api/billing/invoices/:id/pay-link`, once. See [`INVOICE_PAY.md`](./INVOICE_PAY.md). Pay SQL through `553f1830` is on production. The pay page code is on `main`. `invoice_pay_session.sql` (P9), `billing_mode_legal_pairs.sql` (P10), `invoice_pay_held.sql` (P11), and `invoice_pay_collections.sql` (P12) are staging only.
 
 ## Admin (service role)
 

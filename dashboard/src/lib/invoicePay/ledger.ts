@@ -208,6 +208,40 @@ export function invoicePayLedger(env: NodeJS.ProcessEnv = process.env) {
       if (error) throw rpcError(error, "cancelled credit failed");
     },
 
+    async reconcileCollection(input: {
+      provider: string;
+      providerRef: string;
+      checkoutId?: string | null;
+      amountKes: string;
+      tenantId: string;
+      invoiceId: string;
+      raw: unknown;
+      settledAmountMinor: number | null;
+      settledCurrency: string | null;
+      feeMinor: number | null;
+    }) {
+      const { data, error } = await admin.rpc("reconcile_checkout_collection", {
+        p_provider: input.provider,
+        p_provider_ref: input.providerRef,
+        p_checkout_id: input.checkoutId || null,
+        p_amount_kes: input.amountKes,
+        p_tenant_id: input.tenantId,
+        p_invoice_id: input.invoiceId,
+        p_raw: input.raw ?? {},
+        p_settled_amount_minor: input.settledAmountMinor,
+        p_settled_currency: input.settledCurrency,
+        p_fee_minor: input.feeMinor,
+      });
+      if (error) throw rpcError(error, "reconcile failed");
+      const row = asObject(data);
+      return {
+        noop: row?.noop === true,
+        appliedKes: text(row?.applied_kes ?? "0"),
+        excessKes: text(row?.excess_kes ?? "0"),
+        amountKes: text(row?.amount_kes ?? input.amountKes),
+      };
+    },
+
     async creditCheckoutExtra(input: { provider: string; providerRef: string; amountKes: string; tenantId: string }) {
       const { error } = await admin.rpc("credit_checkout_extra", {
         p_provider: input.provider,

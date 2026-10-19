@@ -17,6 +17,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     const result = await startInvoiceCheckout({
       token,
       origin,
+      env,
       ledger: invoicePayLedger(env),
       provider: payProviderFromEnv(env),
     });
@@ -36,6 +37,9 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     const code = err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code || "") : "";
     if (code === "previous_processing") {
       return NextResponse.json({ error: "Previous payment still processing." }, { status: 409 });
+    }
+    if (code === "bachs_live_refused") {
+      return NextResponse.json({ error: "Live payments are not open for this business." }, { status: 403 });
     }
     return NextResponse.json({ error: "Could not start payment." }, { status: 400 });
   }

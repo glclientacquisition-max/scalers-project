@@ -40,6 +40,8 @@ describe("invoice pay SQL", () => {
     await db.exec(read("docs/supabase/invoice_pay_session.sql"));
     await db.exec(read("docs/supabase/invoice_pay_held.sql"));
     await db.exec(read("docs/supabase/invoice_pay_held.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_collections.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_collections.sql"));
   });
 
   it("refuses a draft number or status write unless billing_write is set", async () => {
@@ -632,5 +634,91 @@ describe("invoice pay SQL", () => {
     assert.equal(Number(credits.rows[0].amount), 320);
     const paid = await q("select amount_paid_kes from public.invoices where id = $1", [invoice.rows[0].id]);
     assert.equal(Number(paid.rows[0].amount_paid_kes), 2000);
+  });
+
+  it("holds a succeeded checkout after expiry until it is closed, and reconciles each collection", async () => {
+    const tenant = "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd";
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Collect Shop', 'pending:collect', 'soft')`,
+      [tenant]
+    );
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 20, 20) returning id`,
+      [tenant]
+    );
+    const invoice = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+    const minted = await q("select token from public.mint_invoice_pay_token($1, false)", [invoice.rows[0].id]);
+    const first = await q("select public.create_invoice_pay_attempt($1, 20) as row", [minted.rows[0].token]);
+    const attemptId = first.rows[0].row.id;
+    await q(
+      "select public.attach_invoice_pay_checkout($1, 'chk_col_1', 'https://checkout.example/col', now() - interval '1 minute')",
+      [attemptId]
+    );
+    await q("select public.settle_invoice_pay_attempt($1, 'succeeded', 10, 'KES')", [attemptId]);
+    const held = await q("select public.create_invoice_pay_attempt($1, 20) as row", [minted.rows[0].token]);
+    assert.equal(held.rows[0].row.held, true);
+    assert.equal(held.rows[0].row.id, attemptId);
+
+    const equalA = await q(
+      "select public.reconcile_checkout_collection('bachs', 'ch_a', 'chk_col_1', 10, $1, $2) as row",
+      [tenant, invoice.rows[0].id]
+    );
+    const equalB = await q(
+      "select public.reconcile_checkout_collection('bachs', 'ch_b', 'chk_col_1', 10, $1, $2) as row",
+      [tenant, invoice.rows[0].id]
+    );
+    const replay = await q(
+      "select public.reconcile_checkout_collection('bachs', 'ch_b', 'chk_col_1', 10, $1, $2) as row",
+      [tenant, invoice.rows[0].id]
+    );
+    assert.equal(equalA.rows[0].row.noop, false);
+    assert.equal(Number(equalB.rows[0].row.applied_kes), 10);
+    assert.equal(replay.rows[0].row.noop, true);
+    const paidEqual = await q("select amount_paid_kes, status from public.invoices where id = $1", [invoice.rows[0].id]);
+    assert.equal(Number(paidEqual.rows[0].amount_paid_kes), 20);
+    assert.equal(paidEqual.rows[0].status, "paid");
+
+    const draftSmall = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 20, 20) returning id`,
+      [tenant]
+    );
+    const small = await q("select id from public.finalize_invoice($1)", [draftSmall.rows[0].id]);
+    await q("select public.reconcile_checkout_collection('bachs', 'sm_a', 'chk_sm', 10, $1, $2)", [tenant, small.rows[0].id]);
+    await q("select public.reconcile_checkout_collection('bachs', 'sm_b', 'chk_sm', 4, $1, $2)", [tenant, small.rows[0].id]);
+    await q("select public.reconcile_checkout_collection('bachs', 'sm_b', 'chk_sm', 1, $1, $2)", [tenant, small.rows[0].id]);
+    const paidSmall = await q(
+      "select amount_paid_kes from public.invoices where id = $1",
+      [small.rows[0].id]
+    );
+    const smallCredits = await q(
+      "select coalesce(sum(amount_kes), 0) as amount from public.tenant_credits where tenant_id = $1 and reason = 'collection_excess'",
+      [tenant]
+    );
+    assert.equal(Number(paidSmall.rows[0].amount_paid_kes), 14);
+    assert.equal(Number(smallCredits.rows[0].amount), 0);
+
+    const draftLarge = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 10, 10) returning id`,
+      [tenant]
+    );
+    const large = await q("select id from public.finalize_invoice($1)", [draftLarge.rows[0].id]);
+    await q("select public.reconcile_checkout_collection('bachs', 'cum', 'chk_cum', 10, $1, $2)", [tenant, large.rows[0].id]);
+    await q("select public.reconcile_checkout_collection('bachs', 'cum', 'chk_cum', 12, $1, $2)", [tenant, large.rows[0].id]);
+    await q("select public.reconcile_checkout_collection('bachs', 'cum', 'chk_cum', 20, $1, $2)", [tenant, large.rows[0].id]);
+    await q("select public.reconcile_checkout_collection('bachs', 'cum', 'chk_cum', 20, $1, $2)", [tenant, large.rows[0].id]);
+    const paidLarge = await q("select amount_paid_kes from public.invoices where id = $1", [large.rows[0].id]);
+    const largeCredits = await q(
+      "select coalesce(sum(amount_kes), 0) as amount from public.tenant_credits where payment_id in (select id from public.payments where provider_ref = 'cum')"
+    );
+    assert.equal(Number(paidLarge.rows[0].amount_paid_kes), 10);
+    assert.equal(Number(largeCredits.rows[0].amount), 10);
+    assert.equal(Number(paidLarge.rows[0].amount_paid_kes) + Number(largeCredits.rows[0].amount), 20);
+
+    await q("select public.release_held_pay_checkout($1)", [attemptId]);
+    const closed = await q("select checkout_closed_at is not null as closed from public.payment_attempts where id = $1", [
+      attemptId,
+    ]);
+    assert.equal(closed.rows[0].closed, true);
   });
 });

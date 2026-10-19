@@ -159,7 +159,7 @@ function createMemoryLedger(opts = {}) {
           a.status === "succeeded" &&
           a.partIndex === next.index &&
           a.checkoutSessionId &&
-          (!a.expiresAt || new Date(a.expiresAt).getTime() > now)
+          !a.closedAt
       );
       if (held) return attemptResult(held, { held: true });
       const row = {
@@ -174,6 +174,7 @@ function createMemoryLedger(opts = {}) {
         checkoutSessionId: null,
         checkoutUrl: null,
         expiresAt: null,
+        closedAt: null,
         returnId: newReturnId(),
         returnExpiresAt: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
         providerAmount: null,
@@ -212,6 +213,7 @@ function createMemoryLedger(opts = {}) {
         throw new Error("pay attempt is not a held checkout");
       }
       row.expiresAt = new Date(now - 1000).toISOString();
+      row.closedAt = new Date(now).toISOString();
     },
     async findAttemptByCheckout(checkoutId) {
       const row = [...attempts].reverse().find((a) => a.checkoutSessionId === checkoutId);
@@ -338,6 +340,85 @@ function createMemoryLedger(opts = {}) {
         dueAt: invoice.dueAt,
         checkoutSessionId: row.checkoutSessionId,
         attemptStatus: row.status,
+      };
+    },
+    async reconcileCollection(input) {
+      const invoice = invoices.get(input.invoiceId);
+      if (!invoice || invoice.status === "void" || invoice.status === "uncollectible") {
+        throw new Error("invoice cannot be paid");
+      }
+      if (invoice.status === "draft") throw new Error("draft invoices are not payable");
+      const next = toCents(input.amountKes);
+      if (next == null || next <= 0n) throw new Error("payment amount must be positive");
+      const row = payments.find(
+        (p) => p.provider === input.provider && p.providerRef === input.providerRef && p.matchStatus !== "issue"
+      );
+      const prev = row ? toCents(row.amountKes) : 0n;
+      if (prev != null && next <= prev) {
+        return { noop: true, appliedKes: "0", excessKes: "0", amountKes: row ? row.amountKes : "0" };
+      }
+      const delta = next - (prev || 0n);
+      const dueRaw = toCents(invoice.totalKes) - toCents(invoice.amountPaidKes);
+      const due = dueRaw > 0n ? dueRaw : 0n;
+      const apply = delta < due ? delta : due;
+      const excess = delta - apply;
+      const total = toCents(invoice.totalKes);
+      const paidAfter = toCents(invoice.amountPaidKes) + apply;
+      let match = "partial";
+      if (excess > 0n) match = "over";
+      else if (paidAfter >= total) match = "matched";
+      const amountKes = String(input.amountKes);
+      if (row) {
+        row.amountKes = amountKes;
+        row.matchStatus = match;
+        row.billRef = input.checkoutId || row.billRef;
+        row.raw = input.raw;
+      } else {
+        payments.push({
+          id: id(),
+          provider: input.provider,
+          providerRef: input.providerRef,
+          billRef: input.checkoutId || input.providerRef,
+          invoiceId: input.invoiceId,
+          amountKes,
+          matchStatus: match,
+          settledAmountMinor: input.settledAmountMinor,
+          settledCurrency: input.settledCurrency,
+          feeMinor: input.feeMinor,
+          raw: input.raw,
+        });
+      }
+      if (apply > 0n) {
+        if (paidAfter >= total) {
+          invoice.amountPaidKes = fromCents(total);
+          invoice.status = "paid";
+        } else {
+          invoice.amountPaidKes = fromCents(paidAfter);
+        }
+      }
+      if (excess > 0n) {
+        const key = `collection-excess:${input.provider}:${input.providerRef}:${next.toString()}`;
+        if (!credits.some((credit) => credit.idempotencyKey === key)) {
+          const stored = payments.find(
+            (p) => p.provider === input.provider && p.providerRef === input.providerRef
+          );
+          credits.push({
+            id: id(),
+            tenantId: input.tenantId,
+            invoiceId: input.invoiceId,
+            amountKes: fromCents(excess),
+            reason: "collection_excess",
+            idempotencyKey: key,
+            providerRef: input.providerRef,
+            paymentId: stored ? stored.id : null,
+          });
+        }
+      }
+      return {
+        noop: false,
+        appliedKes: fromCents(apply),
+        excessKes: fromCents(excess),
+        amountKes,
       };
     },
     async applyPayment(input) {

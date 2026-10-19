@@ -273,7 +273,7 @@ describe("a collected shilling must reduce the invoice", () => {
       ledger,
       provider,
     });
-    ledger.applyPayment = async () => {
+    ledger.reconcileCollection = async () => {
       throw new Error("invoice cannot be paid");
     };
     const result = await handlePayWebhook({

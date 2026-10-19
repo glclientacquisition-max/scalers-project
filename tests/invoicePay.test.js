@@ -382,6 +382,87 @@ describe("provider mode", () => {
     assert.equal(called.init.headers.Authorization, "Bearer sk_sandbox_test");
     assert.equal(new URL(called.url).host, "sandbox-api.bachs.io");
   });
+
+  it("opens live mode only when the owner allow flag is set", async () => {
+    const { LIVE_API } = require("../dashboard/src/lib/invoicePay/provider");
+    const prod = "https://fjxcdccgyhnvnnlnovcl.supabase.co";
+    assert.throws(
+      () => payProviderFromEnv({ BACHS_MODE: "live", BACHS_API_KEY: "sk_live_x", SUPABASE_URL: prod }),
+      /refused/
+    );
+    assert.throws(
+      () =>
+        payProviderFromEnv({
+          BACHS_MODE: "live",
+          BACHS_LIVE_ALLOWED: "false",
+          BACHS_API_KEY: "sk_live_x",
+          SUPABASE_URL: prod,
+        }),
+      /refused/
+    );
+    let called = "";
+    const fetchImpl = async (url) => {
+      called = String(url);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ checkout_id: "chk_live", checkout_url: "https://checkout.bachs.io/c/live", status: "open" }),
+      };
+    };
+    const live = payProviderFromEnv(
+      { BACHS_MODE: "live", BACHS_LIVE_ALLOWED: "true", BACHS_API_KEY: "sk_live_x", SUPABASE_URL: prod },
+      { fetchImpl }
+    );
+    assert.ok(live instanceof BachsPayProvider);
+    await live.createCheckout({
+      amountKes: "10.00",
+      successUrl: "https://app.scalers.co.ke/pay/return/ret_1?return=1",
+      cancelUrl: "https://app.scalers.co.ke/pay/return/ret_1",
+      reference: "attempt-live",
+      idempotencyKey: "pay-live",
+    });
+    assert.equal(called, `${LIVE_API}/v1/checkout-sessions`);
+    assert.throws(
+      () =>
+        payProviderFromEnv({
+          BACHS_MODE: "sandbox",
+          BACHS_LIVE_ALLOWED: "true",
+          SUPABASE_URL: prod,
+          BACHS_API_KEY: "sk_test_x",
+        }),
+      /production/
+    );
+
+    const { ledger, token } = seedPayable("10.00", "10.00");
+    const tenantId = ledger.invoices.get("inv1").tenantId;
+    const provider = new MockPayProvider();
+    await assert.rejects(
+      startInvoiceCheckout({
+        token,
+        origin: "https://app.example",
+        ledger,
+        provider,
+        env: {
+          BACHS_MODE: "live",
+          BACHS_LIVE_ALLOWED: "true",
+          BACHS_LIVE_TENANT_ALLOWLIST: "11111111-1111-4111-8111-111111111111",
+        },
+      }),
+      /not open for this business/
+    );
+    const started = await startInvoiceCheckout({
+      token,
+      origin: "https://app.example",
+      ledger,
+      provider,
+      env: {
+        BACHS_MODE: "live",
+        BACHS_LIVE_ALLOWED: "true",
+        BACHS_LIVE_TENANT_ALLOWLIST: tenantId,
+      },
+    });
+    assert.equal(started.checkoutId.startsWith("chk_"), true);
+  });
 });
 
 describe("reconciliation report", () => {
@@ -944,15 +1025,14 @@ describe("Bachs sandbox fields", () => {
       now: NOW,
       amountKes: "320.00",
       eventId: "evt_extra",
+      chargeId: "ch_rest",
     });
     const credited = await handlePayWebhook({ ...extra, secret: SECRET, ledger, now: NOW });
-    assert.equal(credited.body.action, "credit");
-    assert.equal(credited.body.reason, "checkout_extra");
-    assert.equal(ledger.credits.length, 1);
-    assert.equal(ledger.credits[0].idempotencyKey, `checkout-extra:bachs:${started.checkoutId}`);
-    assert.equal(toCents(ledger.credits[0].amountKes), toCents("320.00"));
-    assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("2000"));
-    assert.equal(ledger.payments.length, 1);
+    assert.equal(credited.body.action, "apply_partial");
+    assert.equal(ledger.credits.length, 0);
+    assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("2320"));
+    assert.equal(ledger.invoices.get("inv1").status, "paid");
+    assert.equal(ledger.payments.length, 2);
     const replay = await handlePayWebhook({ ...extra, secret: SECRET, ledger, now: NOW });
     assert.equal(replay.body.duplicate, true);
     const smaller = provider.paidEvent(started.checkoutId, {
@@ -960,10 +1040,26 @@ describe("Bachs sandbox fields", () => {
       now: NOW,
       amountKes: "100.00",
       eventId: "evt_extra_2",
+      chargeId: "ch_rest",
     });
     await handlePayWebhook({ ...smaller, secret: SECRET, ledger, now: NOW });
+    assert.equal(ledger.credits.length, 0);
+    assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("2320"));
+    const afterPaid = provider.paidEvent(started.checkoutId, {
+      secret: SECRET,
+      now: NOW,
+      amountKes: "100.00",
+      eventId: "evt_after_paid",
+      chargeId: "ch_after",
+    });
+    const excess = await handlePayWebhook({ ...afterPaid, secret: SECRET, ledger, now: NOW });
+    assert.equal(excess.body.action, "credit");
     assert.equal(ledger.credits.length, 1);
-    assert.equal(toCents(ledger.credits[0].amountKes), toCents("320.00"));
+    assert.equal(toCents(ledger.credits[0].amountKes), toCents("100.00"));
+    assert.equal(
+      toCents(ledger.invoices.get("inv1").amountPaidKes) + toCents(ledger.credits[0].amountKes),
+      toCents("2420")
+    );
   });
 
   it("credits the difference once when a later collection is larger than the partial", async () => {
@@ -984,12 +1080,193 @@ describe("Bachs sandbox fields", () => {
       eventId: "evt_2000",
     });
     const credited = await handlePayWebhook({ ...more, secret: SECRET, ledger, now: NOW });
-    assert.equal(credited.body.reason, "checkout_extra");
-    assert.equal(ledger.credits.length, 1);
-    assert.equal(toCents(ledger.credits[0].amountKes), toCents("600.00"));
+    assert.equal(credited.body.action, "apply");
+    assert.equal(ledger.credits.length, 0);
+    assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("2000"));
+    assert.equal(ledger.invoices.get("inv1").status, "paid");
     await handlePayWebhook({ ...more, secret: SECRET, ledger, now: NOW });
-    assert.equal(ledger.credits.length, 1);
-    assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("1400"));
+    assert.equal(ledger.credits.length, 0);
+    assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("2000"));
+    assert.equal(ledger.payments.length, 1);
+    assert.equal(toCents(ledger.payments[0].amountKes), toCents("2000"));
+  });
+
+  function collected(ledger) {
+    const paid = toCents(ledger.invoices.get("inv1").amountPaidKes);
+    return ledger.credits.reduce((sum, row) => sum + toCents(row.amountKes), paid);
+  }
+
+  it("applies two equal collections on one checkout and ignores a replay", async () => {
+    const { ledger, token } = seedPayable("20.00", "20.00");
+    const provider = new MockPayProvider();
+    const started = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    const first = provider.paidEvent(started.checkoutId, {
+      secret: SECRET,
+      now: NOW,
+      amountKes: "10.00",
+      eventId: "evt_eq_1",
+      chargeId: "ch_a",
+    });
+    await handlePayWebhook({ ...first, secret: SECRET, ledger, now: NOW });
+    const second = provider.paidEvent(started.checkoutId, {
+      secret: SECRET,
+      now: NOW,
+      amountKes: "10.00",
+      eventId: "evt_eq_2",
+      chargeId: "ch_b",
+    });
+    await handlePayWebhook({ ...second, secret: SECRET, ledger, now: NOW });
+    assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("20"));
+    assert.equal(ledger.credits.length, 0);
+    assert.equal(collected(ledger), toCents("20"));
+    await handlePayWebhook({ ...second, secret: SECRET, ledger, now: NOW });
+    const replay = provider.paidEvent(started.checkoutId, {
+      secret: SECRET,
+      now: NOW,
+      amountKes: "10.00",
+      eventId: "evt_eq_3",
+      chargeId: "ch_b",
+    });
+    await handlePayWebhook({ ...replay, secret: SECRET, ledger, now: NOW });
+    assert.equal(ledger.payments.length, 2);
+    assert.equal(collected(ledger), toCents("20"));
+  });
+
+  it("applies a smaller later collection to the invoice and leaves only the unpaid balance", async () => {
+    const { ledger, token } = seedPayable("20.00", "20.00");
+    const provider = new MockPayProvider();
+    const started = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    await handlePayWebhook({
+      ...provider.paidEvent(started.checkoutId, {
+        secret: SECRET,
+        now: NOW,
+        amountKes: "10.00",
+        eventId: "evt_small_1",
+        chargeId: "ch_a",
+      }),
+      secret: SECRET,
+      ledger,
+      now: NOW,
+    });
+    await handlePayWebhook({
+      ...provider.paidEvent(started.checkoutId, {
+        secret: SECRET,
+        now: NOW,
+        amountKes: "4.00",
+        eventId: "evt_small_2",
+        chargeId: "ch_b",
+      }),
+      secret: SECRET,
+      ledger,
+      now: NOW,
+    });
+    assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("14"));
+    assert.equal(ledger.credits.length, 0);
+    assert.equal(collected(ledger), toCents("14"));
+    await handlePayWebhook({
+      ...provider.paidEvent(started.checkoutId, {
+        secret: SECRET,
+        now: NOW,
+        amountKes: "1.00",
+        eventId: "evt_small_lower",
+        chargeId: "ch_b",
+      }),
+      secret: SECRET,
+      ledger,
+      now: NOW,
+    });
+    assert.equal(ledger.credits.length, 0);
+    assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("14"));
+    provider.setStatus(started.checkoutId, "expired");
+    const remainder = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    assert.equal(toCents(ledger.attempts.find((row) => row.checkoutSessionId === remainder.checkoutId).amountKes), toCents("6"));
+  });
+
+  it("reconciles a higher later total so invoice paid plus credits equals the money", async () => {
+    const { ledger, token } = seedPayable("10.00", "10.00");
+    const provider = new MockPayProvider();
+    const started = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    for (const [amount, eventId] of [
+      ["10.00", "evt_cum_10"],
+      ["12.00", "evt_cum_12"],
+      ["20.00", "evt_cum_20"],
+    ]) {
+      await handlePayWebhook({
+        ...provider.paidEvent(started.checkoutId, {
+          secret: SECRET,
+          now: NOW,
+          amountKes: amount,
+          eventId,
+          chargeId: "ch_same",
+        }),
+        secret: SECRET,
+        ledger,
+        now: NOW,
+      });
+    }
+    assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("10"));
+    assert.equal(collected(ledger), toCents("20"));
+    assert.equal(ledger.payments.length, 1);
+    assert.equal(toCents(ledger.payments[0].amountKes), toCents("20"));
+    await handlePayWebhook({
+      ...provider.paidEvent(started.checkoutId, {
+        secret: SECRET,
+        now: NOW,
+        amountKes: "20.00",
+        eventId: "evt_cum_replay",
+        chargeId: "ch_same",
+      }),
+      secret: SECRET,
+      ledger,
+      now: NOW,
+    });
+    assert.equal(collected(ledger), toCents("20"));
+    assert.equal(ledger.credits.length, 2);
+  });
+
+  it("reads Bachs after checkout expiry and blocks a new session while it is still open", async () => {
+    const { ledger, token } = seedPayable("20.00", "20.00");
+    let created = 0;
+    let open = true;
+    const provider = {
+      async createCheckout() {
+        created += 1;
+        return {
+          checkoutId: `chk_exp_${created}`,
+          checkoutUrl: `https://checkout.example/${created}`,
+          expiresAt: new Date(NOW + 60 * 60 * 1000).toISOString(),
+        };
+      },
+      async getCheckout(id) {
+        return { checkoutId: id, status: open ? "open" : "expired", paymentStatus: "requires_action" };
+      },
+    };
+    const started = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    await handlePayWebhook({
+      ...new MockPayProvider().paidEvent(started.checkoutId, {
+        secret: SECRET,
+        now: NOW,
+        amountKes: "10.00",
+        eventId: "evt_exp",
+        chargeId: "ch_exp",
+      }),
+      secret: SECRET,
+      ledger,
+      now: NOW,
+    });
+    ledger.attempts[0].expiresAt = new Date(NOW - 60 * 1000).toISOString();
+    assert.equal(ledger.attempts[0].closedAt, null);
+    const blocked = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    assert.equal(blocked.reused, true);
+    assert.equal(blocked.checkoutId, started.checkoutId);
+    assert.equal(created, 1);
+    assert.equal(ledger.attempts.filter((row) => row.status === "pending").length, 0);
+    assert.equal(ledger.attempts[0].status, "succeeded");
+    open = false;
+    const fresh = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    assert.equal(created, 2);
+    assert.equal(fresh.checkoutId, "chk_exp_2");
+    assert.equal(toCents(ledger.attempts[1].amountKes), toCents("10"));
   });
 
   it("opens a remainder checkout only after the underpaid session is closed", async () => {

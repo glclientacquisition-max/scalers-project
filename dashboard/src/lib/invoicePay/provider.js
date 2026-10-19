@@ -4,6 +4,7 @@ const { fromCents, toCents } = require("./money");
 const { signBachsBody } = require("./signature");
 
 const SANDBOX_API = "https://sandbox-api.bachs.io";
+const LIVE_API = "https://api.bachs.io";
 const PROD_REF = "fjxcdccgyhnvnnlnovcl";
 const DEFAULT_EXPIRES_MINUTES = 60;
 const MAX_EXPIRES_MINUTES = 1440;
@@ -48,27 +49,53 @@ function bachsMode(env = process.env) {
   throw err;
 }
 
-/** Live mode and live keys are refused. No request is sent. */
+/** Exact `true`. Anything else leaves live mode closed. */
+function liveAllowed(env = process.env) {
+  const raw = env === process.env ? process.env.BACHS_LIVE_ALLOWED : env.BACHS_LIVE_ALLOWED;
+  return String(raw || "").trim().toLowerCase() === "true";
+}
+
+function refused(message, code) {
+  const err = new Error(message);
+  err.code = code;
+  return err;
+}
+
+/**
+ * Live mode stays closed unless BACHS_LIVE_ALLOWED=true.
+ * Sandbox mode still refuses a live key and the production database.
+ * No request is sent when this throws.
+ */
 function assertBachsAllowed(env = process.env) {
   const mode = bachsMode(env);
-  if (mode === "live") {
-    const err = new Error("BACHS_MODE=live is refused");
-    err.code = "bachs_live_refused";
-    throw err;
-  }
   const key = String(env.BACHS_API_KEY || "");
-  if (key.startsWith("sk_live_")) {
-    const err = new Error("live Bachs keys are refused");
-    err.code = "bachs_live_refused";
-    throw err;
-  }
   const url = String(env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || "");
-  if (url.includes(PROD_REF)) {
-    const err = new Error("refusing production database");
-    err.code = "prod_refused";
-    throw err;
+  if (mode === "live") {
+    if (!liveAllowed(env)) throw refused("BACHS_MODE=live is refused", "bachs_live_refused");
+    return mode;
   }
+  if (key.startsWith("sk_live_")) throw refused("live Bachs keys are refused", "bachs_live_refused");
+  if (url.includes(PROD_REF)) throw refused("refusing production database", "prod_refused");
   return mode;
+}
+
+/**
+ * When BACHS_LIVE_TENANT_ALLOWLIST is set, only those tenant ids may start a live checkout.
+ * An empty allowlist does not restrict. This does not drop a webhook that already arrived.
+ * @param {NodeJS.ProcessEnv} env
+ * @param {string} tenantId
+ */
+function assertLiveTenant(env, tenantId) {
+  if (bachsMode(env) !== "live") return;
+  assertBachsAllowed(env);
+  const raw = String(
+    (env === process.env ? process.env.BACHS_LIVE_TENANT_ALLOWLIST : env.BACHS_LIVE_TENANT_ALLOWLIST) || ""
+  ).trim();
+  if (!raw) return;
+  const allowed = new Set(raw.split(",").map((part) => part.trim()).filter(Boolean));
+  if (!allowed.has(String(tenantId || "").trim())) {
+    throw refused("live payments are not open for this business", "bachs_live_refused");
+  }
 }
 
 class MockPayProvider {
@@ -153,21 +180,22 @@ class MockPayProvider {
 
 class BachsPayProvider {
   /**
-   * @param {{ apiKey: string, fetchImpl?: typeof fetch }} opts
+   * @param {{ apiKey: string, mode?: 'sandbox' | 'live', fetchImpl?: typeof fetch }} opts
    */
   constructor(opts) {
+    const live = opts.mode === "live";
     if (!opts.apiKey) {
-      const err = new Error("BACHS_API_KEY is required for sandbox");
+      const err = new Error(live ? "BACHS_API_KEY is required" : "BACHS_API_KEY is required for sandbox");
       err.code = "bachs_key";
       throw err;
     }
-    if (String(opts.apiKey).startsWith("sk_live_")) {
+    if (!live && String(opts.apiKey).startsWith("sk_live_")) {
       const err = new Error("live Bachs keys are refused");
       err.code = "bachs_live_refused";
       throw err;
     }
     this.apiKey = opts.apiKey;
-    this.baseUrl = SANDBOX_API;
+    this.baseUrl = live ? LIVE_API : SANDBOX_API;
     this.fetchImpl = opts.fetchImpl || fetch;
   }
 
@@ -268,24 +296,31 @@ class BachsPayProvider {
 }
 
 /**
- * Mock unless BACHS_MODE=sandbox and a non-live key is set.
+ * Mock unless BACHS_MODE is sandbox or an explicitly allowed live mode.
  * @param {NodeJS.ProcessEnv} [env]
  * @param {{ fetchImpl?: typeof fetch }} [opts]
  */
 function payProviderFromEnv(env = process.env, opts = {}) {
   const mode = assertBachsAllowed(env);
   if (mode === "off") return new MockPayProvider();
-  return new BachsPayProvider({ apiKey: String(env.BACHS_API_KEY || ""), fetchImpl: opts.fetchImpl });
+  return new BachsPayProvider({
+    apiKey: String(env.BACHS_API_KEY || ""),
+    mode,
+    fetchImpl: opts.fetchImpl,
+  });
 }
 
 module.exports = {
   SANDBOX_API,
+  LIVE_API,
   PROD_REF,
   DEFAULT_EXPIRES_MINUTES,
   MAX_EXPIRES_MINUTES,
   expiresInMinutes,
   bachsMode,
+  liveAllowed,
   assertBachsAllowed,
+  assertLiveTenant,
   MockPayProvider,
   BachsPayProvider,
   payProviderFromEnv,

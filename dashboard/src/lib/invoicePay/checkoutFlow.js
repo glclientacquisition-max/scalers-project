@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- node:test loads this file with require() */
 const { nextPart, splitKes } = require("./money");
+const { assertLiveTenant } = require("./provider");
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -184,6 +185,7 @@ async function startInvoiceCheckout(input) {
     err.code = "not_payable";
     throw err;
   }
+  if (input.env) assertLiveTenant(input.env, lookup.tenantId);
   const next = nextPart(splitKes(lookup.totalKes), lookup.amountPaidKes);
   if (!next) {
     const err = new Error("nothing due");

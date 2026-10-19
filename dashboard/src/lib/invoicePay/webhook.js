@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- node:test loads this file with require() */
-const { toCents, fromCents } = require("./money");
+const { toCents } = require("./money");
 const { verifyBachsRequest } = require("./signature");
 
 const KES_PAIRS = [
@@ -118,23 +118,71 @@ function decidePayment(input) {
   return { action: "wait" };
 }
 
+function firstText(value) {
+  if (value == null) return null;
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
+/** M-Pesa receipt when Bachs puts one on the collection. Absent on the sandbox payloads we have seen. */
+function receiptOf(data) {
+  const source = data || {};
+  const details = source.payment_method_details && typeof source.payment_method_details === "object"
+    ? source.payment_method_details
+    : {};
+  const bags = [details.mpesa, details.momo, details.momo_kes, details.mobile_money, details];
+  const keys = ["mpesa_receipt", "mpesa_receipt_number", "receipt_number", "receipt", "trans_id", "transaction_id"];
+  for (const bag of bags) {
+    if (!bag || typeof bag !== "object") continue;
+    for (const key of keys) {
+      const found = firstText(bag[key]);
+      if (found) return found;
+    }
+  }
+  return firstText(source.mpesa_receipt) || firstText(source.mpesa_receipt_number) || firstText(source.receipt_number);
+}
+
+function chargeIdOf(data) {
+  const source = data || {};
+  const charge = source.charge && typeof source.charge === "object" ? source.charge : {};
+  return (
+    firstText(source.charge_id) ||
+    firstText(source.chargeId) ||
+    firstText(source.payment_id) ||
+    firstText(source.paymentId) ||
+    firstText(charge.payment_id) ||
+    firstText(charge.charge_id) ||
+    firstText(charge.id)
+  );
+}
+
 /**
- * A new event on a checkout that already has a payment.
- * A larger amount credits the difference. A smaller amount credits that
- * collection. The same amount stays a duplicate, including a new event id.
- * A replay of the same event id does not credit again.
- * @param {number} attempts
- * @param {{ amountKes: string } | null} applied
- * @param {ReturnType<typeof extractCharge>} charge
+ * The collection id is the M-Pesa receipt, else the Bachs charge or payment id,
+ * else the checkout id when that is all Bachs sent.
+ * A receipt amount is that collection. Otherwise amount_paid, then the KES
+ * charge, is the authoritative total for that id.
+ * @param {Record<string, unknown>} data
+ * @param {string | null} checkoutId
  */
-function laterCollectionExtra(attempts, applied, charge) {
-  if (attempts !== 1 || !applied || !charge.kes) return null;
-  const incoming = toCents(charge.kes.amount);
-  const prev = toCents(applied.amountKes);
-  if (incoming == null || prev == null || incoming <= 0n) return null;
-  if (incoming > prev) return incoming - prev;
-  if (incoming < prev) return incoming;
-  return null;
+function collectionReport(data, checkoutId) {
+  const source = data || {};
+  const receipt = receiptOf(source);
+  const chargeId = chargeIdOf(source);
+  const ref = receipt || chargeId || (checkoutId ? String(checkoutId) : null);
+  const charge = extractCharge(source);
+  let amount = null;
+  if (receipt) {
+    amount = charge.kes ? String(charge.kes.amount) : null;
+  } else {
+    const paid = source.amount_paid != null
+      ? source.amount_paid
+      : source.charge && typeof source.charge === "object"
+        ? source.charge.amount_paid
+        : null;
+    if (paid != null && String(paid).trim() !== "") amount = String(paid);
+    else if (charge.kes) amount = String(charge.kes.amount);
+  }
+  return { ref, amount, receipt, chargeId, cumulative: !receipt };
 }
 
 function minorUnits(amount) {
@@ -194,12 +242,17 @@ async function handlePayWebhook(input) {
   }
 
   const charge = extractCharge(data);
-  const providerRef = String(checkoutId);
+  const report = collectionReport(data, checkoutId ? String(checkoutId) : null);
+  const checkoutRef = checkoutId ? String(checkoutId) : null;
+  const collectionRef = report.ref || checkoutRef;
+  const decisionCharge = report.amount
+    ? { ...charge, kes: { amount: report.amount, currency: "KES" } }
+    : charge;
   const feeMinor = charge.feeAmount == null ? null : minorUnits(charge.feeAmount);
   const settledMinor = charge.settledAmount == null ? null : minorUnits(charge.settledAmount);
   const common = {
     provider: "bachs",
-    providerRef,
+    providerRef: collectionRef,
     tenantId: attempt.tenantId,
     invoiceId: attempt.invoiceId,
     raw: payload,
@@ -218,21 +271,22 @@ async function handlePayWebhook(input) {
     attempt.status === "superseded" ||
     ((attempt.status === "failed" || attempt.status === "pending_unattached") && attempt.livePart !== true);
   if (displaced) {
-    const already = await input.ledger.findPaymentByRef("bachs", providerRef);
+    const already = await input.ledger.findPaymentByRef("bachs", checkoutRef);
     if (already) {
       return { status: 200, body: { ok: true, duplicate: true, action: "apply" } };
     }
-    const amountKes = charge.kes ? String(charge.kes.amount) : null;
+    const amountKes = decisionCharge.kes ? String(decisionCharge.kes.amount) : null;
     if (amountKes && toCents(amountKes) != null && toCents(amountKes) > 0n) {
       await input.ledger.recordIssue({
         ...common,
+        providerRef: checkoutRef,
         amountKes,
         reason: "cancelled",
       });
       if (typeof input.ledger.creditCancelled === "function") {
         await input.ledger.creditCancelled({
           provider: "bachs",
-          providerRef,
+          providerRef: checkoutRef,
           amountKes,
           tenantId: attempt.tenantId,
           invoiceId: attempt.invoiceId,
@@ -244,7 +298,7 @@ async function handlePayWebhook(input) {
 
   const decision = decidePayment({
     attempt,
-    charge,
+    charge: decisionCharge,
     type,
     status: data.status,
     paymentStatus: data.payment_status,
@@ -253,44 +307,39 @@ async function handlePayWebhook(input) {
     return { status: 200, body: { ok: true, action: decision.action, duplicate: recorded.attempts > 1 } };
   }
 
-  const existing = await input.ledger.findPaymentByRef("bachs", providerRef);
-  const applied = existing && existing.matchStatus !== "issue" ? existing : null;
-  if (applied && decision.action === "apply_overpaid" && charge.kes) {
-    const next = toCents(charge.kes.amount);
-    const prev = toCents(applied.amountKes);
-    if (next != null && prev != null && next > prev && typeof input.ledger.adjustOverpay === "function") {
-      await input.ledger.adjustOverpay({
-        provider: "bachs",
-        providerRef,
-        amountKes: String(charge.kes.amount),
-        tenantId: attempt.tenantId,
-      });
-      return { status: 200, body: { ok: true, action: "apply", overpaid: true } };
-    }
-  }
-  if (attempt.status === "succeeded" || applied) {
-    const extra = laterCollectionExtra(recorded.attempts, applied, charge);
-    if (extra != null && typeof input.ledger.creditCheckoutExtra === "function") {
-      await input.ledger.creditCheckoutExtra({
-        provider: "bachs",
-        providerRef,
-        amountKes: fromCents(extra),
-        tenantId: attempt.tenantId,
-        invoiceId: attempt.invoiceId,
-      });
-      return { status: 200, body: { ok: true, action: "credit", reason: "checkout_extra" } };
-    }
-    return { status: 200, body: { ok: true, duplicate: true, action: decision.action } };
-  }
-
   if (decision.action === "apply" || decision.action === "apply_overpaid" || decision.action === "apply_partial") {
-    const received = charge.kes ? String(charge.kes.amount) : attempt.amountKes;
-    const amountKes = decision.action === "apply" ? attempt.amountKes : received;
+    const received = decisionCharge.kes ? String(decisionCharge.kes.amount) : attempt.amountKes;
     try {
-      await input.ledger.applyPayment({
+      const settled = await input.ledger.reconcileCollection({
         ...common,
-        amountKes,
+        providerRef: collectionRef,
+        checkoutId: checkoutRef,
+        amountKes: received,
       });
+      if (settled && settled.noop) {
+        const action = decision.action === "apply_partial" ? "apply_partial" : "apply";
+        return { status: 200, body: { ok: true, duplicate: true, action } };
+      }
+      const appliedCents = toCents(settled && settled.appliedKes) || 0n;
+      const excessCents = toCents(settled && settled.excessKes) || 0n;
+      await input.ledger.markAttempt(attempt.id, {
+        status: "succeeded",
+        providerAmount: common.providerAmount,
+        providerCurrency: common.providerCurrency,
+        feeAmount: common.feeAmount,
+        feeCurrency: common.feeCurrency,
+        raw: payload,
+      });
+      const body = { ok: true, action: "apply" };
+      if (decision.action === "apply_overpaid") {
+        body.overpaid = true;
+      } else if (excessCents > 0n && appliedCents === 0n) {
+        body.action = "credit";
+        body.reason = "collection_excess";
+      } else if (decision.action === "apply_partial") {
+        body.action = "apply_partial";
+      }
+      return { status: 200, body };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes("invoice cannot be paid") || message.includes("draft invoices are not payable")) {
@@ -303,20 +352,6 @@ async function handlePayWebhook(input) {
       }
       throw err;
     }
-    await input.ledger.markAttempt(attempt.id, {
-      status: "succeeded",
-      providerAmount: common.providerAmount,
-      providerCurrency: common.providerCurrency,
-      feeAmount: common.feeAmount,
-      feeCurrency: common.feeCurrency,
-      raw: payload,
-    });
-    const body = {
-      ok: true,
-      action: decision.action === "apply_partial" ? "apply_partial" : "apply",
-    };
-    if (decision.action === "apply_overpaid") body.overpaid = true;
-    return { status: 200, body };
   }
 
   const issueAmount = charge.kes ? String(charge.kes.amount) : null;
@@ -338,6 +373,7 @@ async function handlePayWebhook(input) {
 
 module.exports = {
   extractCharge,
+  collectionReport,
   decidePayment,
   handlePayWebhook,
   minorUnits,

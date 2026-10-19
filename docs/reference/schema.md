@@ -38,7 +38,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `invoices` | `amount_paid_kes`, `billing_source`, `created_at`, `credits_applied_kes`, `currency`, `due_at`, `id`, `invoice_number`, `issued_at`, `issuer_address`, `issuer_city`, `issuer_email`, `issuer_kra_pin`, `issuer_legal_name`, `issuer_phone`, `issuer_product`, `paid_at`, `period_end`, `period_start`, `status`, `subtotal_kes`, `tax_kes`, `tenant_id`, `total_kes`, `updated_at` | `docs/supabase/billing_company.sql`<br>`docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_documents.sql`<br>`docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `notify_sends` | `attempts`, `audience`, `billed_to`, `body`, `call_id`, `call_sid`, `channel`, `created_at`, `error`, `failure_reason`, `held_units`, `id`, `idempotency_key`, `kind`, `outcome`, `overage`, `provider_message_id`, `recipient`, `reserved_at`, `settled_at`, `status`, `tenant_id`, `units` | `docs/supabase/notify_send_ledger.sql`<br>`docs/supabase/notify_send_reserve_settle.sql`<br>`docs/supabase/notify_sends_status.sql`<br>`docs/supabase/sms_allowance.sql` |
 | `ops_audit_log` | `action`, `actor`, `amount_kes`, `created_at`, `detail`, `id`, `tenant_id` | `docs/supabase/wallet_security_beta.sql` |
-| `payment_attempts` | `amount_kes`, `checkout_expires_at`, `checkout_session_id`, `checkout_url`, `client_reference`, `created_at`, `currency`, `fee_amount`, `fee_currency`, `id`, `invoice_id`, `part_count`, `part_index`, `provider`, `provider_amount`, `provider_currency`, `raw`, `return_expires_at`, `return_id`, `status`, `tenant_id`, `updated_at` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_pay.sql` |
+| `payment_attempts` | `amount_kes`, `checkout_closed_at`, `checkout_expires_at`, `checkout_session_id`, `checkout_url`, `client_reference`, `created_at`, `currency`, `fee_amount`, `fee_currency`, `id`, `invoice_id`, `part_count`, `part_index`, `provider`, `provider_amount`, `provider_currency`, `raw`, `return_expires_at`, `return_id`, `status`, `tenant_id`, `updated_at` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_pay.sql`<br>`docs/supabase/invoice_pay_collections.sql` |
 | `payment_events` | `attempts`, `event_key`, `id`, `payload`, `provider`, `received_at` | `docs/supabase/billing_data_layer.sql` |
 | `payments` | `actor`, `amount_kes`, `bill_ref`, `created_at`, `fee_minor`, `fx_rate`, `id`, `invoice_id`, `match_status`, `paid_at`, `payer_msisdn_masked`, `provider`, `provider_ref`, `raw`, `settled_amount_minor`, `settled_currency`, `tenant_id` | `docs/supabase/billing_data_layer.sql` |
 | `platform_ops_notices` | `acked_at`, `detail`, `id`, `kind`, `notified_at`, `opened_at`, `resolved_at`, `status` | `docs/supabase/platform_ops_notices.sql` |
@@ -75,7 +75,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (212)
+## Functions (213)
 
 | Function | Defined in |
 | --- | --- |
@@ -186,7 +186,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `consume_call_seconds` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/package_minute_consume.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `consume_sms_units` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/package_minute_consume.sql`<br>`docs/supabase/prod/owner_billing_actions.sql`<br>`docs/supabase/sms_allowance.sql` |
 | `correct_call_facts` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012210000_three_features.sql` |
-| `create_invoice_pay_attempt` | `docs/supabase/invoice_pay.sql`<br>`docs/supabase/invoice_pay_held.sql`<br>`docs/supabase/invoice_pay_session.sql` |
+| `create_invoice_pay_attempt` | `docs/supabase/invoice_pay.sql`<br>`docs/supabase/invoice_pay_collections.sql`<br>`docs/supabase/invoice_pay_held.sql`<br>`docs/supabase/invoice_pay_session.sql` |
 | `create_tenant_invite` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `credit_cancelled_collection` | `docs/supabase/invoice_pay.sql` |
 | `credit_checkout_extra` | `docs/supabase/invoice_pay_held.sql` |
@@ -238,12 +238,13 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `purge_archived_tenants` | `docs/supabase/purge_archived_tenants.sql` |
 | `purge_voice_turn_traces` | `docs/supabase/voice_turn_traces.sql` |
 | `quarantine_pool_number` | `docs/supabase/billing_data_layer.sql` |
+| `reconcile_checkout_collection` | `docs/supabase/invoice_pay_collections.sql` |
 | `record_payment_event` | `docs/supabase/billing_data_layer.sql` |
 | `record_payment_issue` | `docs/supabase/invoice_pay.sql` |
 | `refresh_line_status` | `docs/supabase/admin_business_suspend.sql`<br>`docs/supabase/line_rental_grace.sql` |
 | `release_did_from_business` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/super_admin_ops.sql` |
 | `release_expired_quarantine` | `docs/supabase/billing_data_layer.sql` |
-| `release_held_pay_checkout` | `docs/supabase/invoice_pay_held.sql` |
+| `release_held_pay_checkout` | `docs/supabase/invoice_pay_collections.sql`<br>`docs/supabase/invoice_pay_held.sql` |
 | `release_stale_notify_sends` | `docs/supabase/notify_send_reserve_settle.sql` |
 | `remove_business_and_release_did` | `docs/supabase/super_admin_ops.sql` |
 | `reopen_tenant_field` | `docs/supabase/tenant_field_confirm_v2.sql` |

@@ -176,7 +176,8 @@ This document is the **executable** apply sequence for greenfield / full staging
 | 33m | `billing_company.sql` | P8. `invoice_documents.sql`. Canonical `finalize_invoice`. Production has this file as of commit `553f1830`. Do not edit it in place. Re-apply last if `finalize_invoice` changes. |
 | 33n | `invoice_pay_session.sql` | P9. After P8. One live checkout per part, including `pending_unattached`. Does not replace `finalize_invoice`. Staging has it. Not on prod. |
 | 33o | `billing_mode_legal_pairs.sql` | P10. After P9. `set_tenant_billing_mode` refuses enforcement while the subscription is beta. Does not change `billing_status`. Staging has the behavior. Not on prod. Do not re-run `wallet_security_beta.sql` for this check. |
-| 33p | `invoice_pay_held.sql` | P11. After P10. Holds an unexpired succeeded checkout, refuses to replace a parked session id, and credits one later collection on that checkout. Does not replace `finalize_invoice`. Staging only. Not on prod. |
+| 33p | `invoice_pay_held.sql` | P11. After P10. Holds an unexpired succeeded checkout, refuses to replace a parked session id, and credits one later collection on that checkout. Does not replace `finalize_invoice`. Staging only. Not on prod. P12 replaces the hold and the extra-credit path. |
+| 33q | `invoice_pay_collections.sql` | P12. After P11. Holds a succeeded checkout until Bachs is read closed, and reconciles each collection onto the invoice before any excess credit. Does not replace `finalize_invoice`. Staging only. Not on prod. |
 
 **Blocker:** `appointments.sql` before `contacts_and_requests.sql` → `relation "public.contacts" does not exist`.
 `realtime_inbox.sql` adds `calls`, `service_requests`, `appointments`, `tenants`, `wallet_ledger`, and `transcripts` to `supabase_realtime`. Apply that file by hand. Deploy does not run it. `realtime_inbox_replica_identity.sql` sets `REPLICA IDENTITY FULL` so `tenant_id` filters match hangup UPDATEs.

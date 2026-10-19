@@ -7,7 +7,7 @@ last_reviewed: 2026-10-19
 
 How Desk pays an open invoice, and how the owner reads invoices and receipts. The pay page needs no login. The token is the capability. A business with `billing_enforcement` off, or `billing_status` beta, gets no link.
 
-SQL is [`docs/supabase/invoice_pay.sql`](../../supabase/invoice_pay.sql), then [`docs/supabase/invoice_documents.sql`](../../supabase/invoice_documents.sql), then [`docs/supabase/billing_company.sql`](../../supabase/billing_company.sql), then [`docs/supabase/invoice_pay_session.sql`](../../supabase/invoice_pay_session.sql), then [`docs/supabase/invoice_pay_held.sql`](../../supabase/invoice_pay_held.sql). Staging (`sgcdncjxauhsbunobmob`) has these. Production has the first three as of commit `553f1830`. The remaining production apply after P8 is P9 `invoice_pay_session.sql`, then P10 [`billing_mode_legal_pairs.sql`](../../supabase/billing_mode_legal_pairs.sql), then P11 `invoice_pay_held.sql`. If `finalize_invoice` changes, re-apply `billing_company.sql` last.
+SQL is [`docs/supabase/invoice_pay.sql`](../../supabase/invoice_pay.sql), then [`docs/supabase/invoice_documents.sql`](../../supabase/invoice_documents.sql), then [`docs/supabase/billing_company.sql`](../../supabase/billing_company.sql), then [`docs/supabase/invoice_pay_session.sql`](../../supabase/invoice_pay_session.sql), then [`docs/supabase/invoice_pay_held.sql`](../../supabase/invoice_pay_held.sql), then [`docs/supabase/invoice_pay_collections.sql`](../../supabase/invoice_pay_collections.sql). Staging (`sgcdncjxauhsbunobmob`) has these. Production has the first three as of commit `553f1830`. The remaining production apply after P8 is P9 `invoice_pay_session.sql`, then P10 [`billing_mode_legal_pairs.sql`](../../supabase/billing_mode_legal_pairs.sql), then P11 `invoice_pay_held.sql`, then P12 `invoice_pay_collections.sql`. If `finalize_invoice` changes, re-apply `billing_company.sql` last.
 
 VAT and KRA eTIMS are off. `invoices.tax_kes` stays null. The page, the invoice, and the receipt do not show a tax line.
 
@@ -56,7 +56,7 @@ A failed or cancelled checkout stays payable and says `Payment was not completed
 
 ## Checkout
 
-Create sends `expires_in_minutes` (60, capped at 1440), `reference` (the attempt id), and `customer` `{email, name, phone_number}` when any of those are known. If the response omits `expires_at`, it is derived from `expires_in_minutes` before the attempt is attached. One live attempt per invoice part is locked with the invoice row (`pending` or `pending_unattached`). A second tap while that row has no URL yet waits for it. An expired pending attempt stays pending until its Bachs session is cancelled and then read. A cancel that returns success is not treated as void: the page GETs the session. A session that is still open is reused when its URL is stored. A session that is still open without a URL, or that cannot be read, blocks with `Previous payment still processing.` No second attempt is inserted for that part. A read that says the session is closed marks the row cancelled and then inserts the next attempt. If attach fails, the session id is stored and the row becomes `pending_unattached`. A follow-up cancel that also fails leaves that row in place. The next click reads the stored session and reuses it or blocks. A second click that is still waiting does the same when it sees `pending_unattached`: it reads that session and reuses or blocks. It does not create another checkout for that row. A thrown create does not mark the row failed while a session id is already stored. `park_invoice_pay_attempt` raises `checkout session is already parked` if a different session id is already stored. The same id may refresh the URL. The row is marked failed only when that cancel succeeds and the read says the session is closed, and only when no session id was stored before that create. After a short collection, the succeeded checkout holds the part until it expires. The next click reads it. An open session is reused. An unreadable session blocks with `Previous payment still processing.` A read that says the session is closed stamps the expiry in the past, keeps the session id, and then a remainder checkout can start. The succeeded row is not cancelled. A reference is single-use, including after expiry. The checkout URL must be https.
+Create sends `expires_in_minutes` (60, capped at 1440), `reference` (the attempt id), and `customer` `{email, name, phone_number}` when any of those are known. If the response omits `expires_at`, it is derived from `expires_in_minutes` before the attempt is attached. One live attempt per invoice part is locked with the invoice row (`pending` or `pending_unattached`). A second tap while that row has no URL yet waits for it. An expired pending attempt stays pending until its Bachs session is cancelled and then read. A cancel that returns success is not treated as void: the page GETs the session. A session that is still open is reused when its URL is stored. A session that is still open without a URL, or that cannot be read, blocks with `Previous payment still processing.` No second attempt is inserted for that part. A read that says the session is closed marks the row cancelled and then inserts the next attempt. If attach fails, the session id is stored and the row becomes `pending_unattached`. A follow-up cancel that also fails leaves that row in place. The next click reads the stored session and reuses it or blocks. A second click that is still waiting does the same when it sees `pending_unattached`: it reads that session and reuses or blocks. It does not create another checkout for that row. A thrown create does not mark the row failed while a session id is already stored. `park_invoice_pay_attempt` raises `checkout session is already parked` if a different session id is already stored. The same id may refresh the URL. The row is marked failed only when that cancel succeeds and the read says the session is closed, and only when no session id was stored before that create. After a short collection, the succeeded checkout holds the part until a read says the Bachs session is closed, including after `checkout_expires_at`. The next click reads Bachs before it inserts. An open session is reused. An unreadable session blocks with `Previous payment still processing.` A read that says the session is closed sets `checkout_closed_at`, stamps the expiry in the past, keeps the session id, and then a remainder checkout can start for what is still due. The succeeded row is not cancelled. A reference is single-use, including after expiry. The checkout URL must be https.
 
 `getCheckout` returns `payment_status` and `charge`. It does not return `checkout_url`. Reconciliation reads `payment_status`.
 
@@ -66,9 +66,9 @@ Create sends `expires_in_minutes` (60, capped at 1440), `reference` (the attempt
 
 Checks `X-Bachs-Timestamp` and `X-Bachs-Signature` (or `X-Bachs-Signature-V2`) as HMAC-SHA256 of `{timestamp}.{raw body}`. The clock window is 300 seconds. Each retry is signed again. Bachs stops retrying about 80 minutes after the first try. Stores the raw event with `record_payment_event`, one row per provider event id. A retry increments `attempts` and does not insert a second event.
 
-`apply_payment` runs once for an applied checkout id. A second event for the same checkout does not pay again. An issue row is not that key: a later exact KES event on the same checkout still applies. A collection on a cancelled attempt is stored as an issue and does not raise `amount_paid_kes`.
+Each collection is its own payment. The provider ref is the M-Pesa receipt when Bachs sends one (`payment_method_details` or `mpesa_receipt`), otherwise the Bachs charge or payment id (`charge_id`, `payment_id`, or `charge.payment_id`), otherwise the checkout id when that is all that arrived. `bill_ref` stays the checkout id. A receipt uses the event KES amount for that collection. Without a receipt, `amount_paid` is the authoritative total for that id, and if `amount_paid` is absent the KES charge is that total.
 
-A terminal collection whose KES is at least the part applies the part and credits the extra. A short terminal `SUCCEEDED` applies that KES as a partial, the same way `collection.underpaid` does when the amount is above 0. `OVERPAID` below the part takes the same partial path. `checkout.completed` then a larger `OVERPAID` updates the payment to the larger amount, credits the difference, and updates the existing receipt to the amount collected. The receipt number does not change. A later collection on a checkout that already has a non-issue payment, and that is not that overpay increase, becomes one `tenant_credits` row. A larger amount credits the difference. A smaller amount credits that collection. The same amount stays a duplicate. The key is `checkout-extra:<provider>:<provider ref>`. A retry does not insert a second credit. The invoice balance does not move again. The first insert writes `checkout_extra_credit` to the billing audit.
+`reconcile_checkout_collection` locks the invoice and compares that total with the payment already stored for the same ref. A replay, or a lower report, changes nothing. The delta is applied to the invoice up to the amount still due. Only the excess becomes a `tenant_credits` row, keyed `collection-excess:<provider>:<ref>:<cents>`, so a later higher total adds only the new excess and a replay of the same total is a no-op. Invoice paid plus those credits equals the authoritative collected total. A short terminal `SUCCEEDED` applies as a partial, the same way `collection.underpaid` does when the amount is above 0. `checkout.completed` then a larger `OVERPAID` on the same ref raises the payment to the larger amount, applies any of that delta still due, credits the rest, and updates the existing receipt. The receipt number does not change.
 
 `checkout.completed` applies only when `payment_status` is `paid` and the KES amount is at least the part. Any other `payment_status` waits, so a later `collection.succeeded` can still apply.
 
@@ -78,7 +78,7 @@ The KES charged is `payments.amount_kes`. When Bachs also sends a USD settlement
 
 A Bachs error logs `error_code` and `x-request-id`. It does not log the key or the request body.
 
-`BACHS_MODE=live` returns 403 and applies nothing. A missing or bad signature returns 401. A handler error returns 500 so Bachs can retry, except `invoice cannot be paid`, which returns 200 after the issue row is stored.
+`BACHS_MODE=live` returns 403 and applies nothing unless `BACHS_LIVE_ALLOWED=true`. A missing or bad signature returns 401. A handler error returns 500 so Bachs can retry, except `invoice cannot be paid`, which returns 200 after the issue row is stored.
 
 Do not register a webhook until the owner has sandbox keys on Vercel Preview.
 
@@ -89,16 +89,22 @@ Events to register: `checkout.completed`, `collection.succeeded`, `collection.fa
 
 ## Provider
 
-`BACHS_MODE` is `off`, `sandbox`, or `live`. Unset is off. Off uses the mock and sends no money. Sandbox needs `BACHS_API_KEY` and talks only to `https://sandbox-api.bachs.io`. A live key (`sk_live_`), live mode, and the production database are refused. Do not put keys in the repo.
+`BACHS_MODE` is `off`, `sandbox`, or `live`. Unset is off. Off uses the mock and sends no money. Sandbox needs `BACHS_API_KEY` and talks only to `https://sandbox-api.bachs.io`. A live key (`sk_live_`) in sandbox mode is refused. Sandbox mode on the production database is refused.
 
-Set these on Vercel Preview (staging). Leave them off production.
+Live mode talks to `https://api.bachs.io` only when `BACHS_LIVE_ALLOWED` is the exact value `true`. Without that flag, live mode, a live key, and the production database are refused. `BACHS_LIVE_TENANT_ALLOWLIST` is an optional comma-separated list of tenant ids. When it is set, only those businesses can start a live checkout. An empty value does not restrict. The allowlist does not drop a webhook that already arrived. Do not put keys in the repo.
 
-| Variable | Staging value |
-| --- | --- |
-| `BACHS_MODE` | `sandbox` |
-| `BACHS_API_KEY` | sandbox key, entered in the dashboard |
-| `BACHS_WEBHOOK_SECRET` | webhook signing secret |
-| `BILLING_NOTICES_SEND` | leave unset |
+Set the sandbox names on Vercel Preview (staging). Leave live mode off there.
+
+| Variable | Staging | Production, only for the first live test |
+| --- | --- | --- |
+| `BACHS_MODE` | `sandbox` | `live` |
+| `BACHS_LIVE_ALLOWED` | leave unset | `true` |
+| `BACHS_LIVE_TENANT_ALLOWLIST` | leave unset | one tenant id, if the first test is limited to that business |
+| `BACHS_API_KEY` | sandbox key, entered in the dashboard | live key, entered in the dashboard |
+| `BACHS_WEBHOOK_SECRET` | webhook signing secret | live webhook signing secret |
+| `BILLING_NOTICES_SEND` | leave unset | leave unset |
+
+The owner sets those names on the Vercel project `scalers-project` (production) and `scalers-staging` (preview). No key belongs in git.
 
 ## Documents
 
@@ -146,7 +152,7 @@ Issuing an invoice queues `platform_billing_invoice_issued`. `enqueue_invoice_du
 
 ## Owner history API
 
-Signed-in owner, own business only. The server uses the service role filtered by that tenant. A client cannot pass a tenant id. Live mode and the production database return 503.
+Signed-in owner, own business only. The server uses the service role filtered by that tenant. A client cannot pass a tenant id. Live mode returns 503 unless `BACHS_LIVE_ALLOWED=true`. Sandbox mode on the production database returns 503.
 
 | Method | Path | What Desk gets |
 | --- | --- | --- |

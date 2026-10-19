@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-175 variables.
+170 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -19,6 +19,8 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `AGENT_NAME` | voice | `server.js`<br>`src/db.js`<br>`src/prompts.js`<br>+1 more |
 | `ALERT_EMAIL_FROM` | voice | `server.js`<br>`src/notifications/email.js` |
 | `BACHS_API_KEY` | desk, scripts | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>`scripts/billing-payment-reconcile.js` |
+| `BACHS_LIVE_ALLOWED` | desk | `dashboard/src/lib/invoicePay/provider.js` |
+| `BACHS_LIVE_TENANT_ALLOWLIST` | desk | `dashboard/src/lib/invoicePay/provider.js` |
 | `BACHS_MODE` | desk, scripts | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>`scripts/billing-payment-reconcile.js` |
 | `BACHS_WEBHOOK_SECRET` | desk | `dashboard/src/app/api/billing/bachs/webhook/route.ts` |
 | `BASE_REPO` | scripts | `scripts/stage-pull-request.js` |
@@ -31,7 +33,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BUSINESS_KNOWLEDGE` | voice | `src/db.js`<br>`src/prompts.js`<br>`src/tenantProfile.js` |
 | `BUSINESS_NAME` | voice | `server.js`<br>`src/conversation/businessAssistantIntro.js`<br>`src/db.js`<br>+2 more |
 | `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js` |
-| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>`dashboard/src/app/dev/admin-ops/page.tsx`<br>+40 more |
+| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>`dashboard/src/app/dev/admin-ops/page.tsx`<br>+41 more |
 | `DASHBOARD_PASSWORD` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
