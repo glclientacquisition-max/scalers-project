@@ -198,7 +198,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **Owner alerts sent twice per call** (fix in #731, frozen).
 - **Aris facts backfill** by Brain pending.
 - **Gemini catalogue flags stay OFF** (`VOICE_GEMINI_CATALOGUE`, `BRAIN_GEMINI_CATALOGUE`).
-- **Fact lookups are not live.** `VOICE_LOOKUPS`, `VOICE_LOOKUP_TOOL` and `VOICE_PERSONA_ONLY_PROMPT` default off. Draft only. Do not set them on staging or prod until Alvin says so.
+- **Fact lookups (#791):** `VOICE_LOOKUPS=on` on staging and, after this merge, on prod voice (owner-approved 19 Oct). `VOICE_LOOKUP_TOOL` and `VOICE_PERSONA_ONLY_PROMPT` stay unset. Rollback: unset `VOICE_LOOKUPS` and redeploy.
 - **Supabase advisor warnings** (SECURITY DEFINER anon execute, `search_path`, one RLS table without a policy, leaked-password protection).
 
 ---
@@ -215,7 +215,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **Legal pack draft #653** (Terms, Privacy, DPA, call notice, beta terms). Parked; call notice ties to the recording decision.
 - **WhatsApp as the assistant doing work** (not just alerts).
 - Live call transfer: **not built** (callbacks only since #658; reviving it needs a new ADR and Alvin's yes).
-- **Fact lookups (in flight, flags off).** One lookup for prices, area fees, hours, payment numbers and the services list, answered in code before the model. See `docs/how-to/LOOKUPS.md`. Not on staging or prod.
+- **Fact lookups (#791).** One lookup for prices, area fees, hours, payment numbers and the services list, answered in code before the model. See `docs/how-to/LOOKUPS.md`. `VOICE_LOOKUPS=on` on staging and prod from 19 Oct.
 
 Public copy never mentions unbuilt features.
 
@@ -240,7 +240,7 @@ Paid-mode copy on Usage still says "next invoice". That wording is a Desk hand-o
 5. **GO or no** for Brain #733 (#732 merged 18 Oct 14:48).
 6. **Carried:** top up TextSMS; staging full-scope SautiKit key for Railway staging Voice (masked card); Meta WhatsApp currency (131042).
 7. **Invoice letterhead still open:** physical address, city, and KRA PIN. Legal name (Scalers Ventures), phone (+254119774470), and billing email (support@scalers.co.ke) are on staging `billing_company`. Set the rest with the update in [`INVOICE_PAY.md`](reference/operations/INVOICE_PAY.md). Blank lines stay off the invoice until then. Set `BACHS_MODE=sandbox`, `BACHS_API_KEY`, and `BACHS_WEBHOOK_SECRET` on Vercel Preview. Leave `BILLING_NOTICES_SEND` off.
-8. **Fact lookups:** leave `VOICE_LOOKUPS`, `VOICE_LOOKUP_TOOL` and `VOICE_PERSONA_ONLY_PROMPT` unset. Staging calls for that draft wait until you say the flag can go on.
+8. **Fact lookups:** `VOICE_LOOKUPS=on` (staging and prod). Leave `VOICE_LOOKUP_TOOL` and `VOICE_PERSONA_ONLY_PROMPT` unset.
 
 ---
 
