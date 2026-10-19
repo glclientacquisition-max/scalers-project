@@ -125,15 +125,30 @@ export function mapBillingHistory(
     .map((item) => item.row);
 }
 
+/** Error codes a 503 carries when invoice payments are switched off (the Bachs safety gate). */
+const PAYMENTS_OFF_CODES = new Set(["payments_unavailable", "unavailable"]);
+
+/** One calm line for the Billing list while payments are switched off. */
+export const INVOICES_UNAVAILABLE_LINE = "Invoices aren't available right now.";
+
 /**
  * What the Billing list shows for a GET /api/billing/invoices response.
  * 404 means the invoice routes are not deployed yet, which reads as no invoices.
+ * 503 with payments_unavailable means payments are switched off: one calm line, no Retry.
  * Other failures (5xx, auth, network) keep the error and Retry.
  */
-export function invoiceLoadOutcome(status: number | null): "list" | "empty" | "error" {
+export function invoiceLoadOutcome(
+  status: number | null,
+  body?: { error?: unknown; code?: unknown } | null,
+): "list" | "empty" | "unavailable" | "error" {
   if (status == null) return "error";
   if (status >= 200 && status < 300) return "list";
-  return status === 404 ? "empty" : "error";
+  if (status === 404) return "empty";
+  if (status === 503) {
+    const code = body ? String(body.code ?? body.error ?? "") : "";
+    if (PAYMENTS_OFF_CODES.has(code)) return "unavailable";
+  }
+  return "error";
 }
 
 /** Redirect only to the one-time path the pay-link POST returns. */
