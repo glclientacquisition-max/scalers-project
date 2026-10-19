@@ -27,7 +27,9 @@ export default async function DevHomeAssistantPage({
   const showChecks = sp.checks === "1";
   const tenant = devChapterOneTenant;
   const readyChecklist = await loadReadyChecklist(tenant);
-  const checks = showChecks ? dataChecksFor(tenant, { saveIsConfirm: true }) : [];
+  const checks = showChecks
+    ? dataChecksFor(tenant, { saveIsConfirm: true, readyItems: readyChecklist.items })
+    : [];
 
   return (
     <div className={deskShellClass}>
@@ -40,7 +42,9 @@ export default async function DevHomeAssistantPage({
           </Suspense>
           <HomeOverviewHeader today={{ iso: "2026-10-19", label: "Monday 19 October" }} />
           <div className="mt-6 max-w-xl space-y-6">
-            {!readyChecklist.allDone ? <HomeGetReadyCallsCard items={readyChecklist.items} /> : null}
+            {!readyChecklist.allDone ? (
+              <HomeGetReadyCallsCard items={readyChecklist.items} checks={checks} />
+            ) : null}
             {checks.length ? <OverviewDataChecksCard checks={checks} /> : null}
           </div>
           <div className="mt-8 max-w-lg">

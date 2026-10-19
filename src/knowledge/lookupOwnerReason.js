@@ -73,8 +73,11 @@ function ownerLookupReason(kind, result) {
   }
 
   if (kind === 'pay' || kind === 'payment') {
+    if (code === 'legacy_text_only') {
+      return 'Your payment note has no number callers can use. Add your till or paybill on Policies.';
+    }
     if (status === 'no_data' || code === 'no_list' || status === 'not_on_file') {
-      return 'No till number saved.';
+      return 'Add how customers pay on Policies.';
     }
     if (status === 'not_found_in_list' || code === 'no_match') {
       return 'No matching payment number on file. Add it on Policies.';
@@ -129,6 +132,7 @@ const LOOKUP_REASON_CODES = [
   'price_quote',
   'price_unknown',
   'price_unspoken',
+  'legacy_text_only',
 ];
 
 module.exports = {

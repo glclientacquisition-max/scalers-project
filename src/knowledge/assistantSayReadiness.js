@@ -62,7 +62,7 @@ function readinessQuestions(profile) {
     price: catalogNames(profile).slice(0, MAX_PROBES).map((name) => `How much is ${name}?`),
     hours: ['What are your opening hours?'],
     fee: areaNames(profile).slice(0, MAX_PROBES).map((name) => `Do you deliver to ${name}?`),
-    pay: ['What is your till number?'],
+    pay: ['How do I pay?'],
   };
 }
 
@@ -147,7 +147,7 @@ function evaluateAssistantSay(profile, opts = {}) {
     factRow('prices', 'Prices and quotes', profile, now),
     factRow('hours', 'Opening hours', profile, now),
     factRow('delivery', 'Delivery and areas', profile, now),
-    factRow('payment', 'Payment and till', profile, now),
+    factRow('payment', 'Payment details', profile, now),
     unsureRow(profile),
   ].map((row) => {
     if (!row._lookupResult) return row;
@@ -168,7 +168,7 @@ const CHECKLIST_META = [
   { id: 'identity', label: 'Business name', href: '/settings?tab=train&panel=identity', rowId: null },
   { id: 'catalog', label: 'Catalogue and prices', href: '/settings?tab=catalog', rowId: 'prices' },
   { id: 'hours', label: 'Opening hours', href: '/settings?tab=train&panel=hours', rowId: 'hours' },
-  { id: 'payment', label: 'M-Pesa till', href: '/settings?tab=train&panel=policies', rowId: 'payment' },
+  { id: 'payment', label: 'Payment details', href: '/settings?tab=train&panel=policies', rowId: 'payment' },
 ];
 
 function identityComplete(profile) {

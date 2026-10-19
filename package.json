@@ -41,7 +41,7 @@
     "test:prompt-facts": "node --test tests/tenantPromptFacts.test.js tests/areaFees.test.js",
     "test:fact-refs": "node --test tests/factSheet.test.js tests/factRefsCarry.test.js tests/factPriceNormalise.test.js",
     "eval:fact-refs": "node scripts/eval-fact-refs.js",
-    "test:lookups": "node --test tests/lookup.test.js tests/lookupRouter.test.js tests/lookupReplay.test.js tests/lookupGuards.test.js tests/lookupHoldGateReplay.test.js tests/lookupKeshoCoverageReplay.test.js tests/lookupFallbackByKind.test.js tests/lookupPaySwahili.test.js tests/lookupOwnerReason.test.js tests/lookupCatalogueMatch.test.js",
+    "test:lookups": "node --test tests/lookup.test.js tests/lookupRouter.test.js tests/lookupReplay.test.js tests/lookupGuards.test.js tests/lookupHoldGateReplay.test.js tests/lookupKeshoCoverageReplay.test.js tests/lookupFallbackByKind.test.js tests/lookupPayCaller.test.js tests/lookupPayMainParity.test.js tests/lookupPayVoiceRound3Replay.test.js tests/lookupPaySwahili.test.js tests/lookupOwnerReason.test.js tests/lookupCatalogueMatch.test.js",
     "eval:release": "node scripts/eval-release.js",
     "test:catalogue-mouth": "node --test tests/catalogueMouth.test.js tests/voiceSentenceStream.test.js tests/serviceFamilies.test.js",
     "test:call-close": "node --test tests/callClose.test.js tests/callFinalizeOnce.test.js tests/endedCallMedia.test.js",

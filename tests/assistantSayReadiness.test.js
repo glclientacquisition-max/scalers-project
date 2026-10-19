@@ -15,7 +15,9 @@ const {
 } = requireRoot('./src/knowledge/assistantSayReadiness.js');
 const fs = require('node:fs');
 const { tenantProfileFromRow } = requireRoot('./src/tenantProfile.js');
-const { profiles } = requireRoot('./evals/replay/profiles.js');
+const { profiles, FALLBACK } = requireRoot('./evals/replay/profiles.js');
+const { hashFactValue, factValueForPath } = requireRoot('./src/conversation/factHash.js');
+const { lookup, speechOf } = requireRoot('./src/knowledge/lookup.js');
 
 const FIXTURE_NOW = new Date('2026-10-19T05:00:00.000Z');
 
@@ -169,7 +171,7 @@ describe('assistantSayReadiness', () => {
     assert.deepEqual(q.price, ['How much is A4 print?', 'How much is Fast charger 20W?']);
     assert.deepEqual(q.fee, ['Do you deliver to Westlands?']);
     assert.deepEqual(q.hours, ['What are your opening hours?']);
-    assert.deepEqual(q.pay, ['What is your till number?']);
+    assert.deepEqual(q.pay, ['How do I pay?']);
     const all = JSON.stringify(q).toLowerCase();
     for (const foreign of ['sofa', 'kilimani', 'carpet']) assert.ok(!all.includes(foreign), foreign);
   });
@@ -197,8 +199,148 @@ describe('assistantSayReadiness', () => {
       price: '',
       hours: 'What are your opening hours?',
       delivery: '',
-      pay: 'What is your till number?',
+      pay: 'How do I pay?',
     });
+  });
+
+  it('payment readiness uses any-method lookup for till, paybill, pochi, and legacy text', () => {
+    const now = FIXTURE_NOW;
+    const base = {
+      business_name: 'Pay Co',
+      hours_schedule: {
+        timezone: 'Africa/Nairobi',
+        days: { mon: { open: '08:00', close: '18:00' }, tue: null, wed: null, thu: null, fri: null, sat: null, sun: null },
+      },
+    };
+    const cases = [
+      {
+        name: 'till-only',
+        row: {
+          business_policies: {
+            payments: {
+              version: 2,
+              methods: ['mpesa_till'],
+              mpesa_till: '123456',
+              timings: ['on_delivery'],
+              source: 'owner',
+              confirmed: true,
+            },
+          },
+        },
+        complete: true,
+      },
+      {
+        name: 'paybill-only',
+        row: {
+          business_policies: {
+            payments: {
+              version: 2,
+              methods: ['mpesa_paybill'],
+              mpesa_paybill: { business_no: '542542', account_mode: 'customer_name', account: null },
+              timings: ['on_delivery'],
+              source: 'owner',
+              confirmed: true,
+            },
+          },
+        },
+        complete: true,
+      },
+      {
+        name: 'pochi',
+        row: {
+          business_policies: {
+            payments: {
+              version: 2,
+              methods: ['pochi'],
+              pochi: { phone: '+254712345678' },
+              timings: ['on_delivery'],
+              source: 'owner',
+              confirmed: true,
+            },
+          },
+        },
+        complete: true,
+      },
+      {
+        name: 'airtel',
+        row: {
+          business_policies: {
+            payments: {
+              version: 2,
+              methods: ['airtel'],
+              airtel: { till: '12345', phone: null },
+              timings: ['on_delivery'],
+              source: 'owner',
+              confirmed: true,
+            },
+          },
+        },
+        complete: true,
+      },
+      {
+        name: 'cash-only-text',
+        row: {
+          business_policies: {
+            payments: {
+              version: 2,
+              methods: ['cash'],
+              timings: ['on_delivery'],
+              source: 'owner',
+              confirmed: true,
+            },
+          },
+        },
+        complete: true,
+      },
+      {
+        name: 'legacy-text-only',
+        row: {
+          business_policies: {
+            payment: 'Cash on delivery only',
+          },
+        },
+        complete: false,
+      },
+      {
+        name: 'legacy-till-and-cash',
+        row: {
+          business_policies: {
+            payment: 'M-Pesa (Till) or cash after the job',
+            payments: {
+              version: 2,
+              methods: ['mpesa_till', 'cash'],
+              mpesa_till: '654321',
+              timings: ['after_job'],
+              source: 'owner',
+              confirmed: true,
+              parsed_from: 'M-Pesa (Till) or cash after the job',
+            },
+          },
+        },
+        complete: true,
+      },
+      {
+        name: 'none',
+        row: { business_policies: {} },
+        complete: false,
+      },
+    ];
+
+    for (const { name, row, complete } of cases) {
+      const profile = tenantProfileFromRow({ ...base, ...row }, {});
+      const say = evaluateAssistantSay(profile, { now });
+      const checklist = getReadyChecklist(profile, { now });
+      const payRow = say.rows.find((r) => r.id === 'payment');
+      const payItem = checklist.items.find((i) => i.id === 'payment');
+      assert.equal(payRow.willSay, complete, `${name} willSay`);
+      assert.equal(payItem.complete, complete, `${name} checklist`);
+      assert.equal(payItem.complete, payRow.willSay, `${name} parity`);
+      assert.equal(payRow.title, 'Payment details', name);
+      assert.equal(payItem.label, 'Payment details', name);
+      if (!complete) {
+        assert.match(payItem.reason, /Policies/i, name);
+      }
+    }
   });
 
   it('a product-only catalogue is probed (retail without services)', () => {
@@ -232,6 +374,56 @@ describe('assistantSayReadiness', () => {
       }
       assert.equal(samples.hours, readinessQuestions(profile).hours[0], key);
       assert.equal(samples.pay, readinessQuestions(profile).pay[0], key);
+    }
+  });
+
+  it('Jirani legacy payment note: callback on calls, distinct owner reason', () => {
+    const prev = process.env.FACT_HASH_MODE;
+    process.env.FACT_HASH_MODE = 'on';
+    const legacyPayReason =
+      'Your payment note has no number callers can use. Add your till or paybill on Policies.';
+    try {
+      const fixture = JSON.parse(
+        fs.readFileSync(path.join(__dirname, 'fixtures/tenants/jirani-staging.json'), 'utf8')
+      );
+      const legacyPay = 'M-Pesa (Till) or cash after the job. No payment before the team arrives.';
+      const tenant = {
+        ...fixture.tenant,
+        business_policies: {
+          ...fixture.tenant.business_policies,
+          payment: legacyPay,
+        },
+      };
+      delete tenant.business_policies.payments;
+      const value = factValueForPath('payments.methods', tenant);
+      const profile = tenantProfileFromRow(tenant, {
+        fieldMeta: {
+          hashMode: true,
+          byPath: {
+            'payments.methods': {
+              source: 'owner',
+              value_hash: hashFactValue(value),
+            },
+          },
+        },
+      });
+      const payHit = lookup('pay', 'How do I pay?', { profile, language: 'en', now: FIXTURE_NOW, seed: 0 });
+      assert.equal(payHit.status, 'no_data');
+      assert.equal(payHit.reason, 'legacy_text_only');
+      assert.equal(speechOf(payHit, 'en'), FALLBACK);
+
+      const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
+      const checklist = getReadyChecklist(profile, { now: FIXTURE_NOW });
+      const payRow = say.rows.find((r) => r.id === 'payment');
+      const payItem = checklist.items.find((i) => i.id === 'payment');
+      assert.equal(payRow.willSay, false);
+      assert.equal(payItem.complete, false);
+      assert.equal(payRow.reason, legacyPayReason);
+      assert.equal(payItem.reason, legacyPayReason);
+      assert.equal(payItem.complete, payRow.willSay);
+    } finally {
+      if (prev == null) delete process.env.FACT_HASH_MODE;
+      else process.env.FACT_HASH_MODE = prev;
     }
   });
 

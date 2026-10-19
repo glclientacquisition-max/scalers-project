@@ -6,6 +6,9 @@ import { PriceConfirmCards, type PriceToConfirm } from "./PriceConfirmCards";
 import { confirmPriceAction, saveBusinessCategoryAction } from "@/app/(desk)/settings/structuredActions";
 import { needsPriceConfirm, sanitizePricing } from "@/lib/structuredData";
 import { normalizePayments, type Payments } from "@/lib/payments";
+import { parseHoursSchedule, scheduleForForm } from "@/lib/hoursSchedule";
+import type { ReadyChecklistItem } from "@/lib/assistantSayTypes";
+import { reasonNeedsOverviewConfirm } from "@/lib/overviewDataChecks";
 import { AddPricesRow } from "./AddPricesRow";
 import { isUnpricedRow } from "@/lib/catalogPricing";
 import { unpricedLabelText } from "./unpricedCopy";
@@ -77,8 +80,15 @@ export function structuredSettingsSlots({
 
 /** Overview checks (import-parsed facts only when save = confirm is on). */
 export function dataChecksFor(
-  tenant: { product_catalog?: unknown; services_catalog?: unknown; business_policies?: unknown },
-  opts?: { saveIsConfirm?: boolean }
+  tenant: {
+    product_catalog?: unknown;
+    services_catalog?: unknown;
+    business_policies?: unknown;
+    hours_schedule?: unknown;
+    service_areas?: unknown;
+    vertical?: string | null;
+  },
+  opts?: { saveIsConfirm?: boolean; readyItems?: ReadyChecklistItem[] }
 ): OverviewDataCheck[] {
   const out: OverviewDataCheck[] = [];
   const priceItems = pricesToConfirm(tenant);
@@ -120,5 +130,24 @@ export function dataChecksFor(
       legacyText: legacy,
     });
   }
+
+  const hoursItem = opts?.readyItems?.find((i) => i.id === "hours");
+  const hoursSchedule = scheduleForForm(tenant.hours_schedule);
+  if (
+    opts?.saveIsConfirm &&
+    hoursItem &&
+    !hoursItem.complete &&
+    reasonNeedsOverviewConfirm(hoursItem.reason) &&
+    parseHoursSchedule(hoursSchedule)
+  ) {
+    out.push({
+      kind: "hours",
+      href: businessSettingsHref("train", "hours"),
+      label: "Check opening hours",
+      detail: hoursItem.reason ?? "",
+      schedule: hoursSchedule,
+    });
+  }
+
   return out;
 }
