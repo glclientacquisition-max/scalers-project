@@ -5,7 +5,146 @@ last_reviewed: 2026-10-19
 
 # Billing stack review, 18 Oct 2026
 
-Round 6 is the current verdict. Round 5, Round 4, Round 3, Round 2, and Round 1 are kept below it.
+Round 7 is the current verdict. Round 6, Round 5, Round 4, Round 3, Round 2, and Round 1 are kept below it.
+
+## Round 7
+
+Review of draft #798 at `a95d89f3` on `cursor/invoice-pay-live-money-0c16`. That commit merges `origin/main` `b3ce4ce0` (including hotfix #802) into `bef91c09` and changes settlement in the same merge. This review did not call Bachs, did not write to staging or production, and did not merge anything. Local Postgres 16.15 ran the apply-order harness. The branch `cursor/billing-review-round7-7822` holds this document only. Do not merge it. Do not merge #798 from this review.
+
+P9 `invoice_pay_session.sql` and P10 `billing_mode_legal_pairs.sql` are already on production. That is the owner's fact. This review did not query production to re-check it. The remaining apply, if the merge is accepted, is P11 then P12 then P13.
+
+### Verdict
+
+| Question | Verdict |
+| --- | --- |
+| Merge #798 at `a95d89f3` onto current main, and apply P11 then P12 then P13, with payments off | **Yes**, with the apply conditions below. `git merge-tree --write-tree` against `origin/main` `b3ce4ce0` exits 0. Main is a parent of `a95d89f3`. |
+| A KSh 10 live test on one allowlisted business | **Not until Bachs answers.** If `charge.amount_paid` is the sum of every collection on that checkout, the single KSh 10 path is the one this code implements, and the test can run under the conditions in "If Bachs says the total is cumulative". If `amount_paid` is only the latest charge, **do not run the test**. The code does not fail safe. |
+
+### If amount_paid is only the latest charge
+
+Bachs has not confirmed the field. `INVOICE_PAY.md` at this commit says so, and the sandbox rows are single collections (`1000.00`, `0.00`, `1400.00`). The handler never reads the webhook amount, the receipt, or the charge id. It treats `GET /v1/checkout-sessions/{id}` `charge.amount_paid` as a checkout-wide running total and compares it with `collected_total_seen_kes`. A later reading that is equal or lower is a no-op. There is no issue row.
+
+That is not manual review. Manual review is the non-KES currency path and the non-allowlisted path (`record_payment_issue`, reason `live_not_allowlisted`). A short or equal later charge does not take either path.
+
+Probes on the fake ledger at `a95d89f3`. Each row is one checkout. "Latest" means the mock GET returns that event's own amount. "Cumulative" means the mock GET returns the running sum. Invoice KSh 20 unless noted.
+
+| Shape | Result |
+| --- | --- |
+| Latest: two events of KSh 10, default charge id, no receipt | Second response `duplicate`. Paid stays 10. Invoice stays open. No issue. No credit. |
+| Latest: no charge id (the old checkout-id fallback) | Same drop. Paid stays 10. The fallback is unused. The key is the checkout id either way. |
+| Cumulative: no charge id, GET 10 then GET 20 | Paid 20. One payment, amount 20. No credit. |
+| Latest: charge ids `ch_a` then `ch_b`, each amount 10 | Paid stays 10. Distinct charge ids no longer add. |
+| Cumulative: `ch_a` then `ch_b`, GET 10 then GET 20 | Paid 20. One payment. The round-6 double-count on a new charge id does not happen when 20 is the checkout total and 10 was already seen. |
+| Latest: GET 10, then GET 4, then GET 1 | Paid stays 10. The 4 and the 1 are no-ops. No credit. No issue. |
+| Cumulative: GET 10, then 12, then 20, on a KSh 10 invoice, then replay 20 | Paid stays 10. Credits KSh 2 and KSh 8, keys `checkout-total:bachs:<checkout>:1200` and `:2000`. One payment, amount 20. Replay is `noop`. |
+| Cumulative: GET 10 then GET 20 on a KSh 30 invoice | Paid 20. Invoice stays open. No credit. Correct if 20 is the sum. Short by 10, with no issue, if 20 is a new charge on top of the first 10. |
+| Two receipts `UBC1` and `UBC2`, each GET amount 10 | Paid stays 10. Receipts are ignored. |
+| KSh 10 invoice. `collection.succeeded` then `checkout.completed`, both GET 10 | Paid 10. No credit. The other order is the same. The round-6 over-credit of one KSh 10 is closed when both events see the same GET total. |
+| Replay of the same event id, GET unchanged | Paid once. Second response `duplicate`. |
+| GET 20 processed, then a later event whose GET is 10 | Paid stays 20. The lower read is a no-op. No issue. |
+| GET 10 then GET 20 | Paid 20. Delta 10. |
+| Unreadable GET, then a new event id whose GET is 10 | First response HTTP 200 `{pending:true, action:"retry"}`. Invoice unchanged. Second event pays it. |
+| GET 20 then GET 10 on a KSh 10 invoice (refund or a lower read) | Paid stays 10. Payment amount stays 20. Credit of KSh 10 stays. Seen stays 20. No issue. The decrease is not reversed. |
+| GET 30 then a correct GET 10 on a KSh 10 invoice | Paid stays 10. Payment stays 30. Credit of KSh 20 stays. No issue. |
+| Attempt already `cancelled`, GET 10 | Invoice paid 10. Attempt status stays `cancelled`. The unit test requires this. It is not an issue row. |
+
+What breaks, in words:
+
+- A second collection whose GET amount equals the first is dropped. The invoice stays short. A later remainder checkout can collect that balance again, so the customer can pay twice. No issue row is written.
+- A second collection whose GET amount is larger applies only the difference. If that number is a new charge rather than the sum, most of the new payment is missing. Any excess credit is the difference above the amount due, not the new charge.
+- A second collection whose GET amount is smaller, including a refund, changes nothing. A bogus high read sticks, including the excess credit, and a later correct lower read does not undo it and does not open manual review.
+- Webhook body amounts, receipts, and charge ids cannot correct the GET. A disagreement between the event and the GET is not flagged.
+
+The no-op response is HTTP 200 `action:"apply"` with `duplicate:true`. Bachs will not retry it.
+
+### Allowlist
+
+`assertLiveTenant(tenantId, env)` runs only when `bachsMode` is `live`. The trimmed allowlist value `*` is the only allow-all. Unset, empty, whitespace, and a comma-only value refuse every tenant. A star inside a list (`other,*`) is not allow-all. `" * "` is allow-all because of the trim. Matching is case-sensitive. Omitting `env` reads `process.env`. It does not skip the check. Probe: checkout with no `env` argument, while `process.env` was live, allowed, and the list was unset, threw `bachs_live_refused` and inserted no attempt.
+
+Both sides call it. `startInvoiceCheckout` calls it before `createAttempt` (`checkoutFlow.js`). `handlePayWebhook` calls it after a positive GET and before `reconcileCheckoutTotal`. A non-listed webhook returns HTTP 200 `action:"issue"` `reason:"live_not_allowlisted"`, writes one issue payment, and leaves the invoice at 0. Probe: list set to another tenant, list omitted, and `other,*` all did that. A later event with the list set to `*` settled that same checkout. The issue row was updated to `matched`. It did not insert a second payment.
+
+`checkoutFailure` maps `bachs_live_refused` to 503 `payments_unavailable`. A business that is not listed gets the same response as payments off, and the pay page hides Pay (`PayPanel.tsx`, notice "Online payment isn't available yet. Contact support@scalers.co.ke"). `paymentsClosed` does not read the allowlist, so while live mode is open the Pay button is still on the page until that click.
+
+The webhook route calls `assertBachsAllowed` before `handlePayWebhook`. Live mode without `BACHS_LIVE_ALLOWED=true` is 403 and the event is not stored. A non-listed tenant is reached only when that flag is already set. Sandbox mode on the production ref is still `prod_refused` and 403. Live mode with the flag returns before the production-ref check, which is what a live test requires.
+
+### Unreadable means stored, and not retried on live
+
+`readCollected` treats a thrown read, a null row (404), a missing `amount_paid`, and a negative amount as unreadable. A successful read with `charge` null is collected total 0 (`action:"wait"`), not unreadable. The unreadable branch runs after `recordEvent` and returns HTTP 200. Bachs stops on 200. A replay of that same event id reads again, but Bachs will not send it again.
+
+`scripts/billing-payment-reconcile.js` refuses a production URL and throws if `bachsMode` is `live`. The sandbox loop is the only retry, and it skips an unreadable read. A live KSh 10 whose only webhook cannot read the checkout is stored and left unpaid until a different event id arrives.
+
+### #802 behaviour is preserved
+
+`assertBachsAllowed` is not called from `invoicePayLedger()`, `loadPay.ts`, or the invoice list. The ledger comment says reads do not call the gate. Checkout calls the gate and returns 503 `payments_unavailable` when it throws. The pay page test "returns payments_unavailable and hides Pay when the gate refuses" passed. The round-6 conflicts are gone because `a95d89f3` already contains `b3ce4ce0`.
+
+`collectionReport` and `reconcileCollection` are still in the tree. The webhook handler does not call them. Settlement is `reconcileCheckoutTotal` only.
+
+### P11 then P12 then P13 after P10
+
+Safe to apply on a database that already has P9 and P10, with payments off, each file in its own transaction, in that order, once.
+
+`invoice_pay_checkout_total.sql` adds `payment_attempts.collected_total_seen_kes` with `if not exists`. It does not edit the P1-P12 files and it does not replace `finalize_invoice`. It does `CREATE OR REPLACE` `reconcile_checkout_total`. The file header says staging only and that production does not have this file. That is the author's caution. It is not a finding that P9 and P10 are missing. Do not apply it until Alvin's GO, and leave payments off after it.
+
+The harness applied P1 through P13, and P9, P10, P11, P12, and P13 each a second time, on throwaway database `billing_apply_order_proof`. Checks after the second P13: session index present, park guard present, `checkout_closed_at is null` present in `create_invoice_pay_attempt`, `release_held_pay_checkout` present, `reconcile_checkout_collection` present, legal-pairs guard present, `reconcile_checkout_total` present, `collected_total_seen_kes` present in that function. Proof invoices were unchanged: `SCL-2026-000001` paid, total 3667, receipt 3667; `SCL-2026-000002` paid, total 0, credit 167; `SCL-2026-000003` open, total 2320, amount paid 2000, receipt 2500, overpay credit 500. Re-applying the P1 finalize installer left `SCL-`, `scalers.billing_write`, and `invoice-credit:`.
+
+Grants, read from that database:
+
+| Function | Security definer | anon | authenticated | public | service_role |
+| --- | --- | --- | --- | --- | --- |
+| `create_invoice_pay_attempt(text, numeric)` | yes | no | no | no | yes |
+| `release_held_pay_checkout(uuid)` | yes | no | no | no | yes |
+| `reconcile_checkout_collection(...)` | yes | no | no | no | yes |
+| `reconcile_checkout_total(...)` | yes | no | no | no | yes |
+| `record_payment_issue(...)` | yes | no | no | no | yes |
+
+`create_invoice_pay_attempt` keeps `search_path = public, extensions`. The reconcile functions use `search_path = public`. `reconcile_checkout_total` sets `scalers.billing_write` for the invoice update (`set_config` third argument true). A second apply of the same cent total does not insert another credit. Postgres: checkout `chk_r7_a` at 10 then 10 was a no-op (paid 10, one payment). A later 4 was a no-op and wrote no issue. A rise to 25 on the KSh 20 invoice paid it, stored one receipt of 25, and one credit of 5 at key `checkout-total:bachs:chk_r7_a:2500`. Checkout `chk_r7_b` at 10 then 12 then 20 on a KSh 10 invoice credited 2 then 8 and kept one receipt of 20.
+
+Do not re-run P11 after P13. Inside a transaction that was rolled back, applying `invoice_pay_held.sql` removed `checkout_closed_at is null` from `create_invoice_pay_attempt` and put `checkout_expires_at > now()` back. `reconcile_checkout_total` was still present. Rollback restored the closed-at hold.
+
+Do not re-run P9 after P13. The same rolled-back experiment applied `invoice_pay_session.sql`. The closed-at hold was gone. `reconcile_checkout_collection` and `reconcile_checkout_total` were still there. P9 also drops and recreates `payment_attempts_one_pending_part`. Rollback restored the hold.
+
+Re-running P12 after P13, also rolled back, left `reconcile_checkout_total`, the seen column, and the closed-at hold in place. P12 does not drop P13.
+
+Concurrency on that database, invoice `for update`: two `reconcile_checkout_total` calls for the same checkout id and the same total 10. The second waited about 2.6 seconds and returned `noop`. One payment, amount 10, invoice open at 10, no credit. A later call that raised the same checkout to 20, held open across `pg_sleep(3)`, and a second checkout reporting 10: the second waited about 2.6 seconds, applied nothing to the invoice, and inserted a KSh 10 excess credit of its own. Checkouts are not netted against each other. Two sessions that both report collected money will both land.
+
+One receipt gap, not on the happy path: `record_payment_issue` for KSh 10 created no receipt and did not change the invoice. A later `reconcile_checkout_total` of the same 10 updated that row to `matched` and set the invoice paid, and the receipt count stayed 0. The receipt trigger on update runs only when `amount_kes` changes. A first settle that inserts `matched` does issue the receipt. The rising-total probe kept one.
+
+Current main returns 503 from checkout before it inserts an attempt, while the gate refuses production. Applying P13 in that state does not exercise the new function. Leave payments off after the apply. Do not set `BACHS_LIVE_ALLOWED`.
+
+### If Bachs says the total is cumulative
+
+A single KSh 10 whose GET returns `amount_paid` `10.00` applies once. A replay of that total is a no-op. One payment, one receipt, no credit. That is the sandbox success shape already written down for one collection.
+
+Conditions for that test, all of them:
+
+- Set `BACHS_LIVE_TENANT_ALLOWLIST` to that one tenant id before the checkout is created. `*` also opens every business. Unset now refuses everyone, which is the safe default. The webhook enforces the same list.
+- Set `BACHS_LIVE_ALLOWED` to `true` only for the test. Sandbox on the production ref stays refused.
+- One checkout, one collection, amount exactly KSh 10. Do not send a second collection on that checkout during the test. A lower second read will not reverse the first.
+- The GET on the webhook has to succeed. An unreadable read is stored, answered 200, and not retried by the reconciler while mode is live.
+- Do not point the test at DID `+254709221536`.
+
+### If Bachs says it is only the latest charge
+
+Do not run the test. The failure is silent under-application, not an issue for manual review, and a remainder checkout can charge the customer again. Fix the settlement so a non-cumulative reading cannot move money, then review again.
+
+### What the tests did
+
+Throwaway database only. `sudo -u postgres psql`. Never Supabase. Code under test: worktree at `a95d89f3`.
+
+| Run | Result |
+| --- | --- |
+| `tests/sql/billing_apply_order/run.sh` | EXIT 0. P1 through P13, with P9 through P13 each twice, then the proof invoices above. |
+| Same database, follow-up SQL, regressions rolled back | Grants as in the table. Equal total no-op. Decrease no-op, no issue. Credits 5, and 2 then 8, one receipt each. Issue-then-same-amount pays the invoice and skips the receipt. Same-checkout overlap: `noop`, one payment, wait about 2.6s. Second checkout overlap: its own excess credit, wait about 2.6s. P11 and P9 each remove the closed-at hold until rollback. P12 leaves P13 in place. |
+| `node --test` of `tests/invoicePay.test.js` and `tests/invoiceDocuments.test.js` | 59 pass, 0 fail. Includes the checkout-total, unreadable-then-readable, and #802 read tests. |
+| Fake-ledger probes, not part of that suite | The table above, plus the allowlist edges. |
+
+`tests/invoicePaySql.test.js` was not executed. `@electric-sql/pglite` is not installed.
+
+### What remains
+
+Ask Bachs the question already written in `INVOICE_PAY.md`: for one checkout paid in more than one M-Pesa collection, is `charge.amount_paid` the sum, or only the latest charge? Do not turn live money on before that answer is "the sum".
+
+Ops, unchanged: no DID touch, `BILLING_NOTICES_SEND` off, `DESK_PLAN_CHANGE` off, letterhead nulls stay off the document, backup before any production apply, do not re-run P5, P9, or P11 after P13.
 
 ## Round 6
 
