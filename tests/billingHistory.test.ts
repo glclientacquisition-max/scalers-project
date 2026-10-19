@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { invoiceLoadOutcome, kshCents, mapBillingHistory, nextPart, payLinkDestination, splitParts } from "../dashboard/src/lib/billingHistory.ts";
+import { INVOICES_UNAVAILABLE_LINE, invoiceLoadOutcome, kshCents, mapBillingHistory, nextPart, payLinkDestination, splitParts } from "../dashboard/src/lib/billingHistory.ts";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -124,10 +124,28 @@ describe("billing history", () => {
     assert.equal(invoiceLoadOutcome(null), "error");
     assert.deepEqual(mapBillingHistory({ invoices: [] }, { fromPay: false }), []);
     const history = fs.readFileSync(path.join(root, "dashboard/src/components/plan/BillingHistory.tsx"), "utf8");
-    assert.match(history, /invoiceLoadOutcome\(res\.status\)/);
+    assert.match(history, /invoiceLoadOutcome\(res\.status, errorBody\)/);
     assert.match(history, /outcome === "empty"[\s\S]*setItems\(\[\]\)/);
     assert.match(history, /Could not load invoices\./);
     assert.match(fs.readFileSync(path.join(root, "dashboard/src/components/plan/OwnerInvoiceList.tsx"), "utf8"), /title="No invoices yet"/);
+  });
+
+  it("shows 404 as no invoices, 503 payments_unavailable as one calm line, and 500 as an error with Retry", () => {
+    assert.equal(invoiceLoadOutcome(404, null), "empty");
+    assert.equal(invoiceLoadOutcome(503, { error: "payments_unavailable" }), "unavailable");
+    assert.equal(invoiceLoadOutcome(503, { code: "payments_unavailable" }), "unavailable");
+    assert.equal(invoiceLoadOutcome(503, { error: "unavailable" }), "unavailable");
+    assert.equal(invoiceLoadOutcome(503, { error: "Could not load invoices." }), "error");
+    assert.equal(invoiceLoadOutcome(503, null), "error");
+    assert.equal(invoiceLoadOutcome(500, { error: "payments_unavailable" }), "error");
+    assert.equal(invoiceLoadOutcome(500, null), "error");
+    assert.equal(INVOICES_UNAVAILABLE_LINE, "Invoices aren't available right now.");
+    assert.doesNotMatch(INVOICES_UNAVAILABLE_LINE, /[\u2013\u2014!]/);
+    const history = fs.readFileSync(path.join(root, "dashboard/src/components/plan/BillingHistory.tsx"), "utf8");
+    assert.match(history, /invoiceLoadOutcome\(res\.status, errorBody\)/);
+    const calm = history.slice(history.indexOf("if (unavailable)"), history.indexOf("if (!items)"));
+    assert.match(calm, /INVOICES_UNAVAILABLE_LINE/);
+    assert.doesNotMatch(calm, /Retry|Button|Stamp|attention/);
   });
 
   it("follows only the pay path the POST returns", () => {
