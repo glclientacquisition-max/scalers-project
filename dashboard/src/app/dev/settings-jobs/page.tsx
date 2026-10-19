@@ -15,6 +15,8 @@ import {
 import { settingsIndexStatuses } from "@/lib/settingsOptionStatus";
 import type { TenantRow } from "@/lib/supabase";
 import { parsePaymentsText } from "@/lib/payments";
+import { assistantSayStateFromTenant } from "@/lib/assistantSayLoad";
+import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
 
 /**
  * Settings job list and rail. DASHBOARD_OPEN=true only.
@@ -113,6 +115,9 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
     test_from: "+254722000111",
     test_started_at: new Date(now - 2 * 86_400_000 - 120_000).toISOString(),
   };
+  const assistantSaySlot =
+    tab === "assistant-say" ? <AssistantSayPanel state={assistantSayStateFromTenant(t)} /> : null;
+
   const callsSlot =
     tab === "calls" ? (
       <CallsForwardingPanel
@@ -148,6 +153,8 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             trainPanel={trainPanel}
             curatedVoices={curatedVoices}
             callsSlot={callsSlot}
+            assistantSaySlot={assistantSaySlot}
+            assistantSayPage
             optionStatus={settingsIndexStatuses(
               t,
               curatedVoices,
