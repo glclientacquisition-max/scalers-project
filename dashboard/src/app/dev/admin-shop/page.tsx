@@ -7,6 +7,7 @@ import type { AdminBusiness } from "@/lib/admin";
 import type { AdminShopPeople as PeopleData } from "@/lib/adminShopPeople";
 import { Stamp } from "@/components/ui/Stamp";
 import { previewLine, statusLabel, statusTone } from "@/lib/adminBusinessUi";
+import { ADMIN_BILLING_DETAIL } from "../fixtures/adminBilling";
 
 const BUSINESS: AdminBusiness = {
   id: "biz-sample",
@@ -64,7 +65,13 @@ export default function DevAdminShopPage() {
         <div className="px-4">
           <Stamp tone={statusTone(BUSINESS.status)}>{statusLabel(BUSINESS.status)}</Stamp>
         </div>
-        <AdminShopPanel business={BUSINESS} availableDids={[{ e164: "+254700111222" }]} freeCount={1} />
+        <AdminShopPanel
+          business={BUSINESS}
+          availableDids={[{ e164: "+254700111222" }]}
+          freeCount={1}
+          billing={ADMIN_BILLING_DETAIL}
+          focusMoney
+        />
         <AdminShopPeople businessId={BUSINESS.id} people={PEOPLE} />
       </div>
     </AdminShell>
