@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       rawBody,
       headers,
       secret,
-      ledger: invoicePayLedger(env),
+      ledger: invoicePayLedger(),
     });
     return NextResponse.json(result.body, { status: result.status });
   } catch (err) {

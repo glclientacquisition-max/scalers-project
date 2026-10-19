@@ -76,7 +76,7 @@ function rpcError(error: { message?: string } | null, fallback: string): Error {
  * Service-role ledger. Token lookup and other reads do not call the Bachs gate.
  * Checkout and the webhook refuse production before they write.
  */
-export function invoicePayLedger(_env: NodeJS.ProcessEnv = process.env) {
+export function invoicePayLedger() {
   const admin = getSupabaseAdmin();
 
   return {

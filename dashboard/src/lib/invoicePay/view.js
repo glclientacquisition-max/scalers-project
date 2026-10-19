@@ -101,8 +101,10 @@ function payView(input) {
 /**
  * Page the owner sees. A closed Bachs gate still shows the invoice, or the
  * invalid or expired link, and drops the Pay button.
- * @param {object} view
+ * @template {object} T
+ * @param {T} view
  * @param {NodeJS.ProcessEnv} [env]
+ * @returns {T}
  */
 function presentPayPage(view, env) {
   if (!view || !view.payLabel || !paymentsClosed(env)) return view;

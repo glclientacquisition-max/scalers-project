@@ -7,7 +7,7 @@ export async function loadPayView(
   search: { return?: string; checkout_id?: string },
   env: NodeJS.ProcessEnv = process.env
 ) {
-  const ledger = invoicePayLedger(env);
+  const ledger = invoicePayLedger();
   const lookup = await ledger.lookup(token);
   const normalized = readPayReturn(search);
   const checkoutId = normalized.checkout_id || "";
@@ -38,7 +38,7 @@ export async function loadPayReturn(
   token: string,
   env: NodeJS.ProcessEnv = process.env
 ) {
-  const ledger = invoicePayLedger(env) as ReturnLedger;
+  const ledger = invoicePayLedger() as ReturnLedger;
   const byReturn = await ledger.lookupReturn(returnId);
   if (!byReturn?.found) return presentPayPage(payView({ lookup: { found: false } }), env);
   if (token) {

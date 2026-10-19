@@ -23,7 +23,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     const result = await startInvoiceCheckout({
       token,
       origin,
-      ledger: invoicePayLedger(env),
+      ledger: invoicePayLedger(),
       provider: payProviderFromEnv(env),
     });
     const response = NextResponse.json(
