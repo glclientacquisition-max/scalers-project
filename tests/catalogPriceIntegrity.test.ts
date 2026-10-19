@@ -248,6 +248,51 @@ test("reportFactHashRestampFailure logs a structured fact_hash_restamp_failed er
   assert.equal(parsed.error, "stamp failed");
 });
 
+test("legacy fixed save does not move the price fact hash; editor Fixed and non-fixed imports do", async () => {
+  const { createRequire } = await import("node:module");
+  const { applyCatalogPriceFields, structureImportedCatalogRow } = await import(
+    "../dashboard/src/lib/catalogPricingMode.ts"
+  );
+  const jsFactHash = createRequire(import.meta.url)("../src/conversation/factHash.js") as {
+    priceFactValue: (row: unknown, kind: "service" | "product") => unknown;
+    hashFactValue: (value: unknown) => string;
+  };
+
+  const legacy = {
+    id: "svc_aaaaaaaaaaaaaaaa",
+    name: "Sofa clean",
+    price_range: "KES 2,500",
+  };
+  const storedHash = jsFactHash.hashFactValue(jsFactHash.priceFactValue(legacy, "service"));
+  assert.deepEqual(jsFactHash.priceFactValue(legacy, "service"), { price: "KES 2,500" });
+
+  const settled = cp.settleCatalogPrices([legacy], [legacy], "service")[0] as typeof legacy & {
+    pricing_mode?: string;
+  };
+  assert.equal(settled.pricing_mode, undefined);
+  assert.equal(jsFactHash.hashFactValue(jsFactHash.priceFactValue(settled, "service")), storedHash);
+  assert.deepEqual(jsFactHash.priceFactValue(settled, "service"), jsFactHash.priceFactValue(legacy, "service"));
+
+  const edited = applyCatalogPriceFields(legacy, "fixed", "2500", "", "price_range");
+  assert.equal(edited.pricing_mode, "fixed");
+  assert.notEqual(jsFactHash.hashFactValue(jsFactHash.priceFactValue(edited, "service")), storedHash);
+
+  const importedFixed = structureImportedCatalogRow(
+    { name: "Carpet wash", price_range: "KSh 60 per sq ft" },
+    "price_range"
+  );
+  assert.equal(importedFixed.pricing_mode, undefined);
+  assert.equal(importedFixed.price_mode, undefined);
+  assert.equal(importedFixed.price_range, "KSh 60 per sq ft");
+  assert.equal(importedFixed.price, "60");
+
+  const importedFrom = structureImportedCatalogRow(
+    { name: "Rooms", price_range: "from KSh 1,500" },
+    "price_range"
+  );
+  assert.equal(importedFrom.pricing_mode, "from");
+});
+
 test("confirmPriceAction reports re-stamp failures instead of a silent console.warn", () => {
   const src = read("dashboard/src/app/(desk)/settings/structuredActions.ts");
   const body = src.slice(src.indexOf("async function restampPriceHash"));

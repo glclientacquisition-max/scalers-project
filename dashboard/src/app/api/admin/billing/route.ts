@@ -10,7 +10,7 @@ import { isLegacyAuthenticated } from "@/lib/auth";
 import { recordAdminAction } from "@/lib/adminAudit";
 import { assignBusinessPackage, loadBusinessPackageNames, unassignBusinessPackage } from "@/lib/packageCatalog";
 import {
-  setTenantBillingMode,
+  confirmTenantBillingMode,
   type BillingMode,
 } from "@/lib/adminWallets";
 
@@ -122,12 +122,11 @@ export async function POST(request: Request) {
       if (note.length < 3) {
         return NextResponse.json({ error: "Add a reason (3 letters or more)." }, { status: 400 });
       }
-      const result = await setTenantBillingMode({
+      const result = await confirmTenantBillingMode({
         businessId,
         mode,
         note,
         actor,
-        betaExpiresAt: body.beta_expires_at ? String(body.beta_expires_at) : null,
       });
       return NextResponse.json({ ok: true, ...result });
     }

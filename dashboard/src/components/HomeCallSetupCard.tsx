@@ -71,7 +71,7 @@ export function HomeCallSetupCard({
       <section aria-labelledby="calls-card" className={cardClass} data-home-call-setup="reaching">
         <div className="min-w-0">
           <h2 id="calls-card" className="text-body font-semibold text-ink">
-            Calls are reaching your assistant
+            Calls are reaching your Business Assistant
           </h2>
           <p className="mt-0.5 text-meta text-ink-2">
             {status?.option === "main_number" ? "To finish setup, run the test call." : "Forwarding isn't tested yet. Run the test call to finish."}

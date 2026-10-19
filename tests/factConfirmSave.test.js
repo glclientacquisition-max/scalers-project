@@ -503,7 +503,7 @@ describe('wiring (static)', () => {
     assert.doesNotMatch(actions, /before: tenant/);
     assert.match(actions, /fieldMeta: compileFieldMeta/);
     // Services keep stable ids; prices are settled against the stored row first (catalogPricing).
-    assert.match(actions, /assignServiceIds\(\s*settleCatalogPrices\(pickedServices, storedServices, "service"/);
+    assert.match(actions, /assignServiceIds\(\s*settleCatalogPrices\(serviceSplit\.rows, storedServices, "service"/);
   });
 
   it('the unused stampOwnerFieldPaths action is gone', () => {

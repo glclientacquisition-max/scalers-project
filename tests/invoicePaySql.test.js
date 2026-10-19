@@ -13,6 +13,15 @@ async function q(sql, params) {
   return db.query(sql, params);
 }
 
+async function openDraft(whereSql, params) {
+  await q("select set_config('scalers.billing_write', '1', false)");
+  try {
+    await q(`update public.invoices set status = 'open', invoice_number = $1 ${whereSql}`, params);
+  } finally {
+    await q("select set_config('scalers.billing_write', '', false)");
+  }
+}
+
 describe("invoice pay SQL", () => {
   before(async () => {
     const { PGlite } = await import("@electric-sql/pglite");
@@ -29,6 +38,26 @@ describe("invoice pay SQL", () => {
     await db.exec(read("docs/supabase/billing_company.sql"));
     await db.exec(read("docs/supabase/invoice_pay_session.sql"));
     await db.exec(read("docs/supabase/invoice_pay_session.sql"));
+  });
+
+  it("refuses a draft number or status write unless billing_write is set", async () => {
+    const tenant = "12121212-1212-4212-8212-121212121212";
+    await q("select set_config('scalers.wallet_write', '1', false)");
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Freeze Shop', 'pending:freeze', 'soft')`,
+      [tenant]
+    );
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 100, 100) returning id`,
+      [tenant]
+    );
+    await assert.rejects(
+      q("update public.invoices set status = 'open', invoice_number = 'SC-2026-000099' where id = $1", [
+        draft.rows[0].id,
+      ]),
+      /set only by finalize_invoice/
+    );
   });
 
   it("splits the same way as the page", async () => {
@@ -54,11 +83,7 @@ describe("invoice pay SQL", () => {
        values ($1, 2000, 2320, '2026-10-24 21:00:00+00')`,
       [beta]
     );
-    await q(
-      `update public.invoices set status = 'open', invoice_number = 'SC-2026-000010'
-       where tenant_id = $1`,
-      [beta]
-    );
+    await openDraft("where tenant_id = $2", ["SC-2026-000010", beta]);
     await assert.rejects(
       q("select * from public.mint_invoice_pay_token((select id from public.invoices where tenant_id = $1), false)", [beta]),
       /beta tenants have no pay link/
@@ -78,10 +103,7 @@ describe("invoice pay SQL", () => {
       [tenant]
     );
     const invoiceId = inserted.rows[0].id;
-    await q(
-      `update public.invoices set status = 'open', invoice_number = 'SC-2026-000042' where id = $1`,
-      [invoiceId]
-    );
+    await openDraft("where id = $2", ["SC-2026-000042", invoiceId]);
 
     const minted = await q("select * from public.mint_invoice_pay_token($1, false)", [invoiceId]);
     const token = minted.rows[0].token;
@@ -128,7 +150,7 @@ describe("invoice pay SQL", () => {
       [tenant]
     );
     const invoiceId = inserted.rows[0].id;
-    await q("update public.invoices set status = 'open', invoice_number = 'SC-2026-000200' where id = $1", [invoiceId]);
+    await openDraft("where id = $2", ["SC-2026-000200", invoiceId]);
 
     const first = await q(
       `select * from public.apply_payment('bachs', 'chk_part_1', 100000, $1, $2, now(), 'test', '{}'::jsonb)`,
@@ -158,7 +180,7 @@ describe("invoice pay SQL", () => {
       [tenant]
     );
     const otherId = other.rows[0].id;
-    await q("update public.invoices set status = 'open', invoice_number = 'SC-2026-000201' where id = $1", [otherId]);
+    await openDraft("where id = $2", ["SC-2026-000201", otherId]);
     const issue = await q(
       `select match_status from public.record_payment_issue(
          'bachs', 'chk_bad', 2000, $1, $2, '{}'::jsonb, 1800, 'USD', null, 'amount'
@@ -369,9 +391,7 @@ describe("invoice pay SQL", () => {
       [tenant]
     );
     await assert.rejects(q("select public.finalize_invoice($1)", [draft.rows[0].id]), /beta tenants have no pay link/);
-    await q(`update public.invoices set status = 'open', invoice_number = 'SCL-2026-000077' where id = $1`, [
-      draft.rows[0].id,
-    ]);
+    await openDraft("where id = $2", ["SCL-2026-000077", draft.rows[0].id]);
     await assert.rejects(q("select * from public.mint_invoice_pay_token($1, false)", [draft.rows[0].id]), /beta tenants have no pay link/);
     await assert.rejects(
       q(

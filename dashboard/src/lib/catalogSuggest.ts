@@ -1,3 +1,4 @@
+import { structureImportedCatalogRow } from "@/lib/catalogPricingMode";
 import type { ProductItem } from "@/lib/productCatalog";
 import type { ServiceItem } from "@/lib/servicesCatalog";
 
@@ -197,7 +198,7 @@ export function suggestImportedServices(
     const { confidence: _c, changed: _ch, ...item } = suggested;
     void _c;
     void _ch;
-    return item;
+    return structureImportedCatalogRow(item, "price_range");
   });
 }
 
@@ -207,7 +208,7 @@ export function suggestImportedProducts(rows: ProductItem[]): ProductItem[] {
     const { confidence: _c, changed: _ch, ...item } = suggested;
     void _c;
     void _ch;
-    return item;
+    return structureImportedCatalogRow(item, "price");
   });
 }
 

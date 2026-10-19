@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth } from "@/lib/admin-auth";
-import { SESSION_COOKIE, sessionCookieValue } from "@/lib/auth";
+import { adminAuth, isAdminAuthProperlyConfigured } from "@/lib/admin-auth";
 
 function copyAuthCookies(from: Response, to: NextResponse) {
   const cookies =
@@ -17,6 +16,10 @@ export async function POST(request: NextRequest) {
   const username = String(form.get("username") || "");
   const accessCode = String(form.get("accessCode") || "");
   const loginUrl = new URL("/admin/login?error=1", request.url);
+
+  if (process.env.NODE_ENV === "production" && !isAdminAuthProperlyConfigured()) {
+    return NextResponse.redirect(loginUrl, 303);
+  }
 
   const jsonReq = new Request(new URL("/api/auth/sign-in/access-code", request.url), {
     method: "POST",
@@ -35,14 +38,5 @@ export async function POST(request: NextRequest) {
 
   const res = NextResponse.redirect(new URL("/admin", request.url), 303);
   copyAuthCookies(authRes, res);
-  if (process.env.DASHBOARD_PASSWORD) {
-    res.cookies.set(SESSION_COOKIE, sessionCookieValue(), {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 14,
-    });
-  }
   return res;
 }

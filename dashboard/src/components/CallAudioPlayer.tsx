@@ -25,14 +25,14 @@ export function CallAudioPlayer({ src }: { src: string }) {
   }
 
   return (
-    <div className="sticky bottom-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom))] z-20 -mx-4 mt-8 border-t border-hairline bg-surface px-4 py-3 shadow-none sm:-mx-6 sm:rounded-t-2xl sm:px-6 md:bottom-0">
-      <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-2 md:flex-row md:items-center">
+    <div className="sticky bottom-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom))] z-20 mt-8 border-t border-hairline bg-surface py-3 shadow-none md:bottom-0">
+      <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-2">
         <audio
           ref={audioRef}
           src={playable}
           controls
           preload="none"
-          className="block h-12 w-full max-w-full shrink-0"
+          className="block h-12 w-full min-w-0 max-w-full"
           onPlay={() => {
             if (audioRef.current) audioRef.current.playbackRate = speed;
           }}
