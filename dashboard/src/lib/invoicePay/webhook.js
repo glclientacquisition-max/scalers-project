@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- node:test loads this file with require() */
-const { toCents } = require("./money");
+const { toCents, fromCents } = require("./money");
 const { verifyBachsRequest } = require("./signature");
 
 const KES_PAIRS = [
@@ -116,6 +116,25 @@ function decidePayment(input) {
   if (overpaid) return { action: "apply_partial" };
   if (terminal && got > 0n) return { action: "apply_partial", reason: "amount" };
   return { action: "wait" };
+}
+
+/**
+ * A new event on a checkout that already has a payment.
+ * A larger amount credits the difference. A smaller amount credits that
+ * collection. The same amount stays a duplicate, including a new event id.
+ * A replay of the same event id does not credit again.
+ * @param {number} attempts
+ * @param {{ amountKes: string } | null} applied
+ * @param {ReturnType<typeof extractCharge>} charge
+ */
+function laterCollectionExtra(attempts, applied, charge) {
+  if (attempts !== 1 || !applied || !charge.kes) return null;
+  const incoming = toCents(charge.kes.amount);
+  const prev = toCents(applied.amountKes);
+  if (incoming == null || prev == null || incoming <= 0n) return null;
+  if (incoming > prev) return incoming - prev;
+  if (incoming < prev) return incoming;
+  return null;
 }
 
 function minorUnits(amount) {
@@ -250,6 +269,17 @@ async function handlePayWebhook(input) {
     }
   }
   if (attempt.status === "succeeded" || applied) {
+    const extra = laterCollectionExtra(recorded.attempts, applied, charge);
+    if (extra != null && typeof input.ledger.creditCheckoutExtra === "function") {
+      await input.ledger.creditCheckoutExtra({
+        provider: "bachs",
+        providerRef,
+        amountKes: fromCents(extra),
+        tenantId: attempt.tenantId,
+        invoiceId: attempt.invoiceId,
+      });
+      return { status: 200, body: { ok: true, action: "credit", reason: "checkout_extra" } };
+    }
     return { status: 200, body: { ok: true, duplicate: true, action: decision.action } };
   }
 

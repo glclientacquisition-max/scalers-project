@@ -153,6 +153,15 @@ function createMemoryLedger(opts = {}) {
           inFlight: !pending.checkoutUrl || !pending.checkoutSessionId,
         });
       }
+      const held = attempts.findLast(
+        (a) =>
+          a.invoiceId === lookup.invoiceId &&
+          a.status === "succeeded" &&
+          a.partIndex === next.index &&
+          a.checkoutSessionId &&
+          (!a.expiresAt || new Date(a.expiresAt).getTime() > now)
+      );
+      if (held) return attemptResult(held, { held: true });
       const row = {
         id: id(),
         invoiceId: lookup.invoiceId,
@@ -189,10 +198,20 @@ function createMemoryLedger(opts = {}) {
       if (!row || (row.status !== "pending" && row.status !== "pending_unattached")) {
         throw new Error("pay attempt is not pending");
       }
+      if (row.checkoutSessionId && row.checkoutSessionId !== created.checkoutId) {
+        throw new Error("checkout session is already parked");
+      }
       row.status = "pending_unattached";
       row.checkoutSessionId = created.checkoutId;
       row.checkoutUrl = created.checkoutUrl || null;
       row.expiresAt = created.expiresAt || null;
+    },
+    async releaseHeld(attemptId) {
+      const row = attempts.find((a) => a.id === attemptId);
+      if (!row || row.status !== "succeeded" || !row.checkoutSessionId) {
+        throw new Error("pay attempt is not a held checkout");
+      }
+      row.expiresAt = new Date(now - 1000).toISOString();
     },
     async findAttemptByCheckout(checkoutId) {
       const row = [...attempts].reverse().find((a) => a.checkoutSessionId === checkoutId);
@@ -263,6 +282,23 @@ function createMemoryLedger(opts = {}) {
         providerRef: input.providerRef,
       });
       alerts.push({ action: "cancelled_checkout_credit", providerRef: input.providerRef, amountKes: input.amountKes });
+      return { duplicate: false };
+    },
+    async creditCheckoutExtra(input) {
+      const amount = toCents(input.amountKes);
+      if (amount == null || amount <= 0n) throw new Error("payment amount must be positive");
+      const key = `checkout-extra:${input.provider}:${input.providerRef}`;
+      if (credits.some((row) => row.idempotencyKey === key)) return { duplicate: true };
+      credits.push({
+        id: id(),
+        tenantId: input.tenantId,
+        invoiceId: input.invoiceId,
+        amountKes: input.amountKes,
+        reason: "checkout_extra",
+        idempotencyKey: key,
+        providerRef: input.providerRef,
+      });
+      alerts.push({ action: "checkout_extra_credit", providerRef: input.providerRef, amountKes: input.amountKes });
       return { duplicate: false };
     },
     async adjustOverpay(input) {

@@ -75,7 +75,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (210)
+## Functions (212)
 
 | Function | Defined in |
 | --- | --- |
@@ -186,9 +186,10 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `consume_call_seconds` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/package_minute_consume.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `consume_sms_units` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/package_minute_consume.sql`<br>`docs/supabase/prod/owner_billing_actions.sql`<br>`docs/supabase/sms_allowance.sql` |
 | `correct_call_facts` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012210000_three_features.sql` |
-| `create_invoice_pay_attempt` | `docs/supabase/invoice_pay.sql`<br>`docs/supabase/invoice_pay_session.sql` |
+| `create_invoice_pay_attempt` | `docs/supabase/invoice_pay.sql`<br>`docs/supabase/invoice_pay_held.sql`<br>`docs/supabase/invoice_pay_session.sql` |
 | `create_tenant_invite` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `credit_cancelled_collection` | `docs/supabase/invoice_pay.sql` |
+| `credit_checkout_extra` | `docs/supabase/invoice_pay_held.sql` |
 | `current_member_role` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `current_user_tenant_ids` | `docs/supabase/multi_tenant_onboarding.sql`<br>`docs/supabase/owner_rls.sql` |
 | `data_quality_for` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
@@ -223,7 +224,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `owner_set_extra_seats` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `owner_set_spend_limit` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `package_version_fingerprint` | `docs/supabase/package_version_editor.sql` |
-| `park_invoice_pay_attempt` | `docs/supabase/invoice_pay_session.sql` |
+| `park_invoice_pay_attempt` | `docs/supabase/invoice_pay_held.sql`<br>`docs/supabase/invoice_pay_session.sql` |
 | `parse_payments_text` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `parse_price_ksh` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `pay_invoice_by_return` | `docs/supabase/invoice_pay.sql` |
@@ -242,6 +243,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `refresh_line_status` | `docs/supabase/admin_business_suspend.sql`<br>`docs/supabase/line_rental_grace.sql` |
 | `release_did_from_business` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/super_admin_ops.sql` |
 | `release_expired_quarantine` | `docs/supabase/billing_data_layer.sql` |
+| `release_held_pay_checkout` | `docs/supabase/invoice_pay_held.sql` |
 | `release_stale_notify_sends` | `docs/supabase/notify_send_reserve_settle.sql` |
 | `remove_business_and_release_did` | `docs/supabase/super_admin_ops.sql` |
 | `reopen_tenant_field` | `docs/supabase/tenant_field_confirm_v2.sql` |

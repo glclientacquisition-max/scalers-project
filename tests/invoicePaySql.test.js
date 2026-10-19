@@ -38,6 +38,8 @@ describe("invoice pay SQL", () => {
     await db.exec(read("docs/supabase/billing_company.sql"));
     await db.exec(read("docs/supabase/invoice_pay_session.sql"));
     await db.exec(read("docs/supabase/invoice_pay_session.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_held.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_held.sql"));
   });
 
   it("refuses a draft number or status write unless billing_write is set", async () => {
@@ -543,6 +545,19 @@ describe("invoice pay SQL", () => {
       "select public.park_invoice_pay_attempt($1, 'chk_park_1', 'https://checkout.example/park', now() + interval '1 hour')",
       [attemptId]
     );
+    await assert.rejects(
+      q(
+        "select public.park_invoice_pay_attempt($1, 'chk_park_new', 'https://checkout.example/new', now() + interval '1 hour')",
+        [attemptId]
+      ),
+      /already parked/
+    );
+    const kept = await q("select checkout_session_id from public.payment_attempts where id = $1", [attemptId]);
+    assert.equal(kept.rows[0].checkout_session_id, "chk_park_1");
+    await q(
+      "select public.park_invoice_pay_attempt($1, 'chk_park_1', 'https://checkout.example/park-again', now() + interval '1 hour')",
+      [attemptId]
+    );
     const again = await q("select public.create_invoice_pay_attempt($1, 2320) as row", [minted.rows[0].token]);
     assert.equal(again.rows[0].row.id, attemptId);
     assert.equal(again.rows[0].row.unattached, true);
@@ -571,5 +586,51 @@ describe("invoice pay SQL", () => {
     const displaced = await q("select public.invoice_pay_attempt_by_checkout('chk_park_1') as row");
     assert.equal(displaced.rows[0].row.live_part, false);
     assert.equal(displaced.rows[0].row.status, "failed");
+  });
+
+  it("holds an open succeeded checkout and credits one later collection", async () => {
+    const tenant = "abababab-abab-4bab-8bab-abababababab";
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Hold Shop', 'pending:hold', 'soft')`,
+      [tenant]
+    );
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 2320, 2320) returning id`,
+      [tenant]
+    );
+    const invoice = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+    const minted = await q("select token from public.mint_invoice_pay_token($1, false)", [invoice.rows[0].id]);
+    const first = await q("select public.create_invoice_pay_attempt($1, 2320) as row", [minted.rows[0].token]);
+    const attemptId = first.rows[0].row.id;
+    await q(
+      "select public.attach_invoice_pay_checkout($1, 'chk_hold_1', 'https://checkout.example/hold', now() + interval '1 hour')",
+      [attemptId]
+    );
+    await q("select public.apply_payment('bachs', 'chk_hold_1', 2000, $1, $2)", [tenant, invoice.rows[0].id]);
+    await q("select public.settle_invoice_pay_attempt($1, 'succeeded', 2000, 'KES')", [attemptId]);
+    const held = await q("select public.create_invoice_pay_attempt($1, 320) as row", [minted.rows[0].token]);
+    assert.equal(held.rows[0].row.held, true);
+    assert.equal(held.rows[0].row.checkout_session_id, "chk_hold_1");
+    const before = await q("select count(*)::int as n from public.payment_attempts where invoice_id = $1", [
+      invoice.rows[0].id,
+    ]);
+    assert.equal(before.rows[0].n, 1);
+    await q("select public.release_held_pay_checkout($1)", [attemptId]);
+    const fresh = await q("select public.create_invoice_pay_attempt($1, 320) as row", [minted.rows[0].token]);
+    assert.equal(fresh.rows[0].row.held, false);
+    assert.notEqual(fresh.rows[0].row.id, attemptId);
+    const kept = await q("select checkout_session_id, status from public.payment_attempts where id = $1", [attemptId]);
+    assert.equal(kept.rows[0].checkout_session_id, "chk_hold_1");
+    assert.equal(kept.rows[0].status, "succeeded");
+    await q("select public.credit_checkout_extra('bachs', 'chk_hold_1', 320, $1)", [tenant]);
+    await q("select public.credit_checkout_extra('bachs', 'chk_hold_1', 100, $1)", [tenant]);
+    const credits = await q(
+      "select amount_kes::text as amount from public.tenant_credits where idempotency_key = 'checkout-extra:bachs:chk_hold_1'"
+    );
+    assert.equal(credits.rows.length, 1);
+    assert.equal(Number(credits.rows[0].amount), 320);
+    const paid = await q("select amount_paid_kes from public.invoices where id = $1", [invoice.rows[0].id]);
+    assert.equal(Number(paid.rows[0].amount_paid_kes), 2000);
   });
 });

@@ -16,6 +16,10 @@ function money(amount) {
   return formatKsh(cents);
 }
 
+function creditMoney(amount) {
+  return `-${money(amount)}`;
+}
+
 function dateLabel(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -141,7 +145,7 @@ function invoiceModel(input) {
   const dueCents = toCents(balance);
   const payable = dueCents != null && dueCents > 0n;
   const totals = [{ label: "Subtotal", value: money(invoice.subtotalKes || "0") }];
-  if (credits != null && Number(credits) > 0) totals.push({ label: "Credits applied", value: money(credits) });
+  if (credits != null && Number(credits) > 0) totals.push({ label: "Credits applied", value: creditMoney(credits) });
   totals.push({ label: "Total", value: money(invoice.totalKes || "0") });
   totals.push({ label: "Amount paid", value: money(invoice.amountPaidKes || "0") });
   totals.push({ label: "Amount due", value: money(balance), emphasis: true });
@@ -180,7 +184,7 @@ function receiptModel(input) {
   const credits = invoice.creditsAppliedKes;
   const totals = [];
   if (invoice.subtotalKes != null) totals.push({ label: "Subtotal", value: money(invoice.subtotalKes) });
-  if (credits != null && Number(credits) > 0) totals.push({ label: "Credits applied", value: money(credits) });
+  if (credits != null && Number(credits) > 0) totals.push({ label: "Credits applied", value: creditMoney(credits) });
   if (invoice.totalKes != null) totals.push({ label: "Total", value: money(invoice.totalKes) });
   totals.push({ label: "Amount paid", value: amount, emphasis: true });
   const paymentFacts = [

@@ -149,6 +149,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 24k.9 | [`billing_company.sql`](./billing_company.sql) | `invoice_documents.sql` | P8. Canonical `finalize_invoice`: `scalers.billing_write`, `SCL-YYYY-NNNNNN`, letterhead snapshot, beta refusal, and a negative draft becomes one `tenant_credits` row (`invoice-credit:<id>`) plus a paid zero invoice. Production has this file as of commit `553f1830`. Do not edit it in place. Re-apply this file last whenever another file replaces `finalize_invoice`. |
 | 24k.10 | [`invoice_pay_session.sql`](./invoice_pay_session.sql) | `billing_company.sql` | P9. After P8. One live checkout per part (`pending` and `pending_unattached`), `park_invoice_pay_attempt`, and `live_part` on the checkout lookup. Does not replace `finalize_invoice`. Staging: `invoice_pay_session` (`20261018233254`). Not on prod. |
 | 24k.11 | [`billing_mode_legal_pairs.sql`](./billing_mode_legal_pairs.sql) | `wallet_security_beta.sql`, `billing_data_layer.sql` | P10. After P9. Replaces `set_tenant_billing_mode` so soft or hard is refused while `billing_status` is beta. Does not change `billing_status`. Does not replace `finalize_invoice`. Staging already has migration `billing_mode_legal_pairs` (`20261018212633`). Production has no such migration. Do not re-run `wallet_security_beta.sql` to pick up this check. |
+| 24k.12 | [`invoice_pay_held.sql`](./invoice_pay_held.sql) | `invoice_pay_session.sql` | P11. After P10. A succeeded checkout that has not expired holds its part. `park_invoice_pay_attempt` refuses a different session id. A later collection on that checkout is one `checkout-extra` credit. Does not replace `finalize_invoice`. Staging only. Not on prod. |
 | 24l | [`platform_ops_notices.sql`](./platform_ops_notices.sql) | none (staff tables) | Staff notice settings + open notices. Service role only. Applied on scalers-staging and production. The ops cron adds no columns: threshold notices are extra `kind` values. [`ops_alerts_prod_later.sql`](./ops_alerts_prod_later.sql) is a read-only check, not a migration. |
 | 24m | [`platform_ops_people.sql`](./platform_ops_people.sql) | `platform_ops_notices.sql` | Escalate people jsonb (name, phone, email). Applied on scalers-staging with the Platform rebuild. |
 | 24n | [`voice_turn_traces.sql`](./voice_turn_traces.sql) | `platform_ops_people.sql` | Per-turn voice traces (`voice_turn_traces`) plus call `score`, `checks`, `diagnosis`, and `release`. Service role only. Not applied by deploy. Apply the whole file on staging before `VOICE_TRACE` can persist. Re-running it adds the score columns if an earlier draft of the table is already there. |
@@ -177,6 +178,7 @@ Remaining production apply, in this order, after a backup and Alvin's GO. These 
 | --- | --- | --- |
 | P9 | [`invoice_pay_session.sql`](./invoice_pay_session.sql) | Widens `payment_attempts_one_pending_part` to `pending` and `pending_unattached`. Adds `park_invoice_pay_attempt`. Replaces `create_invoice_pay_attempt`, `invoice_pay_attempt_by_checkout`, `settle_invoice_pay_attempt`, and `billing_payment_reconciliation`. Does not replace `finalize_invoice`. |
 | P10 | [`billing_mode_legal_pairs.sql`](./billing_mode_legal_pairs.sql) | `set_tenant_billing_mode` raises `billing stays off while the business is on beta` when mode is not `off` and a subscription row is still `beta`. Does not write `billing_status`. |
+| P11 | [`invoice_pay_held.sql`](./invoice_pay_held.sql) | Replaces `create_invoice_pay_attempt` so a succeeded checkout that has not expired returns `held`. Replaces `park_invoice_pay_attempt` so a different session id raises `checkout session is already parked`. Adds `release_held_pay_checkout` and `credit_checkout_extra` (`checkout-extra:<provider>:<ref>`, one row). Does not replace `finalize_invoice`. |
 
 If a later file replaces `finalize_invoice`, re-apply [`billing_company.sql`](./billing_company.sql) last so the `SCL-` letterhead function wins.
 
@@ -195,7 +197,7 @@ P1–P8, already applied. P3 and P4 are one file. Run that file once.
 
 Owner-price v2 (`package_version_owner_prices.sql`) is already on production. It is not part of P1–P8 and it is not in the remaining list.
 
-Proof: `tests/sql/billing_apply_order/run.sh` on a throwaway local database. It applies P1–P10 from this checkout, then issues from `owner_change_plan`, `owner_set_extra_seats` (negative draft), and `finalize_invoice`.
+Proof: `tests/sql/billing_apply_order/run.sh` on a throwaway local database. It applies P1–P11 from this checkout, then issues from `owner_change_plan`, `owner_set_extra_seats` (negative draft), and `finalize_invoice`.
 
 Rollback of P1 and P2 is [`billing_data_layer_down.sql`](./billing_data_layer_down.sql). It drops the layer. Do not run it on staging or production unless that removal is the point.
 

@@ -105,7 +105,13 @@ export function invoicePayLedger(env: NodeJS.ProcessEnv = process.env) {
         inFlight: row.in_flight === true,
         cancel: row.cancel === true,
         unattached: row.unattached === true,
+        held: row.held === true,
       };
+    },
+
+    async releaseHeld(attemptId: string) {
+      const { error } = await admin.rpc("release_held_pay_checkout", { p_attempt_id: attemptId });
+      if (error) throw rpcError(error, "release failed");
     },
 
     async parkUnattached(
@@ -200,6 +206,16 @@ export function invoicePayLedger(env: NodeJS.ProcessEnv = process.env) {
         p_tenant_id: input.tenantId,
       });
       if (error) throw rpcError(error, "cancelled credit failed");
+    },
+
+    async creditCheckoutExtra(input: { provider: string; providerRef: string; amountKes: string; tenantId: string }) {
+      const { error } = await admin.rpc("credit_checkout_extra", {
+        p_provider: input.provider,
+        p_provider_ref: input.providerRef,
+        p_amount_kes: input.amountKes,
+        p_tenant_id: input.tenantId,
+      });
+      if (error) throw rpcError(error, "checkout extra credit failed");
     },
 
     async adjustOverpay(input: { provider: string; providerRef: string; amountKes: string; tenantId: string }) {

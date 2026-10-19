@@ -1,5 +1,5 @@
 #!/bin/bash
-# Throwaway local Postgres proof for the billing P1–P10 apply order.
+# Throwaway local Postgres proof for the billing P1–P11 apply order.
 # Never point this at Supabase. Production is refused by the script's database name.
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
@@ -29,7 +29,11 @@ $PSQL -d "$DB" -f docs/supabase/invoice_pay_session.sql
 echo "P10 billing_mode_legal_pairs.sql"
 $PSQL -d "$DB" -f docs/supabase/billing_mode_legal_pairs.sql
 $PSQL -d "$DB" -f docs/supabase/billing_mode_legal_pairs.sql
-$PSQL -d "$DB" -c "select position('pending_unattached' in pg_get_indexdef('public.payment_attempts_one_pending_part'::regclass)) > 0 as session_index, to_regprocedure('public.park_invoice_pay_attempt(uuid,text,text,timestamptz)') is not null as park, position('billing stays off while the business is on beta' in pg_get_functiondef('public.set_tenant_billing_mode(uuid,text,text,text,timestamptz,boolean)'::regprocedure)) > 0 as legal_pairs;"
+echo "P11 invoice_pay_held.sql"
+$PSQL -d "$DB" -f docs/supabase/invoice_pay_held.sql
+$PSQL -d "$DB" -f docs/supabase/invoice_pay_held.sql
+$PSQL -d "$DB" -c "select position('pending_unattached' in pg_get_indexdef('public.payment_attempts_one_pending_part'::regclass)) > 0 as session_index, position('checkout session is already parked' in pg_get_functiondef('public.park_invoice_pay_attempt(uuid,text,text,timestamptz)'::regprocedure)) > 0 as park_keeps, position('held' in pg_get_functiondef('public.create_invoice_pay_attempt(text,numeric)'::regprocedure)) > 0 as held, to_regprocedure('public.release_held_pay_checkout(uuid)') is not null as release_held, to_regprocedure('public.credit_checkout_extra(text,text,numeric,uuid)') is not null as extra_credit, position('billing stays off while the business is on beta' in pg_get_functiondef('public.set_tenant_billing_mode(uuid,text,text,text,timestamptz,boolean)'::regprocedure)) > 0 as legal_pairs;"
+$PSQL -d "$DB" -c "do \$\$ begin if position('checkout session is already parked' in pg_get_functiondef('public.park_invoice_pay_attempt(uuid,text,text,timestamptz)'::regprocedure)) = 0 or position('held' in pg_get_functiondef('public.create_invoice_pay_attempt(text,numeric)'::regprocedure)) = 0 or to_regprocedure('public.credit_checkout_extra(text,text,numeric,uuid)') is null then raise exception 'P11 did not land'; end if; end \$\$;"
 echo "proof"
 $PSQL -d "$DB" -f tests/sql/billing_apply_order/proof.sql
 echo "re-apply P1 finalize installer after P8"
