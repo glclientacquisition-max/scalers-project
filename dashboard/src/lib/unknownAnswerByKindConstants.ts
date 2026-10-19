@@ -34,7 +34,7 @@ export const FALLBACK_KIND_LABELS: Record<FallbackKind, string> = {
   price: "Prices and quotes",
   hours: "Opening hours",
   fee: "Delivery and areas",
-  pay: "Payment and till",
+  pay: "Payment details",
 };
 
 export const UNKNOWN_ANSWER_BY_KIND_COLUMN = "unknown_answer_by_kind";

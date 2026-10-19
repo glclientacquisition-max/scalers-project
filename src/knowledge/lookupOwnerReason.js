@@ -74,7 +74,7 @@ function ownerLookupReason(kind, result) {
 
   if (kind === 'pay' || kind === 'payment') {
     if (status === 'no_data' || code === 'no_list' || status === 'not_on_file') {
-      return 'No till number saved.';
+      return 'Add how customers pay on Policies.';
     }
     if (status === 'not_found_in_list' || code === 'no_match') {
       return 'No matching payment number on file. Add it on Policies.';

@@ -100,8 +100,11 @@ async function HomeOverviewBody() {
 
   const saveIsConfirm = factSaveIsConfirm();
   const assistantSayPage = deskAssistantSayPage();
-  const overviewChecks = dataChecksFor(tenant, { saveIsConfirm });
   const readyChecklist = assistantSayPage ? await loadReadyChecklist(tenant) : null;
+  const overviewChecks = dataChecksFor(tenant, {
+    saveIsConfirm,
+    readyItems: readyChecklist?.items,
+  });
 
   const readiness = assessMvpAnswerReadiness({
     businessName: tenant.business_name,
@@ -449,7 +452,7 @@ async function HomeOverviewBody() {
           />
         </RoleGate>
         {assistantSayPage && readyChecklist && !readyChecklist.allDone ? (
-          <HomeGetReadyCallsCard items={readyChecklist.items} />
+          <HomeGetReadyCallsCard items={readyChecklist.items} checks={overviewChecks} />
         ) : null}
         {!assistantSayPage && overviewChecks.length ? (
           <OverviewDataChecksCard checks={overviewChecks} />
