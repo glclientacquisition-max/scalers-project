@@ -7,7 +7,6 @@ import { confirmPriceAction, saveBusinessCategoryAction } from "@/app/(desk)/set
 import { needsPriceConfirm, sanitizePricing } from "@/lib/structuredData";
 import { normalizePayments, type Payments } from "@/lib/payments";
 import { parseHoursSchedule, scheduleForForm } from "@/lib/hoursSchedule";
-import { normalizeServiceAreas } from "@/lib/serviceAreas";
 import type { ReadyChecklistItem } from "@/lib/assistantSayTypes";
 import { reasonNeedsOverviewConfirm } from "@/lib/overviewDataChecks";
 import { AddPricesRow } from "./AddPricesRow";
@@ -145,32 +144,8 @@ export function dataChecksFor(
       kind: "hours",
       href: businessSettingsHref("train", "hours"),
       label: "Check opening hours",
-      detail: hoursItem.reason,
+      detail: hoursItem.reason ?? "",
       schedule: hoursSchedule,
-    });
-  }
-
-  const areasBag =
-    tenant.service_areas && typeof tenant.service_areas === "object"
-      ? normalizeServiceAreas(tenant.service_areas, tenant.vertical)
-      : null;
-  const areasItem = opts?.readyItems?.find((i) => i.id === "delivery");
-  const unconfirmedAreas = areasBag?.areas.filter((a) => !a.confirmed) ?? [];
-  if (
-    opts?.saveIsConfirm &&
-    areasItem &&
-    !areasItem.complete &&
-    reasonNeedsOverviewConfirm(areasItem.reason) &&
-    areasBag &&
-    unconfirmedAreas.length
-  ) {
-    out.push({
-      kind: "areas",
-      href: businessSettingsHref("train", "locations"),
-      label: "Check delivery areas",
-      detail: areasItem.reason,
-      areas: areasBag,
-      vertical: tenant.vertical ?? null,
     });
   }
 

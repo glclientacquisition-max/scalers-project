@@ -288,10 +288,19 @@ describe('assistantSayReadiness', () => {
             },
           },
         },
-        complete: false,
+        complete: true,
       },
       {
         name: 'legacy-text-only',
+        row: {
+          business_policies: {
+            payment: 'Cash on delivery only',
+          },
+        },
+        complete: true,
+      },
+      {
+        name: 'legacy-till-and-cash',
         row: {
           business_policies: {
             payment: 'M-Pesa (Till) or cash after the job',

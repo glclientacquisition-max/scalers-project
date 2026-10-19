@@ -816,7 +816,12 @@ function payBag(profile) {
 
 function payReading(profile, pay) {
   const tenant = tenantRowFromProfile(profile);
-  return confirmReading(profile, 'payments.methods', factValueForPath('payments.methods', tenant), pay);
+  const value = factValueForPath('payments.methods', tenant);
+  const bag = pay && typeof pay === 'object' ? pay : {};
+  if (!paySlots(bag).length && legacyPaymentText(profile)) {
+    return confirmReading(profile, 'payments.methods', value, { ...bag, source: bag.source || 'owner' });
+  }
+  return confirmReading(profile, 'payments.methods', value, bag);
 }
 
 const PAY_SLOT_LABEL = {
@@ -836,6 +841,34 @@ function paySlots(pay) {
     ['send', digitsOf(asObject(pay.mpesa_send)?.phone), PAY_SLOT_LABEL.send, null],
     ['airtel', digitsOf(asObject(pay.airtel)?.till || asObject(pay.airtel)?.phone), PAY_SLOT_LABEL.airtel, null],
   ].filter((row) => row[1]);
+}
+
+function payMethodIds(pay) {
+  return asArray(pay?.methods).map((m) => String(m));
+}
+
+function legacyPaymentText(profile) {
+  return String(asObject(profile.businessPolicies)?.payment || '').trim();
+}
+
+/** Cash, cheque, or legacy policy text when there is no till/paybill-style number to speak. */
+function payWithoutNumberAnswer(profile, pay, kind) {
+  const methods = payMethodIds(pay);
+  const wantsCash = kind === 'any' || kind === 'cash';
+  const cashLike = methods.filter((m) => m === 'cash' || m === 'cheque');
+  if (wantsCash && cashLike.length) {
+    const spoken = cashLike.map((m) => (m === 'cheque' ? 'cheque' : 'cash')).join(' or ');
+    const en = `You can pay by ${spoken}.`;
+    const sw = cashLike.includes('cash')
+      ? 'Unaweza kulipa kwa pesa taslimu.'
+      : 'Unaweza kulipa kwa hundi.';
+    return { en, sw, id: 'pay.cash', value: spoken };
+  }
+  if (kind !== 'any') return null;
+  const legacy = legacyPaymentText(profile);
+  if (!legacy || paySlots(pay).length) return null;
+  if (methods.length && cashLike.length !== methods.length) return null;
+  return { en: legacy, sw: legacy, id: 'pay.policy_text', value: legacy };
 }
 
 function payKindOf(query) {
@@ -866,7 +899,24 @@ function lookupPay(query, ctx) {
   const kind = payKindOf(query);
   const pay = payBag(profile);
   const slots = paySlots(pay);
-  if (!slots.length) return noData(profile, `pay.${kind}`, 'pay');
+  if (!slots.length) {
+    if (kind === 'bank' || kind === 'card') {
+      return notFoundInList(profile, `pay.${kind}`, null, 'pay');
+    }
+    const plain = payWithoutNumberAnswer(profile, pay, kind);
+    if (plain) {
+      const payRead = payReading(profile, pay);
+      if (!payRead.ok) return unconfirmed(profile, plain.id, 'pay', payRead.reason, 'pay');
+      if (!String(plain.en || '').trim()) return noData(profile, `pay.${kind}`, 'pay');
+      return resultOf('found', {
+        id: plain.id,
+        value: plain.value,
+        source: 'owner',
+        speech: both(plain.en, plain.sw),
+      }, profile, 'pay');
+    }
+    return noData(profile, `pay.${kind}`, 'pay');
+  }
   if (kind === 'bank' || kind === 'card') {
     return notFoundInList(profile, `pay.${kind}`, null, 'pay');
   }

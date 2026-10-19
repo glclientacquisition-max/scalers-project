@@ -70,6 +70,7 @@ import { UNKNOWN_ANSWER_DEFAULT_EN } from "@/lib/unknownAnswerSpoken";
 import { deskAssistantSayPage, factSaveIsConfirm } from "@/lib/deskFeatureFlags";
 import { HomeGetReadyCallsCard } from "@/components/HomeGetReadyCallsCard";
 import { loadReadyChecklist } from "@/lib/assistantSayVoice.server";
+import { memberCan } from "@/lib/requireMember";
 
 export default function HomeOverviewPage() {
   return (
@@ -100,6 +101,7 @@ async function HomeOverviewBody() {
 
   const saveIsConfirm = factSaveIsConfirm();
   const assistantSayPage = deskAssistantSayPage();
+  const canEditSettings = await memberCan("settings.edit");
   const readyChecklist = assistantSayPage ? await loadReadyChecklist(tenant) : null;
   const overviewChecks = dataChecksFor(tenant, {
     saveIsConfirm,
@@ -452,10 +454,14 @@ async function HomeOverviewBody() {
           />
         </RoleGate>
         {assistantSayPage && readyChecklist && !readyChecklist.allDone ? (
-          <HomeGetReadyCallsCard items={readyChecklist.items} checks={overviewChecks} />
+          <HomeGetReadyCallsCard
+            items={readyChecklist.items}
+            checks={overviewChecks}
+            canEdit={canEditSettings}
+          />
         ) : null}
         {!assistantSayPage && overviewChecks.length ? (
-          <OverviewDataChecksCard checks={overviewChecks} />
+          <OverviewDataChecksCard checks={overviewChecks} canEdit={canEditSettings} />
         ) : null}
         {insights ? (
           <CallInsights insights={insights} />

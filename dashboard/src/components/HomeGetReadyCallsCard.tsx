@@ -43,7 +43,8 @@ export function HomeGetReadyCallsCard({
   function openConfirm(item: ReadyChecklistItem) {
     const check = confirmCheckForReadyItem(item, checks);
     if (!check || !canEdit) return;
-    setOpen(openSheetFromCheck(check));
+    const sheet = openSheetFromCheck(check);
+    if (sheet) setOpen(sheet);
   }
 
   return (
@@ -128,7 +129,12 @@ export function HomeGetReadyCallsCard({
         </p>
       </SettingsGroup>
 
-      <OverviewCheckSheetHost open={open} onClose={() => setOpen(null)} onSaved={() => finish()} />
+      <OverviewCheckSheetHost
+        open={open}
+        onClose={() => setOpen(null)}
+        onSaved={() => finish()}
+        canEdit={canEdit}
+      />
     </>
   );
 }

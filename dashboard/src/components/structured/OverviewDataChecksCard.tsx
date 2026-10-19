@@ -9,7 +9,6 @@ import { deskShiftClass } from "@/components/ui/deskChrome";
 import type { PriceToConfirm } from "@/components/structured/PriceConfirmCards";
 import type { Payments } from "@/lib/payments";
 import type { HoursSchedule } from "@/lib/hoursSchedule";
-import type { ServiceAreas } from "@/lib/serviceAreas";
 import { checkKey } from "@/lib/overviewDataChecks";
 import {
   OverviewCheckSheetHost,
@@ -40,14 +39,6 @@ export type OverviewDataCheck =
       label: string;
       detail: string;
       schedule: HoursSchedule;
-    }
-  | {
-      kind: "areas";
-      href: string;
-      label: string;
-      detail: string;
-      areas: ServiceAreas;
-      vertical: string | null;
     };
 
 /** Overview: owner "Is this right?" checks open a sheet and save on the same paths as Settings. */
@@ -72,7 +63,8 @@ export function OverviewDataChecksCard({
   function openCheck(c: OverviewDataCheck) {
     if (c.kind === "link") return;
     if (!canEdit) return;
-    setOpen(openSheetFromCheck(c));
+    const sheet = openSheetFromCheck(c);
+    if (sheet) setOpen(sheet);
   }
 
   function finish(key: string) {
@@ -110,7 +102,12 @@ export function OverviewDataChecksCard({
         })}
       </SettingsGroup>
 
-      <OverviewCheckSheetHost open={open} onClose={() => setOpen(null)} onSaved={finish} />
+      <OverviewCheckSheetHost
+        open={open}
+        onClose={() => setOpen(null)}
+        onSaved={finish}
+        canEdit={canEdit}
+      />
     </>
   );
 }

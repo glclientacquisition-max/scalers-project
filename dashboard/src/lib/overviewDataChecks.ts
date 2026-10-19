@@ -10,7 +10,6 @@ export function checkKey(c: OverviewDataCheck): string {
   if (c.kind === "link") return `link:${c.href}`;
   if (c.kind === "prices") return `prices:${c.items.map((i) => `${i.kind}:${i.id || i.name}`).join(",")}`;
   if (c.kind === "hours") return "hours";
-  if (c.kind === "areas") return "areas";
   return "payments";
 }
 
@@ -22,7 +21,6 @@ export function confirmCheckForItem(
   if (itemId === "catalog") return checks.find((c) => c.kind === "prices") ?? null;
   if (itemId === "payment") return checks.find((c) => c.kind === "payments") ?? null;
   if (itemId === "hours") return checks.find((c) => c.kind === "hours") ?? null;
-  if (itemId === "delivery") return checks.find((c) => c.kind === "areas") ?? null;
   return null;
 }
 
