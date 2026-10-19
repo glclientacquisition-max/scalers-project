@@ -2,7 +2,7 @@
 -- Apply after invoice_pay_checkout_review.sql (P14). Staging only until Alvin's GO.
 -- Does not replace finalize_invoice. Does not edit P1-P14.
 -- Production (fjxcdccgyhnvnnlnovcl) does not have this file.
--- Do not re-run P9 after P15.
+-- Do not re-run P5, P9, P11, P12, or P14 after P15.
 --
 -- Three corrections on top of P14:
 --   * ch_<checkout id> is kept. With no real receipt or charge id, a GET
