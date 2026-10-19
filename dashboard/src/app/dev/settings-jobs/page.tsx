@@ -6,7 +6,7 @@ import { emptyCallSetup } from "@/lib/callSetupStore";
 import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
 import { DeskPhonePull } from "@/components/PhonePullSurface";
 import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
-import { defaultHoursSchedule } from "@/lib/hoursSchedule";
+import { devChapterOneTenant } from "@/lib/devChapterOneTenant";
 import {
   SETTINGS_NAV,
   parseBusinessSettingsPanel,
@@ -15,42 +15,25 @@ import {
 import { settingsIndexStatuses } from "@/lib/settingsOptionStatus";
 import type { TenantRow } from "@/lib/supabase";
 import { parsePaymentsText } from "@/lib/payments";
+import { assistantSayStateFromTenant } from "@/lib/assistantSayVoice.server";
+import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
 
 /**
  * Settings job list and rail. DASHBOARD_OPEN=true only.
  * Phone: /dev/settings-jobs. Wide rail: ?tab=train&panel=hours.
  */
+export const instant = false;
+
 const tenant = {
-  id: "dev-settings-jobs",
-  business_name: "Chapter One",
-  sautikit_virtual_number: "+254700000000",
-  whatsapp_notification_number: "+254700000000",
-  alert_email: "",
-  notify_channels: { sms: true, whatsapp: true, email: false },
-  llm_system_prompt: "Chapter One answers the phone.",
-  services_offered: "Prints",
-  services_catalog: [{ name: "A4 print", price_range: "20", notes: "", out_of_scope: "" }],
-  product_catalog: [],
-  business_hours: "Mon to Sat, 8 to 6",
-  hours_schedule: defaultHoursSchedule("Westlands"),
-  agent_name: "Aisha",
-  agent_tone: "warm",
-  soniox_voice_id: "7b197f3c-84b4-4404-986f-114e4dac1432",
-  vertical: "retail",
-  team_directory: [{ name: "Amina", role: "Desk", phone: "+254700000001" }],
+  ...devChapterOneTenant,
   faqs: [
     { question: "Do you print on Sundays?", answer: "Yes, from 10 to 2. Bigger jobs are ready on Monday." },
-    { question: "Can I pay by M-Pesa?", answer: "Yes. Use the till number on the counter, then show the message to the cashier before you collect your prints. We also take cash and card for orders over KSh 1,000, and we can send an invoice to your company if you print with us every month." },
+    {
+      question: "Can I pay by M-Pesa?",
+      answer:
+        "Yes. Use the till number on the counter, then show the message to the cashier before you collect your prints. We also take cash and card for orders over KSh 1,000, and we can send an invoice to your company if you print with us every month.",
+    },
   ],
-  business_locations: [{ label: "Westlands", address: "Opposite Naivas" }],
-  // Old free text plus payments read from it (unconfirmed), as an owner upgrading sees it.
-  business_policies: {
-    payment: "M-Pesa till 123456 or cash on delivery",
-    payments: parsePaymentsText("M-Pesa till 123456 or cash on delivery"),
-    returns: "Unused within 7 days with receipt",
-    extra: { "Minimum order": "KSh 500" },
-  },
-  is_active: true,
 } as TenantRow;
 
 const homeTenant = {
@@ -113,6 +96,9 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
     test_from: "+254722000111",
     test_started_at: new Date(now - 2 * 86_400_000 - 120_000).toISOString(),
   };
+  const assistantSaySlot =
+    tab === "assistant-say" ? <AssistantSayPanel state={assistantSayStateFromTenant(t)} /> : null;
+
   const callsSlot =
     tab === "calls" ? (
       <CallsForwardingPanel
@@ -148,6 +134,8 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             trainPanel={trainPanel}
             curatedVoices={curatedVoices}
             callsSlot={callsSlot}
+            assistantSaySlot={assistantSaySlot}
+            assistantSayPage
             optionStatus={settingsIndexStatuses(
               t,
               curatedVoices,

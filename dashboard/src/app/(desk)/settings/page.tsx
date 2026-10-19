@@ -1,4 +1,7 @@
 import { memberCan } from "@/lib/requireMember";
+
+/** Voice lookup on assistant-say uses runtime clock; opt out of static prerender. */
+export const instant = false;
 import { structuredSettingsSlots } from "@/components/structured/StructuredSettingsSlots";
 import { readBusinessType } from "@/lib/structuredServer";
 import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
@@ -27,6 +30,9 @@ import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
 import { DeskPageGate } from "@/components/DeskPageGate";
+import { deskAssistantSayPage } from "@/lib/deskFeatureFlags";
+import { loadAssistantSayState } from "@/lib/assistantSayVoice.server";
+import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
 import { CallsForwardingPanel } from "@/components/CallsForwardingPanel";
 import { loadCallSetupState } from "@/lib/callSetupServer";
 import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
@@ -68,6 +74,8 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   const planRowPromise = loadPlanRowStatus(tenant.id);
   const tab = parseBusinessSettingsTab(tabRaw, panelRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
+  const assistantSayPage = deskAssistantSayPage();
+  if (tab === "assistant-say" && !assistantSayPage) redirect("/settings");
   const needsVoices = tab === "test" || (tab === "train" && trainPanel === "tools");
 
   let curatedVoices: CuratedSonioxVoice[] = [];
@@ -115,6 +123,12 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     });
   }
 
+  let assistantSaySlot = null;
+  if (tab === "assistant-say" && assistantSayPage) {
+    const state = await loadAssistantSayState(tenant);
+    assistantSaySlot = <AssistantSayPanel state={state} />;
+  }
+
   let callsSlot = null;
   if (tab === "calls") {
     const number = toLocal07(tenant.sautikit_virtual_number);
@@ -157,6 +171,8 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
       }
       structuredSlot={structuredSlot}
       callsSlot={callsSlot}
+      assistantSaySlot={assistantSaySlot}
+      assistantSayPage={assistantSayPage}
     />
   );
 }

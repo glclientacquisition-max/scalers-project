@@ -73,6 +73,8 @@ export function BusinessSettingsShell({
   seatNoteSlot = null,
   structuredSlot = null,
   callsSlot = null,
+  assistantSaySlot = null,
+  assistantSayPage = false,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
@@ -86,6 +88,8 @@ export function BusinessSettingsShell({
   structuredSlot?: Partial<Record<"identity" | "catalog", ReactNode>> | null;
   /** Calls & forwarding (server-built: reads tenants.call_setup and the calls table). */
   callsSlot?: ReactNode;
+  assistantSaySlot?: ReactNode;
+  assistantSayPage?: boolean;
 }) {
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
@@ -116,7 +120,12 @@ export function BusinessSettingsShell({
   ].join(":");
 
   const rail = (
-    <SettingsRail tab={tab} trainPanel={trainPanel} optionStatus={optionStatus} />
+    <SettingsRail
+      tab={tab}
+      trainPanel={trainPanel}
+      optionStatus={optionStatus}
+      assistantSayPage={assistantSayPage}
+    />
   );
 
   if (isMenu) {
@@ -138,6 +147,7 @@ export function BusinessSettingsShell({
               trainPanel={trainPanel}
               variant="index"
               optionStatus={optionStatus}
+              assistantSayPage={assistantSayPage}
             />
           </div>
         </div>
@@ -179,6 +189,7 @@ export function BusinessSettingsShell({
                   title={heading}
                 />
                 {tab === "calls" ? callsSlot : null}
+                {tab === "assistant-say" ? assistantSaySlot : null}
                 {tab === "import" || tab === "test" ? (
                   <SettingsPanelBody
                     tab={tab}
