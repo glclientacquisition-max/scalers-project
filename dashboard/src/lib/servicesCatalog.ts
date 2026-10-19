@@ -1,3 +1,4 @@
+import { hydrateCatalogPriceFields, structureImportedCatalogRow } from "./catalogPricingMode";
 import { isAskPriceWording } from "./catalogValidation";
 import { parsePriceText, sanitizePricing, type StructuredPrice } from "./structuredData";
 import { stableRowId } from "@/lib/factHash";
@@ -12,8 +13,11 @@ export type ServiceItem = {
   /** yes | no | unknown | "" (unset) */
   in_stock: string;
   category: string;
-  /** fixed | from | range | ask, or another owner-set mode. */
+  /** fixed | from | range | quote (legacy ask maps to quote). */
   pricing_mode?: string;
+  /** Low amount (KSh) when structured; display stays in price_range. */
+  price?: string;
+  price_max?: number | null;
   /** Required for a Home catalog row to count. Absent does not count. */
   site_visit_required?: boolean;
   /** owner | seed | import | inferred | call_suggested */
@@ -90,7 +94,13 @@ export function normalizeServicesCatalog(raw: unknown): ServiceItem[] {
       if (status === "golden" || status === "confirmed" || status === "suggested") {
         item.status = source === "seed" || source === "call_suggested" ? "suggested" : status;
       }
-      return item;
+      const amount = r.price ?? r.price_amount;
+      if (amount !== undefined && amount !== null && String(amount).trim() !== "") {
+        item.price = String(amount).trim().slice(0, 20);
+      }
+      const pmax = r.price_max ?? r.priceMax;
+      if (pmax !== undefined && pmax !== null && pmax !== "") item.price_max = Number(pmax);
+      return hydrateCatalogPriceFields(item);
     })
     .filter(
       (row) =>
@@ -290,5 +300,6 @@ export function parseBulkServices(raw: string): ServiceItem[] {
     .map((line) => line.trim())
     .filter((line) => line && !/^services?\s*:?$/i.test(line))
     .map(parseBulkServiceLine)
-    .filter((row): row is ServiceItem => Boolean(row?.name));
+    .filter((row): row is ServiceItem => Boolean(row?.name))
+    .map((row) => structureImportedCatalogRow(row, "price_range"));
 }

@@ -8,10 +8,10 @@ import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
-import {
-  compileReceptionistPrompt,
-  parseAgentTone,
-} from "@/lib/promptCompiler";
+import { compileReceptionistPrompt, parseAgentTone } from "@/lib/promptCompiler";
+import { ownerUnknownAnswer, resolveUnknownAnswerSpoken } from "@/lib/unknownAnswerSpoken";
+import { generateUnknownAnswerSpoken } from "@/lib/unknownAnswerSpokenModel";
+import { withoutUnknownSpokenColumn } from "@/lib/peelMissingColumns";
 import { DEFAULT_AGENT_TONE } from "@/lib/onboarding";
 import {
   formatServicesForCompiler,
@@ -390,7 +390,14 @@ export async function applyIngestAction(
   const businessName = nameSuggestion || tenant.business_name;
 
   const agentTools = parseAgentTools(tenant.agent_tools);
-  const { prompt, source } = await compileReceptionistPrompt({
+  const unknownLine = ownerUnknownAnswer(merged.unknownAnswerFallback);
+  const spokenPromise = resolveUnknownAnswerSpoken({
+    fallback: unknownLine,
+    stored: tenant.unknown_answer_spoken,
+    generate: generateUnknownAnswerSpoken,
+  });
+  const [{ prompt, source }, unknownAnswerSpoken] = await Promise.all([
+    compileReceptionistPrompt({
     businessName,
     servicesOffered,
     businessHours,
@@ -398,19 +405,22 @@ export async function applyIngestAction(
     agentName,
     teamDirectory: merged.team,
     faqs: merged.faqs,
-    unknownAnswerFallback: merged.unknownAnswerFallback,
+    unknownAnswerFallback: unknownLine,
     escalateEnabled: agentTools.escalate,
     vertical,
     handoffMode,
     locationsText,
     policiesText,
-  });
+  }),
+    spokenPromise,
+  ]);
 
   const workspace = await createWorkspaceDataClient();
   if (!workspace) return { error: "Not signed in." };
 
   const patch: Record<string, unknown> = {
-    unknown_answer_fallback: merged.unknownAnswerFallback || null,
+    unknown_answer_fallback: unknownLine || null,
+    unknown_answer_spoken: unknownAnswerSpoken,
     llm_system_prompt: prompt,
   };
   if (merged.touched.services) {
@@ -452,10 +462,16 @@ export async function applyIngestAction(
     patch.whatsapp_notification_number = draftPhone.replace(/\s+/g, "");
   }
 
-  const { error } = await workspace.client
+  let { error } = await workspace.client
     .from("tenants")
     .update(patch)
     .eq("id", tenant.id);
+  if (error) {
+    const peeled = withoutUnknownSpokenColumn(error.message, patch);
+    if (peeled) {
+      ({ error } = await workspace.client.from("tenants").update(peeled).eq("id", tenant.id));
+    }
+  }
   bustTenantCache(tenant.id);
 
   if (error) {

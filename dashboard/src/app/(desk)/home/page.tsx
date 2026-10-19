@@ -61,6 +61,7 @@ import { coverageDisplayList } from "@/lib/coverageAreas";
 import { homeMinuteStatus } from "@/lib/usageCap";
 import { createDeskTimer } from "@/lib/deskTiming";
 import { DeskPageGate } from "@/components/DeskPageGate";
+import { UNKNOWN_ANSWER_DEFAULT_EN } from "@/lib/unknownAnswerSpoken";
 
 export default function HomeOverviewPage() {
   return (
@@ -99,7 +100,7 @@ async function HomeOverviewBody() {
     hoursSchedule: tenant.hours_schedule,
     businessLocations: tenant.business_locations,
     faqs: tenant.faqs,
-    unknownAnswerFallback: tenant.unknown_answer_fallback,
+    unknownAnswerFallback: tenant.unknown_answer_fallback || UNKNOWN_ANSWER_DEFAULT_EN,
     whatsappNotificationNumber: tenant.whatsapp_notification_number,
     alertEmail: tenant.alert_email,
     teamDirectory: tenant.team_directory,
