@@ -44,7 +44,7 @@ function run(body) {
     const m = await import(${JSON.stringify(pathToFileURL(sautikitPath).href)});
     ${body}
   `;
-  const ran = spawnSync(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", script], {
+  const ran = spawnSync(process.execPath, ["--experimental-strip-types", "--no-warnings", "--input-type=module", "-e", script], {
     encoding: "utf8",
     env: { ...process.env, NODE_NO_WARNINGS: "1" },
   });
