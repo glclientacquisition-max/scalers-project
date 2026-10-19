@@ -82,6 +82,7 @@ export function isDeskNestedPath(
   if (path === "/contacts/import") return true;
   if (path === "/dev/contacts/file" || path === "/dev/ticket") return true;
   if (/^\/contacts\/[^/]+$/.test(path)) return true;
+  if (path === "/settings/plan" || path === "/settings/billing") return true;
   if (path === "/settings") {
     return isSettingsNestedTab(settingsSearchTab(search));
   }

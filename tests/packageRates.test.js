@@ -49,9 +49,10 @@ describe("package overage math", () => {
     assert.equal(9 / 60, 0.15);
     const prices = read("docs/supabase/package_prices_5_12_25.sql");
     const sql = read("docs/supabase/package_catalog.sql");
-    assert.match(catalog, /monthlyPriceKes: 5000/);
-    assert.match(catalog, /monthlyPriceKes: 12000/);
-    assert.match(catalog, /monthlyPriceKes: 25000/);
+    assert.doesNotMatch(catalog, /monthlyPriceKes:\s*5000/);
+    assert.doesNotMatch(catalog, /monthlyPriceKes:\s*12000/);
+    assert.doesNotMatch(catalog, /monthlyPriceKes:\s*25000/);
+    assert.doesNotMatch(catalog, /strawPublicBoard/);
     assert.match(prices, /when 'starter' then 5000/);
     assert.match(prices, /when 'growth' then 12000/);
     assert.match(prices, /when 'scale' then 25000/);

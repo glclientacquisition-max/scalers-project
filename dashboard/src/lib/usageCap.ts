@@ -21,10 +21,10 @@ export function usageCapNotice(input: {
   if (!minutesOver && !smsOver && !emailOver && !waOver) return null;
   // Extra usage on: nothing stops, the overage is billed.
   if (input.onDemand) {
-    if (minutesOver && smsOver) return "Included minutes and SMS used. Extra usage is billed at the rates on Usage.";
-    if (minutesOver) return "Included minutes used. Extra minutes are billed at the rates on Usage.";
-    if (smsOver) return "Included SMS used. Extra SMS are billed at the rates on Usage.";
-    return "Included alerts used. Extra alerts are billed at the rates on Usage.";
+    if (minutesOver && smsOver) return "Included minutes and SMS used. Extra usage is billed on your next invoice.";
+    if (minutesOver) return "Included minutes used. Extra minutes are billed on your next invoice.";
+    if (smsOver) return "Included SMS used. Extra SMS are billed on your next invoice.";
+    return "Included alerts used. Extra alerts are billed on your next invoice.";
   }
   if (minutesOver && smsOver) {
     return "Included minutes and SMS used. Calls and SMS to callers have stopped.";

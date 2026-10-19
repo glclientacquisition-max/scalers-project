@@ -11,7 +11,6 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Stamp } from "@/components/ui/Stamp";
 import { Switch } from "@/components/ui/Switch";
 import {
-  annualPriceKes,
   inboundKesPerMinute,
   kesPerSecondFromMinute,
   minutesUsedFromSeconds,
@@ -57,8 +56,8 @@ function adminMoney(amount: number) {
   return `KSh ${formatKes(amount)}`;
 }
 
-function skuPreview(pack: BillingPackage, yearKes: number) {
-  return `${adminMoney(pack.monthlyPriceKes)} · Per year ${adminMoney(yearKes)}`;
+function skuPreview(pack: BillingPackage) {
+  return `${adminMoney(pack.monthlyPriceKes)} · Per year ${adminMoney(pack.annualPriceKes)}`;
 }
 
 export function AdminPackagesPanel({
@@ -195,7 +194,7 @@ export function AdminPackagesPanel({
                 <ListRow
                   key={pack.id}
                   title={pack.name}
-                  preview={skuPreview(pack, annualPriceKes(pack.monthlyPriceKes, rates.annualDiscountPercent))}
+                  preview={skuPreview(pack)}
                   when={`${pack.minutes.toLocaleString("en-KE")} min`}
                   stamp={<Stamp tone={pack.isActive ? "live" : "neutral"}>{pack.isActive ? "Live" : "Hidden"}</Stamp>}
                   onOpen={() => openSku(pack.id)}
@@ -425,7 +424,7 @@ export function AdminPackagesPanel({
             <Field
               id="sku-month"
               label="Monthly KSh"
-              hint={`Per year ${adminMoney(annualPriceKes(sku.monthlyPriceKes, rates.annualDiscountPercent))}`}
+              hint={`Per year ${adminMoney(sku.annualPriceKes)}`}
             >
               {(props) => (
                 <Input

@@ -36,7 +36,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
 | `DATABASE_URL` | scripts | `scripts/verify-staging-schema.js` |
-| `DESK_PLAN_CHANGE` | desk | `dashboard/src/lib/ownerBilling.ts` |
+| `DESK_PLAN_CHANGE` | desk | `dashboard/src/lib/deskPlanChange.ts` |
 | `DESK_PUBLIC_URL` | voice | `server.js` |
 | `DOCS_STALE_DAYS` | scripts | `scripts/docs/check-docs.js` |
 | `FACT_HASH_MODE` | desk, scripts, voice | `dashboard/src/lib/tenantFieldProvenance.ts`<br>`scripts/replay-voice-suite.js`<br>`scripts/smoke-mvp-retail.js`<br>+1 more |
@@ -60,10 +60,6 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `GITHUB_STEP_SUMMARY` | scripts | `scripts/stage-pull-request-hold.js` |
 | `HEAD_REF` | scripts | `scripts/stage-pull-request.js` |
 | `HEAD_REPO` | scripts | `scripts/stage-pull-request.js` |
-| `MPESA_CONSUMER_KEY` | desk | `dashboard/src/lib/walletTopUp.ts` |
-| `MPESA_CONSUMER_SECRET` | desk | `dashboard/src/lib/walletTopUp.ts` |
-| `MPESA_PASSKEY` | desk | `dashboard/src/lib/walletTopUp.ts` |
-| `MPESA_SHORTCODE` | desk | `dashboard/src/lib/walletTopUp.ts` |
 | `NEXT_PUBLIC_APP_URL` | voice | `server.js` |
 | `NEXT_PUBLIC_SITE_URL` | desk | `dashboard/src/app/layout.tsx`<br>`dashboard/src/lib/admin-auth.ts` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | desk | `dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
@@ -75,7 +71,6 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `OPS_EMAIL_FROM` | desk | `dashboard/src/lib/opsMail.ts` |
 | `OWNER_ALERT_EMAIL` | voice | `server.js` |
 | `PATH` | scripts | `scripts/smoke-recording-webhook.js` |
-| `PAYSTACK_SECRET_KEY` | desk | `dashboard/src/lib/walletTopUp.ts` |
 | `PLATFORM_WHATSAPP_ACK` | voice | `src/sautikit/whatsappInbound.js` |
 | `PLATFORM_WHATSAPP_PHONE_NUMBER_ID` | voice | `src/notifications/whatsapp.js`<br>`src/sautikit/whatsappInbound.js` |
 | `PORT` | scripts, voice | `scripts/bench-inbound-webhook.js`<br>`scripts/tunnel.js`<br>`server.js` |
@@ -186,7 +181,5 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_TURN_END_CAP_MS` | voice | `src/speech/turnTaking.js` |
 | `WALLET_CHARGING_ENABLED` | voice | `src/db.js` |
 | `WALLET_RATE_KES_PER_MINUTE` | desk, voice | `dashboard/src/lib/wallet.ts`<br>`src/billing/liveTransferLegs.js`<br>`src/db.js` |
-| `WALLET_TOPUP_ENABLED` | desk | `dashboard/src/lib/walletTopUp.ts` |
-| `WALLET_TOPUP_PROVIDER` | desk | `dashboard/src/lib/walletTopUp.ts` |
 | `WALLET_TRANSFER_RATE_KES_PER_MINUTE` | voice | `src/billing/liveTransferLegs.js` |
 | `WHATSAPP_INBOUND_ACK` | voice | `src/sautikit/whatsappInbound.js` |
