@@ -128,7 +128,7 @@ describe("live tenant and reconcile routes", () => {
 
     const vercel = JSON.parse(read("dashboard/vercel.json"));
     assert.deepEqual(vercel.crons, [
-      { path: "/api/cron/billing-payment-retry", schedule: "7,22,37,52 * * * *" },
+      { path: "/api/cron/billing-payment-retry", schedule: "7 3 * * *" },
     ]);
     assert.doesNotMatch(JSON.stringify(vercel), /billing-reconcile/);
 

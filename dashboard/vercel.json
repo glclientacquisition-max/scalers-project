@@ -15,7 +15,7 @@
   "crons": [
     {
       "path": "/api/cron/billing-payment-retry",
-      "schedule": "7,22,37,52 * * * *"
+      "schedule": "7 3 * * *"
     }
   ]
 }

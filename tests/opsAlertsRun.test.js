@@ -412,7 +412,7 @@ describe("ops alert cron", () => {
     assert.equal(opsAlertsDryRun("false"), false);
     const vercel = JSON.parse(fs.readFileSync("dashboard/vercel.json", "utf8"));
     assert.deepEqual(vercel.crons, [
-      { path: "/api/cron/billing-payment-retry", schedule: "7,22,37,52 * * * *" },
+      { path: "/api/cron/billing-payment-retry", schedule: "7 3 * * *" },
     ]);
     assert.doesNotMatch(JSON.stringify(vercel.crons), /ops-alerts|billing-reconcile/);
     const ops = fs.readFileSync("dashboard/src/lib/opsAlerts.ts", "utf8");
