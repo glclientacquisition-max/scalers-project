@@ -126,8 +126,12 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
 
   let assistantSaySlot = null;
   if (tab === "assistant-say" && assistantSayPage) {
-    const state = await loadAssistantSayState(tenant);
-    assistantSaySlot = <AssistantSayPanel state={state} belowList={assistantSayBelowList(tenant)} />;
+    try {
+      const state = await loadAssistantSayState(tenant);
+      assistantSaySlot = <AssistantSayPanel state={state} belowList={assistantSayBelowList(tenant)} />;
+    } catch {
+      assistantSaySlot = <DeskLoadError>Could not load what your Business Assistant will say.</DeskLoadError>;
+    }
   }
 
   let callsSlot = null;

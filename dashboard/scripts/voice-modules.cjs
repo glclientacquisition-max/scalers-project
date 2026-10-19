@@ -13,6 +13,7 @@ const VOICE_ENTRIES = [
   'src/tenantProfile.js',
   'src/knowledge/assistantSayReadiness.js',
   'src/knowledge/lookup.js',
+  'src/knowledge/lookupOwnerReason.js',
 ];
 
 function resolveRel(from, spec) {

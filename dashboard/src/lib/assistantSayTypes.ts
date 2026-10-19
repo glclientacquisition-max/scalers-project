@@ -21,4 +21,6 @@ export type ReadyChecklistItem = {
   label: string;
   href: string;
   complete: boolean;
+  /** Plain-language gap when complete is false. */
+  reason?: string;
 };

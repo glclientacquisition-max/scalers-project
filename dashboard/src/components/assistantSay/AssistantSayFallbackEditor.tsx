@@ -5,8 +5,7 @@ import { saveUnknownAnswerByKindAction } from "@/app/(desk)/settings/assistantSa
 import { Button } from "@/components/ui/Button";
 import { SettingsGroup, SettingsStack, settingsFieldClass } from "@/components/settingsUi";
 import {
-  DEFAULT_BY_KIND,
-  displayLine,
+  spokenFallbackLine,
   FALLBACK_KIND_LABELS,
   FALLBACK_KINDS,
   type UnknownAnswerByKind,
@@ -27,13 +26,15 @@ export function AssistantSayFallbackEditor({ initial, legacyGeneral }: Props) {
   const values = useMemo(() => {
     const out: Record<string, { en: string; sw: string }> = {};
     for (const kind of FALLBACK_KINDS) {
+      const enCustom = byKind?.[kind]?.en?.trim();
+      const swCustom = byKind?.[kind]?.sw?.trim();
       out[kind] = {
-        en: byKind?.[kind]?.en || DEFAULT_BY_KIND[kind].en,
-        sw: byKind?.[kind]?.sw || DEFAULT_BY_KIND[kind].sw,
+        en: enCustom || spokenFallbackLine(kind, byKind, "en", legacyGeneral),
+        sw: swCustom || spokenFallbackLine(kind, byKind, "sw", legacyGeneral),
       };
     }
     return out;
-  }, [byKind]);
+  }, [byKind, legacyGeneral]);
 
   function onSave(formData: FormData) {
     startTransition(async () => {
@@ -97,7 +98,10 @@ export function AssistantSayFallbackEditor({ initial, legacyGeneral }: Props) {
               />
             </SettingsStack>
             <p className="mt-1 text-meta text-ink-3">
-              Callers hear: {displayLine(kind, byKind, "en", legacyGeneral)}
+              Callers hear: {spokenFallbackLine(kind, byKind, "en", legacyGeneral)}
+            </p>
+            <p className="mt-1 text-meta text-ink-3" lang="sw">
+              Wanasikia: {spokenFallbackLine(kind, byKind, "sw", legacyGeneral)}
             </p>
           </div>
         ))}

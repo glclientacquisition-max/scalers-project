@@ -40,5 +40,16 @@ export async function loadReadyChecklist(tenant: TenantRow) {
   const { getReadyChecklist } = requireVoice("./src/knowledge/assistantSayReadiness.js") as {
     getReadyChecklist: (profile: unknown) => { items: ReadyChecklistItem[]; allDone: boolean };
   };
-  return getReadyChecklist(voiceProfileFromTenant(tenant));
+  const profile = await voiceProfileForAssistantSay(tenant);
+  return getReadyChecklist(profile);
+}
+
+export type LookupPreviewSamples = { price: string; hours: string; delivery: string; pay: string };
+
+/** Preview sample questions from this tenant's own catalogue and areas (same as the readiness probes). */
+export function lookupPreviewSamples(tenant: TenantRow): LookupPreviewSamples {
+  const { previewSampleQuestions } = requireVoice("./src/knowledge/assistantSayReadiness.js") as {
+    previewSampleQuestions: (profile: unknown) => LookupPreviewSamples;
+  };
+  return previewSampleQuestions(voiceProfileFromTenant(tenant));
 }

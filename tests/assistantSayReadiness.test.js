@@ -6,8 +6,34 @@ const path = require('node:path');
 const { createRequire } = require('node:module');
 
 const requireRoot = createRequire(path.join(__dirname, '..', 'package.json'));
-const { evaluateAssistantSay, getReadyChecklist } = requireRoot('./src/knowledge/assistantSayReadiness.js');
+const {
+  evaluateAssistantSay,
+  getReadyChecklist,
+  lookupProbeForRowId,
+  readinessQuestions,
+  previewSampleQuestions,
+} = requireRoot('./src/knowledge/assistantSayReadiness.js');
+const fs = require('node:fs');
 const { tenantProfileFromRow } = requireRoot('./src/tenantProfile.js');
+const { profiles } = requireRoot('./evals/replay/profiles.js');
+
+const FIXTURE_NOW = new Date('2026-10-19T05:00:00.000Z');
+
+function profileFromReplay(key) {
+  const p = profiles()[key];
+  return tenantProfileFromRow(
+    {
+      id: `replay-${key}`,
+      business_name: p.businessName,
+      services_catalog: p.servicesCatalog,
+      hours_schedule: p.hoursSchedule,
+      service_areas: p.service_areas,
+      business_policies: p.businessPolicies || {},
+      unknown_answer_fallback: p.unknownAnswerFallback,
+    },
+    { fieldMeta: { hashMode: true }, holdGate: {} }
+  );
+}
 
 /** Mirrors dashboard dev/settings-jobs retail tenant (Chapter One). */
 const devRetailTenant = {
@@ -59,6 +85,60 @@ describe('assistantSayReadiness', () => {
     assert.equal(hoursItem.complete, rowWillSay(say, 'hours'));
     assert.equal(payItem.complete, rowWillSay(say, 'payment'));
     assert.equal(catalogItem.complete, rowWillSay(say, 'prices'));
+    if (!hoursItem.complete) assert.ok(hoursItem.reason);
+    if (!payItem.complete) assert.ok(payItem.reason);
+    assert.equal(hoursItem.complete, rowWillSay(say, 'hours'));
+  });
+
+  it('checklist complete flags match assistant-say rows when compile provenance is present', () => {
+    const profile = tenantProfileFromRow(devRetailTenant, {
+      fieldMeta: { hashMode: true },
+      holdGate: {},
+    });
+    const say = evaluateAssistantSay(profile);
+    const checklist = getReadyChecklist(profile);
+    for (const item of checklist.items) {
+      if (item.id === 'identity') {
+        assert.equal(item.complete, Boolean(devRetailTenant.business_name?.trim()));
+        continue;
+      }
+      const rowId = item.id === 'catalog' ? 'prices' : item.id === 'payment' ? 'payment' : item.id;
+      const row = say.rows.find((r) => r.id === rowId);
+      assert.ok(row, rowId);
+      assert.equal(item.complete, row.willSay);
+      if (!item.complete) assert.equal(item.reason, row.reason);
+    }
+  });
+
+  it('each readiness row matches the same lookup probe voice uses', () => {
+    for (const key of ['carry', 'list']) {
+      const profile = profileFromReplay(key);
+      const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
+      for (const id of ['prices', 'hours', 'delivery', 'payment']) {
+        const row = say.rows.find((r) => r.id === id);
+        const result = lookupProbeForRowId(id, profile, FIXTURE_NOW);
+        assert.ok(row, `${key}/${id}`);
+        assert.equal(row.willSay, result.status === 'found', `${key}/${id}`);
+      }
+    }
+  });
+
+  it('catalogue marks prices ready when a catalogue item lookup is found', () => {
+    const p = profiles().carry;
+    const profile = tenantProfileFromRow(
+      {
+        id: 'replay-carry-open',
+        business_name: p.businessName,
+        services_catalog: p.servicesCatalog,
+        hours_schedule: p.hoursSchedule,
+        service_areas: p.service_areas,
+      },
+      {}
+    );
+    const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
+    const prices = say.rows.find((r) => r.id === 'prices');
+    assert.equal(prices.willSay, true);
+    assert.match(prices.reason, /Ready on the next call/);
   });
 
   it('when unsure uses neutral stamp labels, not Will say / Wont say', () => {
@@ -75,5 +155,111 @@ describe('assistantSayReadiness', () => {
     const defaultUnsure = defaultSay.rows.find((r) => r.id === 'unsure');
     assert.equal(defaultUnsure.stampLabel, 'Using team default');
     assert.equal(defaultUnsure.stampTone, 'neutral');
+  });
+
+  // Probes must come from THIS tenant's data. A fixed "How much is sofa cleaning?"
+  // (a Jirani item) or "Kilimani" probe is wrong for every other business.
+  it('price and delivery probes come only from the tenant catalogue and areas', () => {
+    const retail = tenantProfileFromRow({
+      ...devRetailTenant,
+      product_catalog: [{ name: 'Fast charger 20W', price_range: '650' }],
+      service_areas: { version: 1, areas: [{ id: 'place:westlands', name: 'Westlands', fee_mode: 'fixed', fee_ksh: 200, source: 'owner' }] },
+    }, {});
+    const q = readinessQuestions(retail);
+    assert.deepEqual(q.price, ['How much is A4 print?', 'How much is Fast charger 20W?']);
+    assert.deepEqual(q.fee, ['Do you deliver to Westlands?']);
+    assert.deepEqual(q.hours, ['What are your opening hours?']);
+    assert.deepEqual(q.pay, ['What is your till number?']);
+    const all = JSON.stringify(q).toLowerCase();
+    for (const foreign of ['sofa', 'kilimani', 'carpet']) assert.ok(!all.includes(foreign), foreign);
+  });
+
+  it('id-only areas are asked by their place name, as voice resolves them', () => {
+    const profile = tenantProfileFromRow({
+      business_name: 'Area Co',
+      service_areas: { version: 1, areas: [{ id: 'place:westlands', fee_mode: 'fixed', fee_ksh: 350, source: 'owner' }] },
+    }, {});
+    assert.deepEqual(readinessQuestions(profile).fee, ['Do you deliver to Westlands?']);
+    assert.equal(previewSampleQuestions(profile).delivery, 'Do you deliver to Westlands?');
+    const row = evaluateAssistantSay(profile, { now: FIXTURE_NOW }).rows.find((r) => r.id === 'delivery');
+    assert.equal(row.willSay, lookupProbeForRowId('delivery', profile, FIXTURE_NOW).status === 'found');
+  });
+
+  it('a tenant with no catalogue or areas gets no price or delivery question', () => {
+    const empty = tenantProfileFromRow({ business_name: 'Empty Co', services_catalog: [], product_catalog: [] }, {});
+    const q = readinessQuestions(empty);
+    assert.deepEqual(q.price, []);
+    assert.deepEqual(q.fee, []);
+    const say = evaluateAssistantSay(empty, { now: FIXTURE_NOW });
+    assert.equal(say.rows.find((r) => r.id === 'prices').willSay, false);
+    assert.equal(say.rows.find((r) => r.id === 'delivery').willSay, false);
+    assert.deepEqual(previewSampleQuestions(empty), {
+      price: '',
+      hours: 'What are your opening hours?',
+      delivery: '',
+      pay: 'What is your till number?',
+    });
+  });
+
+  it('a product-only catalogue is probed (retail without services)', () => {
+    const profile = tenantProfileFromRow({
+      business_name: 'Gadget Shop',
+      services_catalog: [],
+      product_catalog: [{ name: 'Fast charger 20W', price_range: '650', source: 'owner' }],
+    }, {});
+    assert.deepEqual(readinessQuestions(profile).price, ['How much is Fast charger 20W?']);
+    const row = evaluateAssistantSay(profile, { now: FIXTURE_NOW }).rows.find((r) => r.id === 'prices');
+    const probe = lookupProbeForRowId('prices', profile, FIXTURE_NOW);
+    assert.equal(row.willSay, probe.status === 'found');
+  });
+
+  it('preview samples match readiness row verdict for price and delivery', () => {
+    const { lookup } = requireRoot('./src/knowledge/lookup.js');
+    for (const key of ['carry', 'list']) {
+      const profile = profileFromReplay(key);
+      const samples = previewSampleQuestions(profile, { now: FIXTURE_NOW });
+      const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
+      const pricesRow = say.rows.find((r) => r.id === 'prices');
+      const deliveryRow = say.rows.find((r) => r.id === 'delivery');
+      const c = { profile, language: 'en', now: FIXTURE_NOW, seed: 0 };
+      if (samples.price) {
+        const priceHit = lookup('price', samples.price, c);
+        assert.equal(priceHit.status === 'found', pricesRow.willSay, `${key} price preview`);
+      }
+      if (samples.delivery) {
+        const feeHit = lookup('fee', samples.delivery, c);
+        assert.equal(feeHit.status === 'found', deliveryRow.willSay, `${key} delivery preview`);
+      }
+      assert.equal(samples.hours, readinessQuestions(profile).hours[0], key);
+      assert.equal(samples.pay, readinessQuestions(profile).pay[0], key);
+    }
+  });
+
+  it('Jirani preview default price question is found when the prices row is Will say', () => {
+    const fixture = JSON.parse(
+      fs.readFileSync(path.join(__dirname, 'fixtures/tenants/jirani-staging.json'), 'utf8')
+    );
+    const profile = tenantProfileFromRow(fixture.tenant, {});
+    const { lookup } = requireRoot('./src/knowledge/lookup.js');
+    const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
+    const pricesRow = say.rows.find((r) => r.id === 'prices');
+    const sample = previewSampleQuestions(profile, { now: FIXTURE_NOW }).price;
+    assert.ok(sample);
+    const hit = lookup('price', sample, { profile, language: 'en', now: FIXTURE_NOW, seed: 0 });
+    assert.equal(hit.status === 'found', pricesRow.willSay);
+  });
+
+  it('no tenant item or place is hard-coded in the probes or the Desk preview', () => {
+    const root = path.join(__dirname, '..');
+    const sources = [
+      'src/knowledge/assistantSayReadiness.js',
+      'dashboard/src/components/assistantSay/AssistantSayLookupPreview.tsx',
+    ];
+    for (const rel of sources) {
+      const text = fs.readFileSync(path.join(root, rel), 'utf8');
+      assert.ok(!/How much is [A-Za-z]/.test(text.replace(/How much is \$\{/g, '')), `${rel}: literal price question`);
+      assert.ok(!/deliver to [A-Z]/.test(text), `${rel}: literal place`);
+      assert.ok(!/sofa|kilimani/i.test(text), `${rel}: tenant-specific sample`);
+    }
   });
 });

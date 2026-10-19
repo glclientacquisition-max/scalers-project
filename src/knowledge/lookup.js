@@ -247,6 +247,127 @@ function scoreLabel(text, label) {
   return hits / words.length;
 }
 
+const LABEL_GENERIC = new Set([
+  'the', 'and', 'for', 'with', 'from', 'your', 'our', 'how', 'much', 'is', 'what', 'price', 'bei', 'ya', 'ni',
+  'cleaning', 'clean', 'service', 'services', 'internal',
+]);
+// NOT generic: 'deep', 'standard' and similar tier words are what tell sibling
+// rows apart ("Deep clean, 2 bedroom" vs "Standard clean, 2 bedroom").
+const EN_NUM_WORD = { one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9' };
+// Bare counting forms plus the noun-class forms callers actually say with a noun:
+// "chumba kimoja", "vyumba viwili/vitatu", "watu wawili", "magari mawili".
+const SW_NUM_WORD = {
+  moja: '1', kimoja: '1', mmoja: '1', limoja: '1',
+  mbili: '2', viwili: '2', wawili: '2', mawili: '2',
+  tatu: '3', vitatu: '3', watatu: '3', matatu: '3',
+  nne: '4', vinne: '4', wanne: '4', manne: '4',
+  tano: '5', vitano: '5', watano: '5', matano: '5',
+  sita: '6', saba: '7', nane: '8', tisa: '9',
+};
+
+function normalizeCatalogueText(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Tokens for catalogue name matching: keep numeric qualifiers and distinctive words. */
+function catalogueMatchTokens(text) {
+  const words = normalizeCatalogueText(text).split(/\s+/).filter(Boolean);
+  const tokens = new Set();
+  for (const w of words) {
+    if (/^\d+$/.test(w)) {
+      tokens.add(w);
+      continue;
+    }
+    const en = EN_NUM_WORD[w];
+    const sw = SW_NUM_WORD[w];
+    if (en) {
+      tokens.add(en);
+      continue;
+    }
+    if (sw) {
+      tokens.add(sw);
+      continue;
+    }
+    if (w.length >= 2 && !LABEL_GENERIC.has(w)) tokens.add(w);
+  }
+  return tokens;
+}
+
+function numericTokens(tokens) {
+  return new Set([...tokens].filter((t) => /^\d+$/.test(t)));
+}
+
+/**
+ * True when the question names a different number than this row, or names another
+ * row's word while missing one of this row's own words. A row the question names in
+ * full is never contradicted ("mattress and sofa" still asks which one).
+ */
+function contradictsLabel(qTokens, lTokens, vocab) {
+  const qNums = numericTokens(qTokens);
+  const lNums = numericTokens(lTokens);
+  if (qNums.size && lNums.size && ![...qNums].some((n) => lNums.has(n))) return true;
+  if (!vocab) return false;
+  const namedInFull = [...lTokens].every((t) => qTokens.has(t));
+  if (namedInFull) return false;
+  for (const t of qTokens) if (vocab.has(t) && !lTokens.has(t)) return true;
+  return false;
+}
+
+function catalogueVocab(facts) {
+  const vocab = new Set();
+  for (const f of facts) for (const t of catalogueMatchTokens(f.label)) vocab.add(t);
+  return vocab;
+}
+
+/**
+ * Score how well a caller question names a catalogue row. Full normalized names
+ * and bedroom/number qualifiers beat shared prefixes like "deep clean".
+ *
+ * A row is ruled out (0) when the question contradicts it:
+ * - the question has a number and the row has a different one ("2 bedroom" never
+ *   matches "1 bedroom");
+ * - the question has a word that names another row but not this one ("standard"
+ *   rules out "Deep clean, 2 bedroom").
+ * `vocab` is the union of all rows' match tokens.
+ */
+function scoreCatalogueLabel(query, label, vocab = null) {
+  const qNorm = normalizeCatalogueText(query);
+  const lNorm = normalizeCatalogueText(label);
+  if (!lNorm) return 0;
+  if (qNorm === lNorm) return 2;
+  const qTokens = catalogueMatchTokens(query);
+  const lTokens = catalogueMatchTokens(label);
+  if (!lTokens.size) return 0;
+  if (contradictsLabel(qTokens, lTokens, vocab)) return 0;
+  if (qNorm.includes(lNorm)) return 1.5;
+  let hits = 0;
+  for (const t of lTokens) if (qTokens.has(t)) hits += 1;
+  return hits / lTokens.size;
+}
+
+/** Below this a row is not "named" by the question; the legacy scorer decides. */
+const CATALOGUE_MATCH_MIN = 0.5;
+
+function pickPriceFactByLabel(query, facts) {
+  const vocab = catalogueVocab(facts);
+  const scored = facts
+    .map((f) => ({ f, score: scoreCatalogueLabel(query, f.label, vocab) }))
+    .filter((row) => row.score >= CATALOGUE_MATCH_MIN)
+    .sort((a, b) => b.score - a.score);
+  if (!scored.length) return { kind: 'none' };
+  const top = scored[0].score;
+  const winners = scored.filter((row) => row.score === top);
+  if (winners.length === 1) return { kind: 'one', fact: winners[0].f };
+  if (scored.length > winners.length && top - scored[winners.length].score >= 0.2) {
+    return { kind: 'one', fact: winners[0].f };
+  }
+  return { kind: 'ambiguous', facts: winners.map((row) => row.f) };
+}
+
 function catalogueEntries(profile) {
   return [
     ...asArray(profile?.servicesCatalog).map((row, index) => ({ row, index, kind: 'service' })),
@@ -278,18 +399,13 @@ function priceReading(profile, entry, row) {
 function lookupPrice(query, ctx, sheet) {
   const profile = ctx.profile || {};
   const facts = [...sheet.facts.values()].filter((f) => f.kind === 'price');
-  const scored = facts
-    .map((f) => ({ f, score: scoreLabel(query, f.label) }))
-    .filter((row) => row.score >= 0.5)
-    .sort((a, b) => b.score - a.score);
-  if (!scored.length) {
-    return catalogueEntries(profile).length || facts.length
-      ? notFoundInList(profile, 'price', priceOptOut(profile, query), 'price')
-      : noData(profile, 'price', 'price');
-  }
-  const top = scored.filter((row) => row.score === scored[0].score);
-  if (top.length > 1) {
-    const names = top.slice(0, 3).map((row) => row.f.label);
+  const q = String(query || '');
+  const byLabel = pickPriceFactByLabel(q, facts);
+  let fact = null;
+  if (byLabel.kind === 'one') {
+    fact = byLabel.fact;
+  } else if (byLabel.kind === 'ambiguous') {
+    const names = byLabel.facts.slice(0, 3).map((f) => f.label);
     const en = names.length === 2
       ? `Which one, ${names[0]} or ${names[1]}?`
       : `Which one, ${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}?`;
@@ -301,8 +417,43 @@ function lookupPrice(query, ctx, sheet) {
       options: names,
       speech: both(en, sw),
     }, profile, 'price');
+  } else {
+    // Legacy word overlap, minus rows the question contradicts, so "Standard
+    // clean, 3 bedroom" cannot quote "Standard clean, 2 bedroom".
+    const vocab = catalogueVocab(facts);
+    const qTokens = catalogueMatchTokens(q);
+    const scored = facts
+      .filter((f) => !contradictsLabel(qTokens, catalogueMatchTokens(f.label), vocab))
+      .map((f) => ({ f, score: scoreLabel(q, f.label) }))
+      .filter((row) => row.score >= 0.5)
+      .sort((a, b) => b.score - a.score);
+    if (!scored.length) {
+      return catalogueEntries(profile).length || facts.length
+        ? notFoundInList(profile, 'price', priceOptOut(profile, q), 'price')
+        : noData(profile, 'price', 'price');
+    }
+    const top = scored.filter((row) => row.score === scored[0].score);
+    if (top.length > 1) {
+      const names = top.slice(0, 3).map((row) => row.f.label);
+      const en = names.length === 2
+        ? `Which one, ${names[0]} or ${names[1]}?`
+        : `Which one, ${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}?`;
+      const sw = names.length === 2
+        ? `Ipi, ${names[0]} au ${names[1]}?`
+        : `Ipi, ${names.slice(0, -1).join(', ')} au ${names[names.length - 1]}?`;
+      return resultOf('ambiguous', {
+        id: 'price',
+        options: names,
+        speech: both(en, sw),
+      }, profile, 'price');
+    }
+    fact = top[0].f;
   }
-  const fact = top[0].f;
+  if (!fact) {
+    return catalogueEntries(profile).length || facts.length
+      ? notFoundInList(profile, 'price', priceOptOut(profile, q), 'price')
+      : noData(profile, 'price', 'price');
+  }
   const entry = locateRow(profile, fact.label);
   const row = entry?.row || { name: fact.label, price: fact.legacyPrice || fact.value };
   const norm = normalisePrice(row);
@@ -350,7 +501,7 @@ function matchCatalogueFollowUp(text, profile) {
   const names = catalogueEntries(profile).map((entry) => String(entry.row.name).trim());
   const query = content.join(' ');
   const scored = names
-    .map((name) => ({ name, score: scoreLabel(query, name) }))
+    .map((name) => ({ name, score: Math.max(scoreLabel(query, name), scoreCatalogueLabel(query, name)) }))
     .filter((row) => row.score >= 0.5)
     .sort((a, b) => b.score - a.score);
   if (scored.length) {

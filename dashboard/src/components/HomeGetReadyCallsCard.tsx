@@ -23,20 +23,27 @@ export function HomeGetReadyCallsCard({ items }: { items: ReadyChecklistItem[] }
             >
               {item.complete ? <CheckIcon className="size-4" /> : null}
             </span>
-            {item.complete ? (
-              <span className="text-body text-ink-2">{item.label}</span>
-            ) : (
-              <Link
-                href={item.href}
-                className={[
-                  "text-body font-medium text-accent-deep underline-offset-2 hover:underline",
-                  deskShiftClass,
-                  focusRingVisible,
-                ].join(" ")}
-              >
-                {item.label}
-              </Link>
-            )}
+            <div className="min-w-0 flex-1">
+              {item.complete ? (
+                <span className="text-body text-ink-2">{item.label}</span>
+              ) : (
+                <>
+                  <Link
+                    href={item.href}
+                    className={[
+                      "text-body font-medium text-accent-deep underline-offset-2 hover:underline",
+                      deskShiftClass,
+                      focusRingVisible,
+                    ].join(" ")}
+                  >
+                    {item.label}
+                  </Link>
+                  {item.reason ? (
+                    <p className="mt-0.5 truncate text-meta text-ink-3">{item.reason}</p>
+                  ) : null}
+                </>
+              )}
+            </div>
           </li>
         ))}
       </ul>

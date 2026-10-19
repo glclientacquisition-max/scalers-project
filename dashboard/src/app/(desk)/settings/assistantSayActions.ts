@@ -81,11 +81,16 @@ async function tenantForPreview(): Promise<TenantRow | null> {
 }
 
 export type DeskLookupPreviewResult = {
+  /** Internal status; not shown in the Desk UI. */
   status: string;
+  /** Plain owner copy. Never an internal lookup code. */
   reason: string;
   speechEn: string;
   speechSw: string;
   willSay: boolean;
+  headline: string;
+  stampLabel: string;
+  stampTone: "ok" | "attention" | "neutral";
 };
 
 export async function previewDeskLookupAction(
@@ -118,14 +123,34 @@ export async function previewDeskLookupAction(
     now: new Date(),
     seed: 0,
   });
+  const { ownerLookupReason, lookupPreviewPresentation } = requireVoice(
+    "./src/knowledge/lookupOwnerReason.js"
+  ) as {
+    ownerLookupReason: (kind: string, result: { status?: string; reason?: string }) => string;
+    lookupPreviewPresentation: (status: string) => {
+      headline: string;
+      stampLabel: string;
+      stampTone: "ok" | "attention" | "neutral";
+      willSay: boolean;
+    };
+  };
+  const reasonKind =
+    lookupKind === "fee" ? "delivery" : lookupKind === "pay" ? "payment" : lookupKind;
+  const presentation = lookupPreviewPresentation(result.status);
+  const reason = ownerLookupReason(reasonKind, result);
+  const showReason =
+    !presentation.willSay && (result.status === "ambiguous" || Boolean(reason));
   return {
     ok: true,
     result: {
       status: result.status,
-      reason: String(result.reason || ""),
+      reason: showReason ? reason : "",
       speechEn: speechOf(result, "en"),
       speechSw: speechOf(result, "sw"),
-      willSay: result.status === "found",
+      willSay: presentation.willSay,
+      headline: presentation.headline,
+      stampLabel: presentation.stampLabel,
+      stampTone: presentation.stampTone,
     },
   };
 }
