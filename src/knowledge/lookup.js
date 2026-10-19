@@ -943,9 +943,9 @@ function payMethodsListSentence(kinds, pay, lang) {
 const PAY_SLOT_PREAMBLE = {
   till: { en: 'We take M-Pesa.', sw: 'Tunapokea M-Pesa.' },
   paybill: { en: 'We take M-Pesa.', sw: 'Tunapokea M-Pesa.' },
-  pochi: { en: 'We take Pochi la Biashara.', sw: 'Tunachukua Pochi la Biashara.' },
-  send: { en: 'We take M-Pesa Send Money.', sw: 'Tunachukua kutuma pesa kwa M-Pesa.' },
-  airtel: { en: 'We take Airtel Money.', sw: 'Tunachukua Airtel Money.' },
+  pochi: { en: 'We take Pochi la Biashara.', sw: 'Tunapokea Pochi la Biashara.' },
+  send: { en: 'We take M-Pesa Send Money.', sw: 'Tunapokea pesa kwa M-Pesa Send Money.' },
+  airtel: { en: 'We take Airtel Money.', sw: 'Tunapokea Airtel Money.' },
 };
 
 function paySlotPreamble(slot) {
@@ -1157,6 +1157,7 @@ function payComposeListKinds(intent, pay) {
     if (intent.method === 'cash' && payMethodOffered(pay, 'cash') && hasSlot) return ['cash', 'mpesa'];
     if (intent.method === 'cash' && payMethodOffered(pay, 'cash')) return ['cash'];
     if (intent.method === 'cheque' && payMethodOffered(pay, 'cheque')) return ['cheque'];
+    if (intent.method === 'send') return [];
   }
   return [];
 }
@@ -1207,7 +1208,16 @@ function lookupPayNumber(kind, profile, pay) {
     any: '',
   }[kind];
   const slot = want ? slots.find((row) => row[0] === want) : slots[0];
-  if (!slot) return notFoundInList(profile, `pay.${kind}`, null, 'pay');
+  if (!slot) {
+    if (kind === 'send' && slots.length) {
+      const payRead = payReading(profile, pay);
+      if (!payRead.ok) {
+        return unconfirmed(profile, 'payments.methods', 'pay', payRead.reason, 'pay');
+      }
+      return lookupPayComposed({ mode: 'method', method: 'send' }, profile, pay);
+    }
+    return notFoundInList(profile, `pay.${kind}`, null, 'pay');
+  }
   const payRead = payReading(profile, pay);
   if (!payRead.ok) return unconfirmed(profile, `pay.${slot[0]}`, 'pay', payRead.reason, 'pay');
   const speech = paySpokenNumberForSlot(slot);
@@ -1253,6 +1263,9 @@ function lookupPay(query, ctx) {
 
   if (intent.mode === 'unknown') {
     if (payDeferQuestion(String(query || ''))) {
+      if (!payRead.ok && (slots.length > 0 || payMethodListSpeech(pay))) {
+        return unconfirmed(profile, 'payments.methods', 'pay', payRead.reason, 'pay');
+      }
       return notFoundInList(profile, 'pay', null, 'pay');
     }
     if (slots.length) {

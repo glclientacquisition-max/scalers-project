@@ -284,6 +284,33 @@ test('pay: numbered tenant payment-number phrases read the confirmed number', ()
   }
 });
 
+test('pay: pay later on unconfirmed payments is unconfirmed before callback', () => {
+  const row = {
+    ...CALLBACK_ROW,
+    business_name: 'Pay Co',
+    business_policies: {
+      payments: {
+        version: 2,
+        methods: ['mpesa_till'],
+        mpesa_till: '123456',
+        timings: ['on_delivery'],
+        source: 'import',
+        confirmed: false,
+        parsed_from: 'M-Pesa till 123456',
+      },
+    },
+  };
+  for (const [language, query] of [
+    ['en', 'Pay later?'],
+    ['sw', 'Naweza kulipa baadaye?'],
+  ]) {
+    const hit = say('pay', query, row, language);
+    assert.equal(hit.result.status, 'unconfirmed', query);
+    expectCallback(hit, language);
+    assert.doesNotMatch(hit.speech, /one two three|moja mbili tatu/i);
+  }
+});
+
 test('pay: pay later uses the callback even when a till is saved', () => {
   const row = confirmedPay({ methods: ['mpesa_till'], mpesa_till: '123456' });
   for (const [language, query] of [
@@ -305,7 +332,7 @@ test('pay: airtel-only uses Airtel wording and rejects M-Pesa till or paybill as
   assert.doesNotMatch(enCash.speech, /We take M-Pesa/i);
   const swCompound = say('pay', 'Mnaweza kulipa kwa pesa taslimu au M-Pesa?', row, 'sw');
   assert.equal(swCompound.result.status, 'found');
-  assert.match(swCompound.speech, /Tunachukua Airtel Money/);
+  assert.match(swCompound.speech, /Tunapokea Airtel Money/);
   for (const [language, query] of [
     ['en', 'M-Pesa till number?'],
     ['en', 'M-Pesa paybill number?'],
@@ -317,18 +344,35 @@ test('pay: airtel-only uses Airtel wording and rejects M-Pesa till or paybill as
   }
 });
 
-test('pay: send money ask without send slot uses callback; send tenant reads number (EN and SW)', () => {
+test('pay: send money ask without send slot reads confirmed till, paybill or pochi (EN and SW)', () => {
   const tillOnly = confirmedPay({ methods: ['mpesa_till'], mpesa_till: '123456' });
-  for (const [language, query] of [
-    ['en', 'Send money number?'],
-    ['sw', 'Namba ya kutuma pesa?'],
-    ['sw', 'Namba ya tuma pesa?'],
-  ]) {
-    const hit = say('pay', query, tillOnly, language);
-    assert.equal(hit.result.status, 'not_found_in_list', query);
-    expectCallback(hit, language);
-    assert.doesNotMatch(hit.speech, /one two three|moja mbili tatu/i);
-  }
+  const enTill = say('pay', 'Send money number?', tillOnly, 'en');
+  assert.equal(enTill.result.status, 'found');
+  assert.equal(
+    enTill.speech,
+    'We take M-Pesa. The till number is one two three four five six.',
+  );
+  const swTill = say('pay', 'Naweza kutuma pesa?', tillOnly, 'sw');
+  assert.equal(swTill.result.status, 'found');
+  assert.match(swTill.speech, /^Tunapokea M-Pesa\. Namba ya till ni /);
+
+  const paybillOnly = confirmedPay({
+    methods: ['mpesa_paybill'],
+    mpesa_paybill: { business_no: '542542', account_mode: 'fixed', account: '70722' },
+  });
+  const enPaybill = say('pay', 'Can I send money?', paybillOnly, 'en');
+  assert.match(enPaybill.speech, /^We take M-Pesa\. The M-Pesa paybill number is five four two five four two\./);
+  assert.match(enPaybill.speech, /account is seven zero seven two two/);
+
+  const pochiOnly = confirmedPay({ methods: ['pochi'], pochi: { phone: '0712345678' } });
+  const swPochi = say('pay', 'Namba ya kutuma pesa?', pochiOnly, 'sw');
+  assert.match(swPochi.speech, /^Tunapokea Pochi la Biashara\. Namba ya Pochi la Biashara ni /);
+
+  const cashOnly = confirmedPay({ methods: ['cash'] });
+  const miss = say('pay', 'Send money number?', cashOnly, 'en');
+  assert.equal(miss.result.status, 'no_data');
+  expectCallback(miss, 'en');
+
   const sendRow = confirmedPay({ methods: ['mpesa_send'], mpesa_send: { phone: '0712345678' } });
   const en = say('pay', 'Send money number?', sendRow, 'en');
   assert.equal(en.result.status, 'found');
@@ -336,7 +380,6 @@ test('pay: send money ask without send slot uses callback; send tenant reads num
   const sw = say('pay', 'Namba ya kutuma pesa?', sendRow, 'sw');
   assert.equal(sw.result.status, 'found');
   assert.match(sw.speech, /^Namba ya kutuma pesa kwa M-Pesa ni /);
-  assert.doesNotMatch(sw.speech, /Namba ya namba ya/i);
 });
 
 test('pay: Swahili paybill and pochi lines use single Namba ya prefix', () => {

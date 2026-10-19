@@ -15,6 +15,7 @@ const SNAPSHOT = JSON.parse(
 
 // Swahili paybill/pochi/send/airtel rows in the snapshot use the branch fix for
 // "Namba ya namba ya …" (single "Namba ya … ni"). Till SW lines match main.
+// Send-money asks without a send slot use composed speech (not main parity).
 
 function payRow(payOverrides) {
   return {

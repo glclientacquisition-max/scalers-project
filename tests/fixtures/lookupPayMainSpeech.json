@@ -840,5 +840,5 @@
       "speech": "Wacha niulize timu kisha nikujulishe."
     }
   ],
-  "swSpeechNote": "Swahili paybill, pochi, send_money, and airtel speech rows match main f6d7fee9 except the Namba ya namba ya doubled-word fix (Namba ya … ni)."
+  "swSpeechNote": "Swahili paybill, pochi, send_money, and airtel digit lines match main f6d7fee9 except the Namba ya namba ya doubled-word fix. Composed Tunapokea openers and send-money fallback without a send slot are branch-only (not snapshotted)."
 }
