@@ -5781,6 +5781,23 @@ try {
   console.warn('[data-quality] not started:', err?.message || err);
 }
 
+try {
+  const dbRetention = require('./src/db');
+  const { purgeExpiredRecordingsBatch, startRecordingRetentionDaily } = require('./src/lib/recordingRetention');
+  const { deleteProviderRecording } = require('./src/sautikit/recordingFetch');
+  startRecordingRetentionDaily({
+    purgeBatch: (opts) =>
+      purgeExpiredRecordingsBatch({
+        listCalls: dbRetention.listCallsForRecordingRetentionPurge,
+        purgeCall: dbRetention.purgeCallRecordingRetention,
+        deleteProvider: deleteProviderRecording,
+        ...opts,
+      }),
+  });
+} catch (err) {
+  console.warn('[recording-retention] not started:', err?.message || err);
+}
+
 // ---------------------------------------------------------------------------
 // Owner lead notification (Telegram interim; WhatsApp when Business is linked).
 // Fires from save_caller_info and recording/events webhooks. Sends once per call.

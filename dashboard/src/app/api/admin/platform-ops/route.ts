@@ -10,18 +10,33 @@ import {
   verifyOpsResendDomain,
 } from "@/lib/opsMail";
 import { ackOpsNotice, loadOpsSettings, saveOpsSettings } from "@/lib/platformOps";
+import { countRecordingPurgeAtNextRun } from "@/lib/recordingRetentionAdmin";
 import {
   DEFAULT_SAUTIKIT_WARN_MINOR,
   OPS_NOTICE_KINDS,
   parseKindFlags,
   parseOpsEmails,
   parsePeople,
+  parseRecordingRetentionDays,
   type OpsNoticeKind,
 } from "@/lib/platformOpsModel";
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await isLegacyAuthenticated())) {
     return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  }
+  // Read-only: how many recordings the next purge would delete at a proposed setting.
+  // A GET, like other admin reads, so it is not an admin write and writes no Activity row.
+  const url = new URL(request.url);
+  if (url.searchParams.has("recording_retention_preview")) {
+    try {
+      const proposed = parseRecordingRetentionDays(url.searchParams.get("recording_retention_preview"));
+      const { count, capped } = await countRecordingPurgeAtNextRun(proposed);
+      return NextResponse.json({ ok: true, count, capped });
+    } catch (err) {
+      logAdminError("platform-ops", err);
+      return NextResponse.json({ error: adminFacingError(err, "Could not preview.") }, { status: 500 });
+    }
   }
   try {
     return NextResponse.json({ ok: true, domain: await getOpsResendDomain() });
@@ -51,8 +66,36 @@ export async function POST(request: Request) {
         sautikitWarnMinor: Number.isFinite(Number(body.sautikit_warn_minor))
           ? Number(body.sautikit_warn_minor)
           : DEFAULT_SAUTIKIT_WARN_MINOR,
+        recordingRetentionDays:
+          body.recording_retention_days !== undefined
+            ? parseRecordingRetentionDays(body.recording_retention_days)
+            : before?.recordingRetentionDays ?? null,
       });
-      await recordAdminAction({ actor, action: "save_alert_settings", before, after: settings });
+      const retentionBefore = before?.recordingRetentionDays ?? null;
+      const retentionAfter = settings.recordingRetentionDays ?? null;
+      const alertBefore = before
+        ? {
+            emails: before.emails,
+            people: before.people,
+            kinds: before.kinds,
+            sautikitWarnMinor: before.sautikitWarnMinor,
+          }
+        : null;
+      const alertAfter = {
+        emails: settings.emails,
+        people: settings.people,
+        kinds: settings.kinds,
+        sautikitWarnMinor: settings.sautikitWarnMinor,
+      };
+      await recordAdminAction({ actor, action: "save_alert_settings", before: alertBefore, after: alertAfter });
+      if (retentionBefore !== retentionAfter) {
+        await recordAdminAction({
+          actor,
+          action: "save_recording_retention_platform",
+          before: { recording_retention_days: retentionBefore },
+          after: { recording_retention_days: retentionAfter },
+        });
+      }
       return NextResponse.json({ ok: true, settings });
     }
 

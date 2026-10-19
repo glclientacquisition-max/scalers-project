@@ -152,8 +152,41 @@ async function fetchCallRecording(callId, opts = {}) {
   };
 }
 
+/**
+ * Best-effort provider delete when our retention window ends.
+ * SautiKit may not implement DELETE; 404/405/501 are treated as unsupported.
+ */
+async function deleteProviderRecording(callSid, opts = {}) {
+  const id = String(callSid || '').trim();
+  if (!id) return { ok: false, status: 'missing_id' };
+  if (recordingScopeDenied(opts.now)) {
+    return { ok: false, status: 'scope_denied' };
+  }
+  const fetchImpl = opts.fetchImpl || fetch;
+  const base = String(process.env.SAUTIKIT_API_BASE || 'https://api.sautikit.com').replace(/\/$/, '');
+  const key = process.env.SAUTIKIT_API_KEY;
+  if (!key) return { ok: false, status: 'no_key' };
+  const headers = { Authorization: `Bearer ${key}` };
+  try {
+    const res = await fetchImpl(`${base}/v1/calls/${encodeURIComponent(id)}/recording`, {
+      method: 'DELETE',
+      headers,
+    });
+    if (res.status === 404 || res.status === 405 || res.status === 501) {
+      return { ok: false, status: 'unsupported', httpStatus: res.status };
+    }
+    if (!res.ok) {
+      return { ok: false, status: 'error', httpStatus: res.status };
+    }
+    return { ok: true, status: 'deleted', httpStatus: res.status };
+  } catch (err) {
+    return { ok: false, status: 'error', message: err?.message || String(err) };
+  }
+}
+
 module.exports = {
   fetchCallRecording,
+  deleteProviderRecording,
   recordingScopeDenied,
   resetRecordingScopeLatch,
   SCOPE_DENIED_TTL_MS,
