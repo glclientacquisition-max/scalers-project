@@ -29,3 +29,9 @@ test('auth cookie matches @supabase/ssr naming and chunking', async () => {
   const joined = big.map((c) => c.split('=').slice(1).join('=')).join('');
   assert.equal(JSON.parse(Buffer.from(joined.replace(/^base64-/, ''), 'base64url')).access_token.length, 5000);
 });
+
+test('signed-out in-body redirect counts as a login bounce', async () => {
+  const { loginRedirectInBody } = await load();
+  assert.equal(loginRedirectInBody('self.__next_f.push([1,"NEXT_REDIRECT;replace;/login;307;"])'), true);
+  assert.equal(loginRedirectInBody('<a href="/login">Sign in</a>'), false);
+});
