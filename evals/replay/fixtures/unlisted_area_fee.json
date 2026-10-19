@@ -1,0 +1,14 @@
+{
+  "id": "unlisted_area_fee",
+  "bug": "not_found_in_list",
+  "profile": "carry",
+  "language": "en",
+  "turns": [
+    {
+      "caller": "Do you charge a fee to come to Westlands?",
+      "mustSay": ["I'll check with the team and they'll call you back."],
+      "mustNotSay": ["don't come", "Hatufiki"],
+      "status": "not_found_in_list"
+    }
+  ]
+}

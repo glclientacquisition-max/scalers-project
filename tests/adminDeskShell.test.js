@@ -74,7 +74,7 @@ describe("admin desk standard shell", () => {
     assert.match(adminNav, />More</);
     assert.doesNotMatch(adminNav, /overflow-x-auto/);
     assert.doesNotMatch(adminNav, /w-\[4\.5rem\]/);
-    assert.deepEqual(loadParents().phoneTabs, ["Today", "Businesses", "Calls", "Billing"]);
+    assert.deepEqual(loadParents().phoneTabs, ["Today", "Businesses", "Quality", "Billing"]);
     assert.deepEqual(loadParents().phoneMore, ["Numbers", "Platform", "Activity", "Settings"]);
     assert.match(links, /safe-area-inset-top/);
     assert.equal(fs.existsSync(path.join(ROOT, "dashboard/src/app/(desk)/loading.tsx")), false);
@@ -97,7 +97,7 @@ describe("admin desk standard shell", () => {
     assert.deepEqual(got.labels, [
       "Today",
       "Businesses",
-      "Calls",
+      "Quality",
       "Billing",
       "Numbers",
       "Platform",

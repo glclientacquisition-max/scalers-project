@@ -213,6 +213,13 @@ export type TenantRow = {
   team_directory?: TeamDirectoryEntry[] | null;
   faqs?: FaqEntry[] | null;
   unknown_answer_fallback?: string | null;
+  /** Spoken rewrite. Voice uses en/sw only when source matches unknown_answer_fallback. */
+  unknown_answer_spoken?: {
+    en?: string;
+    sw?: string;
+    source?: string;
+    updated_at?: string;
+  } | null;
   daily_bulletin?: DailyBulletinEntry[] | null;
   /** Receptionist tool toggles: escalate, end_call. */
   agent_tools?: { escalate?: boolean; end_call?: boolean } | null;

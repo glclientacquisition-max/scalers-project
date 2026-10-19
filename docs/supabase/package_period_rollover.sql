@@ -126,6 +126,13 @@ declare
   v_secs integer;
   v_sms integer;
   v_catch_up boolean;
+  v_version uuid;
+  v_ver_minutes integer;
+  v_ver_seats integer;
+  v_ver_sms integer;
+  v_ver_email integer;
+  v_ver_wa integer;
+  v_extra integer;
 begin
   for r in
     select s.tenant_id, s.period, s.status, s.package_id,
@@ -202,11 +209,58 @@ begin
       end loop;
     end if;
 
+    -- Allowances come from the pinned package version plus extra seats.
+    -- A pending package change pins that package's published version.
+    -- No version (the catalogue-only database) still reads billing_packages.
+    v_version := null;
+    v_ver_minutes := null;
+    v_ver_seats := null;
+    v_ver_sms := null;
+    v_ver_email := null;
+    v_ver_wa := null;
+    v_extra := 0;
+    if to_regclass('public.billing_package_versions') is not null
+       and exists (
+         select 1 from pg_catalog.pg_attribute
+         where attrelid = 'public.tenant_subscriptions'::regclass
+           and attname = 'package_version_id'
+           and attnum > 0 and not attisdropped
+       ) then
+      execute
+        'select s.package_version_id from public.tenant_subscriptions s where s.tenant_id = $1'
+        into v_version using r.tenant_id;
+      if exists (
+        select 1 from pg_catalog.pg_attribute
+        where attrelid = 'public.tenant_subscriptions'::regclass
+          and attname = 'extra_seats'
+          and attnum > 0 and not attisdropped
+      ) then
+        execute
+          'select coalesce(s.extra_seats, 0) from public.tenant_subscriptions s where s.tenant_id = $1'
+          into v_extra using r.tenant_id;
+      end if;
+      if v_change is not null and v_status = 'active' and v_package is distinct from r.package_id then
+        select v.id into v_version
+        from public.billing_package_versions v
+        where v.package_id = v_package and v.status = 'published'
+        order by v.version desc
+        limit 1;
+      end if;
+      if v_version is not null then
+        select v.minutes, v.seats, v.sms, v.email, v.staff_wa
+          into v_ver_minutes, v_ver_seats, v_ver_sms, v_ver_email, v_ver_wa
+        from public.billing_package_versions v
+        where v.id = v_version;
+      end if;
+    end if;
+
     v_grants := public.billing_grant_minutes_for_period(r.tenant_id, v_start, v_end);
-    if v_status = 'active' then
-      select p.minutes + v_grants into v_minutes from public.billing_packages p where p.id = v_package;
-    else
+    if v_status <> 'active' then
       v_minutes := v_grants;
+    elsif v_ver_minutes is not null then
+      v_minutes := v_ver_minutes + v_grants;
+    else
+      select p.minutes + v_grants into v_minutes from public.billing_packages p where p.id = v_package;
     end if;
 
     tenant_id := r.tenant_id;
@@ -228,24 +282,57 @@ begin
     sms_used_after := v_sms;
 
     if not p_dry_run then
-      update public.tenant_subscriptions s
-        set current_period_start = v_start,
-            current_period_end = v_end,
-            period = v_period,
-            term_start = v_term_start,
-            term_end = v_term_end,
-            package_id = v_package,
-            status = v_status,
-            ended_at = case when v_change = 'unassign' then r.current_period_end else s.ended_at end,
-            pending_package_id = case when v_change is not null then null else s.pending_package_id end,
-            pending_period = case when v_change is not null then null else s.pending_period end,
-            pending_change = case when v_change is not null then null else s.pending_change end,
-            pending_effective_at = case when v_change is not null then null else s.pending_effective_at end,
-            pending_set_at = case when v_change is not null then null else s.pending_set_at end,
-            pending_actor = case when v_change is not null then null else s.pending_actor end,
-            updated_at = now()
-        where s.tenant_id = r.tenant_id
-          and s.current_period_end = r.current_period_end;  -- guard against a concurrent roll
+      if exists (
+        select 1 from pg_catalog.pg_attribute
+        where attrelid = 'public.tenant_subscriptions'::regclass
+          and attname = 'package_version_id'
+          and attnum > 0 and not attisdropped
+      ) then
+        -- Same statement as package_id. A later version-only write is rejected
+        -- once the version is pinned.
+        execute $roll$
+          update public.tenant_subscriptions s
+            set current_period_start = $1,
+                current_period_end = $2,
+                period = $3,
+                term_start = $4,
+                term_end = $5,
+                package_id = $6,
+                package_version_id = coalesce($7, s.package_version_id),
+                status = $8,
+                ended_at = case when $9 = 'unassign' then $10 else s.ended_at end,
+                pending_package_id = case when $9 is not null then null else s.pending_package_id end,
+                pending_period = case when $9 is not null then null else s.pending_period end,
+                pending_change = case when $9 is not null then null else s.pending_change end,
+                pending_effective_at = case when $9 is not null then null else s.pending_effective_at end,
+                pending_set_at = case when $9 is not null then null else s.pending_set_at end,
+                pending_actor = case when $9 is not null then null else s.pending_actor end,
+                updated_at = now()
+            where s.tenant_id = $11
+              and s.current_period_end = $10
+        $roll$
+        using v_start, v_end, v_period, v_term_start, v_term_end, v_package,
+              v_version, v_status, v_change, r.current_period_end, r.tenant_id;
+      else
+        update public.tenant_subscriptions s
+          set current_period_start = v_start,
+              current_period_end = v_end,
+              period = v_period,
+              term_start = v_term_start,
+              term_end = v_term_end,
+              package_id = v_package,
+              status = v_status,
+              ended_at = case when v_change = 'unassign' then r.current_period_end else s.ended_at end,
+              pending_package_id = case when v_change is not null then null else s.pending_package_id end,
+              pending_period = case when v_change is not null then null else s.pending_period end,
+              pending_change = case when v_change is not null then null else s.pending_change end,
+              pending_effective_at = case when v_change is not null then null else s.pending_effective_at end,
+              pending_set_at = case when v_change is not null then null else s.pending_set_at end,
+              pending_actor = case when v_change is not null then null else s.pending_actor end,
+              updated_at = now()
+          where s.tenant_id = r.tenant_id
+            and s.current_period_end = r.current_period_end;  -- guard against a concurrent roll
+      end if;
 
       if found then
         -- Counters are wallet-protected; same flag the billing RPCs use.
@@ -258,10 +345,20 @@ begin
               whatsapp_used_units = 0
           where t.id = r.tenant_id;
 
-        perform public._tenant_set_allowances(
-          r.tenant_id,
-          case when v_status = 'active' then v_package end,
-          v_minutes);
+        if v_ver_minutes is not null and v_status = 'active' then
+          update public.tenants t
+            set seat_included = coalesce(v_ver_seats, 0) + greatest(coalesce(v_extra, 0), 0),
+                minutes_included = greatest(coalesce(v_minutes, 0), 0),
+                sms_included_units = coalesce(v_ver_sms, 0),
+                email_included_units = coalesce(v_ver_email, 0),
+                whatsapp_included_units = coalesce(v_ver_wa, 0)
+            where t.id = r.tenant_id;
+        else
+          perform public._tenant_set_allowances(
+            r.tenant_id,
+            case when v_status = 'active' then v_package end,
+            v_minutes);
+        end if;
 
         insert into public.ops_audit_log (actor, action, tenant_id, amount_kes, detail)
         values (
@@ -301,7 +398,7 @@ end;
 $$;
 
 comment on function public.roll_package_periods(boolean) is
-  'Roll ended tenant_subscriptions periods forward, apply pending changes, reset *_used counters (0 on time; rebuilt from calls + notify_sms_billable on a catch-up), rebuild minutes_included (package + grants for the new period). p_dry_run=true reports only.';
+  'Roll ended tenant_subscriptions periods forward, apply pending changes, reset *_used counters (0 on time; rebuilt from calls + notify_sms_billable on a catch-up). Minutes, seats, and message allowances come from the pinned billing_package_versions row plus extra_seats. Without a version they still come from billing_packages. p_dry_run=true reports only.';
 
 revoke all on function public.roll_package_periods(boolean) from public, anon, authenticated;
 grant execute on function public.roll_package_periods(boolean) to service_role;

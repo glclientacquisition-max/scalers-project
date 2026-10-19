@@ -31,9 +31,10 @@ describe("owner usage surface", () => {
 
   it("renders remaining minutes on Home from the package meter", () => {
     assert.match(home, /loadOwnerPackageMeter\(tenant\.id\)/);
-    assert.match(home, /remainingCount\(pack\.minutesIncluded, pack\.minutesUsed\)/);
-    assert.match(home, /min left/);
-    assert.match(home, /aria-label="Usage"/);
+    assert.match(home, /minuteMeter\(pack\?\.minutesIncluded/);
+    assert.match(read("dashboard/src/components/HomeUsageSection.tsx"), /minutesLeftLabel/);
+    assert.match(read("dashboard/src/lib/minutes.ts"), /Under 1 min left/);
+    assert.match(read("dashboard/src/components/HomeUsageSection.tsx"), /aria-label="Usage"/);
   });
 
   it("renders the owner charge lines as a dense table", () => {

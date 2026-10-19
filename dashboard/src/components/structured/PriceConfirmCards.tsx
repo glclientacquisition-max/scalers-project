@@ -7,7 +7,7 @@ import { SegmentedControl } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { notify } from "@/components/ui/DeskNotice";
 import { SettingsGroup } from "@/components/settingsUi";
-import { PRICING_MODES, UNITS, priceLabel, type PricingMode, type StructuredPrice } from "@/lib/structuredData";
+import { PRICING_MODES, UNITS, spokenPrice, type PricingMode, type StructuredPrice } from "@/lib/structuredData";
 import type { StructuredResult } from "@/app/(desk)/settings/structuredActions";
 import { Chips } from "./Chips";
 
@@ -48,19 +48,21 @@ export function PriceConfirmCards({ items, save, canEdit }: { items: PriceToConf
       <ul aria-label="Prices to check">
         {left.slice(0, SHOWN).map((item) => {
           const key = `${item.kind}:${item.id || item.name}`;
+          const shown = spokenPrice(item.pricing, item.text);
+          const wrote = item.text.trim();
           return (
             <li key={key} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-hairline px-4 py-3 last:border-b-0">
               <div className="min-w-0 flex-1 basis-full sm:basis-0">
                 <p className="truncate text-body text-ink">{item.name}</p>
                 <p className="text-meta text-ink-2">
-                  <span className="tabular-nums">{priceLabel(item.pricing)}</span>
-                  {item.text && item.text.trim().toLowerCase() !== priceLabel(item.pricing).toLowerCase() ? <span> · from &ldquo;{item.text}&rdquo;</span> : null}
+                  <span className="tabular-nums">{shown}</span>
+                  {wrote && wrote.toLowerCase() !== shown.trim().toLowerCase() ? <span> · from &ldquo;{wrote}&rdquo;</span> : null}
                 </p>
               </div>
               {canEdit ? (
                 <div className="flex w-full shrink-0 justify-end gap-2 sm:w-auto">
                   <Button variant="tonal" size="sm" disabled={pending} pending={busy === key}
-                    aria-label={`Yes, ${item.name} is ${priceLabel(item.pricing)}`} onClick={() => run(item, item.pricing)}>
+                    aria-label={`Yes, ${item.name} is ${shown}`} onClick={() => run(item, item.pricing)}>
                     Yes
                   </Button>
                   <Button variant="ghost" size="sm" disabled={pending} aria-label={`Change the price of ${item.name}`} onClick={() => setEditing(item)}>

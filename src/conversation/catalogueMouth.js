@@ -5,6 +5,13 @@
 
 const { normalizeServices } = require('./liveKnowledge');
 const { factServices } = require('./provenance');
+const {
+  normalisePrice,
+  priceIsSpeakable,
+  formatPriceDisplay,
+  legacyPriceText,
+  midSentencePriceDisplay,
+} = require('./factPrice');
 const { offerCatalogueLine } = require('./knownFacts');
 const { findCatalogMatch, entityValue } = require('./entityExtraction');
 const {
@@ -213,11 +220,16 @@ const FACT_STOP = new Set([
 
 function catalogueFactRows(profile = {}) {
   return factServices(profile.servicesCatalog, profile.fieldMeta || null)
-    .map((row) => ({
-      name: mouthServiceName(row.name),
-      price: String(row.price_range || row.priceRange || row.price || '').trim(),
-      notes: String(row.notes || '').replace(/\s+/g, ' ').trim(),
-    }))
+    .map((row) => {
+      const norm = normalisePrice(row);
+      return {
+        name: mouthServiceName(row.name),
+        price: priceIsSpeakable(norm) ? formatPriceDisplay(norm, 'en', legacyPriceText(row)) : '',
+        norm,
+        notes: String(row.notes || '').replace(/\s+/g, ' ').trim(),
+        raw: row,
+      };
+    })
     .filter((row) => row.name);
 }
 
@@ -255,7 +267,58 @@ function resolveSpokenService(text, profile = {}, state = null) {
     if (named) return named;
   }
   if (unmatchedFactWord(text, rows)) return null;
-  return rowByName(rows, confirmedServiceName(state));
+  const carried = rowByName(rows, confirmedServiceName(state));
+  // VOICE_FACT_REFS (HD_b070f6939775): a carried-over service answers only a
+  // bare "how much is it?" that still follows it. Not a question about another
+  // topic (a fee, the till, hours), and not once the call moved on to one.
+  if (
+    carried &&
+    factRefsOn() &&
+    (namesOtherTopic(text, profile) || topicMovedOn(state?.conversation?.answersReceived, text, profile))
+  ) {
+    return null;
+  }
+  return carried;
+}
+
+function factRefsOn() {
+  return require('./factSheet').factRefsEnabled();
+}
+
+// Words that put a price ask on something other than a catalogue row.
+const OTHER_TOPIC =
+  /\b(?:fees?|travel|transport|delivery|deliver|usafiri|nauli|ada|till|paybill|pochi|m-?pesa|airtel|account|number|namba|hours?|open|opening|close|closing|saa|kufungua|kufunga|deposit|area|areas|place|location|eneo|minimum|order)\b/i;
+
+/**
+ * True when the caller's words name something other than a catalogue service:
+ * a fee, a payment detail, hours, or a word no catalogue row has
+ * ("Kileleshwa"). A carried-over price must not answer such a question.
+ */
+function namesOtherTopic(text, profile = {}) {
+  const raw = String(text || '');
+  if (OTHER_TOPIC.test(raw)) return true;
+  const rows = catalogueFactRows(profile);
+  return rows.length > 0 && unmatchedFactWord(raw, rows);
+}
+
+/**
+ * True when the caller turn just before this one was about something other
+ * than a catalogue service (the travel fee), so a bare "how much is the..."
+ * no longer refers to a service named further back.
+ * @param {string[]} turns caller turns, oldest first; may end with `text`
+ */
+function topicMovedOn(turns, text, profile = {}) {
+  const list = Array.isArray(turns) ? turns.map((t) => String(t || '').trim()).filter(Boolean) : [];
+  const current = String(text || '').trim().toLowerCase();
+  if (list.length && list[list.length - 1].toLowerCase() === current) list.pop();
+  const previous = list[list.length - 1];
+  return Boolean(previous) && namesOtherTopic(previous, profile);
+}
+
+/** "From KSh 2,500" mid-sentence reads "from KSh 2,500" (flag on only). */
+function midSentencePrice(price) {
+  const text = String(price || '');
+  return factRefsOn() ? text.replace(/^(From|Kuanzia)\b/, (w) => w.toLowerCase()) : text;
 }
 
 function looksLikePriceAsk(text) {
@@ -270,8 +333,10 @@ function swahili(language) {
 function speakRowFact(row, language) {
   if (!row) return '';
   const sw = swahili(language);
-  if (row.price && /\d/.test(row.price)) {
-    return sw ? `${row.name} ni ${row.price}.` : `${row.name} is ${row.price}.`;
+  const norm = row.norm || normalisePrice(row.raw || { price_range: row.price });
+  if (priceIsSpeakable(norm)) {
+    const price = midSentencePriceDisplay(norm, language, factRefsOn(), legacyPriceText(row.raw || row));
+    return sw ? `${row.name} ni ${price}.` : `${row.name} is ${price}.`;
   }
   if (row.notes) return `${row.name}: ${row.notes}.`;
   return '';
@@ -462,4 +527,7 @@ module.exports = {
   whichServiceLine,
   freshCatalogueAsk,
   stripControlLabel,
+  namesOtherTopic,
+  topicMovedOn,
+  midSentencePrice,
 };

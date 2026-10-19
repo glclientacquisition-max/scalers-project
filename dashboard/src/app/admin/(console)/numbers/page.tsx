@@ -1,4 +1,5 @@
 import { AdminSetupError } from "@/components/AdminSetupError";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { DidPoolManager } from "@/components/DidPoolManager";
 import { logAdminError } from "@/lib/adminErrors";
 import { listDidPool, listPendingTenants } from "@/lib/didPool";
@@ -19,6 +20,7 @@ export default async function AdminNumbersPage() {
 
   return (
     <div className="space-y-4">
+      <AdminPageHeader title="Numbers" subtitle="Add, assign, and release lines in the pool." />
       <DidPoolManager pool={pool} pendingBusinesses={pendingBusinesses} />
     </div>
   );

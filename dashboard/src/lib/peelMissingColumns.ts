@@ -4,6 +4,20 @@
  *   column tenants.hours_schedule does not exist
  * Return that column name so callers can drop only it (not every optional field).
  */
+export const UNKNOWN_ANSWER_SPOKEN_COLUMN = "unknown_answer_spoken";
+
+/** When the spoken column is not migrated yet, drop only that key and retry. */
+export function withoutUnknownSpokenColumn(
+  message: string | null | undefined,
+  patch: Record<string, unknown>
+): Record<string, unknown> | null {
+  if (missingColumnFromError(message) !== UNKNOWN_ANSWER_SPOKEN_COLUMN) return null;
+  if (!(UNKNOWN_ANSWER_SPOKEN_COLUMN in patch)) return null;
+  const next = { ...patch };
+  delete next[UNKNOWN_ANSWER_SPOKEN_COLUMN];
+  return next;
+}
+
 export function missingColumnFromError(message: string | null | undefined): string | null {
   const text = String(message || "");
   const a = text.match(/Could not find the '([a-z0-9_]+)' column/i);

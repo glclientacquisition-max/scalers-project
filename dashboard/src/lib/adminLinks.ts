@@ -15,13 +15,13 @@ export type AdminLink = {
 
 /**
  * Desktop rail: all eight, in this order. Phone: the four `tab` items plus More.
- * Calls opens the call quality screens (#603) until the Calls list (A6) absorbs them.
+ * Quality opens traced call quality (#603).
  * Settings opens Voices, the one settings screen today.
  */
 export const ADMIN_LINKS: readonly AdminLink[] = [
   { href: "/admin", label: "Today", exact: true, phone: "tab" },
   { href: "/admin/businesses", label: "Businesses", exact: false, phone: "tab" },
-  { href: "/admin/quality", label: "Calls", exact: false, phone: "tab" },
+  { href: "/admin/quality", label: "Quality", exact: false, phone: "tab" },
   { href: "/admin/billing", label: "Billing", exact: false, phone: "tab" },
   { href: "/admin/numbers", label: "Numbers", exact: false, phone: "more" },
   { href: "/admin/platform", label: "Platform", exact: false, phone: "more" },

@@ -2,15 +2,22 @@ import { NextResponse } from "next/server";
 import { recordAdminAction } from "@/lib/adminAudit";
 import { adminActorName } from "@/lib/adminActor";
 import {
+  adminTransferOwnership,
+  sendOwnerPasswordReset,
+  updateBusinessProfile,
+} from "@/lib/adminBusinessProfile";
+import {
   archiveBusiness,
   releaseBusinessNumber,
   restoreBusiness,
   suspendBusiness,
   unsuspendBusiness,
 } from "@/lib/adminBusinessActions";
+import { requestOrigin, resetPasswordRedirectUrl } from "@/lib/authCallback";
 import { isAdminActionBlocked } from "@/lib/adminBusinessModel";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
+import { saveTenantRecordingRetentionOverride } from "@/lib/recordingRetentionAdmin";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function POST(request: Request) {
@@ -67,6 +74,41 @@ export async function POST(request: Request) {
       // Charging comes back only on an explicit "as before" choice (default off).
       const result = await restoreBusiness(businessId, actor, body.reason, body.resume_billing === true);
       return NextResponse.json({ ok: true, ...result });
+    }
+
+    if (action === "update_profile") {
+      const after = await updateBusinessProfile(businessId, actor, {
+        business_name: body.business_name,
+        whatsapp_notification_number: body.whatsapp_notification_number,
+      });
+      return NextResponse.json({ ok: true, ...after });
+    }
+
+    if (action === "send_owner_reset") {
+      const origin = requestOrigin((name) => request.headers.get(name));
+      const result = await sendOwnerPasswordReset(businessId, actor, resetPasswordRedirectUrl(origin));
+      return NextResponse.json({ ok: true, ...result });
+    }
+
+    if (action === "transfer_owner") {
+      await adminTransferOwnership(businessId, actor, String(body.user_id || ""));
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "save_recording_retention") {
+      const before = { recording_retention_days_override: body.before_override ?? null };
+      const value = await saveTenantRecordingRetentionOverride(
+        businessId,
+        body.recording_retention_days_override,
+      );
+      await recordAdminAction({
+        actor,
+        action: "save_recording_retention",
+        businessId,
+        before,
+        after: { recording_retention_days_override: value },
+      });
+      return NextResponse.json({ ok: true, recording_retention_days_override: value });
     }
 
     // No hard delete from Admin ("remove" and "delete_permanently" are gone).

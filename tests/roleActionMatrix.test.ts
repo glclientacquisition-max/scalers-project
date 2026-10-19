@@ -2,9 +2,11 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { it } from "node:test";
 import { can, ROLES, type Action } from "../dashboard/src/lib/permissions.ts";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DESK = path.join(__dirname, "..", "dashboard", "src", "app", "(desk)");
 function walk(d: string): string[] {
   return fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => {
@@ -35,12 +37,14 @@ const EXPECT: Record<string, Array<"admin" | "staff" | "viewer">> = {
   updateServiceRequestStatus: ["admin", "staff"], updateServiceRequestSchedule: ["admin", "staff"], updateAppointmentStatus: ["admin", "staff"], updateAppointmentSchedule: ["admin", "staff"],
   loadContactsSlice: ["admin", "staff", "viewer"], ensureInboxContact: ["admin", "staff"], createContact: ["admin", "staff"], updateContactNotes: ["admin", "staff"],
   updateContactName: ["admin", "staff"], updateContactFavourite: ["admin", "staff"], previewContactCsv: ["admin"], applyContactCsv: ["admin"],
-  saveAndCompileSettings: ["admin"], saveAlertsAction: ["admin"], postBulletinAction: ["admin"], clearBulletinAction: ["admin"],
+  saveAndCompileSettings: ["admin"], saveAlertsAction: ["admin"], postBulletinAction: ["admin"], editBulletinAction: ["admin"], clearBulletinAction: ["admin"],
+  confirmPriceAction: ["admin"], saveBusinessCategoryAction: ["admin"], correctCallFactsAction: ["admin", "staff"], addFaqFromInsightAction: ["admin"],
   previewCatalogImportAction: ["admin"], applyCatalogImportAction: ["admin"], extractKnowledgeAction: ["admin"], applyIngestAction: ["admin"],
   screenPronunciationSuggestionsAction: ["admin"], confirmPronunciationRecording: ["admin"], persistPronunciationLexicon: ["admin"], minePronunciationFromCallsAction: ["admin"], quickAddPronunciationAction: ["admin"],
   loadPronunciationReviewQueueAction: ["admin", "viewer"], geminiScanRecentCallsAction: ["admin"], approveGeminiScanCandidateAction: ["admin"], dismissGeminiScanCandidateAction: ["admin"], queueGeminiCandidateForRecordingAction: ["admin"],
   inviteMemberAction: ["admin"], resendInviteAction: ["admin"], revokeInviteAction: ["admin"], changeMemberRoleAction: ["admin"], removeMemberAction: ["admin"], transferOwnershipAction: [],
-  saveOnDemandUsage: ["admin"], initiateWalletTopUp: ["admin"],
+  saveOnDemandUsage: ["admin"],
+  confirmPlanChange: ["admin"], setExtraSeatsAction: ["admin"], markBillingNoticeRead: ["admin"],
 };
 
 it("every guarded action is in the expected matrix (and vice versa)", () => {

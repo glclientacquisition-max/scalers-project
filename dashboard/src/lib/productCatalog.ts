@@ -1,3 +1,4 @@
+import { hydrateCatalogPriceFields } from "./catalogPricingMode";
 import { sanitizePricing, type StructuredPrice } from "./structuredData";
 import { stableRowId } from "./factHash";
 export type ProductItem = {
@@ -14,8 +15,9 @@ export type ProductItem = {
   notes: string;
   /** Alternate spoken names / spellings */
   aliases: string[];
-  /** fixed | from | range | ask. Omitted until the owner or import sets it. */
+  /** fixed | from | range | quote. Omitted until the owner or import sets it. */
   price_mode?: string;
+  price_max?: number | null;
   /** Owner confirmed this row can be held. */
   holdable?: boolean;
   /** owner | seed | import | inferred | call_suggested */
@@ -106,9 +108,17 @@ export function normalizeProductCatalog(raw: unknown): ProductItem[] {
       const priceMode = String(r.price_mode || r.priceMode || "")
         .trim()
         .toLowerCase();
-      if (priceMode === "fixed" || priceMode === "from" || priceMode === "range" || priceMode === "ask") {
-        item.price_mode = priceMode;
+      if (
+        priceMode === "fixed" ||
+        priceMode === "from" ||
+        priceMode === "range" ||
+        priceMode === "ask" ||
+        priceMode === "quote"
+      ) {
+        item.price_mode = priceMode === "ask" ? "quote" : priceMode;
       }
+      const pmax = r.price_max ?? r.priceMax;
+      if (pmax !== undefined && pmax !== null && pmax !== "") item.price_max = Number(pmax);
       const source = String(r.source || "").trim().toLowerCase();
       if (
         source === "owner" ||
@@ -140,7 +150,7 @@ export function normalizeProductCatalog(raw: unknown): ProductItem[] {
       ) {
         return null;
       }
-      return item;
+      return hydrateCatalogPriceFields(item);
     })
     .filter((x): x is ProductItem => Boolean(x))
     .slice(0, PRODUCT_CATALOG_MAX);
@@ -356,7 +366,7 @@ export function parseBulkProducts(raw: string): ProductItem[] {
   if (looksDelimitedTable(text)) {
     return parseProductCsv(text);
   }
-  return text
+  const loose = text
     .split("\n")
     .map((line) => line.replace(/^[-*•]\s*/, "").trim())
     .filter((line) => line && !/^products?\s*:?$/i.test(line))
@@ -371,8 +381,8 @@ export function parseBulkProducts(raw: string): ProductItem[] {
       }
       return { ...emptyProduct(), name: line };
     })
-    .filter((p) => p.name)
-    .slice(0, PRODUCT_CATALOG_MAX);
+    .filter((p) => p.name);
+  return normalizeProductCatalog(loose).slice(0, PRODUCT_CATALOG_MAX);
 }
 
 const nameKey = (p: ProductItem) => p.name.trim().toLowerCase();
