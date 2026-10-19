@@ -47,3 +47,6 @@ CLAUDE.md
 # playwright
 /test-results/
 /playwright-report/
+
+# voice modules copied by scripts/sync-voice-modules.cjs at build time
+/.voice/
