@@ -422,7 +422,7 @@ async function handlePayWebhook(input) {
   }
 
   try {
-    assertLiveTenant(attempt.tenantId, input.env);
+    await assertLiveTenant(attempt.tenantId, input.env, input.readLiveTenant);
   } catch (err) {
     const code = err && err.code;
     if (code === "bachs_live_refused") {

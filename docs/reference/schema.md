@@ -9,7 +9,7 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (50)
+## Tables (51)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
@@ -19,6 +19,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_features` | `key`, `label` | `docs/supabase/billing_data_layer.sql` |
 | `billing_invoice_counters` | `last_number`, `year` | `docs/supabase/billing_data_layer.sql` |
 | `billing_lifecycle_settings` | `id`, `new_signup_trial_enabled`, `package_editor_enabled`, `price_change_approval_threshold_kes`, `shadow_invoices`, `updated_at`, `voicemail_hold_days` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/package_version_editor.sql` |
+| `billing_live_tenants` | `enabled`, `reason`, `set_at`, `set_by`, `tenant_id` | `docs/supabase/invoice_pay_live_allowlist.sql` |
 | `billing_notices` | `audience`, `billed_to`, `body`, `channel`, `claimed_at`, `created_at`, `delivery_status`, `fallback`, `id`, `idempotency_key`, `kind`, `last_error`, `notify_send_id`, `read_at`, `recipient`, `tenant_id`, `title` | `docs/supabase/billing_data_layer.sql` |
 | `billing_owner_action_keys` | `action`, `created_at`, `idempotency_key`, `result`, `tenant_id` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_package_version_approvals` | `approver`, `created_at`, `id`, `package_version_id`, `price_snapshot`, `reason`, `requested_by`, `status` | `docs/supabase/package_version_editor.sql` |
@@ -75,7 +76,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (219)
+## Functions (221)
 
 | Function | Defined in |
 | --- | --- |
@@ -146,6 +147,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `admin_set_new_signup_trial` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_price_approval_threshold` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_tenant_billing_mode` | `docs/supabase/package_version_editor.sql` |
+| `admin_set_tenant_live_payments` | `docs/supabase/invoice_pay_live_allowlist.sql` |
 | `admin_update_package_version_draft` | `docs/supabase/package_version_editor.sql` |
 | `apply_line_rental` | `docs/supabase/line_rental_grace.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_security_beta.sql` |
 | `apply_payment` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_pay.sql` |
@@ -160,6 +162,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_audit_log_freeze` | `docs/supabase/billing_data_layer.sql` |
 | `billing_grant_minutes_for_period` | `docs/supabase/package_state_rules.sql` |
 | `billing_latest_package_version` | `docs/supabase/billing_data_layer.sql` |
+| `billing_live_tenant_allowed` | `docs/supabase/invoice_pay_live_allowlist.sql` |
 | `billing_notice_when` | `docs/supabase/billing_data_layer.sql` |
 | `billing_notices_guard` | `docs/supabase/billing_data_layer.sql` |
 | `billing_on_demand_open` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
