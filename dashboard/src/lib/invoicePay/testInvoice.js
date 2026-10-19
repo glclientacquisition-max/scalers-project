@@ -13,8 +13,8 @@ function digits(value) {
 }
 
 /**
- * @param {unknown} body
- * @returns {string | null}
+ * @param {unknown} error
+ * @returns {{ status: number, error: string }}
  */
 function testInvoiceFailure(error) {
   const message = error instanceof Error ? error.message : "";
@@ -31,6 +31,10 @@ function testInvoiceFailure(error) {
   return { status: 400, error: "Could not open the test invoice." };
 }
 
+/**
+ * @param {unknown} body
+ * @returns {string | null}
+ */
 function testInvoicePostError(body) {
   if (!body || typeof body !== "object") return "Confirm the test invoice.";
   const posted = /** @type {{ confirm?: unknown, reason?: unknown, tenantId?: unknown, amount?: unknown }} */ (body);
