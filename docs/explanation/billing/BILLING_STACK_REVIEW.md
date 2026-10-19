@@ -5,7 +5,131 @@ last_reviewed: 2026-10-19
 
 # Billing stack review, 18 Oct 2026
 
-Round 5 is the current verdict. Round 4, Round 3, Round 2, and Round 1 are kept below it.
+Round 6 is the current verdict. Round 5, Round 4, Round 3, Round 2, and Round 1 are kept below it.
+
+## Round 6
+
+Review of draft #798 at `71905b25` on `cursor/invoice-pay-live-money-0c16`. The money change is `bbbee645` plus the type-only follow-up `71905b25`, on top of `ceaa55fa` (main, including the #780 squash `13433da3`, merged into the old round-5 head). The branch tip after that is `bef91c09`, a docs-only merge of `cursor/invoice-pay-0c16`. `webhook.js` at the tip has the same blob as `71905b25`. This review did not call Bachs, did not write to staging or production, and did not merge anything. Local Postgres 16.15 ran the apply-order harness. The branch `cursor/billing-review-round6-7822` holds this document only. Do not merge it. Do not merge #798.
+
+P9 `invoice_pay_session.sql` and P10 `billing_mode_legal_pairs.sql` are already on production. That is the owner's fact. This review did not query production to re-check it. The note on #798 that still lists P9 and P10 as remaining production apply is wrong. #780 is on main as `13433da3`. Main has since moved. At review time `origin/main` is `5b013c4d`, which is hotfix #802 ("Keep invoice reads working when Bachs is refused").
+
+### Verdict
+
+| Question | Verdict |
+| --- | --- |
+| Merge #798 onto current main, and apply P11 then P12, with payments off | **No** as a merge. **Yes** for the two SQL files alone, with payments still off. |
+| Ready for a KSh 10 live test on one allowlisted test business | **No.** Two blockers below. One exact KSh 10 event still applies once, and a replay of that same ref is a no-op. The same handler over-credits that payment when the two events the docs say to register arrive under different ids. |
+
+### What the round-5 blockers did
+
+1. **Live gate.** Fixed only as a switch. `assertBachsAllowed` now returns when `BACHS_MODE=live` and `BACHS_LIVE_ALLOWED` is the exact string `true` after trim and lower-case (`provider.js:69-75`). It does not then check `sk_live_` or the production ref `fjxcdccgyhnvnnlnovcl`. Sandbox mode on that ref still throws `prod_refused`. Live mode without the flag still throws `bachs_live_refused`. The allowlist does not make this safe. See blocker 2.
+
+2. **Equal later collection.** Fixed when the second event has its own receipt or its own charge id, and when the same id reports a higher total. Not fixed when the events share a ref and the amount is the collection itself. That is the checkout-id fallback, and it is also the default mock charge id. Probe below.
+
+3. **Smaller later amount becomes a credit.** Fixed. A new ref of KSh 4 after KSh 10 leaves the invoice at 14 and stores no credit. A later report of KSh 1 on that same ref is a no-op. The invoice balance is not left payable beside a credit of the smaller amount.
+
+4. **First extra wins.** Fixed for one ref. The credit key is `collection-excess:<provider>:<ref>:<cents>` (`invoice_pay_collections.sql:370`). Probe: same charge id, totals 10 then 12 then 20 on a KSh 10 invoice. Paid stays 10. Credits are KSh 2 and KSh 8. A replay of 20 is `noop`. One payment row, amount 20. On Postgres the same rise kept one receipt, number unchanged, amount 20.
+
+The hold after expiry is fixed. `create_invoice_pay_attempt` treats a succeeded checkout with a session id and `checkout_closed_at is null` as held, even when `checkout_expires_at` is in the past (`invoice_pay_collections.sql:127-134`). Probe: expiry already past, `getCheckout` still open, second click reused `chk_exp_1`, one create, attempt stayed `succeeded`. After the read said closed, the next click inserted the remainder for KSh 10. An unreadable read threw `previous_processing` and did not insert. Two overlapping clicks produced one create.
+
+### Blockers for the live KSh 10 test
+
+1. **A shared ref drops an equal collection, and a new ref plus a running total double-counts.** `collectionReport` (`webhook.js:167-186`) keys the payment on the M-Pesa receipt, else the charge or payment id, else the checkout id. A receipt uses the KES charge as that collection. Without a receipt, `amount_paid` wins, and if that field is absent the KES charge is treated as the authoritative total for that id. The `cumulative` flag is returned and then ignored. `reconcile_checkout_collection` applies only `new total - stored total` for that one ref (`invoice_pay_collections.sql:305-317`). It does not subtract what other refs on the same checkout already applied.
+
+   Probes on the fake ledger at `71905b25`, invoice KSh 20 unless noted:
+
+   | Shape | Result |
+   | --- | --- |
+   | Two `collection.succeeded` events of KSh 10, default `paidEvent` charge id (`ch_<checkout>`), no receipt | Second body `duplicate`. Paid stays 10. Credits empty. One payment. |
+   | Same two events with no receipt and no charge id (checkout-id fallback) | Same drop. Paid stays 10. |
+   | Checkout-id fallback, second event `amount_paid` 20 | Paid 20. No credit. The higher total on one ref is the path that works. |
+   | Charge ids `ch_a` then `ch_b`, each amount 10 | Paid 20. No credit. Replay of `ch_b` is `noop`. This is the case the new unit test covers. |
+   | `ch_a` KSh 10, then `ch_b` KSh 4, then `ch_b` KSh 1 | Paid 14. No credit. The KSh 1 report is `noop`. |
+   | `ch_1` amount 10, then `ch_2` amount 10 with `amount_paid` 20 | Paid 20 and a KSh 10 credit. Two payment rows, 10 and 20. The books show KSh 30 for KSh 20 collected. |
+   | Same pair on a KSh 30 invoice | Paid 30. The second event applied the whole running total of 20 on top of the first 10. |
+   | Two receipts `UBC1` and `UBC2`, each KSh 10 | Paid 20. No credit. |
+   | KSh 10 invoice. `collection.succeeded` with `charge_id` 10, then `checkout.completed` (`payment_status=paid`, amount 10, no charge id) | Invoice paid, plus a KSh 10 `collection_excess` credit on the checkout id. |
+   | Those two events in the other order | Same over-credit. The collection's charge id is a second payment of money the checkout id already applied. |
+
+   `INVOICE_PAY.md` tells the owner to register both `checkout.completed` and `collection.succeeded`. A receipt was absent on the sandbox payloads the authors have seen (`webhook.js:127`). If one of those events carries a charge id and the other does not, the fallback gives them different refs and a single KSh 10 is credited twice. If both events share one id and each reports its own KSh 10, the second collection is dropped and the invoice stays open. The unit tests pass distinct charge ids for the equal case, so they do not catch either hole. Postgres confirmed the SQL underneath: checkout id 10 then checkout id 10 left the invoice open at 10; a different ref of 10 then paid it; a further ref whose amount was the running total 20 inserted a KSh 20 excess credit and a third receipt.
+
+2. **The tenant allowlist can be skipped, and the webhook never checks it.** `assertLiveTenant` runs only when `bachsMode` is `live`, and only from `startInvoiceCheckout` when `input.env` is set (`checkoutFlow.js:188`). The pay checkout route is the only caller, and it does pass `env`. After that:
+
+   - Unset `BACHS_LIVE_TENANT_ALLOWLIST`, or a whitespace-only value, returns without restricting. Every business can start a live checkout once `BACHS_LIVE_ALLOWED=true`.
+   - A comma-only value (`"  ,  "`) builds an empty set and refuses every tenant.
+   - A listed id is an exact trimmed match. `" T1 "` does not match `"t1"`.
+   - The webhook route checks `bachsMode() === "live" && !liveAllowed()` and returns 403 (`webhook/route.ts:13-15`). It does not read the allowlist. `handlePayWebhook` has no tenant list. Probe: a signed KSh 10 collection applied and marked the invoice paid with no allowlist argument.
+   - The code comment says the allowlist does not drop a webhook that already arrived (`provider.js:84`). A checkout opened before the list is tightened, or opened while the list is empty, still settles.
+
+   A KSh 10 test on one business is one tenant only if the allowlist is set to that tenant's id before any live checkout is created. The code does not force that. The webhook will still settle any other checkout that exists.
+
+### #802 is on main and does not merge cleanly
+
+`git merge-tree --write-tree` of `71905b25` and `origin/main` (`5b013c4d`) exits 1. Content conflicts:
+
+- `dashboard/src/app/api/billing/bachs/webhook/route.ts`
+- `dashboard/src/app/api/pay/[token]/checkout/route.ts`
+- `dashboard/src/lib/invoicePay/provider.js`
+- `docs/STATUS.md`
+- `docs/reference/operations/INVOICE_PAY.md`
+
+`ledger.ts` and `tests/invoicePay.test.js` auto-merge. The merged ledger drops `assertBachsAllowed` from `invoicePayLedger()` (that is the #802 read fix) and keeps `reconcileCollection`. Do not put the gate back inside the ledger constructor. That is what made invoice reads 503.
+
+The conflict is two intents in the same lines, not a whitespace overlap.
+
+- #802: reads do not call the gate. Checkout calls `assertBachsAllowed` before `startInvoiceCheckout` and returns 503 `payments_unavailable` when the gate throws. `checkoutFailure` maps `bachs_live_refused` to that 503. The pay page hides Pay.
+- #798: live mode with the flag is allowed, including against the production ref. `assertLiveTenant` needs `env` on the checkout call. A tenant that is not listed gets 403 "Live payments are not open for this business." The webhook's own check is `liveAllowed`, not `assertBachsAllowed`.
+
+A resolution that takes main's checkout hunk and drops `env` skips `assertLiveTenant` entirely (`if (input.env)`). A resolution that keeps #798's old `invoicePayLedger(env)` call against a constructor that no longer accepts the gate reopens the read outage, or, if the constructor still calls the pre-#798 gate, refuses the live test again. Both `paymentsClosed` / `checkoutFailure` and `assertLiveTenant` have to stay. `bachs_live_refused` from a missing allowlist entry must still refuse the checkout. It must not be treated as "payments off" in a way that skips the tenant check. `docs/STATUS.md` on #798 still says P9 and P10 are not on production and still describes #802 as an unmerged draft. Main's side of that hunk is also stale (#780 still "in flight", live mode refused). Neither side of the doc conflict is the current fact.
+
+This review did not resolve the conflicts.
+
+### P11 then P12 after P10
+
+Safe to apply on a database that already has P9 and P10, with payments off, each file in its own transaction.
+
+`invoice_pay_collections.sql` is idempotent. It adds `payment_attempts.checkout_closed_at` with `if not exists`. It does not edit the P1-P11 files, and it does not replace `finalize_invoice`. It does `CREATE OR REPLACE` `create_invoice_pay_attempt` and `release_held_pay_checkout`, so the P12 bodies are the ones that must stay. The file's own header says staging is the only apply. That is the author's caution. It is not a finding that P9 and P10 are missing on production.
+
+The harness applied P1 through P12, and P9, P10, P11, and P12 each a second time, on throwaway database `billing_apply_order_proof`. Checks after the second P12: session index present, park guard present, `checkout_closed_at is null` present in `create_invoice_pay_attempt`, `release_held_pay_checkout` present, `reconcile_checkout_collection` present, legal-pairs guard present. Proof invoices were unchanged: `SCL-2026-000001` paid 3667 receipt 3667, `SCL-2026-000002` paid 0 credit 167, `SCL-2026-000003` open 2320 receipt 2500 overpay credit 500. Re-applying the P1 finalize installer left `SCL-`, `scalers.billing_write`, and `invoice-credit:`.
+
+Grants, read from that database:
+
+| Function | Security definer | anon | authenticated | public | service_role |
+| --- | --- | --- | --- | --- | --- |
+| `create_invoice_pay_attempt(text, numeric)` | yes | no | no | no | yes |
+| `release_held_pay_checkout(uuid)` | yes | no | no | no | yes |
+| `reconcile_checkout_collection(...)` | yes | no | no | no | yes |
+
+`create_invoice_pay_attempt` keeps `search_path = public, extensions`. The other two use `search_path = public`. Reconcile sets `scalers.billing_write` for the invoice update (`set_config` third argument true, local to the transaction). It does not weaken `invoices_freeze`. `tenant_credits.idempotency_key` is unique, so `on conflict (idempotency_key) do nothing` matches. A second apply of the same cent total does not insert another credit.
+
+Do not re-run P11 after P12. Inside a transaction that was rolled back, applying `invoice_pay_held.sql` removed `checkout_closed_at is null` from `create_invoice_pay_attempt` and put the expiry test back (`checkout_expires_at > now()`). That is the round-5 hold. Rollback restored the P12 body.
+
+Do not re-run P9 after P12. The same rolled-back experiment applied `invoice_pay_session.sql`. The closed-at hold was gone. `reconcile_checkout_collection` was still there, because P9 does not drop it. P9 also drops and recreates `payment_attempts_one_pending_part`. Rollback restored the P12 function.
+
+Concurrency on that database: two `reconcile_checkout_collection` calls on different refs, the first held open across `pg_sleep(3)`. The second waited about 2.6 seconds, then applied its own KSh 10. The invoice went to paid 20. Two calls on the same ref, the first held across `pg_sleep(2)`. The second waited about 1.7 seconds and returned `noop`. One payment row, amount 10, invoice open at 10, no excess credit. The invoice `for update` is what serializes them.
+
+Current main returns 503 from checkout before it inserts an attempt, while the gate refuses production. Applying P12 in that state does not exercise the new function. Leave payments off after the apply. Do not set `BACHS_LIVE_ALLOWED`.
+
+### What the tests did
+
+Throwaway database only. `sudo -u postgres psql`. Never Supabase. Code under test: `/tmp/live-money-merge` at `bef91c09`, whose pay runtime matches `71905b25`.
+
+| Run | Result |
+| --- | --- |
+| `tests/sql/billing_apply_order/run.sh` | EXIT 0. P1 through P12, with P9, P10, P11, and P12 each twice, then the proof invoices above. |
+| Same database, follow-up SQL, regressions rolled back | Grants as in the table. Equal checkout-id amount is a no-op. A second ref applies. A running total on a third ref credits the whole new amount. One receipt when one ref rises from 10 to 20. P11 after P12 restores the expiry hold. P9 after P12 drops the closed-at hold and leaves reconcile. Both rollbacks restored P12. Same-ref overlap: `noop`, one payment. Different-ref overlap: both apply, paid 20. |
+| `node --test` of `invoicePay.test.js` and `invoiceDocuments.test.js` | 52 pass, 0 fail. Includes the new equal-charge-id, smaller-charge-id, rising-total, and post-expiry hold tests. |
+| Fake-ledger probes, not part of that suite | The table in blocker 1. Hold, unreadable read, overlapping create, and the allowlist cases. |
+
+`tests/invoicePaySql.test.js` was not executed. `@electric-sql/pglite` is not installed. The reconcile assertions in that file match the Postgres probe for distinct refs and for a rising total on one ref. They do not cover a running total on a new charge id.
+
+### What remains
+
+- Resolve the five conflicts with #802 so reads stay off the gate, checkout still returns 503 when payments are actually off, `env` still reaches `assertLiveTenant`, and live mode still requires `BACHS_LIVE_ALLOWED=true`. Do not take either doc hunk as the status of production.
+- One M-Pesa payment must land once, whether Bachs sends a receipt, a charge id, `amount_paid`, `checkout.completed`, or more than one of those. A second equal collection on a checkout that has no receipt must not be a no-op unless it is the same provider ref and the same total. A running total must not be applied again under a new ref.
+- For a one-business test, an empty allowlist has to mean closed, and the webhook has to refuse a tenant that is not on the list. Setting the variable at checkout time is not that control.
+
+Ops, unchanged, and not a substitute for the two blockers: no DID touch, `BILLING_NOTICES_SEND` off, `DESK_PLAN_CHANGE` off, letterhead nulls stay off the document, backup before any production apply, do not re-run P5, P9, or P11 after P12.
 
 ## Round 5
 
