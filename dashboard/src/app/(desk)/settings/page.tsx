@@ -1,4 +1,7 @@
 import { memberCan } from "@/lib/requireMember";
+
+/** Voice lookup on assistant-say uses runtime clock; opt out of static prerender. */
+export const instant = false;
 import { structuredSettingsSlots } from "@/components/structured/StructuredSettingsSlots";
 import { readBusinessType } from "@/lib/structuredServer";
 import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
@@ -28,7 +31,7 @@ import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
 import { DeskPageGate } from "@/components/DeskPageGate";
 import { deskAssistantSayPage } from "@/lib/deskFeatureFlags";
-import { loadAssistantSayState } from "@/lib/assistantSayLoad";
+import { loadAssistantSayState } from "@/lib/assistantSayVoice.server";
 import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
 import { CallsForwardingPanel } from "@/components/CallsForwardingPanel";
 import { loadCallSetupState } from "@/lib/callSetupServer";

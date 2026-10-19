@@ -1,5 +1,5 @@
 import { ButtonLink } from "@/components/ui/Button";
-import { DataChecksCard } from "@/components/structured/DataChecksCard";
+import { OverviewDataChecksCard } from "@/components/structured/OverviewDataChecksCard";
 import { CallInsights } from "@/components/insights/CallInsights";
 import { loadCallInsights } from "@/lib/callInsightsLoad";
 import { dataChecksFor } from "@/components/structured/StructuredSettingsSlots";
@@ -69,7 +69,7 @@ import { DeskPageGate } from "@/components/DeskPageGate";
 import { UNKNOWN_ANSWER_DEFAULT_EN } from "@/lib/unknownAnswerSpoken";
 import { deskAssistantSayPage, factSaveIsConfirm } from "@/lib/deskFeatureFlags";
 import { HomeGetReadyCallsCard } from "@/components/HomeGetReadyCallsCard";
-import { loadReadyChecklist } from "@/lib/assistantSayLoad";
+import { loadReadyChecklist } from "@/lib/assistantSayVoice.server";
 
 export default function HomeOverviewPage() {
   return (
@@ -451,7 +451,7 @@ async function HomeOverviewBody() {
         {assistantSayPage && readyChecklist && !readyChecklist.allDone ? (
           <HomeGetReadyCallsCard items={readyChecklist.items} />
         ) : null}
-        {overviewChecks.length ? <DataChecksCard checks={overviewChecks} /> : null}
+        {overviewChecks.length ? <OverviewDataChecksCard checks={overviewChecks} /> : null}
         {insights ? (
           <CallInsights insights={insights} />
         ) : null}
