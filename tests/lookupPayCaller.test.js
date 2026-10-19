@@ -272,15 +272,95 @@ test('pay: numbered tenant payment-number phrases read the confirmed number', ()
     ['sw', 'Nicheki namba ya kulipa'],
     ['sw', 'Nipe namba ya kulipa'],
     ['en', 'Payment number?'],
+    ['sw', 'Malipo?'],
     ['sw', 'Malipo ni vipi?'],
     ['sw', 'Nataka kufanya malipo'],
-    ['en', 'Pay later?'],
   ];
   for (const [language, query] of cases) {
     const hit = say('pay', query, row, language);
     assert.equal(hit.result.status, 'found', query);
     assert.match(hit.speech, /one two three four five six|moja mbili tatu nne tano sita/i, query);
     assert.doesNotMatch(hit.speech, new RegExp(FALLBACK.slice(0, 20)));
+  }
+});
+
+test('pay: pay later uses the callback even when a till is saved', () => {
+  const row = confirmedPay({ methods: ['mpesa_till'], mpesa_till: '123456' });
+  for (const [language, query] of [
+    ['en', 'Pay later?'],
+    ['sw', 'Naweza kulipa baadaye?'],
+  ]) {
+    const hit = say('pay', query, row, language);
+    assert.equal(hit.result.status, 'not_found_in_list', query);
+    expectCallback(hit, language);
+    assert.doesNotMatch(hit.speech, /one two three|moja mbili tatu/i);
+  }
+});
+
+test('pay: airtel-only uses Airtel wording and rejects M-Pesa till or paybill asks', () => {
+  const row = confirmedPay({ methods: ['airtel'], airtel: { phone: '0734567890' } });
+  const enCash = say('pay', 'Can I pay cash?', row, 'en');
+  assert.equal(enCash.result.status, 'found');
+  assert.match(enCash.speech, /^We take Airtel Money\./);
+  assert.doesNotMatch(enCash.speech, /We take M-Pesa/i);
+  const swCompound = say('pay', 'Mnaweza kulipa kwa pesa taslimu au M-Pesa?', row, 'sw');
+  assert.equal(swCompound.result.status, 'found');
+  assert.match(swCompound.speech, /Tunachukua Airtel Money/);
+  for (const [language, query] of [
+    ['en', 'M-Pesa till number?'],
+    ['en', 'M-Pesa paybill number?'],
+    ['sw', 'namba ya till ya M-Pesa?'],
+  ]) {
+    const hit = say('pay', query, row, language);
+    assert.equal(hit.result.status, 'not_found_in_list', query);
+    expectCallback(hit, language);
+  }
+});
+
+test('pay: paybill plus till tenant resolves paybill and till number asks separately', () => {
+  const row = confirmedPay({
+    methods: ['mpesa_till', 'mpesa_paybill'],
+    mpesa_till: '123456',
+    mpesa_paybill: { business_no: '542542', account_mode: 'fixed', account: '70722' },
+  });
+  const paybill = say('pay', 'M-Pesa paybill number?', row, 'en');
+  assert.equal(paybill.result.status, 'found');
+  assert.match(paybill.speech, /paybill number is five four two five four two/);
+  assert.match(paybill.speech, /account is seven zero seven two two/);
+  assert.doesNotMatch(paybill.speech, /till number is one two three/i);
+  const till = say('pay', 'M-Pesa till number?', row, 'en');
+  assert.equal(till.result.status, 'found');
+  assert.match(till.speech, /till number is one two three four five six/i);
+  assert.doesNotMatch(till.speech, /paybill/i);
+});
+
+test('pay: compound questions respect unconfirmed payments before listing methods', () => {
+  const importedCash = {
+    ...CALLBACK_ROW,
+    business_name: 'Pay Co',
+    business_policies: {
+      payments: {
+        version: 2,
+        methods: ['cash'],
+        timings: ['on_delivery'],
+        source: 'import',
+        confirmed: false,
+        parsed_from: 'Cash on delivery',
+      },
+    },
+  };
+  const cases = [
+    ['en', 'Do you take M-Pesa or cash?'],
+    ['en', 'Do you take card or cash?'],
+    ['en', 'Do you accept cheque or bank transfer?'],
+    ['sw', 'Mnaweza kulipa kwa pesa taslimu au M-Pesa?'],
+  ];
+  for (const [language, query] of cases) {
+    const hit = say('pay', query, importedCash, language);
+    assert.equal(hit.result.status, 'unconfirmed', query);
+    expectCallback(hit, language);
+    assert.doesNotMatch(hit.speech, /You can pay by cash/i);
+    assert.doesNotMatch(hit.speech, /pesa taslimu/i);
   }
 });
 

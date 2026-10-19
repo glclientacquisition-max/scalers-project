@@ -31,6 +31,11 @@ const FIXTURE_PAY = {
   pochi: { methods: ['pochi'], pochi: { phone: '0712345678' } },
   send_money: { methods: ['mpesa_send'], mpesa_send: { phone: '0712345678' } },
   airtel: { methods: ['airtel'], airtel: { phone: '0734567890' } },
+  paybill_plus_till: {
+    methods: ['mpesa_till', 'mpesa_paybill'],
+    mpesa_till: '123456',
+    mpesa_paybill: { business_no: '542542', account_mode: 'fixed', account: '70722' },
+  },
 };
 
 function payRow(payOverrides) {
