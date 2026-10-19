@@ -18,4 +18,4 @@ The SQL file inserts no businesses. Production is not part of this change.
 
 P17 is [`docs/supabase/invoice_pay_live_allowlist.sql`](../supabase/invoice_pay_live_allowlist.sql), after P16. The only apply is staging project `sgcdncjxauhsbunobmob`: `invoice_pay_live_allowlist` (`20261019093619`). The table is empty.
 
-The report route `GET /api/cron/billing-reconcile` is not in `vercel.json`. It returns counts and does not write. It does not call Bachs unless `BACHS_MODE` is `sandbox` or an allowed `live`.
+`GET /api/cron/billing-payment-retry` is in `dashboard/vercel.json` at minute 7, 22, 37, and 52. It sweeps open checkouts and retries unreadable reads only when `BACHS_MODE=live` and `BACHS_LIVE_ALLOWED` is exactly `true`. A closed gate returns 200 and does not call Bachs. The report route `GET /api/cron/billing-reconcile` is not in `vercel.json`. It returns counts and does not write. It does not call Bachs unless `BACHS_MODE` is `sandbox` or an allowed `live`.
