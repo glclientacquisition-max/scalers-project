@@ -19,6 +19,8 @@ export function latestPublishedPackagePrice(rows: PublishedVersionPrice[]): Map<
   return latest;
 }
 
+const UNPUBLISHED_PRICE = 0;
+
 export function withPublishedPackagePrices<T extends { id: string; monthlyPriceKes: number; minutes: number }>(
   packages: T[],
   rows: PublishedVersionPrice[],
@@ -26,7 +28,7 @@ export function withPublishedPackagePrices<T extends { id: string; monthlyPriceK
   const latest = latestPublishedPackagePrice(rows);
   return packages.map((pack) => {
     const published = latest.get(pack.id);
-    if (!published) return { ...pack, monthlyPriceKes: 0, annualPriceKes: 0 };
+    if (!published) return { ...pack, monthlyPriceKes: UNPUBLISHED_PRICE, annualPriceKes: UNPUBLISHED_PRICE };
     return {
       ...pack,
       monthlyPriceKes: published.monthlyPriceKes,
