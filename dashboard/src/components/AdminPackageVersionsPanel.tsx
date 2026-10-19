@@ -7,6 +7,7 @@ import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { Empty } from "@/components/ui/Empty";
 import { Field, Input, Select, Textarea } from "@/components/ui/Field";
 import { ListRow } from "@/components/ui/ListRow";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { Stamp } from "@/components/ui/Stamp";
@@ -18,6 +19,7 @@ import {
   outboundKesPerMinute,
 } from "@/lib/packageCatalog";
 import { formatKes } from "@/lib/packagePriceLabel";
+import { clampListPage } from "@/lib/listPage";
 import {
   packageVersionFromUnknown,
   type BusinessPlanRow,
@@ -26,6 +28,8 @@ import {
   type VersionFeature,
   type VersionPackage,
 } from "@/lib/packageVersionCatalog";
+
+const BUSINESS_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 type Tab = "versions" | "businesses";
 type SheetKind = "edit" | "publish" | "discard" | "move" | "billing" | "signup" | null;
@@ -72,6 +76,20 @@ function impliedDiscount(monthly: string, annual: string): string {
 function planPreview(version: PackageVersionRow) {
   const credits = version.messageCredits === null ? "Credits not set" : `${version.messageCredits.toLocaleString("en-KE")} credits`;
   return `${money(version.monthlyPriceKes)} · ${version.minutes.toLocaleString("en-KE")} min · ${credits}`;
+}
+
+function versionRowPreview(version: PackageVersionRow) {
+  const base = planPreview(version);
+  if (version.subscriberCount <= 0) return base;
+  const noun = version.subscriberCount === 1 ? "business" : "businesses";
+  return `${base} · ${version.subscriberCount.toLocaleString("en-KE")} ${noun}`;
+}
+
+function businessPlanPreview(row: BusinessPlanRow) {
+  if (!row.packageName) return "No plan";
+  const billing =
+    row.billingEnforcement === "off" ? "Billing off" : row.billingEnforcement === "hard" ? "Billing hard" : "Billing soft";
+  return `${row.packageName} v${row.version} · ${row.minutesIncluded.toLocaleString("en-KE")} min · ${billing}`;
 }
 
 function publishedOf(pack: VersionPackage): PackageVersionRow | null {
@@ -202,12 +220,42 @@ export function AdminPackageVersionsPanel({
   const [nextBeta, setNextBeta] = useState(true);
   const [nextEnforcement, setNextEnforcement] = useState<"off" | "soft" | "hard">("off");
   const [signupEnabled, setSignupEnabled] = useState(catalog.newSignupTrialEnabled);
+  const [businessQuery, setBusinessQuery] = useState("");
+  const [businessPage, setBusinessPage] = useState(1);
+  const [showRetiredVersions, setShowRetiredVersions] = useState(false);
 
   const featureCatalog = useMemo<VersionFeature[]>(
     () => catalog.features.map((feature) => ({ ...feature, enabled: false })),
     [catalog.features],
   );
   const packs = catalog.packages;
+  const retiredVersionCount = useMemo(
+    () => packs.reduce((count, pack) => count + pack.versions.filter((version) => version.status === "retired").length, 0),
+    [packs],
+  );
+  const sortedBusinesses = useMemo(() => {
+    return [...businesses].sort((a, b) => {
+      const aNoPlan = a.packageName ? 1 : 0;
+      const bNoPlan = b.packageName ? 1 : 0;
+      if (aNoPlan !== bNoPlan) return aNoPlan - bNoPlan;
+      return a.businessName.localeCompare(b.businessName, "en");
+    });
+  }, [businesses]);
+  const filteredBusinesses = useMemo(() => {
+    const q = businessQuery.trim().toLowerCase();
+    if (!q) return sortedBusinesses;
+    return sortedBusinesses.filter((row) => {
+      if (row.businessName.toLowerCase().includes(q)) return true;
+      if (row.packageName?.toLowerCase().includes(q)) return true;
+      if (row.packageSku?.toLowerCase().includes(q)) return true;
+      return false;
+    });
+  }, [businessQuery, sortedBusinesses]);
+  const safeBusinessPage = clampListPage(businessPage, filteredBusinesses.length, BUSINESS_PAGE_SIZE);
+  const businessPageRows = useMemo(() => {
+    const start = (safeBusinessPage - 1) * BUSINESS_PAGE_SIZE;
+    return filteredBusinesses.slice(start, start + BUSINESS_PAGE_SIZE);
+  }, [filteredBusinesses, safeBusinessPage]);
   const trial = packs.find((pack) => pack.sku === "trial") || null;
   const trialLive = trial ? publishedOf(trial) : null;
   const business = businesses.find((row) => row.tenantId === businessId) || null;
@@ -402,6 +450,13 @@ export function AdminPackageVersionsPanel({
 
       {tab === "versions" ? (
         <div className="space-y-6">
+          {retiredVersionCount > 0 ? (
+            <div className="flex justify-end px-4">
+              <Button variant="ghost" size="sm" onClick={() => setShowRetiredVersions((on) => !on)}>
+                {showRetiredVersions ? "Hide retired" : `Retired (${retiredVersionCount})`}
+              </Button>
+            </div>
+          ) : null}
           {trial && trialLive ? (
             <section>
               <p className="px-4 text-caption text-ink-3">Trial</p>
@@ -449,12 +504,13 @@ export function AdminPackageVersionsPanel({
                   </Button>
                 </div>
                 <ul className="divide-y divide-hairline">
-                  {pack.versions.map((version) => (
+                  {pack.versions
+                    .filter((version) => showRetiredVersions || version.status !== "retired")
+                    .map((version) => (
                     <ListRow
                       key={version.id}
                       title={`Version ${version.version}`}
-                      preview={planPreview(version)}
-                      when={version.subscriberCount ? String(version.subscriberCount) : undefined}
+                      preview={versionRowPreview(version)}
                       stamp={
                         <Stamp tone={version.status === "draft" ? "attention" : version.status === "retired" ? "neutral" : "ok"}>
                           {version.status === "draft" ? "Draft" : version.status === "retired" ? "Retired" : "Published"}
@@ -481,38 +537,68 @@ export function AdminPackageVersionsPanel({
         businesses.length === 0 ? (
           <Empty title="No businesses" line="A signup creates a business, then you can move it onto a plan." />
         ) : (
-          <ul className="divide-y divide-hairline">
-            {businesses.map((row) => (
-              <ListRow
-                key={row.tenantId}
-                title={row.businessName}
-                preview={
-                  row.packageName
-                    ? `${row.packageName} version ${row.version} · ${row.minutesIncluded.toLocaleString("en-KE")} min · Billing ${row.billingEnforcement === "off" ? "off" : row.billingEnforcement}`
-                    : "No plan"
-                }
-                stamp={
-                  row.billingStatus === "beta" ? (
-                    <Stamp>Beta</Stamp>
-                  ) : row.billingEnforcement === "off" ? (
-                    <Stamp tone="attention">Billing off</Stamp>
-                  ) : (
-                    <Stamp tone="ok">Billing on</Stamp>
-                  )
-                }
-                onOpen={() => openMove(row)}
-                actions={
-                  <Button
-                    variant="tonal"
-                    size="sm"
-                    onClick={() => openBilling(row, row.billingStatus === "beta" || row.billingEnforcement === "off", row.billingEnforcement)}
-                  >
-                    Beta
-                  </Button>
-                }
+          <div className="space-y-3">
+            <div className="px-4">
+              <Input
+                autoComplete="off"
+                placeholder="Business or plan"
+                aria-label="Search businesses on plans"
+                value={businessQuery}
+                onChange={(event) => {
+                  setBusinessQuery(event.target.value);
+                  setBusinessPage(1);
+                }}
               />
-            ))}
-          </ul>
+            </div>
+            {filteredBusinesses.length === 0 ? (
+              <Empty title="No match" line="Try another name or plan." />
+            ) : (
+              <>
+                <ul className="divide-y divide-hairline">
+                  {businessPageRows.map((row) => (
+                    <ListRow
+                      key={row.tenantId}
+                      title={row.businessName}
+                      preview={businessPlanPreview(row)}
+                      stamp={
+                        row.billingStatus === "beta" ? (
+                          <Stamp>Beta</Stamp>
+                        ) : row.billingEnforcement === "off" ? (
+                          <Stamp tone="attention">Billing off</Stamp>
+                        ) : (
+                          <Stamp tone="ok">Billing on</Stamp>
+                        )
+                      }
+                      onOpen={() => openMove(row)}
+                      actions={
+                        <Button
+                          variant="tonal"
+                          size="sm"
+                          onClick={() =>
+                            openBilling(
+                              row,
+                              row.billingStatus === "beta" || row.billingEnforcement === "off",
+                              row.billingEnforcement,
+                            )
+                          }
+                        >
+                          Billing
+                        </Button>
+                      }
+                    />
+                  ))}
+                </ul>
+                <Pagination
+                  page={safeBusinessPage}
+                  pageSize={BUSINESS_PAGE_SIZE}
+                  total={filteredBusinesses.length}
+                  noun="business"
+                  onPage={setBusinessPage}
+                  className="px-4 py-3"
+                />
+              </>
+            )}
+          </div>
         )
       ) : null}
 
