@@ -58,7 +58,9 @@ test.describe("admin billing attention fixtures", () => {
     await expect(money.getByRole("switch", { name: "Live payments" })).toBeDisabled();
     await page.screenshot({ path: join(OUT, `${tag}-shop-money.png`), fullPage: true });
 
-    await money.getByRole("switch", { name: "Charging" }).click();
+    const charging = money.locator("label").filter({ has: page.getByRole("switch", { name: "Charging" }) });
+    await charging.scrollIntoViewIfNeeded();
+    await charging.click();
     await expect(page.getByText("Start charging?")).toBeVisible();
     await expect(page.locator(".desk-drawer").getByLabel("Reason")).toBeVisible();
     await page.screenshot({ path: join(OUT, `${tag}-confirm.png`) });

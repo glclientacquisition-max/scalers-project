@@ -18,7 +18,7 @@ export function Switch({
   return (
     <label
       className={cx(
-        "inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-full focus-within:outline-none focus-within:ring-2 focus-within:ring-brand",
+        "relative inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-full focus-within:outline-none focus-within:ring-2 focus-within:ring-brand",
         disabled && "cursor-not-allowed opacity-60",
       )}
     >
@@ -32,7 +32,7 @@ export function Switch({
           if (disabled) return;
           onCheckedChange(event.target.checked);
         }}
-        className="sr-only"
+        className="absolute inset-0 z-10 m-0 cursor-pointer opacity-0 disabled:cursor-not-allowed"
       />
       <span
         aria-hidden

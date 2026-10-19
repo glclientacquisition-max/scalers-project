@@ -152,5 +152,7 @@ describe("admin pay queue labels", () => {
     const toggle = read("dashboard/src/components/ui/Switch.tsx");
     assert.match(toggle, /checked \? "bg-accent"/);
     assert.doesNotMatch(toggle, /checked && !disabled \? "bg-accent"/);
+    assert.match(toggle, /absolute inset-0/);
+    assert.doesNotMatch(toggle, /sr-only/);
   });
 });
