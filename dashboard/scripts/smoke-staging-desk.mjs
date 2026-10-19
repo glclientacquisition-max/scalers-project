@@ -30,6 +30,25 @@ export function errorBoundaryText(html) {
   return null;
 }
 
+/** Next streams `NEXT_REDIRECT;replace;/login;307;` in a 200 body for signed-out requests. */
+export function loginRedirectInBody(html) {
+  return /NEXT_REDIRECT;[a-z]*;\/login[;?/]/.test(String(html || ""));
+}
+
+async function fetchWithRetry(url, cookie, tries = 4) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fetch(url, { headers: cookie ? { cookie } : {}, redirect: "follow" });
+      return { res, html: await res.text() };
+    } catch (err) {
+      last = err;
+      await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+    }
+  }
+  throw new Error(`${url.pathname}${url.search}: ${last?.cause?.message || last?.message || last}`);
+}
+
 /** @supabase/ssr cookies for a session (base64- value, chunked like the library). */
 export function supabaseAuthCookies(supabaseUrl, session) {
   const ref = new URL(supabaseUrl).hostname.split(".")[0];
@@ -96,11 +115,11 @@ async function main() {
   let failed = 0;
   for (const p of o.paths) {
     const url = new URL(p, o.base);
-    const res = await fetch(url, { headers: cookie ? { cookie } : {}, redirect: "follow" });
-    const html = await res.text();
+    const { res, html } = await fetchWithRetry(url, cookie);
     const finalPath = new URL(res.url).pathname;
     const boundary = errorBoundaryText(html);
-    const bounced = finalPath.startsWith("/login") && !p.startsWith("/login");
+    // Signed-out Desk pages stream a 200 with an in-body redirect, not an HTTP 307.
+    const bounced = !p.startsWith("/login") && (finalPath.startsWith("/login") || loginRedirectInBody(html));
     let verdict = "ok";
     if (res.status >= 500) verdict = `FAIL http ${res.status}`;
     else if (boundary) verdict = `FAIL error boundary: "${boundary}"`;
