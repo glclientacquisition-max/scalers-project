@@ -5,7 +5,97 @@ last_reviewed: 2026-10-19
 
 # Billing stack review, 18 Oct 2026
 
-Round 7 is the current verdict. Round 6, Round 5, Round 4, Round 3, Round 2, and Round 1 are kept below it.
+Round 8 is the current verdict. Round 7, Round 6, Round 5, Round 4, Round 3, Round 2, and Round 1 are kept below it.
+
+## Round 8
+
+Review of draft #798 at `3e569e3a` on `cursor/invoice-pay-live-money-0c16`, the two commits after `a95d89f3`: `d9fc508c` (fail safe when a new collection is not covered by the Bachs total) and `3e569e3a` (drop `export const dynamic` on the retry route). This review did not call Bachs, did not write to staging or production, and did not merge anything. Local Postgres 16 ran the P1 to P14 harness and the follow-up below. The branch `cursor/billing-review-round8-7822` holds this document only. Do not merge it. Do not merge #798 from this review.
+
+P9 `invoice_pay_session.sql` and P10 `billing_mode_legal_pairs.sql` are already on production. That is the owner's fact. This review did not query production. The author's migration ledger says the P14 name `invoice_pay_checkout_review` (`20261019034233`) is on staging. This review did not query staging. The remaining production apply, if the merge is accepted, is P11 then P12 then P13 then P14.
+
+### Verdict
+
+| Question | Verdict |
+| --- | --- |
+| Merge #798 at `3e569e3a` onto current main, and apply P11 then P12 then P13 then P14, with payments off | **Yes**, with the apply conditions below. `git merge-tree --write-tree` against `origin/main` `b3ce4ce0` exits 0 and writes tree `9aaf8297682ec129895b01d2668d2964c0df722c`. Main is a parent of `3e569e3a`. |
+
+Payments stay off. `BACHS_LIVE_ALLOWED` stays unset. The webhook route still returns 403 before `handlePayWebhook` when the gate refuses, and checkout still returns 503 `payments_unavailable`. A review row cannot be opened on production while that gate is closed. The findings below are the reason live money stays blocked. They are not a reason to hold the dormant schema apply.
+
+### Fail-safe
+
+`settle_checkout_reading` still applies a GET total that rises by at least the event's own KES amount, then stores that receipt or charge id on `payment_attempts.collection_ids`. Two other shapes write one issue and leave the books:
+
+- A new receipt or charge id whose GET rise is smaller than that event's own KES amount. Kind `short_rise`, reason `collected_total_short`. The partial rise is not applied. The id is not stored.
+- A GET total below `collected_total_seen_kes`. Kind `decrease`, reason `collected_total_decreased`, key `lower:<seen cents>:<next cents>`. The payment and the credit stay.
+
+The same key returns `duplicate: true` and does not insert again. A further drop is a new key. Open writes one `_billing_audit` row, actor `bachs-webhook`, action `checkout_total_review`, and one `platform_ops_notices` row when that table exists. A duplicate open hits the partial unique index and swallows `unique_violation`.
+
+Proved on the fake ledger at `3e569e3a`, then again in SQL on `billing_apply_order_proof`.
+
+| Shape | Result |
+| --- | --- |
+| Placeholder `ch_<checkout>` twice, GET stays 10, invoice 20 | Second response is a no-op. Paid stays 10. Issues 0. Alerts 0. SQL: second call `noop`, `review false`, `collection_ids` stays `[]`. |
+| Real id `ch_a` then `ch_b`, GET stays 10, event amount 10 | One issue, reason `collected_total_short`. Paid stays 10. Replay of `ch_b` is `duplicate`. SQL `collection_ids` stays `[]` and seen stays 10. |
+| Same short review, checkout still pending | `create_invoice_pay_attempt` returns that open checkout. The review check runs after the pending return and after the held return. |
+| Same short review, session succeeded and `checkout_closed_at` null, invoice 30 paid 10 | SQL returns `held: true` for the same attempt. |
+| That session then closed | SQL raises `checkout total needs review`. The fake ledger does the same once the checkout is expired. `checkoutFailure` maps that message to 409 `Previous payment still processing.` |
+| Later GET 20 with the same `ch_b` and event amount 10, after the short review | The rise applies. Paid goes 10 to 20. SQL stores `["ch_real"]`. The issue row stays `review_status = open`. The next insert still raises. |
+| `resolve_checkout_total_review` on that ref | `review_status` becomes `resolved`. `match_status` stays `issue`. Paid stays 20. Audit count stays 1. The next insert returns the KSh 10 remainder. |
+| GET 20 then GET 10 on a KSh 10 invoice | Paid stays 10. Payment stays 20. Credit stays 10. One decrease issue. The same pair is `duplicate`. A further GET of 4 is a second issue. Issues 2. Nothing is reversed. |
+| Event amount 20 (the session price) with a new charge id, GET 10 then GET 20 | The fake ledger opens `collected_total_short` and leaves paid at 10. The KSh 10 rise is not applied. This is the same SQL branch as a short rise: `rise < event cents`. |
+
+The last row is a false review when Bachs puts the checkout amount in the event `amount` and a real new charge id on the payload, while `amount_paid` rose by only the new collection. Resolve does not post that rise. It only lifts the insert block. A later GET that rises by at least the event amount does post it, and the issue row still has to be resolved before a new checkout. Two event types for the same money, with two real charge ids and a flat GET, take the same hold. The unit test for either order expects that one issue.
+
+There is no unrecoverable lock. A pending checkout and a succeeded session with `checkout_closed_at` null for the current part are still returned. Resolve opens the next insert. The function is service-role only, and nothing in the app calls `ledger.resolveCheckoutReview`. A false review waits on that RPC. That is a staff SQL step, and it cannot be reached on production while the gate refuses.
+
+### Placeholder `ch_<checkout>`
+
+`collectionIdentity` returns null when the charge id is `ch_` plus the checkout id. SQL does the same before it decides `v_known`. The placeholder is not a new collection, so two events that both carry it, with a GET that does not rise, are the Round 7 silent no-op. Paid stays at the first total. There is no issue row and no staff alert. A later real receipt or charge id does open a review when the GET does not cover it. If Bachs sends only the placeholder for two real collections, the second collection is still dropped.
+
+### Resolve
+
+`resolve_checkout_total_review` is `security definer`, `search_path = public`. Execute is granted to `service_role` and revoked from `public`, `anon`, and `authenticated`. The same grant shape holds for `open_checkout_total_review`, `settle_checkout_reading`, `mark_payment_event_retry`, `clear_payment_event_retry`, `create_invoice_pay_attempt`, `reconcile_checkout_total`, `reconcile_checkout_collection`, `release_held_pay_checkout`, and `record_payment_issue`.
+
+The function requires a `checkout-total-review:%` ref, locks the issue payment and the invoice, sets `raw.review_status` to `resolved`, and marks a matching `platform_ops_notices` row `resolved`. It does not change `match_status`, the invoice, the payment amount, or a credit. It does not call `_billing_audit`. It does not read `auth.uid()`. Open does call `_billing_audit`. The SQL proof opened one audit row and resolve left that count at 1.
+
+There is no admin route and no product screen. The only caller in the repo is `invoicePayLedger().resolveCheckoutReview`, and no route calls that method. `invoicePayLedger()` still does not call `assertBachsAllowed`.
+
+With one `platform_ops_notices` table created from `platform_ops_notices.sql` on the throwaway database: one notice, a duplicate open did not insert a second row, and resolve set `status` to `resolved`.
+
+### Retry route
+
+`GET /api/cron/billing-payment-retry` requires `CRON_SECRET`. An empty secret, or an `Authorization` header that is not exactly `Bearer <secret>`, returns 401 `{ok:false}`. The handler does not log the secret. The compare is a plain string compare.
+
+`assertBachsAllowed` throwing returns 200 `{ok:true, skipped:"payments_closed"}` and does not call Bachs. A mode other than `live` returns `{ok:true, skipped:"not_live"}`. Live mode lists `payment_events` for provider `bachs` with `needs_retry` true and passes them to `retryStoredReads`. The route takes no checkout id and no invoice id. A skipped allowlist row does not call `getCheckout` and does not clear `needs_retry`. The probe: `retry_skipped` / `live_not_allowlisted`, zero GET calls, flag still true, payments 0. Live mode without the allow flag throws `bachs_live_refused` before any settle.
+
+`dashboard/vercel.json` has no `crons` key. The route is not armed. The second commit removes `export const dynamic = "force-dynamic"` because Cache Components rejects that segment config. The handler reads `request.headers`, so the route stays dynamic.
+
+`scripts/billing-payment-reconcile.js` in live mode calls `assertBachsAllowed` and retries only `needs_retry` rows through `settle_checkout_reading`. The sandbox sweep that calls `reconcile_checkout_total` directly is inside `if (!live && bachsMode() === "sandbox")`. That sweep skips the review logic. It still refuses the production URL when mode is not live. A stolen cron secret on a payments-off deploy cannot invent a payment.
+
+### P11 then P14 after P10
+
+`tests/sql/billing_apply_order/run.sh` from `3e569e3a` applies P1 through P14, and applies P9 through P14 a second time. Exit 0. The harness check sees `checkout total needs review` in `create_invoice_pay_attempt` and sees `settle_checkout_reading`. Finalize still numbers `SCL-` and still contains `scalers.billing_write` and `invoice-credit:`.
+
+Proof invoices after the follow-up, unchanged: `SCL-2026-000001` paid, total 3667, amount paid 3667. `SCL-2026-000002` paid, total 0, amount paid 0. `SCL-2026-000003` open, total 2320, amount paid 2000. The follow-up added `SCL-2026-000004` through `000006` on this throwaway database only.
+
+Rolled back, so the database was left on P14:
+
+| Re-apply, then rollback | While the transaction was open | After rollback |
+| --- | --- | --- |
+| P12 `invoice_pay_collections.sql` | Review text position 0. Closed-at hold position 3574. `settle_checkout_reading` still present. | Review text back at 4404. Hold back at 3571. |
+| P11 `invoice_pay_held.sql` | Review text 0. Closed-at hold 0. | Both restored. |
+| P9 `invoice_pay_session.sql` | Review text 0. Closed-at hold 0. P9 also drops and recreates the pending index inside the transaction. | Both restored. |
+| P13 `invoice_pay_checkout_total.sql` | Review text stayed 4404. `settle_checkout_reading` stayed. `collection_ids` stayed. | Left as P14. |
+
+P14's second apply in the harness is idempotent (`add column if not exists`, `create index if not exists`, `create or replace`). The author's README says not to re-run P9 after P14. P11 and P12 are the same hazard. P12 drops the review check and keeps the closed-at hold. P9 and P11 drop both.
+
+`node --test tests/invoicePay.test.js tests/invoiceDocuments.test.js` at `3e569e3a`: 65 pass, 0 fail. `invoicePaySql.test.js` was not run. This environment has no pglite. The harness is the SQL proof.
+
+### Apply conditions
+
+Apply on production only if this merge is accepted, payments stay off, and Alvin has said GO for each file. One transaction each, in order: P11 `invoice_pay_held.sql`, P12 `invoice_pay_collections.sql`, P13 `invoice_pay_checkout_total.sql`, P14 `invoice_pay_checkout_review.sql`. P9 and P10 are already on production. Do not re-run P5. Do not re-run P9, P11, or P12 after P14. Re-running P13 leaves the review check in place. Take a backup first. Leave `BACHS_LIVE_ALLOWED` unset. Do not add the cron entry. Do not touch DID `+254709221536`. The P14 header still says staging only until Alvin's GO.
+
+Before any live collection, two gaps from this round stay open. The placeholder `ch_<checkout>` is still a silent drop when the GET does not rise. `resolve_checkout_total_review` is service-role only and is not audited, and no screen calls it. A false short review can also leave a real rise off the books after staff clear the hold, until a later GET covers the event amount.
 
 ## Round 7
 
