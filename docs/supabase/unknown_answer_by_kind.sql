@@ -14,7 +14,7 @@ comment on column public.tenants.unknown_answer_by_kind is
 
 update public.tenants
 set unknown_answer_by_kind = case
-  when btrim(unknown_answer_fallback) ~* '(call you back with a (price|quote)|shop will call you back|note what you need|duka litakupigia|litakupigia kwa bei)'
+  when btrim(unknown_answer_fallback) ~* '(call you back with a (price|quote)|shop will call you back|note what you need|duka litakupigia|litakupigia kwa bei|cannot quote|can''?t quote|formal quote)'
     then jsonb_build_object(
       'price',
       jsonb_build_object('en', btrim(unknown_answer_fallback), 'sw', null)
@@ -35,4 +35,4 @@ set unknown_answer_by_kind =
   || jsonb_build_object('price', unknown_answer_by_kind -> 'general')
 where unknown_answer_by_kind ? 'general'
   and not (unknown_answer_by_kind ? 'price')
-  and coalesce(unknown_answer_by_kind -> 'general' ->> 'en', '') ~* '(call you back with a (price|quote)|shop will call you back|note what you need|duka litakupigia|litakupigia kwa bei)';
+  and coalesce(unknown_answer_by_kind -> 'general' ->> 'en', '') ~* '(call you back with a (price|quote)|shop will call you back|note what you need|duka litakupigia|litakupigia kwa bei|cannot quote|can''?t quote|formal quote)';

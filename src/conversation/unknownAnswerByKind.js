@@ -32,8 +32,8 @@ const DEFAULT_BY_KIND = {
     sw: 'Nitaangalia kama tunafikisha eneo lako na mtu atakupigia.',
   },
   pay: {
-    en: "I'll have the team send you the payment details.",
-    sw: 'Timu itakutumia maelezo ya malipo.',
+    en: "I'll ask the team to call you back with the payment details.",
+    sw: 'Timu itakupigia simu kukupa maelezo ya malipo.',
   },
 };
 
@@ -73,14 +73,17 @@ function isQuoteStyleFallbackLine(text) {
     /\bshop will call you back\b/.test(t) ||
     /\bnote what you need\b/.test(t) ||
     /\bduka litakupigia\b/.test(t) ||
-    /\blitakupigia kwa bei\b/.test(t)
+    /\blitakupigia kwa bei\b/.test(t) ||
+    /\bcannot quote\b/.test(t) ||
+    /\bcan'?t quote\b/.test(t) ||
+    /\bformal quote\b/.test(t)
   );
 }
 
 function generalFitsFallbackKind(line, kind) {
   if (!line) return false;
-  if (kind === 'general') return true;
   if (isQuoteStyleFallbackLine(line)) return kind === 'price';
+  if (kind === 'general') return true;
   return true;
 }
 
@@ -102,7 +105,7 @@ function lineForKind(byKind, kind, language, profile = null) {
   const key = langKey(language);
   const bucket = byKind && typeof byKind === 'object' ? byKind[kind] : null;
   const custom = bucket && typeof bucket === 'object' ? String(bucket[key] || '').trim() : '';
-  if (custom && callbackSafeLine(custom)) return custom;
+  if (custom && callbackSafeLine(custom) && (kind === 'price' || !isQuoteStyleFallbackLine(custom))) return custom;
   const general = ownerGeneralLine(byKind, profile, language);
   if (general && generalFitsFallbackKind(general, kind) && callbackSafeLine(general)) return general;
   const fallback = DEFAULT_BY_KIND[kind] || DEFAULT_BY_KIND.general;
