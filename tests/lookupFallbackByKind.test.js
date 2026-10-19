@@ -8,7 +8,9 @@ const { DEFAULT_BY_KIND } = require('../src/conversation/unknownAnswerByKind');
 
 const QUOTE_GENERAL =
   "I'll note what you need and the shop will call you back with a price.";
+const GENERIC_GENERAL = 'Let me check with the team and get back to you.';
 const NOW = new Date('2026-10-19T05:00:00.000Z');
+const { isQuoteStyleFallbackLine } = require('../src/conversation/unknownAnswerByKind');
 
 function hoursRowUnconfirmed() {
   return {
@@ -49,6 +51,63 @@ test('with VOICE_FALLBACK_BY_KIND off, hours unconfirmed still uses legacy gener
   if (prevHash == null) delete process.env.FACT_HASH_MODE;
   else process.env.FACT_HASH_MODE = prevHash;
   if (prevKind != null) process.env.VOICE_FALLBACK_BY_KIND = prevKind;
+});
+
+test('isQuoteStyleFallbackLine classifies Esga-style price callbacks', () => {
+  assert.equal(isQuoteStyleFallbackLine(QUOTE_GENERAL), true);
+  assert.equal(isQuoteStyleFallbackLine(GENERIC_GENERAL), false);
+});
+
+test('with VOICE_FALLBACK_BY_KIND on, quote owner line is used for price but not hours', () => {
+  const prevHash = process.env.FACT_HASH_MODE;
+  const prevKind = process.env.VOICE_FALLBACK_BY_KIND;
+  process.env.FACT_HASH_MODE = 'on';
+  process.env.VOICE_FALLBACK_BY_KIND = 'on';
+  const profile = tenantProfileFromRow(
+    {
+      ...hoursRowUnconfirmed(),
+      unknown_answer_fallback: QUOTE_GENERAL,
+      unknown_answer_by_kind: { general: { en: QUOTE_GENERAL, sw: '' } },
+    },
+    { fieldMeta: { hashMode: true } }
+  );
+  const price = lookup('price', 'How much is cleaning?', { profile, language: 'en', now: NOW, seed: 0 });
+  assert.equal(speechOf(price, 'en'), QUOTE_GENERAL);
+  const hours = lookup('hours', 'What are your opening hours?', { profile, language: 'en', now: NOW, seed: 0 });
+  assert.equal(speechOf(hours, 'en'), DEFAULT_BY_KIND.hours.en);
+  if (prevHash == null) delete process.env.FACT_HASH_MODE;
+  else process.env.FACT_HASH_MODE = prevHash;
+  if (prevKind == null) delete process.env.VOICE_FALLBACK_BY_KIND;
+  else process.env.VOICE_FALLBACK_BY_KIND = prevKind;
+});
+
+test('with VOICE_FALLBACK_BY_KIND on, generic owner general line is used for hours fee and pay', () => {
+  const prevHash = process.env.FACT_HASH_MODE;
+  const prevKind = process.env.VOICE_FALLBACK_BY_KIND;
+  process.env.FACT_HASH_MODE = 'on';
+  process.env.VOICE_FALLBACK_BY_KIND = 'on';
+  const profile = tenantProfileFromRow(
+    {
+      id: 't-generic',
+      business_name: 'Demo',
+      hours_schedule: hoursRowUnconfirmed().hours_schedule,
+      services_catalog: [],
+      business_policies: {},
+      unknown_answer_fallback: GENERIC_GENERAL,
+      unknown_answer_by_kind: { general: { en: GENERIC_GENERAL, sw: '' } },
+    },
+    { fieldMeta: { hashMode: true } }
+  );
+  const hours = lookup('hours', 'opening hours', { profile, language: 'en', now: NOW, seed: 0 });
+  assert.equal(speechOf(hours, 'en'), GENERIC_GENERAL);
+  const fee = lookup('fee', 'Do you deliver to Westlands?', { profile, language: 'en', now: NOW, seed: 0 });
+  assert.equal(speechOf(fee, 'en'), GENERIC_GENERAL);
+  const pay = lookup('pay', 'till number', { profile, language: 'en', now: NOW, seed: 0 });
+  assert.equal(speechOf(pay, 'en'), GENERIC_GENERAL);
+  if (prevHash == null) delete process.env.FACT_HASH_MODE;
+  else process.env.FACT_HASH_MODE = prevHash;
+  if (prevKind == null) delete process.env.VOICE_FALLBACK_BY_KIND;
+  else process.env.VOICE_FALLBACK_BY_KIND = prevKind;
 });
 
 test('with VOICE_FALLBACK_BY_KIND on, hours unconfirmed uses hours fallback not quote general line', () => {

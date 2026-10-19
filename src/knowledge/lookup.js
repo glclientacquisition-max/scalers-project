@@ -84,8 +84,8 @@ function fallbackSpeech(profile, lookupKind) {
     const { lineForKind, parseByKind, mapLookupKindToFallbackKind } = require('../conversation/unknownAnswerByKind');
     const kind = mapLookupKindToFallbackKind(lookupKind);
     const byKind = parseByKind(profile?.unknownAnswerByKind);
-    const en = safeLine(lineForKind(byKind, kind, 'en'), 'en');
-    const sw = safeLine(lineForKind(byKind, kind, 'sw'), 'sw');
+    const en = safeLine(lineForKind(byKind, kind, 'en', profile), 'en');
+    const sw = safeLine(lineForKind(byKind, kind, 'sw', profile), 'sw');
     return { en, sw };
   }
   const en = safeLine(pickUnknownAnswerLine(profile || {}, 'en').text, 'en');
@@ -668,14 +668,22 @@ function payReading(profile, pay) {
   return confirmReading(profile, 'payments.methods', factValueForPath('payments.methods', tenant), pay);
 }
 
+const PAY_SLOT_LABEL = {
+  till: { en: 'M-Pesa till number', sw: 'till ya M-Pesa' },
+  paybill: { en: 'M-Pesa paybill number', sw: 'namba ya paybill ya M-Pesa' },
+  pochi: { en: 'Pochi la Biashara number', sw: 'namba ya Pochi la Biashara' },
+  send: { en: 'M-Pesa send money number', sw: 'namba ya kutuma pesa kwa M-Pesa' },
+  airtel: { en: 'Airtel Money number', sw: 'namba ya Airtel Money' },
+};
+
 function paySlots(pay) {
   const paybill = asObject(pay.mpesa_paybill);
   return [
-    ['till', digitsOf(pay.mpesa_till), 'M-Pesa till number', null],
-    ['paybill', digitsOf(paybill?.business_no), 'M-Pesa paybill number', paybill],
-    ['pochi', digitsOf(asObject(pay.pochi)?.phone), 'Pochi la Biashara number', null],
-    ['send', digitsOf(asObject(pay.mpesa_send)?.phone), 'M-Pesa send money number', null],
-    ['airtel', digitsOf(asObject(pay.airtel)?.till || asObject(pay.airtel)?.phone), 'Airtel Money number', null],
+    ['till', digitsOf(pay.mpesa_till), PAY_SLOT_LABEL.till, null],
+    ['paybill', digitsOf(paybill?.business_no), PAY_SLOT_LABEL.paybill, paybill],
+    ['pochi', digitsOf(asObject(pay.pochi)?.phone), PAY_SLOT_LABEL.pochi, null],
+    ['send', digitsOf(asObject(pay.mpesa_send)?.phone), PAY_SLOT_LABEL.send, null],
+    ['airtel', digitsOf(asObject(pay.airtel)?.till || asObject(pay.airtel)?.phone), PAY_SLOT_LABEL.airtel, null],
   ].filter((row) => row[1]);
 }
 
@@ -724,8 +732,9 @@ function lookupPay(query, ctx) {
   if (!payRead.ok) return unconfirmed(profile, `pay.${slot[0]}`, 'pay', payRead.reason, 'pay');
   const enDigits = speakDigits(slot[1], 'en');
   const swDigits = speakDigits(slot[1], 'sw');
-  let en = `The ${slot[2]} is ${enDigits}.`;
-  let sw = `Namba ya ${slot[2]} ni ${swDigits}.`;
+  const labels = slot[2];
+  let en = `The ${labels.en} is ${enDigits}.`;
+  let sw = `Namba ya ${labels.sw} ni ${swDigits}.`;
   const account = slot[3] && (slot[3].account_mode || 'fixed') === 'fixed' ? digitsOf(slot[3].account) : '';
   if (account) {
     en += ` The account is ${speakDigits(account, 'en')}.`;

@@ -32,8 +32,8 @@ const DEFAULT_BY_KIND = {
     sw: 'Nitaangalia kama tunafikisha eneo lako na mtu atakupigia.',
   },
   pay: {
-    en: "I'll send payment details on WhatsApp after this call.",
-    sw: 'Nitakutumia maelezo ya malipo kwa WhatsApp baada ya simu hii.',
+    en: "I'll have the team send you the payment details.",
+    sw: 'Timu itakutumia maelezo ya malipo.',
   },
 };
 
@@ -65,12 +65,46 @@ function mapLookupKindToFallbackKind(lookupKind) {
   return 'general';
 }
 
-function lineForKind(byKind, kind, language) {
+/** Quote-style owner lines (Esga-style) apply to price lookups only. */
+function isQuoteStyleFallbackLine(text) {
+  const t = String(text || '').toLowerCase();
+  return (
+    /\bcall you back with a (?:price|quote)\b/.test(t) ||
+    /\bshop will call you back\b/.test(t) ||
+    /\bnote what you need\b/.test(t) ||
+    /\bduka litakupigia\b/.test(t) ||
+    /\blitakupigia kwa bei\b/.test(t)
+  );
+}
+
+function generalFitsFallbackKind(line, kind) {
+  if (!line) return false;
+  if (kind === 'general') return true;
+  if (isQuoteStyleFallbackLine(line)) return kind === 'price';
+  return true;
+}
+
+function ownerGeneralLine(byKind, profile, language) {
+  const { callbackSafeLine, pickUnknownAnswerLine } = require('./factSheet');
+  const key = langKey(language);
+  const bucket = byKind && typeof byKind === 'object' ? byKind.general : null;
+  if (bucket && typeof bucket === 'object') {
+    const fromJson = String(bucket[key] || '').trim() || (key === 'en' ? String(bucket.en || '').trim() : '');
+    if (fromJson && callbackSafeLine(fromJson)) return fromJson;
+  }
+  const picked = pickUnknownAnswerLine(profile || {}, language);
+  if (picked.source !== 'default' && callbackSafeLine(picked.text)) return picked.text;
+  return '';
+}
+
+function lineForKind(byKind, kind, language, profile = null) {
   const { callbackSafeLine } = require('./factSheet');
   const key = langKey(language);
   const bucket = byKind && typeof byKind === 'object' ? byKind[kind] : null;
   const custom = bucket && typeof bucket === 'object' ? String(bucket[key] || '').trim() : '';
   if (custom && callbackSafeLine(custom)) return custom;
+  const general = ownerGeneralLine(byKind, profile, language);
+  if (general && generalFitsFallbackKind(general, kind) && callbackSafeLine(general)) return general;
   const fallback = DEFAULT_BY_KIND[kind] || DEFAULT_BY_KIND.general;
   return fallback[key] || fallback.en;
 }
@@ -80,5 +114,7 @@ module.exports = {
   DEFAULT_BY_KIND,
   parseByKind,
   mapLookupKindToFallbackKind,
+  isQuoteStyleFallbackLine,
+  generalFitsFallbackKind,
   lineForKind,
 };

@@ -24,8 +24,8 @@ export const DEFAULT_BY_KIND: Record<FallbackKind, { en: string; sw: string }> =
     sw: "Nitaangalia kama tunafikisha eneo lako na mtu atakupigia.",
   },
   pay: {
-    en: "I'll send payment details on WhatsApp after this call.",
-    sw: "Nitakutumia maelezo ya malipo kwa WhatsApp baada ya simu hii.",
+    en: "I'll have the team send you the payment details.",
+    sw: "Timu itakutumia maelezo ya malipo.",
   },
 };
 
@@ -60,8 +60,35 @@ export function parseUnknownAnswerByKind(raw: unknown): UnknownAnswerByKind | nu
   return Object.keys(out).length ? out : null;
 }
 
-export function displayLine(kind: FallbackKind, byKind: UnknownAnswerByKind | null, lang: "en" | "sw"): string {
+export function isQuoteStyleFallbackLine(text: string): boolean {
+  const t = String(text || "").toLowerCase();
+  return (
+    /\bcall you back with a (?:price|quote)\b/.test(t) ||
+    /\bshop will call you back\b/.test(t) ||
+    /\bnote what you need\b/.test(t) ||
+    /\bduka litakupigia\b/.test(t) ||
+    /\blitakupigia kwa bei\b/.test(t)
+  );
+}
+
+function generalFitsFallbackKind(line: string, kind: FallbackKind): boolean {
+  if (!line) return false;
+  if (kind === "general") return true;
+  if (isQuoteStyleFallbackLine(line)) return kind === "price";
+  return true;
+}
+
+export function displayLine(
+  kind: FallbackKind,
+  byKind: UnknownAnswerByKind | null,
+  lang: "en" | "sw",
+  legacyGeneral?: string | null
+): string {
   const custom = byKind?.[kind]?.[lang]?.trim();
   if (custom) return custom;
+  const fromJson = byKind?.general?.[lang]?.trim() || (lang === "en" ? byKind?.general?.en?.trim() : "");
+  const legacy = lang === "en" ? String(legacyGeneral || "").trim() : "";
+  const general = fromJson || legacy;
+  if (general && generalFitsFallbackKind(general, kind)) return general;
   return DEFAULT_BY_KIND[kind][lang];
 }

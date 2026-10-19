@@ -6,5 +6,10 @@ import type { TenantRow } from "@/lib/supabase";
 export function assistantSayBelowList(tenant: TenantRow) {
   if (!voiceFallbackByKind()) return null;
   const initial = parseUnknownAnswerByKind(tenant.unknown_answer_by_kind);
-  return <AssistantSayFallbackEditor initial={initial} />;
+  return (
+    <AssistantSayFallbackEditor
+      initial={initial}
+      legacyGeneral={tenant.unknown_answer_fallback}
+    />
+  );
 }

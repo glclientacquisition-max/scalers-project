@@ -16,9 +16,10 @@ const fieldClass = `${settingsFieldClass} min-h-11`;
 
 type Props = {
   initial: UnknownAnswerByKind | null;
+  legacyGeneral?: string | null;
 };
 
-export function AssistantSayFallbackEditor({ initial }: Props) {
+export function AssistantSayFallbackEditor({ initial, legacyGeneral }: Props) {
   const [byKind, setByKind] = useState<UnknownAnswerByKind | null>(initial);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -96,7 +97,7 @@ export function AssistantSayFallbackEditor({ initial }: Props) {
               />
             </SettingsStack>
             <p className="mt-1 text-meta text-ink-3">
-              Callers hear: {displayLine(kind, byKind, "en")}
+              Callers hear: {displayLine(kind, byKind, "en", legacyGeneral)}
             </p>
           </div>
         ))}
