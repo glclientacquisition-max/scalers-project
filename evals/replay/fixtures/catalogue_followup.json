@@ -1,0 +1,25 @@
+{
+  "id": "catalogue_followup",
+  "bug": "followup",
+  "profile": "menu",
+  "language": "en",
+  "turns": [
+    {
+      "caller": "And sofa cleaning?",
+      "mustSay": ["two thousand five hundred"],
+      "status": "found",
+      "value": 2500
+    },
+    {
+      "caller": "Na sofa je?",
+      "mustSay": ["two thousand five hundred"],
+      "status": "found"
+    },
+    {
+      "caller": "Na curtain cleaning?",
+      "mustSay": ["one thousand eight hundred"],
+      "status": "found",
+      "value": 1800
+    }
+  ]
+}

@@ -222,6 +222,7 @@ function noopTrace() {
     noteTool: noop,
     noteBarge: noop,
     noteSpeakPacket: noop,
+    noteLookup: noop,
     noteSpeakSlots: noop,
     noteBrainLines: noop,
     noteCall: noop,
@@ -471,6 +472,26 @@ function createVoiceTrace(opts = {}) {
     });
   }
 
+  // One code lookup on this turn (src/conversation/router.js). One row per
+  // answered part: type, result status, matched fact id, and why.
+  function noteLookup(info = {}) {
+    const rows = (Array.isArray(info.lookups) ? info.lookups : []).slice(0, 4).map((row) => ({
+      type: String(row?.kind || ''),
+      result: String(row?.status || ''),
+      matchedId: String(row?.id || '') || null,
+      reason: String(row?.reason || '') || null,
+      source: String(row?.source || '') || null,
+    }));
+    pushStage({
+      stage: 'lookup',
+      handled: info.handled === true,
+      outcome: info.outcome || null,
+      lookups: rows,
+      brainMs: Number.isFinite(Number(info.brainMs)) ? Math.round(Number(info.brainMs) * 10) / 10 : null,
+      at: new Date().toISOString(),
+    });
+  }
+
   function noteSpeakSlots(info = {}) {
     const slots = (Array.isArray(info.slots) ? info.slots : []).slice(0, 12).map((slot) => ({
       outcome: slot?.outcome || null,
@@ -626,6 +647,7 @@ function createVoiceTrace(opts = {}) {
     noteTool: guard(noteTool),
     noteBarge: guard(noteBarge),
     noteSpeakPacket: guard(noteSpeakPacket),
+    noteLookup: guard(noteLookup),
     noteSpeakSlots: guard(noteSpeakSlots),
     noteBrainLines: guard(noteBrainLines),
     noteCall: guard(noteCall),

@@ -8,11 +8,15 @@ const { confirmationLanguage } = require('./language');
 const { factServices, factProducts, speechFactText } = require('./provenance');
 const { entityValue, findCatalogMatch } = require('./entityExtraction');
 const { looksLikeOfferAsk } = require('./fileRead');
+const { fileServicePriceLine, namesOtherTopic } = require('./catalogueMouth');
 const {
-  fileServicePriceLine,
-  namesOtherTopic,
-  midSentencePrice,
-} = require('./catalogueMouth');
+  normalisePrice,
+  priceIsSpeakable,
+  formatPriceDisplay,
+  legacyPriceText,
+  midSentencePriceDisplay,
+  SPOKEN_PLACEHOLDER_RE,
+} = require('./factPrice');
 const { hoursAskLine, looksLikeHoursAsk } = require('./knownFacts');
 const { numbersIn } = require('./numberWords');
 const {
@@ -407,22 +411,18 @@ const PRICE_NAME_SKIP = new Set([
 function pricedRows(profile) {
   const fieldMeta = profile?.fieldMeta || null;
   const rows = [];
-  for (const row of factServices(profile?.servicesCatalog, fieldMeta)) {
+  const push = (row, priceField) => {
     const name = String(row?.name || '')
       .replace(/\([^)]*\)/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    const price = String(row?.price_range || row?.priceRange || '').trim();
-    if (name && price && /\d/.test(price)) rows.push({ name, price });
-  }
-  for (const row of factProducts(profile?.productCatalog, fieldMeta)) {
-    const name = String(row?.name || '')
-      .replace(/\([^)]*\)/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    const price = String(row?.price || row?.price_range || row?.priceRange || '').trim();
-    if (name && price && /\d/.test(price)) rows.push({ name, price });
-  }
+    const norm = normalisePrice(row);
+    if (!name || !priceIsSpeakable(norm)) return;
+    const price = formatPriceDisplay(norm, 'en', legacyPriceText(row));
+    if (price) rows.push({ name, price, norm, legacy: legacyPriceText(row) });
+  };
+  for (const row of factServices(profile?.servicesCatalog, fieldMeta)) push(row);
+  for (const row of factProducts(profile?.productCatalog, fieldMeta)) push(row);
   return rows;
 }
 
@@ -443,7 +443,9 @@ function priceHits(profile, ask) {
 
 function formatFilePrice(hit, language) {
   const lang = confirmationLanguage(language);
-  const price = midSentencePrice(hit.price);
+  const refsOn = require('./factSheet').factRefsEnabled();
+  const norm = hit.norm || normalisePrice({ price_range: hit.price });
+  const price = midSentencePriceDisplay(norm, language, refsOn, hit.legacy || hit.price);
   if (lang === 'sw' || lang === 'sheng') return `${hit.name} ni ${price}.`;
   return `${hit.name} is ${price}.`;
 }
@@ -527,8 +529,7 @@ function catalogueRowNamedWithoutPrice(text, profile) {
     return name && name === want;
   });
   if (!row) return false;
-  const price = String(row.price_range || row.priceRange || row.price || '');
-  return !/\d/.test(price);
+  return !priceIsSpeakable(normalisePrice(row));
 }
 
 function unknownFallback(language) {
@@ -750,6 +751,10 @@ function guardSpokenReply(text, ctx = {}) {
     }
     if (sentenceIsSpeechSlop(sentence, lastCallerTurn)) {
       noteDrop(ctx, 'slop', sentence);
+      continue;
+    }
+    if (SPOKEN_PLACEHOLDER_RE.test(sentence)) {
+      noteDrop(ctx, 'placeholder_price', sentence);
       continue;
     }
     if (ACTION_NARRATION.test(sentence)) {

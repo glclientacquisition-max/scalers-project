@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCurrentTenant } from "@/lib/tenant";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { assertBachsAllowed } from "./provider";
 
+/** Owner invoice and receipt reads. Does not call the Bachs gate. */
 export async function requireBillingRead() {
-  try {
-    assertBachsAllowed();
-  } catch {
-    return { error: NextResponse.json({ error: "unavailable" }, { status: 503 }) };
-  }
   const tenant = await getCurrentTenant();
   if (!tenant?.id) {
     return { error: NextResponse.json({ error: "unauthorized" }, { status: 401 }) };

@@ -61,6 +61,7 @@ const BUSINESSES: AdminBusiness[] = [
     billing_enforcement: "off",
     status: "waiting",
     pre_archive: null,
+    recording_retention_days_override: null,
   },
   {
     id: "biz-live",
@@ -77,6 +78,7 @@ const BUSINESSES: AdminBusiness[] = [
     billing_enforcement: "soft",
     status: "active",
     pre_archive: null,
+    recording_retention_days_override: null,
   },
   {
     id: "biz-suspended",
@@ -93,6 +95,7 @@ const BUSINESSES: AdminBusiness[] = [
     billing_enforcement: "soft",
     status: "suspended",
     pre_archive: null,
+    recording_retention_days_override: null,
   },
   {
     id: "biz-archived",
@@ -109,6 +112,7 @@ const BUSINESSES: AdminBusiness[] = [
     billing_enforcement: "off",
     status: "archived",
     pre_archive: null,
+    recording_retention_days_override: null,
   },
   {
     id: "biz-archived-recent",
@@ -125,6 +129,7 @@ const BUSINESSES: AdminBusiness[] = [
     billing_enforcement: "off",
     status: "archived",
     pre_archive: { billing: "soft", onDemand: true },
+    recording_retention_days_override: null,
   },
   ...Array.from({ length: 24 }, (_, index) => ({
     id: `biz-page-${index + 1}`,
@@ -141,6 +146,7 @@ const BUSINESSES: AdminBusiness[] = [
     billing_enforcement: "off" as const,
     status: "active" as const,
     pre_archive: null,
+    recording_retention_days_override: null,
   })),
 ];
 

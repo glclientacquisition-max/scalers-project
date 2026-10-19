@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { startInvoiceCheckout } from "@/lib/invoicePay/checkoutFlow";
 import { invoicePayLedger } from "@/lib/invoicePay/ledger";
-import { payProviderFromEnv } from "@/lib/invoicePay/provider";
+import { assertBachsAllowed, checkoutFailure, payProviderFromEnv } from "@/lib/invoicePay/provider";
 
 export async function POST(request: Request, context: { params: Promise<{ token: string }> }) {
   const { token } = await context.params;
@@ -10,15 +10,23 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     ...process.env,
     BACHS_MODE: process.env.BACHS_MODE,
     BACHS_API_KEY: process.env.BACHS_API_KEY,
+    BACHS_LIVE_ALLOWED: process.env.BACHS_LIVE_ALLOWED,
+    BACHS_LIVE_TENANT_ALLOWLIST: process.env.BACHS_LIVE_TENANT_ALLOWLIST,
     SUPABASE_URL: process.env.SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   };
+  try {
+    assertBachsAllowed(env);
+  } catch (err) {
+    const failed = checkoutFailure(err);
+    return NextResponse.json({ error: failed.error }, { status: failed.status });
+  }
   try {
     const result = await startInvoiceCheckout({
       token,
       origin,
       env,
-      ledger: invoicePayLedger(env),
+      ledger: invoicePayLedger(),
       provider: payProviderFromEnv(env),
     });
     const response = NextResponse.json(
@@ -34,13 +42,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     });
     return response;
   } catch (err) {
-    const code = err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code || "") : "";
-    if (code === "previous_processing") {
-      return NextResponse.json({ error: "Previous payment still processing." }, { status: 409 });
-    }
-    if (code === "bachs_live_refused") {
-      return NextResponse.json({ error: "Live payments are not open for this business." }, { status: 403 });
-    }
-    return NextResponse.json({ error: "Could not start payment." }, { status: 400 });
+    const failed = checkoutFailure(err);
+    return NextResponse.json({ error: failed.error }, { status: failed.status });
   }
 }

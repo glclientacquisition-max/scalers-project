@@ -1,0 +1,14 @@
+{
+  "id": "HD_9939ca74d492_till",
+  "bug": "E",
+  "profile": "carry",
+  "language": "en",
+  "turns": [
+    {
+      "caller": "What is your till number?",
+      "model": "with the owner to confirm it for you.",
+      "mustNotSay": ["/^with the/"],
+      "mustSay": ["I'll check with the team and they'll call you back."]
+    }
+  ]
+}

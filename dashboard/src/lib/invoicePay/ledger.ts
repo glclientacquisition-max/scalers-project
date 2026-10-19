@@ -1,5 +1,4 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { assertBachsAllowed } from "./provider";
 
 type Json = Record<string, unknown>;
 
@@ -73,9 +72,11 @@ function rpcError(error: { message?: string } | null, fallback: string): Error {
   return err;
 }
 
-/** Service-role ledger. Refuses a production project URL. */
-export function invoicePayLedger(env: NodeJS.ProcessEnv = process.env) {
-  assertBachsAllowed(env);
+/**
+ * Service-role ledger. Token lookup and other reads do not call the Bachs gate.
+ * Checkout and the webhook refuse production before they write.
+ */
+export function invoicePayLedger() {
   const admin = getSupabaseAdmin();
 
   return {
@@ -206,6 +207,39 @@ export function invoicePayLedger(env: NodeJS.ProcessEnv = process.env) {
         p_tenant_id: input.tenantId,
       });
       if (error) throw rpcError(error, "cancelled credit failed");
+    },
+
+    async reconcileCheckoutTotal(input: {
+      provider: string;
+      checkoutId: string;
+      totalKes: string;
+      tenantId: string;
+      invoiceId: string;
+      raw: unknown;
+      settledAmountMinor: number | null;
+      settledCurrency: string | null;
+      feeMinor: number | null;
+    }) {
+      const { data, error } = await admin.rpc("reconcile_checkout_total", {
+        p_provider: input.provider,
+        p_checkout_id: input.checkoutId,
+        p_total_kes: input.totalKes,
+        p_tenant_id: input.tenantId,
+        p_invoice_id: input.invoiceId,
+        p_raw: input.raw ?? {},
+        p_settled_amount_minor: input.settledAmountMinor,
+        p_settled_currency: input.settledCurrency,
+        p_fee_minor: input.feeMinor,
+      });
+      if (error) throw rpcError(error, "reconcile failed");
+      const row = asObject(data);
+      return {
+        noop: row?.noop === true,
+        appliedKes: text(row?.applied_kes ?? "0"),
+        excessKes: text(row?.excess_kes ?? "0"),
+        amountKes: text(row?.amount_kes ?? input.totalKes),
+        partial: row?.partial === true,
+      };
     },
 
     async reconcileCollection(input: {

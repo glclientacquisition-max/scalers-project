@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- node:test loads this file with require() */
 const { toCents } = require("./money");
 const { verifyBachsRequest } = require("./signature");
+const { assertLiveTenant, MockPayProvider } = require("./provider");
 
 const KES_PAIRS = [
   ["charged_amount", "charged_currency"],
@@ -193,10 +194,69 @@ function minorUnits(amount) {
 }
 
 /**
- * Verify the signature, store the event once, and apply or issue the payment once.
- * A retry that already has a payment row does not apply again.
- * A retry whose first attempt stored the event and then failed still applies.
- * @param {{ rawBody: string, headers: Record<string, string | undefined>, secret: string, ledger: object, now?: number }} input
+ * Bachs GET checkout is the collected total. `charge.amount_paid` is "paid so far".
+ * The session `amount` is the price, not what was collected. A null charge on a
+ * successful read means nothing has been collected. A missing `amount_paid`, a
+ * thrown read, or a 404 is unreadable: do not guess from the webhook body.
+ * @param {object | null} row
+ */
+function collectedFromCheckout(row) {
+  if (!row || typeof row !== "object") return { unreadable: true };
+  const charge = row.charge;
+  if (!charge || typeof charge !== "object") return { totalKes: "0", cents: 0n };
+  const paid = charge.amount_paid;
+  if (paid == null || String(paid).trim() === "") return { unreadable: true };
+  const currency = String(charge.currency || "KES").trim().toUpperCase();
+  if (currency !== "KES") return { currencyIssue: true, currency, amount: String(paid) };
+  const cents = toCents(String(paid));
+  if (cents == null || cents < 0n) return { unreadable: true };
+  return { totalKes: String(paid), cents };
+}
+
+function readerFor(input) {
+  if (input.provider && typeof input.provider.getCheckout === "function") return input.provider;
+  if (!MockPayProvider.sessions) return null;
+  return {
+    async getCheckout(checkoutId) {
+      const row = MockPayProvider.sessions.get(checkoutId);
+      if (!row) return null;
+      if (row.unreadable) throw new Error("bachs checkout read failed");
+      return {
+        checkoutId: row.checkoutId,
+        status: row.status || "",
+        paymentStatus: row.paymentStatus || "",
+        charge: row.charge || null,
+      };
+    },
+  };
+}
+
+async function readCollected(input, checkoutId) {
+  const provider = readerFor(input);
+  if (!provider) return { unreadable: true };
+  let row;
+  try {
+    row = await provider.getCheckout(checkoutId);
+  } catch {
+    return { unreadable: true };
+  }
+  if (!row) return { unreadable: true };
+  return collectedFromCheckout(row);
+}
+
+function displacedAttempt(attempt) {
+  return (
+    attempt.status === "cancelled" ||
+    attempt.status === "superseded" ||
+    ((attempt.status === "failed" || attempt.status === "pending_unattached") && attempt.livePart !== true)
+  );
+}
+
+/**
+ * The webhook is a trigger. Money comes from getCheckout's cumulative
+ * `charge.amount_paid` for this checkout, never from summing event ids.
+ * An unreadable Bachs read stores the event and leaves the invoice alone.
+ * @param {{ rawBody: string, headers: Record<string, string | undefined>, secret: string, ledger: object, provider?: { getCheckout?: Function }, env?: NodeJS.ProcessEnv, now?: number }} input
  */
 async function handlePayWebhook(input) {
   if (!input.secret) return { status: 401, body: { ok: false, error: "invalid signature" } };
@@ -219,40 +279,27 @@ async function handlePayWebhook(input) {
     eventKey: String(eventId),
     payload,
   });
+  const duplicateEvent = recorded.attempts > 1;
 
   const data = (payload && payload.data) || {};
   const checkoutId = data.checkout_id || data.checkoutId || null;
   const attempt = checkoutId ? await input.ledger.findAttemptByCheckout(String(checkoutId)) : null;
-
-  if (type === "checkout.expired") {
-    if (attempt && attempt.status === "pending") {
-      await input.ledger.markAttempt(attempt.id, { status: "cancelled", raw: payload });
-    }
-    return { status: 200, body: { ok: true, duplicate: recorded.attempts > 1 } };
-  }
-  if (type === "collection.failed") {
-    if (attempt && attempt.status === "pending") {
-      await input.ledger.markAttempt(attempt.id, { status: "failed", raw: payload });
-    }
-    return { status: 200, body: { ok: true, duplicate: recorded.attempts > 1 } };
+  if (!attempt || !checkoutId) {
+    return { status: 200, body: { ok: true, unmatched: true, duplicate: duplicateEvent } };
   }
 
-  if (!attempt) {
-    return { status: 200, body: { ok: true, unmatched: true, duplicate: recorded.attempts > 1 } };
+  const checkoutRef = String(checkoutId);
+  const collected = await readCollected(input, checkoutRef);
+  if (collected.unreadable) {
+    return { status: 200, body: { ok: true, pending: true, action: "retry", duplicate: duplicateEvent } };
   }
 
   const charge = extractCharge(data);
-  const report = collectionReport(data, checkoutId ? String(checkoutId) : null);
-  const checkoutRef = checkoutId ? String(checkoutId) : null;
-  const collectionRef = report.ref || checkoutRef;
-  const decisionCharge = report.amount
-    ? { ...charge, kes: { amount: report.amount, currency: "KES" } }
-    : charge;
   const feeMinor = charge.feeAmount == null ? null : minorUnits(charge.feeAmount);
   const settledMinor = charge.settledAmount == null ? null : minorUnits(charge.settledAmount);
   const common = {
     provider: "bachs",
-    providerRef: collectionRef,
+    providerRef: checkoutRef,
     tenantId: attempt.tenantId,
     invoiceId: attempt.invoiceId,
     raw: payload,
@@ -261,119 +308,106 @@ async function handlePayWebhook(input) {
     feeMinor,
     feeAmount: charge.feeAmount == null ? null : String(charge.feeAmount),
     feeCurrency: charge.feeCurrency || null,
-    providerAmount: charge.kes ? String(charge.kes.amount) : charge.other ? String(charge.other.amount) : null,
-    providerCurrency: charge.kes ? "KES" : charge.other ? charge.other.currency : null,
+    providerAmount: collected.totalKes || null,
+    providerCurrency: collected.currencyIssue ? collected.currency : "KES",
     attemptId: attempt.id,
   };
 
-  const displaced =
-    attempt.status === "cancelled" ||
-    attempt.status === "superseded" ||
-    ((attempt.status === "failed" || attempt.status === "pending_unattached") && attempt.livePart !== true);
-  if (displaced) {
-    const already = await input.ledger.findPaymentByRef("bachs", checkoutRef);
-    if (already) {
-      return { status: 200, body: { ok: true, duplicate: true, action: "apply" } };
+  if (collected.currencyIssue) {
+    await input.ledger.recordIssue({
+      ...common,
+      amountKes: null,
+      reason: "currency",
+    });
+    if (!displacedAttempt(attempt)) {
+      await input.ledger.markAttempt(attempt.id, {
+        status: "issue",
+        providerAmount: collected.amount,
+        providerCurrency: collected.currency,
+        raw: payload,
+      });
     }
-    const amountKes = decisionCharge.kes ? String(decisionCharge.kes.amount) : null;
-    if (amountKes && toCents(amountKes) != null && toCents(amountKes) > 0n) {
+    return { status: 200, body: { ok: true, action: "issue", reason: "currency" } };
+  }
+
+  const totalKes = collected.totalKes || "0";
+  const totalCents = collected.cents || 0n;
+  if (totalCents === 0n) {
+    if (type === "checkout.expired" && attempt.status === "pending") {
+      await input.ledger.markAttempt(attempt.id, { status: "cancelled", raw: payload });
+    } else if (type === "collection.failed" && attempt.status === "pending") {
+      await input.ledger.markAttempt(attempt.id, { status: "failed", raw: payload });
+    }
+    return { status: 200, body: { ok: true, action: "wait", duplicate: duplicateEvent } };
+  }
+
+  try {
+    assertLiveTenant(attempt.tenantId, input.env);
+  } catch (err) {
+    const code = err && err.code;
+    if (code === "bachs_live_refused") {
       await input.ledger.recordIssue({
         ...common,
-        providerRef: checkoutRef,
-        amountKes,
-        reason: "cancelled",
+        amountKes: totalKes,
+        reason: "live_not_allowlisted",
       });
-      if (typeof input.ledger.creditCancelled === "function") {
-        await input.ledger.creditCancelled({
-          provider: "bachs",
-          providerRef: checkoutRef,
-          amountKes,
-          tenantId: attempt.tenantId,
-          invoiceId: attempt.invoiceId,
-        });
-      }
+      return { status: 200, body: { ok: true, action: "issue", reason: "live_not_allowlisted" } };
     }
-    return { status: 200, body: { ok: true, action: "credit", reason: "cancelled" } };
+    throw err;
   }
 
-  const decision = decidePayment({
-    attempt,
-    charge: decisionCharge,
-    type,
-    status: data.status,
-    paymentStatus: data.payment_status,
-  });
-  if (decision.action === "wait" || decision.action === "ignore") {
-    return { status: 200, body: { ok: true, action: decision.action, duplicate: recorded.attempts > 1 } };
-  }
-
-  if (decision.action === "apply" || decision.action === "apply_overpaid" || decision.action === "apply_partial") {
-    const received = decisionCharge.kes ? String(decisionCharge.kes.amount) : attempt.amountKes;
-    try {
-      const settled = await input.ledger.reconcileCollection({
-        ...common,
-        providerRef: collectionRef,
-        checkoutId: checkoutRef,
-        amountKes: received,
-      });
-      if (settled && settled.noop) {
-        const action = decision.action === "apply_partial" ? "apply_partial" : "apply";
-        return { status: 200, body: { ok: true, duplicate: true, action } };
-      }
-      const appliedCents = toCents(settled && settled.appliedKes) || 0n;
-      const excessCents = toCents(settled && settled.excessKes) || 0n;
+  try {
+    const settled = await input.ledger.reconcileCheckoutTotal({
+      ...common,
+      checkoutId: checkoutRef,
+      totalKes,
+    });
+    if (settled && settled.noop) {
+      return { status: 200, body: { ok: true, duplicate: true, action: "apply" } };
+    }
+    const appliedCents = toCents(settled && settled.appliedKes) || 0n;
+    const excessCents = toCents(settled && settled.excessKes) || 0n;
+    if (!displacedAttempt(attempt)) {
       await input.ledger.markAttempt(attempt.id, {
         status: "succeeded",
-        providerAmount: common.providerAmount,
-        providerCurrency: common.providerCurrency,
+        providerAmount: totalKes,
+        providerCurrency: "KES",
         feeAmount: common.feeAmount,
         feeCurrency: common.feeCurrency,
         raw: payload,
       });
-      const body = { ok: true, action: "apply" };
-      if (decision.action === "apply_overpaid") {
-        body.overpaid = true;
-      } else if (excessCents > 0n && appliedCents === 0n) {
-        body.action = "credit";
-        body.reason = "collection_excess";
-      } else if (decision.action === "apply_partial") {
-        body.action = "apply_partial";
-      }
-      return { status: 200, body };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("invoice cannot be paid") || message.includes("draft invoices are not payable")) {
-        await input.ledger.recordIssue({
-          ...common,
-          amountKes: received,
-          reason: "invoice cannot be paid",
-        });
-        return { status: 200, body: { ok: true } };
-      }
-      throw err;
     }
+    const body = { ok: true, action: "apply" };
+    const partCents = toCents(attempt.amountKes);
+    const coversPart = partCents == null || totalCents >= partCents;
+    if (excessCents > 0n && appliedCents === 0n) {
+      body.action = "credit";
+      body.reason = "collection_excess";
+    } else if (excessCents === 0n && appliedCents > 0n && !coversPart) {
+      body.action = "apply_partial";
+    }
+    if (excessCents > 0n || String(data.status || "").toLowerCase() === "overpaid") {
+      body.overpaid = true;
+    }
+    return { status: 200, body };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("invoice cannot be paid") || message.includes("draft invoices are not payable")) {
+      await input.ledger.recordIssue({
+        ...common,
+        amountKes: totalKes,
+        reason: "invoice cannot be paid",
+      });
+      return { status: 200, body: { ok: true } };
+    }
+    throw err;
   }
-
-  const issueAmount = charge.kes ? String(charge.kes.amount) : null;
-  await input.ledger.recordIssue({
-    ...common,
-    amountKes: issueAmount,
-    reason: decision.reason || "mismatch",
-  });
-  await input.ledger.markAttempt(attempt.id, {
-    status: "issue",
-    providerAmount: common.providerAmount,
-    providerCurrency: common.providerCurrency,
-    feeAmount: common.feeAmount,
-    feeCurrency: common.feeCurrency,
-    raw: payload,
-  });
-  return { status: 200, body: { ok: true, action: "issue", reason: decision.reason } };
 }
 
 module.exports = {
   extractCharge,
   collectionReport,
+  collectedFromCheckout,
   decidePayment,
   handlePayWebhook,
   minorUnits,

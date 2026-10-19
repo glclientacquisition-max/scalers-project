@@ -1,0 +1,14 @@
+{
+  "id": "services_live_order",
+  "bug": "services_list",
+  "profile": "menu",
+  "language": "en",
+  "turns": [
+    {
+      "caller": "How much is the.",
+      "mustSay": ["sofa cleaning, carpet cleaning, mattress cleaning, curtain cleaning and more"],
+      "mustNotSay": ["deep", "oven"],
+      "status": "found"
+    }
+  ]
+}

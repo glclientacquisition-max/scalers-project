@@ -1,27 +1,28 @@
 import { NextResponse } from "next/server";
 import { handlePayWebhook } from "@/lib/invoicePay/webhook";
 import { invoicePayLedger } from "@/lib/invoicePay/ledger";
-import { bachsMode, liveAllowed } from "@/lib/invoicePay/provider";
+import { assertBachsAllowed, payProviderFromEnv } from "@/lib/invoicePay/provider";
 
 export async function POST(request: Request) {
-  let mode: string;
-  try {
-    mode = bachsMode();
-  } catch {
-    return NextResponse.json({ ok: false }, { status: 400 });
-  }
-  if (mode === "live" && !liveAllowed()) {
-    return NextResponse.json({ ok: false }, { status: 403 });
-  }
-
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     BACHS_MODE: process.env.BACHS_MODE,
     BACHS_API_KEY: process.env.BACHS_API_KEY,
     BACHS_WEBHOOK_SECRET: process.env.BACHS_WEBHOOK_SECRET,
+    BACHS_LIVE_ALLOWED: process.env.BACHS_LIVE_ALLOWED,
+    BACHS_LIVE_TENANT_ALLOWLIST: process.env.BACHS_LIVE_TENANT_ALLOWLIST,
     SUPABASE_URL: process.env.SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   };
+  try {
+    assertBachsAllowed(env);
+  } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code || "") : "";
+    if (code === "bachs_live_refused" || code === "prod_refused") {
+      return NextResponse.json({ ok: false }, { status: 403 });
+    }
+    return NextResponse.json({ ok: false }, { status: 400 });
+  }
   const secret = env.BACHS_WEBHOOK_SECRET || "";
   const rawBody = await request.text();
   const headers = {
@@ -35,7 +36,9 @@ export async function POST(request: Request) {
       rawBody,
       headers,
       secret,
-      ledger: invoicePayLedger(env),
+      env,
+      ledger: invoicePayLedger(),
+      provider: payProviderFromEnv(env),
     });
     return NextResponse.json(result.body, { status: result.status });
   } catch (err) {

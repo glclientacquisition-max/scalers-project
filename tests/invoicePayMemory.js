@@ -49,7 +49,93 @@ function createMemoryLedger(opts = {}) {
   const credits = [];
   const alerts = [];
   let seq = 0;
+  let settleChain = Promise.resolve();
   const id = () => `id-${++seq}`;
+
+  function applyCheckoutTotal(input) {
+    const invoice = invoices.get(input.invoiceId);
+    if (!invoice || invoice.status === "void" || invoice.status === "uncollectible") {
+      throw new Error("invoice cannot be paid");
+    }
+    if (invoice.status === "draft") throw new Error("draft invoices are not payable");
+    const checkoutId = String(input.checkoutId || "");
+    const next = toCents(input.totalKes);
+    if (next == null || next < 0n) throw new Error("collected total must be zero or positive");
+    const attempt = [...attempts].reverse().find(
+      (row) => row.checkoutSessionId === checkoutId && row.invoiceId === input.invoiceId
+    );
+    const seen = toCents(attempt && attempt.collectedTotalSeenKes) || 0n;
+    if (next === 0n || next <= seen) {
+      return { noop: true, appliedKes: "0", excessKes: "0", amountKes: fromCents(seen), partial: false };
+    }
+    const delta = next - seen;
+    const dueRaw = toCents(invoice.totalKes) - toCents(invoice.amountPaidKes);
+    const due = dueRaw > 0n ? dueRaw : 0n;
+    const apply = delta < due ? delta : due;
+    const excess = delta - apply;
+    const total = toCents(invoice.totalKes);
+    const paidAfter = toCents(invoice.amountPaidKes) + apply;
+    let match = "partial";
+    if (excess > 0n) match = "over";
+    else if (paidAfter >= total) match = "matched";
+    const amountKes = String(input.totalKes);
+    if (attempt) attempt.collectedTotalSeenKes = amountKes;
+    const existing = payments.find((row) => row.provider === input.provider && row.providerRef === checkoutId);
+    if (existing) {
+      existing.amountKes = amountKes;
+      existing.matchStatus = match;
+      existing.billRef = checkoutId;
+      existing.raw = input.raw;
+      existing.settledAmountMinor = input.settledAmountMinor;
+      existing.settledCurrency = input.settledCurrency;
+      existing.feeMinor = input.feeMinor;
+    } else {
+      payments.push({
+        id: id(),
+        provider: input.provider,
+        providerRef: checkoutId,
+        billRef: checkoutId,
+        invoiceId: input.invoiceId,
+        amountKes,
+        matchStatus: match,
+        settledAmountMinor: input.settledAmountMinor,
+        settledCurrency: input.settledCurrency,
+        feeMinor: input.feeMinor,
+        raw: input.raw,
+      });
+    }
+    if (apply > 0n) {
+      if (paidAfter >= total) {
+        invoice.amountPaidKes = fromCents(total);
+        invoice.status = "paid";
+      } else {
+        invoice.amountPaidKes = fromCents(paidAfter);
+      }
+    }
+    if (excess > 0n) {
+      const key = `checkout-total:${input.provider}:${checkoutId}:${next.toString()}`;
+      if (!credits.some((credit) => credit.idempotencyKey === key)) {
+        const stored = payments.find((row) => row.provider === input.provider && row.providerRef === checkoutId);
+        credits.push({
+          id: id(),
+          tenantId: input.tenantId,
+          invoiceId: input.invoiceId,
+          amountKes: fromCents(excess),
+          reason: "checkout_total",
+          idempotencyKey: key,
+          providerRef: checkoutId,
+          paymentId: stored ? stored.id : null,
+        });
+      }
+    }
+    return {
+      noop: false,
+      appliedKes: fromCents(apply),
+      excessKes: fromCents(excess),
+      amountKes,
+      partial: excess === 0n && paidAfter < total,
+    };
+  }
 
   function lookupToken(token) {
     const row = tokens.find((t) => t.tokenHash === hashToken(token));
@@ -341,6 +427,14 @@ function createMemoryLedger(opts = {}) {
         checkoutSessionId: row.checkoutSessionId,
         attemptStatus: row.status,
       };
+    },
+    async reconcileCheckoutTotal(input) {
+      const run = settleChain.then(() => applyCheckoutTotal(input));
+      settleChain = run.then(
+        () => undefined,
+        () => undefined
+      );
+      return run;
     },
     async reconcileCollection(input) {
       const invoice = invoices.get(input.invoiceId);

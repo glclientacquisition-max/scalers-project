@@ -42,6 +42,8 @@ describe("invoice pay SQL", () => {
     await db.exec(read("docs/supabase/invoice_pay_held.sql"));
     await db.exec(read("docs/supabase/invoice_pay_collections.sql"));
     await db.exec(read("docs/supabase/invoice_pay_collections.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_checkout_total.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_checkout_total.sql"));
   });
 
   it("refuses a draft number or status write unless billing_write is set", async () => {
@@ -661,59 +663,88 @@ describe("invoice pay SQL", () => {
     assert.equal(held.rows[0].row.id, attemptId);
 
     const equalA = await q(
-      "select public.reconcile_checkout_collection('bachs', 'ch_a', 'chk_col_1', 10, $1, $2) as row",
+      "select public.reconcile_checkout_total('bachs', 'chk_col_1', 10, $1, $2) as row",
+      [tenant, invoice.rows[0].id]
+    );
+    const equalReplay = await q(
+      "select public.reconcile_checkout_total('bachs', 'chk_col_1', 10, $1, $2) as row",
       [tenant, invoice.rows[0].id]
     );
     const equalB = await q(
-      "select public.reconcile_checkout_collection('bachs', 'ch_b', 'chk_col_1', 10, $1, $2) as row",
-      [tenant, invoice.rows[0].id]
-    );
-    const replay = await q(
-      "select public.reconcile_checkout_collection('bachs', 'ch_b', 'chk_col_1', 10, $1, $2) as row",
+      "select public.reconcile_checkout_total('bachs', 'chk_col_1', 20, $1, $2) as row",
       [tenant, invoice.rows[0].id]
     );
     assert.equal(equalA.rows[0].row.noop, false);
+    assert.equal(equalReplay.rows[0].row.noop, true);
     assert.equal(Number(equalB.rows[0].row.applied_kes), 10);
-    assert.equal(replay.rows[0].row.noop, true);
+    assert.equal(Number(equalB.rows[0].row.excess_kes), 0);
     const paidEqual = await q("select amount_paid_kes, status from public.invoices where id = $1", [invoice.rows[0].id]);
     assert.equal(Number(paidEqual.rows[0].amount_paid_kes), 20);
     assert.equal(paidEqual.rows[0].status, "paid");
+    const equalCredits = await q(
+      "select coalesce(sum(amount_kes), 0) as amount from public.tenant_credits where payment_id in (select id from public.payments where provider_ref = 'chk_col_1')"
+    );
+    assert.equal(Number(paidEqual.rows[0].amount_paid_kes) + Number(equalCredits.rows[0].amount), 20);
 
-    const draftSmall = await q(
-      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 20, 20) returning id`,
-      [tenant]
-    );
-    const small = await q("select id from public.finalize_invoice($1)", [draftSmall.rows[0].id]);
-    await q("select public.reconcile_checkout_collection('bachs', 'sm_a', 'chk_sm', 10, $1, $2)", [tenant, small.rows[0].id]);
-    await q("select public.reconcile_checkout_collection('bachs', 'sm_b', 'chk_sm', 4, $1, $2)", [tenant, small.rows[0].id]);
-    await q("select public.reconcile_checkout_collection('bachs', 'sm_b', 'chk_sm', 1, $1, $2)", [tenant, small.rows[0].id]);
-    const paidSmall = await q(
-      "select amount_paid_kes from public.invoices where id = $1",
-      [small.rows[0].id]
-    );
+    async function withCheckout(total, checkoutId) {
+      const draft = await q(
+        `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, $2, $2) returning id`,
+        [tenant, total]
+      );
+      const issued = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+      await q(
+        `insert into public.payment_attempts (
+           tenant_id, invoice_id, provider, status, amount_kes, part_index, part_count, checkout_session_id
+         ) values ($1, $2, 'bachs', 'pending', $3, 1, 1, $4)`,
+        [tenant, issued.rows[0].id, total, checkoutId]
+      );
+      return issued.rows[0].id;
+    }
+
+    const smallId = await withCheckout(20, "chk_sm");
+    await q("select public.reconcile_checkout_total('bachs', 'chk_sm', 10, $1, $2)", [tenant, smallId]);
+    await q("select public.reconcile_checkout_total('bachs', 'chk_sm', 14, $1, $2)", [tenant, smallId]);
+    await q("select public.reconcile_checkout_total('bachs', 'chk_sm', 14, $1, $2)", [tenant, smallId]);
+    const paidSmall = await q("select amount_paid_kes from public.invoices where id = $1", [smallId]);
     const smallCredits = await q(
-      "select coalesce(sum(amount_kes), 0) as amount from public.tenant_credits where tenant_id = $1 and reason = 'collection_excess'",
-      [tenant]
+      "select coalesce(sum(amount_kes), 0) as amount from public.tenant_credits where payment_id in (select id from public.payments where provider_ref = 'chk_sm')"
     );
     assert.equal(Number(paidSmall.rows[0].amount_paid_kes), 14);
     assert.equal(Number(smallCredits.rows[0].amount), 0);
+    assert.equal(Number(paidSmall.rows[0].amount_paid_kes) + Number(smallCredits.rows[0].amount), 14);
 
-    const draftLarge = await q(
-      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 10, 10) returning id`,
-      [tenant]
+    const wideId = await withCheckout(30, "chk_wide");
+    await q("select public.reconcile_checkout_total('bachs', 'chk_wide', 10, $1, $2)", [tenant, wideId]);
+    await q("select public.reconcile_checkout_total('bachs', 'chk_wide', 20, $1, $2)", [tenant, wideId]);
+    const paidWide = await q("select amount_paid_kes from public.invoices where id = $1", [wideId]);
+    const wideCredits = await q(
+      "select coalesce(sum(amount_kes), 0) as amount from public.tenant_credits where payment_id in (select id from public.payments where provider_ref = 'chk_wide')"
     );
-    const large = await q("select id from public.finalize_invoice($1)", [draftLarge.rows[0].id]);
-    await q("select public.reconcile_checkout_collection('bachs', 'cum', 'chk_cum', 10, $1, $2)", [tenant, large.rows[0].id]);
-    await q("select public.reconcile_checkout_collection('bachs', 'cum', 'chk_cum', 12, $1, $2)", [tenant, large.rows[0].id]);
-    await q("select public.reconcile_checkout_collection('bachs', 'cum', 'chk_cum', 20, $1, $2)", [tenant, large.rows[0].id]);
-    await q("select public.reconcile_checkout_collection('bachs', 'cum', 'chk_cum', 20, $1, $2)", [tenant, large.rows[0].id]);
-    const paidLarge = await q("select amount_paid_kes from public.invoices where id = $1", [large.rows[0].id]);
+    assert.equal(Number(paidWide.rows[0].amount_paid_kes), 20);
+    assert.equal(Number(wideCredits.rows[0].amount), 0);
+    assert.equal(Number(paidWide.rows[0].amount_paid_kes) + Number(wideCredits.rows[0].amount), 20);
+
+    const largeId = await withCheckout(10, "chk_cum");
+    await q("select public.reconcile_checkout_total('bachs', 'chk_cum', 10, $1, $2)", [tenant, largeId]);
+    await q("select public.reconcile_checkout_total('bachs', 'chk_cum', 12, $1, $2)", [tenant, largeId]);
+    await q("select public.reconcile_checkout_total('bachs', 'chk_cum', 20, $1, $2)", [tenant, largeId]);
+    const replayLarge = await q(
+      "select public.reconcile_checkout_total('bachs', 'chk_cum', 20, $1, $2) as row",
+      [tenant, largeId]
+    );
+    assert.equal(replayLarge.rows[0].row.noop, true);
+    const paidLarge = await q("select amount_paid_kes from public.invoices where id = $1", [largeId]);
     const largeCredits = await q(
-      "select coalesce(sum(amount_kes), 0) as amount from public.tenant_credits where payment_id in (select id from public.payments where provider_ref = 'cum')"
+      "select coalesce(sum(amount_kes), 0) as amount from public.tenant_credits where payment_id in (select id from public.payments where provider_ref = 'chk_cum')"
     );
     assert.equal(Number(paidLarge.rows[0].amount_paid_kes), 10);
     assert.equal(Number(largeCredits.rows[0].amount), 10);
     assert.equal(Number(paidLarge.rows[0].amount_paid_kes) + Number(largeCredits.rows[0].amount), 20);
+    await q("set role anon");
+    await assert.rejects(
+      q("select public.reconcile_checkout_total('bachs', 'chk_cum', 20, $1, $2)", [tenant, largeId])
+    );
+    await q("reset role");
 
     await q("select public.release_held_pay_checkout($1)", [attemptId]);
     const closed = await q("select checkout_closed_at is not null as closed from public.payment_attempts where id = $1", [

@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-170 variables.
+175 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -19,8 +19,8 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `AGENT_NAME` | voice | `server.js`<br>`src/db.js`<br>`src/prompts.js`<br>+1 more |
 | `ALERT_EMAIL_FROM` | voice | `server.js`<br>`src/notifications/email.js` |
 | `BACHS_API_KEY` | desk, scripts | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>`scripts/billing-payment-reconcile.js` |
-| `BACHS_LIVE_ALLOWED` | desk | `dashboard/src/lib/invoicePay/provider.js` |
-| `BACHS_LIVE_TENANT_ALLOWLIST` | desk | `dashboard/src/lib/invoicePay/provider.js` |
+| `BACHS_LIVE_ALLOWED` | desk | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>`dashboard/src/lib/invoicePay/provider.js` |
+| `BACHS_LIVE_TENANT_ALLOWLIST` | desk | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>`dashboard/src/lib/invoicePay/provider.js` |
 | `BACHS_MODE` | desk, scripts | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>`scripts/billing-payment-reconcile.js` |
 | `BACHS_WEBHOOK_SECRET` | desk | `dashboard/src/app/api/billing/bachs/webhook/route.ts` |
 | `BASE_REPO` | scripts | `scripts/stage-pull-request.js` |
@@ -69,7 +69,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `NEXT_PUBLIC_SUPABASE_URL` | desk, scripts | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>`dashboard/src/lib/platformOps.ts`<br>+4 more |
 | `NEXT_PUBLIC_WALLET_RATE_KES_PER_MINUTE` | desk | `dashboard/src/lib/wallet.ts` |
 | `NEXT_RUNTIME` | desk | `dashboard/src/lib/adminQuality.ts` |
-| `NODE_ENV` | desk, scripts, voice | `dashboard/src/app/(desk)/tenantActions.ts`<br>`dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/admin-auth.ts`<br>+4 more |
+| `NODE_ENV` | desk, scripts, voice | `dashboard/src/app/(desk)/tenantActions.ts`<br>`dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/admin-auth.ts`<br>+5 more |
 | `OPS_EMAIL_FROM` | desk | `dashboard/src/lib/opsMail.ts` |
 | `OWNER_ALERT_EMAIL` | voice | `server.js` |
 | `PATH` | scripts | `scripts/smoke-recording-webhook.js` |
@@ -87,6 +87,8 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `PUBLIC_BASE_URL` | desk, voice | `dashboard/src/lib/sautikit.ts`<br>`dashboard/src/lib/voicePublicBase.js`<br>`server.js` |
 | `RAILWAY_GIT_BRANCH` | voice | `server.js` |
 | `RAILWAY_GIT_COMMIT_SHA` | voice | `server.js` |
+| `RECORDING_RETENTION_DAYS` | desk, voice | `dashboard/src/lib/recordingRetentionPolicy.ts`<br>`src/lib/recordingRetention.js`<br>`src/lib/recordingRetentionPolicy.js` |
+| `RECORDING_RETENTION_PURGE` | voice | `src/lib/recordingRetention.js` |
 | `RESEND_API_KEY` | desk, voice | `dashboard/src/lib/opsMail.ts`<br>`src/notifications/email.js` |
 | `SAUTIKIT_ADMIN_OPS_KEY` | desk | `dashboard/src/lib/sautikit.ts` |
 | `SAUTIKIT_API_BASE` | desk, voice | `dashboard/src/lib/sautikit.ts`<br>`src/notifications/whatsapp.js`<br>`src/sautikit/lineUnavailableAudio.js`<br>+3 more |
@@ -165,9 +167,12 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_LIVE_TRANSFER_BETA_OUTBOUND` | voice | `src/billing/liveTransferLegs.js` |
 | `VOICE_LIVE_TRANSFER_IGNORE_HOURS` | voice | `src/conversation/liveTransferReady.js` |
 | `VOICE_LLM_STREAM` | voice | `server.js` |
+| `VOICE_LOOKUP_TOOL` | scripts, voice | `scripts/eval-release.js`<br>`src/knowledge/flags.js` |
+| `VOICE_LOOKUPS` | scripts, voice | `scripts/eval-release.js`<br>`src/knowledge/flags.js` |
 | `VOICE_OUTAGE_CLIP_DIR` | voice | `src/speech/outageClips.js` |
 | `VOICE_OUTAGE_OWNER_COOLDOWN_MS` | voice | `src/speech/speechOutageNotify.js` |
 | `VOICE_OUTAGE_TMP_DIR` | voice | `src/speech/outageClips.js` |
+| `VOICE_PERSONA_ONLY_PROMPT` | voice | `src/knowledge/flags.js` |
 | `VOICE_PLATFORM_OPS_COOLDOWN_MS` | voice | `src/notifications/platformOpsAlert.js` |
 | `VOICE_PLATFORM_OPS_DRY_RUN` | voice | `server.js`<br>`src/notifications/platformOpsAlert.js` |
 | `VOICE_PROFILE` | scripts | `scripts/smoke-tts-pace.js` |

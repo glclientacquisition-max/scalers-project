@@ -79,21 +79,51 @@ function assertBachsAllowed(env = process.env) {
   return mode;
 }
 
+/** True when checkout must not start. Does not change the gate. */
+function paymentsClosed(env = process.env) {
+  try {
+    assertBachsAllowed(env);
+    return false;
+  } catch (err) {
+    const code = err && err.code;
+    if (code === "bachs_live_refused" || code === "prod_refused" || code === "bachs_mode") return true;
+    throw err;
+  }
+}
+
 /**
- * When BACHS_LIVE_TENANT_ALLOWLIST is set, only those tenant ids may start a live checkout.
- * An empty allowlist does not restrict. This does not drop a webhook that already arrived.
- * @param {NodeJS.ProcessEnv} env
- * @param {string} tenantId
+ * Checkout POST body. A closed gate is 503 payments_unavailable.
+ * @param {unknown} err
  */
-function assertLiveTenant(env, tenantId) {
+function checkoutFailure(err) {
+  const code = err && typeof err === "object" && "code" in err ? String(err.code || "") : "";
+  if (code === "bachs_live_refused" || code === "prod_refused" || code === "bachs_mode") {
+    return { status: 503, error: "payments_unavailable" };
+  }
+  if (code === "previous_processing") {
+    return { status: 409, error: "Previous payment still processing." };
+  }
+  return { status: 400, error: "Could not start payment." };
+}
+
+function allowlistRaw(env = process.env) {
+  return env === process.env ? process.env.BACHS_LIVE_TENANT_ALLOWLIST : env.BACHS_LIVE_TENANT_ALLOWLIST;
+}
+
+/**
+ * Live mode refuses every tenant unless BACHS_LIVE_TENANT_ALLOWLIST is `*`
+ * or lists that tenant id. Unset, empty, and whitespace refuse everyone.
+ * Omitting env reads process.env. It does not skip the check.
+ * @param {string} tenantId
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+function assertLiveTenant(tenantId, env = process.env) {
   if (bachsMode(env) !== "live") return;
   assertBachsAllowed(env);
-  const raw = String(
-    (env === process.env ? process.env.BACHS_LIVE_TENANT_ALLOWLIST : env.BACHS_LIVE_TENANT_ALLOWLIST) || ""
-  ).trim();
-  if (!raw) return;
+  const raw = String(allowlistRaw(env) ?? "").trim();
+  if (raw === "*") return;
   const allowed = new Set(raw.split(",").map((part) => part.trim()).filter(Boolean));
-  if (!allowed.has(String(tenantId || "").trim())) {
+  if (!raw || !allowed.has(String(tenantId || "").trim())) {
     throw refused("live payments are not open for this business", "bachs_live_refused");
   }
 }
@@ -123,12 +153,18 @@ class MockPayProvider {
       request,
     };
     this.checkouts.set(checkoutId, row);
+    MockPayProvider.sessions.set(checkoutId, row);
     return { checkoutId, checkoutUrl: row.checkoutUrl, status: "open", expiresAt };
   }
 
   async getCheckout(checkoutId) {
-    const row = this.checkouts.get(checkoutId);
+    const row = this.checkouts.get(checkoutId) || MockPayProvider.sessions.get(checkoutId);
     if (!row) return null;
+    if (row.unreadable) {
+      const err = new Error("bachs checkout read failed");
+      err.code = "bachs_checkout";
+      throw err;
+    }
     return {
       checkoutId: row.checkoutId,
       status: row.status || "",
@@ -149,8 +185,33 @@ class MockPayProvider {
    * @param {object} [opts]
    */
   paidEvent(checkoutId, opts = {}) {
-    const row = this.checkouts.get(checkoutId);
+    let row = this.checkouts.get(checkoutId);
+    if (!row) {
+      row = {
+        checkoutId,
+        status: "open",
+        paymentStatus: "",
+        charge: null,
+        request: { amountKes: opts.amountKes },
+      };
+      this.checkouts.set(checkoutId, row);
+    }
+    MockPayProvider.sessions.set(checkoutId, row);
     const amountKes = opts.amountKes || row?.request?.amountKes;
+    if (opts.unreadable) {
+      row.unreadable = true;
+    } else if (!opts.leaveCheckout) {
+      const collected = opts.collectedKes ?? opts.amountPaid ?? amountKes;
+      if (collected != null && collected !== "") {
+        row.unreadable = false;
+        row.charge = {
+          amount_paid: String(collected),
+          amount: amountKes != null ? String(amountKes) : String(collected),
+          currency: opts.currency || "KES",
+          status: opts.status || "SUCCEEDED",
+        };
+      }
+    }
     const type = opts.type || "collection.succeeded";
     const data = {
       charge_id: opts.chargeId || `ch_${checkoutId}`,
@@ -310,6 +371,8 @@ function payProviderFromEnv(env = process.env, opts = {}) {
   });
 }
 
+MockPayProvider.sessions = new Map();
+
 module.exports = {
   SANDBOX_API,
   LIVE_API,
@@ -321,6 +384,8 @@ module.exports = {
   liveAllowed,
   assertBachsAllowed,
   assertLiveTenant,
+  paymentsClosed,
+  checkoutFailure,
   MockPayProvider,
   BachsPayProvider,
   payProviderFromEnv,
