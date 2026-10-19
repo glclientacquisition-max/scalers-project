@@ -1,7 +1,7 @@
 import { ButtonLink } from "@/components/ui/Button";
 import { ListRow } from "@/components/ui/ListRow";
 import { Stamp } from "@/components/ui/Stamp";
-import type { AssistantSayState } from "@/lib/assistantSayLoad";
+import type { AssistantSayState } from "@/lib/assistantSayTypes";
 import { settingsFormBodyClass } from "@/components/settingsUi";
 
 export function AssistantSayPanel({ state }: { state: AssistantSayState }) {
@@ -14,9 +14,10 @@ export function AssistantSayPanel({ state }: { state: AssistantSayState }) {
             key={row.id}
             title={row.title}
             preview={row.reason}
+            stampWrap={!row.isFact}
             stamp={
-              <Stamp tone={row.willSay ? "ok" : "attention"}>
-                {row.willSay ? "Will say" : "Won't say"}
+              <Stamp tone={row.stampTone} wrap={!row.isFact}>
+                {row.stampLabel}
               </Stamp>
             }
             actions={

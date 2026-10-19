@@ -3,7 +3,7 @@ import { CheckIcon } from "@heroicons/react/20/solid";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { SettingsGroup } from "@/components/settingsUi";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
-import type { ReadyChecklistItem } from "@/lib/assistantSayLoad";
+import type { ReadyChecklistItem } from "@/lib/assistantSayTypes";
 
 /** Compact checklist on Overview until every item is done. */
 export function HomeGetReadyCallsCard({ items }: { items: ReadyChecklistItem[] }) {
