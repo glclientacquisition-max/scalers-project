@@ -2,8 +2,8 @@
 -- Apply once, as one transaction, after invoice_pay_checkout_review_round9.sql (P16).
 -- Does not replace finalize_invoice. Does not edit P1-P16. Inserts no businesses.
 -- Idempotent. Re-running replaces the functions and does not add a tenant.
--- Production (fjxcdccgyhnvnnlnovcl) does not have this file.
--- Staging (sgcdncjxauhsbunobmob) is the only apply.
+-- Production (fjxcdccgyhnvnnlnovcl) has this file: 20261019150641, via #820 f6d7fee9.
+-- Do not re-run. Staging (sgcdncjxauhsbunobmob): invoice_pay_live_allowlist 20261019093619.
 --
 -- Live Bachs stays closed in the app unless BACHS_LIVE_ALLOWED=true and either
 -- this row is enabled or the business is on BACHS_LIVE_TENANT_ALLOWLIST.

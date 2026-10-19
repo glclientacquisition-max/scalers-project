@@ -3,6 +3,7 @@
 -- Does not replace finalize_invoice. Does not edit P1-P18 function bodies except
 -- resolve_checkout_total_review, which this file replaces.
 -- Staging and production do not have this file until it is applied by hand.
+-- Production already has P1-P18. Never re-run P5, P9, P11, P12, P14, P15, P16, P17, or P18.
 --
 -- GET charge.amount_paid is applied as a running total when it rises.
 -- A new collection whose own amount is larger than that rise is not applied

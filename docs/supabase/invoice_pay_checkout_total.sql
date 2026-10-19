@@ -1,7 +1,8 @@
 -- Invoice pay checkout total (P13).
--- Apply after invoice_pay_collections.sql (P12). Staging only until Alvin's GO.
+-- Apply after invoice_pay_collections.sql (P12).
 -- Does not replace finalize_invoice. Does not edit P1–P12.
--- Production (fjxcdccgyhnvnnlnovcl) does not have this file.
+-- Production (fjxcdccgyhnvnnlnovcl) has this file. Applied 2026-10-19
+-- 08:11-08:13 UTC, versions 20261019081159 through 20261019081339. Do not re-run.
 --
 -- The webhook is only a trigger. This function applies Bachs' cumulative
 -- collected total for one checkout. collected_total_seen_kes is that total

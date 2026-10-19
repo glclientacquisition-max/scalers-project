@@ -81,6 +81,8 @@ describe("live tenant and reconcile routes", () => {
     const admin = read("dashboard/src/app/api/billing/live-tenants/route.ts");
     assert.match(admin, /requireSuperAdmin/);
     assert.match(admin, /from "@\/lib\/adminGuard"/);
+    assert.doesNotMatch(admin, /status:\s*401/);
+    assert.match(read("dashboard/src/lib/adminGuard.ts"), /redirect\(ADMIN_LOGIN_PATH\)/);
     assert.match(admin, /liveTenantPostError/);
     assert.match(admin, /admin_set_tenant_live_payments/);
     assert.doesNotMatch(admin, /process\.env\./);

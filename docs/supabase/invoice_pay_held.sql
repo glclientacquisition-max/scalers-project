@@ -1,7 +1,7 @@
 -- invoice_pay_held.sql
 -- Purpose: P11. Apply after P10 (billing_mode_legal_pairs.sql).
 --          Does not replace finalize_invoice. Does not edit P1-P10.
--- Idempotent. Safe to re-run. No table rewrite. No tenant DML.
+-- Idempotent as a function replace. Do not re-run it. Later files replaced these functions.
 --
 -- A succeeded checkout that has not expired holds its part. The next click
 -- reads that Bachs session and does not insert another attempt while it is
@@ -9,8 +9,9 @@
 -- the session id. park_invoice_pay_attempt refuses a different session id.
 -- credit_checkout_extra inserts one tenant_credits row per provider ref.
 --
--- Production fjxcdccgyhnvnnlnovcl does not have this file. Staging
--- sgcdncjxauhsbunobmob is the only apply.
+-- Production fjxcdccgyhnvnnlnovcl has this file. Applied 2026-10-19
+-- 08:11-08:13 UTC, versions 20261019081159 through 20261019081339.
+-- Do not re-run. Staging sgcdncjxauhsbunobmob: invoice_pay_held 20261019011751.
 
 create or replace function public.create_invoice_pay_attempt(p_token text, p_amount_kes numeric)
 returns jsonb

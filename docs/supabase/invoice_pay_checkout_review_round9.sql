@@ -1,9 +1,10 @@
 -- Invoice pay checkout review, round 9 (P16).
--- Apply after invoice_pay_checkout_review_round8.sql (P15). Staging only until Alvin's GO.
+-- Apply after invoice_pay_checkout_review_round8.sql (P15).
 -- Does not replace finalize_invoice.
 -- Replaces open_checkout_total_review (same arguments) so the review stores checkout_id.
 -- Replaces resolve_checkout_total_review. Does not edit any other P1-P15 function body.
--- Production (fjxcdccgyhnvnnlnovcl) does not have this file.
+-- Production (fjxcdccgyhnvnnlnovcl) has this file. Applied 2026-10-19
+-- 08:11-08:13 UTC, versions 20261019081159 through 20261019081339. Do not re-run.
 -- Do not re-run P5, P9, P11, P12, P14, or P15 after P16.
 -- P15 restores a resolve that does not book. P14 restores the two-argument resolve
 -- and the older settle. P12 restores create_invoice_pay_attempt without the review

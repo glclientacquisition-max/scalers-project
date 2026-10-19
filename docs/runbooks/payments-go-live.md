@@ -19,7 +19,7 @@ VAT and KRA eTIMS stay off. `tax_kes` stays null.
 
 Still required before any live shilling moves, and not done by this change:
 
-- Apply P11 through P17, then P19, on the database you will charge. Staging already has P11 through P17. Staging does not have P19. Production has P1 through P10 only. P18 stays off production.
+- Apply P19 only. Production already has P1 through P18. P11 through P16 landed 2026-10-19 08:11-08:13 UTC as versions `20261019081159` through `20261019081339`. P17 is `20261019150641`. P18 is `20261019150654`. Both of those came in with #820 `f6d7fee9`. Staging has P11 through P18 and does not have P19. Never re-run P5, P9, P11, P12, P14, P15, P16, P17, or P18.
 - Set the env names below. Register the webhook only after a signed test returns 200. A 401 or 403 is a permanent refusal, so Bachs will not retry it.
 - Allowlist one non-beta test business. `admin_set_tenant_live_payments` refuses a beta business and a business with enforcement off.
 - Letterhead address, city, and KRA PIN are still unset. They do not block collection. They do leave those lines off the invoice.
@@ -43,16 +43,16 @@ Vercel project for the test: `scalers-staging` (Preview). Production project `sc
 | `SUPABASE_SERVICE_ROLE_KEY` | The reconcile script only. Not a browser key. |
 | `BILLING_NOTICES_SEND` | Leave unset. Notices stay off. |
 
-Do not set `BACHS_MODE=live` or `BACHS_LIVE_ALLOWED` on `scalers-project` until P11 through P17 and P19 are on production and Alvin says GO.
+Do not set `BACHS_MODE=live` or `BACHS_LIVE_ALLOWED` on `scalers-project` until P19 is on production and Alvin says GO. P1 through P18 are already there. Do not re-run them.
 
 ## Order to flip
 
-1. Confirm staging has P11 through P17. Apply P19 by hand on staging only, after a backup and Alvin's GO. Do not apply it to production in this step. Do not apply P18 on production.
+1. Confirm production already has P1 through P18. Apply P19 by hand on staging first, after a backup and Alvin's GO, then on production only after a second GO. Never re-run P5, P9, P11, P12, P14, P15, P16, P17, or P18.
 2. Pick one staging business that is not beta and has enforcement on. Not a production line. Never `+254709221536`.
 3. On Vercel Preview, set `BACHS_API_KEY` and `BACHS_WEBHOOK_SECRET`. Set `BACHS_MODE=sandbox`. Leave `BACHS_LIVE_ALLOWED` unset. Leave `BILLING_NOTICES_SEND` unset.
 4. Send one signed POST and one badly signed POST to `https://scalers-staging.vercel.app/api/billing/bachs/webhook`. Good signature returns 200. Bad signature returns 401 and writes no payment. Do this before the URL is registered at Bachs.
 5. Register that URL for `checkout.completed`, `collection.succeeded`, `collection.failed`, `collection.underpaid`, and `checkout.expired`.
-6. For the KSh 10 test window only: set `BACHS_MODE=live` and `BACHS_LIVE_ALLOWED` to exactly `true`. Allowlist that one business, either with `admin_set_tenant_live_payments` (reason required) or with `BACHS_LIVE_TENANT_ALLOWLIST` set to that id alone.
+6. For the KSh 10 test window only: set `BACHS_MODE=live` and `BACHS_LIVE_ALLOWED` to exactly `true`. Allowlist that one business, either with `admin_set_tenant_live_payments` (reason required) or with `BACHS_LIVE_TENANT_ALLOWLIST` set to that id alone. `GET` and `POST /api/billing/live-tenants` send a signed-out visitor to `/admin/login`. That redirect is expected. The route does not return 401. Sign in as Super Admin before calling it.
 7. Run the KSh 10 test below. Verify. Reconcile.
 8. Roll back unless Alvin says the test business stays live.
 
