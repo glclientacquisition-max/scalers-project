@@ -135,7 +135,18 @@ describe("Super Admin Today: status line and Needs you", () => {
       ],
     );
     assert.equal(rows[1].detail, "Waiting for a number for 7 days");
+    assert.equal(rows[1].href, "/admin/businesses/stuck");
+    assert.equal(rows[3].href, "/admin/businesses/nopack");
     for (const row of rows) assert.ok(row.href.startsWith("/admin/"), row.key);
+    assert.deepEqual(
+      model.todayQueueGroups(rows).map((g) => [g.key, g.rows.length]),
+      [
+        ["alert", 1],
+        ["line", 2],
+        ["package", 1],
+        ["quiet", 1],
+      ],
+    );
   });
 
   it("flags nobody as quiet when the call read failed", () => {
@@ -151,10 +162,10 @@ describe("Super Admin nav: eight destinations, phone 4 + More", () => {
   it("lists the eight in order and puts four on the phone bar", () => {
     assert.deepEqual(
       links.ADMIN_LINKS.map((l) => l.label),
-      ["Today", "Businesses", "Quality", "Billing", "Numbers", "Platform", "Activity", "Settings"],
+      ["Today", "Businesses", "Quality", "Billing", "Numbers", "Platform", "Activity", "Voices"],
     );
     assert.deepEqual(links.ADMIN_PHONE_TABS.map((l) => l.label), ["Today", "Businesses", "Quality", "Billing"]);
-    assert.deepEqual(links.ADMIN_MORE_LINKS.map((l) => l.label), ["Numbers", "Platform", "Activity", "Settings"]);
+    assert.deepEqual(links.ADMIN_MORE_LINKS.map((l) => l.label), ["Numbers", "Platform", "Activity", "Voices"]);
   });
 
   it("links only to screens that exist; nothing is pending now Activity ships", () => {

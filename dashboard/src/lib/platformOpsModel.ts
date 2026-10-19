@@ -373,7 +373,7 @@ export function mergeQueueRows(input: {
       key: `biz-${business.id}`,
       title: business.name,
       detail: "Waiting for a number",
-      href: `/admin/businesses#biz-${business.id}`,
+      href: `/admin/businesses/${business.id}`,
       stamp: "Waiting",
     });
   }
@@ -382,7 +382,7 @@ export function mergeQueueRows(input: {
       key: `biz-${business.id}`,
       title: business.name,
       detail: "No package",
-      href: `/admin/businesses#biz-${business.id}`,
+      href: `/admin/businesses/${business.id}`,
       stamp: "Package",
     });
   }

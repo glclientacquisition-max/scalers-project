@@ -37,7 +37,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
   const badge = badges[business.id];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <AdminPageHeader title={business.business_name} subtitle={previewLine(business)} />
       <div className="px-4">
         <Stamp tone={statusTone(business.status)}>{statusLabel(business.status)}</Stamp>

@@ -32,7 +32,7 @@ last_reviewed: 2026-10-18
 | `/admin/numbers` | Pool |
 | `/admin/platform` | Line, people, notices |
 | `/admin/activity` | Audit |
-| `/admin/voices` | Voice catalog (Settings in More) |
+| `/admin/voices` | Voice catalog (Voices in More) |
 
 ## Shop page sections
 
@@ -59,7 +59,6 @@ last_reviewed: 2026-10-18
 ## Out of scope (this program)
 
 - Invoices, M-Pesa checkout (#780+).  
-- Business edit, members, owner reset (follow-up Ops/Platform).  
 - RBAC inside Super Admin.  
 - Vendor/DNS/API keys on product UI.
 
