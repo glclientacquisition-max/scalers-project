@@ -243,6 +243,31 @@ function collectedFromCheckout(row) {
   return { totalKes: String(paid), cents };
 }
 
+/**
+ * Total to pass when staff chose book. Live mode uses a fresh GET.
+ * A closed gate, or any mode that is not live, books the stored reading.
+ * An unreadable fresh read, or a total below the stored reading, does not book.
+ * @param {{ live: boolean, storedKes: string | number, fresh?: { unreadable?: boolean, currencyIssue?: boolean, totalKes?: string, cents?: bigint } }} input
+ */
+function bookTotalForResolve(input) {
+  const storedKes = input.storedKes == null || String(input.storedKes).trim() === "" ? "0" : String(input.storedKes);
+  if (!input.live) return { ok: true, totalKes: storedKes };
+  const fresh = input.fresh;
+  if (!fresh || fresh.unreadable || fresh.currencyIssue) {
+    return { ok: false, error: "Couldn't read the collected amount. Nothing changed." };
+  }
+  const storedCents = toCents(storedKes);
+  const freshCents = fresh.cents != null ? fresh.cents : toCents(fresh.totalKes);
+  if (storedCents == null || freshCents == null || freshCents < 0n) {
+    return { ok: false, error: "Couldn't read the collected amount. Nothing changed." };
+  }
+  if (freshCents < storedCents) {
+    return { ok: false, error: "The collected amount is lower than the reading. Nothing changed." };
+  }
+  const totalKes = fresh.totalKes == null || String(fresh.totalKes).trim() === "" ? storedKes : String(fresh.totalKes);
+  return { ok: true, totalKes };
+}
+
 function readerFor(input) {
   if (input.provider && typeof input.provider.getCheckout === "function") return input.provider;
   if (!MockPayProvider.sessions) return null;
@@ -479,6 +504,7 @@ module.exports = {
   eventAmountKes,
   collectionReport,
   collectedFromCheckout,
+  bookTotalForResolve,
   decidePayment,
   handlePayWebhook,
   minorUnits,

@@ -267,15 +267,44 @@ export async function loadAdminBillingClient(tenantId: string): Promise<AdminBil
   };
 }
 
+export async function loadCheckoutReviewReading(opts: {
+  businessId: string;
+  providerRef: string;
+}): Promise<{ getKes: string; checkoutId: string }> {
+  const providerRef = opts.providerRef.trim();
+  if (!providerRef.startsWith("checkout-total-review:")) {
+    throw new Error("That review is not on this business.");
+  }
+  const admin = getSupabaseAdmin();
+  const { data: row, error: readError } = await admin
+    .from("payments")
+    .select("provider, tenant_id, match_status, raw")
+    .eq("provider_ref", providerRef)
+    .eq("tenant_id", opts.businessId)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!row || row.match_status !== "issue") {
+    throw new Error("That review is not on this business.");
+  }
+  const raw = row.raw;
+  const checkoutId = raw && typeof raw === "object" ? String((raw as { checkout_id?: string }).checkout_id || "").trim() : "";
+  return { getKes: reviewText(raw, "get_kes"), checkoutId };
+}
+
 export async function resolveCheckoutTotalReview(opts: {
   businessId: string;
   providerRef: string;
   actor: string;
   reason: string;
+  choice: string;
+  totalKes?: string | null;
 }): Promise<void> {
   const providerRef = opts.providerRef.trim();
   if (!providerRef.startsWith("checkout-total-review:")) {
     throw new Error("That review is not on this business.");
+  }
+  if (opts.choice !== "book" && opts.choice !== "nothing") {
+    throw new Error("Choose book collected amount or nothing collected.");
   }
   if (opts.reason.trim().length < 3) {
     throw new Error("Add a reason (3 letters or more).");
@@ -291,12 +320,24 @@ export async function resolveCheckoutTotalReview(opts: {
   if (!row || row.match_status !== "issue") {
     throw new Error("That review is not on this business.");
   }
-  const { error } = await admin.rpc("resolve_checkout_total_review", {
+  const args: {
+    p_provider: string;
+    p_provider_ref: string;
+    p_actor: string;
+    p_reason: string;
+    p_choice: string;
+    p_total_kes?: string;
+  } = {
     p_provider: String(row.provider || "bachs"),
     p_provider_ref: providerRef,
     p_actor: opts.actor,
     p_reason: opts.reason.trim(),
-  });
+    p_choice: opts.choice,
+  };
+  if (opts.totalKes != null && String(opts.totalKes).trim() !== "") {
+    args.p_total_kes = String(opts.totalKes);
+  }
+  const { error } = await admin.rpc("resolve_checkout_total_review", args);
   if (error) throw error;
 }
 

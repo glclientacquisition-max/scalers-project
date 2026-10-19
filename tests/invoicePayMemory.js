@@ -204,6 +204,7 @@ function createMemoryLedger(opts = {}) {
         get_kes: String(input.totalKes),
         seen_kes: fromCents(seen),
         event_amount_kes: input.eventAmountKes == null ? null : String(input.eventAmountKes),
+        checkout_id: checkoutId,
         identity: input.identity || null,
         event: input.raw || {},
       },
@@ -498,13 +499,36 @@ function createMemoryLedger(opts = {}) {
     async resolveCheckoutReview(input) {
       const actor = String(input.actor || "").trim();
       const reason = String(input.reason || "").trim();
+      const choice = String(input.choice || "").trim();
       if (!actor) throw new Error("actor is required");
       if (reason.length < 3) throw new Error("reason is required");
+      if (choice !== "book" && choice !== "nothing") throw new Error("resolve choice is required");
       const row = payments.find(
         (payment) => payment.provider === input.provider && payment.providerRef === input.providerRef
       );
       if (!row || row.matchStatus !== "issue" || !String(row.providerRef || "").startsWith("checkout-total-review:")) {
         throw new Error("checkout review not found");
+      }
+      const already = row.raw && row.raw.review_status === "resolved";
+      let appliedKes = "0";
+      let excessKes = "0";
+      if (!already && choice === "book") {
+        const stored = toCents(row.raw && row.raw.get_kes) || 0n;
+        const passed = input.totalKes == null || String(input.totalKes).trim() === "" ? null : toCents(input.totalKes);
+        if (passed != null && passed < stored) throw new Error("collected total fell");
+        const checkoutId = row.raw && row.raw.checkout_id ? String(row.raw.checkout_id) : "";
+        if (!checkoutId) throw new Error("pay attempt not found");
+        const totalKes = passed != null ? String(input.totalKes) : String(row.raw.get_kes);
+        const booked = applyCheckoutTotal({
+          provider: input.provider,
+          checkoutId,
+          totalKes,
+          tenantId: row.tenantId,
+          invoiceId: row.invoiceId,
+          raw: (row.raw && row.raw.event) || {},
+        });
+        appliedKes = booked.appliedKes;
+        excessKes = booked.excessKes;
       }
       row.raw = { ...(row.raw || {}), review_status: "resolved" };
       alerts.push({
@@ -512,6 +536,10 @@ function createMemoryLedger(opts = {}) {
         actor,
         reason,
         providerRef: input.providerRef,
+        choice,
+        appliedKes,
+        excessKes,
+        getKes: row.raw.get_kes,
       });
     },
     async findPaymentByRef(provider, providerRef) {

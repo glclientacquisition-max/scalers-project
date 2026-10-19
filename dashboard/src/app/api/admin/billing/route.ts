@@ -5,8 +5,11 @@ import {
   grantTenantPackageMinutes,
   loadAdminBillingOverview,
   loadBillingHistory,
+  loadCheckoutReviewReading,
   resolveCheckoutTotalReview,
 } from "@/lib/adminBilling";
+import { bookTotalForResolve, collectedFromCheckout } from "@/lib/invoicePay/webhook";
+import { assertLiveTenant, bachsMode, paymentsClosed, payProviderFromEnv } from "@/lib/invoicePay/provider";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import { recordAdminAction } from "@/lib/adminAudit";
 import { assignBusinessPackage, loadBusinessPackageNames, unassignBusinessPackage } from "@/lib/packageCatalog";
@@ -17,6 +20,42 @@ import {
 
 /** Shown when a write fails for a reason the operator can't act on. The raw cause goes to the log. */
 const SAVE_FAILED = "That didn't save. Nothing changed. Try again, or check Activity.";
+const UNREAD_COLLECTED = "Couldn't read the collected amount. Nothing changed.";
+
+type BookDecision = { ok: true; totalKes: string } | { ok: false; error: string };
+
+/**
+ * Book uses a live GET only when the gate is open. A closed gate, including
+ * an allowlist refusal, books the stored reading and does not call Bachs.
+ */
+async function totalForBookedResolve(
+  businessId: string,
+  reading: { getKes: string; checkoutId: string },
+): Promise<BookDecision> {
+  const liveOpen = bachsMode() === "live" && !paymentsClosed();
+  if (!liveOpen) return bookTotalForResolve({ live: false, storedKes: reading.getKes });
+  try {
+    assertLiveTenant(businessId);
+  } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code || "") : "";
+    if (code === "bachs_live_refused") {
+      return bookTotalForResolve({ live: false, storedKes: reading.getKes });
+    }
+    throw err;
+  }
+  if (!reading.checkoutId) return { ok: false, error: UNREAD_COLLECTED };
+  let row = null;
+  try {
+    row = await payProviderFromEnv().getCheckout(reading.checkoutId);
+  } catch {
+    return { ok: false, error: UNREAD_COLLECTED };
+  }
+  return bookTotalForResolve({
+    live: true,
+    storedKes: reading.getKes,
+    fresh: collectedFromCheckout(row),
+  });
+}
 
 export async function GET(request: Request) {
   if (!(await isLegacyAuthenticated())) {
@@ -117,17 +156,32 @@ export async function POST(request: Request) {
 
     if (action === "resolve_checkout_review") {
       const providerRef = String(body.provider_ref || "").trim();
+      const choice = String(body.choice || "").trim();
       if (!providerRef.startsWith("checkout-total-review:")) {
         return NextResponse.json({ error: "That review is not on this business." }, { status: 400 });
       }
+      if (choice !== "book" && choice !== "nothing") {
+        return NextResponse.json({ error: "Choose book collected amount or nothing collected." }, { status: 400 });
+      }
       if (note.length < 3) {
         return NextResponse.json({ error: "Add a reason (3 letters or more)." }, { status: 400 });
+      }
+      let totalKes: string | undefined;
+      if (choice === "book") {
+        const reading = await loadCheckoutReviewReading({ businessId, providerRef });
+        const decision = await totalForBookedResolve(businessId, reading);
+        if (!decision.ok) {
+          return NextResponse.json({ error: decision.error }, { status: 400 });
+        }
+        totalKes = decision.totalKes;
       }
       await resolveCheckoutTotalReview({
         businessId,
         providerRef,
         actor,
         reason: note,
+        choice,
+        totalKes,
       });
       return NextResponse.json({ ok: true });
     }
