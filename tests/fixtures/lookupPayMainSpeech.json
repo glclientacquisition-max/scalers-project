@@ -39,6 +39,24 @@
       "speech": "Namba ya namba ya paybill ya M-Pesa ni tano nne mbili tano nne mbili. Akaunti ni saba sifuri saba mbili mbili."
     },
     {
+      "fixture": "paybill_with_account",
+      "queryId": "till_en",
+      "language": "en",
+      "query": "till number",
+      "status": "not_found_in_list",
+      "reason": "no_match",
+      "speech": "Let me check with the team and get back to you."
+    },
+    {
+      "fixture": "paybill_with_account",
+      "queryId": "till_sw",
+      "language": "sw",
+      "query": "namba ya till",
+      "status": "not_found_in_list",
+      "reason": "no_match",
+      "speech": "Wacha niulize timu kisha nikujulishe."
+    },
+    {
       "fixture": "till",
       "queryId": "general_en",
       "language": "en",
@@ -70,6 +88,78 @@
       "queryId": "mpesa_sw",
       "language": "sw",
       "query": "Mnapokea M-Pesa?",
+      "status": "found",
+      "reason": "match",
+      "speech": "Namba ya till ya M-Pesa ni moja mbili tatu nne tano sita."
+    },
+    {
+      "fixture": "till",
+      "queryId": "till_en",
+      "language": "en",
+      "query": "till number",
+      "status": "found",
+      "reason": "match",
+      "speech": "The M-Pesa till number is one two three four five six."
+    },
+    {
+      "fixture": "till",
+      "queryId": "till_sw",
+      "language": "sw",
+      "query": "namba ya till",
+      "status": "found",
+      "reason": "match",
+      "speech": "Namba ya till ya M-Pesa ni moja mbili tatu nne tano sita."
+    },
+    {
+      "fixture": "till_plus_cash",
+      "queryId": "general_en",
+      "language": "en",
+      "query": "How do I pay?",
+      "status": "found",
+      "reason": "match",
+      "speech": "The M-Pesa till number is one two three four five six."
+    },
+    {
+      "fixture": "till_plus_cash",
+      "queryId": "general_sw",
+      "language": "sw",
+      "query": "Nalipaje?",
+      "status": "found",
+      "reason": "match",
+      "speech": "Namba ya till ya M-Pesa ni moja mbili tatu nne tano sita."
+    },
+    {
+      "fixture": "till_plus_cash",
+      "queryId": "mpesa_en",
+      "language": "en",
+      "query": "Do you take M-Pesa?",
+      "status": "found",
+      "reason": "match",
+      "speech": "The M-Pesa till number is one two three four five six."
+    },
+    {
+      "fixture": "till_plus_cash",
+      "queryId": "mpesa_sw",
+      "language": "sw",
+      "query": "Mnapokea M-Pesa?",
+      "status": "found",
+      "reason": "match",
+      "speech": "Namba ya till ya M-Pesa ni moja mbili tatu nne tano sita."
+    },
+    {
+      "fixture": "till_plus_cash",
+      "queryId": "till_en",
+      "language": "en",
+      "query": "till number",
+      "status": "found",
+      "reason": "match",
+      "speech": "The M-Pesa till number is one two three four five six."
+    },
+    {
+      "fixture": "till_plus_cash",
+      "queryId": "till_sw",
+      "language": "sw",
+      "query": "namba ya till",
       "status": "found",
       "reason": "match",
       "speech": "Namba ya till ya M-Pesa ni moja mbili tatu nne tano sita."
@@ -111,6 +201,24 @@
       "speech": "Namba ya namba ya Pochi la Biashara ni sifuri saba moja mbili tatu nne tano sita saba nane."
     },
     {
+      "fixture": "pochi",
+      "queryId": "till_en",
+      "language": "en",
+      "query": "till number",
+      "status": "not_found_in_list",
+      "reason": "no_match",
+      "speech": "Let me check with the team and get back to you."
+    },
+    {
+      "fixture": "pochi",
+      "queryId": "till_sw",
+      "language": "sw",
+      "query": "namba ya till",
+      "status": "not_found_in_list",
+      "reason": "no_match",
+      "speech": "Wacha niulize timu kisha nikujulishe."
+    },
+    {
       "fixture": "send_money",
       "queryId": "general_en",
       "language": "en",
@@ -147,6 +255,24 @@
       "speech": "Namba ya namba ya kutuma pesa kwa M-Pesa ni sifuri saba moja mbili tatu nne tano sita saba nane."
     },
     {
+      "fixture": "send_money",
+      "queryId": "till_en",
+      "language": "en",
+      "query": "till number",
+      "status": "not_found_in_list",
+      "reason": "no_match",
+      "speech": "Let me check with the team and get back to you."
+    },
+    {
+      "fixture": "send_money",
+      "queryId": "till_sw",
+      "language": "sw",
+      "query": "namba ya till",
+      "status": "not_found_in_list",
+      "reason": "no_match",
+      "speech": "Wacha niulize timu kisha nikujulishe."
+    },
+    {
       "fixture": "airtel",
       "queryId": "general_en",
       "language": "en",
@@ -181,6 +307,24 @@
       "status": "found",
       "reason": "match",
       "speech": "Namba ya namba ya Airtel Money ni sifuri saba tatu nne tano sita saba nane tisa sifuri."
+    },
+    {
+      "fixture": "airtel",
+      "queryId": "till_en",
+      "language": "en",
+      "query": "till number",
+      "status": "not_found_in_list",
+      "reason": "no_match",
+      "speech": "Let me check with the team and get back to you."
+    },
+    {
+      "fixture": "airtel",
+      "queryId": "till_sw",
+      "language": "sw",
+      "query": "namba ya till",
+      "status": "not_found_in_list",
+      "reason": "no_match",
+      "speech": "Wacha niulize timu kisha nikujulishe."
     }
   ]
 }

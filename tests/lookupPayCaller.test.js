@@ -189,6 +189,104 @@ test('pay: imported till is unconfirmed and uses the callback line', () => {
   }
 });
 
+test('pay: till tenant asked about cash or cheque states M-Pesa number, not callback', () => {
+  const row = confirmedPay({ methods: ['mpesa_till'], mpesa_till: '123456' });
+  const enCash = say('pay', 'Can I pay cash?', row, 'en');
+  const swCheque = say('pay', 'Mnachukua hundi?', row, 'sw');
+  assert.equal(enCash.result.status, 'found');
+  assert.equal(
+    enCash.speech,
+    'We take M-Pesa. The till number is one two three four five six.',
+  );
+  assert.equal(swCheque.result.status, 'found');
+  assert.match(swCheque.speech, /Tunapokea M-Pesa/);
+  assert.match(swCheque.speech, /Namba ya till ni/);
+});
+
+test('pay: till plus cash tenant affirms cash and till on cash question', () => {
+  const row = confirmedPay({ methods: ['mpesa_till', 'cash'], mpesa_till: '123456' });
+  const en = say('pay', 'Can I pay cash?', row, 'en');
+  const sw = say('pay', 'Naweza kulipa kwa pesa taslimu?', row, 'sw');
+  assert.equal(en.result.status, 'found');
+  assert.equal(
+    en.speech,
+    'You can pay by cash or M-Pesa. The till number is one two three four five six.',
+  );
+  assert.equal(sw.result.status, 'found');
+  assert.match(sw.speech, /Unaweza kulipa kwa pesa taslimu au M-Pesa/);
+  assert.match(sw.speech, /Namba ya till ni/);
+});
+
+test('pay: compound M-Pesa or cash covers saved methods', () => {
+  const tillOnly = confirmedPay({ methods: ['mpesa_till'], mpesa_till: '123456' });
+  const tillCash = confirmedPay({ methods: ['mpesa_till', 'cash'], mpesa_till: '123456' });
+  const enOnly = say('pay', 'Do you take M-Pesa or cash?', tillOnly, 'en');
+  assert.equal(enOnly.result.status, 'found');
+  assert.equal(
+    enOnly.speech,
+    'We take M-Pesa. The till number is one two three four five six.',
+  );
+  const enBoth = say('pay', 'Can I pay cash or M-Pesa?', tillCash, 'en');
+  assert.equal(enBoth.result.status, 'found');
+  assert.equal(
+    enBoth.speech,
+    'You can pay by cash or M-Pesa. The till number is one two three four five six.',
+  );
+  const swBoth = say('pay', 'Mnaweza kulipa kwa pesa taslimu au M-Pesa?', tillCash, 'sw');
+  assert.equal(swBoth.result.status, 'found');
+  assert.match(swBoth.speech, /pesa taslimu au M-Pesa/);
+});
+
+test('pay: card and bank method questions use the method line', () => {
+  const row = confirmedPay({ methods: ['card', 'bank'] });
+  const enCard = say('pay', 'Do you take card?', row, 'en');
+  const swCard = say('pay', 'Mnachukua kadi?', row, 'sw');
+  assert.equal(enCard.result.status, 'found');
+  assert.equal(enCard.speech, 'You can pay by card.');
+  assert.equal(swCard.result.status, 'found');
+  assert.equal(swCard.speech, 'Unaweza kulipa kwa kadi.');
+  const enBank = say('pay', 'Can I pay by bank transfer?', row, 'en');
+  const swBank = say('pay', 'Naweza kulipa kwa uhamisho wa benki?', row, 'sw');
+  assert.equal(enBank.result.status, 'found');
+  assert.equal(enBank.speech, 'You can pay by bank transfer.');
+  assert.equal(swBank.result.status, 'found');
+  assert.equal(swBank.speech, 'Unaweza kulipa kwa uhamisho wa benki.');
+});
+
+test('pay: off-topic pay questions use the callback line, not the method list', () => {
+  const row = confirmedPay({ methods: ['cash', 'cheque', 'bank'] });
+  for (const [language, query] of [
+    ['en', 'Pay later?'],
+    ['sw', 'Nicheki namba ya kulipa'],
+  ]) {
+    const hit = say('pay', query, row, language);
+    assert.equal(hit.result.status, 'not_found_in_list', query);
+    expectCallback(hit, language);
+    assert.doesNotMatch(hit.speech, /You can pay by cash/i);
+  }
+});
+
+test('pay: imported till asked about M-Pesa is unconfirmed before not_in_list', () => {
+  const row = {
+    ...CALLBACK_ROW,
+    business_name: 'Pay Co',
+    business_policies: {
+      payments: {
+        version: 2,
+        methods: ['mpesa_till'],
+        mpesa_till: '123456',
+        timings: ['on_delivery'],
+        source: 'import',
+        confirmed: false,
+        parsed_from: 'M-Pesa till 123456',
+      },
+    },
+  };
+  const hit = say('pay', 'Do you take M-Pesa?', row, 'en');
+  assert.equal(hit.result.status, 'unconfirmed');
+  expectCallback(hit, 'en');
+});
+
 test('pay: FACT_HASH_MODE confirms payments from tenant_field_meta', () => {
   const prev = process.env.FACT_HASH_MODE;
   process.env.FACT_HASH_MODE = 'on';

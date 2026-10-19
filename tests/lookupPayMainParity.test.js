@@ -34,6 +34,7 @@ const FIXTURE_PAY = {
     mpesa_paybill: { business_no: '542542', account_mode: 'fixed', account: '70722' },
   },
   till: { methods: ['mpesa_till'], mpesa_till: '123456' },
+  till_plus_cash: { methods: ['mpesa_till', 'cash'], mpesa_till: '123456' },
   pochi: { methods: ['pochi'], pochi: { phone: '0712345678' } },
   send_money: { methods: ['mpesa_send'], mpesa_send: { phone: '0712345678' } },
   airtel: { methods: ['airtel'], airtel: { phone: '0734567890' } },

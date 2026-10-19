@@ -902,6 +902,24 @@ function payMethodLines(pay, filterKind) {
   return lines;
 }
 
+function payListLineForKind(pay, kind) {
+  if (kind === 'mpesa') return { en: 'M-Pesa', sw: 'M-Pesa' };
+  return spokenPayMethodLine(pay, kind);
+}
+
+function payMethodsListSentence(kinds, pay, lang) {
+  const key = lang === 'sw' ? 'sw' : 'en';
+  const parts = kinds
+    .map((k) => payListLineForKind(pay, k))
+    .filter(Boolean)
+    .map((line) => line[key]);
+  if (!parts.length) return '';
+  if (key === 'sw') return `Unaweza kulipa kwa ${joinOrWords(parts, 'sw')}.`;
+  return `You can pay by ${joinOrWords(parts, 'en')}.`;
+}
+
+const PAY_MPESA_PREAMBLE = { en: 'We take M-Pesa.', sw: 'Tunapokea M-Pesa.' };
+
 function payMethodOffered(pay, kind) {
   const methods = payMethodIds(pay);
   if (kind === 'cash') return methods.includes('cash');
@@ -924,12 +942,14 @@ function payMethodListSpeech(pay, { only } = {}) {
   };
 }
 
-function payGeneralQuestion(text) {
+function payStrictGeneralQuestion(text) {
   const t = String(text || '').trim();
-  if (!t) return true;
+  if (!t) return false;
+  if (/\bpay\s+later\b/i.test(t)) return false;
+  if (/\bnicheki\b/i.test(t) && /\bnamba\b/i.test(t) && !/\bnalipaje\b/i.test(t)) return false;
   return (
     /\b(how do i pay|how can i pay|how to pay|payment methods?|ways to pay|what do you accept)\b/i.test(t)
-    || /\b(nalipaje|namna ya kulipa|jinsi ya kulipa|malipo)\b/i.test(t)
+    || /\b(nalipaje|namna ya kulipa|jinsi ya kulipa)\b/i.test(t)
   );
 }
 
@@ -960,26 +980,45 @@ function payMethodMpesaQuestion(text) {
 }
 
 function payMethodBankQuestion(text) {
-  return /\b(bank transfer|bank account|pay by bank)\b/i.test(String(text || ''))
-    && !/\baccount number\b/i.test(String(text || ''));
+  const t = String(text || '');
+  return (
+    /\b(bank transfer|bank account|pay by bank)\b/i.test(t)
+    || /\b(benki|uhamisho wa benki)\b/i.test(t)
+    || (/\bbank\b/i.test(t) && /\b(pay|accept|take|transfer|do you)\b/i.test(t))
+  ) && !/\baccount number\b/i.test(t);
 }
 
 function payMethodCardQuestion(text) {
-  return /\b(pay by card|accept card|visa|mastercard|card payment)\b/i.test(String(text || ''))
-    && !/\bcard number\b/i.test(String(text || ''));
+  const t = String(text || '');
+  return (
+    /\b(pay by card|accept card|do you take card|visa|mastercard|card payment)\b/i.test(t)
+    || /\bkadi\b/i.test(t)
+  ) && !/\bcard number\b/i.test(t);
+}
+
+function payMethodsMentionedInQuery(text) {
+  const mentioned = new Set();
+  if (payMethodCashQuestion(text)) mentioned.add('cash');
+  if (payMethodChequeQuestion(text)) mentioned.add('cheque');
+  if (payMethodMpesaQuestion(text)) mentioned.add('mpesa');
+  if (payMethodBankQuestion(text)) mentioned.add('bank');
+  if (payMethodCardQuestion(text)) mentioned.add('card');
+  return mentioned;
 }
 
 function payQuestionIntent(query) {
   const text = String(query || '');
-  const numberKind = payKindOf(query);
-  if (numberKind !== 'any') return { mode: 'number', kind: numberKind };
+  const mentioned = payMethodsMentionedInQuery(text);
+  if (mentioned.size > 1) return { mode: 'compound', methods: mentioned };
   if (payMethodChequeQuestion(text)) return { mode: 'method', method: 'cheque' };
   if (payMethodCashQuestion(text)) return { mode: 'method', method: 'cash' };
   if (payMethodMpesaQuestion(text)) return { mode: 'method', method: 'mpesa' };
   if (payMethodBankQuestion(text)) return { mode: 'method', method: 'bank' };
   if (payMethodCardQuestion(text)) return { mode: 'method', method: 'card' };
-  if (payGeneralQuestion(text)) return { mode: 'general' };
-  return { mode: 'general' };
+  if (payStrictGeneralQuestion(text)) return { mode: 'general' };
+  const numberKind = payKindOf(query);
+  if (numberKind !== 'any') return { mode: 'number', kind: numberKind };
+  return { mode: 'unknown' };
 }
 
 function payKindOf(query) {
@@ -1005,6 +1044,74 @@ function speakDigits(raw, lang) {
   return [...digits].map((d) => words[Number(d)]).join(' ');
 }
 
+function paySpokenNumberForSlot(slot, { tillShortLabel = false } = {}) {
+  const enDigits = speakDigits(slot[1], 'en');
+  const swDigits = speakDigits(slot[1], 'sw');
+  const labels = slot[2];
+  let en;
+  let sw;
+  if (tillShortLabel && slot[0] === 'till') {
+    en = `The till number is ${enDigits}.`;
+    sw = `Namba ya till ni ${swDigits}.`;
+  } else {
+    en = `The ${labels.en} is ${enDigits}.`;
+    sw = `Namba ya ${labels.sw} ni ${swDigits}.`;
+  }
+  const account = slot[3] && (slot[3].account_mode || 'fixed') === 'fixed' ? digitsOf(slot[3].account) : '';
+  if (account) {
+    en += ` The account is ${speakDigits(account, 'en')}.`;
+    sw += ` Akaunti ni ${speakDigits(account, 'sw')}.`;
+  }
+  return { en, sw };
+}
+
+function payComposeListKinds(intent, pay) {
+  const hasSlot = paySlots(pay).length > 0;
+  if (intent.mode === 'compound') {
+    const kinds = [];
+    for (const k of intent.methods) {
+      if (k === 'mpesa') {
+        if (hasSlot) kinds.push('mpesa');
+      } else if (payMethodOffered(pay, k)) kinds.push(k);
+    }
+    return kinds;
+  }
+  if (intent.mode === 'method') {
+    if (intent.method === 'cash' && payMethodOffered(pay, 'cash') && hasSlot) return ['cash', 'mpesa'];
+    if (intent.method === 'cash' && payMethodOffered(pay, 'cash')) return ['cash'];
+    if (intent.method === 'cheque' && payMethodOffered(pay, 'cheque')) return ['cheque'];
+  }
+  return [];
+}
+
+function lookupPayComposed(intent, profile, pay) {
+  const slots = paySlots(pay);
+  const slot = slots[0];
+  const listKinds = payComposeListKinds(intent, pay);
+  const num = paySpokenNumberForSlot(slot, { tillShortLabel: true });
+  const mpesaOnlyList = listKinds.length === 1 && listKinds[0] === 'mpesa';
+  const usePreamble = !listKinds.length
+    || (mpesaOnlyList && (
+      intent.mode === 'method'
+      || (intent.mode === 'compound' && intent.methods.has('cash') && !payMethodOffered(pay, 'cash'))
+    ));
+  let en;
+  let sw;
+  if (!usePreamble && listKinds.length) {
+    en = `${payMethodsListSentence(listKinds, pay, 'en')} ${num.en}`;
+    sw = `${payMethodsListSentence(listKinds, pay, 'sw')} ${num.sw}`;
+  } else {
+    en = `${PAY_MPESA_PREAMBLE.en} ${num.en}`;
+    sw = `${PAY_MPESA_PREAMBLE.sw} ${num.sw}`;
+  }
+  return resultOf('found', {
+    id: `pay.${slot[0] === 'till' ? 'mpesa_till' : slot[0] === 'paybill' ? 'mpesa_paybill' : slot[0] === 'send' ? 'mpesa_send' : slot[0]}`,
+    value: slot[1],
+    source: 'owner',
+    speech: both(en, sw),
+  }, profile, 'pay');
+}
+
 function lookupPayNumber(kind, profile, pay) {
   if (kind === 'bank' || kind === 'card') {
     return notFoundInList(profile, `pay.${kind}`, null, 'pay');
@@ -1024,30 +1131,24 @@ function lookupPayNumber(kind, profile, pay) {
   if (!slot) return notFoundInList(profile, `pay.${kind}`, null, 'pay');
   const payRead = payReading(profile, pay);
   if (!payRead.ok) return unconfirmed(profile, `pay.${slot[0]}`, 'pay', payRead.reason, 'pay');
-  const enDigits = speakDigits(slot[1], 'en');
-  const swDigits = speakDigits(slot[1], 'sw');
-  const labels = slot[2];
-  let en = `The ${labels.en} is ${enDigits}.`;
-  let sw = `Namba ya ${labels.sw} ni ${swDigits}.`;
-  const account = slot[3] && (slot[3].account_mode || 'fixed') === 'fixed' ? digitsOf(slot[3].account) : '';
-  if (account) {
-    en += ` The account is ${speakDigits(account, 'en')}.`;
-    sw += ` Akaunti ni ${speakDigits(account, 'sw')}.`;
-  }
+  const speech = paySpokenNumberForSlot(slot);
   return resultOf('found', {
     id: `pay.${slot[0] === 'till' ? 'mpesa_till' : slot[0] === 'paybill' ? 'mpesa_paybill' : slot[0] === 'send' ? 'mpesa_send' : slot[0]}`,
     value: slot[1],
     source: 'owner',
-    speech: both(en, sw),
+    speech: both(speech.en, speech.sw),
   }, profile, 'pay');
 }
 
 function lookupPayMethods(profile, pay, intent) {
   const payRead = payReading(profile, pay);
+  if (!payRead.ok) return unconfirmed(profile, 'payments.methods', 'pay', payRead.reason, 'pay');
   if (intent.mode === 'method' && !payMethodOffered(pay, intent.method)) {
+    if (intent.method === 'mpesa' && payMethodOffered(pay, 'mpesa') && !paySlots(pay).length) {
+      return noData(profile, 'pay', 'pay');
+    }
     return notFoundInList(profile, `pay.${intent.method}`, null, 'pay');
   }
-  if (!payRead.ok) return unconfirmed(profile, 'payments.methods', 'pay', payRead.reason, 'pay');
   const speech = intent.mode === 'method'
     ? payMethodListSpeech(pay, { only: intent.method })
     : payMethodListSpeech(pay);
@@ -1060,14 +1161,6 @@ function lookupPayMethods(profile, pay, intent) {
   }, profile, 'pay');
 }
 
-function lookupPayUsesNumberSpeech(intent, pay) {
-  const slots = paySlots(pay);
-  if (!slots.length) return false;
-  if (intent.mode === 'general') return true;
-  if (intent.mode === 'method' && intent.method === 'mpesa') return payMethodOffered(pay, 'mpesa');
-  return false;
-}
-
 function lookupPay(query, ctx) {
   const profile = ctx.profile || {};
   const pay = payBag(profile);
@@ -1076,14 +1169,29 @@ function lookupPay(query, ctx) {
     return noData(profile, 'pay', 'pay');
   }
   const intent = payQuestionIntent(query);
+  const slots = paySlots(pay);
+  const payRead = payReading(profile, pay);
+
+  if (intent.mode === 'unknown') {
+    return notFoundInList(profile, 'pay', null, 'pay');
+  }
   if (intent.mode === 'number') {
     return lookupPayNumber(intent.kind, profile, pay);
   }
-  if (lookupPayUsesNumberSpeech(intent, pay)) {
-    if (intent.mode === 'method' && intent.method === 'mpesa' && !payMethodOffered(pay, 'mpesa')) {
-      return notFoundInList(profile, 'pay.mpesa', null, 'pay');
+  if (slots.length && !payRead.ok) {
+    const slot = slots[0];
+    return unconfirmed(profile, `pay.${slot[0]}`, 'pay', payRead.reason, 'pay');
+  }
+  if (slots.length && payRead.ok) {
+    if (intent.mode === 'general' || (intent.mode === 'method' && intent.method === 'mpesa')) {
+      return lookupPayNumber('any', profile, pay);
     }
-    return lookupPayNumber('any', profile, pay);
+    if (
+      intent.mode === 'compound'
+      || (intent.mode === 'method' && (intent.method === 'cash' || intent.method === 'cheque'))
+    ) {
+      return lookupPayComposed(intent, profile, pay);
+    }
   }
   return lookupPayMethods(profile, pay, intent);
 }
