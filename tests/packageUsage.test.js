@@ -7,6 +7,15 @@ function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
 }
 
+function walk(rel) {
+  const abs = path.join(__dirname, "..", rel);
+  return fs.readdirSync(abs, { withFileTypes: true }).flatMap((entry) => {
+    const child = path.join(rel, entry.name);
+    if (entry.isDirectory()) return walk(child);
+    return /\.(ts|tsx|js|mjs)$/.test(entry.name) ? [child] : [];
+  });
+}
+
 describe("package usage meter", () => {
   it("floors seconds to whole minutes and never goes negative", () => {
     const catalog = read("dashboard/src/lib/packageCatalog.ts");
@@ -203,10 +212,20 @@ describe("package usage meter", () => {
 
   it("lists the assigned package on Admin Businesses", () => {
     const admin = read("dashboard/src/lib/admin.ts");
-    const panel = read("dashboard/src/components/AdminBusinessesPanel.tsx");
+    const ui = read("dashboard/src/lib/adminBusinessUi.ts");
     assert.match(admin, /loadBusinessPackageNames/);
     assert.match(admin, /package_name: pack\?\.packageName \|\| null/);
-    assert.match(panel, /b\.package_name/);
-    assert.match(panel, /packLabel/);
+    assert.match(ui, /export function packLabel/);
+    assert.match(ui, /b\.package_name/);
+    const importRe = /import\s*\{([^}]+)\}\s*from\s*"@\/lib\/adminBusinessUi"/g;
+    const callers = walk("dashboard/src").flatMap((rel) => {
+      const source = read(rel);
+      const names = [...source.matchAll(importRe)].map((match) => match[1]).join(",");
+      return /\bpackLabel\b/.test(names) ? [{ rel, source }] : [];
+    });
+    assert.ok(callers.length > 0, "a screen imports packLabel from adminBusinessUi");
+    for (const caller of callers) {
+      assert.match(caller.source, /packLabel\s*\(/, caller.rel);
+    }
   });
 });
