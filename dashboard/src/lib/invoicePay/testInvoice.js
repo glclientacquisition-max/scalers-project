@@ -16,6 +16,21 @@ function digits(value) {
  * @param {unknown} body
  * @returns {string | null}
  */
+function testInvoiceFailure(error) {
+  const message = error instanceof Error ? error.message : "";
+  if (/still on beta/.test(message)) return { status: 409, error: "This business is still on beta." };
+  if (/Aris/.test(message)) return { status: 409, error: "That line cannot take a test invoice." };
+  if (/not change the plan/.test(message)) return { status: 409, error: "The plan did not stay the same." };
+  if (/already paid/.test(message)) return { status: 409, error: "This test invoice is already paid." };
+  if (/already issued/.test(message)) return { status: 409, error: "A pay link is already issued." };
+  if (/business not found/.test(message)) return { status: 400, error: "Choose the business." };
+  if (/archived/.test(message)) return { status: 400, error: "Archived businesses have no pay link." };
+  if (/more than one/.test(message)) return { status: 400, error: "More than one test invoice is open." };
+  if (/not KSh 10|did not open/.test(message)) return { status: 400, error: "The test invoice did not open at KSh 10." };
+  if (/Add who is doing this/.test(message)) return { status: 400, error: "Add who is doing this." };
+  return { status: 400, error: "Could not open the test invoice." };
+}
+
 function testInvoicePostError(body) {
   if (!body || typeof body !== "object") return "Confirm the test invoice.";
   const posted = /** @type {{ confirm?: unknown, reason?: unknown, tenantId?: unknown, amount?: unknown }} */ (body);
@@ -230,5 +245,6 @@ module.exports = {
   TEST_LINE,
   issueKsh10TestInvoice,
   supabaseTestInvoiceDb,
+  testInvoiceFailure,
   testInvoicePostError,
 };

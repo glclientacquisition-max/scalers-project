@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { adminActorName } from "@/lib/adminActor";
 import { logAdminError } from "@/lib/adminErrors";
 import { requireSuperAdmin } from "@/lib/adminGuard";
-import { issueKsh10TestInvoice, supabaseTestInvoiceDb, testInvoicePostError } from "@/lib/invoicePay/testInvoice";
+import { issueKsh10TestInvoice, supabaseTestInvoiceDb, testInvoiceFailure, testInvoicePostError } from "@/lib/invoicePay/testInvoice";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 /**
@@ -28,8 +28,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, ...issued });
   } catch (error) {
     logAdminError("ksh10-test-invoice", error);
-    const message = error instanceof Error ? error.message : "Could not open the test invoice.";
-    const status = /already|still on beta|Aris|not change the plan/.test(message) ? 409 : 400;
-    return NextResponse.json({ ok: false, error: message }, { status });
+    const failure = testInvoiceFailure(error);
+    return NextResponse.json({ ok: false, error: failure.error }, { status: failure.status });
   }
 }

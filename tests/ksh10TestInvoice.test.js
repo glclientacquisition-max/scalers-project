@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const {
   issueKsh10TestInvoice,
+  testInvoiceFailure,
   testInvoicePostError,
   TEST_LINE,
 } = require("../dashboard/src/lib/invoicePay/testInvoice");
@@ -159,5 +160,28 @@ describe("Jirani SQL and the admin route", () => {
     assert.match(helper, /billing_source: null/);
     assert.doesNotMatch(helper, /owner_change_plan|admin_set_tenant_billing_mode|\.update\(/);
     assert.doesNotMatch(route, /status:\s*401/);
+    assert.doesNotMatch(route, /error:\s*message\b/);
+    assert.match(route, /testInvoiceFailure/);
+  });
+
+  it("answers with a fixed sentence and keeps the raw error out of the response", () => {
+    assert.deepEqual(testInvoiceFailure(new Error("This business is still on beta.")), {
+      status: 409,
+      error: "This business is still on beta.",
+    });
+    assert.deepEqual(testInvoiceFailure(new Error("refusing the Aris line")), {
+      status: 409,
+      error: "That line cannot take a test invoice.",
+    });
+    assert.deepEqual(testInvoiceFailure(new Error("a test invoice must not change the plan")), {
+      status: 409,
+      error: "The plan did not stay the same.",
+    });
+    assert.equal(testInvoiceFailure(new Error("test invoice already paid")).status, 409);
+    assert.equal(testInvoiceFailure(new Error("pay link already issued")).status, 409);
+    const leaked = testInvoiceFailure(new Error("relation invoices does not exist"));
+    assert.equal(leaked.status, 400);
+    assert.equal(leaked.error, "Could not open the test invoice.");
+    assert.doesNotMatch(leaked.error, /relation|invoices/);
   });
 });
