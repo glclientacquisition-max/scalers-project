@@ -54,6 +54,7 @@ const ACTIONS: Record<string, string> = {
   prepare_mail_domain: "Set up alert mail",
   verify_mail_domain: "Checked alert mail",
   ack_notice: "Acknowledged notice",
+  checkout_total_review_resolved: "Resolved checkout review",
 };
 
 export function actionLabel(action: string): string {

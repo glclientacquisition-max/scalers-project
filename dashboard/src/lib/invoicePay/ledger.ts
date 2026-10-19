@@ -291,10 +291,21 @@ export function invoicePayLedger() {
       if (error) throw rpcError(error, "retry mark failed");
     },
 
-    async resolveCheckoutReview(input: { provider: string; providerRef: string }) {
+    async resolveCheckoutReview(input: {
+      provider: string;
+      providerRef: string;
+      actor: string;
+      reason: string;
+      choice: string;
+      totalKes?: string | null;
+    }) {
       const { error } = await admin.rpc("resolve_checkout_total_review", {
         p_provider: input.provider,
         p_provider_ref: input.providerRef,
+        p_actor: input.actor,
+        p_reason: input.reason,
+        p_choice: input.choice,
+        p_total_kes: input.totalKes ?? null,
       });
       if (error) throw rpcError(error, "review resolve failed");
     },

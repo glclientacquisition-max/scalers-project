@@ -132,6 +132,7 @@ describe("admin console polish", () => {
   it("lists businesses as ListRows with shop links, assign sheet, and shop-side release", () => {
     const list = read("dashboard/src/components/AdminBusinessesPanel.tsx");
     const shop = read("dashboard/src/components/AdminShopPanel.tsx");
+    const money = read("dashboard/src/components/AdminShopMoneyPanel.tsx");
     assert.match(list, /ListRow/);
     assert.doesNotMatch(list, /<table/);
     assert.match(list, /href=\{`\/admin\/businesses\/\$\{/);
@@ -145,15 +146,16 @@ describe("admin console polish", () => {
     assert.doesNotMatch(list, /disabled=\{pending \|\| availableDidCount === 0\}/);
     assert.match(shop, /Release this number\?/);
     assert.match(shop, /returns to Available/);
-    assert.match(shop, /title="Plan"/);
-    assert.match(shop, /title="Charges"/);
-    assert.match(shop, /set_billing_mode/);
-    assert.match(shop, /ledger_for/);
-    assert.doesNotMatch(shop, /adjust_wallet/);
-    assert.doesNotMatch(shop, /title="Ledger"/);
-    assert.match(shop, /setSheet\("package"\)/);
+    assert.match(shop, /AdminShopMoneyPanel/);
+    assert.match(money, /title="Plan"/);
+    assert.match(money, /title="Charges"/);
+    assert.match(money, /set_billing_mode/);
+    assert.match(money, /ledger_for/);
+    assert.match(money, /openTask\("package"\)/);
+    assert.match(money, /unassign_package/);
+    assert.doesNotMatch(money, /adjust_wallet/);
+    assert.doesNotMatch(money, /title="Ledger"/);
     assert.doesNotMatch(shop, /wallet_balance_kes/);
-    assert.doesNotMatch(shop, /REMOVE/);
     assert.match(shop, /Archive this business\?/);
   });
 

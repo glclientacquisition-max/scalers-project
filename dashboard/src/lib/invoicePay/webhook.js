@@ -166,9 +166,10 @@ function chargeIdOf(data) {
  * @param {string | null} checkoutId
  */
 /**
- * A receipt, or a real charge id, is a collection identity.
- * `ch_<checkout id>` is the placeholder both events share when Bachs sends
- * no id of its own. That placeholder is not a new collection.
+ * A receipt, or a charge id, is what the event named.
+ * `ch_<checkout id>` is the placeholder Bachs sends when it has no id of
+ * its own. It is returned as-is. Settle treats it as no real collection
+ * and does not drop it.
  * @param {Record<string, unknown>} data
  * @param {string | null} checkoutId
  * @returns {string | null}
@@ -178,7 +179,7 @@ function collectionIdentity(data, checkoutId) {
   if (receipt) return receipt;
   const chargeId = chargeIdOf(data);
   if (!chargeId) return null;
-  if (checkoutId && chargeId === `ch_${checkoutId}`) return null;
+  if (checkoutId && chargeId === `ch_${checkoutId}`) return chargeId;
   return chargeId;
 }
 
@@ -240,6 +241,31 @@ function collectedFromCheckout(row) {
   const cents = toCents(String(paid));
   if (cents == null || cents < 0n) return { unreadable: true };
   return { totalKes: String(paid), cents };
+}
+
+/**
+ * Total to pass when staff chose book. Live mode uses a fresh GET.
+ * A closed gate, or any mode that is not live, books the stored reading.
+ * An unreadable fresh read, or a total below the stored reading, does not book.
+ * @param {{ live: boolean, storedKes: string | number, fresh?: { unreadable?: boolean, currencyIssue?: boolean, totalKes?: string, cents?: bigint } }} input
+ */
+function bookTotalForResolve(input) {
+  const storedKes = input.storedKes == null || String(input.storedKes).trim() === "" ? "0" : String(input.storedKes);
+  if (!input.live) return { ok: true, totalKes: storedKes };
+  const fresh = input.fresh;
+  if (!fresh || fresh.unreadable || fresh.currencyIssue) {
+    return { ok: false, error: "Couldn't read the collected amount. Nothing changed." };
+  }
+  const storedCents = toCents(storedKes);
+  const freshCents = fresh.cents != null ? fresh.cents : toCents(fresh.totalKes);
+  if (storedCents == null || freshCents == null || freshCents < 0n) {
+    return { ok: false, error: "Couldn't read the collected amount. Nothing changed." };
+  }
+  if (freshCents < storedCents) {
+    return { ok: false, error: "The collected amount is lower than the reading. Nothing changed." };
+  }
+  const totalKes = fresh.totalKes == null || String(fresh.totalKes).trim() === "" ? storedKes : String(fresh.totalKes);
+  return { ok: true, totalKes };
 }
 
 function readerFor(input) {
@@ -478,6 +504,7 @@ module.exports = {
   eventAmountKes,
   collectionReport,
   collectedFromCheckout,
+  bookTotalForResolve,
   decidePayment,
   handlePayWebhook,
   minorUnits,
