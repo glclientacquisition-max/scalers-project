@@ -44,6 +44,7 @@ Use for packages catalog, on-demand rate card, DID pool assign/release, phone-li
 7. DID pool statuses (`available` / `assigned` / `reserved` / `disabled` / `quarantine`) stay consistent with tenant `sautikit_virtual_number`. A released number is quarantined until `quarantine_until` (`docs/supabase/billing_data_layer.sql`), not put straight back to available. After that time, `release_expired_quarantine()` and both assign functions can take it. `quarantine_pool_number` and `release_did_from_business` both clear pool `tenant_id` and store the business on `last_tenant_id`. Release also sets the business number to pending.
 8. Super Admin uses service role server-side; never ship service role to `NEXT_PUBLIC_*`.
 9. Super Admin is a universal app, same bar as the owner desk. Platform shows line, speech, reasoning, money. Who we notify are people (name, phone, email) under Escalate. Domain, DNS, Resend, and API keys are infra, not Admin controls. `/no-ai-slop` on ops UI copy. This holds in every Ops/Admin chat.
+10. Owner plan changes (`docs/supabase/owner_billing_actions.sql`) are service-role RPCs. Desk screens stay behind `DESK_PLAN_CHANGE` (exact value `on`, default off). Beta (`billing_enforcement` off) returns `beta` and is not invoiced or capped. No payment provider in that path. Contract: [`docs/reference/operations/OWNER_BILLING_ACTIONS.md`](../operations/OWNER_BILLING_ACTIONS.md).
 
 ## Rate card defaults (env)
 
@@ -56,6 +57,7 @@ Use for packages catalog, on-demand rate card, DID pool assign/release, phone-li
 ## Test / verify
 
 - SQL apply order per [`docs/supabase/README.md`](../../supabase/README.md); no owner-forgable credit paths
+- Package versions (draft, publish, grandfather, audit, confirmed admin move, billing mode): [`PACKAGE_VERSIONS_API.md`](../operations/PACKAGE_VERSIONS_API.md). The editor is Super Admin `/admin/packages`. Staging SQL is `package_version_editor.sql`. Do not promote a version to prod without Alvin's go.
 - Admin: seed DID → assign → release → remove business paths still work
 - Owner **Usage** page (`/wallet`): package remaining, on-demand opt-in, charge history; beta badge when enforcement off
 - If touching voice charge hook: smoke a completed-call path without double-billing

@@ -50,7 +50,40 @@ describe("Desk prices come from the pinned package version", () => {
   it("the plan screen prices from billing_package_versions", () => {
     const plan = read("dashboard/src/lib/ownerPlanLoad.ts");
     assert.match(plan, /version_monthly_price_kes/);
+    assert.match(plan, /version_minutes/);
     assert.match(plan, /billing_package_versions/);
+    assert.match(plan, /eq\("status", "published"\)/);
+    assert.match(plan, /versionById/);
     assert.doesNotMatch(plan, /billing_rate_card/);
+    const picker = read("dashboard/src/components/plan/PlanPicker.tsx");
+    assert.match(picker, /model\.pinned/);
+    assert.match(picker, /publishedCurrent/);
+  });
+
+  it("no Desk screen takes a price, minutes, seats, or credits figure from billing_packages", () => {
+    const figure = /monthly_price_kes|annual_price_kes|message_credits|extra_seat_monthly_kes|credit_kes|\bminutes\b|\bseats\b|\bsms\b|\bemail\b|staff_wa|inbound_kes|outbound_kes|\*/;
+    const files = [
+      ...walk("dashboard/src/app/(desk)"),
+      ...walk("dashboard/src/components/plan"),
+      "dashboard/src/lib/ownerPlanLoad.ts",
+      "dashboard/src/lib/billingStateLoad.ts",
+      "dashboard/src/lib/ownerUsageLoad.ts",
+    ];
+    const selectRe = /\.from\("billing_packages"\)\s*\.select\(\s*"([^"]+)"/g;
+    let selects = 0;
+    for (const file of files) {
+      const source = read(file);
+      assert.doesNotMatch(source, /billing_rate_card/, file);
+      for (const match of source.matchAll(selectRe)) {
+        selects += 1;
+        assert.doesNotMatch(match[1], figure, `${file} selects ${match[1]}`);
+      }
+    }
+    assert.ok(selects >= 2, "expected the plan loader to read package names");
+    const meter = sliceFn(read("dashboard/src/lib/packageCatalog.ts"), "loadOwnerPackageMeter");
+    assert.doesNotMatch(meter, /monthly_price_kes|message_credits|billing_rate_card/);
+    const nameOnly = meter.match(/\.from\("billing_packages"\)\s*\.select\(\s*"([^"]+)"/);
+    assert.ok(nameOnly, "owner meter reads the package name");
+    assert.equal(nameOnly[1], "name");
   });
 });

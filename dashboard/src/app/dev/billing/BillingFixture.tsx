@@ -41,6 +41,7 @@ function sample(
   credits: number,
 ): PublishedPlan {
   return {
+    versionId: `published-${sku}`,
     sku,
     name,
     monthlyKes: monthly,
@@ -73,6 +74,7 @@ function growthModel({
     surface: ownerBillingSurface(trialText ? "trialing" : "active"),
     currentSku: "growth",
     currentMonthlyKes: 18000,
+    pinned: plans.find((plan) => plan.sku === "growth") || null,
     cycle,
     plans,
     seatsUsed,

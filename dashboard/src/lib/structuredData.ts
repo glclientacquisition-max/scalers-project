@@ -142,7 +142,9 @@ export function stockBool(raw: unknown): boolean | null {
 
 /** Typed price from the setup wizard row: these are owner-entered numbers, so source=owner. */
 export function priceFromSetup(row: { pricing_mode?: string; price?: string; price_max?: string }, unit: string | null = null): StructuredPrice {
-  const mode = (["fixed", "from", "range", "ask"].includes(String(row.pricing_mode)) ? row.pricing_mode : "ask") as PricingMode;
+  const rawMode = String(row.pricing_mode).toLowerCase();
+  const normalized = rawMode === "quote" ? "ask" : rawMode;
+  const mode = (["fixed", "from", "range", "ask"].includes(normalized) ? normalized : "ask") as PricingMode;
   const lo = mode === "ask" ? null : parseAmount(row.price);
   const hi = mode === "range" ? parseAmount(row.price_max) : null;
   return {

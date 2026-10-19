@@ -124,12 +124,12 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
   },
   {
     id: "assistant",
-    title: "Assistant",
+    title: "Business Assistant",
     items: [
       { label: "Voice", description: "How your Business Assistant sounds", target: { tab: "train", panel: "tools" } },
       { label: "Pronunciation", description: "Names and words it should say a certain way", target: { tab: "train", panel: "pronunciation" } },
       { label: "Test", description: "Call your line and hear it answer", target: { tab: "test" } },
-      { label: "Calls & forwarding", description: "How calls reach your assistant", target: { tab: "calls" } },
+      { label: "Calls & forwarding", description: "How calls reach your Business Assistant", target: { tab: "calls" } },
     ],
   },
   {

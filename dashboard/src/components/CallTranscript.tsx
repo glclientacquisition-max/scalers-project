@@ -84,13 +84,16 @@ function StreamItemView({
 export function CallTranscript({
   turns,
   mode = "preview",
+  callStartedAt = null,
 }: {
   turns: TranscriptRow[];
   mode?: "preview" | "thread";
+  /** Call row time, so the first line matches the inbox clock. */
+  callStartedAt?: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const thread = mode === "thread";
-  const stream = useMemo(() => buildCallTranscriptStream(turns), [turns]);
+  const stream = useMemo(() => buildCallTranscriptStream(turns, callStartedAt), [turns, callStartedAt]);
   const canCollapse = !thread && stream.length > PREVIEW_TURNS;
   const visible =
     thread || expanded || !canCollapse ? stream : stream.slice(-PREVIEW_TURNS);

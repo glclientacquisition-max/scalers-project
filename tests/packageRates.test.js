@@ -38,8 +38,8 @@ describe("package overage math", () => {
   it("lets Super Admin type inbound KES/min and annual discount %; assigning lives on Billing", () => {
     const panel = read("dashboard/src/components/AdminPackagesPanel.tsx");
     const catalog = read("dashboard/src/lib/packageCatalog.ts");
-    assert.match(panel, /Inbound KES \/ min/);
-    assert.match(panel, /Outbound KES \/ min/);
+    assert.match(panel, /Inbound KSh \/ min/);
+    assert.match(panel, /Outbound KSh \/ min/);
     assert.match(panel, /Annual discount %/);
     assert.match(panel, /kesPerSecondFromMinute/);
     assert.doesNotMatch(panel, /action: "assign"/);

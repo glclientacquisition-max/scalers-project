@@ -23,6 +23,8 @@ export type PlanSku = (typeof SELL)[number];
 export type PlanCycle = "month" | "year";
 
 export type PublishedPlan = {
+  /** billing_package_versions.id. The picker uses the latest published row. The current card uses the pin. */
+  versionId: string;
   sku: PlanSku;
   name: string;
   monthlyKes: number;
@@ -60,7 +62,10 @@ export type OwnerPlanModel = {
   surface: OwnerBillingSurface;
   currentSku: PlanSku | null;
   currentMonthlyKes: number | null;
+  /** The business's pinned version. Current-plan price, minutes, seats, and credits come from here. */
+  pinned: PublishedPlan | null;
   cycle: PlanCycle;
+  /** Latest published version of each plan. The picker and Switch sheets use these, never the live package row. */
   plans: PublishedPlan[];
   seatsUsed: number;
   seatsIncluded: number;
@@ -136,6 +141,7 @@ function betaModel(): OwnerPlanModel {
     surface: ownerBillingSurface("beta"),
     currentSku: null,
     currentMonthlyKes: null,
+    pinned: null,
     cycle: "month",
     plans: [],
     seatsUsed: 0,
@@ -179,6 +185,34 @@ function isSku(raw: unknown): raw is PlanSku {
 
 type VersionRow = Record<string, unknown>;
 
+/** Figures come from a package version row. `name` is the package label, not a price. */
+function planFromVersion(sku: PlanSku, name: string, version: VersionRow): PublishedPlan {
+  const monthly = num(version.monthly_price_kes);
+  const discount = num(version.annual_discount_percent);
+  const storedAnnual = version.annual_price_kes;
+  const annual = annualPriceFromVersion(
+    monthly,
+    discount,
+    storedAnnual == null || storedAnnual === "" ? null : num(storedAnnual),
+  );
+  const creditsRaw = version.message_credits;
+  const messageCredits = creditsRaw == null || creditsRaw === "" ? null : Math.round(num(creditsRaw));
+  return {
+    versionId: String(version.id || ""),
+    sku,
+    name,
+    monthlyKes: monthly,
+    annualKes: annual,
+    savingKes: Math.round(monthly * 12 - annual),
+    minutes: Math.round(num(version.minutes)),
+    seats: Math.round(num(version.seats)),
+    dids: Math.round(num(version.dids)),
+    messageCredits,
+    inboundPerMinuteKes: num(version.inbound_kes_per_second) * 60,
+    outboundPerMinuteKes: num(version.outbound_kes_per_second) * 60,
+  };
+}
+
 function mapPlans(packages: Record<string, unknown>[], versions: VersionRow[]): PublishedPlan[] {
   const latest = new Map<string, VersionRow>();
   for (const row of versions) {
@@ -191,30 +225,7 @@ function mapPlans(packages: Record<string, unknown>[], versions: VersionRow[]): 
     if (!isSku(pack.sku) || pack.is_active === false) continue;
     const version = latest.get(String(pack.id || ""));
     if (!version) continue;
-    const monthly = num(version.monthly_price_kes);
-    const discount = num(version.annual_discount_percent);
-    const storedAnnual = version.annual_price_kes;
-    const annual = annualPriceFromVersion(
-      monthly,
-      discount,
-      storedAnnual == null || storedAnnual === "" ? null : num(storedAnnual),
-    );
-    const creditsRaw = version.message_credits;
-    const messageCredits =
-      creditsRaw == null || creditsRaw === "" ? null : Math.round(num(creditsRaw));
-    plans.push({
-      sku: pack.sku,
-      name: String(pack.name || pack.sku),
-      monthlyKes: monthly,
-      annualKes: annual,
-      savingKes: Math.round(monthly * 12 - annual),
-      minutes: Math.round(num(version.minutes)),
-      seats: Math.round(num(version.seats)),
-      dids: Math.round(num(version.dids)),
-      messageCredits,
-      inboundPerMinuteKes: num(version.inbound_kes_per_second) * 60,
-      outboundPerMinuteKes: num(version.outbound_kes_per_second) * 60,
-    });
+    plans.push(planFromVersion(pack.sku, String(pack.name || pack.sku), version));
   }
   plans.sort((a, b) => SELL.indexOf(a.sku) - SELL.indexOf(b.sku));
   return plans;
@@ -259,6 +270,25 @@ async function publishedVersions(
   if (isMissingTableError(res.error)) return { rows: [], missing: true, failed: false };
   if (res.error) return { rows: [], missing: false, failed: true };
   return { rows: (res.data || []) as VersionRow[], missing: false, failed: false };
+}
+
+/** The pinned row, including an older published version. Not the latest, and not the package table. */
+async function versionById(client: DataClient, versionId: string): Promise<VersionRow | null> {
+  if (!versionId) return null;
+  let fields = [...VERSION_CORE, ...VERSION_OPTIONAL];
+  let res = await selectOne(
+    client.from("billing_package_versions").select(fields.join(", ")).eq("id", versionId).maybeSingle(),
+  );
+  for (let attempt = 0; attempt < VERSION_OPTIONAL.length && res.error && !isMissingTableError(res.error); attempt += 1) {
+    const next = dropOptional(fields, VERSION_OPTIONAL, String(res.error.message || ""));
+    if (!next) break;
+    fields = next;
+    res = await selectOne(
+      client.from("billing_package_versions").select(fields.join(", ")).eq("id", versionId).maybeSingle(),
+    );
+  }
+  if (res.error || !res.data) return null;
+  return res.data;
 }
 
 function nullableKes(raw: unknown): number | null {
@@ -397,7 +427,7 @@ export async function loadOwnerPlan(tenantId: string): Promise<{ ok: true; model
     const sub = await ws.client
       .from("billing_subscription_read")
       .select(
-        "billing_status, package_sku, version_monthly_price_kes, version_seats, trial_ends_at, voicemail_until, past_due_at, billing_suspended_at, billing_cancelled_at, paid_through, minutes_included, seconds_used, package_version_id",
+        "billing_status, package_sku, package_name, version_monthly_price_kes, version_minutes, version_seats, trial_ends_at, voicemail_until, past_due_at, billing_suspended_at, billing_cancelled_at, paid_through, minutes_included, seconds_used, package_version_id",
       )
       .eq("tenant_id", tenantId)
       .maybeSingle();
@@ -424,6 +454,12 @@ export async function loadOwnerPlan(tenantId: string): Promise<{ ok: true; model
     if (notices.error && !isMissingTableError(notices.error)) return { ok: false };
 
     const plans = mapPlans((packs.data || []) as Record<string, unknown>[], versions.rows);
+    const sku = isSku(row.package_sku) ? row.package_sku : null;
+    const pinnedRow = row.package_version_id ? await versionById(ws.client, String(row.package_version_id)) : null;
+    const pinned =
+      sku && pinnedRow
+        ? planFromVersion(sku, String(row.package_name || sku), pinnedRow)
+        : null;
     const seatOffer = await loadPinnedSeatOffer(ws.client, tenantId);
     const open = invoices.rows.find((item) => item.status === "open") || null;
     const now = new Date();
@@ -452,13 +488,18 @@ export async function loadOwnerPlan(tenantId: string): Promise<{ ok: true; model
         freeBeta: false,
         billingStatus: status,
         surface: ownerBillingSurface(status),
-        currentSku: isSku(row.package_sku) ? row.package_sku : null,
-        currentMonthlyKes: row.version_monthly_price_kes == null ? null : num(row.version_monthly_price_kes),
+        currentSku: sku,
+        currentMonthlyKes: pinned
+          ? pinned.monthlyKes
+          : row.version_monthly_price_kes == null
+            ? null
+            : num(row.version_monthly_price_kes),
+        pinned,
         cycle: seatOffer.cycle,
         plans,
         seatsUsed: Math.max(0, Math.round(num(seats.data))),
-        seatsIncluded: Math.max(0, Math.round(num(row.version_seats))),
-        minutesIncluded: Math.max(0, Math.round(num(row.minutes_included))),
+        seatsIncluded: pinned ? pinned.seats : Math.max(0, Math.round(num(row.version_seats))),
+        minutesIncluded: pinned ? pinned.minutes : Math.max(0, Math.round(num(row.version_minutes))),
         minutesUsed: minutesUsedFromSeconds(row.seconds_used),
         trialText: trial?.text ?? null,
         onDemandLocked: status === "trialing",
@@ -527,8 +568,7 @@ export async function loadUsageBillingExtras(tenantId: string): Promise<UsageBil
     let outbound: number | null = null;
     let share: number | null = null;
     if (row.package_version_id) {
-      const versions = await publishedVersions(ws.client);
-      const match = versions.rows.find((item) => String(item.id) === String(row.package_version_id));
+      const match = await versionById(ws.client, String(row.package_version_id));
       if (match) {
         if (match.message_credits != null && match.message_credits !== "") {
           messageCredits = Math.round(num(match.message_credits));

@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-163 variables.
+165 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -28,16 +28,16 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BUSINESS_KNOWLEDGE` | voice | `src/db.js`<br>`src/prompts.js`<br>`src/tenantProfile.js` |
 | `BUSINESS_NAME` | voice | `server.js`<br>`src/conversation/businessAssistantIntro.js`<br>`src/db.js`<br>+2 more |
 | `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js` |
-| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>`dashboard/src/app/dev/admin-ops/page.tsx`<br>+38 more |
-| `DASHBOARD_PASSWORD` | desk | `dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
+| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>`dashboard/src/app/dev/admin-ops/page.tsx`<br>+40 more |
+| `DASHBOARD_PASSWORD` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
 | `DATABASE_URL` | scripts | `scripts/verify-staging-schema.js` |
-| `DESK_PLAN_CHANGE` | desk | `dashboard/src/lib/deskPlanChange.ts` |
+| `DESK_PLAN_CHANGE` | desk | `dashboard/src/lib/deskPlanChange.ts`<br>`dashboard/src/lib/ownerBilling.ts` |
 | `DESK_PUBLIC_URL` | voice | `server.js` |
 | `DOCS_STALE_DAYS` | scripts | `scripts/docs/check-docs.js` |
 | `FACT_HASH_MODE` | desk, scripts, voice | `dashboard/src/lib/tenantFieldProvenance.ts`<br>`scripts/replay-voice-suite.js`<br>`scripts/smoke-mvp-retail.js`<br>+1 more |
-| `GEMINI_API_KEY` | desk, voice | `dashboard/src/app/(desk)/settings/catalogActions.ts`<br>`dashboard/src/app/(desk)/settings/pronunciationGeminiScanActions.ts`<br>`dashboard/src/lib/faqFromTranscript.ts`<br>+8 more |
+| `GEMINI_API_KEY` | desk, voice | `dashboard/src/app/(desk)/settings/catalogActions.ts`<br>`dashboard/src/app/(desk)/settings/pronunciationGeminiScanActions.ts`<br>`dashboard/src/lib/faqFromTranscript.ts`<br>+9 more |
 | `GEMINI_AUDIO_MODEL` | desk | `dashboard/src/lib/gemini.ts` |
 | `GEMINI_BACKUP_MODEL` | voice | `src/conversation/geminiVoice.js` |
 | `GEMINI_MAX_OUTPUT_TOKENS` | voice | `server.js`<br>`src/speech/replayVoice.js` |
@@ -61,7 +61,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `NEXT_PUBLIC_SITE_URL` | desk | `dashboard/src/app/layout.tsx`<br>`dashboard/src/lib/admin-auth.ts` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | desk | `dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | desk | `dashboard/src/lib/supabase/env.ts` |
-| `NEXT_PUBLIC_SUPABASE_URL` | desk | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
+| `NEXT_PUBLIC_SUPABASE_URL` | desk, scripts | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts`<br>+1 more |
 | `NEXT_PUBLIC_WALLET_RATE_KES_PER_MINUTE` | desk | `dashboard/src/lib/wallet.ts` |
 | `NEXT_RUNTIME` | desk | `dashboard/src/lib/adminQuality.ts` |
 | `NODE_ENV` | desk, scripts, voice | `dashboard/src/app/(desk)/tenantActions.ts`<br>`dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/admin-auth.ts`<br>+4 more |
@@ -125,8 +125,8 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SUPABASE_ANON_KEY` | desk | `dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_PUBLISHABLE_KEY` | desk | `dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_RECORDINGS_BUCKET` | voice | `src/db.js` |
-| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/supabase.ts`<br>`scripts/backfillFactHashes.js`<br>`scripts/bench-inbound-webhook.js`<br>+5 more |
-| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts`<br>+7 more |
+| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/supabase.ts`<br>`scripts/backfillFactHashes.js`<br>`scripts/bench-inbound-webhook.js`<br>+6 more |
+| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts`<br>+8 more |
 | `TENANT_DID` | voice | `server.js`<br>`src/db.js` |
 | `TENANT_ID` | scripts, voice | `scripts/bench-inbound-webhook.js`<br>`scripts/smoke-db.js`<br>`server.js`<br>+1 more |
 | `TEXTSMS_API_KEY` | desk, voice | `dashboard/src/lib/callerSms.ts`<br>`src/notifications/sms.js` |
@@ -137,10 +137,12 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `TTS_LEXICON_OVERRIDES` | voice | `src/speech/pronunciationLexicon.js` |
 | `VERCEL_ENV` | desk | `dashboard/src/lib/platformOps.ts` |
 | `VERCEL_TOKEN` | scripts | `scripts/stage-desk-alias.js` |
+| `VOICE_AREA_FEES` | voice | `src/conversation/areaTerms.js`<br>`src/conversation/numberWords.js` |
 | `VOICE_BARGE_EARLY_MS` | voice | `src/speech/turnTaking.js` |
 | `VOICE_BARGE_GRACE_MS` | voice | `src/speech/turnTaking.js` |
 | `VOICE_BARGE_MIN_CHARS` | voice | `src/speech/turnTaking.js` |
 | `VOICE_CLOSED_TENANT_GUARD` | voice | `src/sautikit/closedTenantGuard.js` |
+| `VOICE_FACT_REFS` | voice | `src/conversation/factSheet.js`<br>`src/conversation/numberWords.js` |
 | `VOICE_FAST_INBOUND` | scripts | `scripts/bench-inbound-webhook.js` |
 | `VOICE_FILLER` | voice | `server.js`<br>`src/conversation/language.js` |
 | `VOICE_FILLER_CACHE` | voice | `src/speech/fillerPcmCache.js` |

@@ -1,6 +1,7 @@
 // One table for spoken numbers. The speech guard, the tool guard, and quantity
 // extraction must agree that "five", "tano", and "5" are the same caller fact.
-// "one" and "moja" are left out of the guard set: "one moment" is not a number.
+// "one" and "moja" are left out of the bare guard set: "one moment" is not a
+// number. They still count inside a compound ("one hundred", "mia moja").
 
 const NUMBER_WORDS = {
   two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
@@ -15,10 +16,14 @@ const NUMBER_WORDS = {
 
 const QUANTITY_WORDS = { ...NUMBER_WORDS, one: 1, moja: 1 };
 
+/** Ones that only count inside a compound (never alone as a spoken fee). */
+const COMPOUND_ONES = { one: 1, moja: 1 };
+
 const STANDALONE_DIGITS = /(?<![\w-])\d[\d,]*(?:\.\d+)?(?![\w-])/g;
 const NUMBER_WORD_RE = new RegExp(`\\b(${Object.keys(NUMBER_WORDS).join('|')})\\b`, 'gi');
 const QUANTITY_WORD_RE = new RegExp(`\\b(${Object.keys(QUANTITY_WORDS).join('|')})\\b`, 'i');
 const RANGE_RE = /(\d[\d,]*)(?:\s*[-–—]\s*|\s+(?:to|hadi|mpaka)\s+)(\d[\d,]*)/gi;
+const TOKEN_RE = /[A-Za-z]+|\d[\d,]*(?:\.\d+)?/g;
 
 function digitBody(raw) {
   return String(raw || '').replace(/[^\d.]/g, '').replace(/^0+(?=\d)/, '');
@@ -45,6 +50,200 @@ function numberReadingText(text) {
   return String(text || '').replace(GLUED_CLOCK, '$1 ').replace(GLUED_SHILLINGS, '$1 ').replace(GLUED_AMOUNT, '$1 ');
 }
 
+// Compound amounts ("mia tatu" = 300) are read only when area fees
+// (VOICE_AREA_FEES) or fact references (VOICE_FACT_REFS) are on. Off: each
+// number word is read on its own, exactly as before.
+const FLAG_ON = /^(1|true|on|yes)$/i;
+function compoundNumbersEnabled(env) {
+  const fees = env ? env.VOICE_AREA_FEES : process.env.VOICE_AREA_FEES;
+  const refs = env ? env.VOICE_FACT_REFS : process.env.VOICE_FACT_REFS;
+  return FLAG_ON.test(String(fees || '').trim()) || FLAG_ON.test(String(refs || '').trim());
+}
+
+function wordVal(tok) {
+  const t = String(tok || '').toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(NUMBER_WORDS, t)) return NUMBER_WORDS[t];
+  if (Object.prototype.hasOwnProperty.call(COMPOUND_ONES, t)) return COMPOUND_ONES[t];
+  return null;
+}
+
+function isAnd(tok) {
+  const t = String(tok || '').toLowerCase();
+  return t === 'and' || t === 'na';
+}
+
+/** 1–99 from EN/SW words at i. */
+function readUnder100(tokens, i) {
+  if (i >= tokens.length) return null;
+  const a = String(tokens[i] || '').toLowerCase();
+  const av = wordVal(a);
+  if (av == null) return null;
+
+  if (av >= 1 && av <= 19) return { value: av, next: i + 1 };
+
+  if (av >= 20 && av <= 90 && av % 10 === 0) {
+    let next = i + 1;
+    if (isAnd(tokens[next])) {
+      const b = wordVal(tokens[next + 1]);
+      if (b != null && b >= 1 && b <= 9) return { value: av + b, next: next + 2 };
+      // "na" not followed by ones — leave it for the next clause
+      return { value: av, next: i + 1 };
+    }
+    const b = wordVal(tokens[next]);
+    if (b != null && b >= 1 && b <= 9) return { value: av + b, next: next + 1 };
+    return { value: av, next: i + 1 };
+  }
+  return null;
+}
+
+/**
+ * One EN/SW spoken amount starting at i.
+ * "mia tatu", "three hundred", "elfu moja na mia tano", "mia tatu na hamsini".
+ * Stops before a non-number "na"/"and" ("mia tatu na tunasafisha" → 300).
+ */
+function readAmountPhrase(tokens, i) {
+  if (i >= tokens.length) return null;
+  const w = String(tokens[i] || '').toLowerCase();
+
+  // --- Kiswahili: mia [ones]? [na| ] under100? ---
+  if (w === 'mia') {
+    let next = i + 1;
+    let mult = 1;
+    const ones = wordVal(tokens[next]);
+    if (ones != null && ones >= 1 && ones <= 9) {
+      mult = ones;
+      next += 1;
+    }
+    let value = mult * 100;
+    if (isAnd(tokens[next])) {
+      const under = readUnder100(tokens, next + 1);
+      if (under) return { value: value + under.value, next: under.next };
+      return { value, next };
+    }
+    const under = readUnder100(tokens, next);
+    // Tens after hundreds without "na": "mia tatu hamsini"
+    if (under && under.value >= 10) return { value: value + under.value, next: under.next };
+    return { value, next };
+  }
+
+  // --- Kiswahili: elfu [under100] [na rest]? ---
+  if (w === 'elfu') {
+    let next = i + 1;
+    let mult = 1;
+    const under = readUnder100(tokens, next);
+    if (under) {
+      mult = under.value;
+      next = under.next;
+    }
+    let value = mult * 1000;
+    if (isAnd(tokens[next])) {
+      const rest = readAmountPhrase(tokens, next + 1);
+      if (rest) return { value: value + rest.value, next: rest.next };
+      return { value, next };
+    }
+    const rest = readAmountPhrase(tokens, next);
+    if (rest && (String(tokens[next] || '').toLowerCase() === 'mia' || rest.value >= 100)) {
+      return { value: value + rest.value, next: rest.next };
+    }
+    return { value, next };
+  }
+
+  // --- English: [ones] hundred [and]? [under100]? ---
+  // --- English: [under100] thousand [and]? [rest]? ---
+  const lead = readUnder100(tokens, i);
+  if (lead) {
+    const scale = String(tokens[lead.next] || '').toLowerCase();
+    if (scale === 'hundred' && lead.value >= 1 && lead.value <= 9) {
+      let next = lead.next + 1;
+      let value = lead.value * 100;
+      if (isAnd(tokens[next])) {
+        const under = readUnder100(tokens, next + 1);
+        if (under) return { value: value + under.value, next: under.next };
+        return { value, next };
+      }
+      const under = readUnder100(tokens, next);
+      if (under) return { value: value + under.value, next: under.next };
+      return { value, next };
+    }
+    if (scale === 'thousand') {
+      let next = lead.next + 1;
+      let value = lead.value * 1000;
+      if (isAnd(tokens[next])) {
+        const rest = readAmountPhrase(tokens, next + 1);
+        if (rest) return { value: value + rest.value, next: rest.next };
+        return { value, next };
+      }
+      const rest = readAmountPhrase(tokens, next);
+      if (rest) return { value: value + rest.value, next: rest.next };
+      return { value, next };
+    }
+  }
+
+  // Bare "hundred" / "thousand"
+  if (w === 'hundred') return { value: 100, next: i + 1 };
+  if (w === 'thousand') return { value: 1000, next: i + 1 };
+
+  return null;
+}
+
+/**
+ * Compound EN/SW amounts. Words used in a compound are marked consumed so the
+ * speech check does not also see atomic "100" + "3" beside a confirmed 300.
+ */
+function compoundNumbersIn(text) {
+  const values = new Set();
+  const consumed = new Set();
+  const raw = numberReadingText(text);
+  const tokens = [];
+  let m;
+  const re = new RegExp(TOKEN_RE.source, 'g');
+  while ((m = re.exec(raw)) !== null) tokens.push(m[0]);
+
+  let i = 0;
+  while (i < tokens.length) {
+    const w = String(tokens[i] || '').toLowerCase();
+    const next = String(tokens[i + 1] || '').toLowerCase();
+    const starts =
+      w === 'mia' ||
+      w === 'elfu' ||
+      w === 'hundred' ||
+      w === 'thousand' ||
+      (wordVal(w) != null && (next === 'hundred' || next === 'thousand'));
+
+    if (!starts) {
+      i += 1;
+      continue;
+    }
+
+    const phrase = readAmountPhrase(tokens, i);
+    if (!phrase || phrase.next <= i) {
+      i += 1;
+      continue;
+    }
+    // A real compound uses a scale word, or at least two tokens.
+    const span = phrase.next - i;
+    const scaled =
+      w === 'mia' ||
+      w === 'elfu' ||
+      w === 'hundred' ||
+      w === 'thousand' ||
+      next === 'hundred' ||
+      next === 'thousand';
+    if (!scaled && span < 2) {
+      i += 1;
+      continue;
+    }
+    if (phrase.value > 0) {
+      values.add(String(phrase.value));
+      for (let j = i; j < phrase.next; j += 1) consumed.add(j);
+      i = phrase.next;
+      continue;
+    }
+    i += 1;
+  }
+  return { values, consumed, tokens };
+}
+
 /** Every number a text states, as canonical digit strings. */
 function numbersIn(text) {
   const out = new Set();
@@ -63,8 +262,25 @@ function numbersIn(text) {
   for (const hit of raw.matchAll(/\b(\d{1,2}):(\d{2})\b/g)) {
     out.add(String(Number(hit[1])));
   }
-  for (const hit of raw.match(NUMBER_WORD_RE) || []) {
-    out.add(String(NUMBER_WORDS[hit.toLowerCase()]));
+
+  if (!compoundNumbersEnabled()) {
+    for (const hit of raw.match(NUMBER_WORD_RE) || []) {
+      out.add(String(NUMBER_WORDS[hit.toLowerCase()]));
+    }
+    return out;
+  }
+
+  const compounds = compoundNumbersIn(raw);
+  for (const v of compounds.values) out.add(v);
+
+  // Atomic words that were not part of a compound ("tano", "five").
+  let ti = 0;
+  for (const hit of raw.matchAll(TOKEN_RE)) {
+    const lower = hit[0].toLowerCase();
+    if (!compounds.consumed.has(ti) && Object.prototype.hasOwnProperty.call(NUMBER_WORDS, lower)) {
+      out.add(String(NUMBER_WORDS[lower]));
+    }
+    ti += 1;
   }
   return out;
 }
@@ -77,6 +293,8 @@ function quantityWord(text) {
 
 module.exports = {
   NUMBER_WORDS,
+  compoundNumbersEnabled,
+  compoundNumbersIn,
   QUANTITY_WORDS,
   numbersIn,
   numberReadingText,

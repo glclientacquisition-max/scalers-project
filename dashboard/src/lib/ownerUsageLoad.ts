@@ -1,6 +1,6 @@
 import "server-only";
 import { loadOwnerBillingView } from "@/lib/billingStateLoad";
-import { ownerBillingView, type OwnerBillingView } from "@/lib/billingStateModel";
+import { ownerBillingView, presentFreeBeta, type OwnerBillingView } from "@/lib/billingStateModel";
 import { loadOwnerPackageMeter } from "@/lib/packageCatalog";
 import { isBetaBilling } from "@/lib/wallet";
 
@@ -14,9 +14,10 @@ export async function loadOwnerUsageView(tenant: {
   on_demand_usage_enabled?: boolean | null;
 }): Promise<OwnerBillingView> {
   const [billing, pack] = await Promise.all([loadOwnerBillingView(tenant.id), loadOwnerPackageMeter(tenant.id)]);
-  if (billing) return billing;
+  const beta = isBetaBilling(tenant.billing_enforcement);
+  if (billing) return presentFreeBeta(billing, beta);
   const onDemand = Boolean(tenant.on_demand_usage_enabled);
-  return ownerBillingView({
+  return presentFreeBeta(ownerBillingView({
     state: pack.packageName
       ? {
           package_state: "active",
@@ -34,5 +35,6 @@ export async function loadOwnerUsageView(tenant: {
     seatsIncluded: pack.seatsIncluded,
     seatsUsed: pack.seatsUsed,
     messagesSent: { email: pack.emailUsed, whatsapp: pack.waUsed },
-  });
+    isBeta: beta,
+  }), beta);
 }

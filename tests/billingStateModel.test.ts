@@ -71,7 +71,16 @@ describe("ownerBillingView headlines", () => {
 
   it("no package", () => {
     const v = ownerBillingView(input(null));
-    assert.equal(v.headline, "No package. All usage is billed at the rates below.");
+    assert.equal(v.headline, "No package.");
+    assert.doesNotMatch(v.headline, /invoice/);
+  });
+
+  it("free beta with no package does not show a charge or an invoice", () => {
+    const v = ownerBillingView(input(null, { isBeta: true }));
+    assert.equal(v.headline, "Free during beta. Nothing is charged.");
+    assert.equal(v.shortLabel, "Free during beta");
+    assert.equal(v.ratesTitle, "Rates after beta");
+    assert.doesNotMatch(`${v.headline} ${v.onDemandHint}`, /invoice/);
   });
 });
 

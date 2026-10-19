@@ -65,7 +65,7 @@ function SeatChangeNote({ model, next }: { model: OwnerPlanModel; next: number }
 
 function CurrentPlanCard({ model, plan }: { model: OwnerPlanModel; plan: PublishedPlan }) {
   const renew = model.nextPeriodStartLabel || model.periodEndLabel;
-  const included = model.minutesIncluded || plan.minutes;
+  const included = plan.minutes;
   const tone = meterTone(model.minutesUsed, included, MINUTES_WARN_SHARE);
   return (
     <section aria-label="Your plan" className="rounded-2xl border border-hairline bg-surface p-4">
@@ -143,8 +143,11 @@ export function PlanPicker({
   const [planState, planAction, planPending] = useActionState(confirmPlanChange, idle);
   const [seatState, seatAction, seatPending] = useActionState(setExtraSeatsAction, idle);
 
-  const current = trial ? null : model.plans.find((plan) => plan.sku === model.currentSku) || null;
+  const pinned = trial ? null : model.pinned;
   const selected = model.plans.find((plan) => plan.sku === sku) || null;
+  const publishedCurrent = model.plans.find((plan) => plan.sku === model.currentSku) || null;
+  const onPublished =
+    Boolean(pinned && publishedCurrent && pinned.versionId && pinned.versionId === publishedCurrent.versionId);
   const dids = model.plans[0]?.dids ?? 1;
 
   function open(next: PlanSku) {
@@ -154,7 +157,7 @@ export function PlanPicker({
 
   return (
     <div className="mt-4 flex flex-col gap-4">
-      {current ? <CurrentPlanCard model={model} plan={current} /> : null}
+      {pinned ? <CurrentPlanCard model={model} plan={pinned} /> : null}
 
       <SegmentedControl
         label="Billing period"
@@ -173,7 +176,7 @@ export function PlanPicker({
         <div>
           <ul className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             {model.plans.map((plan) => {
-              const isCurrent = current?.sku === plan.sku;
+              const isCurrent = onPublished && publishedCurrent?.sku === plan.sku;
               let action: ReactNode;
               if (isCurrent && cycle === model.cycle) {
                 action = (
@@ -219,7 +222,7 @@ export function PlanPicker({
 
       <ConfirmSheet
         model={model}
-        current={current}
+        current={pinned}
         selected={selected}
         cycle={cycle}
         open={confirmOpen}
@@ -290,8 +293,9 @@ function ConfirmSheet({
 }) {
   const start = model.nextPeriodStartLabel || model.periodEndLabel;
   const sameCycle = cycle === model.cycle;
+  const sameOffer = Boolean(selected && current && selected.versionId && selected.versionId === current.versionId);
   const newPrice = selected ? priceFor(selected, cycle) : 0;
-  const oldPrice = current ? priceFor(current, cycle) : 0;
+  const oldPrice = current ? priceFor(current, model.cycle) : 0;
   const upgrading = Boolean(selected && current && sameCycle && newPrice > oldPrice);
   const seatBlock = selected && current && selected.seats < current.seats ? seatBlockCopy(model.seatsUsed, selected.seats) : null;
 
@@ -315,13 +319,12 @@ function ConfirmSheet({
           })
         : `${formatKsh(newPrice)} ${per(cycle)}. You pay the difference for the days left in this period.`;
   } else if (selected && current) {
-    const name = selected.sku === current.sku ? (cycle === "year" ? "Annual" : "Monthly") : selected.name;
+    const name = sameOffer ? (cycle === "year" ? "Annual" : "Monthly") : selected.name;
     lead = `No charge today. ${name} starts ${start ? start : "at the end of this period"}.`;
-    detail =
-      selected.sku === current.sku
-        ? `Then ${formatKsh(newPrice)} ${per(cycle)}.`
-        : planDowngradeChanges(current, selected, start);
-    if (selected.sku !== current.sku && !sameCycle) {
+    detail = sameOffer
+      ? `Then ${formatKsh(newPrice)} ${per(cycle)}.`
+      : planDowngradeChanges(current, selected, start);
+    if (!sameOffer && !sameCycle) {
       detail = [detail, `Then ${formatKsh(newPrice)} ${per(cycle)}.`].filter(Boolean).join(" ");
     }
   }
@@ -329,7 +332,7 @@ function ConfirmSheet({
   const split = selected && cycle === "year" ? splitPayNote(selected.annualKes) : null;
   const title = selected
     ? current
-      ? selected.sku === current.sku
+      ? sameOffer
         ? `Switch to ${cycle === "year" ? "annual" : "monthly"}`
         : `Switch to ${selected.name}`
       : `Choose ${selected.name}`

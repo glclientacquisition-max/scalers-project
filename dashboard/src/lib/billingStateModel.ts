@@ -44,6 +44,8 @@ export type OwnerBillingInput = {
   seatsUsed: number;
   /** WhatsApp and email sent this period, from the tenant counters. They draw on message credits too. */
   messagesSent?: { email: number; whatsapp: number };
+  /** Free beta with no package: nothing is charged, and there is no invoice. */
+  isBeta?: boolean;
 };
 
 export type UsageRow = {
@@ -182,8 +184,11 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
   } else if (mode === "capped") {
     headline = `${packageName} · ${priced}. When your included minutes run out, calls stop until ${endLabel || "the end of the month"} unless you turn on extra usage.`;
     shortLabel = `${packageName} · ${priced}`;
+  } else if (input.isBeta) {
+    headline = "Free during beta. Nothing is charged.";
+    shortLabel = "Free during beta";
   } else {
-    headline = "No package. All usage is billed at the rates below.";
+    headline = "No package.";
     shortLabel = "No package";
   }
 
@@ -215,14 +220,13 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     { mode, minutesIncluded, minutesLeft, minutesUnderOne: meter.underOneMinute, periodEndLabel: endLabel, onDemand },
     null,
   );
-
   let onDemandHint: string;
   if (mode === "beta") {
     onDemandHint = onDemand
       ? "On. During beta nothing is charged. After beta, usage past what's included is billed at the rates below."
       : "Off. During beta nothing is charged. After beta, calls stop when included minutes run out.";
   } else if (mode === "none") {
-    onDemandHint = "Without a package, all usage is billed at the rates below.";
+    onDemandHint = input.isBeta ? "Nothing is charged during beta." : "No package.";
   } else {
     onDemandHint = onDemand
       ? "On. Usage past what's included is billed on your next invoice at the rates below."
@@ -234,7 +238,7 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     packageName,
     headline,
     shortLabel,
-    ratesTitle: mode === "beta" ? "Rates after beta" : "Rates past what's included",
+    ratesTitle: mode === "beta" || (mode === "none" && input.isBeta) ? "Rates after beta" : "Rates past what's included",
     rows,
     messageUse,
     minutesIncluded,
@@ -247,5 +251,17 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     lowNoticeNote,
     onDemandHint,
     periodEndLabel: endLabel,
+  };
+}
+
+/** Loader builds the view before the page knows beta. Same words as `isBeta` on the input. */
+export function presentFreeBeta(view: OwnerBillingView, isBeta: boolean): OwnerBillingView {
+  if (!isBeta || view.mode !== "none") return view;
+  return {
+    ...view,
+    headline: "Free during beta. Nothing is charged.",
+    shortLabel: "Free during beta",
+    ratesTitle: "Rates after beta",
+    onDemandHint: "Nothing is charged during beta.",
   };
 }
