@@ -4,8 +4,6 @@ import { invoicePayLedger } from "@/lib/invoicePay/ledger";
 import { assertBachsAllowed, bachsMode, payProviderFromEnv } from "@/lib/invoicePay/provider";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
-export const dynamic = "force-dynamic";
-
 /**
  * Retries stored unreadable Bachs reads. Vercel does not call this until a
  * cron entry is added. The schedule, once enabled, is minute 7, 22, 37, and
