@@ -392,6 +392,85 @@ Retire `/admin/billing/[id]` as a separate layout (redirect to shop).
 
 ---
 
+## Master blueprint (diagram + plan)
+
+One picture: **where ops work**, **what the system runs alone**, **three money layers**, and **delivery phases**.
+
+```mermaid
+flowchart TB
+  subgraph NAV["Super Admin (where you work)"]
+    direction TB
+    T[Today<br/>exception queues]
+    B[Billing<br/>platform queue + graphs]
+    SH[Businesses shop<br/>Line · Shop · Money · People]
+    C[Catalog<br/>SKUs + versions]
+    A[Activity<br/>audit only]
+    T -->|deep link| SH
+    B -->|ListRow → Open shop| SH
+    C -.->|assign SKU| SH
+  end
+
+  subgraph LAYERS["Three layers (per business — do not merge in UI)"]
+    direction TB
+    L1["① Package<br/>included minutes / SMS / seats"]
+    L2["② Commercial mode<br/>Beta meter only · Charging on-demand"]
+    L3["③ Invoices & pay<br/>SCL · M-Pesa · receipts"]
+    L1 --> L2 --> L3
+  end
+
+  SH --> L1
+  SH --> L2
+  SH --> L3
+
+  subgraph AUTO["Runs without admin (automated)"]
+    direction LR
+    V[Voice call] --> MTR[Meter / debit RPC]
+    MTR --> CTR[counters + ledger]
+    CRON[Hourly rollover cron] --> PEND[Apply pending downgrade / unassign]
+    INV[Issue invoice RPC] --> OUT[billing_notices outbox]
+    WH[Bachs webhook] --> RCPT[Receipt + settle]
+  end
+
+  subgraph OPS["Admin confirms only (Phase 1 wires UI)"]
+    direction TB
+    OP1[Assign / change package]
+    OP2[Remove package now or period end]
+    OP3[Start / stop charging + reason]
+    OP4[Grant minutes + reason]
+    OP5[Mint pay link — Phase 2]
+  end
+
+  SH --> OPS
+  OPS -->|POST /api/admin/billing| AUTO
+  AUTO -->|read models| B
+  AUTO -->|read models| SH
+
+  subgraph P1["Phase 1 — shop-first UX"]
+    P1a[One Money block on shop]
+    P1b[Billing tab queue + mix + volume graphs]
+    P1c[Remove package UI]
+    P1d[Admin language + redirect /admin/billing/id]
+  end
+
+  subgraph P2["Phase 2 — money collection UI"]
+    P2a[Shop Invoices + pay link]
+    P2b[Today overdue rows]
+    P2c[Billing open invoice total]
+  end
+
+  subgraph P3["Phase 3 — self-serve + gates"]
+    P3a[Rollover anomaly queue]
+    P3b[Owner plan change preview flag]
+    P3c[P10 legal pairs on prod]
+  end
+
+  P1 --> P2 --> P3
+```
+
+**Reading the diagram:** Operators live in **Today + Billing + shop Money**. The engine **meters, rolls periods, queues notices, records pay**. Admin touches **four writes today** (assign, unassign, mode, grant) plus pay link later. **Package during beta** feeds layer ① while layer ② stays “meter only.”
+
+---
+
 ## Phased delivery
 
 ### Phase 1 (UX + missing strip package)
