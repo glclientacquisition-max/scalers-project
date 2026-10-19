@@ -12,6 +12,7 @@ import {
   stampToneForBillingStatus,
   type BillingAttentionKind,
 } from "@/lib/adminBillingHub";
+import { AdminBillingNeedsCards, buildNeedsCards } from "@/components/AdminBillingNeedsCards";
 import { deskFieldClass } from "@/components/ui/deskChrome";
 import { Empty } from "@/components/ui/Empty";
 import { ButtonLink } from "@/components/ui/Button";
@@ -65,13 +66,48 @@ function HubStat({
   );
 }
 
+function AdminBillingSnapshot({
+  overview,
+  totals,
+  noPackageCount,
+}: {
+  overview: AdminBillingOverview;
+  totals: ReturnType<typeof hubTotals>;
+  noPackageCount: number;
+}) {
+  return (
+    <section className="space-y-4 px-4" aria-label="Platform billing snapshot">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <HubStat label="Active shops" value={totals.activeCount} />
+        <HubStat label="Needs you" value={totals.needsCount} warn={totals.needsCount > 0} />
+        <HubStat
+          label="Minutes used"
+          value={totals.minutesUsed.toLocaleString("en-KE")}
+          hint={`${totals.minutesIncluded.toLocaleString("en-KE")} included`}
+        />
+        <HubStat label="Owner opted in" value={totals.onDemandCount} hint="On-demand overage" />
+      </div>
+      <div className="rounded-2xl border border-hairline/70 bg-surface-2/40 p-4">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-body font-medium text-ink">Commercial mix</p>
+          <p className="text-meta text-ink-2 tabular-nums">
+            {overview.lowMinutesCount} low · {overview.exhaustedCount} exhausted · {noPackageCount} no package
+          </p>
+        </div>
+        <MixBar beta={overview.betaCount} charging={overview.chargingCount} />
+      </div>
+    </section>
+  );
+}
+
 export function AdminBillingListPanel({ overview }: { overview: AdminBillingOverview }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<BillingFilter>("needs");
-  const [attentionKind, setAttentionKind] = useState<BillingAttentionKind>("all");
+  const [attentionKind, setAttentionKind] = useState<BillingAttentionKind | null>(null);
 
   const totals = useMemo(() => hubTotals(overview.rows), [overview.rows]);
   const needs = useMemo(() => attentionRows(overview.rows), [overview.rows]);
+  const needsCards = useMemo(() => buildNeedsCards(needs), [needs]);
 
   const noPackageCount = useMemo(
     () => overview.rows.filter((r) => r.status !== "archived" && !r.packageName).length,
@@ -81,9 +117,15 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let base = overview.rows.filter((r) => r.status !== "archived");
-    if (filter === "needs") base = filterAttentionKind(needs, attentionKind);
-    else if (filter === "beta") base = base.filter((r) => r.billing_enforcement === "off");
-    else if (filter === "charging") base = base.filter((r) => r.billing_enforcement !== "off");
+
+    if (filter === "needs") {
+      if (!attentionKind) return [];
+      base = filterAttentionKind(needs, attentionKind);
+    } else if (filter === "beta") {
+      base = base.filter((r) => r.billing_enforcement === "off");
+    } else if (filter === "charging") {
+      base = base.filter((r) => r.billing_enforcement !== "off");
+    }
 
     if (q) {
       base = base.filter(
@@ -96,6 +138,19 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
 
     return sortBillingQueue(base);
   }, [overview.rows, query, filter, attentionKind, needs]);
+
+  function selectFilter(next: BillingFilter) {
+    setFilter(next);
+    setAttentionKind(null);
+    setQuery("");
+  }
+
+  function toggleAttentionKind(kind: BillingAttentionKind) {
+    setAttentionKind((prev) => (prev === kind ? null : kind));
+    setQuery("");
+  }
+
+  const activeNeedsCard = needsCards.find((c) => c.kind === attentionKind);
 
   return (
     <div className="space-y-5 pb-6">
@@ -119,94 +174,85 @@ export function AdminBillingListPanel({ overview }: { overview: AdminBillingOver
           { key: "beta", label: "Beta", count: overview.betaCount, active: filter === "beta" },
           { key: "charging", label: "Charging", count: overview.chargingCount, active: filter === "charging" },
         ]}
-        onSelect={(key) => setFilter(key as BillingFilter)}
+        onSelect={(key) => selectFilter(key as BillingFilter)}
       />
 
-      <section className="space-y-4 px-4" aria-label="Platform billing snapshot">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <HubStat label="Active shops" value={totals.activeCount} />
-          <HubStat label="Needs you" value={totals.needsCount} warn={totals.needsCount > 0} />
-          <HubStat
-            label="Minutes used"
-            value={totals.minutesUsed.toLocaleString("en-KE")}
-            hint={`${totals.minutesIncluded.toLocaleString("en-KE")} included across shops`}
-          />
-          <HubStat
-            label="Owner opted in"
-            value={totals.onDemandCount}
-            hint="On-demand for overage"
-          />
-        </div>
-
-        <div className="rounded-2xl border border-hairline/70 bg-surface-2/40 p-4">
-          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-body font-medium text-ink">Commercial mix</p>
-            <p className="text-meta text-ink-2 tabular-nums">
-              {overview.lowMinutesCount} low · {overview.exhaustedCount} exhausted · {noPackageCount} no package
-            </p>
+      {filter === "needs" ? (
+        <>
+          <div className="px-4">
+            <div className="rounded-2xl border border-hairline/70 bg-surface-2/40 p-4">
+              <p className="text-body font-medium text-ink">Commercial mix</p>
+              <div className="mt-3">
+                <MixBar beta={overview.betaCount} charging={overview.chargingCount} />
+              </div>
+            </div>
           </div>
-          <MixBar beta={overview.betaCount} charging={overview.chargingCount} />
-        </div>
-      </section>
 
-      {filter === "needs" && needs.length > 0 ? (
-        <Segmented
-          className="px-4"
-          label="Needs you filter"
-          items={[
-            { key: "all", label: "All", count: needs.length, active: attentionKind === "all" },
-            {
-              key: "no_package",
-              label: "No package",
-              count: needs.filter((r) => !r.packageName).length,
-              active: attentionKind === "no_package",
-            },
-            {
-              key: "low_minutes",
-              label: "Low minutes",
-              count: needs.filter((r) => r.status === "low_minutes").length,
-              active: attentionKind === "low_minutes",
-            },
-            {
-              key: "exhausted",
-              label: "Exhausted",
-              count: needs.filter((r) => r.status === "exhausted").length,
-              active: attentionKind === "exhausted",
-            },
-          ]}
-          onSelect={(key) => setAttentionKind(key as BillingAttentionKind)}
-        />
-      ) : null}
-
-      <label className="block px-4 text-body">
-        <span className="sr-only">Search businesses</span>
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className={deskFieldClass}
-          placeholder="Business, number, or package"
-        />
-      </label>
-
-      {filtered.length === 0 ? (
-        <Empty
-          title={filter === "needs" ? "Nothing needs you." : "No businesses match."}
-          line={filter === "needs" ? "Switch to All or open Businesses." : "Widen your filter or search."}
-          action={
-            filter === "needs" ? (
-              <ButtonLink href="/admin/businesses" size="sm" variant="tonal">
-                Businesses
-              </ButtonLink>
-            ) : undefined
-          }
-        />
+          {needs.length === 0 ? (
+            <Empty
+              title="Nothing needs you."
+              line="Beta and charging shops are within limits."
+              action={
+                <ButtonLink href="/admin/businesses" size="sm" variant="tonal">
+                  Businesses
+                </ButtonLink>
+              }
+            />
+          ) : (
+            <>
+              <AdminBillingNeedsCards cards={needsCards} active={attentionKind} onSelect={toggleAttentionKind} />
+              {!attentionKind ? (
+                <p className="px-4 text-body text-ink-2">Pick a queue to see shops.</p>
+              ) : null}
+            </>
+          )}
+        </>
       ) : (
-        <ul className="divide-y divide-hairline/70 border-y border-hairline/70" aria-label="Billing queue">
-          {filtered.map((r) => (
-            <BillingQueueRow key={r.id} row={r} />
-          ))}
-        </ul>
+        <AdminBillingSnapshot overview={overview} totals={totals} noPackageCount={noPackageCount} />
       )}
+
+      {filter !== "needs" || attentionKind ? (
+        <>
+          {filter === "needs" && activeNeedsCard ? (
+            <div className="flex items-center justify-between gap-3 px-4">
+              <p className="text-body font-medium text-ink">
+                {activeNeedsCard.label}
+                <span className="ms-2 tabular-nums text-ink-2">({filtered.length})</span>
+              </p>
+              <button
+                type="button"
+                className="text-meta font-medium text-accent underline-offset-2 hover:underline"
+                onClick={() => setAttentionKind(null)}
+              >
+                Clear
+              </button>
+            </div>
+          ) : null}
+
+          <label className="block px-4 text-body">
+            <span className="sr-only">Search businesses</span>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className={deskFieldClass}
+              placeholder="Business, number, or package"
+            />
+          </label>
+
+          {filtered.length === 0 ? (
+            <Empty
+              title={filter === "needs" ? "No shops in this queue." : "No businesses match."}
+              line={filter === "needs" ? "Try another queue or clear the filter." : "Widen your filter or search."}
+            />
+          ) : (
+            <ul className="divide-y divide-hairline/70 border-y border-hairline/70" aria-label="Billing queue">
+              {filtered.map((r) => (
+                <BillingQueueRow key={r.id} row={r} />
+              ))}
+            </ul>
+          )}
+        </>
+      ) : null}
     </div>
   );
 }

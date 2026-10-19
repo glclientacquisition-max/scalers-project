@@ -127,10 +127,14 @@ describe("admin billing: plain history", () => {
 });
 
 describe("admin billing: list queue", () => {
-  it("uses segmented filters, mix bar, and shop money links", () => {
+  it("uses segmented filters, needs cards, mix bar, and shop money links", () => {
     const list = read(LIST);
+    const cards = read("dashboard/src/components/AdminBillingNeedsCards.tsx");
     assert.match(list, /<Segmented/);
+    assert.match(list, /AdminBillingNeedsCards/);
+    assert.match(cards, /No package/);
     assert.match(list, /MixBar|Beta vs charging mix/);
+    assert.match(list, /Pick a queue to see shops/);
     assert.match(list, /\/admin\/businesses\/\$\{.*\}\?money=1/);
     assert.match(list, /href="\/admin\/packages"/);
     assert.doesNotMatch(list, /admin\/billing\/\$\{/);
