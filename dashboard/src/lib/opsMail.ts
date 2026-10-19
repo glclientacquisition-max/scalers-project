@@ -5,6 +5,7 @@ import {
   type OpsDnsRecord,
 } from "@/lib/platformOpsModel";
 
+import { replayedMailSkip } from "@/lib/opsAlertsRun";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import {
   reserveNotifySend,
@@ -155,7 +156,7 @@ export async function sendOpsMail(opts: {
 
   const reservation = await reserveOpsMail(opts, to);
   if (reservation?.mode === "reserved" && reservation.replayed) {
-    return { sent: 0, skipped: "already_sent" };
+    return { sent: 0, skipped: replayedMailSkip(reservation.reason) };
   }
 
   let res: Response;

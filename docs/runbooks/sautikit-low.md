@@ -1,6 +1,6 @@
 ---
 owner: ops-billing
-last_reviewed: 2026-10-14
+last_reviewed: 2026-10-18
 ---
 
 # Runbook: `sautikit_low` alert
@@ -9,7 +9,7 @@ last_reviewed: 2026-10-14
 
 ## Symptom
 
-Desk ops notice: SautiKit wallet at or below `platform_ops_settings.sautikit_warn_minor` (default 50000 minor); critical when empty.
+Desk ops notice. The phone wallet crossed a threshold (default KES 500 and KES 100, plus Admin low-money). An empty wallet is one notice. A repeat reading does not open another. The notice stays open until the balance is above the threshold plus 10 percent (`OPS_ALERTS_REARM_MARGIN`, default 0.10). Voice calls `GET /api/cron/ops-alerts` ([contract](../reference/operations/OPS_ALERTS_ENDPOINT.md)).
 
 ## Check
 
@@ -28,5 +28,6 @@ Desk ops notice: SautiKit wallet at or below `platform_ops_settings.sautikit_war
 
 ## Rollback / recovery
 
-- Voice clears the alert itself on recovery (`notePlatformOpsRecovered`). Desk notices resolve in Super Admin.
+- Voice clears its own speech and reasoning mail on recovery (`notePlatformOpsRecovered`). Desk does not send those. Desk wallet notices resolve when the balance is above the recovery line.
+- A failed recovery mail is not retried. The notice is already resolved. The next time the balance crosses down, a new notice can mail.
 - TODO(ops-billing): rollback steps.
