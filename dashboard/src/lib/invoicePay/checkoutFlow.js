@@ -176,7 +176,7 @@ function sessionAlreadyStored(attempt) {
  * A thrown create does not mark the row failed while a session id is stored.
  * After a short collection, the succeeded checkout is reused or blocked until
  * a read says it is closed.
- * @param {{ token: string, origin: string, ledger: object, provider: { createCheckout: Function, cancelCheckout?: Function } }} input
+ * @param {{ token: string, origin: string, ledger: object, provider: { createCheckout: Function, cancelCheckout?: Function }, env?: NodeJS.ProcessEnv }} input
  */
 async function startInvoiceCheckout(input) {
   const lookup = await input.ledger.lookup(input.token);
