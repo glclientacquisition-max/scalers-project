@@ -65,7 +65,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `NEXT_PUBLIC_SITE_URL` | desk | `dashboard/src/app/layout.tsx`<br>`dashboard/src/lib/admin-auth.ts` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | desk | `dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | desk | `dashboard/src/lib/supabase/env.ts` |
-| `NEXT_PUBLIC_SUPABASE_URL` | desk | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
+| `NEXT_PUBLIC_SUPABASE_URL` | desk, scripts | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts`<br>+1 more |
 | `NEXT_PUBLIC_WALLET_RATE_KES_PER_MINUTE` | desk | `dashboard/src/lib/wallet.ts` |
 | `NEXT_RUNTIME` | desk | `dashboard/src/lib/adminQuality.ts` |
 | `NODE_ENV` | desk, scripts, voice | `dashboard/src/app/(desk)/tenantActions.ts`<br>`dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/admin-auth.ts`<br>+4 more |
@@ -130,8 +130,8 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SUPABASE_ANON_KEY` | desk | `dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_PUBLISHABLE_KEY` | desk | `dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_RECORDINGS_BUCKET` | voice | `src/db.js` |
-| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/supabase.ts`<br>`scripts/backfillFactHashes.js`<br>`scripts/bench-inbound-webhook.js`<br>+5 more |
-| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts`<br>+7 more |
+| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/supabase.ts`<br>`scripts/backfillFactHashes.js`<br>`scripts/bench-inbound-webhook.js`<br>+6 more |
+| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts`<br>+8 more |
 | `TENANT_DID` | voice | `server.js`<br>`src/db.js` |
 | `TENANT_ID` | scripts, voice | `scripts/bench-inbound-webhook.js`<br>`scripts/smoke-db.js`<br>`server.js`<br>+1 more |
 | `TEXTSMS_API_KEY` | desk, voice | `dashboard/src/lib/callerSms.ts`<br>`src/notifications/sms.js` |

@@ -72,6 +72,33 @@ export async function setTenantBillingMode(opts: {
   };
 }
 
+/** Confirmed admin switch. Off is beta with enforcement off. Soft or hard is active. */
+export async function confirmTenantBillingMode(opts: {
+  businessId: string;
+  mode: BillingMode;
+  note: string;
+  actor: string;
+}): Promise<{ billing_enforcement: BillingMode; billing_status: "beta" | "active" }> {
+  const billingStatus = opts.mode === "off" ? "beta" : "active";
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.rpc("admin_set_tenant_billing_mode", {
+    p_tenant_id: opts.businessId,
+    p_billing_status: billingStatus,
+    p_enforcement: opts.mode,
+    p_actor: opts.actor,
+    p_reason: opts.note,
+    p_confirm: true,
+  });
+  if (error) throw error;
+  const row = data && typeof data === "object" && !Array.isArray(data)
+    ? (data as { billing_enforcement?: string; billing_status?: string })
+    : {};
+  return {
+    billing_enforcement: modeOf(row.billing_enforcement ?? opts.mode),
+    billing_status: row.billing_status === "active" ? "active" : "beta",
+  };
+}
+
 export async function listTenantLedger(
   tenantId: string,
   limit = 30

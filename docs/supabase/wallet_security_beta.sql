@@ -345,6 +345,18 @@ begin
     raise exception 'mode must be off|soft|hard';
   end if;
 
+  -- Charging on while the subscription is still beta is refused. Status is
+  -- not updated here. An admin sets it to active in the same confirmed call
+  -- through admin_set_tenant_billing_mode.
+  if v_mode is distinct from 'off' and exists (
+    select 1
+    from public.tenant_subscriptions
+    where tenant_id = p_tenant_id
+      and billing_status = 'beta'
+  ) then
+    raise exception 'billing stays off while the business is on beta';
+  end if;
+
   update public.tenants
   set
     billing_enforcement = v_mode,

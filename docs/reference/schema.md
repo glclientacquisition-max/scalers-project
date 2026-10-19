@@ -9,7 +9,7 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (45)
+## Tables (46)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
@@ -17,11 +17,12 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_audit_log` | `action`, `actor`, `created_at`, `detail`, `id`, `tenant_id` | `docs/supabase/billing_data_layer.sql` |
 | `billing_features` | `key`, `label` | `docs/supabase/billing_data_layer.sql` |
 | `billing_invoice_counters` | `last_number`, `year` | `docs/supabase/billing_data_layer.sql` |
-| `billing_lifecycle_settings` | `id`, `shadow_invoices`, `updated_at`, `voicemail_hold_days` | `docs/supabase/billing_data_layer.sql` |
+| `billing_lifecycle_settings` | `id`, `new_signup_trial_enabled`, `package_editor_enabled`, `price_change_approval_threshold_kes`, `shadow_invoices`, `updated_at`, `voicemail_hold_days` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/package_version_editor.sql` |
 | `billing_notices` | `audience`, `billed_to`, `body`, `channel`, `claimed_at`, `created_at`, `delivery_status`, `fallback`, `id`, `idempotency_key`, `kind`, `last_error`, `notify_send_id`, `read_at`, `recipient`, `tenant_id`, `title` | `docs/supabase/billing_data_layer.sql` |
 | `billing_owner_action_keys` | `action`, `created_at`, `idempotency_key`, `result`, `tenant_id` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
+| `billing_package_version_approvals` | `approver`, `created_at`, `id`, `package_version_id`, `price_snapshot`, `reason`, `requested_by`, `status` | `docs/supabase/package_version_editor.sql` |
 | `billing_package_version_features` | `enabled`, `feature_key`, `package_version_id` | `docs/supabase/billing_data_layer.sql` |
-| `billing_package_versions` | `active_from`, `allowances_placeholder`, `annual_discount_percent`, `created_at`, `dids`, `email`, `email_kes`, `extra_seat_monthly_kes`, `id`, `inbound_kes_per_second`, `minutes`, `monthly_price_kes`, `outbound_kes_per_second`, `package_id`, `published_at`, `retired_at`, `seats`, `sms`, `sms_kes`, `staff_wa`, `status`, `trial_days`, `version`, `whatsapp_kes` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
+| `billing_package_versions` | `active_from`, `allowances_placeholder`, `annual_discount_percent`, `annual_price_kes`, `copied_from_id`, `created_at`, `credit_kes`, `dids`, `email`, `email_credit_burn`, `email_kes`, `extra_seat_monthly_kes`, `id`, `inbound_kes_per_second`, `message_credits`, `minutes`, `monthly_price_kes`, `notes`, `on_demand_allowed`, `outbound_kes_per_second`, `package_id`, `price_set_by`, `promote_fingerprint`, `published_at`, `retired_at`, `seats`, `sms`, `sms_credit_burn`, `sms_kes`, `spend_limit_share_percent`, `staff_wa`, `status`, `trial_days`, `version`, `whatsapp_credit_burn`, `whatsapp_kes` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/package_version_editor.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_packages` | `dids`, `email`, `id`, `is_active`, `minutes`, `monthly_price_kes`, `name`, `seats`, `sku`, `sms`, `sort_order`, `staff_wa`, `updated_at` | `docs/supabase/package_catalog.sql` |
 | `billing_rate_card` | `annual_discount_percent`, `email_kes`, `id`, `inbound_kes_per_second`, `outbound_kes_per_second`, `sms_kes`, `updated_at`, `whatsapp_kes` | `docs/supabase/package_catalog.sql` |
 | `call_facts` | `call_id`, `caller_area`, `competitor_mentioned`, `confidence`, `created_at`, `dow`, `est_value_ksh`, `hour_eat`, `intent`, `language`, `lost_reason`, `model`, `objection_price_ksh`, `outcome`, `owner_corrected_at`, `owner_corrected_by`, `price_objection`, `products_mentioned`, `review_snapshot`, `secondary_intents`, `sentiment`, `source`, `tenant_id`, `time_of_day`, `unanswered_question`, `updated_at` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
@@ -70,10 +71,11 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (157)
+## Functions (192)
 
 | Function | Defined in |
 | --- | --- |
+| `_apply_package_version_move` | `docs/supabase/package_version_editor.sql` |
 | `_billing_audit` | `docs/supabase/billing_data_layer.sql` |
 | `_billing_mark_spend_blocked` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `_billing_package_snapshot` | `docs/supabase/package_state_rules.sql` |
@@ -87,6 +89,21 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `_owner_next_invoice_line` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `_owner_open_proration_invoice` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `_owner_plan_target` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
+| `_package_annual_discount` | `docs/supabase/package_version_editor.sql` |
+| `_package_editor_actor` | `docs/supabase/package_version_editor.sql` |
+| `_package_editor_apply_features` | `docs/supabase/package_version_editor.sql` |
+| `_package_editor_count` | `docs/supabase/package_version_editor.sql` |
+| `_package_editor_money` | `docs/supabase/package_version_editor.sql` |
+| `_package_editor_open` | `docs/supabase/package_version_editor.sql` |
+| `_package_version_apply_extra_seat` | `docs/supabase/package_version_editor.sql` |
+| `_package_version_copy_extra_seat` | `docs/supabase/package_version_editor.sql` |
+| `_package_version_current_id` | `docs/supabase/package_version_editor.sql` |
+| `_package_version_fill_extra_seat` | `docs/supabase/package_version_editor.sql` |
+| `_package_version_has_column` | `docs/supabase/package_version_editor.sql` |
+| `_package_version_json` | `docs/supabase/package_version_editor.sql` |
+| `_package_version_needs_approval` | `docs/supabase/package_version_editor.sql` |
+| `_package_version_price_snapshot` | `docs/supabase/package_version_editor.sql` |
+| `_package_version_sha256` | `docs/supabase/package_version_editor.sql` |
 | `_parse_catalogue_pricing_mode` | `docs/supabase/manual/catalogue_pricing_mode_json_backfill_DO_NOT_RUN.sql` |
 | `_price_amounts_kept` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `_price_sig_tokens` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
@@ -111,7 +128,20 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `_wallet_apply_delta` | `docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_security_beta.sql` |
 | `accept_tenant_invite` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `adjust_tenant_wallet` | `docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_metering.sql`<br>`docs/supabase/wallet_security_beta.sql` |
+| `admin_approve_package_version` | `docs/supabase/package_version_editor.sql` |
+| `admin_archive_package_version` | `docs/supabase/package_version_editor.sql` |
+| `admin_discard_package_version_draft` | `docs/supabase/package_version_editor.sql` |
+| `admin_draft_package_version` | `docs/supabase/package_version_editor.sql` |
+| `admin_export_package_version` | `docs/supabase/package_version_editor.sql` |
+| `admin_import_promoted_package_version` | `docs/supabase/package_version_editor.sql` |
+| `admin_list_package_versions` | `docs/supabase/package_version_editor.sql` |
+| `admin_move_subscribers_to_package_version` | `docs/supabase/package_version_editor.sql` |
+| `admin_publish_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_business_suspended` | `docs/supabase/admin_business_suspend.sql` |
+| `admin_set_new_signup_trial` | `docs/supabase/package_version_editor.sql` |
+| `admin_set_price_approval_threshold` | `docs/supabase/package_version_editor.sql` |
+| `admin_set_tenant_billing_mode` | `docs/supabase/package_version_editor.sql` |
+| `admin_update_package_version_draft` | `docs/supabase/package_version_editor.sql` |
 | `apply_line_rental` | `docs/supabase/line_rental_grace.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_security_beta.sql` |
 | `apply_payment` | `docs/supabase/billing_data_layer.sql` |
 | `archive_tenant_billing` | `docs/supabase/archive_tenant_billing.sql` |
@@ -127,7 +157,9 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_notice_when` | `docs/supabase/billing_data_layer.sql` |
 | `billing_notices_guard` | `docs/supabase/billing_data_layer.sql` |
 | `billing_on_demand_open` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
-| `billing_package_versions_freeze` | `docs/supabase/billing_data_layer.sql` |
+| `billing_package_version_approvals_freeze` | `docs/supabase/package_version_editor.sql` |
+| `billing_package_version_features_freeze` | `docs/supabase/package_version_editor.sql` |
+| `billing_package_versions_freeze` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/package_version_editor.sql` |
 | `billing_package_versions_freeze_seat` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_period_days` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_period_on_demand_kes` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
@@ -174,10 +206,12 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `owner_preview_plan_change` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `owner_set_extra_seats` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `owner_set_spend_limit` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
+| `package_version_fingerprint` | `docs/supabase/package_version_editor.sql` |
 | `parse_payments_text` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `parse_price_ksh` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `payments_to_v2` | `supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `payments_valid` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012090000_payments_policies_v2.sql` |
+| `pg_temp` | `docs/supabase/package_version_owner_prices.sql` |
 | `platform_soniox_voices_enforce_single_default` | `docs/supabase/soniox_voice_id.sql` |
 | `policy_rules_valid` | `supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `purge_archived_tenants` | `docs/supabase/purge_archived_tenants.sql` |
@@ -207,6 +241,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `sms_counter_drift_log` | `docs/supabase/notify_send_reserve_settle.sql` |
 | `snapshot_data_quality` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `suspend_line_for_nonpayment` | `docs/supabase/admin_business_suspend.sql`<br>`docs/supabase/line_rental_grace.sql` |
+| `system_move_subscribers_to_package_version` | `docs/supabase/package_version_editor.sql` |
 | `tenant_completeness_score` | `docs/supabase/tenant_field_provenance.sql`<br>`supabase/migrations/20261011170000_completeness_matches_onboarding.sql` |
 | `tenant_credits_freeze` | `docs/supabase/billing_data_layer.sql` |
 | `tenant_escalation_allowed` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
@@ -214,10 +249,11 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_member_directory` | `supabase/migrations/20261011140000_team_scale.sql` |
 | `tenant_seat_available` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `tenant_seats_used` | `supabase/migrations/20261011000000_team_invites.sql` |
-| `tenant_subscriptions_a_billing_guard` | `docs/supabase/billing_data_layer.sql` |
-| `tenant_subscriptions_b_pin_version` | `docs/supabase/billing_data_layer.sql` |
+| `tenant_subscriptions_a_billing_guard` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/package_version_editor.sql` |
+| `tenant_subscriptions_b_pin_version` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/package_version_editor.sql` |
 | `tenant_subscriptions_c_require_version_pin` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `tenant_subscriptions_clear_spend_hold` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
+| `tenants_a_new_signup_trial` | `docs/supabase/package_version_editor.sql` |
 | `tenants_archived_billing_guard` | `docs/supabase/archive_tenant_billing.sql` |
 | `tenants_billing_purge_flag` | `docs/supabase/billing_data_layer.sql` |
 | `tenants_protect_spend_limit` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
