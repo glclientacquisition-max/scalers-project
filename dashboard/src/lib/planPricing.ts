@@ -182,7 +182,7 @@ export function allowanceChanges(from: PlanAllowances, to: PlanAllowances): { la
   return rows;
 }
 
-/** "KSh 11,333 today for the rest of October, then KSh 35,000 a month from 1 Nov." No arithmetic shown. */
+/** "KSh 16,452 today until 18 Nov, then KSh 35,000 a month." The date is the period end. */
 export function planUpgradeCopy(input: {
   dueKes: number;
   laterKes: number;
@@ -190,11 +190,11 @@ export function planUpgradeCopy(input: {
   periodMonth: string | null;
   nextPeriodStart: string | null;
 }): string {
-  const today = input.periodMonth
-    ? `${formatKsh(input.dueKes)} today for the rest of ${input.periodMonth}`
+  const today = input.nextPeriodStart
+    ? `${formatKsh(input.dueKes)} today until ${input.nextPeriodStart}`
     : `${formatKsh(input.dueKes)} today`;
   const then = `${formatKsh(input.laterKes)} ${input.cycle === "year" ? "a year" : "a month"}`;
-  return `${today}, then ${then}${input.nextPeriodStart ? ` from ${input.nextPeriodStart}` : ""}.`;
+  return `${today}, then ${then}.`;
 }
 
 /** "From 1 Nov: 300 minutes (now 800), 3 seats (now 8)." Only what changes. */

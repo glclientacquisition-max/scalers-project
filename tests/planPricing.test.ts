@@ -126,11 +126,44 @@ describe("plan change copy", () => {
   const growth = { minutes: 800, seats: 8, messageCredits: 2500 };
   const scale = { minutes: 1600, seats: 20, messageCredits: 5500 };
 
-  it("upgrade: today for the rest of the month, then the new price from the next period", () => {
+  it("upgrade: today until the period end, then the new price", () => {
     const due = proratedUpgradeKes(18000, 35000, 10, 30);
     assert.equal(
       planUpgradeCopy({ dueKes: due, laterKes: 35000, cycle: "month", periodMonth: "October", nextPeriodStart: "1 Nov" }),
-      "KSh 11,333 today for the rest of October, then KSh 35,000 a month from 1 Nov.",
+      "KSh 11,333 today until 1 Nov, then KSh 35,000 a month.",
+    );
+  });
+
+  it("upgrade names the period end when the period crosses months", () => {
+    assert.equal(
+      planUpgradeCopy({
+        dueKes: 16452,
+        laterKes: 35000,
+        cycle: "month",
+        periodMonth: "November",
+        nextPeriodStart: "18 Nov",
+      }),
+      "KSh 16,452 today until 18 Nov, then KSh 35,000 a month.",
+    );
+    assert.equal(
+      planUpgradeCopy({
+        dueKes: 16452,
+        laterKes: 378000,
+        cycle: "year",
+        periodMonth: null,
+        nextPeriodStart: "18 Nov",
+      }),
+      "KSh 16,452 today until 18 Nov, then KSh 378,000 a year.",
+    );
+    assert.doesNotMatch(
+      planUpgradeCopy({
+        dueKes: 16452,
+        laterKes: 35000,
+        cycle: "month",
+        periodMonth: "November",
+        nextPeriodStart: "18 Nov",
+      }),
+      /rest of November/,
     );
   });
 
