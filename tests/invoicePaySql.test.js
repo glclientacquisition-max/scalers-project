@@ -46,6 +46,8 @@ describe("invoice pay SQL", () => {
     await db.exec(read("docs/supabase/invoice_pay_checkout_total.sql"));
     await db.exec(read("docs/supabase/invoice_pay_checkout_review.sql"));
     await db.exec(read("docs/supabase/invoice_pay_checkout_review.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_checkout_review_round8.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_checkout_review_round8.sql"));
   });
 
   it("refuses a draft number or status write unless billing_write is set", async () => {
@@ -825,7 +827,23 @@ describe("invoice pay SQL", () => {
       "select provider_ref from public.payments where invoice_id = $1 and match_status = 'issue'",
       [shortId]
     );
-    await q("select public.resolve_checkout_total_review('bachs', $1)", [reviewRef.rows[0].provider_ref]);
+    await assert.rejects(
+      q("select public.resolve_checkout_total_review('bachs', $1, 'ada', 'no')", [reviewRef.rows[0].provider_ref]),
+      /reason is required/
+    );
+    await q(
+      "select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Checked the receipt')",
+      [reviewRef.rows[0].provider_ref]
+    );
+    const audited = await q(
+      `select actor, detail->>'reason' as reason
+       from public.billing_audit_log
+       where action = 'checkout_total_review_resolved'
+       order by created_at desc
+       limit 1`
+    );
+    assert.equal(audited.rows[0].actor, "ada");
+    assert.equal(audited.rows[0].reason, "Checked the receipt");
     const opened = await q("select public.create_invoice_pay_attempt($1, 10) as row", [minted.rows[0].token]);
     assert.equal(opened.rows[0].row.held, false);
     assert.notEqual(opened.rows[0].row.id, undefined);
@@ -894,6 +912,63 @@ describe("invoice pay SQL", () => {
     );
     assert.equal(riseIssues.rows[0].n, 0);
 
+    const priceId = await issued(20, "chk_price", 20);
+    const priceFirst = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_price', 10, $1, $2, 'ch_price_a', 20, '{}'::jsonb) as row",
+      [tenant, priceId]
+    );
+    assert.equal(priceFirst.rows[0].row.review, false);
+    assert.equal(Number(priceFirst.rows[0].row.applied_kes), 10);
+    const priceSecond = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_price', 20, $1, $2, 'ch_price_b', 20, '{}'::jsonb) as row",
+      [tenant, priceId]
+    );
+    assert.equal(priceSecond.rows[0].row.review, false);
+    assert.equal(Number(priceSecond.rows[0].row.applied_kes), 10);
+    const pricePaid = await q("select amount_paid_kes from public.invoices where id = $1", [priceId]);
+    assert.equal(Number(pricePaid.rows[0].amount_paid_kes), 20);
+    const priceShort = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_price', 20, $1, $2, 'ch_price_c', 5, '{}'::jsonb) as row",
+      [tenant, priceId]
+    );
+    assert.equal(priceShort.rows[0].row.reason, "collected_total_short");
+    const priceStill = await q("select amount_paid_kes from public.invoices where id = $1", [priceId]);
+    assert.equal(Number(priceStill.rows[0].amount_paid_kes), 20);
+
+    const missingId = await issued(20, "chk_missing", 20);
+    const missingRise = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_missing', 10, $1, $2, 'ch_chk_missing', 10, '{}'::jsonb) as row",
+      [tenant, missingId]
+    );
+    assert.equal(missingRise.rows[0].row.reason, "collected_identity_missing");
+    assert.match(missingRise.rows[0].row.provider_ref, /ch_chk_missing/);
+    const missingPaid = await q("select amount_paid_kes from public.invoices where id = $1", [missingId]);
+    assert.equal(Number(missingPaid.rows[0].amount_paid_kes), 0);
+    const missingReplay = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_missing', 10, $1, $2, 'ch_chk_missing', 10, '{}'::jsonb) as row",
+      [tenant, missingId]
+    );
+    assert.equal(missingReplay.rows[0].row.duplicate, true);
+    const flatId = await issued(20, "chk_flat", 20);
+    await q(
+      "select public.settle_checkout_reading('bachs', 'chk_flat', 10, $1, $2, 'ch_flat_real', 10, '{}'::jsonb)",
+      [tenant, flatId]
+    );
+    const flat = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_flat', 10, $1, $2, 'ch_chk_flat', 10, '{}'::jsonb) as row",
+      [tenant, flatId]
+    );
+    assert.equal(flat.rows[0].row.reason, "collected_identity_missing");
+    const flatPaid = await q("select amount_paid_kes from public.invoices where id = $1", [flatId]);
+    assert.equal(Number(flatPaid.rows[0].amount_paid_kes), 10);
+    const zero = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_zero', 0, $1, $2, null, null, '{}'::jsonb) as row",
+      [tenant, await issued(20, "chk_zero", 20)]
+    );
+    assert.equal(zero.rows[0].row.noop, true);
+    assert.equal(zero.rows[0].row.wait, true);
+    assert.equal(zero.rows[0].row.review, false);
+
     await q("select public.record_payment_event('bachs', 'evt_retry', '{\"data\":{\"checkout_id\":\"chk_rise\"}}'::jsonb)");
     await q("select public.mark_payment_event_retry('bachs', 'evt_retry')");
     const marked = await q(
@@ -909,6 +984,9 @@ describe("invoice pay SQL", () => {
     await q("set role anon");
     await assert.rejects(
       q("select public.settle_checkout_reading('bachs', 'chk_rise', 20, $1, $2, 'ch_2', 10)", [tenant, riseId])
+    );
+    await assert.rejects(
+      q("select public.resolve_checkout_total_review('bachs', 'checkout-total-review:bachs:chk_rise:x', 'ada', 'Checked the receipt')")
     );
     await q("reset role");
   });

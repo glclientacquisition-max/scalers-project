@@ -83,6 +83,14 @@ const DETAIL: AdminBillingClientDetail = {
     },
     gap: null,
   },
+  checkoutReviews: [
+    {
+      provider: "bachs",
+      providerRef: "checkout-total-review:bachs:cs_demo:ch_cs_demo:1000:1000",
+      getKes: "10",
+      seenKes: "10",
+    },
+  ],
 };
 
 export default function DevBillingClientPage() {
