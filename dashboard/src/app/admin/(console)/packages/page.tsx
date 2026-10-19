@@ -1,5 +1,6 @@
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminPackagesPanel } from "@/components/AdminPackagesPanel";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminPackageVersionsPanel } from "@/components/AdminPackageVersionsPanel";
 import { logAdminError } from "@/lib/adminErrors";
 import { requireSuperAdmin } from "@/lib/adminGuard";
@@ -13,9 +14,12 @@ export default async function AdminPackagesPage() {
   try {
     const [live, editor] = await Promise.all([loadPackageCatalog(), loadPackageVersionEditor()]);
     return (
-      <AdminPackageVersionsPanel catalog={editor.catalog} businesses={editor.businesses}>
-        <AdminPackagesPanel {...live} />
-      </AdminPackageVersionsPanel>
+      <div className="space-y-4">
+        <AdminPageHeader title="Packages" subtitle="Catalog, rates, and which shops are on each plan." />
+        <AdminPackageVersionsPanel catalog={editor.catalog} businesses={editor.businesses}>
+          <AdminPackagesPanel {...live} />
+        </AdminPackageVersionsPanel>
+      </div>
     );
   } catch (err) {
     logAdminError("packages", err);

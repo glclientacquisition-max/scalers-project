@@ -114,7 +114,7 @@ describe("admin console polish", () => {
     assert.match(page, /readPlatformOps/);
     assert.doesNotMatch(page, /evaluatePlatformOps/);
     assert.match(panel, /Needs you/);
-    assert.match(panel, /Calls today/);
+    assert.match(panel, /Volume today/);
     assert.match(panel, /ListRow/);
     assert.match(panel, /row\.href/);
     assert.match(panel, /Nothing waiting\./);
@@ -129,36 +129,32 @@ describe("admin console polish", () => {
     assert.doesNotMatch(panel, /wallet top-up/i);
   });
 
-  it("lists businesses as ListRows with a shop sheet, assign, and confirmed release", () => {
-    const panel = read("dashboard/src/components/AdminBusinessesPanel.tsx");
-    assert.match(panel, /ListRow/);
-    assert.doesNotMatch(panel, /<table/);
-    assert.match(panel, /Notify/);
-    assert.match(panel, /Created/);
-    assert.match(panel, /whatsapp_notification_number/);
-    assert.match(panel, /startsWith\("pending:"\)/);
-    assert.match(panel, /Assign next/);
-    assert.doesNotMatch(panel, /Assign next available/);
-    assert.match(panel, /next === "shop"/);
-    assert.match(panel, /SheetNote/);
-    assert.match(panel, /type="search"/);
-    assert.match(panel, /assign_specific/);
-    assert.match(panel, /Add number/);
-    assert.match(panel, /No numbers available/);
-    assert.match(panel, /Release this number\?/);
-    assert.match(panel, /returns to Available/);
-    assert.match(panel, /title="Plan"/);
-    assert.match(panel, /title="Charges"/);
-    assert.match(panel, /set_billing_mode/);
-    assert.match(panel, /ledger_for/);
-    assert.doesNotMatch(panel, /adjust_wallet/);
-    assert.doesNotMatch(panel, /title="Ledger"/);
-    assert.match(panel, /b\.package_name/);
-    assert.doesNotMatch(panel, /wallet_balance_kes/);
-    // Remove became Archive (A0). Permanent delete only after the grace period, typed name.
-    assert.doesNotMatch(panel, /REMOVE/);
-    assert.match(panel, /Archive this business\?/);
-    assert.doesNotMatch(panel, /disabled=\{pending \|\| availableDidCount === 0\}/);
+  it("lists businesses as ListRows with shop links, assign sheet, and shop-side release", () => {
+    const list = read("dashboard/src/components/AdminBusinessesPanel.tsx");
+    const shop = read("dashboard/src/components/AdminShopPanel.tsx");
+    assert.match(list, /ListRow/);
+    assert.doesNotMatch(list, /<table/);
+    assert.match(list, /href=\{`\/admin\/businesses\/\$\{/);
+    assert.match(list, /whatsapp_notification_number/);
+    assert.match(list, /Assign next/);
+    assert.doesNotMatch(list, /Assign next available/);
+    assert.match(list, /type="search"/);
+    assert.match(list, /assign_specific/);
+    assert.match(list, /Add number/);
+    assert.match(list, /No numbers available/);
+    assert.doesNotMatch(list, /disabled=\{pending \|\| availableDidCount === 0\}/);
+    assert.match(shop, /Release this number\?/);
+    assert.match(shop, /returns to Available/);
+    assert.match(shop, /title="Plan"/);
+    assert.match(shop, /title="Charges"/);
+    assert.match(shop, /set_billing_mode/);
+    assert.match(shop, /ledger_for/);
+    assert.doesNotMatch(shop, /adjust_wallet/);
+    assert.doesNotMatch(shop, /title="Ledger"/);
+    assert.match(shop, /setSheet\("package"\)/);
+    assert.doesNotMatch(shop, /wallet_balance_kes/);
+    assert.doesNotMatch(shop, /REMOVE/);
+    assert.match(shop, /Archive this business\?/);
   });
 
   it("keeps the removed ledger actions out of billing surfaces", () => {
@@ -230,7 +226,8 @@ describe("admin console polish", () => {
   it("uses the desk list title on admin list roots", () => {
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/voices/page.tsx"), /deskListTitleClass/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/voices/page.tsx"), /<h1/);
-    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /PageHeader/);
+    assert.match(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /AdminPageHeader/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /from "@\/components\/PageHeader"/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /deskListTitleClass/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/businesses/page.tsx"), /deskListTitleClass/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/packages/page.tsx"), /deskListTitleClass/);

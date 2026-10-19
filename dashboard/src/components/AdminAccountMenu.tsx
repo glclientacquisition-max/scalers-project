@@ -6,6 +6,7 @@ import { ThemePicker, appearanceLabel, useThemeChoice } from "@/components/Theme
 import { iconButtonClass } from "@/components/ui/IconButton";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
 import { SignOutButton } from "@/components/ui/SignOutButton";
+import { AdminGlobalSearch } from "@/components/admin/AdminGlobalSearch";
 import { cx } from "@/lib/cx";
 import { deskRowInitials } from "@/components/ui/deskRow";
 
@@ -25,6 +26,9 @@ export function AdminAccountMenu({ name }: { name: string }) {
       data-account-bar=""
       className="relative flex min-h-12 shrink-0 items-center justify-end gap-2 border-b border-hairline bg-surface px-3 sm:px-4"
     >
+      <div className="me-auto hidden min-w-0 flex-1 md:block md:max-w-md lg:max-w-lg">
+        <AdminGlobalSearch />
+      </div>
       <div className="me-auto md:hidden">
         <BrandLockup
           href="/admin"

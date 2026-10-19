@@ -158,28 +158,29 @@ describe("server actions", () => {
 });
 
 describe("screens", () => {
-  const panel = read(`${DASH}/components/AdminBusinessesPanel.tsx`);
+  const list = read(`${DASH}/components/AdminBusinessesPanel.tsx`);
+  const shop = read(`${DASH}/components/AdminShopPanel.tsx`);
 
   it("archived businesses are hidden from the default list and have their own filter", () => {
-    assert.match(panel, /filter === "all" \? b\.status === "archived"/);
-    assert.match(panel, /key: "archived"/);
-    assert.match(panel, /key: "suspended"/);
+    assert.match(list, /filter === "all" \? b\.status === "archived"/);
+    assert.match(list, /key: "archived"/);
+    assert.match(list, /key: "suspended"/);
   });
 
   it("shows the purge date and the suspended line in plain words", () => {
-    assert.match(panel, /`Purges on \$\{createdLabel\.format\(at\)\}`/);
-    assert.match(panel, /"Suspended: line unavailable"/);
-    assert.match(panel, /timeZone: "Africa\/Nairobi"/);
+    assert.match(shop, /purgeLabel\(b\)/);
+    assert.match(shop, /SUSPENDED_LINE/);
+    assert.match(read(`${DASH}/lib/adminBusinessUi.ts`), /timeZone: "Africa\/Nairobi"/);
   });
 
   it("every lifecycle action needs the reason before Confirm is enabled", () => {
-    assert.match(panel, /confirmDisabled=\{!reasonOk\(reason\)\}/);
+    assert.match(shop, /confirmDisabled=\{!reasonOk\(reason\)\}/);
   });
 
   it("no vendor or infra names in the new copy", () => {
     const { hasVendorOrInfraName } = require("../dashboard/src/lib/adminErrors.ts");
     // Sentence-like literals only (start with a capital, contain a space, no JSX).
-    const strings = (panel.match(/"[A-Z][^"\n]{11,}"|`[^`\n]{12,}`/g) || []).filter((t) => / /.test(t) && !/[<=]/.test(t));
+    const strings = (shop.match(/"[A-Z][^"\n]{11,}"|`[^`\n]{12,}`/g) || []).filter((t) => / /.test(t) && !/[<=]/.test(t));
     // Interpolations are code (ARCHIVE_RESTORE_DAYS), not copy.
     for (const text of strings) assert.equal(hasVendorOrInfraName(text.replace(/\$\{[^}]*\}/g, "")), false, text);
     const closed = read(`${DASH}/components/WorkspaceClosed.tsx`);
@@ -273,7 +274,7 @@ describe("unarchive: explicit 'back on as before' choice", () => {
   });
 
   it("defaults off, sends the choice, and records it in the audit row", () => {
-    const panel = read(`${DASH}/components/AdminBusinessesPanel.tsx`);
+    const panel = read(`${DASH}/components/AdminShopPanel.tsx`);
     assert.match(panel, /setReason\(""\);\n\s+setResumeBilling\(false\);/);
     assert.match(panel, /lifecycle === "restore" \? \{ resume_billing: resumeBilling \} : \{\}/);
     assert.match(panel, /<Switch checked=\{checked\} onCheckedChange=\{onChange\} label=\{offer\.label\} \/>/);
