@@ -23,9 +23,13 @@ describe("usage cap copy", () => {
       "Included minutes used. During beta, calls keep working and nothing is charged."
     );
     assert.equal(usageCapNotice({ ...empty, isBeta: true, smsLeft: 0 }), null);
+    assert.equal(
+      usageCapNotice({ ...empty, onDemand: true, minutesLeft: 0 }),
+      "Included minutes used. Extra minutes are billed on your next invoice."
+    );
     assert.doesNotMatch(
       usageCapNotice({ ...empty, onDemand: true, minutesLeft: 0 }) || "",
-      /invoice/
+      /rates on Usage/
     );
     assert.equal(
       homeMinuteStatus({ isBeta: true, onDemand: false, minutesIncluded: 300, minutesLeft: 12 }),
@@ -33,7 +37,7 @@ describe("usage cap copy", () => {
     );
   });
 
-  it("says calls stop when the cap is hit, and extra usage is billed without an invoice", () => {
+  it("says calls stop when the cap is hit, and extra usage is billed on the next invoice", () => {
     assert.equal(
       usageCapNotice({ ...empty, minutesLeft: 0 }),
       "Included minutes used. Calls have stopped."
@@ -48,7 +52,7 @@ describe("usage cap copy", () => {
     );
     assert.equal(
       usageCapNotice({ ...empty, onDemand: true, minutesLeft: 0 }),
-      "Included minutes used. Extra minutes are billed at the rates on Usage."
+      "Included minutes used. Extra minutes are billed on your next invoice."
     );
     assert.equal(
       homeMinuteStatus({ isBeta: false, onDemand: false, minutesIncluded: 300, minutesLeft: 0 }),
