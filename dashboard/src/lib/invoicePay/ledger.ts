@@ -242,6 +242,63 @@ export function invoicePayLedger() {
       };
     },
 
+    async settleCheckoutReading(input: {
+      provider: string;
+      checkoutId: string;
+      totalKes: string;
+      tenantId: string;
+      invoiceId: string;
+      identity?: string | null;
+      eventAmountKes?: string | null;
+      raw: unknown;
+      settledAmountMinor: number | null;
+      settledCurrency: string | null;
+      feeMinor: number | null;
+    }) {
+      const { data, error } = await admin.rpc("settle_checkout_reading", {
+        p_provider: input.provider,
+        p_checkout_id: input.checkoutId,
+        p_total_kes: input.totalKes,
+        p_tenant_id: input.tenantId,
+        p_invoice_id: input.invoiceId,
+        p_identity: input.identity || null,
+        p_event_amount_kes: input.eventAmountKes || null,
+        p_raw: input.raw ?? {},
+        p_settled_amount_minor: input.settledAmountMinor,
+        p_settled_currency: input.settledCurrency,
+        p_fee_minor: input.feeMinor,
+      });
+      if (error) throw rpcError(error, "reconcile failed");
+      const row = asObject(data);
+      return {
+        noop: row?.noop === true,
+        review: row?.review === true,
+        reason: row?.reason ? text(row.reason) : "",
+        duplicate: row?.duplicate === true,
+        wait: row?.wait === true,
+        appliedKes: text(row?.applied_kes ?? "0"),
+        excessKes: text(row?.excess_kes ?? "0"),
+        amountKes: text(row?.amount_kes ?? input.totalKes),
+        partial: row?.partial === true,
+      };
+    },
+
+    async markPaymentEventRetry(input: { provider: string; eventKey: string }) {
+      const { error } = await admin.rpc("mark_payment_event_retry", {
+        p_provider: input.provider,
+        p_event_key: input.eventKey,
+      });
+      if (error) throw rpcError(error, "retry mark failed");
+    },
+
+    async resolveCheckoutReview(input: { provider: string; providerRef: string }) {
+      const { error } = await admin.rpc("resolve_checkout_total_review", {
+        p_provider: input.provider,
+        p_provider_ref: input.providerRef,
+      });
+      if (error) throw rpcError(error, "review resolve failed");
+    },
+
     async reconcileCollection(input: {
       provider: string;
       providerRef: string;

@@ -137,6 +137,120 @@ function createMemoryLedger(opts = {}) {
     };
   }
 
+  function reviewOpen(invoiceId) {
+    return payments.some(
+      (row) =>
+        row.invoiceId === invoiceId &&
+        row.matchStatus === "issue" &&
+        String(row.providerRef || "").startsWith("checkout-total-review:") &&
+        (!row.raw || row.raw.review_status !== "resolved")
+    );
+  }
+
+  function openReview(input, kind) {
+    const checkoutId = String(input.checkoutId || "");
+    const attempt = [...attempts].reverse().find(
+      (row) => row.checkoutSessionId === checkoutId && row.invoiceId === input.invoiceId
+    );
+    const seen = toCents(attempt && attempt.collectedTotalSeenKes) || 0n;
+    const next = toCents(input.totalKes) || 0n;
+    const identityKey = kind === "decrease" ? `lower:${seen.toString()}:${next.toString()}` : String(input.identity);
+    const providerRef = `checkout-total-review:${input.provider}:${checkoutId}:${identityKey}`;
+    const reason = kind === "decrease" ? "collected_total_decreased" : "collected_total_short";
+    const existing = payments.find((row) => row.provider === input.provider && row.providerRef === providerRef);
+    if (existing) {
+      return {
+        review: true,
+        duplicate: true,
+        reason,
+        noop: false,
+        appliedKes: "0",
+        excessKes: "0",
+        amountKes: existing.amountKes,
+        partial: false,
+      };
+    }
+    const eventCents = toCents(input.eventAmountKes);
+    const drop = seen > next ? seen - next : 0n;
+    const amountKes = kind === "decrease"
+      ? fromCents(drop)
+      : eventCents != null && eventCents > 0n
+        ? String(input.eventAmountKes)
+        : fromCents(seen > 0n ? seen : next || 1n);
+    payments.push({
+      id: id(),
+      provider: input.provider,
+      providerRef,
+      billRef: providerRef,
+      invoiceId: input.invoiceId,
+      tenantId: input.tenantId,
+      amountKes,
+      matchStatus: "issue",
+      raw: {
+        review_status: "open",
+        review_kind: kind,
+        get_kes: String(input.totalKes),
+        seen_kes: fromCents(seen),
+        event_amount_kes: input.eventAmountKes == null ? null : String(input.eventAmountKes),
+        identity: input.identity || null,
+        event: input.raw || {},
+      },
+    });
+    alerts.push({
+      action: "checkout_total_review",
+      providerRef,
+      getKes: String(input.totalKes),
+      seenKes: fromCents(seen),
+      kind,
+    });
+    return {
+      review: true,
+      duplicate: false,
+      reason,
+      noop: false,
+      appliedKes: "0",
+      excessKes: "0",
+      amountKes,
+      partial: false,
+    };
+  }
+
+  function guardedSettle(input) {
+    const checkoutId = String(input.checkoutId || "");
+    const attempt = [...attempts].reverse().find(
+      (row) => row.checkoutSessionId === checkoutId && row.invoiceId === input.invoiceId
+    );
+    const seen = toCents(attempt && attempt.collectedTotalSeenKes) || 0n;
+    const next = toCents(input.totalKes);
+    if (next == null || next < 0n) throw new Error("collected total must be zero or positive");
+    let identity = input.identity ? String(input.identity).trim() : "";
+    if (!identity || identity === `ch_${checkoutId}`) identity = "";
+    const known = Boolean(identity) && !(attempt && (attempt.collectionIds || []).includes(identity));
+    const eventCents = toCents(input.eventAmountKes);
+    if (next < seen) return openReview(input, "decrease");
+    if (known && eventCents != null && eventCents > 0n && next - seen < eventCents) return openReview(input, "short_rise");
+    if (known && (eventCents == null || eventCents <= 0n) && next === seen && seen > 0n) {
+      return openReview(input, "short_rise");
+    }
+    if (next === 0n || next <= seen) {
+      return {
+        noop: true,
+        review: false,
+        wait: next === 0n,
+        appliedKes: "0",
+        excessKes: "0",
+        amountKes: fromCents(seen),
+        partial: false,
+      };
+    }
+    const settled = applyCheckoutTotal(input);
+    if (attempt && identity) {
+      const ids = attempt.collectionIds || [];
+      if (!ids.includes(identity)) attempt.collectionIds = [...ids, identity];
+    }
+    return { ...settled, review: false, duplicate: false };
+  }
+
   function lookupToken(token) {
     const row = tokens.find((t) => t.tokenHash === hashToken(token));
     if (!row) return { found: false };
@@ -248,6 +362,7 @@ function createMemoryLedger(opts = {}) {
           !a.closedAt
       );
       if (held) return attemptResult(held, { held: true });
+      if (reviewOpen(lookup.invoiceId)) throw new Error("checkout total needs review");
       const row = {
         id: id(),
         invoiceId: lookup.invoiceId,
@@ -348,8 +463,26 @@ function createMemoryLedger(opts = {}) {
         existing.attempts += 1;
         return { attempts: existing.attempts };
       }
-      events.set(key, { attempts: 1, payload: input.payload });
+      events.set(key, {
+        attempts: 1,
+        payload: input.payload,
+        needsRetry: false,
+        provider: input.provider,
+        eventKey: input.eventKey,
+      });
       return { attempts: 1 };
+    },
+    async markPaymentEventRetry(input) {
+      const key = `${input.provider}:${input.eventKey}`;
+      const existing = events.get(key);
+      if (existing) existing.needsRetry = true;
+    },
+    async resolveCheckoutReview(input) {
+      const row = payments.find(
+        (payment) => payment.provider === input.provider && payment.providerRef === input.providerRef
+      );
+      if (!row || row.matchStatus !== "issue") throw new Error("checkout review not found");
+      row.raw = { ...(row.raw || {}), review_status: "resolved" };
     },
     async findPaymentByRef(provider, providerRef) {
       const row = payments.find(
@@ -430,6 +563,14 @@ function createMemoryLedger(opts = {}) {
     },
     async reconcileCheckoutTotal(input) {
       const run = settleChain.then(() => applyCheckoutTotal(input));
+      settleChain = run.then(
+        () => undefined,
+        () => undefined
+      );
+      return run;
+    },
+    async settleCheckoutReading(input) {
+      const run = settleChain.then(() => guardedSettle(input));
       settleChain = run.then(
         () => undefined,
         () => undefined

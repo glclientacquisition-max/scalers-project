@@ -305,7 +305,7 @@ describe("a collected shilling must reduce the invoice", () => {
       provider,
     });
     provider.totals.set(checkout.checkoutId, "1000.00");
-    ledger.reconcileCheckoutTotal = async () => {
+    ledger.settleCheckoutReading = async () => {
       throw new Error("invoice cannot be paid");
     };
     const result = await handlePayWebhook({

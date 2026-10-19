@@ -1,19 +1,23 @@
 #!/usr/bin/env node
 /**
  * Report payments stuck pending and invoices whose status disagrees.
- * Prints JSON. Does not call Bachs unless BACHS_MODE=sandbox.
- * In sandbox, a readable getCheckout settles that checkout from
- * charge.amount_paid via reconcile_checkout_total. It does not read
- * event amounts. An unreadable read changes nothing.
+ * Prints JSON. Does not print secrets.
  *
- * Refuses the production project and live mode. Does not print secrets.
+ * Sandbox, and only sandbox, also settles pending, pending-unattached,
+ * and succeeded attempts from getCheckout charge.amount_paid. That sweep
+ * does not run in live mode and does not run against production.
+ *
+ * Live mode, including the production project, retries only payment_events
+ * with needs_retry. The Bachs gate and the tenant allowlist both apply.
+ * A stored event is settled once. An unreadable read stays stored.
  */
 "use strict";
 
 const path = require("node:path");
 const { assertNotProductionUrl, reconciliationReport } = require("../dashboard/src/lib/invoicePay/reconcile");
 const { collectedFromCheckout } = require("../dashboard/src/lib/invoicePay/webhook");
-const { bachsMode, payProviderFromEnv } = require("../dashboard/src/lib/invoicePay/provider");
+const { assertBachsAllowed, bachsMode, payProviderFromEnv } = require("../dashboard/src/lib/invoicePay/provider");
+const { retryStoredReads } = require("../dashboard/src/lib/invoicePay/retryReads");
 
 function loadSupabase() {
   try {
@@ -25,13 +29,19 @@ function loadSupabase() {
   }
 }
 
+function productionUrl(url) {
+  return String(url || "").includes("fjxcdccgyhnvnnlnovcl");
+}
+
 async function main() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  assertNotProductionUrl(url);
-  const mode = process.env.BACHS_MODE;
-  const apiKey = process.env.BACHS_API_KEY;
-  if (bachsMode({ BACHS_MODE: mode, BACHS_API_KEY: apiKey }) === "live") {
-    throw new Error("BACHS_MODE=live is refused");
+  const live = bachsMode(process.env) === "live";
+  if (live) {
+    assertBachsAllowed(process.env);
+  } else if (productionUrl(url)) {
+    assertNotProductionUrl(url);
+  } else {
+    assertNotProductionUrl(url);
   }
   if (!url || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.log(JSON.stringify({ ok: false, error: "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required" }));
@@ -58,7 +68,7 @@ async function main() {
     detail: row.detail,
   }));
 
-  if (bachsMode() === "sandbox") {
+  if (!live && bachsMode() === "sandbox") {
     const provider = payProviderFromEnv();
     const pending = rows.filter((row) => row.kind === "pending_timeout" && row.attemptId);
     const attempts = [];
@@ -126,7 +136,63 @@ async function main() {
     }
   }
 
-  console.log(JSON.stringify({ ok: true, changed: rows.some((row) => row.kind === "checkout_total_settled"), rows }, null, 2));
+  if (live || bachsMode() === "sandbox") {
+    const provider = payProviderFromEnv(process.env);
+    const retry = await retryStoredReads({
+      env: process.env,
+      async listEvents() {
+        const { data, error: listError } = await admin
+          .from("payment_events")
+          .select("event_key, payload")
+          .eq("provider", "bachs")
+          .eq("needs_retry", true);
+        if (listError) throw listError;
+        return (data || []).map((row) => ({ eventKey: String(row.event_key), payload: row.payload || {} }));
+      },
+      async clearRetry(eventKey) {
+        const { error: clearError } = await admin.rpc("clear_payment_event_retry", {
+          p_provider: "bachs",
+          p_event_key: eventKey,
+        });
+        if (clearError) throw clearError;
+      },
+      async findAttempt(checkoutId) {
+        const { data: attempt, error: attemptError } = await admin.rpc("invoice_pay_attempt_by_checkout", {
+          p_checkout_id: checkoutId,
+        });
+        if (attemptError || !attempt) return null;
+        return { tenantId: attempt.tenant_id, invoiceId: attempt.invoice_id };
+      },
+      getCheckout(checkoutId) {
+        return provider.getCheckout(checkoutId);
+      },
+      async settle(input) {
+        const { data: settled, error: settleError } = await admin.rpc("settle_checkout_reading", {
+          p_provider: input.provider,
+          p_checkout_id: input.checkoutId,
+          p_total_kes: input.totalKes,
+          p_tenant_id: input.tenantId,
+          p_invoice_id: input.invoiceId,
+          p_identity: input.identity,
+          p_event_amount_kes: input.eventAmountKes,
+          p_raw: input.raw || {},
+          p_settled_amount_minor: input.settledAmountMinor,
+          p_settled_currency: input.settledCurrency,
+          p_fee_minor: input.feeMinor,
+        });
+        if (settleError) throw settleError;
+        return { review: settled && settled.review === true, noop: settled && settled.noop === true };
+      },
+    });
+    rows.push(...retry.rows);
+  }
+
+  console.log(JSON.stringify({
+    ok: true,
+    mode: live ? "live-retry" : "sandbox",
+    changed: rows.some((row) => row.kind === "checkout_total_settled" || row.kind === "retry_settled" || row.kind === "retry_review"),
+    rows,
+  }, null, 2));
 }
 
 main().catch((err) => {

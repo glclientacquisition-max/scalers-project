@@ -100,7 +100,8 @@ function checkoutFailure(err) {
   if (code === "bachs_live_refused" || code === "prod_refused" || code === "bachs_mode") {
     return { status: 503, error: "payments_unavailable" };
   }
-  if (code === "previous_processing") {
+  const message = err instanceof Error ? err.message : String(err || "");
+  if (code === "previous_processing" || code === "checkout_review" || message.includes("checkout total needs review")) {
     return { status: 409, error: "Previous payment still processing." };
   }
   return { status: 400, error: "Could not start payment." };

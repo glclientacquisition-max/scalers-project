@@ -165,6 +165,35 @@ function chargeIdOf(data) {
  * @param {Record<string, unknown>} data
  * @param {string | null} checkoutId
  */
+/**
+ * A receipt, or a real charge id, is a collection identity.
+ * `ch_<checkout id>` is the placeholder both events share when Bachs sends
+ * no id of its own. That placeholder is not a new collection.
+ * @param {Record<string, unknown>} data
+ * @param {string | null} checkoutId
+ * @returns {string | null}
+ */
+function collectionIdentity(data, checkoutId) {
+  const receipt = receiptOf(data);
+  if (receipt) return receipt;
+  const chargeId = chargeIdOf(data);
+  if (!chargeId) return null;
+  if (checkoutId && chargeId === `ch_${checkoutId}`) return null;
+  return chargeId;
+}
+
+/**
+ * The collection's own KES amount. `amount_paid` is the running GET total
+ * and is not this amount.
+ * @param {Record<string, unknown>} data
+ * @returns {string | null}
+ */
+function eventAmountKes(data) {
+  const charge = extractCharge(data || {});
+  if (!charge.kes || charge.kes.amount == null || String(charge.kes.amount).trim() === "") return null;
+  return String(charge.kes.amount);
+}
+
 function collectionReport(data, checkoutId) {
   const source = data || {};
   const receipt = receiptOf(source);
@@ -291,6 +320,9 @@ async function handlePayWebhook(input) {
   const checkoutRef = String(checkoutId);
   const collected = await readCollected(input, checkoutRef);
   if (collected.unreadable) {
+    if (typeof input.ledger.markPaymentEventRetry === "function") {
+      await input.ledger.markPaymentEventRetry({ provider: "bachs", eventKey: String(eventId) });
+    }
     return { status: 200, body: { ok: true, pending: true, action: "retry", duplicate: duplicateEvent } };
   }
 
@@ -332,7 +364,29 @@ async function handlePayWebhook(input) {
 
   const totalKes = collected.totalKes || "0";
   const totalCents = collected.cents || 0n;
+
   if (totalCents === 0n) {
+    const settle = input.ledger.settleCheckoutReading;
+    if (typeof settle === "function") {
+      const settled = await settle.call(input.ledger, {
+        ...common,
+        checkoutId: checkoutRef,
+        totalKes,
+        identity: collectionIdentity(data, checkoutRef),
+        eventAmountKes: eventAmountKes(data),
+      });
+      if (settled && settled.review) {
+        return {
+          status: 200,
+          body: {
+            ok: true,
+            action: "issue",
+            reason: settled.reason || "collected_total_decreased",
+            duplicate: settled.duplicate === true,
+          },
+        };
+      }
+    }
     if (type === "checkout.expired" && attempt.status === "pending") {
       await input.ledger.markAttempt(attempt.id, { status: "cancelled", raw: payload });
     } else if (type === "collection.failed" && attempt.status === "pending") {
@@ -357,11 +411,25 @@ async function handlePayWebhook(input) {
   }
 
   try {
-    const settled = await input.ledger.reconcileCheckoutTotal({
+    const settle = input.ledger.settleCheckoutReading || input.ledger.reconcileCheckoutTotal;
+    const settled = await settle.call(input.ledger, {
       ...common,
       checkoutId: checkoutRef,
       totalKes,
+      identity: collectionIdentity(data, checkoutRef),
+      eventAmountKes: eventAmountKes(data),
     });
+    if (settled && settled.review) {
+      return {
+        status: 200,
+        body: {
+          ok: true,
+          action: "issue",
+          reason: settled.reason || "collected_total_short",
+          duplicate: settled.duplicate === true,
+        },
+      };
+    }
     if (settled && settled.noop) {
       return { status: 200, body: { ok: true, duplicate: true, action: "apply" } };
     }
@@ -406,6 +474,8 @@ async function handlePayWebhook(input) {
 
 module.exports = {
   extractCharge,
+  collectionIdentity,
+  eventAmountKes,
   collectionReport,
   collectedFromCheckout,
   decidePayment,

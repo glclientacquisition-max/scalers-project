@@ -44,6 +44,8 @@ describe("invoice pay SQL", () => {
     await db.exec(read("docs/supabase/invoice_pay_collections.sql"));
     await db.exec(read("docs/supabase/invoice_pay_checkout_total.sql"));
     await db.exec(read("docs/supabase/invoice_pay_checkout_total.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_checkout_review.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_checkout_review.sql"));
   });
 
   it("refuses a draft number or status write unless billing_write is set", async () => {
@@ -751,5 +753,163 @@ describe("invoice pay SQL", () => {
       attemptId,
     ]);
     assert.equal(closed.rows[0].closed, true);
+  });
+
+  it("reviews a short new collection and a lower total without moving the books", async () => {
+    const tenant = "cececece-cece-4ece-8ece-cececececece";
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Review Shop', 'pending:review', 'soft')`,
+      [tenant]
+    );
+    async function issued(total, checkoutId, attemptAmount) {
+      const draft = await q(
+        `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, $2, $2) returning id`,
+        [tenant, total]
+      );
+      const invoice = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+      await q(
+        `insert into public.payment_attempts (
+           tenant_id, invoice_id, provider, status, amount_kes, part_index, part_count, checkout_session_id
+         ) values ($1, $2, 'bachs', 'pending', $3, 1, 1, $4)`,
+        [tenant, invoice.rows[0].id, attemptAmount, checkoutId]
+      );
+      return invoice.rows[0].id;
+    }
+
+    const shortId = await issued(20, "chk_short", 20);
+    const first = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_short', 10, $1, $2, 'ch_a', 10, '{}'::jsonb) as row",
+      [tenant, shortId]
+    );
+    assert.equal(first.rows[0].row.review, false);
+    assert.equal(Number(first.rows[0].row.applied_kes), 10);
+    const second = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_short', 10, $1, $2, 'ch_b', 10, '{\"id\":\"evt_b\"}'::jsonb) as row",
+      [tenant, shortId]
+    );
+    assert.equal(second.rows[0].row.review, true);
+    assert.equal(second.rows[0].row.reason, "collected_total_short");
+    const replay = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_short', 10, $1, $2, 'ch_b', 10, '{}'::jsonb) as row",
+      [tenant, shortId]
+    );
+    assert.equal(replay.rows[0].row.duplicate, true);
+    const shortPaid = await q("select amount_paid_kes from public.invoices where id = $1", [shortId]);
+    assert.equal(Number(shortPaid.rows[0].amount_paid_kes), 10);
+    const shortIssues = await q(
+      "select count(*)::int as n from public.payments where invoice_id = $1 and match_status = 'issue'",
+      [shortId]
+    );
+    assert.equal(shortIssues.rows[0].n, 1);
+    const shortSeen = await q(
+      "select collected_total_seen_kes, collection_ids from public.payment_attempts where checkout_session_id = 'chk_short'",
+      []
+    );
+    assert.equal(Number(shortSeen.rows[0].collected_total_seen_kes), 10);
+    assert.deepEqual(shortSeen.rows[0].collection_ids, ["ch_a"]);
+    const checkoutPay = await q(
+      "select amount_kes from public.payments where provider_ref = 'chk_short'"
+    );
+    assert.equal(Number(checkoutPay.rows[0].amount_kes), 10);
+
+    await q(
+      "update public.payment_attempts set status = 'succeeded', checkout_closed_at = now() where checkout_session_id = 'chk_short'"
+    );
+    const minted = await q("select token from public.mint_invoice_pay_token($1, false)", [shortId]);
+    await assert.rejects(
+      q("select public.create_invoice_pay_attempt($1, 10)", [minted.rows[0].token]),
+      /checkout total needs review/
+    );
+    const reviewRef = await q(
+      "select provider_ref from public.payments where invoice_id = $1 and match_status = 'issue'",
+      [shortId]
+    );
+    await q("select public.resolve_checkout_total_review('bachs', $1)", [reviewRef.rows[0].provider_ref]);
+    const opened = await q("select public.create_invoice_pay_attempt($1, 10) as row", [minted.rows[0].token]);
+    assert.equal(opened.rows[0].row.held, false);
+    assert.notEqual(opened.rows[0].row.id, undefined);
+
+    const dropId = await issued(10, "chk_drop", 10);
+    await q(
+      "select public.settle_checkout_reading('bachs', 'chk_drop', 30, $1, $2, 'ch_high', 30, '{}'::jsonb)",
+      [tenant, dropId]
+    );
+    const before = await q(
+      `select i.amount_paid_kes,
+              (select coalesce(sum(amount_kes), 0) from public.tenant_credits c where c.payment_id = p.id) as credit,
+              p.amount_kes as payment
+       from public.invoices i
+       join public.payments p on p.invoice_id = i.id and p.provider_ref = 'chk_drop'
+       where i.id = $1`,
+      [dropId]
+    );
+    const dropped = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_drop', 10, $1, $2, 'ch_high', 10, '{\"id\":\"evt_low\"}'::jsonb) as row",
+      [tenant, dropId]
+    );
+    assert.equal(dropped.rows[0].row.reason, "collected_total_decreased");
+    const again = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_drop', 10, $1, $2, 'ch_high', 10, '{}'::jsonb) as row",
+      [tenant, dropId]
+    );
+    assert.equal(again.rows[0].row.duplicate, true);
+    const after = await q(
+      `select i.amount_paid_kes,
+              (select coalesce(sum(amount_kes), 0) from public.tenant_credits c where c.payment_id = p.id) as credit,
+              p.amount_kes as payment
+       from public.invoices i
+       join public.payments p on p.invoice_id = i.id and p.provider_ref = 'chk_drop'
+       where i.id = $1`,
+      [dropId]
+    );
+    assert.equal(Number(after.rows[0].amount_paid_kes), Number(before.rows[0].amount_paid_kes));
+    assert.equal(Number(after.rows[0].credit), Number(before.rows[0].credit));
+    assert.equal(Number(after.rows[0].payment), Number(before.rows[0].payment));
+    assert.equal(Number(after.rows[0].amount_paid_kes), 10);
+    assert.equal(Number(after.rows[0].credit), 20);
+    assert.equal(Number(after.rows[0].payment), 30);
+    const dropIssues = await q(
+      "select raw->>'get_kes' as get_kes, raw->>'seen_kes' as seen_kes from public.payments where invoice_id = $1 and match_status = 'issue'",
+      [dropId]
+    );
+    assert.equal(dropIssues.rows.length, 1);
+    assert.equal(Number(dropIssues.rows[0].get_kes), 10);
+    assert.equal(Number(dropIssues.rows[0].seen_kes), 30);
+
+    const riseId = await issued(30, "chk_rise", 30);
+    await q(
+      "select public.settle_checkout_reading('bachs', 'chk_rise', 10, $1, $2, 'ch_1', 10, '{}'::jsonb)",
+      [tenant, riseId]
+    );
+    const rose = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_rise', 20, $1, $2, 'ch_2', 10, '{}'::jsonb) as row",
+      [tenant, riseId]
+    );
+    assert.equal(rose.rows[0].row.review, false);
+    assert.equal(Number(rose.rows[0].row.applied_kes), 10);
+    const riseIssues = await q(
+      "select count(*)::int as n from public.payments where invoice_id = $1 and match_status = 'issue'",
+      [riseId]
+    );
+    assert.equal(riseIssues.rows[0].n, 0);
+
+    await q("select public.record_payment_event('bachs', 'evt_retry', '{\"data\":{\"checkout_id\":\"chk_rise\"}}'::jsonb)");
+    await q("select public.mark_payment_event_retry('bachs', 'evt_retry')");
+    const marked = await q(
+      "select needs_retry from public.payment_events where event_key = 'evt_retry'"
+    );
+    assert.equal(marked.rows[0].needs_retry, true);
+    await q("select public.clear_payment_event_retry('bachs', 'evt_retry')");
+    const cleared = await q(
+      "select needs_retry from public.payment_events where event_key = 'evt_retry'"
+    );
+    assert.equal(cleared.rows[0].needs_retry, false);
+
+    await q("set role anon");
+    await assert.rejects(
+      q("select public.settle_checkout_reading('bachs', 'chk_rise', 20, $1, $2, 'ch_2', 10)", [tenant, riseId])
+    );
+    await q("reset role");
   });
 });
