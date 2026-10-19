@@ -1,15 +1,24 @@
 import { AssistantSayFallbackEditor } from "@/components/assistantSay/AssistantSayFallbackEditor";
-import { voiceFallbackByKind } from "@/lib/deskFeatureFlags";
+import { AssistantSayLookupPreview } from "@/components/assistantSay/AssistantSayLookupPreview";
+import { deskLookupPreview, voiceFallbackByKind } from "@/lib/deskFeatureFlags";
 import { parseUnknownAnswerByKind } from "@/lib/unknownAnswerByKindConstants";
 import type { TenantRow } from "@/lib/supabase";
 
 export function assistantSayBelowList(tenant: TenantRow) {
-  if (!voiceFallbackByKind()) return null;
-  const initial = parseUnknownAnswerByKind(tenant.unknown_answer_by_kind);
+  const fallback = voiceFallbackByKind()
+    ? (
+      <AssistantSayFallbackEditor
+        initial={parseUnknownAnswerByKind(tenant.unknown_answer_by_kind)}
+        legacyGeneral={tenant.unknown_answer_fallback}
+      />
+    )
+    : null;
+  const preview = deskLookupPreview() ? <AssistantSayLookupPreview /> : null;
+  if (!fallback && !preview) return null;
   return (
-    <AssistantSayFallbackEditor
-      initial={initial}
-      legacyGeneral={tenant.unknown_answer_fallback}
-    />
+    <div className="space-y-6">
+      {fallback}
+      {preview}
+    </div>
   );
 }

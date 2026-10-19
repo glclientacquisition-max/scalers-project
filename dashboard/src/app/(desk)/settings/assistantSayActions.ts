@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { memberCan } from "@/lib/requireMember";
+import { voiceProfileForAssistantSay } from "@/lib/assistantSayVoice.server";
+import { requireVoice } from "@/lib/voiceRequire.server";
+import { deskLookupPreview } from "@/lib/deskFeatureFlags";
+import { devChapterOneTenant } from "@/lib/devChapterOneTenant";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import type { TenantRow } from "@/lib/supabase";
 import { updateWithColumnPeel } from "@/lib/peelMissingColumns";
 import {
   DEFAULT_BY_KIND,
@@ -56,4 +61,71 @@ export async function saveUnknownAnswerByKindAction(formData: FormData) {
   revalidatePath("/settings");
   revalidatePath("/home");
   return { ok: true as const, byKind: parseUnknownAnswerByKind(payload) };
+}
+
+async function voiceProfileForPreview(tenant: TenantRow) {
+  if (process.env.DASHBOARD_OPEN === "true") {
+    const { tenantProfileFromRow } = requireVoice("./src/tenantProfile.js") as {
+      tenantProfileFromRow: (row: unknown, extras: unknown) => unknown;
+    };
+    return tenantProfileFromRow(tenant, {});
+  }
+  return voiceProfileForAssistantSay(tenant);
+}
+
+async function tenantForPreview(): Promise<TenantRow | null> {
+  if (process.env.DASHBOARD_OPEN === "true") {
+    return devChapterOneTenant;
+  }
+  return getCurrentTenant();
+}
+
+export type DeskLookupPreviewResult = {
+  status: string;
+  reason: string;
+  speechEn: string;
+  speechSw: string;
+  willSay: boolean;
+};
+
+export async function previewDeskLookupAction(
+  kind: string,
+  query: string
+): Promise<{ ok: true; result: DeskLookupPreviewResult } | { ok: false; error: string }> {
+  if (!deskLookupPreview()) {
+    return { ok: false, error: "Preview is not enabled." };
+  }
+  if (!(await memberCan("settings.view"))) {
+    return { ok: false, error: "No permission." };
+  }
+  const tenant = await tenantForPreview();
+  if (!tenant) return { ok: false, error: "No workspace." };
+
+  const profile = await voiceProfileForPreview(tenant);
+  const { lookup, speechOf } = requireVoice("./src/knowledge/lookup.js") as {
+    lookup: (
+      kind: string,
+      query: string,
+      ctx: object
+    ) => { status: string; reason?: string; speech?: { en?: string; sw?: string } };
+    speechOf: (result: { speech?: { en?: string; sw?: string } }, language: string) => string;
+  };
+  const trimmedQuery = String(query || "").trim() || "sample question";
+  const lookupKind = kind === "delivery" ? "fee" : kind;
+  const result = lookup(lookupKind, trimmedQuery, {
+    profile,
+    language: "en",
+    now: new Date(),
+    seed: 0,
+  });
+  return {
+    ok: true,
+    result: {
+      status: result.status,
+      reason: String(result.reason || ""),
+      speechEn: speechOf(result, "en"),
+      speechSw: speechOf(result, "sw"),
+      willSay: result.status === "found",
+    },
+  };
 }
