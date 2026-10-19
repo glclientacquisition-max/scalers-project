@@ -60,6 +60,8 @@ Do not set `BACHS_MODE=live` or `BACHS_LIVE_ALLOWED` on `scalers-project` until 
 
 A person runs this. Do not script a charge from CI or from an agent.
 
+The owner-approved production run, on the one business named Jirani, is [`ksh10-live-test-jirani.sql`](ksh10-live-test-jirani.sql). Run ENABLE, then ISSUE, then open the pay URL the ISSUE notice prints. RESTORE puts that business back on beta with enforcement off and live payments off. It does not delete the invoice or a booked payment. This pull request does not run that file and does not apply it. P19 stays unapplied. One collection of KSh 10 does not need P19.
+
 1. Allowlist the one test business from the step above. Leave every other business off.
 2. Issue one open invoice for KSh 10 on that business. Mint the pay link once. The raw token is shown once.
 3. Open `/pay/<token>`. Pay KSh 10 with M-Pesa (`MOMO_KES` hosted checkout). One collection.

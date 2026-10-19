@@ -22,3 +22,5 @@ One runbook per ops alert kind. Sources: Voice `src/notifications/platformOpsAle
 Adding an alert kind? Add its runbook in the same PR.
 
 Payments go-live (not an alert kind): [`payments-go-live.md`](payments-go-live.md). Staging first. Production stays off.
+
+The owner-approved KSh 10 production test for Jirani is [`ksh10-live-test-jirani.sql`](ksh10-live-test-jirani.sql). A person runs it. This repo does not.
