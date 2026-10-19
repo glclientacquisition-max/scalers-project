@@ -5,7 +5,86 @@ last_reviewed: 2026-10-19
 
 # Billing stack review, 18 Oct 2026
 
-Round 9 is the current verdict. Round 8, Round 7, Round 6, Round 5, Round 4, Round 3, Round 2, and Round 1 are kept below it.
+Round 10 is the current verdict. Round 9, Round 8, Round 7, Round 6, Round 5, Round 4, Round 3, Round 2, and Round 1 are kept below it.
+
+## Round 10
+
+Review of draft #808 at `4dab5ffc` on `cursor/invoice-pay-review-round9-0c16`. That pull request sits on #806 at `a766763b`. The two commits are `5bd233de` (book a placeholder collection before a new checkout can open) and `4dab5ffc` (note draft #808 and keep the book decision typed). The new file is P16 `docs/supabase/invoice_pay_checkout_review_round9.sql`. The only edit to the P15 file is the do-not-rerun comment. This review did not call Bachs, did not write to staging or production, and did not merge anything. Local Postgres 16 ran the P1 to P16 harness, a second apply of P16, the follow-up below, and a rolled-back re-apply of P15, P14, P12, P11, P9, and P13. The branch `cursor/billing-review-round10-7822` holds this document only. Do not merge it. Do not merge #808 from this review.
+
+P9 `invoice_pay_session.sql` and P10 `billing_mode_legal_pairs.sql` are already on production. That is the owner's fact. This review did not query production. The remaining production apply, if the stack is accepted, is P11 then P12 then P13 then P14 then P15 then P16.
+
+### Verdict
+
+| Question | Verdict |
+| --- | --- |
+| Stack #798 at `3e569e3a`, #806 at `a766763b`, and #808 at `4dab5ffc` for merge onto current main, and apply P11 then P12 then P13 then P14 then P15 then P16, with payments off | **Yes**, with the apply conditions below. `git merge-tree --write-tree` against `origin/main` `b3ce4ce0` exits 0 and writes tree `c4986b34023bb7ac3946060fefbd2b74ebb2bd06`. Main is a parent of `4dab5ffc`. #806 at `a766763b` is a parent of `4dab5ffc`. |
+| A single KSh 10 live test with a real charge id | **The Bachs cumulative answer is the only code blocker left.** Charge id `ch_real`, event amount 10, GET 10 applies: paid 10, no issue. A second collection on that checkout is still unsafe until Bachs says `charge.amount_paid` is the checkout-wide total. The Round 9 placeholder block does not apply to this payload. |
+
+Payments stay off. `BACHS_LIVE_ALLOWED` stays unset. The webhook still returns 403 and checkout still returns 503 while the gate refuses. Book, when the gate is closed, uses the stored reading and does not call Bachs.
+
+### Double debit
+
+The old Resolve cleared the hold and did not post the reading, so the next checkout could be the full unpaid amount after the customer had already paid. That path is gone. P16 drops `resolve_checkout_total_review(text, text)` and `resolve_checkout_total_review(text, text, text, text)`. The only function left is the 6-argument one. A call with no choice raises `resolve choice is required` and leaves the review open.
+
+`book` reads `raw.checkout_id` and `raw.get_kes`, which P16's `open_checkout_total_review` now stores on the payment. It calls `reconcile_checkout_total` with the stored GET, or with `p_total_kes` when that value is present and not lower. The delta over `collected_total_seen_kes` is applied up to the amount due. The excess is one `checkout_total` credit keyed by provider, checkout, and cumulative cents. Then the review is marked resolved with `resolve_choice = book`. A lower total raises `collected total fell` before that update.
+
+`nothing` does not call reconcile. It marks `resolve_choice = nothing` and leaves the invoice, the seen total, and any credit as they are. After the attempt is closed, `create_invoice_pay_attempt` can insert the full unpaid amount. That is the only full-amount reopen.
+
+Proved on the fake ledger at `4dab5ffc`, then in SQL on `billing_apply_order_proof`.
+
+| Shape | Result |
+| --- | --- |
+| Placeholder GET 10 on invoice 20, then Book | Paid becomes 10. Seen becomes 10. A second Book, even with total 15, applies 0. The next checkout amount is 10, not 20. While the review was open, a create for 20 raised `checkout total needs review`. |
+| Blank identity, GET 20, invoice 10, then Book, then Book again with 40 | Paid 10, status `paid`, one credit of 10. The second call does not add a credit. A paid invoice cannot mint another pay link (`only an open invoice can have a pay link`). |
+| Same placeholder shape, choice `nothing`, then a later Book | Paid stays 0. First audit is actor `Ada`, choice `nothing`, applied 0, get 10. `resolve_choice` stays `nothing`. The next checkout amount is 20. |
+| Real id `ch_real`, GET 10, invoice 10 | Applies. Paid 10. Issues 0. A later placeholder at the same GET is a review. Book of that review leaves paid 10 and seen 10. |
+| GET then falls from 10 to 4 on that real checkout, then Book of the lower reading | Paid stays 10. Seen stays 10. Nothing is reversed. |
+| Open review whose stored GET is 10, first Book passes 15, invoice 20 | Paid 15. Seen 15. Applied 15. A second Book passing 18 stays at 15. |
+
+A replay writes a second `_billing_audit` row with `applied_kes` 0. It does not move money. A Book that runs after `nothing` is the same: the review is already resolved, so reconcile is skipped.
+
+`nothing` is still a staff choice that can leave a real collection off the books. The row on the page shows the reading. The audit stores the actor, the reason, the choice, the applied amount, and the stored GET. It is not a silent clear. A Super Admin who confirms nothing collected, then sends the customer to pay again, can still take a second M-Pesa debit. That is the explicit escape hatch. The one-click Resolve that did this by default is gone.
+
+A review opened by the P15 function has no `checkout_id` on the payment raw. P16 Book raises `pay attempt not found` before it marks the review resolved. Do not take a live collection between P15 and P16. This review read those two function bodies. The money rows above were opened by the P16 function, which does store the id.
+
+### Book does not take a typed total
+
+The admin route computes the total. It does not read an amount from the request body. When `bachsMode()` is not `live`, or `paymentsClosed()` is set, or the tenant allowlist refuses, Book sends the stored GET and does not call Bachs. When live is open for that tenant, it reads `getCheckout`. An unreadable fresh read, or a fresh total below the stored reading, returns 400 and does not resolve. A higher fresh total is the number passed to the RPC. A direct `service_role` call can still pass any total at or above the stored GET. The screen cannot.
+
+The same `isLegacyAuthenticated` gate as grant minutes wraps the route. The page and the admin layout still call `requireSuperAdmin()`. The actor is `adminActorName()` from the session. The route does not read `body.actor`. The payment must belong to that business and have `match_status` `issue`. Anon, authenticated, and public have no execute on the 6-argument function. `set role anon` raises `permission denied for function resolve_checkout_total_review`. No owner route renders the sheet.
+
+### Copy
+
+The old line "This does not move money" is gone. The sheet says a new checkout stays closed until you book the reading or confirm nothing was collected. Book says it books the reading up to what is still due, and anything over that is a credit. Nothing collected says it leaves the books as they are and a new checkout can start for what is still due. Those three sentences match the SQL. Confirm stays disabled until a choice is selected and the reason has 3 characters. The confirm label is "Book collected amount" or "Confirm nothing collected". The list row still shows "Reading KSh {get}. Books show KSh {seen}." The sheet does not repeat that amount. In live mode the booked total can be a fresher GET that is higher than the row. The sheet does not say that it re-reads. With payments off, Book uses the stored reading, which is the number on the row.
+
+### P16 after P15
+
+`tests/sql/billing_apply_order/run.sh` from `4dab5ffc` applies P1 through P16, and applies P9 through P16 a second time. Exit 0. The second P16 apply skips the missing 2-argument and 4-argument resolves. The harness raises unless only the 6-argument resolve exists, `open_checkout_total_review` stores `checkout_id`, and that resolve calls `reconcile_checkout_total` and `_billing_audit`. `settle_checkout_reading` is still the P15 body (`missing_identity` and `v_amount_is_price`). `create_invoice_pay_attempt` still has the review hold.
+
+Only the 6-argument resolve exists after the harness. It is `security definer`, `search_path = public`, execute granted to `service_role` and revoked from `public`, `anon`, and `authenticated`. The same grant shape holds for `open_checkout_total_review` and `settle_checkout_reading`.
+
+Proof invoices after the follow-up, unchanged: `SCL-2026-000001` paid 3667. `SCL-2026-000002` paid 0. `SCL-2026-000003` open, amount paid 2000 of 2320. The follow-up added later `SCL-2026-` numbers on this throwaway database only.
+
+Rolled back, so the database was left on P16:
+
+| Re-apply, then rollback | While the transaction was open | After rollback |
+| --- | --- | --- |
+| P15 `invoice_pay_checkout_review_round8.sql` | The 4-argument resolve returns. Audit position 1847. It does not call reconcile. The 6-argument resolve stays. `open_checkout_total_review` is the P15 body, whose payment raw does not store `checkout_id`. Settle stays. | Only the 6-argument resolve remains. The P16 open body is back. |
+| P14 `invoice_pay_checkout_review.sql` | `missing_identity` position 0. `v_amount_is_price` position 0. The 2-argument resolve returns, audit position 0, `service_role` only. The 6-argument resolve stays. | P16 settle and the 6-argument resolve are back. The 2-argument function is gone. |
+| P12 `invoice_pay_collections.sql` | Review text position 0. Closed-at hold position 3574. The 6-argument resolve stays. | Review text back at 4404. Hold back at 3571. |
+| P11 `invoice_pay_held.sql` | Review text 0. Closed-at hold 0. | Both restored. |
+| P9 `invoice_pay_session.sql` | Review text 0. Closed-at hold 0. P9 also drops and recreates the pending index inside the transaction. | Both restored. |
+| P13 `invoice_pay_checkout_total.sql` | Settle, the review text, and the 6-argument resolve stay. | Left as P16. |
+
+Re-running P15 after P16 puts a resolve that does not book back beside the 6-argument function, and new reviews stop storing `checkout_id`, so a later Book raises `pay attempt not found`. Re-running P14 puts the silent placeholder settle and the unaudited 2-argument resolve back beside the 6-argument function. P12 drops the review hold and keeps the closed-at hold. P9 and P11 drop both. P13 leaves P16 in place. A second P16 apply is idempotent. The P16 header names P5, P9, P11, P12, P14, and P15.
+
+`node --test tests/invoicePay.test.js tests/invoiceDocuments.test.js` at `4dab5ffc`: 71 pass, 0 fail. `node --experimental-strip-types --test tests/adminBillingCleanup.test.js`: 18 pass, 0 fail, including the two choices, the session actor, and the absence of `body.actor`. `invoicePaySql.test.js` was not run. This environment has no pglite. The harness is the SQL proof.
+
+### Apply conditions
+
+Apply on production only if this stack is accepted, payments stay off, and Alvin has said GO for each file. One transaction each, in order: P11 `invoice_pay_held.sql`, P12 `invoice_pay_collections.sql`, P13 `invoice_pay_checkout_total.sql`, P14 `invoice_pay_checkout_review.sql`, P15 `invoice_pay_checkout_review_round8.sql`, P16 `invoice_pay_checkout_review_round9.sql`. P9 and P10 are already on production. Do not re-run P5. Do not re-run P9, P11, P12, P14, or P15 after P16. Re-running P13 leaves P16 in place. Re-running P16 is idempotent. Take a backup first. Leave `BACHS_LIVE_ALLOWED` unset. Do not add the cron entry. Do not touch DID `+254709221536`. Do not take a live collection between P15 and P16. The P16 header still says staging only until Alvin's GO.
+
+Before any second collection on the same checkout, Bachs still has to say whether `charge.amount_paid` is the checkout-wide cumulative total. A single listed KSh 10 whose GET returns 10.00 and whose event carries a real receipt or a charge id other than `ch_<checkout>` can be credited under the same gate as Round 7: that one tenant on the allowlist, `BACHS_LIVE_ALLOWED` true only for the test, one checkout, one collection, GET succeeds, no DID. This review did not call Bachs.
 
 ## Round 9
 
