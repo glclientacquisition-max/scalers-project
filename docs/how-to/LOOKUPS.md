@@ -16,6 +16,8 @@ All three flags default off. Nothing here is live until Alvin turns a flag on.
 | `VOICE_LOOKUPS` | off | Comma list: `price`, `fee`, `hours`, `pay`, `services`. `on` or `all` enables every kind. `area_fee` is an alias of `fee`. |
 | `VOICE_LOOKUP_TOOL` | off | Gemini function `lookup` for a turn the router did not answer. The tool speech is said as returned. If the lookup is not back in 1.5 seconds the caller hears a short ack, then the cannot-answer line. |
 | `VOICE_PERSONA_ONLY_PROMPT` | off | The Desk-compiled prompt keeps tone and identity. Prices, clocks and payment numbers in that prompt are removed. Money-as-digits rules stay on `VOICE_FACT_REFS` only. |
+| `VOICE_FALLBACK_BY_KIND` | off | Per lookup kind callback lines from `tenants.unknown_answer_by_kind` (see `docs/supabase/unknown_answer_by_kind.sql`). |
+| `DESK_LOOKUP_PREVIEW` | off | Readiness page runs the same `lookup()` as voice for a sample question. |
 
 ## What a turn may use
 

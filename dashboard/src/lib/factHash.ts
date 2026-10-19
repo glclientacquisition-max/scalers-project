@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // TS twin of src/conversation/factHash.js (GIGO confirm v2 value hash).
+import { factPaymentsV2Hash } from '@/lib/deskFeatureFlags';
+import { paymentsFactHashValue } from '@/lib/payments';
 // Pure and sync: no Node crypto, so it runs in the client graph too.
 // Keep lockstep with the JS module. Both run tests/fixtures/factHashVectors.json.
 //
@@ -321,6 +323,16 @@ export function stableRowId(row: any): string | null {
   return id;
 }
 
+function serviceAreaFeeFactValue(area: any) {
+  if (!area) return null;
+  return {
+    id: String(area.id || '').trim().toLowerCase(),
+    fee_mode: area.fee_mode ?? null,
+    fee_ksh: area.fee_ksh ?? null,
+    modes: Array.isArray(area.modes) ? area.modes : null,
+  };
+}
+
 function findCatalogRow(list: any[], key: string, kind: string): any {
   for (let i = 0; i < list.length; i += 1) {
     const row = list[i];
@@ -346,7 +358,21 @@ export function factValueForPath(fieldPath: string, tenant: any = {}): any {
   const t: any = tenant && typeof tenant === 'object' ? tenant : {};
   if (SCALAR_COLUMNS[path]) return t[SCALAR_COLUMNS[path]] ?? null;
   const policies = asObj(t.business_policies);
-  if (path === 'payments.methods') return policies.payment ?? null;
+  if (path === 'payments.methods') {
+    if (factPaymentsV2Hash()) {
+      const structured = paymentsFactHashValue(policies?.payments);
+      if (structured) return structured;
+    }
+    return policies.payment ?? null;
+  }
+  const areaMatch = path.match(/^service_areas\.(.+)$/);
+  if (areaMatch) {
+    const id = String(areaMatch[1] || '').trim().toLowerCase();
+    const bag = asObj(t.service_areas);
+    const areas = asList(bag?.areas);
+    const area = areas.find((row) => String(row?.id || '').trim().toLowerCase() === id);
+    return area ? serviceAreaFeeFactValue(area) : null;
+  }
   if (path === 'policies.holds' || path === 'policies.holds.allowed') return holdsFactValue(policies);
   let m = path.match(/^policies\.([A-Za-z0-9_]+)$/);
   if (m) return policies[m[1]] ?? null;
@@ -388,6 +414,7 @@ export function tenantRowFromProfile(profile: any = {}): Record<string, any> {
     hours_schedule: p.hoursSchedule ?? null,
     business_locations: p.businessLocations ?? null,
     business_policies: p.businessPolicies ?? null,
+    service_areas: p.serviceAreas ?? p.service_areas ?? null,
     whatsapp_notification_number: p.whatsappNumber ?? null,
     alert_email: p.alertEmail ?? null,
     notify_channels: p.notifyChannels ?? null,

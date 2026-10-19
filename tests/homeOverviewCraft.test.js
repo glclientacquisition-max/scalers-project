@@ -139,8 +139,9 @@ describe("home overview craft", () => {
   });
 
   it("shows Setup capture only before the line is live", () => {
-    assert.match(page, /score && line !== "live"/);
+    assert.match(page, /score && line !== "live" && !assistantSayPage/);
     assert.match(page, /<HomeCapture/);
+    assert.match(page, /!assistantSayPage && overviewChecks\.length/);
     assert.match(page, /line === "live" && !score\.ready_badge/);
     assert.match(page, /<HomeReviewSettingsNudge/);
     const nudge = read("dashboard/src/components/HomeReviewSettingsNudge.tsx");

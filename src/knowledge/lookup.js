@@ -78,7 +78,16 @@ function safeLine(text, language) {
   return TEAM_DEFAULT_LINE[swish(language) ? 'sw' : 'en'];
 }
 
-function fallbackSpeech(profile) {
+function fallbackSpeech(profile, lookupKind) {
+  const { voiceFallbackByKind } = require('../conversation/deskFeatureFlags');
+  if (voiceFallbackByKind() && lookupKind) {
+    const { lineForKind, parseByKind, mapLookupKindToFallbackKind } = require('../conversation/unknownAnswerByKind');
+    const kind = mapLookupKindToFallbackKind(lookupKind);
+    const byKind = parseByKind(profile?.unknownAnswerByKind);
+    const en = safeLine(lineForKind(byKind, kind, 'en', profile), 'en');
+    const sw = safeLine(lineForKind(byKind, kind, 'sw', profile), 'sw');
+    return { en, sw };
+  }
   const en = safeLine(pickUnknownAnswerLine(profile || {}, 'en').text, 'en');
   const sw = safeLine(pickUnknownAnswerLine(profile || {}, 'sw').text, 'sw');
   return { en, sw };
@@ -95,8 +104,8 @@ const DEFAULT_REASON = {
   ambiguous: 'several_matches',
 };
 
-function resultOf(status, extra, profile) {
-  const speech = extra.speech || fallbackSpeech(profile);
+function resultOf(status, extra, profile, lookupKind = 'general') {
+  const speech = extra.speech || fallbackSpeech(profile, lookupKind);
   return {
     status,
     id: extra.id || '',
@@ -110,22 +119,22 @@ function resultOf(status, extra, profile) {
   };
 }
 
-function notOnFile(profile, id, reason) {
-  return resultOf('not_on_file', { id, reason, speech: fallbackSpeech(profile) }, profile);
+function notOnFile(profile, id, reason, lookupKind = 'general') {
+  return resultOf('not_on_file', { id, reason }, profile, lookupKind);
 }
 
 /** The list itself was never saved. Never speak that as "we don't do this". */
-function noData(profile, id) {
-  return resultOf('no_data', { id, speech: fallbackSpeech(profile) }, profile);
+function noData(profile, id, lookupKind = 'general') {
+  return resultOf('no_data', { id }, profile, lookupKind);
 }
 
 /**
  * The list exists and this item is not on it. The callback line, unless the
  * business explicitly opted out of anything off the list.
  */
-function notFoundInList(profile, id, optOutSpeech) {
-  const speech = optOutSpeech || fallbackSpeech(profile);
-  return resultOf('not_found_in_list', { id, speech }, profile);
+function notFoundInList(profile, id, optOutSpeech, lookupKind = 'general') {
+  const extra = optOutSpeech ? { id, speech: optOutSpeech } : { id };
+  return resultOf('not_found_in_list', extra, profile, lookupKind);
 }
 
 /**
@@ -163,8 +172,8 @@ function optedOutOfUnlisted(profile, kind) {
   return areas?.decline_unlisted === true;
 }
 
-function unconfirmed(profile, id, source, reason) {
-  return resultOf('unconfirmed', { id, source, reason, speech: fallbackSpeech(profile) }, profile);
+function unconfirmed(profile, id, source, reason, lookupKind = 'general') {
+  return resultOf('unconfirmed', { id, source, reason }, profile, lookupKind);
 }
 
 function termsFor(profile) {
@@ -238,6 +247,127 @@ function scoreLabel(text, label) {
   return hits / words.length;
 }
 
+const LABEL_GENERIC = new Set([
+  'the', 'and', 'for', 'with', 'from', 'your', 'our', 'how', 'much', 'is', 'what', 'price', 'bei', 'ya', 'ni',
+  'cleaning', 'clean', 'service', 'services', 'internal',
+]);
+// NOT generic: 'deep', 'standard' and similar tier words are what tell sibling
+// rows apart ("Deep clean, 2 bedroom" vs "Standard clean, 2 bedroom").
+const EN_NUM_WORD = { one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9' };
+// Bare counting forms plus the noun-class forms callers actually say with a noun:
+// "chumba kimoja", "vyumba viwili/vitatu", "watu wawili", "magari mawili".
+const SW_NUM_WORD = {
+  moja: '1', kimoja: '1', mmoja: '1', limoja: '1',
+  mbili: '2', viwili: '2', wawili: '2', mawili: '2',
+  tatu: '3', vitatu: '3', watatu: '3', matatu: '3',
+  nne: '4', vinne: '4', wanne: '4', manne: '4',
+  tano: '5', vitano: '5', watano: '5', matano: '5',
+  sita: '6', saba: '7', nane: '8', tisa: '9',
+};
+
+function normalizeCatalogueText(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Tokens for catalogue name matching: keep numeric qualifiers and distinctive words. */
+function catalogueMatchTokens(text) {
+  const words = normalizeCatalogueText(text).split(/\s+/).filter(Boolean);
+  const tokens = new Set();
+  for (const w of words) {
+    if (/^\d+$/.test(w)) {
+      tokens.add(w);
+      continue;
+    }
+    const en = EN_NUM_WORD[w];
+    const sw = SW_NUM_WORD[w];
+    if (en) {
+      tokens.add(en);
+      continue;
+    }
+    if (sw) {
+      tokens.add(sw);
+      continue;
+    }
+    if (w.length >= 2 && !LABEL_GENERIC.has(w)) tokens.add(w);
+  }
+  return tokens;
+}
+
+function numericTokens(tokens) {
+  return new Set([...tokens].filter((t) => /^\d+$/.test(t)));
+}
+
+/**
+ * True when the question names a different number than this row, or names another
+ * row's word while missing one of this row's own words. A row the question names in
+ * full is never contradicted ("mattress and sofa" still asks which one).
+ */
+function contradictsLabel(qTokens, lTokens, vocab) {
+  const qNums = numericTokens(qTokens);
+  const lNums = numericTokens(lTokens);
+  if (qNums.size && lNums.size && ![...qNums].some((n) => lNums.has(n))) return true;
+  if (!vocab) return false;
+  const namedInFull = [...lTokens].every((t) => qTokens.has(t));
+  if (namedInFull) return false;
+  for (const t of qTokens) if (vocab.has(t) && !lTokens.has(t)) return true;
+  return false;
+}
+
+function catalogueVocab(facts) {
+  const vocab = new Set();
+  for (const f of facts) for (const t of catalogueMatchTokens(f.label)) vocab.add(t);
+  return vocab;
+}
+
+/**
+ * Score how well a caller question names a catalogue row. Full normalized names
+ * and bedroom/number qualifiers beat shared prefixes like "deep clean".
+ *
+ * A row is ruled out (0) when the question contradicts it:
+ * - the question has a number and the row has a different one ("2 bedroom" never
+ *   matches "1 bedroom");
+ * - the question has a word that names another row but not this one ("standard"
+ *   rules out "Deep clean, 2 bedroom").
+ * `vocab` is the union of all rows' match tokens.
+ */
+function scoreCatalogueLabel(query, label, vocab = null) {
+  const qNorm = normalizeCatalogueText(query);
+  const lNorm = normalizeCatalogueText(label);
+  if (!lNorm) return 0;
+  if (qNorm === lNorm) return 2;
+  const qTokens = catalogueMatchTokens(query);
+  const lTokens = catalogueMatchTokens(label);
+  if (!lTokens.size) return 0;
+  if (contradictsLabel(qTokens, lTokens, vocab)) return 0;
+  if (qNorm.includes(lNorm)) return 1.5;
+  let hits = 0;
+  for (const t of lTokens) if (qTokens.has(t)) hits += 1;
+  return hits / lTokens.size;
+}
+
+/** Below this a row is not "named" by the question; the legacy scorer decides. */
+const CATALOGUE_MATCH_MIN = 0.5;
+
+function pickPriceFactByLabel(query, facts) {
+  const vocab = catalogueVocab(facts);
+  const scored = facts
+    .map((f) => ({ f, score: scoreCatalogueLabel(query, f.label, vocab) }))
+    .filter((row) => row.score >= CATALOGUE_MATCH_MIN)
+    .sort((a, b) => b.score - a.score);
+  if (!scored.length) return { kind: 'none' };
+  const top = scored[0].score;
+  const winners = scored.filter((row) => row.score === top);
+  if (winners.length === 1) return { kind: 'one', fact: winners[0].f };
+  if (scored.length > winners.length && top - scored[winners.length].score >= 0.2) {
+    return { kind: 'one', fact: winners[0].f };
+  }
+  return { kind: 'ambiguous', facts: winners.map((row) => row.f) };
+}
+
 function catalogueEntries(profile) {
   return [
     ...asArray(profile?.servicesCatalog).map((row, index) => ({ row, index, kind: 'service' })),
@@ -269,18 +399,13 @@ function priceReading(profile, entry, row) {
 function lookupPrice(query, ctx, sheet) {
   const profile = ctx.profile || {};
   const facts = [...sheet.facts.values()].filter((f) => f.kind === 'price');
-  const scored = facts
-    .map((f) => ({ f, score: scoreLabel(query, f.label) }))
-    .filter((row) => row.score >= 0.5)
-    .sort((a, b) => b.score - a.score);
-  if (!scored.length) {
-    return catalogueEntries(profile).length || facts.length
-      ? notFoundInList(profile, 'price', priceOptOut(profile, query))
-      : noData(profile, 'price');
-  }
-  const top = scored.filter((row) => row.score === scored[0].score);
-  if (top.length > 1) {
-    const names = top.slice(0, 3).map((row) => row.f.label);
+  const q = String(query || '');
+  const byLabel = pickPriceFactByLabel(q, facts);
+  let fact = null;
+  if (byLabel.kind === 'one') {
+    fact = byLabel.fact;
+  } else if (byLabel.kind === 'ambiguous') {
+    const names = byLabel.facts.slice(0, 3).map((f) => f.label);
     const en = names.length === 2
       ? `Which one, ${names[0]} or ${names[1]}?`
       : `Which one, ${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}?`;
@@ -291,26 +416,61 @@ function lookupPrice(query, ctx, sheet) {
       id: 'price',
       options: names,
       speech: both(en, sw),
-    }, profile);
+    }, profile, 'price');
+  } else {
+    // Legacy word overlap, minus rows the question contradicts, so "Standard
+    // clean, 3 bedroom" cannot quote "Standard clean, 2 bedroom".
+    const vocab = catalogueVocab(facts);
+    const qTokens = catalogueMatchTokens(q);
+    const scored = facts
+      .filter((f) => !contradictsLabel(qTokens, catalogueMatchTokens(f.label), vocab))
+      .map((f) => ({ f, score: scoreLabel(q, f.label) }))
+      .filter((row) => row.score >= 0.5)
+      .sort((a, b) => b.score - a.score);
+    if (!scored.length) {
+      return catalogueEntries(profile).length || facts.length
+        ? notFoundInList(profile, 'price', priceOptOut(profile, q), 'price')
+        : noData(profile, 'price', 'price');
+    }
+    const top = scored.filter((row) => row.score === scored[0].score);
+    if (top.length > 1) {
+      const names = top.slice(0, 3).map((row) => row.f.label);
+      const en = names.length === 2
+        ? `Which one, ${names[0]} or ${names[1]}?`
+        : `Which one, ${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}?`;
+      const sw = names.length === 2
+        ? `Ipi, ${names[0]} au ${names[1]}?`
+        : `Ipi, ${names.slice(0, -1).join(', ')} au ${names[names.length - 1]}?`;
+      return resultOf('ambiguous', {
+        id: 'price',
+        options: names,
+        speech: both(en, sw),
+      }, profile, 'price');
+    }
+    fact = top[0].f;
   }
-  const fact = top[0].f;
+  if (!fact) {
+    return catalogueEntries(profile).length || facts.length
+      ? notFoundInList(profile, 'price', priceOptOut(profile, q), 'price')
+      : noData(profile, 'price', 'price');
+  }
   const entry = locateRow(profile, fact.label);
   const row = entry?.row || { name: fact.label, price: fact.legacyPrice || fact.value };
   const norm = normalisePrice(row);
   // quote, unknown, and a non-numeric price such as "Ask" are never spoken.
-  if (!priceIsSpeakable(norm)) return notOnFile(profile, fact.id, `price_${norm.kind || 'unknown'}`);
+  if (!priceIsSpeakable(norm)) return notOnFile(profile, fact.id, `price_${norm.kind || 'unknown'}`, 'price');
   const reading = priceReading(profile, entry, row);
-  if (!reading.ok) return unconfirmed(profile, fact.id, 'catalogue', reading.reason);
+  if (!reading.ok) return unconfirmed(profile, fact.id, 'catalogue', reading.reason, 'price');
   const enVal = speakNormalisedPrice(norm, 'en');
   const swVal = speakNormalisedPrice(norm, 'sw');
-  if (!enVal || !swVal) return notOnFile(profile, fact.id, 'price_unspoken');
+  if (!enVal || !swVal) return notOnFile(profile, fact.id, 'price_unspoken', 'price');
   const seed = ctx.seed;
   return resultOf('found', {
     id: fact.id,
     value: norm.kind === 'range' ? norm.min : norm.min,
     source: 'owner',
     speech: both(priceLine(fact.label, enVal, 'en', seed), priceLine(fact.label, swVal, 'sw', seed)),
-  }, profile);
+  }, profile, 'price');
 }
 
 function priceOptOut(profile, query) {
@@ -341,7 +501,7 @@ function matchCatalogueFollowUp(text, profile) {
   const names = catalogueEntries(profile).map((entry) => String(entry.row.name).trim());
   const query = content.join(' ');
   const scored = names
-    .map((name) => ({ name, score: scoreLabel(query, name) }))
+    .map((name) => ({ name, score: Math.max(scoreLabel(query, name), scoreCatalogueLabel(query, name)) }))
     .filter((row) => row.score >= 0.5)
     .sort((a, b) => b.score - a.score);
   if (scored.length) {
@@ -432,7 +592,7 @@ function lookupFee(query, ctx, terms) {
   const profile = ctx.profile || {};
   const areas = terms?.areas || [];
   // No saved list. A known town is still missing data, not "we don't come".
-  if (!areas.length) return noData(profile, 'fee');
+  if (!areas.length) return noData(profile, 'fee', 'fee');
   const viewed = nluProfile(profile, terms);
   const amb = areaAmbiguity(String(query || ''), viewed);
   if (amb) {
@@ -442,7 +602,7 @@ function lookupFee(query, ctx, terms) {
         id: 'fee',
         options: amb.options,
         speech,
-      }, profile);
+      }, profile, 'fee');
     }
   }
   const text = String(query || '');
@@ -453,20 +613,20 @@ function lookupFee(query, ctx, terms) {
   })();
   if (hit && hit.missing) {
     const speech = optedOutOfUnlisted(profile, 'fee') ? dontCome(hit.missing) : null;
-    return notFoundInList(profile, speech ? 'fee.out' : 'fee.missing', speech);
+    return notFoundInList(profile, speech ? 'fee.out' : 'fee.missing', speech, 'fee');
   }
-  if (!hit) return notFoundInList(profile, 'fee');
+  if (!hit) return notFoundInList(profile, 'fee', null, 'fee');
   const feeRead = feeReading(profile, hit);
-  if (!feeRead.ok) return unconfirmed(profile, `fee.${hit.id}`, 'area', feeRead.reason);
+  if (!feeRead.ok) return unconfirmed(profile, `fee.${hit.id}`, 'area', feeRead.reason, 'fee');
   if (hit.feeMode !== 'free' && hit.feeKsh == null) {
-    return unconfirmed(profile, `fee.${hit.id}`, 'area', 'fee_missing');
+    return unconfirmed(profile, `fee.${hit.id}`, 'area', 'fee_missing', 'fee');
   }
   return resultOf('found', {
     id: `fee.${hit.id}`,
     value: hit.feeMode === 'free' ? 0 : hit.feeKsh,
     source: 'owner',
     speech: areaSpeech(hit, profile, ctx.seed),
-  }, profile);
+  }, profile, 'fee');
 }
 
 function parseClock(hhmm) {
@@ -596,16 +756,16 @@ function lookupHours(query, ctx) {
       value: hhmm,
       source: 'clock',
       speech: both(`It is ${enClock(hhmm)}.`, `Sasa ni ${swClock(hhmm)}.`),
-    }, profile);
+    }, profile, 'hours');
   }
   const parsed = parseHoursSchedule(profile.hoursSchedule);
-  if (!parsed) return noData(profile, 'hours');
+  if (!parsed) return noData(profile, 'hours', 'hours');
   const tenant = tenantRowFromProfile(profile);
   const hoursRead = confirmReading(profile, 'hours.weekly_grid', factValueForPath('hours.weekly_grid', tenant), {});
-  if (!hoursRead.ok) return unconfirmed(profile, 'hours', 'hours', hoursRead.reason);
+  if (!hoursRead.ok) return unconfirmed(profile, 'hours', 'hours', hoursRead.reason, 'hours');
   if (scope === 'open') {
     const status = openClosedStatus(parsed, now);
-    if (status === 'unknown') return notOnFile(profile, 'hours', 'open_status_unknown');
+    if (status === 'unknown') return notOnFile(profile, 'hours', 'open_status_unknown', 'hours');
     const open = status === 'open';
     return resultOf('found', {
       id: 'hours.open',
@@ -615,7 +775,7 @@ function lookupHours(query, ctx) {
         open ? 'Yes, we are open now.' : 'No, we are closed now.',
         open ? 'Ndiyo, tuko wazi sasa.' : 'Hapana, tumefunga sasa.',
       ),
-    }, profile);
+    }, profile, 'hours');
   }
   if (scope === 'day') {
     const rel = typeof query === 'string' ? relativeDayAsked(query, now) : null;
@@ -630,7 +790,7 @@ function lookupHours(query, ctx) {
         value: 'closed',
         source: 'owner',
         speech: both(`${enLead} we are closed.`, `${swLead} tumefunga.`),
-      }, profile);
+      }, profile, 'hours');
     }
     return resultOf('found', {
       id: `hours.${key}`,
@@ -640,14 +800,14 @@ function lookupHours(query, ctx) {
         `${enLead} we are open from ${enClock(day.open)} to ${enClock(day.close)}.`,
         `${swLead} tunafungua kutoka ${swClock(day.open)} hadi ${swClock(day.close)}.`,
       ),
-    }, profile);
+    }, profile, 'hours');
   }
   return resultOf('found', {
     id: 'hours.week',
     value: 'week',
     source: 'owner',
     speech: weekSpeech(parsed),
-  }, profile);
+  }, profile, 'hours');
 }
 
 function payBag(profile) {
@@ -659,14 +819,22 @@ function payReading(profile, pay) {
   return confirmReading(profile, 'payments.methods', factValueForPath('payments.methods', tenant), pay);
 }
 
+const PAY_SLOT_LABEL = {
+  till: { en: 'M-Pesa till number', sw: 'till ya M-Pesa' },
+  paybill: { en: 'M-Pesa paybill number', sw: 'namba ya paybill ya M-Pesa' },
+  pochi: { en: 'Pochi la Biashara number', sw: 'namba ya Pochi la Biashara' },
+  send: { en: 'M-Pesa send money number', sw: 'namba ya kutuma pesa kwa M-Pesa' },
+  airtel: { en: 'Airtel Money number', sw: 'namba ya Airtel Money' },
+};
+
 function paySlots(pay) {
   const paybill = asObject(pay.mpesa_paybill);
   return [
-    ['till', digitsOf(pay.mpesa_till), 'M-Pesa till number', null],
-    ['paybill', digitsOf(paybill?.business_no), 'M-Pesa paybill number', paybill],
-    ['pochi', digitsOf(asObject(pay.pochi)?.phone), 'Pochi la Biashara number', null],
-    ['send', digitsOf(asObject(pay.mpesa_send)?.phone), 'M-Pesa send money number', null],
-    ['airtel', digitsOf(asObject(pay.airtel)?.till || asObject(pay.airtel)?.phone), 'Airtel Money number', null],
+    ['till', digitsOf(pay.mpesa_till), PAY_SLOT_LABEL.till, null],
+    ['paybill', digitsOf(paybill?.business_no), PAY_SLOT_LABEL.paybill, paybill],
+    ['pochi', digitsOf(asObject(pay.pochi)?.phone), PAY_SLOT_LABEL.pochi, null],
+    ['send', digitsOf(asObject(pay.mpesa_send)?.phone), PAY_SLOT_LABEL.send, null],
+    ['airtel', digitsOf(asObject(pay.airtel)?.till || asObject(pay.airtel)?.phone), PAY_SLOT_LABEL.airtel, null],
   ].filter((row) => row[1]);
 }
 
@@ -698,9 +866,9 @@ function lookupPay(query, ctx) {
   const kind = payKindOf(query);
   const pay = payBag(profile);
   const slots = paySlots(pay);
-  if (!slots.length) return noData(profile, `pay.${kind}`);
+  if (!slots.length) return noData(profile, `pay.${kind}`, 'pay');
   if (kind === 'bank' || kind === 'card') {
-    return notFoundInList(profile, `pay.${kind}`);
+    return notFoundInList(profile, `pay.${kind}`, null, 'pay');
   }
   const want = {
     till: 'till',
@@ -710,13 +878,14 @@ function lookupPay(query, ctx) {
     any: '',
   }[kind];
   const slot = want ? slots.find((row) => row[0] === want) : slots[0];
-  if (!slot) return notFoundInList(profile, `pay.${kind}`);
+  if (!slot) return notFoundInList(profile, `pay.${kind}`, null, 'pay');
   const payRead = payReading(profile, pay);
-  if (!payRead.ok) return unconfirmed(profile, `pay.${slot[0]}`, 'pay', payRead.reason);
+  if (!payRead.ok) return unconfirmed(profile, `pay.${slot[0]}`, 'pay', payRead.reason, 'pay');
   const enDigits = speakDigits(slot[1], 'en');
   const swDigits = speakDigits(slot[1], 'sw');
-  let en = `The ${slot[2]} is ${enDigits}.`;
-  let sw = `Namba ya ${slot[2]} ni ${swDigits}.`;
+  const labels = slot[2];
+  let en = `The ${labels.en} is ${enDigits}.`;
+  let sw = `Namba ya ${labels.sw} ni ${swDigits}.`;
   const account = slot[3] && (slot[3].account_mode || 'fixed') === 'fixed' ? digitsOf(slot[3].account) : '';
   if (account) {
     en += ` The account is ${speakDigits(account, 'en')}.`;
@@ -727,7 +896,7 @@ function lookupPay(query, ctx) {
     value: slot[1],
     source: 'owner',
     speech: both(en, sw),
-  }, profile);
+  }, profile, 'pay');
 }
 
 function speechName(name) {
@@ -737,10 +906,10 @@ function speechName(name) {
 function lookupServices(ctx) {
   const profile = ctx.profile || {};
   const rows = catalogueEntries(profile);
-  if (!rows.length) return noData(profile, 'services');
+  if (!rows.length) return noData(profile, 'services', 'price');
   const confirmed = rows.filter((entry) => priceConfirmed(profile, entry, entry.row));
   if (!confirmed.length) {
-    return unconfirmed(profile, 'services', 'catalogue', priceReading(profile, rows[0], rows[0].row).reason);
+    return unconfirmed(profile, 'services', 'catalogue', priceReading(profile, rows[0], rows[0].row).reason, 'price');
   }
   const names = confirmed.map((entry) => speechName(entry.row.name));
   const more = names.length > 4;
@@ -755,7 +924,7 @@ function lookupServices(ctx) {
     value: shown,
     source: 'owner',
     speech: both(en, sw),
-  }, profile);
+  }, profile, 'price');
 }
 
 /**
@@ -776,7 +945,7 @@ function lookup(kind, query, ctx = {}) {
   if (canonical === 'hours') return lookupHours(query, ctx);
   if (canonical === 'pay') return lookupPay(query, ctx);
   if (canonical === 'services') return lookupServices(ctx);
-  return notOnFile(profile, canonical || 'unknown', 'unknown_kind');
+  return notOnFile(profile, canonical || 'unknown', 'unknown_kind', canonical || 'general');
 }
 
 function cataloguePhrases(profile) {
@@ -801,7 +970,7 @@ function lookupWithDeadline(kind, query, ctx = {}, opts = {}) {
     .then((result) => ({ timedOut: false, result }));
   return Promise.race([run, timeout]).finally(() => clearTimeout(timer)).then((out) => {
     if (out.timedOut || !out.result) {
-      const fb = notOnFile(ctx.profile || {}, 'timeout', 'timeout');
+      const fb = notOnFile(ctx.profile || {}, 'timeout', 'timeout', kind);
       const lang = ctx.language;
       return {
         timedOut: true,

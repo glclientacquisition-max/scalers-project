@@ -213,6 +213,7 @@ export type TenantRow = {
   team_directory?: TeamDirectoryEntry[] | null;
   faqs?: FaqEntry[] | null;
   unknown_answer_fallback?: string | null;
+  unknown_answer_by_kind?: Record<string, { en?: string; sw?: string }> | null;
   /** Spoken rewrite. Voice uses en/sw only when source matches unknown_answer_fallback. */
   unknown_answer_spoken?: {
     en?: string;
