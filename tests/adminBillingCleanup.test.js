@@ -68,8 +68,8 @@ describe("admin billing: placeholder numbers", () => {
     assert.equal(copy.searchableNumber("pending:abc"), "");
     assert.equal(copy.searchableNumber("+254711082000"), "+254711082000");
     const list = read(LIST);
-    assert.match(list, /numberLabel\(r\.sautikit_virtual_number\)/);
-    assert.doesNotMatch(list, /\{r\.sautikit_virtual_number\}/);
+    assert.match(list, /numberLabel\(row\.sautikit_virtual_number\)/);
+    assert.doesNotMatch(list, /\{row\.sautikit_virtual_number\}/);
   });
 });
 
@@ -141,8 +141,8 @@ describe("admin billing: list queue", () => {
     assert.match(list, /\/admin\/businesses\/\$\{.*\}\?money=1/);
     assert.match(list, /href="\/admin\/packages"/);
     assert.match(list, /Needs attention/);
-    assert.match(list, /href="\/admin\/billing\/invoices"/);
-    assert.match(list, /href="\/admin\/billing\/payments"/);
+    assert.match(list, /Open invoices/);
+    assert.match(list, /PlatformRevenueStrip|openInvoiceKesLabel/);
     assert.doesNotMatch(list, /admin\/billing\/\$\{/);
   });
 });
