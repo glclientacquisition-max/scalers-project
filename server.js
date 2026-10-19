@@ -7553,6 +7553,8 @@ function startReviewSweep() {
 server.listen(PORT, () => {
   console.log(`🚀 Server listening on port ${PORT}`);
   startReviewSweep();
+  // Voice-side trigger for Desk /api/cron/ops-alerts (off unless URL + CRON_SECRET set).
+  require('./src/notifications/opsAlertsCron').startOpsAlertsCron();
   console.log(`📞 Voice webhook: POST /voice/incoming (SautiKit XML Stream → /ws/media)`);
   console.log(`📡 Media WebSocket: /ws/media (Host-based wss URL for Localtunnel)`);
   if (PUBLIC_BASE_URL) {

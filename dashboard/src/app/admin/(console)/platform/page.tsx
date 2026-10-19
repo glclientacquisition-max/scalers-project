@@ -3,7 +3,7 @@ import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { PlatformRunBoard } from "@/components/PlatformRunBoard";
 import { logAdminError } from "@/lib/adminErrors";
-import { evaluatePlatformOps } from "@/lib/platformOps";
+import { readPlatformOps } from "@/lib/platformOps";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 
 export const instant = false;
@@ -12,7 +12,7 @@ export default async function AdminPlatformPage() {
   await requireSuperAdmin();
   let snapshot;
   try {
-    snapshot = await evaluatePlatformOps();
+    snapshot = await readPlatformOps();
   } catch (err) {
     logAdminError("platform", err);
     return <AdminSetupError />;
