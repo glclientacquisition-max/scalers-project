@@ -1,0 +1,185 @@
+{
+  "note": "Generated from this branch; pay default callback-only, quote-style owner lines price-only.",
+  "cases": [
+    {
+      "profile": "quote_owner",
+      "kind": "general",
+      "language": "en",
+      "line": "Let me check with the team and get back to you."
+    },
+    {
+      "profile": "quote_owner",
+      "kind": "general",
+      "language": "sw",
+      "line": "Wacha niulize timu kisha nikujulishe."
+    },
+    {
+      "profile": "quote_owner",
+      "kind": "price",
+      "language": "en",
+      "line": "We cannot quote exact prices on the spot. Our team can prepare a formal quote for you."
+    },
+    {
+      "profile": "quote_owner",
+      "kind": "price",
+      "language": "sw",
+      "line": "Nitaweka ombi lako na duka litakupigia kwa bei."
+    },
+    {
+      "profile": "quote_owner",
+      "kind": "hours",
+      "language": "en",
+      "line": "I'll confirm opening times with the team and call you back."
+    },
+    {
+      "profile": "quote_owner",
+      "kind": "hours",
+      "language": "sw",
+      "line": "Nitahakikisha muda wa kufungua na timu kisha nitakupigia."
+    },
+    {
+      "profile": "quote_owner",
+      "kind": "fee",
+      "language": "en",
+      "line": "I'll check whether we deliver to your area and someone will call you back."
+    },
+    {
+      "profile": "quote_owner",
+      "kind": "fee",
+      "language": "sw",
+      "line": "Nitaangalia kama tunafikisha eneo lako na mtu atakupigia."
+    },
+    {
+      "profile": "quote_owner",
+      "kind": "pay",
+      "language": "en",
+      "line": "I'll ask the team to call you back with the payment details."
+    },
+    {
+      "profile": "quote_owner",
+      "kind": "pay",
+      "language": "sw",
+      "line": "Timu itakupigia simu kukupa maelezo ya malipo."
+    },
+    {
+      "profile": "generic_owner",
+      "kind": "general",
+      "language": "en",
+      "line": "Let me check with the team and get back to you."
+    },
+    {
+      "profile": "generic_owner",
+      "kind": "general",
+      "language": "sw",
+      "line": "Wacha niulize timu kisha nikujulishe."
+    },
+    {
+      "profile": "generic_owner",
+      "kind": "price",
+      "language": "en",
+      "line": "Let me check with the team and get back to you."
+    },
+    {
+      "profile": "generic_owner",
+      "kind": "price",
+      "language": "sw",
+      "line": "Nitaweka ombi lako na duka litakupigia kwa bei."
+    },
+    {
+      "profile": "generic_owner",
+      "kind": "hours",
+      "language": "en",
+      "line": "Let me check with the team and get back to you."
+    },
+    {
+      "profile": "generic_owner",
+      "kind": "hours",
+      "language": "sw",
+      "line": "Nitahakikisha muda wa kufungua na timu kisha nitakupigia."
+    },
+    {
+      "profile": "generic_owner",
+      "kind": "fee",
+      "language": "en",
+      "line": "Let me check with the team and get back to you."
+    },
+    {
+      "profile": "generic_owner",
+      "kind": "fee",
+      "language": "sw",
+      "line": "Nitaangalia kama tunafikisha eneo lako na mtu atakupigia."
+    },
+    {
+      "profile": "generic_owner",
+      "kind": "pay",
+      "language": "en",
+      "line": "Let me check with the team and get back to you."
+    },
+    {
+      "profile": "generic_owner",
+      "kind": "pay",
+      "language": "sw",
+      "line": "Timu itakupigia simu kukupa maelezo ya malipo."
+    },
+    {
+      "profile": "no_owner_line",
+      "kind": "general",
+      "language": "en",
+      "line": "Let me check with the team and get back to you."
+    },
+    {
+      "profile": "no_owner_line",
+      "kind": "general",
+      "language": "sw",
+      "line": "Wacha niulize timu kisha nikujulishe."
+    },
+    {
+      "profile": "no_owner_line",
+      "kind": "price",
+      "language": "en",
+      "line": "I'll note what you need and the shop will call you back with a price."
+    },
+    {
+      "profile": "no_owner_line",
+      "kind": "price",
+      "language": "sw",
+      "line": "Nitaweka ombi lako na duka litakupigia kwa bei."
+    },
+    {
+      "profile": "no_owner_line",
+      "kind": "hours",
+      "language": "en",
+      "line": "I'll confirm opening times with the team and call you back."
+    },
+    {
+      "profile": "no_owner_line",
+      "kind": "hours",
+      "language": "sw",
+      "line": "Nitahakikisha muda wa kufungua na timu kisha nitakupigia."
+    },
+    {
+      "profile": "no_owner_line",
+      "kind": "fee",
+      "language": "en",
+      "line": "I'll check whether we deliver to your area and someone will call you back."
+    },
+    {
+      "profile": "no_owner_line",
+      "kind": "fee",
+      "language": "sw",
+      "line": "Nitaangalia kama tunafikisha eneo lako na mtu atakupigia."
+    },
+    {
+      "profile": "no_owner_line",
+      "kind": "pay",
+      "language": "en",
+      "line": "I'll ask the team to call you back with the payment details."
+    },
+    {
+      "profile": "no_owner_line",
+      "kind": "pay",
+      "language": "sw",
+      "line": "Timu itakupigia simu kukupa maelezo ya malipo."
+    }
+  ]
+}

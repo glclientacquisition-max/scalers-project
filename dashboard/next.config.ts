@@ -10,6 +10,15 @@ const nextConfig: NextConfig = {
   },
   // Keep Next rooted on the dashboard package (monorepo-safe).
   outputFileTracingRoot: path.join(__dirname),
+  outputFileTracingIncludes: {
+    // Voice modules the assistant-say bridge require()s at runtime (lib/voiceRequire.server.ts).
+    // scripts/sync-voice-modules.cjs copies them here before `next build`.
+    "/**": ["./.voice/**/*"],
+    "/api/billing/invoices/[id]": ["./src/lib/invoicePay/wordmark.jpg"],
+    "/api/billing/invoices/[id]/pdf": ["./src/lib/invoicePay/wordmark.jpg"],
+    "/api/billing/receipts/[id]": ["./src/lib/invoicePay/wordmark.jpg"],
+    "/api/billing/receipts/[id]/pdf": ["./src/lib/invoicePay/wordmark.jpg"],
+  },
   // Old links and muscle memory: the Inbox lives at /calls.
   async redirects() {
     return [

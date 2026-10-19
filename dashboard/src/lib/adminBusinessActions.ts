@@ -6,7 +6,7 @@ import {
   releaseBlockReason,
   requireReason,
 } from "@/lib/adminBusinessModel";
-import { setTenantBillingMode } from "@/lib/adminWallets";
+import { confirmTenantBillingMode, setTenantBillingMode } from "@/lib/adminWallets";
 import { adminErrorParts } from "@/lib/adminErrors";
 import { normalizeE164 } from "@/lib/didPool";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -99,7 +99,7 @@ export async function releasePoolNumber(
     .maybeSingle();
   if (error) throw error;
   if (!row) throw new AdminActionBlocked("This number is not in the pool.");
-  if (row.status === "available") return { e164, releasedBusiness: false };
+  if (row.status === "available" || row.status === "quarantine") return { e164, releasedBusiness: false };
   if (row.status === "disabled") throw new AdminActionBlocked("This number is disabled.");
 
   const business = row.tenant_id ? await loadBusiness(String(row.tenant_id)) : null;
@@ -109,18 +109,19 @@ export async function releasePoolNumber(
     const { error: rpcError } = await admin.rpc("release_did_from_business", { p_tenant_id: business.id });
     if (rpcError) throw rpcError;
   } else {
-    const { error: updateError } = await admin
-      .from("sautikit_did_pool")
-      .update({ status: "available", tenant_id: null, assigned_at: null })
-      .eq("id", row.id);
-    if (updateError) throw updateError;
+    const { error: rpcError } = await admin.rpc("quarantine_pool_number", {
+      p_e164: e164,
+      p_actor: actor,
+      p_reason: "pool release",
+    });
+    if (rpcError) throw rpcError;
   }
   await recordAdminAction({
     actor,
     action: "release_number",
     businessId: business?.id || null,
     before: { number: e164, business: business?.id || null },
-    after: { number: e164, business: null, pool: "available" },
+    after: { number: e164, business: null, pool: "quarantine" },
     detail: { e164 },
   });
   return { e164, releasedBusiness: Boolean(business) };
@@ -344,7 +345,7 @@ export async function restoreBusiness(
   const resumed = { billing: billing?.billing || business.billing_enforcement || "off", on_demand: false };
   if (resumeBilling && pre) {
     if (pre.billing === "soft" || pre.billing === "hard") {
-      const res = await setTenantBillingMode({
+      const res = await confirmTenantBillingMode({
         businessId,
         mode: pre.billing,
         note: `Unarchived, back on as before: ${reason}`,

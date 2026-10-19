@@ -23,9 +23,9 @@ export function searchableNumber(raw: string | null | undefined): string {
 }
 
 export function modeName(mode: ChargingMode): string {
-  if (mode === "off") return "Beta (free)";
-  if (mode === "soft") return "On-demand soft";
-  return "On-demand hard";
+  if (mode === "off") return "Beta · Meter only";
+  if (mode === "soft") return "Charging · On-demand";
+  return "Charging · Block at cap";
 }
 
 /**

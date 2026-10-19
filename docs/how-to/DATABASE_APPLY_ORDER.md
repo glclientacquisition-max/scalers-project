@@ -1,6 +1,6 @@
 ---
 owner: platform
-last_reviewed: 2026-10-04
+last_reviewed: 2026-10-19
 ---
 
 # Database apply order
@@ -169,6 +169,21 @@ This document is the **executable** apply sequence for greenfield / full staging
 | 33f | `package_entitlements.sql` | `sms_allowance.sql` |
 | 33g | `whatsapp_threads.sql` | `notify_send_ledger.sql` |
 | 33h | `package_minute_consume.sql` | `package_catalog.sql` (README 24g) |
+| 33i | `billing_data_layer.sql` | P1. Run after, in this order: `package_catalog.sql`, `package_state_rules.sql`, `tenant_billing_state.sql`, `did_number_pool.sql`, `super_admin_ops.sql`, `notify_channels.sql`, `alert_email.sql`, `admin_business_archive.sql`, `admin_business_suspend.sql`, `wallet_security_beta.sql` (`ops_audit_log`). README 24k.4. Do not re-run this file after `invoice_documents.sql`. Production has P1–P8 and the owner-price v2 import. |
+| 33j | `owner_billing_actions.sql` | P3 and P4. `billing_data_layer.sql`. Re-apply after any later re-apply of `package_minute_consume.sql` or `notify_send_reserve_settle.sql`, or the spend-limit hook is dropped. Re-applying it replaces `finalize_invoice`, so re-apply `billing_company.sql` last. Production has this file. |
+| 33k | `invoice_pay.sql` | P5. `billing_data_layer.sql`. Needs `pgcrypto` (`gen_random_bytes`, `digest`). Production has this file as of commit `553f1830`. Do not edit it in place. |
+| 33l | `invoice_documents.sql` | P6. `invoice_pay.sql`. Does not replace `finalize_invoice`. Production has this file as of commit `553f1830`. Do not edit it in place. |
+| 33m | `billing_company.sql` | P8. `invoice_documents.sql`. Canonical `finalize_invoice`. Production has this file as of commit `553f1830`. Do not edit it in place. Re-apply last if `finalize_invoice` changes. |
+| 33n | `invoice_pay_session.sql` | P9. After P8. One live checkout per part, including `pending_unattached`. Does not replace `finalize_invoice`. Staging has it. Production has it (owner confirmed 19 Oct). |
+| 33o | `billing_mode_legal_pairs.sql` | P10. After P9. `set_tenant_billing_mode` refuses enforcement while the subscription is beta. Does not change `billing_status`. Staging has the behavior. Production has it (owner confirmed 19 Oct). Do not re-run `wallet_security_beta.sql` for this check. |
+| 33p | `invoice_pay_held.sql` | P11. After P10. Holds an unexpired succeeded checkout, refuses to replace a parked session id, and credits one later collection on that checkout. Does not replace `finalize_invoice`. Staging only. Not on prod. P12 replaces the hold and the extra-credit path. |
+| 33q | `invoice_pay_collections.sql` | P12. After P11. Holds a succeeded checkout until Bachs is read closed. `reconcile_checkout_collection` stays. The webhook no longer calls it. Does not replace `finalize_invoice`. Staging only. Not on prod. |
+| 33r | `invoice_pay_checkout_total.sql` | P13. After P12. `collected_total_seen_kes` and `reconcile_checkout_total` apply Bachs' cumulative collected total for one checkout. Does not replace `finalize_invoice`. Staging: `invoice_pay_checkout_total` (`20261019025507`). Not on prod. |
+| 33s | `invoice_pay_checkout_review.sql` | P14. After P13. One review issue when a new receipt or charge id is not covered, or the GET total falls. Blocks the next checkout until resolved. Adds `needs_retry`. Does not replace `finalize_invoice`. Staging: `invoice_pay_checkout_review` (`20261019034233`). Not on prod. Do not re-run P9 after P14. |
+| 33t | `invoice_pay_checkout_review_round8.sql` | P15. After P14. Placeholder and missing collection ids review a GET rise or an unchanged GET after money was seen. A session-price event amount does not hold a real rise. Resolve audits the actor and the reason. Does not replace `finalize_invoice`. Staging: `invoice_pay_checkout_review_round8` (`20261019042439`). Not on prod. Do not re-run P5, P9, P11, P12, or P14 after P15. |
+| 33u | `invoice_pay_checkout_review_round9.sql` | P16. After P15. Resolve requires book or nothing. Book applies the collected rise up to the amount due and credits the excess. Nothing leaves the books. A replay does not book again. Does not replace `finalize_invoice`. Staging: `invoice_pay_checkout_review_round9` (`20261019045940`). Not on prod. Do not re-run P5, P9, P11, P12, P14, or P15 after P16. |
+| 33v | `invoice_pay_live_allowlist.sql` | P17. After P16. Live payment allowlist. Service role only. Requires a reason. Refuses to enable a beta business. Inserts no businesses. Does not replace `finalize_invoice`. Staging: `invoice_pay_live_allowlist` (`20261019093619`). Not on prod. |
+| 33w | `billing_package_editor_flag.sql` | P18. After P17. `admin_set_package_editor_enabled`. Service role only. Requires a reason and confirm. Does not call `_package_editor_open`. Staging: `billing_package_editor_flag` (`20261019113040`). Not on prod. Do not apply on prod. |
 
 **Blocker:** `appointments.sql` before `contacts_and_requests.sql` → `relation "public.contacts" does not exist`.
 `realtime_inbox.sql` adds `calls`, `service_requests`, `appointments`, `tenants`, `wallet_ledger`, and `transcripts` to `supabase_realtime`. Apply that file by hand. Deploy does not run it. `realtime_inbox_replica_identity.sql` sets `REPLICA IDENTITY FULL` so `tenant_id` filters match hangup UPDATEs.

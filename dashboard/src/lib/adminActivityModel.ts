@@ -34,6 +34,18 @@ const ACTIONS: Record<string, string> = {
   save_rates: "Changed rates",
   grant_package_minutes: "Granted minutes",
   set_billing_mode: "Changed charging",
+  draft_package_version: "Opened package draft",
+  update_package_version_draft: "Edited package draft",
+  publish_package_version: "Published package version",
+  archive_package_version: "Archived package version",
+  discard_package_version_draft: "Discarded package draft",
+  approve_package_version: "Approved package version",
+  move_package_version: "Moved to a version",
+  set_tenant_billing_mode: "Changed billing mode",
+  set_new_signup_trial: "Changed signup trial",
+  set_package_editor_enabled: "Changed package editor",
+  tenant_live_payments_set: "Changed live payments",
+  set_price_approval_threshold: "Changed price approval",
   waive_overage: "Waived overage",
   save_voice: "Saved voice",
   set_default_voice: "Set default voice",
@@ -44,6 +56,7 @@ const ACTIONS: Record<string, string> = {
   prepare_mail_domain: "Set up alert mail",
   verify_mail_domain: "Checked alert mail",
   ack_notice: "Acknowledged notice",
+  checkout_total_review_resolved: "Resolved checkout review",
 };
 
 export function actionLabel(action: string): string {

@@ -11,6 +11,8 @@
  * 7. Never speak a default shop name ("the business").
  */
 
+const { RECORDING_NOTICE_EN, recordingNoticeOn } = require('./recordingNotice');
+
 const LANGUAGE_INVITE = 'You can speak in English or Kiswahili.';
 
 const FORBIDDEN_FIRST_OPEN =
@@ -253,7 +255,12 @@ function composeBusinessAssistantIntro(opts = {}) {
       : 'serve';
   const closureNotice = shortenNotice(opts.closureNotice);
   const closed = opts.isOpen === false;
-  const identity = composeOpenerIdentity(opts);
+  // The recording notice rides the identity sentence so every branch below says it.
+  const noticeOn =
+    opts.recordingNotice != null ? Boolean(opts.recordingNotice) : recordingNoticeOn();
+  const identity = noticeOn
+    ? `${composeOpenerIdentity(opts)} ${RECORDING_NOTICE_EN}`
+    : composeOpenerIdentity(opts);
   const invite = languageInviteClause(opts);
   const help = greetingHelpLine(opts);
   const fileName = String(opts.callerFileName || opts.fileOwnerName || '').trim();

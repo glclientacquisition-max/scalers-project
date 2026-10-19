@@ -3,14 +3,19 @@ import { nextCookies } from "better-auth/next-js";
 import { adminAccessCode } from "@/lib/admin-auth-plugin";
 import { configuredAdminHost, configuredAppHost, configuredSiteHost } from "@/lib/adminHost";
 
+/** Production must set a dedicated signing secret, not an access code or shared desk password. */
+export function isAdminAuthProperlyConfigured(): boolean {
+  return Boolean(process.env.BETTER_AUTH_SECRET || process.env.DASHBOARD_SECRET);
+}
+
 function adminAuthSecret(): string {
-  return (
-    process.env.BETTER_AUTH_SECRET ||
-    process.env.DASHBOARD_SECRET ||
-    process.env.ADMIN_ACCESS_CODE ||
-    process.env.DASHBOARD_PASSWORD ||
-    "dev-admin-secret"
-  );
+  const preferred = process.env.BETTER_AUTH_SECRET || process.env.DASHBOARD_SECRET;
+  if (preferred) return preferred;
+  if (process.env.NODE_ENV !== "production") {
+    return process.env.ADMIN_ACCESS_CODE || process.env.DASHBOARD_PASSWORD || "dev-admin-secret";
+  }
+  // Build and misconfigured prod: sessions fail closed; do not sign with door codes.
+  return "unconfigured-super-admin-auth";
 }
 
 function adminAuthBaseURL(): string {

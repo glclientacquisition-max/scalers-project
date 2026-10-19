@@ -4,6 +4,7 @@ import {
   packageUsageGap,
   type PackageUsageCounters,
 } from "@/lib/packageUsageAlign";
+import { minutesUsedFromSeconds } from "@/lib/minutes";
 
 export type BillingRateCard = {
   inboundKesPerSecond: number;
@@ -19,6 +20,8 @@ export type BillingPackage = {
   sku: string;
   name: string;
   monthlyPriceKes: number;
+  /** Stored on the published version. 0 until that row is applied. */
+  annualPriceKes: number;
   seats: number;
   minutes: number;
   sms: number;
@@ -117,9 +120,7 @@ export function parseCount(raw: unknown): number | null {
   return n;
 }
 
-export function minutesUsedFromSeconds(seconds: number): number {
-  return Math.ceil(Math.max(0, Number(seconds) || 0) / 60);
-}
+export { minutesUsedFromSeconds };
 
 export function remainingCount(included: number, used: number): number {
   return Math.max(0, Math.floor(Number(included) || 0) - Math.max(0, Number(used) || 0));
@@ -130,6 +131,8 @@ export type OwnerPackageMeter = {
   period: "month" | "year" | null;
   minutesIncluded: number;
   minutesUsed: number;
+  /** Metered seconds behind minutesUsed, for the shared minutes rule. */
+  secondsUsed: number;
   smsIncluded: number;
   smsUsed: number;
   emailIncluded: number;
@@ -138,7 +141,6 @@ export type OwnerPackageMeter = {
   waUsed: number;
   seatsIncluded: number;
   seatsUsed: number;
-  rates: BillingRateCard;
 };
 
 export function emptyOwnerPackageMeter(): OwnerPackageMeter {
@@ -147,6 +149,7 @@ export function emptyOwnerPackageMeter(): OwnerPackageMeter {
     period: null,
     minutesIncluded: 0,
     minutesUsed: 0,
+    secondsUsed: 0,
     smsIncluded: 0,
     smsUsed: 0,
     emailIncluded: 0,
@@ -155,7 +158,6 @@ export function emptyOwnerPackageMeter(): OwnerPackageMeter {
     waUsed: 0,
     seatsIncluded: 0,
     seatsUsed: 0,
-    rates: { ...DEFAULT_RATES },
   };
 }
 
@@ -180,6 +182,7 @@ function mapPackage(row: Record<string, unknown>): BillingPackage {
     sku: String(row.sku || ""),
     name: String(row.name || ""),
     monthlyPriceKes: num(row.monthly_price_kes),
+    annualPriceKes: 0,
     seats: num(row.seats),
     minutes: num(row.minutes),
     sms: num(row.sms),
@@ -195,27 +198,6 @@ function isMissingCatalog(message: string): boolean {
   return /billing_rate_card|billing_packages|tenant_subscriptions|does not exist|schema cache/i.test(
     message
   );
-}
-
-const STRAW_OFFERS: Array<Omit<PublicPackageOffer, "annualPriceKes">> = [
-  { sku: "starter", name: "Starter", monthlyPriceKes: 5000, seats: 2, minutes: 300, sms: 200, email: 100, staffWa: 200, dids: 1 },
-  { sku: "growth", name: "Growth", monthlyPriceKes: 12000, seats: 5, minutes: 800, sms: 500, email: 250, staffWa: 500, dids: 1 },
-  { sku: "scale", name: "Scale", monthlyPriceKes: 25000, seats: 10, minutes: 2000, sms: 1500, email: 500, staffWa: 1000, dids: 1 },
-];
-
-export function strawPublicBoard(): PublicPackageBoard {
-  return {
-    discountPercent: DEFAULT_RATES.annualDiscountPercent,
-    inboundKesPerMinute: inboundKesPerMinute(DEFAULT_RATES.inboundKesPerSecond),
-    outboundKesPerMinute: outboundKesPerMinute(DEFAULT_RATES.outboundKesPerSecond),
-    smsKes: DEFAULT_RATES.smsKes,
-    emailKes: DEFAULT_RATES.emailKes,
-    whatsappKes: DEFAULT_RATES.whatsappKes,
-    packages: STRAW_OFFERS.map((pack) => ({
-      ...pack,
-      annualPriceKes: annualPriceKes(pack.monthlyPriceKes, DEFAULT_RATES.annualDiscountPercent),
-    })),
-  };
 }
 
 /** No invented prices. Missing catalog or rate card stays blank on the public page. */
@@ -474,7 +456,7 @@ export async function loadOwnerPackageMeter(tenantId: string): Promise<OwnerPack
   if (!tenantId) return empty;
   try {
     const admin = getSupabaseAdmin();
-    const [tenantRes, subRes, ratesRes, seatsRes] = await Promise.all([
+    const [tenantRes, subRes, seatsRes] = await Promise.all([
       admin
         .from("tenants")
         .select(
@@ -488,7 +470,6 @@ export async function loadOwnerPackageMeter(tenantId: string): Promise<OwnerPack
         .eq("tenant_id", tenantId)
         .eq("status", "active")
         .maybeSingle(),
-      admin.from("billing_rate_card").select("*").eq("id", 1).maybeSingle(),
       // Seats in use = members plus unexpired invites (Ops-Billing tenant_seats_used),
       // not members alone.
       admin.rpc("tenant_seats_used", { p_tenant: tenantId }),
@@ -512,18 +493,12 @@ export async function loadOwnerPackageMeter(tenantId: string): Promise<OwnerPack
       if (!packRes.error) packageName = packRes.data?.name ? String(packRes.data.name) : null;
     }
 
-    const rates =
-      ratesRes.error && isMissingCatalog(ratesRes.error.message)
-        ? { ...DEFAULT_RATES }
-        : ratesRes.error
-          ? { ...DEFAULT_RATES }
-          : mapRates((ratesRes.data || {}) as Record<string, unknown>);
-
     return {
       packageName,
       period,
       minutesIncluded: num(tenant.minutes_included),
       minutesUsed: minutesUsedFromSeconds(num(tenant.seconds_used)),
+      secondsUsed: Math.max(0, num(tenant.seconds_used)),
       smsIncluded: num(tenant.sms_included_units),
       smsUsed: num(tenant.sms_used_units),
       emailIncluded: num(tenant.email_included_units),
@@ -532,7 +507,6 @@ export async function loadOwnerPackageMeter(tenantId: string): Promise<OwnerPack
       waUsed: num(tenant.whatsapp_used_units),
       seatsIncluded: num(tenant.seat_included),
       seatsUsed: seatsRes.error ? 0 : num(seatsRes.data),
-      rates,
     };
   } catch {
     return empty;

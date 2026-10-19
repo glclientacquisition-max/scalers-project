@@ -87,7 +87,7 @@ describe("inbox call action", () => {
   it("is a tel: deep link with E.164 plus prefix", () => {
     assert.match(call, /export function telHref/);
     assert.match(call, /tel:\+\$\{digits\}/);
-    assert.match(call, /replace\(\/\\D\/g, ""\)/);
+    assert.match(call, /kePhoneDigits\(rawNumber\)/);
   });
 
   it("is a muted 44px icon button, never filled", () => {
@@ -100,22 +100,19 @@ describe("inbox call action", () => {
     assert.doesNotMatch(call, /bg-\[#0096FF\]|bg-whatsapp/);
   });
 
-  it("sits left of the WhatsApp icon in the inbox trailing dock", () => {
-    assert.match(inbox, /import \{ CallLink \} from "@\/components\/CallLink"/);
-    const dock = inbox.indexOf("<CallLink number={item.callerPhone} />");
-    const wa = inbox.indexOf('variant="icon"');
-    assert.ok(dock > -1 && wa > -1 && dock < wa, "CallLink before WhatsApp icon");
+  it("sits left of WhatsApp in the opened item dock; list rows keep Confirm and Done only", () => {
+    const dock = read("dashboard/src/components/InboxTicketActionDock.tsx");
+    const callAt = dock.indexOf("<CallLink number={callerPhone} />");
+    const waAt = dock.indexOf("<WhatsAppLink", callAt);
+    assert.ok(callAt > -1 && waAt > callAt, "CallLink before WhatsApp icon");
     assert.match(master, /`CallLink`/);
-    assert.match(master, /Inbox Action dock/);
     assert.match(inbox, /Visit requested → Confirm\. Confirmed visit → Done\. Hold → Done/);
     const actionFn = inbox.indexOf("function InboxTrailingAction");
     const recipeAt = inbox.indexOf("inboxListDockRecipe(item)", actionFn);
     const confirmAt = inbox.indexOf('recipe === "confirm"', actionFn);
     const holdAt = inbox.indexOf('recipe === "hold_done"', actionFn);
-    const phoneAt = inbox.indexOf('recipe === "call_wa"', actionFn);
-    assert.ok(recipeAt > -1 && confirmAt > recipeAt && holdAt > confirmAt && phoneAt > holdAt);
-    assert.doesNotMatch(inbox.slice(actionFn, actionFn + 1600), /Send SMS|mailto:/);
-    assert.match(inbox, /flex shrink-0 items-center justify-end gap-2/);
+    assert.ok(recipeAt > -1 && confirmAt > recipeAt && holdAt > confirmAt);
+    assert.doesNotMatch(inbox, /CallLink|WhatsAppLink|call_wa/);
     assert.match(read("dashboard/src/components/InboxJobActions.tsx"), /variant=\{wide \? "primary" : "tonal"\}/);
     assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /variant=\{wide \? "primary" : "tonal"\}/);
     assert.match(call, /label=\{`Call \$\{number\}`\}/);

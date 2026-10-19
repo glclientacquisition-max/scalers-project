@@ -15,18 +15,18 @@ export type AdminLink = {
 
 /**
  * Desktop rail: all eight, in this order. Phone: the four `tab` items plus More.
- * Calls opens the call quality screens (#603) until the Calls list (A6) absorbs them.
- * Settings opens Voices, the one settings screen today.
+ * Quality opens traced call quality (#603).
+ * Voices is the catalog. One settings-like screen today.
  */
 export const ADMIN_LINKS: readonly AdminLink[] = [
   { href: "/admin", label: "Today", exact: true, phone: "tab" },
   { href: "/admin/businesses", label: "Businesses", exact: false, phone: "tab" },
-  { href: "/admin/quality", label: "Calls", exact: false, phone: "tab" },
+  { href: "/admin/quality", label: "Quality", exact: false, phone: "tab" },
   { href: "/admin/billing", label: "Billing", exact: false, phone: "tab" },
   { href: "/admin/numbers", label: "Numbers", exact: false, phone: "more" },
   { href: "/admin/platform", label: "Platform", exact: false, phone: "more" },
   { href: "/admin/activity", label: "Activity", exact: false, phone: "more" },
-  { href: "/admin/voices", label: "Settings", exact: false, phone: "more" },
+  { href: "/admin/voices", label: "Voices", exact: false, phone: "more" },
 ];
 
 /** Older screens still in use, filed under the destination that will absorb them. */
@@ -78,6 +78,10 @@ export function adminParentTarget(pathname: string): { href: string; label: stri
       const parent = linkFor(section.parent);
       return parent ? { href: parent.href, label: parent.label } : { href: "/admin", label: "Today" };
     }
+  }
+
+  if (path.startsWith("/admin/billing/invoices/")) {
+    return { href: "/admin/billing/invoices", label: "Invoices" };
   }
 
   const ranked = ADMIN_LINKS.filter((item) => item.href.startsWith("/admin/") && !item.pending).toSorted(

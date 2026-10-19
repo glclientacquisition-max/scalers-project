@@ -64,10 +64,14 @@ import {
 } from "@/lib/ownerAttestFields";
 import { fieldPathsAttestedOnSettingsSave } from "@/lib/fieldPathsFromSettingsSave";
 import { cleanFieldPaths } from "@/lib/fieldPathRegistry";
+import { factSaveIsConfirm } from "@/lib/deskFeatureFlags";
 import {
   settingsFieldFromScope,
   settingsScopeValidationError,
 } from "@/lib/settingsSaveScope";
+import { ownerUnknownAnswer, planUnknownAnswerSave } from "@/lib/unknownAnswerSpoken";
+import { generateUnknownAnswerSpoken } from "@/lib/unknownAnswerSpokenModel";
+import { withoutUnknownSpokenColumn } from "@/lib/peelMissingColumns";
 import { factHashModeFromEnv, loadCompileProvenance } from "@/lib/tenantFieldProvenance";
 import { overlayFieldMeta, planFactConfirm } from "@/lib/factConfirm";
 import { normalizeFactRow } from "@/lib/factRowNormalize";
@@ -107,6 +111,8 @@ export type SettingsCompileState = {
   error?: string;
   ok?: boolean;
   source?: "gemini" | "local";
+  /** Present when this save owns the unsure line. Null clears the spoken lines. */
+  unknownAnswerSpoken?: { en: string; sw: string; source: string } | null;
   /** Client only: the response was lost (connection dropped). The save may have landed. */
   networkError?: boolean;
 };
@@ -276,8 +282,8 @@ export async function saveAndCompileSettings(
   );
   const unknownAnswerFallback = pick(
     "unknownAnswerFallback",
-    String(formData.get("unknown_answer_fallback") || "").trim(),
-    String(tenant.unknown_answer_fallback || "").trim()
+    ownerUnknownAnswer(formData.get("unknown_answer_fallback")),
+    ownerUnknownAnswer(tenant.unknown_answer_fallback)
   );
   let teamDirectory = pick(
     "teamDirectory",
@@ -492,7 +498,31 @@ export async function saveAndCompileSettings(
   // row never looks changed against its parsed copy. The compile below already
   // sees that pending confirm; the write hashes the stored row as saved.
   const hashMode = factHashModeFromEnv();
-  const explicitPaths = cleanFieldPaths(ownerPathsFromForm);
+  const saveIsConfirm = factSaveIsConfirm();
+  const attestPathsPre = fieldPathsAttestedOnSettingsSave({
+    scope,
+    businessName,
+    vertical,
+    spokenName,
+    agentName,
+    agentTone,
+    agentTools,
+    hasStructuredHours: Boolean(scheduleForSave),
+    businessHoursLength: businessHours.length,
+    businessLocationsCount: businessLocations.length,
+    businessPolicies,
+    productCatalog,
+    servicesCatalog,
+    faqs,
+    hasSocialHandles:
+      Array.isArray(socialHandles?.channels) &&
+      socialHandles.channels.some((row) => row && String(row.value || "").trim()),
+    lineNumber: String(tenant.sautikit_virtual_number || "").trim(),
+    serviceAreas: formAreas ?? serviceAreas ?? null,
+  });
+  const explicitPaths = cleanFieldPaths(
+    saveIsConfirm ? [...ownerPathsFromForm, ...attestPathsPre] : ownerPathsFromForm
+  );
   const tPrep = Date.now();
   const [savedBefore, provenance] = await Promise.all([
     hashMode ? readSavedFactRow(workspace.client, tenant.id) : Promise.resolve(null),
@@ -509,9 +539,22 @@ export async function saveAndCompileSettings(
           after: { ...storedFactRow, ...patch },
           explicitPaths,
           normalize: normalizeFactRow,
+          saveIsConfirm,
         })
       )
     : provenance.fieldMeta;
+  const ownsUnknown = settingsFieldFromScope(scope, "unknownAnswerFallback", true, false);
+  const unknownPlanPromise = ownsUnknown
+    ? planUnknownAnswerSave({
+        submitted: formData.get("unknown_answer_fallback"),
+        storedSpoken: tenant.unknown_answer_spoken,
+        editedEn: String(formData.get("unknown_answer_spoken_en") || ""),
+        editedSw: String(formData.get("unknown_answer_spoken_sw") || ""),
+        touched: String(formData.get("unknown_answer_spoken_touched") || "") === "1",
+        generate: generateUnknownAnswerSpoken,
+      })
+    : null;
+
   const compileInput = {
     businessName,
     servicesOffered,
@@ -536,12 +579,23 @@ export async function saveAndCompileSettings(
   // Fast path: write the facts with the template prompt now (milliseconds), so the owner
   // sees "Saved" quickly and a reload shows the new data. The model-written prompt and
   // the fact bookkeeping run after the response (see after() below).
-  const { prompt } = await compileReceptionistPrompt({ ...compileInput, localOnly: true });
+  const [{ prompt }, unknownPlan] = await Promise.all([
+    compileReceptionistPrompt({ ...compileInput, localOnly: true }),
+    unknownPlanPromise,
+  ]);
+  const unknownAnswerSpoken = unknownPlan?.unknown_answer_spoken ?? null;
   const source = "local" as const;
 
   patch.llm_system_prompt = prompt;
+  if (unknownPlan) Object.assign(patch, unknownPlan);
   const tCompile = Date.now();
-  const { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
+  let { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
+  if (error) {
+    const peeled = withoutUnknownSpokenColumn(error.message, patch);
+    if (peeled) {
+      ({ error } = await workspace.client.from("tenants").update(peeled).eq("id", tenant.id));
+    }
+  }
   bustTenantCache(tenant.id);
   const tWrite = Date.now();
 
@@ -571,6 +625,7 @@ export async function saveAndCompileSettings(
     faqs,
     hasSocialHandles,
     lineNumber: String(tenant.sautikit_virtual_number || "").trim(),
+    serviceAreas: formAreas ?? serviceAreas ?? null,
   });
 
   const client = workspace.client;
@@ -610,6 +665,7 @@ export async function saveAndCompileSettings(
             after: saved,
             explicitPaths,
             normalize: normalizeFactRow,
+            saveIsConfirm,
           })
         );
       } else {
@@ -629,9 +685,10 @@ export async function saveAndCompileSettings(
 
   revalidatePath("/settings");
 
+  const spokenState = ownsUnknown ? { unknownAnswerSpoken } : {};
   if (priceIssues.length) {
-    return { ok: true, source, error: priceIssueSummary(priceIssues, true), fields: priceFields };
+    return { ok: true, source, error: priceIssueSummary(priceIssues, true), fields: priceFields, ...spokenState };
   }
 
-  return { ok: true, source };
+  return { ok: true, source, ...spokenState };
 }

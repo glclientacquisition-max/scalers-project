@@ -105,7 +105,8 @@ One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclu
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |
 | Payment, Holds, Returns, Delivery, Cancellation, Warranty, Other | textarea `rows={2}` | `business_policies` | Assistant on calls |
-| When unsure / What to say | textarea `rows={2}` | `unknown_answer_fallback` | Assistant on calls |
+| When unsure / What to say | textarea, opens on the team default with a `Default` label; `Reset to default` once edited | `unknown_answer_fallback` (null while default) | Assistant on calls |
+| When unsure / Callers hear | English and Kiswahili textareas, shown after an owner line is saved | `unknown_answer_spoken` (null while default) | Assistant on calls |
 | Save | filled sticky | compile; toast `Saved · training line` | Assistant on calls |
 
 ### Voice (`?tab=train&panel=tools`)

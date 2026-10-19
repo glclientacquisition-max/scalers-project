@@ -4,23 +4,6 @@ import { policiesFormKey } from "@/lib/serviceAreas";
 import { catalogContentKey } from "@/lib/catalogPricing";
 import type { ReactNode } from "react";
 
-import Link from "next/link";
-import { ChevronRightIcon } from "@heroicons/react/20/solid";
-import {
-  ArrowDownTrayIcon,
-  BellIcon,
-  BuildingStorefrontIcon,
-  ClockIcon,
-  DocumentTextIcon,
-  LanguageIcon,
-  MapPinIcon,
-  MicrophoneIcon,
-  PhoneArrowUpRightIcon,
-  PhoneIcon,
-  QuestionMarkCircleIcon,
-  ShoppingBagIcon,
-  UsersIcon,
-} from "@heroicons/react/24/outline";
 import type { TenantRow } from "@/lib/supabase";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import dynamic from "next/dynamic";
@@ -36,151 +19,17 @@ import { TenantForm } from "@/components/TenantForm";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import { parseVertical } from "@/lib/vertical";
 import {
-  SETTINGS_NAV,
-  settingsNavHref,
-  settingsNavItemActive,
   settingsPanelHeading,
   type BusinessSettingsTab,
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
-import {
-  settingsStatusKey,
-  type SettingsListStatus,
-} from "@/lib/settingsOptionStatus";
+import { type SettingsListStatus } from "@/lib/settingsOptionStatus";
 import {
   SettingsPageHeader,
   settingsConsoleClass,
   settingsPanelClass,
-  settingsRailClass,
-  settingsRailWrapClass,
 } from "@/components/settingsUi";
-import { deskShiftClass } from "@/components/ui/deskChrome";
-
-function SettingsChevron({ active }: { active: boolean }) {
-  return (
-    <ChevronRightIcon
-      aria-hidden
-      className={active ? "size-5 shrink-0 text-ink" : "size-5 shrink-0 text-ink-3"}
-    />
-  );
-}
-
-const settingsMenuRowClass =
-  "flex min-h-11 w-full items-center gap-3 px-3 text-body font-medium text-ink";
-
-/** One icon per section, keyed like the status map. */
-const SETTINGS_ICON: Record<string, typeof ClockIcon> = {
-  "train:identity": BuildingStorefrontIcon,
-  "train:hours": ClockIcon,
-  "train:locations": MapPinIcon,
-  "train:policies": DocumentTextIcon,
-  catalog: ShoppingBagIcon,
-  import: ArrowDownTrayIcon,
-  "train:faqs": QuestionMarkCircleIcon,
-  "train:tools": MicrophoneIcon,
-  "train:pronunciation": LanguageIcon,
-  test: PhoneArrowUpRightIcon,
-  calls: PhoneIcon,
-  "train:team": UsersIcon,
-  alerts: BellIcon,
-};
-
-/** Statuses that ask the owner to act get the attention colour; the rest stay quiet. */
-const needsAction = (text: string) => /^(needs|not )/i.test(text);
-
-/**
- * Settings home (phone screen and the md+ right pane) and the md+ rail share this list.
- * Home rows: icon, name, one plain line, status. Rail rows: name and status only.
- */
-function SettingsMenu({
-  tab,
-  trainPanel,
-  variant,
-  optionStatus,
-}: {
-  tab: BusinessSettingsTab;
-  trainPanel: SettingsPanel;
-  variant: "index" | "rail";
-  optionStatus: Record<string, SettingsListStatus>;
-}) {
-  const isRail = variant === "rail";
-  return (
-    <nav
-      aria-label="Settings sections"
-      data-settings-menu={variant}
-      className={isRail ? settingsRailClass : "grid min-w-0 w-full gap-6 xl:grid-cols-2 xl:items-start xl:gap-x-8"}
-    >
-      {isRail ? (
-        <Link
-          href="/settings"
-          className="mb-4 flex min-h-11 items-center rounded-lg px-1 text-title text-ink hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-        >
-          Settings
-        </Link>
-      ) : null}
-      {SETTINGS_NAV.map((section, index) => (
-        <section key={section.id} className={isRail && index > 0 ? "mt-6" : undefined}>
-          <h2 className="pointer-events-none mb-2 select-none px-1 text-meta font-medium text-ink-2">
-            {section.title}
-          </h2>
-          <ul className="overflow-hidden rounded-2xl border border-hairline bg-surface [&>li:first-child>a]:rounded-t-2xl [&>li:last-child>a]:rounded-b-2xl">
-            {section.items.map((item) => {
-              const active = settingsNavItemActive(item.target, tab, trainPanel);
-              const key = settingsStatusKey(item.target);
-              const status = optionStatus[key];
-              const statusText = status?.text || "";
-              return (
-                <li key={key} className="border-b border-hairline last:border-b-0">
-                  <Link
-                    href={settingsNavHref(item.target)}
-                    aria-current={active ? "page" : undefined}
-                    className={[
-                      settingsMenuRowClass,
-                      isRail ? "" : "min-h-16",
-                      deskShiftClass,
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand",
-                      active ? "bg-accent-tonal" : "hover:bg-surface-2 active:bg-surface-2",
-                    ].join(" ")}
-                  >
-                    {isRail ? (
-                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                    ) : (
-                      <>
-                        <SettingsRowIcon statusKey={key} />
-                        <span className="min-w-0 flex-1 py-2">
-                          <span className="block truncate">{item.label}</span>
-                          <span className="block text-meta font-normal text-ink-2">{item.description}</span>
-                        </span>
-                      </>
-                    )}
-                    {statusText ? (
-                      <span
-                        title={status?.title || statusText}
-                        className={`max-w-[40%] shrink-0 truncate text-meta font-normal tabular-nums ${needsAction(statusText) ? "text-attention" : "text-ink-2"}`}
-                      >
-                        {statusText}
-                      </span>
-                    ) : null}
-                    <SettingsChevron active={active} />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
-    </nav>
-  );
-}
-
-function SettingsRowIcon({ statusKey }: { statusKey: string }) {
-  const Icon = SETTINGS_ICON[statusKey] ?? DocumentTextIcon;
-  return (
-    <span aria-hidden="true" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-tonal text-accent">
-      <Icon className="h-5 w-5" />
-    </span>
-  );
-}
+import { SettingsMenu, SettingsRail } from "@/components/SettingsSideNav";
 
 function settingsLineState(did: string | null | undefined): {
   lineLive: boolean;
@@ -221,8 +70,11 @@ export function BusinessSettingsShell({
   optionStatus = {},
   liveTransferExecutor = false,
   membersSlot = null,
+  seatNoteSlot = null,
   structuredSlot = null,
   callsSlot = null,
+  assistantSaySlot = null,
+  assistantSayPage = false,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
@@ -231,9 +83,13 @@ export function BusinessSettingsShell({
   optionStatus?: Record<string, SettingsListStatus>;
   liveTransferExecutor?: boolean;
   membersSlot?: ReactNode;
+  /** Team: one note when every seat is taken. */
+  seatNoteSlot?: ReactNode;
   structuredSlot?: Partial<Record<"identity" | "catalog", ReactNode>> | null;
   /** Calls & forwarding (server-built: reads tenants.call_setup and the calls table). */
   callsSlot?: ReactNode;
+  assistantSaySlot?: ReactNode;
+  assistantSayPage?: boolean;
 }) {
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
@@ -264,14 +120,12 @@ export function BusinessSettingsShell({
   ].join(":");
 
   const rail = (
-    <div className={settingsRailWrapClass}>
-      <SettingsMenu
-        tab={tab}
-        trainPanel={trainPanel}
-        variant="rail"
-        optionStatus={optionStatus}
-      />
-    </div>
+    <SettingsRail
+      tab={tab}
+      trainPanel={trainPanel}
+      optionStatus={optionStatus}
+      assistantSayPage={assistantSayPage}
+    />
   );
 
   if (isMenu) {
@@ -293,6 +147,7 @@ export function BusinessSettingsShell({
               trainPanel={trainPanel}
               variant="index"
               optionStatus={optionStatus}
+              assistantSayPage={assistantSayPage}
             />
           </div>
         </div>
@@ -314,6 +169,7 @@ export function BusinessSettingsShell({
           sidebar={rail}
           liveTransferExecutor={liveTransferExecutor}
           membersSlot={formPanel === "team" ? membersSlot : null}
+          seatNoteSlot={formPanel === "team" ? seatNoteSlot : null}
           structuredSlot={structuredSlot}
         />
       ) : (
@@ -333,6 +189,7 @@ export function BusinessSettingsShell({
                   title={heading}
                 />
                 {tab === "calls" ? callsSlot : null}
+                {tab === "assistant-say" ? assistantSaySlot : null}
                 {tab === "import" || tab === "test" ? (
                   <SettingsPanelBody
                     tab={tab}
