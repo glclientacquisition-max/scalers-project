@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- node:test loads this file with require() */
-const { PROD_REF } = require("./provider");
+const { PROD_REF, assertBachsAllowed, bachsMode } = require("./provider");
+
+const DISAGREE = new Set(["status_disagreement", "provider_disagreement", "overpaid", "issue"]);
 
 const PENDING_MS = 30 * 60 * 1000;
 
@@ -163,6 +165,104 @@ function reconciliationReport(input) {
   return rows;
 }
 
+/**
+ * True only for sandbox, or live when the Bachs gate allows a request.
+ * Off, mock, and a closed live gate do not call Bachs.
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+function bachsReadsAllowed(env) {
+  let mode;
+  try {
+    mode = bachsMode(env);
+  } catch {
+    return false;
+  }
+  if (mode !== "sandbox" && mode !== "live") return false;
+  try {
+    assertBachsAllowed(env);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function remoteLabel(row, remote) {
+  if (remote == null) return "missing_bachs";
+  const status = String(remote.paymentStatus || "").toLowerCase();
+  const remotePaid = SUCCESS.has(status);
+  const localPaid = row.localStatus === "succeeded" || row.hasPayment === true;
+  if (remotePaid && localPaid) return "matched";
+  if (remotePaid && !localPaid) return "missing_ours";
+  if (!remotePaid && localPaid) return "mismatch";
+  return null;
+}
+
+/**
+ * Report counts. remotes null means Bachs was not called, so only local
+ * disagreements count as mismatch.
+ * @param {{ rows?: object[], remotes?: Record<string, object | null> | null }} [input]
+ */
+function reconciliationCounts(input = {}) {
+  const counts = { matched: 0, mismatch: 0, missing_ours: 0, missing_bachs: 0 };
+  const remotes = input.remotes;
+  for (const row of input.rows || []) {
+    const checkoutId = row && row.checkoutId;
+    if (remotes && checkoutId && Object.prototype.hasOwnProperty.call(remotes, checkoutId)) {
+      const label = remoteLabel(row, remotes[checkoutId]);
+      if (label) counts[label] += 1;
+      continue;
+    }
+    if (row && DISAGREE.has(row.kind)) counts.mismatch += 1;
+  }
+  return counts;
+}
+
+/**
+ * Report only. listRows is billing_payment_reconciliation. getCheckout is
+ * called only when BACHS_MODE is sandbox or an allowed live mode.
+ * @param {{
+ *   env?: NodeJS.ProcessEnv,
+ *   listRows: () => Promise<object[]>,
+ *   loadAttempts?: (ids: string[]) => Promise<object[]>,
+ *   getCheckout?: (checkoutId: string) => Promise<object | null>,
+ * }} input
+ */
+async function billingReconcileReport(input) {
+  const sqlRows = (await input.listRows()) || [];
+  if (!bachsReadsAllowed(input.env)) {
+    return reconciliationCounts({ rows: sqlRows, remotes: null });
+  }
+  const ids = [...new Set(sqlRows.map((row) => row.attemptId).filter(Boolean))];
+  const attempts = ids.length && input.loadAttempts ? await input.loadAttempts(ids) : [];
+  const byId = new Map((attempts || []).map((row) => [row.id, row]));
+  /** @type {Record<string, object | null>} */
+  const remotes = {};
+  const rows = [];
+  for (const row of sqlRows) {
+    const attempt = row.attemptId ? byId.get(row.attemptId) : null;
+    const checkoutId = attempt && attempt.checkoutSessionId;
+    if (!checkoutId || typeof input.getCheckout !== "function") {
+      rows.push(row);
+      continue;
+    }
+    if (!Object.prototype.hasOwnProperty.call(remotes, checkoutId)) {
+      try {
+        remotes[checkoutId] = await input.getCheckout(checkoutId);
+      } catch {
+        rows.push(row);
+        continue;
+      }
+    }
+    rows.push({
+      ...row,
+      checkoutId,
+      localStatus: attempt.status,
+      hasPayment: Boolean(row.paymentId) || attempt.status === "succeeded",
+    });
+  }
+  return reconciliationCounts({ rows, remotes });
+}
+
 function assertNotProductionUrl(url) {
   if (String(url || "").includes(PROD_REF)) {
     const err = new Error("refusing production database");
@@ -174,5 +274,8 @@ function assertNotProductionUrl(url) {
 module.exports = {
   PENDING_MS,
   reconciliationReport,
+  reconciliationCounts,
+  bachsReadsAllowed,
+  billingReconcileReport,
   assertNotProductionUrl,
 };

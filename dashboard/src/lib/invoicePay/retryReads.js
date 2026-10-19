@@ -32,7 +32,7 @@ async function retryStoredReads(input) {
     if (!attempt) continue;
     if (live) {
       try {
-        assertLiveTenant(attempt.tenantId, env);
+        await assertLiveTenant(attempt.tenantId, env, input.readLiveTenant);
       } catch (err) {
         if (err && err.code === "bachs_live_refused") {
           rows.push({ kind: "retry_skipped", detail: String(checkoutId), reason: "live_not_allowlisted" });
