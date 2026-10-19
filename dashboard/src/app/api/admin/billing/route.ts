@@ -24,6 +24,14 @@ const UNREAD_COLLECTED = "Couldn't read the collected amount. Nothing changed.";
 
 type BookDecision = { ok: true; totalKes: string } | { ok: false; error: string };
 
+/** The helper is plain JS, so its `ok` flag is a boolean until we narrow it. */
+function decidedBook(raw: { ok: boolean; totalKes?: string; error?: string }): BookDecision {
+  if (raw.ok === true && typeof raw.totalKes === "string" && raw.totalKes !== "") {
+    return { ok: true, totalKes: raw.totalKes };
+  }
+  return { ok: false, error: typeof raw.error === "string" && raw.error ? raw.error : UNREAD_COLLECTED };
+}
+
 /**
  * Book uses a live GET only when the gate is open. A closed gate, including
  * an allowlist refusal, books the stored reading and does not call Bachs.
@@ -33,13 +41,13 @@ async function totalForBookedResolve(
   reading: { getKes: string; checkoutId: string },
 ): Promise<BookDecision> {
   const liveOpen = bachsMode() === "live" && !paymentsClosed();
-  if (!liveOpen) return bookTotalForResolve({ live: false, storedKes: reading.getKes });
+  if (!liveOpen) return decidedBook(bookTotalForResolve({ live: false, storedKes: reading.getKes }));
   try {
     assertLiveTenant(businessId);
   } catch (err) {
     const code = err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code || "") : "";
     if (code === "bachs_live_refused") {
-      return bookTotalForResolve({ live: false, storedKes: reading.getKes });
+      return decidedBook(bookTotalForResolve({ live: false, storedKes: reading.getKes }));
     }
     throw err;
   }
@@ -50,11 +58,11 @@ async function totalForBookedResolve(
   } catch {
     return { ok: false, error: UNREAD_COLLECTED };
   }
-  return bookTotalForResolve({
+  return decidedBook(bookTotalForResolve({
     live: true,
     storedKes: reading.getKes,
     fresh: collectedFromCheckout(row),
-  });
+  }));
 }
 
 export async function GET(request: Request) {
