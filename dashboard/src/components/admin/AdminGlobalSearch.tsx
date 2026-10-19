@@ -6,13 +6,14 @@ import { Input } from "@/components/ui/Field";
 import { ListRow } from "@/components/ui/ListRow";
 import type { AdminSearchHit } from "@/lib/adminGlobalSearchModel";
 
-export function AdminGlobalSearch() {
+export function AdminGlobalSearch({ layout = "dropdown" }: { layout?: "dropdown" | "sheet" }) {
   const router = useRouter();
   const listId = useId();
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<AdminSearchHit[]>([]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [active, setActive] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export function AdminGlobalSearch() {
         .then((res) => res.json())
         .then((json: { hits?: AdminSearchHit[] }) => {
           setHits(json.hits || []);
+          setActive(0);
           setOpen(true);
         })
         .catch(() => setHits([]))
@@ -39,18 +41,21 @@ export function AdminGlobalSearch() {
   }, [query]);
 
   useEffect(() => {
+    if (layout === "sheet") return;
     function onDocClick(event: MouseEvent) {
       if (!wrapRef.current?.contains(event.target as Node)) setOpen(false);
     }
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
+  }, [layout]);
 
   function go(hit: AdminSearchHit) {
     setOpen(false);
     setQuery("");
     router.push(hit.href);
   }
+
+  const showHits = open && hits.length > 0;
 
   return (
     <div ref={wrapRef} className="relative w-full">
@@ -61,22 +66,28 @@ export function AdminGlobalSearch() {
         autoComplete="off"
         placeholder="Business or call id"
         aria-label="Search businesses and calls"
-        aria-expanded={open && hits.length > 0}
-        aria-controls={open && hits.length > 0 ? listId : undefined}
+        role="combobox"
+        aria-expanded={showHits}
+        aria-controls={showHits ? listId : undefined}
+        aria-autocomplete="list"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         onFocus={() => {
           if (hits.length > 0) setOpen(true);
         }}
       />
-      {open && hits.length > 0 ? (
+      {showHits ? (
         <ul
           id={listId}
           role="listbox"
-          className="absolute inset-x-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-2xl border border-hairline bg-surface shadow-lg"
+          className={
+            layout === "sheet"
+              ? "mt-2 divide-y divide-hairline"
+              : "absolute inset-x-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-2xl border border-hairline bg-surface shadow-lg"
+          }
         >
-          {hits.map((hit) => (
-            <li key={hit.key} role="option">
+          {hits.map((hit, index) => (
+            <li key={hit.key} role="option" aria-selected={index === active}>
               <ListRow
                 title={hit.title}
                 preview={hit.preview}
@@ -86,8 +97,8 @@ export function AdminGlobalSearch() {
           ))}
         </ul>
       ) : null}
-      {busy && query.trim().length >= 2 ? (
-        <p className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-meta text-ink-3">…</p>
+      {busy && query.trim().length >= 2 && !showHits ? (
+        <p className="pt-2 text-meta text-ink-3">Searching</p>
       ) : null}
     </div>
   );

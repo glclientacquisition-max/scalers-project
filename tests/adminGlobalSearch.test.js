@@ -38,8 +38,11 @@ describe("Super Admin global search", () => {
     assert.match(route, /adminGlobalSearch/);
   });
 
-  it("shows search in the admin header from md breakpoint", () => {
+  it("shows search in the admin header on desktop and a Search sheet on phone", () => {
     assert.match(chrome, /AdminGlobalSearch/);
     assert.match(chrome, /md:block/);
+    assert.match(chrome, /layout="sheet"/);
+    assert.match(chrome, /title="Search"/);
+    assert.match(read("dashboard/src/components/admin/AdminGlobalSearch.tsx"), /aria-selected/);
   });
 });
