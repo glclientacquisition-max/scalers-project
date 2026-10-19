@@ -89,6 +89,7 @@ export const ADMIN_BILLING_DETAIL: AdminBillingClientDetail = {
     },
   ],
   invoiceCount: 2,
+  livePayments: { available: true, enabled: false, beta: true },
 };
 
 export const ADMIN_BILLING_OVERVIEW: AdminBillingOverview = {
@@ -278,6 +279,8 @@ export const ADMIN_BACHS_STATUS: BachsStatusView = {
   liveSwitch: "Off",
   keySet: "No",
   webhookSecretSet: "No",
+  hosting: { modeOn: false, liveMasterOn: false, noticesOn: false, planChangeOn: true },
+  dbFlags: { available: true, packageEditorEnabled: true, signupTrialEnabled: false },
   liveSummary: "None on the list. Environment list: 0.",
   liveNames: [],
   lastWebhook: "None yet",

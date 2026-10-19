@@ -209,6 +209,8 @@ export type AdminBillingClientDetail = {
   checkoutReviews: CheckoutReview[];
   /** Null when the invoice table could not be read. */
   invoiceCount: number | null;
+  /** Live payment row for this business. Unavailable when the table cannot be read. */
+  livePayments: { available: boolean; enabled: boolean; beta: boolean };
 };
 
 function reviewText(raw: unknown, key: "get_kes" | "seen_kes"): string {
@@ -278,7 +280,36 @@ export async function loadAdminBillingClient(tenantId: string): Promise<AdminBil
     subscription,
     checkoutReviews: await loadOpenCheckoutReviews(tenantId),
     invoiceCount: await countInvoices(tenantId),
+    livePayments: await loadLivePayments(tenantId, row.billing_enforcement),
   };
+}
+
+async function loadLivePayments(
+  tenantId: string,
+  enforcement: BillingMode,
+): Promise<AdminBillingClientDetail["livePayments"]> {
+  const admin = getSupabaseAdmin();
+  const sub = await admin
+    .from("tenant_subscriptions")
+    .select("billing_status")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  let beta = enforcement === "off";
+  if (!sub.error) {
+    const status = typeof sub.data?.billing_status === "string" ? sub.data.billing_status : "beta";
+    if (status === "beta") beta = true;
+  } else if (!isMissingTableError(sub.error)) {
+    logAdminError("billing-live-status", sub.error);
+  }
+
+  const live = await admin.from("billing_live_tenants").select("enabled").eq("tenant_id", tenantId).maybeSingle();
+  if (live.error) {
+    const missing =
+      isMissingTableError(live.error) || /column .+ does not exist/i.test(String(live.error.message || ""));
+    if (!missing) logAdminError("billing-live-tenant", live.error);
+    return { available: false, enabled: false, beta };
+  }
+  return { available: true, enabled: live.data?.enabled === true, beta };
 }
 
 async function countInvoices(tenantId: string): Promise<number | null> {

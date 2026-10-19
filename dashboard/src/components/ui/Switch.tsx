@@ -39,14 +39,14 @@ export function Switch({
         className={cx(
           "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full",
           deskShiftClass,
-          checked && !disabled ? "bg-accent" : "bg-hairline",
+          checked ? "bg-accent" : "bg-hairline",
         )}
       >
         <span
           className={cx(
             "inline-block h-5 w-5 rounded-full bg-surface shadow",
             deskShiftClass,
-            checked && !disabled ? "translate-x-6" : "translate-x-1",
+            checked ? "translate-x-6" : "translate-x-1",
           )}
         />
       </span>

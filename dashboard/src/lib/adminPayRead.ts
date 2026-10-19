@@ -7,6 +7,7 @@ import {
   auditTitle,
   bachsModeLabel,
   bachsStatusFromEnv,
+  hostingSwitches,
   dueLabel,
   invoiceHref,
   invoiceNumberLabel,
@@ -25,6 +26,7 @@ import {
   type AdminInvoiceListRow,
   type AttentionItem,
   type BachsStatusView,
+  type DbFlagSwitches,
   type ReviewTarget,
 } from "@/lib/adminPayCopy";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -495,11 +497,35 @@ export async function loadBachsStatus(): Promise<BachsStatusView> {
     reconcile = reconcileCounts(rows as { kind?: string | null }[]);
   }
 
+  const hosting = hostingSwitches({
+    mode: process.env.BACHS_MODE,
+    liveAllowed: process.env.BACHS_LIVE_ALLOWED,
+    noticesSend: process.env.BILLING_NOTICES_SEND,
+    planChange: process.env.DESK_PLAN_CHANGE,
+  });
+  const settings = await admin
+    .from("billing_lifecycle_settings")
+    .select("package_editor_enabled, new_signup_trial_enabled")
+    .eq("id", 1)
+    .maybeSingle();
+  let dbFlags: DbFlagSwitches = { available: false, packageEditorEnabled: false, signupTrialEnabled: false };
+  if (settings.error) {
+    if (!schemaMiss(settings.error)) logAdminError("billing-flags", settings.error);
+  } else if (settings.data) {
+    dbFlags = {
+      available: true,
+      packageEditorEnabled: settings.data.package_editor_enabled !== false,
+      signupTrialEnabled: settings.data.new_signup_trial_enabled === true,
+    };
+  }
+
   return {
     modeLabel: bachsModeLabel(flags.mode),
     liveSwitch: flags.liveSwitch,
     keySet: flags.keySet,
     webhookSecretSet: flags.webhookSecretSet,
+    hosting,
+    dbFlags,
     liveSummary,
     liveNames,
     lastWebhook,

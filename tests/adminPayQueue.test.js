@@ -25,6 +25,7 @@ function load(body) {
     import {
       allowlistCount,
       bachsStatusFromEnv,
+      hostingSwitches,
       kshLabel,
       reconcileCounts,
       reviewReasonFromRaw,
@@ -74,6 +75,18 @@ describe("admin pay queue labels", () => {
     assert.equal(off.keySet, "No");
   });
 
+  it("reads hosting switches without echoing secrets or env names", () => {
+    const got = load(`hostingSwitches({
+      mode: "sandbox",
+      liveAllowed: "true",
+      noticesSend: "ON",
+      planChange: "on",
+    })`);
+    assert.deepEqual(got, { modeOn: true, liveMasterOn: true, noticesOn: true, planChangeOn: true });
+    const locked = load(`hostingSwitches({ mode: "mock", liveAllowed: "yes", noticesSend: "true", planChange: "true" })`);
+    assert.deepEqual(locked, { modeOn: false, liveMasterOn: false, noticesOn: false, planChangeOn: false });
+  });
+
   it("counts an environment list without returning the ids", () => {
     const got = load(`({
       all: allowlistCount("*"),
@@ -109,6 +122,35 @@ describe("admin pay queue labels", () => {
     }
     const status = read("dashboard/src/components/AdminPaymentsStatus.tsx");
     assert.match(status, /Webhook secret/);
+    assert.match(status, /Changed in hosting settings/);
+    assert.match(status, /Package editor/);
+    assert.match(status, /Signup trial/);
+    assert.match(status, /All live payments/);
     assert.doesNotMatch(status, /API key|api key/i);
+    assert.doesNotMatch(status, /BILLING_NOTICES_SEND|DESK_PLAN_CHANGE|BACHS_/);
+    const money = read("dashboard/src/components/AdminShopMoneyPanel.tsx");
+    assert.match(money, /Live payments stay off while this business is on beta/);
+    assert.match(money, /\/api\/billing\/live-tenants/);
+    assert.match(money, /confirm: true/);
+    assert.match(money, /label="Charging"/);
+    assert.match(money, /checked=\{chargingOn\}/);
+    const flags = read("dashboard/src/app/api/admin/billing/flags/route.ts");
+    assert.match(flags, /requireSuperAdmin/);
+    assert.match(flags, /packageEditorWritesAllowed/);
+    assert.match(flags, /admin_set_package_editor_enabled/);
+    assert.match(flags, /admin_set_new_signup_trial/);
+    assert.match(flags, /adminActorName\(\)/);
+    assert.doesNotMatch(flags, /body\.actor|posted\.actor/);
+    const sql = read("docs/supabase/billing_package_editor_flag.sql");
+    const body = sql.slice(sql.indexOf("as $$"), sql.indexOf("$$;"));
+    assert.match(body, /_package_editor_actor/);
+    assert.match(body, /set_package_editor_enabled/);
+    assert.match(body, /_billing_audit/);
+    assert.doesNotMatch(body, /_package_editor_open/);
+    assert.match(sql, /grant execute on function public\.admin_set_package_editor_enabled\(boolean, text, text, boolean\) to service_role/);
+    assert.match(sql, /from public, anon, authenticated/);
+    const toggle = read("dashboard/src/components/ui/Switch.tsx");
+    assert.match(toggle, /checked \? "bg-accent"/);
+    assert.doesNotMatch(toggle, /checked && !disabled \? "bg-accent"/);
   });
 });

@@ -23,6 +23,7 @@ import { assignmentFromBusiness } from "@/lib/packagePriceLabel";
 import { usedOfIncluded } from "@/lib/packageUsageAlign";
 import { chargingAction, packageChange, requestErrorText } from "@/lib/adminBillingCopy";
 import { CheckoutReviewResolve } from "@/components/CheckoutReviewResolve";
+import { ReasonedSwitch } from "@/components/ReasonedSwitch";
 
 type MoneyTask = "package" | "plan" | "grant" | "charges" | "history" | "remove";
 
@@ -165,6 +166,16 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
     ? sub.gap
     : `${usedOfIncluded(row.minutesUsed, row.minutesIncluded)} min`;
   const planPreview = adminModeLabel(row.billing_enforcement);
+  const chargingOn = row.billing_enforcement !== "off";
+  const live = detail.livePayments;
+  const liveDisabled = !live.available || live.beta;
+  const livePreview = !live.available
+    ? "Not on this database."
+    : live.beta
+      ? "Live payments stay off while this business is on beta."
+      : live.enabled
+        ? "On"
+        : "Off";
   const optInPreview = row.on_demand_usage_enabled ? "Yes" : "No";
 
   async function submitPlan() {
@@ -222,6 +233,42 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
     }
   }
 
+  async function saveCharging(next: boolean, reason: string) {
+    const modeNext: BillingMode = next ? "soft" : "off";
+    const res = await fetch("/api/admin/billing", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "set_billing_mode",
+        business_id: row.id,
+        mode: modeNext,
+        note: reason,
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return requestErrorText(json, "That didn't save. Nothing changed.");
+    setMode(modeNext);
+    router.refresh();
+    return null;
+  }
+
+  async function saveLivePayments(enabled: boolean, reason: string) {
+    const res = await fetch("/api/billing/live-tenants", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        tenantId: row.id,
+        enabled,
+        reason,
+        confirm: true,
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return requestErrorText(json, "That didn't save. Nothing changed.");
+    router.refresh();
+    return null;
+  }
+
   async function confirmCharge() {
     setSavingCharge(true);
     await post(
@@ -266,7 +313,42 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
       {sub?.packageId ? (
         <ListRow title="Remove package" preview="Now or end of period" onOpen={() => openTask("remove")} />
       ) : null}
-      <ListRow title="Plan" preview={planPreview} onOpen={() => openTask("plan")} />
+      <ListRow
+        title="Plan"
+        preview={planPreview}
+        onOpen={() => openTask("plan")}
+        actions={
+          <ReasonedSwitch
+            checked={chargingOn}
+            label="Charging"
+            title={(next) => (next ? "Start charging?" : "Stop charging?")}
+            explain={(next) =>
+              next
+                ? "Past included is charged when the owner opted in on Usage. Calls still connect."
+                : "Meter only. No charges."
+            }
+            confirmLabel={(next) => (next ? "Start charging" : "Stop charging")}
+            onSave={saveCharging}
+          />
+        }
+      />
+      <ListRow
+        title="Live payments"
+        preview={livePreview}
+        actions={
+          <ReasonedSwitch
+            checked={live.available && live.enabled}
+            disabled={liveDisabled}
+            label="Live payments"
+            title={(next) => (next ? "Turn live payments on?" : "Turn live payments off?")}
+            explain={(next) =>
+              next ? "This business can take live payments." : "Live payments stop for this business."
+            }
+            confirmLabel={(next) => (next ? "Turn on" : "Turn off")}
+            onSave={saveLivePayments}
+          />
+        }
+      />
       <ListRow title="Usage" preview={usagePreview} />
       <ListRow title="Owner opted in" preview={optInPreview} />
       <ListRow title="Charges" preview="Ledger lines this period" onOpen={() => openTask("charges")} />

@@ -43,7 +43,9 @@ test.describe("admin billing attention fixtures", () => {
     await page.goto("/dev/admin-payments", { waitUntil: "networkidle" });
     await page.waitForTimeout(400);
     await expect(page.getByRole("heading", { name: "Payments" })).toBeVisible();
-    await expect(page.getByText("Webhook secret")).toBeVisible();
+    await expect(page.getByText("Changed in hosting settings")).toBeVisible();
+    await expect(page.getByRole("switch", { name: "Package editor" })).toBeVisible();
+    await expect(page.getByRole("switch", { name: "Plan changes" })).toBeDisabled();
     await page.screenshot({ path: join(OUT, `${tag}-payments.png`), fullPage: true });
 
     await page.goto("/dev/admin-shop", { waitUntil: "networkidle" });
@@ -52,7 +54,14 @@ test.describe("admin billing attention fixtures", () => {
     const money = page.locator("#shop-money");
     await money.scrollIntoViewIfNeeded();
     await expect(money.getByText("Collected amount has no receipt")).toBeVisible();
+    await expect(money.getByText("Live payments stay off while this business is on beta.")).toBeVisible();
+    await expect(money.getByRole("switch", { name: "Live payments" })).toBeDisabled();
     await page.screenshot({ path: join(OUT, `${tag}-shop-money.png`), fullPage: true });
+
+    await money.getByRole("switch", { name: "Charging" }).click();
+    await expect(page.getByText("Start charging?")).toBeVisible();
+    await expect(page.locator(".desk-drawer").getByLabel("Reason")).toBeVisible();
+    await page.screenshot({ path: join(OUT, `${tag}-confirm.png`) });
 
     testInfo.annotations.push({ type: "screenshots", description: OUT });
   });

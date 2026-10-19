@@ -74,11 +74,26 @@ export type AdminInvoiceDetail = {
   warning: string | null;
 };
 
+export type HostingSwitches = {
+  modeOn: boolean;
+  liveMasterOn: boolean;
+  noticesOn: boolean;
+  planChangeOn: boolean;
+};
+
+export type DbFlagSwitches = {
+  available: boolean;
+  packageEditorEnabled: boolean;
+  signupTrialEnabled: boolean;
+};
+
 export type BachsStatusView = {
   modeLabel: string;
   liveSwitch: "On" | "Off";
   keySet: "Yes" | "No";
   webhookSecretSet: "Yes" | "No";
+  hosting: HostingSwitches;
+  dbFlags: DbFlagSwitches;
   liveSummary: string;
   liveNames: string[];
   lastWebhook: string;
@@ -203,6 +218,22 @@ export function bachsStatusFromEnv(env: {
     liveSwitch,
     keySet: String(env.key || "").trim() ? "Yes" : "No",
     webhookSecretSet: String(env.webhookSecret || "").trim() ? "Yes" : "No",
+  };
+}
+
+/** Locked hosting switches. Names here are not environment variable names. */
+export function hostingSwitches(env: {
+  mode?: string | null;
+  liveAllowed?: string | null;
+  noticesSend?: string | null;
+  planChange?: string | null;
+}): HostingSwitches {
+  const parsed = bachsStatusFromEnv({ mode: env.mode, liveAllowed: env.liveAllowed });
+  return {
+    modeOn: parsed.mode === "sandbox" || parsed.mode === "live",
+    liveMasterOn: parsed.liveSwitch === "On",
+    noticesOn: String(env.noticesSend ?? "").trim().toLowerCase() === "on",
+    planChangeOn: String(env.planChange ?? "").trim() === "on",
   };
 }
 
