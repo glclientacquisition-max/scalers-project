@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { MinusIcon, PlusIcon } from "@heroicons/react/24/outline";
 import {
   changeMemberRoleAction,
   inviteMemberAction,
@@ -15,12 +16,18 @@ import {
 import { ROLE_BLURBS, ROLE_LABELS, assignableRoles, canManageMember, type Role } from "@/lib/permissions";
 import { daysLeft } from "@/lib/invites";
 import type { MembersData } from "@/lib/membersLoad";
+import type { PlanEntry } from "@/lib/planEntry";
 import { transferConfirmMatches } from "@/lib/memberConfirm";
 import { INVITES_PAGE, MEMBERS_PAGE } from "@/lib/teamLimits";
-import { Button, pendingDotClass } from "@/components/ui/Button";
+import { setExtraSeatsAction, type PlanActionState } from "@/app/(desk)/settings/plan/planActions";
+import { Button, ButtonLink, pendingDotClass } from "@/components/ui/Button";
 import { ChoiceSheet } from "@/components/ui/ChoiceSheet";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
+import { IconButton } from "@/components/ui/IconButton";
+import { Input, Select } from "@/components/ui/Field";
+import { Sheet } from "@/components/ui/Sheet";
 import { notify } from "@/components/ui/DeskNotice";
+import { formatKsh, seatIncreaseCopy } from "@/lib/planPricing";
 import { SettingsGroup, settingsFieldClass, settingsGroupTitleClass } from "@/components/settingsUi";
 
 type Pending = {
@@ -43,7 +50,18 @@ const linkClass =
  * Settings > Team & access > Members. Renders inside the Settings <form>, so there are
  * no nested forms: every action is called directly and confirmed in a drawer.
  */
-export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData; viewerRole: Role; viewerId: string }) {
+export function MembersPanel({
+  data,
+  viewerRole,
+  viewerId,
+  planEntry = null,
+}: {
+  data: MembersData;
+  viewerRole: Role;
+  viewerId: string;
+  /** Change plan when every seat is taken. Null on beta. */
+  planEntry?: PlanEntry | null;
+}) {
   const [email, setEmail] = useState("");
   const roles = assignableRoles(viewerRole);
   const [role, setRole] = useState<Role>(roles.includes("staff") ? "staff" : roles[0] || "viewer");
@@ -51,13 +69,55 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
   const [pending, start] = useTransition();
   const [confirming, setConfirming] = useState<Pending | null>(null);
   const [typed, setTyped] = useState("");
+  const [seatOpen, setSeatOpen] = useState(false);
+  const [seatQty, setSeatQty] = useState(1);
+  const [seatNote, setSeatNote] = useState<string | null>(null);
+  const seatOffer = data.seatOffer;
+  const seatPrice = seatOffer?.extraSeatMonthlyKes ?? null;
+  const maxAdd = Math.max(0, 100 - (seatOffer?.extraSeats ?? 0));
   /** The control whose action is in flight; only it shows a spinner, the rest just disable. */
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const spinning = (key: string) => pending && activeKey === key;
+
+  async function confirmSeatInvite() {
+    if (!seatOffer || seatPrice == null || !email.trim()) return;
+    const form = new FormData();
+    form.set("extra_seats", String(seatOffer.extraSeats + seatQty));
+    form.set("idempotency_key", crypto.randomUUID());
+    let result: PlanActionState;
+    try {
+      result = await setExtraSeatsAction({ ok: false }, form);
+    } catch {
+      result = { ok: false, error: "Something went wrong. Try again." };
+    }
+    const saved = (result as { ok: boolean }).ok;
+    if (!saved) {
+      setSeatNote(result.message || result.error || "Plan changes open soon");
+      return;
+    }
+    setSeatOpen(false);
+    run(() => inviteMemberAction(email, role), { key: "invite" });
+  }
   const busy = useRef(false);
   const router = useRouter();
   const canInvite = roles.length > 0;
   const { seats, totals, limits } = data;
+  const canBuySeat = Boolean(seats.full && seatPrice != null && maxAdd >= 1);
+  const seatLine =
+    canBuySeat &&
+    seatOffer?.seatUnitKes != null &&
+    seatOffer.daysLeft != null &&
+    seatOffer.daysInPeriod != null &&
+    seatPrice != null
+      ? seatIncreaseCopy({
+          quantity: seatQty,
+          monthlyKes: seatPrice,
+          unitKes: seatOffer.seatUnitKes,
+          daysLeft: seatOffer.daysLeft,
+          daysInPeriod: seatOffer.daysInPeriod,
+          periodMonth: seatOffer.periodEndMonth,
+        })
+      : null;
 
   /** Runs one action at a time and always shows the outcome: inline + desk toast (survives a re-render). */
   function run(fn: () => Promise<MembersActionResult>, opts?: { refreshAll?: boolean; onDone?: () => void; key?: string }) {
@@ -267,10 +327,32 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
       {canInvite ? (
         seats.full ? (
           <SettingsGroup title="Invite">
-            <p className="flex min-h-12 items-center px-4 py-2.5 text-body text-ink">All {seats.included} seats are in use.</p>
-            <Link href="/wallet" className={linkClass + " justify-start"}>
-              Upgrade your package to invite more people
-            </Link>
+            <p role="status" className="flex min-h-12 items-center px-4 py-2.5 text-body font-medium text-warn">
+              All {seats.included} seats are in use.
+            </p>
+            {canBuySeat || planEntry ? (
+              <div className="flex flex-wrap justify-end gap-2 px-4 py-3">
+                {planEntry ? (
+                  <ButtonLink href={planEntry.href} variant="tonal">
+                    {planEntry.label}
+                  </ButtonLink>
+                ) : null}
+                {canBuySeat ? (
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="md"
+                    onClick={() => {
+                      setSeatQty(1);
+                      setSeatNote(null);
+                      setSeatOpen(true);
+                    }}
+                  >
+                    Invite
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
           </SettingsGroup>
         ) : (
           <SettingsGroup title="Invite">
@@ -317,6 +399,68 @@ export function MembersPanel({ data, viewerRole, viewerId }: { data: MembersData
         <p role={flash.error ? "alert" : "status"} className={`-mt-3 px-1 text-meta ${flash.error ? "text-attention" : "text-ink-2"}`}>
           {flash.error || flash.message}
         </p>
+      ) : null}
+
+      {canBuySeat && seatPrice != null ? (
+        <Sheet
+          open={seatOpen}
+          onOpenChange={setSeatOpen}
+          title={`Add a seat, ${formatKsh(seatPrice)} a month`}
+          footer={
+            <Button
+              type="button"
+              variant="tonal"
+              block
+              pending={spinning("invite")}
+              disabled={pending || !email.trim()}
+              onClick={() => void confirmSeatInvite()}
+            >
+              Confirm
+            </Button>
+          }
+        >
+          <div className="flex items-center gap-3">
+            <IconButton label="Fewer seats" onClick={() => setSeatQty((n) => Math.max(1, n - 1))} disabled={seatQty <= 1}>
+              <MinusIcon />
+            </IconButton>
+            <span className="min-w-8 text-center text-title tabular-nums text-ink">{seatQty}</span>
+            <IconButton
+              label="More seats"
+              onClick={() => setSeatQty((n) => Math.min(maxAdd, n + 1))}
+              disabled={seatQty >= maxAdd}
+            >
+              <PlusIcon />
+            </IconButton>
+          </div>
+          {seatLine ? <p className="mt-3 text-body text-ink-2">{seatLine}</p> : null}
+          <div className="mt-4">
+            <label className="mb-1.5 block text-meta font-medium text-ink" htmlFor="seat-invite-email">
+              Email
+            </label>
+            <Input
+              id="seat-invite-email"
+              type="email"
+              inputMode="email"
+              autoComplete="off"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@business.co.ke"
+            />
+          </div>
+          <div className="mt-3">
+            <label className="mb-1.5 block text-meta font-medium text-ink" htmlFor="seat-invite-role">
+              Role
+            </label>
+            <Select id="seat-invite-role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
+              {roles.map((item) => (
+                <option key={item} value={item}>
+                  {ROLE_LABELS[item]}
+                </option>
+              ))}
+            </Select>
+          </div>
+          {seatNote ? <p className="mt-3 text-body text-ink">{seatNote}</p> : null}
+        </Sheet>
       ) : null}
 
       <ConfirmSheet

@@ -25,6 +25,7 @@ export function TeamFixture({ full, open }: { full: boolean; open: string }) {
     seats: full ? { used: 2, included: 2, full: true, members: 2, pending: 0 } : { used: 3, included: 5, full: false, members: 2, pending: 1 },
     totals: { members: 2, invites: full ? 0 : 1 },
     limits: { members: 50, invites: 50 },
+    seatOffer: null,
   };
   const [team, setTeam] = useState<TeamDirectoryEntry[]>([
     { name: "Alvin Kiprotich Yegon", role: "General manager", phone: "+254790123456", email: "yegonalvin@gmail.com", receives_escalation: true, receives_inbox: true, receives_ops: true },
