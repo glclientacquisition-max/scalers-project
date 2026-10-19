@@ -254,7 +254,16 @@ const LABEL_GENERIC = new Set([
 // NOT generic: 'deep', 'standard' and similar tier words are what tell sibling
 // rows apart ("Deep clean, 2 bedroom" vs "Standard clean, 2 bedroom").
 const EN_NUM_WORD = { one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9' };
-const SW_NUM_WORD = { moja: '1', mbili: '2', tatu: '3', nne: '4', tano: '5', sita: '6', saba: '7', nane: '8', tisa: '9' };
+// Bare counting forms plus the noun-class forms callers actually say with a noun:
+// "chumba kimoja", "vyumba viwili/vitatu", "watu wawili", "magari mawili".
+const SW_NUM_WORD = {
+  moja: '1', kimoja: '1', mmoja: '1', limoja: '1',
+  mbili: '2', viwili: '2', wawili: '2', mawili: '2',
+  tatu: '3', vitatu: '3', watatu: '3', matatu: '3',
+  nne: '4', vinne: '4', wanne: '4', manne: '4',
+  tano: '5', vitano: '5', watano: '5', matano: '5',
+  sita: '6', saba: '7', nane: '8', tisa: '9',
+};
 
 function normalizeCatalogueText(text) {
   return String(text || '')

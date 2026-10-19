@@ -95,6 +95,21 @@ describe('catalogue price matching: no false positives (Jirani siblings)', () =>
     assert.match(hit.speech, /Deep clean, 2 bedroom/);
   });
 
+  it('Swahili noun-class numbers: chumba kimoja / vyumba viwili / vyumba vitatu', () => {
+    const cases = [
+      ['Bei ya deep clean, chumba kimoja?', 'Deep clean, 1 bedroom'],
+      ['Deep clean ya vyumba viwili ni bei gani?', 'Deep clean, 2 bedroom'],
+      ['Bei ya standard clean vyumba viwili?', 'Standard clean, 2 bedroom'],
+      ['Bei ya deep clean vyumba vitatu?', 'Deep clean, 3 bedroom'],
+    ];
+    for (const [q, name] of cases) {
+      const hit = sw(q);
+      assert.equal(hit.result.status, 'found', q);
+      assert.match(hit.speech, new RegExp(name), q);
+    }
+    assert.equal(sw('Bei ya deep clean vyumba vinne?').result.status !== 'found', true);
+  });
+
   it('two items named in one question still asks which one', () => {
     const hit = price('How much is sofa cleaning and carpet cleaning?', profile);
     assert.equal(hit.result.status, 'ambiguous');
