@@ -10,7 +10,7 @@ export default function DevAdminBillingPage() {
 
   return (
     <AdminShell operatorName="alvin">
-      <AdminPageHeader title="Billing" subtitle="Platform queue, mix, and minutes." />
+      <AdminPageHeader title="Billing" />
       <AdminBillingListPanel overview={ADMIN_BILLING_OVERVIEW} />
     </AdminShell>
   );
