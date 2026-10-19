@@ -297,7 +297,7 @@ describe('assistantSayReadiness', () => {
             payment: 'Cash on delivery only',
           },
         },
-        complete: true,
+        complete: false,
       },
       {
         name: 'legacy-till-and-cash',

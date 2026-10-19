@@ -818,9 +818,6 @@ function payReading(profile, pay) {
   const tenant = tenantRowFromProfile(profile);
   const value = factValueForPath('payments.methods', tenant);
   const bag = pay && typeof pay === 'object' ? pay : {};
-  if (!paySlots(bag).length && legacyPaymentText(profile)) {
-    return confirmReading(profile, 'payments.methods', value, { ...bag, source: bag.source || 'owner' });
-  }
   return confirmReading(profile, 'payments.methods', value, bag);
 }
 
@@ -847,28 +844,25 @@ function payMethodIds(pay) {
   return asArray(pay?.methods).map((m) => String(m));
 }
 
-function legacyPaymentText(profile) {
-  return String(asObject(profile.businessPolicies)?.payment || '').trim();
+function payCashSw(cashLike) {
+  const parts = [];
+  if (cashLike.includes('cash')) parts.push('pesa taslimu');
+  if (cashLike.includes('cheque')) parts.push('hundi');
+  if (!parts.length) return '';
+  if (parts.length === 1) return `Unaweza kulipa kwa ${parts[0]}.`;
+  return `Unaweza kulipa kwa ${parts.join(' au ')}.`;
 }
 
-/** Cash, cheque, or legacy policy text when there is no till/paybill-style number to speak. */
-function payWithoutNumberAnswer(profile, pay, kind) {
+/** Structured cash or cheque when there is no till/paybill-style number to speak. */
+function payWithoutNumberAnswer(pay, kind) {
   const methods = payMethodIds(pay);
   const wantsCash = kind === 'any' || kind === 'cash';
   const cashLike = methods.filter((m) => m === 'cash' || m === 'cheque');
-  if (wantsCash && cashLike.length) {
-    const spoken = cashLike.map((m) => (m === 'cheque' ? 'cheque' : 'cash')).join(' or ');
-    const en = `You can pay by ${spoken}.`;
-    const sw = cashLike.includes('cash')
-      ? 'Unaweza kulipa kwa pesa taslimu.'
-      : 'Unaweza kulipa kwa hundi.';
-    return { en, sw, id: 'pay.cash', value: spoken };
-  }
-  if (kind !== 'any') return null;
-  const legacy = legacyPaymentText(profile);
-  if (!legacy || paySlots(pay).length) return null;
+  if (!wantsCash || !cashLike.length) return null;
   if (methods.length && cashLike.length !== methods.length) return null;
-  return { en: legacy, sw: legacy, id: 'pay.policy_text', value: legacy };
+  const spoken = cashLike.map((m) => (m === 'cheque' ? 'cheque' : 'cash')).join(' or ');
+  const en = `You can pay by ${spoken}.`;
+  return { en, sw: payCashSw(cashLike), id: 'pay.cash', value: spoken };
 }
 
 function payKindOf(query) {
@@ -903,7 +897,7 @@ function lookupPay(query, ctx) {
     if (kind === 'bank' || kind === 'card') {
       return notFoundInList(profile, `pay.${kind}`, null, 'pay');
     }
-    const plain = payWithoutNumberAnswer(profile, pay, kind);
+    const plain = payWithoutNumberAnswer(pay, kind);
     if (plain) {
       const payRead = payReading(profile, pay);
       if (!payRead.ok) return unconfirmed(profile, plain.id, 'pay', payRead.reason, 'pay');
