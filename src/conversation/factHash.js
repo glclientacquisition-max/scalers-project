@@ -19,6 +19,8 @@
 // Twin: dashboard/src/lib/factHash.ts. Both run tests/fixtures/factHashVectors.json.
 
 const crypto = require('node:crypto');
+const { factPaymentsV2Hash } = require('./deskFeatureFlags');
+const { paymentsFactHashValue } = require('./paymentsFactHashValue');
 
 const DECIMAL_RE = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
 
@@ -270,6 +272,16 @@ function stableRowId(row) {
   return id;
 }
 
+function serviceAreaFeeFactValue(area) {
+  if (!area) return null;
+  return {
+    id: String(area.id || '').trim().toLowerCase(),
+    fee_mode: area.fee_mode ?? null,
+    fee_ksh: area.fee_ksh ?? null,
+    modes: Array.isArray(area.modes) ? area.modes : null,
+  };
+}
+
 function findCatalogRow(list, key, kind) {
   for (let i = 0; i < list.length; i += 1) {
     const row = list[i];
@@ -295,7 +307,21 @@ function factValueForPath(fieldPath, tenant = {}) {
   const t = tenant && typeof tenant === 'object' ? tenant : {};
   if (SCALAR_COLUMNS[path]) return t[SCALAR_COLUMNS[path]] ?? null;
   const policies = asObj(t.business_policies);
-  if (path === 'payments.methods') return policies.payment ?? null;
+  if (path === 'payments.methods') {
+    if (factPaymentsV2Hash()) {
+      const structured = paymentsFactHashValue(policies?.payments);
+      if (structured) return structured;
+    }
+    return policies.payment ?? null;
+  }
+  const areaMatch = path.match(/^service_areas\.(.+)$/);
+  if (areaMatch) {
+    const id = String(areaMatch[1] || '').trim().toLowerCase();
+    const bag = asObj(t.service_areas);
+    const areas = asList(bag?.areas);
+    const area = areas.find((row) => String(row?.id || '').trim().toLowerCase() === id);
+    return area ? serviceAreaFeeFactValue(area) : null;
+  }
   if (path === 'policies.holds' || path === 'policies.holds.allowed') return holdsFactValue(policies);
   let m = path.match(/^policies\.([A-Za-z0-9_]+)$/);
   if (m) return policies[m[1]] ?? null;
@@ -345,6 +371,7 @@ function tenantRowFromProfile(profile = {}) {
     hours_schedule: p.hoursSchedule ?? null,
     business_locations: p.businessLocations ?? null,
     business_policies: p.businessPolicies ?? null,
+    service_areas: p.serviceAreas ?? p.service_areas ?? null,
     whatsapp_notification_number: p.whatsappNumber ?? null,
     alert_email: p.alertEmail ?? null,
     notify_channels: p.notifyChannels ?? null,
