@@ -1,10 +1,14 @@
 /**
  * Owner plan changes the Desk calls. Screens stay off unless
- * process.env.DESK_PLAN_CHANGE is the exact value "on". SQL does not read
- * the flag. This module does.
+ * DESK_PLAN_CHANGE is the exact value "on". SQL does not read the flag.
+ * deskPlanChangeOn does.
  * Production Supabase is refused here so a Desk deploy cannot write it.
  * No payment provider.
  */
+
+import { deskPlanChangeOn } from "./deskPlanChange";
+
+export { deskPlanChangeOn };
 
 export const PRODUCTION_SUPABASE_REF = "fjxcdccgyhnvnnlnovcl";
 
@@ -20,10 +24,6 @@ export type OwnerBillingRefusal = {
   code: OwnerBillingCode;
   message: string;
 };
-
-export function deskPlanChangeOn(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.DESK_PLAN_CHANGE === "on";
-}
 
 export function billingWritesAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
   const url = env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || "";

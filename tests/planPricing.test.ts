@@ -110,7 +110,7 @@ describe("plan change port", () => {
       delete process.env.DESK_PLAN_CHANGE;
       const off = await planChangePort().changePlan({ sku: "growth", cycle: "year" });
       assert.deepEqual(off, { ok: false, message: "Plan changes open soon" });
-      process.env.DESK_PLAN_CHANGE = "true";
+      process.env.DESK_PLAN_CHANGE = "on";
       const on = await planChangePort().setExtraSeats({ extraSeats: 2, idempotencyKey: "seat-key" });
       assert.equal(on.ok, false);
       assert.equal(on.message, "Plan changes open soon");

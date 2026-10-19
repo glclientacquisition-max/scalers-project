@@ -20,6 +20,8 @@ export type BillingPackage = {
   sku: string;
   name: string;
   monthlyPriceKes: number;
+  /** Stored on the published version. 0 until that row is applied. */
+  annualPriceKes: number;
   seats: number;
   minutes: number;
   sms: number;
@@ -180,6 +182,7 @@ function mapPackage(row: Record<string, unknown>): BillingPackage {
     sku: String(row.sku || ""),
     name: String(row.name || ""),
     monthlyPriceKes: num(row.monthly_price_kes),
+    annualPriceKes: 0,
     seats: num(row.seats),
     minutes: num(row.minutes),
     sms: num(row.sms),
