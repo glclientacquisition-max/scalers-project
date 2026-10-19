@@ -844,25 +844,150 @@ function payMethodIds(pay) {
   return asArray(pay?.methods).map((m) => String(m));
 }
 
-function payCashSw(cashLike) {
-  const parts = [];
-  if (cashLike.includes('cash')) parts.push('pesa taslimu');
-  if (cashLike.includes('cheque')) parts.push('hundi');
-  if (!parts.length) return '';
-  if (parts.length === 1) return `Unaweza kulipa kwa ${parts[0]}.`;
-  return `Unaweza kulipa kwa ${parts.join(' au ')}.`;
+const MPESA_METHOD_IDS = new Set(['mpesa_till', 'mpesa_paybill', 'pochi', 'mpesa_send', 'airtel']);
+
+function payNothingSaved(pay) {
+  return payMethodIds(pay).length === 0;
 }
 
-/** Structured cash or cheque when there is no till/paybill-style number to speak. */
-function payWithoutNumberAnswer(pay, kind) {
+function joinOrWords(words, lang) {
+  if (!words.length) return '';
+  if (words.length === 1) return words[0];
+  const sep = lang === 'sw' ? ' au ' : ' or ';
+  return `${words.slice(0, -1).join(', ')}${sep}${words[words.length - 1]}`;
+}
+
+function spokenPayMethodLine(pay, methodId) {
+  switch (methodId) {
+    case 'cash':
+      return { en: 'cash', sw: 'pesa taslimu' };
+    case 'cheque':
+      return { en: 'cheque', sw: 'hundi' };
+    case 'mpesa_till': {
+      const till = digitsOf(pay.mpesa_till);
+      return till
+        ? { en: `M-Pesa Buy Goods Till ${till}`, sw: `M-Pesa Till ${till}` }
+        : { en: 'M-Pesa Buy Goods', sw: 'M-Pesa Buy Goods' };
+    }
+    case 'mpesa_paybill': {
+      const pb = asObject(pay.mpesa_paybill);
+      const no = digitsOf(pb?.business_no);
+      return no
+        ? { en: `M-Pesa Paybill ${no}`, sw: `M-Pesa Paybill ${no}` }
+        : { en: 'M-Pesa Paybill', sw: 'M-Pesa Paybill' };
+    }
+    case 'pochi': {
+      const phone = digitsOf(asObject(pay.pochi)?.phone);
+      return phone
+        ? { en: 'Pochi la Biashara', sw: 'Pochi la Biashara' }
+        : { en: 'Pochi la Biashara', sw: 'Pochi la Biashara' };
+    }
+    case 'mpesa_send':
+      return { en: 'M-Pesa Send Money', sw: 'M-Pesa Send Money' };
+    case 'airtel':
+      return { en: 'Airtel Money', sw: 'Airtel Money' };
+    case 'bank':
+      return { en: 'bank transfer', sw: 'uhamisho wa benki' };
+    case 'card':
+      return { en: 'card', sw: 'kadi' };
+    default:
+      return null;
+  }
+}
+
+function payMethodLines(pay, filterKind) {
   const methods = payMethodIds(pay);
-  const wantsCash = kind === 'any' || kind === 'cash';
-  const cashLike = methods.filter((m) => m === 'cash' || m === 'cheque');
-  if (!wantsCash || !cashLike.length) return null;
-  if (methods.length && cashLike.length !== methods.length) return null;
-  const spoken = cashLike.map((m) => (m === 'cheque' ? 'cheque' : 'cash')).join(' or ');
-  const en = `You can pay by ${spoken}.`;
-  return { en, sw: payCashSw(cashLike), id: 'pay.cash', value: spoken };
+  const lines = [];
+  for (const id of methods) {
+    if (filterKind === 'cash' && id !== 'cash') continue;
+    if (filterKind === 'cheque' && id !== 'cheque') continue;
+    if (filterKind === 'mpesa' && !MPESA_METHOD_IDS.has(id)) continue;
+    if (filterKind === 'bank' && id !== 'bank') continue;
+    if (filterKind === 'card' && id !== 'card') continue;
+    const line = spokenPayMethodLine(pay, id);
+    if (line) lines.push(line);
+  }
+  return lines;
+}
+
+function payMethodOffered(pay, kind) {
+  const methods = payMethodIds(pay);
+  if (kind === 'cash') return methods.includes('cash');
+  if (kind === 'cheque') return methods.includes('cheque');
+  if (kind === 'mpesa') return methods.some((m) => MPESA_METHOD_IDS.has(m));
+  if (kind === 'bank') return methods.includes('bank');
+  if (kind === 'card') return methods.includes('card');
+  return false;
+}
+
+function payMethodListSpeech(pay, { only } = {}) {
+  const lines = payMethodLines(pay, only || null);
+  if (!lines.length) return null;
+  const enParts = lines.map((l) => l.en);
+  const swParts = lines.map((l) => l.sw);
+  return {
+    en: `You can pay by ${joinOrWords(enParts, 'en')}.`,
+    sw: `Unaweza kulipa kwa ${joinOrWords(swParts, 'sw')}.`,
+    value: enParts.join(', '),
+  };
+}
+
+function payGeneralQuestion(text) {
+  const t = String(text || '').trim();
+  if (!t) return true;
+  return (
+    /\b(how do i pay|how can i pay|how to pay|payment methods?|ways to pay|what do you accept)\b/i.test(t)
+    || /\b(nalipaje|namna ya kulipa|jinsi ya kulipa|malipo)\b/i.test(t)
+  );
+}
+
+function payMethodCashQuestion(text) {
+  const t = String(text || '');
+  return (
+    /\b(pesa taslimu|fedha taslimu)\b/i.test(t)
+    || (/\bcash\b/i.test(t) && /\b(pay|accept|take|can i|do you)\b/i.test(t))
+  );
+}
+
+function payMethodChequeQuestion(text) {
+  const t = String(text || '');
+  return (
+    /\b(hundi|cheki)\b/i.test(t)
+    || (/\bcheque?s?\b/i.test(t) && /\b(pay|accept|take|can i|do you)\b/i.test(t))
+  );
+}
+
+function payMethodMpesaQuestion(text) {
+  const t = String(text || '');
+  return (
+    /\b(m-?pesa|mpesa)\b/i.test(t)
+    || /\b(lipa na m-?pesa|lipa kwa m-?pesa)\b/i.test(t)
+    || /\b(mnachukua|mnapokea|mnalipa)\b.*\b(m-?pesa|mpesa)\b/i.test(t)
+    || (/\b(do you take|do you accept|can i pay with)\b/i.test(t) && /\b(m-?pesa|mpesa)\b/i.test(t))
+  );
+}
+
+function payMethodBankQuestion(text) {
+  return /\b(bank transfer|bank account|pay by bank)\b/i.test(String(text || ''))
+    && !/\baccount number\b/i.test(String(text || ''));
+}
+
+function payMethodCardQuestion(text) {
+  return /\b(pay by card|accept card|visa|mastercard|card payment)\b/i.test(String(text || ''))
+    && !/\bcard number\b/i.test(String(text || ''));
+}
+
+function payQuestionIntent(query) {
+  const text = String(query || '');
+  const numberKind = payKindOf(query);
+  if (numberKind !== 'any') return { mode: 'number', kind: numberKind };
+  if (payMethodChequeQuestion(text)) return { mode: 'method', method: 'cheque' };
+  if (payMethodCashQuestion(text)) return { mode: 'method', method: 'cash' };
+  if (payMethodMpesaQuestion(text)) return { mode: 'method', method: 'mpesa' };
+  if (payMethodBankQuestion(text)) return { mode: 'method', method: 'bank' };
+  if (payMethodCardQuestion(text)) return { mode: 'method', method: 'card' };
+  if (payGeneralQuestion(text)) return { mode: 'general' };
+  return { mode: 'general' };
 }
 
 function payKindOf(query) {
@@ -888,31 +1013,13 @@ function speakDigits(raw, lang) {
   return [...digits].map((d) => words[Number(d)]).join(' ');
 }
 
-function lookupPay(query, ctx) {
-  const profile = ctx.profile || {};
-  const kind = payKindOf(query);
-  const pay = payBag(profile);
-  const slots = paySlots(pay);
-  if (!slots.length) {
-    if (kind === 'bank' || kind === 'card') {
-      return notFoundInList(profile, `pay.${kind}`, null, 'pay');
-    }
-    const plain = payWithoutNumberAnswer(pay, kind);
-    if (plain) {
-      const payRead = payReading(profile, pay);
-      if (!payRead.ok) return unconfirmed(profile, plain.id, 'pay', payRead.reason, 'pay');
-      if (!String(plain.en || '').trim()) return noData(profile, `pay.${kind}`, 'pay');
-      return resultOf('found', {
-        id: plain.id,
-        value: plain.value,
-        source: 'owner',
-        speech: both(plain.en, plain.sw),
-      }, profile, 'pay');
-    }
-    return noData(profile, `pay.${kind}`, 'pay');
-  }
+function lookupPayNumber(kind, profile, pay) {
   if (kind === 'bank' || kind === 'card') {
     return notFoundInList(profile, `pay.${kind}`, null, 'pay');
+  }
+  const slots = paySlots(pay);
+  if (!slots.length) {
+    return noData(profile, `pay.${kind}`, 'pay');
   }
   const want = {
     till: 'till',
@@ -941,6 +1048,37 @@ function lookupPay(query, ctx) {
     source: 'owner',
     speech: both(en, sw),
   }, profile, 'pay');
+}
+
+function lookupPayMethods(profile, pay, intent) {
+  const payRead = payReading(profile, pay);
+  if (intent.mode === 'method' && !payMethodOffered(pay, intent.method)) {
+    return notFoundInList(profile, `pay.${intent.method}`, null, 'pay');
+  }
+  if (!payRead.ok) return unconfirmed(profile, 'payments.methods', 'pay', payRead.reason, 'pay');
+  const speech = intent.mode === 'method'
+    ? payMethodListSpeech(pay, { only: intent.method })
+    : payMethodListSpeech(pay);
+  if (!speech) return noData(profile, 'pay', 'pay');
+  return resultOf('found', {
+    id: intent.mode === 'method' ? `pay.${intent.method}` : 'pay.methods',
+    value: speech.value,
+    source: 'owner',
+    speech: both(speech.en, speech.sw),
+  }, profile, 'pay');
+}
+
+function lookupPay(query, ctx) {
+  const profile = ctx.profile || {};
+  const pay = payBag(profile);
+  if (payNothingSaved(pay)) {
+    return noData(profile, 'pay', 'pay');
+  }
+  const intent = payQuestionIntent(query);
+  if (intent.mode === 'number') {
+    return lookupPayNumber(intent.kind, profile, pay);
+  }
+  return lookupPayMethods(profile, pay, intent);
 }
 
 function speechName(name) {
