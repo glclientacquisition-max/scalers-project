@@ -66,10 +66,26 @@ function readinessQuestions(profile) {
   };
 }
 
-/** Desk preview defaults: the first readiness question per preview kind ('' when the tenant has none). */
-function previewSampleQuestions(profile) {
+/** First question in a probe list that voice answers with found, else the first question. */
+function firstFoundOrFirst(kind, profile, now) {
+  const c = ctx(profile, now);
+  const questions = readinessQuestions(profile)[kind];
+  for (const query of questions) {
+    if (lookup(kind, query, c)?.status === 'found') return query;
+  }
+  return questions[0] || '';
+}
+
+/** Desk preview defaults: a question that matches the readiness row verdict when possible. */
+function previewSampleQuestions(profile, opts = {}) {
+  const now = opts.now || new Date();
   const q = readinessQuestions(profile);
-  return { price: q.price[0] || '', hours: q.hours[0], delivery: q.fee[0] || '', pay: q.pay[0] };
+  return {
+    price: firstFoundOrFirst('price', profile, now),
+    hours: q.hours[0],
+    delivery: firstFoundOrFirst('fee', profile, now),
+    pay: q.pay[0],
+  };
 }
 
 /** First found answer across the tenant's questions; otherwise the first result (or empty-query result). */

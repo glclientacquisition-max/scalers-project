@@ -74,10 +74,8 @@ export function AssistantSayLookupPreview({
             data-lookup-preview=""
           >
             <div className="flex items-center justify-between gap-2">
-              <p className="text-body font-medium text-ink">
-                {result.willSay ? "Will say" : "Won't say"}
-              </p>
-              <Stamp tone={result.willSay ? "ok" : "attention"}>{result.status}</Stamp>
+              <p className="text-body font-medium text-ink">{result.headline}</p>
+              <Stamp tone={result.stampTone}>{result.stampLabel}</Stamp>
             </div>
             <p className="mt-2 text-body text-ink">{result.speechEn}</p>
             <p className="mt-1 text-meta text-ink-3" lang="sw">{result.speechSw}</p>

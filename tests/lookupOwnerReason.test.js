@@ -2,7 +2,11 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { ownerLookupReason, LOOKUP_REASON_CODES } = require('../src/knowledge/lookupOwnerReason');
+const {
+  ownerLookupReason,
+  lookupPreviewPresentation,
+  LOOKUP_REASON_CODES,
+} = require('../src/knowledge/lookupOwnerReason');
 
 describe('lookupOwnerReason', () => {
   it('maps every known lookup reason code to plain copy without echoing the code', () => {
@@ -21,6 +25,23 @@ describe('lookupOwnerReason', () => {
       const line = ownerLookupReason('pay', { status, reason: 'x' });
       assert.ok(line);
       assert.doesNotMatch(line, /hash_|no_list/);
+    }
+  });
+
+  it('ambiguous price reason is not the add-catalogue line', () => {
+    const line = ownerLookupReason('price', { status: 'ambiguous', reason: 'several_matches' });
+    assert.match(line, /asked which one/i);
+    assert.doesNotMatch(line, /Add items and prices/);
+  });
+
+  it('lookup preview presentation hides raw status codes', () => {
+    assert.equal(lookupPreviewPresentation('found').stampLabel, 'Will say');
+    assert.equal(lookupPreviewPresentation('ambiguous').stampLabel, 'Will ask which one');
+    assert.equal(lookupPreviewPresentation('unconfirmed').stampLabel, 'Not confirmed yet');
+    assert.equal(lookupPreviewPresentation('no_data').stampLabel, 'Missing');
+    for (const status of ['found', 'ambiguous', 'unconfirmed', 'no_data']) {
+      const { stampLabel } = lookupPreviewPresentation(status);
+      assert.doesNotMatch(stampLabel, /ambiguous|unconfirmed|no_data|found/);
     }
   });
 });

@@ -213,16 +213,40 @@ describe('assistantSayReadiness', () => {
     assert.equal(row.willSay, probe.status === 'found');
   });
 
-  it('preview samples are the first readiness question per kind', () => {
+  it('preview samples match readiness row verdict for price and delivery', () => {
+    const { lookup } = requireRoot('./src/knowledge/lookup.js');
     for (const key of ['carry', 'list']) {
       const profile = profileFromReplay(key);
-      const q = readinessQuestions(profile);
-      const samples = previewSampleQuestions(profile);
-      assert.equal(samples.price, q.price[0] || '', key);
-      assert.equal(samples.delivery, q.fee[0] || '', key);
-      assert.equal(samples.hours, q.hours[0], key);
-      assert.equal(samples.pay, q.pay[0], key);
+      const samples = previewSampleQuestions(profile, { now: FIXTURE_NOW });
+      const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
+      const pricesRow = say.rows.find((r) => r.id === 'prices');
+      const deliveryRow = say.rows.find((r) => r.id === 'delivery');
+      const c = { profile, language: 'en', now: FIXTURE_NOW, seed: 0 };
+      if (samples.price) {
+        const priceHit = lookup('price', samples.price, c);
+        assert.equal(priceHit.status === 'found', pricesRow.willSay, `${key} price preview`);
+      }
+      if (samples.delivery) {
+        const feeHit = lookup('fee', samples.delivery, c);
+        assert.equal(feeHit.status === 'found', deliveryRow.willSay, `${key} delivery preview`);
+      }
+      assert.equal(samples.hours, readinessQuestions(profile).hours[0], key);
+      assert.equal(samples.pay, readinessQuestions(profile).pay[0], key);
     }
+  });
+
+  it('Jirani preview default price question is found when the prices row is Will say', () => {
+    const fixture = JSON.parse(
+      fs.readFileSync(path.join(__dirname, 'fixtures/tenants/jirani-staging.json'), 'utf8')
+    );
+    const profile = tenantProfileFromRow(fixture.tenant, {});
+    const { lookup } = requireRoot('./src/knowledge/lookup.js');
+    const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
+    const pricesRow = say.rows.find((r) => r.id === 'prices');
+    const sample = previewSampleQuestions(profile, { now: FIXTURE_NOW }).price;
+    assert.ok(sample);
+    const hit = lookup('price', sample, { profile, language: 'en', now: FIXTURE_NOW, seed: 0 });
+    assert.equal(hit.status === 'found', pricesRow.willSay);
   });
 
   it('no tenant item or place is hard-coded in the probes or the Desk preview', () => {

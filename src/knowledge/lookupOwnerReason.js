@@ -48,6 +48,13 @@ function ownerLookupReason(kind, result) {
     return `Imported from your notes. Press Save on ${panel} to use it.`;
   }
 
+  if (status === 'ambiguous' || code === 'several_matches') {
+    if (kind === 'price' || kind === 'prices') {
+      return 'Several items match this question, so callers will be asked which one.';
+    }
+    return 'Several matches on file. Narrow the question or tidy the catalogue.';
+  }
+
   if (kind === 'price' || kind === 'prices') {
     if (code === 'price_quote' || status === 'not_on_file') {
       return 'Price is ask for a quote, so it takes a message.';
@@ -75,11 +82,35 @@ function ownerLookupReason(kind, result) {
     return 'Add how customers pay on Policies.';
   }
 
-  if (status === 'ambiguous' || code === 'several_matches') {
-    return 'Several matches on file. Narrow the question or tidy the catalogue.';
-  }
-
   return 'Not added yet.';
+}
+
+/** Desk lookup preview: plain stamp and headline (never raw lookup status codes). */
+function lookupPreviewPresentation(status) {
+  const s = String(status || '');
+  if (s === 'found') {
+    return { headline: 'Will say', stampLabel: 'Will say', stampTone: 'ok', willSay: true };
+  }
+  if (s === 'ambiguous') {
+    return {
+      headline: 'Will ask which one',
+      stampLabel: 'Will ask which one',
+      stampTone: 'neutral',
+      willSay: false,
+    };
+  }
+  if (s === 'unconfirmed') {
+    return {
+      headline: "Won't say",
+      stampLabel: 'Not confirmed yet',
+      stampTone: 'attention',
+      willSay: false,
+    };
+  }
+  if (s === 'no_data') {
+    return { headline: "Won't say", stampLabel: 'Missing', stampTone: 'attention', willSay: false };
+  }
+  return { headline: "Won't say", stampLabel: "Won't say", stampTone: 'attention', willSay: false };
 }
 
 /** Every reason code lookup() may attach (for guard tests). */
@@ -102,5 +133,6 @@ const LOOKUP_REASON_CODES = [
 
 module.exports = {
   ownerLookupReason,
+  lookupPreviewPresentation,
   LOOKUP_REASON_CODES,
 };
