@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type TestInfo } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -9,7 +9,7 @@ function widthTag(width: number): string {
   return "360";
 }
 
-function schemeName(testInfo: { project: { use: { colorScheme?: string } } }): string {
+function schemeName(testInfo: TestInfo): string {
   return testInfo.project.use.colorScheme === "dark" ? "dark" : "light";
 }
 
