@@ -290,3 +290,62 @@ describe('backfillFactHashes run', () => {
     assert.equal(isEmptyFactValue('faqs.1', { question: 'q', answer: ' ' }), true);
   });
 });
+
+describe('--restamp-old-rule', () => {
+  const { legacyCatalogRowFactValue } = require('../src/conversation/factHash');
+  const T = '44444444-4444-4444-8444-444444444444';
+  const row = (id, price, parsed) => ({ id, name: `S ${id}`, price_range: price, pricing: { mode: 'fixed', amount_ksh: 3000, source: 'owner', confirmed: true, parsed_from: parsed } });
+  function setup() {
+    const svc = [row('svc_a', 'KSh 3,000', 'KSh 3,000'), row('svc_b', 'KSh 3,000', 'KSh 3,000'), row('svc_c', 'KSh 3,000', 'KSh 3,000'), row('svc_d', 'KSh 3,000', 'KSh 3,000')];
+    const tenant = { id: T, services_catalog: svc };
+    const oldA = hashFactValue(legacyCatalogRowFactValue(svc[0]));
+    const edited = { ...svc[2], name: 'Old name' }; // owner value changed since the confirm
+    const meta = [
+      { tenant_id: T, field_path: 'catalog.service.svc_a.name', source: 'owner', value_hash: oldA },
+      { tenant_id: T, field_path: 'catalog.service.svc_b.name', source: 'owner', value_hash: hashFactValue(catalogRowFactValue(svc[1])) },
+      { tenant_id: T, field_path: 'catalog.service.svc_c.name', source: 'owner', value_hash: hashFactValue(legacyCatalogRowFactValue(edited)) },
+      { tenant_id: T, field_path: 'catalog.service.svc_d.name', source: 'owner', value_hash: null },
+      { tenant_id: T, field_path: 'identity.business_name', source: 'owner', value_hash: 'abc' },
+    ];
+    return { tenant, meta, svc, oldA };
+  }
+
+  it('parses flags; --key needs --restamp-old-rule; bad regex refused', () => {
+    const a = parseArgs(['--restamp-old-rule', '--tenant', T]);
+    assert.equal(a.restampOldRule, true);
+    assert.equal(a.apply, false);
+    assert.ok(a.keyRe.test('catalog.service.x.name'));
+    assert.ok(!a.keyRe.test('catalog.service.x.price'));
+    assert.ok(parseArgs(['--key', 'x', '--tenant', T]).errors.length);
+    assert.ok(parseArgs(['--restamp-old-rule', '--key', '(', '--tenant', T]).errors.length);
+  });
+
+  it('dry run counts and writes nothing', async () => {
+    const { tenant, meta, oldA } = setup();
+    const client = fakeClient({ meta, tenants: [tenant] });
+    const { code, summary } = await runBackfill({ client, supabaseUrl: STAGING, args: parseArgs(['--restamp-old-rule', '--tenant', T]), log: () => {} });
+    assert.equal(code, 0);
+    assert.deepEqual(
+      { ...summary.totals },
+      { matched: 4, to_restamp: 1, restamped: 0, unchanged: 1, kept_stale: 1, no_hash: 1, unresolved: 0, write_errors: 0 }
+    );
+    assert.equal(meta[0].value_hash, oldA);
+    assert.ok(!client.calls.some((q) => q.op === 'update'));
+  });
+
+  it('--apply re-stamps only old-rule matches, conditional on the stored hash', async () => {
+    const { tenant, meta, svc } = setup();
+    const before = meta.map((m) => m.value_hash);
+    const client = fakeClient({ meta, tenants: [tenant] });
+    const { summary } = await runBackfill({ client, supabaseUrl: STAGING, args: parseArgs(['--restamp-old-rule', '--tenant', T, '--apply']), log: () => {} });
+    assert.equal(summary.totals.restamped, 1);
+    assert.equal(meta[0].value_hash, hashFactValue(catalogRowFactValue(svc[0])).toLowerCase());
+    assert.deepEqual(meta.slice(1).map((m) => m.value_hash), before.slice(1));
+    assert.equal(client.calls.filter((q) => q.op === 'update').length, 1);
+  });
+
+  it('refuses prod without --i-have-alvin-ok', async () => {
+    const { code } = await runBackfill({ client: null, supabaseUrl: `https://${PROD_REF}.supabase.co`, args: parseArgs(['--restamp-old-rule', '--tenant', T]), log: () => {} });
+    assert.equal(code, 2);
+  });
+});

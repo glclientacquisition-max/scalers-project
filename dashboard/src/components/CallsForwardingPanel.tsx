@@ -86,7 +86,7 @@ export function CallsForwardingPanel({
           <Row label="How calls reach you">
             {option === "main_number" ? "Scalers number" : option === "forward" ? "Forwarding" : "Not set up"}
           </Row>
-          <Row label="Assistant's number">
+          <Row label="Business Assistant's number">
             <span className="tabular-nums">{pretty}</span>
           </Row>
           {option === "forward" ? (

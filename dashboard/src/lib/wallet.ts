@@ -5,7 +5,7 @@ export const WALLET_RATE_KES_PER_MINUTE = Number(
   process.env.WALLET_RATE_KES_PER_MINUTE || process.env.NEXT_PUBLIC_WALLET_RATE_KES_PER_MINUTE || 0
 );
 
-/** Owner soft spend budget presets (KES / calendar month UTC). Opt-in only. */
+/** Owner soft spend budget presets for a calendar month, UTC. Opt-in only. */
 export const SOFT_SPEND_LIMIT_PRESETS_KES = [2000, 5000, 10000, 20000] as const;
 export const SOFT_SPEND_LIMIT_MIN_KES = 500;
 export const SOFT_SPEND_LIMIT_MAX_KES = 1_000_000;
@@ -91,10 +91,10 @@ export function resolveSoftSpendLimitStatus(opts: {
 export function softSpendLimitMessage(status: SoftSpendLimitStatus): string | null {
   if (!status.enabled || !status.limitKes) return null;
   if (status.thresholdReached >= 100) {
-    return `Soft limit reached (KES ${status.limitKes.toLocaleString("en-KE")} this month). Calls still work. Raise or turn off the limit if you want.`;
+    return `Soft limit reached (KSh ${status.limitKes.toLocaleString("en-KE")} this month). Calls still work. Raise or turn off the limit if you want.`;
   }
   if (status.thresholdReached >= 80) {
-    return `Approaching your soft limit (${Math.round(status.percent)}% of KES ${status.limitKes.toLocaleString("en-KE")}).`;
+    return `Approaching your soft limit (${Math.round(status.percent)}% of KSh ${status.limitKes.toLocaleString("en-KE")}).`;
   }
   if (status.thresholdReached >= 50) {
     return `Halfway through your soft monthly budget.`;

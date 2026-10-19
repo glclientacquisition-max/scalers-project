@@ -43,7 +43,7 @@ export function TestLinePanel({
   const did = String(tenant.sautikit_virtual_number || "").trim();
   const lineLive = Boolean(did) && !pendingDid;
   const businessName = String(tenant.business_name || "").trim();
-  const agentName = String(tenant.agent_name || "").trim() || "Assistant";
+  const agentName = String(tenant.agent_name || "").trim() || "Business Assistant";
   const sonioxVoiceId = resolveLiveCallVoiceId(
     tenant.soniox_voice_id,
     curatedVoices

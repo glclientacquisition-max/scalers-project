@@ -77,7 +77,7 @@ export function settingsScopeValidationError(
     return "Business name is required.";
   }
   if (scopeOwns(scope, "agentName") && input.agentName.length > 40) {
-    return "Assistant name should be under 40 characters.";
+    return "Business Assistant name should be under 40 characters.";
   }
   if (
     scopeOwns(scope, "servicesCatalog") &&

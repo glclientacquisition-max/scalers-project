@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ChoiceSheet } from "@/components/ui/ChoiceSheet";
 import { Empty } from "@/components/ui/Empty";
 import { ListRow } from "@/components/ui/ListRow";
@@ -44,10 +45,11 @@ export function AdminActivityPanel({
 
   return (
     <div className="space-y-6">
+      <AdminPageHeader title="Activity" subtitle="Every admin write, newest first." />
       <section aria-labelledby="activity-filters">
-        <h1 id="activity-filters" className="px-4 text-caption text-ink-3">
-          Activity
-        </h1>
+        <h2 id="activity-filters" className="px-4 text-caption text-ink-3">
+          Filters
+        </h2>
         <ul className="divide-y divide-hairline bg-surface">
           <li>
             <ChoiceSheet

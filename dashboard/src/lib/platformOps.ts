@@ -10,6 +10,7 @@ import {
   parseKindFlags,
   parseOpsEmails,
   parsePeople,
+  parseRecordingRetentionDays,
   type OpsKindFlags,
   type OpsNotice,
   type OpsSettings,
@@ -99,6 +100,10 @@ export async function loadOpsSettings(): Promise<{ settings: OpsSettings; persis
         people,
         kinds: parseKindFlags(data.kinds),
         sautikitWarnMinor: Number(data.sautikit_warn_minor) || defaultOpsSettings().sautikitWarnMinor,
+        recordingRetentionDays:
+          data.recording_retention_days != null
+            ? parseRecordingRetentionDays(data.recording_retention_days)
+            : null,
       },
       persisted: true,
     };
@@ -120,14 +125,20 @@ export async function saveOpsSettings(input: {
   people?: ReturnType<typeof parsePeople>;
   kinds: OpsKindFlags;
   sautikitWarnMinor: number;
+  recordingRetentionDays?: number | null;
 }): Promise<OpsSettings> {
   const people = parsePeople(input.people || [], input.emails || []);
   const emails = emailsFromPeople(people);
+  const retention =
+    input.recordingRetentionDays !== undefined
+      ? parseRecordingRetentionDays(input.recordingRetentionDays)
+      : null;
   const settings: OpsSettings = {
     emails,
     people,
     kinds: input.kinds,
     sautikitWarnMinor: Math.max(0, Math.round(input.sautikitWarnMinor)),
+    recordingRetentionDays: retention,
   };
   const admin = getSupabaseAdmin();
   const row = {
@@ -136,6 +147,7 @@ export async function saveOpsSettings(input: {
     people: settings.people,
     kinds: settings.kinds,
     sautikit_warn_minor: settings.sautikitWarnMinor,
+    recording_retention_days: settings.recordingRetentionDays,
     updated_at: new Date().toISOString(),
   };
   let { error } = await admin.from("platform_ops_settings").upsert(row);
@@ -143,6 +155,12 @@ export async function saveOpsSettings(input: {
     const fallback = { ...row };
     delete (fallback as { people?: unknown }).people;
     ({ error } = await admin.from("platform_ops_settings").upsert(fallback));
+  }
+  if (error && /recording_retention_days/i.test(error.message)) {
+    const fallback = { ...row };
+    delete (fallback as { recording_retention_days?: unknown }).recording_retention_days;
+    ({ error } = await admin.from("platform_ops_settings").upsert(fallback));
+    settings.recordingRetentionDays = null;
   }
   if (error) throw error;
   return settings;

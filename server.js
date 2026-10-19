@@ -221,6 +221,7 @@ const {
   extractGeminiText,
   extractThoughtSignature,
   extractGeminiParts,
+  extractGeminiFunctionCalls,
   appendGeminiStreamParts,
   modelPartsForHistory,
   buildGeminiContents,
@@ -345,6 +346,9 @@ const {
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
 const { resolveLocalReply, planCallerModelTurn } = require('./src/conversation/turnPolicy');
+const { planLookupTurn } = require('./src/conversation/router');
+const { lookupWithDeadline, lookupToolDeclaration } = require('./src/knowledge/lookup');
+const { lookupToolEnabled } = require('./src/knowledge/flags');
 const { unfinishedTurnHold } = require('./src/conversation/unfinishedTurn');
 const {
   drainSpokenSpeakSlots,
@@ -3737,15 +3741,39 @@ mediaWss.on('connection', (ws, req) => {
         return folded;
       }
       const slotsBeforeReply = slotRows(brainState);
-      const localReply = resolveLocalReply({
+      const lookupPlan = planLookupTurn({
         text: clean,
         state: brainState,
         profile: brainProfile,
         language: callLanguage,
-        agentName,
-        businessName,
-        nextBestAction,
+        now: new Date(),
+        turnId: `${sidLabel()}:${brainState?.conversation?.turnCount || 0}`,
       });
+      if (lookupPlan?.handled) {
+        const lookupWhy = (lookupPlan.lookups || [])
+          .map((row) => `${row.kind}:${row.status}:${row.id || '-'}:${row.reason || '-'}`)
+          .join(',');
+        console.log(
+          `[ws/media][${callKey}] lookup ${lookupPlan.outcome} ${lookupWhy} brainMs=${Number(lookupPlan.brainMs).toFixed(1)} lang=${callLanguage}`
+        );
+        voiceTrace.noteLookup({
+          handled: true,
+          outcome: lookupPlan.outcome,
+          lookups: lookupPlan.lookups,
+          brainMs: lookupPlan.brainMs,
+        });
+      }
+      const localReply = lookupPlan?.handled
+        ? { outcome: lookupPlan.outcome, line: lookupPlan.speech, lookup: true }
+        : resolveLocalReply({
+            text: clean,
+            state: brainState,
+            profile: brainProfile,
+            language: callLanguage,
+            agentName,
+            businessName,
+            nextBestAction,
+          });
       const enqueuedSlots = slotRows(brainState).filter(
         (slot) =>
           !slotsBeforeReply.some((row) => row.outcome === slot.outcome && row.line === slot.line)
@@ -3778,16 +3806,21 @@ mediaWss.on('connection', (ws, req) => {
       const packetsBeforeFacts = packetRows();
       const localPacket = commitTurnFacts(speakCommit, {
         localReply,
-        catalogueLine:
-          catalogueMouth.speakLocal && catalogueMouth.line ? catalogueMouth.line : '',
+        catalogueLine: lookupPlan?.handled
+          ? ''
+          : catalogueMouth.speakLocal && catalogueMouth.line
+            ? catalogueMouth.line
+            : '',
         catalogueListed: brainState?.conversation?.catalogueListed === true,
-        groundedPrice: groundFilePriceLine({
-          profile: brainProfile,
-          text: clean,
-          callerTurns: brainState?.conversation?.answersReceived,
-          state: brainState,
-          language: callLanguage,
-        }),
+        groundedPrice: lookupPlan?.handled
+          ? ''
+          : groundFilePriceLine({
+              profile: brainProfile,
+              text: clean,
+              callerTurns: brainState?.conversation?.answersReceived,
+              state: brainState,
+              language: callLanguage,
+            }),
       });
       traceCommittedPackets(packetsBeforeFacts);
       if (localReply && !localPacket && !authorizeSpeak(localReply)) {
@@ -3971,7 +4004,7 @@ mediaWss.on('connection', (ws, req) => {
           callTranscript.pushAgent(line);
           turnTiming.markFirstSpokenChunk();
           const nameAsk = askingName && line === fileNameAsk;
-          await speakText(
+          const plannedSpoken = await speakText(
             line,
             speakCommit.wasSpoken(line)
               ? { skipFileGate: true, ...(nameAsk ? { tracePath: 'file_name_ask' } : {}) }
@@ -3980,6 +4013,22 @@ mediaWss.on('connection', (ws, req) => {
                 : {}
           );
           spokeThisTurn = true;
+          // VOICE_FACT_REFS: keep a locally spoken answer in the model's
+          // history, so the next turn does not answer it again
+          // (HD_9939ca74d492 repeated the Kileleshwa fee on the hours turn).
+          if (
+            plannedSpoken?.ok &&
+            (require('./src/conversation/factSheet').factRefsEnabled() ||
+              (lookupPlan?.handled && line === lookupPlan.speech))
+          ) {
+            messages.push({
+              role: 'assistant',
+              content: line,
+              local: true,
+              spokenAnswer: true,
+              ...(lookupPlan?.handled && line === lookupPlan.speech ? { turn_id: lookupPlan.turnId } : {}),
+            });
+          }
         }
         return;
       }
@@ -4237,6 +4286,7 @@ mediaWss.on('connection', (ws, req) => {
           capabilities,
           state: brainState,
           language: callLanguage,
+          spokenThisTurn: spokeThisTurn === true,
         });
         const polished = polishedDetail.text;
         if (typeof voiceTrace !== 'undefined' && voiceTrace) {
@@ -4568,15 +4618,19 @@ mediaWss.on('connection', (ws, req) => {
             speakSession = null;
             if (planned.speakNow && planned.reply && !bargeInActive) {
               const missed = Boolean(result?.timedOut || result?.llmFailed);
-              const reply = missed
-                ? await speechWhenModelMissed(result, clean, localReply)
-                : catalogueMouth.letGemini
-                  ? softenCataloguePunctuation(cutNoAiSlop(planned.reply))
-                  : cutNoAiSlop(planned.reply);
+              const reply = result?.lookupSpeech
+                ? result.lookupSpeech
+                : missed
+                  ? await speechWhenModelMissed(result, clean, localReply)
+                  : modelMouthLine(planned.reply, result, catalogueMouth.letGemini);
               if (reply) {
+                if (result?.lookupAck) await speakText(result.lookupAck, { skipFileGate: true });
                 callTranscript.pushAgent(reply);
                 turnTiming.markFirstSpokenChunk();
-                await speakText(reply, missed ? { tracePath: 'speech_repair' } : undefined);
+                await speakText(
+                  reply,
+                  result?.lookupSpeech ? { skipFileGate: true } : missed ? { tracePath: 'speech_repair' } : undefined
+                );
                 spokeThisTurn = true;
                 turnOutcome = result?.llmHardDown
                   ? 'speech_guarantee'
@@ -4608,15 +4662,19 @@ mediaWss.on('connection', (ws, req) => {
           });
           if (planned.speakNow && planned.reply) {
             const missed = Boolean(result?.timedOut || result?.llmFailed);
-            const reply = missed
-              ? await speechWhenModelMissed(result, clean, localReply)
-              : catalogueMouth.letGemini
-                ? softenCataloguePunctuation(cutNoAiSlop(planned.reply))
-                : cutNoAiSlop(planned.reply);
+            const reply = result?.lookupSpeech
+              ? result.lookupSpeech
+              : missed
+                ? await speechWhenModelMissed(result, clean, localReply)
+                : modelMouthLine(planned.reply, result, catalogueMouth.letGemini);
             if (reply) {
+              if (result?.lookupAck) await speakText(result.lookupAck, { skipFileGate: true });
               callTranscript.pushAgent(reply);
               turnTiming.markFirstSpokenChunk();
-              await speakText(reply, missed ? { tracePath: 'speech_repair' } : undefined);
+              await speakText(
+                reply,
+                result?.lookupSpeech ? { skipFileGate: true } : missed ? { tracePath: 'speech_repair' } : undefined
+              );
               spokeThisTurn = true;
               turnOutcome = result?.llmHardDown
                 ? 'speech_guarantee'
@@ -4658,11 +4716,11 @@ mediaWss.on('connection', (ws, req) => {
           }
           speakSession = null;
         }
-        const modelLine = result?.spokenText
-          ? catalogueMouth.letGemini
-            ? softenCataloguePunctuation(cutNoAiSlop(result.spokenText))
-            : cutNoAiSlop(result.spokenText)
-          : '';
+        const modelLine = result?.lookupSpeech
+          ? result.lookupSpeech
+          : result?.spokenText
+            ? modelMouthLine(result.spokenText, result, catalogueMouth.letGemini)
+            : '';
         const reply =
           (result?.spokenText ? modelLine : '') ||
           (result?.actionConfirmation
@@ -4689,12 +4747,15 @@ mediaWss.on('connection', (ws, req) => {
         if (suppressModelSpeech) {
           await speakLookupSentence();
         } else if (reply && !skipDuplicateAsk) {
+          if (result?.lookupAck) await speakText(result.lookupAck, { skipFileGate: true });
           callTranscript.pushAgent(reply);
           turnTiming.markFirstSpokenChunk();
           await speakText(
             reply,
-            !result?.spokenText && (result?.timedOut || result?.llmFailed)
-              ? { tracePath: 'speech_repair' }
+            result?.lookupSpeech
+              ? { skipFileGate: true }
+              : !result?.spokenText && (result?.timedOut || result?.llmFailed)
+                ? { tracePath: 'speech_repair' }
               : undefined
           );
           spokeThisTurn = true;
@@ -5720,6 +5781,23 @@ try {
   console.warn('[data-quality] not started:', err?.message || err);
 }
 
+try {
+  const dbRetention = require('./src/db');
+  const { purgeExpiredRecordingsBatch, startRecordingRetentionDaily } = require('./src/lib/recordingRetention');
+  const { deleteProviderRecording } = require('./src/sautikit/recordingFetch');
+  startRecordingRetentionDaily({
+    purgeBatch: (opts) =>
+      purgeExpiredRecordingsBatch({
+        listCalls: dbRetention.listCallsForRecordingRetentionPurge,
+        purgeCall: dbRetention.purgeCallRecordingRetention,
+        deleteProvider: deleteProviderRecording,
+        ...opts,
+      }),
+  });
+} catch (err) {
+  console.warn('[recording-retention] not started:', err?.message || err);
+}
+
 // ---------------------------------------------------------------------------
 // Owner lead notification (Telegram interim; WhatsApp when Business is linked).
 // Fires from save_caller_info and recording/events webhooks. Sends once per call.
@@ -6633,8 +6711,8 @@ async function generateGeminiText({
   return text;
 }
 
-function geminiVoiceConfig(systemPrompt) {
-  return {
+function geminiVoiceConfig(systemPrompt, extra) {
+  const config = {
     systemInstruction: { parts: [{ text: systemPrompt }] },
     // Slightly lower temp + shorter cap → faster, more consistent phone lines.
     temperature: Number(process.env.GEMINI_VOICE_TEMPERATURE || 0.35),
@@ -6644,6 +6722,40 @@ function geminiVoiceConfig(systemPrompt) {
       thinkingLevel: process.env.GEMINI_THINKING_LEVEL || 'MINIMAL',
     },
   };
+  if (extra && Array.isArray(extra.tools) && extra.tools.length) config.tools = extra.tools;
+  return config;
+}
+
+function modelMouthLine(text, result, soften) {
+  if (result?.lookupSpeech) return String(result.lookupSpeech);
+  const raw = String(text || '');
+  if (!raw) return '';
+  return soften ? softenCataloguePunctuation(cutNoAiSlop(raw)) : cutNoAiSlop(raw);
+}
+
+function voiceGeminiConfig(systemPrompt) {
+  if (!lookupToolEnabled()) return geminiVoiceConfig(systemPrompt);
+  const prompt = `${systemPrompt}\n\nLOOKUP TOOL: if the caller asks a price, a travel fee, opening hours, a payment number, or which services you offer, call lookup and write no speech. The system says the result.`;
+  return geminiVoiceConfig(prompt, { tools: [lookupToolDeclaration()] });
+}
+
+async function spokenFromLookupTool(callSid, calls, modelAlreadySpoke) {
+  if (modelAlreadySpoke || !lookupToolEnabled() || !Array.isArray(calls) || !calls.length) return null;
+  const call = calls.find((row) => row.name === 'lookup');
+  if (!call) return null;
+  const state = callBrainStates.get(callSid);
+  const profile = callTenantProfiles.get(callSid) || {};
+  const language = state?.language?.current || 'en';
+  const out = await lookupWithDeadline(String(call.args?.kind || ''), String(call.args?.query || ''), {
+    profile,
+    language,
+    now: new Date(),
+  });
+  const spoken = polishSpokenReply(out.speech, {
+    ...finalSpeechGuardOpts(callSid),
+    lookupSpeech: true,
+  });
+  return { speech: spoken, ack: out.ack || '' };
 }
 
 /**
@@ -7044,6 +7156,7 @@ async function runGeminiTurnStreaming(
   let buffer = createSpokenStreamBuffer({ catalogueBreath: breath });
   let fullText = '';
   let firstTokenAt = null;
+  let functionCalls = [];
   let streamFailed = false;
   let streamErr = null;
   let thoughtSignature = '';
@@ -7058,6 +7171,7 @@ async function runGeminiTurnStreaming(
     buffer = createSpokenStreamBuffer({ catalogueBreath: breath });
     thoughtSignature = '';
     modelParts = [];
+    functionCalls = [];
     joinTrace = createStreamJoinTrace();
     streamErr = null;
     streamFailed = false;
@@ -7070,7 +7184,7 @@ async function runGeminiTurnStreaming(
           const stream = await getGeminiClient().models.generateContentStream({
             model,
             contents,
-            config: geminiVoiceConfig(systemPrompt),
+            config: voiceGeminiConfig(systemPrompt),
           });
 
           for await (const chunk of stream) {
@@ -7079,6 +7193,7 @@ async function runGeminiTurnStreaming(
               break;
             }
             modelParts = appendGeminiStreamParts(modelParts, chunk);
+            functionCalls.push(...extractGeminiFunctionCalls(chunk));
             thoughtSignature = extractThoughtSignature(chunk) || thoughtSignature;
             const delta = extractGeminiText(chunk);
             if (!delta) continue;
@@ -7184,6 +7299,7 @@ async function runGeminiTurnStreaming(
   }
 
   const parsed = parseGeminiResponse(fullText || buffer.getRaw());
+  const lookupTool = await spokenFromLookupTool(callSid, functionCalls, buffer.getSpokenEmitted().length > 0);
   const heldTools = await applyToolsWithHold(callSid, parsed, { shouldAbort, onToolHold });
   const execution = heldTools.execution;
   let actionConfirmation = formatToolConfirmation(
@@ -7199,16 +7315,18 @@ async function runGeminiTurnStreaming(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   ).lines;
-  const spokenText = polishSpokenReply(
-    spokenTextForToolTurn({
-      spoken: spokenTextWithoutToolFallback({
-        spoken: buffer.getSpokenEmitted() || parsed.spokenText,
-        actionConfirmation,
-      }),
-      toolResults: execution.results,
-    }),
-    finalSpeechGuardOpts(callSid, execution.results)
-  );
+  const spokenText = lookupTool
+    ? lookupTool.speech
+    : polishSpokenReply(
+        spokenTextForToolTurn({
+          spoken: spokenTextWithoutToolFallback({
+            spoken: buffer.getSpokenEmitted() || parsed.spokenText,
+            actionConfirmation,
+          }),
+          toolResults: execution.results,
+        }),
+        finalSpeechGuardOpts(callSid, execution.results)
+      );
   // BRAIN_CALL_FIXES_D199: lines the speech guard put in (confirm_identity_first).
   {
     const conv = callBrainStates.get(callSid)?.conversation;
@@ -7242,6 +7360,8 @@ async function runGeminiTurnStreaming(
     shouldEndCall: execution.shouldEndCall,
     streamed: !streamFailed,
     streamJoins: joinTrace.summary(),
+    lookupSpeech: lookupTool?.speech || '',
+    lookupAck: lookupTool?.ack || '',
   };
 }
 
@@ -7271,7 +7391,7 @@ async function runGeminiTurn(
         getGeminiClient().models.generateContent({
           model,
           contents,
-          config: geminiVoiceConfig(systemPrompt),
+          config: voiceGeminiConfig(systemPrompt),
         }),
         geminiTurnTimeoutMs(),
         'Gemini generateContent'
@@ -7314,6 +7434,11 @@ async function runGeminiTurn(
   }
 
   const outputText = extractGeminiText(response);
+  const lookupTool = await spokenFromLookupTool(
+    callSid,
+    extractGeminiFunctionCalls(response),
+    Boolean(String(outputText || '').trim())
+  );
   const parsed = parseGeminiResponse(outputText);
   const heldTools = await applyToolsWithHold(callSid, parsed, hooks);
   const execution = heldTools.execution;
@@ -7330,16 +7455,18 @@ async function runGeminiTurn(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   ).lines;
-  const spokenText = polishSpokenReply(
-    spokenTextForToolTurn({
-      spoken: spokenTextWithoutToolFallback({
-        spoken: parsed.spokenText,
-        actionConfirmation,
-      }),
-      toolResults: execution.results,
-    }),
-    finalSpeechGuardOpts(callSid, execution.results)
-  );
+  const spokenText = lookupTool
+    ? lookupTool.speech
+    : polishSpokenReply(
+        spokenTextForToolTurn({
+          spoken: spokenTextWithoutToolFallback({
+            spoken: parsed.spokenText,
+            actionConfirmation,
+          }),
+          toolResults: execution.results,
+        }),
+        finalSpeechGuardOpts(callSid, execution.results)
+      );
   // BRAIN_CALL_FIXES_D199: lines the speech guard put in (confirm_identity_first).
   {
     const conv = callBrainStates.get(callSid)?.conversation;
@@ -7372,6 +7499,8 @@ async function runGeminiTurn(
     brainLines,
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
+    lookupSpeech: lookupTool?.speech || '',
+    lookupAck: lookupTool?.ack || '',
   };
 }
 

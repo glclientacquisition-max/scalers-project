@@ -1,6 +1,6 @@
 ---
 owner: platform
-last_reviewed: 2026-10-09
+last_reviewed: 2026-10-19
 ---
 
 # Supabase SQL apply order
@@ -140,7 +140,16 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 24k.1 | [`fix_grant_package_minutes.sql`](./fix_grant_package_minutes.sql) | `package_catalog.sql`, `admin_billing_ops.sql` | Hotfix: `grant_tenant_package_minutes` raised 42702 (OUT param `minutes_included` shadowed the column) on every call. Adds `tenant_minute_grants` (period-scoped, idempotent per key) + audit row. Safe to re-run. |
 | 24k.2 | [`package_state_rules.sql`](./package_state_rules.sql) | `fix_grant_package_minutes.sql`, `package_catalog.sql` | DRAFT. Explicit no package (`status = cancelled`, never unlimited), `unassign_tenant_package`, upgrade now (prorated, grants kept) / downgrade + period change at next period (`pending_*`), single grant-expiry rule `billing_grant_minutes_for_period`. Re-run `package_period_rollover.sql` after it. |
 | 24k.3 | [`tenant_billing_state.sql`](./tenant_billing_state.sql) | `package_state_rules.sql`, `owner_rls.sql` | DRAFT. `tenant_billing_state` view (security invoker) for the Admin period card and Desk banners, plus owner read policies. Re-run after `notify_send_reserve_settle.sql` to bill SMS from the ledger. |
-| 24l | [`platform_ops_notices.sql`](./platform_ops_notices.sql) | none (staff tables) | Staff notice settings + open notices. Service role only. Applied on scalers-staging and production. The ops cron adds no columns: threshold notices are extra `kind` values. [`ops_alerts_prod_later.sql`](./ops_alerts_prod_later.sql) is a read-only check, not a migration. |
+| 24k.4 | [`billing_data_layer.sql`](./billing_data_layer.sql) | `package_state_rules.sql`, `tenant_billing_state.sql`, `did_number_pool.sql`, `super_admin_ops.sql` | P1. Versioned packages, billing status, invoices, payments, credits, billing notice outbox, `tenant_escalation_allowed`, DID quarantine. Does not charge and does not send. Replaces assign/release. Does not set `billing_status` NOT NULL (that is P2). `invoices_freeze` rejects a draft number or status change unless `scalers.billing_write` is `1`. Production has this file. Do not re-apply it after P6. |
+| 24k.5 | [`package_version_editor.sql`](./package_version_editor.sql) | `billing_data_layer.sql` | P7. Super Admin draft, edit, publish, and archive of a package version, including the trial. One message-credit allowance and a burn rate per channel. Stores annual price, credit price, and the default spend-limit share on the version. Extra-seat price is edited only when that column already exists. Published rows stay frozen. A new subscription pins the latest version. An existing business keeps its version number, including when the package changes, unless an admin confirms a move. An admin move can land any business on any published version and leaves beta and enforcement unchanged. A system move skips a beta business. Nothing turns enforcement on except `admin_set_tenant_billing_mode` with confirm, and only as active with soft or hard. Beta stays with enforcement off. Production has this file. Re-apply it after any re-apply of `billing_data_layer.sql`. Contract: [`PACKAGE_VERSIONS_API.md`](../reference/operations/PACKAGE_VERSIONS_API.md). |
+| 24k.5b | [`package_version_owner_prices.sql`](./package_version_owner_prices.sql) | `package_version_editor.sql` | Owner-price v2 import. Publishes the owner price table as the next version of Starter, Growth, Scale, and the trial. Does not move a business, enable enforcement, or create an invoice. New subscriptions pin these versions. Idempotent. Production has this import. |
+| 24k.6 | [`owner_billing_actions.sql`](./owner_billing_actions.sql) | `billing_data_layer.sql`, then re-apply after `package_minute_consume.sql` and `notify_send_reserve_settle.sql` | P3 is the extra-seat backfill in this file. P4 is the rest. Owner plan change, extra seats, spend limit. Service role only. Beta returns `beta` and writes no invoice. No payment provider. Desk stays behind `DESK_PLAN_CHANGE` (off). Production has this file. Re-applying it replaces `finalize_invoice`, so re-apply [`billing_company.sql`](./billing_company.sql) last. Prod script is [`prod/owner_billing_actions.sql`](./prod/owner_billing_actions.sql). |
+| 24k.7 | [`invoice_pay.sql`](./invoice_pay.sql) | `billing_data_layer.sql` | P5. Pay tokens (hash only), split M-Pesa parts, checkout expiry, issue payments, report-only reconciliation. `apply_payment` sets `scalers.billing_write` before it writes invoice status. Does not call Bachs. `payment_attempts.updated_at` is added nullable, backfilled, then defaulted. Production has this file as of commit `553f1830`. Do not edit it in place. |
+| 24k.8 | [`invoice_documents.sql`](./invoice_documents.sql) | `invoice_pay.sql` | P6. Nullable `tax_kes`, receipts `RCT-YYYY-000001`, and billing notice kinds for issued, due soon, payment received, and overdue. Does not define `finalize_invoice`. An overpay updates the existing receipt amount and does not mint a second number. Does not charge and does not send. Production has this file as of commit `553f1830`. Do not edit it in place. |
+| 24k.9 | [`billing_company.sql`](./billing_company.sql) | `invoice_documents.sql` | P8. Canonical `finalize_invoice`: `scalers.billing_write`, `SCL-YYYY-NNNNNN`, letterhead snapshot, beta refusal, and a negative draft becomes one `tenant_credits` row (`invoice-credit:<id>`) plus a paid zero invoice. Production has this file as of commit `553f1830`. Do not edit it in place. Re-apply this file last whenever another file replaces `finalize_invoice`. |
+| 24k.10 | [`invoice_pay_session.sql`](./invoice_pay_session.sql) | `billing_company.sql` | P9. After P8. One live checkout per part (`pending` and `pending_unattached`), `park_invoice_pay_attempt`, and `live_part` on the checkout lookup. Does not replace `finalize_invoice`. Staging: `invoice_pay_session` (`20261018233254`). Not on prod. |
+| 24k.11 | [`billing_mode_legal_pairs.sql`](./billing_mode_legal_pairs.sql) | `wallet_security_beta.sql`, `billing_data_layer.sql` | P10. After P9. Replaces `set_tenant_billing_mode` so soft or hard is refused while `billing_status` is beta. Does not change `billing_status`. Does not replace `finalize_invoice`. Staging already has migration `billing_mode_legal_pairs` (`20261018212633`). Production has no such migration. Do not re-run `wallet_security_beta.sql` to pick up this check. |
+| 24l | [`platform_ops_notices.sql`](./platform_ops_notices.sql) | none (staff tables) | Staff notice settings + open notices. Service role only. Applied on scalers-staging and production. The ops cron adds no columns: threshold notices are extra `kind` values. `ops_alerts_prod_later.sql` (added by the ops alerts pull request) is a read-only check, not a migration. |
 | 24m | [`platform_ops_people.sql`](./platform_ops_people.sql) | `platform_ops_notices.sql` | Escalate people jsonb (name, phone, email). Applied on scalers-staging with the Platform rebuild. |
 | 24n | [`voice_turn_traces.sql`](./voice_turn_traces.sql) | `platform_ops_people.sql` | Per-turn voice traces (`voice_turn_traces`) plus call `score`, `checks`, `diagnosis`, and `release`. Service role only. Not applied by deploy. Apply the whole file on staging before `VOICE_TRACE` can persist. Re-running it adds the score columns if an earlier draft of the table is already there. |
 | 24o | [`calls_inbox_assignee.sql`](./calls_inbox_assignee.sql) | `inbox_triage.sql` | Optional. `calls.inbox_assignee_name` / `inbox_assignee_phone` (text, nullable). Already on scalers-staging (manual, 2026-10); file written to match. Not on prod. |
@@ -155,6 +164,40 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 24y | [`purge_archived_tenants_schedule.sql`](./purge_archived_tenants_schedule.sql) | `purge_archived_tenants.sql` | pg_cron nightly purge (03:15 EAT). **Not applied anywhere.** Needs Alvin's GO and the recording cleanup first. |
 | 24z | [`archive_tenant_billing.sql`](./archive_tenant_billing.sql) | `admin_business_archive.sql`, `wallet_on_demand_alerts.sql` | `archive_tenant_billing` (on Archive: billing mode off, on-demand off, line rental stops, rollover skips archived, one audited row; invoice hook documented, no invoice table yet) and `unarchive_tenant_billing` (on Unarchive: audit only, turns nothing back on). Trigger `tenants_archived_billing_guard` refuses billing/on-demand on while archived. Service role only. Staging applied 2026-10-17, prod applied 2026-10-18 (Alvin's GO). |
 | 24f | [`whatsapp_threads.sql`](./whatsapp_threads.sql) | `notify_send_ledger.sql` | Platform two-way WhatsApp persist (`whatsapp_threads` / `whatsapp_messages`). Service role only. Not voice DID routing. |
+
+---
+
+## Production billing apply order
+
+Production already has P1–P8 (the SQL as of commit `553f1830`) and the owner-price v2 import (`package_version_owner_prices.sql`). Do not edit P5, P6, or P8 in place. Do not re-run the whole of P1 after P7: the published feature freeze rejects that seed. P1's `finalize_invoice` installer still skips a body that already numbers `SCL-`.
+
+Remaining production apply, in this order, after a backup and Alvin's GO. These are the only files after P8.
+
+| # | File | What it must leave behind |
+| --- | --- | --- |
+| P9 | [`invoice_pay_session.sql`](./invoice_pay_session.sql) | Widens `payment_attempts_one_pending_part` to `pending` and `pending_unattached`. Adds `park_invoice_pay_attempt`. Replaces `create_invoice_pay_attempt`, `invoice_pay_attempt_by_checkout`, `settle_invoice_pay_attempt`, and `billing_payment_reconciliation`. Does not replace `finalize_invoice`. |
+| P10 | [`billing_mode_legal_pairs.sql`](./billing_mode_legal_pairs.sql) | `set_tenant_billing_mode` raises `billing stays off while the business is on beta` when mode is not `off` and a subscription row is still `beta`. Does not write `billing_status`. |
+
+If a later file replaces `finalize_invoice`, re-apply [`billing_company.sql`](./billing_company.sql) last so the `SCL-` letterhead function wins.
+
+P1–P8, already applied. P3 and P4 are one file. Run that file once.
+
+| # | File | What it left behind |
+| --- | --- | --- |
+| P1 | [`billing_data_layer.sql`](./billing_data_layer.sql) | Versions, invoices, notices. `invoices_freeze` rejects a draft number or status change unless `scalers.billing_write` is `1`. Its own `finalize_invoice` is `SC-` and sets that flag. If the installed body already contains `SCL-`, P1 leaves it alone. |
+| P2 | [`billing_data_layer_billing_status_not_null.sql`](./billing_data_layer_billing_status_not_null.sql) | `billing_status` NOT NULL. On production the three statements (`NOT VALID`, `VALIDATE`, `SET NOT NULL`) were separate transactions. |
+| P3 | extra-seat backfill inside [`owner_billing_actions.sql`](./owner_billing_actions.sql) | Sets `extra_seat_monthly_kes = 500` with the freeze triggers disabled, then turns them back on. Same file as P4. |
+| P4 | [`owner_billing_actions.sql`](./owner_billing_actions.sql) | Owner plan, seats, and spend. Re-applying it replaces `finalize_invoice`. |
+| P5 | [`invoice_pay.sql`](./invoice_pay.sql) | Pay attempts, tokens, reconciliation, as of `553f1830`. `apply_payment` sets `scalers.billing_write` before a status write. |
+| P6 | [`invoice_documents.sql`](./invoice_documents.sql) | Receipts and notice kinds, as of `553f1830`. Does not replace `finalize_invoice`. |
+| P7 | [`package_version_editor.sql`](./package_version_editor.sql) | Version editor and the version freeze. |
+| P8 | [`billing_company.sql`](./billing_company.sql) | Canonical `finalize_invoice`, as of `553f1830`. |
+
+Owner-price v2 (`package_version_owner_prices.sql`) is already on production. It is not part of P1–P8 and it is not in the remaining list.
+
+Proof: `tests/sql/billing_apply_order/run.sh` on a throwaway local database. It applies P1–P10 from this checkout, then issues from `owner_change_plan`, `owner_set_extra_seats` (negative draft), and `finalize_invoice`.
+
+Rollback of P1 and P2 is [`billing_data_layer_down.sql`](./billing_data_layer_down.sql). It drops the layer. Do not run it on staging or production unless that removal is the point.
 
 ---
 

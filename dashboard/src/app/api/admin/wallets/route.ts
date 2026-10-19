@@ -3,9 +3,9 @@ import { adminActorName } from "@/lib/adminActor";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import {
+  confirmTenantBillingMode,
   listAdminWallets,
   listTenantLedger,
-  setTenantBillingMode,
   type BillingMode,
 } from "@/lib/adminWallets";
 
@@ -60,12 +60,11 @@ export async function POST(request: Request) {
       if (note.length < 3) {
         return NextResponse.json({ error: "Note required" }, { status: 400 });
       }
-      const result = await setTenantBillingMode({
+      const result = await confirmTenantBillingMode({
         businessId,
         mode,
         note,
         actor,
-        betaExpiresAt: body.beta_expires_at ? String(body.beta_expires_at) : null,
       });
       return NextResponse.json({ ok: true, ...result });
     }

@@ -46,6 +46,7 @@ function run(body) {
   `;
   const ran = spawnSync(process.execPath, ["--experimental-strip-types", "--no-warnings", "--input-type=module", "-e", script], {
     encoding: "utf8",
+    env: { ...process.env, NODE_NO_WARNINGS: "1" },
   });
   assert.equal(ran.status, 0, ran.stderr || ran.stdout);
   return JSON.parse(ran.stdout.trim().split("\n").at(-1));

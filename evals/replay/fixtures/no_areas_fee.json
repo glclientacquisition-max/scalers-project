@@ -1,0 +1,14 @@
+{
+  "id": "no_areas_fee",
+  "bug": "invented_absence",
+  "profile": "nowhere",
+  "language": "en",
+  "turns": [
+    {
+      "caller": "Do you charge a fee to come to Westlands?",
+      "mustSay": ["I'll check with the team and they'll call you back."],
+      "mustNotSay": ["don't come", "Hatufiki", "Westlands"],
+      "status": "no_data"
+    }
+  ]
+}

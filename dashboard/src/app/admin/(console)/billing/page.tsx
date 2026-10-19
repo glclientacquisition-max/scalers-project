@@ -1,6 +1,6 @@
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminBillingListPanel } from "@/components/AdminBillingListPanel";
-import { deskListTitleClass } from "@/components/ui/deskChrome";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { logAdminError } from "@/lib/adminErrors";
 import { loadAdminBillingOverview } from "@/lib/adminBilling";
 import { requireSuperAdmin } from "@/lib/adminGuard";
@@ -19,7 +19,7 @@ export default async function AdminBillingPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className={deskListTitleClass}>Billing</h1>
+      <AdminPageHeader title="Billing" subtitle="Packages, minutes, and charges by business." />
       <AdminBillingListPanel overview={overview} />
     </div>
   );
