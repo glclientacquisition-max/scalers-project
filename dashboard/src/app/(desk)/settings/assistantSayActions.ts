@@ -82,6 +82,7 @@ async function tenantForPreview(): Promise<TenantRow | null> {
 
 export type DeskLookupPreviewResult = {
   status: string;
+  /** Plain owner copy. Never an internal lookup code. */
   reason: string;
   speechEn: string;
   speechSw: string;
@@ -118,11 +119,16 @@ export async function previewDeskLookupAction(
     now: new Date(),
     seed: 0,
   });
+  const { ownerLookupReason } = requireVoice("./src/knowledge/lookupOwnerReason.js") as {
+    ownerLookupReason: (kind: string, result: { status?: string; reason?: string }) => string;
+  };
+  const reasonKind =
+    lookupKind === "fee" ? "delivery" : lookupKind === "pay" ? "payment" : lookupKind;
   return {
     ok: true,
     result: {
       status: result.status,
-      reason: String(result.reason || ""),
+      reason: ownerLookupReason(reasonKind, result),
       speechEn: speechOf(result, "en"),
       speechSw: speechOf(result, "sw"),
       willSay: result.status === "found",

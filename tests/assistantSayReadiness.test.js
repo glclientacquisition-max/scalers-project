@@ -6,8 +6,31 @@ const path = require('node:path');
 const { createRequire } = require('node:module');
 
 const requireRoot = createRequire(path.join(__dirname, '..', 'package.json'));
-const { evaluateAssistantSay, getReadyChecklist } = requireRoot('./src/knowledge/assistantSayReadiness.js');
+const {
+  evaluateAssistantSay,
+  getReadyChecklist,
+  lookupProbeForRowId,
+} = requireRoot('./src/knowledge/assistantSayReadiness.js');
 const { tenantProfileFromRow } = requireRoot('./src/tenantProfile.js');
+const { profiles } = requireRoot('./evals/replay/profiles.js');
+
+const FIXTURE_NOW = new Date('2026-10-19T05:00:00.000Z');
+
+function profileFromReplay(key) {
+  const p = profiles()[key];
+  return tenantProfileFromRow(
+    {
+      id: `replay-${key}`,
+      business_name: p.businessName,
+      services_catalog: p.servicesCatalog,
+      hours_schedule: p.hoursSchedule,
+      service_areas: p.service_areas,
+      business_policies: p.businessPolicies || {},
+      unknown_answer_fallback: p.unknownAnswerFallback,
+    },
+    { fieldMeta: { hashMode: true }, holdGate: {} }
+  );
+}
 
 /** Mirrors dashboard dev/settings-jobs retail tenant (Chapter One). */
 const devRetailTenant = {
@@ -82,6 +105,37 @@ describe('assistantSayReadiness', () => {
       assert.equal(item.complete, row.willSay);
       if (!item.complete) assert.equal(item.reason, row.reason);
     }
+  });
+
+  it('each readiness row matches the same lookup probe voice uses', () => {
+    for (const key of ['carry', 'list']) {
+      const profile = profileFromReplay(key);
+      const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
+      for (const id of ['prices', 'hours', 'delivery', 'payment']) {
+        const row = say.rows.find((r) => r.id === id);
+        const result = lookupProbeForRowId(id, profile, FIXTURE_NOW);
+        assert.ok(row, `${key}/${id}`);
+        assert.equal(row.willSay, result.status === 'found', `${key}/${id}`);
+      }
+    }
+  });
+
+  it('catalogue marks prices ready when sofa cleaning lookup is found', () => {
+    const p = profiles().carry;
+    const profile = tenantProfileFromRow(
+      {
+        id: 'replay-carry-open',
+        business_name: p.businessName,
+        services_catalog: p.servicesCatalog,
+        hours_schedule: p.hoursSchedule,
+        service_areas: p.service_areas,
+      },
+      {}
+    );
+    const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
+    const prices = say.rows.find((r) => r.id === 'prices');
+    assert.equal(prices.willSay, true);
+    assert.match(prices.reason, /Ready on the next call/);
   });
 
   it('when unsure uses neutral stamp labels, not Will say / Wont say', () => {

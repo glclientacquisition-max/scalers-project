@@ -457,7 +457,7 @@ async function HomeOverviewBody() {
         {insights ? (
           <CallInsights insights={insights} />
         ) : null}
-        {score && line !== "live" ? (
+        {score && line !== "live" && !assistantSayPage ? (
           <HomeCapture
             tenantId={tenant.id}
             vertical={vertical}

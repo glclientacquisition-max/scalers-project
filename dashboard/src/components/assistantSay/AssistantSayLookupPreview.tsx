@@ -71,7 +71,7 @@ export function AssistantSayLookupPreview() {
             <p className="mt-2 text-body text-ink">{result.speechEn}</p>
             <p className="mt-1 text-meta text-ink-3" lang="sw">{result.speechSw}</p>
             {!result.willSay && result.reason ? (
-              <p className="mt-2 text-meta text-ink-3">Reason: {result.reason}</p>
+              <p className="mt-2 text-meta text-ink-3">{result.reason}</p>
             ) : null}
           </div>
         ) : null}

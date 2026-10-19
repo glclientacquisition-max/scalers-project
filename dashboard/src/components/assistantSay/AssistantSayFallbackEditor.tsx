@@ -100,6 +100,9 @@ export function AssistantSayFallbackEditor({ initial, legacyGeneral }: Props) {
             <p className="mt-1 text-meta text-ink-3">
               Callers hear: {spokenFallbackLine(kind, byKind, "en", legacyGeneral)}
             </p>
+            <p className="mt-1 text-meta text-ink-3" lang="sw">
+              Wanasikia: {spokenFallbackLine(kind, byKind, "sw", legacyGeneral)}
+            </p>
           </div>
         ))}
         <div className="flex items-center justify-between gap-3 px-4 py-3">
