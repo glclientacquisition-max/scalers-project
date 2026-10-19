@@ -18,32 +18,68 @@ function ctx(profile, now) {
   return { profile, language: 'en', now: now || new Date(), seed: 0 };
 }
 
-function catalogNames(profile) {
-  const raw = profile?.servicesCatalog || profile?.services_catalog || [];
-  if (!Array.isArray(raw)) return [];
-  return raw.map((row) => String(row?.name || '').trim()).filter(Boolean);
+function asList(value) {
+  return Array.isArray(value) ? value : [];
 }
 
-function probePrices(profile, now) {
+/** The tenant's own catalogue names (services and products), as voice price lookups see them. */
+function catalogNames(profile) {
+  const rows = [
+    ...asList(profile?.servicesCatalog || profile?.services_catalog),
+    ...asList(profile?.productCatalog || profile?.product_catalog),
+  ];
+  return [...new Set(rows.map((row) => String(row?.name || '').trim()).filter(Boolean))];
+}
+
+/** The tenant's own saved delivery/service area names. */
+function areaNames(profile) {
+  const raw = profile?.service_areas || profile?.serviceAreas;
+  const areas = raw && typeof raw === 'object' && !Array.isArray(raw) ? asList(raw.areas) : asList(raw);
+  return [...new Set(areas.map((a) => String(a?.name || a?.id || '').trim()).filter(Boolean))];
+}
+
+/** Probe caps: enough to find one answer on a long catalogue without a slow page. */
+const MAX_PROBES = 25;
+
+/**
+ * Questions the readiness rows (and the Desk preview defaults) ask voice lookups.
+ * Prices and delivery come only from this tenant's catalogue and areas; hours and
+ * payment are generic. A tenant with no catalogue or no areas gets no question:
+ * the probe asks an empty query, which voice reports as missing data.
+ */
+function readinessQuestions(profile) {
+  return {
+    price: catalogNames(profile).slice(0, MAX_PROBES).map((name) => `How much is ${name}?`),
+    hours: ['What are your opening hours?'],
+    fee: areaNames(profile).slice(0, MAX_PROBES).map((name) => `Do you deliver to ${name}?`),
+    pay: ['What is your till number?'],
+  };
+}
+
+/** Desk preview defaults: the first readiness question per preview kind ('' when the tenant has none). */
+function previewSampleQuestions(profile) {
+  const q = readinessQuestions(profile);
+  return { price: q.price[0] || '', hours: q.hours[0], delivery: q.fee[0] || '', pay: q.pay[0] };
+}
+
+/** First found answer across the tenant's questions; otherwise the first result (or empty-query result). */
+function probeKind(kind, profile, now) {
   const c = ctx(profile, now);
-  const queries = ['How much is sofa cleaning?'];
-  for (const name of catalogNames(profile)) {
-    queries.push(`How much is ${name}?`);
-  }
-  let fallback = null;
-  for (const query of queries) {
-    const result = lookup('price', query, c);
+  const questions = readinessQuestions(profile)[kind];
+  let first = null;
+  for (const query of questions) {
+    const result = lookup(kind, query, c);
     if (result?.status === 'found') return result;
-    if (!fallback) fallback = result;
+    if (!first) first = result;
   }
-  return fallback || lookup('price', 'How much is sofa cleaning?', c);
+  return first || lookup(kind, '', c);
 }
 
 const FACT_PROBES = {
-  prices: probePrices,
-  hours: (profile, now) => lookup('hours', 'What are your opening hours?', ctx(profile, now)),
-  delivery: (profile, now) => lookup('fee', 'Do you deliver to Kilimani?', ctx(profile, now)),
-  payment: (profile, now) => lookup('pay', 'What is your till number?', ctx(profile, now)),
+  prices: (profile, now) => probeKind('price', profile, now),
+  hours: (profile, now) => probeKind('hours', profile, now),
+  delivery: (profile, now) => probeKind('fee', profile, now),
+  payment: (profile, now) => probeKind('pay', profile, now),
 };
 
 function factRow(kind, title, profile, now) {
@@ -143,4 +179,6 @@ module.exports = {
   getReadyChecklist,
   lookupProbeForRowId,
   FACT_PROBES,
+  readinessQuestions,
+  previewSampleQuestions,
 };

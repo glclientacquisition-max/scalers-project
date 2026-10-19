@@ -10,7 +10,10 @@ const {
   evaluateAssistantSay,
   getReadyChecklist,
   lookupProbeForRowId,
+  readinessQuestions,
+  previewSampleQuestions,
 } = requireRoot('./src/knowledge/assistantSayReadiness.js');
+const fs = require('node:fs');
 const { tenantProfileFromRow } = requireRoot('./src/tenantProfile.js');
 const { profiles } = requireRoot('./evals/replay/profiles.js');
 
@@ -120,7 +123,7 @@ describe('assistantSayReadiness', () => {
     }
   });
 
-  it('catalogue marks prices ready when sofa cleaning lookup is found', () => {
+  it('catalogue marks prices ready when a catalogue item lookup is found', () => {
     const p = profiles().carry;
     const profile = tenantProfileFromRow(
       {
@@ -152,5 +155,76 @@ describe('assistantSayReadiness', () => {
     const defaultUnsure = defaultSay.rows.find((r) => r.id === 'unsure');
     assert.equal(defaultUnsure.stampLabel, 'Using team default');
     assert.equal(defaultUnsure.stampTone, 'neutral');
+  });
+
+  // Probes must come from THIS tenant's data. A fixed "How much is sofa cleaning?"
+  // (a Jirani item) or "Kilimani" probe is wrong for every other business.
+  it('price and delivery probes come only from the tenant catalogue and areas', () => {
+    const retail = tenantProfileFromRow({
+      ...devRetailTenant,
+      product_catalog: [{ name: 'Fast charger 20W', price_range: '650' }],
+      service_areas: { areas: [{ id: 'westlands', name: 'Westlands', fee_mode: 'flat', fee_ksh: 200 }] },
+    }, {});
+    const q = readinessQuestions(retail);
+    assert.deepEqual(q.price, ['How much is A4 print?', 'How much is Fast charger 20W?']);
+    assert.deepEqual(q.fee, ['Do you deliver to Westlands?']);
+    assert.deepEqual(q.hours, ['What are your opening hours?']);
+    assert.deepEqual(q.pay, ['What is your till number?']);
+    const all = JSON.stringify(q).toLowerCase();
+    for (const foreign of ['sofa', 'kilimani', 'carpet']) assert.ok(!all.includes(foreign), foreign);
+  });
+
+  it('a tenant with no catalogue or areas gets no price or delivery question', () => {
+    const empty = tenantProfileFromRow({ business_name: 'Empty Co', services_catalog: [], product_catalog: [] }, {});
+    const q = readinessQuestions(empty);
+    assert.deepEqual(q.price, []);
+    assert.deepEqual(q.fee, []);
+    const say = evaluateAssistantSay(empty, { now: FIXTURE_NOW });
+    assert.equal(say.rows.find((r) => r.id === 'prices').willSay, false);
+    assert.equal(say.rows.find((r) => r.id === 'delivery').willSay, false);
+    assert.deepEqual(previewSampleQuestions(empty), {
+      price: '',
+      hours: 'What are your opening hours?',
+      delivery: '',
+      pay: 'What is your till number?',
+    });
+  });
+
+  it('a product-only catalogue is probed (retail without services)', () => {
+    const profile = tenantProfileFromRow({
+      business_name: 'Gadget Shop',
+      services_catalog: [],
+      product_catalog: [{ name: 'Fast charger 20W', price_range: '650', source: 'owner' }],
+    }, {});
+    assert.deepEqual(readinessQuestions(profile).price, ['How much is Fast charger 20W?']);
+    const row = evaluateAssistantSay(profile, { now: FIXTURE_NOW }).rows.find((r) => r.id === 'prices');
+    const probe = lookupProbeForRowId('prices', profile, FIXTURE_NOW);
+    assert.equal(row.willSay, probe.status === 'found');
+  });
+
+  it('preview samples are the first readiness question per kind', () => {
+    for (const key of ['carry', 'list']) {
+      const profile = profileFromReplay(key);
+      const q = readinessQuestions(profile);
+      const samples = previewSampleQuestions(profile);
+      assert.equal(samples.price, q.price[0] || '', key);
+      assert.equal(samples.delivery, q.fee[0] || '', key);
+      assert.equal(samples.hours, q.hours[0], key);
+      assert.equal(samples.pay, q.pay[0], key);
+    }
+  });
+
+  it('no tenant item or place is hard-coded in the probes or the Desk preview', () => {
+    const root = path.join(__dirname, '..');
+    const sources = [
+      'src/knowledge/assistantSayReadiness.js',
+      'dashboard/src/components/assistantSay/AssistantSayLookupPreview.tsx',
+    ];
+    for (const rel of sources) {
+      const text = fs.readFileSync(path.join(root, rel), 'utf8');
+      assert.ok(!/How much is [A-Za-z]/.test(text.replace(/How much is \$\{/g, '')), `${rel}: literal price question`);
+      assert.ok(!/deliver to [A-Z]/.test(text), `${rel}: literal place`);
+      assert.ok(!/sofa|kilimani/i.test(text), `${rel}: tenant-specific sample`);
+    }
   });
 });

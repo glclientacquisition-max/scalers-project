@@ -14,14 +14,25 @@ const KINDS = [
   { id: "pay", label: "Payment" },
 ] as const;
 
-const PLACEHOLDERS: Record<string, string> = {
-  price: "How much is sofa cleaning?",
-  hours: "What are your opening hours?",
-  delivery: "Do you deliver to Kilimani?",
-  pay: "What is your till number?",
+/** Shown when the tenant has no catalogue item or area to ask about yet. */
+const EMPTY_HINT: Record<string, string> = {
+  price: "Add a catalogue item first",
+  hours: "",
+  delivery: "Add a delivery area first",
+  pay: "",
 };
 
-export function AssistantSayLookupPreview() {
+/**
+ * Sample questions come from this tenant's own catalogue and areas
+ * (src/knowledge/assistantSayReadiness.js previewSampleQuestions), the same
+ * questions the readiness rows ask. Never another business's items.
+ */
+export function AssistantSayLookupPreview({
+  samples,
+}: {
+  samples: { price: string; hours: string; delivery: string; pay: string };
+}) {
+  const sampleFor = (k: string) => samples[k as keyof typeof samples] || "";
   const [kind, setKind] = useState<string>("price");
   const [query, setQuery] = useState("");
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof previewDeskLookupAction>> | null>(null);
@@ -29,7 +40,7 @@ export function AssistantSayLookupPreview() {
 
   function runPreview() {
     startTransition(async () => {
-      const res = await previewDeskLookupAction(kind, query || PLACEHOLDERS[kind]);
+      const res = await previewDeskLookupAction(kind, query || sampleFor(kind));
       setPreview(res);
     });
   }
@@ -51,7 +62,7 @@ export function AssistantSayLookupPreview() {
             className={settingsFieldClass}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={PLACEHOLDERS[kind]}
+            placeholder={sampleFor(kind) || EMPTY_HINT[kind]}
           />
         </SettingsStack>
         <Button type="button" variant="tonal" size="sm" onClick={runPreview} disabled={pending}>

@@ -1,5 +1,6 @@
 import { AssistantSayFallbackEditor } from "@/components/assistantSay/AssistantSayFallbackEditor";
 import { AssistantSayLookupPreview } from "@/components/assistantSay/AssistantSayLookupPreview";
+import { lookupPreviewSamples } from "@/lib/assistantSayVoice.server";
 import { deskLookupPreview, voiceFallbackByKind } from "@/lib/deskFeatureFlags";
 import { parseUnknownAnswerByKind } from "@/lib/unknownAnswerByKindConstants";
 import type { TenantRow } from "@/lib/supabase";
@@ -13,7 +14,7 @@ export function assistantSayBelowList(tenant: TenantRow) {
       />
     )
     : null;
-  const preview = deskLookupPreview() ? <AssistantSayLookupPreview /> : null;
+  const preview = deskLookupPreview() ? <AssistantSayLookupPreview samples={lookupPreviewSamples(tenant)} /> : null;
   if (!fallback && !preview) return null;
   return (
     <div className="space-y-6">
