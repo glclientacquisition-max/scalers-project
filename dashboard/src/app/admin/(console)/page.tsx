@@ -20,7 +20,7 @@ import { requireSuperAdmin } from "@/lib/adminGuard";
 export const instant = false;
 
 /**
- * Today. Reads only: the notice check and alert mail run on Platform, not here.
+ * Today. Reads only. The notice check and alert mail run on the ops cron, not here.
  */
 export default async function AdminTodayPage() {
   await requireSuperAdmin();
