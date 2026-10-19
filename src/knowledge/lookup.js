@@ -868,35 +868,15 @@ function joinOrWords(words, lang) {
   return `${words.slice(0, -1).join(', ')}${sep}${words[words.length - 1]}`;
 }
 
+/** Methods spoken as a short list only when there is no usable pay number slot. */
+const PAY_LIST_METHOD_IDS = new Set(['cash', 'cheque', 'bank', 'card']);
+
 function spokenPayMethodLine(pay, methodId) {
   switch (methodId) {
     case 'cash':
       return { en: 'cash', sw: 'pesa taslimu' };
     case 'cheque':
       return { en: 'cheque', sw: 'hundi' };
-    case 'mpesa_till': {
-      const till = digitsOf(pay.mpesa_till);
-      return till
-        ? { en: `M-Pesa Buy Goods Till ${till}`, sw: `M-Pesa Till ${till}` }
-        : { en: 'M-Pesa Buy Goods', sw: 'M-Pesa Buy Goods' };
-    }
-    case 'mpesa_paybill': {
-      const pb = asObject(pay.mpesa_paybill);
-      const no = digitsOf(pb?.business_no);
-      return no
-        ? { en: `M-Pesa Paybill ${no}`, sw: `M-Pesa Paybill ${no}` }
-        : { en: 'M-Pesa Paybill', sw: 'M-Pesa Paybill' };
-    }
-    case 'pochi': {
-      const phone = digitsOf(asObject(pay.pochi)?.phone);
-      return phone
-        ? { en: 'Pochi la Biashara', sw: 'Pochi la Biashara' }
-        : { en: 'Pochi la Biashara', sw: 'Pochi la Biashara' };
-    }
-    case 'mpesa_send':
-      return { en: 'M-Pesa Send Money', sw: 'M-Pesa Send Money' };
-    case 'airtel':
-      return { en: 'Airtel Money', sw: 'Airtel Money' };
     case 'bank':
       return { en: 'bank transfer', sw: 'uhamisho wa benki' };
     case 'card':
@@ -910,9 +890,9 @@ function payMethodLines(pay, filterKind) {
   const methods = payMethodIds(pay);
   const lines = [];
   for (const id of methods) {
+    if (!PAY_LIST_METHOD_IDS.has(id)) continue;
     if (filterKind === 'cash' && id !== 'cash') continue;
     if (filterKind === 'cheque' && id !== 'cheque') continue;
-    if (filterKind === 'mpesa' && !MPESA_METHOD_IDS.has(id)) continue;
     if (filterKind === 'bank' && id !== 'bank') continue;
     if (filterKind === 'card' && id !== 'card') continue;
     const line = spokenPayMethodLine(pay, id);
@@ -1079,6 +1059,14 @@ function lookupPayMethods(profile, pay, intent) {
   }, profile, 'pay');
 }
 
+function lookupPayUsesNumberSpeech(intent, pay) {
+  const slots = paySlots(pay);
+  if (!slots.length) return false;
+  if (intent.mode === 'general') return true;
+  if (intent.mode === 'method' && intent.method === 'mpesa') return payMethodOffered(pay, 'mpesa');
+  return false;
+}
+
 function lookupPay(query, ctx) {
   const profile = ctx.profile || {};
   const pay = payBag(profile);
@@ -1089,6 +1077,12 @@ function lookupPay(query, ctx) {
   const intent = payQuestionIntent(query);
   if (intent.mode === 'number') {
     return lookupPayNumber(intent.kind, profile, pay);
+  }
+  if (lookupPayUsesNumberSpeech(intent, pay)) {
+    if (intent.mode === 'method' && intent.method === 'mpesa' && !payMethodOffered(pay, 'mpesa')) {
+      return notFoundInList(profile, 'pay.mpesa', null, 'pay');
+    }
+    return lookupPayNumber('any', profile, pay);
   }
   return lookupPayMethods(profile, pay, intent);
 }

@@ -110,16 +110,14 @@ test('pay: cheque-only tenant asked about cash gets the callback line', () => {
   }
 });
 
-test('pay: cash plus blank till lists both on general pay', () => {
+test('pay: cash plus blank till is cash only on general pay', () => {
   const row = confirmedPay({ methods: ['cash', 'mpesa_till'], mpesa_till: '' });
   const en = say('pay', 'How do I pay?', row, 'en');
-  const sw = say('pay', 'How do I pay?', row, 'sw');
+  const sw = say('pay', 'Nalipaje?', row, 'sw');
   assert.equal(en.result.status, 'found');
-  assert.match(en.speech, /cash/);
-  assert.match(en.speech, /M-Pesa Buy Goods/);
+  assert.equal(en.speech, 'You can pay by cash.');
   assert.equal(sw.result.status, 'found');
-  assert.match(sw.speech, /pesa taslimu/);
-  assert.match(sw.speech, /M-Pesa Buy Goods/);
+  assert.equal(sw.speech, 'Unaweza kulipa kwa pesa taslimu.');
 });
 
 test('pay: bank-only general names bank without account digits', () => {
