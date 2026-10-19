@@ -65,7 +65,7 @@ export function stampToneForBillingStatus(status: AdminBillingStatus): "attentio
 
 export function rowWhenLabel(r: AdminBillingRow): string {
   if (r.status === "archived") return "Archived";
-  if (!r.packageName) return "No package";
+  if (!r.packageName) return "No plan";
   if (r.periodEndLabel && periodEndWithinRolloverWindow(r.periodEnd)) return `Ends ${r.periodEndLabel}`;
   if (r.minutesIncluded <= 0) return "No cap";
   if (r.minutesRemaining <= 0) return "0 left";
@@ -75,7 +75,7 @@ export function rowWhenLabel(r: AdminBillingRow): string {
 export function rowPreviewLine(r: AdminBillingRow, modeLabel: (m: AdminBillingRow["billing_enforcement"]) => string): string {
   return [
     r.sautikit_virtual_number ? r.sautikit_virtual_number.replace(/\s+/g, " ") : "No number",
-    r.packageName || "Unassigned",
+    r.packageName || "No plan",
     modeLabel(r.billing_enforcement),
   ].join(" · ");
 }

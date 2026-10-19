@@ -57,21 +57,22 @@ test.describe("admin billing hub mobile previews", () => {
     });
   });
 
-  test("billing needs you cards", async ({ page }, testInfo) => {
+  test("billing shop list", async ({ page }, testInfo) => {
     const tag = widthTag(page.viewportSize()?.width ?? 390);
     const scheme = schemeName(testInfo);
     await page.goto("/dev/admin-billing", { waitUntil: "networkidle" });
     await expect(page.getByRole("heading", { name: "Billing" })).toBeVisible();
+    await expect(page.getByLabel("Billing shops")).toBeVisible();
     await page.waitForTimeout(350);
-    await page.screenshot({ path: join(OUT, `${tag}-${scheme}-billing-needs-cards.png`), fullPage: true });
+    await page.screenshot({ path: join(OUT, `${tag}-${scheme}-billing-shop-list.png`), fullPage: true });
   });
 
-  test("billing low minutes queue", async ({ page }, testInfo) => {
+  test("billing low queue", async ({ page }, testInfo) => {
     const tag = widthTag(page.viewportSize()?.width ?? 390);
     const scheme = schemeName(testInfo);
     await page.goto("/dev/admin-billing", { waitUntil: "networkidle" });
-    await page.getByRole("button", { name: /Low minutes/i }).click();
-    await expect(page.getByPlaceholder("Business, number, or package")).toBeVisible();
+    await page.getByRole("button", { name: /Low/i }).click();
+    await expect(page.getByPlaceholder("Shop, number, or plan")).toBeVisible();
     await page.waitForTimeout(300);
     await page.screenshot({ path: join(OUT, `${tag}-${scheme}-billing-low-queue.png`), fullPage: true });
   });
@@ -81,7 +82,7 @@ test.describe("admin billing hub mobile previews", () => {
     const scheme = schemeName(testInfo);
     await page.goto("/dev/admin-billing", { waitUntil: "networkidle" });
     await page.getByLabel("Billing view").getByRole("button", { name: /^All\b/i }).click();
-    await expect(page.getByLabel("Platform billing snapshot")).toBeVisible();
+    await expect(page.getByLabel("Billing shops")).toBeVisible();
     await page.waitForTimeout(300);
     await page.screenshot({ path: join(OUT, `${tag}-${scheme}-billing-all-directory.png`), fullPage: true });
   });

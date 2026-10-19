@@ -21,7 +21,7 @@ export default async function DevAdminBillingPage({
       <AdminBillingListPanel
         overview={ADMIN_BILLING_OVERVIEW}
         attention={ADMIN_ATTENTION}
-        initialFilter={view === "attention" ? "attention" : "needs"}
+        initialFilter={view === "attention" ? "attention" : "all"}
       />
     </AdminShell>
   );

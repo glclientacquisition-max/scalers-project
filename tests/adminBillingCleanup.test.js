@@ -130,19 +130,21 @@ describe("admin billing: plain history", () => {
 });
 
 describe("admin billing: list queue", () => {
-  it("uses segmented filters, needs cards, mix bar, and shop money links", () => {
+  it("uses segmented filters, wait chips, and shop money links", () => {
     const list = read(LIST);
-    const cards = read("dashboard/src/components/AdminBillingNeedsCards.tsx");
+    const chips = read("dashboard/src/components/AdminBillingFilterChips.tsx");
     assert.match(list, /<Segmented/);
-    assert.match(list, /AdminBillingNeedsCards/);
-    assert.match(cards, /No package/);
-    assert.match(list, /MixBar|Beta vs charging mix/);
-    assert.match(list, /Pick a queue to see shops/);
+    assert.match(list, /AdminBillingFilterChips/);
+    assert.match(chips, /No plan/);
+    assert.match(chips, /rounded-md/);
+    assert.doesNotMatch(chips, /hint/);
+    assert.doesNotMatch(list, /MixBar|Commercial mix|Pick a queue|Needs attention|Catalog/);
     assert.match(list, /\/admin\/businesses\/\$\{.*\}\?money=1/);
     assert.match(list, /href="\/admin\/packages"/);
-    assert.match(list, /Needs attention/);
-    assert.match(list, /Open invoices/);
-    assert.match(list, /PlatformRevenueStrip|openInvoiceKesLabel/);
+    assert.match(list, /Plans/);
+    assert.match(list, /Reviews/);
+    assert.match(list, /Open invoices|openInvoiceKesLabel/);
+    assert.match(list, /Pagination/);
     assert.doesNotMatch(list, /admin\/billing\/\$\{/);
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
@@ -27,7 +27,7 @@ import {
   type VersionPackage,
 } from "@/lib/packageVersionCatalog";
 
-type Tab = "versions" | "businesses" | "catalogue";
+type Tab = "versions" | "businesses";
 type SheetKind = "edit" | "publish" | "discard" | "move" | "billing" | "signup" | null;
 
 type DraftForm = {
@@ -184,11 +184,9 @@ function changedLines(before: PackageVersionRow, form: DraftForm): string[] {
 export function AdminPackageVersionsPanel({
   catalog,
   businesses,
-  children,
 }: {
   catalog: PackageVersionCatalog;
   businesses: BusinessPlanRow[];
-  children?: ReactNode;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -389,11 +387,10 @@ export function AdminPackageVersionsPanel({
   return (
     <div className="space-y-4">
       <Segmented
-        label="Packages"
+        label="Plans"
         items={[
           { key: "versions", label: "Versions", active: tab === "versions" },
           { key: "businesses", label: "Businesses", count: businesses.length, active: tab === "businesses" },
-          { key: "catalogue", label: "Catalogue", active: tab === "catalogue" },
         ]}
         onSelect={(key) => setTab(key as Tab)}
       />
@@ -402,8 +399,6 @@ export function AdminPackageVersionsPanel({
       {error && sheet === null ? (
         <p className="px-4 text-body text-attention" role="alert">{error}</p>
       ) : null}
-
-      {tab === "catalogue" ? children : null}
 
       {tab === "versions" ? (
         <div className="space-y-6">

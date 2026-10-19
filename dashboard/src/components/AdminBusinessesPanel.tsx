@@ -15,6 +15,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { Stamp } from "@/components/ui/Stamp";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/ui/Pagination";
 
 type ShopFilter = "all" | "waiting" | "active" | "suspended" | "archived";
 
@@ -37,7 +38,7 @@ export function AdminBusinessesPanel({
   const [error, setError] = useState("");
   const [assignId, setAssignId] = useState<string | null>(null);
 
-  const PAGE_SIZE = 25;
+  const PAGE_SIZE = DEFAULT_PAGE_SIZE;
   const freeCount = availableDids.length;
   const assignBusiness = assignId ? businesses.find((b) => b.id === assignId) : null;
 
@@ -98,7 +99,7 @@ export function AdminBusinessesPanel({
 
   return (
     <>
-      <AdminPageHeader title="Businesses" subtitle="Search, open a shop, assign a line." />
+      <AdminPageHeader title="Businesses" />
 
       {pendingBusinesses.length > 0 ? (
         <section>
@@ -219,31 +220,14 @@ export function AdminBusinessesPanel({
             })}
           </ul>
         )}
-        {filtered.length > PAGE_SIZE ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-            <p className="min-w-0 text-meta tabular-nums text-ink-2">
-              {(safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length}
-            </p>
-            <div className="flex shrink-0 gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={safePage <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Previous
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={safePage >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        ) : null}
+        <Pagination
+          page={safePage}
+          pageSize={PAGE_SIZE}
+          total={filtered.length}
+          noun="shop"
+          onPage={setPage}
+          className="px-4 py-3"
+        />
       </section>
 
       <Sheet

@@ -114,12 +114,12 @@ describe("admin console polish", () => {
     assert.match(page, /readPlatformOps/);
     assert.doesNotMatch(page, /evaluatePlatformOps/);
     assert.match(panel, /Needs you/);
-    assert.match(panel, /Volume today/);
+    assert.doesNotMatch(panel, /Volume today/);
     assert.match(panel, /ListRow/);
     assert.match(panel, /row\.href/);
     assert.match(panel, /Nothing waiting\./);
     assert.match(panel, /href="\/admin\/platform"/);
-    assert.match(panel, /id="calls"/);
+    assert.match(panel, /calls today/);
     assert.doesNotMatch(page, /lg:grid-cols-4/);
     assert.doesNotMatch(page, /function Kpi/);
     assert.doesNotMatch(page, /<h2/);
@@ -243,7 +243,8 @@ describe("admin console polish", () => {
 
   it("opens Packages with assign and sends old Ledger to Businesses", () => {
     const packages = read("dashboard/src/app/admin/(console)/packages/page.tsx");
-    assert.match(packages, /loadPackageCatalog/);
+    assert.match(packages, /loadPackageVersionEditor/);
+    assert.match(packages, /title="Plans"/);
     assert.doesNotMatch(packages, /deskListTitleClass/);
     assert.doesNotMatch(packages, /catalogOnly/);
     assert.doesNotMatch(packages, /redirect\(/);
