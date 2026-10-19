@@ -184,13 +184,50 @@ export async function loadAdminBillingOverview(): Promise<AdminBillingOverview> 
   };
 }
 
+export type CheckoutReview = {
+  provider: string;
+  providerRef: string;
+  getKes: string;
+  seenKes: string;
+};
+
 export type AdminBillingClientDetail = {
   row: AdminBillingRow;
   beta_notes: string | null;
   rates: BillingRateCard;
   packages: BillingPackage[];
   subscription: TenantSubscriptionRow | null;
+  checkoutReviews: CheckoutReview[];
 };
+
+function reviewText(raw: unknown, key: "get_kes" | "seen_kes"): string {
+  if (!raw || typeof raw !== "object") return "0";
+  const value = (raw as Record<string, unknown>)[key];
+  if (value == null || String(value).trim() === "") return "0";
+  return String(value);
+}
+
+async function loadOpenCheckoutReviews(tenantId: string): Promise<CheckoutReview[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("payments")
+    .select("provider, provider_ref, raw")
+    .eq("tenant_id", tenantId)
+    .eq("match_status", "issue")
+    .like("provider_ref", "checkout-total-review:%");
+  if (error) throw error;
+  return (data || []).flatMap((row) => {
+    const raw = row.raw;
+    const status = raw && typeof raw === "object" ? (raw as { review_status?: string }).review_status : null;
+    if (status === "resolved") return [];
+    return [{
+      provider: String(row.provider || "bachs"),
+      providerRef: String(row.provider_ref),
+      getKes: reviewText(raw, "get_kes"),
+      seenKes: reviewText(raw, "seen_kes"),
+    }];
+  });
+}
 
 export async function loadAdminBillingClient(tenantId: string): Promise<AdminBillingClientDetail | null> {
   const overview = await loadAdminBillingOverview();
@@ -226,7 +263,41 @@ export async function loadAdminBillingClient(tenantId: string): Promise<AdminBil
     rates: catalog.rates,
     packages: catalog.packages,
     subscription,
+    checkoutReviews: await loadOpenCheckoutReviews(tenantId),
   };
+}
+
+export async function resolveCheckoutTotalReview(opts: {
+  businessId: string;
+  providerRef: string;
+  actor: string;
+  reason: string;
+}): Promise<void> {
+  const providerRef = opts.providerRef.trim();
+  if (!providerRef.startsWith("checkout-total-review:")) {
+    throw new Error("That review is not on this business.");
+  }
+  if (opts.reason.trim().length < 3) {
+    throw new Error("Add a reason (3 letters or more).");
+  }
+  const admin = getSupabaseAdmin();
+  const { data: row, error: readError } = await admin
+    .from("payments")
+    .select("provider, tenant_id, match_status")
+    .eq("provider_ref", providerRef)
+    .eq("tenant_id", opts.businessId)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!row || row.match_status !== "issue") {
+    throw new Error("That review is not on this business.");
+  }
+  const { error } = await admin.rpc("resolve_checkout_total_review", {
+    p_provider: String(row.provider || "bachs"),
+    p_provider_ref: providerRef,
+    p_actor: opts.actor,
+    p_reason: opts.reason.trim(),
+  });
+  if (error) throw error;
 }
 
 export async function grantTenantPackageMinutes(opts: {

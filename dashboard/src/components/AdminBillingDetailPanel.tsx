@@ -12,6 +12,7 @@ import type { BillingMode } from "@/lib/adminWallets";
 import { adminTdClass } from "@/components/AdminIdentityList";
 import { Button } from "@/components/ui/Button";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
+import { ListRow } from "@/components/ui/ListRow";
 import { btnGhost, deskFieldClass } from "@/components/ui/deskChrome";
 import { DeskSelect } from "@/components/ui/DeskSelect";
 import { Empty } from "@/components/ui/Empty";
@@ -64,6 +65,9 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [packageConfirmOpen, setPackageConfirmOpen] = useState(false);
+  const [reviewRef, setReviewRef] = useState<string | null>(null);
+  const [reviewNote, setReviewNote] = useState("");
+  const [savingReview, setSavingReview] = useState(false);
   const [history, setHistory] = useState<BillingHistoryEntry[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
 
@@ -172,6 +176,25 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
     }
   }
 
+  async function confirmReview() {
+    if (!reviewRef || reviewNote.trim().length < 3) return;
+    setSavingReview(true);
+    const ok = await post(
+      {
+        action: "resolve_checkout_review",
+        business_id: detail.row.id,
+        provider_ref: reviewRef,
+        note: reviewNote.trim(),
+      },
+      "Checkout review resolved."
+    );
+    setSavingReview(false);
+    if (ok) {
+      setReviewRef(null);
+      setReviewNote("");
+    }
+  }
+
   async function confirmCharge() {
     setSavingCharge(true);
     await post(
@@ -224,6 +247,39 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
         <p className="text-body text-ok" role="status">
           {status}
         </p>
+      ) : null}
+
+      {detail.checkoutReviews.length > 0 ? (
+        <section className="border-b border-hairline/70 pb-6">
+          <h2 className="text-title font-medium text-ink">Checkout review</h2>
+          <ul className="mt-2 divide-y divide-hairline">
+            {detail.checkoutReviews.map((review) => (
+              <ListRow
+                key={review.providerRef}
+                title="Checkout total"
+                preview={
+                  <span className="tabular-nums">
+                    Reading KSh {review.getKes}. Books show KSh {review.seenKes}.
+                  </span>
+                }
+                actions={
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="tonal"
+                    onClick={() => {
+                      setError(null);
+                      setReviewNote("");
+                      setReviewRef(review.providerRef);
+                    }}
+                  >
+                    Resolve
+                  </Button>
+                }
+              />
+            ))}
+          </ul>
+        </section>
       ) : null}
 
       <section className="border-b border-hairline/70 pb-6">
@@ -454,6 +510,32 @@ export function AdminBillingDetailPanel({ detail }: { detail: AdminBillingClient
           </Field>
         </div>
       </Sheet>
+
+      <ConfirmSheet
+        open={reviewRef != null}
+        theme="admin"
+        pending={savingReview}
+        title="Resolve checkout review"
+        confirmLabel="Resolve"
+        confirmDisabled={reviewNote.trim().length < 3}
+        onClose={() => {
+          if (!savingReview) setReviewRef(null);
+        }}
+        onConfirm={() => void confirmReview()}
+      >
+        <div className="space-y-3">
+          <p>This does not move money. A new checkout can start after this.</p>
+          <Field id="bill-review-note" label="Reason" required>
+            {(props) => (
+              <Input
+                {...props}
+                value={reviewNote}
+                onChange={(e) => setReviewNote(e.target.value)}
+              />
+            )}
+          </Field>
+        </div>
+      </ConfirmSheet>
 
       <ConfirmSheet
         open={chargeOpen}

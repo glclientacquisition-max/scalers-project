@@ -200,6 +200,21 @@ describe("admin billing: Change package confirm", () => {
   });
 });
 
+describe("admin billing: checkout review", () => {
+  it("resolves from a confirm with a typed reason and the session actor", () => {
+    const detail = read(DETAIL);
+    const api = read(BILLING_API);
+    assert.match(detail, /resolve_checkout_review/);
+    assert.match(detail, /title="Resolve checkout review"/);
+    assert.match(detail, /confirmDisabled=\{reviewNote\.trim\(\)\.length < 3\}/);
+    assert.doesNotMatch(detail, /actor:/);
+    assert.match(api, /action === "resolve_checkout_review"/);
+    assert.match(api, /adminActorName\(\)/);
+    assert.match(api, /resolveCheckoutTotalReview/);
+    assert.doesNotMatch(api, /body\.actor/);
+  });
+});
+
 describe("admin billing copy: no vendor names", () => {
   it("copy module and panels name no supplier or infra", () => {
     for (const rel of ["dashboard/src/lib/adminBillingCopy.ts", DETAIL, LIST, PACKAGES]) {

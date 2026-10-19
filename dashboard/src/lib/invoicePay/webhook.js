@@ -166,9 +166,10 @@ function chargeIdOf(data) {
  * @param {string | null} checkoutId
  */
 /**
- * A receipt, or a real charge id, is a collection identity.
- * `ch_<checkout id>` is the placeholder both events share when Bachs sends
- * no id of its own. That placeholder is not a new collection.
+ * A receipt, or a charge id, is what the event named.
+ * `ch_<checkout id>` is the placeholder Bachs sends when it has no id of
+ * its own. It is returned as-is. Settle treats it as no real collection
+ * and does not drop it.
  * @param {Record<string, unknown>} data
  * @param {string | null} checkoutId
  * @returns {string | null}
@@ -178,7 +179,7 @@ function collectionIdentity(data, checkoutId) {
   if (receipt) return receipt;
   const chargeId = chargeIdOf(data);
   if (!chargeId) return null;
-  if (checkoutId && chargeId === `ch_${checkoutId}`) return null;
+  if (checkoutId && chargeId === `ch_${checkoutId}`) return chargeId;
   return chargeId;
 }
 

@@ -1166,11 +1166,24 @@ describe("Bachs sandbox fields", () => {
     const provider = new MockPayProvider();
     const started = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
     await post(provider, ledger, started.checkoutId, { amountKes: "10.00", eventId: "evt_eq_1", chargeId: "ch_a" });
-    await post(provider, ledger, started.checkoutId, { amountKes: "10.00", eventId: "evt_eq_2", chargeId: `ch_${started.checkoutId}` });
-    await post(provider, ledger, started.checkoutId, { amountKes: "10.00", eventId: "evt_eq_3" });
+    const placeholder = await post(provider, ledger, started.checkoutId, {
+      amountKes: "10.00",
+      eventId: "evt_eq_2",
+      chargeId: `ch_${started.checkoutId}`,
+    });
+    assert.equal(placeholder.body.action, "issue");
+    assert.equal(placeholder.body.reason, "collected_identity_missing");
+    const replay = await post(provider, ledger, started.checkoutId, {
+      amountKes: "10.00",
+      eventId: "evt_eq_3",
+      chargeId: `ch_${started.checkoutId}`,
+    });
+    assert.equal(replay.body.duplicate, true);
     assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("10"));
     assert.equal(ledger.credits.length, 0);
-    assert.equal(ledger.payments.length, 1);
+    assert.equal(ledger.payments.filter((row) => row.matchStatus !== "issue").length, 1);
+    assert.equal(ledger.payments.filter((row) => row.matchStatus === "issue").length, 1);
+    assert.match(ledger.payments.find((row) => row.matchStatus === "issue").providerRef, new RegExp(`ch_${started.checkoutId}`));
     assert.equal(collected(ledger), toCents("10"));
   });
 
@@ -1388,7 +1401,15 @@ describe("Bachs sandbox fields", () => {
       /checkout total needs review/
     );
     assert.equal(ledger.attempts.filter((row) => row.status === "pending").length, 0);
-    await ledger.resolveCheckoutReview({ provider: "bachs", providerRef: issue.providerRef });
+    await ledger.resolveCheckoutReview({
+      provider: "bachs",
+      providerRef: issue.providerRef,
+      actor: "ada",
+      reason: "Checked the receipt",
+    });
+    const resolved = ledger.alerts.find((row) => row.action === "checkout_total_review_resolved");
+    assert.equal(resolved.actor, "ada");
+    assert.equal(resolved.reason, "Checked the receipt");
     const remainder = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
     const pending = ledger.attempts.filter((row) => row.status === "pending");
     assert.equal(pending.length, 1);
@@ -1488,26 +1509,83 @@ describe("Bachs sandbox fields", () => {
     assert.deepEqual(attempt.collectionIds, ["ch_rise_a", "ch_rise_b"]);
   });
 
-  it("treats the shared placeholder charge id as one collection", async () => {
+  it("reviews a placeholder charge id instead of dropping it", async () => {
     const { collectionIdentity } = require("../dashboard/src/lib/invoicePay/webhook");
     const { ledger, token } = seedPayable("20.00", "20.00");
     const provider = new MockPayProvider();
     const started = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
-    assert.equal(collectionIdentity({ charge_id: `ch_${started.checkoutId}` }, started.checkoutId), null);
-    await post(provider, ledger, started.checkoutId, {
+    const placeholder = `ch_${started.checkoutId}`;
+    assert.equal(collectionIdentity({ charge_id: placeholder }, started.checkoutId), placeholder);
+    const rise = await post(provider, ledger, started.checkoutId, {
       amountKes: "10.00",
       collectedKes: "10.00",
-      eventId: "evt_ph_1",
+      chargeId: placeholder,
+      eventId: "evt_ph_rise",
     });
-    const second = await post(provider, ledger, started.checkoutId, {
+    assert.equal(rise.body.action, "issue");
+    assert.equal(rise.body.reason, "collected_identity_missing");
+    assert.equal(collected(ledger), 0n);
+    assert.equal(ledger.payments.filter((row) => row.matchStatus !== "issue").length, 0);
+    const issue = ledger.payments.find((row) => row.matchStatus === "issue");
+    assert.match(issue.providerRef, new RegExp(placeholder));
+    const again = await post(provider, ledger, started.checkoutId, {
       amountKes: "10.00",
       collectedKes: "10.00",
-      eventId: "evt_ph_2",
+      chargeId: placeholder,
+      eventId: "evt_ph_rise_2",
     });
-    assert.equal(second.body.duplicate, true);
-    assert.equal(second.body.action, "apply");
+    assert.equal(again.body.duplicate, true);
+    assert.equal(ledger.payments.filter((row) => row.matchStatus === "issue").length, 1);
+  });
+
+  it("leaves a zero placeholder read as a wait so an expired checkout can close", async () => {
+    const { ledger, token } = seedPayable("20.00", "20.00");
+    const provider = new MockPayProvider();
+    const started = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    const expired = await post(provider, ledger, started.checkoutId, {
+      type: "checkout.expired",
+      amountKes: "20.00",
+      collectedKes: "0",
+      chargeId: `ch_${started.checkoutId}`,
+      eventId: "evt_ph_zero",
+    });
+    assert.equal(expired.body.action, "wait");
     assert.equal(ledger.payments.filter((row) => row.matchStatus === "issue").length, 0);
-    assert.equal(collected(ledger), toCents("10"));
+    assert.equal(ledger.attempts.find((row) => row.checkoutSessionId === started.checkoutId).status, "cancelled");
+  });
+
+  it("applies a rise when the event amount is the session price", async () => {
+    const { ledger, token } = seedPayable("20.00", "20.00");
+    const provider = new MockPayProvider();
+    const started = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    const first = await post(provider, ledger, started.checkoutId, {
+      amountKes: "20.00",
+      collectedKes: "10.00",
+      chargeId: "ch_price_a",
+      eventId: "evt_price_a",
+    });
+    assert.equal(first.body.action, "apply_partial");
+    assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("10"));
+    assert.equal(ledger.payments.filter((row) => row.matchStatus === "issue").length, 0);
+    const second = await post(provider, ledger, started.checkoutId, {
+      amountKes: "20.00",
+      collectedKes: "20.00",
+      chargeId: "ch_price_b",
+      eventId: "evt_price_b",
+    });
+    assert.equal(second.body.action, "apply");
+    assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("20"));
+    assert.equal(ledger.payments.filter((row) => row.matchStatus === "issue").length, 0);
+    const short = await post(provider, ledger, started.checkoutId, {
+      amountKes: "5.00",
+      collectedKes: "20.00",
+      chargeId: "ch_price_c",
+      eventId: "evt_price_c",
+    });
+    assert.equal(short.body.action, "issue");
+    assert.equal(short.body.reason, "collected_total_short");
+    assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("20"));
+    assert.equal(collected(ledger), toCents("20"));
   });
 
   it("retries a stored unreadable read once in live mode and skips a business that is not allowed", async () => {

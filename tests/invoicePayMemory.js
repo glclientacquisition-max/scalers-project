@@ -154,9 +154,18 @@ function createMemoryLedger(opts = {}) {
     );
     const seen = toCents(attempt && attempt.collectedTotalSeenKes) || 0n;
     const next = toCents(input.totalKes) || 0n;
-    const identityKey = kind === "decrease" ? `lower:${seen.toString()}:${next.toString()}` : String(input.identity);
+    const named = input.identity ? String(input.identity).trim() : "";
+    const identityKey = kind === "decrease"
+      ? `lower:${seen.toString()}:${next.toString()}`
+      : kind === "missing_identity"
+        ? `${named || "missing"}:${seen.toString()}:${next.toString()}`
+        : named;
     const providerRef = `checkout-total-review:${input.provider}:${checkoutId}:${identityKey}`;
-    const reason = kind === "decrease" ? "collected_total_decreased" : "collected_total_short";
+    const reason = kind === "decrease"
+      ? "collected_total_decreased"
+      : kind === "missing_identity"
+        ? "collected_identity_missing"
+        : "collected_total_short";
     const existing = payments.find((row) => row.provider === input.provider && row.providerRef === providerRef);
     if (existing) {
       return {
@@ -172,11 +181,14 @@ function createMemoryLedger(opts = {}) {
     }
     const eventCents = toCents(input.eventAmountKes);
     const drop = seen > next ? seen - next : 0n;
+    const rise = next > seen ? next - seen : 0n;
     const amountKes = kind === "decrease"
       ? fromCents(drop)
-      : eventCents != null && eventCents > 0n
-        ? String(input.eventAmountKes)
-        : fromCents(seen > 0n ? seen : next || 1n);
+      : kind === "missing_identity"
+        ? fromCents(rise > 0n ? rise : seen > 0n ? seen : 1n)
+        : eventCents != null && eventCents > 0n
+          ? String(input.eventAmountKes)
+          : fromCents(seen > 0n ? seen : next || 1n);
     payments.push({
       id: id(),
       provider: input.provider,
@@ -223,13 +235,19 @@ function createMemoryLedger(opts = {}) {
     const seen = toCents(attempt && attempt.collectedTotalSeenKes) || 0n;
     const next = toCents(input.totalKes);
     if (next == null || next < 0n) throw new Error("collected total must be zero or positive");
-    let identity = input.identity ? String(input.identity).trim() : "";
-    if (!identity || identity === `ch_${checkoutId}`) identity = "";
-    const known = Boolean(identity) && !(attempt && (attempt.collectionIds || []).includes(identity));
+    const rawIdentity = input.identity ? String(input.identity).trim() : "";
+    const real = Boolean(rawIdentity) && rawIdentity !== `ch_${checkoutId}`;
+    const known = real && !(attempt && (attempt.collectionIds || []).includes(rawIdentity));
     const eventCents = toCents(input.eventAmountKes);
+    const priceCents = toCents(attempt && attempt.amountKes);
+    const amountIsPrice = eventCents != null && eventCents > 0n && priceCents != null && eventCents === priceCents;
+    const rise = next - seen;
     if (next < seen) return openReview(input, "decrease");
-    if (known && eventCents != null && eventCents > 0n && next - seen < eventCents) return openReview(input, "short_rise");
-    if (known && (eventCents == null || eventCents <= 0n) && next === seen && seen > 0n) {
+    if (!real && (rise > 0n || (rise === 0n && seen > 0n))) return openReview(input, "missing_identity");
+    if (known && eventCents != null && eventCents > 0n && !amountIsPrice && rise < eventCents) {
+      return openReview(input, "short_rise");
+    }
+    if (known && (eventCents == null || eventCents <= 0n || amountIsPrice) && rise === 0n && seen > 0n) {
       return openReview(input, "short_rise");
     }
     if (next === 0n || next <= seen) {
@@ -244,9 +262,9 @@ function createMemoryLedger(opts = {}) {
       };
     }
     const settled = applyCheckoutTotal(input);
-    if (attempt && identity) {
+    if (attempt && real) {
       const ids = attempt.collectionIds || [];
-      if (!ids.includes(identity)) attempt.collectionIds = [...ids, identity];
+      if (!ids.includes(rawIdentity)) attempt.collectionIds = [...ids, rawIdentity];
     }
     return { ...settled, review: false, duplicate: false };
   }
@@ -478,11 +496,23 @@ function createMemoryLedger(opts = {}) {
       if (existing) existing.needsRetry = true;
     },
     async resolveCheckoutReview(input) {
+      const actor = String(input.actor || "").trim();
+      const reason = String(input.reason || "").trim();
+      if (!actor) throw new Error("actor is required");
+      if (reason.length < 3) throw new Error("reason is required");
       const row = payments.find(
         (payment) => payment.provider === input.provider && payment.providerRef === input.providerRef
       );
-      if (!row || row.matchStatus !== "issue") throw new Error("checkout review not found");
+      if (!row || row.matchStatus !== "issue" || !String(row.providerRef || "").startsWith("checkout-total-review:")) {
+        throw new Error("checkout review not found");
+      }
       row.raw = { ...(row.raw || {}), review_status: "resolved" };
+      alerts.push({
+        action: "checkout_total_review_resolved",
+        actor,
+        reason,
+        providerRef: input.providerRef,
+      });
     },
     async findPaymentByRef(provider, providerRef) {
       const row = payments.find(

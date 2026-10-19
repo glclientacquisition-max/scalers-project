@@ -5,6 +5,7 @@ import {
   grantTenantPackageMinutes,
   loadAdminBillingOverview,
   loadBillingHistory,
+  resolveCheckoutTotalReview,
 } from "@/lib/adminBilling";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import { recordAdminAction } from "@/lib/adminAudit";
@@ -112,6 +113,23 @@ export async function POST(request: Request) {
       const result = await unassignBusinessPackage({ tenantId: businessId, when, note, actor });
       await recordAdminAction({ actor, action: "unassign_package", businessId, before, after: { when, ...result } });
       return NextResponse.json({ ok: true, ...result });
+    }
+
+    if (action === "resolve_checkout_review") {
+      const providerRef = String(body.provider_ref || "").trim();
+      if (!providerRef.startsWith("checkout-total-review:")) {
+        return NextResponse.json({ error: "That review is not on this business." }, { status: 400 });
+      }
+      if (note.length < 3) {
+        return NextResponse.json({ error: "Add a reason (3 letters or more)." }, { status: 400 });
+      }
+      await resolveCheckoutTotalReview({
+        businessId,
+        providerRef,
+        actor,
+        reason: note,
+      });
+      return NextResponse.json({ ok: true });
     }
 
     if (action === "set_billing_mode") {
