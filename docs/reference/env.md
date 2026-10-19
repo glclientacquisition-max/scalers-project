@@ -18,28 +18,28 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `ADMIN_ACCESS_CODE` | desk | `dashboard/src/lib/admin-auth.ts` |
 | `AGENT_NAME` | voice | `server.js`<br>`src/db.js`<br>`src/prompts.js`<br>+1 more |
 | `ALERT_EMAIL_FROM` | voice | `server.js`<br>`src/notifications/email.js` |
-| `BACHS_API_KEY` | desk | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts` |
-| `BACHS_LIVE_ALLOWED` | desk | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>+1 more |
-| `BACHS_LIVE_TENANT_ALLOWLIST` | desk | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>+1 more |
-| `BACHS_MODE` | desk | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts` |
-| `BACHS_WEBHOOK_SECRET` | desk | `dashboard/src/app/api/billing/bachs/webhook/route.ts` |
+| `BACHS_API_KEY` | desk | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>+1 more |
+| `BACHS_LIVE_ALLOWED` | desk | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>+2 more |
+| `BACHS_LIVE_TENANT_ALLOWLIST` | desk | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>+2 more |
+| `BACHS_MODE` | desk | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/pay/[token]/checkout/route.ts`<br>+1 more |
+| `BACHS_WEBHOOK_SECRET` | desk | `dashboard/src/app/api/billing/bachs/webhook/route.ts`<br>`dashboard/src/lib/adminPayRead.ts` |
 | `BASE_REPO` | scripts | `scripts/stage-pull-request.js` |
 | `BENCH_VERBOSE` | scripts | `scripts/bench-inbound-webhook.js` |
 | `BETTER_AUTH_SECRET` | desk | `dashboard/src/lib/admin-auth.ts` |
 | `BETTER_AUTH_URL` | desk | `dashboard/src/lib/admin-auth.ts` |
-| `BILLING_NOTICES_SEND` | voice | `src/billing/billingNoticeSend.js` |
+| `BILLING_NOTICES_SEND` | desk, voice | `dashboard/src/lib/adminPayRead.ts`<br>`src/billing/billingNoticeSend.js` |
 | `BRAIN_CALL_FIXES_D199` | desk | `dashboard/src/lib/tenantFieldProvenance.ts` |
 | `BRAIN_GEMINI_CATALOGUE` | voice | `src/conversation/catalogueMouth.js` |
 | `BUSINESS_KNOWLEDGE` | voice | `src/db.js`<br>`src/prompts.js`<br>`src/tenantProfile.js` |
 | `BUSINESS_NAME` | voice | `server.js`<br>`src/conversation/businessAssistantIntro.js`<br>`src/db.js`<br>+2 more |
 | `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js` |
 | `CRON_SECRET` | desk | `dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/cron/ops-alerts/route.ts` |
-| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>`dashboard/src/app/dev/admin-billing/page.tsx`<br>+42 more |
+| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>`dashboard/src/app/dev/admin-billing/page.tsx`<br>+45 more |
 | `DASHBOARD_PASSWORD` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
 | `DATABASE_URL` | scripts | `scripts/verify-staging-schema.js` |
-| `DESK_PLAN_CHANGE` | desk | `dashboard/src/lib/deskPlanChange.ts` |
+| `DESK_PLAN_CHANGE` | desk | `dashboard/src/lib/adminPayRead.ts`<br>`dashboard/src/lib/deskPlanChange.ts` |
 | `DESK_PUBLIC_URL` | voice | `server.js` |
 | `DOCS_STALE_DAYS` | scripts | `scripts/docs/check-docs.js` |
 | `FACT_HASH_MODE` | desk, scripts, voice | `dashboard/src/lib/tenantFieldProvenance.ts`<br>`scripts/replay-voice-suite.js`<br>`scripts/smoke-mvp-retail.js`<br>+1 more |

@@ -76,7 +76,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (221)
+## Functions (222)
 
 | Function | Defined in |
 | --- | --- |
@@ -145,6 +145,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `admin_publish_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_business_suspended` | `docs/supabase/admin_business_suspend.sql` |
 | `admin_set_new_signup_trial` | `docs/supabase/package_version_editor.sql` |
+| `admin_set_package_editor_enabled` | `docs/supabase/billing_package_editor_flag.sql` |
 | `admin_set_price_approval_threshold` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_tenant_billing_mode` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_tenant_live_payments` | `docs/supabase/invoice_pay_live_allowlist.sql` |
