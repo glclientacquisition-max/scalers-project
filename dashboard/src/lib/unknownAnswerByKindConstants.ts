@@ -24,8 +24,8 @@ export const DEFAULT_BY_KIND: Record<FallbackKind, { en: string; sw: string }> =
     sw: "Nitaangalia kama tunafikisha eneo lako na mtu atakupigia.",
   },
   pay: {
-    en: "I'll have the team send you the payment details.",
-    sw: "Timu itakutumia maelezo ya malipo.",
+    en: "I'll ask the team to call you back with the payment details.",
+    sw: "Timu itakupigia simu kukupa maelezo ya malipo.",
   },
 };
 
@@ -67,14 +67,17 @@ export function isQuoteStyleFallbackLine(text: string): boolean {
     /\bshop will call you back\b/.test(t) ||
     /\bnote what you need\b/.test(t) ||
     /\bduka litakupigia\b/.test(t) ||
-    /\blitakupigia kwa bei\b/.test(t)
+    /\blitakupigia kwa bei\b/.test(t) ||
+    /\bcannot quote\b/.test(t) ||
+    /\bcan'?t quote\b/.test(t) ||
+    /\bformal quote\b/.test(t)
   );
 }
 
 function generalFitsFallbackKind(line: string, kind: FallbackKind): boolean {
   if (!line) return false;
-  if (kind === "general") return true;
   if (isQuoteStyleFallbackLine(line)) return kind === "price";
+  if (kind === "general") return true;
   return true;
 }
 
@@ -92,7 +95,7 @@ export function spokenFallbackLine(
   legacyGeneral?: string | null
 ): string {
   const custom = byKind?.[kind]?.[lang]?.trim();
-  if (custom && callbackSafeLine(custom)) return custom;
+  if (custom && callbackSafeLine(custom) && (kind === "price" || !isQuoteStyleFallbackLine(custom))) return custom;
   const fromJson = byKind?.general?.[lang]?.trim() || (lang === "en" ? byKind?.general?.en?.trim() : "");
   const legacy = lang === "en" ? String(legacyGeneral || "").trim() : "";
   const general = fromJson || legacy;
