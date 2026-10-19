@@ -17,6 +17,7 @@ import type { TenantRow } from "@/lib/supabase";
 import { parsePaymentsText } from "@/lib/payments";
 import { assistantSayStateFromTenant } from "@/lib/assistantSayVoice.server";
 import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
+import { assistantSayBelowList } from "@/components/assistantSay/AssistantSayExtras";
 
 /**
  * Settings job list and rail. DASHBOARD_OPEN=true only.
@@ -97,7 +98,9 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
     test_started_at: new Date(now - 2 * 86_400_000 - 120_000).toISOString(),
   };
   const assistantSaySlot =
-    tab === "assistant-say" ? <AssistantSayPanel state={assistantSayStateFromTenant(t)} /> : null;
+    tab === "assistant-say" ? (
+      <AssistantSayPanel state={assistantSayStateFromTenant(t)} belowList={assistantSayBelowList(t)} />
+    ) : null;
 
   const callsSlot =
     tab === "calls" ? (

@@ -54,6 +54,9 @@ function tenantProfileFromRow(row, extras = {}) {
     teamDirectory: row.team_directory || [],
     unknownAnswerFallback: row.unknown_answer_fallback || null,
     unknownAnswerSpoken: extras.unknownAnswerSpoken ?? row.unknown_answer_spoken ?? null,
+    unknownAnswerByKind: require('./conversation/unknownAnswerByKind').parseByKind(
+      row.unknown_answer_by_kind
+    ),
     dailyBulletin: row.daily_bulletin || [],
     agentTools: parseAgentTools(row.agent_tools),
     ttsLexicon: parseLexiconOverrides(row.tts_lexicon),

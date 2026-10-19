@@ -17,7 +17,7 @@ const TENANT_SELECT_NO_GREETING_IDENTITY =
 const TENANT_SELECT_NO_UNKNOWN_SPOKEN =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, notify_channels, llm_system_prompt, services_offered, services_catalog, product_catalog, social_handles, business_hours, hours_schedule, after_hours_mode, agent_name, spoken_name, greeting_invite, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, service_areas, tts_lexicon, soniox_voice_id, soniox_voice_label, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, soft_spend_limit_enabled, soft_spend_limit_kes, on_demand_usage_enabled, sms_included_units, sms_used_units, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
 
-const TENANT_SELECT = `${TENANT_SELECT_NO_UNKNOWN_SPOKEN}, unknown_answer_spoken`;
+const TENANT_SELECT = `${TENANT_SELECT_NO_UNKNOWN_SPOKEN}, unknown_answer_spoken, unknown_answer_by_kind`;
 
 const TENANT_SELECT_NO_SMS_ALLOWANCE =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, notify_channels, llm_system_prompt, services_offered, services_catalog, product_catalog, social_handles, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, tts_lexicon, soniox_voice_id, soniox_voice_label, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, soft_spend_limit_enabled, soft_spend_limit_kes, on_demand_usage_enabled, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
@@ -41,7 +41,7 @@ const TENANT_SELECT_LEGACY =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, llm_system_prompt, is_active";
 
 function isMissingUnknownSpokenColumnError(message: string): boolean {
-  return /unknown_answer_spoken/i.test(message);
+  return /unknown_answer_spoken|unknown_answer_by_kind/i.test(message);
 }
 
 function isMissingGreetingIdentityColumnError(message: string): boolean {
