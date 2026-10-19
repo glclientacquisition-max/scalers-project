@@ -6,7 +6,7 @@ import {
   releaseBlockReason,
   requireReason,
 } from "@/lib/adminBusinessModel";
-import { setTenantBillingMode } from "@/lib/adminWallets";
+import { confirmTenantBillingMode, setTenantBillingMode } from "@/lib/adminWallets";
 import { adminErrorParts } from "@/lib/adminErrors";
 import { normalizeE164 } from "@/lib/didPool";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -345,7 +345,7 @@ export async function restoreBusiness(
   const resumed = { billing: billing?.billing || business.billing_enforcement || "off", on_demand: false };
   if (resumeBilling && pre) {
     if (pre.billing === "soft" || pre.billing === "hard") {
-      const res = await setTenantBillingMode({
+      const res = await confirmTenantBillingMode({
         businessId,
         mode: pre.billing,
         note: `Unarchived, back on as before: ${reason}`,
