@@ -5,7 +5,120 @@ last_reviewed: 2026-10-19
 
 # Billing stack review, 18 Oct 2026
 
-Round 3 is the current verdict. Round 2 and Round 1 are kept below it.
+Round 4 is the current verdict. Round 3, Round 2, and Round 1 are kept below it.
+
+## Round 4
+
+Final review of #780 before a production release. Review only. No SQL was applied to staging `sgcdncjxauhsbunobmob` or production `fjxcdccgyhnvnnlnovcl`. This review did not call Bachs. Local Postgres 16.15 ran the apply-order harness. The branch `cursor/billing-review-round4-7822` holds this document only. Do not merge it. Do not merge #788 or #793.
+
+Since round 3, P1 through P8 are on production, #775 (`6edbba92`), #781 (`3e051899`), and #778 (`62b77ac1`) are on `main`, and the owner-price v2 import plus the beta repin and catalogue sync are on production. This review did not query production. Those statements are the operator's, and the SQL below was judged against a fresh local database that applied P1 through P10.
+
+Reviewed head: #780 `cursor/invoice-pay-0c16` at `730f67aa`. `main` was merged at `49e7ea99`. Commits after the round 3 head `553f1830`:
+
+| Commit | What it does |
+| --- | --- |
+| `63a6c578` | After cancel, read the Bachs session. Park an unattached checkout. |
+| `209391b0` | Record the Bachs sandbox drill and the round 3 staging migrations. |
+| `3dc0fd02` | Keep a credit total negative on the invoice history API and the PDF lines. |
+| `d46115d5` | Move the live-checkout SQL into `invoice_pay_session.sql` after P8. |
+| `49e7ea99` | Merge `main` (`8e0f0392`) into invoice pay. |
+| `730f67aa` | Embed the invoice wordmark so Next's page-data trace can still find it. |
+
+`2b31a3bc` is not an ancestor of `730f67aa`. The negative "Credits applied" print from that commit is not on the branch that will ship.
+
+### Verdict
+
+| Question | Verdict |
+| --- | --- |
+| (1) Merge `730f67aa` and apply P9 then P10, with payments off | **Yes**, with the conditions under (a). `BACHS_MODE` stays off. `assertBachsAllowed` also refuses `sk_live_` and any `SUPABASE_URL` that contains `fjxcdccgyhnvnnlnovcl` (`provider.js:52-71`), so this merge cannot call Bachs against the production database. `BILLING_NOTICES_SEND` stays off. |
+| (2) Live money | **No.** Two code blockers, below. Owner and ops items stay separate and do not change that no. |
+
+### (a) P9 and P10 after P8
+
+Safe to apply on current production, in that order, with payments off. Neither file replaces `finalize_invoice`. A second apply of each file on the fresh database succeeded. The proof after P10 still issued `SCL-2026-000001` (paid 3667, receipt 3667), `SCL-2026-000002` (paid 0, credit `invoice-credit:<id>` of 167), and `SCL-2026-000003` (open 2320, receipt 2500, overpay credit 500).
+
+P9 `docs/supabase/invoice_pay_session.sql` (489 lines):
+
+- No tenant DML. No table grants. No RLS change. No `anon` execute.
+- `revoke all` from `public`, `anon`, and `authenticated`, then `grant execute` to `service_role`, on `create_invoice_pay_attempt` (`:201-202`), `park_invoice_pay_attempt` (`:239-240`), `invoice_pay_attempt_by_checkout` (`:302-303`), `settle_invoice_pay_attempt` (`:335-336`), and `billing_payment_reconciliation` (`:487-488`).
+- Drops and recreates `payment_attempts_one_pending_part` so the unique index covers `pending` and `pending_unattached` (`:28-31`). Drops and adds `payment_attempts_status_check` with `pending_unattached` added to the P5 set (`:33-36`). That is a short lock. Run the file in one transaction. A default `psql` session autocommits each statement, and a failure between the drop and the create would leave the table without the one-pending index.
+- `create_invoice_pay_attempt` returns `unattached` for `pending_unattached`, and still returns `cancel` for an expired pending row with a null URL treated as in flight. `park_invoice_pay_attempt` accepts an `https` URL or a null URL, and only updates `pending` or `pending_unattached`. `invoice_pay_attempt_by_checkout` adds `live_part`. `settle_invoice_pay_attempt` accepts `pending_unattached`. Reconciliation is a report. It includes `cancelled`, `superseded`, `failed`, and `pending_unattached` in the credited-cancelled set.
+
+P10 `docs/supabase/billing_mode_legal_pairs.sql` exists only on this head. The merge `49e7ea99` added it. It is not on either parent (`d46115d5`, `8e0f0392`) and it is not on `origin/main` (`33b24f1b`). The function body matches `main`'s `set_tenant_billing_mode` in `wallet_security_beta.sql`. The file also sets the comment and re-asserts the revoke and grant (`:110-111`). Apply is DDL. It does not update tenant rows and it does not change `billing_status`. On the throwaway database, setting soft while a subscription was beta raised `billing stays off while the business is on beta` and left `billing_status` as beta. `anon` and `authenticated` have no execute. `service_role` does. Existing illegal pairs are not rewritten.
+
+Do not re-run `docs/supabase/invoice_pay.sql` (P5) after P9. P5's `settle_invoice_pay_attempt` rejects `pending_unattached`. P5's `invoice_pay_attempt_by_checkout` has no `live_part`, so the webhook would treat a live unattached collection as displaced and credit it instead of applying it. P5's status check drops `pending_unattached`. P5's unique index is `CREATE UNIQUE INDEX IF NOT EXISTS`, so the wider P9 index name can remain while the functions regress. Do not re-run the whole of P1. Re-applying only the P1 finalize installer after P8 printed a skip notice and left `SCL-`, `scalers.billing_write`, and `invoice-credit:`. The notice text now says it is leaving the `invoice_documents.sql` body in place (`billing_data_layer.sql:1466`). That sentence is stale. The skip predicate is still a body that contains `SCL-` (`:1464`). Re-applying `owner_billing_actions.sql` after P8, P9, and P10 printed `finalize_invoice already numbers SCL- with the freeze flag and the credit key` (`owner_billing_actions.sql:1208`) and left the letterhead, the flag, `SCL-`, the credit key, and the pin trigger. The README warning to re-apply P8 after an owner re-run is conservative. Re-applying P8 last is still safe.
+
+### (b) Bachs no-cancel
+
+The sequential path from round 3 is fixed and tested. `cancelCheckout` treats HTTP 404 and 409 as success (`provider.js:239`). `replaceExpiredAttempt` then always reads the session (`checkoutFlow.js:93-104`). An open or unreadable session is reused or blocked (`reuseOrBlock`, `:73-82`). A replacement is inserted only after a read that says the session is closed. `resumeUnattached` does the same for a parked row (`:117-124`). Tests: "does not open a second session when cancel succeeds and the checkout is still open" and "keeps an unattached session and reuses it on the next click" (`tests/invoicePay.test.js:590`, `:668`). The authors' sandbox drill in `209391b0` matches this: cancel returns 404, the session stays `open`, and none of DELETE, PATCH, or expire take it off `open`. This review did not repeat that drill.
+
+A live unattached collection is applied. A displaced failed or unattached collection, once a newer live row exists, is credited once (`webhook.js:197-223`, test at `invoicePay.test.js:739`). The credit key is still one row per provider ref.
+
+Two double-collect paths remain. Both are code blockers for live money.
+
+1. Overlapping click while an attach failure has parked the attempt. `waitForAttached` returns as soon as `!inFlight && !reused` (`checkoutFlow.js:13-19`). A `pending_unattached` row is neither in flight nor reused, and the waiter does not call `resumeUnattached`. The caller then calls `createCheckout` again (`:200-217`). If that throws, the catch marks the attempt `failed` (`:218-220`), which frees `payment_attempts_one_pending_part`. The next click inserts a new pending row while the old Bachs session is still open. If `createCheckout` returns a new id and `attachCheckout` throws, `parkUnattached` stores the new id (`:231-237`) and the old session id is gone. A payment on the old id is unmatched. A local probe with a fake ledger showed both: one create, status `failed`, on the throw path; one create and a park of the new checkout id on the success path. Sequential second clicks are the tested path and are safe. This race is not covered by those tests.
+2. A short or underpaid collection marks the attempt `succeeded` (`webhook.js:256-277`). The pay page then offers the remainder (`Pay KSh 320` in `tests/invoicePay.test.js:216`). The sandbox drill recorded that underpay leaves the Bachs session open (`payment_status` `requires_action`, `amount_remaining` set). A later collection on that same checkout id is the same `provider_ref`. The attempt is already `succeeded`, so the webhook returns duplicate (`webhook.js:252-253`) and does not credit the extra money. The new remainder session can also be paid. That is a second collection whose extra is not a credit. Overpay cannot be simulated in that sandbox (the API accepts only `success`, `failed`, and `underpaid`). That limit is a test gap, not a third defect.
+
+`collection.failed` still marks only `status = 'pending'` (`webhook.js:166-170`). A `pending_unattached` row is left for the next click. A later collection on a failed row is credited once a newer live row exists, and applied when `live_part` is true. That path has a credit. It is not a third blocker.
+
+`getCheckout` returns null on HTTP 404 (`provider.js:253`). `checkoutIsOpen(null)` is false, so a 404 read is treated as closed and the code may insert a replacement. A network error is unreadable and blocks. A live sandbox session does not 404, so the cancel-404-then-GET-open path is the one that matters, and that path reuses or blocks.
+
+### (c) Negative amounts and credits
+
+`3dc0fd02` is on the branch. `toCents` accepts a leading minus. `formatKsh` prints `KSh -1,000`. A negative split is empty, so there is no pay part. The history API shows negative line totals and clamps the balance and the pay link to zero when nothing is owed. The document test "keeps a credit total negative and does not offer pay" expects line and total `KSh -1,000`, amount due `KSh 0`, and an empty pay label and pay URL. `payView` then says the invoice cannot be paid here. `minorUnits` rejects cents below zero (`webhook.js:121-124`), so a negative charge is not applied.
+
+`2b31a3bc` is not on this head. `documents.js` prints "Credits applied" only when `creditsAppliedKes` is greater than zero, and the value is `money(credits)`, which is a positive amount (`documents.js:144`, `:183`). A negative credits figure is omitted. Amount due still floors at zero. That is a display gap. It is not a payment-math bug and it is not a live-money blocker.
+
+### (d) The invoice freeze in the pay SQL tests
+
+`invoices_freeze` is unchanged against `main`. The diff of that trigger is empty. `tests/invoicePaySql.test.js` opens a draft by `set_config('scalers.billing_write', '1', false)`, runs the update, and clears the flag in `finally` (`:16-21`). It does not drop the trigger. A new test expects `/set only by finalize_invoice/` when the flag is unset (`:43-59`). On the throwaway database, a number or status write without the flag was rejected, and the same write with the flag succeeded. That is the sanctioned path. It does not weaken #775.
+
+`invoicePaySql.test.js` was not executed here. `@electric-sql/pglite` is not installed. The judgment is the test diff plus the SQL probe.
+
+### (e) The merge of main
+
+Parents of `49e7ea99` are `d46115d5` and `8e0f0392`. `origin/main` has since moved to `33b24f1b`. No conflict markers remain. `foundation_bootstrap.sql` lines that contain `====` are comments.
+
+`billing_data_layer.sql` on the tip is byte-identical to `origin/main` (blob `5c796cf6`). The pre-merge file named `billing_company.sql` in the skip notice. The merged notice names `invoice_documents.sql` (`:1466`). The skip still leaves an `SCL-` body in place, which the re-apply probe confirmed. Comment regression only.
+
+`billingNoticeSend.js` kept `main`'s already-sent settlement and a slightly safer env read. Sends stay off unless `BILLING_NOTICES_SEND=on`.
+
+P9 and P10 do not replace `finalize_invoice`. The pin trigger and `rate_missing` were still present after the owner re-apply. No new money-function regression in finalize.
+
+`730f67aa` embeds a base64 JPEG in `wordmark.js` because the Next trace rewrites `__dirname`. It does not change amounts.
+
+### What the tests did
+
+Throwaway database `billing_apply_order_proof` only. `sudo -u postgres psql`. Never Supabase. Working tree `/tmp/invoice-pay-730f67aa` at `730f67aa`.
+
+| Run | Result |
+| --- | --- |
+| `tests/sql/billing_apply_order/run.sh` | EXIT 0. P1 through P10, P9 twice, P10 twice, then the proof invoices above. The session index contains `pending_unattached`. `park_invoice_pay_attempt` exists. `set_tenant_billing_mode` contains the beta sentence. Re-applying the P1 finalize installer left `SCL-`, `scalers.billing_write`, and `invoice-credit:`. |
+| Same database, after that | A draft write without `scalers.billing_write` was rejected. The same write with the flag succeeded. Soft enforcement on a beta subscription raised and left `billing_status` as beta. `anon` cannot execute `park_invoice_pay_attempt` or `set_tenant_billing_mode`. Re-applying `owner_billing_actions.sql` printed the skip notice and left the letterhead, the flag, `SCL-`, the credit key, and the pin trigger. |
+| `node --test` of `invoicePay`, `invoiceDocuments`, `billingReviewContracts`, `billingReviewMoney` | 67 pass, 0 fail. |
+| Fake-ledger probe of `startInvoiceCheckout` | Waiter returns the unattached row, then a thrown `createCheckout` marks the attempt failed (one create). A second `createCheckout` that returns a new id is parked over the old id (one create). |
+
+### What remains before live money
+
+Code, still in #780:
+
+- When `waitForAttached` observes `pending_unattached`, resume or block that session. Do not call `createCheckout` again. A thrown create must not mark that parked attempt `failed`.
+- After `apply_partial`, do not open a second hosted session while the first Bachs checkout is still open. A later collection on that checkout id must become exactly one credit of the extra, or the first session must be closed before a remainder checkout is created.
+- Remove the production-ref refusal in `assertBachsAllowed` only after those two fixes, and only with Alvin's GO. Until then the merged code cannot pay against production, which is what verdict (1) relies on.
+
+Owner and ops, not a code change:
+
+- Bachs KYC, and a live key stored as an environment variable. Do not print it.
+- `BACHS_MODE` stays off. `BILLING_NOTICES_SEND` stays off. `DESK_PLAN_CHANGE` stays off.
+- Letterhead address, city, and KRA PIN stay null until the owner sets them.
+- `package_editor_enabled` false, and no promote import, until Alvin's GO.
+- Backup. Apply P9, then P10, each file in one transaction. Do not re-run P5 after P9. Do not re-run the whole of P1. Do not run `billing_data_layer_down.sql`. Do not re-run `wallet_security_beta.sql` to pick up the beta check. Do not touch DID `+254709221536`.
+
+### New regressions
+
+None in finalize, the pin trigger, or `rate_missing`. The merge's only billing-text regression is the stale P1 skip notice, and the installer still skips. The two live-money blockers are new relative to a claim that no double-collect path remains. The sequential cancel path that round 3 left open is closed.
+
+---
 
 ## Round 3
 
