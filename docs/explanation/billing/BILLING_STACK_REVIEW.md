@@ -5,7 +5,87 @@ last_reviewed: 2026-10-19
 
 # Billing stack review, 18 Oct 2026
 
-Round 4 is the current verdict. Round 3, Round 2, and Round 1 are kept below it.
+Round 5 is the current verdict. Round 4, Round 3, Round 2, and Round 1 are kept below it.
+
+## Round 5
+
+Review of draft #798 only. Head `56d82b89` on `cursor/invoice-pay-live-money-0c16`, base `730f67aa`. No SQL was applied to staging or production. This review did not call Bachs. Local Postgres 16.15 ran the apply-order harness. The branch `cursor/billing-review-round5-7822` holds this document only. Do not merge it. Do not merge #798, #796, #793, or #788.
+
+`origin/main` at review time was `b296e11e`. `730f67aa` was not on it. `origin/cursor/invoice-pay-0c16` had moved to `2362d92b` (main merged onto `730f67aa`). That merge does not edit the pay runtime files #798 changes. `docs/STATUS.md` will need a resolution when #798 is rebased onto main after the squash of #780. This review does not adopt any live claim in that status file.
+
+Commits on #798 after `730f67aa`: `a9462892` (parked-checkout resume, underpay hold, negative credit print, P11) and `56d82b89` (one catalogue link removed from `docs/supabase/README.md`).
+
+### Verdict
+
+| Question | Verdict |
+| --- | --- |
+| Apply P11 after P10, payments off | **Yes.** `invoice_pay_held.sql` is `CREATE OR REPLACE` only. Applied twice on a fresh local database. It does not replace `finalize_invoice`, does not change tenant rows by being applied, and does not grant `anon` or `authenticated`. |
+| Ready for a live KSh 10 test on our own test business once Bachs live keys are set | **No.** Four blockers below. An exact KSh 10 collection with one webhook does apply once and a same-amount replay stays a duplicate, but this build cannot send that request, and the same code drops or double-counts a second collection on that checkout. |
+
+### What #798 fixes
+
+The two round-4 races that were named are closed for the cases that were probed.
+
+`waitForAttached` now resumes a `pending_unattached` or held row instead of handing it back to `createCheckout` (`checkoutFlow.js:26-30`). A thrown create does not mark the attempt failed when a session id, an unattached flag, or a held flag is already stored (`:162-164`, `:265`). A fake-ledger overlap, with the second click waiting inside the attach, produced one Bachs create. The parked id stayed `chk_old` when the next create would have thrown, and stayed `chk_1` when the next create would have returned a new id. `park_invoice_pay_attempt` raises `checkout session is already parked` when the stored id differs (`invoice_pay_held.sql` park body).
+
+While a succeeded checkout is unexpired, `create_invoice_pay_attempt` returns `held: true` and does not insert (`invoice_pay_held.sql:119-122`). `resumeHeld` reads Bachs. An open or unreadable session is reused or blocked (`checkoutFlow.js:150-155`). A closed read stamps `checkout_expires_at` one second in the past and only then inserts the remainder (`:156-159`, `release_held_pay_checkout`). The succeeded row is not cancelled and its session id stays. Probe: underpay, Bachs still open, second click reused, one attempt, one create.
+
+Credits print with a leading minus. `creditMoney` returns `-${money(amount)}` (`documents.js:19-20`), so a stored 600 renders as `-KSh 600` on the invoice and the receipt. The history API uses the same sign (`history.js` `creditsAppliedLabel`). The document tests expect that string. A negative invoice total still floors the amount due and the pay link at zero.
+
+### Blockers for the live KSh 10 test
+
+1. **The provider still refuses the test.** `assertBachsAllowed` throws on `BACHS_MODE=live`, on a key that starts with `sk_live_`, and on any `SUPABASE_URL` that contains `fjxcdccgyhnvnnlnovcl` (`provider.js:52-71`). #798 does not change that file. Setting the live keys does not send a request. The test business is on production, so the production-ref check fires even for sandbox mode.
+
+2. **An equal later collection is dropped.** `laterCollectionExtra` returns null when the new amount equals the stored payment (`webhook.js:130-137`). Probe: invoice KSh 20, first collection KSh 10 applied (`apply_partial`), second event KSh 10 on the same checkout with a new event id returned `duplicate`. Credits stayed empty. `amount_paid_kes` stayed 10. A second KSh 10 on that checkout is not a credit and not an invoice payment. A same-amount replay of one KSh 10 payment is correctly a duplicate. The function cannot tell those apart because the provider ref is the checkout id.
+
+3. **A smaller later amount becomes a credit and the invoice balance stays payable.** The same function credits the full incoming amount when it is below the stored payment (`webhook.js:136`). The credit does not change `amount_paid_kes` (`credit_checkout_extra` comment and the SQL probe: credit 10, invoice paid stayed 10). After a closed Bachs read, `release_held_pay_checkout` lets the next click insert a remainder attempt for that balance. Paying the remainder collects it again, on top of the credit. Probe of the other door: with `checkout_expires_at` already in the past, the next click created `chk_u2` while `getCheckout` still returned `open`. Attempts were `succeeded` plus `pending`. The hold lasts only until the stored expiry (`invoice_pay_held.sql:122`). It does not ask Bachs once that timestamp has passed.
+
+4. **A larger later amount is kept only from the first extra.** `credit_checkout_extra` inserts `checkout-extra:<provider>:<provider_ref>` and does nothing on conflict (`invoice_pay_held.sql:307`). The webhook still answers `action: credit` (`webhook.js:273-280`). Probe: partial KSh 10, then KSh 12 stored a KSh 2 credit, then KSh 20 on a new event id answered `checkout_extra` again and the stored credit stayed KSh 2. The SQL probe called the function with 10 and then with 4. One row remained, amount 10. Bachs will not retry a 200. The rest of that collection is not on the invoice and not in `tenant_credits`.
+
+Blockers 2, 3, and 4 are the live-money reason to leave the gate in blocker 1 closed.
+
+### P11 after P10
+
+Safe to apply on current production after P10, with payments off.
+
+- Idempotent. The harness applied the file twice. `held`, the park guard, `release_held_pay_checkout`, and `credit_checkout_extra` were all present. A second call does not rewrite tenant rows. The file itself contains no tenant DML.
+- Grants. `revoke all` from `public`, `anon`, and `authenticated`, then `grant execute` to `service_role`, on `create_invoice_pay_attempt`, `park_invoice_pay_attempt`, `release_held_pay_checkout` (`:273`), and `credit_checkout_extra` (`:339`). On the throwaway database, `public`, `anon`, and `authenticated` had no execute. `service_role` did. All four are `SECURITY DEFINER`. `create_invoice_pay_attempt` keeps `search_path = public, extensions` because it uses `gen_random_bytes`. The other three use `search_path = public`. No table grants. No RLS change. No `anon` policy.
+- `finalize_invoice` is untouched. The proof after P11 still issued `SCL-2026-000001` (paid 3667, receipt 3667), `SCL-2026-000002` (paid 0, credit 167), and `SCL-2026-000003` (open 2320, receipt 2500, overpay credit 500). Re-applying the P1 finalize installer left `SCL-`, `scalers.billing_write`, and `invoice-credit:`. `invoice_pay_attempt_by_checkout` still returns `live_part`. `settle_invoice_pay_attempt` still accepts `pending_unattached`.
+- Do not re-run `invoice_pay_session.sql` after P11. Inside a transaction that was rolled back, applying P9 replaced `create_invoice_pay_attempt` and `park_invoice_pay_attempt`. `held` and `checkout session is already parked` were both gone. After rollback they were present again. P9 also drops and recreates the one-pending index. P11 does not.
+
+`idempotency_key` on `tenant_credits` is `UNIQUE`, so `on conflict (idempotency_key)` matches a real constraint. The first amount wins. A retry does not insert a second row. It also does not raise the amount.
+
+The invoice lock in `create_invoice_pay_attempt` is unchanged, so two reserve calls on one invoice still serialize. The hold check runs under that lock. The JS waiter fix is what stops a second `createCheckout` on a row the first call has already parked.
+
+### What the tests did
+
+Throwaway database `billing_apply_order_proof` only. `sudo -u postgres psql`. Never Supabase. Working tree `/tmp/invoice-pay-56d82b89` at `56d82b89`.
+
+| Run | Result |
+| --- | --- |
+| `tests/sql/billing_apply_order/run.sh` | EXIT 0. P1 through P11, P9, P10, and P11 each twice, then the proof invoices above. |
+| Same database, rolled back | Hold returned the succeeded checkout and left one attempt. Two `credit_checkout_extra` calls left one credit at the first amount. Invoice `amount_paid_kes` stayed 10. `public` has no execute on the new functions. Re-applying P9 inside the same transaction removed the hold and the park guard. Rollback restored both. |
+| `node --test` of `invoicePay`, `invoiceDocuments`, `billingReviewContracts`, `billingReviewMoney` | 73 pass, 0 fail. Includes the new waiter, hold, credit, and `-KSh 600` cases. |
+| Fake-ledger probes, not part of that suite | Waiter overlap: one create, parked id kept, on both the throw path and the new-id path. Exact KSh 10: `apply`, replay `duplicate`, credits 0. Equal second KSh 10: `duplicate`, paid stays 10, credits empty. Underpay while Bachs is open: reused, one create. Expiry in the past while Bachs is open: second create. Growing extras: stored credit stays at the first delta while the webhook still answers `credit`. |
+
+`tests/invoicePaySql.test.js` was not executed. `@electric-sql/pglite` is not installed. The hold and credit assertions in that file match the rolled-back SQL probe. The freeze test in that file is unchanged from round 4: `openDraft` sets `scalers.billing_write` and clears it. It does not drop `invoices_freeze`.
+
+### What remains before a live KSh 10 test
+
+Code, still in #798:
+
+- Leave `assertBachsAllowed` in place until the three collection holes are fixed. Opening the gate with this build can send the KSh 10, and it can also drop an equal second collection, credit a smaller one without reducing the invoice, and ignore a later larger one.
+- A later collection on a checkout that already has a payment has to become exactly one credit of the money that is not already on the invoice, including when the new amount equals the stored amount and when a second event raises the total. The invoice balance has to come down by that same money, or the remainder checkout has to stay closed for that amount.
+- Once `checkout_expires_at` has passed, read Bachs before inserting. An open session is reused or blocked. A new attempt waits for a closed read.
+
+Owner and ops, not a code change:
+
+- Do not set `BACHS_MODE=live` and do not put a live key in the environment for this build.
+- `BILLING_NOTICES_SEND` stays off. `DESK_PLAN_CHANGE` stays off.
+- Backup. Apply P11 after P10 as one script. Do not re-run P9 after it. Do not re-run P5. Do not run `billing_data_layer_down.sql`. Do not touch DID `+254709221536`.
+- Rebase #798 onto main after the squash of #780. Resolve `docs/STATUS.md` there. Do not merge this review branch.
+
+---
 
 ## Round 4
 
