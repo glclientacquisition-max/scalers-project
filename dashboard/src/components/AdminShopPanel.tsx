@@ -1,29 +1,24 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminBusiness } from "@/lib/admin";
+import type { AdminBillingClientDetail } from "@/lib/adminBilling";
+import { AdminShopMoneyPanel } from "@/components/AdminShopMoneyPanel";
 import type { QualityBadge } from "@/lib/adminQualityModel";
 import { formatScore } from "@/lib/adminQualityModel";
 import {
   ARCHIVE_RESTORE_DAYS,
-  chargeAmount,
-  chargeKind,
   formatCreated,
   hasLiveNumber,
   lifecycleOf,
   notifyLabel,
-  packLabel,
   phoneLine,
-  planLabel,
-  planOf,
   purgeLabel,
   releaseReason,
   SUSPENDED_LINE,
-  type PlanChoice,
 } from "@/lib/adminBusinessUi";
 import { reasonOk, resumeBillingOffer } from "@/lib/adminBusinessModel";
-import type { WalletLedgerRow } from "@/lib/wallet";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { Empty } from "@/components/ui/Empty";
@@ -61,10 +56,8 @@ function tenantRetentionLabel(override: number | null): string {
   return "Platform default";
 }
 
-type SheetKind = "assign" | "release" | "plan" | "charges" | "package" | "lifecycle" | "edit" | "recording";
+type SheetKind = "assign" | "release" | "lifecycle" | "edit" | "recording";
 type LifecycleAction = "suspend" | "unsuspend" | "archive" | "restore";
-type PackOption = { id: string; name: string; isActive?: boolean };
-
 const LIFECYCLE: Record<
   LifecycleAction,
   { title: string; confirm: string; danger?: boolean; body: (b: AdminBusiness) => string }
@@ -110,11 +103,15 @@ export function AdminShopPanel({
   badge,
   availableDids,
   freeCount,
+  billing,
+  focusMoney,
 }: {
   business: AdminBusiness;
   badge?: QualityBadge;
   availableDids: { e164: string }[];
   freeCount: number;
+  billing?: AdminBillingClientDetail | null;
+  focusMoney?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -124,15 +121,16 @@ export function AdminShopPanel({
   const [lifecycle, setLifecycle] = useState<LifecycleAction>("suspend");
   const [reason, setReason] = useState("");
   const [resumeBilling, setResumeBilling] = useState(false);
-  const [plan, setPlan] = useState<PlanChoice>(() => planOf(business));
-  const [charges, setCharges] = useState<WalletLedgerRow[]>([]);
-  const [packs, setPacks] = useState<PackOption[]>([]);
-  const [packageId, setPackageId] = useState("");
-  const [period, setPeriod] = useState<"month" | "year">(business.package_period || "month");
   const [editName, setEditName] = useState(business.business_name);
   const [editNotify, setEditNotify] = useState(business.whatsapp_notification_number);
   const [recordingMode, setRecordingMode] = useState<TenantRetentionMode>("default");
   const [recordingDays, setRecordingDays] = useState("30");
+  const moneyRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!focusMoney) return;
+    moneyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [focusMoney]);
 
   async function run(body: Record<string, unknown>, url = "/api/admin/businesses") {
     setError("");
@@ -152,37 +150,6 @@ export function AdminShopPanel({
     setStatus("Saved.");
     startTransition(() => router.refresh());
     return true;
-  }
-
-  async function loadPacks() {
-    try {
-      const res = await fetch("/api/admin/packages");
-      const json = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        packages?: PackOption[];
-      };
-      if (!res.ok) throw new Error(json.error || "Could not load.");
-      const next = (json.packages || []).filter((pack) => pack.isActive !== false);
-      setPacks(next);
-      if (!packageId && next[0]) setPackageId(next[0].id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load.");
-    }
-  }
-
-  async function loadCharges(id: string) {
-    setCharges([]);
-    try {
-      const res = await fetch(`/api/admin/wallets?ledger_for=${encodeURIComponent(id)}`);
-      const json = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        ledger?: WalletLedgerRow[];
-      };
-      if (!res.ok) throw new Error(json.error || "Could not load.");
-      setCharges(json.ledger || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load.");
-    }
   }
 
   function openLifecycle(action: LifecycleAction) {
@@ -290,32 +257,12 @@ export function AdminShopPanel({
         />
       </ShopBlock>
 
-      <ShopBlock title="Money">
-        <ListRow
-          title="Package"
-          preview={packLabel(b)}
-          onOpen={() => {
-            setPeriod(b.package_period || "month");
-            setSheet("package");
-            void loadPacks();
-          }}
-        />
-        <ListRow
-          title="Plan"
-          preview={planLabel(b)}
-          onOpen={() => {
-            setPlan(planOf(b));
-            setSheet("plan");
-          }}
-        />
-        <ListRow
-          title="Charges"
-          preview="Calls and line fees"
-          onOpen={() => {
-            setSheet("charges");
-            void loadCharges(b.id);
-          }}
-        />
+      <ShopBlock title="Money" sectionRef={moneyRef} id="shop-money">
+        {billing ? (
+          <AdminShopMoneyPanel detail={billing} />
+        ) : (
+          <ListRow title="Billing" preview="Could not load billing for this business." />
+        )}
       </ShopBlock>
 
       <ShopBlock title="Line state">
@@ -412,51 +359,6 @@ export function AdminShopPanel({
       </ConfirmSheet>
 
       <Sheet
-        open={sheet === "plan"}
-        onOpenChange={(next) => {
-          if (!next) setSheet(null);
-        }}
-        title="Plan"
-        theme="admin"
-        footer={
-          <Button
-            type="button"
-            block
-            pending={pending}
-            onClick={() =>
-              void run(
-                {
-                  action: "set_billing_mode",
-                  business_id: b.id,
-                  mode: plan === "on" ? "soft" : "off",
-                  note: plan === "on" ? "On-demand" : "Beta",
-                },
-                "/api/admin/wallets",
-              )
-            }
-          >
-            Save
-          </Button>
-        }
-      >
-        <SheetNote error={error} />
-        <p className="pb-3 text-body text-ink-2">
-          {plan === "on"
-            ? "Past included uses the rate card when the shop opted in."
-            : "Meter only. Not charged."}
-        </p>
-        <Segmented
-          className="-mx-5 px-5 sm:-mx-6 sm:px-6"
-          label="Plan"
-          items={[
-            { key: "beta", label: "Beta", active: plan === "beta" },
-            { key: "on", label: "On-demand", active: plan === "on" },
-          ]}
-          onSelect={(key) => setPlan(key as PlanChoice)}
-        />
-      </Sheet>
-
-      <Sheet
         open={sheet === "recording"}
         onOpenChange={(next) => {
           if (!next) setSheet(null);
@@ -512,86 +414,6 @@ export function AdminShopPanel({
             )}
           </Field>
         </div>
-      </Sheet>
-
-      <Sheet
-        open={sheet === "charges"}
-        onOpenChange={(next) => {
-          if (!next) setSheet(null);
-        }}
-        title="Charges"
-        theme="admin"
-      >
-        <SheetNote error={error} />
-        {charges.length === 0 ? (
-          <Empty className="px-0 py-8" title="No charges." line="On-demand lines show up here." />
-        ) : (
-          <ul className="-mx-5 divide-y divide-hairline sm:-mx-6">
-            {charges.map((row) => (
-              <ListRow
-                key={row.id}
-                title={chargeKind(row.kind)}
-                preview={row.note || chargeAmount(row.amount_kes)}
-                when={formatCreated(row.created_at)}
-              />
-            ))}
-          </ul>
-        )}
-      </Sheet>
-
-      <Sheet
-        open={sheet === "package"}
-        onOpenChange={(next) => {
-          if (!next) setSheet(null);
-        }}
-        title="Package"
-        theme="admin"
-        footer={
-          <Button
-            type="button"
-            block
-            pending={pending}
-            disabled={!packageId}
-            onClick={() =>
-              void run(
-                { action: "assign", business_id: b.id, package_id: packageId, period },
-                "/api/admin/packages",
-              )
-            }
-          >
-            Assign
-          </Button>
-        }
-      >
-        <SheetNote error={error} />
-        <Segmented
-          className="-mx-5 px-5 sm:-mx-6 sm:px-6 md:-mx-6 md:px-6"
-          label="Period"
-          items={[
-            { key: "month", label: "Month", active: period === "month" },
-            { key: "year", label: "Year", active: period === "year" },
-          ]}
-          onSelect={(key) => setPeriod(key as "month" | "year")}
-        />
-        {packs.length === 0 ? (
-          <Empty
-            className="px-0 py-8"
-            title="No packages."
-            line="Set SKUs on Packages."
-            action={<ButtonLink href="/admin/packages">Packages</ButtonLink>}
-          />
-        ) : (
-          <ul className="-mx-5 divide-y divide-hairline sm:-mx-6">
-            {packs.map((pack) => (
-              <ListRow
-                key={pack.id}
-                title={pack.name}
-                unread={pack.id === packageId}
-                onOpen={() => setPackageId(pack.id)}
-              />
-            ))}
-          </ul>
-        )}
       </Sheet>
 
       <Sheet
@@ -684,9 +506,19 @@ export function AdminShopPanel({
   );
 }
 
-function ShopBlock({ title, children }: { title: string; children: ReactNode }) {
+function ShopBlock({
+  title,
+  children,
+  sectionRef,
+  id,
+}: {
+  title: string;
+  children: ReactNode;
+  sectionRef?: React.RefObject<HTMLElement | null>;
+  id?: string;
+}) {
   return (
-    <section className="space-y-1">
+    <section ref={sectionRef} id={id} className="scroll-mt-4 space-y-1">
       <h2 className="px-4 text-caption text-ink-3">{title}</h2>
       <ul className="divide-y divide-hairline">{children}</ul>
     </section>

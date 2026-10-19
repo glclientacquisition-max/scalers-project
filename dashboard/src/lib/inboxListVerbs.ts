@@ -37,20 +37,18 @@ export function inboxCanVisitDone(item: InboxItem): boolean {
   return String(item.job?.status || "").toLowerCase() === "confirmed";
 }
 
-export type InboxListDockRecipe = "confirm" | "visit_done" | "hold_done" | "call_wa" | "none";
+export type InboxListDockRecipe = "confirm" | "visit_done" | "hold_done" | "none";
 
 /**
  * List Action dock. Confirm owns requested visits. Hold Done owns open holds.
- * Intent-only work never gets Confirm or Done. Call plus WhatsApp needs a number.
+ * Intent-only work never gets Confirm or Done. Call and WhatsApp live only
+ * in the opened item (`InboxTicketActionDock`), never on a list row.
  */
 export function inboxListDockRecipe(item: InboxItem): InboxListDockRecipe {
-  if (itemIsArchived(item)) {
-    return item.callerPhone ? "call_wa" : "none";
-  }
+  if (itemIsArchived(item)) return "none";
   if (inboxCanConfirm(item)) return "confirm";
   if (inboxCanVisitDone(item)) return "visit_done";
   if (inboxCanHoldDone(item)) return "hold_done";
-  if (item.callerPhone) return "call_wa";
   return "none";
 }
 

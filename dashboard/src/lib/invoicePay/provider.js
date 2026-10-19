@@ -215,7 +215,9 @@ class MockPayProvider {
     }
     const type = opts.type || "collection.succeeded";
     const data = {
-      charge_id: opts.chargeId || `ch_${checkoutId}`,
+      // ch_<checkout id> is the Bachs placeholder. Tests that want it pass it.
+      // A real default keeps an ordinary paid event from looking unidentified.
+      charge_id: opts.chargeId || `ch_paid_${checkoutId}`,
       checkout_id: checkoutId,
       status: opts.status || (type === "collection.failed" ? "FAILED" : "SUCCEEDED"),
       amount: amountKes,

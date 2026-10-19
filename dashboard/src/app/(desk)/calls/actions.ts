@@ -57,8 +57,8 @@ export type WhatsAppFollowUpResult = LeadStatusResult & {
 };
 
 /**
- * wa.me click write-back. Same pile close as Mark done (`lead_status = resolved`)
- * plus an owner-writable follow-up note. `contacted` stays on Needs you.
+ * wa.me click write-back: appends the owner-writable follow-up note only.
+ * Never changes `lead_status`; Mark done stays with the owner.
  */
 export async function logWhatsAppFollowUp(
   callId: string
@@ -91,17 +91,11 @@ export async function logWhatsAppFollowUp(
   if (!row) return { error: "Missing call." };
 
   const current = parseLeadStatus(row.lead_status);
-  if (current === "archived") {
-    return { ok: true, leadStatus: current };
-  }
 
   const note = appendWhatsAppFollowUpNote(row.resolution_note);
   const { error } = await workspace.client
     .from("calls")
-    .update({
-      lead_status: "resolved",
-      resolution_note: note,
-    })
+    .update({ resolution_note: note })
     .eq("id", id)
     .eq("tenant_id", tenant.id);
 
@@ -112,5 +106,5 @@ export async function logWhatsAppFollowUp(
   revalidatePath("/home");
   revalidatePath("/calls");
   revalidatePath(`/calls/${id}`);
-  return { ok: true, leadStatus: "resolved", note };
+  return { ok: true, leadStatus: current, note };
 }
