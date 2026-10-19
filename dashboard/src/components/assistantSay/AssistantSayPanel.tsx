@@ -3,8 +3,15 @@ import { ListRow } from "@/components/ui/ListRow";
 import { Stamp } from "@/components/ui/Stamp";
 import type { AssistantSayState } from "@/lib/assistantSayTypes";
 import { settingsFormBodyClass } from "@/components/settingsUi";
+import type { ReactNode } from "react";
 
-export function AssistantSayPanel({ state }: { state: AssistantSayState }) {
+export function AssistantSayPanel({
+  state,
+  belowList,
+}: {
+  state: AssistantSayState;
+  belowList?: ReactNode;
+}) {
   return (
     <div className={settingsFormBodyClass}>
       <p className="text-body text-ink-2">{state.intro}</p>
@@ -21,13 +28,16 @@ export function AssistantSayPanel({ state }: { state: AssistantSayState }) {
               </Stamp>
             }
             actions={
-              <ButtonLink href={row.fixHref} variant="tonal" size="sm">
-                Fix
-              </ButtonLink>
+              row.id === "unsure" ? null : (
+                <ButtonLink href={row.fixHref} variant="tonal" size="sm">
+                  Fix
+                </ButtonLink>
+              )
             }
           />
         ))}
       </ul>
+      {belowList ? <div className="mt-6">{belowList}</div> : null}
     </div>
   );
 }

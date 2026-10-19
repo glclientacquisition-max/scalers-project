@@ -33,6 +33,7 @@ import { DeskPageGate } from "@/components/DeskPageGate";
 import { deskAssistantSayPage } from "@/lib/deskFeatureFlags";
 import { loadAssistantSayState } from "@/lib/assistantSayVoice.server";
 import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
+import { assistantSayBelowList } from "@/components/assistantSay/AssistantSayExtras";
 import { CallsForwardingPanel } from "@/components/CallsForwardingPanel";
 import { loadCallSetupState } from "@/lib/callSetupServer";
 import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
@@ -126,7 +127,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   let assistantSaySlot = null;
   if (tab === "assistant-say" && assistantSayPage) {
     const state = await loadAssistantSayState(tenant);
-    assistantSaySlot = <AssistantSayPanel state={state} />;
+    assistantSaySlot = <AssistantSayPanel state={state} belowList={assistantSayBelowList(tenant)} />;
   }
 
   let callsSlot = null;
