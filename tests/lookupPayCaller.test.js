@@ -253,17 +253,53 @@ test('pay: card and bank method questions use the method line', () => {
   assert.equal(swBank.speech, 'Unaweza kulipa kwa uhamisho wa benki.');
 });
 
-test('pay: off-topic pay questions use the callback line, not the method list', () => {
+test('pay: off-topic pay questions without a saved number use the callback line', () => {
   const row = confirmedPay({ methods: ['cash', 'cheque', 'bank'] });
   for (const [language, query] of [
     ['en', 'Pay later?'],
-    ['sw', 'Nicheki namba ya kulipa'],
+    ['sw', 'Malipo?'],
   ]) {
     const hit = say('pay', query, row, language);
     assert.equal(hit.result.status, 'not_found_in_list', query);
     expectCallback(hit, language);
     assert.doesNotMatch(hit.speech, /You can pay by cash/i);
   }
+});
+
+test('pay: numbered tenant payment-number phrases read the confirmed number', () => {
+  const row = confirmedPay({ methods: ['mpesa_till'], mpesa_till: '123456' });
+  const cases = [
+    ['sw', 'Nicheki namba ya kulipa'],
+    ['sw', 'Nipe namba ya kulipa'],
+    ['en', 'Payment number?'],
+    ['sw', 'Malipo ni vipi?'],
+    ['sw', 'Nataka kufanya malipo'],
+    ['en', 'Pay later?'],
+  ];
+  for (const [language, query] of cases) {
+    const hit = say('pay', query, row, language);
+    assert.equal(hit.result.status, 'found', query);
+    assert.match(hit.speech, /one two three four five six|moja mbili tatu nne tano sita/i, query);
+    assert.doesNotMatch(hit.speech, new RegExp(FALLBACK.slice(0, 20)));
+  }
+});
+
+test('pay: compound question with none of the asked methods saved uses callback', () => {
+  const chequeOnly = confirmedPay({ methods: ['cheque'] });
+  for (const [language, query] of [
+    ['en', 'Do you take M-Pesa or cash?'],
+    ['sw', 'Mnaweza kulipa kwa pesa taslimu au M-Pesa?'],
+  ]) {
+    const hit = say('pay', query, chequeOnly, language);
+    assert.equal(hit.result.status, 'not_found_in_list', query);
+    expectCallback(hit, language);
+    assert.doesNotMatch(hit.speech, /cheque|hundi/i);
+  }
+  const cardBank = confirmedPay({ methods: ['card', 'bank'] });
+  const en = say('pay', 'Do you take M-Pesa or cash?', cardBank, 'en');
+  assert.equal(en.result.status, 'not_found_in_list');
+  expectCallback(en, 'en');
+  assert.doesNotMatch(en.speech, /card|bank transfer/i);
 });
 
 test('pay: imported till asked about M-Pesa is unconfirmed before not_in_list', () => {

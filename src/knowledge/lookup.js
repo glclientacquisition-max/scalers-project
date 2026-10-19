@@ -1173,7 +1173,9 @@ function lookupPay(query, ctx) {
   const payRead = payReading(profile, pay);
 
   if (intent.mode === 'unknown') {
-    return notFoundInList(profile, 'pay', null, 'pay');
+    return slots.length
+      ? lookupPayNumber('any', profile, pay)
+      : notFoundInList(profile, 'pay', null, 'pay');
   }
   if (intent.mode === 'number') {
     return lookupPayNumber(intent.kind, profile, pay);
@@ -1182,14 +1184,24 @@ function lookupPay(query, ctx) {
     const slot = slots[0];
     return unconfirmed(profile, `pay.${slot[0]}`, 'pay', payRead.reason, 'pay');
   }
+  if (intent.mode === 'compound') {
+    const kinds = payComposeListKinds(intent, pay);
+    if (!kinds.length) return notFoundInList(profile, 'pay', null, 'pay');
+    if (slots.length && payRead.ok) return lookupPayComposed(intent, profile, pay);
+    const en = payMethodsListSentence(kinds, pay, 'en');
+    const sw = payMethodsListSentence(kinds, pay, 'sw');
+    return resultOf('found', {
+      id: 'pay.methods',
+      value: kinds.join(', '),
+      source: 'owner',
+      speech: both(en, sw),
+    }, profile, 'pay');
+  }
   if (slots.length && payRead.ok) {
     if (intent.mode === 'general' || (intent.mode === 'method' && intent.method === 'mpesa')) {
       return lookupPayNumber('any', profile, pay);
     }
-    if (
-      intent.mode === 'compound'
-      || (intent.mode === 'method' && (intent.method === 'cash' || intent.method === 'cheque'))
-    ) {
+    if (intent.mode === 'method' && (intent.method === 'cash' || intent.method === 'cheque')) {
       return lookupPayComposed(intent, profile, pay);
     }
   }
