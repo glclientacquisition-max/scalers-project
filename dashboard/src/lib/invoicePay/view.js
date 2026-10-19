@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- node:test loads this file with require() */
 const { formatDue, formatKsh, nextPart, splitKes, toCents } = require("./money");
+const { paymentsClosed } = require("./provider");
+const { PAYMENTS_UNAVAILABLE_NOTICE } = require("./paymentsNotice");
 
 function facts(lookup) {
   const parts = splitKes(lookup.totalKes);
@@ -96,6 +98,17 @@ function payView(input) {
   return payableView(base, lookup, {});
 }
 
+/**
+ * Page the owner sees. A closed Bachs gate still shows the invoice, or the
+ * invalid or expired link, and drops the Pay button.
+ * @param {object} view
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+function presentPayPage(view, env) {
+  if (!view || !view.payLabel || !paymentsClosed(env)) return view;
+  return { ...view, payLabel: null, notice: PAYMENTS_UNAVAILABLE_NOTICE };
+}
+
 function payableView(base, lookup, extra) {
   if (!base.payLabel) {
     return {
@@ -109,4 +122,4 @@ function payableView(base, lookup, extra) {
   return { ...base, ...extra, state: "payable", title: lookup.businessName || "Invoice" };
 }
 
-module.exports = { payView };
+module.exports = { payView, presentPayPage, PAYMENTS_UNAVAILABLE_NOTICE };

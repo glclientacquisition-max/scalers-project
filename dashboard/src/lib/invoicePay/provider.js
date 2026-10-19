@@ -71,6 +71,33 @@ function assertBachsAllowed(env = process.env) {
   return mode;
 }
 
+/** True when checkout must not start. Does not change the gate. */
+function paymentsClosed(env = process.env) {
+  try {
+    assertBachsAllowed(env);
+    return false;
+  } catch (err) {
+    const code = err && err.code;
+    if (code === "bachs_live_refused" || code === "prod_refused" || code === "bachs_mode") return true;
+    throw err;
+  }
+}
+
+/**
+ * Checkout POST body. A closed gate is 503 payments_unavailable.
+ * @param {unknown} err
+ */
+function checkoutFailure(err) {
+  const code = err && typeof err === "object" && "code" in err ? String(err.code || "") : "";
+  if (code === "bachs_live_refused" || code === "prod_refused" || code === "bachs_mode") {
+    return { status: 503, error: "payments_unavailable" };
+  }
+  if (code === "previous_processing") {
+    return { status: 409, error: "Previous payment still processing." };
+  }
+  return { status: 400, error: "Could not start payment." };
+}
+
 class MockPayProvider {
   constructor() {
     /** @type {Map<string, { checkoutId: string, checkoutUrl: string, status: string, request: object }>} */
@@ -286,6 +313,8 @@ module.exports = {
   expiresInMinutes,
   bachsMode,
   assertBachsAllowed,
+  paymentsClosed,
+  checkoutFailure,
   MockPayProvider,
   BachsPayProvider,
   payProviderFromEnv,

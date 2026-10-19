@@ -1,5 +1,4 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { assertBachsAllowed } from "./provider";
 
 type Json = Record<string, unknown>;
 
@@ -73,9 +72,11 @@ function rpcError(error: { message?: string } | null, fallback: string): Error {
   return err;
 }
 
-/** Service-role ledger. Refuses a production project URL. */
-export function invoicePayLedger(env: NodeJS.ProcessEnv = process.env) {
-  assertBachsAllowed(env);
+/**
+ * Service-role ledger. Token lookup and other reads do not call the Bachs gate.
+ * Checkout and the webhook refuse production before they write.
+ */
+export function invoicePayLedger(_env: NodeJS.ProcessEnv = process.env) {
   const admin = getSupabaseAdmin();
 
   return {

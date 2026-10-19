@@ -1,5 +1,5 @@
 import { invoicePayLedger } from "./ledger";
-import { payView } from "./view";
+import { payView, presentPayPage } from "./view";
 import { readPayReturn } from "./returnUrl";
 
 export async function loadPayView(
@@ -28,7 +28,7 @@ export async function loadPayView(
       };
     }
   }
-  return payView({ lookup, checkout });
+  return presentPayPage(payView({ lookup, checkout }), env);
 }
 
 /** Status page for a Bachs return id. The id is not a pay token. */
@@ -40,7 +40,7 @@ export async function loadPayReturn(
 ) {
   const ledger = invoicePayLedger(env) as ReturnLedger;
   const byReturn = await ledger.lookupReturn(returnId);
-  if (!byReturn?.found) return payView({ lookup: { found: false } });
+  if (!byReturn?.found) return presentPayPage(payView({ lookup: { found: false } }), env);
   if (token) {
     const lookup = await ledger.lookup(token);
     if (lookup.found && lookup.invoiceId && lookup.invoiceId === byReturn.invoiceId) {
@@ -54,7 +54,7 @@ export async function loadPayReturn(
       ? { id: byReturn.checkoutSessionId, status: byReturn.attemptStatus || "pending", returning: true }
       : null,
   });
-  return { ...view, payLabel: null };
+  return presentPayPage({ ...view, payLabel: null }, env);
 }
 
 type ReturnLedger = {
