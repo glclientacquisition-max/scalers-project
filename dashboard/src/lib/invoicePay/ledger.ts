@@ -215,13 +215,14 @@ export function invoicePayLedger(env: NodeJS.ProcessEnv = process.env) {
     async lookupReturn(returnId: string) {
       const { data, error } = await admin.rpc("pay_invoice_by_return", { p_return_id: returnId });
       if (error) throw rpcError(error, "return lookup failed");
+      const lookup = mapLookup(data);
+      if (!lookup.found) return { found: false as const };
       const row = asObject(data);
-      if (!row || row.found !== true) return { found: false as const };
       return {
+        ...lookup,
         found: true as const,
-        ...mapLookup(data),
-        checkoutSessionId: row.checkout_session_id ? text(row.checkout_session_id) : null,
-        attemptStatus: row.attempt_status ? text(row.attempt_status) : null,
+        checkoutSessionId: row?.checkout_session_id ? text(row.checkout_session_id) : null,
+        attemptStatus: row?.attempt_status ? text(row.attempt_status) : null,
       };
     },
 

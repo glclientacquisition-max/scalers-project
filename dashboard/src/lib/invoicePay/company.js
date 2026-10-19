@@ -47,7 +47,9 @@ function letterheadFromCompanyRow(row) {
  * Issued invoices use the snapshot. A draft, or an invoice issued before the
  * snapshot columns existed, uses the current billing_company row.
  * A missing row returns null. The document then omits the letterhead lines.
- * @param {{ from: (table: string) => { select: (cols: string) => { eq: (col: string, value: number) => { maybeSingle: () => Promise<{ data?: object, error?: unknown }> } } } } | null} admin
+ * The admin client is the service-role Supabase client. Typed loosely so the
+ * Postgrest builder stays assignable from the generated client.
+ * @param {any} admin
  * @param {object | null | undefined} row
  */
 async function letterheadForInvoice(admin, row) {
