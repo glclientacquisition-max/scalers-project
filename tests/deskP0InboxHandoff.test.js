@@ -42,13 +42,12 @@ describe("P0 #2 WhatsApp write-back", () => {
   const dock = read("dashboard/src/components/InboxTicketActionDock.tsx");
   const note = read("dashboard/src/lib/whatsappFollowUp.ts");
 
-  it("keeps wa.me and writes resolved plus follow-up note on click", () => {
+  it("keeps wa.me and logs the follow-up note on click without resolving", () => {
     assert.match(link, /https:\/\/wa\.me\//);
     assert.match(link, /callId/);
-    assert.match(link, /logWhatsAppFollowUp\(callId\)/);
-    assert.match(actions, /lead_status: "resolved"/);
+    assert.match(link, /logWhatsAppFollowUpBeacon\(callId\)/);
+    assert.match(actions, /update\(\{ resolution_note: note \}\)/);
     assert.match(note, /WhatsApp follow-up opened/);
-    assert.match(row, /callId=\{item\.callId\}/);
     assert.match(ticket, /callId=\{callId\}/);
     assert.match(dock, /variant="icon"/);
     assert.match(dock, /callId=\{callId\}/);
