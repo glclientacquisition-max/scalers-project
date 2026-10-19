@@ -59,6 +59,29 @@ describe('assistantSayReadiness', () => {
     assert.equal(hoursItem.complete, rowWillSay(say, 'hours'));
     assert.equal(payItem.complete, rowWillSay(say, 'payment'));
     assert.equal(catalogItem.complete, rowWillSay(say, 'prices'));
+    if (!hoursItem.complete) assert.ok(hoursItem.reason);
+    if (!payItem.complete) assert.ok(payItem.reason);
+    assert.equal(hoursItem.complete, rowWillSay(say, 'hours'));
+  });
+
+  it('checklist complete flags match assistant-say rows when compile provenance is present', () => {
+    const profile = tenantProfileFromRow(devRetailTenant, {
+      fieldMeta: { hashMode: true },
+      holdGate: {},
+    });
+    const say = evaluateAssistantSay(profile);
+    const checklist = getReadyChecklist(profile);
+    for (const item of checklist.items) {
+      if (item.id === 'identity') {
+        assert.equal(item.complete, Boolean(devRetailTenant.business_name?.trim()));
+        continue;
+      }
+      const rowId = item.id === 'catalog' ? 'prices' : item.id === 'payment' ? 'payment' : item.id;
+      const row = say.rows.find((r) => r.id === rowId);
+      assert.ok(row, rowId);
+      assert.equal(item.complete, row.willSay);
+      if (!item.complete) assert.equal(item.reason, row.reason);
+    }
   });
 
   it('when unsure uses neutral stamp labels, not Will say / Wont say', () => {

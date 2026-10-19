@@ -40,5 +40,6 @@ export async function loadReadyChecklist(tenant: TenantRow) {
   const { getReadyChecklist } = requireVoice("./src/knowledge/assistantSayReadiness.js") as {
     getReadyChecklist: (profile: unknown) => { items: ReadyChecklistItem[]; allDone: boolean };
   };
-  return getReadyChecklist(voiceProfileFromTenant(tenant));
+  const profile = await voiceProfileForAssistantSay(tenant);
+  return getReadyChecklist(profile);
 }

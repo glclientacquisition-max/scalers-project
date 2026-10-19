@@ -78,17 +78,34 @@ function generalFitsFallbackKind(line: string, kind: FallbackKind): boolean {
   return true;
 }
 
-export function displayLine(
+function callbackSafeLine(text: string): boolean {
+  const line = String(text || "").trim();
+  if (!line || line.length > 240 || /[{}]/.test(line)) return false;
+  return true;
+}
+
+/** Matches src/conversation/unknownAnswerByKind.js lineForKind() for Desk copy. */
+export function spokenFallbackLine(
   kind: FallbackKind,
   byKind: UnknownAnswerByKind | null,
   lang: "en" | "sw",
   legacyGeneral?: string | null
 ): string {
   const custom = byKind?.[kind]?.[lang]?.trim();
-  if (custom) return custom;
+  if (custom && callbackSafeLine(custom)) return custom;
   const fromJson = byKind?.general?.[lang]?.trim() || (lang === "en" ? byKind?.general?.en?.trim() : "");
   const legacy = lang === "en" ? String(legacyGeneral || "").trim() : "";
   const general = fromJson || legacy;
-  if (general && generalFitsFallbackKind(general, kind)) return general;
+  if (general && generalFitsFallbackKind(general, kind) && callbackSafeLine(general)) return general;
   return DEFAULT_BY_KIND[kind][lang];
+}
+
+/** @deprecated Use spokenFallbackLine */
+export function displayLine(
+  kind: FallbackKind,
+  byKind: UnknownAnswerByKind | null,
+  lang: "en" | "sw",
+  legacyGeneral?: string | null
+): string {
+  return spokenFallbackLine(kind, byKind, lang, legacyGeneral);
 }

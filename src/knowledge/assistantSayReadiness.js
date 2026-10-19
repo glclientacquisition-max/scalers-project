@@ -43,7 +43,10 @@ function plainReason(kind, result) {
     if (status === 'no_data') return 'Add delivery areas on Locations.';
     return 'Add delivery areas on Locations.';
   }
-  if (kind === 'payment') return 'Add how customers pay on Policies.';
+  if (kind === 'payment') {
+    if (status === 'no_data' || status === 'not_on_file') return 'No till number saved.';
+    return 'Add how customers pay on Policies.';
+  }
   return 'Not added yet.';
 }
 
@@ -119,7 +122,15 @@ function getReadyChecklist(profile, opts = {}) {
     } else {
       complete = identityComplete(profile);
     }
-    return { id: meta.id, label: meta.label, href: meta.href, complete };
+    let reason = '';
+    if (!complete) {
+      if (meta.rowId) {
+        reason = byId.get(meta.rowId)?.reason || '';
+      } else if (!identityComplete(profile)) {
+        reason = 'Add your business name.';
+      }
+    }
+    return { id: meta.id, label: meta.label, href: meta.href, complete, reason };
   });
   const allDone = items.every((i) => i.complete);
   return { items, allDone };

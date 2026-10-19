@@ -451,7 +451,9 @@ async function HomeOverviewBody() {
         {assistantSayPage && readyChecklist && !readyChecklist.allDone ? (
           <HomeGetReadyCallsCard items={readyChecklist.items} />
         ) : null}
-        {overviewChecks.length ? <OverviewDataChecksCard checks={overviewChecks} /> : null}
+        {!assistantSayPage && overviewChecks.length ? (
+          <OverviewDataChecksCard checks={overviewChecks} />
+        ) : null}
         {insights ? (
           <CallInsights insights={insights} />
         ) : null}
