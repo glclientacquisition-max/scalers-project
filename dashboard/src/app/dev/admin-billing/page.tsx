@@ -5,6 +5,8 @@ import { AdminShell } from "@/components/AdminNav";
 import { ADMIN_ATTENTION, ADMIN_BILLING_OVERVIEW } from "../fixtures/adminBilling";
 
 /** Billing queue fixture. DASHBOARD_OPEN=true only. */
+export const instant = false;
+
 export default async function DevAdminBillingPage({
   searchParams,
 }: {
