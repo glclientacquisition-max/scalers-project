@@ -1,7 +1,7 @@
 -- invoice_pay_collections.sql
 -- Purpose: P12. Apply after P11 (invoice_pay_held.sql).
 --          Does not replace finalize_invoice. Does not edit P1-P11.
--- Idempotent. Safe to re-run. Additive column. No tenant DML.
+-- Idempotent as a function replace. Do not re-run it. Later files replaced these functions.
 --
 -- A succeeded checkout stays held until Bachs has been read and the session
 -- is closed, even after checkout_expires_at. release_held_pay_checkout sets
@@ -14,8 +14,9 @@
 -- amount due. Only the excess is a credit, keyed per collection and total,
 -- so a replay is a no-op.
 --
--- Production fjxcdccgyhnvnnlnovcl does not have this file. Staging
--- sgcdncjxauhsbunobmob is the only apply.
+-- Production fjxcdccgyhnvnnlnovcl has this file. Applied 2026-10-19
+-- 08:11-08:13 UTC, versions 20261019081159 through 20261019081339.
+-- Do not re-run. Staging sgcdncjxauhsbunobmob: invoice_pay_collections 20261019015637.
 
 alter table public.payment_attempts
   add column if not exists checkout_closed_at timestamptz;

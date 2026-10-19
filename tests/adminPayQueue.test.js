@@ -27,6 +27,7 @@ function load(body) {
       bachsStatusFromEnv,
       hostingSwitches,
       kshLabel,
+      livePayBlock,
       reconcileCounts,
       reviewReasonFromRaw,
       reviewTitle,
@@ -126,6 +127,18 @@ describe("admin pay queue labels", () => {
     assert.match(status, /Package editor/);
     assert.match(status, /Signup trial/);
     assert.match(status, /All live payments/);
+    assert.match(status, /liveRows/);
+    assert.deepEqual(load(`({
+      hosting: livePayBlock({ modeLive: false, liveMasterOn: true, tenantEnabled: true }),
+      off: livePayBlock({ modeLive: true, liveMasterOn: false, tenantEnabled: true }),
+      tenant: livePayBlock({ modeLive: true, liveMasterOn: true, tenantEnabled: false }),
+      open: livePayBlock({ modeLive: true, liveMasterOn: true, tenantEnabled: true }),
+    })`), {
+      hosting: "Hosting switch is off",
+      off: "Hosting switch is off",
+      tenant: "Not enabled",
+      open: null,
+    });
     assert.doesNotMatch(status, /API key|api key/i);
     assert.doesNotMatch(status, /BILLING_NOTICES_SEND|DESK_PLAN_CHANGE|BACHS_/);
     const money = read("dashboard/src/components/AdminShopMoneyPanel.tsx");

@@ -3,8 +3,8 @@
 -- Does not call _package_editor_open, so this switch can turn the editor back on.
 -- Does not replace finalize_invoice. Does not edit P1-P17.
 -- Idempotent. Re-running replaces the function and does not change the stored flag.
--- Production (fjxcdccgyhnvnnlnovcl) does not have this file. Do not apply it there.
--- Staging (sgcdncjxauhsbunobmob) is the only apply.
+-- Production (fjxcdccgyhnvnnlnovcl) has this file: 20261019150654, via #820 f6d7fee9.
+-- Do not re-run. Staging (sgcdncjxauhsbunobmob): billing_package_editor_flag 20261019113040.
 
 create or replace function public.admin_set_package_editor_enabled(
   p_enabled boolean,

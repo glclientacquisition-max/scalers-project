@@ -7,7 +7,8 @@
  * and succeeded attempts from getCheckout charge.amount_paid. That sweep
  * does not run in live mode and does not run against production.
  *
- * Live mode, including the production project, retries only payment_events
+ * Live mode, including the production project, also reads open checkouts and
+ * applies charge.amount_paid as the running total, then retries payment_events
  * with needs_retry. The Bachs gate and the tenant allowlist both apply.
  * A stored event is settled once. An unreadable read stays stored.
  */
@@ -17,7 +18,7 @@ const path = require("node:path");
 const { assertNotProductionUrl, reconciliationReport } = require("../dashboard/src/lib/invoicePay/reconcile");
 const { collectedFromCheckout } = require("../dashboard/src/lib/invoicePay/webhook");
 const { assertBachsAllowed, bachsMode, payProviderFromEnv } = require("../dashboard/src/lib/invoicePay/provider");
-const { retryStoredReads } = require("../dashboard/src/lib/invoicePay/retryReads");
+const { retryStoredReads, sweepOpenCheckouts } = require("../dashboard/src/lib/invoicePay/retryReads");
 
 function loadSupabase() {
   try {
@@ -136,6 +137,42 @@ async function main() {
     }
   }
 
+  if (live) {
+    const provider = payProviderFromEnv(process.env);
+    const sweep = await sweepOpenCheckouts({
+      env: process.env,
+      async listAttempts() {
+        const { data: openAttempts, error: listError } = await admin
+          .from("payment_attempts")
+          .select("tenant_id, invoice_id, checkout_session_id")
+          .in("status", ["pending", "pending_unattached", "succeeded"])
+          .not("checkout_session_id", "is", null);
+        if (listError) throw listError;
+        return (openAttempts || []).map((row) => ({
+          tenantId: row.tenant_id,
+          invoiceId: row.invoice_id,
+          checkoutId: row.checkout_session_id,
+        }));
+      },
+      getCheckout(checkoutId) {
+        return provider.getCheckout(checkoutId);
+      },
+      async settleTotal(input) {
+        const { data: settled, error: settleError } = await admin.rpc("reconcile_checkout_total", {
+          p_provider: input.provider,
+          p_checkout_id: input.checkoutId,
+          p_total_kes: input.totalKes,
+          p_tenant_id: input.tenantId,
+          p_invoice_id: input.invoiceId,
+          p_raw: input.raw || {},
+        });
+        if (settleError) throw settleError;
+        return { noop: settled && settled.noop === true };
+      },
+    });
+    rows.push(...sweep.rows);
+  }
+
   if (live || bachsMode() === "sandbox") {
     const provider = payProviderFromEnv(process.env);
     const retry = await retryStoredReads({
@@ -190,7 +227,7 @@ async function main() {
   console.log(JSON.stringify({
     ok: true,
     mode: live ? "live-retry" : "sandbox",
-    changed: rows.some((row) => row.kind === "checkout_total_settled" || row.kind === "retry_settled" || row.kind === "retry_review"),
+    changed: rows.some((row) => row.kind === "checkout_total_settled" || row.kind === "retry_settled" || row.kind === "retry_review" || (row.kind === "sweep_settled" && row.noop !== true)),
     rows,
   }, null, 2));
 }

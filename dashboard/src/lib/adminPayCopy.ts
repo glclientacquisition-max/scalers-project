@@ -95,7 +95,7 @@ export type BachsStatusView = {
   hosting: HostingSwitches;
   dbFlags: DbFlagSwitches;
   liveSummary: string;
-  liveNames: string[];
+  liveRows: { id: string; name: string; preview: string }[];
   lastWebhook: string;
   webhooks24h: string;
   reconcileAvailable: boolean;
@@ -235,6 +235,17 @@ export function hostingSwitches(env: {
     noticesOn: String(env.noticesSend ?? "").trim().toLowerCase() === "on",
     planChangeOn: String(env.planChange ?? "").trim() === "on",
   };
+}
+
+/** Why this business cannot take a live payment. Null when it can. */
+export function livePayBlock(input: {
+  modeLive: boolean;
+  liveMasterOn: boolean;
+  tenantEnabled: boolean;
+}): string | null {
+  if (!input.modeLive || !input.liveMasterOn) return "Hosting switch is off";
+  if (!input.tenantEnabled) return "Not enabled";
+  return null;
 }
 
 export function bachsModeLabel(mode: "off" | "sandbox" | "live" | "unknown"): string {

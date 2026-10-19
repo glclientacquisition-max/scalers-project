@@ -52,6 +52,8 @@ describe("invoice pay SQL", () => {
     await db.exec(read("docs/supabase/invoice_pay_checkout_review_round9.sql"));
     await db.exec(read("docs/supabase/invoice_pay_live_allowlist.sql"));
     await db.exec(read("docs/supabase/invoice_pay_live_allowlist.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_amount_paid_either.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_amount_paid_either.sql"));
   });
 
   it("refuses a draft number or status write unless billing_write is set", async () => {
@@ -1214,5 +1216,61 @@ describe("invoice pay SQL", () => {
     assert.equal(locked.rows[0].anon_read, false);
     assert.equal(locked.rows[0].anon_set, false);
     assert.equal(locked.rows[0].service_set, true);
+  });
+
+  it("books a per-event collection on top of the seen total, once", async () => {
+    const tenant = "37373737-3737-4373-8373-373737373737";
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Either Shop', 'pending:either', 'soft')`,
+      [tenant]
+    );
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 20, 20) returning id`,
+      [tenant]
+    );
+    const invoice = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+    const invoiceId = invoice.rows[0].id;
+    await q(
+      `insert into public.payment_attempts (
+         tenant_id, invoice_id, provider, status, amount_kes, part_index, part_count, checkout_session_id
+       ) values ($1, $2, 'bachs', 'pending', 20, 1, 1, 'chk_either')`,
+      [tenant, invoiceId]
+    );
+    await q(
+      "select public.settle_checkout_reading('bachs', 'chk_either', 10, $1, $2, 'RCPT1', 10, '{}'::jsonb)",
+      [tenant, invoiceId]
+    );
+    const review = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_either', 10, $1, $2, 'RCPT2', 10, '{}'::jsonb) as row",
+      [tenant, invoiceId]
+    );
+    assert.equal(review.rows[0].row.reason, "collected_total_short");
+    const held = await q("select amount_paid_kes, status from public.invoices where id = $1", [invoiceId]);
+    assert.equal(Number(held.rows[0].amount_paid_kes), 10);
+    assert.equal(held.rows[0].status, "open");
+    const ref = review.rows[0].row.provider_ref;
+    await q(
+      "select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Second receipt is new money', 'book')",
+      [ref]
+    );
+    const paid = await q("select amount_paid_kes, status from public.invoices where id = $1", [invoiceId]);
+    assert.equal(Number(paid.rows[0].amount_paid_kes), 20);
+    assert.equal(paid.rows[0].status, "paid");
+    const seen = await q(
+      "select collected_total_seen_kes from public.payment_attempts where checkout_session_id = 'chk_either'"
+    );
+    assert.equal(Number(seen.rows[0].collected_total_seen_kes), 20);
+    await q(
+      "select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Second receipt is new money', 'book')",
+      [ref]
+    );
+    const twice = await q("select amount_paid_kes from public.invoices where id = $1", [invoiceId]);
+    assert.equal(Number(twice.rows[0].amount_paid_kes), 20);
+    const credits = await q(
+      "select coalesce(sum(amount_kes), 0) as n from public.tenant_credits where tenant_id = $1",
+      [tenant]
+    );
+    assert.equal(Number(credits.rows[0].n), 0);
   });
 });

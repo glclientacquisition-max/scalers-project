@@ -2,7 +2,8 @@ const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { assertLiveTenant } = require("../dashboard/src/lib/invoicePay/provider");
+const { assertBachsAllowed, assertLiveTenant } = require("../dashboard/src/lib/invoicePay/provider");
+const { readBillingLiveTenant } = require("../dashboard/src/lib/invoicePay/liveTenant");
 const { billingCronAllows } = require("../dashboard/src/lib/invoicePay/cronAuth");
 const { liveTenantPostError } = require("../dashboard/src/lib/invoicePay/liveTenantsApi");
 const { billingReconcileReport, reconciliationCounts } = require("../dashboard/src/lib/invoicePay/reconcile");
@@ -50,6 +51,44 @@ describe("live tenant gate", () => {
       /not open for this business/
     );
   });
+
+  it("reads an enabled production tenant and refuses a disabled, missing, or failed read", async () => {
+    const prod = liveEnv({
+      SUPABASE_URL: "https://fjxcdccgyhnvnnlnovcl.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role-test",
+    });
+    const allow = (data, error = null) => readBillingLiveTenant(TENANT, prod, {
+      async rpc() {
+        return { data, error };
+      },
+    });
+
+    assert.equal(await allow(true), true);
+    await assertLiveTenant(TENANT, prod, () => allow(true));
+    await assert.rejects(() => assertLiveTenant(TENANT, prod, () => allow(false)), /not open for this business/);
+    await assert.rejects(() => assertLiveTenant(TENANT, prod, () => allow(null)), /not open for this business/);
+    await assert.rejects(
+      () => assertLiveTenant(TENANT, prod, () => allow(null, { message: "down" })),
+      (err) => err && err.code === "bachs_live_refused" && !/production database/.test(String(err.message || ""))
+    );
+
+    assert.throws(
+      () => assertBachsAllowed({
+        BACHS_MODE: "sandbox",
+        BACHS_API_KEY: "sk_test_x",
+        SUPABASE_URL: "https://fjxcdccgyhnvnnlnovcl.supabase.co",
+      }),
+      (err) => err.code === "prod_refused"
+    );
+
+    const liveTenant = read("dashboard/src/lib/invoicePay/liveTenant.js");
+    assert.doesNotMatch(liveTenant, /prod_refused|PROD_REF/);
+    const provider = read("dashboard/src/lib/invoicePay/provider.js");
+    const gateStart = provider.indexOf("async function assertLiveTenant");
+    const gate = provider.slice(gateStart, provider.indexOf("class MockPayProvider", gateStart));
+    assert.doesNotMatch(gate, /prod_refused/);
+    assert.match(provider, /refusing production database/);
+  });
 });
 
 describe("live tenant and reconcile routes", () => {
@@ -81,12 +120,16 @@ describe("live tenant and reconcile routes", () => {
     const admin = read("dashboard/src/app/api/billing/live-tenants/route.ts");
     assert.match(admin, /requireSuperAdmin/);
     assert.match(admin, /from "@\/lib\/adminGuard"/);
+    assert.doesNotMatch(admin, /status:\s*401/);
+    assert.match(read("dashboard/src/lib/adminGuard.ts"), /redirect\(ADMIN_LOGIN_PATH\)/);
     assert.match(admin, /liveTenantPostError/);
     assert.match(admin, /admin_set_tenant_live_payments/);
     assert.doesNotMatch(admin, /process\.env\./);
 
     const vercel = JSON.parse(read("dashboard/vercel.json"));
-    assert.equal(vercel.crons, undefined);
+    assert.deepEqual(vercel.crons, [
+      { path: "/api/cron/billing-payment-retry", schedule: "7,22,37,52 * * * *" },
+    ]);
     assert.doesNotMatch(JSON.stringify(vercel), /billing-reconcile/);
 
     const readme = read("docs/supabase/README.md");

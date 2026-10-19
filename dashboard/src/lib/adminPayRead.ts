@@ -8,6 +8,7 @@ import {
   bachsModeLabel,
   bachsStatusFromEnv,
   hostingSwitches,
+  livePayBlock,
   dueLabel,
   invoiceHref,
   invoiceNumberLabel,
@@ -452,15 +453,24 @@ export async function loadBachsStatus(): Promise<BachsStatusView> {
   const envList = allowlistCount(process.env.BACHS_LIVE_TENANT_ALLOWLIST);
   const admin = getSupabaseAdmin();
 
-  let liveSummary = envList.all ? "All businesses" : envList.count === 0 ? "None" : String(envList.count);
-  let liveNames: string[] = [];
-  const table = await admin.from("billing_live_tenants").select("tenant_id, enabled").eq("enabled", true);
+  const hostingOpen = flags.mode === "live" && flags.liveSwitch === "On";
+  let liveSummary = hostingOpen ? "Hosting switch is on." : "Hosting switch is off.";
+  let liveRows: BachsStatusView["liveRows"] = [];
+  const table = await admin.from("billing_live_tenants").select("tenant_id, enabled").order("set_at", { ascending: false });
   if (!table.error) {
     const ids = (table.data || []).map((row) => String(row.tenant_id));
     const names = ids.length ? await businessNames(ids).catch(() => new Map<string, string>()) : new Map<string, string>();
-    liveNames = ids.map((id) => names.get(id) || "Business");
+    liveRows = (table.data || []).map((row) => {
+      const id = String(row.tenant_id);
+      const enabled = row.enabled === true;
+      const block = livePayBlock({ modeLive: flags.mode === "live", liveMasterOn: flags.liveSwitch === "On", tenantEnabled: enabled });
+      return { id, name: names.get(id) || "Business", preview: block || "Can pay" };
+    });
     const envNote = envList.all ? "Environment list: all" : `Environment list: ${envList.count}`;
-    liveSummary = liveNames.length === 0 ? `None on the list. ${envNote}.` : `${liveNames.length} on the list. ${envNote}.`;
+    const paying = liveRows.filter((row) => row.preview === "Can pay").length;
+    liveSummary = hostingOpen
+      ? `${paying} can pay. ${envNote}.`
+      : `Hosting switch is off. ${envNote}.`;
   } else if (!schemaMiss(table.error)) {
     logAdminError("billing-live-tenants", table.error);
   }
@@ -527,7 +537,7 @@ export async function loadBachsStatus(): Promise<BachsStatusView> {
     hosting,
     dbFlags,
     liveSummary,
-    liveNames,
+    liveRows,
     lastWebhook,
     webhooks24h,
     reconcileAvailable,

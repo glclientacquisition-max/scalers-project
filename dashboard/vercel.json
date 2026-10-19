@@ -11,5 +11,11 @@
       "main": true,
       "cursor/staging-voice-468b": true
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/billing-payment-retry",
+      "schedule": "7,22,37,52 * * * *"
+    }
+  ]
 }

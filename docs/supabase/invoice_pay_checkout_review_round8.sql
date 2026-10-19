@@ -1,7 +1,8 @@
 -- Invoice pay checkout review, round 8 (P15).
--- Apply after invoice_pay_checkout_review.sql (P14). Staging only until Alvin's GO.
+-- Apply after invoice_pay_checkout_review.sql (P14).
 -- Does not replace finalize_invoice. Does not edit P1-P14.
--- Production (fjxcdccgyhnvnnlnovcl) does not have this file.
+-- Production (fjxcdccgyhnvnnlnovcl) has this file. Applied 2026-10-19
+-- 08:11-08:13 UTC, versions 20261019081159 through 20261019081339. Do not re-run.
 -- Do not re-run P5, P9, P11, P12, or P14 after P15.
 --
 -- Three corrections on top of P14:
