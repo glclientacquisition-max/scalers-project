@@ -23,6 +23,8 @@ export type AdminBusiness = {
   status: "active" | "waiting" | "suspended" | "archived";
   /** Archived only: charging right before archive, for the Unarchive "as before" choice. */
   pre_archive: PreArchiveBilling | null;
+  /** Super Admin only. null = platform default. -1 = never. */
+  recording_retention_days_override: number | null;
 };
 
 /**
@@ -103,12 +105,19 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
     archived_at?: string | null;
     line_status?: string | null;
     suspended_at?: string | null;
+    recording_retention_days_override?: number | null;
   };
 
   const BASE =
     "id, created_at, business_name, sautikit_virtual_number, whatsapp_notification_number, is_active";
   // Optional columns, newest first. Each one drops out if the database does not have it yet.
-  let optional = ["billing_enforcement", "archived_at", "line_status", "suspended_at"];
+  let optional = [
+    "billing_enforcement",
+    "archived_at",
+    "line_status",
+    "suspended_at",
+    "recording_retention_days_override",
+  ];
   let data: BusinessRow[] | null = null;
   let error: { message: string } | null = null;
 
@@ -144,6 +153,10 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
           : "off",
       status: businessStatus(row),
       pre_archive: preArchive.get(String(row.id)) || null,
+      recording_retention_days_override:
+        row.recording_retention_days_override != null
+          ? row.recording_retention_days_override
+          : null,
     } as AdminBusiness;
   });
 }

@@ -23,6 +23,33 @@ import { ListRow } from "@/components/ui/ListRow";
 import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { Stamp, type StampTone } from "@/components/ui/Stamp";
+import {
+  RETENTION_MAX_DAYS,
+  RETENTION_MIN_DAYS,
+  RETENTION_NEVER,
+} from "@/lib/recordingRetentionPolicy";
+
+type TenantRetentionMode = "default" | "days" | "never";
+
+function tenantRetentionInit(override: number | null): { mode: TenantRetentionMode; days: string } {
+  if (override === RETENTION_NEVER) return { mode: "never", days: "30" };
+  if (override != null) return { mode: "days", days: String(override) };
+  return { mode: "default", days: "30" };
+}
+
+function tenantRetentionStored(mode: TenantRetentionMode, days: string): number | null {
+  if (mode === "default") return null;
+  if (mode === "never") return RETENTION_NEVER;
+  const n = Math.floor(Number(days));
+  if (n >= RETENTION_MIN_DAYS && n <= RETENTION_MAX_DAYS) return n;
+  return RETENTION_MIN_DAYS;
+}
+
+function tenantRetentionLabel(override: number | null): string {
+  if (override === RETENTION_NEVER) return "Never delete";
+  if (override != null) return `${override} days`;
+  return "Platform default";
+}
 
 const createdLabel = new Intl.DateTimeFormat("en-KE", {
   day: "numeric",
@@ -41,7 +68,8 @@ type SheetKind =
   | "plan"
   | "charges"
   | "package"
-  | "lifecycle";
+  | "lifecycle"
+  | "recording";
 type PlanChoice = "beta" | "on";
 type PackOption = { id: string; name: string; isActive?: boolean };
 
@@ -209,6 +237,8 @@ export function AdminBusinessesPanel({
   const [packs, setPacks] = useState<PackOption[]>([]);
   const [packageId, setPackageId] = useState("");
   const [period, setPeriod] = useState<"month" | "year">("month");
+  const [recordingMode, setRecordingMode] = useState<TenantRetentionMode>("default");
+  const [recordingDays, setRecordingDays] = useState("30");
 
   const PAGE_SIZE = 25;
   const freeCount = availableDids.length;
@@ -542,6 +572,16 @@ export function AdminBusinessesPanel({
                 void loadCharges(open.id);
               }}
             />
+            <ListRow
+              title="Recording retention"
+              preview={tenantRetentionLabel(open.recording_retention_days_override)}
+              onOpen={() => {
+                const init = tenantRetentionInit(open.recording_retention_days_override);
+                setRecordingMode(init.mode);
+                setRecordingDays(init.days);
+                openKind("recording", open.id);
+              }}
+            />
             {open.status === "waiting" ? (
               <ListRow
                 title="Assign"
@@ -810,6 +850,65 @@ export function AdminBusinessesPanel({
             ))}
           </ul>
         )}
+      </Sheet>
+
+      <Sheet
+        open={sheet?.kind === "recording"}
+        onOpenChange={(next) => {
+          if (!next) setSheet(open ? { kind: "shop", id: open.id } : null);
+        }}
+        title="Recording retention"
+        theme="admin"
+        footer={
+          <Button
+            type="button"
+            block
+            pending={pending}
+            onClick={() =>
+              open &&
+              void run({
+                action: "save_recording_retention",
+                business_id: open.id,
+                before_override: open.recording_retention_days_override,
+                recording_retention_days_override: tenantRetentionStored(recordingMode, recordingDays),
+              })
+            }
+          >
+            Save
+          </Button>
+        }
+      >
+        <SheetNote error={error} />
+        <div className="space-y-4">
+          <Segmented
+            className="-mx-5 px-5 sm:-mx-6 sm:px-6 md:-mx-6 md:px-6"
+            label="Override"
+            items={[
+              { key: "default", label: "Platform", active: recordingMode === "default" },
+              { key: "days", label: "Days", active: recordingMode === "days" },
+              { key: "never", label: "Never", active: recordingMode === "never" },
+            ]}
+            onSelect={(key) => setRecordingMode(key as TenantRetentionMode)}
+          />
+          <Field id="tenant-recording-days" label="Delete after" hint="Days">
+            {(props) => (
+              <Input
+                {...props}
+                type="number"
+                min={RETENTION_MIN_DAYS}
+                max={RETENTION_MAX_DAYS}
+                step={1}
+                className="tabular-nums"
+                disabled={recordingMode !== "days"}
+                value={recordingDays}
+                onChange={(event) => {
+                  setRecordingMode("days");
+                  setRecordingDays(event.target.value);
+                }}
+              />
+            )}
+          </Field>
+        </div>
       </Sheet>
 
       <ConfirmSheet
