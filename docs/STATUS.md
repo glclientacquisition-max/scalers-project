@@ -21,7 +21,7 @@ Prod DID **+254709221536** is Aris, the live paying customer: **never release, r
 
 **Product is callbacks only (#658, 11 Oct).** There is no live call transfer: the assistant takes a message and alerts a teammate. [`LIVE_TRANSFER.md`](archive/LIVE_TRANSFER.md) is archived as history.
 
-Billing is **packages + on-demand only**; beta charging is off; no prepaid wallet; no waive overage. Metering is live. Production has billing SQL P1–P8 (as of `553f1830`) and the owner-price v2 import. The pay page is not on prod. P9 `invoice_pay_session.sql` and P10 `billing_mode_legal_pairs.sql` are staging only. The pay page stays in #780. Bachs is the chosen payment provider. Prices are about to be raised. The new prices are not decided. Detail in [Billing](#billing).
+Billing is **packages + on-demand only**; beta charging is off; no prepaid wallet; no waive overage. Metering is live. Production has billing SQL P1–P10 and the owner-price v2 import. #780 (pay page) is merged, and its pay and billing read routes refuse the production database until a later change, so nothing is collected. Bachs is the chosen payment provider. Prices are about to be raised. The new prices are not decided. Detail in [Billing](#billing).
 
 **Gate right now:** the next step is a clean, scored Aris call on prod. Until then, nothing else ships except live-call voice fixes Alvin approves (see section 4).
 
@@ -43,6 +43,7 @@ Times EAT. SHAs are the squash commits on `main` (first-parent log). Older histo
 
 | PR | SHA | Merged | What |
 | --- | --- | --- | --- |
+| #780 | `13433da3` | 19 Oct 04:35 EAT | Invoice pay page, `SCL-` invoices and `RCT-` receipts, A4 documents, `billing_company` letterhead, owner billing history API. Production SQL P9 `invoice_pay_session.sql` (`20261019012356`) and P10 `billing_mode_legal_pairs.sql` (`20261019012401`) applied before the merge, Alvin's GO 04:21 EAT. `BACHS_MODE`, `BILLING_NOTICES_SEND`, and `DESK_PLAN_CHANGE` are unset on prod. Every business stays `beta` with enforcement off; 0 invoices, payments, and receipts. On prod the pay and billing read routes fail closed (`assertBachsAllowed` refuses the production database): `/pay/<token>` shows "Could not load this invoice." and `GET /api/billing/invoices` returns 503. Rollback = revert. |
 | #778 | `62b77ac1` | 19 Oct | Admin package version editor. Production has the editor SQL (P7) with the editor flag off, and the owner-price v2 import. `set_tenant_billing_mode` still lacks the beta refusal on production (P10, not applied). |
 | #781 | `3e051899` | 19 Oct | Owner billing actions. Production has P3 and P4. Desk plan screens stay behind `DESK_PLAN_CHANGE` (off). |
 | #775 | `6edbba92` | 19 Oct | Billing data layer. Production has P1 and P2. `invoices_freeze` rejects a draft number or status unless `scalers.billing_write` is `1`. |
