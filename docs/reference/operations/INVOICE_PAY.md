@@ -38,6 +38,8 @@ It shows the business name, the invoice number, the KSh total, and the due date 
 
 One filled button: `Pay KSh X`. X is the next unpaid part. Above KSh 150,000 the page also shows `Part 1 of N`. M-Pesa's per-transaction cap is KSh 150,000. Parts sum to the invoice. The invoice is paid when the paid total reaches the invoice total.
 
+When the Bachs gate refuses (live mode, a live key, or the production database), the page still loads. A payable invoice keeps the business, the number, the total, and the due date, and shows `Online payment isn't available yet. Contact support@scalers.co.ke` with no Pay button. An unknown token still says `This link is not valid`. An expired link still says `This link has expired`.
+
 The button starts a hosted checkout. Bachs success and cancel URLs use a return id (`/pay/return/<id>`), not the pay token. The return id expires 24 hours after the attempt is created. It cannot start a charge. After that, the page says `This link has expired`. The pay page cookie keeps the token on this browser so a split invoice can still take the next part. Bachs may append `?checkout_id=` onto the success query. The page reads `checkout_id` from either shape and ignores a checkout that belongs to another invoice. That screen says `Checking payment` until money is on this invoice. `Payment received` appears only when the invoice is fully paid. A paid part of a split says `Part 1 of 2 received, KSh X still due` and keeps the next Pay button. The return never marks the invoice paid by itself.
 
 Other states, with no pay button:
@@ -55,6 +57,8 @@ Other states, with no pay button:
 A failed or cancelled checkout stays payable and says `Payment was not completed.`
 
 ## Checkout
+
+`POST /api/pay/<token>/checkout` calls the gate before it inserts an attempt. When the gate refuses, the response is 503 `{ "error": "payments_unavailable" }` and no checkout is created. The page drops the Pay button and shows the same sentence as above.
 
 Create sends `expires_in_minutes` (60, capped at 1440), `reference` (the attempt id), and `customer` `{email, name, phone_number}` when any of those are known. If the response omits `expires_at`, it is derived from `expires_in_minutes` before the attempt is attached. One live attempt per invoice part is locked with the invoice row (`pending` or `pending_unattached`). A second tap while that row has no URL yet waits for it. An expired pending attempt stays pending until its Bachs session is cancelled and then read. A cancel that returns success is not treated as void: the page GETs the session. A session that is still open is reused when its URL is stored. A session that is still open without a URL, or that cannot be read, blocks with `Previous payment still processing.` No second attempt is inserted for that part. A read that says the session is closed marks the row cancelled and then inserts the next attempt. If attach fails, the session id is stored and the row becomes `pending_unattached`. A follow-up cancel that also fails leaves that row in place. The next click reads the stored session and reuses it or blocks. The row is marked failed only when that cancel succeeds and the read says the session is closed. A reference is single-use, including after expiry. The checkout URL must be https.
 
@@ -146,7 +150,7 @@ Issuing an invoice queues `platform_billing_invoice_issued`. `enqueue_invoice_du
 
 ## Owner history API
 
-Signed-in owner, own business only. The server uses the service role filtered by that tenant. A client cannot pass a tenant id. Live mode and the production database return 503.
+Signed-in owner, own business only. The server uses the service role filtered by that tenant. A client cannot pass a tenant id. Invoice, receipt, PDF, and HTML reads do not call the Bachs gate. A live key, live mode, and the production database still refuse checkout and the webhook.
 
 | Method | Path | What Desk gets |
 | --- | --- | --- |

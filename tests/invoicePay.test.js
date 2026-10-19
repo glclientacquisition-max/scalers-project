@@ -880,3 +880,190 @@ describe("Bachs sandbox fields", () => {
     assert.match(url, /\/v1\/checkout-sessions\/chk_1$/);
   });
 });
+
+const { assertBachsAllowed, paymentsClosed, checkoutFailure } = require("../dashboard/src/lib/invoicePay/provider");
+const { presentPayPage, PAYMENTS_UNAVAILABLE_NOTICE } = require("../dashboard/src/lib/invoicePay/view");
+const { listOwnerInvoices } = require("../dashboard/src/lib/invoicePay/invoiceList");
+
+const PROD_CLOSED = {
+  BACHS_MODE: "sandbox",
+  BACHS_API_KEY: "sk_test_not_live",
+  SUPABASE_URL: "https://fjxcdccgyhnvnnlnovcl.supabase.co",
+};
+
+function invoiceQuery(result) {
+  const q = Promise.resolve(result);
+  q.select = () => q;
+  q.eq = () => q;
+  q.in = () => q;
+  q.order = () => q;
+  return q;
+}
+
+describe("reads while the Bachs gate refuses", () => {
+  it("lists invoices while production is refused", async () => {
+    assert.equal(paymentsClosed(PROD_CLOSED), true);
+    assert.throws(() => assertBachsAllowed(PROD_CLOSED), /production database/);
+    const empty = await listOwnerInvoices(
+      {
+        from() {
+          return invoiceQuery({ data: [], error: null });
+        },
+      },
+      "tenant-1"
+    );
+    assert.equal(empty.ok, true);
+    assert.deepEqual(empty.body.invoices, []);
+    assert.deepEqual(empty.body.receipts, []);
+
+    const listed = await listOwnerInvoices(
+      {
+        from(name) {
+          if (name === "invoices") {
+            return invoiceQuery({
+              data: [
+                {
+                  id: "inv-1",
+                  invoice_number: "SCL-2026-000001",
+                  status: "paid",
+                  total_kes: "7000.00",
+                  amount_paid_kes: "7000.00",
+                  subtotal_kes: "7000.00",
+                },
+              ],
+              error: null,
+            });
+          }
+          return invoiceQuery({ data: [], error: null });
+        },
+      },
+      "tenant-1"
+    );
+    assert.equal(listed.ok, true);
+    assert.equal(listed.body.invoices[0].number, "SCL-2026-000001");
+    assert.equal(listed.body.invoices[0].status, "paid");
+
+    const root = path.join(__dirname, "..");
+    const route = fs.readFileSync(path.join(root, "dashboard/src/app/api/billing/invoices/route.ts"), "utf8");
+    assert.match(route, /listOwnerInvoices/);
+    assert.doesNotMatch(route, /assertBachsAllowed/);
+    assert.doesNotMatch(fs.readFileSync(path.join(root, "dashboard/src/lib/invoicePay/billingRead.ts"), "utf8"), /assertBachsAllowed/);
+    for (const rel of [
+      "dashboard/src/app/api/billing/invoices/[id]/route.ts",
+      "dashboard/src/app/api/billing/invoices/[id]/pdf/route.ts",
+      "dashboard/src/app/api/billing/receipts/[id]/route.ts",
+      "dashboard/src/app/api/billing/receipts/[id]/pdf/route.ts",
+      "dashboard/src/lib/invoicePay/ledger.ts",
+      "dashboard/src/lib/invoicePay/invoiceList.js",
+    ]) {
+      assert.doesNotMatch(fs.readFileSync(path.join(root, rel), "utf8"), /assertBachsAllowed/, rel);
+    }
+  });
+
+  it("shows the invalid-link page for an unknown token while production is refused", () => {
+    assert.throws(() => assertBachsAllowed(PROD_CLOSED), /production database/);
+    const view = presentPayPage(payView({ lookup: { found: false } }), PROD_CLOSED);
+    assert.equal(view.state, "missing");
+    assert.equal(view.title, "This link is not valid");
+    assert.equal(view.payLabel, null);
+    assert.equal(view.notice, null);
+
+    const root = path.join(__dirname, "..");
+    const load = fs.readFileSync(path.join(root, "dashboard/src/lib/invoicePay/loadPay.ts"), "utf8");
+    assert.ok(load.indexOf("ledger.lookup") < load.indexOf("presentPayPage("));
+    assert.doesNotMatch(load, /assertBachsAllowed/);
+    assert.match(fs.readFileSync(path.join(root, "dashboard/src/app/pay/[token]/page.tsx"), "utf8"), /loadPayView/);
+
+    const expired = presentPayPage(
+      payView({
+        lookup: {
+          found: true,
+          state: "expired",
+          businessName: "Jirani Cleaning",
+          invoiceNumber: "SCL-2026-000001",
+          totalKes: "7000.00",
+          amountPaidKes: "0",
+          dueAt: "2026-10-24T21:00:00Z",
+        },
+      }),
+      PROD_CLOSED
+    );
+    assert.equal(expired.title, "This link has expired");
+    assert.equal(expired.payLabel, null);
+  });
+
+  it("returns payments_unavailable and hides Pay when the gate refuses", () => {
+    const payable = presentPayPage(
+      payView({
+        lookup: {
+          found: true,
+          state: "payable",
+          businessName: "Jirani Cleaning",
+          invoiceNumber: "SCL-2026-000042",
+          totalKes: "2320.00",
+          amountPaidKes: "0",
+          dueAt: "2026-10-24T21:00:00Z",
+        },
+      }),
+      PROD_CLOSED
+    );
+    assert.equal(payable.title, "Jirani Cleaning");
+    assert.equal(payable.invoiceNumber, "SCL-2026-000042");
+    assert.equal(payable.totalLabel, "KSh 2,320");
+    assert.equal(payable.payLabel, null);
+    assert.equal(payable.notice, "Online payment isn't available yet. Contact support@scalers.co.ke");
+    assert.equal(payable.notice, PAYMENTS_UNAVAILABLE_NOTICE);
+
+    const open = presentPayPage(
+      payView({
+        lookup: {
+          found: true,
+          state: "payable",
+          businessName: "Jirani Cleaning",
+          invoiceNumber: "SCL-2026-000042",
+          totalKes: "2320.00",
+          amountPaidKes: "0",
+        },
+      }),
+      { BACHS_MODE: "off" }
+    );
+    assert.equal(open.payLabel, "Pay KSh 2,320");
+    assert.equal(open.notice, null);
+
+    let caught;
+    try {
+      payProviderFromEnv(PROD_CLOSED);
+    } catch (err) {
+      caught = err;
+    }
+    assert.equal(caught.code, "prod_refused");
+    assert.deepEqual(checkoutFailure(caught), { status: 503, error: "payments_unavailable" });
+    try {
+      payProviderFromEnv({ BACHS_MODE: "live", BACHS_API_KEY: "sk_live_x" });
+    } catch (err) {
+      caught = err;
+    }
+    assert.deepEqual(checkoutFailure(caught), { status: 503, error: "payments_unavailable" });
+    assert.equal(
+      checkoutFailure(Object.assign(new Error("previous payment still processing"), { code: "previous_processing" })).status,
+      409
+    );
+
+    const root = path.join(__dirname, "..");
+    const route = fs.readFileSync(path.join(root, "dashboard/src/app/api/pay/[token]/checkout/route.ts"), "utf8");
+    assert.ok(route.indexOf("assertBachsAllowed(env)") < route.indexOf("startInvoiceCheckout({"));
+    assert.match(route, /checkoutFailure/);
+    const panel = fs.readFileSync(path.join(root, "dashboard/src/app/pay/[token]/PayPanel.tsx"), "utf8");
+    assert.match(panel, /payments_unavailable/);
+    assert.match(panel, /PAYMENTS_UNAVAILABLE_NOTICE/);
+    const notice = fs.readFileSync(path.join(root, "dashboard/src/lib/invoicePay/paymentsNotice.js"), "utf8");
+    assert.match(notice, /Online payment isn't available yet\. Contact support@scalers\.co\.ke/);
+    const provider = fs.readFileSync(path.join(root, "dashboard/src/lib/invoicePay/provider.js"), "utf8");
+    assert.match(provider, /function assertBachsAllowed/);
+    assert.match(provider, /refusing production database/);
+    assert.match(provider, /sk_live_/);
+    assert.match(provider, /BACHS_MODE=live is refused/);
+    const webhook = fs.readFileSync(path.join(root, "dashboard/src/app/api/billing/bachs/webhook/route.ts"), "utf8");
+    assert.ok(webhook.indexOf("assertBachsAllowed(env)") < webhook.indexOf("handlePayWebhook({"));
+  });
+});

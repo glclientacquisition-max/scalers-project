@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PayCard, type PayCardModel } from "@/components/pay/PayCard";
+import { PAYMENTS_UNAVAILABLE_NOTICE } from "@/lib/invoicePay/paymentsNotice";
 
 export function PayPanel({ token, initial }: { token: string; initial: PayCardModel }) {
   const [view, setView] = useState(initial);
@@ -37,6 +38,11 @@ export function PayPanel({ token, initial }: { token: string; initial: PayCardMo
     try {
       const res = await fetch(`/api/pay/${encodeURIComponent(token)}/checkout`, { method: "POST" });
       const body = (await res.json().catch(() => ({}))) as { checkoutUrl?: string; error?: string };
+      if (body.error === "payments_unavailable") {
+        setView((current) => ({ ...current, payLabel: null, notice: PAYMENTS_UNAVAILABLE_NOTICE }));
+        setPending(false);
+        return;
+      }
       if (!res.ok || !body.checkoutUrl) {
         setError(
           body.error === "Previous payment still processing." ? body.error : "Could not start payment."

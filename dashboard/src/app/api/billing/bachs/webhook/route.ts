@@ -1,19 +1,9 @@
 import { NextResponse } from "next/server";
 import { handlePayWebhook } from "@/lib/invoicePay/webhook";
 import { invoicePayLedger } from "@/lib/invoicePay/ledger";
-import { bachsMode } from "@/lib/invoicePay/provider";
+import { assertBachsAllowed } from "@/lib/invoicePay/provider";
 
 export async function POST(request: Request) {
-  let mode: string;
-  try {
-    mode = bachsMode();
-  } catch {
-    return NextResponse.json({ ok: false }, { status: 400 });
-  }
-  if (mode === "live") {
-    return NextResponse.json({ ok: false }, { status: 403 });
-  }
-
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     BACHS_MODE: process.env.BACHS_MODE,
@@ -22,6 +12,15 @@ export async function POST(request: Request) {
     SUPABASE_URL: process.env.SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   };
+  try {
+    assertBachsAllowed(env);
+  } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code || "") : "";
+    if (code === "bachs_live_refused" || code === "prod_refused") {
+      return NextResponse.json({ ok: false }, { status: 403 });
+    }
+    return NextResponse.json({ ok: false }, { status: 400 });
+  }
   const secret = env.BACHS_WEBHOOK_SECRET || "";
   const rawBody = await request.text();
   const headers = {
@@ -35,7 +34,7 @@ export async function POST(request: Request) {
       rawBody,
       headers,
       secret,
-      ledger: invoicePayLedger(env),
+      ledger: invoicePayLedger(),
     });
     return NextResponse.json(result.body, { status: result.status });
   } catch (err) {
