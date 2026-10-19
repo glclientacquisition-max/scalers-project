@@ -64,6 +64,7 @@ import {
 } from "@/lib/ownerAttestFields";
 import { fieldPathsAttestedOnSettingsSave } from "@/lib/fieldPathsFromSettingsSave";
 import { cleanFieldPaths } from "@/lib/fieldPathRegistry";
+import { factSaveIsConfirm } from "@/lib/deskFeatureFlags";
 import {
   settingsFieldFromScope,
   settingsScopeValidationError,
@@ -497,7 +498,31 @@ export async function saveAndCompileSettings(
   // row never looks changed against its parsed copy. The compile below already
   // sees that pending confirm; the write hashes the stored row as saved.
   const hashMode = factHashModeFromEnv();
-  const explicitPaths = cleanFieldPaths(ownerPathsFromForm);
+  const saveIsConfirm = factSaveIsConfirm();
+  const attestPathsPre = fieldPathsAttestedOnSettingsSave({
+    scope,
+    businessName,
+    vertical,
+    spokenName,
+    agentName,
+    agentTone,
+    agentTools,
+    hasStructuredHours: Boolean(scheduleForSave),
+    businessHoursLength: businessHours.length,
+    businessLocationsCount: businessLocations.length,
+    businessPolicies,
+    productCatalog,
+    servicesCatalog,
+    faqs,
+    hasSocialHandles:
+      Array.isArray(socialHandles?.channels) &&
+      socialHandles.channels.some((row) => row && String(row.value || "").trim()),
+    lineNumber: String(tenant.sautikit_virtual_number || "").trim(),
+    serviceAreas: formAreas ?? serviceAreas ?? null,
+  });
+  const explicitPaths = cleanFieldPaths(
+    saveIsConfirm ? [...ownerPathsFromForm, ...attestPathsPre] : ownerPathsFromForm
+  );
   const tPrep = Date.now();
   const [savedBefore, provenance] = await Promise.all([
     hashMode ? readSavedFactRow(workspace.client, tenant.id) : Promise.resolve(null),
@@ -514,6 +539,7 @@ export async function saveAndCompileSettings(
           after: { ...storedFactRow, ...patch },
           explicitPaths,
           normalize: normalizeFactRow,
+          saveIsConfirm,
         })
       )
     : provenance.fieldMeta;
@@ -599,6 +625,7 @@ export async function saveAndCompileSettings(
     faqs,
     hasSocialHandles,
     lineNumber: String(tenant.sautikit_virtual_number || "").trim(),
+    serviceAreas: formAreas ?? serviceAreas ?? null,
   });
 
   const client = workspace.client;
@@ -638,6 +665,7 @@ export async function saveAndCompileSettings(
             after: saved,
             explicitPaths,
             normalize: normalizeFactRow,
+            saveIsConfirm,
           })
         );
       } else {
