@@ -17,11 +17,7 @@ function voiceProfileFromTenant(
 }
 
 export async function loadAssistantSayState(tenant: TenantRow): Promise<AssistantSayState> {
-  const provenance = await loadCompileProvenance(tenant.id);
-  const profile = voiceProfileFromTenant(tenant, {
-    fieldMeta: provenance.fieldMeta,
-    holdGate: provenance.holdGate,
-  });
+  const profile = await voiceProfileForAssistantSay(tenant);
   const { evaluateAssistantSay } = requireVoice("./src/knowledge/assistantSayReadiness.js") as {
     evaluateAssistantSay: (profile: unknown) => AssistantSayState;
   };
@@ -33,6 +29,14 @@ export function assistantSayStateFromTenant(tenant: TenantRow): AssistantSayStat
     evaluateAssistantSay: (profile: unknown) => AssistantSayState;
   };
   return evaluateAssistantSay(voiceProfileFromTenant(tenant));
+}
+
+export async function voiceProfileForAssistantSay(tenant: TenantRow) {
+  const provenance = await loadCompileProvenance(tenant.id);
+  return voiceProfileFromTenant(tenant, {
+    fieldMeta: provenance.fieldMeta,
+    holdGate: provenance.holdGate,
+  });
 }
 
 export async function loadReadyChecklist(tenant: TenantRow) {
