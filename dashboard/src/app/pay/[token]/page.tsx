@@ -5,9 +5,6 @@ import { loadPayView } from "@/lib/invoicePay/loadPay";
 
 export const instant = false;
 
-/** Do not keep a prerender in the client router. The Bachs gate is request-time. */
-export const unstable_dynamicStaleTime = 0;
-
 export const metadata: Metadata = {
   title: "Pay invoice",
   robots: { index: false, follow: false },
