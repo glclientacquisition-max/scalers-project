@@ -64,10 +64,27 @@ export async function loadBillingRuntimeSettings(): Promise<BillingRuntimeSettin
   return runtimeSettingsFromRow(data);
 }
 
+/**
+ * Hosting secrets as static process.env reads. Spreading process.env in a
+ * route drops names this module never mentions, and checkout then cannot
+ * read billing_live_tenants or call Bachs.
+ */
+function hostingPaymentEnv(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const publicUrl = ["NEXT", "PUBLIC", "SUPABASE", "URL"].join("_");
+  return {
+    ...base,
+    BACHS_API_KEY: process.env.BACHS_API_KEY,
+    BACHS_LIVE_TENANT_ALLOWLIST: process.env.BACHS_LIVE_TENANT_ALLOWLIST,
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    [publicUrl]: process.env[publicUrl],
+  };
+}
+
 /** Effective env for payment gates: DB switches overlay hosting secrets and URLs. */
 export async function effectivePaymentEnv(
   base: NodeJS.ProcessEnv = process.env,
 ): Promise<NodeJS.ProcessEnv> {
   const settings = await loadBillingRuntimeSettings();
-  return overlayRuntimeEnv(base, settings);
+  return overlayRuntimeEnv(hostingPaymentEnv(base), settings);
 }
