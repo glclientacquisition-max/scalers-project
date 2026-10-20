@@ -8,6 +8,7 @@ const L = require('./lexicon');
 const N = require('./nlu');
 const R = require('./receipts');
 const { buildCatalogue, validateCall } = require('./catalogue');
+const { compileSpokenCatalogue } = require('../spokenCatalogue');
 const { renderOwnerMessage } = require('./owner');
 const { buildRequest } = require('./gemini');
 
@@ -227,12 +228,22 @@ function infoAnswer(state, u, profile, kind) {
     return R.info({ kind: 'hours', everyDay: same, open: h.open, close: h.close }, state.lang);
   }
   if (kind === 'services') {
-    const cat = vertical(profile) === 'retail' ? (profile.productCatalog || []).map((p) => p.name) : (profile.servicesCatalog || []).map((x) => x.name);
-    if (u.service) return R.info({ kind: 'offered', label: u.service.name, price: u.service.price_range || null }, state.lang);
+    const compiled = compileSpokenCatalogue(profile, { limit: 4 });
+    if (u.service) {
+      const fam = compiled.familyForName(u.service.name);
+      const sized = /\b(\d{1,2}|one|two|three|moja|mbili|tatu|kimoja|viwili|vitatu)\s*-?\s*(bedroom|chumba|vyumba|seater|kiti)?\b/i.test(u.text);
+      if (fam?.askSize && !sized) {
+        return R.info({
+          kind: 'which_size',
+          head: L.isSw(state.lang) ? fam.labelSw : fam.labelEn,
+          sizes: compiled.sizeAsk(fam, state.lang),
+        }, state.lang);
+      }
+      return R.info({ kind: 'offered', label: u.service.name, price: u.service.price_range || null }, state.lang);
+    }
     if (u.products[0]) return R.info({ kind: 'offered', label: u.products[0].name, price: u.products[0].price ? `KSh ${u.products[0].price}` : null }, state.lang);
-    if (!cat.length) return R.info({ kind: 'want_know' }, state.lang);
-    const start = (n * 4) % cat.length;
-    return R.info({ kind: 'services', names: [...cat, ...cat].slice(start, start + 4), more: cat.length > 4 }, state.lang);
+    if (!compiled.families.length) return R.info({ kind: 'want_know' }, state.lang);
+    return R.info({ kind: 'services', names: compiled.labels(state.lang), more: compiled.more }, state.lang);
   }
   if (kind === 'coverage') {
     const loc = (profile.businessLocations || [])[0];

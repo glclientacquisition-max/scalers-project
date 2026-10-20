@@ -2,7 +2,11 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { speakCatalogueName, speakCatalogueNames } = require('../src/conversation/spokenCatalogue');
+const {
+  speakCatalogueName,
+  speakCatalogueNames,
+  compileSpokenCatalogue,
+} = require('../src/conversation/spokenCatalogue');
 const { lookup, speechOf } = require('../src/knowledge/lookup');
 const { offerCatalogueLine } = require('../src/conversation/knownFacts');
 const { info } = require('../src/conversation/v2/receipts');
@@ -34,6 +38,42 @@ describe('speakCatalogueName', () => {
   });
 });
 
+describe('compileSpokenCatalogue groups size siblings', () => {
+  it('does not list every Jirani bedroom SKU on the first ask', () => {
+    const compiled = compileSpokenCatalogue(JIRANI);
+    const en = compiled.opener('en');
+    const sw = compiled.opener('sw');
+    assert.doesNotMatch(en, /Deep clean, one bedroom.*Deep clean, two bedroom/);
+    assert.doesNotMatch(sw, /1 bedroom|2 bedroom|moja bedroom/);
+    assert.match(en, /deep clean for one bedroom to three bedroom homes/i);
+    assert.match(sw, /chumba kimoja hadi vyumba vitatu/i);
+    assert.match(en, /sofa cleaning/i);
+    assert.match(en, /and more/i);
+  });
+
+  it('groups seater, kilo, and pack siblings the same way', () => {
+    const compiled = compileSpokenCatalogue({
+      servicesCatalog: [
+        { name: 'Sofa, 3 seater' },
+        { name: 'Sofa, 5 seater' },
+        { name: 'Wash, 5 kg' },
+        { name: 'Wash, 10 kg' },
+        { name: 'Detergent small' },
+        { name: 'Detergent large' },
+      ],
+    });
+    const en = compiled.opener('en');
+    const sw = compiled.opener('sw');
+    assert.match(en, /sofa for three seater to five seater/i);
+    assert.match(en, /wash for five kilo to ten kilo/i);
+    assert.match(en, /detergent, small and large/i);
+    assert.match(sw, /kiti tatu hadi kiti tano/i);
+    assert.match(sw, /kilo tano hadi kilo kumi/i);
+    assert.doesNotMatch(en, /3 seater|5 kg/);
+    assert.doesNotMatch(sw, /moja seater|5 kg/);
+  });
+});
+
 describe('lookup services uses the spoken compile', () => {
   it('does not read raw 1 bedroom / 2 bedroom titles', () => {
     const en = lookup('services', 'which services', { profile: JIRANI, language: 'en', seed: 0 });
@@ -42,18 +82,19 @@ describe('lookup services uses the spoken compile', () => {
     const swSpeech = speechOf(sw, 'sw');
     assert.doesNotMatch(enSpeech, /1 bedroom|2 bedroom|3 bedroom/);
     assert.doesNotMatch(swSpeech, /1 bedroom|2 bedroom|moja bedroom|mbili bedroom/);
-    assert.match(enSpeech, /Bedroom Cleaning|one bedroom|Deep clean/i);
-    assert.match(swSpeech, /chumba kimoja|vyumba|Bedroom Cleaning/i);
+    assert.match(enSpeech, /deep clean for one bedroom to three bedroom homes/i);
+    assert.match(swSpeech, /chumba kimoja hadi vyumba vitatu/i);
   });
 });
 
 describe('local catalogue line and v2 receipts share the same names', () => {
-  it('rewrites a short bedroom list', () => {
+  it('rewrites a short bedroom list into one family', () => {
     const short = { servicesCatalog: JIRANI.servicesCatalog.slice(0, 3) };
     const en = offerCatalogueLine('What services do you offer?', short, 'en');
     const sw = offerCatalogueLine('Niambie huduma zenu.', short, 'sw');
-    assert.match(en, /one bedroom/);
-    assert.match(sw, /chumba kimoja/);
+    assert.match(en, /deep clean for one bedroom to three bedroom homes/i);
+    assert.match(sw, /chumba kimoja hadi vyumba vitatu/i);
+    assert.doesNotMatch(en, /Deep clean, one bedroom, Deep clean, two bedroom/);
     assert.doesNotMatch(sw, /1 bedroom|moja bedroom/);
   });
 
@@ -64,5 +105,16 @@ describe('local catalogue line and v2 receipts share the same names', () => {
     );
     assert.match(line, /chumba kimoja/);
     assert.doesNotMatch(line, /1 bedroom/);
+  });
+
+  it('v2 offered price uses spoken money, not KSh', () => {
+    const en = info({ kind: 'offered', label: 'Deep clean, 1 bedroom', price: 'KSh 6,500' }, 'en');
+    const sw = info({ kind: 'offered', label: 'Deep clean, 1 bedroom', price: 'KSh 6,500' }, 'sw');
+    assert.match(en, /one bedroom/);
+    assert.match(en, /six thousand five hundred shillings/);
+    assert.doesNotMatch(en, /KSh/);
+    assert.match(sw, /chumba kimoja/);
+    assert.match(sw, /shilingi/);
+    assert.doesNotMatch(sw, /KSh|moja bedroom/);
   });
 });

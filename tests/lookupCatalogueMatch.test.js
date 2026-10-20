@@ -36,7 +36,7 @@ describe('catalogue price matching (Jirani deep clean bedrooms)', () => {
   it('same name without comma still resolves', () => {
     const hit = price('How much is Deep clean 1 bedroom?', profile);
     assert.equal(hit.result.status, 'found');
-    assert.match(hit.speech, /1 bedroom|6,?500|six thousand five hundred/i);
+    assert.match(hit.speech, /one bedroom|6,?500|six thousand five hundred/i);
   });
 
   it('spoken qualifier disambiguates siblings', () => {
@@ -55,8 +55,9 @@ describe('catalogue price matching (Jirani deep clean bedrooms)', () => {
     const hit = price('How much is deep clean?', profile);
     assert.equal(hit.result.status, 'ambiguous');
     assert.match(hit.speech, /Which one/i);
-    assert.match(hit.speech, /1 bedroom/);
-    assert.match(hit.speech, /2 bedroom/);
+    assert.match(hit.speech, /one bedroom/);
+    assert.match(hit.speech, /two bedroom/);
+    assert.doesNotMatch(hit.speech, /\b1 bedroom\b/);
   });
 });
 
@@ -70,7 +71,7 @@ describe('catalogue price matching: no false positives (Jirani siblings)', () =>
   it('tier word picks the right sibling: standard 2 bedroom is not deep 2 bedroom', () => {
     const hit = price('two bedroom standard clean', profile);
     assert.equal(hit.result.status, 'found');
-    assert.match(hit.speech, /Standard clean, 2 bedroom/);
+    assert.match(hit.speech, /Standard clean, two bedroom/);
     assert.match(hit.speech, /4,?500|four thousand five hundred/i);
   });
 
@@ -92,20 +93,21 @@ describe('catalogue price matching: no false positives (Jirani siblings)', () =>
   it('Swahili number word with tier word resolves the sibling', () => {
     const hit = sw('Bei ya deep clean vyumba mbili?');
     assert.equal(hit.result.status, 'found');
-    assert.match(hit.speech, /Deep clean, 2 bedroom/);
+    assert.match(hit.speech, /Deep clean, vyumba viwili/);
   });
 
   it('Swahili noun-class numbers: chumba kimoja / vyumba viwili / vyumba vitatu', () => {
     const cases = [
-      ['Bei ya deep clean, chumba kimoja?', 'Deep clean, 1 bedroom'],
-      ['Deep clean ya vyumba viwili ni bei gani?', 'Deep clean, 2 bedroom'],
-      ['Bei ya standard clean vyumba viwili?', 'Standard clean, 2 bedroom'],
-      ['Bei ya deep clean vyumba vitatu?', 'Deep clean, 3 bedroom'],
+      ['Bei ya deep clean, chumba kimoja?', 'Deep clean, chumba kimoja'],
+      ['Deep clean ya vyumba viwili ni bei gani?', 'Deep clean, vyumba viwili'],
+      ['Bei ya standard clean vyumba viwili?', 'Standard clean, vyumba viwili'],
+      ['Bei ya deep clean vyumba vitatu?', 'Deep clean, vyumba vitatu'],
     ];
     for (const [q, name] of cases) {
       const hit = sw(q);
       assert.equal(hit.result.status, 'found', q);
       assert.match(hit.speech, new RegExp(name), q);
+      assert.doesNotMatch(hit.speech, /moja bedroom|\b1 bedroom\b/, q);
     }
     assert.equal(sw('Bei ya deep clean vyumba vinne?').result.status !== 'found', true);
   });

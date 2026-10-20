@@ -241,6 +241,21 @@ function buildLiveGroundTruth(profile = {}) {
     formatServicesBlock(services),
   ];
 
+  const { compileSpokenCatalogue } = require('./spokenCatalogue');
+  const spoken = compileSpokenCatalogue(profile, {
+    limit: 4,
+    messageOnly: isMessageOnlyMode(profile.afterHoursMode),
+  });
+  if (spoken.families.length) {
+    parts.push(
+      '',
+      'SPOKEN CATALOGUE (how to say SERVICES on the phone. File titles stay above. Do not invent names.):',
+      `EN: ${spoken.opener('en')}`,
+      `SW: ${spoken.opener('sw')}`,
+      'Speak size tokens as words (one bedroom / chumba kimoja), never "1 bedroom" or "moja bedroom". When a family has sizes, ask the size before quoting a price.'
+    );
+  }
+
   if (extras && services.length) {
     // Avoid dumping a duplicate auto-summary: only append if it looks like owner notes.
     const looksLikeAutoSummary = /^Services:\n/i.test(extras) || /Out of scope:/i.test(extras);

@@ -15,7 +15,7 @@ New agent or new human: read this whole page before you touch code.
 
 ## 1. Where we are
 
-Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b66e1661`** (#647, merged 17 Oct 22:12 EAT). Prod `/healthz` reports this SHA, started 17 Oct 22:13 EAT. Staging Voice is a SHA pin on **`1fcbbb19`** (`cursor/v2-live-spoken-catalog-3e8f` on #832). Staging `/healthz` reports it, started 20 Oct 10:06 UTC. `BRAIN_V2=on`, `BRAIN_V2_MODE=live`, `BRAIN_V2_SHADOW=off`. Caller hears v2 receipts. Keep `hold-staging` / `STAGE_PR_HOLD`. A merge to `main` can overwrite this pin. Prod untouched.
+Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b66e1661`** (#647, merged 17 Oct 22:12 EAT). Prod `/healthz` reports this SHA, started 17 Oct 22:13 EAT. Staging Voice is a SHA pin on **`1fcbbb19`** (`cursor/v2-live-spoken-catalog-3e8f` on #833). A follow-up on that branch compiles spoken families (bedroom / seater / kilo / pack), bilingual openers, and spoken money on lookup, catalogue mouth, live ground truth, and BA v2. Pin after this lands. `BRAIN_V2=on`, `BRAIN_V2_MODE=live`, `BRAIN_V2_SHADOW=off`. Keep `hold-staging` / `STAGE_PR_HOLD`. A merge to `main` can overwrite this pin. Prod untouched.
 
 Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Esga is on prod DID +254709221542. Staging DID is **+254709221537** (staging tenant Jirani Cleaning Services, *per team notes*).
 
@@ -228,7 +228,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **WhatsApp as the assistant doing work** (not just alerts).
 - Live call transfer: **not built** (callbacks only since #658; reviving it needs a new ADR and Alvin's yes).
 - **Fact lookups (#791).** One lookup for prices, area fees, hours, payment numbers and the services list, answered in code before the model. See `docs/how-to/LOOKUPS.md`. `VOICE_LOOKUPS=on` on staging and prod from 19 Oct.
-- **BA v2 live mouth + spoken catalogue.** #833 / `cursor/v2-live-spoken-catalog-3e8f` is on Railway staging Voice as SHA `1fcbbb19` (started 20 Oct 10:06 UTC). `BRAIN_V2=on`, `BRAIN_V2_MODE=live`, `BRAIN_V2_SHADOW=off`. Caller hears v2. Lookups and v2 receipts speak compiled names (`one bedroom` / `chumba kimoja`), not raw `1 bedroom`. Keep `hold-staging` / `STAGE_PR_HOLD`. A merge to `main` can overwrite the pin. Prod untouched. Rollback: `BRAIN_V2` off and redeploy `80b100e3`.
+- **BA v2 live mouth + spoken catalogue.** #833 / `cursor/v2-live-spoken-catalog-3e8f`. Staging Voice is still SHA `1fcbbb19` until the family compile is pinned. Compile groups size siblings, speaks EN/SW openers (`We offer` / `Tuna`), and prices through `speakMoney`. Same compile for lookup, catalogue mouth, live ground truth, and v2 receipts. File titles stay the desk source of truth. No new column. `BRAIN_V2=on`, `BRAIN_V2_MODE=live`, `BRAIN_V2_SHADOW=off`. Keep `hold-staging` / `STAGE_PR_HOLD`. Prod untouched. Rollback: `BRAIN_V2` off and redeploy `80b100e3`.
 
 Public copy never mentions unbuilt features.
 
