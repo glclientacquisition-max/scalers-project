@@ -9,7 +9,8 @@ const N = require('./nlu');
 const R = require('./receipts');
 const { buildCatalogue, validateCall } = require('./catalogue');
 const { compileSpokenCatalogue, joinList } = require('../spokenCatalogue');
-const { compileSpokenCoverage, compileSpokenPolicies, compileSpokenVisitFee } = require('../spokenFacts');
+const { compileSpokenCoverage, compileSpokenPolicies } = require('../spokenFacts');
+const { compileAskReceipt } = require('./askReceipt');
 const { applyTicket, needsClassify, normalizeTicket } = require('./classifyAsk');
 const { renderOwnerMessage } = require('./owner');
 const { buildRequest } = require('./gemini');
@@ -254,7 +255,7 @@ function infoAnswer(state, u, profile, kind) {
   }
   if (kind === 'coverage') {
     if (u.feeAsk || FEE_ASK.test(u.text) || (!u.area && DELIVER_ASK.test(u.text))) {
-      const line = compileSpokenVisitFee(profile, u.area && u.area.name, state.lang);
+      const line = compileAskReceipt(profile, { kind: 'come_cost', place: u.area && u.area.name }, state.lang);
       if (line) return R.info({ kind: 'policy', line }, state.lang);
     }
     const loc = (profile.businessLocations || [])[0];
@@ -271,15 +272,20 @@ function infoAnswer(state, u, profile, kind) {
     }, state.lang);
   }
   if (kind === 'payment_how') {
-    const M = { mpesa_paybill: ['M-Pesa Paybill', 'M-Pesa Paybill'], mpesa_till: ['M-Pesa Till', 'M-Pesa Till'], bank: ['bank transfer', 'benki'], cash: ['cash', 'pesa taslimu'], card: ['card', 'kadi'], pochi: ['Pochi la Biashara', 'Pochi la Biashara'], airtel: ['Airtel Money', 'Airtel Money'] };
-    const ms = (profile.businessPolicies?.payments?.methods || []).map((m) => M[m]?.[L.isSw(state.lang) ? 1 : 0]).filter(Boolean);
-    if (ms.length) {
-      return R.info({ kind: 'payment_how', methods: ms.join(L.isSw(state.lang) ? ', ' : ', ').replace(/, ([^,]+)$/, L.isSw(state.lang) ? ' au $1' : ' or $1') }, state.lang);
+    const line = compileAskReceipt(profile, { kind: 'pay' }, state.lang);
+    if (/\b(Paybill|Till|benki|pesa taslimu|kadi|Pochi|Airtel)\b/i.test(line) && (profile.businessPolicies?.payments?.methods || []).length) {
+      return R.info({ kind: 'payment_how', methods: line.replace(/^You can pay by |^Malipo: |\.$/g, '') }, state.lang);
     }
-    return R.info({ kind: 'policy', line: compileSpokenPolicies(profile).line('payment', state.lang) }, state.lang);
+    return R.info({ kind: 'policy', line }, state.lang);
   }
   if (POLICY_KEY[kind]) {
-    return R.info({ kind: 'policy', line: compileSpokenPolicies(profile).line(POLICY_KEY[kind], state.lang) }, state.lang);
+    const ask = {
+      policy_returns: 'refund',
+      policy_deposit: 'deposit',
+      policy_warranty: 'warranty',
+      policy_cancel: 'cancel_rules',
+    }[kind];
+    return R.info({ kind: 'policy', line: compileAskReceipt(profile, { kind: ask }, state.lang) }, state.lang);
   }
   if (kind === 'greeting') return R.info({ kind: 'greeting' }, state.lang);
   if (kind === 'who_are_you') return R.info({ kind: 'who', agent: profile.agentName || 'Shy', biz: profile.businessName || '' }, state.lang);
