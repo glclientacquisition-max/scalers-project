@@ -13,6 +13,8 @@ const { parseHoursSchedule, eatParts, openClosedStatus } = require('../conversat
 const { speakMoney, numberToEn } = require('../speech/spokenForms');
 const { speakSwClock } = require('../speech/swahiliTime');
 const { areaAmbiguity, matchArea: nluMatchArea } = require('./v2/nlu');
+const { catalogueFileNames } = require('../conversation/knownFacts');
+const { speakCatalogueName } = require('../conversation/spokenCatalogue');
 
 const EN_HOUR = ['twelve', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven'];
 const EN_DIGIT = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
@@ -1307,21 +1309,27 @@ function lookupPay(query, ctx) {
   return lookupPayMethods(profile, pay, intent);
 }
 
-function speechName(name) {
-  return String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+function speechName(name, language = 'en') {
+  return speakCatalogueName(name, language).toLowerCase();
 }
 
 function lookupServices(ctx) {
   const profile = ctx.profile || {};
+  const language = ctx.language || 'en';
   const rows = catalogueEntries(profile);
   if (!rows.length) return noData(profile, 'services', 'price');
   const confirmed = rows.filter((entry) => priceConfirmed(profile, entry, entry.row));
   if (!confirmed.length) {
     return unconfirmed(profile, 'services', 'catalogue', priceReading(profile, rows[0], rows[0].row).reason, 'price');
   }
-  const names = confirmed.map((entry) => speechName(entry.row.name));
-  const more = names.length > 4;
-  const shown = names.slice(0, 4);
+  const file = catalogueFileNames(
+    { servicesCatalog: confirmed.map((entry) => entry.row) },
+    4,
+    language
+  );
+  const names = file.names.map((name) => speechName(name, language));
+  const more = file.more;
+  const shown = names;
   const enList = joinAnd(shown.concat(more ? ['more'] : []), 'and');
   const swList = joinAnd(shown.concat(more ? ['zingine'] : []), 'na');
   const seed = ctx.seed;

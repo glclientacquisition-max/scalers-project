@@ -10,6 +10,7 @@ const {
 } = require('./businessHours');
 const { looksLikeOfferAsk, looksLikeNewWork } = require('./fileRead');
 const { isMessageOnlyMode } = require('./messageOnly');
+const { speakCatalogueName } = require('./spokenCatalogue');
 
 const HOURS_ASK_RE =
   /\b(are you open|you open now|opening hours|your hours|what are your hours|what time do you (?:open|close)|when do you (?:open|close)|at what time are you opening|what time are you opening|mko wazi|mnafungua|mnafunga|saa ngapi mna(?:fungua|funga))\b/i;
@@ -155,11 +156,18 @@ function catalogueFileNames(profile = {}, limit = 4, language = 'en', opts = {})
   if (opts.families !== false && names.length > cap) {
     const families = serviceFamilies(rows, { language });
     if (families.length < names.length && families.some((f) => f.members.length > 1)) {
-      const labels = families.map((f) => f.label);
+      const labels = families.map((f) =>
+        opts.speak === false ? f.label : speakCatalogueName(f.label, language)
+      );
       return { names: labels.slice(0, cap), more: labels.length > cap, families: true };
     }
   }
-  return { names: names.slice(0, cap), more: names.length > cap, families: false };
+  const raw = names.slice(0, cap);
+  return {
+    names: opts.speak === false ? raw : raw.map((name) => speakCatalogueName(name, language)),
+    more: names.length > cap,
+    families: false,
+  };
 }
 
 /**

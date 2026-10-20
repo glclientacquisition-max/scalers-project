@@ -15,7 +15,7 @@ New agent or new human: read this whole page before you touch code.
 
 ## 1. Where we are
 
-Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b66e1661`** (#647, merged 17 Oct 22:12 EAT). Prod `/healthz` reports this SHA, started 17 Oct 22:13 EAT. Staging Voice is a SHA pin on **`80b100e3`** (`cursor/staging-v2-shadow-pin-3e8f`: current `main` + #680 + #681). Staging `/healthz` reports it, started 20 Oct 09:16 UTC. `BRAIN_V2_SHADOW=on` (caller still hears v1). Keep `hold-staging` / `STAGE_PR_HOLD`. A merge to `main` can overwrite this pin. Prod untouched.
+Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b66e1661`** (#647, merged 17 Oct 22:12 EAT). Prod `/healthz` reports this SHA, started 17 Oct 22:13 EAT. Staging Voice is a SHA pin on **`80b100e3`** (`cursor/staging-v2-shadow-pin-3e8f`: current `main` + #680 + #681). Staging `/healthz` reports it, started 20 Oct 09:16 UTC. `BRAIN_V2_SHADOW=on` (caller still hears v1). Follow-up `cursor/v2-live-spoken-catalog-3e8f` wires `BRAIN_V2=on` + `BRAIN_V2_MODE=live` so v2 sentences are spoken, and puts the spoken catalogue compile back on the lookup mouth (size tokens as words: "one bedroom" / "chumba kimoja"). Keep `hold-staging` / `STAGE_PR_HOLD`. A merge to `main` can overwrite this pin. Prod untouched.
 
 Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Esga is on prod DID +254709221542. Staging DID is **+254709221537** (staging tenant Jirani Cleaning Services, *per team notes*).
 
@@ -228,7 +228,8 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **WhatsApp as the assistant doing work** (not just alerts).
 - Live call transfer: **not built** (callbacks only since #658; reviving it needs a new ADR and Alvin's yes).
 - **Fact lookups (#791).** One lookup for prices, area fees, hours, payment numbers and the services list, answered in code before the model. See `docs/how-to/LOOKUPS.md`. `VOICE_LOOKUPS=on` on staging and prod from 19 Oct.
-- **BA v2 staging pin (shadow live, not mouth).** #832 / `cursor/staging-v2-shadow-pin-3e8f` is on Railway staging Voice as SHA `80b100e3` (started 20 Oct 09:16 UTC). `BRAIN_V2_SHADOW=on`, model `gemini-3.5-flash-lite`, no tenant allowlist. Caller hears v1. After hangup, turns get `brain_v2_shadow`. Keep `hold-staging` / `STAGE_PR_HOLD`. A merge to `main` can overwrite the pin. Prod untouched. Live `BRAIN_V2_MODE=live` still needs a Voice wire PR.
+- **BA v2 staging pin (shadow live, not mouth).** #832 / `cursor/staging-v2-shadow-pin-3e8f` is on Railway staging Voice as SHA `80b100e3` (started 20 Oct 09:16 UTC). `BRAIN_V2_SHADOW=on`, model `gemini-3.5-flash-lite`, no tenant allowlist. Caller hears v1. After hangup, turns get `brain_v2_shadow`. Keep `hold-staging` / `STAGE_PR_HOLD`. A merge to `main` can overwrite the pin. Prod untouched.
+- **BA v2 live mouth + spoken catalogue (`cursor/v2-live-spoken-catalog-3e8f`).** The spoken compile you already had (`serviceFamilies` / catalogue mouth) was bypassed when `VOICE_LOOKUPS` answered the services list from raw titles, so Jirani heard "deep clean, 1 bedroom" and TTS said "moja bedroom". Lookups now use `catalogueFileNames` plus `speakCatalogueName` (EN "one bedroom", SW "chumba kimoja"). v2 receipts use the same helper. `BRAIN_V2=on` + `BRAIN_V2_MODE=live` speaks v2 sentences on the media path and skips shadow for that call. Writes go through `applyGeminiTools`. Staging only; default remains off.
 
 Public copy never mentions unbuilt features.
 
