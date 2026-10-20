@@ -5,7 +5,6 @@ import { logAdminError } from "@/lib/adminErrors";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { planWritesBlockedLine } from "@/lib/adminBillingCopy";
 import { loadPackageVersionEditor } from "@/lib/packageVersionCatalog";
-import { packageEditorWritesAllowed } from "@/lib/packageVersionEditor";
 
 export const instant = false;
 
@@ -13,9 +12,8 @@ export default async function AdminPackagesPage() {
   await requireSuperAdmin();
   try {
     const editor = await loadPackageVersionEditor();
-    const writesAllowed = packageEditorWritesAllowed();
-    const planWritesEnabled = writesAllowed && editor.catalog.packageEditorEnabled;
-    const readOnlyHint = planWritesBlockedLine(editor.catalog.packageEditorEnabled, writesAllowed);
+    const planWritesEnabled = editor.catalog.packageEditorEnabled;
+    const readOnlyHint = planWritesBlockedLine(editor.catalog.packageEditorEnabled);
     return (
       <div className="space-y-4">
         <AdminPageHeader title="Plans" />

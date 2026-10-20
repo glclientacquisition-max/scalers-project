@@ -44,9 +44,8 @@ describe("admin billing: readable errors", () => {
     assert.match(copy.requestErrorText({ error: "package_editor_off" }), /package editor is off/i);
     assert.equal(copy.requestErrorText({ message: "Confirm the change." }), "Confirm the change.");
     assert.equal(copy.requestErrorText({ error: "unknown_internal_code" }, "Nope."), "Nope.");
-    assert.equal(copy.planWritesBlockedLine(true, true), null);
-    assert.match(copy.planWritesBlockedLine(false, true), /package editor is off/i);
-    assert.match(copy.planWritesBlockedLine(true, false), /read-only on production/i);
+    assert.equal(copy.planWritesBlockedLine(true), null);
+    assert.match(copy.planWritesBlockedLine(false), /package editor is off/i);
   });
 
   it("billing API speaks plainly and uses a save fallback", () => {

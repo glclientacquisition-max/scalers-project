@@ -3,7 +3,6 @@ import { recordAdminAction } from "@/lib/adminAudit";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { adminActorName } from "@/lib/adminActor";
 import { requireSuperAdmin } from "@/lib/adminGuard";
-import { packageEditorWritesAllowed } from "@/lib/packageVersionEditor";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 const SAVE_FAILED = "That didn't save. Nothing changed.";
@@ -15,9 +14,6 @@ const SAVE_FAILED = "That didn't save. Nothing changed.";
  */
 export async function POST(request: Request) {
   await requireSuperAdmin();
-  if (!packageEditorWritesAllowed()) {
-    return NextResponse.json({ error: "This change is not available here." }, { status: 403 });
-  }
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {

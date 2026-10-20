@@ -208,8 +208,7 @@ export function requestErrorText(json: unknown, fallback = "That didn't save. No
 }
 
 /** Why Plans edits are blocked on this screen, if they are. */
-export function planWritesBlockedLine(editorEnabled: boolean, writesAllowed: boolean): string | null {
-  if (writesAllowed && editorEnabled) return null;
-  if (!editorEnabled) return ADMIN_REQUEST_ERROR_MESSAGES.package_editor_off;
-  return ADMIN_REQUEST_ERROR_MESSAGES.package_editor_staging_only;
+export function planWritesBlockedLine(editorEnabled: boolean): string | null {
+  if (editorEnabled) return null;
+  return ADMIN_REQUEST_ERROR_MESSAGES.package_editor_off;
 }

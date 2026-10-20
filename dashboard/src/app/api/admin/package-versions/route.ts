@@ -5,7 +5,6 @@ import { adminActorName } from "@/lib/adminActor";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import {
   packageEditorActivityEntries,
-  packageEditorWritesAllowed,
   packageVersionEditorHttpStatus,
   parseEditorCommand,
   type EditorActivityBefore,
@@ -203,16 +202,6 @@ export async function POST(request: Request) {
       { status: 403 },
     );
   }
-  if (!packageEditorWritesAllowed()) {
-    return NextResponse.json(
-      {
-        error: "package_editor_staging_only",
-        message: "Plans are read-only on production. Edit on staging, or turn on production plan edits in hosting.",
-      },
-      { status: 403 },
-    );
-  }
-
   let body: unknown;
   try {
     body = await request.json();

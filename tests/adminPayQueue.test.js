@@ -149,7 +149,7 @@ describe("admin pay queue labels", () => {
     assert.match(money, /checked=\{chargingOn\}/);
     const flags = read("dashboard/src/app/api/admin/billing/flags/route.ts");
     assert.match(flags, /requireSuperAdmin/);
-    assert.match(flags, /packageEditorWritesAllowed/);
+    assert.doesNotMatch(flags, /packageEditorWritesAllowed/);
     assert.match(flags, /admin_set_package_editor_enabled/);
     assert.match(flags, /admin_set_new_signup_trial/);
     assert.match(flags, /adminActorName\(\)/);

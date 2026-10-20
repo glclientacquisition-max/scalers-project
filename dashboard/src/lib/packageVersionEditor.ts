@@ -43,11 +43,9 @@ export type ParsedEditorCommand =
   | { ok: true; command: EditorCommand }
   | { ok: false; error: string };
 
-/** Production writes stay off unless Alvin's flag is exactly `on`. */
-export function packageEditorWritesAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
-  const url = `${env.SUPABASE_URL || ""} ${env.NEXT_PUBLIC_SUPABASE_URL || ""}`;
-  if (!url.includes(PROD_SUPABASE_PROJECT_REF)) return true;
-  return env.ADMIN_PACKAGE_EDITOR_ALLOW_PROD === "on";
+/** Super Admin auth is the write gate. Host and env do not block plan edits. */
+export function packageEditorWritesAllowed(_env: NodeJS.ProcessEnv = process.env): boolean {
+  return true;
 }
 
 export function packageVersionEditorHttpStatus(message: string): { status: number; error: string } | null {
