@@ -18,7 +18,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_company` | `address`, `city`, `email`, `id`, `kra_pin`, `legal_name`, `phone`, `product`, `updated_at` | `docs/supabase/billing_company.sql` |
 | `billing_features` | `key`, `label` | `docs/supabase/billing_data_layer.sql` |
 | `billing_invoice_counters` | `last_number`, `year` | `docs/supabase/billing_data_layer.sql` |
-| `billing_lifecycle_settings` | `id`, `new_signup_trial_enabled`, `package_editor_enabled`, `price_change_approval_threshold_kes`, `shadow_invoices`, `updated_at`, `voicemail_hold_days` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/package_version_editor.sql` |
+| `billing_lifecycle_settings` | `bachs_payments_mode`, `billing_notices_send`, `desk_plan_change_enabled`, `id`, `live_payments_master`, `new_signup_trial_enabled`, `package_editor_enabled`, `price_change_approval_threshold_kes`, `shadow_invoices`, `updated_at`, `voicemail_hold_days` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/billing_payment_runtime_flags.sql`<br>`docs/supabase/package_version_editor.sql` |
 | `billing_live_tenants` | `enabled`, `reason`, `set_at`, `set_by`, `tenant_id` | `docs/supabase/invoice_pay_live_allowlist.sql` |
 | `billing_notices` | `audience`, `billed_to`, `body`, `channel`, `claimed_at`, `created_at`, `delivery_status`, `fallback`, `id`, `idempotency_key`, `kind`, `last_error`, `notify_send_id`, `read_at`, `recipient`, `tenant_id`, `title` | `docs/supabase/billing_data_layer.sql` |
 | `billing_owner_action_keys` | `action`, `created_at`, `idempotency_key`, `result`, `tenant_id` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
@@ -76,7 +76,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (222)
+## Functions (223)
 
 | Function | Defined in |
 | --- | --- |
@@ -143,6 +143,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `admin_list_package_versions` | `docs/supabase/package_version_editor.sql` |
 | `admin_move_subscribers_to_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_publish_package_version` | `docs/supabase/package_version_editor.sql` |
+| `admin_set_billing_runtime_switch` | `docs/supabase/billing_payment_runtime_flags.sql` |
 | `admin_set_business_suspended` | `docs/supabase/admin_business_suspend.sql` |
 | `admin_set_new_signup_trial` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_package_editor_enabled` | `docs/supabase/billing_package_editor_flag.sql` |

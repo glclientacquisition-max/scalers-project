@@ -28,11 +28,9 @@ describe("package version editor", () => {
     assert.match(route, /adminActorName\(\)/);
   });
 
-  it("keeps production writes off unless the editor flag is on", () => {
-    assert.match(editor, /fjxcdccgyhnvnnlnovcl/);
-    assert.match(editor, /ADMIN_PACKAGE_EDITOR_ALLOW_PROD === "on"/);
-    assert.match(route, /package_editor_staging_only/);
-    assert.match(route, /packageEditorWritesAllowed\(\)/);
+  it("does not block writes by database host", () => {
+    assert.doesNotMatch(route, /package_editor_staging_only/);
+    assert.doesNotMatch(route, /packageEditorWritesAllowed\(\)/);
   });
 
   it("does not run the promote script against production", () => {
@@ -240,12 +238,12 @@ describe("package version editor commands", () => {
     }
     assert.match(sql, /sms_kes = v_sms_burn/);
     assert.match(sql, /message_credits stays null/);
-    assert.equal(mod.packageEditorWritesAllowed({
-      SUPABASE_URL: "https://fjxcdccgyhnvnnlnovcl.supabase.co",
-    }), false);
-    assert.equal(mod.packageEditorWritesAllowed({
-      NEXT_PUBLIC_SUPABASE_URL: "https://sgcdncjxauhsbunobmob.supabase.co",
-    }), true);
+    assert.equal(
+      mod.packageEditorWritesAllowed({
+        SUPABASE_URL: "https://fjxcdccgyhnvnnlnovcl.supabase.co",
+      }),
+      true,
+    );
   });
 
   it("records one Admin Activity row per editor write, and one per business on a move", async () => {

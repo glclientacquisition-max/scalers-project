@@ -10,6 +10,7 @@ import {
 } from "@/lib/adminBilling";
 import { loadAdminShopInvoices, mintAdminInvoicePayLink } from "@/lib/adminBillingInvoices";
 import { bookTotalForResolve, collectedFromCheckout } from "@/lib/invoicePay/webhook";
+import { effectivePaymentEnv } from "@/lib/billingRuntimeSettings";
 import { assertLiveTenant, bachsMode, paymentsClosed, payProviderFromEnv } from "@/lib/invoicePay/provider";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import { recordAdminAction } from "@/lib/adminAudit";
@@ -41,10 +42,11 @@ async function totalForBookedResolve(
   businessId: string,
   reading: { getKes: string; checkoutId: string },
 ): Promise<BookDecision> {
-  const liveOpen = bachsMode() === "live" && !paymentsClosed();
+  const paymentEnv = await effectivePaymentEnv();
+  const liveOpen = bachsMode(paymentEnv) === "live" && !paymentsClosed(paymentEnv);
   if (!liveOpen) return decidedBook(bookTotalForResolve({ live: false, storedKes: reading.getKes }));
   try {
-    await assertLiveTenant(businessId);
+    await assertLiveTenant(businessId, paymentEnv);
   } catch (err) {
     const code = err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code || "") : "";
     if (code === "bachs_live_refused") {
@@ -55,7 +57,7 @@ async function totalForBookedResolve(
   if (!reading.checkoutId) return { ok: false, error: UNREAD_COLLECTED };
   let row = null;
   try {
-    row = await payProviderFromEnv().getCheckout(reading.checkoutId);
+    row = await payProviderFromEnv(paymentEnv).getCheckout(reading.checkoutId);
   } catch {
     return { ok: false, error: UNREAD_COLLECTED };
   }

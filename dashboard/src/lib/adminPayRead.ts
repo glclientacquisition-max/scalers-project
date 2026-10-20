@@ -1,5 +1,6 @@
 import { eatStamp } from "@/lib/adminActivityModel";
 import { isMissingTableError, logAdminError } from "@/lib/adminErrors";
+import { loadBillingRuntimeSettings, overlayRuntimeEnv } from "@/lib/billingRuntimeSettings";
 import {
   allowlistCount,
   attemptTitle,
@@ -444,9 +445,12 @@ export async function countTenantInvoices(tenantId: string): Promise<number | nu
 }
 
 export async function loadBachsStatus(): Promise<BachsStatusView> {
+  const runtime = await loadBillingRuntimeSettings().catch(() => null);
+  const runtimeControlsAvailable = runtime?.available === true;
+  const paymentEnv = overlayRuntimeEnv(process.env, runtime);
   const flags = bachsStatusFromEnv({
-    mode: process.env.BACHS_MODE,
-    liveAllowed: process.env.BACHS_LIVE_ALLOWED,
+    mode: paymentEnv.BACHS_MODE,
+    liveAllowed: paymentEnv.BACHS_LIVE_ALLOWED,
     key: process.env.BACHS_API_KEY,
     webhookSecret: process.env.BACHS_WEBHOOK_SECRET,
   });
@@ -508,10 +512,10 @@ export async function loadBachsStatus(): Promise<BachsStatusView> {
   }
 
   const hosting = hostingSwitches({
-    mode: process.env.BACHS_MODE,
-    liveAllowed: process.env.BACHS_LIVE_ALLOWED,
-    noticesSend: process.env.BILLING_NOTICES_SEND,
-    planChange: process.env.DESK_PLAN_CHANGE,
+    mode: paymentEnv.BACHS_MODE,
+    liveAllowed: paymentEnv.BACHS_LIVE_ALLOWED,
+    noticesSend: paymentEnv.BILLING_NOTICES_SEND,
+    planChange: paymentEnv.DESK_PLAN_CHANGE,
   });
   const settings = await admin
     .from("billing_lifecycle_settings")
@@ -534,6 +538,7 @@ export async function loadBachsStatus(): Promise<BachsStatusView> {
     liveSwitch: flags.liveSwitch,
     keySet: flags.keySet,
     webhookSecretSet: flags.webhookSecretSet,
+    runtimeControlsAvailable,
     hosting,
     dbFlags,
     liveSummary,

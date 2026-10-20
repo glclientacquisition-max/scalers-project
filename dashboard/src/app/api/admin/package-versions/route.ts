@@ -5,7 +5,6 @@ import { adminActorName } from "@/lib/adminActor";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import {
   packageEditorActivityEntries,
-  packageEditorWritesAllowed,
   packageVersionEditorHttpStatus,
   parseEditorCommand,
   type EditorActivityBefore,
@@ -182,7 +181,10 @@ async function loadEditorBefore(command: EditorCommand): Promise<EditorActivityB
 
 export async function GET() {
   if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+    return NextResponse.json(
+      { error: "ops_only", message: "Super Admin only." },
+      { status: 403 },
+    );
   }
   try {
     const catalog = await callEditor("admin_list_package_versions", {});
@@ -195,12 +197,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+    return NextResponse.json(
+      { error: "ops_only", message: "Super Admin only." },
+      { status: 403 },
+    );
   }
-  if (!packageEditorWritesAllowed()) {
-    return NextResponse.json({ error: "package_editor_staging_only" }, { status: 403 });
-  }
-
   let body: unknown;
   try {
     body = await request.json();
