@@ -124,7 +124,7 @@ describe("admin pay queue labels", () => {
     }
     const status = read("dashboard/src/components/AdminPaymentsStatus.tsx");
     assert.match(status, /Webhook secret/);
-    assert.match(status, /Changed in hosting settings/);
+    assert.match(status, /Checkout/);
     assert.match(status, /Package editor/);
     assert.match(status, /Signup trial/);
     assert.match(status, /All live payments/);
