@@ -15,7 +15,7 @@ New agent or new human: read this whole page before you touch code.
 
 ## 1. Where we are
 
-Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b66e1661`** (#647, merged 17 Oct 22:12 EAT). Prod `/healthz` reports this SHA, started 17 Oct 22:13 EAT. Staging Voice is a SHA pin on **`4d4a31cd`** (`cursor/v2-live-spoken-catalog-3e8f` on #833). Staging `/healthz` reports it, started 20 Oct 10:53 UTC. Spoken compile covers the shop file we say to a caller: catalogue families, coverage list, locations, hours, policies, and FAQ answers. Money and clocks are words. File titles stay on the desk. `BRAIN_V2=on`, `BRAIN_V2_MODE=live`, `BRAIN_V2_SHADOW=off`. Keep `hold-staging` / `STAGE_PR_HOLD`. A merge to `main` can overwrite this pin. Prod untouched.
+Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b66e1661`** (#647, merged 17 Oct 22:12 EAT). Prod `/healthz` reports this SHA, started 17 Oct 22:13 EAT. Staging Voice is a SHA pin on **`b1375273`** (`cursor/v2-live-spoken-catalog-3e8f` on #833). Staging `/healthz` reports it, started 20 Oct 11:08 UTC. Spoken compile covers the shop file we say to a caller: catalogue families, coverage list, locations, hours, policies, and FAQ answers. Money and clocks are words. File titles stay on the desk. `BRAIN_V2=on`, `BRAIN_V2_MODE=live`, `BRAIN_V2_SHADOW=off`. Keep `hold-staging` / `STAGE_PR_HOLD`. A merge to `main` can overwrite this pin. Prod untouched.
 
 Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Esga is on prod DID +254709221542. Staging DID is **+254709221537** (staging tenant Jirani Cleaning Services, *per team notes*).
 
@@ -27,7 +27,7 @@ Billing is **packages + on-demand only**; beta charging is off; no prepaid walle
 
 | | Production | Staging |
 | --- | --- | --- |
-| Voice (Railway) | `scalers-project-production.up.railway.app`, deploys `main` on merge. `b66e1661` | `scalers-staging-staging.up.railway.app`, SHA pin `4d4a31cd` (#833) |
+| Voice (Railway) | `scalers-project-production.up.railway.app`, deploys `main` on merge. `b66e1661` | `scalers-staging-staging.up.railway.app`, SHA pin `b1375273` (#833) |
 | Desk (Vercel) | `scalers-project`, builds `main`. `b66e1661` | `scalers-staging` (one debounced API deploy, #665) |
 | DID | **+254709221536** Aris, +254709221542 Esga | **+254709221537** Jirani |
 | SautiKit workspace | `e0e57aa5` | `1f85601c` |
@@ -228,7 +228,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **WhatsApp as the assistant doing work** (not just alerts).
 - Live call transfer: **not built** (callbacks only since #658; reviving it needs a new ADR and Alvin's yes).
 - **Fact lookups (#791).** One lookup for prices, area fees, hours, payment numbers and the services list, answered in code before the model. See `docs/how-to/LOOKUPS.md`. `VOICE_LOOKUPS=on` on staging and prod from 19 Oct.
-- **BA v2 live mouth + spoken shop facts.** #833 / `cursor/v2-live-spoken-catalog-3e8f`. Staging Voice is SHA `4d4a31cd` until the shop-facts compile is pinned. `compileSpokenShop` speaks catalogue families, coverage (capped), locations, hours, policies, and FAQ answers. Owner prose stays the owner's; money and clocks become words. Empty policy stays unknown. Same mouth on live ground truth and v2 coverage. File stays the desk source of truth. No new column. `BRAIN_V2=on`, `BRAIN_V2_MODE=live`, `BRAIN_V2_SHADOW=off`. Keep `hold-staging` / `STAGE_PR_HOLD`. Prod untouched. Rollback: `BRAIN_V2` off and redeploy `80b100e3`.
+- **BA v2 live mouth + spoken shop facts.** #833 / `cursor/v2-live-spoken-catalog-3e8f` is on Railway staging Voice as SHA `b1375273` (started 20 Oct 11:08 UTC). `compileSpokenShop` speaks catalogue families, coverage (capped), locations, hours, policies, and FAQ answers. Owner prose stays the owner's; money and clocks become words. Empty policy stays unknown. Same mouth on live ground truth and v2 coverage. File stays the desk source of truth. No new column. `BRAIN_V2=on`, `BRAIN_V2_MODE=live`, `BRAIN_V2_SHADOW=off`. Keep `hold-staging` / `STAGE_PR_HOLD`. Prod untouched. Rollback: `BRAIN_V2` off and redeploy `80b100e3`.
 
 Public copy never mentions unbuilt features.
 
