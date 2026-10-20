@@ -317,9 +317,13 @@ test('classifier picks a drawer and the file still speaks', async () => {
     if (/five hundred|KSh 500/i.test(text)) return { kind: 'come_cost', place: 'Karen', say: 'The fee is KSh 500' };
     return { kind: 'unknown', place: '' };
   };
-  const come = await talk(['How much to come that side, Karen?'], { profile: JIRANI_IDS_ONLY, langLock: 'en', classify });
-  assert.match(come.out[0].line, /eight hundred shillings|Home visits/i);
-  assert.doesNotMatch(come.out[0].line, /KSh 500|five hundred|How can I help you today/i);
+  const come = await talk(['How much to come that side, Karen?'], { profile: JIRANI, langLock: 'en', classify });
+  assert.match(come.out[0].line, /eight hundred shillings/i);
+  assert.doesNotMatch(come.out[0].line, /Kilimani|Westlands|KSh 500|five hundred|How can I help you today/i);
+
+  const hole = await talk(['How much to come that side, Karen?'], { profile: JIRANI_IDS_ONLY, langLock: 'en', classify });
+  assert.match(hole.out[0].line, /Karen/i);
+  assert.doesNotMatch(hole.out[0].line, /eight hundred|Home visits|Kilimani|KSh 500/i);
 
   const rules = await talk(['Kama niacha?'], { profile: JIRANI, langLock: 'sw', classify });
   assert.match(rules.out[0].line, /12 hours|reschedule/i);
@@ -337,9 +341,9 @@ test('classifier cannot invent a kind we do not speak', () => {
 });
 
 test('HD_16b: fare, ada ya, and a bare cancellation speak the file', async () => {
-  const fare = await talk(['Are like the fare to Karen?'], { profile: JIRANI_IDS_ONLY, langLock: 'en' });
+  const fare = await talk(['Are like the fare to Karen?'], { profile: JIRANI, langLock: 'en' });
   assert.match(fare.out[0].line, /eight hundred shillings/i);
-  assert.doesNotMatch(fare.out[0].line, /confirms the fee|Shall I go ahead|How can I help you today/i);
+  assert.doesNotMatch(fare.out[0].line, /Kilimani|Westlands|Shall I go ahead|How can I help you today/i);
 
   const ada = await talk(['Kwanza niko nataka kujua ada ya.'], { profile: JIRANI, langLock: 'sw' });
   assert.match(ada.out[0].line, /Home visits|Kilimani|Karen/i);
@@ -349,4 +353,31 @@ test('HD_16b: fare, ada ya, and a bare cancellation speak the file', async () =>
   assert.match(cancel.out[0].line, /reschedule up to 12 hours/i);
   assert.doesNotMatch(cancel.out[0].line, /Shall I go ahead|Cancel your/i);
   assert.equal(cancel.log.length, 0);
+});
+
+test('ask receipts: ticket speaks one file line', async () => {
+  const rows = [
+    { say: 'Nilikuwa nataka kujua ada ya kuja Karen ni ngapi.', lang: 'sw', has: /Karen|mia nane|eight hundred/i, not: /Kilimani|Westlands|Shall I go ahead/i },
+    { say: 'Are like the fare to Karen?', lang: 'en', has: /eight hundred shillings/i, not: /Kilimani|Westlands|Home visits/i },
+    { say: 'Or how do you handle cancellation?', lang: 'en', has: /reschedule up to 12 hours/i, not: /Shall I go ahead|Cancel your/i, writes: false },
+    { say: 'Do you give refunds?', lang: 'en', has: /don't have that on file/i, not: /Shall I go ahead/i, writes: false },
+  ];
+  for (const row of rows) {
+    const { out, log } = await talk([row.say], { profile: JIRANI, langLock: row.lang });
+    assert.match(out[0].line, row.has, row.say);
+    assert.doesNotMatch(out[0].line, row.not, row.say);
+    if (row.writes === false) assert.equal(log.length, 0, row.say);
+  }
+
+  const hole = await talk(['Are like the fare to Karen?'], { profile: JIRANI_IDS_ONLY, langLock: 'en' });
+  assert.match(hole.out[0].line, /Karen/i);
+  assert.doesNotMatch(hole.out[0].line, /eight hundred|Home visits in Kilimani/i);
+
+  const visit = await talk(['I want to cancel my booking.'], {
+    profile: JIRANI,
+    langLock: 'en',
+    openRows: [{ id: 'a', caller_phone: '+254700000001', service_name: 'Sofa Cleaning (per seat)', status: 'requested', window_start: '2026-10-16T07:00:00Z' }],
+  });
+  assert.match(visit.out[0].line, /Cancel your|Shall I go ahead/i);
+  assert.doesNotMatch(visit.out[0].line, /reschedule up to 12 hours/i);
 });

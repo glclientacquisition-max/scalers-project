@@ -163,19 +163,16 @@ function unknownPolicy(line) {
   return /don't have that on file|Sina hiyo kwenye rekodi/.test(String(line || ''));
 }
 
-function knownAreaFee(line) {
-  return /\b(shillings|shilingi)\b|no travel fee to|Hakuna ada ya/i.test(String(line || ''));
-}
-
-/** Named-area fee if Locations has it; else the delivery sentence we already file. */
+/** Named place: only that area. No place: the delivery sentence, or empty. */
 function compileSpokenVisitFee(profile = {}, place, language = 'en') {
-  const delivery = compileSpokenPolicies(profile).line('delivery', language);
   if (place) {
     const fee = compileSpokenAreaFee(profile, place, language);
-    if (knownAreaFee(fee)) return fee;
-    if (!unknownPolicy(delivery)) return delivery;
-    return fee;
+    if (fee) return fee;
+    return isSw(language)
+      ? 'Sina ada ya eneo hilo kwenye rekodi.'
+      : "I don't have a travel fee for that area on file.";
   }
+  const delivery = compileSpokenPolicies(profile).line('delivery', language);
   return unknownPolicy(delivery) ? '' : delivery;
 }
 

@@ -33,7 +33,28 @@ const INTENT_RULES = [
   ['price', /\b(how much|price|pricing|cost|charge|bei|pesa ngapi|shilingi ngapi|ni ngapi|ndio ngapi|ni bei gani|ngapi pesa)\b/i],
   ['hours', /\b(open|opening|close|closing|hours|fungua|mnafungua|unafungua|mnafunga|unafunga|funga|mnafanya kazi|mko wazi|working (days|hours)|operate until|until what time|mnafunga saa ngapi|saa za kazi)\b/i],
 ];
-function detectIntents(text) { return INTENT_RULES.filter(([, re]) => re.test(text)).map(([n]) => n); }
+function cancelAskIsPolicy(text) {
+  const t = String(text || '');
+  if (/\b(my (booking|visit|appointment|clean)|cancel my|futa (booking|appointment)|sitaki tena|ondoa booking)\b/i.test(t)) {
+    return false;
+  }
+  if (/^\W*cancell?ation\W*$/i.test(t)) return true;
+  if (/\b(cancellation policy|cancel(?:lation)? policy|reschedule policy)\b/i.test(t)) return true;
+  if (/\b(what|how|handle|gani|vipi|niacha)\b/i.test(t) && /\bcancel/i.test(t)) return true;
+  if (/\b(kama niacha|niacha)\b/i.test(t)) return true;
+  return false;
+}
+
+function detectIntents(text) {
+  const intents = INTENT_RULES.filter(([, re]) => re.test(text)).map(([n]) => n);
+  if (intents.includes('cancel') && cancelAskIsPolicy(text)) {
+    return ['policy_cancel', ...intents.filter((i) => i !== 'cancel')];
+  }
+  if (cancelAskIsPolicy(text) && !intents.includes('policy_cancel')) {
+    return ['policy_cancel', ...intents];
+  }
+  return intents;
+}
 
 const STOP_NAME = new Set(['calling', 'speaking', 'here', 'fine', 'good', 'using', 'looking', 'trying', 'not', 'just', 'the', 'a', 'an', 'interested', 'okay', 'ok', 'sure', 'yes', 'no', 'in', 'at', 'from', 'with', 'sorry', 'well', 'mimi', 'ni', 'going', 'calling', 'wondering', 'happy', 'unhappy', 'new', 'old']);
 const nameCase = (s) => s.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
@@ -169,4 +190,4 @@ function understand(text, { profile = {}, now, expecting = null } = {}) {
     _yes: isYes,
   };
 }
-module.exports = { splitLandmark, extractLandmark, matchArea, understand, detectIntents, extractName, extractPlace, matchService, matchProducts, YES, NO };
+module.exports = { splitLandmark, extractLandmark, matchArea, understand, detectIntents, cancelAskIsPolicy, extractName, extractPlace, matchService, matchProducts, YES, NO };

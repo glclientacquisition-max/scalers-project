@@ -106,6 +106,24 @@ describe('compileSpokenAreaFee', () => {
     assert.match(compileSpokenAreaFee(visitShop, 'Rongai', 'en'), /isn't on our list/i);
     assert.equal(compileSpokenPolicies(visitShop).line('returns', 'en'), "I don't have that on file.");
   });
+
+  it('a named place never falls back to the whole delivery map', () => {
+    const { compileSpokenVisitFee } = require('../src/conversation/spokenFacts');
+    const noFees = {
+      vertical: 'home_services',
+      businessPolicies: {
+        delivery: 'Home visits in Kilimani (no travel fee) and Karen (KSh 800 travel fee).',
+        coverage_areas: ['place:karen', 'place:kilimani'],
+      },
+    };
+    const line = compileSpokenVisitFee(noFees, 'Karen', 'en');
+    assert.match(line, /Karen/i);
+    assert.doesNotMatch(line, /Kilimani|Home visits/i);
+    assert.doesNotMatch(line, /eight hundred shillings/i);
+    const trusted = compileSpokenVisitFee(visitShop, 'Karen', 'en');
+    assert.match(trusted, /eight hundred shillings/i);
+    assert.doesNotMatch(trusted, /Kilimani|Home visits/i);
+  });
 });
 
 describe('compileSpokenShop and live ground truth', () => {
