@@ -64,6 +64,39 @@ describe("live tenant gate", () => {
     });
 
     assert.equal(await allow(true), true);
+
+    const prevKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const prevUrl = process.env.SUPABASE_URL;
+    const prevPublic = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "from-process";
+    process.env.SUPABASE_URL = "https://example.supabase.co";
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    try {
+      const fromProcess = await readBillingLiveTenant(TENANT, liveEnv(), {
+        async rpc() {
+          return { data: true, error: null };
+        },
+      });
+      assert.equal(fromProcess, true);
+      delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+      delete process.env.SUPABASE_URL;
+      await assert.rejects(
+        () => readBillingLiveTenant(TENANT, liveEnv()),
+        (err) => err && err.code === "bachs_live_refused"
+      );
+    } finally {
+      if (prevKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+      else process.env.SUPABASE_SERVICE_ROLE_KEY = prevKey;
+      if (prevUrl === undefined) delete process.env.SUPABASE_URL;
+      else process.env.SUPABASE_URL = prevUrl;
+      if (prevPublic === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      else process.env.NEXT_PUBLIC_SUPABASE_URL = prevPublic;
+    }
+
+    const settings = read("dashboard/src/lib/billingRuntimeSettings.ts");
+    assert.match(settings, /process\.env\.SUPABASE_SERVICE_ROLE_KEY/);
+    assert.match(settings, /process\.env\.BACHS_API_KEY/);
+    assert.match(settings, /hostingPaymentEnv/);
     await assertLiveTenant(TENANT, prod, () => allow(true));
     await assert.rejects(() => assertLiveTenant(TENANT, prod, () => allow(false)), /not open for this business/);
     await assert.rejects(() => assertLiveTenant(TENANT, prod, () => allow(null)), /not open for this business/);
