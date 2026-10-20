@@ -40,7 +40,7 @@ function logBachsError(res, json) {
  * @returns {'off' | 'sandbox' | 'live'}
  */
 /**
- * Static `process.env.NAME` when the caller did not pass a fixture.
+ * Static member on process.env when the caller did not pass a fixture.
  * A dynamic property is not a static env read. Next also rewrites any member
  * whose name starts with NEXT_PUBLIC_ into the build-time string, so the
  * public URL is a bracket read. A prerender that missed the mode would
