@@ -32,7 +32,8 @@ import {
 const BUSINESS_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 type Tab = "versions" | "businesses";
-type SheetKind = "edit" | "publish" | "discard" | "move" | "billing" | "signup" | null;
+type VersionLens = "live" | "retired" | "draft";
+type SheetKind = "edit" | "publish" | "discard" | "move" | "billing" | "signup" | "newDraft" | null;
 
 type DraftForm = {
   versionId: string;
@@ -101,18 +102,28 @@ function draftOf(pack: VersionPackage): PackageVersionRow | null {
   return pack.versions.find((version) => version.status === "draft") || null;
 }
 
-type PlanVersionRow = { version: PackageVersionRow; kind: "live" | "retired" };
+type PlanVersionListRow = { pack: VersionPackage; version: PackageVersionRow };
 
-/** Default: one live row per SKU (published). Drafts open from Edit draft. Retired only when toggled. */
-function planVersionRows(pack: VersionPackage, showRetired: boolean): PlanVersionRow[] {
-  const rows: PlanVersionRow[] = [];
+function newDraftPickerPreview(pack: VersionPackage): string {
+  if (draftOf(pack)) return "Draft open";
   const live = publishedOf(pack);
-  const draft = draftOf(pack);
-  if (live) rows.push({ version: live, kind: "live" });
-  else if (draft) rows.push({ version: draft, kind: "live" });
-  if (showRetired) {
-    for (const version of pack.versions) {
-      if (version.status === "retired") rows.push({ version, kind: "retired" });
+  if (live) return `Live · version ${live.version}`;
+  return "No live version";
+}
+
+function planVersionsForLens(packs: VersionPackage[], lens: VersionLens): PlanVersionListRow[] {
+  const rows: PlanVersionListRow[] = [];
+  for (const pack of packs) {
+    if (lens === "live") {
+      const live = publishedOf(pack);
+      if (live) rows.push({ pack, version: live });
+    } else if (lens === "draft") {
+      const draft = draftOf(pack);
+      if (draft) rows.push({ pack, version: draft });
+    } else {
+      for (const version of pack.versions) {
+        if (version.status === "retired") rows.push({ pack, version });
+      }
     }
   }
   return rows;
@@ -239,17 +250,20 @@ export function AdminPackageVersionsPanel({
   const [signupEnabled, setSignupEnabled] = useState(catalog.newSignupTrialEnabled);
   const [businessQuery, setBusinessQuery] = useState("");
   const [businessPage, setBusinessPage] = useState(1);
-  const [showRetiredVersions, setShowRetiredVersions] = useState(false);
+  const [versionLens, setVersionLens] = useState<VersionLens>("live");
 
   const featureCatalog = useMemo<VersionFeature[]>(
     () => catalog.features.map((feature) => ({ ...feature, enabled: false })),
     [catalog.features],
   );
   const packs = catalog.packages;
+  const liveSkuCount = useMemo(() => packs.filter((pack) => publishedOf(pack)).length, [packs]);
+  const draftVersionCount = useMemo(() => packs.filter((pack) => draftOf(pack)).length, [packs]);
   const retiredVersionCount = useMemo(
     () => packs.reduce((count, pack) => count + pack.versions.filter((version) => version.status === "retired").length, 0),
     [packs],
   );
+  const lensRows = useMemo(() => planVersionsForLens(packs, versionLens), [packs, versionLens]);
   const sortedBusinesses = useMemo(() => {
     return [...businesses].sort((a, b) => {
       const aNoPlan = a.packageName ? 1 : 0;
@@ -466,93 +480,90 @@ export function AdminPackageVersionsPanel({
       ) : null}
 
       {tab === "versions" ? (
-        <div className="space-y-6">
-          {retiredVersionCount > 0 ? (
-            <div className="flex justify-end px-4">
-              <Button variant="ghost" size="sm" onClick={() => setShowRetiredVersions((on) => !on)}>
-                {showRetiredVersions ? "Hide retired" : `Retired (${retiredVersionCount})`}
-              </Button>
-            </div>
-          ) : null}
-          {trial && trialLive ? (
-            <section>
-              <p className="px-4 text-caption text-ink-3">Trial</p>
-              <ul className="divide-y divide-hairline">
-                <ListRow
-                  title="Trial"
-                  preview={`${trialLive.trialDays ?? 0} days · ${trialLive.minutes} min · ${trialLive.messageCredits ?? 0} credits · On-demand ${trialLive.onDemandAllowed ? "on" : "off"}`}
-                  stamp={<Stamp tone={trialLive.onDemandAllowed ? "attention" : "neutral"}>Version {trialLive.version}</Stamp>}
-                  onOpen={() => void createDraft(trial)}
-                />
-              </ul>
-              <div className="flex items-center justify-between gap-3 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-body text-ink">New signups get a trial</p>
-                  <p className="text-meta text-ink-2">Off until you confirm. Existing businesses stay as they are.</p>
-                </div>
-                <Switch
-                  checked={catalog.newSignupTrialEnabled}
-                  label="New signups get a trial"
-                  onCheckedChange={(next) => {
-                    setSignupEnabled(next);
-                    setReason("");
-                    setError(null);
-                    setSheet("signup");
-                  }}
-                />
-              </div>
-              <div className="px-4">
-                <Button variant="tonal" size="sm" onClick={() => void createDraft(trial)} pending={pending}>
-                  {draftOf(trial) ? "Edit trial draft" : "Edit trial"}
-                </Button>
-              </div>
-            </section>
-          ) : null}
+        <div className="space-y-4">
+          <div className="space-y-3 px-4">
+            <Segmented
+              label="Plan versions"
+              items={[
+                { key: "live", label: "Live", count: liveSkuCount, active: versionLens === "live" },
+                { key: "retired", label: "Retired", count: retiredVersionCount, active: versionLens === "retired" },
+                { key: "draft", label: "Draft", count: draftVersionCount, active: versionLens === "draft" },
+              ]}
+              onSelect={(key) => setVersionLens(key as VersionLens)}
+            />
+            <Button
+              variant="primary"
+              size="md"
+              className="w-full"
+              pending={pending}
+              onClick={() => {
+                setError(null);
+                setSheet("newDraft");
+              }}
+            >
+              New draft
+            </Button>
+          </div>
 
           {packs.length === 0 ? (
             <Empty title="No plans" line="Publish a package version and it shows up here." />
+          ) : lensRows.length === 0 ? (
+            <Empty
+              title={
+                versionLens === "live" ? "Nothing live" : versionLens === "draft" ? "No drafts" : "Nothing retired"
+              }
+              line={
+                versionLens === "draft"
+                  ? "New draft picks a plan to change."
+                  : versionLens === "retired"
+                    ? "Retired versions show here after you publish a replacement."
+                    : "Publish a version and it shows here."
+              }
+            />
           ) : (
-            packs.filter((pack) => pack.sku !== "trial").map((pack) => (
-              <section key={pack.id}>
-                <div className="flex items-center justify-between gap-3 px-4">
-                  <p className="text-caption text-ink-3">{pack.name}</p>
-                  <Button variant="ghost" size="sm" onClick={() => void createDraft(pack)}>
-                    {draftOf(pack) ? "Edit draft" : "New draft"}
-                  </Button>
-                </div>
-                <ul className="divide-y divide-hairline">
-                  {planVersionRows(pack, showRetiredVersions).map(({ version, kind }) => (
-                    <ListRow
-                      key={version.id}
-                      title={kind === "live" ? pack.name : `Version ${version.version}`}
-                      preview={
-                        kind === "live"
-                          ? `Version ${version.version} · ${versionRowPreview(version)}`
-                          : versionRowPreview(version)
+            <ul className="divide-y divide-hairline">
+              {lensRows.map(({ pack, version }) => (
+                <ListRow
+                  key={version.id}
+                  title={pack.name}
+                  preview={
+                    pack.sku === "trial"
+                      ? `${version.trialDays ?? 0} days · ${version.minutes} min · ${version.messageCredits ?? 0} credits · On-demand ${version.onDemandAllowed ? "on" : "off"}`
+                      : `Version ${version.version} · ${versionRowPreview(version)}`
+                  }
+                  stamp={
+                    <Stamp
+                      tone={
+                        version.status === "draft" ? "attention" : version.status === "retired" ? "neutral" : "ok"
                       }
-                      stamp={
-                        <Stamp
-                          tone={
-                            version.status === "draft" ? "attention" : version.status === "retired" ? "neutral" : "ok"
-                          }
-                        >
-                          {version.status === "draft" ? "Draft" : version.status === "retired" ? "Retired" : "Live"}
-                        </Stamp>
-                      }
-                      onOpen={
-                        kind === "retired"
-                          ? undefined
-                          : () => {
-                              if (version.status === "draft") openEdit(pack, version);
-                              else void createDraft(pack);
-                            }
-                      }
-                    />
-                  ))}
-                </ul>
-              </section>
-            ))
+                    >
+                      {version.status === "draft" ? "Draft" : version.status === "retired" ? "Retired" : "Live"}
+                    </Stamp>
+                  }
+                  onOpen={version.status === "draft" ? () => openEdit(pack, version) : undefined}
+                />
+              ))}
+            </ul>
           )}
+
+          {versionLens === "live" && trial && trialLive ? (
+            <div className="flex items-center justify-between gap-3 border-t border-hairline px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-body text-ink">New signups get a trial</p>
+                <p className="text-meta text-ink-2">Off until you confirm. Existing businesses stay as they are.</p>
+              </div>
+              <Switch
+                checked={catalog.newSignupTrialEnabled}
+                label="New signups get a trial"
+                onCheckedChange={(next) => {
+                  setSignupEnabled(next);
+                  setReason("");
+                  setError(null);
+                  setSheet("signup");
+                }}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -919,6 +930,42 @@ export function AdminPackageVersionsPanel({
           </Field>
         </div>
       </ConfirmSheet>
+
+      <Sheet
+        open={sheet === "newDraft"}
+        title="New draft"
+        theme="admin"
+        onOpenChange={(open) => {
+          if (!open) closeSheet();
+        }}
+      >
+        {error ? <p className="pb-3 text-body text-attention" role="alert">{error}</p> : null}
+        <p className="pb-3 text-meta text-ink-2">Pick a plan. An open draft opens for edit.</p>
+        <ul className="divide-y divide-hairline">
+          {packs.map((pack) => {
+            const open = draftOf(pack);
+            const live = publishedOf(pack);
+            return (
+              <ListRow
+                key={pack.id}
+                title={pack.name}
+                preview={newDraftPickerPreview(pack)}
+                stamp={
+                  open ? (
+                    <Stamp tone="attention">Draft</Stamp>
+                  ) : live ? (
+                    <Stamp tone="ok">Live</Stamp>
+                  ) : undefined
+                }
+                onOpen={() => {
+                  setSheet(null);
+                  void createDraft(pack);
+                }}
+              />
+            );
+          })}
+        </ul>
+      </Sheet>
 
       <ConfirmSheet
         open={sheet === "signup"}

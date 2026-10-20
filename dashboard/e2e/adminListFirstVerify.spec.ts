@@ -62,12 +62,16 @@ test.describe("admin list-first verification", () => {
     await expect(page.getByRole("heading", { name: "Plans" })).toBeVisible();
     await expect(page.getByText("Catalogue")).toHaveCount(0);
     await expect(page.getByLabel("Plans").getByRole("button", { name: /^Versions\b/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Starter/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Version 1 · KSh 5,000/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Version 2 · KSh 6,000/ })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Edit draft" })).toBeVisible();
+    await expect(page.getByLabel("Plan versions").getByRole("button", { name: /^Live\b/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: "New draft" })).toBeVisible();
+    await expect(page.getByText("Starter")).toBeVisible();
+    await expect(page.getByText(/Version 1 · KSh 5,000/)).toBeVisible();
     await page.waitForTimeout(300);
-    await page.screenshot({ path: join(OUT, `${tag(width, testInfo)}-plans-versions.png`), fullPage: true });
+    await page.screenshot({ path: join(OUT, `${tag(width, testInfo)}-plans-versions-live.png`), fullPage: true });
+    await page.getByLabel("Plan versions").getByRole("button", { name: /^Draft\b/i }).click();
+    await expect(page.getByRole("button", { name: /Version 2 · KSh 6,000/ })).toBeVisible();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: join(OUT, `${tag(width, testInfo)}-plans-versions-draft.png`), fullPage: true });
   });
 
   test("plans businesses tab", async ({ page }, testInfo) => {
