@@ -20,7 +20,7 @@ async function talk(lines, opts = {}) {
   const { log, handlers } = fakeHandlers();
   const st = V2.createState({ profile: opts.profile || DD, callerPhone: '+254700000001', contactName: opts.contactName || null, openRows: opts.openRows || [], pendingTasks: opts.pendingTasks || [] });
   const out = [];
-  for (const text of lines) out.push(await V2.runTurn(st, { text, profile: opts.profile || DD, now: NOW, handlers, model: opts.model, langLock: opts.langLock || null }));
+  for (const text of lines) out.push(await V2.runTurn(st, { text, profile: opts.profile || DD, now: NOW, handlers, model: opts.model, classify: opts.classify, langLock: opts.langLock || null }));
   return { st, out, log };
 }
 
@@ -309,6 +309,32 @@ const JIRANI_IDS_ONLY = {
   serviceAreas: undefined,
   areaTerms: undefined,
 };
+
+test('classifier picks a drawer and the file still speaks', async () => {
+  const classify = async ({ text }) => {
+    if (/niacha|kama niacha/i.test(text)) return { kind: 'cancel_rules', place: '' };
+    if (/come that side|kuja huko/i.test(text)) return { kind: 'come_cost', place: 'Karen' };
+    if (/five hundred|KSh 500/i.test(text)) return { kind: 'come_cost', place: 'Karen', say: 'The fee is KSh 500' };
+    return { kind: 'unknown', place: '' };
+  };
+  const come = await talk(['How much to come that side, Karen?'], { profile: JIRANI_IDS_ONLY, langLock: 'en', classify });
+  assert.match(come.out[0].line, /eight hundred shillings|Home visits/i);
+  assert.doesNotMatch(come.out[0].line, /KSh 500|five hundred|How can I help you today/i);
+
+  const rules = await talk(['Kama niacha?'], { profile: JIRANI, langLock: 'sw', classify });
+  assert.match(rules.out[0].line, /12 hours|reschedule/i);
+  assert.doesNotMatch(rules.out[0].line, /Shall I go ahead|Cancel your/i);
+  assert.equal(rules.log.length, 0);
+});
+
+test('classifier cannot invent a kind we do not speak', () => {
+  const C = require('../src/conversation/v2/classifyAsk');
+  const bad = C.normalizeTicket({ kind: 'discount', place: 'Karen', line: 'We do 10% off' }, JIRANI);
+  assert.equal(bad.kind, 'unknown');
+  const u = { intents: [], text: 'give me a discount' };
+  C.applyTicket(u, bad);
+  assert.deepEqual(u.intents, []);
+});
 
 test('HD_16b: fare, ada ya, and a bare cancellation speak the file', async () => {
   const fare = await talk(['Are like the fare to Karen?'], { profile: JIRANI_IDS_ONLY, langLock: 'en' });

@@ -6,6 +6,22 @@ const { brainV2Enabled, brainV2Mode } = require('./flag');
 const { createState } = require('./machine');
 const { runTurnStream } = require('./stream');
 const { createLiveHandlers } = require('./liveHandlers');
+const { createClassifyAsk } = require('./classifyAsk');
+const { createGeminiSend } = require('./transport');
+
+function defaultClassify(opts = {}) {
+  if (typeof opts.classify === 'function') return opts.classify;
+  const key = opts.apiKey || (opts.env && opts.env.GEMINI_API_KEY) || process.env.GEMINI_API_KEY;
+  if (!key) return null;
+  try {
+    return createClassifyAsk({
+      send: createGeminiSend({ apiKey: key, timeoutMs: 1200, model: opts.classifyModel || 'gemini-3.5-flash-lite' }),
+      timeoutMs: 1200,
+    });
+  } catch {
+    return null;
+  }
+}
 
 function callerFile(opts = {}) {
   const file = opts.callerFile || {};
@@ -54,6 +70,7 @@ function createBrainV2Live(opts = {}) {
       now: new Date(),
       handlers,
       model: opts.model || null,
+      classify: defaultClassify(opts),
       langLock: langLock === 'en' || langLock === 'sw' ? langLock : null,
       shouldAbort: typeof shouldAbort === 'function' ? shouldAbort : () => false,
     });

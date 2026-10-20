@@ -10,6 +10,7 @@ const R = require('./receipts');
 const { buildCatalogue, validateCall } = require('./catalogue');
 const { compileSpokenCatalogue, joinList } = require('../spokenCatalogue');
 const { compileSpokenCoverage, compileSpokenPolicies, compileSpokenVisitFee } = require('../spokenFacts');
+const { applyTicket, needsClassify, normalizeTicket } = require('./classifyAsk');
 const { renderOwnerMessage } = require('./owner');
 const { buildRequest } = require('./gemini');
 
@@ -252,7 +253,7 @@ function infoAnswer(state, u, profile, kind) {
     return R.info({ kind: 'services', names: compiled.labels(state.lang), more: compiled.more }, state.lang);
   }
   if (kind === 'coverage') {
-    if (FEE_ASK.test(u.text) || (!u.area && DELIVER_ASK.test(u.text))) {
+    if (u.feeAsk || FEE_ASK.test(u.text) || (!u.area && DELIVER_ASK.test(u.text))) {
       const line = compileSpokenVisitFee(profile, u.area && u.area.name, state.lang);
       if (line) return R.info({ kind: 'policy', line }, state.lang);
     }
@@ -349,7 +350,7 @@ function applyAckRule(state, line, { ackOk, acked, callerAck, lang }) {
 }
 function noteAck(state, line) { state.lastAckLed = isAckLed(line); if (state.lastAckLed) state.lastAckTurn = state.turn; }
 
-async function runTurn(state, { text, profile = {}, now = new Date(), handlers, model = null, langLock = null, acked = false }) {
+async function runTurn(state, { text, profile = {}, now = new Date(), handlers, model = null, classify = null, langLock = null, acked = false }) {
   state.turn += 1; state.now = now;
   const prevLang = state.lang;
   // langLock (Voice #677): the call language is owned by Voice; never flip mid-turn.
@@ -358,6 +359,13 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   const results = [];
   const catalogue = buildCatalogue({ profile, openRows: state.file.openRows });
   const mc = await consultModel(state, u, profile, model, catalogue);
+  if (typeof classify === 'function' && needsClassify(u, pickIntent(u, state, profile))) {
+    try {
+      const ticket = normalizeTicket(await classify({ text: u.text, profile, lang: state.lang }), profile);
+      applyTicket(u, ticket);
+      state.trace.push({ turn: state.turn, classify: { kind: ticket.kind, listed: !!(ticket.area && ticket.area.listed) } });
+    } catch { /* keep regex reading */ }
+  }
   const lang = state.lang || 'en';
   const out = (line0, extra = {}) => { const line = applyAckRule(state, line0, { ackOk: !!extra.ackOk, acked: !!acked, callerAck: !!u.ack, lang }); const l = line && (line === state.lastLine || line === state.lastBase) ? (() => { const n = state.repeatN = (state.repeatN || 0) + 1; let v = R.vary(line, lang, n); if (v === state.lastLine) v = R.vary(line, lang, n, true); return v; })() : line; state.lastBase = line; state.lastLine = l; noteAck(state, l); return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end }; };
 
