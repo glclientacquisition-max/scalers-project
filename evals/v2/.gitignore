@@ -1,0 +1,13 @@
+# Read-only SELECT exports and anything derived from real calls stay local (PII).
+fixtures/raw/
+fixtures/replay/*
+!fixtures/replay/HD_212e49ef183f.json
+!fixtures/replay/HD_d199dbbf6b79.json
+!fixtures/replay/HD_1b3a67ea7ee9.json
+!fixtures/replay/HD_1677e57f73f9.json
+!fixtures/replay/HD_ceba9d9b3f37.json
+!fixtures/replay/HD_993e272e398a.json
+!fixtures/replay/HD_ad735da7fb01.json
+fixtures/tenants/prod_*.json
+results/*.json
+!results/live-latency-staging.json
