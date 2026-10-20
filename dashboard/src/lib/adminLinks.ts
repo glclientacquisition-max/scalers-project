@@ -16,7 +16,7 @@ export type AdminLink = {
 /**
  * Desktop rail: all eight, in this order. Phone: the four `tab` items plus More.
  * Quality opens traced call quality (#603).
- * Voices is the catalog. One settings-like screen today.
+ * Voices is the voice list. One settings-like screen today.
  */
 export const ADMIN_LINKS: readonly AdminLink[] = [
   { href: "/admin", label: "Today", exact: true, phone: "tab" },
@@ -31,7 +31,7 @@ export const ADMIN_LINKS: readonly AdminLink[] = [
 
 /** Older screens still in use, filed under the destination that will absorb them. */
 export const ADMIN_SECTIONS: readonly { href: string; label: string; parent: string }[] = [
-  { href: "/admin/packages", label: "Packages", parent: "/admin/billing" },
+  { href: "/admin/packages", label: "Plans", parent: "/admin/billing" },
   { href: "/admin/wallets", label: "Ledger", parent: "/admin/billing" },
 ];
 

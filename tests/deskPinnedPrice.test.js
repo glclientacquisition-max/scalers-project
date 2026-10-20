@@ -105,7 +105,8 @@ describe("Desk prices come from the pinned package version", () => {
       }
     }
     const page = read("dashboard/src/app/admin/(console)/packages/page.tsx");
-    assert.match(page, /withPublishedPackagePrices/);
+    assert.match(page, /loadPackageVersionEditor/);
+    assert.doesNotMatch(page, /withPublishedPackagePrices/);
     const panel = read("dashboard/src/components/AdminPackagesPanel.tsx");
     assert.match(panel, /pack\.annualPriceKes/);
     const state = read("dashboard/src/lib/billingStateLoad.ts");

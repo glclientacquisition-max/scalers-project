@@ -8,6 +8,7 @@ import {
   loadCheckoutReviewReading,
   resolveCheckoutTotalReview,
 } from "@/lib/adminBilling";
+import { loadAdminShopInvoices, mintAdminInvoicePayLink } from "@/lib/adminBillingInvoices";
 import { bookTotalForResolve, collectedFromCheckout } from "@/lib/invoicePay/webhook";
 import { assertLiveTenant, bachsMode, paymentsClosed, payProviderFromEnv } from "@/lib/invoicePay/provider";
 import { isLegacyAuthenticated } from "@/lib/auth";
@@ -71,6 +72,20 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
+  const invoicesFor = searchParams.get("invoices_for");
+  if (invoicesFor) {
+    try {
+      const loaded = await loadAdminShopInvoices(invoicesFor);
+      if (!loaded.ok) {
+        return NextResponse.json({ error: "Could not load invoices." }, { status: 500 });
+      }
+      return NextResponse.json({ ok: true, missing: loaded.missing, invoices: loaded.invoices });
+    } catch (err) {
+      logAdminError("billing-invoices", err);
+      return NextResponse.json({ error: adminFacingError(err) }, { status: 500 });
+    }
+  }
+
   const historyFor = searchParams.get("history_for");
   if (historyFor) {
     try {
@@ -192,6 +207,25 @@ export async function POST(request: Request) {
         totalKes,
       });
       return NextResponse.json({ ok: true });
+    }
+
+    if (action === "mint_pay_link") {
+      const invoiceId = String(body.invoice_id || "");
+      if (!invoiceId) {
+        return NextResponse.json({ error: "Pick an invoice." }, { status: 400 });
+      }
+      const minted = await mintAdminInvoicePayLink(invoiceId, businessId);
+      if ("error" in minted) {
+        return NextResponse.json({ error: minted.error }, { status: 400 });
+      }
+      await recordAdminAction({
+        actor,
+        action: "mint_pay_link",
+        businessId,
+        before: null,
+        after: { invoice_id: invoiceId },
+      });
+      return NextResponse.json({ ok: true, pay_path: minted.payPath });
     }
 
     if (action === "set_billing_mode") {

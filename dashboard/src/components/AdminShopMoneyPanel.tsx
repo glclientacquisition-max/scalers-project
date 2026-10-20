@@ -2,11 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  adminModeLabel,
-  type AdminBillingClientDetail,
-  type BillingHistoryEntry,
-} from "@/lib/adminBilling";
+import { type AdminBillingClientDetail, type BillingHistoryEntry } from "@/lib/adminBilling";
+import { modeName as adminModeLabel } from "@/lib/adminBillingCopy";
 import type { BillingMode } from "@/lib/adminWallets";
 import { chargeAmount, chargeKind, formatCreated } from "@/lib/adminBusinessUi";
 import type { WalletLedgerRow } from "@/lib/wallet";
@@ -16,12 +13,15 @@ import { Empty } from "@/components/ui/Empty";
 import { Field, Input } from "@/components/ui/Field";
 import { ListRow } from "@/components/ui/ListRow";
 import { Segmented } from "@/components/ui/Segmented";
+import { Stamp } from "@/components/ui/Stamp";
+import { stampToneForBillingStatus } from "@/lib/adminBillingHub";
 import { Sheet } from "@/components/ui/Sheet";
 import { deskFieldClass } from "@/components/ui/deskChrome";
 import { DeskSelect } from "@/components/ui/DeskSelect";
 import { assignmentFromBusiness } from "@/lib/packagePriceLabel";
 import { usedOfIncluded } from "@/lib/packageUsageAlign";
 import { chargingAction, packageChange, requestErrorText } from "@/lib/adminBillingCopy";
+import { AdminBillingShopInvoices } from "@/components/AdminBillingShopInvoices";
 import { CheckoutReviewResolve } from "@/components/CheckoutReviewResolve";
 import { ReasonedSwitch } from "@/components/ReasonedSwitch";
 
@@ -284,8 +284,13 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
     setChargeOpen(false);
   }
 
+  const minutesPct =
+    row.minutesIncluded > 0
+      ? Math.min(100, Math.round((row.minutesUsed / row.minutesIncluded) * 100))
+      : null;
+
   return (
-    <>
+    <div className="space-y-1">
       {status ? (
         <p className="px-4 text-body text-ok" role="status">
           {status}
@@ -296,6 +301,31 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
           {error}
         </p>
       ) : null}
+
+      <div className="mx-4 mb-3 rounded-2xl border border-hairline/70 bg-surface p-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="text-body font-medium text-ink">{packagePreview}</p>
+            <p className="mt-0.5 text-meta text-ink-2">{usagePreview}</p>
+          </div>
+          <Stamp tone={stampToneForBillingStatus(row.status)}>{row.statusLabel}</Stamp>
+        </div>
+        {minutesPct !== null ? (
+          <div className="mt-3 space-y-1" aria-label="Minutes used this period">
+            <div className="flex h-2 overflow-hidden rounded-full bg-surface-2">
+              <div
+                className={`${minutesPct >= 100 ? "bg-attention" : minutesPct >= 85 ? "bg-brand" : "bg-accent/90"}`}
+                style={{ width: `${minutesPct}%` }}
+              />
+            </div>
+            <p className="text-caption text-ink-3 tabular-nums">{minutesPct}% of included minutes</p>
+          </div>
+        ) : null}
+        <p className="mt-2 text-meta text-ink-2">
+          {planPreview} · Owner {optInPreview.toLowerCase()} on overage
+          {row.periodEndLabel ? ` · Period ends ${row.periodEndLabel}` : ""}
+        </p>
+      </div>
 
       <CheckoutReviewResolve
         link={false}
@@ -309,10 +339,13 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
           invoiceId: review.invoiceId,
         }))}
       />
+
+      <p className="px-4 pb-1 text-caption font-medium uppercase tracking-wide text-ink-3">Package</p>
       <ListRow title="Package" preview={packagePreview} onOpen={() => openTask("package")} />
       {sub?.packageId ? (
         <ListRow title="Remove package" preview="Now or end of period" onOpen={() => openTask("remove")} />
       ) : null}
+      <p className="px-4 pb-1 pt-3 text-caption font-medium uppercase tracking-wide text-ink-3">Plan and usage</p>
       <ListRow
         title="Plan"
         preview={planPreview}
@@ -351,6 +384,11 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
       />
       <ListRow title="Usage" preview={usagePreview} />
       <ListRow title="Owner opted in" preview={optInPreview} />
+      <p className="px-4 pb-1 pt-3 text-caption font-medium uppercase tracking-wide text-ink-3">Invoices</p>
+      <div className="px-4 pb-2">
+        <AdminBillingShopInvoices businessId={row.id} />
+      </div>
+      <p className="px-4 pb-1 pt-3 text-caption font-medium uppercase tracking-wide text-ink-3">Ledger</p>
       <ListRow title="Charges" preview="Ledger lines this period" onOpen={() => openTask("charges")} />
       <ListRow title="Grant minutes" preview="Adds to included this period" onOpen={() => openTask("grant")} />
       <ListRow
@@ -649,6 +687,6 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
           ))}
         </ul>
       </ConfirmSheet>
-    </>
+    </div>
   );
 }

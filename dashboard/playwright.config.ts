@@ -41,6 +41,7 @@ export default defineConfig({
       },
   projects: [
     { name: "phone-360-light", use: { ...devices["Desktop Chrome"], viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, colorScheme: "light" } },
+    { name: "phone-390-light", use: { ...devices["Desktop Chrome"], viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, colorScheme: "light" } },
     { name: "phone-390-dark", use: { ...devices["Desktop Chrome"], viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, colorScheme: "dark" } },
     { name: "tablet-768-light", use: { ...devices["Desktop Chrome"], viewport: { width: 768, height: 1024 }, colorScheme: "light" } },
     { name: "desk-1280-dark", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 }, colorScheme: "dark" } },

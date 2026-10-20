@@ -1,4 +1,4 @@
-import { DeltaMark } from "@/components/admin/QualityBits";
+import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ButtonLink } from "@/components/ui/Button";
 import { Empty } from "@/components/ui/Empty";
@@ -8,10 +8,7 @@ import { todayQueueGroups, type TodayNumberRow, type TodayQueueRow } from "@/lib
 
 export type TodayStatus = { tone: "ok" | "attention" | "down"; text: string };
 
-/**
- * Super Admin Today. Platform, grouped Needs you, then volume.
- * Every figure comes from recorded calls; gaps say so.
- */
+/** Super Admin Today. Platform, then shops that need a person. */
 export function AdminTodayPanel({
   dayLabel,
   status,
@@ -33,6 +30,7 @@ export function AdminTodayPanel({
     );
   const groups = todayQueueGroups(queue);
   const showAddNumber = queue.some((row) => row.stamp === "Waiting" || row.stamp === "Stuck") && needsNumber;
+  const calls = numbers.find((row) => row.key === "calls");
 
   return (
     <div className="space-y-8">
@@ -43,7 +41,7 @@ export function AdminTodayPanel({
           Platform
         </h2>
         <ul className="divide-y divide-hairline">
-          <ListRow href="/admin/platform" title={status.text} preview="Open notices and line health" stamp={statusStamp} />
+          <ListRow href="/admin/platform" title={status.text} preview="Notices and line" stamp={statusStamp} />
         </ul>
       </section>
 
@@ -54,7 +52,7 @@ export function AdminTodayPanel({
         {queue.length === 0 ? (
           <Empty
             title="Nothing waiting."
-            line={needsNumber ? "Add a number before the next business signs up." : "New problems show up here first."}
+            line={needsNumber ? "Add a number before the next signup." : undefined}
             action={needsNumber ? <ButtonLink href="/admin/numbers">Add number</ButtonLink> : undefined}
           />
         ) : (
@@ -85,31 +83,13 @@ export function AdminTodayPanel({
         ) : null}
       </section>
 
-      <section id="calls" aria-labelledby="today-calls" className="scroll-mt-4">
-        <h2 id="today-calls" className="px-4 text-caption text-ink-3">
-          Volume today
-        </h2>
-        <ul className="divide-y divide-hairline">
-          {numbers.map((row) => (
-            <ListRow
-              key={row.key}
-              href={row.href}
-              title={row.title}
-              preview={row.detail}
-              when={
-                row.available ? (
-                  <span className="inline-flex items-baseline gap-2 tabular-nums">
-                    <span className="text-body text-ink">{row.value}</span>
-                    <DeltaMark delta={row.delta} lowerIsBetter={row.lowerIsBetter} />
-                  </span>
-                ) : undefined
-              }
-              stamp={row.available ? undefined : <Stamp tone="neutral">{row.href ? "Open" : "Not yet"}</Stamp>}
-            />
-          ))}
-        </ul>
-        <p className="px-4 pt-2 text-meta text-ink-3">Counted from midnight, East Africa time.</p>
-      </section>
+      {calls?.available ? (
+        <p className="px-4 text-meta tabular-nums text-ink-2">
+          <Link href="/admin/quality" className="text-ink underline-offset-2 hover:underline">
+            {calls.value} calls today
+          </Link>
+        </p>
+      ) : null}
     </div>
   );
 }

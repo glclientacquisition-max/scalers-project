@@ -1,4 +1,5 @@
-import type { AdminBillingClientDetail, AdminBillingOverview } from "@/lib/adminBilling";
+import type { AdminBillingClientDetail } from "@/lib/adminBilling";
+import type { AdminBillingOverview } from "@/lib/adminBillingTypes";
 import type { AdminInvoiceDetail, AdminInvoiceListRow, AttentionItem, BachsStatusView } from "@/lib/adminPayCopy";
 
 export const ADMIN_BILLING_DETAIL: AdminBillingClientDetail = {
@@ -9,6 +10,8 @@ export const ADMIN_BILLING_DETAIL: AdminBillingClientDetail = {
     packageName: "Growth",
     packageSku: "growth",
     period: "month",
+    periodEnd: "2026-11-01T00:00:00+03:00",
+    periodEndLabel: "31 Oct",
     minutesIncluded: 1000,
     minutesUsed: 640,
     minutesRemaining: 360,
@@ -97,6 +100,12 @@ export const ADMIN_BILLING_OVERVIEW: AdminBillingOverview = {
   chargingCount: 18,
   lowMinutesCount: 7,
   exhaustedCount: 2,
+  rolloverSoonCount: 1,
+  platformPeriodEndLabel: "31 Oct",
+  openInvoiceCount: 2,
+  overdueInvoiceCount: 1,
+  openInvoiceKesLabel: "KSh 27,000",
+  invoicesMissing: false,
   rows: [
     ADMIN_BILLING_DETAIL.row,
     {
@@ -106,6 +115,8 @@ export const ADMIN_BILLING_OVERVIEW: AdminBillingOverview = {
       packageName: null,
       packageSku: null,
       period: null,
+      periodEnd: null,
+      periodEndLabel: null,
       minutesIncluded: 0,
       minutesUsed: 0,
       minutesRemaining: 0,
@@ -121,6 +132,8 @@ export const ADMIN_BILLING_OVERVIEW: AdminBillingOverview = {
       packageName: "Starter",
       packageSku: "starter",
       period: "month",
+      periodEnd: "2026-10-22T00:00:00+03:00",
+      periodEndLabel: "21 Oct",
       minutesIncluded: 300,
       minutesUsed: 285,
       minutesRemaining: 15,
@@ -136,6 +149,8 @@ export const ADMIN_BILLING_OVERVIEW: AdminBillingOverview = {
       packageName: "Starter",
       packageSku: "starter",
       period: "month",
+      periodEnd: "2026-11-01T00:00:00+03:00",
+      periodEndLabel: "31 Oct",
       minutesIncluded: 300,
       minutesUsed: 300,
       minutesRemaining: 0,
