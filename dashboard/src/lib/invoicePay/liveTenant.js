@@ -23,13 +23,18 @@ function publicSupabaseUrlName() {
   return ["NEXT", "PUBLIC", "SUPABASE", "URL"].join("_");
 }
 
+/** supabase-js appends /rest/v1. A project URL that already has it 404s. */
+function normalizeSupabaseUrl(raw) {
+  return String(raw || "").trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "");
+}
+
 async function readBillingLiveTenant(tenantId, env, deps = {}) {
   const source = env || {};
   const publicUrl = publicSupabaseUrlName();
   // Checkout passes a copied env. Next omits hosting secrets this file did
   // not read itself, so the copy can lack the service role. A missing key
   // used to refuse the business before Bachs was called.
-  const url = String(
+  const url = normalizeSupabaseUrl(
     source.SUPABASE_URL ||
       source[publicUrl] ||
       process.env.SUPABASE_URL ||
@@ -58,4 +63,4 @@ async function readBillingLiveTenant(tenantId, env, deps = {}) {
   return data === true;
 }
 
-module.exports = { readBillingLiveTenant };
+module.exports = { readBillingLiveTenant, normalizeSupabaseUrl };
