@@ -62,8 +62,10 @@ test.describe("admin list-first verification", () => {
     await expect(page.getByRole("heading", { name: "Plans" })).toBeVisible();
     await expect(page.getByText("Catalogue")).toHaveCount(0);
     await expect(page.getByLabel("Plans").getByRole("button", { name: /^Versions\b/i })).toBeVisible();
-    await expect(page.getByText("Starter")).toBeVisible();
-    await expect(page.getByRole("button", { name: /Version 2 KSh 6,000/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Starter/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Version 1 · KSh 5,000/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Version 2 · KSh 6,000/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Edit draft" })).toBeVisible();
     await page.waitForTimeout(300);
     await page.screenshot({ path: join(OUT, `${tag(width, testInfo)}-plans-versions.png`), fullPage: true });
   });

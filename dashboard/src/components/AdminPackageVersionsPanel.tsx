@@ -101,6 +101,23 @@ function draftOf(pack: VersionPackage): PackageVersionRow | null {
   return pack.versions.find((version) => version.status === "draft") || null;
 }
 
+type PlanVersionRow = { version: PackageVersionRow; kind: "live" | "retired" };
+
+/** Default: one live row per SKU (published). Drafts open from Edit draft. Retired only when toggled. */
+function planVersionRows(pack: VersionPackage, showRetired: boolean): PlanVersionRow[] {
+  const rows: PlanVersionRow[] = [];
+  const live = publishedOf(pack);
+  const draft = draftOf(pack);
+  if (live) rows.push({ version: live, kind: "live" });
+  else if (draft) rows.push({ version: draft, kind: "live" });
+  if (showRetired) {
+    for (const version of pack.versions) {
+      if (version.status === "retired") rows.push({ version, kind: "retired" });
+    }
+  }
+  return rows;
+}
+
 function formFrom(
   pack: VersionPackage,
   version: PackageVersionRow,
@@ -504,20 +521,26 @@ export function AdminPackageVersionsPanel({
                   </Button>
                 </div>
                 <ul className="divide-y divide-hairline">
-                  {pack.versions
-                    .filter((version) => showRetiredVersions || version.status !== "retired")
-                    .map((version) => (
+                  {planVersionRows(pack, showRetiredVersions).map(({ version, kind }) => (
                     <ListRow
                       key={version.id}
-                      title={`Version ${version.version}`}
-                      preview={versionRowPreview(version)}
+                      title={kind === "live" ? pack.name : `Version ${version.version}`}
+                      preview={
+                        kind === "live"
+                          ? `Version ${version.version} · ${versionRowPreview(version)}`
+                          : versionRowPreview(version)
+                      }
                       stamp={
-                        <Stamp tone={version.status === "draft" ? "attention" : version.status === "retired" ? "neutral" : "ok"}>
-                          {version.status === "draft" ? "Draft" : version.status === "retired" ? "Retired" : "Published"}
+                        <Stamp
+                          tone={
+                            version.status === "draft" ? "attention" : version.status === "retired" ? "neutral" : "ok"
+                          }
+                        >
+                          {version.status === "draft" ? "Draft" : version.status === "retired" ? "Retired" : "Live"}
                         </Stamp>
                       }
                       onOpen={
-                        version.status === "retired"
+                        kind === "retired"
                           ? undefined
                           : () => {
                               if (version.status === "draft") openEdit(pack, version);
