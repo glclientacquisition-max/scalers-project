@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { assertBachsAllowed, assertLiveTenant } = require("../dashboard/src/lib/invoicePay/provider");
-const { readBillingLiveTenant } = require("../dashboard/src/lib/invoicePay/liveTenant");
+const { readBillingLiveTenant, normalizeSupabaseUrl } = require("../dashboard/src/lib/invoicePay/liveTenant");
 const { billingCronAllows } = require("../dashboard/src/lib/invoicePay/cronAuth");
 const { liveTenantPostError } = require("../dashboard/src/lib/invoicePay/liveTenantsApi");
 const { billingReconcileReport, reconciliationCounts } = require("../dashboard/src/lib/invoicePay/reconcile");
@@ -64,6 +64,14 @@ describe("live tenant gate", () => {
     });
 
     assert.equal(await allow(true), true);
+    assert.equal(
+      normalizeSupabaseUrl("https://fjxcdccgyhnvnnlnovcl.supabase.co/rest/v1"),
+      "https://fjxcdccgyhnvnnlnovcl.supabase.co"
+    );
+    assert.equal(
+      normalizeSupabaseUrl("https://fjxcdccgyhnvnnlnovcl.supabase.co/rest/v1/"),
+      "https://fjxcdccgyhnvnnlnovcl.supabase.co"
+    );
 
     const prevKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const prevUrl = process.env.SUPABASE_URL;
