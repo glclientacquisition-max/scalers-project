@@ -1,0 +1,89 @@
+{
+ "id": "R_HD_ceba9d9b3f37",
+ "sid": "HD_ceba9d9b3f37",
+ "env": "staging",
+ "tenant": "done_and_dusted",
+ "createdAt": "2026-10-09T09:59:43.504053+00:00",
+ "callerPhone": "+254700000009",
+ "replayMode": "recorded-model",
+ "lang": "en",
+ "commitment": false,
+ "turns": [
+  {
+   "caller": "My booking, please.",
+   "model": "",
+   "agent": "Am I speaking with Alvin?",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 261,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "Yeah.",
+   "model": "",
+   "agent": "You have a Carpet Cleaning visit request for today, Friday, at 9 A M, in Kitengela. You have a Carpet Cleaning, per room, visit request for tomorrow, Saturday, at 9 A M, in Kitengela, Grace Apartments. You have an open enquiry for Mansion Cleaning Custom Quote. You have an open enquiry for Water bowl enquiry. You have a callback request about Carpet cleaning outside coverage. You have a callback request about Dishwashing enquiry. There are 25 older open items on file too.",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 298,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "Okay.",
+   "model": "",
+   "agent": "",
+   "lang": null,
+   "latency": {
+    "callerStopToFirstTtsPcmMs": null,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "Um, and what services do you offer?",
+   "model": "",
+   "agent": "We offer Apartment and House Cleaning, Deep Cleaning, Office Cleaning, and Mattress cleaning, and more. Which one do you need?",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 332,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "Okay, thank you.",
+   "model": "{\n  \"lang\": \"en\",\n  \"intent\": \"services\",\n  \"facts_used\": [\n    {\n      \"kind\": \"visit\",\n      \"id\": \"vis:1\"\n    },\n    {\n      \"kind\": \"visit\",\n      \"id\": \"vis:2\"\n    },\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:carpet-cleaning\"\n    },\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:sofa-cleaning\"\n    },\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:mattress-cleaning\"\n    },\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:1-bedroom-apartment\"\n    },\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:2-bedroom-apartment\"\n    },\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:3-bedroom-house\"\n    },\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:hourly-housekeeping\"\n    },\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:move-in-move-out-clean\"\n    },\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:post-construction-clean\"\n    },\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:office-cleaning\"\n    }\n  ],\n  \"say\": [\n    \"Alvin, you have a Carpet Cleaning requested for today at 9 AM in Kitengela, and another for tomorrow, Saturday, at 9 AM at Grace Apartments Kitengela.\",\n    \"We offer carpet cleaning, sofa cleaning, mattress cleaning, house cleaning for one to three bedroom homes, hourly housekeeping, move-in or move-out cleaning, post-construction cleaning, and office cleaning.\",\n    \"How can I help you with these today?\"\n  ]\n}",
+   "agent": "Alvin, you have a Carpet Cleaning requested for today at 9 A M in Kitengela, and another for tomorrow, Saturday, at 9 A M at Grace Apartments Kitengela. We offer carpet cleaning, sofa cleaning, mattress cleaning, house cleaning for one to three bedroom homes, hourly housekeeping, move-in or move-out cleaning, post-construction cleaning, and office cleaning. How can I help you with these today?",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": null,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "That's all.",
+   "model": "",
+   "agent": "",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": null,
+    "callerStopToModelFirstTokenMs": null
+   }
+  }
+ ],
+ "observed": {
+  "service_requests": [],
+  "appointments": [],
+  "resolution": "needs_human",
+  "resolution_note": "Alvin asked about that's all.",
+  "primary_intent": "human",
+  "ownerBody": null
+ },
+ "expect": {
+  "noWrites": true
+ },
+ "label": {
+  "by": "brain-lead",
+  "why": "'My booking please' produced a 90-word file dump. Nothing written; each turn under the word cap."
+ },
+ "seed": {}
+}

@@ -15,7 +15,7 @@ New agent or new human: read this whole page before you touch code.
 
 ## 1. Where we are
 
-Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b66e1661`** (#647, merged 17 Oct 22:12 EAT). Prod `/healthz` reports this SHA, started 17 Oct 22:13 EAT. Staging Voice is pinned to **`aa872ade`** (branch `staging/pin-738-main-8ee9`: #738 on top of `main` @ `8ee9b161`); staging `/healthz` reports it, started 17 Oct 21:51 EAT. The old kitchen pin `1374b25d` is gone.
+Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b66e1661`** (#647, merged 17 Oct 22:12 EAT). Prod `/healthz` reports this SHA, started 17 Oct 22:13 EAT. Staging Voice is a SHA pin on **`80b100e3`** (`cursor/staging-v2-shadow-pin-3e8f`: current `main` + #680 + #681). Staging `/healthz` reports it, started 20 Oct 09:16 UTC. `BRAIN_V2_SHADOW=on` (caller still hears v1). Keep `hold-staging` / `STAGE_PR_HOLD`. A merge to `main` can overwrite this pin. Prod untouched.
 
 Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Esga is on prod DID +254709221542. Staging DID is **+254709221537** (staging tenant Jirani Cleaning Services, *per team notes*).
 
@@ -27,7 +27,7 @@ Billing is **packages + on-demand only**; beta charging is off; no prepaid walle
 
 | | Production | Staging |
 | --- | --- | --- |
-| Voice (Railway) | `scalers-project-production.up.railway.app`, deploys `main` on merge. `b66e1661` | `scalers-staging-staging.up.railway.app`, pinned `aa872ade` |
+| Voice (Railway) | `scalers-project-production.up.railway.app`, deploys `main` on merge. `b66e1661` | `scalers-staging-staging.up.railway.app`, SHA pin `80b100e3` (#832) |
 | Desk (Vercel) | `scalers-project`, builds `main`. `b66e1661` | `scalers-staging` (one debounced API deploy, #665) |
 | DID | **+254709221536** Aris, +254709221542 Esga | **+254709221537** Jirani |
 | SautiKit workspace | `e0e57aa5` | `1f85601c` |
@@ -228,6 +228,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **WhatsApp as the assistant doing work** (not just alerts).
 - Live call transfer: **not built** (callbacks only since #658; reviving it needs a new ADR and Alvin's yes).
 - **Fact lookups (#791).** One lookup for prices, area fees, hours, payment numbers and the services list, answered in code before the model. See `docs/how-to/LOOKUPS.md`. `VOICE_LOOKUPS=on` on staging and prod from 19 Oct.
+- **BA v2 staging pin (shadow live, not mouth).** #832 / `cursor/staging-v2-shadow-pin-3e8f` is on Railway staging Voice as SHA `80b100e3` (started 20 Oct 09:16 UTC). `BRAIN_V2_SHADOW=on`, model `gemini-3.5-flash-lite`, no tenant allowlist. Caller hears v1. After hangup, turns get `brain_v2_shadow`. Keep `hold-staging` / `STAGE_PR_HOLD`. A merge to `main` can overwrite the pin. Prod untouched. Live `BRAIN_V2_MODE=live` still needs a Voice wire PR.
 
 Public copy never mentions unbuilt features.
 
@@ -248,7 +249,7 @@ Paid-mode copy on Usage still says "next invoice". That wording is a Desk hand-o
 1. **Make a clean Aris test call** on +254709221536; Voice scores it. This unlocks section 4's queue.
 2. **Send the SautiKit ticket** (21:52 media degradation, 22:00–22:25 missing dials, which secret signs voice and `events_url` posts).
 3. **Recording decision:** record with a spoken notice, record without one, or don't record.
-4. **Set staging Jirani `events_url`** in the SautiKit dashboard (staging workspace `1f85601c`).
+4. **Staging Jirani `events_url`** is set (`https://scalers-staging-staging.up.railway.app/voice/events`, confirmed 20 Oct). Keep it.
 5. **GO or no** for Brain #733 (#732 merged 18 Oct 14:48).
 6. **Carried:** top up TextSMS; staging full-scope SautiKit key for Railway staging Voice (masked card); Meta WhatsApp currency (131042).
 7. **Invoice letterhead still open:** physical address, city, and KRA PIN. Legal name (Scalers Ventures), phone (+254119774470), and billing email (support@scalers.co.ke) are on staging `billing_company`. Set the rest with the update in [`INVOICE_PAY.md`](reference/operations/INVOICE_PAY.md). Blank lines stay off the invoice until then. On Vercel Preview (`scalers-staging`) set `BACHS_MODE=sandbox`, `BACHS_API_KEY`, and `BACHS_WEBHOOK_SECRET`. Leave `BACHS_LIVE_ALLOWED` unset and leave `BILLING_NOTICES_SEND` off. Live money on Vercel production (`scalers-project`) stays closed until the owner sets `BACHS_MODE=live`, `BACHS_LIVE_ALLOWED=true`, `BACHS_API_KEY`, `BACHS_WEBHOOK_SECRET`, and `BACHS_LIVE_TENANT_ALLOWLIST` to one tenant id. An unset allowlist refuses every business. `*` is the only value that opens live checkout to every business. Do not set those until P19 is on prod and Alvin says GO. P1 through P18 are already on prod. Never re-run P5, P9, P11, P12, P14, P15, P16, P17, or P18. `GET /api/billing/live-tenants` redirects a signed-out visitor to `/admin/login`. That is expected. It does not return 401. #798, #806, #808, #820, and #824 are on `main`. The retry route is `GET /api/cron/billing-payment-retry`. Vercel Hobby can run it once a day, so the schedule is `7 3 * * *` (03:07 UTC). The four-times-an-hour schedule failed the deploy of `5e4813d7`. It does not call Bachs while the gate is closed. Steps: [`payments-go-live.md`](runbooks/payments-go-live.md).
