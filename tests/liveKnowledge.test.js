@@ -40,6 +40,23 @@ test('formatUnknownAnswerPolicy prefers owner custom line', () => {
   assert.doesNotMatch(text, /Default line ideas/);
 });
 
+test('buildLiveGroundTruth speaks bedroom families, not raw SKU titles', () => {
+  const truth = buildLiveGroundTruth({
+    servicesCatalog: [
+      { name: 'Deep clean, 1 bedroom', price_range: 'KSh 6,500' },
+      { name: 'Deep clean, 2 bedroom', price_range: 'KSh 9,500' },
+      { name: 'Deep clean, 3 bedroom', price_range: 'KSh 13,500' },
+      { name: 'Sofa cleaning', price_range: 'From KSh 2,500' },
+    ],
+  });
+  assert.match(truth, /SPOKEN CATALOGUE/);
+  assert.match(truth, /Deep clean for one bedroom to three bedroom homes/i);
+  assert.match(truth, /chumba kimoja hadi vyumba vitatu/i);
+  assert.match(truth, /1\. Deep clean, 1 bedroom/);
+  assert.doesNotMatch(truth, /EN:.*Deep clean, 1 bedroom, Deep clean, 2 bedroom/);
+  assert.doesNotMatch(truth, /SW:.*moja bedroom/);
+});
+
 test('buildLiveGroundTruth injects unknown policy without custom line', () => {
   const truth = buildLiveGroundTruth({
     servicesCatalog: [{ name: 'Plumbing', price_range: 'quote after visit' }],

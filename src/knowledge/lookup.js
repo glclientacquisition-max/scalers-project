@@ -13,6 +13,8 @@ const { parseHoursSchedule, eatParts, openClosedStatus } = require('../conversat
 const { speakMoney, numberToEn } = require('../speech/spokenForms');
 const { speakSwClock } = require('../speech/swahiliTime');
 const { areaAmbiguity, matchArea: nluMatchArea } = require('./v2/nlu');
+const { catalogueFileNames } = require('../conversation/knownFacts');
+const { speakCatalogueName, compileSpokenCatalogue } = require('../conversation/spokenCatalogue');
 
 const EN_HOUR = ['twelve', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven'];
 const EN_DIGIT = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
@@ -215,17 +217,18 @@ function speakNormalisedPrice(norm, lang) {
 }
 
 function priceLine(label, value, lang, seed) {
+  const spoken = speakCatalogueName(label, lang);
   if (lang === 'sw') {
     return pick(seed, [
-      `${label} ni ${value}.`,
-      `${label} inagharimu ${value}.`,
-      `Bei ya ${label} ni ${value}.`,
+      `${spoken} ni ${value}.`,
+      `${spoken} inagharimu ${value}.`,
+      `Bei ya ${spoken} ni ${value}.`,
     ]);
   }
   return pick(seed, [
-    `${label} is ${value}.`,
-    `${label} costs ${value}.`,
-    `The price for ${label} is ${value}.`,
+    `${spoken} is ${value}.`,
+    `${spoken} costs ${value}.`,
+    `The price for ${spoken} is ${value}.`,
   ]);
 }
 
@@ -435,12 +438,14 @@ function lookupPrice(query, ctx, sheet) {
     const top = scored.filter((row) => row.score === scored[0].score);
     if (top.length > 1) {
       const names = top.slice(0, 3).map((row) => row.f.label);
-      const en = names.length === 2
-        ? `Which one, ${names[0]} or ${names[1]}?`
-        : `Which one, ${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}?`;
-      const sw = names.length === 2
-        ? `Ipi, ${names[0]} au ${names[1]}?`
-        : `Ipi, ${names.slice(0, -1).join(', ')} au ${names[names.length - 1]}?`;
+      const enNames = names.map((name) => speakCatalogueName(name, 'en'));
+      const swNames = names.map((name) => speakCatalogueName(name, 'sw'));
+      const en = enNames.length === 2
+        ? `Which one, ${enNames[0]} or ${enNames[1]}?`
+        : `Which one, ${enNames.slice(0, -1).join(', ')} or ${enNames[enNames.length - 1]}?`;
+      const sw = swNames.length === 2
+        ? `Ipi, ${swNames[0]} au ${swNames[1]}?`
+        : `Ipi, ${swNames.slice(0, -1).join(', ')} au ${swNames[swNames.length - 1]}?`;
       return resultOf('ambiguous', {
         id: 'price',
         options: names,
@@ -1307,31 +1312,29 @@ function lookupPay(query, ctx) {
   return lookupPayMethods(profile, pay, intent);
 }
 
-function speechName(name) {
-  return String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+function speechName(name, language = 'en') {
+  return speakCatalogueName(name, language).toLowerCase();
 }
 
 function lookupServices(ctx) {
   const profile = ctx.profile || {};
+  const language = ctx.language || 'en';
   const rows = catalogueEntries(profile);
   if (!rows.length) return noData(profile, 'services', 'price');
   const confirmed = rows.filter((entry) => priceConfirmed(profile, entry, entry.row));
   if (!confirmed.length) {
     return unconfirmed(profile, 'services', 'catalogue', priceReading(profile, rows[0], rows[0].row).reason, 'price');
   }
-  const names = confirmed.map((entry) => speechName(entry.row.name));
-  const more = names.length > 4;
-  const shown = names.slice(0, 4);
-  const enList = joinAnd(shown.concat(more ? ['more'] : []), 'and');
-  const swList = joinAnd(shown.concat(more ? ['zingine'] : []), 'na');
-  const seed = ctx.seed;
-  const en = pick(seed, [`We do ${enList}.`, `Our services are ${enList}.`, `We offer ${enList}.`]);
-  const sw = pick(seed, [`Tunafanya ${swList}.`, `Huduma zetu ni ${swList}.`, `Tunatoa ${swList}.`]);
+  const compiled = compileSpokenCatalogue(
+    { servicesCatalog: confirmed.map((entry) => entry.row) },
+    { limit: 4 }
+  );
+  const shown = compiled.labels(language);
   return resultOf('found', {
     id: 'services',
     value: shown,
     source: 'owner',
-    speech: both(en, sw),
+    speech: both(compiled.opener('en'), compiled.opener('sw')),
   }, profile, 'price');
 }
 

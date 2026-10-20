@@ -95,6 +95,8 @@ const toolSmooth = require('./src/speech/toolSmooth');
 /** VOICE_TOOL_SMOOTH: per-connection heard-audio clock. Empty when the flags are off. */
 const MEDIA_CLOCKS = new WeakMap();
 const { brainV2ShadowEnabled, createBrainV2Shadow } = require('./src/conversation/v2Shadow');
+const { brainV2Enabled, brainV2Mode } = require('./src/conversation/v2/flag');
+const { createBrainV2Live } = require('./src/conversation/v2/liveTurn');
 const voiceTraceBySid = new Map();
 
 function bindVoiceTrace(callSid, trace) {
@@ -2403,6 +2405,8 @@ mediaWss.on('connection', (ws, req) => {
   if (sessionCallSid) callSpokenTranscripts.set(sessionCallSid, callTranscript);
   /** BA v2 shadow runner; created on first caller turn only when BRAIN_V2_SHADOW is on. */
   let brainV2Shadow = null;
+  /** BA v2 live mouth; created on first caller turn only when BRAIN_V2=on and MODE=live. */
+  let brainV2Live = null;
   function logTurnTiming(timing, extra) {
     if (!timing) return null;
     const summary = timing.log(extra);
@@ -3638,7 +3642,10 @@ mediaWss.on('connection', (ws, req) => {
     messages.push({ role: 'user', content: clean });
     // BA v2 shadow (BRAIN_V2_SHADOW, default off): log-only, never awaited,
     // never spoken, dry-run writes only. Flag off = no code below runs.
-    if (brainV2ShadowEnabled({ tenantId: brainProfile?.id })) {
+    if (
+      brainV2ShadowEnabled({ tenantId: brainProfile?.id }) &&
+      !(brainV2Enabled({ tenantId: brainProfile?.id }) && brainV2Mode() === 'live')
+    ) {
       try {
         if (!brainV2Shadow) {
           brainV2Shadow = createBrainV2Shadow({
@@ -3783,6 +3790,42 @@ mediaWss.on('connection', (ws, req) => {
         return folded;
       }
       const slotsBeforeReply = slotRows(brainState);
+      if (brainV2Enabled({ tenantId: brainProfile?.id }) && brainV2Mode() === 'live') {
+        try {
+          if (!brainV2Live) {
+            const mem = brainProfile?.callerMemory || {};
+            brainV2Live = createBrainV2Live({
+              applyTools: (parsed) => applyGeminiTools(callKey, parsed),
+              callerFile: {
+                callerPhone: brainState?.caller?.phone || mem.phone || null,
+                contactName: mem.fileOwnerName || mem.name || brainState?.caller?.name || null,
+                openRows: Array.isArray(mem.openRows) ? mem.openRows : [],
+              },
+            });
+          }
+          const live = await brainV2Live.run({
+            text: clean,
+            profile: brainProfile,
+            langLock: callLanguage === 'en' || callLanguage === 'sw' ? callLanguage : null,
+            shouldAbort: () => bargeInActive === true,
+          });
+          if (live?.line) {
+            console.log(`[ws/media][${callKey}] brain_v2_live lang=${live.lang}: ${live.line}`);
+            callTranscript.pushAgent(live.line);
+            if (turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') {
+              turnTiming.markFirstSpokenChunk();
+            }
+            const spoken = await speakText(live.line, { tracePath: 'brain_v2_live' });
+            if (spoken?.ok !== false) {
+              spokeThisTurn = true;
+              messages.push({ role: 'assistant', content: live.line, local: true });
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn(`[ws/media][${callKey}] brain_v2_live failed, using v1:`, err?.message || err);
+        }
+      }
       const lookupPlan = planLookupTurn({
         text: clean,
         state: brainState,

@@ -2,6 +2,7 @@
 // Deterministic caller-turn understanding for BA v2. Produces intent hints and
 // normalised slot candidates; the state machine decides what to do with them.
 const L = require('./lexicon');
+const { listedAreaIds } = require('../listedAreas');
 
 const YES = /^\W*(yes|yeah|yep|yup|ok|okay|sure|correct|right|exactly|please do|go ahead|do it|ndio|ndiyo|eeh ndio|sawa|poa|fiti|kabisa|haya|yes please)\b/i;
 const NO = /^\W*(no|nope|not really|hapana|la|sitaki)\b|\b(that'?s wrong|si sawa|not correct)\b/i;
@@ -11,16 +12,20 @@ const NEG = /\b(not|no|wrong|hapana|si|sio|badala)\b/i;
 const INTENT_RULES = [
   ['payment_change', /\b(m-?pesa number|payment details|pay to a different|different (m-?pesa|number to pay)|change (my )?payment|lipa kwa namba nyingine|badilisha (namba ya )?malipo)\b/i],
   ['address_change', /\b(come to .+ instead|change (the |my )?(address|location)|different (address|location)|new address|badilisha (anwani|mahali)|mje .+ badala)\b/i],
+  ['policy_cancel', /\b(cancellation policy|cancel(lation)? policy|what.{0,24}cancell|how.{0,24}cancell|reschedule policy)\b|^\W*cancell?ation\W*$/i],
   ['cancel', /\b(cancel|cancell?ation|futa (booking|appointment)|sitaki tena|ondoa booking)\b/i],
   ['change', /\b(move my|reschedule|postpone|change my (booking|appointment|visit)|change (the )?(time|date)|badilisha (booking|siku|saa)|songesha)\b/i],
   ['complaint', /\b(not happy|unhappy|bad service|complain\w*|disappointed|left .{0,20}dirty|damaged|ruined|sijaridhika|mmeniharibia|mmeharibu|malalamiko|huduma mbaya)\b/i],
   ['handoff', /\b(manager|the owner|speak to (a |someone|somebody|the)|talk to (a |someone|the)|human|real person|mwenye biashara|meneja)\b/i],
   ['services', /\b(services? gani|huduma gani|mnaofa\w*|mna-?offer\w*|mnauza\w* nini|which (exact )?services|what services|services (do )?you (do )?offer|mnafanya nini|mnatoa nini|gani (uko|mko) nayo|(uko|mko) nayo|saizi gani|sizes? (do you|gani)|mnawash\w*|mnasafisha|do you (clean|wash|do)\b)/i],
-  ['coverage', /\b(do you cover|you( guys)? cover|uko wapi|outside (nairobi|the county)|niko outside|siishi \w+|sikai \w+|mfike huko|mtafika huko|mnafika huko|mnafika|mnakuja|mnafikana|mtafika|mko wapi|where are you( located)?|your location|location yenu|mnapatikana wapi|kama mnakuja)\b/i],
+  ['coverage', /\b(do you cover|you( guys)? cover|do you deliver|do you come|travel fee|delivery fee|fee to|fare|ada ya|usafiri|transport|uko wapi|outside (nairobi|the county)|niko outside|siishi \w+|sikai \w+|mfike huko|mtafika huko|mnafika huko|mnafika|nafika|mnakuja|mnafikana|mtafika|mko wapi|where are you( located)?|your location|location yenu|mnapatikana wapi|kama mnakuja)\b|\bfair\b.{0,24}\b(kuja|come|to)\b/i],
   ['recall', /\b(remember me|last time|what did i (book|order)|my last (visit|booking|order)|mara ya mwisho|mnanikumbuka|unanikumbuka|unakumbuka|do you remember|previous(ly)? (thing|dealing|call|order|booking)|in another call|before this call|i (had )?(spoke|spoken|talked) to you|tulifika wapi|tumeachia wapi|tulikuwa tumeachia|tumeongea|tulikuwa tumeongea|nilikuwa nimeitisha|nimekuongelesha|ile (mambo|kitu) (yetu )?ya jana|a while back)\b/i],
   ['want_know', /\b(nataka kujua|nilikuwa nataka kujua|nataka jua|nilitaka kujua|i wanted to (know|ask)|just inquiring|nataka kuuliza|nataka unisaidie|unisaidie|msaidia|hamwezi (ku)?nisaidia|nisaidie|maybe you tell me|you tell me|i don'?t know)\b/i],
   ['who_are_you', /^\W*(nani|ni nani|who is this|who am i (speaking|talking) (to|with)|tunaitwaje( tena)?|unaitwa nani|wewe ni nani|unaitwaje|what'?s your name)\W*\??\W*$/i],
-  ['payment_how', /\b(naweza (ku)?lipa|how (do|can) i pay|payment (method|options)|mnapokea (m-?pesa|pesa)|nilipe aje|malipo ni aje|lipa vipi)\b/i],
+  ['payment_how', /\b(naweza (ku)?lipa|how (do|can) i pay|do i pay|pay before|when do i (pay|lipa)|payment (method|options)|mnapokea (m-?pesa|pesa)|nilipe aje|nilipe kabla|malipo ni aje|lipa vipi|lipa kabla)\b/i],
+  ['policy_returns', /\b(refunds?|returns?|exchange|rejesha|rudisha pesa)\b/i],
+  ['policy_deposit', /\b(deposit|depo|down payment|malipo ya awali)\b/i],
+  ['policy_warranty', /\b(warranty|guarantee|dhamana|garanti)\b/i],
   ['greeting', /^\W*(oh,?\s*)?(habari( yako| zenu)?|niaje|mambo|sasa|hujambo|how are you|hello|hi)\W*(shy\W*)?(,?\s*(ni namna gani|mnaendelea aje|mko aje|how are you)\W*)?$/i],
   ['order', /\b(order|kuagiza|agiza|niwekee|buy|nunua|reserve|hold (one|two|\d))\b/i],
   ['book', /\b(book|booking|make a booking|ku-?book|kubook|schedule|appointment|to be (washed|cleaned)|(wash|clean) my|someone to come|mtu aje|mkuje|utume (hao )?watu|mtume (mtu|watu)|wakuje|waje kufanya|come (today|tomorrow|kesho|leo)|come (and|to) clean|kusafisha|usafi|tuieke|tuweke|niwekee booking|weka booking)\b/i],
@@ -28,7 +33,28 @@ const INTENT_RULES = [
   ['price', /\b(how much|price|pricing|cost|charge|bei|pesa ngapi|shilingi ngapi|ni ngapi|ndio ngapi|ni bei gani|ngapi pesa)\b/i],
   ['hours', /\b(open|opening|close|closing|hours|fungua|mnafungua|unafungua|mnafunga|unafunga|funga|mnafanya kazi|mko wazi|working (days|hours)|operate until|until what time|mnafunga saa ngapi|saa za kazi)\b/i],
 ];
-function detectIntents(text) { return INTENT_RULES.filter(([, re]) => re.test(text)).map(([n]) => n); }
+function cancelAskIsPolicy(text) {
+  const t = String(text || '');
+  if (/\b(my (booking|visit|appointment|clean)|cancel my|futa (booking|appointment)|sitaki tena|ondoa booking)\b/i.test(t)) {
+    return false;
+  }
+  if (/^\W*cancell?ation\W*$/i.test(t)) return true;
+  if (/\b(cancellation policy|cancel(?:lation)? policy|reschedule policy)\b/i.test(t)) return true;
+  if (/\b(what|how|handle|gani|vipi|niacha)\b/i.test(t) && /\bcancel/i.test(t)) return true;
+  if (/\b(kama niacha|niacha)\b/i.test(t)) return true;
+  return false;
+}
+
+function detectIntents(text) {
+  const intents = INTENT_RULES.filter(([, re]) => re.test(text)).map(([n]) => n);
+  if (intents.includes('cancel') && cancelAskIsPolicy(text)) {
+    return ['policy_cancel', ...intents.filter((i) => i !== 'cancel')];
+  }
+  if (cancelAskIsPolicy(text) && !intents.includes('policy_cancel')) {
+    return ['policy_cancel', ...intents];
+  }
+  return intents;
+}
 
 const STOP_NAME = new Set(['calling', 'speaking', 'here', 'fine', 'good', 'using', 'looking', 'trying', 'not', 'just', 'the', 'a', 'an', 'interested', 'okay', 'ok', 'sure', 'yes', 'no', 'in', 'at', 'from', 'with', 'sorry', 'well', 'mimi', 'ni', 'going', 'calling', 'wondering', 'happy', 'unhappy', 'new', 'old']);
 const nameCase = (s) => s.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
@@ -124,11 +150,11 @@ function lev(a, b) { const m = a.length, n = b.length; const d = Array.from({ le
 // Tenant service areas only (serviceAreas.areas ids like place:kitengela, county:nairobi).
 function matchArea(text, profile = {}) {
   if (/\b(outside|siishi|sikai|not in|si wa)\b/i.test(String(text || ''))) return null;
-  const areas = (profile.serviceAreas?.areas || []).map((a) => String(a.id || '').split(':')[1]).filter(Boolean);
+  const areas = listedAreaIds(profile);
   const toks = String(text || '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter((w) => w.length >= 4);
   for (const a of areas) { const parts = a.split(' '); const key = parts[parts.length - 1]; if (toks.some((w) => w === key || (key.length >= 6 && lev(w, key) <= 2))) return { listed: true, name: a.replace(/\b\w/g, (c) => c.toUpperCase()) }; }
-  const tx = String(text || '').replace(/\b(Mnafika|Mnakuja|Mtafika|Hadi|Cover|Niko|Nipo|Kwa|Na)\b/g, (m) => m.toLowerCase());
-  const asked = tx.match(/\b(?:cover|niko|nipo|in|na|kwa|si|fika|kuja|mnafika|mnakuja|mtafika|hadi|to)\s+([A-Z][a-z]{3,})/) || tx.match(KNOWN_AREAS);
+  const tx = String(text || '').replace(/\b(Mnafika|Nafika|Mnakuja|Mtafika|Hadi|Cover|Niko|Nipo|Kwa|Na)\b/g, (m) => m.toLowerCase());
+  const asked = tx.match(/\b(?:cover|niko|nipo|nafika|in|na|kwa|si|fika|kuja|mnafika|mnakuja|mtafika|hadi|to)\s+([A-Z][a-z]{3,})/) || tx.match(KNOWN_AREAS);
   return asked ? { listed: false, name: asked[1] } : null;
 }
 function extractQuantity(text) { const m = String(text || '').toLowerCase().match(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|moja|mbili|tatu|nne|tano|sita)\b/); return m ? L.toNum(m[1]) : null; }
@@ -164,4 +190,4 @@ function understand(text, { profile = {}, now, expecting = null } = {}) {
     _yes: isYes,
   };
 }
-module.exports = { splitLandmark, extractLandmark, matchArea, understand, detectIntents, extractName, extractPlace, matchService, matchProducts, YES, NO };
+module.exports = { splitLandmark, extractLandmark, matchArea, understand, detectIntents, cancelAskIsPolicy, extractName, extractPlace, matchService, matchProducts, YES, NO };

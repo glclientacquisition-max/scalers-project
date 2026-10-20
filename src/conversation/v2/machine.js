@@ -8,11 +8,19 @@ const L = require('./lexicon');
 const N = require('./nlu');
 const R = require('./receipts');
 const { buildCatalogue, validateCall } = require('./catalogue');
+const { compileSpokenCatalogue, joinList } = require('../spokenCatalogue');
+const { compileSpokenCoverage, compileSpokenPolicies } = require('../spokenFacts');
+const { compileAskReceipt } = require('./askReceipt');
+const { applyTicket, needsClassify, normalizeTicket } = require('./classifyAsk');
 const { renderOwnerMessage } = require('./owner');
 const { buildRequest } = require('./gemini');
 
 const TRANSACTIONAL = ['payment_change', 'address_change', 'cancel', 'change', 'complaint', 'handoff', 'order', 'book'];
-const INFO = ['payment_how', 'greeting', 'who_are_you', 'services', 'coverage', 'recall', 'availability', 'price', 'hours', 'want_know'];
+const INFO = ['payment_how', 'policy_returns', 'policy_deposit', 'policy_warranty', 'policy_cancel', 'greeting', 'who_are_you', 'services', 'coverage', 'recall', 'availability', 'price', 'hours', 'want_know'];
+const AREA_ASK = /\b(nafika|niko|nipo|mnafika|mnakuja|mtafika|mnafikana|cover|do you cover|travel fee|delivery fee|fee to|fare|ada ya|usafiri|do you deliver|do you come)\b|\bfair\b.{0,24}\b(kuja|come|to)\b/i;
+const POLICY_KEY = { policy_returns: 'returns', policy_deposit: 'deposit', policy_warranty: 'warranty', policy_cancel: 'cancellation' };
+const FEE_ASK = /\b(travel fee|delivery fee|fee to|fare|ada ya|usafiri|transport|how much|ngapi|bei)\b|\bfair\b.{0,24}\b(kuja|come|to)\b/i;
+const DELIVER_ASK = /\b(deliver|delivery|mnafika|come to|do you come)\b/i;
 
 function createState({ profile = {}, callerPhone, contactName = null, openRows = [], pendingTasks = [] } = {}) {
   return {
@@ -41,6 +49,7 @@ function pickIntent(u, state, profile) {
   if (t === 'handoff' && state.intent === 'complaint') t = null;
   // a question about services/prices/hours/areas that only mentions "usafi" is an enquiry, not a booking
   if (t === 'book' && u.intents.some((i) => ['services', 'coverage', 'price', 'hours'].includes(i)) && !/\b(book|ku-?book|kubook|appointment|schedule|tuweke|tuieke)\b/i.test(u.text)) t = null;
+  if (t === 'cancel' && u.intents.includes('policy_cancel')) t = null;
   return t || null;
 }
 
@@ -227,23 +236,56 @@ function infoAnswer(state, u, profile, kind) {
     return R.info({ kind: 'hours', everyDay: same, open: h.open, close: h.close }, state.lang);
   }
   if (kind === 'services') {
-    const cat = vertical(profile) === 'retail' ? (profile.productCatalog || []).map((p) => p.name) : (profile.servicesCatalog || []).map((x) => x.name);
-    if (u.service) return R.info({ kind: 'offered', label: u.service.name, price: u.service.price_range || null }, state.lang);
+    const compiled = compileSpokenCatalogue(profile, { limit: 4 });
+    if (u.service) {
+      const fam = compiled.familyForName(u.service.name);
+      const sized = /\b(\d{1,2}|one|two|three|moja|mbili|tatu|kimoja|viwili|vitatu)\s*-?\s*(bedroom|chumba|vyumba|seater|kiti)?\b/i.test(u.text);
+      if (fam?.askSize && !sized) {
+        return R.info({
+          kind: 'which_size',
+          head: L.isSw(state.lang) ? fam.labelSw : fam.labelEn,
+          sizes: compiled.sizeAsk(fam, state.lang),
+        }, state.lang);
+      }
+      return R.info({ kind: 'offered', label: u.service.name, price: u.service.price_range || null }, state.lang);
+    }
     if (u.products[0]) return R.info({ kind: 'offered', label: u.products[0].name, price: u.products[0].price ? `KSh ${u.products[0].price}` : null }, state.lang);
-    if (!cat.length) return R.info({ kind: 'want_know' }, state.lang);
-    const start = (n * 4) % cat.length;
-    return R.info({ kind: 'services', names: [...cat, ...cat].slice(start, start + 4), more: cat.length > 4 }, state.lang);
+    if (!compiled.families.length) return R.info({ kind: 'want_know' }, state.lang);
+    return R.info({ kind: 'services', names: compiled.labels(state.lang), more: compiled.more }, state.lang);
   }
   if (kind === 'coverage') {
+    if (u.feeAsk || FEE_ASK.test(u.text) || (!u.area && DELIVER_ASK.test(u.text))) {
+      const line = compileAskReceipt(profile, { kind: 'come_cost', place: u.area && u.area.name }, state.lang);
+      if (line) return R.info({ kind: 'policy', line }, state.lang);
+    }
     const loc = (profile.businessLocations || [])[0];
-    const listed = (profile.serviceAreas?.areas || []).map((a) => String(a.id || '').split(':')[1]).filter(Boolean).map((a) => a.replace(/\b\w/g, (c) => c.toUpperCase()));
-    const general = listed.length ? listed.slice(0, 4).join(', ') : (loc?.address || profile.hoursSchedule?.location?.split('·').pop()?.trim() || null);
-    return R.info({ kind: 'coverage', area: u.area, general, fromList: listed.length > 0, more: listed.length > 4 }, state.lang);
+    const compiled = compileSpokenCoverage(profile, { limit: 4 });
+    const general = compiled.names.length
+      ? joinList(compiled.names, state.lang)
+      : (loc?.address || profile.hoursSchedule?.location?.split('·').pop()?.trim() || null);
+    return R.info({
+      kind: 'coverage',
+      area: u.area,
+      general,
+      fromList: compiled.all.length > 0,
+      more: compiled.more,
+    }, state.lang);
   }
   if (kind === 'payment_how') {
-    const M = { mpesa_paybill: ['M-Pesa Paybill', 'M-Pesa Paybill'], mpesa_till: ['M-Pesa Till', 'M-Pesa Till'], bank: ['bank transfer', 'benki'], cash: ['cash', 'pesa taslimu'], card: ['card', 'kadi'], pochi: ['Pochi la Biashara', 'Pochi la Biashara'], airtel: ['Airtel Money', 'Airtel Money'] };
-    const ms = (profile.businessPolicies?.payments?.methods || []).map((m) => M[m]?.[L.isSw(state.lang) ? 1 : 0]).filter(Boolean);
-    return R.info({ kind: 'payment_how', methods: ms.length ? ms.join(L.isSw(state.lang) ? ', ' : ', ').replace(/, ([^,]+)$/, L.isSw(state.lang) ? ' au $1' : ' or $1') : null }, state.lang);
+    const line = compileAskReceipt(profile, { kind: 'pay' }, state.lang);
+    if (/\b(Paybill|Till|benki|pesa taslimu|kadi|Pochi|Airtel)\b/i.test(line) && (profile.businessPolicies?.payments?.methods || []).length) {
+      return R.info({ kind: 'payment_how', methods: line.replace(/^You can pay by |^Malipo: |\.$/g, '') }, state.lang);
+    }
+    return R.info({ kind: 'policy', line }, state.lang);
+  }
+  if (POLICY_KEY[kind]) {
+    const ask = {
+      policy_returns: 'refund',
+      policy_deposit: 'deposit',
+      policy_warranty: 'warranty',
+      policy_cancel: 'cancel_rules',
+    }[kind];
+    return R.info({ kind: 'policy', line: compileAskReceipt(profile, { kind: ask }, state.lang) }, state.lang);
   }
   if (kind === 'greeting') return R.info({ kind: 'greeting' }, state.lang);
   if (kind === 'who_are_you') return R.info({ kind: 'who', agent: profile.agentName || 'Shy', biz: profile.businessName || '' }, state.lang);
@@ -314,7 +356,7 @@ function applyAckRule(state, line, { ackOk, acked, callerAck, lang }) {
 }
 function noteAck(state, line) { state.lastAckLed = isAckLed(line); if (state.lastAckLed) state.lastAckTurn = state.turn; }
 
-async function runTurn(state, { text, profile = {}, now = new Date(), handlers, model = null, langLock = null, acked = false }) {
+async function runTurn(state, { text, profile = {}, now = new Date(), handlers, model = null, classify = null, langLock = null, acked = false }) {
   state.turn += 1; state.now = now;
   const prevLang = state.lang;
   // langLock (Voice #677): the call language is owned by Voice; never flip mid-turn.
@@ -323,12 +365,26 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   const results = [];
   const catalogue = buildCatalogue({ profile, openRows: state.file.openRows });
   const mc = await consultModel(state, u, profile, model, catalogue);
+  if (typeof classify === 'function' && needsClassify(u, pickIntent(u, state, profile))) {
+    try {
+      const ticket = normalizeTicket(await classify({ text: u.text, profile, lang: state.lang }), profile);
+      applyTicket(u, ticket);
+      state.trace.push({ turn: state.turn, classify: { kind: ticket.kind, listed: !!(ticket.area && ticket.area.listed) } });
+    } catch { /* keep regex reading */ }
+  }
   const lang = state.lang || 'en';
   const out = (line0, extra = {}) => { const line = applyAckRule(state, line0, { ackOk: !!extra.ackOk, acked: !!acked, callerAck: !!u.ack, lang }); const l = line && (line === state.lastLine || line === state.lastBase) ? (() => { const n = state.repeatN = (state.repeatN || 0) + 1; let v = R.vary(line, lang, n); if (v === state.lastLine) v = R.vary(line, lang, n, true); return v; })() : line; state.lastBase = line; state.lastLine = l; noteAck(state, l); return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end }; };
 
   // 1) read-back pending: commit only on the caller's yes
   // a new question while a callback offer is open drops the offer and answers the question
   if (state.phase === 'readback' && state.pending?.tool === 'create_handoff' && !u.yes && u.intents.some((i) => INFO.includes(i))) resetIntent(state);
+  if (state.phase === 'readback' && state.pending && !u.yes && !u.no && !u.done && u.intents.some((i) => INFO.includes(i))) {
+    const infoKind = u.intents.find((i) => INFO.includes(i) && i !== 'want_know') || (u.intents.includes('want_know') ? 'want_know' : null);
+    if (infoKind) {
+      state.lastInfo = infoKind;
+      return out(infoAnswer(state, u, profile, infoKind));
+    }
+  }
   if (state.phase === 'readback' && state.pending) {
     const p = state.pending;
     mergeSlots(state, u, profile);
@@ -376,7 +432,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
       state.lastInfo = infoKind;
       if (!state.intent) mergeSlots(state, u, profile);
       const line = infoAnswer(state, u, profile, infoKind);
-      if (state.intent) { mergeSlots(state, u, profile); if (/\?\s*$/.test(line.replace(/\s*(Anything else\?|Kuna kingine\?)$/, ''))) return out(line); const st = stepIntent(state, u, profile); return out(st?.line ? `${line.replace(/\s*(Anything else\?|Kuna kingine\?)$/, '')} ${st.line}` : line); }
+      if (state.intent) mergeSlots(state, u, profile);
       return out(line);
     }
   }
@@ -385,6 +441,10 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
     // a service named with no question word is an enquiry about that service
     if (u.service && !u.intents.length && vertical(profile) === 'home') { state.lastInfo = 'services'; mergeSlots(state, u, profile); state.offer = 'book'; state.offerService = u.service.name; return out(R.info({ kind: 'offered', label: u.service.name, price: u.service.price_range || null }, lang)); }
     // a time or a place with no intent on a home-services line means a visit
+    if (AREA_ASK.test(u.text) && (u.place || u.area) && !u.intents.length) {
+      state.lastInfo = 'coverage';
+      return out(infoAnswer(state, u, profile, 'coverage'));
+    }
     if (!u.intents.length && (u.when?.time || ((u.when?.date || u.place) && state.slots.service)) && (u.place || state.slots.service) && vertical(profile) === 'home' && !u.ack && !u.done) { state.intent = 'book'; mergeSlots(state, u, profile); const st0 = stepIntent(state, u, profile); if (st0?.line) return out(st0.line); }
     if (u.name && !u.intents.length) return out(nameSpeakable(state) ? R.info({ kind: 'greet_name', name: nameSpeakable(state) }, lang) : R.ask('intent', 0, lang));
     if (state.lastInfo === 'recall' && !u.ack) { const line = infoAnswer(state, u, profile, 'recall'); return out(line); }
