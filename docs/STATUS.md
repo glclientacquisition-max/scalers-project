@@ -1,6 +1,6 @@
 ---
 owner: platform
-last_reviewed: 2026-10-19
+last_reviewed: 2026-10-20
 ---
 
 # Scalers status and handoff (start here)
@@ -228,6 +228,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **WhatsApp as the assistant doing work** (not just alerts).
 - Live call transfer: **not built** (callbacks only since #658; reviving it needs a new ADR and Alvin's yes).
 - **Fact lookups (#791).** One lookup for prices, area fees, hours, payment numbers and the services list, answered in code before the model. See `docs/how-to/LOOKUPS.md`. `VOICE_LOOKUPS=on` on staging and prod from 19 Oct.
+- **Orchestrator research (docs only).** Why Sierra / PolyAI / OpenAI realtime feel better than one Gemini turn, and what [REA](https://github.com/morluto/rea) can and cannot recover: [`docs/rfcs/big-company-orchestrator-setup.md`](rfcs/big-company-orchestrator-setup.md). No runtime change. Do not decompile a vendor. Next Brain tickets, if Alvin agrees after the Aris score: Gemini last on public facts, then tools off the mouth.
 
 Public copy never mentions unbuilt features.
 
