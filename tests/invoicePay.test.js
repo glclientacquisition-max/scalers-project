@@ -2240,6 +2240,7 @@ describe("reads while the Bachs gate refuses", () => {
     assert.doesNotMatch(load, /assertBachsAllowed/);
     const payPage = fs.readFileSync(path.join(root, "dashboard/src/app/pay/[token]/page.tsx"), "utf8");
     assert.ok(payPage.indexOf("await connection()") < payPage.indexOf("loadPayView(token"));
+    assert.doesNotMatch(payPage, /export const revalidate/);
     assert.doesNotMatch(payPage, /unstable_dynamicStaleTime/);
 
     const expired = presentPayPage(
@@ -2298,6 +2299,34 @@ describe("reads while the Bachs gate refuses", () => {
     assert.equal(open.payLabel, "Pay KSh 2,320");
     assert.equal(open.notice, null);
 
+    const savedMode = process.env.BACHS_MODE;
+    const savedKey = process.env.BACHS_API_KEY;
+    const savedAllowed = process.env.BACHS_LIVE_ALLOWED;
+    const savedUrl = process.env.SUPABASE_URL;
+    const savedPublic = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    try {
+      process.env.BACHS_MODE = "off";
+      process.env.BACHS_API_KEY = "sk_test_x";
+      delete process.env.BACHS_LIVE_ALLOWED;
+      process.env.SUPABASE_URL = "https://fjxcdccgyhnvnnlnovcl.supabase.co";
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      assert.equal(paymentsClosed(), true);
+      process.env.BACHS_MODE = "live";
+      process.env.BACHS_LIVE_ALLOWED = "true";
+      assert.equal(paymentsClosed(), false);
+    } finally {
+      if (savedMode === undefined) delete process.env.BACHS_MODE;
+      else process.env.BACHS_MODE = savedMode;
+      if (savedKey === undefined) delete process.env.BACHS_API_KEY;
+      else process.env.BACHS_API_KEY = savedKey;
+      if (savedAllowed === undefined) delete process.env.BACHS_LIVE_ALLOWED;
+      else process.env.BACHS_LIVE_ALLOWED = savedAllowed;
+      if (savedUrl === undefined) delete process.env.SUPABASE_URL;
+      else process.env.SUPABASE_URL = savedUrl;
+      if (savedPublic === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      else process.env.NEXT_PUBLIC_SUPABASE_URL = savedPublic;
+    }
+
     let caught;
     try {
       payProviderFromEnv(PROD_CLOSED);
@@ -2324,10 +2353,19 @@ describe("reads while the Bachs gate refuses", () => {
     const panel = fs.readFileSync(path.join(root, "dashboard/src/app/pay/[token]/PayPanel.tsx"), "utf8");
     assert.match(panel, /payments_unavailable/);
     assert.match(panel, /PAYMENTS_UNAVAILABLE_NOTICE/);
+    assert.match(panel, /\/api\/pay\/\$\{encodeURIComponent\(token\)\}/);
+    assert.match(panel, /cache: "no-store"/);
     const notice = fs.readFileSync(path.join(root, "dashboard/src/lib/invoicePay/paymentsNotice.js"), "utf8");
     assert.match(notice, /Online payment isn't available yet\. Contact support@scalers\.co\.ke/);
     const provider = fs.readFileSync(path.join(root, "dashboard/src/lib/invoicePay/provider.js"), "utf8");
     assert.match(provider, /function assertBachsAllowed/);
+    assert.match(provider, /process\.env\.BACHS_MODE/);
+    assert.match(provider, /process\.env\.BACHS_API_KEY/);
+    assert.match(provider, /process\.env\.SUPABASE_URL/);
+    assert.match(provider, /function publicSupabaseUrlName/);
+    // A member access is rewritten to the build-time URL. The name is assembled instead.
+    assert.doesNotMatch(provider, /\.NEXT_PUBLIC_/);
+    assert.doesNotMatch(provider, /process\.env\.NEXT_PUBLIC/);
     assert.match(provider, /refusing production database/);
     assert.match(provider, /sk_live_/);
     assert.match(provider, /BACHS_MODE=live is refused/);

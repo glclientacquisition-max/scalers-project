@@ -10,6 +10,32 @@ export function PayPanel({ token, initial }: { token: string; initial: PayCardMo
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!token) return;
+    let stop = false;
+    const load = async () => {
+      try {
+        const current = new URLSearchParams(window.location.search);
+        const query = new URLSearchParams();
+        const back = current.get("return");
+        const checkoutId = current.get("checkout_id");
+        if (back) query.set("return", back);
+        if (checkoutId) query.set("checkout_id", checkoutId);
+        const suffix = query.size ? `?${query.toString()}` : "";
+        const res = await fetch(`/api/pay/${encodeURIComponent(token)}${suffix}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const next = (await res.json()) as PayCardModel;
+        if (!stop && next && next.state) setView(next);
+      } catch {
+        /* keep the server view */
+      }
+    };
+    void load();
+    return () => {
+      stop = true;
+    };
+  }, [token]);
+
+  useEffect(() => {
     if (view.state !== "checking" || !view.checkoutId || !token) return;
     let stop = false;
     const tick = async () => {
