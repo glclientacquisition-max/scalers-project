@@ -39,8 +39,47 @@ function logBachsError(res, json) {
  * @param {NodeJS.ProcessEnv} [env]
  * @returns {'off' | 'sandbox' | 'live'}
  */
+/**
+ * Static `process.env.NAME` when the caller did not pass a fixture.
+ * A dynamic property is not a static env read. Next also rewrites any member
+ * whose name starts with NEXT_PUBLIC_ into the build-time string, so the
+ * public URL is a bracket read. A prerender that missed the mode would
+ * otherwise look like off on the production URL and close the pay page.
+ * @param {NodeJS.ProcessEnv} env
+ * @param {string} name
+ */
+/** Built at runtime so the compiler cannot emit a NEXT_PUBLIC_ member for Next to bake. */
+function publicSupabaseUrlName() {
+  const parts = ["NEXT", "PUBLIC", "SUPABASE", "URL"];
+  let name = "";
+  for (const part of parts) name += (name ? "_" : "") + part;
+  return name;
+}
+
+function readEnv(env, name) {
+  if (env === process.env) {
+    switch (name) {
+      case "BACHS_MODE":
+        return process.env.BACHS_MODE;
+      case "BACHS_API_KEY":
+        return process.env.BACHS_API_KEY;
+      case "BACHS_LIVE_ALLOWED":
+        return process.env.BACHS_LIVE_ALLOWED;
+      case "BACHS_LIVE_TENANT_ALLOWLIST":
+        return process.env.BACHS_LIVE_TENANT_ALLOWLIST;
+      case "SUPABASE_URL":
+        return process.env.SUPABASE_URL;
+      case "NEXT_PUBLIC_SUPABASE_URL":
+        return process.env[publicSupabaseUrlName()];
+      default:
+        return undefined;
+    }
+  }
+  return env[name];
+}
+
 function bachsMode(env = process.env) {
-  const raw = String(env.BACHS_MODE ?? "off").trim().toLowerCase();
+  const raw = String(readEnv(env, "BACHS_MODE") ?? "off").trim().toLowerCase();
   if (raw === "" || raw === "off" || raw === "mock") return "off";
   if (raw === "sandbox") return "sandbox";
   if (raw === "live") return "live";
@@ -51,8 +90,7 @@ function bachsMode(env = process.env) {
 
 /** Exact `true`. Anything else leaves live mode closed. */
 function liveAllowed(env = process.env) {
-  const raw = env === process.env ? process.env.BACHS_LIVE_ALLOWED : env.BACHS_LIVE_ALLOWED;
-  return String(raw || "").trim().toLowerCase() === "true";
+  return String(readEnv(env, "BACHS_LIVE_ALLOWED") || "").trim().toLowerCase() === "true";
 }
 
 function refused(message, code) {
@@ -68,8 +106,8 @@ function refused(message, code) {
  */
 function assertBachsAllowed(env = process.env) {
   const mode = bachsMode(env);
-  const key = String(env.BACHS_API_KEY || "");
-  const url = String(env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || "");
+  const key = String(readEnv(env, "BACHS_API_KEY") || "");
+  const url = String(readEnv(env, "SUPABASE_URL") || readEnv(env, "NEXT_PUBLIC_SUPABASE_URL") || "");
   if (mode === "live") {
     if (!liveAllowed(env)) throw refused("BACHS_MODE=live is refused", "bachs_live_refused");
     return mode;
@@ -108,7 +146,7 @@ function checkoutFailure(err) {
 }
 
 function allowlistRaw(env = process.env) {
-  return env === process.env ? process.env.BACHS_LIVE_TENANT_ALLOWLIST : env.BACHS_LIVE_TENANT_ALLOWLIST;
+  return readEnv(env, "BACHS_LIVE_TENANT_ALLOWLIST");
 }
 
 function tenantOnEnvAllowlist(tenantId, env = process.env) {
@@ -391,7 +429,7 @@ function payProviderFromEnv(env = process.env, opts = {}) {
   const mode = assertBachsAllowed(env);
   if (mode === "off") return new MockPayProvider();
   return new BachsPayProvider({
-    apiKey: String(env.BACHS_API_KEY || ""),
+    apiKey: String(readEnv(env, "BACHS_API_KEY") || ""),
     mode,
     fetchImpl: opts.fetchImpl,
   });

@@ -1,6 +1,6 @@
 ---
 owner: ops-billing
-last_reviewed: 2026-10-19
+last_reviewed: 2026-10-20
 ---
 
 # Invoice pay
@@ -32,7 +32,7 @@ Service role only. Not granted to `anon` or `authenticated`.
 
 ## Page
 
-Route: `/pay/<token>` on the Desk app host (`https://app.scalers.co.ke/pay/<token>`). No login. The page is `noindex`. It calls `connection()` before the invoice lookup, so Next renders it on the request. A prerender is cached and would keep "Online payment isn't available yet" after the hosting switches are on. `GET /api/pay/<token>` is `no-store`.
+Route: `/pay/<token>` on the Desk app host (`https://app.scalers.co.ke/pay/<token>`). No login. The page is `noindex`. It calls `connection()` before the invoice lookup. The page and `GET /api/pay/<token>` both call `loadPayView`, then `presentPayPage`, then `paymentsClosed`. Next's `inlineStaticEnv` rewrites every `.NEXT_PUBLIC_*` member, including `env.NEXT_PUBLIC_SUPABASE_URL`, into the build-time URL. `env.BACHS_MODE` is not a static `process.env` read, so a prerender can miss it, fall through to off, and refuse the baked production URL. The page then shows `Online payment isn't available yet` with no Pay button. The API runs with the runtime env, sees live mode, and stays payable. That closed HTML is a public prerender (`x-nextjs-prerender`, `cache-control: public`). `cacheComponents` rejects `revalidate` and `dynamic` on the page. The gate now reads `process.env.BACHS_MODE`, `process.env.BACHS_API_KEY`, and `process.env.SUPABASE_URL` as static members. The public URL name is assembled at runtime, so Next cannot bake it. A local production build with that public URL set left the gate function free of the baked host. `/pay/:path*` sends `Cache-Control: private, no-store`. After paint the pay panel loads `GET /api/pay/<token>` (`no-store`) and replaces a cached closed view.
 
 It shows the business name, the invoice number, the KSh total, and the due date in East Africa time. It does not show VAT.
 
