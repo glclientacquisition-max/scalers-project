@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { PayPanel } from "./PayPanel";
 import { loadPayView } from "@/lib/invoicePay/loadPay";
 
@@ -16,6 +17,7 @@ export default async function PayInvoicePage({
   params: Promise<{ token: string }>;
   searchParams: Promise<{ return?: string; checkout_id?: string }>;
 }) {
+  await connection();
   const { token } = await params;
   const search = await searchParams;
   const view = await loadPayView(token, search);

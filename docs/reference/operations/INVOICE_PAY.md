@@ -32,7 +32,7 @@ Service role only. Not granted to `anon` or `authenticated`.
 
 ## Page
 
-Route: `/pay/<token>` on the Desk app host (`https://app.scalers.co.ke/pay/<token>`). No login. The page is `noindex`.
+Route: `/pay/<token>` on the Desk app host (`https://app.scalers.co.ke/pay/<token>`). No login. The page is `noindex`. It calls `connection()` before the invoice lookup, so Next renders it on the request. A prerender is cached and would keep "Online payment isn't available yet" after the hosting switches are on. `GET /api/pay/<token>` is `no-store`.
 
 It shows the business name, the invoice number, the KSh total, and the due date in East Africa time. It does not show VAT.
 

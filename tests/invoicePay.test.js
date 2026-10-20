@@ -2238,7 +2238,9 @@ describe("reads while the Bachs gate refuses", () => {
     const load = fs.readFileSync(path.join(root, "dashboard/src/lib/invoicePay/loadPay.ts"), "utf8");
     assert.ok(load.indexOf("ledger.lookup") < load.indexOf("presentPayPage("));
     assert.doesNotMatch(load, /assertBachsAllowed/);
-    assert.match(fs.readFileSync(path.join(root, "dashboard/src/app/pay/[token]/page.tsx"), "utf8"), /loadPayView/);
+    const payPage = fs.readFileSync(path.join(root, "dashboard/src/app/pay/[token]/page.tsx"), "utf8");
+    assert.ok(payPage.indexOf("await connection()") < payPage.indexOf("loadPayView(token"));
+    assert.doesNotMatch(payPage, /unstable_dynamicStaleTime/);
 
     const expired = presentPayPage(
       payView({
