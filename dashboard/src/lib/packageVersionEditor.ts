@@ -44,7 +44,8 @@ export type ParsedEditorCommand =
   | { ok: false; error: string };
 
 /** Super Admin auth is the write gate. Host and env do not block plan edits. */
-export function packageEditorWritesAllowed(_env: NodeJS.ProcessEnv = process.env): boolean {
+export function packageEditorWritesAllowed(_env?: NodeJS.ProcessEnv): boolean {
+  void _env;
   return true;
 }
 

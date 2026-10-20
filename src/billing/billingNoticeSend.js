@@ -29,7 +29,9 @@ function ledgerAlreadySent(result) {
 async function sendClaimedBillingNotices(input) {
   const base = input.env || process.env;
   let env = base;
-  if (!input.skipRuntimeOverlay) {
+  const useRuntimeOverlay =
+    !input.skipRuntimeOverlay && (!input.env || input.env === process.env);
+  if (useRuntimeOverlay) {
     try {
       const { supabase } = require("../lib/supabaseClient");
       env = await effectivePaymentEnv(base, supabase);
