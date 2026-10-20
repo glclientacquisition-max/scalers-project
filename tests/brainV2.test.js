@@ -249,3 +249,56 @@ test('an hours ask during an open booking does not glue the next slot', async ()
   assert.match(out[1].line, /08:00|18:00|wazi|open/i);
   assert.doesNotMatch(out[1].line, /Shall I book|Nithibitishe|Siku gani/);
 });
+
+const JIRANI = {
+  ...DD,
+  vertical: 'home_services',
+  businessPolicies: {
+    payment: 'M-Pesa (Till) or cash after the job. No payment before the team arrives.',
+    delivery: 'Home visits in Kilimani (no travel fee), Kileleshwa, Lavington and Westlands (KSh 300 travel fee), and Karen (KSh 800 travel fee).',
+    deposit: 'No deposit for homes under 4 bedrooms.',
+    cancellation: 'Free to reschedule up to 12 hours before the visit.',
+    warranty: 'If something was missed, tell us within 24 hours and we come back to redo it free.',
+    returns: '',
+    coverage_areas: ['place:kilimani', 'place:kileleshwa', 'place:lavington', 'place:westlands', 'place:karen'],
+  },
+  service_areas: {
+    areas: [
+      { id: 'place:kilimani', source: 'owner', confirmed: true, fee_mode: 'free', fee_ksh: null, modes: ['visit'] },
+      { id: 'place:kileleshwa', source: 'owner', confirmed: true, fee_mode: 'fixed', fee_ksh: 300, modes: ['visit'] },
+      { id: 'place:karen', source: 'owner', confirmed: true, fee_mode: 'fixed', fee_ksh: 800, modes: ['visit'] },
+    ],
+  },
+};
+
+test('HD_b717: payment and pay-before speak the file, not a missing-methods line', async () => {
+  const { out, log } = await talk(['How can I pay?', 'Do I pay before you come?'], { profile: JIRANI, langLock: 'en' });
+  assert.match(out[0].line, /Till|cash after the job/i);
+  assert.doesNotMatch(out[0].line, /don't have payment details|How can I help you today|book, or about something else/i);
+  assert.match(out[1].line, /No payment before|cash after the job|Till/i);
+  assert.doesNotMatch(out[1].line, /How can I help you today|call you back to finish/i);
+  assert.equal(log.length, 0);
+});
+
+test('HD_db88: travel fee to a listed area and do you deliver stay on the file', async () => {
+  const { out, log } = await talk(
+    ["What's the travel fee to Karen?", 'Do you deliver?'],
+    { profile: JIRANI, langLock: 'en' }
+  );
+  assert.match(out[0].line, /Karen/i);
+  assert.match(out[0].line, /eight hundred shillings/i);
+  assert.doesNotMatch(out[0].line, /KSh|How can I help you today|call you back to finish|book, or about something else/i);
+  assert.match(out[1].line, /Home visits|Kilimani|travel fee/i);
+  assert.doesNotMatch(out[1].line, /parcel|courier|call you back to finish/i);
+  assert.equal(log.length, 0);
+});
+
+test('empty refund slot stays unknown and cancellation policy is not a cancel write', async () => {
+  const { out, log } = await talk(
+    ['Do you give refunds?', 'What is your cancellation policy?'],
+    { profile: JIRANI, langLock: 'en' }
+  );
+  assert.match(out[0].line, /don't have that on file/i);
+  assert.match(out[1].line, /reschedule up to 12 hours/i);
+  assert.equal(log.length, 0);
+});

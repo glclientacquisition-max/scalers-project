@@ -114,6 +114,7 @@ function info(r, lang, n = 0) {
     case 'who': return S ? `Unaongea na ${r.agent}, wa ${r.biz}. Tukusaidie na usafi gani?` : `You're speaking with ${r.agent} from ${r.biz}. What can we clean for you?`;
     case 'greet_name': return S ? `${r.name}, unahitaji huduma gani leo?` : `Thanks, ${r.name}. Which service do you need today?`;
     case 'off_catalogue': return S ? `Sina ${r.item} kwenye orodha yetu. ${r.hint ? `Tunafanya ${r.hint}.` : ''}`.trim() : `${r.item} isn't on our list. ${r.hint ? `We do ${r.hint}.` : ''}`.trim();
+    case 'policy': return r.line || (S ? 'Sina hiyo kwenye rekodi.' : "I don't have that on file.");
     case 'payment_how': return r.methods ? (S ? `Tunapokea ${r.methods}.` : `We accept ${r.methods}.`) : (S ? 'Sina maelezo ya malipo kwenye orodha yetu.' : "I don't have payment details on our list.");
     case 'greeting': return S ? 'Nzuri, asante. Ungependa huduma gani?' : "I'm well, thank you. Which service do you need?";
     case 'repair': return S ? 'Samahani, sijakusikia vizuri. Unaweza kurudia?' : "Sorry, I didn't catch that. Could you say it again?";

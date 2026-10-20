@@ -66,10 +66,42 @@ function listedAreaKeys(profile = {}) {
   return { names, counties };
 }
 
+function listedAreaFee(profile = {}, place) {
+  const slug = slugOf(place);
+  if (!slug) return null;
+  const listed = listedAreaRows(profile).some((row) => row.slug === slug);
+  const bags = [profile.serviceAreas, profile.areaTerms, profile.service_areas];
+  let terms = null;
+  for (const bag of bags) {
+    for (const item of asAreas(bag)) {
+      if (!item || typeof item !== 'object') continue;
+      if (slugOf(item.id || item.name) !== slug) continue;
+      const trusted = item.source === 'owner' && item.confirmed === true;
+      const feeMode = String(item.fee_mode || 'ask');
+      const n = Number(item.fee_ksh);
+      terms = {
+        trusted,
+        feeMode: trusted ? feeMode : 'ask',
+        feeKsh: trusted && feeMode === 'fixed' && Number.isInteger(n) ? n : null,
+      };
+      break;
+    }
+    if (terms) break;
+  }
+  return {
+    listed,
+    name: titleName(slug),
+    trusted: Boolean(terms?.trusted),
+    feeMode: terms?.feeMode || 'ask',
+    feeKsh: terms?.feeKsh ?? null,
+  };
+}
+
 module.exports = {
   listedAreaRows,
   listedAreaIds,
   listedAreaNames,
   listedAreaKeys,
+  listedAreaFee,
   titleName,
 };

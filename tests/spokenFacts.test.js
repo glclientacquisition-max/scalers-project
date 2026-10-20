@@ -81,6 +81,33 @@ describe('compileSpokenHours and policies', () => {
   });
 });
 
+describe('compileSpokenAreaFee', () => {
+  const { compileSpokenAreaFee } = require('../src/conversation/spokenFacts');
+  const visitShop = {
+    vertical: 'home_services',
+    service_areas: {
+      areas: [
+        { id: 'place:kilimani', source: 'owner', confirmed: true, fee_mode: 'free', fee_ksh: null },
+        { id: 'place:karen', source: 'owner', confirmed: true, fee_mode: 'fixed', fee_ksh: 800 },
+        { id: 'place:lavington', source: 'owner', confirmed: true, fee_mode: 'ask' },
+      ],
+    },
+    businessPolicies: {
+      delivery: 'Home visits in Kilimani (no travel fee) and Karen (KSh 800 travel fee).',
+    },
+  };
+
+  it('speaks a listed travel fee in words and leaves an empty refund unknown', () => {
+    const karen = compileSpokenAreaFee(visitShop, 'Karen', 'en');
+    assert.match(karen, /travel fee to Karen/i);
+    assert.match(karen, /eight hundred shillings/i);
+    assert.doesNotMatch(karen, /KSh/);
+    assert.match(compileSpokenAreaFee(visitShop, 'Kilimani', 'en'), /no travel fee to Kilimani/i);
+    assert.match(compileSpokenAreaFee(visitShop, 'Rongai', 'en'), /isn't on our list/i);
+    assert.equal(compileSpokenPolicies(visitShop).line('returns', 'en'), "I don't have that on file.");
+  });
+});
+
 describe('compileSpokenShop and live ground truth', () => {
   it('puts a spoken mouth next to raw file blocks', () => {
     const shop = compileSpokenShop(SHOP);

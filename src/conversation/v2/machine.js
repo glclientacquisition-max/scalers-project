@@ -9,13 +9,16 @@ const N = require('./nlu');
 const R = require('./receipts');
 const { buildCatalogue, validateCall } = require('./catalogue');
 const { compileSpokenCatalogue, joinList } = require('../spokenCatalogue');
-const { compileSpokenCoverage } = require('../spokenFacts');
+const { compileSpokenAreaFee, compileSpokenCoverage, compileSpokenPolicies } = require('../spokenFacts');
 const { renderOwnerMessage } = require('./owner');
 const { buildRequest } = require('./gemini');
 
 const TRANSACTIONAL = ['payment_change', 'address_change', 'cancel', 'change', 'complaint', 'handoff', 'order', 'book'];
-const INFO = ['payment_how', 'greeting', 'who_are_you', 'services', 'coverage', 'recall', 'availability', 'price', 'hours', 'want_know'];
-const AREA_ASK = /\b(nafika|niko|nipo|mnafika|mnakuja|mtafika|mnafikana|cover|do you cover)\b/i;
+const INFO = ['payment_how', 'policy_returns', 'policy_deposit', 'policy_warranty', 'policy_cancel', 'greeting', 'who_are_you', 'services', 'coverage', 'recall', 'availability', 'price', 'hours', 'want_know'];
+const AREA_ASK = /\b(nafika|niko|nipo|mnafika|mnakuja|mtafika|mnafikana|cover|do you cover|travel fee|delivery fee|fee to|do you deliver|do you come|ada ya)\b/i;
+const POLICY_KEY = { policy_returns: 'returns', policy_deposit: 'deposit', policy_warranty: 'warranty', policy_cancel: 'cancellation' };
+const FEE_ASK = /\b(travel fee|delivery fee|fee to|ada ya|how much|ngapi|bei)\b/i;
+const DELIVER_ASK = /\b(deliver|delivery|mnafika|come to|do you come)\b/i;
 
 function createState({ profile = {}, callerPhone, contactName = null, openRows = [], pendingTasks = [] } = {}) {
   return {
@@ -44,6 +47,7 @@ function pickIntent(u, state, profile) {
   if (t === 'handoff' && state.intent === 'complaint') t = null;
   // a question about services/prices/hours/areas that only mentions "usafi" is an enquiry, not a booking
   if (t === 'book' && u.intents.some((i) => ['services', 'coverage', 'price', 'hours'].includes(i)) && !/\b(book|ku-?book|kubook|appointment|schedule|tuweke|tuieke)\b/i.test(u.text)) t = null;
+  if (t === 'cancel' && u.intents.includes('policy_cancel')) t = null;
   return t || null;
 }
 
@@ -248,6 +252,15 @@ function infoAnswer(state, u, profile, kind) {
     return R.info({ kind: 'services', names: compiled.labels(state.lang), more: compiled.more }, state.lang);
   }
   if (kind === 'coverage') {
+    if (u.area && FEE_ASK.test(u.text)) {
+      return R.info({ kind: 'policy', line: compileSpokenAreaFee(profile, u.area.name, state.lang) }, state.lang);
+    }
+    if (!u.area && DELIVER_ASK.test(u.text)) {
+      const delivery = compileSpokenPolicies(profile).line('delivery', state.lang);
+      if (delivery && !/don't have that on file|Sina hiyo kwenye rekodi/.test(delivery)) {
+        return R.info({ kind: 'policy', line: delivery }, state.lang);
+      }
+    }
     const loc = (profile.businessLocations || [])[0];
     const compiled = compileSpokenCoverage(profile, { limit: 4 });
     const general = compiled.names.length
@@ -264,7 +277,13 @@ function infoAnswer(state, u, profile, kind) {
   if (kind === 'payment_how') {
     const M = { mpesa_paybill: ['M-Pesa Paybill', 'M-Pesa Paybill'], mpesa_till: ['M-Pesa Till', 'M-Pesa Till'], bank: ['bank transfer', 'benki'], cash: ['cash', 'pesa taslimu'], card: ['card', 'kadi'], pochi: ['Pochi la Biashara', 'Pochi la Biashara'], airtel: ['Airtel Money', 'Airtel Money'] };
     const ms = (profile.businessPolicies?.payments?.methods || []).map((m) => M[m]?.[L.isSw(state.lang) ? 1 : 0]).filter(Boolean);
-    return R.info({ kind: 'payment_how', methods: ms.length ? ms.join(L.isSw(state.lang) ? ', ' : ', ').replace(/, ([^,]+)$/, L.isSw(state.lang) ? ' au $1' : ' or $1') : null }, state.lang);
+    if (ms.length) {
+      return R.info({ kind: 'payment_how', methods: ms.join(L.isSw(state.lang) ? ', ' : ', ').replace(/, ([^,]+)$/, L.isSw(state.lang) ? ' au $1' : ' or $1') }, state.lang);
+    }
+    return R.info({ kind: 'policy', line: compileSpokenPolicies(profile).line('payment', state.lang) }, state.lang);
+  }
+  if (POLICY_KEY[kind]) {
+    return R.info({ kind: 'policy', line: compileSpokenPolicies(profile).line(POLICY_KEY[kind], state.lang) }, state.lang);
   }
   if (kind === 'greeting') return R.info({ kind: 'greeting' }, state.lang);
   if (kind === 'who_are_you') return R.info({ kind: 'who', agent: profile.agentName || 'Shy', biz: profile.businessName || '' }, state.lang);

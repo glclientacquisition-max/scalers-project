@@ -5,7 +5,8 @@
 // or policy text.
 
 const { compileSpokenCatalogue, joinList } = require('./spokenCatalogue');
-const { listedAreaNames } = require('./listedAreas');
+const { listedAreaFee, listedAreaNames } = require('./listedAreas');
+const { speakMoney } = require('../speech/spokenForms');
 const { normalizePolicies } = require('./businessPolicies');
 const { normalizeLocations } = require('./businessLocations');
 const { parseHoursSchedule } = require('./businessHours');
@@ -128,6 +129,36 @@ function compileSpokenHours(profile = {}) {
   };
 }
 
+function homeVisit(profile = {}) {
+  const v = String(profile.vertical || profile.businessType || '').toLowerCase();
+  return v.includes('home');
+}
+
+function compileSpokenAreaFee(profile = {}, place, language = 'en') {
+  const hit = listedAreaFee(profile, place);
+  if (!hit) return '';
+  const sw = isSw(language);
+  const travel = homeVisit(profile);
+  const noun = sw ? (travel ? 'ada ya usafiri' : 'ada ya delivery') : (travel ? 'travel fee' : 'delivery fee');
+  if (!hit.listed) {
+    return sw
+      ? `${hit.name} haiko kwenye orodha ya maeneo yetu.`
+      : `${hit.name} isn't on our list of service areas.`;
+  }
+  if (hit.trusted && hit.feeMode === 'free') {
+    return sw ? `Hakuna ${noun} kwenda ${hit.name}.` : `There is no ${noun} to ${hit.name}.`;
+  }
+  if (hit.trusted && hit.feeMode === 'fixed' && hit.feeKsh != null) {
+    const money = speakMoney(hit.feeKsh, sw ? 'sw' : 'en');
+    return sw
+      ? `${noun.charAt(0).toUpperCase()}${noun.slice(1)} kwenda ${hit.name} ni ${money}.`
+      : `The ${noun} to ${hit.name} is ${money}.`;
+  }
+  return sw
+    ? `${hit.name} iko kwenye orodha. Timu itathibitisha ada ukibook.`
+    : `${hit.name} is on our list. The team confirms the fee when you book.`;
+}
+
 function compileSpokenPolicies(profile = {}) {
   const p = normalizePolicies(profile.businessPolicies);
   const rows = [];
@@ -194,6 +225,7 @@ module.exports = {
   compileSpokenLocations,
   compileSpokenHours,
   compileSpokenPolicies,
+  compileSpokenAreaFee,
   compileSpokenFaqs,
   compileSpokenShop,
 };
