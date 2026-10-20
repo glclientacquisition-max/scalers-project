@@ -39,6 +39,16 @@ describe("admin billing: readable errors", () => {
     assert.equal(copy.requestErrorText(null, "Nope."), "Nope.");
   });
 
+  it("maps internal error codes to operator copy", () => {
+    assert.match(copy.requestErrorText({ error: "package_editor_staging_only" }), /read-only on production/i);
+    assert.match(copy.requestErrorText({ error: "package_editor_off" }), /package editor is off/i);
+    assert.equal(copy.requestErrorText({ message: "Confirm the change." }), "Confirm the change.");
+    assert.equal(copy.requestErrorText({ error: "unknown_internal_code" }, "Nope."), "Nope.");
+    assert.equal(copy.planWritesBlockedLine(true, true), null);
+    assert.match(copy.planWritesBlockedLine(false, true), /package editor is off/i);
+    assert.match(copy.planWritesBlockedLine(true, false), /read-only on production/i);
+  });
+
   it("billing API speaks plainly and uses a save fallback", () => {
     const api = read(BILLING_API);
     assert.doesNotMatch(api, /business_id required|off\|soft\|hard|unknown action|min 3 chars/);

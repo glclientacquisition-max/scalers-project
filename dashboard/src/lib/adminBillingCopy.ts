@@ -176,9 +176,40 @@ export function ledgerKindLabel(kind: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** The error text a failed admin request should show. Never an object, never empty. */
+const ADMIN_REQUEST_ERROR_MESSAGES: Record<string, string> = {
+  package_editor_staging_only:
+    "Plans are read-only on production. Edit on staging, or turn on production plan edits in hosting.",
+  package_editor_off: "The package editor is off. Turn it on under Billing · Payments.",
+  approval_required: "A second admin must approve this price change.",
+  draft_exists: "That plan already has a draft. Open the draft instead.",
+  version_frozen: "That version is frozen and cannot change.",
+  invalid: "Those numbers or dates did not pass checks. Nothing changed.",
+  ops_only: "Super Admin only.",
+};
+
+function looksLikeInternalErrorCode(value: string): boolean {
+  return /^[a-z][a-z0-9_]*$/.test(value) && value.includes("_");
+}
+
+/** The error text a failed admin request should show. Never an object, never a snake_case code. */
 export function requestErrorText(json: unknown, fallback = "That didn't save. Nothing changed. Try again."): string {
-  const raw = json && typeof json === "object" ? (json as { error?: unknown }).error : undefined;
-  if (typeof raw === "string" && raw.trim() && raw.trim() !== "[object Object]") return raw.trim();
-  return fallback;
+  if (!json || typeof json !== "object") return fallback;
+  const body = json as { message?: unknown; error?: unknown };
+  if (typeof body.message === "string") {
+    const message = body.message.trim();
+    if (message && message !== "[object Object]") return message;
+  }
+  if (typeof body.error !== "string") return fallback;
+  const code = body.error.trim();
+  if (!code || code === "[object Object]") return fallback;
+  if (ADMIN_REQUEST_ERROR_MESSAGES[code]) return ADMIN_REQUEST_ERROR_MESSAGES[code];
+  if (looksLikeInternalErrorCode(code)) return fallback;
+  return code;
+}
+
+/** Why Plans edits are blocked on this screen, if they are. */
+export function planWritesBlockedLine(editorEnabled: boolean, writesAllowed: boolean): string | null {
+  if (writesAllowed && editorEnabled) return null;
+  if (!editorEnabled) return ADMIN_REQUEST_ERROR_MESSAGES.package_editor_off;
+  return ADMIN_REQUEST_ERROR_MESSAGES.package_editor_staging_only;
 }
