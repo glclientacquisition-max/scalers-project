@@ -106,7 +106,8 @@ describe("admin pay queue labels", () => {
 
   it("keeps secret reads on the server page, not in client billing UI", () => {
     const server = read("dashboard/src/lib/adminPayRead.ts");
-    assert.match(server, /process\.env\.BACHS_MODE/);
+    assert.match(server, /loadBillingRuntimeSettings/);
+    assert.match(server, /overlayRuntimeEnv/);
     assert.match(server, /billing_live_tenants/);
     assert.match(server, /billing_payment_reconciliation/);
     assert.doesNotMatch(server, /payProviderFromEnv/);
@@ -152,6 +153,10 @@ describe("admin pay queue labels", () => {
     assert.doesNotMatch(flags, /packageEditorWritesAllowed/);
     assert.match(flags, /admin_set_package_editor_enabled/);
     assert.match(flags, /admin_set_new_signup_trial/);
+    assert.match(flags, /admin_set_billing_runtime_switch/);
+    const paymentsStatus = read("dashboard/src/components/AdminPaymentsStatus.tsx");
+    assert.match(paymentsStatus, /Checkout/);
+    assert.doesNotMatch(paymentsStatus, /Changed in hosting settings/);
     assert.match(flags, /adminActorName\(\)/);
     assert.doesNotMatch(flags, /body\.actor|posted\.actor/);
     const sql = read("docs/supabase/billing_package_editor_flag.sql");
