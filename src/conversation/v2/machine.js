@@ -9,15 +9,15 @@ const N = require('./nlu');
 const R = require('./receipts');
 const { buildCatalogue, validateCall } = require('./catalogue');
 const { compileSpokenCatalogue, joinList } = require('../spokenCatalogue');
-const { compileSpokenAreaFee, compileSpokenCoverage, compileSpokenPolicies } = require('../spokenFacts');
+const { compileSpokenCoverage, compileSpokenPolicies, compileSpokenVisitFee } = require('../spokenFacts');
 const { renderOwnerMessage } = require('./owner');
 const { buildRequest } = require('./gemini');
 
 const TRANSACTIONAL = ['payment_change', 'address_change', 'cancel', 'change', 'complaint', 'handoff', 'order', 'book'];
 const INFO = ['payment_how', 'policy_returns', 'policy_deposit', 'policy_warranty', 'policy_cancel', 'greeting', 'who_are_you', 'services', 'coverage', 'recall', 'availability', 'price', 'hours', 'want_know'];
-const AREA_ASK = /\b(nafika|niko|nipo|mnafika|mnakuja|mtafika|mnafikana|cover|do you cover|travel fee|delivery fee|fee to|do you deliver|do you come|ada ya)\b/i;
+const AREA_ASK = /\b(nafika|niko|nipo|mnafika|mnakuja|mtafika|mnafikana|cover|do you cover|travel fee|delivery fee|fee to|fare|ada ya|usafiri|do you deliver|do you come)\b|\bfair\b.{0,24}\b(kuja|come|to)\b/i;
 const POLICY_KEY = { policy_returns: 'returns', policy_deposit: 'deposit', policy_warranty: 'warranty', policy_cancel: 'cancellation' };
-const FEE_ASK = /\b(travel fee|delivery fee|fee to|ada ya|how much|ngapi|bei)\b/i;
+const FEE_ASK = /\b(travel fee|delivery fee|fee to|fare|ada ya|usafiri|transport|how much|ngapi|bei)\b|\bfair\b.{0,24}\b(kuja|come|to)\b/i;
 const DELIVER_ASK = /\b(deliver|delivery|mnafika|come to|do you come)\b/i;
 
 function createState({ profile = {}, callerPhone, contactName = null, openRows = [], pendingTasks = [] } = {}) {
@@ -252,14 +252,9 @@ function infoAnswer(state, u, profile, kind) {
     return R.info({ kind: 'services', names: compiled.labels(state.lang), more: compiled.more }, state.lang);
   }
   if (kind === 'coverage') {
-    if (u.area && FEE_ASK.test(u.text)) {
-      return R.info({ kind: 'policy', line: compileSpokenAreaFee(profile, u.area.name, state.lang) }, state.lang);
-    }
-    if (!u.area && DELIVER_ASK.test(u.text)) {
-      const delivery = compileSpokenPolicies(profile).line('delivery', state.lang);
-      if (delivery && !/don't have that on file|Sina hiyo kwenye rekodi/.test(delivery)) {
-        return R.info({ kind: 'policy', line: delivery }, state.lang);
-      }
+    if (FEE_ASK.test(u.text) || (!u.area && DELIVER_ASK.test(u.text))) {
+      const line = compileSpokenVisitFee(profile, u.area && u.area.name, state.lang);
+      if (line) return R.info({ kind: 'policy', line }, state.lang);
     }
     const loc = (profile.businessLocations || [])[0];
     const compiled = compileSpokenCoverage(profile, { limit: 4 });

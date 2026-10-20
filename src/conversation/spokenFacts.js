@@ -159,6 +159,26 @@ function compileSpokenAreaFee(profile = {}, place, language = 'en') {
     : `${hit.name} is on our list. The team confirms the fee when you book.`;
 }
 
+function unknownPolicy(line) {
+  return /don't have that on file|Sina hiyo kwenye rekodi/.test(String(line || ''));
+}
+
+function knownAreaFee(line) {
+  return /\b(shillings|shilingi)\b|no travel fee to|Hakuna ada ya/i.test(String(line || ''));
+}
+
+/** Named-area fee if Locations has it; else the delivery sentence we already file. */
+function compileSpokenVisitFee(profile = {}, place, language = 'en') {
+  const delivery = compileSpokenPolicies(profile).line('delivery', language);
+  if (place) {
+    const fee = compileSpokenAreaFee(profile, place, language);
+    if (knownAreaFee(fee)) return fee;
+    if (!unknownPolicy(delivery)) return delivery;
+    return fee;
+  }
+  return unknownPolicy(delivery) ? '' : delivery;
+}
+
 function compileSpokenPolicies(profile = {}) {
   const p = normalizePolicies(profile.businessPolicies);
   const rows = [];
@@ -226,6 +246,7 @@ module.exports = {
   compileSpokenHours,
   compileSpokenPolicies,
   compileSpokenAreaFee,
+  compileSpokenVisitFee,
   compileSpokenFaqs,
   compileSpokenShop,
 };

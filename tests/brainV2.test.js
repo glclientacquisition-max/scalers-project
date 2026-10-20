@@ -302,3 +302,25 @@ test('empty refund slot stays unknown and cancellation policy is not a cancel wr
   assert.match(out[1].line, /reschedule up to 12 hours/i);
   assert.equal(log.length, 0);
 });
+
+const JIRANI_IDS_ONLY = {
+  ...JIRANI,
+  service_areas: undefined,
+  serviceAreas: undefined,
+  areaTerms: undefined,
+};
+
+test('HD_16b: fare, ada ya, and a bare cancellation speak the file', async () => {
+  const fare = await talk(['Are like the fare to Karen?'], { profile: JIRANI_IDS_ONLY, langLock: 'en' });
+  assert.match(fare.out[0].line, /eight hundred shillings/i);
+  assert.doesNotMatch(fare.out[0].line, /confirms the fee|Shall I go ahead|How can I help you today/i);
+
+  const ada = await talk(['Kwanza niko nataka kujua ada ya.'], { profile: JIRANI, langLock: 'sw' });
+  assert.match(ada.out[0].line, /Home visits|Kilimani|Karen/i);
+  assert.doesNotMatch(ada.out[0].line, /bei, huduma au saa|prices, services or our hours/i);
+
+  const cancel = await talk(['Cancellation?'], { profile: JIRANI, langLock: 'en' });
+  assert.match(cancel.out[0].line, /reschedule up to 12 hours/i);
+  assert.doesNotMatch(cancel.out[0].line, /Shall I go ahead|Cancel your/i);
+  assert.equal(cancel.log.length, 0);
+});
