@@ -1,11 +1,11 @@
 ---
 owner: platform
-last_reviewed: 2026-10-19
+last_reviewed: 2026-10-20
 ---
 
 # Scalers status and handoff (start here)
 
-**Last updated 20 Oct 2026, 02:20 EAT.** #827 (`1fe78868`) is the production Desk deploy, 23:01 UTC. `/pay/[token]` was a cached prerender, so it could still show the closed-gate sentence after the hosting switches were on. Follow-up `cursor/pay-page-request-9679` renders that page on each request. Checked against the billing apply list. Items marked *per team notes* come from lane agents and Alvin, not from the repo. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule)).
+**Last updated 20 Oct 2026.** #828 (`aff2cc80`) is the production Desk deploy, 06:35 UTC. `GET /api/pay/<token>` is `no-store` and payable. The pay page is a public prerender that can still show "Online payment isn't available yet" from a cached body. Follow-up `cursor/pay-page-gate-9679` stops Next baking `NEXT_PUBLIC_SUPABASE_URL` into the gate, reads `BACHS_MODE` from `process.env`, sends `Cache-Control: private, no-store` on `/pay`, and loads that API on the page. Checked against the billing apply list. Items marked *per team notes* come from lane agents and Alvin, not from the repo. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule)).
 
 New agent or new human: read this whole page before you touch code.
 
@@ -187,7 +187,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 
 ## 5. Known broken / open issues
 
-- **`/pay/[token]` was a cached prerender (open).** #827 (`1fe78868`) is production Desk as of 23:01 UTC. The pay API is `no-store` and, with the hosting switches on, returns the Pay button. The page itself was `x-nextjs-prerender` and a Vercel cache HIT, so a render from while the Bachs gate was closed kept "Online payment isn't available yet". `instant = false` does not stop that prerender. Follow-up `cursor/pay-page-request-9679` calls `connection()` before the lookup. Billing notices and plan changes do not decide that sentence.
+- **`/pay/[token]` can cache the closed sentence.** #828 (`aff2cc80`) is production Desk as of 06:35 UTC on 20 Oct. The page and `GET /api/pay/<token>` share `paymentsClosed`. Next rewrites `.NEXT_PUBLIC_*` members to the build-time URL, and `env.BACHS_MODE` is not a static read, so a prerender can look like mode off on the production database and store "Online payment isn't available yet" (`x-nextjs-prerender`, `cache-control: public`). The API is `no-store` and returns Pay KSh 10 with notice null. A fresh IAD document after #828 was already payable. `connection()` did not stop the prerender. `cacheComponents` rejects `revalidate` and `dynamic`. Follow-up `cursor/pay-page-gate-9679` reads `process.env.BACHS_MODE` directly, does not bake the public URL, sends `Cache-Control: private, no-store` on `/pay`, and loads the no-store API on the page. Billing notices and plan changes do not decide that sentence.
 - **Invoice reads while Bachs is refused (fixed on `main`, #802, `5b013c4d`).** Invoice, receipt, PDF, and `/pay/<token>` reads do not call the Bachs gate. Checkout still returns 503 `payments_unavailable` while the gate is closed. Production Desk is `1fe78868`.
 - **Bachs collected total is still unconfirmed (open).** Whether `charge.amount_paid` is the sum of every collection on one checkout is unanswered. A short new receipt or a lower GET still opens a review and does not move money. The go-live follow-up (`cursor/bachs-payments-go-live-9679`) lets staff `book` add the seen total plus that event once, or `nothing` to leave the books. P19 is not applied. P15, P16, and P17 are on prod. Do not re-run them. A missed live webhook is swept by the retry cron once live mode is on. On this Vercel Hobby account that sweep is once a day at 03:07 UTC.
 - **#685 price units (open, fix in #771, not merged).** Settings "Is this right?" shows and saves "KSh 40 per sq ft" as "KSh 40", so the Business Assistant can quote the short line. Migration `20261018200000_price_unit_preserve.sql` repairs backfilled rows. Not applied. Staging first, needs backup before prod.

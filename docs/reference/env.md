@@ -11,16 +11,17 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-189 variables.
+190 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
 | `ADMIN_ACCESS_CODE` | desk | `dashboard/src/lib/admin-auth.ts` |
 | `AGENT_NAME` | voice | `server.js`<br>`src/db.js`<br>`src/prompts.js`<br>+1 more |
 | `ALERT_EMAIL_FROM` | voice | `server.js`<br>`src/notifications/email.js` |
-| `BACHS_API_KEY` | desk | `dashboard/src/lib/adminPayRead.ts` |
+| `BACHS_API_KEY` | desk | `dashboard/src/lib/adminPayRead.ts`<br>`dashboard/src/lib/invoicePay/provider.js` |
 | `BACHS_LIVE_ALLOWED` | desk | `dashboard/src/lib/invoicePay/provider.js` |
 | `BACHS_LIVE_TENANT_ALLOWLIST` | desk | `dashboard/src/lib/adminPayRead.ts`<br>`dashboard/src/lib/invoicePay/provider.js` |
+| `BACHS_MODE` | desk | `dashboard/src/lib/invoicePay/provider.js` |
 | `BACHS_WEBHOOK_SECRET` | desk | `dashboard/src/lib/adminPayRead.ts` |
 | `BASE_REPO` | scripts | `scripts/stage-pull-request.js` |
 | `BENCH_VERBOSE` | scripts | `scripts/bench-inbound-webhook.js` |
@@ -146,7 +147,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SUPABASE_PUBLISHABLE_KEY` | desk | `dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_RECORDINGS_BUCKET` | voice | `src/db.js` |
 | `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/supabase.ts`<br>`scripts/backfillFactHashes.js`<br>`scripts/bench-inbound-webhook.js`<br>+7 more |
-| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts`<br>+9 more |
+| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/invoicePay/provider.js`<br>`dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>+10 more |
 | `TENANT_DID` | voice | `server.js`<br>`src/db.js` |
 | `TENANT_ID` | scripts, voice | `scripts/bench-inbound-webhook.js`<br>`scripts/smoke-db.js`<br>`server.js`<br>+1 more |
 | `TEXTSMS_API_KEY` | desk, voice | `dashboard/src/lib/callerSms.ts`<br>`src/notifications/sms.js` |

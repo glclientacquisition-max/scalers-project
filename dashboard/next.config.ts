@@ -16,6 +16,20 @@ const nextConfig: NextConfig = {
     "/**": ["./.voice/**/*"],
   },
   // Old links and muscle memory: the Inbox lives at /calls.
+  async headers() {
+    return [
+      {
+        // The filled pay page was a public prerender (Vercel HIT). The API is no-store.
+        source: "/pay/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-cache, no-store, max-age=0, must-revalidate",
+          },
+        ],
+      },
+    ];
+  },
   async redirects() {
     return [
       { source: "/inbox", destination: "/calls", permanent: false },
