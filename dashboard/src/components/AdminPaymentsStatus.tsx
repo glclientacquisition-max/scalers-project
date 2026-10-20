@@ -118,8 +118,8 @@ export function AdminPaymentsStatus({ status }: { status: BachsStatusView }) {
         <h2 className="px-4 text-caption text-ink-3">Live businesses</h2>
         <ul className="divide-y divide-hairline/70 border-y border-hairline/70">
           <ListRow title="Allowed" preview={status.liveSummary} />
-          {status.liveNames.map((name) => (
-            <ListRow key={name} title={name} preview="Live payments on" />
+          {status.liveRows.map((row) => (
+            <ListRow key={row.id} title={row.name} preview={row.preview} />
           ))}
         </ul>
       </section>

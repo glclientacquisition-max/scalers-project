@@ -1,5 +1,7 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const {
   invoiceModel,
   renderInvoiceHtml,
@@ -7,6 +9,7 @@ const {
 } = require("../dashboard/src/lib/invoicePay/documents");
 const { letterheadFromCompanyRow, letterheadFromInvoice, letterheadForInvoice } = require("../dashboard/src/lib/invoicePay/company");
 const { renderInvoicePdf, renderReceiptPdf } = require("../dashboard/src/lib/invoicePay/pdf");
+const wordmark = require("../dashboard/src/lib/invoicePay/wordmark");
 const { invoiceDocumentFor, receiptDocumentFor, shapeBillingHistory } = require("../dashboard/src/lib/invoicePay/history");
 const { openInvoice, paidInvoice, receiptDoc, splitInvoice } = require("../dashboard/src/lib/invoicePay/samples");
 const {
@@ -22,6 +25,16 @@ function sampleDocs() {
 }
 
 describe("invoice documents", () => {
+  it("embeds the wordmark jpeg and does not read it from disk", () => {
+    const file = fs.readFileSync(path.join(__dirname, "../dashboard/src/lib/invoicePay/wordmark.jpg"));
+    const source = fs.readFileSync(path.join(__dirname, "../dashboard/src/lib/invoicePay/wordmark.js"), "utf8");
+    assert.ok(file.equals(wordmark.bytes));
+    assert.equal(wordmark.width, 840);
+    assert.equal(wordmark.height, 321);
+    assert.equal(wordmark.dataUri, `data:image/jpeg;base64,${file.toString("base64")}`);
+    assert.doesNotMatch(source, /readFileSync|require\("node:fs"\)|path\.join/);
+  });
+
   it("shows the confirmed letterhead, the locked prices, and no VAT", () => {
     const { invoice, receipt } = sampleDocs();
     assert.equal(invoice.company.legalName, "Scalers Ventures");

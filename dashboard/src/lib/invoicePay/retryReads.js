@@ -76,4 +76,68 @@ async function retryStoredReads(input) {
   return { ok: true, rows };
 }
 
-module.exports = { retryStoredReads };
+/**
+ * Live mode reads open checkouts and applies charge.amount_paid as the
+ * running total. A business that is not allowlisted is skipped. Sandbox and
+ * off do not sweep here. An unreadable read is skipped. A second run of the
+ * same total does nothing.
+ * @param {{
+ *   env?: NodeJS.ProcessEnv,
+ *   listAttempts: () => Promise<Array<{ tenantId: string, invoiceId: string, checkoutId: string }>>,
+ *   getCheckout: (checkoutId: string) => Promise<object | null>,
+ *   settleTotal: (input: object) => Promise<{ noop?: boolean }>,
+ *   readLiveTenant?: (tenantId: string, env: NodeJS.ProcessEnv) => Promise<boolean>,
+ * }} input
+ */
+async function sweepOpenCheckouts(input) {
+  const env = input.env || process.env;
+  if (bachsMode(env) !== "live") return { ok: true, rows: [] };
+  assertBachsAllowed(env);
+  const attempts = await input.listAttempts();
+  const rows = [];
+  for (const attempt of attempts || []) {
+    const checkoutId = attempt && attempt.checkoutId ? String(attempt.checkoutId) : "";
+    if (!checkoutId || !attempt.tenantId || !attempt.invoiceId) continue;
+    try {
+      await assertLiveTenant(attempt.tenantId, env, input.readLiveTenant);
+    } catch (err) {
+      if (err && err.code === "bachs_live_refused") {
+        rows.push({ kind: "sweep_skipped", detail: checkoutId, reason: "live_not_allowlisted" });
+        continue;
+      }
+      throw err;
+    }
+    let remote;
+    try {
+      remote = await input.getCheckout(checkoutId);
+    } catch {
+      rows.push({ kind: "sweep_unreadable", detail: checkoutId });
+      continue;
+    }
+    const collected = collectedFromCheckout(remote);
+    if (!collected || collected.unreadable || collected.currencyIssue || collected.cents == null || collected.cents <= 0n) {
+      rows.push({ kind: "sweep_unread", detail: checkoutId });
+      continue;
+    }
+    try {
+      const settled = await input.settleTotal({
+        provider: "bachs",
+        checkoutId,
+        totalKes: collected.totalKes || "0",
+        tenantId: attempt.tenantId,
+        invoiceId: attempt.invoiceId,
+        raw: {},
+      });
+      rows.push({
+        kind: "sweep_settled",
+        detail: checkoutId,
+        noop: Boolean(settled && settled.noop),
+      });
+    } catch {
+      rows.push({ kind: "sweep_failed", detail: checkoutId });
+    }
+  }
+  return { ok: true, rows };
+}
+
+module.exports = { retryStoredReads, sweepOpenCheckouts };

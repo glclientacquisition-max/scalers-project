@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- node:test loads this file with require() */
-const { toCents } = require("./money");
+const { fromCents, toCents } = require("./money");
 const { verifyBachsRequest } = require("./signature");
 const { assertLiveTenant, MockPayProvider } = require("./provider");
 
@@ -268,6 +268,45 @@ function bookTotalForResolve(input) {
   return { ok: true, totalKes };
 }
 
+/**
+ * Total to pass when staff chose book.
+ * A rising GET is the cumulative reading: book that total.
+ * A new collection whose own amount is larger than the rise is the per-event
+ * reading: book the seen total plus that amount. A replay of the same total
+ * is a no-op. A passed total below the stored GET is refused.
+ * An event amount equal to the checkout price is not a collection amount.
+ * @param {{ kind?: string, getKes?: string | number, seenKes?: string | number, eventKes?: string | number | null, priceKes?: string | number | null, passedKes?: string | number | null }} input
+ */
+function bookTotalForReview(input) {
+  const get = toCents(input.getKes == null || String(input.getKes).trim() === "" ? "0" : String(input.getKes));
+  const seen = toCents(input.seenKes == null || String(input.seenKes).trim() === "" ? "0" : String(input.seenKes));
+  if (get == null || seen == null || get < 0n || seen < 0n) {
+    return { ok: false, error: "Couldn't read the collected amount. Nothing changed." };
+  }
+  const passedRaw = input.passedKes == null ? "" : String(input.passedKes).trim();
+  const passed = passedRaw === "" ? null : toCents(passedRaw);
+  if (passedRaw !== "" && (passed == null || passed < 0n)) {
+    return { ok: false, error: "Couldn't read the collected amount. Nothing changed." };
+  }
+  if (passed != null && passed < get) {
+    return { ok: false, error: "collected total fell" };
+  }
+  const event = input.eventKes == null || String(input.eventKes).trim() === "" ? null : toCents(String(input.eventKes));
+  const price = input.priceKes == null || String(input.priceKes).trim() === "" ? null : toCents(String(input.priceKes));
+  const rise = get > seen ? get - seen : 0n;
+  const eventIsPrice = event != null && price != null && price > 0n && event === price;
+  const perEvent = input.kind === "short_rise"
+    && event != null
+    && event > 0n
+    && !eventIsPrice
+    && event > rise;
+  if (perEvent) {
+    return { ok: true, perEvent: true, totalKes: fromCents(seen + event) };
+  }
+  const total = passed != null ? passed : get;
+  return { ok: true, perEvent: false, totalKes: fromCents(total) };
+}
+
 function readerFor(input) {
   if (input.provider && typeof input.provider.getCheckout === "function") return input.provider;
   if (!MockPayProvider.sessions) return null;
@@ -505,6 +544,7 @@ module.exports = {
   collectionReport,
   collectedFromCheckout,
   bookTotalForResolve,
+  bookTotalForReview,
   decidePayment,
   handlePayWebhook,
   minorUnits,

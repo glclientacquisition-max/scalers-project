@@ -145,8 +145,7 @@ async function assertLiveTenant(tenantId, env = process.env, reader) {
   let allowed = false;
   try {
     allowed = await read(String(tenantId || "").trim(), env);
-  } catch (err) {
-    if (err && err.code === "prod_refused") throw err;
+  } catch {
     throw refused("live payments are not open for this business", "bachs_live_refused");
   }
   if (allowed === true) return;

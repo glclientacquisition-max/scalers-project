@@ -7,6 +7,8 @@ import { liveTenantPostError } from "@/lib/invoicePay/liveTenantsApi";
 /**
  * Super Admin list and set for billing_live_tenants.
  * POST requires confirm: true and a reason. The SQL function refuses beta.
+ * Signed-out visitors are redirected to /admin/login by requireSuperAdmin.
+ * That redirect is expected. This route does not return 401.
  */
 export async function GET() {
   await requireSuperAdmin();

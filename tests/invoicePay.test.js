@@ -5,7 +5,7 @@ const path = require("node:path");
 const { splitKes, toCents, formatKsh, nextPart } = require("../dashboard/src/lib/invoicePay/money");
 const { signBachsBody, verifyBachsRequest } = require("../dashboard/src/lib/invoicePay/signature");
 const { MockPayProvider, BachsPayProvider, payProviderFromEnv, SANDBOX_API } = require("../dashboard/src/lib/invoicePay/provider");
-const { handlePayWebhook, extractCharge, bookTotalForResolve } = require("../dashboard/src/lib/invoicePay/webhook");
+const { handlePayWebhook, extractCharge, bookTotalForResolve, bookTotalForReview } = require("../dashboard/src/lib/invoicePay/webhook");
 const { payView } = require("../dashboard/src/lib/invoicePay/view");
 const { startInvoiceCheckout } = require("../dashboard/src/lib/invoicePay/checkoutFlow");
 const { reconciliationReport, assertNotProductionUrl } = require("../dashboard/src/lib/invoicePay/reconcile");
@@ -131,6 +131,22 @@ describe("Bachs signature", () => {
     const past = sent * 1000 + 301 * 1000;
     assert.equal(verifyBachsRequest({ rawBody: raw, headers: signed.headers, secret: SECRET, now: within }), true);
     assert.equal(verifyBachsRequest({ rawBody: raw, headers: signed.headers, secret: SECRET, now: past }), false);
+  });
+
+  it("rejects a webhook whose signature does not match and does not record it", async () => {
+    const { ledger } = seedPayable("10.00", "10.00");
+    const raw = JSON.stringify({ id: "evt_bad", type: "collection.succeeded", data: { checkout_id: "chk_x" } });
+    const signed = signBachsBody("other-secret", raw, Math.floor(NOW / 1000));
+    const rejected = await handlePayWebhook({
+      rawBody: raw,
+      headers: signed.headers,
+      secret: SECRET,
+      ledger,
+      now: NOW,
+    });
+    assert.equal(rejected.status, 401);
+    assert.equal(ledger.events.size, 0);
+    assert.equal(ledger.payments.length, 0);
   });
 
   it("accepts signature v2 when one of the v1 secrets matches", () => {
@@ -1571,6 +1587,45 @@ describe("Bachs sandbox fields", () => {
     assert.equal(fresh.totalKes, "12");
   });
 
+  it("books a running total when the rise covers the collection, and a per-event amount when it does not", () => {
+    const covered = bookTotalForReview({
+      kind: "short_rise",
+      getKes: "20",
+      seenKes: "10",
+      eventKes: "10",
+      priceKes: "30",
+    });
+    assert.equal(covered.perEvent, false);
+    assert.equal(covered.totalKes, "20");
+    const slice = bookTotalForReview({
+      kind: "short_rise",
+      getKes: "10",
+      seenKes: "10",
+      eventKes: "10",
+      priceKes: "20",
+    });
+    assert.equal(slice.perEvent, true);
+    assert.equal(slice.totalKes, "20");
+    const priceEcho = bookTotalForReview({
+      kind: "short_rise",
+      getKes: "20",
+      seenKes: "20",
+      eventKes: "20",
+      priceKes: "20",
+    });
+    assert.equal(priceEcho.perEvent, false);
+    assert.equal(priceEcho.totalKes, "20");
+    const fell = bookTotalForReview({
+      kind: "decrease",
+      getKes: "10",
+      seenKes: "20",
+      eventKes: "10",
+      priceKes: "20",
+      passedKes: "9",
+    });
+    assert.equal(fell.ok, false);
+  });
+
   it("opens one review when a new receipt is not covered by the Bachs total", async () => {
     const { ledger, token } = seedPayable("20.00", "20.00");
     const provider = new MockPayProvider();
@@ -1600,6 +1655,25 @@ describe("Bachs sandbox fields", () => {
       extraData: { mpesa_receipt: "UBC2" },
     });
     assert.equal(ledger.payments.filter((row) => row.matchStatus === "issue").length, 1);
+    const issue = ledger.payments.find((row) => row.matchStatus === "issue");
+    await ledger.resolveCheckoutReview({
+      provider: "bachs",
+      providerRef: issue.providerRef,
+      actor: "ada",
+      reason: "Second M-Pesa receipt",
+      choice: "book",
+    });
+    assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("20"));
+    assert.equal(collected(ledger), toCents("20"));
+    await ledger.resolveCheckoutReview({
+      provider: "bachs",
+      providerRef: issue.providerRef,
+      actor: "ada",
+      reason: "Second M-Pesa receipt again",
+      choice: "book",
+    });
+    assert.equal(collected(ledger), toCents("20"));
+    assert.equal(ledger.payments.filter((row) => row.matchStatus !== "issue").length, 1);
   });
 
   it("keeps a credit when the Bachs total falls and writes one review", async () => {
@@ -1797,6 +1871,60 @@ describe("Bachs sandbox fields", () => {
     assert.equal([...ledger.events.values()][0].needsRetry, false);
     const again = await retryStoredReads({ ...adapters, env: liveEnv });
     assert.equal(again.rows.length, 0);
+    assert.equal(ledger.payments.filter((row) => row.matchStatus !== "issue").length, 1);
+  });
+
+  it("sweeps an open live checkout from the running total and skips a business that is not allowed", async () => {
+    const { sweepOpenCheckouts } = require("../dashboard/src/lib/invoicePay/retryReads");
+    const { ledger, token } = seedPayable("10.00", "10.00");
+    const provider = new MockPayProvider();
+    const started = await startInvoiceCheckout({ token, origin: "https://app.example", ledger, provider });
+    provider.paidEvent(started.checkoutId, {
+      secret: SECRET,
+      now: NOW,
+      amountKes: "10.00",
+      collectedKes: "10.00",
+      leaveCheckout: false,
+    });
+    const attempt = ledger.attempts.find((row) => row.checkoutSessionId === started.checkoutId);
+    const adapters = {
+      listAttempts: async () => [{
+        tenantId: attempt.tenantId,
+        invoiceId: attempt.invoiceId,
+        checkoutId: started.checkoutId,
+      }],
+      getCheckout: (checkoutId) => provider.getCheckout(checkoutId),
+      settleTotal: (input) => ledger.reconcileCheckoutTotal(input),
+    };
+    const closed = await sweepOpenCheckouts({
+      ...adapters,
+      env: { BACHS_MODE: "sandbox", BACHS_API_KEY: "sk_sandbox_x" },
+    });
+    assert.equal(closed.rows.length, 0);
+    assert.equal(collected(ledger), 0n);
+    const skipped = await sweepOpenCheckouts({
+      ...adapters,
+      env: {
+        BACHS_MODE: "live",
+        BACHS_LIVE_ALLOWED: "true",
+        BACHS_API_KEY: "test-live",
+        BACHS_LIVE_TENANT_ALLOWLIST: "someone-else",
+      },
+    });
+    assert.equal(skipped.rows[0].reason, "live_not_allowlisted");
+    assert.equal(collected(ledger), 0n);
+    const liveEnv = {
+      BACHS_MODE: "live",
+      BACHS_LIVE_ALLOWED: "true",
+      BACHS_API_KEY: "test-live",
+      BACHS_LIVE_TENANT_ALLOWLIST: "*",
+    };
+    const settled = await sweepOpenCheckouts({ ...adapters, env: liveEnv });
+    assert.equal(settled.rows[0].kind, "sweep_settled");
+    assert.equal(toCents(ledger.invoices.get("inv1").amountPaidKes), toCents("10"));
+    assert.equal(ledger.invoices.get("inv1").status, "paid");
+    const again = await sweepOpenCheckouts({ ...adapters, env: liveEnv });
+    assert.equal(again.rows[0].noop, true);
     assert.equal(ledger.payments.filter((row) => row.matchStatus !== "issue").length, 1);
   });
 
@@ -2110,7 +2238,9 @@ describe("reads while the Bachs gate refuses", () => {
     const load = fs.readFileSync(path.join(root, "dashboard/src/lib/invoicePay/loadPay.ts"), "utf8");
     assert.ok(load.indexOf("ledger.lookup") < load.indexOf("presentPayPage("));
     assert.doesNotMatch(load, /assertBachsAllowed/);
-    assert.match(fs.readFileSync(path.join(root, "dashboard/src/app/pay/[token]/page.tsx"), "utf8"), /loadPayView/);
+    const payPage = fs.readFileSync(path.join(root, "dashboard/src/app/pay/[token]/page.tsx"), "utf8");
+    assert.ok(payPage.indexOf("await connection()") < payPage.indexOf("loadPayView(token"));
+    assert.doesNotMatch(payPage, /unstable_dynamicStaleTime/);
 
     const expired = presentPayPage(
       payView({

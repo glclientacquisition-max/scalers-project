@@ -1,7 +1,8 @@
 -- Invoice pay checkout review (P14).
--- Apply after invoice_pay_checkout_total.sql (P13). Staging only until Alvin's GO.
+-- Apply after invoice_pay_checkout_total.sql (P13).
 -- Does not replace finalize_invoice. Does not edit P1-P13.
--- Production (fjxcdccgyhnvnnlnovcl) does not have this file.
+-- Production (fjxcdccgyhnvnnlnovcl) has this file. Applied 2026-10-19
+-- 08:11-08:13 UTC, versions 20261019081159 through 20261019081339. Do not re-run.
 --
 -- A signed event is still only a trigger. Money still comes from
 -- charge.amount_paid on GET /v1/checkout-sessions/{id}. This file refuses
