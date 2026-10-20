@@ -49,7 +49,7 @@ test('live turn speaks a services list and does not invent a booking', async () 
     profile,
     langLock: 'en',
   });
-  assert.match(out.line, /Deep clean, one bedroom|Sofa cleaning|We do/i);
+  assert.match(out.line, /Deep clean, one bedroom|Sofa cleaning|We offer/i);
   assert.doesNotMatch(out.line, /1 bedroom/);
   assert.equal(writes.length, 0);
 });

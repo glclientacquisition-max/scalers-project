@@ -20,7 +20,7 @@ async function talk(lines, opts = {}) {
   const { log, handlers } = fakeHandlers();
   const st = V2.createState({ profile: opts.profile || DD, callerPhone: '+254700000001', contactName: opts.contactName || null, openRows: opts.openRows || [], pendingTasks: opts.pendingTasks || [] });
   const out = [];
-  for (const text of lines) out.push(await V2.runTurn(st, { text, profile: opts.profile || DD, now: NOW, handlers, model: opts.model }));
+  for (const text of lines) out.push(await V2.runTurn(st, { text, profile: opts.profile || DD, now: NOW, handlers, model: opts.model, langLock: opts.langLock || null }));
   return { st, out, log };
 }
 
@@ -122,7 +122,7 @@ test('catalogue: schemas reject extra properties and foreign row ids; Gemini req
 test('Swahili/Sheng questions get fact answers from tenant data, not a generic reply', async () => {
   const one = async (t) => (await talk([t])).out[0];
   let r = await one('Nilikuwa nataka kujua ni services gani mnaofa.');
-  assert.equal(r.lang, 'sw'); assert.match(r.line, /^Tunafanya .*Mattress cleaning/);
+  assert.equal(r.lang, 'sw'); assert.match(r.line, /^Tuna .*Mattress cleaning/);
   r = await one('Nilikuwa nataka kujua ni saizi gani mnatoa.'); assert.match(r.line, /Bedroom|chumba kimoja|vyumba|bedroom homes/i);
   r = await one('Mnawashanga carpet?'); assert.match(r.line, /^Ndio, tunafanya Carpet Cleaning, bei ni kuanzia shilingi elfu mbili na mia mbili/);
   r = await one('Niaje, mnafika Syokimau?'); assert.match(r.line, /^Syokimau iko kwenye orodha/);
@@ -145,7 +145,7 @@ test('live-run regressions: no double question, recall beats services, a questio
   const b = await talk(['Ni huduma gani nilikuwa nimeitisha, mara ya mwisho?']);
   assert.match(b.out[0].line, /Sioni booking/);
   const c = await talk(['Uh, I don\'t know.', 'Maybe you tell me.', 'For sure.', 'Nilikuwa nataka kujua ni services gani mna-offer,na.']);
-  assert.match(c.out[3].line, /^Tunafanya/);
+  assert.match(c.out[3].line, /^Tuna /);
 });
 
 test('"Sawa, ni hayo tu" at a read-back is not a yes (live regression HD_1677)', async () => {
@@ -171,7 +171,7 @@ test('"siishi Nairobi" is not answered as "Nairobi is covered"; help requests ge
 test('never-repeat: the coverage line is not said twice in a row (live HD_6a7597)', async () => {
   const r = await talk(['Hapana, mimi siishi Nairobi.', 'Oh, eh, sawa, mfike huko.', 'Mfike huko.']);
   assert.notEqual(r.out[0].line, r.out[1].line); assert.notEqual(r.out[1].line, r.out[2].line);
-  assert.match(r.out[1].line, /^Maeneo yetu ni Nairobi/);
+  assert.match(r.out[1].line, /^Maeneo yetu ni /);
   const p = await talk(['How much is gutter cleaning?', 'How much is gutter cleaning?']);
   assert.doesNotMatch(p.out[1].line, /^(As I said|Just to repeat)/, 'a repeat is said plainly, no filler prefix');
 });
@@ -222,4 +222,30 @@ test('HD_513dfb2fa73f: "make a booking" + detail answers keep the booking going;
   // an offered service answered with a day is a yes to "Would you like to book?"
   const r = await talk(['Do you clean sofas?', 'Tomorrow at 10am please']);
   assert.match(r.out[1].line, /Where should we come|name|Shall I book/i);
+});
+
+test('HD_725: Nafika a listed area from service_areas answers coverage, does not book', async () => {
+  const profile = {
+    ...DD,
+    serviceAreas: undefined,
+    service_areas: {
+      areas: [
+        { id: 'place:kileleshwa', source: 'owner', confirmed: true, fee_ksh: 300, fee_mode: 'fixed', modes: ['visit'] },
+      ],
+    },
+  };
+  const { out, st, log } = await talk(['How much is sofa cleaning?', 'Nafika Kileleshwa?'], { profile, langLock: 'sw' });
+  assert.match(out[1].line, /Kileleshwa iko kwenye orodha/);
+  assert.doesNotMatch(out[1].line, /haiko kwenye orodha|Siku gani|What day/);
+  assert.equal(st.intent, null);
+  assert.equal(log.length, 0);
+});
+
+test('an hours ask during an open booking does not glue the next slot', async () => {
+  const { out } = await talk([
+    'Book sofa cleaning Friday at 10am in Kitengela, I am Alvin.',
+    'Mnafungua saa ngapi?',
+  ]);
+  assert.match(out[1].line, /08:00|18:00|wazi|open/i);
+  assert.doesNotMatch(out[1].line, /Shall I book|Nithibitishe|Siku gani/);
 });

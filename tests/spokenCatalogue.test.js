@@ -36,6 +36,16 @@ describe('speakCatalogueName', () => {
   it('keeps names without sizes', () => {
     assert.equal(speakCatalogueName('Mattress cleaning', 'sw'), 'Mattress cleaning');
   });
+
+  it('speaks sq ft, litres, and per seat instead of the typed token', () => {
+    assert.match(speakCatalogueName('Office, 1200 sq ft', 'en'), /one thousand two hundred square feet/i);
+    assert.match(speakCatalogueName('Office, 1200 sq ft', 'sw'), /futi za mraba/);
+    assert.doesNotMatch(speakCatalogueName('Office, 1200 sq ft', 'en'), /sq\s*ft/i);
+    assert.match(speakCatalogueName('Water, 20 litres', 'en'), /twenty litres/i);
+    assert.match(speakCatalogueName('Water, 20 litres', 'sw'), /lita ishirini|ishirini/);
+    assert.match(speakCatalogueName('Sofa cleaning per seat', 'en'), /per seat/i);
+    assert.match(speakCatalogueName('Sofa cleaning per seat', 'sw'), /kwa kiti/);
+  });
 });
 
 describe('compileSpokenCatalogue groups size siblings', () => {
@@ -104,7 +114,19 @@ describe('local catalogue line and v2 receipts share the same names', () => {
       'sw'
     );
     assert.match(line, /chumba kimoja/);
-    assert.doesNotMatch(line, /1 bedroom/);
+    assert.match(line, /^Tuna /);
+    assert.match(line, /Unahitaji gani/);
+    assert.doesNotMatch(line, /1 bedroom|Tunafanya/);
+  });
+
+  it('v2 English list uses the compile opener', () => {
+    const line = info(
+      { kind: 'services', names: ['Deep clean for one bedroom to three bedroom homes', 'Sofa cleaning'], more: true },
+      'en'
+    );
+    assert.match(line, /^We offer /);
+    assert.match(line, /Which one do you need/);
+    assert.doesNotMatch(line, /We do |would you like/i);
   });
 
   it('v2 offered price uses spoken money, not KSh', () => {

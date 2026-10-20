@@ -55,8 +55,9 @@ describe('compileSpokenCoverage', () => {
     const compiled = compileSpokenCoverage(SHOP);
     assert.deepEqual(compiled.names, ['Kileleshwa', 'Westlands', 'Kilimani', 'Lavington']);
     assert.equal(compiled.more, true);
-    assert.match(compiled.opener('en'), /We serve Kileleshwa, Westlands, Kilimani, and Lavington and other listed areas/i);
-    assert.match(compiled.opener('sw'), /Tunahudumia Kileleshwa, Westlands, Kilimani, na Lavington na maeneo mengine/);
+    assert.match(compiled.opener('en'), /We serve Kileleshwa, Westlands, Kilimani, and Lavington\. We also cover other listed areas/i);
+    assert.doesNotMatch(compiled.opener('en'), /and Lavington and other/);
+    assert.match(compiled.opener('sw'), /Tunahudumia Kileleshwa, Westlands, Kilimani, na Lavington\. Pia tuna maeneo mengine/);
     assert.doesNotMatch(compiled.opener('en'), /Runda/);
   });
 });
@@ -67,7 +68,9 @@ describe('compileSpokenHours and policies', () => {
     assert.match(hours.opener('en'), /8 AM/);
     assert.match(hours.opener('en'), /5 PM/);
     assert.doesNotMatch(hours.opener('en'), /08:00/);
-    assert.match(hours.opener('sw'), /8 AM/);
+    assert.match(hours.opener('sw'), /saa mbili asubuhi/);
+    assert.match(hours.opener('sw'), /saa kumi na moja jioni/);
+    assert.doesNotMatch(hours.opener('sw'), /8 AM|5 PM|AM|PM/);
   });
 
   it('keeps empty policy unknown', () => {
@@ -98,6 +101,19 @@ describe('v2 coverage list uses spoken join', () => {
       { kind: 'coverage', general: 'Kileleshwa, Westlands, Kilimani, and Lavington', more: true },
       'en'
     );
-    assert.match(line, /We serve Kileleshwa, Westlands, Kilimani, and Lavington and other listed areas/);
+    assert.match(line, /We serve Kileleshwa, Westlands, Kilimani, and Lavington\. We also cover other listed areas/);
+    assert.doesNotMatch(line, /and Lavington and other/);
+  });
+});
+
+describe('listed areas from service_areas', () => {
+  it('treats Settings Locations as listed when serviceAreas is missing', () => {
+    const { listedAreaIds } = require('../src/conversation/listedAreas');
+    const ids = listedAreaIds({
+      service_areas: {
+        areas: [{ id: 'place:kileleshwa' }, { id: 'place:lavington' }],
+      },
+    });
+    assert.deepEqual(ids, ['kileleshwa', 'lavington']);
   });
 });

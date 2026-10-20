@@ -15,6 +15,7 @@ const { buildRequest } = require('./gemini');
 
 const TRANSACTIONAL = ['payment_change', 'address_change', 'cancel', 'change', 'complaint', 'handoff', 'order', 'book'];
 const INFO = ['payment_how', 'greeting', 'who_are_you', 'services', 'coverage', 'recall', 'availability', 'price', 'hours', 'want_know'];
+const AREA_ASK = /\b(nafika|niko|nipo|mnafika|mnakuja|mtafika|mnafikana|cover|do you cover)\b/i;
 
 function createState({ profile = {}, callerPhone, contactName = null, openRows = [], pendingTasks = [] } = {}) {
   return {
@@ -349,6 +350,13 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   // 1) read-back pending: commit only on the caller's yes
   // a new question while a callback offer is open drops the offer and answers the question
   if (state.phase === 'readback' && state.pending?.tool === 'create_handoff' && !u.yes && u.intents.some((i) => INFO.includes(i))) resetIntent(state);
+  if (state.phase === 'readback' && state.pending && !u.yes && !u.no && !u.done && u.intents.some((i) => INFO.includes(i))) {
+    const infoKind = u.intents.find((i) => INFO.includes(i) && i !== 'want_know') || (u.intents.includes('want_know') ? 'want_know' : null);
+    if (infoKind) {
+      state.lastInfo = infoKind;
+      return out(infoAnswer(state, u, profile, infoKind));
+    }
+  }
   if (state.phase === 'readback' && state.pending) {
     const p = state.pending;
     mergeSlots(state, u, profile);
@@ -396,7 +404,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
       state.lastInfo = infoKind;
       if (!state.intent) mergeSlots(state, u, profile);
       const line = infoAnswer(state, u, profile, infoKind);
-      if (state.intent) { mergeSlots(state, u, profile); if (/\?\s*$/.test(line.replace(/\s*(Anything else\?|Kuna kingine\?)$/, ''))) return out(line); const st = stepIntent(state, u, profile); return out(st?.line ? `${line.replace(/\s*(Anything else\?|Kuna kingine\?)$/, '')} ${st.line}` : line); }
+      if (state.intent) mergeSlots(state, u, profile);
       return out(line);
     }
   }
@@ -405,6 +413,10 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
     // a service named with no question word is an enquiry about that service
     if (u.service && !u.intents.length && vertical(profile) === 'home') { state.lastInfo = 'services'; mergeSlots(state, u, profile); state.offer = 'book'; state.offerService = u.service.name; return out(R.info({ kind: 'offered', label: u.service.name, price: u.service.price_range || null }, lang)); }
     // a time or a place with no intent on a home-services line means a visit
+    if (AREA_ASK.test(u.text) && (u.place || u.area) && !u.intents.length) {
+      state.lastInfo = 'coverage';
+      return out(infoAnswer(state, u, profile, 'coverage'));
+    }
     if (!u.intents.length && (u.when?.time || ((u.when?.date || u.place) && state.slots.service)) && (u.place || state.slots.service) && vertical(profile) === 'home' && !u.ack && !u.done) { state.intent = 'book'; mergeSlots(state, u, profile); const st0 = stepIntent(state, u, profile); if (st0?.line) return out(st0.line); }
     if (u.name && !u.intents.length) return out(nameSpeakable(state) ? R.info({ kind: 'greet_name', name: nameSpeakable(state) }, lang) : R.ask('intent', 0, lang));
     if (state.lastInfo === 'recall' && !u.ack) { const line = infoAnswer(state, u, profile, 'recall'); return out(line); }

@@ -4,6 +4,8 @@
 // size tokens so TTS does not read "1 bedroom" as "moja bedroom".
 // Same function for every tenant, including ones not yet onboarded.
 
+const { numberToEn, numberToSw } = require('../speech/spokenForms');
+
 const EN_NUM = {
   1: 'one',
   2: 'two',
@@ -42,6 +44,8 @@ const SIZE_RES = [
   { kind: 'bedroom', re: /\b(\d{1,2})\s*-?\s*bedrooms?\b/gi, pack: false },
   { kind: 'seater', re: /\b(\d{1,2})\s*-?\s*seaters?\b/gi, pack: false },
   { kind: 'kg', re: /\b(\d{1,2})\s*-?\s*kgs?\b/gi, pack: false },
+  { kind: 'sqft', re: /\b(\d{2,5})\s*-?\s*(?:sq\.?\s*ft|sqft|square feet)\b/gi, pack: false },
+  { kind: 'litre', re: /\b(\d{1,4})\s*-?\s*(?:litres?|liters?|ltrs?)\b/gi, pack: false },
   { kind: 'pack', re: /\b(small|medium|large|mini|xl)\b/gi, pack: true },
 ];
 
@@ -86,6 +90,14 @@ function speakSize(kind, n, language) {
   if (kind === 'kg') {
     return sw ? `kilo ${SW_NUM[num] || n}` : `${EN_NUM[num] || n} kilo`;
   }
+  if (kind === 'sqft') {
+    const words = sw ? numberToSw(num) : numberToEn(num);
+    return sw ? `futi za mraba ${words}` : `${words} square feet`;
+  }
+  if (kind === 'litre') {
+    const words = sw ? numberToSw(num) : numberToEn(num);
+    return sw ? `lita ${words}` : `${words} litres`;
+  }
   if (sw) return SW_NUM[num] || String(n);
   return EN_NUM[num] || String(n);
 }
@@ -120,6 +132,9 @@ function speakCatalogueName(name, language = 'en') {
   spoken = spoken.replace(/\b(\d{1,2})\s*-?\s*bedrooms?\b/gi, (_, raw) => speakSize('bedroom', raw, language));
   spoken = spoken.replace(/\b(\d{1,2})\s*-?\s*seaters?\b/gi, (_, raw) => speakSize('seater', raw, language));
   spoken = spoken.replace(/\b(\d{1,2})\s*-?\s*kgs?\b/gi, (_, raw) => speakSize('kg', raw, language));
+  spoken = spoken.replace(/\b(\d{2,5})\s*-?\s*(?:sq\.?\s*ft|sqft|square feet)\b/gi, (_, raw) => speakSize('sqft', raw, language));
+  spoken = spoken.replace(/\b(\d{1,4})\s*-?\s*(?:litres?|liters?|ltrs?)\b/gi, (_, raw) => speakSize('litre', raw, language));
+  spoken = spoken.replace(/\bper\s+seats?\b/gi, sw ? 'kwa kiti' : 'per seat');
   spoken = spoken.replace(/\b(\d{1,2})\b/g, (raw) => {
     const n = Number(raw);
     return (sw ? SW_NUM[n] : EN_NUM[n]) || raw;
@@ -158,7 +173,7 @@ function familyLabel(family, language) {
     }
     return `${head} for ${speakSize('bedroom', first, 'en')} to ${speakSize('bedroom', last, 'en')} homes`;
   }
-  if (family.kind === 'seater' || family.kind === 'kg') {
+  if (family.kind === 'seater' || family.kind === 'kg' || family.kind === 'sqft' || family.kind === 'litre') {
     const a = speakSize(family.kind, first, language);
     const b = speakSize(family.kind, last, language);
     return sw ? `${head} ya ${a} hadi ${b}` : `${head} for ${a} to ${b}`;
@@ -211,7 +226,7 @@ function compileSpokenCatalogue(profile = {}, opts = {}) {
     groups.get(key).members.push(item);
   }
   const families = [...groups.values()].map((family) => {
-    if (family.kind === 'bedroom' || family.kind === 'seater' || family.kind === 'kg') {
+    if (family.kind === 'bedroom' || family.kind === 'seater' || family.kind === 'kg' || family.kind === 'sqft' || family.kind === 'litre') {
       family.members.sort((a, b) => Number(a.value) - Number(b.value));
     }
     const askSize = Boolean(family.kind) && family.members.length > 1;

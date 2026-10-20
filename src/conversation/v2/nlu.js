@@ -2,6 +2,7 @@
 // Deterministic caller-turn understanding for BA v2. Produces intent hints and
 // normalised slot candidates; the state machine decides what to do with them.
 const L = require('./lexicon');
+const { listedAreaIds } = require('../listedAreas');
 
 const YES = /^\W*(yes|yeah|yep|yup|ok|okay|sure|correct|right|exactly|please do|go ahead|do it|ndio|ndiyo|eeh ndio|sawa|poa|fiti|kabisa|haya|yes please)\b/i;
 const NO = /^\W*(no|nope|not really|hapana|la|sitaki)\b|\b(that'?s wrong|si sawa|not correct)\b/i;
@@ -16,7 +17,7 @@ const INTENT_RULES = [
   ['complaint', /\b(not happy|unhappy|bad service|complain\w*|disappointed|left .{0,20}dirty|damaged|ruined|sijaridhika|mmeniharibia|mmeharibu|malalamiko|huduma mbaya)\b/i],
   ['handoff', /\b(manager|the owner|speak to (a |someone|somebody|the)|talk to (a |someone|the)|human|real person|mwenye biashara|meneja)\b/i],
   ['services', /\b(services? gani|huduma gani|mnaofa\w*|mna-?offer\w*|mnauza\w* nini|which (exact )?services|what services|services (do )?you (do )?offer|mnafanya nini|mnatoa nini|gani (uko|mko) nayo|(uko|mko) nayo|saizi gani|sizes? (do you|gani)|mnawash\w*|mnasafisha|do you (clean|wash|do)\b)/i],
-  ['coverage', /\b(do you cover|you( guys)? cover|uko wapi|outside (nairobi|the county)|niko outside|siishi \w+|sikai \w+|mfike huko|mtafika huko|mnafika huko|mnafika|mnakuja|mnafikana|mtafika|mko wapi|where are you( located)?|your location|location yenu|mnapatikana wapi|kama mnakuja)\b/i],
+  ['coverage', /\b(do you cover|you( guys)? cover|uko wapi|outside (nairobi|the county)|niko outside|siishi \w+|sikai \w+|mfike huko|mtafika huko|mnafika huko|mnafika|nafika|mnakuja|mnafikana|mtafika|mko wapi|where are you( located)?|your location|location yenu|mnapatikana wapi|kama mnakuja)\b/i],
   ['recall', /\b(remember me|last time|what did i (book|order)|my last (visit|booking|order)|mara ya mwisho|mnanikumbuka|unanikumbuka|unakumbuka|do you remember|previous(ly)? (thing|dealing|call|order|booking)|in another call|before this call|i (had )?(spoke|spoken|talked) to you|tulifika wapi|tumeachia wapi|tulikuwa tumeachia|tumeongea|tulikuwa tumeongea|nilikuwa nimeitisha|nimekuongelesha|ile (mambo|kitu) (yetu )?ya jana|a while back)\b/i],
   ['want_know', /\b(nataka kujua|nilikuwa nataka kujua|nataka jua|nilitaka kujua|i wanted to (know|ask)|just inquiring|nataka kuuliza|nataka unisaidie|unisaidie|msaidia|hamwezi (ku)?nisaidia|nisaidie|maybe you tell me|you tell me|i don'?t know)\b/i],
   ['who_are_you', /^\W*(nani|ni nani|who is this|who am i (speaking|talking) (to|with)|tunaitwaje( tena)?|unaitwa nani|wewe ni nani|unaitwaje|what'?s your name)\W*\??\W*$/i],
@@ -124,11 +125,11 @@ function lev(a, b) { const m = a.length, n = b.length; const d = Array.from({ le
 // Tenant service areas only (serviceAreas.areas ids like place:kitengela, county:nairobi).
 function matchArea(text, profile = {}) {
   if (/\b(outside|siishi|sikai|not in|si wa)\b/i.test(String(text || ''))) return null;
-  const areas = (profile.serviceAreas?.areas || []).map((a) => String(a.id || '').split(':')[1]).filter(Boolean);
+  const areas = listedAreaIds(profile);
   const toks = String(text || '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter((w) => w.length >= 4);
   for (const a of areas) { const parts = a.split(' '); const key = parts[parts.length - 1]; if (toks.some((w) => w === key || (key.length >= 6 && lev(w, key) <= 2))) return { listed: true, name: a.replace(/\b\w/g, (c) => c.toUpperCase()) }; }
-  const tx = String(text || '').replace(/\b(Mnafika|Mnakuja|Mtafika|Hadi|Cover|Niko|Nipo|Kwa|Na)\b/g, (m) => m.toLowerCase());
-  const asked = tx.match(/\b(?:cover|niko|nipo|in|na|kwa|si|fika|kuja|mnafika|mnakuja|mtafika|hadi|to)\s+([A-Z][a-z]{3,})/) || tx.match(KNOWN_AREAS);
+  const tx = String(text || '').replace(/\b(Mnafika|Nafika|Mnakuja|Mtafika|Hadi|Cover|Niko|Nipo|Kwa|Na)\b/g, (m) => m.toLowerCase());
+  const asked = tx.match(/\b(?:cover|niko|nipo|nafika|in|na|kwa|si|fika|kuja|mnafika|mnakuja|mtafika|hadi|to)\s+([A-Z][a-z]{3,})/) || tx.match(KNOWN_AREAS);
   return asked ? { listed: false, name: asked[1] } : null;
 }
 function extractQuantity(text) { const m = String(text || '').toLowerCase().match(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|moja|mbili|tatu|nne|tano|sita)\b/); return m ? L.toNum(m[1]) : null; }

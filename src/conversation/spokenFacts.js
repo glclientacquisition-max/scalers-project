@@ -5,11 +5,12 @@
 // or policy text.
 
 const { compileSpokenCatalogue, joinList } = require('./spokenCatalogue');
-const { coverageAreaNames } = require('./coverageAreas');
+const { listedAreaNames } = require('./listedAreas');
 const { normalizePolicies } = require('./businessPolicies');
 const { normalizeLocations } = require('./businessLocations');
 const { parseHoursSchedule } = require('./businessHours');
 const { expandSpokenForms } = require('../speech/spokenForms');
+const { speakSwClock } = require('../speech/swahiliTime');
 
 const POLICY_KEYS = [
   'payment',
@@ -26,21 +27,16 @@ function isSw(language) {
   return lang === 'sw' || lang === 'sheng' || lang.startsWith('swahili');
 }
 
-function speakClock(hhmm) {
+function speakClock(hhmm, language = 'en') {
   const match = String(hhmm || '').match(/^(\d{1,2}):(\d{2})$/);
   if (!match) return String(hhmm || '').trim();
   const hour = Number(match[1]);
   const minute = Number(match[2]);
+  if (isSw(language)) return speakSwClock(hour, minute);
   const ap = hour >= 12 ? 'PM' : 'AM';
   const h12 = ((hour + 11) % 12) + 1;
   if (!minute) return `${h12} ${ap}`;
   return `${h12}:${String(minute).padStart(2, '0')} ${ap}`;
-}
-
-function titleName(name) {
-  return String(name || '').replace(/\b[a-z]+/g, (word) =>
-    word === 'cbd' ? 'CBD' : word.charAt(0).toUpperCase() + word.slice(1)
-  );
 }
 
 /**
@@ -54,17 +50,8 @@ function speakFileLine(text, language = 'en') {
 }
 
 function coverageNames(profile = {}) {
-  const fromPolicy = coverageAreaNames(profile.businessPolicies || {});
-  if (fromPolicy.length) return fromPolicy;
-  const areas = Array.isArray(profile.serviceAreas?.areas) ? profile.serviceAreas.areas : [];
-  const fromService = areas
-    .map((row) => {
-      const id = String(row?.id || row || '').trim();
-      if (id.includes(':')) return titleName(id.slice(id.indexOf(':') + 1));
-      return titleName(row?.name || '');
-    })
-    .filter(Boolean);
-  if (fromService.length) return fromService;
+  const fromListed = listedAreaNames(profile);
+  if (fromListed.length) return fromListed;
   return normalizeLocations(profile.businessLocations)
     .map((loc) => loc.label || loc.address)
     .filter(Boolean);
@@ -88,11 +75,11 @@ function compileSpokenCoverage(profile = {}, opts = {}) {
       }
       if (isSw(language)) {
         return more
-          ? `Tunahudumia ${list} na maeneo mengine. Uko wapi?`
+          ? `Tunahudumia ${list}. Pia tuna maeneo mengine. Uko wapi?`
           : `Tunahudumia ${list}. Uko wapi?`;
       }
       return more
-        ? `We serve ${list} and other listed areas. Which place are you in?`
+        ? `We serve ${list}. We also cover other listed areas. Which place are you in?`
         : `We serve ${list}. Which place are you in?`;
     },
   };
@@ -127,8 +114,8 @@ function compileSpokenHours(profile = {}) {
       const same =
         openDays.length === 7 &&
         openDays.every((day) => day.open === first.open && day.close === first.close);
-      const open = speakClock(first.open);
-      const close = speakClock(first.close);
+      const open = speakClock(first.open, language);
+      const close = speakClock(first.close, language);
       if (sw) {
         return same
           ? `Tuko wazi kila siku kuanzia ${open} hadi ${close}.`

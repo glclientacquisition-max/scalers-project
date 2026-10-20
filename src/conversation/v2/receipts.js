@@ -99,12 +99,12 @@ function info(r, lang, n = 0) {
       if (!r.rows.length) return [S ? 'Sioni booking yoyote ya awali kwa namba hii.' : "I don't see any earlier bookings on this number.", S ? 'Samahani, siipati. Ungependa timu iangalie na ikupigie simu?' : "Sorry, I can't find it. Would you like the team to check and call you back?"][Math.min(n, 1)];
       return S ? `Naona ${rowLabel(r.rows[0], lang)}.` : `I can see your ${rowLabel(r.rows[0], lang)}.`;
     case 'pending': return S ? `Ombi lako la kubadilisha ${r.what === 'payment' ? 'malipo' : 'mahali'} bado linasubiri. Mwenye biashara atakupigia simu.` : `Your ${r.what} change request is still pending. The owner will call you back.`;
-    case 'services': return S ? `Tunafanya ${r.names.map((n) => svcName(n, lang)).join(', ')}${r.more ? ' na zaidi' : ''}. Ungependa ipi?` : `We do ${r.names.map((n) => svcName(n, lang)).join(', ')}${r.more ? ', and more' : ''}. Which one would you like?`;
+    case 'services': return S ? `Tuna ${r.names.map((n) => svcName(n, lang)).join(', ')}${r.more ? ', na zingine' : ''}. Unahitaji gani?` : `We offer ${r.names.map((n) => svcName(n, lang)).join(', ')}${r.more ? ', and more' : ''}. Which one do you need?`;
     case 'offered': return S ? `Ndio, tunafanya ${svcName(r.label, lang)}${r.price ? `, bei ni ${priceTxt(r.price, true)}` : ''}. Ungependa kubook?` : `Yes, we do ${svcName(r.label, lang).toLowerCase()}${r.price ? `, ${/^From/i.test(r.price) ? priceTxt(r.price) : `at ${priceTxt(r.price)}`}` : ''}. Would you like to book?`;
     case 'coverage':
       if (r.area?.listed) return S ? `${r.area.name} iko kwenye orodha ya maeneo yetu. Timu itathibitisha ukibook.` : `${r.area.name} is on our list of service areas. The team confirms when you book.`;
       if (r.area) return S ? `${r.area.name} haiko kwenye orodha ya maeneo yetu. Timu inaweza kuangalia na kukupigia simu.` : `${r.area.name} isn't on our list of service areas. The team can check and call you back.`;
-      return r.general ? (S ? `Tunahudumia ${r.general}${r.more ? ' na maeneo mengine' : ''}. Uko wapi?` : `We serve ${r.general}${r.more ? ' and other listed areas' : ''}. Which place are you in?`) : (S ? 'Uko wapi? Nitaangalia orodha ya maeneo yetu.' : "Which place are you in? I'll check our service areas.");
+      return r.general ? (S ? `Tunahudumia ${r.general}${r.more ? '. Pia tuna maeneo mengine' : ''}. Uko wapi?` : `We serve ${r.general}${r.more ? '. We also cover other listed areas' : ''}. Which place are you in?`) : (S ? 'Uko wapi? Nitaangalia orodha ya maeneo yetu.' : "Which place are you in? I'll check our service areas.");
     case 'want_know': return [S ? 'Sawa, ungependa kujua kuhusu bei, huduma au saa za kazi?' : 'Sure, would you like to know about prices, services or our hours?', S ? 'Uliza tu, mfano bei ya carpet au saa tunafungua.' : 'Go ahead, for example a price or our opening hours.'][Math.min(n, 1)];
     case 'which_price': return S ? 'Bei ya huduma gani ungependa kujua?' : 'Which service would you like the price for?';
     case 'which_size': return r.sizes
@@ -131,7 +131,7 @@ const enMark = (l) => remark(l, SW2EN); const swMark = (l) => remark(l, EN2SW);
 // Never-repeat rule: the same line twice in a row is re-worded (same facts, no new claims).
 function vary(line, lang, n = 1, plain = false) {
   const S = sw(lang);
-  const m = plain ? null : String(line).match(/^Tunahudumia (.+?)(?: na maeneo mengine)?\. Uko wapi\?$/) || String(line).match(/^We serve (.+?)(?: and other listed areas)?\. Which place are you in\?$/);
+  const m = plain ? null : String(line).match(/^Tunahudumia (.+?)(?:\. Pia tuna maeneo mengine)?\. Uko wapi\?$/) || String(line).match(/^We serve (.+?)(?:\. We also cover other listed areas)?\. Which place are you in\?$/);
   if (m) return S ? `Maeneo yetu ni ${m[1]}. Uko mtaa gani hasa?` : `Our areas are ${m[1]}. Which estate are you in exactly?`;
   // An ack-led repeat drops the ack instead of swapping it (Okay -> Alright was still an ack).
   // An ack-led repeat drops the ack instead of swapping it (Okay -> Alright was still an ack).
