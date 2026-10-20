@@ -241,18 +241,27 @@ function buildLiveGroundTruth(profile = {}) {
     formatServicesBlock(services),
   ];
 
-  const { compileSpokenCatalogue } = require('./spokenCatalogue');
-  const spoken = compileSpokenCatalogue(profile, {
+  const { compileSpokenShop } = require('./spokenFacts');
+  const spoken = compileSpokenShop(profile, {
     limit: 4,
     messageOnly: isMessageOnlyMode(profile.afterHoursMode),
   });
-  if (spoken.families.length) {
+  if (spoken.catalogue.families.length) {
     parts.push(
       '',
       'SPOKEN CATALOGUE (how to say SERVICES on the phone. File titles stay above. Do not invent names.):',
-      `EN: ${spoken.opener('en')}`,
-      `SW: ${spoken.opener('sw')}`,
+      `EN: ${spoken.catalogue.opener('en')}`,
+      `SW: ${spoken.catalogue.opener('sw')}`,
       'Speak size tokens as words (one bedroom / chumba kimoja), never "1 bedroom" or "moja bedroom". When a family has sizes, ask the size before quoting a price.'
+    );
+  }
+  const spokenWhere = spoken.locations.opener('en');
+  if (spokenWhere) {
+    parts.push(
+      '',
+      'SPOKEN LOCATIONS (how to say LOCATIONS on the phone. Addresses stay above.):',
+      `EN: ${spokenWhere}`,
+      `SW: ${spoken.locations.opener('sw')}`
     );
   }
 
@@ -281,6 +290,35 @@ function buildLiveGroundTruth(profile = {}) {
   }
 
   parts.push('', 'POLICIES:', formatPoliciesBlock(policies, { areaTerms: profile.areaTerms || null }));
+
+  if (spoken.coverage.all.length) {
+    parts.push(
+      '',
+      'SPOKEN COVERAGE (how to say the Coverage list on the phone. Do not invent a place.):',
+      `EN: ${spoken.coverage.opener('en')}`,
+      `SW: ${spoken.coverage.opener('sw')}`
+    );
+  }
+  if (spoken.policies.rows.length) {
+    parts.push(
+      '',
+      'SPOKEN POLICIES (same owner sentences, money and clocks as words. Empty fields stay unknown.):',
+      ...spoken.policies.rows.flatMap((row) => [`EN ${row.key}: ${row.en}`, `SW ${row.key}: ${row.sw}`])
+    );
+  }
+  parts.push(
+    '',
+    'SPOKEN HOURS (how to say the schedule on the phone):',
+    `EN: ${spoken.hours.opener('en')}`,
+    `SW: ${spoken.hours.opener('sw')}`
+  );
+  if (spoken.faqs.rows.length) {
+    parts.push(
+      '',
+      'SPOKEN FAQS (same owner answers, money and numbers as words):',
+      ...spoken.faqs.rows.map((row) => `Q: ${row.question}\nEN: ${row.en}\nSW: ${row.sw}`)
+    );
+  }
 
   parts.push('', formatUnknownSection(unknownTopics));
 

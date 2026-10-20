@@ -8,7 +8,8 @@ const L = require('./lexicon');
 const N = require('./nlu');
 const R = require('./receipts');
 const { buildCatalogue, validateCall } = require('./catalogue');
-const { compileSpokenCatalogue } = require('../spokenCatalogue');
+const { compileSpokenCatalogue, joinList } = require('../spokenCatalogue');
+const { compileSpokenCoverage } = require('../spokenFacts');
 const { renderOwnerMessage } = require('./owner');
 const { buildRequest } = require('./gemini');
 
@@ -247,9 +248,17 @@ function infoAnswer(state, u, profile, kind) {
   }
   if (kind === 'coverage') {
     const loc = (profile.businessLocations || [])[0];
-    const listed = (profile.serviceAreas?.areas || []).map((a) => String(a.id || '').split(':')[1]).filter(Boolean).map((a) => a.replace(/\b\w/g, (c) => c.toUpperCase()));
-    const general = listed.length ? listed.slice(0, 4).join(', ') : (loc?.address || profile.hoursSchedule?.location?.split('·').pop()?.trim() || null);
-    return R.info({ kind: 'coverage', area: u.area, general, fromList: listed.length > 0, more: listed.length > 4 }, state.lang);
+    const compiled = compileSpokenCoverage(profile, { limit: 4 });
+    const general = compiled.names.length
+      ? joinList(compiled.names, state.lang)
+      : (loc?.address || profile.hoursSchedule?.location?.split('·').pop()?.trim() || null);
+    return R.info({
+      kind: 'coverage',
+      area: u.area,
+      general,
+      fromList: compiled.all.length > 0,
+      more: compiled.more,
+    }, state.lang);
   }
   if (kind === 'payment_how') {
     const M = { mpesa_paybill: ['M-Pesa Paybill', 'M-Pesa Paybill'], mpesa_till: ['M-Pesa Till', 'M-Pesa Till'], bank: ['bank transfer', 'benki'], cash: ['cash', 'pesa taslimu'], card: ['card', 'kadi'], pochi: ['Pochi la Biashara', 'Pochi la Biashara'], airtel: ['Airtel Money', 'Airtel Money'] };

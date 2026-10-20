@@ -15,7 +15,7 @@ New agent or new human: read this whole page before you touch code.
 
 ## 1. Where we are
 
-Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b66e1661`** (#647, merged 17 Oct 22:12 EAT). Prod `/healthz` reports this SHA, started 17 Oct 22:13 EAT. Staging Voice is a SHA pin on **`4d4a31cd`** (`cursor/v2-live-spoken-catalog-3e8f` on #833). Staging `/healthz` reports it, started 20 Oct 10:53 UTC. Spoken compile groups size siblings (bedroom / seater / kilo / pack), bilingual openers, and spoken money on lookup, catalogue mouth, live ground truth, and BA v2. `BRAIN_V2=on`, `BRAIN_V2_MODE=live`, `BRAIN_V2_SHADOW=off`. Keep `hold-staging` / `STAGE_PR_HOLD`. A merge to `main` can overwrite this pin. Prod untouched.
+Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b66e1661`** (#647, merged 17 Oct 22:12 EAT). Prod `/healthz` reports this SHA, started 17 Oct 22:13 EAT. Staging Voice is a SHA pin on **`4d4a31cd`** (`cursor/v2-live-spoken-catalog-3e8f` on #833). Staging `/healthz` reports it, started 20 Oct 10:53 UTC. Spoken compile covers the shop file we say to a caller: catalogue families, coverage list, locations, hours, policies, and FAQ answers. Money and clocks are words. File titles stay on the desk. `BRAIN_V2=on`, `BRAIN_V2_MODE=live`, `BRAIN_V2_SHADOW=off`. Keep `hold-staging` / `STAGE_PR_HOLD`. A merge to `main` can overwrite this pin. Prod untouched.
 
 Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Esga is on prod DID +254709221542. Staging DID is **+254709221537** (staging tenant Jirani Cleaning Services, *per team notes*).
 
