@@ -232,14 +232,21 @@ for (const [lang, ask, yes, echo] of [
     assert.equal(r.e.urgent, false);
   }));
 
-  test(`[${lang}] C1 callback: a repeated callback window is asked yes/no once (no write, unconfirmed); the yes after it confirms`, withEnv(CS_ON, async () => {
-    // C1 takes a repeated read-back time as the yes for a booking time; for a callback window it re-asks yes/no.
-    const echoOnly = await c1Call(DD, [ask, echo]);
-    assert.equal(echoOnly.phases.includes('request_callback:committed'), false);
-    assert.equal(echoOnly.e.receipts.filter((x) => x.status === 'confirmed').length, 0);
-    const then = await c1Call(DD, [ask, echo, yes]);
-    assert.deepEqual(then.phases, ['request_callback:proposed', 'request_callback:confirmed', 'request_callback:committed']);
-    assert.equal(then.e.receipts.find((x) => x.type === 'callback').status, 'confirmed');
+  test(`[${lang}] C1 callback confirmed: the caller repeating the exact read-back time is the yes (Alvin's rule, 15 Oct); write ok`, withEnv(CS_ON, async () => {
+    // one shared read-back classifier (#849): a repeat of the exact read-back time confirms a callback as it does a booking
+    const r = await c1Call(DD, [ask, echo]);
+    assert.deepEqual(r.phases, ['request_callback:proposed', 'request_callback:confirmed', 'request_callback:committed']);
+    const c = r.e.receipts.find((x) => x.type === 'callback');
+    assert.equal(c.status, 'confirmed');
+    assert.equal(r.e.outcome, 'callback_needed');
+    // a different time is a change: re-proposed, nothing written or confirmed yet
+    const other = await c1Call(DD, [ask, lang === 'en' ? 'At 3pm please.' : 'Saa tisa mchana.']);
+    assert.deepEqual(other.phases, ['request_callback:proposed', 'request_callback:rejected', 'request_callback:proposed']);
+    assert.equal(other.e.receipts.filter((x) => x.status === 'confirmed').length, 0);
+    // the exact repeat failing to write is never confirmed
+    const failed = await c1Call(DD, [ask, echo], { callbackFail: true });
+    assert.ok(failed.phases.includes('request_callback:failed'));
+    assert.equal(failed.e.receipts.find((x) => x.type === 'callback').status, 'unconfirmed');
   }));
 
   test(`[${lang}] C1 callback unconfirmed: 'okay wait' is not a yes (no write, nothing confirmed)`, withEnv(CS_ON, async () => {
