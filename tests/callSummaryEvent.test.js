@@ -33,7 +33,7 @@ function build(profile, st, turns, extra = {}) {
   const receipts = E.receiptsFromV1({ brainState: st, turns, profile });
   const out = E.buildCallSummaryEvent({
     path: 'v1', callLanguage: st.language.current, callId: 'call_1', tenantId: profile.id,
-    answered: true, caller: { e164: '+254700000001', name: E.v1CallerName(st) }, receipts,
+    answered: true, caller: { phone: '+254700000001', name: E.v1CallerName(st) }, receipts,
     now: new Date('2026-10-21T08:00:00Z'), ...extra,
   });
   assert.equal(out.ok, true, out.errors.join('; '));
@@ -166,17 +166,16 @@ test('info_only: a question answered, nothing captured', () => {
 
 test('missed EN and SW: never answered, no receipts', () => {
   for (const lang of ['en', 'sw']) {
-    const out = E.buildCallSummaryEvent({ path: 'v1', callLanguage: lang, callId: 'call_m', tenantId: 'ten_x', answered: false, caller: { e164: '+254700000002' }, receipts: [] });
+    const out = E.buildCallSummaryEvent({ path: 'v1', callLanguage: lang, callId: 'call_m', tenantId: 'ten_x', answered: false, caller: { phone: '+254700000002' }, receipts: [] });
     assert.equal(out.ok, true);
     assert.equal(out.event.outcome, 'missed');
     assert.equal(out.event.callLanguage, lang);
-    assert.equal(out.event.caller.e164, '+254700000002');
-    assert.equal(out.event.caller.phone, '+254700000002');
+    assert.deepEqual(out.event.caller, { phone: '+254700000002' });
   }
 });
 
 test('validator rejects confirmed-without-row, urgent mismatch and invented stock', () => {
-  const base = { event: E.EVENT_NAME, schemaVersion: 1, path: 'v1', callLanguage: 'en', callId: 'c', tenantId: 't', outcome: 'booked', urgent: false, caller: { e164: null }, emittedAt: new Date().toISOString() };
+  const base = { event: E.EVENT_NAME, schemaVersion: 1, path: 'v1', callLanguage: 'en', callId: 'c', tenantId: 't', outcome: 'booked', urgent: false, caller: { phone: null }, emittedAt: new Date().toISOString() };
   assert.equal(E.validateCallSummaryEvent({ ...base, receipts: [{ receiptId: 'r1', type: 'booking', status: 'confirmed', slots: {} }] }).ok, false);
   assert.equal(E.validateCallSummaryEvent({ ...base, urgent: true, receipts: [] }).ok, false);
   assert.equal(E.validateCallSummaryEvent({ ...base, outcome: 'info_only', receipts: [{ receiptId: 'r1', type: 'order', status: 'unconfirmed', slots: {}, items: [{ catalogueId: null, name: 'Mystery pen', qty: { status: 'not_given' }, stock: 'in_stock' }] }] }).ok, false);
@@ -196,7 +195,7 @@ test('emitter: stores on the call row, hooks see replaces on a re-emit', async (
   const db = { mergeCallSummaryMeta: async (a) => { stored.push(a); } };
   const seen = [];
   E.onCallSummaryReady((ev, meta) => seen.push(meta.replaces));
-  const { event } = E.buildCallSummaryEvent({ path: 'v1', callLanguage: 'en', callId: 'call_r', tenantId: 't', answered: true, caller: { e164: '+254700000003' }, receipts: [] });
+  const { event } = E.buildCallSummaryEvent({ path: 'v1', callLanguage: 'en', callId: 'call_r', tenantId: 't', answered: true, caller: { phone: '+254700000003' }, receipts: [] });
   const quiet = { log() {}, warn() {} };
   await E.emitCallSummaryEvent(event, { db, callSid: 'sid_r', log: quiet });
   await E.emitCallSummaryEvent(event, { db, callSid: 'sid_r', log: quiet });
@@ -210,4 +209,16 @@ test('flag is off by default', () => {
   assert.equal(E.callSummaryEventEnabled({}), false);
   assert.equal(E.callSummaryEventEnabled({ CALL_SUMMARY_EVENT: 'off' }), false);
   assert.equal(E.callSummaryEventEnabled({ CALL_SUMMARY_EVENT: 'on' }), true);
+});
+
+test('caller is { name?, phone } only; phone normalised to E.164, never guessed', () => {
+  assert.equal(E.toE164('0712345678'), '+254712345678');
+  assert.equal(E.toE164('254712345678'), '+254712345678');
+  assert.equal(E.toE164('+447700900123'), '+447700900123');
+  assert.equal(E.toE164('anonymous'), null);
+  const out = E.buildCallSummaryEvent({ path: 'v1', callLanguage: 'en', callId: 'c', tenantId: 't', answered: false, caller: { phone: '0712345678', name: 'Baraka' }, receipts: [] });
+  assert.deepEqual(out.event.caller, { name: 'Baraka', phone: '+254712345678' });
+  const base = { event: E.EVENT_NAME, schemaVersion: 1, path: 'v1', callLanguage: 'en', callId: 'c', tenantId: 't', outcome: 'missed', urgent: false, receipts: [], emittedAt: new Date().toISOString() };
+  assert.equal(E.validateCallSummaryEvent({ ...base, caller: { phone: '+254712345678', number: '+254712345678' } }).ok, false);
+  assert.equal(E.validateCallSummaryEvent({ ...base, caller: { phone: '0712345678' } }).ok, false);
 });

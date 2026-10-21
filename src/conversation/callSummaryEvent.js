@@ -244,6 +244,15 @@ function mergeV2Receipts(v2Receipts = [], v1Receipts = []) {
   return [...v2, ...extra].map((r, i) => ({ ...r, receiptId: `r_${i + 1}` }));
 }
 
+/** caller.phone is E.164 (+2547…); anything not normalisable is null, never guessed. */
+function toE164(raw) {
+  const { normalizeKenyaE164 } = require('./liveTransferReady');
+  const ke = normalizeKenyaE164(raw);
+  if (ke) return ke;
+  const digits = String(raw || '').replace(/[^\d]/g, '');
+  return /^\+/.test(String(raw || '').trim()) && /^\d{8,15}$/.test(digits) ? `+${digits}` : null;
+}
+
 // ---- builder ---------------------------------------------------------------
 
 function deriveOutcome({ answered, receipts, infoAnswered }) {
@@ -269,7 +278,7 @@ function buildCallSummaryEvent(input = {}) {
   if (input.answered === false) receipts.length = 0; // a missed call has no receipts
   const outcome = deriveOutcome({ answered: input.answered, receipts, infoAnswered: Boolean(input.infoAnswered) });
   const escalation = receipts.find((r) => r.type === 'escalation');
-  const e164 = clean(input.caller?.e164 || input.caller?.phone || '', 32) || null;
+  const phone = toE164(input.caller?.phone);
   const name = clean(input.caller?.name || '', 80);
   const event = {
     event: EVENT_NAME,
@@ -280,8 +289,7 @@ function buildCallSummaryEvent(input = {}) {
     tenantId: clean(input.tenantId, 80) || null,
     outcome,
     urgent: Boolean(escalation),
-    // e164 is the contract name; phone mirrors it for Ops' sender spec.
-    caller: { ...(name ? { name } : {}), e164, phone: e164 },
+    caller: { ...(name ? { name } : {}), phone },
     receipts,
     ...(escalation ? { escalationReason: clean(input.escalationReason || escalation.slots?.reason?.value || 'escalation', 160) } : {}),
     emittedAt: (input.now instanceof Date ? input.now : new Date()).toISOString(),
@@ -304,6 +312,10 @@ function validateCallSummaryEvent(e) {
   req(OUTCOMES.includes(e.outcome), 'outcome');
   req(typeof e.urgent === 'boolean', 'urgent');
   req(e.caller && typeof e.caller === 'object', 'caller');
+  if (e.caller && typeof e.caller === 'object') {
+    req(e.caller.phone === null || (typeof e.caller.phone === 'string' && /^\+\d{6,15}$/.test(e.caller.phone)), 'caller.phone must be E.164 or null');
+    req(Object.keys(e.caller).every((k) => k === 'name' || k === 'phone'), 'caller has only name and phone');
+  }
   req(Array.isArray(e.receipts), 'receipts');
   req(!Number.isNaN(Date.parse(e.emittedAt)), 'emittedAt');
   const hasEsc = (e.receipts || []).some((r) => r.type === 'escalation');
@@ -387,6 +399,7 @@ module.exports = {
   receiptsFromV1,
   v1CallerName,
   mergeV2Receipts,
+  toE164,
   readbackConfirmedInTurns,
   isExplicitYes,
   itemFromCatalogue,

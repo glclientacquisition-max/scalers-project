@@ -28,7 +28,7 @@ async function call(profile, lines, { langLock = null, failWrites = false } = {}
   const fin = finishCall(st, { businessName: profile.businessName, callerPhone: '+254700000001', profile });
   const built = E.buildCallSummaryEvent({
     path: 'v2', callLanguage: st.lang, callId: 'call_v2', tenantId: 'ten_v2', answered: true,
-    infoAnswered: fin.infoAnswered, caller: { e164: '+254700000001', name: st.slots.name }, receipts: fin.summaryReceipts,
+    infoAnswered: fin.infoAnswered, caller: { phone: '+254700000001', name: st.slots.name }, receipts: fin.summaryReceipts,
   });
   assert.equal(built.ok, true, built.errors.join('; '));
   return { e: built.event, fin, log: h.log, st };
@@ -133,7 +133,7 @@ test('v2 + v1 merge: same row once, v2 owns handoffs (no phantom urgent escalati
   ];
   const merged = E.mergeV2Receipts(v2, v1);
   assert.deepEqual(merged.map((r) => [r.type, r.writtenRowId || null]), [['order', 'sr_1'], ['callback', null], ['booking', 'apt_9']]);
-  const built = E.buildCallSummaryEvent({ path: 'v2', callLanguage: 'en', callId: 'c', tenantId: 't', answered: true, caller: { e164: '+254700000001' }, receipts: merged });
+  const built = E.buildCallSummaryEvent({ path: 'v2', callLanguage: 'en', callId: 'c', tenantId: 't', answered: true, caller: { phone: '+254700000001' }, receipts: merged });
   assert.equal(built.ok, true, built.errors.join('; '));
   assert.equal(built.event.urgent, false);
   assert.equal(built.event.outcome, 'ordered');

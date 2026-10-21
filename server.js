@@ -1321,7 +1321,7 @@ async function emitHangupCallSummary({ callSid, call, brainState, spokenTurns, d
       tenantId: call?.tenant_id || profile?.id || null,
       answered: true,
       infoAnswered: answeredQs > 0 || Boolean(brainState?.conversation?.catalogueAnswered) || Boolean(v2Fin?.infoAnswered),
-      caller: { name: (v2Fin && v2State.slots?.name) || callSummaryEvent.v1CallerName(brainState), e164: call?.caller_number || brainState?.caller?.phone || null },
+      caller: { name: (v2Fin && v2State.slots?.name) || callSummaryEvent.v1CallerName(brainState), phone: call?.caller_number || brainState?.caller?.phone || null },
       receipts,
     });
     if (!built.ok) {
