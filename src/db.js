@@ -2106,40 +2106,94 @@ function normalizeCallerLanguage(language) {
 }
 
 /**
- * Save the language a caller settled on (greeting_language.sql, 13c).
- * Updates the existing contact for tenant + phone only; never creates one
- * (upsertContact owns that). Never throws: the call path gets
- * { ok, updated, skipped?, error? } and a warning in the log.
+ * Find the contact for tenant + phone with the same lookup keys upsertContact
+ * uses (Kenya E.164 plus legacy variants). { data, error }.
+ */
+async function findContactForWrite(tenantId, phoneNorm, columns) {
+  return supabase
+    .from('contacts')
+    .select(columns)
+    .eq('tenant_id', tenantId)
+    .in('phone', storedPhoneLookupKeys(phoneNorm))
+    .order('phone', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+}
+
+function isUniqueViolation(error) {
+  return Boolean(error) && (error.code === '23505' || /duplicate|unique/i.test(error.message || ''));
+}
+
+/**
+ * Write a patch onto the tenant + phone contact, creating it when missing.
+ * contacts_tenant_phone_uidx is a partial unique index, so PostgREST
+ * onConflict cannot target it: find, then update by id; else insert, and on a
+ * unique violation (a racing insert) re-find and update. buildPatch(existing)
+ * returns the update patch; buildInsert() the insert row.
+ * Throws only to its caller's try/catch.
+ */
+async function writeContactByPhone({ tenantId, phoneNorm, columns, buildPatch, buildInsert, label }) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const { data: existing, error: findErr } = await findContactForWrite(tenantId, phoneNorm, columns);
+    if (findErr) return { error: findErr };
+    if (existing?.id) {
+      const patch = buildPatch(existing);
+      const { error } = await supabase.from('contacts').update(patch).eq('id', existing.id);
+      if (error) return { error };
+      return { created: false, updated: 1, existing };
+    }
+    if (attempt > 0) break;
+    const { error: insErr } = await supabase.from('contacts').insert(buildInsert());
+    if (!insErr) return { created: true, updated: 0, existing: null };
+    if (!isUniqueViolation(insErr)) return { error: insErr };
+    // Another writer created it between find and insert: loop and update.
+  }
+  return { error: { message: `${label}: contact neither found nor created` } };
+}
+
+/**
+ * Save the language a caller settled on (greeting_language.sql, 13c) on the
+ * tenant + phone contact, creating the contact for a first-time caller.
+ * Never throws: { ok, created, updated, skipped?, error? } and a warning.
  */
 async function saveCallerLanguage({ tenantId, phone, language } = {}) {
   const lang = normalizeCallerLanguage(language);
   const phoneNorm = normalizeStoredPhone(phone);
-  if (!tenantId || !phoneNorm) return { ok: false, updated: 0, skipped: 'no_tenant_or_phone' };
-  if (!lang) return { ok: true, updated: 0, skipped: 'no_language' };
-  if (!supabase) return { ok: false, updated: 0, skipped: 'no_supabase' };
+  if (!tenantId || !phoneNorm) return { ok: false, created: false, updated: 0, skipped: 'no_tenant_or_phone' };
+  if (!lang) return { ok: true, created: false, updated: 0, skipped: 'no_language' };
+  if (!supabase) return { ok: false, created: false, updated: 0, skipped: 'no_supabase' };
   try {
-    const { data, error } = await supabase
-      .from('contacts')
-      .update({ last_language: lang, last_language_at: new Date().toISOString() })
-      .eq('tenant_id', tenantId)
-      .in('phone', storedPhoneLookupKeys(phoneNorm))
-      .select('id');
-    if (error) {
+    const now = new Date().toISOString();
+    const out = await writeContactByPhone({
+      tenantId,
+      phoneNorm,
+      columns: 'id',
+      label: 'saveCallerLanguage',
+      buildPatch: () => ({ last_language: lang, last_language_at: now }),
+      buildInsert: () => ({
+        tenant_id: tenantId,
+        phone: phoneNorm,
+        metadata: mergeContactIdentity(null, {}).metadata,
+        last_language: lang,
+        last_language_at: now,
+        updated_at: now,
+      }),
+    });
+    if (out.error) {
+      const message = out.error.message || String(out.error);
       console.warn(
-        '[db] saveCallerLanguage failed' +
-          (/last_language/i.test(error.message || '') ? ' (apply greeting_language.sql)' : '') +
-          ':',
-        JSON.stringify({ tenantId, language: lang, error: error.message || String(error) })
+        '[db] saveCallerLanguage failed' + (/last_language/i.test(message) ? ' (apply greeting_language.sql)' : '') + ':',
+        JSON.stringify({ tenantId, language: lang, error: message })
       );
-      return { ok: false, updated: 0, error: error.message || String(error) };
+      return { ok: false, created: false, updated: 0, error: message };
     }
-    return { ok: true, updated: Array.isArray(data) ? data.length : 0 };
+    return { ok: true, created: out.created, updated: out.updated };
   } catch (err) {
     console.warn(
       '[db] saveCallerLanguage threw:',
       JSON.stringify({ tenantId, language: lang, error: err?.message || String(err) })
     );
-    return { ok: false, updated: 0, error: err?.message || String(err) };
+    return { ok: false, created: false, updated: 0, error: err?.message || String(err) };
   }
 }
 
@@ -2169,42 +2223,86 @@ function migrationHint(message) {
 
 /**
  * Save a caller-confirmed name (Brain v2 save_caller_name after readback_yes).
- * Sets name + name_confirmed, _at, _source, _call_id in one update on the
- * existing contact. The contacts_name_confirmed_reset trigger keeps these
- * because name_confirmed_at changes in the same statement. Never throws.
+ * Upserts the tenant + phone contact. A new caller gets a contact with the name
+ * and all four confirmed fields. An existing contact whose stored name differs
+ * keeps that old name in metadata.alternate_names (same format and dedupe as
+ * upsertContact), then takes the new name and the confirmed fields in one
+ * update; the fresh name_confirmed_at keeps contacts_name_confirmed_reset from
+ * clearing them. Never throws: { ok, created, updated, previousName, error? }.
  */
 async function confirmCallerName({ tenantId, phone, name, source = 'readback_yes', callId } = {}) {
+  const base = { ok: false, created: false, updated: 0, previousName: null };
   const phoneNorm = normalizeStoredPhone(phone);
   const nameNorm = String(name || '').trim();
-  if (!tenantId || !phoneNorm) return { ok: false, updated: 0, skipped: 'no_tenant_or_phone' };
-  if (!nameNorm) return { ok: false, updated: 0, skipped: 'no_name' };
-  if (!NAME_CONFIRMED_SOURCES.has(source)) return { ok: false, updated: 0, error: `invalid_source:${source}` };
-  if (!supabase) return { ok: false, updated: 0, skipped: 'no_supabase' };
+  if (!tenantId || !phoneNorm) return { ...base, skipped: 'no_tenant_or_phone' };
+  if (!nameNorm) return { ...base, skipped: 'no_name' };
+  if (!NAME_CONFIRMED_SOURCES.has(source)) return { ...base, error: `invalid_source:${source}` };
+  if (!supabase) return { ...base, skipped: 'no_supabase' };
   const callUuid = RESUME_UUID_RE.test(String(callId || '')) ? String(callId) : null;
   try {
-    const { data, error } = await supabase
-      .from('contacts')
-      .update({
-        name: nameNorm,
-        name_confirmed: true,
-        name_confirmed_at: new Date().toISOString(),
-        name_confirmed_source: source,
-        name_confirmed_call_id: callUuid,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('tenant_id', tenantId)
-      .in('phone', storedPhoneLookupKeys(phoneNorm))
-      .select('id');
-    if (error) {
-      const message = error.message || String(error);
+    const now = new Date().toISOString();
+    const confirmed = {
+      name: nameNorm,
+      name_confirmed: true,
+      name_confirmed_at: now,
+      name_confirmed_source: source,
+      name_confirmed_call_id: callUuid,
+      updated_at: now,
+    };
+    const out = await writeContactByPhone({
+      tenantId,
+      phoneNorm,
+      columns: 'id, name, metadata',
+      label: 'confirmCallerName',
+      buildPatch: (existing) => ({
+        ...confirmed,
+        metadata: confirmedNameMetadata(existing, nameNorm, { seenAt: now, callId: callUuid }),
+      }),
+      buildInsert: () => ({
+        tenant_id: tenantId,
+        phone: phoneNorm,
+        ...confirmed,
+        metadata: mergeContactIdentity(null, { name: nameNorm }).metadata,
+      }),
+    });
+    if (out.error) {
+      const message = out.error.message || String(out.error);
       warnCallPath('confirmCallerName failed', { tenantId, source, error: message, hint: migrationHint(message) });
-      return { ok: false, updated: 0, error: message };
+      return { ...base, error: message };
     }
-    return { ok: true, updated: Array.isArray(data) ? data.length : 0 };
+    const previousName = String(out.existing?.name || '').trim() || null;
+    return { ok: true, created: out.created, updated: out.updated, previousName };
   } catch (err) {
     warnCallPath('confirmCallerName threw', { tenantId, source, error: err?.message || String(err) });
-    return { ok: false, updated: 0, error: err?.message || String(err) };
+    return { ...base, error: err?.message || String(err) };
   }
+}
+
+/**
+ * metadata for a confirmed rename: the stored name (when it differs, case
+ * insensitive) goes to the front of alternate_names, then the contactIdentity
+ * dedupe/cap applies against the new primary.
+ */
+function confirmedNameMetadata(existing, newName, { seenAt, callId } = {}) {
+  const { normalizeAlternates, ALT_CAP } = require('./conversation/contactIdentity');
+  const { isJunkCallerName } = require('./conversation/callerNameQuality');
+  const meta =
+    existing?.metadata && typeof existing.metadata === 'object' && !Array.isArray(existing.metadata)
+      ? { ...existing.metadata }
+      : {};
+  const primaryKey = String(newName).trim().toLowerCase();
+  // Existing alternates keep upsertContact's dedupe and cap against the new primary.
+  let alternates = normalizeAlternates(meta.alternate_names, newName).filter(
+    (row) => row.name.toLowerCase() !== primaryKey
+  );
+  const oldName = String(existing?.name || '').trim();
+  // The replaced name is never dropped (even when it fuzzily matches the new
+  // one): case-insensitive dedupe only, newest first, same row format.
+  if (oldName && !isJunkCallerName(oldName) && oldName.toLowerCase() !== primaryKey) {
+    alternates = alternates.filter((row) => row.name.toLowerCase() !== oldName.toLowerCase());
+    alternates.unshift({ name: oldName, seen_at: seenAt || new Date().toISOString(), call_id: callId || null });
+  }
+  return { ...meta, alternate_names: alternates.slice(0, ALT_CAP) };
 }
 
 /**

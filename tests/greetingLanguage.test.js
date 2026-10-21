@@ -14,6 +14,8 @@ let missing = new Set();
 let tables = {};
 let failUpdate = null;
 let throwUpdate = false;
+let raceInsert = null;
+let idSeq = 0;
 
 function project(row, cols) {
   const keep = cols.split(',').map((c) => c.trim());
@@ -25,7 +27,18 @@ function query(table) {
   const q = { table, op: 'select', cols: '*', filters: [], patch: null, single: false };
   const run = () => {
     calls.push({ ...q, filters: [...q.filters] });
-    const miss = [...missing].find((c) => new RegExp(`\\b${c}\\b`).test(q.op === 'update' ? Object.keys(q.patch).join(',') : q.cols));
+    const miss = [...missing].find((c) => new RegExp(`\\b${c}\\b`).test(q.op === 'update' || q.op === 'insert' ? Object.keys(q.patch).join(',') : q.cols));
+    if (q.op === 'insert') {
+      if (throwUpdate) throw new Error('socket hang up');
+      if (miss) return { data: null, error: { message: `column ${table}.${miss} does not exist` } };
+      if (raceInsert) {
+        (tables[table] = tables[table] || []).push(raceInsert);
+        raceInsert = null;
+        return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "contacts_tenant_phone_uidx"' } };
+      }
+      (tables[table] = tables[table] || []).push({ id: `new${++idSeq}`, ...q.patch });
+      return { data: null, error: null };
+    }
     if (q.op === 'update' && throwUpdate) throw new Error('socket hang up');
     if (miss) return { data: null, error: { message: `column ${table}.${miss} does not exist` } };
     if (q.op === 'update' && failUpdate) return { data: null, error: { message: failUpdate } };
@@ -45,6 +58,7 @@ function query(table) {
   const b = {
     select(cols) { q.cols = cols; return b; },
     update(patch) { q.op = 'update'; q.patch = patch; return b; },
+    insert(row) { q.op = 'insert'; q.patch = row; return b; },
     eq(col, v) { q.filters.push(['eq', col, v]); return b; },
     in(col, v) { q.filters.push(['in', col, v]); return b; },
     is(col, v) { q.filters.push(['is', col, v]); return b; }, neq() { return b; }, gte() { return b; }, lte() { return b; }, lt() { return b; }, gt() { return b; },
@@ -81,6 +95,7 @@ beforeEach(() => {
   failUpdate = null;
   throwUpdate = false;
   rpcError = null;
+  raceInsert = null;
   tables = {
     tenants: [{ id: 't1', business_name: 'Shop', spoken_name: 'Shopu', greeting_invite: 'Karibu', greeting_text: 'Habari, hii ni Shopu.', greeting_language: 'sw', is_active: true }],
     contacts: [{ id: 'c1', tenant_id: 't1', phone: '+254712345678', name: 'Wanjiku', notes: null, last_reason: null, metadata: {}, last_language: 'sw', last_language_at: '2026-10-20T08:00:00Z' }],
@@ -164,13 +179,15 @@ describe('saveCallerLanguage', () => {
   it('writes last_language + last_language_at on the existing contact (sheng -> sw)', async () => {
     tables.contacts[0].last_language = 'en';
     const out = await db.saveCallerLanguage({ tenantId: 't1', phone: '0712345678', language: 'sheng' });
-    assert.deepEqual(out, { ok: true, updated: 1 });
+    assert.deepEqual(out, { ok: true, created: false, updated: 1 });
     assert.equal(tables.contacts[0].last_language, 'sw');
     assert.ok(tables.contacts[0].last_language_at);
     const upd = calls.find((c) => c.op === 'update');
     assert.deepEqual(Object.keys(upd.patch).sort(), ['last_language', 'last_language_at']);
     assert.equal(tables.contacts[0].name, 'Wanjiku');
-    assert.ok(upd.filters.some(([k, col, v]) => k === 'in' && col === 'phone' && v.includes('+254712345678')));
+    assert.deepEqual(upd.filters, [['eq', 'id', 'c1']]);
+    const find = calls.find((c) => c.table === 'contacts' && c.op === 'select');
+    assert.ok(find.filters.some(([k, col, v]) => k === 'in' && col === 'phone' && v.includes('+254712345678')));
   });
   it('mixed / unknown write nothing and keep the previous value', async () => {
     for (const language of ['mixed', 'unknown', '']) {
@@ -246,7 +263,7 @@ describe('greeting_language.sql: name confirmed + resume state', () => {
 describe('confirmCallerName', () => {
   it('sets name + all four confirmed fields in one update', async () => {
     const out = await db.confirmCallerName({ tenantId: 't1', phone: '0712345678', name: ' Wanjiku Kamau ', source: 'readback_yes', callId: '55555555-5555-4555-8555-555555555555' });
-    assert.deepEqual(out, { ok: true, updated: 1 });
+    assert.deepEqual(out, { ok: true, created: false, updated: 1, previousName: 'Wanjiku' });
     const upd = calls.filter((c) => c.op === 'update');
     assert.equal(upd.length, 1);
     const c = tables.contacts[0];
@@ -332,5 +349,72 @@ describe('calls resume state', () => {
     const r = await quiet(() => db.bumpStreamSeq('HD_a1'));
     assert.equal(r.out.ok, false);
     assert.ok(r.logs.some((l) => /apply greeting_language\.sql/.test(l)));
+  });
+});
+
+describe('contact upserts by tenant + phone (Brain review)', () => {
+  const NEW = '+254799000111';
+  it('saveCallerLanguage creates the contact for a first-time caller', async () => {
+    const out = await db.saveCallerLanguage({ tenantId: 't1', phone: '0799000111', language: 'en' });
+    assert.deepEqual(out, { ok: true, created: true, updated: 0 });
+    const row = tables.contacts.find((r) => r.phone === NEW);
+    assert.equal(row.tenant_id, 't1');
+    assert.equal(row.last_language, 'en');
+    assert.ok(row.last_language_at);
+    assert.deepEqual(row.metadata, { alternate_names: [] });
+  });
+  it('confirmCallerName create-new: inserts name + all four confirmed fields', async () => {
+    const out = await db.confirmCallerName({ tenantId: 't1', phone: '254799000111', name: 'Otieno', callId: '55555555-5555-4555-8555-555555555555' });
+    assert.deepEqual(out, { ok: true, created: true, updated: 0, previousName: null });
+    const row = tables.contacts.find((r) => r.phone === NEW);
+    assert.equal(row.name, 'Otieno');
+    assert.equal(row.name_confirmed, true);
+    assert.ok(row.name_confirmed_at);
+    assert.equal(row.name_confirmed_source, 'readback_yes');
+    assert.equal(row.name_confirmed_call_id, '55555555-5555-4555-8555-555555555555');
+  });
+  it('confirmCallerName rename: the old name moves to alternate_names (kept, deduped)', async () => {
+    tables.contacts[0].metadata = { alternate_names: [{ name: 'wanjiku', seen_at: 'x', call_id: null }, { name: 'Akinyi', seen_at: 'y', call_id: null }], other: 1 };
+    const out = await db.confirmCallerName({ tenantId: 't1', phone: '+254712345678', name: 'Wanjiru' });
+    assert.equal(out.previousName, 'Wanjiku');
+    assert.equal(out.updated, 1);
+    const c = tables.contacts[0];
+    assert.equal(c.name, 'Wanjiru');
+    assert.equal(c.name_confirmed, true);
+    assert.equal(c.metadata.other, 1);
+    const names = c.metadata.alternate_names.map((r) => r.name);
+    assert.equal(names[0], 'Wanjiku');
+    assert.equal(names.filter((n) => n.toLowerCase() === 'wanjiku').length, 1);
+    assert.ok(names.includes('Akinyi'));
+    assert.ok(c.metadata.alternate_names[0].seen_at);
+    assert.equal(calls.filter((q) => q.op === 'update').length, 1, 'name + confirmed fields in one update');
+  });
+  it('confirmCallerName same name (case-insensitive): no alternate added', async () => {
+    const out = await db.confirmCallerName({ tenantId: 't1', phone: '+254712345678', name: 'WANJIKU' });
+    assert.equal(out.ok, true);
+    assert.equal(out.previousName, 'Wanjiku');
+    assert.deepEqual(tables.contacts[0].metadata.alternate_names, []);
+    assert.equal(tables.contacts[0].name, 'WANJIKU');
+  });
+  it('racing insert (unique violation) falls back to updating the row the other writer made', async () => {
+    raceInsert = { id: 'raced', tenant_id: 't1', phone: NEW, name: 'Otieno', metadata: {} };
+    const out = await db.confirmCallerName({ tenantId: 't1', phone: NEW, name: 'Otieno O' });
+    assert.deepEqual(out, { ok: true, created: false, updated: 1, previousName: 'Otieno' });
+    const row = tables.contacts.find((r) => r.id === 'raced');
+    assert.equal(row.name, 'Otieno O');
+    assert.equal(row.name_confirmed, true);
+    assert.equal(row.metadata.alternate_names[0].name, 'Otieno');
+  });
+  it('errors are swallowed: insert/update throw or a DB error returns ok:false', async () => {
+    throwUpdate = true;
+    let r = await quiet(() => db.confirmCallerName({ tenantId: 't1', phone: NEW, name: 'Otieno' }));
+    assert.deepEqual({ ok: r.out.ok, created: r.out.created, updated: r.out.updated }, { ok: false, created: false, updated: 0 });
+    r = await quiet(() => db.saveCallerLanguage({ tenantId: 't1', phone: NEW, language: 'sw' }));
+    assert.equal(r.out.ok, false);
+    throwUpdate = false;
+    missing = new Set(['name_confirmed']);
+    r = await quiet(() => db.confirmCallerName({ tenantId: 't1', phone: '+254712345678', name: 'Wanjiru' }));
+    assert.equal(r.out.ok, false);
+    assert.ok(r.logs.some((l) => /confirmCallerName failed/.test(l) && /apply greeting_language\.sql/.test(l)));
   });
 });
