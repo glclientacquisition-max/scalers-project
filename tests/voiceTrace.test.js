@@ -192,6 +192,27 @@ describe('voice trace session', () => {
     await trace.finishCall();
   });
 
+  it('records the lookup step with type, result, matched id and reason', async () => {
+    const sink = createMemorySink();
+    const trace = createVoiceTrace({ enabled: true, sink, callId: 'HD_lookup' });
+    trace.beginTurn({ callerText: 'How much is carpet cleaning?', language: { current: 'en' } });
+    trace.noteLookup({
+      handled: true,
+      outcome: 'price',
+      brainMs: 0.84,
+      lookups: [{ kind: 'price', status: 'unconfirmed', id: 'price.carpet_cleaning', reason: 'hash_mismatch', source: 'catalogue' }],
+    });
+    const turn = trace.commitTurn({ outcome: 'early_return' });
+    const step = turn.stages.find((row) => row.stage === 'lookup');
+    assert.equal(step.handled, true);
+    assert.equal(step.outcome, 'price');
+    assert.deepEqual(step.lookups, [
+      { type: 'price', result: 'unconfirmed', matchedId: 'price.carpet_cleaning', reason: 'hash_mismatch', source: 'catalogue' },
+    ]);
+    assert.equal(step.brainMs, 0.8);
+    await trace.finishCall();
+  });
+
   it('leaves score fields null when scoring throws, and warns once', async () => {
     const warns = [];
     const orig = console.warn;

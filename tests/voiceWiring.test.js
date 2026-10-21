@@ -97,8 +97,8 @@ assert.match(
 
 assert.match(
   source,
-  /const localReply = resolveLocalReply\(\{[\s\S]*?nextBestAction,\s*\}\);/,
-  'every caller turn must pass the one local turn contract (turnPolicy.resolveLocalReply) before Gemini'
+  /const localReply = lookupPlan\?\.handled[\s\S]*?resolveLocalReply\(\{[\s\S]*?nextBestAction,\s*\}\);/,
+  'a turn the lookup does not handle still passes turnPolicy.resolveLocalReply before Gemini'
 );
 
 assert.match(
@@ -424,8 +424,8 @@ assert.doesNotMatch(
 
 assert.match(
   source,
-  /if \(state === 'completed' && hasCallSetupFields\) return false;/,
-  'SautiKit initial callback with callSessionState=Completed must still open the media stream'
+  /if \(state === 'completed' && hasCallSetupFields && !streamIssued\) return false;/,
+  'SautiKit initial callback with callSessionState=Completed must still open the media stream (only before Stream went out; after that it is the hangup, prod HD_d3900cbf2b2d)'
 );
 
 assert.match(
@@ -688,8 +688,18 @@ assert.match(
 
 assert.match(
   source,
-  /package exhausted — reject/,
-  'a used-up package with on-demand off must not open the media stream'
+  /'no package' : 'package exhausted'\} \(billing .*on-demand off\) — refuse/,
+  'a used-up package (or no package) with on-demand off and billing enforced must not open the media stream'
+);
+assert.match(
+  source,
+  /\.send\(packageRefusalXml\(\{ businessName: gate\.usage\?\.businessName \}\)\)/,
+  'package refusals go through packageRefusalXml (Reject by default, voicemail behind a flag)'
+);
+assert.match(
+  source,
+  /maybeAlertPackageUsage\(gate\.usage\)/,
+  'the package gate must raise the beta 80% / 100% ops notice'
 );
 
 const telephonyRejectAt = source.indexOf('telephonyBillingRejectXml()');

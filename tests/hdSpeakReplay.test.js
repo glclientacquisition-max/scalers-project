@@ -105,9 +105,11 @@ function hear(state, text, profile, language) {
   });
 }
 
-function nameAskFor(state, language) {
+function nameAskFor(state, language, publicAnswerCommitted = false) {
   const gate = planCallerModelTurn(state, {
     fileNameAskCommitted: state?.caller?.fileNameAskSpoken === true,
+    // server.js commits the turn's local facts first, then runs the gate.
+    publicAnswerCommitted,
   });
   if (gate.runModel || !gate.line) return '';
   return lockFileNameAsk(gate.line, language);
@@ -132,12 +134,12 @@ function playTurn({ commit, text, state, profile, language, endAction }) {
     geminiCatalogue: false,
   });
   const nameJustConfirmed = state?.caller?.nameJustConfirmed === true;
-  const nameAsk = nameJustConfirmed ? '' : nameAskFor(state, language);
-  commitTurnFacts(commit, {
+  const localPacket = commitTurnFacts(commit, {
     localReply,
     catalogueLine: mouth.speakLocal ? mouth.line : '',
     catalogueListed: state?.conversation?.catalogueListed === true,
   });
+  const nameAsk = nameJustConfirmed ? '' : nameAskFor(state, language, Boolean(localPacket));
   if (nameAsk || nameJustConfirmed || String(endAction || '').toUpperCase() === 'END') {
     commitReadySpeakSlots(commit, state, {
       nameJustConfirmed: nameJustConfirmed || String(endAction || '').toUpperCase() === 'END',

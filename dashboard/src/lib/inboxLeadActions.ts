@@ -21,7 +21,7 @@ export async function inboxMarkDone(item: InboxItem) {
   return updateLeadStatus(item.callId, "resolved");
 }
 
-/** wa.me click: same pile close as Mark done, plus "WhatsApp follow-up opened". */
+/** wa.me click: appends "WhatsApp follow-up opened". Does not close the item. */
 export async function inboxWhatsAppFollowUp(item: InboxItem) {
   if (!item.callId) return { error: "Missing call." };
   return logWhatsAppFollowUp(item.callId);

@@ -1,0 +1,43 @@
+{
+  "source": "Railway prod deploy logs, service scalers-project (production), read 17 Oct 2026. Text redacted to what the call path needs; no caller numbers.",
+  "tenant": "Esga Stationery",
+  "release": "main 7d870a75",
+  "calls": [
+    {
+      "callSid": "HD_116ff6a67508",
+      "ttsSessionOpenAt": "2026-10-13T12:16:51.441Z",
+      "greeting": { "text": "Esga, this is Lucy. Nikusaidie vipi.", "cached": true, "connectToGreetingPcmMs": 661 },
+      "callerFinalAt": "2026-10-13T12:17:00.726Z",
+      "callerText": "Um, kuna order nilikuwa nime-mix, sijui kama naikumbuka.",
+      "replyStreamPrefetchedAt": "2026-10-13T12:17:00.729Z",
+      "thinkingAck": { "text": "Mm.", "cached": true, "at": "2026-10-13T12:17:01.128Z" },
+      "ttsClose": { "at": "2026-10-13T12:17:01.422Z", "code": 1001, "reason": "Timeout" },
+      "socketIdleMsBeforeClose": 9981,
+      "after": "Unhandled rejection 'Error: TTS socket closed (1001)' at src/speech/sonioxTts.js:204; Node exited and Railway restarted the process at 12:17:02.12Z. No reply audio. Caller hung up; SautiKit marked the call complete at 36 s.",
+      "callEndedAt": "2026-10-13T12:17:27.101Z"
+    },
+    {
+      "callSid": "HD_1e4e3e955169",
+      "greeting": { "text": "Esga, this is Lucy. Nikusaidie vipi.", "cached": true, "connectToGreetingPcmMs": 773 },
+      "callerFinalAt": "2026-10-13T12:35:33.959Z",
+      "callerText": "Kuna order nilikuwa nimeplace, I don't know if, um, I don't.",
+      "replyStreamPrefetchedAt": "2026-10-13T12:35:33.997Z",
+      "ttsClose": { "at": "2026-10-13T12:35:34.409Z", "code": 1001, "reason": "Timeout" },
+      "after": "Same unhandled rejection; process restarted at 12:35:35.27Z. Caller heard nothing after the greeting; call complete at 29 s.",
+      "callEndedAt": "2026-10-13T12:35:52.611Z"
+    }
+  ],
+  "sameWindowIdleTimeouts": [
+    "HD_5e55f63b241c 2026-10-10T22:18:30Z",
+    "HD_cf312be8ba00 2026-10-11T13:36:28Z",
+    "HD_226f814d7ab0 2026-10-11T15:22:20Z",
+    "HD_8f6cbdf5d30a 2026-10-12T09:06:02Z",
+    "HD_ec7a4c3422ab 2026-10-12T09:09:16Z",
+    "HD_769d67dec399 2026-10-12T09:10:34Z",
+    "HD_015b5b78295c 2026-10-12T09:14:54Z",
+    "HD_fe30244cfac1 2026-10-13T07:33:50Z",
+    "HD_8bd4ebc460d4 2026-10-13T07:35:38Z",
+    "HD_b51db9785bd6 2026-10-13T16:59:59Z"
+  ],
+  "note": "Every 1001 Timeout close came roughly 10 s after the TTS socket's last client message. It is only fatal when a line is in flight; the two calls above had a prefetched reply stream open."
+}

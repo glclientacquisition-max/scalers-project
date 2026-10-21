@@ -2,7 +2,7 @@
  * Super Admin A0 safety:
  * - no supplier, vendor, or infra names in admin error copy;
  * - a number live on an active business can't be released (server and UI);
- * - Remove is Archive, with permanent delete only after 30 days;
+ * - Remove is Archive; no hard delete from Admin (purge rules: adminLifecycle.test.js);
  * - admin writes record the signed-in operator, never a typed name or "ops";
  * - confirms are ConfirmSheet bottom drawers, never window.confirm or a centred dialog.
  */
@@ -18,8 +18,7 @@ const {
   adminFacingError,
 } = require("../dashboard/src/lib/adminErrors.ts");
 const {
-  ARCHIVE_GRACE_DAYS,
-  archiveState,
+  ARCHIVE_RESTORE_DAYS,
   releaseBlockReason,
   AdminActionBlocked,
   isAdminActionBlocked,
@@ -164,49 +163,29 @@ describe("A0: a live number can't be released", () => {
   });
 
   it("Businesses and Numbers show a disabled Release with the reason", () => {
-    for (const rel of [`${DASH}/components/AdminBusinessesPanel.tsx`, `${DASH}/components/DidPoolManager.tsx`]) {
+    for (const rel of [`${DASH}/components/AdminShopPanel.tsx`, `${DASH}/components/DidPoolManager.tsx`]) {
       const src = read(rel);
-      assert.match(src, /releaseBlockReason/, rel);
+      assert.match(src, /releaseBlockReason|releaseReason/, rel);
       assert.match(src, /disabled\s*\n\s*(title=[^\n]*\n\s*)?aria-describedby=\{`release-why-/, rel);
     }
   });
 });
 
-describe("A0: Remove is Archive, permanent delete after the grace period", () => {
-  const day = 24 * 60 * 60 * 1000;
-  const now = new Date("2026-10-09T10:00:00Z");
-
-  it("is 30 days", () => {
-    assert.equal(ARCHIVE_GRACE_DAYS, 30);
+describe("A0: Remove is Archive, and Admin has no hard delete", () => {
+  it("keeps a 30 day restore window", () => {
+    assert.equal(ARCHIVE_RESTORE_DAYS, 30);
   });
 
-  it("keeps delete off for active, undated, and recent archives", () => {
-    assert.equal(archiveState({ isActive: true, archivedAt: null }, now).canDelete, false);
-    const undated = archiveState({ isActive: false, archivedAt: null }, now);
-    assert.equal(undated.archived, true);
-    assert.equal(undated.canDelete, false);
-    assert.match(undated.deleteBlockedReason, /No archive date/);
-    const recent = archiveState({ isActive: false, archivedAt: new Date(now.getTime() - 29 * day).toISOString() }, now);
-    assert.equal(recent.canDelete, false);
-    assert.ok(recent.deleteOpensAt);
-  });
-
-  it("opens delete at 30 days", () => {
-    const old = archiveState({ isActive: false, archivedAt: new Date(now.getTime() - 30 * day).toISOString() }, now);
-    assert.equal(old.canDelete, true);
-    assert.equal(old.deleteBlockedReason, null);
-  });
-
-  it("the server enforces the grace period and the typed name; the one-step remove is gone", () => {
+  it("the one-step remove and the permanent delete are gone", () => {
     const actions = read(`${DASH}/lib/adminBusinessActions.ts`);
-    const del = actions.slice(actions.indexOf("export async function deleteArchivedBusiness("));
-    assert.ok(del.indexOf("state.canDelete") < del.indexOf('rpc("remove_business_and_release_did"'));
-    assert.ok(del.indexOf("typedName") < del.indexOf('rpc("remove_business_and_release_did"'));
+    assert.doesNotMatch(actions, /remove_business_and_release_did/);
+    assert.doesNotMatch(actions, /deleteArchivedBusiness/);
     const route = read(`${DASH}/app/api/admin/businesses/route.ts`);
     assert.doesNotMatch(route, /action === "remove"/);
+    assert.doesNotMatch(route, /action === "delete_permanently"/);
     assert.match(route, /action === "archive"/);
     assert.match(route, /action === "restore"/);
-    assert.match(route, /action === "delete_permanently"/);
+    assert.doesNotMatch(read(`${DASH}/components/AdminBusinessesPanel.tsx`), /Delete permanently|delete_permanently/);
   });
 
   it("works before the archive SQL exists", () => {
@@ -243,9 +222,9 @@ describe("A0: the signed-in Super Admin is the actor", () => {
     assert.doesNotMatch(read(`${DASH}/components/AdminBusinessesPanel.tsx`), /actor:/);
   });
 
-  it("archive, restore, delete, and release write an audit row with that actor", () => {
+  it("suspend, restore line, archive, unarchive, and release write an audit row with that actor", () => {
     const actions = read(`${DASH}/lib/adminBusinessActions.ts`);
-    for (const action of ["archive_business", "restore_business", "delete_business", "release_number"]) {
+    for (const action of ["suspend_business", "unsuspend_business", "archive_business", "restore_business", "release_number"]) {
       assert.match(actions, new RegExp(`action: "${action}"`), action);
     }
     assert.match(read(`${DASH}/lib/adminAudit.ts`), /from\("ops_audit_log"\)/);
@@ -261,13 +240,17 @@ describe("A0: confirms are ConfirmSheet bottom drawers", () => {
     }
   });
 
-  it("release, archive, restore, and delete confirm in a ConfirmSheet", () => {
-    const biz = read(`${DASH}/components/AdminBusinessesPanel.tsx`);
-    for (const title of ["Release this number?", "Archive this business?", "Restore this business?", "Delete permanently?"]) {
-      const at = biz.indexOf(`title="${title}"`);
-      assert.ok(at > 0, title);
-      const opener = biz.lastIndexOf("<", biz.lastIndexOf("open={", at));
-      assert.equal(biz.slice(opener, opener + 13), "<ConfirmSheet", title);
+  it("release and every lifecycle action confirm in a ConfirmSheet", () => {
+    const biz = read(`${DASH}/components/AdminShopPanel.tsx`);
+    const rel = biz.indexOf('title="Release this number?"');
+    assert.ok(rel > 0);
+    const opener = biz.lastIndexOf("<", biz.lastIndexOf("open={", rel));
+    assert.equal(biz.slice(opener, opener + 13), "<ConfirmSheet");
+    const life = biz.indexOf('open={sheet === "lifecycle"}');
+    assert.ok(life > 0);
+    assert.equal(biz.slice(biz.lastIndexOf("<", life), biz.lastIndexOf("<", life) + 13), "<ConfirmSheet");
+    for (const title of ["Suspend this line?", "Restore this line?", "Archive this business?", "Unarchive this business?"]) {
+      assert.ok(biz.includes(`title: "${title}"`), title);
     }
     const pool = read(`${DASH}/components/DidPoolManager.tsx`);
     const at = pool.indexOf('title="Release this number?"');

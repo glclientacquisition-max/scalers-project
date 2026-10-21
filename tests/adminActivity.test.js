@@ -16,10 +16,16 @@ const SELF_AUDITING = {
   releasePoolNumber: "dashboard/src/lib/adminBusinessActions.ts",
   archiveBusiness: "dashboard/src/lib/adminBusinessActions.ts",
   restoreBusiness: "dashboard/src/lib/adminBusinessActions.ts",
-  deleteArchivedBusiness: "dashboard/src/lib/adminBusinessActions.ts",
+  suspendBusiness: "dashboard/src/lib/adminBusinessActions.ts",
+  unsuspendBusiness: "dashboard/src/lib/adminBusinessActions.ts",
+  updateBusinessProfile: "dashboard/src/lib/adminBusinessProfile.ts",
+  sendOwnerPasswordReset: "dashboard/src/lib/adminBusinessProfile.ts",
+  adminTransferOwnership: "dashboard/src/lib/adminBusinessProfile.ts",
   // These call billing RPCs that insert into ops_audit_log themselves.
   grantTenantPackageMinutes: "rpc:grant_tenant_package_minutes",
+  resolveCheckoutTotalReview: "rpc:resolve_checkout_total_review",
   setTenantBillingMode: "rpc:set_tenant_billing_mode",
+  confirmTenantBillingMode: "rpc:admin_set_tenant_billing_mode",
 };
 
 function fnBody(src, name) {
@@ -66,7 +72,11 @@ describe("Activity: every admin write is recorded", () => {
   it("the self-auditing helpers really record", () => {
     for (const [fn, where] of Object.entries(SELF_AUDITING)) {
       if (where.startsWith("rpc:")) {
-        const lib = read(fn === "setTenantBillingMode" ? "dashboard/src/lib/adminWallets.ts" : "dashboard/src/lib/adminBilling.ts");
+        const lib = read(
+          fn === "setTenantBillingMode" || fn === "confirmTenantBillingMode"
+            ? "dashboard/src/lib/adminWallets.ts"
+            : "dashboard/src/lib/adminBilling.ts",
+        );
         assert.match(fnBody(lib, fn), new RegExp(where.slice(4)), fn);
         continue;
       }
@@ -84,7 +94,7 @@ describe("Activity: every admin write is recorded", () => {
 
   it("number assign and release, archive, and package changes carry before and after", () => {
     const actions = read("dashboard/src/lib/adminBusinessActions.ts");
-    for (const action of ["release_number", "archive_business", "restore_business", "delete_business"]) {
+    for (const action of ["release_number", "archive_business", "restore_business", "suspend_business", "unsuspend_business"]) {
       const at = actions.indexOf(`action: "${action}"`);
       assert.ok(at >= 0, action);
       assert.match(actions.slice(at, at + 400), /before:/, action);
@@ -97,11 +107,6 @@ describe("Activity: every admin write is recorded", () => {
       /recordAdminAction\(\{ actor, action: "assign_package", businessId, before, after \}\)/,
     );
     assert.match(read("dashboard/src/app/api/did-pool/route.ts"), /action: "assign_number"[\s\S]{0,300}after:/);
-  });
-
-  it("the delete row is written before the business is gone", () => {
-    const body = fnBody(read("dashboard/src/lib/adminBusinessActions.ts"), "deleteArchivedBusiness");
-    assert.ok(body.indexOf("recordAdminAction(") < body.indexOf("remove_business_and_release_did"));
   });
 });
 
@@ -169,7 +174,7 @@ describe("Activity: screen", () => {
     assert.equal(item.href, "/admin/activity");
     assert.equal(item.pending, undefined);
     assert.ok(links.ADMIN_MORE_LINKS.some((l) => l.href === "/admin/activity"));
-    assert.match(read("dashboard/src/components/AdminBusinessesPanel.tsx"), /\/admin\/activity\?business=\$\{open\.id\}/);
+    assert.match(read("dashboard/src/components/AdminShopPanel.tsx"), /\/admin\/activity\?business=\$\{b\.id\}/);
   });
 
   it("filters in Sheets and opens detail in a Sheet; no centred dialog", () => {

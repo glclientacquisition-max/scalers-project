@@ -13,6 +13,8 @@ import { stampScheduleWindows } from "@/lib/visitCalendar";
 export type AppointmentStatusState = {
   error?: string;
   ok?: boolean;
+  /** Saved, but the caller text did not go out (line paused or business closed). */
+  notice?: string;
 };
 
 const STATUSES = new Set(["requested", "confirmed", "cancelled", "done"]);
@@ -50,6 +52,7 @@ export async function updateAppointmentStatus(
     return ownerSaveFailed("appointment-status", error.message, "Could not save appointment.");
   }
 
+  let notice: string | undefined;
   const prefs = parseNotifyChannels(tenant.notify_channels);
   if (
     prefs.caller_sms &&
@@ -78,17 +81,20 @@ export async function updateAppointmentStatus(
       body,
     });
     if (!sent.ok) console.warn("[appointment caller sms]", sent.reason);
+    if (sent.message) notice = sent.message;
   }
 
   revalidatePath("/appointments");
   revalidatePath("/calls");
   revalidatePath("/home");
-  return { ok: true };
+  return notice ? { ok: true, notice } : { ok: true };
 }
 
 export type AppointmentScheduleState = {
   error?: string;
   ok?: boolean;
+  /** Saved, but the caller text did not go out (line paused or business closed). */
+  notice?: string;
 };
 
 export async function updateAppointmentSchedule(
@@ -138,6 +144,7 @@ export async function updateAppointmentSchedule(
   }
 
   const whenChanged = String(existing?.when_text || "").trim() !== whenText;
+  let notice: string | undefined;
   const prefs = parseNotifyChannels(tenant.notify_channels);
   if (prefs.caller_sms && row?.caller_phone && whenChanged) {
     const body = renderDeskCallerText({
@@ -156,11 +163,12 @@ export async function updateAppointmentSchedule(
       body,
     });
     if (!sent.ok) console.warn("[appointment caller sms]", sent.reason);
+    if (sent.message) notice = sent.message;
   }
 
   revalidatePath("/appointments");
   revalidatePath("/calls");
   revalidatePath("/home");
   if (row?.call_id) revalidatePath(`/calls/${row.call_id}`);
-  return { ok: true };
+  return notice ? { ok: true, notice } : { ok: true };
 }

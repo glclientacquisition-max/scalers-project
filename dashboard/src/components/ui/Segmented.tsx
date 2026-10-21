@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { cx } from "@/lib/cx";
 
 export type SegmentedItem = {
@@ -34,38 +34,42 @@ function Count({ n, active }: { n: number; active: boolean }) {
 export function Segmented({
   items,
   onSelect,
+  onNavigate,
   label,
   className,
 }: {
   items: SegmentedItem[];
   onSelect?: (key: string) => void;
+  /**
+   * Link mode: called on a plain click. Return true when the parent handled it
+   * on the client (the Link's own navigation is then skipped).
+   */
+  onNavigate?: (key: string) => boolean;
   /** Accessible name for the group. */
   label: string;
   className?: string;
 }) {
   const asLinks = items.every((item) => item.href);
   const activeKey = items.find((item) => item.active)?.key ?? null;
+  const navRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (!activeKey) return;
-    const node = document.querySelector(
-      `[data-segmented="${CSS.escape(label)}"] [data-segmented-active]`
-    );
+    const nav = navRef.current;
+    if (!nav || !activeKey) return;
+    const node = nav.querySelector("[data-segmented-active]");
     if (!(node instanceof HTMLElement)) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    node.scrollIntoView({
-      inline: "nearest",
-      block: "nearest",
-      behavior: reduce ? "auto" : "smooth",
-    });
+    const left = node.offsetLeft - (nav.clientWidth - node.offsetWidth) / 2;
+    nav.scrollTo({ left: Math.max(0, left), behavior: reduce ? "auto" : "smooth" });
   }, [activeKey, label]);
 
   return (
     <nav
+      ref={navRef}
       aria-label={label}
       data-segmented={label}
       className={cx(
-        "-mx-4 flex snap-x snap-mandatory overflow-x-auto border-b border-hairline px-4 [scrollbar-width:none] sm:-mx-6 sm:px-6 md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden",
+        "-mx-4 flex w-full min-w-0 max-w-full snap-x snap-mandatory overflow-x-auto border-b border-hairline px-4 [scrollbar-width:none] sm:-mx-6 sm:px-6 md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden",
         className,
       )}
     >
@@ -76,10 +80,17 @@ export function Segmented({
             <Link
               key={item.key}
               href={item.href}
-              prefetch
+              // Default prefetch (shell only). A full `prefetch` here rendered
+              // every Inbox tab, each a full inbox load, on every visit.
               data-segmented-active={active ? "" : undefined}
               aria-current={active ? "page" : undefined}
               aria-disabled={item.disabled || undefined}
+              onClick={(event) => {
+                if (!onNavigate) return;
+                if (event.defaultPrevented || event.button !== 0) return;
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                if (onNavigate(item.key)) event.preventDefault();
+              }}
               className={cx(itemBase, itemState(active), item.disabled && "pointer-events-none opacity-50")}
             >
               {item.label}

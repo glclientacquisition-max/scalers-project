@@ -97,13 +97,15 @@ NAME ACCURACY (critical — names go to owner notifications):
  * Live per-call header — highest priority over the compiled prompt.
  * Injects clock, identity, open/closed, and mood adaptation.
  */
-function buildContextHeader(profile = {}) {
+function buildContextHeader(profile = {}, opts = {}) {
   const agentName =
     String(profile.agentName || process.env.AGENT_NAME || 'Receptionist').trim() ||
     'Receptionist';
   const businessName =
     profile.businessName || process.env.BUSINESS_NAME || 'the business';
-  const nowLabel = formatEatNowLabel(new Date());
+  // The speech guard trusts this same instant (trustedFacts.js); the server
+  // passes it in and stamps it on the call state.
+  const nowLabel = formatEatNowLabel(opts.now ? new Date(opts.now) : new Date());
   const status = openClosedStatus(profile.hoursSchedule);
   const scheduleSummary = formatScheduleSummary(profile.hoursSchedule);
 
@@ -224,7 +226,7 @@ Enquiry and take-a-message always work, even when the file is incomplete.
 If you append create_service_request, create_appointment, or update_appointment, speak nothing. Do not narrate hours, prices, or a booking attempt. Never say saved, held, ordered, booked, sent, or confirmed. The backend speaks the outcome. If you append ONLY save_caller_info, you MUST speak your natural response. Do not read open visits, holds, callbacks, or orders unless they just asked about them.`;
 }
 
-function buildSystemPrompt(profile = {}) {
+function buildSystemPrompt(profile = {}, opts = {}) {
   const businessName =
     profile.businessName || process.env.BUSINESS_NAME || 'the business';
   const knowledge =
@@ -233,7 +235,7 @@ function buildSystemPrompt(profile = {}) {
     DEFAULT_KNOWLEDGE;
   const languagePolicy = tenantLanguagePolicy();
   const languageLine = formatVoiceLanguagesLine();
-  const header = buildContextHeader(profile);
+  const header = buildContextHeader(profile, { now: opts.now });
   const liveTruth = buildLiveGroundTruth(profile);
   const liveBlock = liveTruth ? `\n\n${liveTruth}\n` : '\n';
   const playbook = formatPlaybookForPrompt(profile);
@@ -343,3 +345,56 @@ module.exports = {
   VOICE_SYSTEM_PROMPT_ID,
   VOICE_SYSTEM_PROMPT_VERSION,
 };
+
+// VOICE_FACT_REFS (default off). Wraps the prompt builders without touching
+// their bodies (so #779's prompt order merges cleanly):
+// - the Desk-compiled llm_system_prompt is persona only; its facts are removed
+//   (factSheet.personaOnlyPrompt). Facts come from LIVE GROUND TRUTH and the
+//   FACT CARD (liveKnowledge.js).
+// - money and clock times are written as digits or fact IDs, never as words:
+//   the speech check reads digits exactly and the renderer words them in the
+//   caller's language (spokenForms.js).
+const FACT_REFS_RULES = [
+  [
+    '- Say money as words when you can ("five thousand shillings" / "shilingi elfu tano"), not "KES 5,000".',
+    '- Write money as digits ("KSh 5,000"), never as words. For a price, fee, hour or payment number on the FACT CARD, write its ID instead ({price.example}). The system reads it aloud in the caller\'s language.',
+  ],
+  [
+    '- Say times clearly ("3 P M" / "saa 3 jioni"), not "15:00" or "3pm" jammed together.',
+    '- Write clock times as digits with AM or PM ("3:00 PM"), never as words, in every language. The system reads them aloud the right way.',
+  ],
+];
+
+function factRefsProfile(profile) {
+  const { factRefsEnabled, personaOnlyPrompt } = require('./conversation/factSheet');
+  const { personaOnlyFlag } = require('./knowledge/flags');
+  const strip = factRefsEnabled() || personaOnlyFlag();
+  if (!strip || !profile || !String(profile.llmSystemPrompt || '').trim()) return profile;
+  return { ...profile, llmSystemPrompt: personaOnlyPrompt(profile.llmSystemPrompt) };
+}
+
+function factRefsRules(text) {
+  const { factRefsEnabled } = require('./conversation/factSheet');
+  if (!factRefsEnabled()) return text;
+  let out = String(text);
+  for (const [from, to] of FACT_REFS_RULES) out = out.split(from).join(to);
+  return out;
+}
+
+function withFactRefs(build) {
+  return function factRefsPrompt(profile = {}, opts = {}) {
+    const built = build(factRefsProfile(profile), opts);
+    if (typeof built === 'string') return factRefsRules(built);
+    if (built && typeof built === 'object') {
+      const out = {};
+      for (const [key, value] of Object.entries(built)) out[key] = typeof value === 'string' ? factRefsRules(value) : value;
+      return out;
+    }
+    return built;
+  };
+}
+
+module.exports.buildSystemPrompt = withFactRefs(buildSystemPrompt);
+if (typeof module.exports.buildSystemPromptParts === 'function') {
+  module.exports.buildSystemPromptParts = withFactRefs(module.exports.buildSystemPromptParts);
+}

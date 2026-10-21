@@ -80,7 +80,7 @@ describe('VOICE_GEMINI_CATALOGUE', () => {
     assert.equal(mouth.reason, 'flag_off');
     assert.equal(
       mouth.line,
-      'We offer Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning, and more. Which one do you need?'
+      'We offer Couch cleaning, Mattress cleaning, Carpet cleaning, General cleaning and more. Which one do you need?'
     );
     assert.doesNotMatch(mouth.line, /Couch cleaning\. Mattress/);
   });
@@ -113,7 +113,7 @@ describe('VOICE_GEMINI_CATALOGUE', () => {
     assert.equal(mouth.reason, 'local_blend');
     assert.equal(
       mouth.line,
-      'We offer Couch cleaning, Mattress cleaning, Carpet cleaning, and General cleaning, and more. Which one do you need?'
+      'We offer Couch cleaning, Mattress cleaning, Carpet cleaning, General cleaning and more. Which one do you need?'
     );
   });
 
@@ -156,7 +156,7 @@ describe('VOICE_GEMINI_CATALOGUE', () => {
       profile: FILE,
     });
     assert.equal(local.outcome, 'catalogue');
-    assert.match(local.line, /and General cleaning, and more/);
+    assert.match(local.line, /Carpet cleaning, General cleaning and more\./);
     assert.doesNotMatch(local.line, /Couch cleaning\. Mattress/);
     const pending = planCatalogueMouth({
       localReply: null,
@@ -193,12 +193,12 @@ describe('VOICE_GEMINI_CATALOGUE', () => {
     assert.equal(mouth.reason, 'outage');
     assert.equal(
       mouth.line,
-      'Tuna Couch cleaning, Mattress cleaning, Carpet cleaning, na General cleaning, na zingine. Unahitaji gani?'
+      'Tuna Couch cleaning, Mattress cleaning, Carpet cleaning, General cleaning na zingine. Unahitaji gani?'
     );
     const prepared = prepareForTts(mouth.line, { callLanguage: 'sw' });
     assert.doesNotMatch(prepared.text, /\bna and\b/i);
     assert.doesNotMatch(prepared.text, /\bperiod\b/i);
-    assert.match(prepared.text, /na General cleaning, na zingine\./);
+    assert.match(prepared.text, /Carpet cleaning, General cleaning na zingine\./);
     assert.match(prepared.text, /Unahitaji gani\?$/);
   });
 

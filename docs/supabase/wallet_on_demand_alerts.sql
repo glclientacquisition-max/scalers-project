@@ -315,6 +315,8 @@ grant execute on function public.claim_wallet_balance_alerts(uuid)
 
 -- ---------------------------------------------------------------------------
 -- 5) Owner RPC: opt in / out of on-demand usage
+-- SUPERSEDED by on_demand_usage_audit.sql (same signature + ops_audit_log row).
+-- If you re-run this file, re-run on_demand_usage_audit.sql after it.
 -- ---------------------------------------------------------------------------
 create or replace function public.set_tenant_on_demand_usage(
   p_tenant_id uuid,

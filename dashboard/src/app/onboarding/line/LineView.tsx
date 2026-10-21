@@ -1,12 +1,33 @@
 import { BrandWordmark } from "@/components/brand/BrandMark";
 import { ButtonLink } from "@/components/ui/Button";
 import { formatKenyaNumber, numberPending } from "@/lib/setupFlow";
+import { toLocal07 } from "@/lib/callForwarding";
+import type { CallSetup, CallSetupOption } from "@/lib/callSetupStore";
+import { CallSetupStep } from "./CallSetupStep";
 import { PendingNumber } from "./PendingNumber";
 
 /** Number screen from data only (route loads it; /dev/setup/line renders fixtures). */
-export function LineView({ businessName, tenantId, raw }: { businessName: string; tenantId: string; raw: string | null }) {
+export function LineView({
+  businessName,
+  tenantId,
+  raw,
+  initialOption = null,
+  server = null,
+  testFromSuggestion = null,
+}: {
+  businessName: string;
+  tenantId: string;
+  raw: string | null;
+  /** Dev fixture only (/dev/setup/line?option=...). */
+  initialOption?: CallSetupOption | null;
+  /** Account call setup (tenants.call_setup); null in the dev fixture. */
+  server?: { supported: boolean; setup: CallSetup | null } | null;
+  /** Teammate's number (+254) to pre-fill the test phone. */
+  testFromSuggestion?: string | null;
+}) {
   const pending = numberPending(raw);
   const pretty = formatKenyaNumber(raw);
+  const local = pending ? null : toLocal07(raw);
   return (
     <main className="min-h-dvh pb-[max(2rem,env(safe-area-inset-bottom))]">
       {/* Same header as the setup steps, so the logo stays put from step 1 to the number. */}
@@ -28,7 +49,7 @@ export function LineView({ businessName, tenantId, raw }: { businessName: string
             </h2>
             <p className="mt-1 text-display font-semibold tabular-nums text-ink">{pretty}</p>
             <p className="mt-3 text-body text-ink-2">
-              Call it from your phone to hear how it answers. Then share it with customers, or forward your business line to it.
+              Call it from your phone to hear how it answers. Then set up your calls below.
             </p>
             <a
               href={`tel:${String(raw).replace(/\s/g, "")}`}
@@ -39,7 +60,9 @@ export function LineView({ businessName, tenantId, raw }: { businessName: string
           </section>
         )}
 
-        <ButtonLink href="/home" prefetch variant="primary" size="lg" block className="mt-8">
+        {local ? <CallSetupStep tenantId={tenantId} number={local} pretty={pretty} initialOption={initialOption} server={server} testFromSuggestion={testFromSuggestion} /> : null}
+
+        <ButtonLink href="/home" prefetch variant={local ? "tonal" : "primary"} size="lg" block className="mt-8">
           Go to Overview
         </ButtonLink>
         <p className="mt-3 text-center text-meta text-ink-2">You can change any answer later in Settings.</p>

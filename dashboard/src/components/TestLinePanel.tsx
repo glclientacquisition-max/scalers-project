@@ -6,7 +6,6 @@ import {
   parseTtsLexicon,
 } from "@/lib/pronunciationLexicon";
 import { previewBusinessAssistantIntro } from "@/lib/businessAssistantIntro";
-import { previewSpokenLine } from "@/lib/pronunciationPacks";
 import {
   displaySonioxVoiceLabel,
   resolveLiveCallVoiceId,
@@ -44,7 +43,7 @@ export function TestLinePanel({
   const did = String(tenant.sautikit_virtual_number || "").trim();
   const lineLive = Boolean(did) && !pendingDid;
   const businessName = String(tenant.business_name || "").trim();
-  const agentName = String(tenant.agent_name || "").trim() || "Assistant";
+  const agentName = String(tenant.agent_name || "").trim() || "Business Assistant";
   const sonioxVoiceId = resolveLiveCallVoiceId(
     tenant.soniox_voice_id,
     curatedVoices
@@ -67,13 +66,14 @@ export function TestLinePanel({
         : [],
       servicesOffered: tenant.services_offered,
     });
-    return previewSpokenLine(sample, lexicon);
+    // Raw greeting. The voice line applies pronunciation and tells us what it
+    // said (X-Spoken-Text), so Desk never guesses how the line reads it.
+    return sample;
   }, [
     businessName,
     agentName,
     tenant.spoken_name,
     tenant.greeting_invite,
-    lexicon,
     tenant.services_catalog,
     tenant.services_offered,
   ]);
@@ -89,6 +89,7 @@ export function TestLinePanel({
     null
   );
   const [phonePreviewUrl, setPhonePreviewUrl] = useState<string | null>(null);
+  const [spokenText, setSpokenText] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -100,6 +101,7 @@ export function TestLinePanel({
     if (!greetingPreview) return;
     setPhonePreviewLoading(true);
     setPhonePreviewError(null);
+    setSpokenText(null);
     if (phonePreviewUrl) {
       URL.revokeObjectURL(phonePreviewUrl);
       setPhonePreviewUrl(null);
@@ -112,8 +114,19 @@ export function TestLinePanel({
           text: greetingPreview,
           lexicon: lexiconForStorage(lexicon),
           voiceId: sonioxVoiceId,
+          greeting: true,
         }),
+        // Server gives up at 15s; this only covers a dropped connection.
+        signal: AbortSignal.timeout(20_000),
       });
+      const spokenHeader = res.headers.get("x-spoken-text");
+      if (spokenHeader) {
+        try {
+          setSpokenText(decodeURIComponent(spokenHeader));
+        } catch {
+          setSpokenText(spokenHeader);
+        }
+      }
       const preview = await objectUrlFromPreviewResponse(res);
       try {
         await assertPreviewAudioPlayable(preview.url);
@@ -184,6 +197,11 @@ export function TestLinePanel({
                 >
                   <source src={phonePreviewUrl} type="audio/wav" />
                 </audio>
+              ) : null}
+              {phonePreviewUrl && spokenText && spokenText !== greetingPreview ? (
+                <p className="text-meta text-ink-2">
+                  Callers hear: <span className="text-ink">{spokenText}</span>
+                </p>
               ) : phonePreviewError ? (
                 <p className="text-body text-warn" role="alert">
                   {phonePreviewError}

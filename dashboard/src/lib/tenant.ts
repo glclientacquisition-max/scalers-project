@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { deskLineState } from "@/lib/tenantLineState";
 import { cacheLife, cacheTag } from "next/cache";
 import { tenantCacheTag } from "@/lib/tenantCache";
 import { cookies } from "next/headers";
@@ -13,8 +14,10 @@ import { normalizePhone } from "@/lib/setupFlow";
 const TENANT_SELECT_NO_GREETING_IDENTITY =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, notify_channels, llm_system_prompt, services_offered, services_catalog, product_catalog, social_handles, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, service_areas, tts_lexicon, soniox_voice_id, soniox_voice_label, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, soft_spend_limit_enabled, soft_spend_limit_kes, on_demand_usage_enabled, sms_included_units, sms_used_units, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
 
-const TENANT_SELECT =
+const TENANT_SELECT_NO_UNKNOWN_SPOKEN =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, notify_channels, llm_system_prompt, services_offered, services_catalog, product_catalog, social_handles, business_hours, hours_schedule, after_hours_mode, agent_name, spoken_name, greeting_invite, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, service_areas, tts_lexicon, soniox_voice_id, soniox_voice_label, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, soft_spend_limit_enabled, soft_spend_limit_kes, on_demand_usage_enabled, sms_included_units, sms_used_units, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
+
+const TENANT_SELECT = `${TENANT_SELECT_NO_UNKNOWN_SPOKEN}, unknown_answer_spoken, unknown_answer_by_kind`;
 
 const TENANT_SELECT_NO_SMS_ALLOWANCE =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, notify_channels, llm_system_prompt, services_offered, services_catalog, product_catalog, social_handles, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, tts_lexicon, soniox_voice_id, soniox_voice_label, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, soft_spend_limit_enabled, soft_spend_limit_kes, on_demand_usage_enabled, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
@@ -36,6 +39,10 @@ const TENANT_SELECT_NO_PRODUCT_SOCIAL =
 
 const TENANT_SELECT_LEGACY =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, llm_system_prompt, is_active";
+
+function isMissingUnknownSpokenColumnError(message: string): boolean {
+  return /unknown_answer_spoken|unknown_answer_by_kind/i.test(message);
+}
 
 function isMissingGreetingIdentityColumnError(message: string): boolean {
   return /spoken_name|greeting_invite/i.test(message);
@@ -145,6 +152,8 @@ const SHELL_SELECT =
   "id, business_name, vertical, services_offered, business_hours, agent_tone";
 /** Adds the setup flag (migration 20261011150000). Falls back to SHELL_SELECT before it is applied. */
 const SHELL_SELECT_SETUP = `${SHELL_SELECT}, setup_completed_at`;
+/** Adds archived_at (admin_business_archive.sql): an archived business blocks owner sign-in. */
+const SHELL_SELECT_ARCHIVE = `${SHELL_SELECT_SETUP}, archived_at, is_active, line_status`;
 
 export type DeskShellTenant = {
   id: string;
@@ -156,6 +165,10 @@ export type DeskShellTenant = {
   llm_system_prompt: string | null;
   /** Present (string or null) once the setup migration is applied; undefined before. */
   setup_completed_at?: string | null;
+  /** True when a Super Admin archived the business. The Desk shows a closed screen instead. */
+  archived?: boolean;
+  /** True while the line is suspended: Desk opens read-only for sends, with a banner. */
+  linePaused?: boolean;
 };
 
 function shellProfileComplete(row: {
@@ -183,9 +196,25 @@ export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null
 
   let { data, error } = await supabase
     .from("tenants")
-    .select(SHELL_SELECT_SETUP)
+    .select(SHELL_SELECT_ARCHIVE)
     .eq("id", tenantId)
     .maybeSingle();
+
+  if (error && /line_status/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from("tenants")
+      .select(`${SHELL_SELECT_SETUP}, archived_at, is_active`)
+      .eq("id", tenantId)
+      .maybeSingle());
+  }
+
+  if (error && /archived_at/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from("tenants")
+      .select(SHELL_SELECT_SETUP)
+      .eq("id", tenantId)
+      .maybeSingle());
+  }
 
   if (error && /setup_completed_at/i.test(error.message)) {
     ({ data, error } = await supabase
@@ -206,7 +235,13 @@ export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null
   if (error) throw error;
   if (!data?.id) return null;
 
-  const row = data as Partial<DeskShellTenant> & { id: string; business_name?: string | null };
+  const row = data as Partial<DeskShellTenant> & {
+    id: string;
+    business_name?: string | null;
+    archived_at?: string | null;
+    is_active?: boolean | null;
+    line_status?: string | null;
+  };
   const shell: DeskShellTenant = {
     id: row.id,
     business_name: row.business_name || "",
@@ -215,6 +250,8 @@ export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null
     business_hours: row.business_hours ?? null,
     agent_tone: row.agent_tone ?? null,
     llm_system_prompt: null,
+    archived: deskLineState(row) === "closed",
+    linePaused: deskLineState(row) === "paused",
   };
   if (row.setup_completed_at !== undefined) {
     shell.setup_completed_at = row.setup_completed_at ?? null;
@@ -251,6 +288,14 @@ async function cachedTenantRow(tenantId: string): Promise<TenantRow | null> {
       .select(TENANT_SELECT)
       .eq("id", tenantId)
       .maybeSingle();
+
+    if (error && isMissingUnknownSpokenColumnError(error.message)) {
+      ({ data, error } = await supabase
+        .from("tenants")
+        .select(TENANT_SELECT_NO_UNKNOWN_SPOKEN)
+        .eq("id", tenantId)
+        .maybeSingle());
+    }
 
     if (error && isMissingGreetingIdentityColumnError(error.message)) {
       ({ data, error } = await supabase
@@ -344,6 +389,16 @@ export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
+
+    if (error && isMissingUnknownSpokenColumnError(error.message)) {
+      ({ data, error } = await admin
+        .from("tenants")
+        .select(TENANT_SELECT_NO_UNKNOWN_SPOKEN)
+        .eq("is_active", true)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle());
+    }
 
     if (error && isMissingGreetingIdentityColumnError(error.message)) {
       ({ data, error } = await admin

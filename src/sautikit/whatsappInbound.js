@@ -268,6 +268,7 @@ async function processWhatsAppReceived(opts = {}) {
           to: contactId,
           type: 'text',
           body: inboundAckBody(),
+          replyTo: msg.wamid,
         });
       } catch (err) {
         console.warn('[whatsapp] inbound ack failed:', err?.message || err);

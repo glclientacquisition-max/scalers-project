@@ -9,6 +9,16 @@
  * @param {object} row  tenants row
  * @param {{ openAppointments?: object[], fieldMeta?: object|null, holdGate?: object|null }} [extras]
  */
+/**
+ * { closed: true, reason } for an archived, suspended or is_active=false row;
+ * null when the line is live. src/sautikit/inactiveTenantGate.js decides.
+ */
+function tenantRowLineState(row) {
+  const { tenantLineInactiveReason } = require('./sautikit/inactiveTenantGate');
+  const reason = tenantLineInactiveReason(row);
+  return reason ? { closed: true, reason, tenantId: row?.id || null } : null;
+}
+
 function tenantProfileFromRow(row, extras = {}) {
   const { parseAgentTools } = require('./conversation/agentTools');
   const { parseLexiconOverrides } = require('./speech/pronunciationLexicon');
@@ -43,22 +53,35 @@ function tenantProfileFromRow(row, extras = {}) {
     faqs: row.faqs || [],
     teamDirectory: row.team_directory || [],
     unknownAnswerFallback: row.unknown_answer_fallback || null,
+    unknownAnswerSpoken: extras.unknownAnswerSpoken ?? row.unknown_answer_spoken ?? null,
+    unknownAnswerByKind: require('./conversation/unknownAnswerByKind').parseByKind(
+      row.unknown_answer_by_kind
+    ),
     dailyBulletin: row.daily_bulletin || [],
     agentTools: parseAgentTools(row.agent_tools),
     ttsLexicon: parseLexiconOverrides(row.tts_lexicon),
     sonioxVoiceId: row.soniox_voice_id || null,
     sonioxVoiceLabel: row.soniox_voice_label || null,
     vertical: parseVertical(row.vertical),
+    // Settings › Locations area terms (fee, time, mode) from tenants.service_areas.
+    areaTerms: require('./conversation/areaTerms').readAreaTerms(
+      row.service_areas !== undefined ? row.service_areas : extras.serviceAreas,
+      { vertical: parseVertical(row.vertical) }
+    ),
     handoffMode: parseHandoffMode(row.handoff_mode),
     businessLocations: row.business_locations || [],
+    service_areas: row.service_areas ?? null,
     // SPOKEN_CATALOGUE_STORED_FIRST only: v2 area logic reads profile.serviceAreas,
     // so loading it changes call behaviour; gated with the stored-first flag.
-    ...(require('./knowledge/spokenCatalogue').storedFirst() ? { serviceAreas: require('./knowledge/spokenCatalogue').catalogueProfileFromRow(row).serviceAreas } : {}),
+    ...(require('./knowledge/spokenCatalogue').storedFirst() ? { serviceAreas: require('./knowledge/spokenCatalogue').catalogueProfileFromRow({ ...row, service_areas: row.service_areas !== undefined ? row.service_areas : extras.serviceAreas }).serviceAreas } : {}),
     businessPolicies: row.business_policies || {},
     billingEnforcement:
       row.billing_enforcement != null ? String(row.billing_enforcement) : null,
     walletBalanceKes:
       row.wallet_balance_kes != null ? Number(row.wallet_balance_kes) : null,
+    // archived / suspended / is_active=false, same rules as the inbound gate.
+    // null when the row is live (or an older schema lacks the columns).
+    lineState: tenantRowLineState(row),
     openAppointments: Array.isArray(extras.openAppointments) ? extras.openAppointments : [],
     fieldMeta: extras.fieldMeta || null,
     holdGate: extras.holdGate || null,

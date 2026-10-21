@@ -19,8 +19,9 @@ const DEFAULT_TENANT_ID = process.env.TENANT_ID || null;
 const WALLET_CHARGING_ENABLED = String(process.env.WALLET_CHARGING_ENABLED || 'true').toLowerCase() !== 'false';
 const WALLET_RATE_KES_PER_MINUTE = Number(process.env.WALLET_RATE_KES_PER_MINUTE || 0);
 const { envTransferRateKesPerMin } = require('./billing/liveTransferLegs');
-const { billableTalkSeconds, inboundOpen } = require('./billing/packageOverage');
+const { billableTalkSeconds, inboundOpen, effectiveOnDemand } = require('./billing/packageOverage');
 const recordingCopy = require('./sautikit/recordingCopy');
+const recordingEncode = require('./sautikit/recordingEncode');
 
 function throwIfError(context, error) {
   if (error) {
@@ -85,6 +86,11 @@ function shapeCall(row) {
     recording_path: meta.recording_path || null,
     status: row.status || null,
     whatsapp_sent: Boolean(meta.whatsapp_sent),
+    owner_notified: Boolean(meta.owner_notified || meta.whatsapp_sent),
+    owner_notify_channels:
+      meta.owner_notify_channels && typeof meta.owner_notify_channels === 'object'
+        ? meta.owner_notify_channels
+        : null,
     owner_notify_kind: meta.owner_notify_kind || null,
     escalation_sent: Boolean(meta.escalation_sent),
     escalated_to: meta.escalated_to || null,
@@ -227,14 +233,47 @@ const TENANT_LINE_SELECTS = Object.freeze([
   'id, sautikit_virtual_number, is_active',
 ]);
 
-async function selectTenantLineRows() {
+async function selectTenantLineRows({ tenantId = null } = {}) {
   let last = { data: null, error: null };
   for (const columns of TENANT_LINE_SELECTS) {
-    last = await supabase.from('tenants').select(columns);
+    let query = supabase.from('tenants').select(columns);
+    if (tenantId) query = query.eq('id', tenantId);
+    last = await query;
     if (!last.error) return last;
     if (!/column|schema cache|does not exist/i.test(last.error.message || '')) return last;
   }
   return last;
+}
+
+// Per-tenant line state for paths outside an inbound call (closed-tenant
+// guard, src/sautikit/closedTenantGuard.js). Cached ~60 s; errors fail open.
+let tenantLineCache = null;
+function tenantLineCacheInstance() {
+  if (!tenantLineCache) {
+    const { createTenantLineCache } = require('./sautikit/closedTenantGuard');
+    tenantLineCache = createTenantLineCache({
+      loadRows: (tenantId) => selectTenantLineRows({ tenantId }),
+    });
+  }
+  return tenantLineCache;
+}
+
+/**
+ * Whether this tenant's line is closed (archived, suspended or is_active =
+ * false), same rules as the inbound gate (tenantLineState). Cached ~60 s.
+ * Never throws: a lookup error answers { closed: false, reason: 'lookup_failed' }.
+ * @returns {Promise<{ closed: boolean, reason: string, tenantId: string|null }>}
+ */
+async function tenantLineClosed(tenantId) {
+  return tenantLineCacheInstance().lineFor(tenantId);
+}
+
+/** Drop a cached line state (tests, or after a known status change). */
+function forgetTenantLine(tenantId) {
+  if (tenantLineCache) {
+    if (tenantId) tenantLineCache.invalidate(tenantId);
+    else tenantLineCache.clear();
+  }
 }
 
 /**
@@ -266,8 +305,121 @@ async function inboundTenantLine({ toNumber, fromNumber } = {}) {
 }
 
 /**
- * New inbound calls stop when the package minute bucket is used up and
- * on-demand is off. Missing columns fail open so a webhook still answers.
+ * Every tenant row the inbound webhook needs, in one query, for the cached
+ * inbound directory (src/sautikit/inboundDirectory.js). Optional columns
+ * fall back so an older schema still answers.
+ */
+/**
+ * Explicit package state for the inbound directory, same rule as
+ * getTenantPackageUsage: 'active' subscription = package; no row or
+ * 'cancelled' = no package. package_status stays undefined (unknown, gate
+ * fails open at 0 minutes) when the subscriptions read fails.
+ */
+async function attachPackageStatus(rows) {
+  try {
+    const { data, error } = await supabase.from('tenant_subscriptions').select('tenant_id, status');
+    if (error) return;
+    const byTenant = new Map((data || []).map((r) => [r.tenant_id, r.status]));
+    for (const row of rows) {
+      if (row && row.id) row.package_status = byTenant.get(row.id) || 'none';
+    }
+  } catch {
+    // unknown: leave package_status undefined
+  }
+}
+
+async function listInboundTenantRows() {
+  const selects = [
+    // archived_at / line_status drive the closed-line gate (#639/#651).
+    // billing_enforcement: beta (off) never rejects at the cap (#631).
+    'id, business_name, sautikit_virtual_number, is_active, archived_at, line_status, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement, spend_limit_blocked',
+    'id, sautikit_virtual_number, is_active, archived_at, line_status, minutes_included, seconds_used, on_demand_usage_enabled',
+    'id, sautikit_virtual_number, is_active, archived_at, minutes_included, seconds_used, on_demand_usage_enabled',
+    'id, sautikit_virtual_number, is_active, line_status, minutes_included, seconds_used, on_demand_usage_enabled',
+    'id, sautikit_virtual_number, is_active, minutes_included, seconds_used, on_demand_usage_enabled',
+    'id, sautikit_virtual_number, is_active, archived_at, line_status',
+    'id, sautikit_virtual_number, is_active',
+  ];
+  let lastError = null;
+  for (const columns of selects) {
+    const { data, error } = await supabase.from('tenants').select(columns);
+    if (!error) {
+      const rows = data || [];
+      if (/minutes_included/.test(columns)) await attachPackageStatus(rows);
+      return {
+        rows,
+        packageColumns: /minutes_included/.test(columns),
+      };
+    }
+    lastError = error;
+    if (!/column|schema cache|does not exist/i.test(error.message || '')) break;
+  }
+  throwIfError('listInboundTenantRows', lastError);
+  return { rows: [], packageColumns: false };
+}
+
+/**
+ * Package minute state for one tenant. Never throws; null when unreadable.
+ * periodStart comes from tenant_subscriptions (null without a package row).
+ */
+async function getTenantPackageUsage(tenantId) {
+  if (!tenantId) return null;
+  const baseSelect = 'id, business_name, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement';
+  let { data, error } = await supabase
+    .from('tenants')
+    .select(`${baseSelect}, spend_limit_blocked`)
+    .eq('id', tenantId)
+    .maybeSingle();
+  if (error && /spend_limit_blocked|column|schema cache/i.test(error.message || '')) {
+    ({ data, error } = await supabase
+      .from('tenants')
+      .select(baseSelect)
+      .eq('id', tenantId)
+      .maybeSingle());
+  }
+  if (error) {
+    if (!/minutes_included|seconds_used|on_demand_usage_enabled|billing_enforcement|column|schema cache/i.test(error.message || '')) {
+      console.warn('[db] getTenantPackageUsage:', error.message);
+    }
+    return { error: error.message || 'lookup_failed' };
+  }
+  if (!data) return null;
+  let periodStart = null;
+  // null = unknown (lookup failed). false = explicit no package: no row or
+  // status 'cancelled'. Never treat 0 included minutes as unlimited.
+  let hasPackage = null;
+  try {
+    const { data: sub, error: subErr } = await supabase
+      .from('tenant_subscriptions')
+      .select('current_period_start, status')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (!subErr) {
+      periodStart = sub?.current_period_start || null;
+      hasPackage = Boolean(sub && sub.status === 'active');
+    }
+  } catch {
+    periodStart = null;
+    hasPackage = null;
+  }
+  return {
+    tenantId: data.id,
+    businessName: data.business_name || null,
+    minutesIncluded: data.minutes_included,
+    secondsUsed: data.seconds_used,
+    onDemand: Boolean(data.on_demand_usage_enabled),
+    spendLimitBlocked: data.spend_limit_blocked === true,
+    enforcement: data.billing_enforcement || 'off',
+    periodStart,
+    hasPackage,
+  };
+}
+
+/**
+ * Package minute cap gate for a new inbound call.
+ * Rejects only when billing is enforced (soft/hard), included minutes are
+ * used, and on-demand is off. Beta (enforcement off) never rejects; it keeps
+ * metering and ops get 80% / 100% notices. Lookup failures fail open.
  */
 async function packageInboundOpen({ toNumber, fromNumber, tenantId } = {}) {
   let resolvedTenantId;
@@ -279,25 +431,123 @@ async function packageInboundOpen({ toNumber, fromNumber, tenantId } = {}) {
     return { open: true, reason: 'tenant_lookup_failed' };
   }
 
-  const { data, error } = await supabase
-    .from('tenants')
-    .select('minutes_included, seconds_used, on_demand_usage_enabled')
-    .eq('id', resolvedTenantId)
-    .maybeSingle();
-
-  if (error) {
-    if (/minutes_included|seconds_used|on_demand_usage_enabled|column|schema cache/i.test(error.message || '')) {
-      return { open: true, reason: 'columns_missing' };
-    }
-    console.warn('[db] packageInboundOpen:', error.message);
-    return { open: true, reason: 'lookup_failed' };
+  const usage = await getTenantPackageUsage(resolvedTenantId);
+  if (!usage) return { open: true, reason: 'lookup_failed' };
+  if (usage.error) {
+    return {
+      open: true,
+      reason: /column|schema cache/i.test(usage.error) ? 'columns_missing' : 'lookup_failed',
+    };
   }
 
-  return inboundOpen({
-    minutesIncluded: data?.minutes_included,
-    secondsUsed: data?.seconds_used,
-    onDemand: Boolean(data?.on_demand_usage_enabled),
+  return {
+    ...inboundOpen({
+      minutesIncluded: usage.minutesIncluded,
+      secondsUsed: usage.secondsUsed,
+      onDemand: effectiveOnDemand(usage.onDemand, usage.spendLimitBlocked),
+      enforcement: usage.enforcement,
+      hasPackage: usage.hasPackage,
+    }),
+    usage,
+  };
+}
+
+/** Durable dedupe marker for one-off ops notices (status 'resolved', hidden on Desk). */
+async function hasPlatformOpsMarker(kind) {
+  const { data, error } = await supabase
+    .from('platform_ops_notices')
+    .select('id')
+    .eq('kind', kind)
+    .limit(1);
+  if (error) {
+    if (/platform_ops_notices|does not exist|schema cache|relation/i.test(error.message || '')) {
+      return false;
+    }
+    throw new Error(error.message);
+  }
+  return Array.isArray(data) && data.length > 0;
+}
+
+async function putPlatformOpsMarker(kind, detail) {
+  const now = new Date().toISOString();
+  const { error } = await supabase.from('platform_ops_notices').insert({
+    kind,
+    status: 'resolved',
+    detail: detail ? String(detail).slice(0, 500) : null,
+    opened_at: now,
+    notified_at: now,
+    resolved_at: now,
   });
+  if (error && !/platform_ops_notices|does not exist|schema cache|relation/i.test(error.message || '')) {
+    throw new Error(error.message);
+  }
+}
+
+/** Fire-and-forget after metering: 80% / 100% ops notice for beta tenants. */
+async function checkPackageUsageAlertsForCall(callId) {
+  try {
+    const { data: callRow, error } = await supabase
+      .from('calls')
+      .select('tenant_id')
+      .eq('id', callId)
+      .maybeSingle();
+    if (error || !callRow?.tenant_id) return;
+    const usage = await getTenantPackageUsage(callRow.tenant_id);
+    if (!usage || usage.error) return;
+    const { maybeAlertPackageUsage } = require('./billing/packageUsageAlerts');
+    await maybeAlertPackageUsage(usage);
+  } catch (err) {
+    console.warn('[db] package usage alert:', err?.message || err);
+  }
+}
+
+/** Package SMS usage for the 80% / 100% ops notice (tenants counter = sent + pending holds). */
+async function getTenantSmsUsage(tenantId) {
+  if (!tenantId) return null;
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('id, business_name, sms_included_units, sms_used_units, on_demand_usage_enabled, billing_enforcement')
+    .eq('id', tenantId)
+    .maybeSingle();
+  if (error) {
+    if (!/sms_included_units|sms_used_units|column|schema cache/i.test(error.message || '')) {
+      console.warn('[db] getTenantSmsUsage:', error.message);
+    }
+    return { error: error.message || 'lookup_failed' };
+  }
+  if (!data) return null;
+  let periodStart = null;
+  try {
+    const { data: sub, error: subErr } = await supabase
+      .from('tenant_subscriptions')
+      .select('current_period_start')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (!subErr) periodStart = sub?.current_period_start || null;
+  } catch {
+    periodStart = null;
+  }
+  return {
+    tenantId: data.id,
+    businessName: data.business_name || null,
+    smsIncluded: Number(data.sms_included_units) || 0,
+    smsUsed: Number(data.sms_used_units) || 0,
+    onDemand: Boolean(data.on_demand_usage_enabled),
+    enforcement: data.billing_enforcement || 'off',
+    periodStart,
+  };
+}
+
+/** Fire-and-forget after a tenant SMS reservation: 80% / 100% package SMS ops notice. */
+async function checkSmsUsageAlertsForTenant(tenantId) {
+  try {
+    const usage = await getTenantSmsUsage(tenantId);
+    if (!usage || usage.error) return;
+    const { maybeAlertSmsUsage } = require('./billing/smsUsageAlerts');
+    await maybeAlertSmsUsage(usage);
+  } catch (err) {
+    console.warn('[db] sms usage alert:', err?.message || err);
+  }
 }
 
 async function upsertCall({
@@ -472,13 +722,29 @@ async function listRecentCallsFromNumber({ tenantId, callerNumber, sinceIso, lim
   return data || [];
 }
 
-async function markWhatsappSent(callSid) {
+/**
+ * Mark that staff were alerted for this call. Without an outcome (legacy
+ * callers) this still sets whatsapp_sent. With one, whatsapp_sent is true only
+ * when WhatsApp delivered; owner_notified and owner_notify_channels record
+ * what actually landed (src/notifications/notifyOutcome.js).
+ * @param {string} callSid
+ * @param {{ owner_notify_channels?: Record<string,string>, whatsapp_delivered?: boolean }} [outcome]
+ */
+async function markWhatsappSent(callSid, outcome) {
   const existing = await getCall(callSid);
   if (!existing) return false;
-  if (existing.whatsapp_sent) return false;
+  if (existing.whatsapp_sent || existing.owner_notified) return false;
 
   const meta = parseSummary(existing.summary);
-  meta.whatsapp_sent = true;
+  meta.owner_notified = true;
+  if (outcome && typeof outcome === 'object') {
+    meta.whatsapp_sent = outcome.whatsapp_delivered === true;
+    if (outcome.owner_notify_channels && typeof outcome.owner_notify_channels === 'object') {
+      meta.owner_notify_channels = { ...outcome.owner_notify_channels };
+    }
+  } else {
+    meta.whatsapp_sent = true;
+  }
 
   const { data, error } = await supabase
     .from('calls')
@@ -627,16 +893,33 @@ async function uploadRecordingBuffer({
   contentType = 'audio/mpeg',
   extension = 'mp3',
 }) {
-  const objectPath = `${callSid}/${recordingSid || Date.now()}.${extension}`;
+  const prepared = await recordingEncode.prepareRecordingForUpload(buffer, contentType, extension);
+  if (prepared.encodeError) {
+    console.warn(
+      `[recording-copy] MP3 encode failed callSid=${callSid}, uploading WAV:`,
+      prepared.encodeError.message
+    );
+  }
+  const objectPath = `${callSid}/${recordingSid || Date.now()}.${prepared.extension}`;
 
   const { error: uploadError } = await supabase.storage
     .from(RECORDINGS_BUCKET)
-    .upload(objectPath, buffer, {
-      contentType,
+    .upload(objectPath, prepared.buffer, {
+      contentType: prepared.contentType,
       upsert: true,
     });
 
   throwIfError('uploadRecordingBuffer', uploadError);
+
+  if (prepared.extension === 'mp3' && recordingSid) {
+    const wavPath = `${callSid}/${recordingSid}.wav`;
+    if (wavPath !== objectPath) {
+      const { error: removeError } = await supabase.storage.from(RECORDINGS_BUCKET).remove([wavPath]);
+      if (removeError) {
+        console.warn(`[recording-copy] could not remove old WAV ${wavPath}:`, removeError.message);
+      }
+    }
+  }
 
   const { data: signed, error: signError } = await supabase.storage
     .from(RECORDINGS_BUCKET)
@@ -866,6 +1149,7 @@ async function settleCallUsage({
 
   const metered = await consumeCallSeconds({ callId, seconds, direction });
   if (metered.applied) {
+    void checkPackageUsageAlertsForCall(callId);
     const amount = Number(metered.row?.amount_kes || 0);
     if (amount > 0) {
       console.log(
@@ -1116,160 +1400,180 @@ async function listPendingRecordingCopies({ limit = 20 } = {}) {
   return data || [];
 }
 
+function recordingRetentionCutoffIso(olderThanDays) {
+  const days = Math.max(1, Number(olderThanDays) || 30);
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+/**
+ * Calls older than minOlderThanDays that still have a recording pointer.
+ * Per-tenant retention is applied in the purge batch (recordingRetention.js).
+ */
+async function listCallsForRecordingRetentionPurge({ olderThanDays, minOlderThanDays, limit = 50 } = {}) {
+  const days = minOlderThanDays ?? olderThanDays ?? 7;
+  const cutoff = recordingRetentionCutoffIso(days);
+  const { data, error } = await supabase
+    .from('calls')
+    .select('id, tenant_id, sautikit_call_sid, recording_url, summary, created_at')
+    .lt('created_at', cutoff)
+    .or('recording_url.not.is.null,summary.like.%recording_path%')
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  throwIfError('listCallsForRecordingRetentionPurge', error);
+  return (data || []).filter((row) => {
+    const meta = parseSummary(row.summary);
+    if (meta.recording_deleted_at) return false;
+    return Boolean(row.recording_url || meta.recording_path);
+  });
+}
+
+/** Scan cap for admin purge preview counts. */
+async function listCallsWithRecordingsForRetentionScan({ minOlderThanDays = 7, limit = 5000 } = {}) {
+  const cutoff = recordingRetentionCutoffIso(minOlderThanDays);
+  const { data, error } = await supabase
+    .from('calls')
+    .select('tenant_id, created_at, recording_url, summary')
+    .lt('created_at', cutoff)
+    .or('recording_url.not.is.null,summary.like.%recording_path%')
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  throwIfError('listCallsWithRecordingsForRetentionScan', error);
+  return (data || []).filter((row) => {
+    const meta = parseSummary(row.summary);
+    if (meta.recording_deleted_at) return false;
+    return Boolean(row.recording_url || meta.recording_path);
+  });
+}
+
+/**
+ * Remove Storage object(s), clear recording_url / recording_path, stamp deleted_at.
+ * Idempotent when the row is already purged.
+ */
+async function purgeCallRecordingRetention({
+  callSid,
+  tenantId,
+  recordingPath,
+  deletedAt = new Date().toISOString(),
+} = {}) {
+  if (!callSid) return { purged: false, reason: 'no_call_sid' };
+  const existing = await getCall(callSid);
+  if (!existing) return { purged: false, reason: 'missing_call' };
+  if (tenantId && existing.tenant_id && String(existing.tenant_id) !== String(tenantId)) {
+    return { purged: false, reason: 'tenant_mismatch' };
+  }
+  const meta = parseSummary(existing.summary);
+  if (meta.recording_deleted_at && !existing.recording_url && !meta.recording_path) {
+    return { purged: false, reason: 'already_purged', deletedAt: meta.recording_deleted_at };
+  }
+  const path =
+    recordingPath ||
+    (typeof meta.recording_path === 'string' ? meta.recording_path.trim() : '') ||
+    null;
+  const pathsToRemove = [];
+  if (path && !path.includes('..') && !path.startsWith('/')) {
+    pathsToRemove.push(path);
+    if (path.endsWith('.mp3')) pathsToRemove.push(path.replace(/\.mp3$/i, '.wav'));
+    if (path.endsWith('.wav')) pathsToRemove.push(path.replace(/\.wav$/i, '.mp3'));
+  }
+  if (pathsToRemove.length) {
+    const { error: removeError } = await supabase.storage.from(RECORDINGS_BUCKET).remove(pathsToRemove);
+    if (removeError) {
+      console.warn(`[recording-retention] storage remove failed ${callSid}:`, removeError.message);
+    }
+  }
+  delete meta.recording_path;
+  delete meta.recording_status;
+  delete meta.recording_copy_attempts;
+  delete meta.recording_copy_last_error;
+  meta.recording_deleted_at = deletedAt;
+  const { error } = await supabase
+    .from('calls')
+    .update({ recording_url: null, summary: serializeSummary(meta) })
+    .eq('sautikit_call_sid', callSid);
+  throwIfError('purgeCallRecordingRetention', error);
+  return { purged: true, deletedAt, pathsRemoved: pathsToRemove };
+}
+
+// Line-state columns tried on top of each getTenantById select, newest first.
+// A schema without one of them drops it and keeps the rest of the row.
+const TENANT_ROW_LINE_COLUMNS = Object.freeze([', archived_at, line_status', ', archived_at', ', line_status', '']);
+
+async function selectTenantRowWithLine(tenantId, columns) {
+  let last = { data: null, error: null };
+  for (const extra of TENANT_ROW_LINE_COLUMNS) {
+    last = await supabase
+      .from('tenants')
+      .select(columns + extra)
+      .eq('id', tenantId)
+      .maybeSingle();
+    if (!last.error) return last;
+    if (!extra || !/archived_at|line_status/i.test(last.error.message || '')) return last;
+  }
+  return last;
+}
+
 async function getTenantById(tenantId) {
   if (!tenantId) return null;
   const fullCols =
-    'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, spoken_name, greeting_invite, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, service_areas, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active';
+    'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, spoken_name, greeting_invite, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active';
   // VOICE_V2_CATALOGUE only: also read the stored spoken catalogue (migration
   // 20261015063255). Flag off: the exact select as before. A DB without the
   // column falls back to the same select; a null value means the rules baseline.
   const v2Catalogue = /^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || ''));
-  let { data, error } = await supabase
-    .from('tenants')
-    .select(v2Catalogue ? `${fullCols}, spoken_catalogue` : fullCols)
-    .eq('id', tenantId)
-    .maybeSingle();
+  let { data, error } = await selectTenantRowWithLine(tenantId, v2Catalogue ? `${fullCols}, spoken_catalogue` : fullCols);
   if (v2Catalogue && error && /spoken_catalogue/i.test(error.message || '')) {
-    ({ data, error } = await supabase.from('tenants').select(fullCols).eq('id', tenantId).maybeSingle());
-  }
-  // service_areas missing (old schema): same row without it, then the usual ladder.
-  if (error && /service_areas/i.test(error.message || '')) {
-    ({ data, error } = await supabase.from('tenants').select(fullCols.replace('service_areas, ', '')).eq('id', tenantId).maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, fullCols));
   }
 
   if (error && /spoken_name|greeting_invite/i.test(error.message || '')) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, service_areas, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active'));
   }
 
   if (error && /billing_enforcement|wallet_balance_kes/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, service_areas, business_locations, business_policies, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, is_active'));
   }
 
   if (error && /notify_channels/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, service_areas, business_locations, business_policies, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, is_active'));
   }
 
   if (error && /soniox_voice_id|soniox_voice_label/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, vertical, handoff_mode, service_areas, business_locations, business_policies, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, vertical, handoff_mode, business_locations, business_policies, is_active'));
   }
 
   // Older DBs may lack newer KA columns — peel them off gradually.
   if (error && /product_catalog|social_handles/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, vertical, handoff_mode, service_areas, business_locations, business_policies, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, vertical, handoff_mode, business_locations, business_policies, is_active'));
   }
   if (
     error &&
     /vertical|handoff_mode|business_locations|business_policies/i.test(error.message)
   ) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, is_active'));
   }
   if (error && /tts_lexicon/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, is_active'));
   }
   if (error && /agent_tools/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, is_active'));
   }
   if (error && /alert_email/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, is_active'));
   }
   if (error && /daily_bulletin/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, is_active'));
   }
   if (error && /services_catalog/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, faqs, team_directory, unknown_answer_fallback, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, faqs, team_directory, unknown_answer_fallback, is_active'));
   }
   if (error && /faqs|team_directory|services_offered|unknown_answer_fallback/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, is_active'));
   }
   if (error && /after_hours_mode/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, is_active'));
   }
   if (error && /hours_schedule|agent_name|agent_tone|business_hours|column/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, is_active'));
   }
 
   throwIfError('getTenantById', error);
@@ -1312,6 +1616,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       faqs: [],
       teamDirectory: [],
       unknownAnswerFallback: null,
+      unknownAnswerSpoken: null,
       dailyBulletin: [],
       alertEmail: null,
       notifyChannels: { sms: true, whatsapp: true, email: true, caller_sms: false },
@@ -1325,6 +1630,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       businessPolicies: {},
       billingEnforcement: null,
       walletBalanceKes: null,
+      lineState: null,
       openAppointments: [],
       fieldMeta: null,
       holdGate: null,
@@ -1333,8 +1639,47 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
 
   return tenantProfileFromRow(row, {
     openAppointments: await listOpenAppointments(row.id),
+    serviceAreas:
+      row.service_areas !== undefined ||
+      !(require('./conversation/areaTerms').areaFeesEnabled() || require('./knowledge/spokenCatalogue').storedFirst())
+        ? undefined
+        : await getTenantServiceAreas(row.id),
     ...(await loadProvenanceForProfile(row.id)),
+    ...(await loadUnknownAnswerSpoken(row.id)),
   });
+}
+
+/** tenants.service_areas (Locations area terms) when the main select did not read it. Null on an old schema or error. */
+async function getTenantServiceAreas(tenantId) {
+  if (!tenantId) return null;
+  try {
+    const { data, error } = await supabase.from('tenants').select('service_areas').eq('id', tenantId).maybeSingle();
+    if (error) return null;
+    return data?.service_areas ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * tenants.unknown_answer_spoken ({en, sw, source, updated_at}), written by the
+ * Desk. Read only with VOICE_FACT_REFS on, in its own query so a database
+ * without the column (or any error) still loads the call: null, never a throw.
+ */
+async function loadUnknownAnswerSpoken(tenantId) {
+  try {
+    const { factRefsEnabled } = require('./conversation/factSheet');
+    if (!tenantId || !factRefsEnabled()) return {};
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('unknown_answer_spoken')
+      .eq('id', tenantId)
+      .maybeSingle();
+    if (error) return { unknownAnswerSpoken: null };
+    return { unknownAnswerSpoken: data?.unknown_answer_spoken ?? null };
+  } catch {
+    return { unknownAnswerSpoken: null };
+  }
 }
 
 async function loadProvenanceForProfile(tenantId) {
@@ -2376,6 +2721,76 @@ async function findNotifySend({ tenantId, idempotencyKey } = {}) {
   return data || null;
 }
 
+function notifyRpcMissing(error) {
+  return /reserve_notify_send|settle_notify_send|does not exist|schema cache|could not find the function/i.test(
+    error?.message || ''
+  );
+}
+
+/**
+ * Reserve one notify send: pending notify_sends row + SMS units in one RPC.
+ * docs/supabase/notify_send_reserve_settle.sql. reason 'rpc_missing' means the
+ * SQL is not applied yet; callers fall back to the legacy consume + insert path.
+ */
+async function reserveNotifySend(params = {}) {
+  const { data, error } = await supabase.rpc('reserve_notify_send', {
+    p_tenant_id: params.tenantId || null,
+    p_idempotency_key: params.idempotencyKey,
+    p_kind: params.kind,
+    p_channel: params.channel,
+    p_recipient: params.recipient || null,
+    p_body: params.body || null,
+    p_units: Number.isFinite(Number(params.units)) ? Number(params.units) : null,
+    p_call_id: params.callId || null,
+    p_call_sid: params.callSid || null,
+    p_audience: params.audience || null,
+    p_billed_to: params.billedTo || null,
+    p_strict: Boolean(params.strict),
+  });
+  if (error) {
+    if (notifyRpcMissing(error)) return { ok: false, reason: 'rpc_missing' };
+    console.warn('[db] reserveNotifySend:', error.message);
+    return { ok: false, reason: 'rpc_failed' };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return { ok: false, reason: 'rpc_failed' };
+  return {
+    ok: true,
+    id: row.send_id || null,
+    allowed: row.allowed === true,
+    replayed: row.replayed === true,
+    status: row.status || null,
+    outcome: row.outcome || null,
+    reason: row.reason || null,
+    overage: Boolean(row.overage),
+    heldUnits: Number(row.held_units) || 0,
+    attempts: Number(row.attempts) || 1,
+  };
+}
+
+/** Settle a reserved send: 'sent' or 'failed' (releases held SMS units). */
+async function settleNotifySend({ id, status, providerMessageId, failureReason } = {}) {
+  if (!id) return { ok: false, reason: 'invalid' };
+  const { data, error } = await supabase.rpc('settle_notify_send', {
+    p_send_id: id,
+    p_status: status,
+    p_provider_message_id: providerMessageId || null,
+    p_failure_reason: failureReason ? String(failureReason).slice(0, 200) : null,
+  });
+  if (error) {
+    if (notifyRpcMissing(error)) return { ok: false, reason: 'rpc_missing' };
+    console.warn('[db] settleNotifySend:', error.message);
+    return { ok: false, reason: 'rpc_failed' };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    ok: true,
+    status: row?.status || status,
+    replayed: row?.replayed === true,
+    releasedUnits: Number(row?.released_units) || 0,
+  };
+}
+
 async function consumeSmsUnits({ tenantId, units } = {}) {
   if (!tenantId) return { allowed: true, reason: 'no_tenant', overage: false };
   const need = Math.max(1, Number(units) || 1);
@@ -2595,6 +3010,10 @@ async function getTenantCatalogue(tenantId) {
 module.exports = {
   copyRecordingToStorage,
   listPendingRecordingCopies,
+  listCallsForRecordingRetentionPurge,
+  listCallsWithRecordingsForRetentionScan,
+  purgeCallRecordingRetention,
+  recordingRetentionCutoffIso,
   upsertCallFacts,
   getTenantCatalogue,
   resolveTenantId,
@@ -2602,6 +3021,7 @@ module.exports = {
   getPlatformAudio,
   upsertPlatformAudio,
   notePlatformAudioError,
+  listInboundTenantRows,
   upsertCall,
   saveCallerInfo,
   saveEscalation,
@@ -2615,10 +3035,18 @@ module.exports = {
   setCallResolution,
   chargeCallToWallet,
   packageInboundOpen,
+  getTenantPackageUsage,
+  getTenantSmsUsage,
+  checkSmsUsageAlertsForTenant,
+  hasPlatformOpsMarker,
+  putPlatformOpsMarker,
   uploadRecordingBuffer,
   getCall,
   getTenantById,
   getTenantProfile,
+  tenantLineClosed,
+  forgetTenantLine,
+  selectTenantLineRows,
   listActiveTenantDids,
   markWhatsappSent,
   markEscalationSent,
@@ -2640,6 +3068,8 @@ module.exports = {
   persistWhatsAppStatus,
   getWhatsAppSession,
   consumeSmsUnits,
+  reserveNotifySend,
+  settleNotifySend,
   getTenantCompletenessScore,
   getTenantHoldGate,
   listTenantFieldMeta,

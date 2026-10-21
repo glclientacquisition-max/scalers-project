@@ -2,14 +2,12 @@
 
 import type { ReactNode } from "react";
 import { useInboxRowLocal } from "@/components/InboxRowUi";
-import { CallLink } from "@/components/CallLink";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
 import { InboxRowAvatar } from "@/components/InboxRowAvatar";
 import { InboxRowMore, InboxRowShell } from "@/components/InboxRowOverflow";
 import { InboxPhoneOpen, InboxRowCheck, InboxRowHit, InboxDockIdle } from "@/components/InboxRowSelect";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
-import { WhatsAppLink } from "@/components/WhatsAppLink";
 import {
   deskRowActionClass,
   deskRowMutedClass,
@@ -24,7 +22,7 @@ import {
   RowStateDot,
   deskRowWeightClass,
 } from "@/components/ui/deskRow";
-import { followUpWhatsAppMessage, formatCallWhenRelative } from "@/lib/callsTriage";
+import { formatCallWhenRelative } from "@/lib/callsTriage";
 import { contactFromInboxHref, inboxRecordHref, type InboxReturn } from "@/lib/inboxHref";
 import { inboxListDockRecipe, inboxNeedsYouNextStep } from "@/lib/inboxListVerbs";
 import {
@@ -50,11 +48,6 @@ function inboxCopy(
 ) {
   const kind = inboxTableKind(purpose);
   const who = item.callerName || item.callerPhone || "Caller";
-  const message = followUpWhatsAppMessage({
-    businessName,
-    name: item.callerName,
-    reason: item.headline,
-  });
   const openHref = item.callId
     ? inboxRecordHref(item.callId, ret || { purpose })
     : null;
@@ -73,7 +66,6 @@ function inboxCopy(
   return {
     kind,
     who,
-    message,
     openHref,
     needed,
     visit,
@@ -171,16 +163,9 @@ function InboxRowWho({
 /**
  * Inbox Action dock. One primary verb. Never Open, View, SMS, or email.
  * Visit requested → Confirm. Confirmed visit → Done. Hold → Done.
- * Return, intent-only, archived + number → Call then WhatsApp.
- * Intent-only never Confirm or Done.
+ * Call and WhatsApp live in the opened item only. Intent-only never Confirm or Done.
  */
-function InboxTrailingAction({
-  item,
-  message,
-}: {
-  item: InboxItem;
-  message: string;
-}) {
+function InboxTrailingAction({ item }: { item: InboxItem }) {
   const recipe = inboxListDockRecipe(item);
   if ((recipe === "confirm" || recipe === "visit_done") && item.job) {
     return (
@@ -193,21 +178,6 @@ function InboxTrailingAction({
     return (
       <InboxDockIdle>
         <RequestStatusToggle id={item.hold.id} status={item.hold.status} extra={false} />
-      </InboxDockIdle>
-    );
-  }
-  if (recipe === "call_wa" && item.callerPhone) {
-    return (
-      <InboxDockIdle>
-        <div className="flex shrink-0 items-center justify-end gap-2">
-          <CallLink number={item.callerPhone} />
-          <WhatsAppLink
-            number={item.callerPhone}
-            message={message}
-            variant="icon"
-            callId={item.callId}
-          />
-        </div>
       </InboxDockIdle>
     );
   }
@@ -230,7 +200,6 @@ export function InboxTableRow({
   const {
     kind,
     who,
-    message,
     openHref,
     needed,
     visit,
@@ -330,7 +299,7 @@ export function InboxTableRow({
       <td className={`${deskRowActionClass} whitespace-nowrap px-3 py-2 align-middle`}>
         <div className="flex items-center justify-end gap-1">
           <InboxRowMore item={item} />
-          <InboxTrailingAction item={item} message={message} />
+          <InboxTrailingAction item={item} />
         </div>
       </td>
     </InboxRowShell>
@@ -351,7 +320,7 @@ export function InboxPhoneRow({
   vertical?: string | null;
   ret?: InboxReturn;
 }) {
-  const { who, message, openHref, needed, visit, when, showJob, showHold, nextStep, stamp } =
+  const { who, openHref, needed, visit, when, showJob, showHold, nextStep, stamp } =
     inboxCopy(item, purpose, vertical, businessName, ret);
   const work = item.headline;
   const meta = showHold ? needed : showJob ? visit : when;
@@ -407,7 +376,7 @@ export function InboxPhoneRow({
       </InboxPhoneOpen>
       <div className={`${deskRowActionClass} flex shrink-0 items-center self-center gap-1`}>
         <InboxRowMore item={item} />
-        <InboxTrailingAction item={item} message={message} />
+        <InboxTrailingAction item={item} />
       </div>
     </InboxRowShell>
   );

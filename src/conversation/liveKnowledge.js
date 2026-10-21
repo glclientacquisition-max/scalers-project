@@ -8,6 +8,13 @@ const {
   unknownFaqTopics,
   formatUnknownSection,
 } = require('./provenance');
+const {
+  normalisePrice,
+  priceIsSpeakable,
+  formatPriceDisplay,
+  legacyPriceText,
+  factSheetPriceNote,
+} = require('./factPrice');
 
 function asArray(raw) {
   if (!raw) return [];
@@ -43,9 +50,15 @@ function normalizeServices(raw) {
       } else if (['unknown', 'maybe', '?'].includes(stockRaw)) {
         in_stock = 'unknown';
       }
+      const norm = normalisePrice(row);
+      const speakable = priceIsSpeakable(norm);
       return {
         name: String(row?.name || '').trim(),
-        price_range: String(row?.price_range || row?.priceRange || '').trim(),
+        price_range: speakable
+          ? formatPriceDisplay(norm, 'en', legacyPriceText(row))
+          : String(row?.price_range || row?.priceRange || '').trim()
+            ? factSheetPriceNote()
+            : '',
         notes: String(row?.notes || '').trim(),
         out_of_scope: String(row?.out_of_scope || row?.outOfScope || '').trim(),
         in_stock,
@@ -228,6 +241,30 @@ function buildLiveGroundTruth(profile = {}) {
     formatServicesBlock(services),
   ];
 
+  const { compileSpokenShop } = require('./spokenFacts');
+  const spoken = compileSpokenShop(profile, {
+    limit: 4,
+    messageOnly: isMessageOnlyMode(profile.afterHoursMode),
+  });
+  if (spoken.catalogue.families.length) {
+    parts.push(
+      '',
+      'SPOKEN CATALOGUE (how to say SERVICES on the phone. File titles stay above. Do not invent names.):',
+      `EN: ${spoken.catalogue.opener('en')}`,
+      `SW: ${spoken.catalogue.opener('sw')}`,
+      'Speak size tokens as words (one bedroom / chumba kimoja), never "1 bedroom" or "moja bedroom". When a family has sizes, ask the size before quoting a price.'
+    );
+  }
+  const spokenWhere = spoken.locations.opener('en');
+  if (spokenWhere) {
+    parts.push(
+      '',
+      'SPOKEN LOCATIONS (how to say LOCATIONS on the phone. Addresses stay above.):',
+      `EN: ${spokenWhere}`,
+      `SW: ${spoken.locations.opener('sw')}`
+    );
+  }
+
   if (extras && services.length) {
     // Avoid dumping a duplicate auto-summary: only append if it looks like owner notes.
     const looksLikeAutoSummary = /^Services:\n/i.test(extras) || /Out of scope:/i.test(extras);
@@ -252,7 +289,36 @@ function buildLiveGroundTruth(profile = {}) {
     parts.push('', openVisits);
   }
 
-  parts.push('', 'POLICIES:', formatPoliciesBlock(policies));
+  parts.push('', 'POLICIES:', formatPoliciesBlock(policies, { areaTerms: profile.areaTerms || null }));
+
+  if (spoken.coverage.all.length) {
+    parts.push(
+      '',
+      'SPOKEN COVERAGE (how to say the Coverage list on the phone. Do not invent a place.):',
+      `EN: ${spoken.coverage.opener('en')}`,
+      `SW: ${spoken.coverage.opener('sw')}`
+    );
+  }
+  if (spoken.policies.rows.length) {
+    parts.push(
+      '',
+      'SPOKEN POLICIES (same owner sentences, money and clocks as words. Empty fields stay unknown.):',
+      ...spoken.policies.rows.flatMap((row) => [`EN ${row.key}: ${row.en}`, `SW ${row.key}: ${row.sw}`])
+    );
+  }
+  parts.push(
+    '',
+    'SPOKEN HOURS (how to say the schedule on the phone):',
+    `EN: ${spoken.hours.opener('en')}`,
+    `SW: ${spoken.hours.opener('sw')}`
+  );
+  if (spoken.faqs.rows.length) {
+    parts.push(
+      '',
+      'SPOKEN FAQS (same owner answers, money and numbers as words):',
+      ...spoken.faqs.rows.map((row) => `Q: ${row.question}\nEN: ${row.en}\nSW: ${row.sw}`)
+    );
+  }
 
   parts.push('', formatUnknownSection(unknownTopics));
 
@@ -261,6 +327,15 @@ function buildLiveGroundTruth(profile = {}) {
     'CONFIRMED FAQs (owner-confirmed facts. Answer these exactly when asked. Do not treat pack seeds as fact):',
     faqs.length ? formatFaqsBlock(faqs) : '(none confirmed)'
   );
+
+  // VOICE_FACT_REFS: the FACT CARD (IDs for prices, area fees, hours and
+  // payment numbers). No clock and no caller data, so it stays in the
+  // cacheable part of the prompt (#779 puts this block first).
+  const factSheet = require('./factSheet');
+  if (factSheet.factRefsEnabled()) {
+    const card = factSheet.formatFactCard(factSheet.factSheetFor(profile));
+    if (card) parts.push('', card);
+  }
 
   if (tools.escalate) {
     parts.push(

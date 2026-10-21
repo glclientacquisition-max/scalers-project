@@ -88,11 +88,14 @@ export function SignInForm({ token, email }: { token: string; email: string }) {
         {pending ? "Signing in…" : "Sign in and join"}
       </Button>
       <p className="text-meta text-ink-2">
-        Forgot your password? Reset it from the{" "}
-        <Link href="/login" className="font-medium text-accent hover:underline">
-          sign-in page
+        Forgot your password?{" "}
+        <Link
+          href={`/forgot-password?email=${encodeURIComponent(email)}`}
+          className="inline-flex min-h-11 items-center font-medium text-accent-deep underline-offset-2 hover:underline"
+        >
+          Reset it here
         </Link>
-        , then open this link again.
+        . Then open this invite link again.
       </p>
     </form>
   );

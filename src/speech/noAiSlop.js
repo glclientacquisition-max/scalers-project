@@ -104,7 +104,10 @@ function sentenceBody(sentence) {
 function splitSentences(text) {
   const src = String(text || '').replace(/\s+/g, ' ').trim();
   if (!src) return [];
-  const parts = src.match(/[^.!?]+(?:[.!?]+|$)/g);
+  // A mark glued to the next character is not a sentence end: domains
+  // (arisstationaries.co.ke), emails, decimals. Prod HD_d3900cbf2b2d spoke
+  // "arisstationaries. co. ke." from the old split.
+  const parts = src.match(/(?:[^.!?]|[.!?](?=[^\s.!?]))+(?:[.!?]+|$)/g);
   return parts ? parts.map((part) => part.trim()).filter(Boolean) : [src];
 }
 

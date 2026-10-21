@@ -15,7 +15,9 @@ export type BusinessSettingsTab =
   | "train"
   | "import"
   | "test"
-  | "alerts";
+  | "calls"
+  | "alerts"
+  | "assistant-say";
 
 const TRAIN_PANEL_ALIAS = new Set<string>([
   "identity",
@@ -34,15 +36,21 @@ export function isTrainPanelAlias(raw: string | undefined | null): boolean {
 }
 
 export function parseBusinessSettingsTab(
-  raw: string | undefined | null
+  raw: string | undefined | null,
+  panelRaw?: string | null
 ): BusinessSettingsTab {
   if (isTrainPanelAlias(raw)) return "train";
+  // The catalogue is its own tab. Old "Add prices" / "Check prices" links sent
+  // ?tab=train&panel=catalog, which fell through to Identity.
+  if ((raw === "train" || !raw) && panelRaw === "catalog") return "catalog";
   if (
     raw === "catalog" ||
     raw === "train" ||
     raw === "import" ||
     raw === "test" ||
-    raw === "alerts"
+    raw === "calls" ||
+    raw === "alerts" ||
+    raw === "assistant-say"
   ) {
     return raw;
   }
@@ -71,7 +79,8 @@ export function businessSettingsHref(tab: BusinessSettingsTab, panel?: SettingsP
 /** Sidebar target. Same tabs and panels. Grouped by owner job. */
 export type SettingsNavTarget =
   | { tab: Exclude<BusinessSettingsTab, "train" | "menu"> }
-  | { tab: "train"; panel: Exclude<SettingsPanel, "catalog"> };
+  | { tab: "train"; panel: Exclude<SettingsPanel, "catalog"> }
+  | { href: "/settings/plan" | "/settings/billing" };
 
 export type SettingsNavItem = {
   label: string;
@@ -81,7 +90,7 @@ export type SettingsNavItem = {
 };
 
 export type SettingsNavSection = {
-  id: "business" | "knowledge" | "assistant" | "people";
+  id: "business" | "knowledge" | "assistant" | "people" | "billing";
   title: string;
   items: SettingsNavItem[];
 };
@@ -89,8 +98,9 @@ export type SettingsNavSection = {
 /**
  * Settings destinations. /settings with no section is the Settings home on every width
  * (phone: the whole screen; tablet and desktop: the right pane beside the rail).
- * One header each: Business, Knowledge, Assistant, People.
+ * One header each: Business, Knowledge, Assistant, People, then Plan and billing.
  * Import sits directly under Catalog. Team is People, ahead of Alerts.
+ * Plan and Billing are the last section. The rail shows them to the owner and an admin.
  * Appearance is the account-menu theme cluster. It is not a settings tab.
  * URLs stay `?tab=` / `?panel=`.
  */
@@ -116,11 +126,17 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
   },
   {
     id: "assistant",
-    title: "Assistant",
+    title: "Business Assistant",
     items: [
+      {
+        label: "What it will say",
+        description: "What callers hear before your team calls back",
+        target: { tab: "assistant-say" },
+      },
       { label: "Voice", description: "How your Business Assistant sounds", target: { tab: "train", panel: "tools" } },
       { label: "Pronunciation", description: "Names and words it should say a certain way", target: { tab: "train", panel: "pronunciation" } },
       { label: "Test", description: "Call your line and hear it answer", target: { tab: "test" } },
+      { label: "Calls & forwarding", description: "How calls reach your Business Assistant", target: { tab: "calls" } },
     ],
   },
   {
@@ -131,9 +147,18 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
       { label: "How we notify", description: "Where new calls and leads reach you", target: { tab: "alerts" } },
     ],
   },
+  {
+    id: "billing",
+    title: "Plan and billing",
+    items: [
+      { label: "Plan", description: "Package, minutes and seats", target: { href: "/settings/plan" } },
+      { label: "Billing", description: "Invoices and notices", target: { href: "/settings/billing" } },
+    ],
+  },
 ];
 
 export function settingsNavHref(target: SettingsNavTarget): string {
+  if ("href" in target) return target.href;
   return target.tab === "train"
     ? businessSettingsHref("train", target.panel)
     : businessSettingsHref(target.tab);
@@ -142,8 +167,13 @@ export function settingsNavHref(target: SettingsNavTarget): string {
 export function settingsNavItemActive(
   target: SettingsNavTarget,
   tab: BusinessSettingsTab,
-  trainPanel: SettingsPanel
+  trainPanel: SettingsPanel,
+  pathname?: string | null,
 ): boolean {
+  if ("href" in target) {
+    const path = pathname || "";
+    return path === target.href || path.startsWith(`${target.href}/`);
+  }
   if (target.tab === "train") {
     return tab === "train" && trainPanel === target.panel;
   }
@@ -168,13 +198,16 @@ export function settingsPanelHeading(
       .toLowerCase()
       .replace(/[\s-]+/g, "_");
     return v === "retail" || v === "shop" || v === "shops"
-      ? "Import Catalog"
-      : "Import Knowledge";
+      ? "Import catalogue"
+      : "Import knowledge";
   }
   if (tab === "test") return "Test";
+  if (tab === "calls") return "Calls & forwarding";
+  if (tab === "assistant-say") return "What your Business Assistant will say";
   if (tab !== "train") return null;
-  const item = settingsNavItems().find(
-    (entry) => entry.target.tab === "train" && entry.target.panel === trainPanel
-  );
+  const item = settingsNavItems().find((entry) => {
+    const target = entry.target;
+    return "tab" in target && target.tab === "train" && target.panel === trainPanel;
+  });
   return item?.label ?? "Identity";
 }

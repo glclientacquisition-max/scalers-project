@@ -111,6 +111,8 @@ export type TranscriptRow = {
   speaker: string;
   text_content: string;
   latency_ms: number | null;
+  /** 0-based turn index from Voice. Absent until transcripts.seq is applied. */
+  seq?: number | null;
 };
 
 export type TeamDirectoryEntry = {
@@ -211,6 +213,14 @@ export type TenantRow = {
   team_directory?: TeamDirectoryEntry[] | null;
   faqs?: FaqEntry[] | null;
   unknown_answer_fallback?: string | null;
+  unknown_answer_by_kind?: Record<string, { en?: string; sw?: string }> | null;
+  /** Spoken rewrite. Voice uses en/sw only when source matches unknown_answer_fallback. */
+  unknown_answer_spoken?: {
+    en?: string;
+    sw?: string;
+    source?: string;
+    updated_at?: string;
+  } | null;
   daily_bulletin?: DailyBulletinEntry[] | null;
   /** Receptionist tool toggles: escalate, end_call. */
   agent_tools?: { escalate?: boolean; end_call?: boolean } | null;

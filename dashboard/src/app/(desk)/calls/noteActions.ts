@@ -152,7 +152,8 @@ export type SendCallerNoteState = {
 
 async function sendOwnerCallerSms(
   formData: FormData,
-  kind: string
+  kind: string,
+  keyParts: { replyId?: string | null; version?: string | null } = {}
 ): Promise<SendCallerNoteState> {
   const tenant = await getCurrentTenant();
   if (!tenant) return { error: "Not signed in." };
@@ -178,8 +179,11 @@ async function sendOwnerCallerSms(
     kind,
     to: phone,
     body,
+    replyId: keyParts.replyId || null,
+    version: keyParts.version || null,
   });
   if (!sent.ok) {
+    if (sent.message) return { error: sent.message };
     if (sent.reason === "sms_not_configured") return { error: "Text is unavailable." };
     if (sent.reason === "sms_allowance_exhausted") {
       return { error: "Included SMS used. Enable on-demand on Wallet." };
@@ -226,7 +230,13 @@ export async function sendCallerNoteAction(
 ): Promise<SendCallerNoteState> {
   const denied = await memberDenied("inbox.act");
   if (denied) return denied;
-  return sendOwnerCallerSms(formData, "caller_note");
+  // One key per note submission: the form's note_id (client-generated), so a
+  // double-submit is deduped and a new note is a new send.
+  const noteId = String(formData.get("note_id") || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9:_-]/g, "")
+    .slice(0, 80);
+  return sendOwnerCallerSms(formData, "caller_note", { version: noteId || null });
 }
 
 /** Manual Inbox ticket SMS. Distinct from auto-SMS on Confirm. */
@@ -240,8 +250,9 @@ export async function sendInboxReplySms(
     .trim()
     .replace(/[^a-zA-Z0-9:_-]/g, "")
     .slice(0, 80);
-  const kind = replyId
-    ? `caller_inbox_reply:${replyId}`
-    : `caller_inbox_reply:${Date.now()}`;
-  return sendOwnerCallerSms(formData, kind);
+  // kind is the fixed CALLER_KINDS value; the reply id lives in the key
+  // (reply:<tenant>:<replyId>), never in kind. Was: kind = caller_inbox_reply:<id|Date.now()>.
+  return sendOwnerCallerSms(formData, "caller_inbox_reply", {
+    replyId: replyId || crypto.randomUUID(),
+  });
 }

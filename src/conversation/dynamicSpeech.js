@@ -11,6 +11,7 @@ const {
   LANGUAGE_INVITE,
 } = require('./businessAssistantIntro');
 const { confirmationLanguage } = require('./language');
+const { RECORDING_NOTICE_EN, recordingNoticeOn } = require('./recordingNotice');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
 const { prepareStreamedSpeech, looksLikeShortAffirmation } = require('./callCorrectives');
 const { dropSpeechSlop, guardSpokenReply, logSpokenFilterDrop } = require('./speechGuard');
@@ -53,6 +54,7 @@ function fallbackGreeting(businessName, opts = {}) {
     afterHoursMode: opts.afterHoursMode,
     closureNotice: opts.closureNotice,
     callerFileName: opts.callerFileName || opts.fileOwnerName,
+    recordingNotice: opts.recordingNotice,
     now: opts.now,
     variant: opts.variant,
   });
@@ -84,7 +86,9 @@ async function generateDynamicGreeting(opts) {
   ).toLowerCase();
 
   if (process.env.VOICE_GREETING) {
-    return String(process.env.VOICE_GREETING).trim();
+    const fixed = String(process.env.VOICE_GREETING).trim();
+    if (recordingNoticeOn() && !/\brecord/i.test(fixed)) return `${fixed} ${RECORDING_NOTICE_EN}`;
+    return fixed;
   }
 
   const afterHoursMode =
@@ -108,10 +112,14 @@ async function generateDynamicGreeting(opts) {
     afterHoursMode,
     closureNotice,
     callerFileName: opts.callerFileName || opts.fileOwnerName,
+    // Greeting warm renders the next daypart ahead of time (greetingWarm.js).
+    now: opts.now,
     ...offeringOpts,
   };
   const instant = fallbackGreeting(businessName, introOpts);
   if (mode !== 'gemini') return instant;
+  // A rewritten opener could drop the recording notice; keep the fixed line.
+  if (recordingNoticeOn()) return instant;
 
   const timeoutMs = Math.max(
     300,
@@ -363,6 +371,53 @@ function looksLikeSpokenServiceDump(text) {
   return (raw.match(/,/g) || []).length >= 3 && unique.size >= 2;
 }
 
+const DUMP_GENERIC = new Set([
+  'cleaning', 'clean', 'service', 'services', 'the', 'and', 'our', 'we', 'do',
+  'with', 'for', 'you', 'your', 'that', 'this', 'from', 'also', 'plus', 'more',
+]);
+
+function dumpHelpLine(language) {
+  const lang = confirmationLanguage(language);
+  return lang === 'sw' || lang === 'sheng'
+    ? 'Tunaweza kusaidia. Unahitaji huduma gani?'
+    : 'We can help with that. What do you need done?';
+}
+
+function noteDrop(dropReasons, reason) {
+  if (Array.isArray(dropReasons) && reason && !dropReasons.includes(reason)) dropReasons.push(reason);
+}
+
+/** Catalogue-name check. Flag-on only. Null means the caller did not opt in. */
+function catalogueServiceDump(raw, opts) {
+  if (!require('../knowledge/flags').anyLookupOn()) return null;
+  const { cataloguePhrases } = require('../knowledge/lookup');
+  const names = cataloguePhrases(opts.profile || {})
+    .map((name) => name.toLowerCase())
+    .filter((name) => name.length >= 4);
+  const items = raw.split(/\s*,\s*|\band\b|\bna\b/i).map((part) => part.trim()).filter(Boolean);
+  const mentions = (item) => {
+    const low = item.toLowerCase();
+    return names.some((name) => {
+      if (low.includes(name)) return true;
+      return name
+        .replace(/[^a-z ]/g, ' ')
+        .split(/\s+/)
+        .filter((word) => word.length >= 4 && !DUMP_GENERIC.has(word))
+        .some((word) => low.includes(word));
+    });
+  };
+  const kept = items.filter(mentions);
+  if (items.length && kept.length === items.length) return raw;
+  noteDrop(opts.dropReasons, 'service_dump');
+  logSpokenFilterDrop('service_dump', raw);
+  if (kept.length < 2) return dumpHelpLine(opts.language);
+  const lang = confirmationLanguage(opts.language);
+  const and = lang === 'sw' || lang === 'sheng' ? 'na' : 'and';
+  const list = kept.length === 1 ? kept[0] : `${kept.slice(0, -1).join(', ')} ${and} ${kept[kept.length - 1]}`;
+  const sentence = /[.!?]$/.test(list) ? list : `${list}.`;
+  return /^[a-z]/.test(sentence) ? `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}` : sentence;
+}
+
 function trimSpokenServiceDump(text, opts = {}) {
   const raw = String(text || '').trim();
   const callerText = String(
@@ -380,23 +435,19 @@ function trimSpokenServiceDump(text, opts = {}) {
   const G = require('./answerGrounding');
   const structural = G.noAnswerDeleteEnabled();
   if (structural) {
-    // A grounded list answers any phrasing of the question: never delete it.
+    // VOICE_NO_ANSWER_DELETE: a grounded list answers any phrasing of the question: never delete it.
     const g = G.serviceListGrounding(raw, { profile: opts.profile, state: opts.state });
     if (g.grounded) return raw;
   }
-  const lang = structural
-    ? confirmationLanguage(G.replyLanguage(raw, opts.language))
-    : confirmationLanguage(opts.language);
-  const line =
-    lang === 'sw' || lang === 'sheng'
-      ? 'Tunaweza kusaidia. Unahitaji huduma gani?'
-      : 'We can help with that. What do you need done?';
+  const checked = catalogueServiceDump(raw, opts);
+  if (checked != null) return checked;
   logSpokenFilterDrop('service_dump', raw);
   if (structural) {
     const mem = G.turnMemory(opts.state, opts.callerTurns);
     if (mem) mem.listDeleted = true;
+    return dumpHelpLine(G.replyLanguage(raw, opts.language));
   }
-  return line;
+  return dumpHelpLine(opts.language);
 }
 
 const HEDGE_OPENER =
@@ -438,12 +489,33 @@ function stripHedgesBySentence(text, opts = {}) {
   return joined;
 }
 
+// VOICE_FACT_REFS: a hedge that runs on into its own clause ("Let me check
+// with the owner to confirm it for you.") is a promise, not filler. Cutting
+// only the hedge left "with the owner to confirm it for you." on
+// HD_9939ca74d492. With the flag on, a hedge is removed only when it stands
+// alone (end of text, or followed by punctuation or a new sentence).
+function stripHedgeAlone(raw, re) {
+  return raw.replace(re, (match, ...rest) => {
+    const offset = rest[rest.length - 2];
+    const whole = rest[rest.length - 1];
+    // The opener also eats the spaces and punctuation after the hedge.
+    const hedge = match.replace(/[\s,.]+$/, '');
+    const tail = whole.slice(offset + hedge.length);
+    return /^\s+[a-z]/.test(tail) ? match : '';
+  });
+}
+
 function stripSpokenHedges(text, opts = {}) {
   let raw = String(text || '').trim();
   if (!raw) return raw;
   if (require('./answerGrounding').noAnswerDeleteEnabled()) return stripHedgesBySentence(raw, opts);
-  raw = raw.replace(HEDGE_OPENER, '');
-  raw = raw.replace(HEDGE_PHRASE, '');
+  if (require('./factSheet').factRefsEnabled()) {
+    raw = stripHedgeAlone(raw, HEDGE_OPENER);
+    raw = stripHedgeAlone(raw, HEDGE_PHRASE).replace(/\s*,\s*([.!?])/g, '$1');
+  } else {
+    raw = raw.replace(HEDGE_OPENER, '');
+    raw = raw.replace(HEDGE_PHRASE, '');
+  }
   raw = raw.replace(/\s+/g, ' ').replace(/^[,.]+\s*/, '').trim();
   if (!raw) {
     return confirmationLanguage(opts.language) === 'en' ? 'Okay.' : 'Sawa.';
@@ -457,12 +529,99 @@ const PREMATURE_OUTCOME =
 function stripPrematureOutcomeClaims(text, opts = {}) {
   let raw = String(text || '').trim();
   if (!raw) return raw;
+  PREMATURE_OUTCOME.lastIndex = 0;
   raw = raw.replace(PREMATURE_OUTCOME, '');
   raw = raw.replace(/\s+/g, ' ').replace(/^[,.]+\s*/, '').replace(/\s+[,.]+/g, '.').trim();
   if (!raw) {
     return confirmationLanguage(opts.language) === 'en' ? 'Okay.' : 'Sawa.';
   }
   return raw;
+}
+
+function splitSpokenSentences(text) {
+  return String(text || '')
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Lookups on: a hedge or a booked/transferred claim is dropped as a whole
+ * sentence, or kept whole when cutting it would leave a lowercase fragment.
+ */
+function wholeSentenceClaims(text, opts, dropReasons) {
+  const kept = [];
+  for (const sentence of splitSpokenSentences(text)) {
+    let stripped = stripHedgeAlone(sentence, HEDGE_OPENER);
+    HEDGE_PHRASE.lastIndex = 0;
+    stripped = stripHedgeAlone(stripped, HEDGE_PHRASE);
+    stripped = stripped.replace(/\s+/g, ' ').replace(/^[,.]+\s*/, '').trim();
+    if (!stripped) {
+      noteDrop(dropReasons, 'hedge');
+      logSpokenFilterDrop('hedge', sentence);
+      continue;
+    }
+    if (/^[a-z]/.test(stripped)) {
+      kept.push(sentence);
+      continue;
+    }
+    PREMATURE_OUTCOME.lastIndex = 0;
+    const premature = stripped.replace(PREMATURE_OUTCOME, '').replace(/\s+/g, ' ').trim();
+    PREMATURE_OUTCOME.lastIndex = 0;
+    if (premature !== stripped) {
+      noteDrop(dropReasons, 'premature_outcome');
+      logSpokenFilterDrop('premature_outcome', sentence);
+      continue;
+    }
+    kept.push(stripped);
+  }
+  const joined = kept.join(' ').trim();
+  if (!joined) {
+    // The guard cut a fact claim (coverage, price, pay): the caller asked
+    // something, so they get the team callback line, never a bare "Okay",
+    // which sounds like a yes (staging call 2026-10-19, "We cover <place>").
+    if (cutFactClaim(dropReasons)) return cannotAnswerLine(opts);
+    if (Array.isArray(dropReasons) && dropReasons.includes('glued_words') && opts.spokenThisTurn !== true) {
+      return cannotAnswerLine(opts);
+    }
+    if (Array.isArray(dropReasons) && dropReasons.includes('glued_words')) return '';
+    return confirmationLanguage(opts.language) === 'en' ? 'Okay.' : 'Sawa.';
+  }
+  return joined;
+}
+
+// Guard drops that removed a factual claim the caller may have asked about.
+const FACT_CLAIM_DROPS = new Set([
+  'coverage',
+  'unbound_place',
+  'placeholder_price',
+  'unsaid_number',
+  'hold_payment',
+  'fact_ref_confirm',
+  'pay_number_unknown',
+]);
+
+function cutFactClaim(dropReasons) {
+  return Array.isArray(dropReasons) && dropReasons.some((reason) => FACT_CLAIM_DROPS.has(reason));
+}
+
+function cannotAnswerLine(opts = {}) {
+  const factSheet = require('./factSheet');
+  const line = factSheet.pickUnknownAnswerLine(opts.profile || {}, opts.language).text;
+  if (factSheet.callbackSafeLine(line)) return line;
+  const sw = String(opts.language || '').toLowerCase();
+  return factSheet.TEAM_DEFAULT_LINE[sw === 'sw' || sw === 'sheng' ? 'sw' : 'en'];
+}
+
+/** Lookup speech is already the answer. Never re-parse it, never log the sentence. */
+function safeLookupSpeech(text, opts) {
+  const factSheet = require('./factSheet');
+  const raw = String(text || '').trim();
+  if (factSheet.callbackSafeLine(raw)) return { text: raw, dropReasons: [] };
+  return {
+    text: factSheet.pickUnknownAnswerLine(opts.profile || {}, opts.language).text,
+    dropReasons: ['callbacks_only'],
+  };
 }
 
 /**
@@ -475,8 +634,67 @@ function splitSpokenSentences(text) {
 }
 
 function polishSpokenDetail(text, opts = {}) {
+  if (opts.lookupSpeech) {
+    const safe = safeLookupSpeech(text, opts);
+    return { text: safe.text, reason: safe.dropReasons[0] || '', dropReasons: safe.dropReasons };
+  }
   const dropReasons = [];
+  const lookupsOn = require('../knowledge/flags').anyLookupOn();
   let spoken = stripSpokenInstructionLeaks(prepareStreamedSpeech(text), { final: true });
+  // VOICE_FACT_REFS: put the owner's values in for {price.x} / {fee.x} /
+  // {hours.x} / {pay.x} before the guard reads the sentence. The values are
+  // passed on as allowed facts; an unconfirmed or unknown ID became the
+  // cannot-answer line (factSheet.renderFactRefs).
+  let factText = '';
+  if ((opts.state || opts.profile) && spoken.includes('{')) {
+    const factSheet = require('./factSheet');
+    if (factSheet.factRefsEnabled()) {
+      const rendered = factSheet.renderFactRefs(spoken, factSheet.factSheetFor(opts.profile || {}), {
+        language: opts.language,
+      });
+      if (rendered.changed) {
+        spoken = rendered.text;
+        factText = rendered.factText;
+        if (rendered.unconfirmed.length || rendered.unknown.length) {
+          dropReasons.push('fact_ref_confirm');
+          // Say which kind in the trace: unconfirmed (owner/hash) or unknown ID.
+          if (rendered.unconfirmed.length) dropReasons.push('fact_ref_unconfirmed');
+          if (rendered.unknown.length) dropReasons.push('fact_ref_unknown');
+          logSpokenFilterDrop('fact_ref_confirm', [...rendered.unconfirmed, ...rendered.unknown].join(','), opts);
+        }
+      }
+    }
+  }
+  // VOICE_FACT_REFS: a payment number not on file is the cannot-answer line,
+  // never an invented "given when you pay" process (HD_b070f6939775).
+  if ((opts.state || opts.profile) && require('./factSheet').factRefsEnabled()) {
+    const turns = opts.callerTurns || opts.state?.conversation?.answersReceived || [];
+    const lastCaller = Array.isArray(turns) && turns.length ? turns[turns.length - 1] : '';
+    const paid = require('./factSheet').guardPaymentNumberClaim(spoken, lastCaller, {
+      language: opts.language,
+      profile: opts.profile,
+    });
+    if (paid.replaced) {
+      spoken = paid.text;
+      dropReasons.push('pay_number_unknown');
+      logSpokenFilterDrop('pay_number_unknown', lastCaller, opts);
+    }
+  }
+  // Run-together words (staging call 2026-10-19): split them with the word list, or
+  // drop the sentence, before the guard and the lint read it.
+  if (lookupsOn && spoken) {
+    const { repairGluedWords, profileWords } = require('../speech/glueRepair');
+    const glue = repairGluedWords(spoken, {
+      language: opts.language,
+      extraWords: profileWords(opts.profile || {}),
+    });
+    if (glue.split) noteDrop(dropReasons, 'glue_split');
+    if (glue.dropped.length) {
+      noteDrop(dropReasons, 'glued_words');
+      logSpokenFilterDrop('glued_words', glue.dropped.join(' '), opts);
+    }
+    spoken = glue.text;
+  }
   // Guard whole sentences first. Stripping a verb phrase after the fact would
   // leave a fragment ("that for you.") that the guard can no longer see.
   if (opts.state || opts.profile) {
@@ -485,20 +703,20 @@ function polishSpokenDetail(text, opts = {}) {
       profile: opts.profile || {},
       toolResults: opts.toolResults || [],
       capabilities: opts.capabilities || {},
-      extra: JSON.stringify(opts.state?.entities || {}),
+      extra: factText ? `${JSON.stringify(opts.state?.entities || {})} ${factText}` : JSON.stringify(opts.state?.entities || {}),
       state: opts.state,
       language: opts.language,
       allowEmpty: true,
       dropReasons,
+      ...(opts.now != null ? { now: opts.now } : {}),
     });
   }
   const callerText = String(
     (opts.callerTurns || opts.state?.conversation?.answersReceived || []).slice(-1)[0] || ''
   );
-  spoken = trimSpokenServiceDump(
-    stripPrematureOutcomeClaims(stripSpokenHedges(spoken, opts), opts),
-    { ...opts, callerText }
-  );
+  if (lookupsOn) spoken = wholeSentenceClaims(spoken, opts, dropReasons);
+  else spoken = stripPrematureOutcomeClaims(stripSpokenHedges(spoken, opts), opts);
+  spoken = trimSpokenServiceDump(spoken, { ...opts, callerText, dropReasons });
   const sanitized = sanitizeSpokenFileClaim(spoken, {
     callerText,
     state: opts.state,
@@ -520,8 +738,33 @@ function polishSpokenDetail(text, opts = {}) {
     const G = require('./answerGrounding');
     out = G.applyTurnContext(out, G.turnMemory(opts.state, opts.callerTurns), splitSpokenSentences);
   }
+  if (lookupsOn && dropReasons.includes('service_dump') && dropReasons.includes('slop')) {
+    noteDrop(dropReasons, 'service_dump→slop');
+  }
+  if (lookupsOn && out) {
+    const { lintSentence, sentencesOf } = require('../knowledge/sentenceLint');
+    const parts = sentencesOf(out);
+    let failed = false;
+    const fixed = [];
+    for (const sentence of parts) {
+      if (!lintSentence(sentence)) {
+        fixed.push(sentence);
+        continue;
+      }
+      // A fragment is dropped. It is never swapped for an unrelated line.
+      failed = true;
+    }
+    if (failed) {
+      noteDrop(dropReasons, 'sentence_fragment');
+      out = fixed.join(' ').trim();
+      if (!out && opts.spokenThisTurn !== true) out = cannotAnswerLine(opts);
+    }
+  }
   const before = String(text || '').trim();
   const after = String(out || '').trim();
+  if (lookupsOn && after.length < before.length && dropReasons.length === 0) {
+    noteDrop(dropReasons, 'rewritten');
+  }
   let reason = '';
   if (dropReasons.length) reason = dropReasons[0];
   else if (!after) reason = 'dropped';

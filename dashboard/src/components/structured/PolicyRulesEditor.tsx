@@ -34,6 +34,8 @@ import {
   type ReturnsRule,
   type WarrantyRule,
 } from "@/lib/policyRules";
+import { cleanLegacyPolicyText, legacyRuleRowText } from "@/lib/ownerPolicyCopy";
+import { usePointerKind } from "@/components/ui/usePointerKind";
 import { AddRow, CallersHear, CheckList, OpenRow } from "./PickList";
 
 const topicLabel = (t: PolicyTopic) => POLICY_TOPICS.find((o) => o.id === t)?.label || t;
@@ -55,8 +57,9 @@ const LEGACY_KEY: Record<PolicyTopic, "returns" | "delivery" | "cancellation" | 
 
 /**
  * Policy rules: one row per rule with what callers hear, each opening a bottom drawer of
- * short choices plus an optional note. Topics with only old free text show that text and
- * open pre-filled, so nothing the owner wrote is lost.
+ * short choices plus an optional note. Topics with only old free text show a tidy summary
+ * and open pre-filled, so nothing the owner wrote is lost. Starter text and lines written
+ * for the assistant are not shown here (the caller passes owner text only).
  */
 export function PolicyRulesEditor({
   rules,
@@ -76,8 +79,10 @@ export function PolicyRulesEditor({
   const [sheet, setSheet] = useState<null | "pick" | PolicyTopic>(null);
   const [draft, setDraft] = useState<PolicyRules>(rules);
   const [draftErrors, setDraftErrors] = useState<Record<string, string>>({});
+  const pointer = usePointerKind();
   const offered = topicsFor(vertical);
-  const legacyOnly = (t: PolicyTopic) => !rules[t] && Boolean(LEGACY_KEY[t] && legacy[LEGACY_KEY[t]!]);
+  const legacyText = (t: PolicyTopic) => (LEGACY_KEY[t] ? cleanLegacyPolicyText(legacy[LEGACY_KEY[t]!]) : null);
+  const legacyOnly = (t: PolicyTopic) => !rules[t] && Boolean(legacyText(t));
   const shown = [...offered, ...POLICY_TOPICS.map((o) => o.id).filter((t) => !offered.includes(t))].filter((t) => rules[t] || legacyOnly(t));
   const addable = POLICY_TOPICS.filter((o) => !shown.includes(o.id)).sort((a, b) => {
     const ia = offered.indexOf(a.id);
@@ -88,7 +93,7 @@ export function PolicyRulesEditor({
   function open(t: PolicyTopic | "pick") {
     if (t !== "pick" && !rules[t]) {
       const seed = emptyRule(t) as { note: string | null };
-      const old = LEGACY_KEY[t] ? legacy[LEGACY_KEY[t]!] : "";
+      const old = legacyText(t);
       setDraft({ ...rules, [t]: { ...seed, note: old ? old.slice(0, RULE_NOTE_MAX) : null } });
     } else setDraft(rules);
     setDraftErrors({});
@@ -128,7 +133,7 @@ export function PolicyRulesEditor({
               key={t}
               id={`rule-row-${t}`}
               title={topicLabel(t)}
-              value={rules[t] ? ruleSentence(t, rules) : `Old text: ${legacy[LEGACY_KEY[t]!]}. Tap to set it up.`}
+              value={rules[t] ? ruleSentence(t, rules) : legacyRuleRowText(legacy[LEGACY_KEY[t]!], pointer)}
               error={rowError}
               disabled={!canEdit}
               onOpen={() => open(t)}

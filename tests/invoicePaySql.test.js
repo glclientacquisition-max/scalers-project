@@ -1,0 +1,1276 @@
+const { describe, it, before } = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const { splitKes } = require("../dashboard/src/lib/invoicePay/money");
+
+const ROOT = path.join(__dirname, "..");
+const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
+
+let db;
+
+async function q(sql, params) {
+  return db.query(sql, params);
+}
+
+async function openDraft(whereSql, params) {
+  await q("select set_config('scalers.billing_write', '1', false)");
+  try {
+    await q(`update public.invoices set status = 'open', invoice_number = $1 ${whereSql}`, params);
+  } finally {
+    await q("select set_config('scalers.billing_write', '', false)");
+  }
+}
+
+describe("invoice pay SQL", () => {
+  before(async () => {
+    const { PGlite } = await import("@electric-sql/pglite");
+    const { pgcrypto } = await import("@electric-sql/pglite/contrib/pgcrypto");
+    db = new PGlite({ extensions: { pgcrypto } });
+    await db.exec(read("tests/sql/billing_data_layer/00_stub_schema.sql"));
+    await db.exec(read("tests/sql/billing_data_layer/05_legacy.sql"));
+    await db.exec(read("docs/supabase/billing_data_layer.sql"));
+    await db.exec(read("docs/supabase/invoice_pay.sql"));
+    await db.exec(read("docs/supabase/invoice_pay.sql"));
+    await db.exec(read("docs/supabase/invoice_documents.sql"));
+    await db.exec(read("docs/supabase/invoice_documents.sql"));
+    await db.exec(read("docs/supabase/billing_company.sql"));
+    await db.exec(read("docs/supabase/billing_company.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_session.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_session.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_held.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_held.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_collections.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_collections.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_checkout_total.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_checkout_total.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_checkout_review.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_checkout_review.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_checkout_review_round8.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_checkout_review_round8.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_checkout_review_round9.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_checkout_review_round9.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_live_allowlist.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_live_allowlist.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_amount_paid_either.sql"));
+    await db.exec(read("docs/supabase/invoice_pay_amount_paid_either.sql"));
+  });
+
+  it("refuses a draft number or status write unless billing_write is set", async () => {
+    const tenant = "12121212-1212-4212-8212-121212121212";
+    await q("select set_config('scalers.wallet_write', '1', false)");
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Freeze Shop', 'pending:freeze', 'soft')`,
+      [tenant]
+    );
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 100, 100) returning id`,
+      [tenant]
+    );
+    await assert.rejects(
+      q("update public.invoices set status = 'open', invoice_number = 'SC-2026-000099' where id = $1", [
+        draft.rows[0].id,
+      ]),
+      /set only by finalize_invoice/
+    );
+  });
+
+  it("splits the same way as the page", async () => {
+    for (const total of ["150000", "150001", "200000", "2320.50", "300000.25"]) {
+      const { rows } = await q("select public.invoice_kes_parts($1::numeric) as parts", [total]);
+      const sqlParts = rows[0].parts.map((part) => {
+        const n = Number(part);
+        return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, "").replace(/\.0$/, "");
+      });
+      const jsParts = splitKes(total).map((part) => (part.includes(".") ? part.replace(/0$/, "").replace(/\.$/, "") : part));
+      assert.deepEqual(
+        sqlParts.map((part) => Number(part).toFixed(2)),
+        jsParts.map((part) => Number(part).toFixed(2)),
+        total
+      );
+    }
+  });
+
+  it("refuses a beta tenant and mints, rotates, and expires a link for an enforced tenant", async () => {
+    const beta = "11111111-1111-1111-1111-111111111111";
+    await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes, due_at)
+       values ($1, 2000, 2320, '2026-10-24 21:00:00+00')`,
+      [beta]
+    );
+    await openDraft("where tenant_id = $2", ["SC-2026-000010", beta]);
+    await assert.rejects(
+      q("select * from public.mint_invoice_pay_token((select id from public.invoices where tenant_id = $1), false)", [beta]),
+      /beta tenants have no pay link/
+    );
+
+    const tenant = "44444444-4444-4444-4444-444444444444";
+    await q("select set_config('scalers.wallet_write', '1', false)");
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Pay Test Shop', 'pending:pay-test', 'soft')`,
+      [tenant]
+    );
+    const inserted = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes, due_at)
+       values ($1, 2000, 2320, '2026-10-24 21:00:00+00')
+       returning id`,
+      [tenant]
+    );
+    const invoiceId = inserted.rows[0].id;
+    await openDraft("where id = $2", ["SC-2026-000042", invoiceId]);
+
+    const minted = await q("select * from public.mint_invoice_pay_token($1, false)", [invoiceId]);
+    const token = minted.rows[0].token;
+    assert.match(token, /^pay_[A-Za-z0-9_-]+$/);
+    const stored = await q("select token_hash, expires_at, revoked_at from public.invoice_pay_tokens where invoice_id = $1", [
+      invoiceId,
+    ]);
+    assert.equal(stored.rows.length, 1);
+    assert.notEqual(stored.rows[0].token_hash, token);
+    assert.equal(stored.rows[0].revoked_at, null);
+    const hashed = await q("select encode(digest($1, 'sha256'), 'hex') as hash", [token]);
+    assert.equal(stored.rows[0].token_hash, hashed.rows[0].hash);
+
+    const preview = await q("select public.pay_invoice_by_token($1) as row", [token]);
+    assert.equal(preview.rows[0].row.state, "payable");
+    assert.equal(preview.rows[0].row.business_name, "Pay Test Shop");
+    assert.equal(preview.rows[0].row.invoice_number, "SC-2026-000042");
+
+    await assert.rejects(q("select * from public.mint_invoice_pay_token($1, false)", [invoiceId]), /already exists/);
+    const rotated = await q("select * from public.mint_invoice_pay_token($1, true)", [invoiceId]);
+    const nextToken = rotated.rows[0].token;
+    assert.notEqual(nextToken, token);
+    const oldPreview = await q("select public.pay_invoice_by_token($1) as row", [token]);
+    assert.equal(oldPreview.rows[0].row.state, "expired");
+    const newPreview = await q("select public.pay_invoice_by_token($1) as row", [nextToken]);
+    assert.equal(newPreview.rows[0].row.state, "payable");
+
+    await q("set role anon");
+    await assert.rejects(q("select * from public.mint_invoice_pay_token($1, false)", [invoiceId]));
+    await q("reset role");
+  });
+
+  it("applies two parts once each and leaves a mismatch unpaid", async () => {
+    const tenant = "55555555-5555-4555-8555-555555555555";
+    await q("select set_config('scalers.wallet_write', '1', false)");
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Split Shop', 'pending:split', 'soft')`,
+      [tenant]
+    );
+    const inserted = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes)
+       values ($1, 200000, 200000) returning id`,
+      [tenant]
+    );
+    const invoiceId = inserted.rows[0].id;
+    await openDraft("where id = $2", ["SC-2026-000200", invoiceId]);
+
+    const first = await q(
+      `select * from public.apply_payment('bachs', 'chk_part_1', 100000, $1, $2, now(), 'test', '{}'::jsonb)`,
+      [tenant, invoiceId]
+    );
+    assert.equal(first.rows[0].match_status, "partial");
+    const replay = await q(
+      `select * from public.apply_payment('bachs', 'chk_part_1', 100000, $1, $2)`,
+      [tenant, invoiceId]
+    );
+    assert.equal(replay.rows[0].id, first.rows[0].id);
+    let invoice = await q("select status, amount_paid_kes from public.invoices where id = $1", [invoiceId]);
+    assert.equal(invoice.rows[0].status, "open");
+    assert.equal(Number(invoice.rows[0].amount_paid_kes), 100000);
+
+    await q(
+      `select * from public.apply_payment('bachs', 'chk_part_2', 100000, $1, $2)`,
+      [tenant, invoiceId]
+    );
+    invoice = await q("select status, amount_paid_kes from public.invoices where id = $1", [invoiceId]);
+    assert.equal(invoice.rows[0].status, "paid");
+    assert.equal(Number(invoice.rows[0].amount_paid_kes), 200000);
+
+    const other = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes)
+       values ($1, 2320, 2320) returning id`,
+      [tenant]
+    );
+    const otherId = other.rows[0].id;
+    await openDraft("where id = $2", ["SC-2026-000201", otherId]);
+    const issue = await q(
+      `select match_status from public.record_payment_issue(
+         'bachs', 'chk_bad', 2000, $1, $2, '{}'::jsonb, 1800, 'USD', null, 'amount'
+       )`,
+      [tenant, otherId]
+    );
+    assert.equal(issue.rows[0].match_status, "issue");
+    const still = await q("select status, amount_paid_kes from public.invoices where id = $1", [otherId]);
+    assert.equal(still.rows[0].status, "open");
+    assert.equal(Number(still.rows[0].amount_paid_kes), 0);
+    const again = await q(
+      `select id from public.record_payment_issue('bachs', 'chk_bad', 2000, $1, $2)`,
+      [tenant, otherId]
+    );
+    const count = await q("select count(*)::int as n from public.payments where provider_ref = 'chk_bad'");
+    assert.equal(count.rows[0].n, 1);
+    assert.ok(again.rows[0].id);
+  });
+
+  it("reports a pending attempt older than 30 minutes and does not change it", async () => {
+    const tenant = "55555555-5555-4555-8555-555555555555";
+    const invoice = await q("select id from public.invoices where invoice_number = 'SC-2026-000201'");
+    await q(
+      `insert into public.payment_attempts (tenant_id, invoice_id, provider, status, amount_kes, created_at)
+       values ($1, $2, 'bachs', 'pending', 2320, now() - interval '31 minutes')`,
+      [tenant, invoice.rows[0].id]
+    );
+    const before = await q(
+      "select status, amount_kes from public.payment_attempts where invoice_id = $1",
+      [invoice.rows[0].id]
+    );
+    const report = await q(
+      "select kind, detail from public.billing_payment_reconciliation() where invoice_id = $1",
+      [invoice.rows[0].id]
+    );
+    const after = await q(
+      "select status, amount_kes from public.payment_attempts where invoice_id = $1",
+      [invoice.rows[0].id]
+    );
+    assert.deepEqual(after.rows, before.rows);
+    assert.ok(report.rows.some((row) => row.kind === "pending_timeout"));
+    assert.ok(report.rows.some((row) => row.kind === "issue"));
+  });
+
+  it("numbers issued invoices SCL- without a gap and leaves drafts unnumbered", async () => {
+    const tenant = "66666666-6666-4666-8666-666666666666";
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement, alert_email)
+       values ($1, 'Example Business', 'pending:pay-docs', 'soft', 'example@example.com')`,
+      [tenant]
+    );
+    const first = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes, tax_kes)
+       values ($1, 7000, 7000, null) returning id, invoice_number, status, tax_kes`,
+      [tenant]
+    );
+    assert.equal(first.rows[0].invoice_number, null);
+    assert.equal(first.rows[0].status, "draft");
+    assert.equal(first.rows[0].tax_kes, null);
+    const issued = await q(
+      `select invoice_number, status, issuer_legal_name, issuer_product, issuer_phone, issuer_email,
+              issuer_address, issuer_city, issuer_kra_pin
+       from public.finalize_invoice($1)`,
+      [first.rows[0].id]
+    );
+    const year = await q("select extract(year from (now() at time zone 'Africa/Nairobi'))::int as y");
+    assert.match(issued.rows[0].invoice_number, new RegExp(`^SCL-${year.rows[0].y}-\\d{6}$`));
+    assert.equal(issued.rows[0].status, "open");
+    assert.equal(issued.rows[0].issuer_legal_name, "Scalers Ventures");
+    assert.equal(issued.rows[0].issuer_product, "Business Assistant");
+    assert.equal(issued.rows[0].issuer_phone, "+254119774470");
+    assert.equal(issued.rows[0].issuer_email, "support@scalers.co.ke");
+    assert.equal(issued.rows[0].issuer_address, null);
+    assert.equal(issued.rows[0].issuer_city, null);
+    assert.equal(issued.rows[0].issuer_kra_pin, null);
+    await q(
+      `update public.billing_company
+       set legal_name = 'Scalers Ventures Ltd', phone = '  +254700000000  ',
+           address = 'Westlands', city = 'Nairobi', kra_pin = 'A123456789B', updated_at = now()
+       where id = 1`
+    );
+    const second = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 1000, 1000) returning id, invoice_number`,
+      [tenant]
+    );
+    assert.equal(second.rows[0].invoice_number, null);
+    const issued2 = await q(
+      `select invoice_number, issuer_legal_name, issuer_phone, issuer_address, issuer_city, issuer_kra_pin
+       from public.finalize_invoice($1)`,
+      [second.rows[0].id]
+    );
+    assert.equal(issued2.rows[0].issuer_legal_name, "Scalers Ventures Ltd");
+    assert.equal(issued2.rows[0].issuer_phone, "+254700000000");
+    assert.equal(issued2.rows[0].issuer_address, "Westlands");
+    assert.equal(issued2.rows[0].issuer_city, "Nairobi");
+    assert.equal(issued2.rows[0].issuer_kra_pin, "A123456789B");
+    const firstStill = await q(
+      `select issuer_legal_name, issuer_phone, issuer_address, issuer_kra_pin from public.invoices where id = $1`,
+      [first.rows[0].id]
+    );
+    assert.equal(firstStill.rows[0].issuer_legal_name, "Scalers Ventures");
+    assert.equal(firstStill.rows[0].issuer_phone, "+254119774470");
+    assert.equal(firstStill.rows[0].issuer_address, null);
+    assert.equal(firstStill.rows[0].issuer_kra_pin, null);
+    const n1 = Number(issued.rows[0].invoice_number.slice(-6));
+    const n2 = Number(issued2.rows[0].invoice_number.slice(-6));
+    assert.equal(n2, n1 + 1);
+    const notice = await q(
+      `select kind, body, delivery_status, billed_to from public.billing_notices
+       where tenant_id = $1 and kind = 'platform_billing_invoice_issued'`,
+      [tenant]
+    );
+    assert.equal(notice.rows.length, 2);
+    assert.equal(notice.rows[0].delivery_status, "pending");
+    assert.equal(notice.rows[0].billed_to, "platform");
+    assert.match(notice.rows[0].body, /Business Assistant/);
+    assert.match(notice.rows[0].body, /KSh/);
+    assert.doesNotMatch(notice.rows[0].body, /VAT/);
+  });
+
+  it("does not issue or burn a number when the company row is missing", async () => {
+    const tenant = "66666666-6666-4666-8666-666666666666";
+    const before = await q("select coalesce(max(last_number), 0)::int as n from public.billing_invoice_counters");
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 10, 10) returning id`,
+      [tenant]
+    );
+    await q("delete from public.billing_company where id = 1");
+    await assert.rejects(() => q("select public.finalize_invoice($1)", [draft.rows[0].id]), /billing company is not set/);
+    const still = await q("select status, invoice_number from public.invoices where id = $1", [draft.rows[0].id]);
+    assert.equal(still.rows[0].status, "draft");
+    assert.equal(still.rows[0].invoice_number, null);
+    const after = await q("select coalesce(max(last_number), 0)::int as n from public.billing_invoice_counters");
+    assert.equal(Number(after.rows[0].n), Number(before.rows[0].n));
+    await q(
+      `insert into public.billing_company (id, legal_name, product, phone, email)
+       values (1, 'Scalers Ventures', 'Business Assistant', '+254119774470', 'support@scalers.co.ke')
+       on conflict (id) do nothing`
+    );
+  });
+
+  it("issues a receipt when a payment is recorded and flags an overpaid webhook", async () => {
+    const tenant = "66666666-6666-4666-8666-666666666666";
+    const invoice = await q(
+      `select id from public.invoices where tenant_id = $1 and status = 'open' order by created_at limit 1`,
+      [tenant]
+    );
+    const invoiceId = invoice.rows[0].id;
+    await q("select public.mint_invoice_pay_token($1, false)", [invoiceId]);
+    const applied = await q(
+      `select id, match_status from public.apply_payment(
+         'bachs', 'chk_docs_1', 7000, $1, $2, now(), 'bachs-webhook',
+         '{"data":{"status":"OVERPAID"}}'::jsonb
+       )`,
+      [tenant, invoiceId]
+    );
+    assert.equal(applied.rows[0].match_status, "matched");
+    const receipt = await q(
+      "select receipt_number, method, provider_ref, amount_kes from public.invoice_receipts where payment_id = $1",
+      [applied.rows[0].id]
+    );
+    assert.match(receipt.rows[0].receipt_number, /^RCT-\d{4}-\d{6}$/);
+    assert.equal(receipt.rows[0].method, "M-Pesa");
+    assert.equal(receipt.rows[0].provider_ref, "chk_docs_1");
+    const again = await q("select receipt_number from public.issue_invoice_receipt($1)", [applied.rows[0].id]);
+    const count = await q("select count(*)::int as n from public.invoice_receipts where payment_id = $1", [
+      applied.rows[0].id,
+    ]);
+    assert.equal(count.rows[0].n, 1);
+    assert.equal(again.rows[0].receipt_number, receipt.rows[0].receipt_number);
+    const report = await q(
+      `insert into public.payment_attempts (tenant_id, invoice_id, provider, checkout_session_id, status, amount_kes)
+       values ($1, $2, 'bachs', 'chk_docs_1', 'succeeded', 7000)`,
+      [tenant, invoiceId]
+    );
+    assert.ok(report);
+    const rows = await q(
+      "select kind from public.billing_payment_reconciliation() where invoice_id = $1 and kind = 'overpaid'",
+      [invoiceId]
+    );
+    assert.equal(rows.rows.length, 1);
+    const mail = await q(
+      `select body, delivery_status from public.billing_notices
+       where tenant_id = $1 and kind = 'platform_billing_payment_received'`,
+      [tenant]
+    );
+    assert.equal(mail.rows[0].delivery_status, "pending");
+    assert.match(mail.rows[0].body, /Receipt RCT-/);
+    assert.doesNotMatch(mail.rows[0].body, /VAT/);
+  });
+
+  it("refuses a pay link and finalize while billing_status is beta, and refuses an http checkout url", async () => {
+    const tenant = "77777777-7777-4777-8777-777777777777";
+    await q("select set_config('scalers.wallet_write', '1', false)");
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Beta Status Shop', 'pending:beta-status', 'soft')`,
+      [tenant]
+    );
+    const pkg = await q("select id from public.billing_packages order by sort_order limit 1");
+    await q(
+      `insert into public.tenant_subscriptions (tenant_id, package_id, billing_status)
+       values ($1, $2, 'beta')`,
+      [tenant, pkg.rows[0].id]
+    );
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 1000, 1000) returning id`,
+      [tenant]
+    );
+    await assert.rejects(q("select public.finalize_invoice($1)", [draft.rows[0].id]), /beta tenants have no pay link/);
+    await openDraft("where id = $2", ["SCL-2026-000077", draft.rows[0].id]);
+    await assert.rejects(q("select * from public.mint_invoice_pay_token($1, false)", [draft.rows[0].id]), /beta tenants have no pay link/);
+    await assert.rejects(
+      q(
+        "select public.attach_invoice_pay_checkout('00000000-0000-4000-8000-000000000099', 'cs_http', 'http://example.test/c', now())"
+      ),
+      /checkout url refused/
+    );
+  });
+
+  it("turns a negative draft into one credit and a paid zero invoice", async () => {
+    const tenant = "88888888-8888-4888-8888-888888888888";
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Credit Shop', 'pending:credit', 'soft')`,
+      [tenant]
+    );
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, -400, -400) returning id`,
+      [tenant]
+    );
+    const issued = await q(
+      `select status, total_kes, subtotal_kes, invoice_number, paid_at from public.finalize_invoice($1)`,
+      [draft.rows[0].id]
+    );
+    assert.equal(issued.rows[0].status, "paid");
+    assert.equal(Number(issued.rows[0].total_kes), 0);
+    assert.equal(Number(issued.rows[0].subtotal_kes), 0);
+    assert.match(issued.rows[0].invoice_number, /^SCL-\d{4}-\d{6}$/);
+    assert.ok(issued.rows[0].paid_at);
+    const credits = await q(
+      `select amount_kes, reason from public.tenant_credits where idempotency_key = $1`,
+      [`invoice-credit:${draft.rows[0].id}`]
+    );
+    assert.equal(credits.rows.length, 1);
+    assert.equal(Number(credits.rows[0].amount_kes), 400);
+    assert.equal(credits.rows[0].reason, "invoice_credit");
+    const receipts = await q("select count(*)::int as n from public.invoice_receipts where invoice_id = $1", [
+      draft.rows[0].id,
+    ]);
+    assert.equal(receipts.rows[0].n, 0);
+    const notice = await q(
+      `select count(*)::int as n from public.billing_notices
+       where idempotency_key = $1`,
+      [`platform_billing_invoice_issued:${draft.rows[0].id}`]
+    );
+    assert.equal(notice.rows[0].n, 0);
+    const body = await q("select pg_get_functiondef('public.finalize_invoice(uuid)'::regprocedure) as def");
+    assert.match(body.rows[0].def, /scalers\.billing_write/);
+    assert.match(body.rows[0].def, /invoice-credit:/);
+    assert.match(body.rows[0].def, /SCL-/);
+    assert.doesNotMatch(read("docs/supabase/invoice_documents.sql"), /function public\.finalize_invoice/);
+  });
+
+  it("updates one receipt when the collected amount rises", async () => {
+    const tenant = "88888888-8888-4888-8888-888888888888";
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 500, 500) returning id`,
+      [tenant]
+    );
+    const issued = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+    const applied = await q(
+      `select id, amount_kes from public.apply_payment('bachs', 'chk_over_1', 500, $1, $2)`,
+      [tenant, issued.rows[0].id]
+    );
+    const before = await q(
+      "select receipt_number, amount_kes from public.invoice_receipts where payment_id = $1",
+      [applied.rows[0].id]
+    );
+    await q("select public.adjust_payment_overpay('bachs', 'chk_over_1', 700, $1)", [tenant]);
+    const after = await q(
+      "select receipt_number, amount_kes from public.invoice_receipts where payment_id = $1",
+      [applied.rows[0].id]
+    );
+    assert.equal(after.rows.length, 1);
+    assert.equal(after.rows[0].receipt_number, before.rows[0].receipt_number);
+    assert.equal(Number(after.rows[0].amount_kes), 700);
+  });
+
+  it("expires a return id and credits a cancelled collection once", async () => {
+    const tenant = "88888888-8888-4888-8888-888888888888";
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 2320, 2320) returning id`,
+      [tenant]
+    );
+    const invoice = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+    await q(
+      `insert into public.payment_attempts (
+         tenant_id, invoice_id, provider, checkout_session_id, status, amount_kes, return_id, return_expires_at
+       ) values ($1, $2, 'bachs', 'chk_cancel_1', 'cancelled', 500, 'ret_old', now() - interval '1 hour')`,
+      [tenant, invoice.rows[0].id]
+    );
+    const stale = await q("select public.pay_invoice_by_return('ret_old') as row");
+    assert.equal(stale.rows[0].row.state, "expired");
+    await q(
+      `insert into public.payment_attempts (
+         tenant_id, invoice_id, provider, status, amount_kes, return_id, return_expires_at
+       ) values ($1, $2, 'bachs', 'pending', 500, 'ret_fresh', now() + interval '1 hour')`,
+      [tenant, invoice.rows[0].id]
+    );
+    const fresh = await q("select public.pay_invoice_by_return('ret_fresh') as row");
+    assert.equal(fresh.rows[0].row.found, true);
+    assert.notEqual(fresh.rows[0].row.state, "expired");
+    await q("select public.record_payment_issue('bachs', 'chk_cancel_1', 500, $1, $2, '{}'::jsonb, null, null, null, 'cancelled')", [
+      tenant,
+      invoice.rows[0].id,
+    ]);
+    await q("select public.credit_cancelled_collection('bachs', 'chk_cancel_1', 500, $1)", [tenant]);
+    await q("select public.credit_cancelled_collection('bachs', 'chk_cancel_1', 500, $1)", [tenant]);
+    const credits = await q(
+      "select count(*)::int as n from public.tenant_credits where idempotency_key = 'cancelled:bachs:chk_cancel_1'"
+    );
+    assert.equal(credits.rows[0].n, 1);
+    const audits = await q(
+      "select count(*)::int as n from public.billing_audit_log where action = 'cancelled_checkout_credit'"
+    );
+    assert.equal(audits.rows[0].n, 1);
+    const report = await q(
+      "select kind, detail from public.billing_payment_reconciliation() where invoice_id = $1",
+      [invoice.rows[0].id]
+    );
+    assert.ok(report.rows.some((row) => row.kind === "credited_cancelled"));
+    assert.ok(!report.rows.some((row) => row.detail === "Collected on a cancelled checkout with no credit"));
+    const column = await q(
+      `select is_nullable, column_default
+       from information_schema.columns
+       where table_schema = 'public' and table_name = 'payment_attempts' and column_name = 'updated_at'`
+    );
+    assert.equal(column.rows[0].is_nullable, "NO");
+    assert.match(column.rows[0].column_default, /now\(\)/);
+    assert.doesNotMatch(read("docs/supabase/invoice_pay.sql"), /updated_at timestamptz not null default now\(\)/);
+  });
+
+  it("parks one unattached session per part and marks a displaced failed attempt not live", async () => {
+    const tenant = "99999999-9999-4999-8999-999999999999";
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Park Shop', 'pending:park', 'soft')`,
+      [tenant]
+    );
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 2320, 2320) returning id`,
+      [tenant]
+    );
+    const invoice = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+    const minted = await q("select token from public.mint_invoice_pay_token($1, false)", [invoice.rows[0].id]);
+    const first = await q("select public.create_invoice_pay_attempt($1, 2320) as row", [minted.rows[0].token]);
+    const attemptId = first.rows[0].row.id;
+    await q(
+      "select public.park_invoice_pay_attempt($1, 'chk_park_1', 'https://checkout.example/park', now() + interval '1 hour')",
+      [attemptId]
+    );
+    await assert.rejects(
+      q(
+        "select public.park_invoice_pay_attempt($1, 'chk_park_new', 'https://checkout.example/new', now() + interval '1 hour')",
+        [attemptId]
+      ),
+      /already parked/
+    );
+    const kept = await q("select checkout_session_id from public.payment_attempts where id = $1", [attemptId]);
+    assert.equal(kept.rows[0].checkout_session_id, "chk_park_1");
+    await q(
+      "select public.park_invoice_pay_attempt($1, 'chk_park_1', 'https://checkout.example/park-again', now() + interval '1 hour')",
+      [attemptId]
+    );
+    const again = await q("select public.create_invoice_pay_attempt($1, 2320) as row", [minted.rows[0].token]);
+    assert.equal(again.rows[0].row.id, attemptId);
+    assert.equal(again.rows[0].row.unattached, true);
+    const count = await q("select count(*)::int as n from public.payment_attempts where invoice_id = $1", [
+      invoice.rows[0].id,
+    ]);
+    assert.equal(count.rows[0].n, 1);
+    const live = await q("select public.invoice_pay_attempt_by_checkout('chk_park_1') as row");
+    assert.equal(live.rows[0].row.live_part, true);
+    assert.equal(live.rows[0].row.status, "pending_unattached");
+    await assert.rejects(
+      q(
+        `insert into public.payment_attempts (tenant_id, invoice_id, provider, status, amount_kes, part_index)
+         values ($1, $2, 'bachs', 'pending', 2320, 1)`,
+        [tenant, invoice.rows[0].id]
+      ),
+      /duplicate key|unique/
+    );
+    await q("select public.settle_invoice_pay_attempt($1, 'failed')", [attemptId]);
+    await q(
+      `insert into public.payment_attempts (
+         tenant_id, invoice_id, provider, status, amount_kes, part_index, part_count, checkout_session_id
+       ) values ($1, $2, 'bachs', 'pending', 2320, 1, 1, 'chk_park_2')`,
+      [tenant, invoice.rows[0].id]
+    );
+    const displaced = await q("select public.invoice_pay_attempt_by_checkout('chk_park_1') as row");
+    assert.equal(displaced.rows[0].row.live_part, false);
+    assert.equal(displaced.rows[0].row.status, "failed");
+  });
+
+  it("holds an open succeeded checkout and credits one later collection", async () => {
+    const tenant = "abababab-abab-4bab-8bab-abababababab";
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Hold Shop', 'pending:hold', 'soft')`,
+      [tenant]
+    );
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 2320, 2320) returning id`,
+      [tenant]
+    );
+    const invoice = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+    const minted = await q("select token from public.mint_invoice_pay_token($1, false)", [invoice.rows[0].id]);
+    const first = await q("select public.create_invoice_pay_attempt($1, 2320) as row", [minted.rows[0].token]);
+    const attemptId = first.rows[0].row.id;
+    await q(
+      "select public.attach_invoice_pay_checkout($1, 'chk_hold_1', 'https://checkout.example/hold', now() + interval '1 hour')",
+      [attemptId]
+    );
+    await q("select public.apply_payment('bachs', 'chk_hold_1', 2000, $1, $2)", [tenant, invoice.rows[0].id]);
+    await q("select public.settle_invoice_pay_attempt($1, 'succeeded', 2000, 'KES')", [attemptId]);
+    const held = await q("select public.create_invoice_pay_attempt($1, 320) as row", [minted.rows[0].token]);
+    assert.equal(held.rows[0].row.held, true);
+    assert.equal(held.rows[0].row.checkout_session_id, "chk_hold_1");
+    const before = await q("select count(*)::int as n from public.payment_attempts where invoice_id = $1", [
+      invoice.rows[0].id,
+    ]);
+    assert.equal(before.rows[0].n, 1);
+    await q("select public.release_held_pay_checkout($1)", [attemptId]);
+    const fresh = await q("select public.create_invoice_pay_attempt($1, 320) as row", [minted.rows[0].token]);
+    assert.equal(fresh.rows[0].row.held, false);
+    assert.notEqual(fresh.rows[0].row.id, attemptId);
+    const kept = await q("select checkout_session_id, status from public.payment_attempts where id = $1", [attemptId]);
+    assert.equal(kept.rows[0].checkout_session_id, "chk_hold_1");
+    assert.equal(kept.rows[0].status, "succeeded");
+    await q("select public.credit_checkout_extra('bachs', 'chk_hold_1', 320, $1)", [tenant]);
+    await q("select public.credit_checkout_extra('bachs', 'chk_hold_1', 100, $1)", [tenant]);
+    const credits = await q(
+      "select amount_kes::text as amount from public.tenant_credits where idempotency_key = 'checkout-extra:bachs:chk_hold_1'"
+    );
+    assert.equal(credits.rows.length, 1);
+    assert.equal(Number(credits.rows[0].amount), 320);
+    const paid = await q("select amount_paid_kes from public.invoices where id = $1", [invoice.rows[0].id]);
+    assert.equal(Number(paid.rows[0].amount_paid_kes), 2000);
+  });
+
+  it("holds a succeeded checkout after expiry until it is closed, and reconciles each collection", async () => {
+    const tenant = "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd";
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Collect Shop', 'pending:collect', 'soft')`,
+      [tenant]
+    );
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 20, 20) returning id`,
+      [tenant]
+    );
+    const invoice = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+    const minted = await q("select token from public.mint_invoice_pay_token($1, false)", [invoice.rows[0].id]);
+    const first = await q("select public.create_invoice_pay_attempt($1, 20) as row", [minted.rows[0].token]);
+    const attemptId = first.rows[0].row.id;
+    await q(
+      "select public.attach_invoice_pay_checkout($1, 'chk_col_1', 'https://checkout.example/col', now() - interval '1 minute')",
+      [attemptId]
+    );
+    await q("select public.settle_invoice_pay_attempt($1, 'succeeded', 10, 'KES')", [attemptId]);
+    const held = await q("select public.create_invoice_pay_attempt($1, 20) as row", [minted.rows[0].token]);
+    assert.equal(held.rows[0].row.held, true);
+    assert.equal(held.rows[0].row.id, attemptId);
+
+    const equalA = await q(
+      "select public.reconcile_checkout_total('bachs', 'chk_col_1', 10, $1, $2) as row",
+      [tenant, invoice.rows[0].id]
+    );
+    const equalReplay = await q(
+      "select public.reconcile_checkout_total('bachs', 'chk_col_1', 10, $1, $2) as row",
+      [tenant, invoice.rows[0].id]
+    );
+    const equalB = await q(
+      "select public.reconcile_checkout_total('bachs', 'chk_col_1', 20, $1, $2) as row",
+      [tenant, invoice.rows[0].id]
+    );
+    assert.equal(equalA.rows[0].row.noop, false);
+    assert.equal(equalReplay.rows[0].row.noop, true);
+    assert.equal(Number(equalB.rows[0].row.applied_kes), 10);
+    assert.equal(Number(equalB.rows[0].row.excess_kes), 0);
+    const paidEqual = await q("select amount_paid_kes, status from public.invoices where id = $1", [invoice.rows[0].id]);
+    assert.equal(Number(paidEqual.rows[0].amount_paid_kes), 20);
+    assert.equal(paidEqual.rows[0].status, "paid");
+    const equalCredits = await q(
+      "select coalesce(sum(amount_kes), 0) as amount from public.tenant_credits where payment_id in (select id from public.payments where provider_ref = 'chk_col_1')"
+    );
+    assert.equal(Number(paidEqual.rows[0].amount_paid_kes) + Number(equalCredits.rows[0].amount), 20);
+
+    async function withCheckout(total, checkoutId) {
+      const draft = await q(
+        `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, $2, $2) returning id`,
+        [tenant, total]
+      );
+      const issued = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+      await q(
+        `insert into public.payment_attempts (
+           tenant_id, invoice_id, provider, status, amount_kes, part_index, part_count, checkout_session_id
+         ) values ($1, $2, 'bachs', 'pending', $3, 1, 1, $4)`,
+        [tenant, issued.rows[0].id, total, checkoutId]
+      );
+      return issued.rows[0].id;
+    }
+
+    const smallId = await withCheckout(20, "chk_sm");
+    await q("select public.reconcile_checkout_total('bachs', 'chk_sm', 10, $1, $2)", [tenant, smallId]);
+    await q("select public.reconcile_checkout_total('bachs', 'chk_sm', 14, $1, $2)", [tenant, smallId]);
+    await q("select public.reconcile_checkout_total('bachs', 'chk_sm', 14, $1, $2)", [tenant, smallId]);
+    const paidSmall = await q("select amount_paid_kes from public.invoices where id = $1", [smallId]);
+    const smallCredits = await q(
+      "select coalesce(sum(amount_kes), 0) as amount from public.tenant_credits where payment_id in (select id from public.payments where provider_ref = 'chk_sm')"
+    );
+    assert.equal(Number(paidSmall.rows[0].amount_paid_kes), 14);
+    assert.equal(Number(smallCredits.rows[0].amount), 0);
+    assert.equal(Number(paidSmall.rows[0].amount_paid_kes) + Number(smallCredits.rows[0].amount), 14);
+
+    const wideId = await withCheckout(30, "chk_wide");
+    await q("select public.reconcile_checkout_total('bachs', 'chk_wide', 10, $1, $2)", [tenant, wideId]);
+    await q("select public.reconcile_checkout_total('bachs', 'chk_wide', 20, $1, $2)", [tenant, wideId]);
+    const paidWide = await q("select amount_paid_kes from public.invoices where id = $1", [wideId]);
+    const wideCredits = await q(
+      "select coalesce(sum(amount_kes), 0) as amount from public.tenant_credits where payment_id in (select id from public.payments where provider_ref = 'chk_wide')"
+    );
+    assert.equal(Number(paidWide.rows[0].amount_paid_kes), 20);
+    assert.equal(Number(wideCredits.rows[0].amount), 0);
+    assert.equal(Number(paidWide.rows[0].amount_paid_kes) + Number(wideCredits.rows[0].amount), 20);
+
+    const largeId = await withCheckout(10, "chk_cum");
+    await q("select public.reconcile_checkout_total('bachs', 'chk_cum', 10, $1, $2)", [tenant, largeId]);
+    await q("select public.reconcile_checkout_total('bachs', 'chk_cum', 12, $1, $2)", [tenant, largeId]);
+    await q("select public.reconcile_checkout_total('bachs', 'chk_cum', 20, $1, $2)", [tenant, largeId]);
+    const replayLarge = await q(
+      "select public.reconcile_checkout_total('bachs', 'chk_cum', 20, $1, $2) as row",
+      [tenant, largeId]
+    );
+    assert.equal(replayLarge.rows[0].row.noop, true);
+    const paidLarge = await q("select amount_paid_kes from public.invoices where id = $1", [largeId]);
+    const largeCredits = await q(
+      "select coalesce(sum(amount_kes), 0) as amount from public.tenant_credits where payment_id in (select id from public.payments where provider_ref = 'chk_cum')"
+    );
+    assert.equal(Number(paidLarge.rows[0].amount_paid_kes), 10);
+    assert.equal(Number(largeCredits.rows[0].amount), 10);
+    assert.equal(Number(paidLarge.rows[0].amount_paid_kes) + Number(largeCredits.rows[0].amount), 20);
+    await q("set role anon");
+    await assert.rejects(
+      q("select public.reconcile_checkout_total('bachs', 'chk_cum', 20, $1, $2)", [tenant, largeId])
+    );
+    await q("reset role");
+
+    await q("select public.release_held_pay_checkout($1)", [attemptId]);
+    const closed = await q("select checkout_closed_at is not null as closed from public.payment_attempts where id = $1", [
+      attemptId,
+    ]);
+    assert.equal(closed.rows[0].closed, true);
+  });
+
+  it("reviews a short new collection and a lower total without moving the books", async () => {
+    const tenant = "cececece-cece-4ece-8ece-cececececece";
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Review Shop', 'pending:review', 'soft')`,
+      [tenant]
+    );
+    async function issued(total, checkoutId, attemptAmount) {
+      const draft = await q(
+        `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, $2, $2) returning id`,
+        [tenant, total]
+      );
+      const invoice = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+      await q(
+        `insert into public.payment_attempts (
+           tenant_id, invoice_id, provider, status, amount_kes, part_index, part_count, checkout_session_id
+         ) values ($1, $2, 'bachs', 'pending', $3, 1, 1, $4)`,
+        [tenant, invoice.rows[0].id, attemptAmount, checkoutId]
+      );
+      return invoice.rows[0].id;
+    }
+
+    const shortId = await issued(20, "chk_short", 20);
+    const first = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_short', 10, $1, $2, 'ch_a', 10, '{}'::jsonb) as row",
+      [tenant, shortId]
+    );
+    assert.equal(first.rows[0].row.review, false);
+    assert.equal(Number(first.rows[0].row.applied_kes), 10);
+    const second = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_short', 10, $1, $2, 'ch_b', 10, '{\"id\":\"evt_b\"}'::jsonb) as row",
+      [tenant, shortId]
+    );
+    assert.equal(second.rows[0].row.review, true);
+    assert.equal(second.rows[0].row.reason, "collected_total_short");
+    const replay = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_short', 10, $1, $2, 'ch_b', 10, '{}'::jsonb) as row",
+      [tenant, shortId]
+    );
+    assert.equal(replay.rows[0].row.duplicate, true);
+    const shortPaid = await q("select amount_paid_kes from public.invoices where id = $1", [shortId]);
+    assert.equal(Number(shortPaid.rows[0].amount_paid_kes), 10);
+    const shortIssues = await q(
+      "select count(*)::int as n from public.payments where invoice_id = $1 and match_status = 'issue'",
+      [shortId]
+    );
+    assert.equal(shortIssues.rows[0].n, 1);
+    const shortSeen = await q(
+      "select collected_total_seen_kes, collection_ids from public.payment_attempts where checkout_session_id = 'chk_short'",
+      []
+    );
+    assert.equal(Number(shortSeen.rows[0].collected_total_seen_kes), 10);
+    assert.deepEqual(shortSeen.rows[0].collection_ids, ["ch_a"]);
+    const checkoutPay = await q(
+      "select amount_kes from public.payments where provider_ref = 'chk_short'"
+    );
+    assert.equal(Number(checkoutPay.rows[0].amount_kes), 10);
+
+    await q(
+      "update public.payment_attempts set status = 'succeeded', checkout_closed_at = now() where checkout_session_id = 'chk_short'"
+    );
+    const minted = await q("select token from public.mint_invoice_pay_token($1, false)", [shortId]);
+    await assert.rejects(
+      q("select public.create_invoice_pay_attempt($1, 10)", [minted.rows[0].token]),
+      /checkout total needs review/
+    );
+    const reviewRef = await q(
+      "select provider_ref from public.payments where invoice_id = $1 and match_status = 'issue'",
+      [shortId]
+    );
+    await assert.rejects(
+      q("select public.resolve_checkout_total_review('bachs', $1, 'ada', 'no', 'nothing')", [reviewRef.rows[0].provider_ref]),
+      /reason is required/
+    );
+    await assert.rejects(
+      q("select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Checked the receipt', 'later')", [reviewRef.rows[0].provider_ref]),
+      /resolve choice is required/
+    );
+    await assert.rejects(
+      q("select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Checked the receipt')", [reviewRef.rows[0].provider_ref])
+    );
+    await q(
+      "select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Checked the receipt', 'nothing')",
+      [reviewRef.rows[0].provider_ref]
+    );
+    const audited = await q(
+      `select actor, detail->>'reason' as reason, detail->>'choice' as choice
+       from public.billing_audit_log
+       where action = 'checkout_total_review_resolved'
+       order by created_at desc
+       limit 1`
+    );
+    assert.equal(audited.rows[0].actor, "ada");
+    assert.equal(audited.rows[0].reason, "Checked the receipt");
+    assert.equal(audited.rows[0].choice, "nothing");
+    const opened = await q("select public.create_invoice_pay_attempt($1, 10) as row", [minted.rows[0].token]);
+    assert.equal(opened.rows[0].row.held, false);
+    assert.notEqual(opened.rows[0].row.id, undefined);
+
+    const dropId = await issued(10, "chk_drop", 10);
+    await q(
+      "select public.settle_checkout_reading('bachs', 'chk_drop', 30, $1, $2, 'ch_high', 30, '{}'::jsonb)",
+      [tenant, dropId]
+    );
+    const before = await q(
+      `select i.amount_paid_kes,
+              (select coalesce(sum(amount_kes), 0) from public.tenant_credits c where c.payment_id = p.id) as credit,
+              p.amount_kes as payment
+       from public.invoices i
+       join public.payments p on p.invoice_id = i.id and p.provider_ref = 'chk_drop'
+       where i.id = $1`,
+      [dropId]
+    );
+    const dropped = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_drop', 10, $1, $2, 'ch_high', 10, '{\"id\":\"evt_low\"}'::jsonb) as row",
+      [tenant, dropId]
+    );
+    assert.equal(dropped.rows[0].row.reason, "collected_total_decreased");
+    const again = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_drop', 10, $1, $2, 'ch_high', 10, '{}'::jsonb) as row",
+      [tenant, dropId]
+    );
+    assert.equal(again.rows[0].row.duplicate, true);
+    const after = await q(
+      `select i.amount_paid_kes,
+              (select coalesce(sum(amount_kes), 0) from public.tenant_credits c where c.payment_id = p.id) as credit,
+              p.amount_kes as payment
+       from public.invoices i
+       join public.payments p on p.invoice_id = i.id and p.provider_ref = 'chk_drop'
+       where i.id = $1`,
+      [dropId]
+    );
+    assert.equal(Number(after.rows[0].amount_paid_kes), Number(before.rows[0].amount_paid_kes));
+    assert.equal(Number(after.rows[0].credit), Number(before.rows[0].credit));
+    assert.equal(Number(after.rows[0].payment), Number(before.rows[0].payment));
+    assert.equal(Number(after.rows[0].amount_paid_kes), 10);
+    assert.equal(Number(after.rows[0].credit), 20);
+    assert.equal(Number(after.rows[0].payment), 30);
+    const dropRef = await q(
+      "select provider_ref from public.payments where invoice_id = $1 and match_status = 'issue'",
+      [dropId]
+    );
+    await q(
+      "select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Book the lower reading', 'book')",
+      [dropRef.rows[0].provider_ref]
+    );
+    const afterBook = await q(
+      `select i.amount_paid_kes,
+              (select coalesce(sum(amount_kes), 0) from public.tenant_credits c where c.payment_id = p.id) as credit,
+              p.amount_kes as payment
+       from public.invoices i
+       join public.payments p on p.invoice_id = i.id and p.provider_ref = 'chk_drop'
+       where i.id = $1`,
+      [dropId]
+    );
+    assert.equal(Number(afterBook.rows[0].amount_paid_kes), 10);
+    assert.equal(Number(afterBook.rows[0].credit), 20);
+    assert.equal(Number(afterBook.rows[0].payment), 30);
+    const dropIssues = await q(
+      "select raw->>'get_kes' as get_kes, raw->>'seen_kes' as seen_kes from public.payments where invoice_id = $1 and match_status = 'issue'",
+      [dropId]
+    );
+    assert.equal(dropIssues.rows.length, 1);
+    assert.equal(Number(dropIssues.rows[0].get_kes), 10);
+    assert.equal(Number(dropIssues.rows[0].seen_kes), 30);
+
+    const riseId = await issued(30, "chk_rise", 30);
+    await q(
+      "select public.settle_checkout_reading('bachs', 'chk_rise', 10, $1, $2, 'ch_1', 10, '{}'::jsonb)",
+      [tenant, riseId]
+    );
+    const rose = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_rise', 20, $1, $2, 'ch_2', 10, '{}'::jsonb) as row",
+      [tenant, riseId]
+    );
+    assert.equal(rose.rows[0].row.review, false);
+    assert.equal(Number(rose.rows[0].row.applied_kes), 10);
+    const riseIssues = await q(
+      "select count(*)::int as n from public.payments where invoice_id = $1 and match_status = 'issue'",
+      [riseId]
+    );
+    assert.equal(riseIssues.rows[0].n, 0);
+
+    const priceId = await issued(20, "chk_price", 20);
+    const priceFirst = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_price', 10, $1, $2, 'ch_price_a', 20, '{}'::jsonb) as row",
+      [tenant, priceId]
+    );
+    assert.equal(priceFirst.rows[0].row.review, false);
+    assert.equal(Number(priceFirst.rows[0].row.applied_kes), 10);
+    const priceSecond = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_price', 20, $1, $2, 'ch_price_b', 20, '{}'::jsonb) as row",
+      [tenant, priceId]
+    );
+    assert.equal(priceSecond.rows[0].row.review, false);
+    assert.equal(Number(priceSecond.rows[0].row.applied_kes), 10);
+    const pricePaid = await q("select amount_paid_kes from public.invoices where id = $1", [priceId]);
+    assert.equal(Number(pricePaid.rows[0].amount_paid_kes), 20);
+    const priceShort = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_price', 20, $1, $2, 'ch_price_c', 5, '{}'::jsonb) as row",
+      [tenant, priceId]
+    );
+    assert.equal(priceShort.rows[0].row.reason, "collected_total_short");
+    const priceStill = await q("select amount_paid_kes from public.invoices where id = $1", [priceId]);
+    assert.equal(Number(priceStill.rows[0].amount_paid_kes), 20);
+
+    const missingId = await issued(20, "chk_missing", 20);
+    const missingRise = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_missing', 10, $1, $2, 'ch_chk_missing', 10, '{}'::jsonb) as row",
+      [tenant, missingId]
+    );
+    assert.equal(missingRise.rows[0].row.reason, "collected_identity_missing");
+    assert.match(missingRise.rows[0].row.provider_ref, /ch_chk_missing/);
+    const missingPaid = await q("select amount_paid_kes from public.invoices where id = $1", [missingId]);
+    assert.equal(Number(missingPaid.rows[0].amount_paid_kes), 0);
+    const missingReplay = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_missing', 10, $1, $2, 'ch_chk_missing', 10, '{}'::jsonb) as row",
+      [tenant, missingId]
+    );
+    assert.equal(missingReplay.rows[0].row.duplicate, true);
+    const missingReview = await q(
+      "select provider_ref, raw->>'checkout_id' as checkout_id from public.payments where invoice_id = $1 and match_status = 'issue'",
+      [missingId]
+    );
+    assert.equal(missingReview.rows[0].checkout_id, "chk_missing");
+    await assert.rejects(
+      q(
+        "select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Book the reading', 'book', 9)",
+        [missingReview.rows[0].provider_ref]
+      ),
+      /collected total fell/
+    );
+    const missingStill = await q(
+      "select coalesce(raw->>'review_status', 'open') as status from public.payments where provider_ref = $1",
+      [missingReview.rows[0].provider_ref]
+    );
+    assert.equal(missingStill.rows[0].status, "open");
+    await q("update public.payments set raw = raw - 'checkout_id' where provider_ref = $1", [missingReview.rows[0].provider_ref]);
+    await assert.rejects(
+      q(
+        "select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Book the reading', 'book')",
+        [missingReview.rows[0].provider_ref]
+      ),
+      /pay attempt not found/
+    );
+    await q(
+      "update public.payments set raw = raw || jsonb_build_object('checkout_id', 'chk_missing') where provider_ref = $1",
+      [missingReview.rows[0].provider_ref]
+    );
+    await q(
+      "select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Book the reading', 'book')",
+      [missingReview.rows[0].provider_ref]
+    );
+    const missingBooked = await q("select amount_paid_kes from public.invoices where id = $1", [missingId]);
+    assert.equal(Number(missingBooked.rows[0].amount_paid_kes), 10);
+    await q(
+      "select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Book the reading again', 'book')",
+      [missingReview.rows[0].provider_ref]
+    );
+    const missingTwice = await q("select amount_paid_kes from public.invoices where id = $1", [missingId]);
+    assert.equal(Number(missingTwice.rows[0].amount_paid_kes), 10);
+    const missingAudits = await q(
+      `select detail->>'choice' as choice, detail->>'applied_kes' as applied
+       from public.billing_audit_log
+       where action = 'checkout_total_review_resolved'
+         and detail->>'provider_ref' = $1
+       order by created_at asc`,
+      [missingReview.rows[0].provider_ref]
+    );
+    assert.equal(missingAudits.rows[0].choice, "book");
+    assert.equal(Number(missingAudits.rows[0].applied), 10);
+    assert.equal(Number(missingAudits.rows[1].applied), 0);
+    await q(
+      "update public.payment_attempts set status = 'succeeded', checkout_closed_at = now() where checkout_session_id = 'chk_missing'"
+    );
+    const missingToken = await q("select token from public.mint_invoice_pay_token($1, false)", [missingId]);
+    const missingNext = await q("select public.create_invoice_pay_attempt($1, 10) as row", [missingToken.rows[0].token]);
+    assert.equal(Number(missingNext.rows[0].row.amount_kes), 10);
+
+    const blankId = await issued(20, "chk_blank", 20);
+    const blank = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_blank', 10, $1, $2, null, 10, '{}'::jsonb) as row",
+      [tenant, blankId]
+    );
+    assert.equal(blank.rows[0].row.reason, "collected_identity_missing");
+    const blankRef = await q(
+      "select provider_ref from public.payments where invoice_id = $1 and match_status = 'issue'",
+      [blankId]
+    );
+    await q(
+      "select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Book the blank reading', 'book')",
+      [blankRef.rows[0].provider_ref]
+    );
+    const blankPaid = await q("select amount_paid_kes from public.invoices where id = $1", [blankId]);
+    assert.equal(Number(blankPaid.rows[0].amount_paid_kes), 10);
+
+    const noneId = await issued(20, "chk_none", 20);
+    await q(
+      "select public.settle_checkout_reading('bachs', 'chk_none', 10, $1, $2, 'ch_chk_none', 10, '{}'::jsonb)",
+      [tenant, noneId]
+    );
+    const noneRef = await q(
+      "select provider_ref from public.payments where invoice_id = $1 and match_status = 'issue'",
+      [noneId]
+    );
+    await q(
+      "select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Confirmed nothing collected', 'nothing')",
+      [noneRef.rows[0].provider_ref]
+    );
+    const nonePaid = await q("select amount_paid_kes from public.invoices where id = $1", [noneId]);
+    assert.equal(Number(nonePaid.rows[0].amount_paid_kes), 0);
+    await q(
+      "update public.payment_attempts set status = 'succeeded', checkout_closed_at = now() where checkout_session_id = 'chk_none'"
+    );
+    const noneToken = await q("select token from public.mint_invoice_pay_token($1, false)", [noneId]);
+    const noneNext = await q("select public.create_invoice_pay_attempt($1, 20) as row", [noneToken.rows[0].token]);
+    assert.equal(Number(noneNext.rows[0].row.amount_kes), 20);
+
+    const overId = await issued(10, "chk_over", 10);
+    await q(
+      "select public.settle_checkout_reading('bachs', 'chk_over', 20, $1, $2, 'ch_chk_over', 20, '{}'::jsonb)",
+      [tenant, overId]
+    );
+    const overRef = await q(
+      "select provider_ref from public.payments where invoice_id = $1 and match_status = 'issue'",
+      [overId]
+    );
+    await q(
+      "select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Book the extra', 'book')",
+      [overRef.rows[0].provider_ref]
+    );
+    const overBooks = await q(
+      `select i.amount_paid_kes,
+              (select coalesce(sum(amount_kes), 0) from public.tenant_credits c where c.payment_id = p.id) as credit,
+              p.amount_kes as payment
+       from public.invoices i
+       join public.payments p on p.invoice_id = i.id and p.provider_ref = 'chk_over'
+       where i.id = $1`,
+      [overId]
+    );
+    assert.equal(Number(overBooks.rows[0].amount_paid_kes), 10);
+    assert.equal(Number(overBooks.rows[0].credit), 10);
+    assert.equal(Number(overBooks.rows[0].payment), 20);
+    const flatId = await issued(20, "chk_flat", 20);
+    await q(
+      "select public.settle_checkout_reading('bachs', 'chk_flat', 10, $1, $2, 'ch_flat_real', 10, '{}'::jsonb)",
+      [tenant, flatId]
+    );
+    const flat = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_flat', 10, $1, $2, 'ch_chk_flat', 10, '{}'::jsonb) as row",
+      [tenant, flatId]
+    );
+    assert.equal(flat.rows[0].row.reason, "collected_identity_missing");
+    const flatPaid = await q("select amount_paid_kes from public.invoices where id = $1", [flatId]);
+    assert.equal(Number(flatPaid.rows[0].amount_paid_kes), 10);
+    const zero = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_zero', 0, $1, $2, null, null, '{}'::jsonb) as row",
+      [tenant, await issued(20, "chk_zero", 20)]
+    );
+    assert.equal(zero.rows[0].row.noop, true);
+    assert.equal(zero.rows[0].row.wait, true);
+    assert.equal(zero.rows[0].row.review, false);
+
+    await q("select public.record_payment_event('bachs', 'evt_retry', '{\"data\":{\"checkout_id\":\"chk_rise\"}}'::jsonb)");
+    await q("select public.mark_payment_event_retry('bachs', 'evt_retry')");
+    const marked = await q(
+      "select needs_retry from public.payment_events where event_key = 'evt_retry'"
+    );
+    assert.equal(marked.rows[0].needs_retry, true);
+    await q("select public.clear_payment_event_retry('bachs', 'evt_retry')");
+    const cleared = await q(
+      "select needs_retry from public.payment_events where event_key = 'evt_retry'"
+    );
+    assert.equal(cleared.rows[0].needs_retry, false);
+
+    await q("set role anon");
+    await assert.rejects(
+      q("select public.settle_checkout_reading('bachs', 'chk_rise', 20, $1, $2, 'ch_2', 10)", [tenant, riseId])
+    );
+    await assert.rejects(
+      q("select public.resolve_checkout_total_review('bachs', 'checkout-total-review:bachs:chk_rise:x', 'ada', 'Checked the receipt', 'nothing')")
+    );
+    await q("reset role");
+  });
+
+  it("keeps live payments off for beta and records an enabled business", async () => {
+    const beta = "17171717-1717-4171-8171-171717171717";
+    const live = "27272727-2727-4272-8272-272727272727";
+    await q("select set_config('scalers.wallet_write', '1', false)");
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Beta Shop', 'pending:live-beta', 'off'), ($2, 'Live Shop', 'pending:live-on', 'soft')`,
+      [beta, live]
+    );
+    await q(
+      `insert into public.tenant_subscriptions (tenant_id, package_id, billing_status)
+       select $1, id, 'beta' from public.billing_packages where sku = 'starter'`,
+      [beta]
+    );
+    await q(
+      `insert into public.tenant_subscriptions (tenant_id, package_id, billing_status)
+       select $1, id, 'active' from public.billing_packages where sku = 'starter'`,
+      [live]
+    );
+    await assert.rejects(
+      q("select public.admin_set_tenant_live_payments($1, true, 'open it', 'ada')", [beta]),
+      /beta/
+    );
+    await assert.rejects(
+      q("select public.admin_set_tenant_live_payments($1, true, '   ', 'ada')", [live]),
+      /reason/
+    );
+    const { rows: before } = await q(
+      "select count(*)::int as n from public.billing_audit_log where action = 'tenant_live_payments_set'"
+    );
+    const set = await q(
+      "select public.admin_set_tenant_live_payments($1, true, 'Ready to collect', 'ada') as row",
+      [live]
+    );
+    assert.equal(set.rows[0].row.enabled, true);
+    const allowed = await q("select public.billing_live_tenant_allowed($1) as ok", [live]);
+    assert.equal(allowed.rows[0].ok, true);
+    const denied = await q("select public.billing_live_tenant_allowed($1) as ok", [beta]);
+    assert.equal(denied.rows[0].ok, false);
+    const audit = await q(
+      "select count(*)::int as n from public.billing_audit_log where action = 'tenant_live_payments_set' and tenant_id = $1",
+      [live]
+    );
+    assert.equal(audit.rows[0].n, before[0].n + 1);
+    await q("select public.admin_set_tenant_live_payments($1, false, 'Pause', 'ada')", [live]);
+    const off = await q("select public.billing_live_tenant_allowed($1) as ok", [live]);
+    assert.equal(off.rows[0].ok, false);
+    const empty = await q("select count(*)::int as n from public.billing_live_tenants where enabled");
+    assert.equal(empty.rows[0].n, 0);
+    const locked = await q(
+      `select c.relrowsecurity as rls,
+              has_table_privilege('anon', 'public.billing_live_tenants', 'select') as anon_select,
+              has_table_privilege('authenticated', 'public.billing_live_tenants', 'select') as auth_select,
+              has_table_privilege('service_role', 'public.billing_live_tenants', 'select') as service_select,
+              has_function_privilege('anon', 'public.billing_live_tenant_allowed(uuid)', 'execute') as anon_read,
+              has_function_privilege('anon', 'public.admin_set_tenant_live_payments(uuid,boolean,text,text)', 'execute') as anon_set,
+              has_function_privilege('service_role', 'public.admin_set_tenant_live_payments(uuid,boolean,text,text)', 'execute') as service_set
+       from pg_class c
+       join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public' and c.relname = 'billing_live_tenants'`
+    );
+    assert.equal(locked.rows[0].rls, true);
+    assert.equal(locked.rows[0].anon_select, false);
+    assert.equal(locked.rows[0].auth_select, false);
+    assert.equal(locked.rows[0].service_select, true);
+    assert.equal(locked.rows[0].anon_read, false);
+    assert.equal(locked.rows[0].anon_set, false);
+    assert.equal(locked.rows[0].service_set, true);
+  });
+
+  it("books a per-event collection on top of the seen total, once", async () => {
+    const tenant = "37373737-3737-4373-8373-373737373737";
+    await q(
+      `insert into public.tenants (id, business_name, sautikit_virtual_number, billing_enforcement)
+       values ($1, 'Either Shop', 'pending:either', 'soft')`,
+      [tenant]
+    );
+    const draft = await q(
+      `insert into public.invoices (tenant_id, subtotal_kes, total_kes) values ($1, 20, 20) returning id`,
+      [tenant]
+    );
+    const invoice = await q("select id from public.finalize_invoice($1)", [draft.rows[0].id]);
+    const invoiceId = invoice.rows[0].id;
+    await q(
+      `insert into public.payment_attempts (
+         tenant_id, invoice_id, provider, status, amount_kes, part_index, part_count, checkout_session_id
+       ) values ($1, $2, 'bachs', 'pending', 20, 1, 1, 'chk_either')`,
+      [tenant, invoiceId]
+    );
+    await q(
+      "select public.settle_checkout_reading('bachs', 'chk_either', 10, $1, $2, 'RCPT1', 10, '{}'::jsonb)",
+      [tenant, invoiceId]
+    );
+    const review = await q(
+      "select public.settle_checkout_reading('bachs', 'chk_either', 10, $1, $2, 'RCPT2', 10, '{}'::jsonb) as row",
+      [tenant, invoiceId]
+    );
+    assert.equal(review.rows[0].row.reason, "collected_total_short");
+    const held = await q("select amount_paid_kes, status from public.invoices where id = $1", [invoiceId]);
+    assert.equal(Number(held.rows[0].amount_paid_kes), 10);
+    assert.equal(held.rows[0].status, "open");
+    const ref = review.rows[0].row.provider_ref;
+    await q(
+      "select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Second receipt is new money', 'book')",
+      [ref]
+    );
+    const paid = await q("select amount_paid_kes, status from public.invoices where id = $1", [invoiceId]);
+    assert.equal(Number(paid.rows[0].amount_paid_kes), 20);
+    assert.equal(paid.rows[0].status, "paid");
+    const seen = await q(
+      "select collected_total_seen_kes from public.payment_attempts where checkout_session_id = 'chk_either'"
+    );
+    assert.equal(Number(seen.rows[0].collected_total_seen_kes), 20);
+    await q(
+      "select public.resolve_checkout_total_review('bachs', $1, 'ada', 'Second receipt is new money', 'book')",
+      [ref]
+    );
+    const twice = await q("select amount_paid_kes from public.invoices where id = $1", [invoiceId]);
+    assert.equal(Number(twice.rows[0].amount_paid_kes), 20);
+    const credits = await q(
+      "select coalesce(sum(amount_kes), 0) as n from public.tenant_credits where tenant_id = $1",
+      [tenant]
+    );
+    assert.equal(Number(credits.rows[0].n), 0);
+  });
+});

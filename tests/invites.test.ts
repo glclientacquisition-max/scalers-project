@@ -41,7 +41,8 @@ it("seats count owner + members + pending (unexpired) invites", () => {
   assert.equal(seatSummary({ members: 1, invites: [], included: 5, now }).full, false);
 });
 it("maps RPC errors to owner copy", () => {
-  assert.match(inviteErrorCopy('P0001: seats_full'), /Upgrade/);
+  assert.match(inviteErrorCopy("P0001: seats_full"), /All your seats are in use/);
+  assert.doesNotMatch(inviteErrorCopy("P0001: seats_full"), /Upgrade/);
   assert.match(inviteErrorCopy("email_mismatch"), /different email/);
   assert.match(inviteErrorCopy("expired"), /expired/);
   assert.match(inviteErrorCopy("weird"), /Something went wrong/);

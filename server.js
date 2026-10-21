@@ -4,6 +4,9 @@
 // Twilio has been removed from the telephony path.
 
 require('dotenv').config();
+// Log-and-continue on unhandled rejections; uncaught exceptions stay fatal.
+require('./src/lib/processGuards').installProcessGuards();
+const { asyncRoute } = require('./src/lib/asyncRoute');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
@@ -44,7 +47,21 @@ const {
   putGreetingPcm,
 } = require('./src/speech/greetingPcmCache');
 const { mergeIdentityLexicon } = require('./src/speech/pronunciationLexicon');
+const {
+  createInitialBurstGate,
+  prerollFilter,
+  pcmBytesToMs,
+} = require('./src/speech/greetingPreroll');
+const { buildNotifyOutcome, ownerAlreadyNotified } = require('./src/notifications/notifyOutcome');
+const { createGreetingWarmer, greetingWarmEnabled } = require('./src/speech/greetingWarm');
+const {
+  shouldReinvite: shouldReinviteBareGreeting,
+  bareGreetingReplyLine,
+  isBareGreetingOrAffirmation,
+  bareGreetingReplyEnabled,
+} = require('./src/speech/bareGreetingReply');
 const { classifySonioxError } = require('./src/speech/sonioxErrors');
+const { createLineFallback } = require('./src/speech/ttsRespeak');
 const { getSonioxProviderHealth } = require('./src/speech/sonioxProviderHealth');
 const {
   pickSpeechOutageLine,
@@ -75,6 +92,8 @@ const {
 } = require('./src/prompts');
 const { createVoiceTrace } = require('./src/speech/voiceTrace');
 const { brainV2ShadowEnabled, createBrainV2Shadow } = require('./src/conversation/v2Shadow');
+const { brainV2Enabled, brainV2Mode } = require('./src/conversation/v2/flag');
+const { createBrainV2Live } = require('./src/conversation/v2/liveTurn');
 const ackRule = require('./src/speech/ackRule');
 const toolSmooth = require('./src/speech/toolSmooth');
 /** VOICE_TOOL_SMOOTH: per-connection heard-audio clock. Empty when the flags are off. */
@@ -182,6 +201,7 @@ const { determineNextBestAction } = require('./src/conversation/nextBestAction')
 const { logBrainTrace } = require('./src/conversation/brainObservability');
 const {
   executeBrainTools,
+  brainToolsWantWrite,
   formatToolConfirmation,
   brainLinesForResults,
 } = require('./src/conversation/toolExecution');
@@ -205,6 +225,7 @@ const {
   extractGeminiText,
   extractThoughtSignature,
   extractGeminiParts,
+  extractGeminiFunctionCalls,
   appendGeminiStreamParts,
   modelPartsForHistory,
   buildGeminiContents,
@@ -238,6 +259,8 @@ const {
   opsCooldownMs,
 } = require('./src/notifications/platformOpsAlert');
 const { platformOpsRecipients } = require('./src/notifications/platformOpsRecipients');
+const { maybeAlertPackageUsage } = require('./src/billing/packageUsageAlerts');
+const { packageRefusalXml } = require('./src/billing/packageOverage');
 const {
   selectProductsForTurn,
   formatTargetedProductsForPrompt,
@@ -257,6 +280,9 @@ const {
 const callAgentTools = new Map();
 /** Structured semantic state and actual runtime capabilities, keyed by callSid. */
 const callBrainStates = new Map();
+// Spoken transcript per live media call (rows pushed after the speech guard).
+// The hangup summary reads it when the webhook carries no turns (HD_cd0c01f28b05).
+const callSpokenTranscripts = new Map();
 const callBrainCapabilities = new Map();
 /** Per-call tenant grounding (product catalogue) for hold/order validation. */
 const callTenantProfiles = new Map();
@@ -300,7 +326,6 @@ async function persistFirstForwardAcceptance(callSid, durationSeconds) {
 /** SautiKit UUID call_id → Stream session SID (HD_…) for recording attach. */
 const sidByProviderCallId = new Map();
 const providerCallIdBySid = new Map();
-const recordingFetchScheduled = new Set();
 const {
   analyzeCallerLanguage,
   dominantSonioxLanguage,
@@ -325,12 +350,17 @@ const {
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
 const { resolveLocalReply, planCallerModelTurn } = require('./src/conversation/turnPolicy');
+const { planLookupTurn } = require('./src/conversation/router');
+const { lookupWithDeadline, lookupToolDeclaration } = require('./src/knowledge/lookup');
+const { lookupToolEnabled } = require('./src/knowledge/flags');
 const { unfinishedTurnHold } = require('./src/conversation/unfinishedTurn');
 const {
   drainSpokenSpeakSlots,
   isSpeakSlotOutcome,
 } = require('./src/conversation/speakSlots');
 const { narratesInternalAction, groundFilePriceLine } = require('./src/conversation/speechGuard');
+const { promptClockStale, stampPromptClock } = require('./src/conversation/trustedFacts');
+const { usableLeadReason } = require('./src/conversation/leadReason');
 const { noteSpokenPendingAsk } = require('./src/conversation/callCorrectives');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
@@ -376,7 +406,8 @@ const {
 const {
   createToolHoldSession,
   fileReadFollowUp,
-  holdSpeaksAfterAck,
+  planHoldTiming,
+  toolStillRunningAfter,
   trimAckLead,
   turnRequestsTool,
 } = require('./src/speech/toolHold');
@@ -393,6 +424,12 @@ const {
 } = require('./src/conversation/requestDedupe');
 const { lineUnavailableResponse } = require('./src/sautikit/inactiveTenantGate');
 const { createClosedLineCalls } = require('./src/sautikit/closedLineCalls');
+const {
+  closedTenantGuardEnabled,
+  tenantLineForAction,
+  closedLineRefusal,
+  warmableTenantRows,
+} = require('./src/sautikit/closedTenantGuard');
 const closedLineCalls = createClosedLineCalls();
 const { startLineUnavailableClipRefresh } = require('./src/sautikit/lineUnavailableAudio');
 const { coverageNextStepFor } = require('./src/conversation/coverageNextStep');
@@ -401,6 +438,7 @@ const {
   joinSpokenPieces,
   speakPreparedSentences,
 } = require('./src/speech/spokenStreamBuffer');
+const { createStreamJoinTrace } = require('./src/speech/streamJoinTrace');
 const { cutNoAiSlop } = require('./src/speech/noAiSlop');
 const {
   createOverlapHold,
@@ -410,6 +448,8 @@ const { createLateFinalHold } = require('./src/speech/lateFinal');
 const { createIdleNudgeController } = require('./src/speech/idleNudge');
 const { createUnfinishedHold, unfinishedHoldMs } = require('./src/speech/unfinishedHold');
 const { noteCallTerminal, callTerminalSince } = require('./src/speech/callLifecycle');
+const endedCalls = require('./src/speech/endedCalls');
+const { createCallFinalizer } = require('./src/callFinalize');
 const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
 const {
   createVoiceTurnTiming,
@@ -445,12 +485,16 @@ const {
 } = require('./src/sautikit/recordingEvents');
 const { fetchCallRecording, recordingScopeDenied } = require('./src/sautikit/recordingFetch');
 const { finalizeOnceEnabled, finalizeDecision } = require('./src/callFinalizeOnce');
+const { createRecordingFetchScheduler } = require('./src/sautikit/recordingSchedule');
+const { createInboundDirectory, fastInboundEnabled } = require('./src/sautikit/inboundDirectory');
+const { createInboundCalls, completedIsCallSetup } = require('./src/sautikit/inboundCalls');
 const {
   summarizeHeaders,
   summarizeBody,
   createWsPayloadSampler,
 } = require('./src/sautikit/safeLog');
 const { isWhatsAppConfigured, sendOwnerWhatsApp, markWhatsAppRead, normalizeWhatsAppTo } = require('./src/notifications/whatsapp');
+const { sendReserved } = require('./src/notifications/sendLedger');
 const {
   ownerLeadEvent,
   renderEventText,
@@ -696,25 +740,25 @@ app.get('/healthz', (_req, res) => {
 });
 
 /** Ops: force a TextSMS balance probe (no SMS charged). */
-app.get('/internal/sms/status', async (req, res) => {
+app.get('/internal/sms/status', asyncRoute('internal/sms/status', async (req, res) => {
   if (!voicePreviewAuthorized(req)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   const status = await probeSmsCredentials({ force: true });
   return res.status(200).json({ ok: Boolean(status.verified), sms: status });
-});
+}));
 
 /** Ops: force SautiKit wallet probe (may fire telephony platform alert). */
-app.post('/internal/telephony/wallet-probe', async (req, res) => {
+app.post('/internal/telephony/wallet-probe', asyncRoute('internal/telephony/wallet-probe', async (req, res) => {
   if (!voicePreviewAuthorized(req)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   const result = await probeSautikitWallet();
   return res.status(200).json(result);
-});
+}));
 
 /** Staging proof: fire platform ops alert with VOICE_PLATFORM_OPS_DRY_RUN=true. */
-app.post('/internal/platform/ops-alert', async (req, res) => {
+app.post('/internal/platform/ops-alert', asyncRoute('internal/platform/ops-alert', async (req, res) => {
   if (!voicePreviewAuthorized(req)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -724,6 +768,41 @@ app.post('/internal/platform/ops-alert', async (req, res) => {
     message: String(req.body?.message || 'staging probe').trim(),
   });
   return res.status(200).json({ ok: Boolean(result.ok), result });
+}));
+
+/**
+ * Desk: re-render a tenant's greeting PCM after Identity / greeting / voice /
+ * hours edits so the next call plays it from cache. Body: { tenantId }.
+ */
+app.post('/internal/greeting-warm', async (req, res) => {
+  if (!voicePreviewAuthorized(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (!isSonioxTtsConfigured() || !greetingWarmEnabled()) {
+    return res.status(200).json({ ok: false, reason: 'greeting_warm_disabled' });
+  }
+  const tenantId = String(req.body?.tenantId || '').trim();
+  if (!tenantId) return res.status(400).json({ ok: false, reason: 'tenantId required' });
+  const line = await tenantLineForAction(tenantId);
+  if (line.closed) {
+    console.log(`[greeting-warm] tenant=${tenantId} skipped: line closed (${line.reason})`);
+    const refusal = closedLineRefusal(line);
+    return res.status(200).json({
+      ...refusal,
+      message: `This business line is ${refusal.lineState}. Greeting not rendered.`,
+    });
+  }
+  try {
+    const result = await greetingWarmer.warmTenant(tenantId);
+    return res.status(200).json({
+      ok: Boolean(result),
+      rendered: result?.rendered || 0,
+      dropped: result?.dropped || 0,
+      lines: result?.keys?.length || 0,
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, reason: err?.message || String(err) });
+  }
 });
 
 /** Owner desk re-ping. Same dispatch as live escalate. Force retries after a failed notify. */
@@ -735,12 +814,28 @@ app.post('/internal/desk/escalate', async (req, res) => {
   if (!callSid) {
     return res.status(400).json({ ok: false, reason: 'callSid required' });
   }
+  if (closedTenantGuardEnabled()) {
+    // A closed business (archived, suspended, is_active=false) gets no re-ping.
+    // Lookup errors answer open; the send ledger checks again per send.
+    let tenantId = null;
+    try {
+      tenantId = (await db.getCall(callSid))?.tenant_id || null;
+    } catch (err) {
+      console.warn(`[desk/escalate] call lookup failed ${callSid} (continuing):`, err?.message || err);
+    }
+    const line = await tenantLineForAction(tenantId);
+    if (line.closed) {
+      console.warn(`[desk/escalate] refused ${callSid}: tenant line closed (${line.reason}) tenant=${tenantId}`);
+      return res.status(409).json(closedLineRefusal(line));
+    }
+  }
   try {
     const result = await maybeSendEscalationNotification(callSid, {
       teammate: String(req.body?.teammate || '').trim() || undefined,
       name: String(req.body?.callerName || '').trim() || undefined,
       reason: String(req.body?.reason || '').trim() || 'Desk ping',
       force: req.body?.force !== false,
+      pingId: String(req.body?.pingId || '').trim().slice(0, 80) || undefined,
     });
     return res.status(200).json(result);
   } catch (err) {
@@ -954,7 +1049,7 @@ function extractInboundCallFields(body = {}) {
   };
 }
 
-function shouldSkipMediaStream(callSessionState, body = {}, callSid = '') {
+function shouldSkipMediaStream(callSessionState, body = {}, callSid = '', opts = {}) {
   if (hasPendingLiveTransfer(callSid)) return true;
 
   const state = String(callSessionState || '').toLowerCase();
@@ -971,7 +1066,11 @@ function shouldSkipMediaStream(callSessionState, body = {}, callSid = '') {
     body.isActive !== undefined ||
     body.direction !== undefined ||
     (durationSeconds != null && durationSeconds >= 0);
-  if (state === 'completed' && hasCallSetupFields) return false;
+  // Only for a sid that never got Stream: once answered, Completed with the
+  // same fields is the hangup (prod HD_d3900cbf2b2d, src/sautikit/inboundCalls.js).
+  const streamIssued =
+    opts.streamIssued != null ? Boolean(opts.streamIssued) : inboundCalls.streamIssuedFor(callSid);
+  if (state === 'completed' && hasCallSetupFields && !streamIssued) return false;
 
   // Stream already running / finished — never re-issue <Stream/>.
   const skipTokens = [
@@ -1104,22 +1203,39 @@ async function attachProviderRecording({
   return null;
 }
 
+// Inbound webhook state: sids that got Stream, background call-row writes,
+// and the cached DID -> tenant directory (prod HD_d3900cbf2b2d).
+const inboundCalls = createInboundCalls();
+// Greeting PCM rendered before calls ring (src/speech/greetingWarm.js).
+const greetingWarmer = createGreetingWarmer({
+  listTenantIds: async () => {
+    if (process.env.TENANT_ID) return [process.env.TENANT_ID];
+    const { rows } = await db.listInboundTenantRows();
+    // Closed lines (archived, suspended, is_active=false) never ring: no render.
+    return warmableTenantRows(rows).map((r) => r.id);
+  },
+  getProfile: (tenantId) => db.getTenantProfile({ tenantId }),
+  createSession: ({ voiceId }) => createSonioxTtsSession({ callSid: 'greeting-warm', voiceId }),
+  log: (msg) => console.log(msg),
+});
+const inboundDirectory = createInboundDirectory({
+  loadTenants: () => db.listInboundTenantRows(),
+  defaultTenantId: process.env.TENANT_ID || null,
+  envDids: [process.env.SAUTIKIT_DID, process.env.TENANT_DID].filter(Boolean),
+  log: (msg) => console.log(msg),
+});
+
+const recordingFetchScheduler = createRecordingFetchScheduler({
+  attach: (ids, source) =>
+    attachProviderRecording({ callSids: ids, fetchIfMissing: true, source }),
+  log: (msg) => console.warn(msg),
+});
+
 function scheduleRecordingFetch(callSids, source) {
-  const ids = [...new Set((callSids || []).map((id) => String(id || '').trim()).filter(Boolean))];
-  if (!ids.length) return;
-  const key = ids.join('|');
-  if (recordingFetchScheduled.has(key)) return;
+  // Recordings scope denied on this key (cooldown in recordingFetch): skip
+  // the retry ladder instead of hammering a 403.
   if (recordingScopeDenied()) return;
-  recordingFetchScheduled.add(key);
-  setTimeout(() => {
-    attachProviderRecording({
-      callSids: ids,
-      fetchIfMissing: true,
-      source: `${source}+retry`,
-    }).catch((err) => {
-      console.warn(`[${source}] delayed recording fetch failed:`, err?.message || err);
-    });
-  }, 8000);
+  return recordingFetchScheduler.schedule(callSids, source);
 }
 
 /** Pull duration (seconds) from whatever field SautiKit used. */
@@ -1219,9 +1335,14 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
 async function writeHangupSummary(callSid, source, opts, brainState) {
   try {
     const call = await db.getCall(callSid);
+    const spokenTurns =
+      Array.isArray(opts.turns) && opts.turns.length
+        ? opts.turns
+        : callSpokenTranscripts.get(callSid)?.turns() || null;
     const derived = deriveCallResolution({
       brainState,
       callId: call?.id || null,
+      spokenTurns,
     });
     const summary = deriveCallSummary({ brainState });
     const primaryIntent = summary.primaryIntent || null;
@@ -1257,6 +1378,13 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
           actions: summary.actions,
           instructions: summary.instructions,
           language: summary.language,
+          // What the caller heard answered, from the spoken transcript.
+          ...(Array.isArray(derived.answeredQuestions)
+            ? {
+                answered_questions: derived.answeredQuestions,
+                unanswered_questions: derived.unansweredQuestions || [],
+              }
+            : {}),
         },
       });
     } catch (err) {
@@ -1293,47 +1421,20 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
   }
 }
 
-async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, source, turns }) {
-  if (!callSid) {
-    console.warn(`[${source}] termination detected but no callSid — skipping DB update`);
-    return null;
-  }
-  try {
-    const updated = await db.updateCallStatus({
-      callSid,
-      status,
-      durationSeconds,
-    });
-    console.log(`[${source}] marked call ${callSid} status=${status}`, {
-      durationSeconds: durationSeconds ?? null,
-      found: Boolean(updated),
-    });
-    const decision = finalizeDecision({
-      enabled: finalizeOnceEnabled(),
-      won: updated?.finalizeWinner,
-      hasTurns: Array.isArray(turns) && turns.length > 0,
-    });
-    if (decision !== 'run') {
-      console.log(`[${source}] finalize skipped ${callSid} (another webhook won) decision=${decision}`);
-      if (decision === 'review_only') {
-        await persistCallResolution(callSid, source, { turns, callStatus: status, writeResolution: false });
-      }
-      return updated;
-    }
-    // Best-effort outcome while Brain state may still be in memory.
-    await persistCallResolution(callSid, source, { turns, callStatus: status });
-    await persistFirstForwardAcceptance(callSid, durationSeconds);
-    if (updated) {
-      // Fire-and-forget: SMS latency must not hold the webhook open.
-      maybeSendMissedTextback({ callSid, call: updated }).catch((err) =>
-        console.warn(`[${source}] missed text-back failed:`, err?.message || err)
-      );
-    }
-    return updated;
-  } catch (err) {
-    console.error(`[${source}] updateCallStatus failed:`, err?.message || err);
-    return null;
-  }
+// VOICE_ENDED_CALL_GUARD (HD_49d726c3dc9b): finalize once per call; see
+// src/callFinalize.js and src/speech/endedCalls.js.
+const markCallTerminal = createCallFinalizer({
+  db,
+  endedCalls,
+  persistCallResolution: (...args) => persistCallResolution(...args),
+  persistFirstForwardAcceptance: (...args) => persistFirstForwardAcceptance(...args),
+  maybeSendMissedTextback: (...args) => maybeSendMissedTextback(...args),
+  finalizeOnceEnabled,
+  finalizeDecision,
+});
+
+async function markCallTerminalFromWebhook(args) {
+  return markCallTerminal(args);
 }
 
 // One in-flight text-back per call; the summary marker closes the rest.
@@ -1391,7 +1492,34 @@ async function maybeSendMissedTextback({ callSid, call }) {
 //    Mounted on BOTH `/` and `/voice/incoming` because some number routing
 //    configs point at the tunnel root (logs showed POST / → 404 before).
 // ---------------------------------------------------------------------------
+/**
+ * Package cap decision for a new inbound call (fast and legacy paths).
+ * Fires the beta 80% / 100% ops notice and logs; true = refuse the call.
+ */
+function packageGateRefuses(callSid, gate) {
+  if (gate?.usage) {
+    // Beta tenants are never rejected at the cap; ops get 80% / 100% notices.
+    void maybeAlertPackageUsage(gate.usage).catch((err) => {
+      console.warn('[package-usage] alert failed:', err?.message || err);
+    });
+  }
+  if (gate?.reason === 'beta_over_cap') {
+    console.log(`[${callSid}] package minutes used, billing in beta — answering (metered, not charged)`);
+  }
+  if (gate?.reason === 'beta_no_package') {
+    console.log(`[${callSid}] no package, billing in beta — answering (metered, not charged)`);
+  }
+  if (gate && gate.open === false) {
+    console.warn(
+      `[${callSid}] ${gate.reason === 'no_package' ? 'no package' : 'package exhausted'} (billing ${gate.usage?.enforcement || '?'}, on-demand off) — refuse`
+    );
+    return true;
+  }
+  return false;
+}
+
 async function handleVoiceIncoming(req, res) {
+  const webhookStartedAt = Date.now();
   try {
     const extracted = extractInboundCallFields(req.body);
     let fromNumber = extracted.fromNumber;
@@ -1401,15 +1529,43 @@ async function handleVoiceIncoming(req, res) {
     const callSid = extracted.callSid || `sautikit_call_${Date.now()}`;
     rememberProviderCallIds(callSid, req.body);
 
+    // Fast path: tenant DIDs, the owning tenant and the package gate come
+    // from the cached inbound directory, and the call row is written after
+    // Stream XML goes out. Prod HD_d3900cbf2b2d spent 2051 ms here on six
+    // sequential Supabase reads before answering (src/sautikit/inboundDirectory.js).
+    const fast = fastInboundEnabled();
+    let directoryHit = null;
+    if (fast) {
+      try {
+        directoryHit = await inboundDirectory.lookup(
+          { fromNumber, toNumber },
+          correctCallerCalleeNumbers
+        );
+      } catch (err) {
+        console.warn('[voice/incoming] inbound directory failed (legacy path):', err?.message || err);
+        directoryHit = null;
+      }
+    }
+
     // Load tenant DIDs and undo WebRTC/header flips before persisting.
     let tenantDids = [];
-    try {
-      tenantDids = await db.listActiveTenantDids();
-    } catch (err) {
-      console.warn('[voice/incoming] listActiveTenantDids failed:', err?.message || err);
-      tenantDids = [process.env.SAUTIKIT_DID, process.env.TENANT_DID].filter(Boolean);
+    let corrected;
+    if (directoryHit) {
+      tenantDids = directoryHit.tenantDids;
+      corrected = {
+        fromNumber: directoryHit.fromNumber,
+        toNumber: directoryHit.toNumber,
+        swapped: directoryHit.swapped,
+      };
+    } else {
+      try {
+        tenantDids = await db.listActiveTenantDids();
+      } catch (err) {
+        console.warn('[voice/incoming] listActiveTenantDids failed:', err?.message || err);
+        tenantDids = [process.env.SAUTIKIT_DID, process.env.TENANT_DID].filter(Boolean);
+      }
+      corrected = correctCallerCalleeNumbers({ fromNumber, toNumber, tenantDids });
     }
-    const corrected = correctCallerCalleeNumbers({ fromNumber, toNumber, tenantDids });
     if (corrected.swapped) {
       console.warn('[voice/incoming] caller/callee looked flipped (from matched tenant DID) — swapping', {
         before: { fromNumber, toNumber },
@@ -1437,6 +1593,8 @@ async function handleVoiceIncoming(req, res) {
     // A first webhook whose callSessionState is already "Completed" is still
     // call-set-up (it carries callerNumber/destinationNumber/isActive). Open
     // the stream, persist the call, and let the later Completed event close it.
+    // A Completed for a sid that already got Stream (memory, or a call row
+    // after a restart) is the hangup.
     const sid = extracted.callSid || callSid;
     if (closedLineCalls.has(sid, callSid)) {
       // A closed line (#639) already got line-unavailable + Hangup. Its later
@@ -1446,7 +1604,15 @@ async function handleVoiceIncoming(req, res) {
         .type('text/xml')
         .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
     }
-    if (shouldSkipMediaStream(callSessionState, req.body, sid)) {
+    let streamIssued = inboundCalls.streamIssuedFor(sid);
+    if (!streamIssued && extracted.callSid && /completed/i.test(callSessionState)) {
+      try {
+        streamIssued = Boolean(await db.getCall(sid));
+      } catch {
+        /* unknown: keep the set-up reading */
+      }
+    }
+    if (shouldSkipMediaStream(callSessionState, req.body, sid, { streamIssued })) {
       const transferXml = consumeLiveTransferWebhook({
         callSid: sid,
         callSessionState,
@@ -1469,6 +1635,9 @@ async function handleVoiceIncoming(req, res) {
           durationSeconds: extractEventDurationSeconds(req.body),
           source: 'voice/incoming',
         }).catch(() => {});
+        // Prod posts every lifecycle edge to this route and never to
+        // /voice/events; fetch the provider recording from here too.
+        scheduleRecordingFetch(resolveAttachCallSids(req.body, [sid]), 'voice/incoming');
       }
       console.log('[voice/incoming] lifecycle edge — empty <Response/> (no re-Stream)');
       return res
@@ -1490,7 +1659,12 @@ async function handleVoiceIncoming(req, res) {
     // unavailable message and hang up, before Stream and before the call row
     // (no minutes, no model, no outage alert). Fails open on lookup errors.
     try {
-      const line = await db.inboundTenantLine({ toNumber, fromNumber });
+      // Fast path: the inbound directory decides with the same
+      // isTenantLineInactive/tenantLineState rules (live owner first), no
+      // extra round trip. Legacy path: one direct tenants read.
+      const line = directoryHit && directoryHit.lineState
+        ? directoryHit.lineState
+        : await db.inboundTenantLine({ toNumber, fromNumber });
       if (line && line.closed === true) {
         console.warn(`[${callSid}] tenant line closed (${line.reason}) tenant=${line.tenantId} — line unavailable, hang up`);
         closedLineCalls.remember(sid, callSid, extracted.callSid);
@@ -1501,50 +1675,90 @@ async function handleVoiceIncoming(req, res) {
     }
 
     const preTerminal = detectCallTermination(req.body, callSessionState).terminal;
+    const scheduleSetupTerminal = () => {
+      // The setup webhook already says Completed. Do not mark the row
+      // complete before /ws/media has a chance to write transcript/state.
+      setTimeout(() => {
+        markCallTerminalFromWebhook({
+          callSid,
+          status: 'complete',
+          durationSeconds: extractEventDurationSeconds(req.body),
+          source: 'voice/incoming-setup-terminal',
+        }).catch(() => {});
+      }, 3000);
+    };
 
-    try {
-      const gate = await db.packageInboundOpen({ toNumber, fromNumber });
-      if (gate && gate.open === false) {
-        console.warn(`[${callSid}] package exhausted — reject`);
+    if (directoryHit) {
+      if (directoryHit.gate && directoryHit.gate.open === false) {
+        // Same decision as db.packageInboundOpen (billing_enforcement is in
+        // the directory row): beta never rejects at the cap (#631).
+        console.warn(
+          `[${callSid}] ${directoryHit.gate.reason === 'no_package' ? 'no package' : 'package exhausted'} (billing ${directoryHit.gate.enforcement || '?'}, on-demand off) — refuse`
+        );
         return res
           .type('text/xml')
-          .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+          .send(packageRefusalXml({ businessName: directoryHit.businessName }));
       }
-    } catch (gateErr) {
-      console.warn(
-        '[voice/incoming] package gate failed (answering):',
-        gateErr?.message || gateErr
-      );
-    }
-
-    try {
-      await db.upsertCall({
-        callSid,
-        fromNumber: fromNumber || 'unknown',
-        toNumber,
-        provider: 'sautikit',
-      });
-      if (preTerminal) {
-        // The setup webhook already says Completed. Do not mark the row
-        // complete before /ws/media has a chance to write transcript/state.
-        setTimeout(() => {
-          markCallTerminalFromWebhook({
-            callSid,
-            status: 'complete',
-            durationSeconds: extractEventDurationSeconds(req.body),
-            source: 'voice/incoming-setup-terminal',
-          }).catch(() => {});
-        }, 3000);
-      }
-    } catch (dbErr) {
-      if (dbErr?.code === 'unassigned_did') {
+      if (directoryHit.unassigned) {
         console.warn(`[${callSid}] unassigned number — reject`);
         return res
           .type('text/xml')
           .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
       }
-      // Do not fail the webhook / Stream setup if DB is briefly unavailable.
-      console.error('[voice/incoming] DB upsert failed (continuing with Stream):', dbErr?.message || dbErr);
+      // Off the critical path. /ws/media awaits this before it reads the row.
+      const rowPromise = db
+        .upsertCall({
+          callSid,
+          fromNumber: fromNumber || 'unknown',
+          toNumber,
+          tenantId: directoryHit.tenantId || undefined,
+          provider: 'sautikit',
+        })
+        .then((row) => {
+          if (preTerminal) scheduleSetupTerminal();
+          return row;
+        })
+        .catch((dbErr) => {
+          console.error(
+            '[voice/incoming] background DB upsert failed (Stream already answered):',
+            dbErr?.message || dbErr
+          );
+          return null;
+        });
+      inboundCalls.trackRow(callSid, rowPromise, directoryHit.tenantId);
+    } else {
+      try {
+        const gate = await db.packageInboundOpen({ toNumber, fromNumber });
+        if (packageGateRefuses(callSid, gate)) {
+          return res
+            .type('text/xml')
+            .send(packageRefusalXml({ businessName: gate.usage?.businessName }));
+        }
+      } catch (gateErr) {
+        console.warn(
+          '[voice/incoming] package gate failed (answering):',
+          gateErr?.message || gateErr
+        );
+      }
+
+      try {
+        await db.upsertCall({
+          callSid,
+          fromNumber: fromNumber || 'unknown',
+          toNumber,
+          provider: 'sautikit',
+        });
+        if (preTerminal) scheduleSetupTerminal();
+      } catch (dbErr) {
+        if (dbErr?.code === 'unassigned_did') {
+          console.warn(`[${callSid}] unassigned number — reject`);
+          return res
+            .type('text/xml')
+            .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+        }
+        // Do not fail the webhook / Stream setup if DB is briefly unavailable.
+        console.error('[voice/incoming] DB upsert failed (continuing with Stream):', dbErr?.message || dbErr);
+      }
     }
 
     const streamUrl = `${buildMediaStreamUrl(req)}?callSid=${encodeURIComponent(callSid)}`;
@@ -1557,7 +1771,15 @@ async function handleVoiceIncoming(req, res) {
       continueUrl: buildVoiceTransferContinueUrl(req, callSid),
     });
 
+    inboundCalls.markStreamIssued(callSid);
     res.type('text/xml').send(twiml);
+    console.log(
+      `[voice/incoming][${callSid}] stream answered in ${Date.now() - webhookStartedAt}ms` +
+        ` path=${directoryHit ? 'fast' : 'legacy'}` +
+        (directoryHit
+          ? ` directory_ms=${directoryHit.lookupMs} directory_age_ms=${directoryHit.ageMs}${directoryHit.refreshed ? ' refreshed' : ''}`
+          : '')
+    );
   } catch (err) {
     console.error('[voice/incoming] Webhook handling failed:', err);
     res.sendStatus(500);
@@ -1628,8 +1850,28 @@ async function handleWhatsAppWebhook(req, res) {
         await noteWhatsAppDeliveryFailed(row);
       },
       markRead: (wamid) => markWhatsAppRead(wamid),
-      sendText: async ({ to, body }) => {
-        const json = await sendOwnerWhatsApp({ to, body, windowOpen: true });
+      sendText: async ({ to, body, replyTo }) => {
+        // Platform-billed reply: notify_sends row (tenant null) keyed by the
+        // inbound wamid, so a webhook redelivery cannot send or count twice.
+        const waTo = normalizeWhatsAppTo(to);
+        const reserved = await sendReserved(
+          {
+            ledger: { tenantId: null, kind: 'platform_wa_reply' },
+            key: replyTo ? `wa:${replyTo}` : `wa:${waTo}:${new Date().toISOString().slice(0, 16)}`,
+            kind: 'platform_wa_reply',
+            channel: 'whatsapp',
+            to: waTo,
+            body,
+          },
+          () => sendOwnerWhatsApp({ to, body, windowOpen: true })
+        );
+        if (!reserved.legacy && !reserved.sent) {
+          console.warn(`[whatsapp/events] reply skipped (${reserved.reason})`);
+          return null;
+        }
+        const json = reserved.legacy
+          ? await sendOwnerWhatsApp({ to, body, windowOpen: true })
+          : reserved.result;
         await db.persistPlatformWhatsAppOutbound({
           identity: 'platform',
           phoneNumberId: platformPhoneNumberId(),
@@ -1897,9 +2139,33 @@ server.on('upgrade', (req, socket, head) => {
     console.log(`[upgrade] pathname=${pathname} proto=${req.headers['sec-websocket-protocol'] || ''}`);
 
     if (pathname === '/ws/media') {
-      mediaWss.handleUpgrade(req, socket, head, (ws) => {
-        mediaWss.emit('connection', ws, req);
-      });
+      // VOICE_ENDED_CALL_GUARD (HD_49d726c3dc9b): SautiKit re-opened
+      // /ws/media 1.2 s after our end_call closed it. A call that is over is
+      // closed at once: no prompt load, no greeting, no finalize.
+      // Off (unset, the default): the upgrade runs synchronously, as before.
+      if (!endedCalls.endedCallGuardEnabled()) {
+        mediaWss.handleUpgrade(req, socket, head, (ws) => {
+          mediaWss.emit('connection', ws, req);
+        });
+        return;
+      }
+      const mediaSid = mediaSidFromUrl(req.url);
+      endedCalls
+        .checkMediaConnect(mediaSid, {
+          terminalSince: callTerminalSince,
+          streamIssued: (sid) => inboundCalls.streamIssuedFor(sid),
+          getCall: (sid) => db.getCall(sid),
+        })
+        .catch(() => ({ refuse: false }))
+        .then((verdict) => {
+          mediaWss.handleUpgrade(req, socket, head, (ws) => {
+            if (verdict && verdict.refuse) {
+              refuseEndedMedia(ws, mediaSid, verdict.reason, verdict.source);
+              return;
+            }
+            mediaWss.emit('connection', ws, req);
+          });
+        });
       return;
     }
 
@@ -1922,6 +2188,31 @@ server.on('upgrade', (req, socket, head) => {
     }
   }
 });
+
+function mediaSidFromUrl(url) {
+  try {
+    const q = new URL(url || '', 'http://localhost').searchParams;
+    return q.get('callSid') || q.get('sessionId') || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Close a media socket for a call that already ended. Nothing else runs. */
+function refuseEndedMedia(ws, callSid, reason, source) {
+  console.warn(
+    `[ws/media] refused media reconnect for ended call callSid=${callSid || 'unknown'} reason=${reason || 'ended'} via=${source || 'memory'}: no greeting, no prompt load, no finalize`
+  );
+  try {
+    ws.close(1000, 'call_already_ended');
+  } catch {
+    try {
+      ws.terminate();
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 /** ~20 ms of mono pcm_s16le @ 16 kHz — matches typical SautiKit inbound frames. */
 const OUTBOUND_PCM_FRAME_BYTES = 640;
@@ -1983,6 +2274,10 @@ mediaWss.on('connection', (ws, req) => {
   console.log(
     `[ws/media] connected from ${req.socket.remoteAddress} proto=${ws.protocol || '(none)'} url=${req.url} callSid=${sessionCallSid || 'unknown'}`
   );
+  // VOICE_ENDED_CALL_GUARD: this session counts as live for its sid, so a
+  // terminal webhook mid-call leaves finalize to this socket's close.
+  let endedRefused = false;
+  if (sessionCallSid) endedCalls.noteMediaOpen(sessionCallSid, connectedAt);
   console.log('[ws/media] upgrade', summarizeHeaders(req.headers));
   const sampleWsPayload = createWsPayloadSampler(3);
 
@@ -2018,6 +2313,10 @@ mediaWss.on('connection', (ws, req) => {
   let utteranceStartedAt = 0;
   /** Idle check-in only after the caller has actually spoken. */
   let heardCallerUtterance = false;
+  // VOICE_BARE_GREETING_REPLY: re-invites spoken for a bare Hello/Yes before
+  // the caller's first real turn (src/speech/bareGreetingReply.js).
+  let firstRealCallerTurnDone = false;
+  let bareGreetingReinvites = 0;
   /** Brain END is in flight. No idle nudge and no next caller turn. */
   let callEnding = false;
   const overlapHold = createOverlapHold();
@@ -2122,7 +2421,9 @@ mediaWss.on('connection', (ws, req) => {
     weakStt: false,
     tokenLanguages: [],
   };
-  let systemPrompt = buildSystemPrompt();
+  // VOICE_GUARD_TRUSTED_FACTS: the clock instant behind CURRENT TIME IN KENYA.
+  let promptClockAt = new Date();
+  let systemPrompt = buildSystemPrompt({}, { now: promptClockAt });
   let greetingLine = buildGreeting(process.env.BUSINESS_NAME || 'the business');
   let businessName = process.env.BUSINESS_NAME || 'the business';
   let agentName = process.env.AGENT_NAME || 'Receptionist';
@@ -2134,8 +2435,11 @@ mediaWss.on('connection', (ws, req) => {
   let closureNotice = null;
   let messages = [{ role: 'system', content: systemPrompt }];
   const callTranscript = createCallTranscript();
+  if (sessionCallSid) callSpokenTranscripts.set(sessionCallSid, callTranscript);
   /** BA v2 shadow runner; created on first caller turn only when BRAIN_V2_SHADOW is on. */
   let brainV2Shadow = null;
+  /** BA v2 live mouth; created on first caller turn only when BRAIN_V2=on and MODE=live. */
+  let brainV2Live = null;
   function logTurnTiming(timing, extra) {
     if (!timing) return null;
     const summary = timing.log(extra);
@@ -2165,6 +2469,12 @@ mediaWss.on('connection', (ws, req) => {
   // Until this process commits that line, the caller turn must say it.
   let greetingInterrupted = false;
   let greetingSettled = false;
+  // STT audio clock (ms of caller PCM sent to Soniox) at the greeting's first
+  // PCM. Words that started before it cannot barge the greeting
+  // (src/speech/greetingPreroll.js, prod HD_d3900cbf2b2d).
+  let greetingPrerollMs = null;
+  let sttAudioBytes = 0;
+  const inboundBurstGate = createInitialBurstGate();
   let fileNameAsksCommitted = 0;
   const firstForward = {
     greetingPlayed: false,
@@ -2181,6 +2491,7 @@ mediaWss.on('connection', (ws, req) => {
     firstForward.greetingLogged = true;
     firstForward.greetingPlayed = true;
     greetingAwaitingFirstPcm = false;
+    greetingPrerollMs = pcmBytesToMs(sttAudioBytes);
     const at = Date.now();
     const logged = logConnectToGreetingPcm({
       callSid: sidLabel(),
@@ -2303,6 +2614,8 @@ mediaWss.on('connection', (ws, req) => {
   let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
   let ttsLexiconOverrides = [];
+  /** Tenant words that split glued web/email labels ("aris" + "stationaries"). */
+  let ttsAddressTerms = [];
   /** Tenant-selected Soniox voice from curated catalog. */
   let tenantSonioxVoiceId = null;
   /** Voice id the live TTS websocket was opened with. */
@@ -2357,7 +2670,14 @@ mediaWss.on('connection', (ws, req) => {
       return buildSttContext(sttTenantSnapshot);
     }
     try {
-      const profile = await db.getTenantProfile({ callSid: sessionCallSid });
+      // The webhook writes the call row after Stream XML (fast inbound path).
+      // Use the tenant it resolved, and let the row land before later reads.
+      const inboundTenantId = inboundCalls.tenantIdFor(sessionCallSid);
+      await inboundCalls.awaitRow(sessionCallSid, 2500);
+      const profile = await db.getTenantProfile({
+        callSid: sessionCallSid,
+        tenantId: inboundTenantId || undefined,
+      });
       await hydrateCallerMemory(profile, sessionCallSid);
       if (turnArbiter.enabled) {
         // Pin the spoken catalogue once, via Platform's resolver. Never recompiled mid-call.
@@ -2375,10 +2695,14 @@ mediaWss.on('connection', (ws, req) => {
       afterHoursMode = profile.afterHoursMode || 'serve';
       openStatus = openClosedStatus(hoursSchedule);
       closureNotice = bulletinClosureNotice(profile.dailyBulletin);
-      systemPrompt = buildSystemPrompt(profile);
+      promptClockAt = new Date();
+      systemPrompt = buildSystemPrompt(profile, { now: promptClockAt });
       ttsLexiconOverrides = Array.isArray(profile.ttsLexicon)
         ? profile.ttsLexicon
         : [];
+      ttsAddressTerms = [profile.businessName, profile.spokenName].filter(
+        (v) => typeof v === 'string' && v.trim()
+      );
       tenantSonioxVoiceId = profile.sonioxVoiceId || null;
       if (sessionCallSid) {
         const parsedTools = parseAgentTools(profile.agentTools);
@@ -2436,10 +2760,61 @@ mediaWss.on('connection', (ws, req) => {
     return agentReplay.pickReplay();
   }
 
+  // A bare "Hello" / "Yes" / "Halo" / "Uko?" before the first real turn gets a
+  // short spoken re-invite, never silence (VOICE_BARE_GREETING_REPLY, off).
+  function maybeReinviteBareGreeting(text, source) {
+    if (
+      !shouldReinviteBareGreeting({
+        text,
+        firstRealTurnDone: firstRealCallerTurnDone,
+        reinvites: bareGreetingReinvites,
+        speaking,
+        turnBusy,
+        callEnding: callEnding || callIsOver() || speechOutageStarted,
+      })
+    ) {
+      return false;
+    }
+    const line = bareGreetingReplyLine({
+      text,
+      callLanguage,
+      agentName,
+      businessName: spokenName || businessName,
+      count: bareGreetingReinvites,
+    });
+    bareGreetingReinvites += 1;
+    idleNudge.clear();
+    console.log(
+      `[ws/media][${sidLabel()}] bare_greeting_reinvite n=${bareGreetingReinvites} src=${source}: ${String(text || '').slice(0, 40)}`
+    );
+    void speakText(line)
+      .then((spoken) => {
+        if (spoken?.ok) {
+          callTranscript.pushAgent(line);
+          messages.push({ role: 'assistant', content: line, local: true });
+        }
+      })
+      .catch((err) => {
+        console.error(`[ws/media][${sidLabel()}] bare_greeting_reinvite failed:`, err?.message || err);
+      });
+    return true;
+  }
+
   function releaseQueuedCallerSpeech(endedGeneration) {
     const gen =
       endedGeneration != null ? endedGeneration : activePlaybackGeneration;
     const { text, duplicate } = overlapHold.drain(gen);
+    // A bare Hello said over the greeting was answered by the greeting
+    // itself. Do not re-invite for it (VOICE_BARE_GREETING_REPLY).
+    if (
+      text &&
+      !firstRealCallerTurnDone &&
+      bareGreetingReplyEnabled() &&
+      isBareGreetingOrAffirmation(text)
+    ) {
+      console.log(`[ws/media][${sidLabel()}] bare_greeting_over_greeting dropped gen=${gen}`);
+      return;
+    }
     if (duplicate) {
       console.log(
         `[ws/media][${sidLabel()}] caller_turn_duplicate_suppressed gen=${gen}`
@@ -2628,6 +3003,7 @@ mediaWss.on('connection', (ws, req) => {
     const prepared = prepareForTts(text, {
       callLanguage,
       extraLexicon,
+      addressTerms: ttsAddressTerms,
     });
     voiceTrace.noteCall({
       stage: 'tts',
@@ -2672,7 +3048,7 @@ mediaWss.on('connection', (ws, req) => {
         !spoken.cancelled &&
         isGreetingCacheEnabled()
       ) {
-        putGreetingPcm(opts.greetingCacheKey, spoken.pcm);
+        putGreetingPcm(opts.greetingCacheKey, spoken.pcm, { tenantId: brainProfile?.id || null });
       }
       if (!streamed.chunks.length || spoken?.empty) return { ok: false, empty: true };
       return { ok: !spoken?.cancelled, sentences: streamed.chunks.length };
@@ -2713,16 +3089,28 @@ mediaWss.on('connection', (ws, req) => {
       if (startHoldFill()) return;
       // Cache miss: fall through to the live hold line below (never silent).
     }
-    if (
-      spoken.kind === 'hold' &&
-      thinkingAckTurn &&
-      thinkingAckTurn === activeTurnTiming &&
-      !holdSpeaksAfterAck({ kind: spoken.kind, ackAtMs: thinkingAckAtMs })
-    ) {
-      console.log(
-        `[ws/media][${sidLabel()}] tool hold skipped after thinking-ack ${Date.now() - thinkingAckAtMs}ms: ${spoken.line}`
-      );
-      return;
+    if (spoken.kind === 'hold' && thinkingAckTurn && thinkingAckTurn === activeTurnTiming) {
+      const timing = planHoldTiming({ kind: spoken.kind, ackAtMs: thinkingAckAtMs });
+      if (timing.mode === 'skip') {
+        console.log(
+          `[ws/media][${sidLabel()}] tool hold skipped after thinking-ack ${Date.now() - thinkingAckAtMs}ms: ${spoken.line}`
+        );
+        return;
+      }
+      if (timing.mode === 'defer') {
+        const turnAtDefer = activeTurnTiming;
+        const slow = await toolStillRunningAfter(spoken.toolSettled, timing.delayMs);
+        if (!slow) {
+          console.log(
+            `[ws/media][${sidLabel()}] tool hold skipped (tool done <${timing.delayMs}ms after thinking-ack): ${spoken.line}`
+          );
+          return;
+        }
+        if (bargeInActive || activeTurnTiming !== turnAtDefer) return;
+        console.log(
+          `[ws/media][${sidLabel()}] tool hold after thinking-ack (tool still running ${timing.delayMs}ms): ${spoken.line}`
+        );
+      }
     }
     if (spoken.kind === 'hold') ackPlayedTurn = activeTurnTiming;
     await speakText(spoken.line, {
@@ -2795,6 +3183,7 @@ mediaWss.on('connection', (ws, req) => {
       callLanguage,
       language: opts.language,
       extraLexicon,
+      addressTerms: ttsAddressTerms,
     });
     if (opts.isFiller) {
       voiceTrace.noteFiller({
@@ -2865,7 +3254,7 @@ mediaWss.on('connection', (ws, req) => {
         spoken?.pcm?.length &&
         !spoken.cancelled
       ) {
-        putGreetingPcm(opts.greetingCacheKey, spoken.pcm);
+        putGreetingPcm(opts.greetingCacheKey, spoken.pcm, { tenantId: brainProfile?.id || null });
       }
       return { ok: true };
     } catch (err) {
@@ -3040,7 +3429,9 @@ mediaWss.on('connection', (ws, req) => {
           name: planned.name,
           reason: 'Live line could not complete. Team to follow up.',
         });
-        maybeSendWhatsAppNotification(sidLabel());
+        maybeSendWhatsAppNotification(sidLabel()).catch((err) => {
+          console.error(`[ws/media][${sidLabel()}] owner notify failed:`, err?.message || err);
+        });
       } catch (err) {
         console.error(
           `[ws/media][${sidLabel()}] llm recovery save failed:`,
@@ -3124,6 +3515,13 @@ mediaWss.on('connection', (ws, req) => {
     // A new caller turn may speak. The previous barge must not swallow it.
     suppressReplyRemainder = false;
 
+    if (maybeReinviteBareGreeting(clean, 'turn')) {
+      voiceTrace.beginTurn({ callerText: clean });
+      voiceTrace.noteTurnEnd({ decision: 'reinvite', reason: 'bare_greeting' });
+      voiceTrace.commitTurn({ outcome: 'reinvite' });
+      return;
+    }
+
     const idleDecision = decideCallerEvent({
       text: clean,
       speaking: false,
@@ -3156,6 +3554,7 @@ mediaWss.on('connection', (ws, req) => {
       voiceTrace.commitTurn({ outcome: 'skip' });
       return;
     }
+    if (!isBareGreetingOrAffirmation(clean)) firstRealCallerTurnDone = true;
 
     overlapHold.discardExcept(0);
     turnBusy = true;
@@ -3254,11 +3653,20 @@ mediaWss.on('connection', (ws, req) => {
         }
       )
     );
-    if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
-      systemPrompt = buildSystemPrompt(brainProfile);
+    // The prompt clock was frozen at call start, so 3 minutes in the model still
+    // said 3:51 (HD_95e6745c0df1). Rebuild when the Kenya minute moved, and
+    // stamp the instant so the speech guard trusts the same clock.
+    const promptNow = new Date();
+    if (
+      liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp ||
+      promptClockStale(promptClockAt, promptNow)
+    ) {
+      promptClockAt = promptNow;
+      systemPrompt = buildSystemPrompt(brainProfile, { now: promptClockAt });
     }
     const nextBestAction = determineNextBestAction({ state: brainState, capabilities });
     brainState = setNextBestAction(brainState, nextBestAction);
+    stampPromptClock(brainState, promptClockAt);
     if (
       previousBrainState?.caller?.nameConfirmed !== true &&
       brainState?.caller?.nameConfirmed === true
@@ -3292,7 +3700,10 @@ mediaWss.on('connection', (ws, req) => {
     if (ackTracker) ackTracker.beginTurn({ callerText: clean });
     // BA v2 shadow (BRAIN_V2_SHADOW, default off): log-only, never awaited,
     // never spoken, dry-run writes only. Flag off = no code below runs.
-    if (brainV2ShadowEnabled({ tenantId: brainProfile?.id })) {
+    if (
+      brainV2ShadowEnabled({ tenantId: brainProfile?.id }) &&
+      !(brainV2Enabled({ tenantId: brainProfile?.id }) && brainV2Mode() === 'live')
+    ) {
       try {
         if (!brainV2Shadow) {
           brainV2Shadow = createBrainV2Shadow({
@@ -3447,15 +3858,75 @@ mediaWss.on('connection', (ws, req) => {
         return folded;
       }
       const slotsBeforeReply = slotRows(brainState);
-      const localReply = resolveLocalReply({
+      if (brainV2Enabled({ tenantId: brainProfile?.id }) && brainV2Mode() === 'live') {
+        try {
+          if (!brainV2Live) {
+            const mem = brainProfile?.callerMemory || {};
+            brainV2Live = createBrainV2Live({
+              applyTools: (parsed) => applyGeminiTools(callKey, parsed),
+              callerFile: {
+                callerPhone: brainState?.caller?.phone || mem.phone || null,
+                contactName: mem.fileOwnerName || mem.name || brainState?.caller?.name || null,
+                openRows: Array.isArray(mem.openRows) ? mem.openRows : [],
+              },
+            });
+          }
+          const live = await brainV2Live.run({
+            text: clean,
+            profile: brainProfile,
+            langLock: callLanguage === 'en' || callLanguage === 'sw' ? callLanguage : null,
+            shouldAbort: () => bargeInActive === true,
+          });
+          if (live?.line) {
+            console.log(`[ws/media][${callKey}] brain_v2_live lang=${live.lang}: ${live.line}`);
+            callTranscript.pushAgent(live.line);
+            if (turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') {
+              turnTiming.markFirstSpokenChunk();
+            }
+            const spoken = await speakText(live.line, { tracePath: 'brain_v2_live' });
+            if (spoken?.ok !== false) {
+              spokeThisTurn = true;
+              messages.push({ role: 'assistant', content: live.line, local: true });
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn(`[ws/media][${callKey}] brain_v2_live failed, using v1:`, err?.message || err);
+        }
+      }
+      const lookupPlan = planLookupTurn({
         text: clean,
         state: brainState,
         profile: brainProfile,
         language: callLanguage,
-        agentName,
-        businessName,
-        nextBestAction,
+        now: new Date(),
+        turnId: `${sidLabel()}:${brainState?.conversation?.turnCount || 0}`,
       });
+      if (lookupPlan?.handled) {
+        const lookupWhy = (lookupPlan.lookups || [])
+          .map((row) => `${row.kind}:${row.status}:${row.id || '-'}:${row.reason || '-'}`)
+          .join(',');
+        console.log(
+          `[ws/media][${callKey}] lookup ${lookupPlan.outcome} ${lookupWhy} brainMs=${Number(lookupPlan.brainMs).toFixed(1)} lang=${callLanguage}`
+        );
+        voiceTrace.noteLookup({
+          handled: true,
+          outcome: lookupPlan.outcome,
+          lookups: lookupPlan.lookups,
+          brainMs: lookupPlan.brainMs,
+        });
+      }
+      const localReply = lookupPlan?.handled
+        ? { outcome: lookupPlan.outcome, line: lookupPlan.speech, lookup: true }
+        : resolveLocalReply({
+            text: clean,
+            state: brainState,
+            profile: brainProfile,
+            language: callLanguage,
+            agentName,
+            businessName,
+            nextBestAction,
+          });
       const enqueuedSlots = slotRows(brainState).filter(
         (slot) =>
           !slotsBeforeReply.some((row) => row.outcome === slot.outcome && row.line === slot.line)
@@ -3532,10 +4003,13 @@ mediaWss.on('connection', (ws, req) => {
       const packetsBeforeFacts = packetRows();
       const localPacket = arbiterClaims ? null : commitTurnFacts(speakCommit, {
         localReply: turnLocalReply,
-        catalogueLine:
-          turnCatalogueMouth.speakLocal && turnCatalogueMouth.line ? turnCatalogueMouth.line : '',
+        catalogueLine: lookupPlan?.handled
+          ? ''
+          : turnCatalogueMouth.speakLocal && turnCatalogueMouth.line
+            ? turnCatalogueMouth.line
+            : '',
         catalogueListed: brainState?.conversation?.catalogueListed === true,
-        groundedPrice: groundedPriceLine,
+        groundedPrice: lookupPlan?.handled ? '' : groundedPriceLine,
       });
       traceCommittedPackets(packetsBeforeFacts);
       if (turnLocalReply && !localPacket && !arbiterClaims && !authorizeSpeak(turnLocalReply)) {
@@ -3560,9 +4034,15 @@ mediaWss.on('connection', (ws, req) => {
         fileNameAskCommitted: fileNameAsksCommitted > 0,
         unfinishedDecided: true,
         holdTimedOut: opts.holdTimedOut === true,
+        // A committed local fact line already answers the question first.
+        publicAnswerCommitted: Boolean(localPacket),
       });
       if (nameGate.nameAskDeferred) {
-        console.log(`[ws/media][${callKey}] name ask deferred: held fragment timed out, model replies`);
+        console.log(
+          nameGate.deferredFor
+            ? `[ws/media][${callKey}] name ask deferred: caller asked (${nameGate.deferredFor}), model answers first`
+            : `[ws/media][${callKey}] name ask deferred: held fragment timed out, model replies`
+        );
       }
       const fileNameAsk = lockFileNameAsk(nameGate.line, callLanguage);
       const nameJustConfirmed = brainState?.caller?.nameJustConfirmed === true;
@@ -3724,7 +4204,7 @@ mediaWss.on('connection', (ws, req) => {
           callTranscript.pushAgent(line);
           turnTiming.markFirstSpokenChunk();
           const nameAsk = askingName && line === fileNameAsk;
-          await speakText(
+          const plannedSpoken = await speakText(
             line,
             speakCommit.wasSpoken(line)
               ? { skipFileGate: true, ...(nameAsk ? { tracePath: 'file_name_ask' } : {}) }
@@ -3733,6 +4213,22 @@ mediaWss.on('connection', (ws, req) => {
                 : {}
           );
           spokeThisTurn = true;
+          // VOICE_FACT_REFS: keep a locally spoken answer in the model's
+          // history, so the next turn does not answer it again
+          // (HD_9939ca74d492 repeated the Kileleshwa fee on the hours turn).
+          if (
+            plannedSpoken?.ok &&
+            (require('./src/conversation/factSheet').factRefsEnabled() ||
+              (lookupPlan?.handled && line === lookupPlan.speech))
+          ) {
+            messages.push({
+              role: 'assistant',
+              content: line,
+              local: true,
+              spokenAnswer: true,
+              ...(lookupPlan?.handled && line === lookupPlan.speech ? { turn_id: lookupPlan.turnId } : {}),
+            });
+          }
         }
         if (arbPacket) turnArbiter.release();
         return;
@@ -3963,6 +4459,7 @@ mediaWss.on('connection', (ws, req) => {
             callLanguage,
             speedScale: ttsSpeedScale,
             extraLexicon: ttsLexiconOverrides,
+            addressTerms: ttsAddressTerms,
           })
           .then((session) => {
             speakSession = session;
@@ -4014,6 +4511,7 @@ mediaWss.on('connection', (ws, req) => {
           callLanguage,
           speedScale: ttsSpeedScale,
           extraLexicon: ttsLexiconOverrides,
+          addressTerms: ttsAddressTerms,
         });
         console.log(`[ws/media][${sidLabel()}] llm→tts stream open`);
         return speakSession;
@@ -4040,6 +4538,7 @@ mediaWss.on('connection', (ws, req) => {
           state: brainState,
           language: callLanguage,
           streamChunk: true,
+          spokenThisTurn: spokeThisTurn === true,
         });
         const polished = polishedDetail.text;
         if (typeof voiceTrace !== 'undefined' && voiceTrace) {
@@ -4141,6 +4640,7 @@ mediaWss.on('connection', (ws, req) => {
           const traced = prepareForTts(text, {
             callLanguage,
             extraLexicon: typeof ttsLexiconOverrides !== 'undefined' ? ttsLexiconOverrides : [],
+            addressTerms: ttsAddressTerms,
           });
           voiceTrace.noteTts({
             text: traced.text,
@@ -4249,6 +4749,7 @@ mediaWss.on('connection', (ws, req) => {
             : String(result?.rawText || '').length,
           spokenEmitted: result?.spokenEmitted ?? null,
           firstTokenAt: result?.firstTokenAt || null,
+          stream: result?.streamJoins || null,
         });
       }
 
@@ -4398,15 +4899,19 @@ mediaWss.on('connection', (ws, req) => {
             speakSession = null;
             if (planned.speakNow && planned.reply && !bargeInActive) {
               const missed = Boolean(result?.timedOut || result?.llmFailed);
-              const reply = missed
-                ? await speechWhenModelMissed(result, clean, localReply)
-                : catalogueMouth.letGemini
-                  ? softenCataloguePunctuation(cutNoAiSlop(planned.reply))
-                  : cutNoAiSlop(planned.reply);
+              const reply = result?.lookupSpeech
+                ? result.lookupSpeech
+                : missed
+                  ? await speechWhenModelMissed(result, clean, localReply)
+                  : modelMouthLine(planned.reply, result, catalogueMouth.letGemini);
               if (reply) {
+                if (result?.lookupAck) await speakText(result.lookupAck, { skipFileGate: true });
                 callTranscript.pushAgent(reply);
                 turnTiming.markFirstSpokenChunk();
-                await speakText(reply, missed ? { tracePath: 'speech_repair' } : undefined);
+                await speakText(
+                  reply,
+                  result?.lookupSpeech ? { skipFileGate: true } : missed ? { tracePath: 'speech_repair' } : undefined
+                );
                 spokeThisTurn = true;
                 turnOutcome = result?.llmHardDown
                   ? 'speech_guarantee'
@@ -4438,15 +4943,19 @@ mediaWss.on('connection', (ws, req) => {
           });
           if (planned.speakNow && planned.reply) {
             const missed = Boolean(result?.timedOut || result?.llmFailed);
-            const reply = missed
-              ? await speechWhenModelMissed(result, clean, localReply)
-              : catalogueMouth.letGemini
-                ? softenCataloguePunctuation(cutNoAiSlop(planned.reply))
-                : cutNoAiSlop(planned.reply);
+            const reply = result?.lookupSpeech
+              ? result.lookupSpeech
+              : missed
+                ? await speechWhenModelMissed(result, clean, localReply)
+                : modelMouthLine(planned.reply, result, catalogueMouth.letGemini);
             if (reply) {
+              if (result?.lookupAck) await speakText(result.lookupAck, { skipFileGate: true });
               callTranscript.pushAgent(reply);
               turnTiming.markFirstSpokenChunk();
-              await speakText(reply, missed ? { tracePath: 'speech_repair' } : undefined);
+              await speakText(
+                reply,
+                result?.lookupSpeech ? { skipFileGate: true } : missed ? { tracePath: 'speech_repair' } : undefined
+              );
               spokeThisTurn = true;
               turnOutcome = result?.llmHardDown
                 ? 'speech_guarantee'
@@ -4488,11 +4997,11 @@ mediaWss.on('connection', (ws, req) => {
           }
           speakSession = null;
         }
-        const modelLine = result?.spokenText
-          ? catalogueMouth.letGemini
-            ? softenCataloguePunctuation(cutNoAiSlop(result.spokenText))
-            : cutNoAiSlop(result.spokenText)
-          : '';
+        const modelLine = result?.lookupSpeech
+          ? result.lookupSpeech
+          : result?.spokenText
+            ? modelMouthLine(result.spokenText, result, catalogueMouth.letGemini)
+            : '';
         const reply =
           (result?.spokenText ? modelLine : '') ||
           (result?.actionConfirmation
@@ -4519,12 +5028,15 @@ mediaWss.on('connection', (ws, req) => {
         if (suppressModelSpeech) {
           await speakLookupSentence();
         } else if (reply && !skipDuplicateAsk) {
+          if (result?.lookupAck) await speakText(result.lookupAck, { skipFileGate: true });
           callTranscript.pushAgent(reply);
           turnTiming.markFirstSpokenChunk();
           await speakText(
             reply,
-            !result?.spokenText && (result?.timedOut || result?.llmFailed)
-              ? { tracePath: 'speech_repair' }
+            result?.lookupSpeech
+              ? { skipFileGate: true }
+              : !result?.spokenText && (result?.timedOut || result?.llmFailed)
+                ? { tracePath: 'speech_repair' }
               : undefined
           );
           spokeThisTurn = true;
@@ -4811,13 +5323,27 @@ mediaWss.on('connection', (ws, req) => {
     considerTurnEnd(false);
   }
 
+  let lastPrerollSkipLogAt = 0;
+  function noteGreetingPrerollSkip(preroll, source) {
+    const now = Date.now();
+    if (now - lastPrerollSkipLogAt < 900) return;
+    lastPrerollSkipLogAt = now;
+    console.log(
+      `[ws/media][${sidLabel()}] barge skipped (greeting_preroll) src=${source} preroll_ms=${
+        greetingPrerollMs == null ? 'pending' : greetingPrerollMs
+      }: ${String(preroll.droppedText || '').slice(0, 80)}`
+    );
+  }
+
   function onSttEvent(evt) {
     if (evt.type === 'error') {
       const classified = evt.classified || classifySonioxError(evt.raw);
       if (classified.billing || classified.fatal) {
-        void handleSpeechProviderOutage(
+        handleSpeechProviderOutage(
           `stt ${classified.code || classified.message}`
-        );
+        ).catch((err) => {
+          console.error(`[ws/media][${sidLabel()}] stt outage handler failed:`, err?.message || err);
+        });
       }
       return;
     }
@@ -4846,10 +5372,24 @@ mediaWss.on('connection', (ws, req) => {
       // "For" mid-sentence). The hold caps how long postpones can stretch it.
       if (unfinishedHold.pending() && !looksLikeEcho(text)) unfinishedHold.postpone(text);
 
+      // While the greeting plays, only words that started after its first
+      // PCM can barge it. Earlier speech still queues for the first turn.
+      const preroll = prerollFilter(evt.tokens, {
+        prerollMs: greetingPrerollMs != null ? greetingPrerollMs : Infinity,
+        greetingPlaying: !greetingSettled && greetingStarted,
+      });
+      if (preroll.applied && preroll.droppedText) {
+        noteGreetingPrerollSkip(preroll, isInterim ? 'interim' : 'final');
+      }
+
       // Instant barge-in on accumulated interim tokens while TTS/LLM is busy.
       if (isInterim) {
         if (speaking || turnBusy) {
-          interimBargeText = mergeInterimHypothesis(interimBargeText, text);
+          if (preroll.preroll) return;
+          interimBargeText = mergeInterimHypothesis(
+            interimBargeText,
+            preroll.applied ? preroll.text : text
+          );
           const interimDecision = maybeBargeIn(interimBargeText, 'interim speech');
           if (callerEventClearsIdle(interimDecision)) {
             noteCallerSpeechForIdle(interimBargeText);
@@ -4879,7 +5419,9 @@ mediaWss.on('connection', (ws, req) => {
 
       // Finals: one turn-taking decision, then act.
       interimBargeText = '';
-      const decision = maybeBargeIn(text, 'final speech');
+      const decision = preroll.preroll
+        ? { interrupt: false, action: 'queue', queue: false, reason: 'greeting_preroll' }
+        : maybeBargeIn(preroll.applied ? preroll.text : text, 'final speech');
 
       if (decision.reason === 'echo') {
         voiceTrace.noteTurnEnd({ decision: 'drop', reason: 'echo' });
@@ -4889,20 +5431,58 @@ mediaWss.on('connection', (ws, req) => {
         return;
       }
 
+      // VOICE_BARE_GREETING_REPLY: a bare Hello/Yes before the first real turn
+      // used to end here as an empty replay or an ignored backchannel. Send it
+      // through the normal turn-end merge instead ("Hello" + "I need a
+      // cleaner" stays one turn); runCallerTurn speaks the re-invite if it is
+      // still bare.
+      if (
+        !decision.queue &&
+        (decision.replay ||
+          decision.interrupt ||
+          decision.action === 'ignore' ||
+          decision.action === 'skip' ||
+          decision.action === 'barge_listen') &&
+        shouldReinviteBareGreeting({
+          text: preroll.applied ? preroll.text : text,
+          firstRealTurnDone: firstRealCallerTurnDone,
+          reinvites: bareGreetingReinvites,
+          speaking: decision.interrupt ? false : speaking,
+          turnBusy,
+          callEnding: callEnding || callIsOver() || speechOutageStarted,
+        })
+      ) {
+        noteCallerSpeechForIdle(text);
+        voiceTrace.noteTurnEnd({ decision: 'queue', reason: 'bare_greeting' });
+        appendFinalPart(utteranceParts, evt.text);
+        scheduleUtteranceFlush();
+        return;
+      }
+
       if (decision.replay) {
         voiceTrace.noteTurnEnd({ decision: 'replay', reason: decision.reason || 'replay' });
-        const replay = hearAgainReplayText();
+        let replay = hearAgainReplayText();
+        // The cached-PCM greeting never reaches agentReplay, so a hear-again
+        // right after it found no line and went silent. Fall back to the last
+        // spoken question (VOICE_BARE_GREETING_REPLY).
+        if (!replay && bareGreetingReplyEnabled() && agentAwaitingReply(lastAgentText)) {
+          replay = String(lastAgentText || '').trim();
+        }
         if (replay) {
           if (callerEventClearsIdle(decision)) noteCallerSpeechForIdle(text);
           console.log(
             `[ws/media][${sidLabel()}] agent_question_replay reason=${decision.reason}`
           );
-          void speakText(replay, { isReplay: true }).then(() => {
-            if (callEnding) return;
-            if (agentAwaitingReply(replay)) {
-              idleNudge.arm({ skip: !heardCallerUtterance });
-            }
-          });
+          speakText(replay, { isReplay: true })
+            .then(() => {
+              if (callEnding) return;
+              if (agentAwaitingReply(replay)) {
+                idleNudge.arm({ skip: !heardCallerUtterance });
+              }
+            })
+            .catch((err) => {
+              console.warn(`[ws/media][${sidLabel()}] replay speak failed:`, err?.message || err);
+            });
         }
         return;
       }
@@ -5011,8 +5591,14 @@ mediaWss.on('connection', (ws, req) => {
         playbackBytes += pcm.length;
         if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
         // Live clone-voice audio means we can record downtime clips for the next outage.
-        scheduleOutageClipWarm({ voiceId: tenantSonioxVoiceId });
+        // Fallback audio (espeak / Gemini) is not the clone voice.
+        if (!meta.fallback) scheduleOutageClipWarm({ voiceId: tenantSonioxVoiceId });
       },
+      // VOICE_TTS_RESPEAK: a line Soniox lost mid-call is spoken again, or
+      // through this chain, unless the caller barged in or the call is over.
+      fallbackPcm: createLineFallback({ voiceId: () => tenantSonioxVoiceId }),
+      shouldRespeak: () =>
+        !bargeInActive && !speechOutageStarted && ws.readyState === WebSocket.OPEN,
     });
     tts = session;
     ttsSessionVoiceId = resolveSonioxVoice(voiceId);
@@ -5031,7 +5617,10 @@ mediaWss.on('connection', (ws, req) => {
         callSid: sidLabel(),
         onEvent: onSttEvent,
         // Prefer awaited profile; fall back quickly if load is slow (audio still buffers).
-        contextPromise: tenantWarm.then((ctx) => ctx || buildSttContext(sttTenantSnapshot)),
+        // .catch here: if the STT socket never opens, nothing else subscribes.
+        contextPromise: tenantWarm
+          .then((ctx) => ctx || buildSttContext(sttTenantSnapshot))
+          .catch(() => null),
       });
       stt.ready.catch((err) => {
         console.error(`[ws/media] Soniox STT failed to start:`, err?.message || err);
@@ -5087,6 +5676,7 @@ mediaWss.on('connection', (ws, req) => {
     try {
       await ensureTenantPrompt();
       if (speechOutageStarted) return;
+      if (endedRefused) return;
       // Every answered call starts at profile pace. A faster ask on the last
       // call must not ride this greeting or the rest of this session.
       ttsSpeedScale = 1;
@@ -5175,6 +5765,11 @@ mediaWss.on('connection', (ws, req) => {
         }
 
         greetingAwaitingFirstPcm = true;
+        if (brainProfile?.id && greetingWarmEnabled()) {
+          // Cache miss: render it off-call so the next caller gets cached PCM
+          // even if this greeting is cut short (cancelled renders are not kept).
+          void greetingWarmer.warmTenant(brainProfile.id);
+        }
         const spoken = await speakGreetingSentences(greetingLine, {
           greetingCacheKey: found.key,
           extraLexicon: found.extraLexicon,
@@ -5256,6 +5851,7 @@ mediaWss.on('connection', (ws, req) => {
   })();
 
   ws.on('message', (data, isBinary) => {
+    if (endedRefused) return;
     try {
       const buf = toNodeBuffer(data);
       const asText = buf.toString('utf8');
@@ -5296,7 +5892,20 @@ mediaWss.on('connection', (ws, req) => {
               );
             }
             if (maybeSid && !sessionCallSid) {
+              // A sid that only arrives in the start frame gets the same
+              // ended-call check (memory only; the upgrade had no sid).
+              const lateEnded = endedCalls.endedCallGuardEnabled()
+                ? endedCalls.endedReason(String(maybeSid), { terminalSince: callTerminalSince })
+                : '';
+              if (lateEnded) {
+                endedRefused = true;
+                sessionCallSid = String(maybeSid);
+                refuseEndedMedia(ws, sessionCallSid, lateEnded, 'memory_start_frame');
+                return;
+              }
               sessionCallSid = String(maybeSid);
+              endedCalls.noteMediaOpen(sessionCallSid, connectedAt);
+              callSpokenTranscripts.set(sessionCallSid, callTranscript);
               ttsSpeedScale = 1;
               publishVoiceTrace();
               console.log(`[ws/media] bound session callSid=${sessionCallSid}`);
@@ -5322,8 +5931,22 @@ mediaWss.on('connection', (ws, req) => {
           `[ws/media] binary audio frame #${binaryFrames} (${buf.length} bytes) callSid=${sessionCallSid || 'unknown'}`
         );
       }
+      // The leading burst (audio SautiKit queued while the leg was set up)
+      // is drained so it cannot be transcribed late and barge the greeting.
+      const admitted = inboundBurstGate.admit(buf.length, {
+        greetingStarted: firstForward.greetingLogged,
+      });
+      if (!admitted.forward) {
+        console.log(
+          `[ws/media][${sidLabel()}] initial caller audio burst drained frame=${binaryFrames} bytes=${buf.length} total_ms=${inboundBurstGate.drainedMs}`
+        );
+        return;
+      }
       // Keep feeding STT during TTS so barge-in can fire; echo is filtered in onSttEvent.
-      if (stt) stt.sendAudio(buf);
+      if (stt) {
+        sttAudioBytes += buf.length;
+        stt.sendAudio(buf);
+      }
     } catch (err) {
       console.error(
         '[ws/media] message handler error (socket kept open):',
@@ -5335,6 +5958,20 @@ mediaWss.on('connection', (ws, req) => {
 
   ws.on('close', (code, reason) => {
     const ms = Date.now() - connectedAt;
+    // VOICE_ENDED_CALL_GUARD: did this session end the call? Our end_call,
+    // a clean 1000 close, or a terminal webhook while it was open. An
+    // abnormal close with none of those finalizes provisionally, so a
+    // resumed session can still finalize last.
+    const endedByThisSession =
+      !endedRefused &&
+      Boolean(sessionCallSid) &&
+      (callEnding || code === 1000 || Boolean(callTerminalSince(sessionCallSid, connectedAt)));
+    if (sessionCallSid && !endedRefused) {
+      endedCalls.noteMediaClose(sessionCallSid, {
+        ended: endedByThisSession,
+        reason: callEnding ? 'end_call' : code === 1000 ? 'media_close_1000' : 'terminal_webhook',
+      });
+    }
     console.log(
       `[ws/media] closed after ${ms}ms code=${code} reason=${reason?.toString?.() || ''} callSid=${sessionCallSid || 'unknown'} frames={text:${textFrames},binary:${binaryFrames}}`
     );
@@ -5362,7 +5999,13 @@ mediaWss.on('connection', (ws, req) => {
       }
       tts = null;
     }
-    void voiceTrace.finishCall();
+    if (endedRefused) {
+      console.log(`[ws/media] refused session closed callSid=${sessionCallSid || 'unknown'}: nothing finalized`);
+      return;
+    }
+    voiceTrace.finishCall().catch((err) => {
+      console.warn(`[ws/media] voice trace finish failed:`, err?.message || err);
+    });
     if (sessionCallSid && callTranscript.size()) {
       db.appendTranscript({ callSid: sessionCallSid, turns: callTranscript.turns() }).catch(
         (err) => {
@@ -5372,19 +6015,31 @@ mediaWss.on('connection', (ws, req) => {
     }
     // Fallback: if SautiKit never posts call.completed, still leave the row finished.
     // Do not close the desk row while a cold Dial is waiting on Redirect.
-    if (sessionCallSid && !hasPendingLiveTransfer(sessionCallSid)) {
+    if (sessionCallSid) {
+      // The hangup webhook may never reach /voice/events (prod posts to /).
+      scheduleRecordingFetch(
+        [sessionCallSid, providerCallIdBySid.get(sessionCallSid)],
+        'ws/media'
+      );
+    }
+    const deferredEnd = sessionCallSid && endedCalls.endedCallGuardEnabled()
+      ? endedCalls.takeDeferred(sessionCallSid)
+      : null;
+    if (sessionCallSid && (!hasPendingLiveTransfer(sessionCallSid) || deferredEnd)) {
       const durationSeconds = Math.max(0, Math.round(ms / 1000));
       markCallTerminalFromWebhook({
         callSid: sessionCallSid,
-        status: 'complete',
+        status: deferredEnd?.status || 'complete',
         durationSeconds,
         source: 'ws/media',
         turns: callTranscript.turns(),
+        provisional: !endedByThisSession && !deferredEnd,
       })
         .catch(() => {})
         .finally(() => {
           callAgentTools.delete(sessionCallSid);
           callBrainStates.delete(sessionCallSid);
+          callSpokenTranscripts.delete(sessionCallSid);
           callBrainCapabilities.delete(sessionCallSid);
           callTenantProfiles.delete(sessionCallSid);
         });
@@ -5420,6 +6075,23 @@ try {
   if (dqClient) require('./src/lib/dataQualityDaily').startDataQualityDaily({ rpc: (fn) => dqClient.rpc(fn) });
 } catch (err) {
   console.warn('[data-quality] not started:', err?.message || err);
+}
+
+try {
+  const dbRetention = require('./src/db');
+  const { purgeExpiredRecordingsBatch, startRecordingRetentionDaily } = require('./src/lib/recordingRetention');
+  const { deleteProviderRecording } = require('./src/sautikit/recordingFetch');
+  startRecordingRetentionDaily({
+    purgeBatch: (opts) =>
+      purgeExpiredRecordingsBatch({
+        listCalls: dbRetention.listCallsForRecordingRetentionPurge,
+        purgeCall: dbRetention.purgeCallRecordingRetention,
+        deleteProvider: deleteProviderRecording,
+        ...opts,
+      }),
+  });
+} catch (err) {
+  console.warn('[recording-retention] not started:', err?.message || err);
 }
 
 // ---------------------------------------------------------------------------
@@ -5533,6 +6205,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         callSid,
         kind: 'escalation',
         force,
+        pingId: escalate.pingId || null,
       },
     });
 
@@ -5589,7 +6262,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
     }
 
     await db.markEscalationSent(callSid);
-    await db.markWhatsappSent(callSid);
+    await db.markWhatsappSent(callSid, buildNotifyOutcome(sent));
     const liveOutcome = shapeEscalationNotifyOutcome({
       ok: true,
       soft: false,
@@ -5626,6 +6299,18 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
   }
 }
 
+/**
+ * The line state when this call's business is closed (archived, suspended,
+ * is_active=false), else null. The profile's lineState is from call start;
+ * the cached lookup (~60 s) catches a line closed mid-call. Guard off: null.
+ */
+async function callTenantLineClosed(profile) {
+  if (!closedTenantGuardEnabled()) return null;
+  if (profile?.lineState?.closed) return profile.lineState;
+  const line = await tenantLineForAction(profile?.id);
+  return line.closed ? line : null;
+}
+
 async function maybeQueueLiveTransfer({
   callSid,
   escalate,
@@ -5636,6 +6321,13 @@ async function maybeQueueLiveTransfer({
   const dest = liveTransferDestination(teamDirectory, escalate?.teammate);
   const ready = liveTransferReady({ profile });
   if (!ready.ready || !dest) return false;
+  const closedLine = await callTenantLineClosed(profile);
+  if (closedLine) {
+    console.warn(
+      `[${callSid}] live transfer skipped: tenant line closed (${closedLine.reason}) tenant=${profile?.id || 'unknown'}`
+    );
+    return false;
+  }
   const callerE164 = normalizeKenyaE164(callerNumber);
   if (callerE164 && callerE164 === dest.phone) {
     console.warn(
@@ -5672,7 +6364,14 @@ async function maybeQueueLiveTransfer({
 
 async function maybeSendWhatsAppNotification(callSid, opts = {}) {
   // Lead alert: WhatsApp owner number when sender is ready; email fallback otherwise.
-  const call = await db.getCall(callSid);
+  // Never rejects: two mid-call callers fire this without awaiting it.
+  let call = null;
+  try {
+    call = await db.getCall(callSid);
+  } catch (err) {
+    console.error(`[${callSid}] Owner notification skipped (call lookup failed):`, err?.message || err);
+    return;
+  }
   if (!call) return;
 
   if (!shouldSendOwnerLead(call)) return;
@@ -5691,7 +6390,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
   }
 
   if (ownerNotifyInProgress.has(callSid)) return;
-  if (call.whatsapp_sent) return;
+  if (ownerAlreadyNotified(call)) return;
   ownerNotifyInProgress.add(callSid);
 
   try {
@@ -5713,15 +6412,21 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       console.warn(`[${callSid}] tenant lookup for notify failed:`, err?.message || err);
     }
 
-    const event = ownerLeadEvent(
-      { ...call, callUrl: callDeskUrl(call.id) },
-      businessName
-    );
+    // HD_cd0c01f28b05: the lead reason is the caller's need. A missing reason
+    // or the name detour ("correct name spelling") falls back to the need
+    // Brain recorded this call ("Alvin asked about what time it is.").
+    const leadCall = { ...call, callUrl: callDeskUrl(call.id) };
+    if (!usableLeadReason(call.reason) && brain) {
+      const need = usableLeadReason(deriveCallSummary({ brainState: brain }).reason);
+      if (need && !/^\S+ called\.$/.test(need)) leadCall.reason = need;
+      else if (call.reason) leadCall.reason = null;
+    }
+    const event = ownerLeadEvent(leadCall, businessName);
     const body = renderEventText(event);
     const lead = {
       businessName,
       name: event.caller?.name || call.name,
-      reason: event.caller?.reason || call.reason,
+      reason: event.caller?.reason || leadCall.reason,
       callerNumber: call.from_number,
       recordingUrl: call.recording_url,
     };
@@ -5730,7 +6435,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       ownerPhone: ownerNumber,
       ownerEmail,
     });
-    const { sent } = await dispatchToStaff({
+    const { sent, errors: notifyErrors } = await dispatchToStaff({
       recipients: inbox.recipients,
       body,
       lead,
@@ -5759,7 +6464,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       return;
     }
 
-    await db.markWhatsappSent(callSid);
+    await db.markWhatsappSent(callSid, buildNotifyOutcome(sent, notifyErrors));
     await db.mergeCallSummaryMeta({
       callSid,
       patch: {
@@ -5825,7 +6530,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
     ownerPhone: ownerNumber,
     ownerEmail,
   });
-  const { sent } = await dispatchToStaff({
+  const { sent, errors: staffNotifyErrors } = await dispatchToStaff({
     recipients: inbox.recipients,
     body,
     lead,
@@ -5840,7 +6545,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
         (result.to ? ` → ${result.to}` : '')
     );
     try {
-      await db.markWhatsappSent(callSid);
+      await db.markWhatsappSent(callSid, buildNotifyOutcome(sent, staffNotifyErrors));
       await db.mergeCallSummaryMeta({
         callSid,
         patch: {
@@ -5928,7 +6633,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     ownerPhone: ownerNumber,
     ownerEmail,
   });
-  const { sent } = await dispatchToStaff({
+  const { sent, errors: staffNotifyErrors } = await dispatchToStaff({
     recipients: inbox.recipients,
     body,
     lead,
@@ -5943,7 +6648,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
         (result.to ? ` → ${result.to}` : '')
     );
     try {
-      await db.markWhatsappSent(callSid);
+      await db.markWhatsappSent(callSid, buildNotifyOutcome(sent, staffNotifyErrors));
       await db.mergeCallSummaryMeta({
         callSid,
         patch: {
@@ -5989,7 +6694,8 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
 
 wss.on('connection', (ws) => {
   let callSid = null;
-  let systemPrompt = buildSystemPrompt();
+  let promptClockAt = new Date();
+  let systemPrompt = buildSystemPrompt({}, { now: promptClockAt });
   let messages = [{ role: 'system', content: systemPrompt }];
   let transcriptLog = [];
   let callLanguage = 'unknown';
@@ -6018,7 +6724,8 @@ wss.on('connection', (ws) => {
           const profile = await db.getTenantProfile({ callSid, toNumber: data.to });
           await hydrateCallerMemory(profile, callSid);
           brainProfile = profile;
-          systemPrompt = buildSystemPrompt(profile);
+          promptClockAt = new Date();
+          systemPrompt = buildSystemPrompt(profile, { now: promptClockAt });
           const parsedTools = parseAgentTools(profile.agentTools);
           callAgentTools.set(callSid, parsedTools);
           callTenantProfiles.set(callSid, profile);
@@ -6072,11 +6779,17 @@ wss.on('connection', (ws) => {
             profile: brainProfile,
           })
         );
-        if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
-          systemPrompt = buildSystemPrompt(brainProfile);
+        const promptNow = new Date();
+        if (
+          liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp ||
+          promptClockStale(promptClockAt, promptNow)
+        ) {
+          promptClockAt = promptNow;
+          systemPrompt = buildSystemPrompt(brainProfile, { now: promptClockAt });
         }
         const decision = determineNextBestAction({ state: brainState, capabilities });
         brainState = setNextBestAction(brainState, decision);
+        stampPromptClock(brainState, promptClockAt);
         callBrainStates.set(callSid, brainState);
         logBrainTrace({
           callSid,
@@ -6294,8 +7007,8 @@ async function generateGeminiText({
   return text;
 }
 
-function geminiVoiceConfig(systemPrompt) {
-  return {
+function geminiVoiceConfig(systemPrompt, extra) {
+  const config = {
     systemInstruction: { parts: [{ text: systemPrompt }] },
     // Slightly lower temp + shorter cap → faster, more consistent phone lines.
     temperature: Number(process.env.GEMINI_VOICE_TEMPERATURE || 0.35),
@@ -6305,6 +7018,40 @@ function geminiVoiceConfig(systemPrompt) {
       thinkingLevel: process.env.GEMINI_THINKING_LEVEL || 'MINIMAL',
     },
   };
+  if (extra && Array.isArray(extra.tools) && extra.tools.length) config.tools = extra.tools;
+  return config;
+}
+
+function modelMouthLine(text, result, soften) {
+  if (result?.lookupSpeech) return String(result.lookupSpeech);
+  const raw = String(text || '');
+  if (!raw) return '';
+  return soften ? softenCataloguePunctuation(cutNoAiSlop(raw)) : cutNoAiSlop(raw);
+}
+
+function voiceGeminiConfig(systemPrompt) {
+  if (!lookupToolEnabled()) return geminiVoiceConfig(systemPrompt);
+  const prompt = `${systemPrompt}\n\nLOOKUP TOOL: if the caller asks a price, a travel fee, opening hours, a payment number, or which services you offer, call lookup and write no speech. The system says the result.`;
+  return geminiVoiceConfig(prompt, { tools: [lookupToolDeclaration()] });
+}
+
+async function spokenFromLookupTool(callSid, calls, modelAlreadySpoke) {
+  if (modelAlreadySpoke || !lookupToolEnabled() || !Array.isArray(calls) || !calls.length) return null;
+  const call = calls.find((row) => row.name === 'lookup');
+  if (!call) return null;
+  const state = callBrainStates.get(callSid);
+  const profile = callTenantProfiles.get(callSid) || {};
+  const language = state?.language?.current || 'en';
+  const out = await lookupWithDeadline(String(call.args?.kind || ''), String(call.args?.query || ''), {
+    profile,
+    language,
+    now: new Date(),
+  });
+  const spoken = polishSpokenReply(out.speech, {
+    ...finalSpeechGuardOpts(callSid),
+    lookupSpeech: true,
+  });
+  return { speech: spoken, ack: out.ack || '' };
 }
 
 /**
@@ -6334,8 +7081,15 @@ async function applyGeminiTools(callSid, parsed) {
       `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : enforcedParsed.fragmentBlocked ? 'fragment_turn' : 'needs_visit_time'}`
     );
   }
+  const closedLine = brainToolsWantWrite(enforcedParsed)
+    ? await callTenantLineClosed(groundedProfile)
+    : null;
+  if (closedLine) {
+    console.warn(`[${callSid}] tool writes refused: tenant line closed (${closedLine.reason})`);
+  }
   const execution = await executeBrainTools({
     parsed: enforcedParsed,
+    lineClosed: closedLine ? closedLine.reason || 'closed' : null,
     capabilities,
     completedFingerprints: state.actions.completedFingerprints,
     priorHolds: state.actions.openHolds || [],
@@ -6576,7 +7330,9 @@ async function applyGeminiTools(callSid, parsed) {
       (result.status === 'succeeded' || result.status === 'updated')
   );
   if (savedInfo?.name && savedInfo?.reason && !escalationRequested && !visitSaved) {
-    maybeSendWhatsAppNotification(callSid, { midCall: true });
+    maybeSendWhatsAppNotification(callSid, { midCall: true }).catch((err) => {
+      console.error(`[${callSid}] mid-call owner notify failed:`, err?.message || err);
+    });
   }
   if (visitSaved) {
     persistCallResolution(callSid, 'tool', { review: false }).catch((err) => {
@@ -6655,7 +7411,7 @@ async function applyToolsWithHold(callSid, parsed, hooks = {}) {
   if (session && session.phase !== 'cancelled') {
     const begun = session.begin();
     if (begun.speak && typeof hooks.onToolHold === 'function') {
-      holdSpeech = Promise.resolve(hooks.onToolHold(begun));
+      holdSpeech = Promise.resolve(hooks.onToolHold({ ...begun, toolSettled: toolPromise }));
     }
   }
   const [execution] = await Promise.all([toolPromise, holdSpeech]);
@@ -6696,10 +7452,12 @@ async function runGeminiTurnStreaming(
   let buffer = createSpokenStreamBuffer({ catalogueBreath: breath });
   let fullText = '';
   let firstTokenAt = null;
+  let functionCalls = [];
   let streamFailed = false;
   let streamErr = null;
   let thoughtSignature = '';
   let modelParts = [];
+  let joinTrace = createStreamJoinTrace();
   const timeoutMs = geminiTurnTimeoutMs();
   let attempt = 0;
 
@@ -6709,6 +7467,8 @@ async function runGeminiTurnStreaming(
     buffer = createSpokenStreamBuffer({ catalogueBreath: breath });
     thoughtSignature = '';
     modelParts = [];
+    functionCalls = [];
+    joinTrace = createStreamJoinTrace();
     streamErr = null;
     streamFailed = false;
     try {
@@ -6720,7 +7480,7 @@ async function runGeminiTurnStreaming(
           const stream = await getGeminiClient().models.generateContentStream({
             model,
             contents,
-            config: geminiVoiceConfig(systemPrompt),
+            config: voiceGeminiConfig(systemPrompt),
           });
 
           for await (const chunk of stream) {
@@ -6729,11 +7489,14 @@ async function runGeminiTurnStreaming(
               break;
             }
             modelParts = appendGeminiStreamParts(modelParts, chunk);
+            functionCalls.push(...extractGeminiFunctionCalls(chunk));
             thoughtSignature = extractThoughtSignature(chunk) || thoughtSignature;
             const delta = extractGeminiText(chunk);
             if (!delta) continue;
             if (!firstTokenAt) firstTokenAt = Date.now();
+            const joinedBefore = fullText;
             fullText = joinSpokenPieces(fullText, delta);
+            joinTrace.note(joinedBefore, delta, fullText);
             const pieces = buffer.push(delta);
             for (const piece of pieces) {
               if (shouldAbort?.()) break;
@@ -6753,8 +7516,9 @@ async function runGeminiTurnStreaming(
         timeoutMs,
         'Gemini stream'
       );
+      const joins = joinTrace.summary();
       console.log(
-        `[${callSid}] Gemini stream done chars=${fullText.length} spokenEmitted=${buffer.getSpokenEmitted().length}`
+        `[${callSid}] Gemini stream done chars=${fullText.length} spokenEmitted=${buffer.getSpokenEmitted().length} deltas=${joins.deltas} unspacedJoins=${joins.unspacedJoins}`
       );
       break;
     } catch (err) {
@@ -6831,6 +7595,7 @@ async function runGeminiTurnStreaming(
   }
 
   const parsed = parseGeminiResponse(fullText || buffer.getRaw());
+  const lookupTool = await spokenFromLookupTool(callSid, functionCalls, buffer.getSpokenEmitted().length > 0);
   const heldTools = await applyToolsWithHold(callSid, parsed, { shouldAbort, onToolHold });
   const execution = heldTools.execution;
   let actionConfirmation = formatToolConfirmation(
@@ -6846,16 +7611,18 @@ async function runGeminiTurnStreaming(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   ).lines;
-  const spokenText = polishSpokenReply(
-    spokenTextForToolTurn({
-      spoken: spokenTextWithoutToolFallback({
-        spoken: buffer.getSpokenEmitted() || parsed.spokenText,
-        actionConfirmation,
-      }),
-      toolResults: execution.results,
-    }),
-    finalSpeechGuardOpts(callSid, execution.results)
-  );
+  const spokenText = lookupTool
+    ? lookupTool.speech
+    : polishSpokenReply(
+        spokenTextForToolTurn({
+          spoken: spokenTextWithoutToolFallback({
+            spoken: buffer.getSpokenEmitted() || parsed.spokenText,
+            actionConfirmation,
+          }),
+          toolResults: execution.results,
+        }),
+        finalSpeechGuardOpts(callSid, execution.results)
+      );
   // BRAIN_CALL_FIXES_D199: lines the speech guard put in (confirm_identity_first).
   {
     const conv = callBrainStates.get(callSid)?.conversation;
@@ -6888,6 +7655,9 @@ async function runGeminiTurnStreaming(
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
     streamed: !streamFailed,
+    streamJoins: joinTrace.summary(),
+    lookupSpeech: lookupTool?.speech || '',
+    lookupAck: lookupTool?.ack || '',
   };
 }
 
@@ -6917,7 +7687,7 @@ async function runGeminiTurn(
         getGeminiClient().models.generateContent({
           model,
           contents,
-          config: geminiVoiceConfig(systemPrompt),
+          config: voiceGeminiConfig(systemPrompt),
         }),
         geminiTurnTimeoutMs(),
         'Gemini generateContent'
@@ -6960,6 +7730,11 @@ async function runGeminiTurn(
   }
 
   const outputText = extractGeminiText(response);
+  const lookupTool = await spokenFromLookupTool(
+    callSid,
+    extractGeminiFunctionCalls(response),
+    Boolean(String(outputText || '').trim())
+  );
   const parsed = parseGeminiResponse(outputText);
   const heldTools = await applyToolsWithHold(callSid, parsed, hooks);
   const execution = heldTools.execution;
@@ -6976,16 +7751,18 @@ async function runGeminiTurn(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   ).lines;
-  const spokenText = polishSpokenReply(
-    spokenTextForToolTurn({
-      spoken: spokenTextWithoutToolFallback({
-        spoken: parsed.spokenText,
-        actionConfirmation,
-      }),
-      toolResults: execution.results,
-    }),
-    finalSpeechGuardOpts(callSid, execution.results)
-  );
+  const spokenText = lookupTool
+    ? lookupTool.speech
+    : polishSpokenReply(
+        spokenTextForToolTurn({
+          spoken: spokenTextWithoutToolFallback({
+            spoken: parsed.spokenText,
+            actionConfirmation,
+          }),
+          toolResults: execution.results,
+        }),
+        finalSpeechGuardOpts(callSid, execution.results)
+      );
   // BRAIN_CALL_FIXES_D199: lines the speech guard put in (confirm_identity_first).
   {
     const conv = callBrainStates.get(callSid)?.conversation;
@@ -7018,6 +7795,8 @@ async function runGeminiTurn(
     brainLines,
     toolResults: execution.results,
     shouldEndCall: execution.shouldEndCall,
+    lookupSpeech: lookupTool?.speech || '',
+    lookupAck: lookupTool?.ack || '',
   };
 }
 
@@ -7070,6 +7849,8 @@ function startReviewSweep() {
 server.listen(PORT, () => {
   console.log(`🚀 Server listening on port ${PORT}`);
   startReviewSweep();
+  // Voice-side trigger for Desk /api/cron/ops-alerts (off unless URL + CRON_SECRET set).
+  require('./src/notifications/opsAlertsCron').startOpsAlertsCron();
   console.log(`📞 Voice webhook: POST /voice/incoming (SautiKit XML Stream → /ws/media)`);
   console.log(`📡 Media WebSocket: /ws/media (Host-based wss URL for Localtunnel)`);
   if (PUBLIC_BASE_URL) {
@@ -7078,6 +7859,12 @@ server.listen(PORT, () => {
     console.log(`🌐 PUBLIC_BASE_URL not set — Stream URLs use request Host header`);
   }
   console.log(`✓ Supabase database initialized`);
+  if (fastInboundEnabled()) {
+    // Warm the inbound directory so the first call never pays the read.
+    inboundDirectory.refresh().catch((err) =>
+      console.warn('[inbound-directory] warm failed (first call loads it):', err?.message || err)
+    );
+  }
   if (process.env.GEMINI_API_KEY) {
     console.log(`✓ GEMINI_API_KEY present (lazy-loaded on LLM use)`);
   } else {
@@ -7085,6 +7872,9 @@ server.listen(PORT, () => {
   }
   if (isSonioxConfigured()) {
     console.log(`✓ SONIOX_API_KEY present (STT on /ws/media)`);
+    if (isSonioxTtsConfigured() && greetingWarmEnabled()) {
+      greetingWarmer.start();
+    }
     if (isSonioxTtsConfigured()) {
       console.log(
         `✓ Soniox TTS enabled default voice=${resolveSonioxVoice()}`

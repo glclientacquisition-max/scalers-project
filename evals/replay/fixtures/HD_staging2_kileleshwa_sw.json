@@ -1,0 +1,16 @@
+{
+  "id": "HD_staging2_kileleshwa_sw",
+  "bug": "A",
+  "profile": "carry",
+  "language": "sw",
+  "turns": [
+    {
+      "caller": "Ah, nilikuwa nataka kujua kama mnafika Kileleshwa,",
+      "mustSay": ["mia tatu"],
+      "mustNotSay": ["300"],
+      "value": 300,
+      "status": "found",
+      "dropReasons": []
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "HD_b159e7ae70c3_t3",
+  "bug": "F",
+  "profile": "list",
+  "language": "en",
+  "turns": [
+    {
+      "caller": "How much is the.",
+      "mustSay": ["deep", "standard", "sofa", "carpet"],
+      "mustNotSay": ["6,500", "eight thousand"],
+      "status": "found"
+    }
+  ]
+}

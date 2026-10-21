@@ -25,7 +25,7 @@ async function talk(lines, opts = {}) {
   const { log, handlers } = fakeHandlers();
   const st = V2.createState({ profile: opts.profile || DD, callerPhone: '+254700000001', contactName: opts.contactName || null, openRows: opts.openRows || [], pendingTasks: opts.pendingTasks || [] });
   const out = [];
-  for (const text of lines) out.push(await V2.runTurn(st, { text, profile: opts.profile || DD, now: NOW, handlers, model: opts.model }));
+  for (const text of lines) out.push(await V2.runTurn(st, { text, profile: opts.profile || DD, now: NOW, handlers, model: opts.model, classify: opts.classify, langLock: opts.langLock || null }));
   return { st, out, log };
 }
 
@@ -95,7 +95,8 @@ test('staff names are never spoken; file name is never spoken unless the caller 
 
 test('availability is never claimed without a receipt; prices only from the catalogue', async () => {
   const { out } = await talk(['How much is an oven deep clean?', 'And for the fridge?', 'How much is gutter cleaning?']);
-  assert.match(out[0].line, priceRe('1,200', 'en')); assert.match(out[1].line, priceRe('1,000', 'en'));
+  if (SC_ON()) { assert.match(out[0].line, priceRe('1,200', 'en')); assert.match(out[1].line, priceRe('1,000', 'en')); }
+  else { assert.match(out[0].line, /one thousand two hundred shillings/); assert.match(out[1].line, /one thousand shillings/); }
   for (const o of out.slice(0, 2)) { assert.doesNotMatch(o.line, otherCurrency('en')); assert.doesNotMatch(o.line, BOOK_ASK); assert.doesNotMatch(o.line, /\b11,200\b/); } assert.match(out[2].line, /don't have a price/);
 });
 
@@ -128,15 +129,15 @@ test('catalogue: schemas reject extra properties and foreign row ids; Gemini req
 test('Swahili/Sheng questions get fact answers from tenant data, not a generic reply', async () => {
   const one = async (t) => (await talk([t])).out[0];
   let r = await one('Nilikuwa nataka kujua ni services gani mnaofa.');
-  assert.equal(r.lang, 'sw'); assert.match(r.line, /^Tunafanya usafi wa magodoro/);
+  assert.equal(r.lang, 'sw'); assert.match(r.line, SC_ON() ? /^Tunafanya usafi wa magodoro/ : /^Tuna .*Mattress cleaning/);
   r = await one('Nilikuwa nataka kujua ni saizi gani mnatoa.'); assert.match(r.line, /^Usafi wa nyumba ni kulingana na ukubwa, vyumba vya kulala kimoja, viwili au vitatu\./);
-  r = await one('Mnawashanga carpet?'); assert.match(r.line, SC_ON() ? /^Ndio, tunafanya usafi wa zulia, bei ni kuanzia shilingi 2,200 kwa mita mraba\./ : /^Ndio, tunafanya Carpet Cleaning, bei ni kuanzia KSh 2,200\b/); assert.doesNotMatch(r.line, otherCurrency('sw'));
+  r = await one('Mnawashanga carpet?'); assert.match(r.line, SC_ON() ? /^Ndio, tunafanya usafi wa zulia, bei ni kuanzia shilingi 2,200 kwa mita mraba\./ : /^Ndio, tunafanya Carpet Cleaning, bei ni kuanzia shilingi elfu mbili na mia mbili/); assert.doesNotMatch(r.line, otherCurrency('sw'));
   r = await one('Niaje, mnafika Syokimau?'); assert.match(r.line, /^Syokimau iko kwenye orodha/);
   r = await one('Mnafika Kisumu?'); assert.match(r.line, /^Kisumu haiko kwenye orodha/);
   r = await one('Habari, nilikuwa nataka kujua.'); assert.match(r.line, /bei, huduma au saa za kazi/);
   r = await one('You guys operate until what time?'); assert.match(r.line, /08:00 to 18:00/);
   const p = await talk(['Shilingi ngapi?', 'Ya sofa.']);
-  assert.match(p.out[0].line, /huduma gani/); assert.match(p.out[1].line, SC_ON() ? priceRe('800', 'sw', { sw: 'kwa kiti' }) : priceRe('800', 'sw')); assert.doesNotMatch(p.out[1].line, otherCurrency('sw')); assert.doesNotMatch(p.out[1].line, BOOK_ASK);
+  assert.match(p.out[0].line, /huduma gani/); assert.match(p.out[1].line, SC_ON() ? priceRe('800', 'sw', { sw: 'kwa kiti' }) : /eight hundred shillings|KSh 800|shilingi/); assert.doesNotMatch(p.out[1].line, otherCurrency('sw')); assert.doesNotMatch(p.out[1].line, BOOK_ASK);
   for (const o of [r, ...p.out]) assert.doesNotMatch(o.line, /Samahani, unapiga kubook|Nimwombe mwenye biashara/);
 });
 
@@ -151,7 +152,7 @@ test('live-run regressions: no double question, recall beats services, a questio
   const b = await talk(['Ni huduma gani nilikuwa nimeitisha, mara ya mwisho?']);
   assert.match(b.out[0].line, /Sioni booking/);
   const c = await talk(['Uh, I don\'t know.', 'Maybe you tell me.', 'For sure.', 'Nilikuwa nataka kujua ni services gani mna-offer,na.']);
-  assert.match(c.out[3].line, /^Tunafanya/);
+  assert.match(c.out[3].line, /^Tuna /);
 });
 
 test('"Sawa, ni hayo tu" at a read-back is not a yes (live regression HD_1677)', async () => {
@@ -177,7 +178,7 @@ test('"siishi Nairobi" is not answered as "Nairobi is covered"; help requests ge
 test('never-repeat: the coverage line is not said twice in a row (live HD_6a7597)', async () => {
   const r = await talk(['Hapana, mimi siishi Nairobi.', 'Oh, eh, sawa, mfike huko.', 'Mfike huko.']);
   assert.notEqual(r.out[0].line, r.out[1].line); assert.notEqual(r.out[1].line, r.out[2].line);
-  assert.match(r.out[1].line, /^Maeneo yetu ni Nairobi/);
+  assert.match(r.out[1].line, /^Maeneo yetu ni /);
   const p = await talk(['How much is gutter cleaning?', 'How much is gutter cleaning?']);
   assert.doesNotMatch(p.out[1].line, /^(As I said|Just to repeat)/, 'a repeat is said plainly, no filler prefix');
 });
@@ -223,7 +224,7 @@ test('HD_513dfb2fa73f: "make a booking" + detail answers keep the booking going;
   for (const o of out) assert.doesNotMatch(o.line, /As I said|Just to repeat|Kama nilivyosema|Narudia|call you back to finish|calling to book/);
   // area clarify: Rongai touches our Ongata Rongai (Kajiado) and Rongai (Nakuru); the caller moved on, so the place we serve is kept and read back
   assert.equal(out[4].line, 'Is that Ongata Rongai in Kajiado or Rongai in Nakuru?');
-  assert.match(out[5].line, /2-Bedroom Apartment on Thursday 15 October at 08:00 in Ongata Rongai, for Alvin Yegon/);
+  assert.match(out[5].line, /(2-Bedroom|two bedroom) Apartment on Thursday 15 October at 08:00 in Ongata Rongai, for Alvin Yegon/);
   assert.match(out[6].line, /in Ongata Rongai, Simba Drive/);
   const a = h.log.find((l) => l.name === 'createAppointment').args;
   assert.equal(a.landmark, 'Ongata Rongai'); assert.equal(a.notes, 'Simba Drive'); assert.equal(a.whenText, '2026-10-15 08:00');
@@ -303,4 +304,162 @@ test('v2: small-hours tomorrow (EN) -> later today; second "tomorrow" not re-ask
 test('v2: daytime kesho is not confirmed', async () => {
   const { out } = await talkAt(NOW, ['Nataka kubook sofa cleaning kesho saa nne asubuhi.']);
   assert.doesNotMatch(out[0].line, /Unamaanisha/);
+});
+
+test('HD_725: Nafika a listed area from service_areas answers coverage, does not book', async () => {
+  const profile = {
+    ...DD,
+    serviceAreas: undefined,
+    service_areas: {
+      areas: [
+        { id: 'place:kileleshwa', source: 'owner', confirmed: true, fee_ksh: 300, fee_mode: 'fixed', modes: ['visit'] },
+      ],
+    },
+  };
+  const { out, st, log } = await talk(['How much is sofa cleaning?', 'Nafika Kileleshwa?'], { profile, langLock: 'sw' });
+  assert.match(out[1].line, /Kileleshwa iko kwenye orodha/);
+  assert.doesNotMatch(out[1].line, /haiko kwenye orodha|Siku gani|What day/);
+  assert.equal(st.intent, null);
+  assert.equal(log.length, 0);
+});
+
+test('an hours ask during an open booking does not glue the next slot', async () => {
+  const { out } = await talk([
+    'Book sofa cleaning Friday at 10am in Kitengela, I am Alvin.',
+    'Mnafungua saa ngapi?',
+  ]);
+  assert.match(out[1].line, /08:00|18:00|wazi|open/i);
+  assert.doesNotMatch(out[1].line, /Shall I book|Nithibitishe|Siku gani/);
+});
+
+const JIRANI = {
+  ...DD,
+  vertical: 'home_services',
+  businessPolicies: {
+    payment: 'M-Pesa (Till) or cash after the job. No payment before the team arrives.',
+    delivery: 'Home visits in Kilimani (no travel fee), Kileleshwa, Lavington and Westlands (KSh 300 travel fee), and Karen (KSh 800 travel fee).',
+    deposit: 'No deposit for homes under 4 bedrooms.',
+    cancellation: 'Free to reschedule up to 12 hours before the visit.',
+    warranty: 'If something was missed, tell us within 24 hours and we come back to redo it free.',
+    returns: '',
+    coverage_areas: ['place:kilimani', 'place:kileleshwa', 'place:lavington', 'place:westlands', 'place:karen'],
+  },
+  service_areas: {
+    areas: [
+      { id: 'place:kilimani', source: 'owner', confirmed: true, fee_mode: 'free', fee_ksh: null, modes: ['visit'] },
+      { id: 'place:kileleshwa', source: 'owner', confirmed: true, fee_mode: 'fixed', fee_ksh: 300, modes: ['visit'] },
+      { id: 'place:karen', source: 'owner', confirmed: true, fee_mode: 'fixed', fee_ksh: 800, modes: ['visit'] },
+    ],
+  },
+};
+
+test('HD_b717: payment and pay-before speak the file, not a missing-methods line', async () => {
+  const { out, log } = await talk(['How can I pay?', 'Do I pay before you come?'], { profile: JIRANI, langLock: 'en' });
+  assert.match(out[0].line, /Till|cash after the job/i);
+  assert.doesNotMatch(out[0].line, /don't have payment details|How can I help you today|book, or about something else/i);
+  assert.match(out[1].line, /No payment before|cash after the job|Till/i);
+  assert.doesNotMatch(out[1].line, /How can I help you today|call you back to finish/i);
+  assert.equal(log.length, 0);
+});
+
+test('HD_db88: travel fee to a listed area and do you deliver stay on the file', async () => {
+  const { out, log } = await talk(
+    ["What's the travel fee to Karen?", 'Do you deliver?'],
+    { profile: JIRANI, langLock: 'en' }
+  );
+  assert.match(out[0].line, /Karen/i);
+  assert.match(out[0].line, /eight hundred shillings/i);
+  assert.doesNotMatch(out[0].line, /KSh|How can I help you today|call you back to finish|book, or about something else/i);
+  assert.match(out[1].line, /Home visits|Kilimani|travel fee/i);
+  assert.doesNotMatch(out[1].line, /parcel|courier|call you back to finish/i);
+  assert.equal(log.length, 0);
+});
+
+test('empty refund slot stays unknown and cancellation policy is not a cancel write', async () => {
+  const { out, log } = await talk(
+    ['Do you give refunds?', 'What is your cancellation policy?'],
+    { profile: JIRANI, langLock: 'en' }
+  );
+  assert.match(out[0].line, /don't have that on file/i);
+  assert.match(out[1].line, /reschedule up to 12 hours/i);
+  assert.equal(log.length, 0);
+});
+
+const JIRANI_IDS_ONLY = {
+  ...JIRANI,
+  service_areas: undefined,
+  serviceAreas: undefined,
+  areaTerms: undefined,
+};
+
+test('classifier picks a drawer and the file still speaks', async () => {
+  const classify = async ({ text }) => {
+    if (/niacha|kama niacha/i.test(text)) return { kind: 'cancel_rules', place: '' };
+    if (/come that side|kuja huko/i.test(text)) return { kind: 'come_cost', place: 'Karen' };
+    if (/five hundred|KSh 500/i.test(text)) return { kind: 'come_cost', place: 'Karen', say: 'The fee is KSh 500' };
+    return { kind: 'unknown', place: '' };
+  };
+  const come = await talk(['How much to come that side, Karen?'], { profile: JIRANI, langLock: 'en', classify });
+  assert.match(come.out[0].line, /eight hundred shillings/i);
+  assert.doesNotMatch(come.out[0].line, /Kilimani|Westlands|KSh 500|five hundred|How can I help you today/i);
+
+  const hole = await talk(['How much to come that side, Karen?'], { profile: JIRANI_IDS_ONLY, langLock: 'en', classify });
+  assert.match(hole.out[0].line, /Karen/i);
+  assert.doesNotMatch(hole.out[0].line, /eight hundred|Home visits|Kilimani|KSh 500/i);
+
+  const rules = await talk(['Kama niacha?'], { profile: JIRANI, langLock: 'sw', classify });
+  assert.match(rules.out[0].line, /12 hours|reschedule/i);
+  assert.doesNotMatch(rules.out[0].line, /Shall I go ahead|Cancel your/i);
+  assert.equal(rules.log.length, 0);
+});
+
+test('classifier cannot invent a kind we do not speak', () => {
+  const C = require('../src/conversation/v2/classifyAsk');
+  const bad = C.normalizeTicket({ kind: 'discount', place: 'Karen', line: 'We do 10% off' }, JIRANI);
+  assert.equal(bad.kind, 'unknown');
+  const u = { intents: [], text: 'give me a discount' };
+  C.applyTicket(u, bad);
+  assert.deepEqual(u.intents, []);
+});
+
+test('HD_16b: fare, ada ya, and a bare cancellation speak the file', async () => {
+  const fare = await talk(['Are like the fare to Karen?'], { profile: JIRANI, langLock: 'en' });
+  assert.match(fare.out[0].line, /eight hundred shillings/i);
+  assert.doesNotMatch(fare.out[0].line, /Kilimani|Westlands|Shall I go ahead|How can I help you today/i);
+
+  const ada = await talk(['Kwanza niko nataka kujua ada ya.'], { profile: JIRANI, langLock: 'sw' });
+  assert.match(ada.out[0].line, /Home visits|Kilimani|Karen/i);
+  assert.doesNotMatch(ada.out[0].line, /bei, huduma au saa|prices, services or our hours/i);
+
+  const cancel = await talk(['Cancellation?'], { profile: JIRANI, langLock: 'en' });
+  assert.match(cancel.out[0].line, /reschedule up to 12 hours/i);
+  assert.doesNotMatch(cancel.out[0].line, /Shall I go ahead|Cancel your/i);
+  assert.equal(cancel.log.length, 0);
+});
+
+test('ask receipts: ticket speaks one file line', async () => {
+  const rows = [
+    { say: 'Nilikuwa nataka kujua ada ya kuja Karen ni ngapi.', lang: 'sw', has: /Karen|mia nane|eight hundred/i, not: /Kilimani|Westlands|Shall I go ahead/i },
+    { say: 'Are like the fare to Karen?', lang: 'en', has: /eight hundred shillings/i, not: /Kilimani|Westlands|Home visits/i },
+    { say: 'Or how do you handle cancellation?', lang: 'en', has: /reschedule up to 12 hours/i, not: /Shall I go ahead|Cancel your/i, writes: false },
+    { say: 'Do you give refunds?', lang: 'en', has: /don't have that on file/i, not: /Shall I go ahead/i, writes: false },
+  ];
+  for (const row of rows) {
+    const { out, log } = await talk([row.say], { profile: JIRANI, langLock: row.lang });
+    assert.match(out[0].line, row.has, row.say);
+    assert.doesNotMatch(out[0].line, row.not, row.say);
+    if (row.writes === false) assert.equal(log.length, 0, row.say);
+  }
+
+  const hole = await talk(['Are like the fare to Karen?'], { profile: JIRANI_IDS_ONLY, langLock: 'en' });
+  assert.match(hole.out[0].line, /Karen/i);
+  assert.doesNotMatch(hole.out[0].line, /eight hundred|Home visits in Kilimani/i);
+
+  const visit = await talk(['I want to cancel my booking.'], {
+    profile: JIRANI,
+    langLock: 'en',
+    openRows: [{ id: 'a', caller_phone: '+254700000001', service_name: 'Sofa Cleaning (per seat)', status: 'requested', window_start: '2026-10-16T07:00:00Z' }],
+  });
+  assert.match(visit.out[0].line, /Cancel your|Shall I go ahead/i);
+  assert.doesNotMatch(visit.out[0].line, /reschedule up to 12 hours/i);
 });

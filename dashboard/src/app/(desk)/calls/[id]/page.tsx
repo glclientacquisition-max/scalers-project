@@ -1,3 +1,6 @@
+import { createDeskTimer } from "@/lib/deskTiming";
+import { summaryTopic } from "@/lib/ownerTopic";
+import { loadTranscriptTurns } from "@/lib/transcriptLoad";
 import { memberCan } from "@/lib/requireMember";
 import { CallFactsCorrection } from "@/components/structured/CallFactsCorrection";
 import { correctCallFactsAction } from "@/app/(desk)/settings/structuredActions";
@@ -8,15 +11,16 @@ import {
   parseLeadStatus,
   parseSummary,
   type CallRow,
-  type TranscriptRow,
 } from "@/lib/supabase";
 import {
   pickCallOwnerCard,
-  pickCallOwnerReason,
   pickCallOwnerWant,
   shapeTicketChat,
 } from "@/lib/callSummarySentence";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { playableCallRecordingUrl } from "@/lib/recordingPlayback";
+import { recordingDeletedByRetention } from "@/lib/recordingSource";
+import { effectiveRecordingRetentionForTenant } from "@/lib/recordingRetentionDesk";
 import { InboxTicketView } from "@/components/InboxTicketView";
 import { LiveTicket } from "@/components/LiveTicket";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
@@ -89,36 +93,70 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
   const workspace = await createWorkspaceDataClient();
   if (!workspace) return <DeskNoWorkspace />;
 
-  const first = await workspace.client
-    .from("calls")
-    .select(CALL_SELECT)
-    .eq("id", id)
-    .eq("tenant_id", tenant.id)
-    .maybeSingle();
-  let call = first.data as CallRow | null;
-  let error = first.error;
-
-  if (error && /resolution|primary_intent|resolution_note|column/i.test(error.message)) {
-    const retry = await workspace.client
+  // One wave instead of five serial round trips (owner review: 20s+ call opens).
+  // Everything keyed by the call id runs together; the call row still decides
+  // what renders, so nothing from another tenant is shown.
+  const timer = createDeskTimer();
+  const loadCall = async () => {
+    const first = await workspace.client
       .from("calls")
-      .select(CALL_SELECT_LEAD)
+      .select(CALL_SELECT)
       .eq("id", id)
       .eq("tenant_id", tenant.id)
       .maybeSingle();
-    call = retry.data as CallRow | null;
-    error = retry.error;
-  }
+    let call = first.data as CallRow | null;
+    let error = first.error;
 
-  if (error && /lead_status|column/i.test(error.message)) {
-    const retry = await workspace.client
-      .from("calls")
-      .select(CALL_SELECT_LEGACY)
-      .eq("id", id)
+    if (error && /resolution|primary_intent|resolution_note|column/i.test(error.message)) {
+      const retry = await workspace.client
+        .from("calls")
+        .select(CALL_SELECT_LEAD)
+        .eq("id", id)
+        .eq("tenant_id", tenant.id)
+        .maybeSingle();
+      call = retry.data as CallRow | null;
+      error = retry.error;
+    }
+
+    if (error && /lead_status|column/i.test(error.message)) {
+      const retry = await workspace.client
+        .from("calls")
+        .select(CALL_SELECT_LEGACY)
+        .eq("id", id)
+        .eq("tenant_id", tenant.id)
+        .maybeSingle();
+      call = retry.data as CallRow | null;
+      error = retry.error;
+    }
+    return { call, error };
+  };
+
+  const [{ call, error }, transcriptRes, holdRes, jobRes, facts, canCorrect, effectiveRecordingRetention] =
+    await Promise.all([
+    loadCall(),
+    loadTranscriptTurns(workspace.client, id),
+    workspace.client
+      .from("service_requests")
+      .select(
+        "id, created_at, request_type, status, item, quantity, when_text, notes, caller_name, caller_phone, call_id"
+      )
       .eq("tenant_id", tenant.id)
-      .maybeSingle();
-    call = retry.data as CallRow | null;
-    error = retry.error;
-  }
+      .eq("call_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1),
+    workspace.client
+      .from("appointments")
+      .select(
+        "id, created_at, service_name, status, when_text, address_landmark, notes, caller_name, caller_phone, call_id"
+      )
+      .eq("tenant_id", tenant.id)
+      .eq("call_id", id)
+      .order("created_at", { ascending: false }),
+    readCallFacts(id),
+    memberCan("inbox.act"),
+    effectiveRecordingRetentionForTenant(tenant.id),
+  ]);
+  timer.mark("call");
 
   if (error) {
     return (
@@ -148,17 +186,21 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
         .limit(1)
         .maybeSingle()
     : { data: null };
+  timer.mark("contact");
+  console.info(timer.line("call-detail"));
   const meta = parseSummary(row.summary);
+  // Row is already scoped to this tenant above; re-sign its private recording.
+  const recordingRetentionDeleted = recordingDeletedByRetention(meta);
+  const recordingUrl = await playableCallRecordingUrl(row, meta);
   const summaryName = typeof meta.name === "string" ? meta.name.trim() : "";
   const contactName = person?.name?.trim() || "";
   const name = contactName || summaryName || null;
-  const reason = pickCallOwnerReason(meta);
   const want = pickCallOwnerWant(meta);
   const summaryCard = pickCallOwnerCard(meta);
   const leadStatus = parseLeadStatus(row.lead_status);
   const resolution = parseCallResolution(row.resolution);
   const businessName = tenant.business_name?.trim() || "us";
-  const waMessage = followUpWhatsAppMessage({ businessName, name, reason });
+  const waMessage = followUpWhatsAppMessage({ businessName, name, topic: summaryTopic(meta) });
   const escalatedTo =
     meta.escalated_to && typeof meta.escalated_to === "object"
       ? (meta.escalated_to as { name?: string; role?: string; phone?: string })
@@ -166,33 +208,8 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
   const escalateReason =
     typeof meta.escalate_reason === "string" ? meta.escalate_reason : null;
 
-  const { data: transcripts } = await workspace.client
-    .from("transcripts")
-    .select("id, created_at, call_id, speaker, text_content, latency_ms")
-    .eq("call_id", id)
-    .order("created_at", { ascending: true });
-
-  const turns = (transcripts || []) as TranscriptRow[];
-
-  const [holdRes, jobRes] = await Promise.all([
-    workspace.client
-      .from("service_requests")
-      .select(
-        "id, created_at, request_type, status, item, quantity, when_text, notes, caller_name, caller_phone, call_id"
-      )
-      .eq("tenant_id", tenant.id)
-      .eq("call_id", id)
-      .order("created_at", { ascending: false })
-      .limit(1),
-    workspace.client
-      .from("appointments")
-      .select(
-        "id, created_at, service_name, status, when_text, address_landmark, notes, caller_name, caller_phone, call_id"
-      )
-      .eq("tenant_id", tenant.id)
-      .eq("call_id", id)
-      .order("created_at", { ascending: false }),
-  ]);
+  // Spoken order: seq when Voice has written it, then created_at.
+  const turns = transcriptRes.turns;
 
   const hold = holdRes.error
     ? null
@@ -232,11 +249,16 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
     vertical: tenant.vertical,
   });
   const escalatedLine = escalatedTo?.name
-    ? `Escalated to ${escalatedTo.name}${escalatedTo.role ? ` (${escalatedTo.role})` : ""}${
+    ? `Passed to ${escalatedTo.name}${escalatedTo.role ? ` (${escalatedTo.role})` : ""}${
         escalateReason ? `: ${escalateReason}` : ""
       }`
     : null;
-  const escalationDelivery = formatEscalationDelivery(meta);
+  const callEndedAt = (() => {
+    const startMs = Date.parse(row.created_at);
+    if (!Number.isFinite(startMs)) return null;
+    return new Date(startMs + Math.max(0, Number(row.duration_seconds) || 0) * 1000).toISOString();
+  })();
+  const escalationDelivery = formatEscalationDelivery(meta, { callEndedAt });
   const handoffMode = parseHandoffMode(tenant.handoff_mode);
   const liveConnectLine = formatLiveConnectStamp(meta, handoffMode);
   const escalatePeople = normalizeTeamDirectory(tenant.team_directory, {
@@ -261,8 +283,6 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
     stamp,
     whenLabel: formatCallWhenRelative(row.created_at),
   });
-
-  const [facts, canCorrect] = await Promise.all([readCallFacts(row.id), memberCan("inbox.act")]);
 
   return (
     <>
@@ -289,7 +309,9 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
         job={job}
         hold={hold}
         turns={turns}
-        recordingUrl={row.recording_url}
+        recordingUrl={recordingUrl}
+        recordingRetentionDeleted={recordingRetentionDeleted}
+        effectiveRecordingRetention={effectiveRecordingRetention}
         durationLabel={row.duration_seconds != null ? `${row.duration_seconds}s` : "N/A"}
         assistLabel={
           row.resolution != null || row.resolution_note

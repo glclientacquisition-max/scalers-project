@@ -222,14 +222,28 @@ function noopTrace() {
     noteTool: noop,
     noteBarge: noop,
     noteSpeakPacket: noop,
+    noteLookup: noop,
     noteSpeakSlots: noop,
     noteBrainLines: noop,
     noteCall: noop,
-    noteBrainV2Shadow: noop,
     noteAudioSegments: noop,
+    noteBrainV2Shadow: noop,
     currentTurnIndex: noop,
     commitTurn: noop,
     finishCall: async () => null,
+  };
+}
+
+/** Stream join counts for the model stage (streamJoinTrace). Samples are redacted. */
+function streamStats(stream) {
+  const n = (v) => (Number.isFinite(v) ? v : 0);
+  return {
+    deltas: n(stream.deltas),
+    unspacedJoins: n(stream.unspacedJoins),
+    addedSpaces: n(stream.addedSpaces),
+    unspacedSamples: (Array.isArray(stream.unspacedSamples) ? stream.unspacedSamples : [])
+      .slice(0, 3)
+      .map((x) => redactText(String(x || ''))),
   };
 }
 
@@ -374,6 +388,7 @@ function createVoiceTrace(opts = {}) {
       outputText: redactText(info.outputText || ''),
       chars: Number.isFinite(info.chars) ? info.chars : String(info.outputText || '').length,
       spokenEmitted: info.spokenEmitted ?? null,
+      ...(info.stream && typeof info.stream === 'object' ? { stream: streamStats(info.stream) } : {}),
     });
   }
 
@@ -455,6 +470,26 @@ function createVoiceTrace(opts = {}) {
       outcome: info.outcome || null,
       text: redactText(info.text || ''),
       committed: info.committed === true,
+      at: new Date().toISOString(),
+    });
+  }
+
+  // One code lookup on this turn (src/conversation/router.js). One row per
+  // answered part: type, result status, matched fact id, and why.
+  function noteLookup(info = {}) {
+    const rows = (Array.isArray(info.lookups) ? info.lookups : []).slice(0, 4).map((row) => ({
+      type: String(row?.kind || ''),
+      result: String(row?.status || ''),
+      matchedId: String(row?.id || '') || null,
+      reason: String(row?.reason || '') || null,
+      source: String(row?.source || '') || null,
+    }));
+    pushStage({
+      stage: 'lookup',
+      handled: info.handled === true,
+      outcome: info.outcome || null,
+      lookups: rows,
+      brainMs: Number.isFinite(Number(info.brainMs)) ? Math.round(Number(info.brainMs) * 10) / 10 : null,
       at: new Date().toISOString(),
     });
   }
@@ -635,7 +670,12 @@ function createVoiceTrace(opts = {}) {
       diagnosis,
       release: voiceRelease(traceEnv),
     };
-    await sink.write(record);
+    try {
+      await sink.write(record);
+    } catch (err) {
+      // Fire-and-forget at hang-up: a failed trace write must not reject.
+      console.warn('[voice-trace] call write failed:', err?.message || err);
+    }
     return record;
   }
 
@@ -666,11 +706,12 @@ function createVoiceTrace(opts = {}) {
     noteTool: guard(noteTool),
     noteBarge: guard(noteBarge),
     noteSpeakPacket: guard(noteSpeakPacket),
+    noteLookup: guard(noteLookup),
     noteSpeakSlots: guard(noteSpeakSlots),
     noteBrainLines: guard(noteBrainLines),
     noteCall: guard(noteCall),
-    noteBrainV2Shadow: guard(noteBrainV2Shadow),
     noteAudioSegments: guard(noteAudioSegments),
+    noteBrainV2Shadow: guard(noteBrainV2Shadow),
     currentTurnIndex: guard(currentTurnIndex),
     commitTurn: guard(commitTurn),
     finishCall: async () => {

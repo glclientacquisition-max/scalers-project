@@ -14,12 +14,13 @@ const { coverageNextStepFor } = require('../conversation/coverageNextStep');
 function initialState(fixture = {}) {
   const name = String(fixture.callerName || '').trim();
   const onFile = Boolean(fixture.nameOnFile && name);
+  const promptClockMs = fixture.promptClock ? Date.parse(fixture.promptClock) : null;
   return {
     caller: {
       name: onFile ? name : '',
       nameConfirmed: onFile,
     },
-    conversation: { answersReceived: [] },
+    conversation: { answersReceived: [], ...(promptClockMs ? { promptClockMs } : {}) },
     language: { current: 'unknown' },
   };
 }
@@ -55,6 +56,9 @@ function speechContext(state, callerTurns, language, fixture) {
     language: language === 'unknown' ? 'en' : language,
     toolResults: [],
     capabilities: {},
+    // Recorded calls replay at their own clock (fixture.promptClock / turn.at),
+    // so a trusted time fact is the one the live prompt held.
+    ...(fixture.__turnAt ? { now: Date.parse(fixture.__turnAt) } : {}),
   };
 }
 
@@ -102,7 +106,11 @@ function speakModelText(modelText, ctx, caller) {
     });
   }
   const prepared = String(cut || '').trim()
-    ? prepareForTts(cut, { callLanguage: ctx.language })
+    ? prepareForTts(cut, {
+        callLanguage: ctx.language,
+        // Live voice splits glued web labels on the tenant's own words.
+        addressTerms: [ctx.profile?.businessName].filter((v) => v && v !== 'the business'),
+      })
     : { text: '', language: ctx.language, original: '' };
   if (prepared.text && prepared.text !== String(cut || '').trim()) {
     stages.push({
@@ -153,7 +161,13 @@ function replayTurn(turn, ctx) {
   const evidence = analyzeCallerLanguage(caller);
   const sticky =
     evidence.language === 'unknown' ? ctx.language || 'unknown' : evidence.language;
-  const speech = speechContext(ctx.state, ctx.callerTurns.concat(caller), sticky, ctx.fixture);
+  // A fixture without a clock replays at a fixed instant, so the CI score never
+  // depends on the wall clock.
+  const turnAt = turn.at || ctx.fixture.promptClock || '2000-01-01T00:00:00Z';
+  const speech = speechContext(ctx.state, ctx.callerTurns.concat(caller), sticky, {
+    ...ctx.fixture,
+    __turnAt: turnAt,
+  });
   let modelText = turn.model && turn.model.outputText != null ? String(turn.model.outputText) : null;
   let provider = turn.model?.provider || 'recorded';
   let modelName = turn.model?.model || 'recorded';

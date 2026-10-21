@@ -62,13 +62,10 @@ function inboxCanHoldDone(row) {
 }
 
 function inboxListDockRecipe(row) {
-  if (itemIsArchived(row)) {
-    return row.callerPhone ? "call_wa" : "none";
-  }
+  if (itemIsArchived(row)) return "none";
   if (inboxCanConfirm(row)) return "confirm";
   if (inboxCanVisitDone(row)) return "visit_done";
   if (inboxCanHoldDone(row)) return "hold_done";
-  if (row.callerPhone) return "call_wa";
   return "none";
 }
 

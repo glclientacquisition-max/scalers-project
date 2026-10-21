@@ -13,7 +13,7 @@ const ROOT = path.join(__dirname, "..");
 const FIX = path.join(ROOT, "docs/supabase/fix_grant_package_minutes.sql");
 const OPS = path.join(ROOT, "docs/supabase/admin_billing_ops.sql");
 const helperPath = path.join(ROOT, "dashboard/src/lib/adminErrors.ts");
-const panel = path.join(ROOT, "dashboard/src/components/AdminBillingDetailPanel.tsx");
+const panel = path.join(ROOT, "dashboard/src/components/AdminShopMoneyPanel.tsx");
 
 function mapErrors(cases) {
   const script = `

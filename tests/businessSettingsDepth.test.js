@@ -39,14 +39,14 @@ describe("business settings depth", () => {
     assert.doesNotMatch(form, />When closed</);
     const modes = read("dashboard/src/lib/afterHours.ts");
     assert.match(modes, /label: "Message only"/);
-    assert.match(modes, /label: "Full assistant"/);
-    assert.match(modes, /Answer, book, and change a visit/);
+    assert.match(modes, /label: "Full Business Assistant"/);
+    assert.match(modes, /Answer questions and take a message/);
     assert.doesNotMatch(modes, /Not ready/);
     assert.doesNotMatch(modes, /disabled:\s*true/);
     assert.doesNotMatch(modes, /Keep helping/);
     assert.doesNotMatch(modes, /missing access|upgrade|Gemini|Soniox|GPT/i);
     assert.match(form, /title="When unsure"/);
-    assert.match(form, /What to say/);
+    assert.match(read("dashboard/src/components/UnknownAnswerField.tsx"), /What to say/);
     assert.match(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /"Wanjiku Mwangi"/);
     assert.match(form, /Add service/);
     assert.match(form, /placeholder="Shop voice"/);

@@ -14,8 +14,11 @@ export type ActivityRow = {
 };
 
 const ACTIONS: Record<string, string> = {
+  suspend_business: "Suspended line",
+  unsuspend_business: "Restored line",
   archive_business: "Archived business",
-  restore_business: "Restored business",
+  restore_business: "Unarchived business",
+  purge_business: "Purged archived data",
   delete_business: "Deleted business for good",
   release_number: "Released number",
   assign_number: "Assigned number",
@@ -23,10 +26,26 @@ const ACTIONS: Record<string, string> = {
   buy_number: "Bought number",
   sync_numbers: "Synced numbers",
   assign_package: "Changed package",
+  unassign_package: "Removed package",
+  sms_counter_drift: "SMS counter drift",
+  set_on_demand_usage: "Changed on-demand",
+  usage_counter_reconcile: "Corrected usage counters",
   save_package: "Edited package",
   save_rates: "Changed rates",
   grant_package_minutes: "Granted minutes",
   set_billing_mode: "Changed charging",
+  draft_package_version: "Opened package draft",
+  update_package_version_draft: "Edited package draft",
+  publish_package_version: "Published package version",
+  archive_package_version: "Archived package version",
+  discard_package_version_draft: "Discarded package draft",
+  approve_package_version: "Approved package version",
+  move_package_version: "Moved to a version",
+  set_tenant_billing_mode: "Changed billing mode",
+  set_new_signup_trial: "Changed signup trial",
+  set_package_editor_enabled: "Changed package editor",
+  tenant_live_payments_set: "Changed live payments",
+  set_price_approval_threshold: "Changed price approval",
   waive_overage: "Waived overage",
   save_voice: "Saved voice",
   set_default_voice: "Set default voice",
@@ -37,6 +56,7 @@ const ACTIONS: Record<string, string> = {
   prepare_mail_domain: "Set up alert mail",
   verify_mail_domain: "Checked alert mail",
   ack_notice: "Acknowledged notice",
+  checkout_total_review_resolved: "Resolved checkout review",
 };
 
 export function actionLabel(action: string): string {

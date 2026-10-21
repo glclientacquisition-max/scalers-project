@@ -16,6 +16,11 @@ import { settingsLeaveHref, settingsLeaveTarget } from "@/lib/settingsLeave";
 
 type SetSource = (id: string, dirty: boolean) => void;
 
+/** History entry we add while edits are unsaved, so Back lands here first. */
+const GUARD_KEY = "__settingsLeaveGuard";
+/** pendingHref value for the Android back gesture / browser Back. */
+const BACK = "__back__";
+
 const SettingsLeaveContext = createContext<SetSource>(() => {});
 
 export function useSettingsLeaveSource(id: string, dirty: boolean) {
@@ -36,12 +41,14 @@ function anyDirty(sources: Map<string, boolean>) {
 /**
  * Dirty settings stay put until the owner discards them.
  * A downward drag, Escape, or Keep editing leaves the edits in place.
+ * Link clicks, page unloads, and Back (Android gesture or browser) all ask first.
  */
 export function SettingsLeaveGuard({ children }: { children: ReactNode }) {
   const router = useRouter();
   const sources = useRef(new Map<string, boolean>());
   const [dirty, setDirty] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const armed = useRef(false);
 
   const setSource = useCallback((id: string, value: boolean) => {
     if (value) sources.current.set(id, true);
@@ -83,12 +90,52 @@ export function SettingsLeaveGuard({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
 
+  // Back gesture: same idea as onboarding's step history. While edits are unsaved we add
+  // one same-URL entry; Back pops it and we ask before really leaving.
+  const arm = useCallback(() => {
+    if (armed.current) return;
+    const state = window.history.state && typeof window.history.state === "object" ? window.history.state : {};
+    window.history.pushState({ ...state, [GUARD_KEY]: true }, "", window.location.href);
+    armed.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (dirty) arm();
+  }, [dirty, arm]);
+
+  useEffect(() => {
+    function onPop(event: PopStateEvent) {
+      const state = event.state as Record<string, unknown> | null;
+      if (state && state[GUARD_KEY]) {
+        // Forward onto our own entry again.
+        armed.current = true;
+        return;
+      }
+      if (!armed.current) return;
+      armed.current = false;
+      if (anyDirty(sources.current)) {
+        setPendingHref(BACK);
+        return;
+      }
+      // Saved since we armed: finish the Back the owner asked for.
+      window.history.back();
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  function keepEditing() {
+    if (pendingHref === BACK && anyDirty(sources.current)) arm();
+    setPendingHref(null);
+  }
+
   function discard() {
     const href = pendingHref;
     sources.current.clear();
     setDirty(false);
     setPendingHref(null);
-    if (href) router.push(href);
+    if (href === BACK) window.history.back();
+    else if (href) router.push(href);
   }
 
   return (
@@ -100,7 +147,7 @@ export function SettingsLeaveGuard({ children }: { children: ReactNode }) {
         confirmLabel="Discard"
         cancelLabel="Keep editing"
         danger
-        onClose={() => setPendingHref(null)}
+        onClose={keepEditing}
         onConfirm={discard}
       >
         These edits are not saved.

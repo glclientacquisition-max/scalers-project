@@ -1,0 +1,643 @@
+'use strict';
+// Fact sheet with references (option B, RFC docs/rfcs/speech-check-fact-sheet.md).
+// Behind VOICE_FACT_REFS, default off.
+//
+// Every speakable business fact gets a stable ID: {price.<item>}, {fee.<area>},
+// {hours.<day>}, {pay.<method>}. The prompt's FACT CARD lists the IDs. The model
+// writes the ID; code puts in the owner's value in the caller's language. A
+// fact the owner has not confirmed, or an ID that does not exist, is never
+// spoken as a value: that sentence becomes the cannot-answer line (the
+// business's own line, or "Let me check with the team and get back to
+// you").
+//
+// Facts come only from live Desk data: Catalogue (services_catalog,
+// product_catalog), Locations (service_areas via areaTerms, #769), hours
+// (hours_schedule) and Payments & Policies (business_policies.payments). The
+// compiled llm_system_prompt is never a fact source (personaOnlyPrompt).
+//
+// Pure module: no I/O, no env reads except the flag. v2 can reuse it as is.
+
+const { factServices, factProducts, factPolicyMap } = require('./provenance');
+const { parseHoursSchedule } = require('./businessHours');
+const {
+  normalisePrice,
+  priceIsSpeakable,
+  formatPriceDisplay,
+  legacyPriceText,
+  factSheetPriceNote,
+} = require('./factPrice');
+
+const FLAG_ON = /^(1|true|on|yes)$/i;
+
+/** VOICE_FACT_REFS=on|1|true|yes. Default off. */
+function factRefsEnabled(env) {
+  return FLAG_ON.test(String((env ? env.VOICE_FACT_REFS : process.env.VOICE_FACT_REFS) || '').trim());
+}
+
+// Owner decision, 18 Oct: the line spoken when the Business Assistant cannot
+// answer (an unconfirmed or unknown fact ID), picked in this order:
+//   1. tenants.unknown_answer_spoken {en, sw, source, updated_at}: the caller's
+//      language, when `source` still equals the trimmed unknown_answer_fallback
+//      (the Desk rewrite is for the current fallback, not an old one);
+//   2. unknown_answer_fallback as written, when it is clearly in the caller's
+//      language;
+//   3. the team default below.
+// Every candidate passes the callbacks-only check first: no transfer, no
+// booking or saved-work claim, no "we're on our way".
+const TEAM_DEFAULT_LINE = {
+  en: 'Let me check with the team and get back to you.',
+  sw: 'Wacha niulize timu kisha nikujulishe.',
+};
+
+function langKey(language) {
+  const l = String(language || 'en').toLowerCase();
+  return l === 'sw' || l === 'sheng' ? 'sw' : 'en';
+}
+
+const BOOKING_CLAIM =
+  /\b(?:booked|book(?:ing)? (?:is )?confirmed|confirmed (?:your|the) (?:booking|visit|appointment)|appointment is (?:set|confirmed)|nimekubook|imethibitishwa|nimethibitisha|tumekubook)\b/i;
+
+/** True when a fallback line keeps the callbacks-only rule. */
+function callbackSafeLine(text) {
+  const line = String(text || '').trim();
+  if (!line || line.length > 240 || /[{}]/.test(line)) return false;
+  const guard = require('./speechGuard');
+  if (guard.TRANSFER_CLAIM && guard.TRANSFER_CLAIM.test(line)) return false;
+  if (guard.SAVED_CLAIM && guard.SAVED_CLAIM.test(line)) return false;
+  if (guard.JOB_CLOSE && guard.JOB_CLOSE.test(line)) return false;
+  return !BOOKING_CLAIM.test(line);
+}
+
+function clearlyInLanguage(text, key) {
+  const { analyzeCallerLanguage } = require('./language');
+  const res = analyzeCallerLanguage(String(text || ''));
+  const detected = res.language === 'sheng' ? 'sw' : res.language;
+  return detected === key && Number(res.confidence || 0) >= 0.5;
+}
+
+function parseSpoken(raw) {
+  let obj = raw;
+  if (typeof obj === 'string') {
+    try {
+      obj = JSON.parse(obj);
+    } catch {
+      return null;
+    }
+  }
+  return obj && typeof obj === 'object' && !Array.isArray(obj) ? obj : null;
+}
+
+/**
+ * The cannot-answer line for this business in the caller's language.
+ * `source` says which branch won (spoken | fallback | default).
+ */
+function pickUnknownAnswerLine(profile, language) {
+  const key = langKey(language);
+  const fallback = String(profile?.unknownAnswerFallback || '').trim();
+  const spoken = parseSpoken(profile?.unknownAnswerSpoken);
+  if (spoken && fallback && String(spoken.source || '').trim() === fallback) {
+    const text = String(spoken[key] || '').trim();
+    if (callbackSafeLine(text)) return { text, source: 'spoken' };
+  }
+  if (fallback && clearlyInLanguage(fallback, key) && callbackSafeLine(fallback)) {
+    return { text: fallback, source: 'fallback' };
+  }
+  return { text: TEAM_DEFAULT_LINE[key], source: 'default' };
+}
+
+const PAY_NUMBER_ASK =
+  /\b(?:till|paybill|pay ?bill|pochi|account (?:number|no)|business (?:number|no)|namba ya (?:till|malipo|akaunti)|lipa na m-?pesa)\b/i;
+const PAY_NUMBER_TALK =
+  /\b(?:till|paybill|pay ?bill|pochi|account)\b[^.!?]*\b(?:number|no\.?|namba)\b|\b(?:number|namba)\b[^.!?]*\b(?:till|paybill|pochi|akaunti|account)\b/i;
+
+/**
+ * HD_b070f6939775: asked for a till number that is not on file, the model
+ * said "Our till number is given when you pay after the job is completed",
+ * an invented process. With the flag on, a sentence about a payment number
+ * that carries no digits, on a payment-number ask, becomes the cannot-answer
+ * line (once). A real number rendered from {pay.*} has digits and is kept.
+ * @returns {{ text: string, replaced: boolean }}
+ */
+function guardPaymentNumberClaim(text, callerText, opts = {}) {
+  const raw = String(text || '');
+  if (!PAY_NUMBER_ASK.test(String(callerText || '')) || !PAY_NUMBER_TALK.test(raw)) return { text: raw, replaced: false };
+  const line = unknownAnswerLine(opts.language, opts.profile || null);
+  let replaced = false;
+  const parts = raw.match(/[^.!?]+[.!?]*\s*/g) || [raw];
+  const out = [];
+  for (const part of parts) {
+    if (PAY_NUMBER_TALK.test(part) && !/\d/.test(part)) {
+      if (!replaced && !raw.includes(line)) out.push(`${line} `);
+      replaced = true;
+      continue;
+    }
+    out.push(part);
+  }
+  return { text: out.join('').replace(/\s+/g, ' ').trim(), replaced };
+}
+
+/** The cannot-answer line (see pickUnknownAnswerLine). Never empty. */
+function unknownAnswerLine(language, profile = null) {
+  return pickUnknownAnswerLine(profile || {}, language).text;
+}
+
+function slug(raw) {
+  return String(raw || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40);
+}
+
+function rowKey(row) {
+  return `${String(row?.name || '').trim().toLowerCase()}|${String(row?.price || row?.price_range || row?.priceRange || '').trim()}`;
+}
+
+function asArray(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function asObject(raw) {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function clock12(hhmm) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || ''));
+  if (!m) return String(hhmm || '');
+  let h = Number(m[1]);
+  const period = h >= 12 ? 'PM' : 'AM';
+  h %= 12;
+  if (h === 0) h = 12;
+  return `${h}:${m[2]} ${period}`;
+}
+
+const EN_DAY = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+const SW_DAY = { mon: 'Jumatatu', tue: 'Jumanne', wed: 'Jumatano', thu: 'Alhamisi', fri: 'Ijumaa', sat: 'Jumamosi', sun: 'Jumapili' };
+const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+function addFact(facts, fact) {
+  let id = fact.id;
+  let n = 2;
+  while (facts.has(id)) {
+    id = `${fact.id}_${n}`;
+    n += 1;
+  }
+  facts.set(id, { ...fact, id });
+}
+
+function catalogueFacts(facts, profile) {
+  const fieldMeta = profile.fieldMeta || null;
+  const rows = [
+    ...asArray(profile.servicesCatalog).map((row) => ({ row, kind: 'service' })),
+    ...asArray(profile.productCatalog).map((row) => ({ row, kind: 'product' })),
+  ];
+  const confirmed = new Set([
+    ...factServices(profile.servicesCatalog, fieldMeta).map(rowKey),
+    ...factProducts(profile.productCatalog, fieldMeta).map(rowKey),
+  ]);
+  for (const { row, kind } of rows) {
+    const name = String(row?.name || '').trim();
+    const id = slug(name);
+    if (!name || !id) continue;
+    const priceNorm = normalisePrice(row);
+    const speakable = priceIsSpeakable(priceNorm);
+    const legacy = legacyPriceText(row);
+    addFact(facts, {
+      id: `price.${id}`,
+      kind: 'price',
+      source: kind,
+      label: name,
+      value: speakable ? formatPriceDisplay(priceNorm, 'en', legacy) : '',
+      legacyPrice: legacy,
+      priceNorm,
+      speakable,
+      confirmed: confirmed.has(rowKey(row)),
+    });
+  }
+}
+
+function areaFeeFacts(facts, profile) {
+  const areas = Array.isArray(profile.areaTerms?.areas) ? profile.areaTerms.areas : [];
+  for (const area of areas) {
+    const id = slug(area.name || area.id);
+    if (!id) continue;
+    const free = area.trusted && area.feeMode === 'free';
+    const fixed = area.trusted && area.feeMode === 'fixed' && area.feeKsh != null;
+    addFact(facts, {
+      id: `fee.${id}`,
+      kind: 'fee',
+      label: area.name,
+      feeKind: area.kind === 'travel' ? 'travel' : 'delivery',
+      value: fixed ? `KSh ${Number(area.feeKsh).toLocaleString('en-US')}` : free ? 'free' : '',
+      free,
+      confirmed: Boolean(fixed || free),
+    });
+  }
+}
+
+/** Runs of days with the same hours, Monday first: [{ from, to, open, close }] (open null = closed). */
+function weekRuns(parsed) {
+  const runs = [];
+  for (const key of DAY_ORDER) {
+    const day = parsed.days[key];
+    const open = day ? clock12(day.open) : null;
+    const close = day ? clock12(day.close) : null;
+    const last = runs[runs.length - 1];
+    if (last && last.open === open && last.close === close) last.to = key;
+    else runs.push({ from: key, to: key, open, close });
+  }
+  return runs;
+}
+
+function weekText(runs, sw) {
+  const days = sw ? SW_DAY : EN_DAY;
+  const span = (r) => (r.from === r.to ? days[r.from] : `${days[r.from]} ${sw ? 'hadi' : 'to'} ${days[r.to]}`);
+  return runs
+    .map((r) => (r.open ? `${span(r)} ${r.open} ${sw ? 'hadi' : 'to'} ${r.close}` : `${span(r)} ${sw ? 'tumefunga' : 'closed'}`))
+    .join(sw ? '; ' : '; ');
+}
+
+function hoursFacts(facts, profile) {
+  const parsed = parseHoursSchedule(profile.hoursSchedule);
+  if (!parsed) return;
+  const runs = weekRuns(parsed);
+  addFact(facts, {
+    id: 'hours.week',
+    kind: 'hours',
+    day: 'week',
+    label: 'Opening hours',
+    runs,
+    value: weekText(runs, false),
+    confirmed: true,
+  });
+  for (const key of DAY_ORDER) {
+    const day = parsed.days[key];
+    addFact(facts, {
+      id: `hours.${key}`,
+      kind: 'hours',
+      day: key,
+      label: EN_DAY[key],
+      open: day ? clock12(day.open) : null,
+      close: day ? clock12(day.close) : null,
+      value: day ? `${clock12(day.open)} to ${clock12(day.close)}` : 'closed',
+      closed: !day,
+      confirmed: true,
+    });
+  }
+}
+
+function paymentFacts(facts, profile) {
+  const policies = asObject(profile.businessPolicies);
+  const pay = asObject(policies?.payments);
+  if (!pay) return;
+  const split = factPolicyMap(profile.businessPolicies, profile.fieldMeta || null);
+  const confirmed = Boolean(String(split.policies?.payment || '').trim());
+  const push = (id, label, value, extra = {}) => {
+    if (!String(value || '').trim()) return;
+    addFact(facts, { id: `pay.${id}`, kind: 'pay', label, value: String(value).trim(), confirmed, ...extra });
+  };
+  push('mpesa_till', 'M-Pesa till number', pay.mpesa_till);
+  const paybill = asObject(pay.mpesa_paybill);
+  if (paybill?.business_no) {
+    const fixedAccount = (paybill.account_mode || 'fixed') === 'fixed' ? String(paybill.account || '').trim() : '';
+    push('mpesa_paybill', 'M-Pesa paybill number', paybill.business_no, { account: fixedAccount, accountMode: paybill.account_mode || 'fixed' });
+  }
+  push('pochi', 'Pochi la Biashara number', asObject(pay.pochi)?.phone);
+  push('mpesa_send', 'M-Pesa send money number', asObject(pay.mpesa_send)?.phone);
+  push('airtel_till', 'Airtel Money till', asObject(pay.airtel)?.till);
+  push('airtel_phone', 'Airtel Money number', asObject(pay.airtel)?.phone);
+}
+
+/**
+ * The fact sheet for one tenant profile, in ID order: prices, area fees,
+ * hours, payment numbers. Pure.
+ * @param {object} profile voice profile (tenantProfile.js)
+ * @returns {{ facts: Map<string, object> }}
+ */
+function buildFactSheet(profile = {}) {
+  const facts = new Map();
+  catalogueFacts(facts, profile);
+  areaFeeFacts(facts, profile);
+  hoursFacts(facts, profile);
+  paymentFacts(facts, profile);
+  return { facts, profile };
+}
+
+const SHEETS = new WeakMap();
+
+/** buildFactSheet cached per profile object (one per call). */
+function factSheetFor(profile) {
+  if (!profile || typeof profile !== 'object') return buildFactSheet({});
+  let sheet = SHEETS.get(profile);
+  if (!sheet) {
+    sheet = buildFactSheet(profile);
+    SHEETS.set(profile, sheet);
+  }
+  return sheet;
+}
+
+/** The value as spoken in the caller's language. Digits stay digits: the TTS renderer words them. */
+function renderFact(fact, language) {
+  const sw = langKey(language) === 'sw';
+  if (!fact || !fact.confirmed) return '';
+  if (fact.kind === 'price' && fact.speakable === false) return '';
+  if (fact.kind === 'fee' && fact.free) return sw ? 'bure' : 'free';
+  if (fact.kind === 'hours') {
+    if (fact.runs) return weekText(fact.runs, sw);
+    if (fact.closed) return sw ? 'tumefunga' : 'closed';
+    return sw ? `${fact.open} hadi ${fact.close}` : `${fact.open} to ${fact.close}`;
+  }
+  if (fact.kind === 'pay' && fact.id.startsWith('pay.mpesa_paybill')) {
+    if (fact.account) return sw ? `${fact.value}, akaunti ${fact.account}` : `${fact.value}, account ${fact.account}`;
+    return fact.value;
+  }
+  if (fact.kind === 'price') {
+    const norm = fact.priceNorm || normalisePrice({ price_range: fact.value });
+    const display = formatPriceDisplay(norm, language, fact.legacyPrice || '');
+    return localiseFromLead(display, sw);
+  }
+  return fact.value;
+}
+
+// "From KSh 2,500" sits mid-sentence after rendering: lower-case the lead
+// word, and say it in Swahili for a Swahili caller.
+function localiseFromLead(text, sw) {
+  const value = String(text || '');
+  const m = value.match(/^(from|starting at|starting from|kuanzia)\s+/i);
+  if (!m) return value;
+  return `${sw ? 'kuanzia' : m[1].toLowerCase()} ${value.slice(m[0].length)}`;
+}
+
+/** A whole sentence stating one fact, for repair when the model's sentence was dropped. */
+function factSentence(fact, language, profile = null) {
+  const sw = langKey(language) === 'sw';
+  if (!fact || !fact.confirmed) return unknownAnswerLine(language, profile);
+  if (fact.kind === 'price' && fact.speakable === false) return unknownAnswerLine(language, profile);
+  const value = renderFact(fact, language);
+  switch (fact.kind) {
+    case 'price': {
+      // Mid-sentence: "Sofa cleaning is from KSh 2,500.", not "is From".
+      const mid = value.replace(/^(From|Kuanzia)\b/, (w) => w.toLowerCase());
+      return sw ? `${fact.label} ni ${mid}.` : `${fact.label} is ${mid}.`;
+    }
+    case 'fee': {
+      const noun = fact.feeKind === 'travel' ? (sw ? 'Ada ya usafiri' : 'The travel fee') : sw ? 'Ada ya delivery' : 'The delivery fee';
+      return sw ? `${noun} hadi ${fact.label} ni ${value}.` : `${noun} to ${fact.label} is ${value}.`;
+    }
+    case 'hours':
+      if (fact.runs) return sw ? `Saa zetu ni ${value}.` : `Our hours are ${value}.`;
+      if (fact.closed) return sw ? `Siku ya ${SW_DAY[fact.day]} tumefunga.` : `On ${fact.label} we are closed.`;
+      return sw ? `Siku ya ${SW_DAY[fact.day]} tunafungua ${value}.` : `On ${fact.label} we are open ${value}.`;
+    case 'pay':
+      return sw ? `${fact.label} ni ${value}.` : `The ${fact.label} is ${value}.`;
+    default:
+      return unknownAnswerLine(language, profile);
+  }
+}
+
+function cardLine(fact) {
+  const id = `{${fact.id}}`;
+  if (!fact.confirmed) return `${id} ${fact.label}: (team to confirm)`;
+  if (fact.kind === 'price' && fact.speakable === false) {
+    return `${id} ${fact.label}: ${factSheetPriceNote()}`;
+  }
+  switch (fact.kind) {
+    case 'fee':
+      return `${id} ${fact.label} ${fact.feeKind} fee: ${renderFact(fact, 'en')}`;
+    case 'hours':
+      return `${id} ${fact.label}: ${renderFact(fact, 'en')}`;
+    default:
+      return `${id} ${fact.label}: ${renderFact(fact, 'en')}`;
+  }
+}
+
+const CARD_SECTIONS = [
+  ['price', 'PRICES'],
+  ['fee', 'AREA FEES'],
+  ['hours', 'HOURS'],
+  ['pay', 'PAYMENT NUMBERS'],
+];
+
+/**
+ * FACT CARD block for the prompt, or '' when there are no facts. Stable for a
+ * business (no clock, no caller data), so it belongs in the cacheable prefix.
+ */
+function formatFactCard(sheet) {
+  const facts = [...(sheet?.facts?.values() || [])];
+  if (!facts.length) return '';
+  const lines = [
+    'FACT CARD (prices, fees, hours and payment numbers: use these IDs):',
+    'To say one of these, write its ID in braces exactly as listed, for example "It is {price.example}." The system speaks the value in the caller\'s language.',
+    'Never write these amounts, times or numbers yourself, in digits or in words. An ID marked (team to confirm) is spoken as a promise to check with the team.',
+    'If a price, fee, time or number is not listed here, say you will check with the team. Write the ID only inside a full sentence.',
+    'A payment number (till, paybill, Pochi, account) not listed here is not on file: still write its ID ({pay.mpesa_till}, {pay.mpesa_paybill}, {pay.pochi}) and the system says the check-with-the-team line. Never say when, where or how a number is given.',
+  ];
+  for (const [kind, title] of CARD_SECTIONS) {
+    const rows = facts.filter((f) => f.kind === kind);
+    if (!rows.length) continue;
+    lines.push(`${title}:`);
+    for (const fact of rows) lines.push(cardLine(fact));
+  }
+  return lines.join('\n');
+}
+
+const REF_RE = /\{\s*([A-Za-z_]+)\s*\.\s*([A-Za-z0-9_]+)\s*\}/g;
+const ANY_BRACE_RE = /\{[^{}]*\}/;
+
+function splitSentences(text) {
+  return String(text || '')
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Put values in for every {kind.id} reference. A sentence holding an
+ * unconfirmed or unknown reference (or any other brace text) is dropped and
+ * the cannot-answer line is spoken once instead.
+ * @returns {{ text: string, used: string[], unconfirmed: string[], unknown: string[], factText: string, changed: boolean }}
+ */
+function renderFactRefs(text, sheet, opts = {}) {
+  const raw = String(text || '');
+  const result = { text: raw, used: [], unconfirmed: [], unknown: [], factText: '', changed: false };
+  if (!raw.includes('{')) return result;
+  const facts = sheet?.facts || new Map();
+  const values = [];
+  let needConfirm = false;
+  const kept = [];
+  for (const sentence of splitSentences(raw)) {
+    if (!sentence.includes('{')) {
+      kept.push(sentence);
+      continue;
+    }
+    let bad = false;
+    const rendered = sentence.replace(REF_RE, (match, kind, name, offset) => {
+      const id = `${kind.toLowerCase()}.${name.toLowerCase()}`;
+      const fact = facts.get(id);
+      if (!fact) {
+        result.unknown.push(id);
+        bad = true;
+        return match;
+      }
+      if (!fact.confirmed || (fact.kind === 'price' && fact.speakable === false)) {
+        result.unconfirmed.push(id);
+        bad = true;
+        return match;
+      }
+      const value = dropRepeatedLead(sentence.slice(0, offset), renderFact(fact, opts.language));
+      result.used.push(id);
+      values.push(value);
+      return value;
+    });
+    if (bad || ANY_BRACE_RE.test(rendered) || /[{}]/.test(rendered)) {
+      if (!bad) result.unknown.push('malformed');
+      // The confirm line takes the dropped sentence's place, once.
+      if (!needConfirm) kept.push(unknownAnswerLine(opts.language, sheet?.profile));
+      needConfirm = true;
+      continue;
+    }
+    kept.push(rendered);
+  }
+  result.text = kept.join(' ');
+  result.factText = values.join(' ');
+  result.changed = result.text !== raw;
+  return result;
+}
+
+// "starts from {price.x}" with a "from KSh 2,500" value would say "from"
+// twice (HD_9939ca74d492): drop the value's lead word when the sentence
+// already says it right before the ID.
+const LEAD_BEFORE_REF = /\b(from|starting at|starting from|starts at|starts from|kuanzia|inaanzia|zinaanzia)\s*$/i;
+const VALUE_LEAD = /^(from|kuanzia)\s+/i;
+function dropRepeatedLead(before, value) {
+  const text = String(value || '');
+  if (!LEAD_BEFORE_REF.test(String(before || ''))) return text;
+  return text.replace(VALUE_LEAD, '');
+}
+
+function words(text) {
+  return new Set(
+    String(text || '')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= 4)
+  );
+}
+
+const HOURS_WORDS = /\b(open|opens|opening|close|closes|closing|hours|weekdays?|weekends?|every day|daily|tomorrow|today|fungua|tunafungua|funga|tunafunga|saa ngapi|kesho|leo)\b/i;
+
+const DAY_WORDS = {
+  mon: /\b(monday|jumatatu)\b/i,
+  tue: /\b(tuesday|jumanne)\b/i,
+  wed: /\b(wednesday|jumatano)\b/i,
+  thu: /\b(thursday|alhamisi)\b/i,
+  fri: /\b(friday|ijumaa)\b/i,
+  sat: /\b(saturday|jumamosi)\b/i,
+  sun: /\b(sunday|jumapili)\b/i,
+};
+
+/**
+ * The fact a dropped sentence (or the caller's ask) was about: a catalogue
+ * item or area named in it, a weekday for hours, or a payment method. Null
+ * when nothing on the sheet matches.
+ */
+function findFactFor(texts, sheet) {
+  const hay = (Array.isArray(texts) ? texts : [texts]).filter(Boolean).join(' ');
+  if (!hay.trim()) return null;
+  const bag = words(hay);
+  const facts = [...(sheet?.facts?.values() || [])];
+  let best = null;
+  let bestScore = 0;
+  for (const fact of facts) {
+    if (fact.kind !== 'price' && fact.kind !== 'fee') continue;
+    const label = words(fact.label);
+    if (!label.size) continue;
+    let hits = 0;
+    for (const w of label) if (bag.has(w)) hits += 1;
+    const score = hits / label.size;
+    if (hits && score > bestScore) {
+      best = fact;
+      bestScore = score;
+    }
+  }
+  if (best && bestScore >= 0.5) return best;
+  for (const [day, re] of Object.entries(DAY_WORDS)) {
+    if (re.test(hay)) return facts.find((f) => f.id === `hours.${day}`) || null;
+  }
+  if (HOURS_WORDS.test(hay)) return facts.find((f) => f.id === 'hours.week') || null;
+  if (/\b(till|paybill|pay ?bill|lipa|m-?pesa|pochi|airtel)\b/i.test(hay)) {
+    return facts.find((f) => f.kind === 'pay') || null;
+  }
+  return null;
+}
+
+/**
+ * Prompt text from the Desk-compiled llm_system_prompt with its fact content
+ * removed: knowledge, catalogue, FAQ, hours, location and policy sections are
+ * dropped, and any remaining line stating an amount, a clock time or a phone,
+ * till or account number is dropped. Tone, identity and rules stay.
+ */
+const FACT_SECTION = /(knowledge|faq|unknown|service|product|catalog|price|pricing|hours|location|landmark|direction|polic|payment|coverage|delivery|social|team directory|areas?)/i;
+const SECTION_HEADER = /^\s*(?:#+\s*)?([A-Z][A-Z0-9 &/()'’,.-]{2,}?)\s*(?:\([^)]*\))?\s*:\s*(.*)$/;
+const FACT_LINE =
+  /\b(ksh|kes|sh)\.?\s*\d|\d[\d,]*\s*(?:\/=|bob|shillings?)\b|shilingi|\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b|\b\d{1,2}:\d{2}\b|\+?254\d{6,}|\b0[17]\d{8}\b|\b\d{5,}\b/i;
+
+function personaOnlyPrompt(text) {
+  const lines = String(text || '').split('\n');
+  const out = [];
+  let dropping = false;
+  for (const line of lines) {
+    const header = SECTION_HEADER.exec(line);
+    if (header && !/^\s*-/.test(line)) {
+      dropping = FACT_SECTION.test(header[1]);
+      if (dropping) continue;
+    }
+    if (dropping) continue;
+    if (FACT_LINE.test(line)) continue;
+    out.push(line);
+  }
+  const body = out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return [
+    'PERSONA (tone, identity and conversation style only). Business facts in the old compiled prompt were removed: take every price, fee, hour, place and payment number from the FACT CARD and LIVE GROUND TRUTH.',
+    body,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+module.exports = {
+  factRefsEnabled,
+  buildFactSheet,
+  factSheetFor,
+  formatFactCard,
+  renderFact,
+  renderFactRefs,
+  factSentence,
+  findFactFor,
+  unknownAnswerLine,
+  pickUnknownAnswerLine,
+  guardPaymentNumberClaim,
+  callbackSafeLine,
+  TEAM_DEFAULT_LINE,
+  personaOnlyPrompt,
+};

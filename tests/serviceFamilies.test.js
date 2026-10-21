@@ -18,11 +18,9 @@ const DUSTED = profileFromSnapshot(TENANT);
 describe('service families for a long catalogue', () => {
   it('HD_72ab T6: speaks service types, not the first four package rows', () => {
     const en = offerCatalogueLine('And what are the services you offer?', DUSTED, 'en');
-    assert.equal(
-      en,
-      'We offer Apartment and House Cleaning, Deep Cleaning, Office Cleaning, and Mattress cleaning, and more. Which one do you need?'
-    );
+    assert.match(en, /Apartment for one bedroom to two bedroom homes/i);
     assert.doesNotMatch(en, /1-Bedroom|2-Bedroom|3-Bedroom/);
+    assert.doesNotMatch(en, /1-Bedroom Apartment, 2-Bedroom/);
   });
 
   it('derives families from any file, not this tenant', () => {

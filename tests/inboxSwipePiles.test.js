@@ -275,7 +275,8 @@ describe("inbox swipe wiring", () => {
 
   it("scrolls the active chip on a snap strip that never wraps", () => {
     const segmented = read("dashboard/src/components/ui/Segmented.tsx");
-    assert.match(segmented, /scrollIntoView/);
+    assert.match(segmented, /nav\.scrollTo/);
+    assert.doesNotMatch(segmented, /scrollIntoView/);
     assert.match(segmented, /snap-x snap-mandatory/);
     assert.match(segmented, /overflow-x-auto/);
     assert.doesNotMatch(pills, /md:flex-wrap|md:overflow-visible|max-md/);

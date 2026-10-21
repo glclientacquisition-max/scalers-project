@@ -71,13 +71,9 @@ describe("usage balance refresh", () => {
   const out = load();
 
   it("does not refresh when payment starts", () => {
-    const button = read("dashboard/src/components/WalletTopUpButton.tsx");
-    const topup = read("dashboard/src/app/(desk)/wallet/topupActions.ts");
+    assert.equal(fs.existsSync(path.join(__dirname, "../dashboard/src/components/WalletTopUpButton.tsx")), false);
+    assert.equal(fs.existsSync(path.join(__dirname, "../dashboard/src/app/(desk)/wallet/topupActions.ts")), false);
     assert.equal(out.payStart, false);
-    assert.equal(refreshUsageOnPaymentStartSafe(button), false);
-    assert.doesNotMatch(button, /router\.refresh/);
-    assert.doesNotMatch(button, /location\.reload/);
-    assert.match(topup, /Complete the payment on your phone to credit your balance/);
     assert.doesNotMatch(read("dashboard/src/lib/deskPullAction.ts"), /topup|payment/i);
     assert.match(read("dashboard/src/components/PhonePullSurface.tsx"), /router\.refresh\(\)/);
     assert.doesNotMatch(read("dashboard/src/app/(desk)/wallet/page.tsx"), /location\.reload/);

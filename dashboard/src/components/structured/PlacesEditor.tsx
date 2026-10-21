@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { Sheet } from "@/components/ui/Sheet";
 import { Switch } from "@/components/ui/Switch";
 import { TextAreaField, TextField } from "@/components/ui/TextField";
@@ -45,6 +46,7 @@ export function PlacesEditor({
   const [ownHours, setOwnHours] = useState(false);
   const [areaQuery, setAreaQuery] = useState("");
   const [error, setError] = useState("");
+  const [confirmRemove, setConfirmRemove] = useState<number | null>(null);
   const rows = value.filter((l) => validatePlace(l).label === undefined);
   const results = useMemo(
     () => (areaQuery.trim() ? searchAreaOptions(areaQuery, draft.area_id ? [draft.area_id] : [], 6) : []),
@@ -72,11 +74,27 @@ export function PlacesEditor({
     setIndex(null);
   }
 
+  // Remove saves the page at once, so ask first. Cancel goes back to the drawer as it was.
   function remove() {
     if (index == null) return;
-    onSave(value.filter((_, i) => i !== index));
+    setConfirmRemove(index);
     setIndex(null);
   }
+
+  function confirmRemoveNow() {
+    if (confirmRemove == null) return;
+    onSave(value.filter((_, i) => i !== confirmRemove));
+    setConfirmRemove(null);
+  }
+
+  function cancelRemove() {
+    const i = confirmRemove;
+    setConfirmRemove(null);
+    setIndex(i);
+  }
+
+  const removing = confirmRemove != null ? value[confirmRemove] : null;
+  const removingName = removing ? removing.label || (removing.area_id ? coverageAreaLabel(removing.area_id) : "") : "";
 
   const isNew = index != null && index >= value.length;
 
@@ -234,6 +252,17 @@ export function PlacesEditor({
           </div>
         </div>
       </Sheet>
+
+      <ConfirmSheet
+        open={confirmRemove != null}
+        title={removingName ? `Remove ${removingName}?` : "Remove this place?"}
+        confirmLabel="Remove"
+        danger
+        onClose={cancelRemove}
+        onConfirm={confirmRemoveNow}
+      >
+        It comes off your list of places. This saves straight away.
+      </ConfirmSheet>
     </div>
   );
 }

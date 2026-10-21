@@ -13,6 +13,7 @@ import { InboxSmsDock } from "@/components/InboxSmsDock";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { InboxTicketActionDock } from "@/components/InboxTicketActionDock";
 import { ContactStrip } from "@/components/ContactStrip";
+import type { EffectiveRetention } from "@/lib/recordingSource";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import { DeskHint } from "@/components/ui/DeskHint";
 import { iconButtonClass } from "@/components/ui/IconButton";
@@ -206,6 +207,8 @@ export function InboxTicketView({
   hold,
   turns,
   recordingUrl,
+  recordingRetentionDeleted = false,
+  effectiveRecordingRetention,
   durationLabel,
   assistLabel,
   assistNote,
@@ -238,6 +241,8 @@ export function InboxTicketView({
   hold: InboxHold | null;
   turns: TranscriptRow[];
   recordingUrl: string | null;
+  recordingRetentionDeleted?: boolean;
+  effectiveRecordingRetention?: EffectiveRetention;
   durationLabel: string;
   assistLabel: string | null;
   assistNote: string | null;
@@ -255,10 +260,11 @@ export function InboxTicketView({
   const threadRef = useRef<HTMLDivElement>(null);
   const splitRef = useRef<HTMLDivElement>(null);
   const threadPlaceRef = useRef<{ anchor: ThreadAnchor; scrollTop: number }>({
-    anchor: "latest",
+    anchor: "start",
     scrollTop: 0,
   });
   const threadFreezeRef = useRef(false);
+  const openedRef = useRef(false);
   const seenTurnsRef = useRef(turns.length);
   if (seenTurnsRef.current !== turns.length) {
     seenTurnsRef.current = turns.length;
@@ -416,6 +422,15 @@ export function InboxTicketView({
         return () => {};
       }
       const el: HTMLElement = scroller;
+      // Below lg the summary and the chat share one scroller. Open at the top so the
+      // owner sees who called and what they want first; the jump button reaches the latest.
+      if (!openedRef.current) {
+        openedRef.current = true;
+        if (el === paneRef.current && !el.hasAttribute("data-thread-stick")) {
+          threadPlaceRef.current = { anchor: "start", scrollTop: 0 };
+          el.setAttribute("data-thread-stick", "start");
+        }
+      }
       applyStick(el, readStick(el));
       requestAnimationFrame(() => {
         if (!el.isConnected || readStick(el) !== "latest") return;
@@ -525,7 +540,7 @@ export function InboxTicketView({
           <aside
             data-ticket-summary=""
             data-pull-scroll=""
-            className="space-y-4 px-4 py-4 sm:px-6 lg:min-h-0 lg:overflow-y-auto"
+            className="min-w-0 space-y-4 overflow-x-clip px-4 py-4 sm:px-6 lg:min-h-0 lg:overflow-y-auto"
           >
             <InboxPurposeChip purpose={purpose} label={plainOwnerCopy(stamp)} />
             <TicketSummaryFacts want={want} mood={mood} done={done} />
@@ -576,7 +591,11 @@ export function InboxTicketView({
                   {liveConnectLine}
                 </p>
               ) : null}
-              <CallRecording recordingUrl={recordingUrl} />
+              <CallRecording
+                recordingUrl={recordingUrl}
+                retentionDeleted={recordingRetentionDeleted}
+                effectiveRetention={effectiveRecordingRetention}
+              />
               {factsSlot ? <div className="pt-2">{factsSlot}</div> : null}
             </div>
           </aside>
@@ -643,7 +662,7 @@ export function InboxTicketView({
               aria-label="Transcript"
               className="outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand space-y-2.5 px-4 py-4 sm:px-6 lg:absolute lg:inset-0 lg:overflow-y-auto"
             >
-              <CallTranscript turns={turns} mode="thread" />
+              <CallTranscript turns={turns} mode="thread" callStartedAt={lastContactAt} />
             </div>
           </section>
         </div>
