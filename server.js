@@ -63,6 +63,10 @@ const {
 const { classifySonioxError } = require('./src/speech/sonioxErrors');
 // VOICE_OPENING_V2 (default off): one call opening for v1 and v2.
 const callOpening = require('./src/speech/callOpening');
+const recordingNoticeVariant = require('./src/speech/recordingNoticeVariant');
+if (recordingNoticeVariant.noticeVariants().length && !callOpening.openingV2Enabled()) {
+  console.warn('[voice] VOICE_RECORDING_NOTICE_VARIANT is set but VOICE_OPENING_V2 is off; the variant is ignored');
+}
 const { createOpeningSessionStore } = require('./src/speech/openingSessionStore');
 const { createCallPrefetch } = require('./src/speech/callPrefetch');
 // VOICE_OPENING_V2: tenant profile + caller card loaded at the incoming-call
@@ -1570,6 +1574,7 @@ function composeOpeningForProfile(profile, { callSid } = {}) {
     isOpen: open === 'unknown' ? null : open === 'open',
     afterHoursMode: profile.afterHoursMode || 'serve',
     closureNotice: bulletinClosureNotice(profile.dailyBulletin),
+    noticeVariant: recordingNoticeVariant.pickNoticeVariant(callSid || ''),
     ...facts,
   });
 }
@@ -2398,6 +2403,11 @@ mediaWss.on('connection', (ws, req) => {
   let openingLang = 'en';
   let openingInviteLine = '';
   let openingKind = '';
+  // VOICE_RECORDING_NOTICE_VARIANT (needs VOICE_OPENING_V2): the wording this
+  // call heard, when its greeting ended, and whether a barge cut it.
+  let openingNoticeVariant = null;
+  let openingGreetingEndAt = null;
+  let openingNoticeCut = false;
   /** First media frame (text or binary) on this socket: greeting.first_pcm_ms clock. */
   let firstMediaFrameAt = 0;
   /** Caller speech span over the greeting (STT audio clock), for the 600 ms barge rule. */
@@ -2609,7 +2619,10 @@ mediaWss.on('connection', (ws, req) => {
 
   function owedNoticeLine() {
     const lang = callLanguage === 'sw' || callLanguage === 'en' ? callLanguage : openingLang;
-    return callOpening.noticeLine(lang);
+    // Same call, same variant: deterministic from the callSid, so a stream
+    // resumed on another replica owes the wording this call was greeted with.
+    const variant = openingNoticeVariant || recordingNoticeVariant.pickNoticeVariant(sessionCallSid || '');
+    return callOpening.noticeLine(lang, variant);
   }
 
   /**
@@ -5862,6 +5875,7 @@ mediaWss.on('connection', (ws, req) => {
       isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
       afterHoursMode,
       closureNotice,
+      noticeVariant: recordingNoticeVariant.pickNoticeVariant(sessionCallSid || ''),
       ...facts,
     });
     if (langPick.source === 'caller_last') {
@@ -5903,6 +5917,18 @@ mediaWss.on('connection', (ws, req) => {
     opening.session.notice = noticeTracker.snapshot();
     if (sessionCallSid) callNoticeGates.set(sessionCallSid, (how) => deliverOwedNotice(how));
     const carry = opening.resumed ? opening.session.carry : null;
+    if (carry && carry.noticeVariant) {
+      // Reconnect: same call, same variant; the outcome is logged once, at the end.
+      openingNoticeVariant = carry.noticeVariant;
+      openingGreetingEndAt = carry.greetingEndAt ?? null;
+      openingNoticeCut = Boolean(carry.noticeCut);
+    } else if (!(opening.resumed && opening.action !== 'greet') && composed.noticeVariant) {
+      openingNoticeVariant = composed.noticeVariant;
+      console.log(
+        `[ws/media][${sidLabel()}] recording_notice variant=${openingNoticeVariant} lang=${composed.language} kind=${composed.kind}`
+      );
+      voiceTrace.noteCall({ stage: 'recording_notice', variant: openingNoticeVariant, language: composed.language });
+    }
     if (carry && carry.languageState) {
       callLanguageState = carry.languageState;
       callLanguage = callLanguageState.current;
@@ -5992,6 +6018,9 @@ mediaWss.on('connection', (ws, req) => {
   /** Greeting playout ended (not barged): AWAIT_FIRST, silence ladder armed. */
   function openingGreetingDone() {
     if (!openingOn || !opening) return;
+    if (openingGreetingEndAt == null) openingGreetingEndAt = Date.now();
+    // The notice is the last sentence, so a barge means it was cut.
+    if (greetingInterrupted && openingNoticeVariant) openingNoticeCut = true;
     openingSpeechStartMs = null;
     openingSpeechMs = 0;
     if (greetingInterrupted) return;
@@ -6398,8 +6427,30 @@ mediaWss.on('connection', (ws, req) => {
               messages: messages.filter((m) => m && m.role !== 'system'),
               languageState: callLanguageState,
               firstRealTurnDone: firstRealCallerTurnDone,
+              noticeVariant: openingNoticeVariant,
+              greetingEndAt: openingGreetingEndAt,
+              noticeCut: openingNoticeCut,
             },
       });
+      if (openingNoticeVariant && endedByThisSession) {
+        // Did the caller hang up within 5 s of the greeting end (or during it)?
+        const out = recordingNoticeVariant.earlyHangup({
+          greetingEndAt: openingGreetingEndAt,
+          closedAt: Date.now(),
+          byAgent: callEnding,
+        });
+        console.log(
+          `[ws/media][${sessionCallSid}] recording_notice_outcome variant=${openingNoticeVariant} early_hangup=${out.early ? 1 : 0} since_greeting_end_ms=${out.sinceEndMs == null ? 'none' : out.sinceEndMs} by_agent=${callEnding ? 1 : 0} notice_cut=${openingNoticeCut ? 1 : 0} first_turn_done=${firstRealCallerTurnDone ? 1 : 0}`
+        );
+        voiceTrace.noteCall({
+          stage: 'recording_notice_outcome',
+          variant: openingNoticeVariant,
+          earlyHangup: out.early,
+          sinceGreetingEndMs: out.sinceEndMs,
+          byAgent: Boolean(callEnding),
+          noticeCut: openingNoticeCut,
+        });
+      }
       console.log(
         `[ws/media][${sessionCallSid}] opening_socket_closed ended=${endedByThisSession ? 1 : 0} cut=${cut ? 1 : 0}${detached && !detached.ended ? ` detached_ms=${detached.detachMs}` : ''}`
       );
