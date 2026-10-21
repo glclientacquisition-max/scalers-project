@@ -151,9 +151,9 @@ export function MembersPanel({
   }
 
   function moreHref(key: "members" | "invites", next: number) {
-    const params = new URLSearchParams({ tab: "train", panel: "team", members: String(limits.members), invites: String(limits.invites) });
+    const params = new URLSearchParams({ members: String(limits.members), invites: String(limits.invites) });
     params.set(key, String(next));
-    return `/settings?${params.toString()}`;
+    return `/settings/team?${params.toString()}`;
   }
 
   const roleOptions = roles.map((r) => ({ value: r, label: ROLE_LABELS[r], detail: ROLE_BLURBS[r] }));

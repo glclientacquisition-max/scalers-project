@@ -28,7 +28,7 @@ import {
 import type { OwnerPlanModel, PlanCycle, PlanSku, PublishedPlan } from "@/lib/ownerPlanLoad";
 
 const idle: PlanActionState = { ok: false };
-const TEAM_HREF = "/settings?tab=train&panel=team";
+const TEAM_HREF = "/settings/team";
 
 function per(cycle: PlanCycle): string {
   return cycle === "year" ? "a year" : "a month";

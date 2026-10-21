@@ -106,7 +106,7 @@ describe("desk batch D screen fit and recovery", () => {
       "dashboard/src/app/(desk)/calls/[id]/page.tsx",
       "dashboard/src/app/(desk)/contacts/page.tsx",
       "dashboard/src/app/(desk)/contacts/[id]/page.tsx",
-      "dashboard/src/app/(desk)/settings/page.tsx",
+      "dashboard/src/app/(desk)/settings/SettingsBody.tsx",
       "dashboard/src/app/(desk)/wallet/page.tsx",
     ]) {
       assert.match(read(file), /DeskLoadError/);

@@ -58,7 +58,27 @@ function settingsSearchTab(search: string | null | undefined): string {
   return new URLSearchParams(raw).get("tab") || "";
 }
 
-function isSettingsNestedTab(tab: string): boolean {
+/**
+ * `/settings/[section]` slugs whose old `?tab=` was nested (catalog, train, import, test, alerts).
+ * Kept in step with `SECTION_VIEWS` in businessSettingsNav.ts by tests/settingsSectionRoutes.test.ts.
+ * Inline on purpose: this file loads in node tests without the `@/` alias.
+ */
+export const SETTINGS_NESTED_SECTIONS = new Set<string>([
+  "identity",
+  "hours",
+  "locations",
+  "policies",
+  "catalogue",
+  "import",
+  "faqs",
+  "voice",
+  "pronunciation",
+  "test",
+  "team",
+  "notify",
+]);
+
+export function isSettingsNestedTab(tab: string): boolean {
   return (
     tab === "catalog" ||
     tab === "train" ||
@@ -86,6 +106,8 @@ export function isDeskNestedPath(
   if (path === "/settings") {
     return isSettingsNestedTab(settingsSearchTab(search));
   }
+  const section = /^\/settings\/([^/]+)$/.exec(path);
+  if (section) return SETTINGS_NESTED_SECTIONS.has(section[1]);
   return false;
 }
 

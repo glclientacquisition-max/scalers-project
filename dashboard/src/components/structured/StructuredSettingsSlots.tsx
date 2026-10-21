@@ -42,7 +42,7 @@ export function unpricedCount(tenant: { product_catalog?: unknown; services_cata
   );
 }
 
-export const UNPRICED_HREF = `${businessSettingsHref("catalog")}&filter=unpriced`;
+export const UNPRICED_HREF = `${businessSettingsHref("catalog")}?filter=unpriced`;
 
 export { unpricedLabelText as unpricedLabel } from "./unpricedCopy";
 

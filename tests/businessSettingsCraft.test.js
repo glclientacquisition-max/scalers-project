@@ -196,10 +196,9 @@ describe("business settings craft", () => {
     assert.doesNotMatch(shell, /<ThemePicker \/>/);
     assert.doesNotMatch(shell, /title="This device"/);
     assert.doesNotMatch(shell, /tab === "appearance"/);
-    assert.match(page, /tabRaw === "appearance"\) redirect\("\/settings"\)/);
-    const redirectAt = page.indexOf('tabRaw === "appearance"');
-    const tenantAt = page.indexOf("getCurrentTenant()");
-    assert.ok(redirectAt > 0 && tenantAt > redirectAt);
+    // Old ?tab=appearance bookmarks: proxy.ts 308s to the Settings home before any page code runs.
+    assert.match(nav, /Old \?tab=updates, \?tab=today, and \?tab=appearance bookmarks open the hub/);
+    assert.match(read("dashboard/src/proxy.ts"), /legacySettingsRedirect/);
     assert.doesNotMatch(nav, /title: "This device"/);
     assert.doesNotMatch(nav, /label: "Appearance"/);
   });
@@ -237,7 +236,8 @@ describe("business settings craft", () => {
   it("opens /settings as a destination menu, not a dumped form", () => {
     assert.match(nav, /\| "menu"/);
     assert.match(nav, /return "menu"/);
-    assert.match(nav, /if \(tab === "menu"\) return "\/settings"/);
+    assert.match(nav, /if \(tab === "menu"\) return null/);
+    assert.match(nav, /return slug \? `\/settings\/\$\{slug\}` : "\/settings"/);
     assert.match(side, /variant: "index" \| "rail"/);
     assert.match(side, /settingsRailWrapClass/);
     assert.match(side, /SettingsChevron/);
@@ -415,8 +415,8 @@ describe("business settings craft", () => {
     assert.equal(people.id, "people");
     assert.notEqual(people.id, "alerts");
     assert.equal(got.sections.some((section) => section.title === "How we notify" || section.title === "Alerts" || section.id === "alerts"), false);
-    assert.equal(got.trainHref, "/settings?tab=train");
-    assert.equal(got.testHref, "/settings?tab=test");
+    assert.equal(got.trainHref, "/settings/identity");
+    assert.equal(got.testHref, "/settings/test");
     assert.equal(got.trainPanel, "identity");
   });
 
