@@ -53,7 +53,7 @@ const {
   pcmBytesToMs,
 } = require('./src/speech/greetingPreroll');
 const { buildNotifyOutcome, ownerAlreadyNotified } = require('./src/notifications/notifyOutcome');
-const { createGreetingWarmer, greetingWarmEnabled } = require('./src/speech/greetingWarm');
+const { createGreetingWarmer, greetingWarmEnabled, renderGreetingPcm } = require('./src/speech/greetingWarm');
 const {
   shouldReinvite: shouldReinviteBareGreeting,
   bareGreetingReplyLine,
@@ -63,7 +63,13 @@ const {
 const { classifySonioxError } = require('./src/speech/sonioxErrors');
 // VOICE_OPENING_V2 (default off): one call opening for v1 and v2.
 const callOpening = require('./src/speech/callOpening');
-const openingStore = callOpening.createOpeningStore();
+const { createOpeningSessionStore } = require('./src/speech/openingSessionStore');
+const { createCallPrefetch } = require('./src/speech/callPrefetch');
+// VOICE_OPENING_V2: tenant profile + caller card loaded at the incoming-call
+// webhook, keyed by callSid, so the media stream greets from cache at once.
+const callPrefetch = createCallPrefetch();
+// Per-call "deliver the owed recording notice now" hooks (before the first save).
+const callNoticeGates = new Map();
 const { createLineFallback } = require('./src/speech/ttsRespeak');
 const { getSonioxProviderHealth } = require('./src/speech/sonioxProviderHealth');
 const {
@@ -600,6 +606,15 @@ if (missingEnvironmentVariables.length > 0) {
 }
 
 const db = require('./src/db');
+// VOICE_OPENING_V2 shared resume state: Platform's #844 helpers on the calls
+// row (markCallGreeted claim, getCallResumeState, updateLastAgentLine,
+// bumpStreamSeq) when present and migrated, else this replica's memory.
+const openingStore = callOpening.createOpeningStore({
+  shared: createOpeningSessionStore({ db: callOpening.openingV2Enabled() ? db : null }),
+});
+// Feature-detect once at boot (one probe, one warning) so the first claim
+// does not pay for it.
+if (typeof openingStore.shared.detect === 'function') void openingStore.shared.detect().catch(() => {});
 
 async function hydrateCallerMemory(profile, callSid) {
   return attachCallerMemory(profile, {
@@ -1485,6 +1500,68 @@ function packageGateRefuses(callSid, gate) {
   return false;
 }
 
+/**
+ * VOICE_OPENING_V2: start loading what the greeting needs (tenant profile,
+ * caller card, cached greeting PCM) when the incoming-call webhook answers,
+ * before SautiKit opens /ws/media. Off the webhook's critical path; the
+ * stream takes it by callSid (ensureTenantPrompt) or loads as today on a miss.
+ */
+function prefetchCallOpening({ callSid, tenantId, toNumber, fromNumber }) {
+  const phone = String(fromNumber || '').trim();
+  callPrefetch.start(callSid, async () => {
+    const t0 = Date.now();
+    const profilePromise = db.getTenantProfile({ tenantId: tenantId || undefined, toNumber });
+    const cardFor = (id) =>
+      id && phone && phone.toLowerCase() !== 'unknown'
+        ? db.getCallerMemory({ tenantId: id, phone }).catch(() => null)
+        : Promise.resolve(null);
+    const [profile, early] = await Promise.all([profilePromise, cardFor(tenantId)]);
+    const card = tenantId ? early : await cardFor(profile?.id);
+    if (card) profile.callerMemory = card;
+    else delete profile.callerMemory;
+    const loadMs = Date.now() - t0;
+    // Render the exact greeting into the PCM cache if it is not there yet.
+    let warm = 'skipped';
+    try {
+      if (isGreetingCacheEnabled() && !isDefaultShopName(profile.businessName || '')) {
+        const composed = composeOpeningForProfile(profile, { callSid });
+        const r = await renderGreetingPcm({
+          text: composed.text,
+          profile,
+          tenantId: profile.id,
+          createSession: ({ voiceId }) => createSonioxTtsSession({ callSid: 'greeting-prefetch', voiceId }),
+        });
+        warm = r.rendered ? 'rendered' : 'cached';
+      }
+    } catch (err) {
+      warm = `failed:${err?.message || err}`;
+    }
+    console.log(`[voice/incoming][${callSid}] opening_prefetch ready load_ms=${loadMs} total_ms=${Date.now() - t0} greeting_pcm=${warm}`);
+    return { profile };
+  });
+}
+
+/** The V2 opening for a loaded profile, with the stream's own fallbacks. */
+function composeOpeningForProfile(profile, { callSid } = {}) {
+  const hours = profile.hoursSchedule || null;
+  const open = openClosedStatus(hours);
+  const facts = callOpening.callerOpeningFacts(profile.callerMemory);
+  const pick = callOpening.openingLanguageFor(profile, facts);
+  return callOpening.composeOpening({
+    businessName: profile.businessName || process.env.BUSINESS_NAME || '',
+    spokenName: profile.spokenName || '',
+    agentName: profile.agentName || process.env.AGENT_NAME || '',
+    greetingText: profile.greetingText || '',
+    greetingInvite: profile.greetingInvite || '',
+    language: pick.language,
+    shopLanguage: pick.shopLanguage,
+    isOpen: open === 'unknown' ? null : open === 'open',
+    afterHoursMode: profile.afterHoursMode || 'serve',
+    closureNotice: bulletinClosureNotice(profile.dailyBulletin),
+    ...facts,
+  });
+}
+
 async function handleVoiceIncoming(req, res) {
   const webhookStartedAt = Date.now();
   try {
@@ -1740,6 +1817,14 @@ async function handleVoiceIncoming(req, res) {
 
     inboundCalls.markStreamIssued(callSid);
     res.type('text/xml').send(twiml);
+    if (callOpening.openingV2Enabled()) {
+      prefetchCallOpening({
+        callSid,
+        tenantId: directoryHit?.tenantId || null,
+        toNumber,
+        fromNumber,
+      });
+    }
     console.log(
       `[voice/incoming][${callSid}] stream answered in ${Date.now() - webhookStartedAt}ms` +
         ` path=${directoryHit ? 'fast' : 'legacy'}` +
@@ -2287,8 +2372,17 @@ mediaWss.on('connection', (ws, req) => {
   // VOICE_OPENING_V2 (src/speech/callOpening.js, default off). Read once per
   // socket. Off: none of the opening* state below is used.
   const openingOn = callOpening.openingV2Enabled();
-  /** { session, resumed, action } from openingStore.attach (per callSid). */
-  let opening = openingOn && sessionCallSid ? openingStore.attach(sessionCallSid) : null;
+  /** { session, resumed, action, source } from openingStore.attachShared (per callSid). */
+  let opening = null;
+  let openingAttach = null;
+  /** hit (ready before the stream), inflight, failed, miss (no webhook here), off. */
+  let openingPrefetch = openingOn ? 'miss' : 'off';
+  /** Recording notice: heard in the greeting, or owed after a barge (KDPA). */
+  let noticeTracker = null;
+  let openingNoticeEnd = null;
+  let greetingClipMs = null;
+  let greetingFirstPcmAt = 0;
+  if (openingOn && sessionCallSid) beginOpeningAttach(sessionCallSid);
   let openingLang = 'en';
   let openingInviteLine = '';
   let openingKind = '';
@@ -2473,6 +2567,86 @@ mediaWss.on('connection', (ws, req) => {
     connectToGreetingPcmMs: null,
   };
 
+  /** Look the callSid up (local, then shared store) once per socket. */
+  function beginOpeningAttach(sid) {
+    if (!openingOn) return Promise.resolve(null);
+    if (openingAttach) return openingAttach;
+    const key = String(sid || '');
+    if (!key) {
+      opening = { ...openingStore.attach(''), source: 'new' };
+      openingAttach = Promise.resolve(opening);
+      return openingAttach;
+    }
+    // The incoming-call webhook for this sid ran here: a new call, no read.
+    const fresh = callPrefetch.has(key);
+    openingAttach = openingStore.attachShared(key, { fresh }).then((r) => {
+      opening = r;
+      if (r.source === 'shared') {
+        console.log(`[ws/media][${key}] opening_attach source=shared action=${r.action} stream_seq=${r.session.streamSeq} store=${openingStore.shared.kind()}`);
+      }
+      return r;
+    });
+    return openingAttach;
+  }
+
+  function syncNotice() {
+    if (!opening || !noticeTracker) return;
+    opening.session.notice = noticeTracker.snapshot();
+    if (opening.session.notice.given) openingStore.noteNoticeGiven(opening.session);
+  }
+
+  function owedNoticeLine() {
+    const lang = callLanguage === 'sw' || callLanguage === 'en' ? callLanguage : openingLang;
+    return callOpening.noticeLine(lang);
+  }
+
+  /**
+   * An agent line that asks for name / phone / address / location while the
+   * notice is owed: prepend the one short notice line (KDPA, conservative).
+   */
+  function withOwedNotice(text) {
+    if (!noticeTracker || !noticeTracker.owed()) return text;
+    const ask = callOpening.isPersonalDetailsAsk(text);
+    if (!ask) return text;
+    const line = owedNoticeLine();
+    noticeTracker.given('before_ask');
+    console.log(`[ws/media][${sidLabel()}] recording_notice given how=before_ask ask=${ask}: ${line}`);
+    syncNotice();
+    return `${line} ${text}`;
+  }
+
+  /** Before the first save: speak the owed notice line, then let the write run. */
+  async function deliverOwedNotice(how) {
+    if (!noticeTracker || !noticeTracker.owed()) return false;
+    // No wait on `speaking`: the save gate runs inside the turn whose own
+    // speech is held for the tool results, so waiting would only time out.
+    if (ws.readyState !== WebSocket.OPEN) return false;
+    const line = owedNoticeLine();
+    const spoken = await speakText(line, { skipFileGate: true, isIdleNudge: true });
+    if (!spoken?.ok) return false;
+    noticeTracker.given(how);
+    console.log(`[ws/media][${sidLabel()}] recording_notice given how=${how}: ${line}`);
+    callTranscript.pushAgent(line);
+    messages.push({ role: 'assistant', content: line, local: true });
+    syncNotice();
+    return true;
+  }
+
+  function noteNoticeCut() {
+    if (!noticeTracker) return;
+    const playedMs = greetingFirstPcmAt ? Date.now() - greetingFirstPcmAt : 0;
+    const noticeEndMs = callOpening.noticeEndMsIn({
+      text: greetingLine,
+      noticeEnd: openingNoticeEnd,
+      durationMs: greetingClipMs,
+    });
+    const r = noticeTracker.greetingCut({ playedMs, noticeEndMs });
+    console.log(
+      `[ws/media][${sidLabel()}] recording_notice cut played_ms=${playedMs} notice_end_ms=${noticeEndMs == null ? 'unknown' : noticeEndMs} -> ${r}`
+    );
+    syncNotice();
+  }
+
   function noteGreetingPcm({ cached = false } = {}) {
     if (firstForward.greetingLogged) return;
     firstForward.greetingLogged = true;
@@ -2494,17 +2668,22 @@ mediaWss.on('connection', (ws, req) => {
       });
     }
     if (openingOn && opening) {
-      const from = firstMediaFrameAt || connectedAt;
-      const firstPcmMs = Math.max(0, at - from);
+      // Stream start = the media socket opening (SautiKit starts the stream).
+      const firstPcmMs = Math.max(0, at - connectedAt);
+      const firstMediaMs = firstMediaFrameAt ? Math.max(0, at - firstMediaFrameAt) : null;
+      greetingFirstPcmAt = at;
       openingStore.noteGreeted(opening.session, { text: greetingLine, at });
       console.log(
-        `[voice-timing][${sidLabel()}] greeting.first_pcm_ms=${firstPcmMs} cached=${cached ? 1 : 0} from=${firstMediaFrameAt ? 'first_media_frame' : 'connect'} kind=${openingKind} lang=${openingLang}`
+        `[voice-timing][${sidLabel()}] greeting.first_pcm_ms=${firstPcmMs} from=stream_start prefetch=${openingPrefetch} cached=${cached ? 1 : 0} first_media_ms=${firstMediaMs == null ? 'none' : firstMediaMs} kind=${openingKind} lang=${openingLang}`
       );
       voiceTrace.noteCall({
         stage: 'opening',
         path: 'greeting',
         firstPcmMs,
+        from: 'stream_start',
+        prefetch: openingPrefetch,
         cached: Boolean(cached),
+        firstMediaMs,
         kind: openingKind,
         language: openingLang,
         streamSeq: opening.session.streamSeq,
@@ -2663,7 +2842,24 @@ mediaWss.on('connection', (ws, req) => {
     return opening.session.carry || null;
   }
 
-  async function ensureTenantPrompt() {
+  // VOICE_OPENING_V2: one in-flight load per socket. The connect path and the
+  // start frame both ask; the second must await the first (which took the
+  // webhook prefetch) instead of loading the profile again.
+  let tenantPromptInflight = null;
+  let tenantPromptInflightSid = '';
+  function ensureTenantPrompt() {
+    if (!openingOn) return loadTenantPrompt();
+    if (tenantPromptInflight && tenantPromptInflightSid === sessionCallSid) return tenantPromptInflight;
+    tenantPromptInflightSid = sessionCallSid;
+    const p = loadTenantPrompt();
+    tenantPromptInflight = p;
+    p.finally(() => {
+      if (tenantPromptInflight === p) tenantPromptInflight = null;
+    }).catch(() => {});
+    return p;
+  }
+
+  async function loadTenantPrompt() {
     if (profileLoaded && profileCallSid === sessionCallSid) {
       return buildSttContext(sttTenantSnapshot);
     }
@@ -2671,12 +2867,23 @@ mediaWss.on('connection', (ws, req) => {
       // The webhook writes the call row after Stream XML (fast inbound path).
       // Use the tenant it resolved, and let the row land before later reads.
       const inboundTenantId = inboundCalls.tenantIdFor(sessionCallSid);
-      await inboundCalls.awaitRow(sessionCallSid, 2500);
-      const profile = await db.getTenantProfile({
-        callSid: sessionCallSid,
-        tenantId: inboundTenantId || undefined,
-      });
-      await hydrateCallerMemory(profile, sessionCallSid);
+      // VOICE_OPENING_V2: the webhook already loaded the profile + caller card.
+      const pre = openingOn ? callPrefetch.take(sessionCallSid) : null;
+      let profile = null;
+      if (pre) {
+        openingPrefetch = pre.settledAt && pre.settledAt <= connectedAt ? 'hit' : 'inflight';
+        const got = await pre.promise;
+        if (got && got.profile) profile = got.profile;
+        else openingPrefetch = 'failed';
+      }
+      if (!profile) {
+        await inboundCalls.awaitRow(sessionCallSid, 2500);
+        profile = await db.getTenantProfile({
+          callSid: sessionCallSid,
+          tenantId: inboundTenantId || undefined,
+        });
+        await hydrateCallerMemory(profile, sessionCallSid);
+      }
       brainProfile = profile;
       businessName = profile.businessName || businessName;
       agentName = profile.agentName || agentName;
@@ -3210,6 +3417,7 @@ mediaWss.on('connection', (ws, req) => {
       }
       text = gated.line;
     }
+    if (!opts.isFiller && !opts.isIdleNudge) text = withOwedNotice(text);
     if (!text) return { ok: false };
     if (speechOutageStarted) return { ok: false, outage: true };
     // Greeting / early turns can race tenantWarm → TTS session create.
@@ -3465,6 +3673,7 @@ mediaWss.on('connection', (ws, req) => {
           };
       greetingInterrupted = true;
       if (opening) callOpening.onGreetingBarge(opening.session);
+      noteNoticeCut();
       if (openingSilence) openingSilence.clear();
       console.log(
         `[ws/media][${sidLabel()}] opening_barge reason=${g.reason} speech_ms=${openingSpeechMs} src=${source}: ${String(text || '').slice(0, 60)}`
@@ -4532,7 +4741,7 @@ mediaWss.on('connection', (ws, req) => {
             reason: gated.reason || 'trimmed',
           });
         }
-        const text = cutNoAiSlop(gated.line);
+        let text = cutNoAiSlop(gated.line);
         if (typeof voiceTrace !== 'undefined' && voiceTrace) {
           voiceTrace.noteTransform({
             stage: 'no_ai_slop',
@@ -4541,6 +4750,7 @@ mediaWss.on('connection', (ws, req) => {
           });
         }
         if (!text) return;
+        text = withOwedNotice(text);
         if (!tts) return;
         if (suppressReplyRemainder || bargeInActive) return;
         if (isOrphanFragment(bargeCancelledText, text)) {
@@ -5610,10 +5820,13 @@ mediaWss.on('connection', (ws, req) => {
    * set the call language to the shop language (or restore it on resume),
    * and build the silence ladder.
    */
-  function setupOpening() {
-    if (!opening) opening = openingStore.attach(sessionCallSid || '');
-    openingLang = callOpening.shopLanguage({ ...brainProfile, greetingInvite });
+  async function setupOpening() {
+    if (!opening) await beginOpeningAttach(sessionCallSid || '');
     const facts = callOpening.callerOpeningFacts(brainProfile?.callerMemory);
+    // Returning caller: greet in the language they settled on last time
+    // (contacts.last_language, #844); else the shop's language.
+    const langPick = callOpening.openingLanguageFor({ ...brainProfile, greetingInvite }, facts);
+    openingLang = langPick.language;
     const composed = callOpening.composeOpening({
       businessName,
       spokenName,
@@ -5621,13 +5834,50 @@ mediaWss.on('connection', (ws, req) => {
       greetingText: brainProfile?.greetingText || '',
       greetingInvite,
       language: openingLang,
+      shopLanguage: langPick.shopLanguage,
       isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
       afterHoursMode,
       closureNotice,
       ...facts,
     });
+    if (langPick.source === 'caller_last') {
+      console.log(`[ws/media][${sidLabel()}] opening_lang caller_last=${openingLang} shop=${langPick.shopLanguage}`);
+    }
+    // Who greets: one stream per call wins the shared claim (markCallGreeted).
+    // The webhook ran here: a new call, claim without waiting. Otherwise wait
+    // (bounded): a reconnect on another replica loses and resumes.
+    const sid = sessionCallSid || '';
+    if (sid && opening && !opening.resumed) {
+      if (opening.needsClaim) {
+        const c = await openingStore.claimGreeting(sid, { line: composed.text, timeoutMs: 500 });
+        if (c.won === false && c.attach) {
+          opening = c.attach;
+          console.log(`[ws/media][${sid}] opening_claim lost store=${openingStore.shared.kind()} -> resume action=${opening.action}`);
+        } else {
+          console.log(`[ws/media][${sid}] opening_claim ${c.won === true ? 'won' : `unknown${c.timeout ? ' timeout' : ''} (greet)`} store=${openingStore.shared.kind()}`);
+        }
+      } else {
+        void openingStore.shared.claim(sid, { lastAgentLine: composed.text }).then((c) => {
+          if (c && c.won === false) console.warn(`[ws/media][${sid}] opening_claim lost after greeting (fresh call)`);
+        }).catch(() => {});
+      }
+    }
     openingInviteLine = composed.invite;
     openingKind = composed.kind;
+    // Recording notice (KDPA): a fresh greeting tracks this line's notice; a
+    // resumed stream keeps the call's state (pending -> owed on a cut). A
+    // resume rebuilt from the shared row without notice_given owes it.
+    const prevNotice = opening.resumed ? opening.session.notice : null;
+    if (prevNotice) {
+      noticeTracker = callOpening.createNoticeTracker({ required: prevNotice.required !== false, startedAt: connectedAt });
+      noticeTracker.restore(prevNotice);
+    } else {
+      noticeTracker = callOpening.createNoticeTracker({ required: composed.notice, startedAt: connectedAt });
+      openingNoticeEnd = composed.noticeEnd;
+      if (opening.resumed) noticeTracker.resumeFromPending();
+    }
+    opening.session.notice = noticeTracker.snapshot();
+    if (sessionCallSid) callNoticeGates.set(sessionCallSid, (how) => deliverOwedNotice(how));
     const carry = opening.resumed ? opening.session.carry : null;
     if (carry && carry.languageState) {
       callLanguageState = carry.languageState;
@@ -5710,6 +5960,12 @@ mediaWss.on('connection', (ws, req) => {
     openingSpeechStartMs = null;
     openingSpeechMs = 0;
     if (greetingInterrupted) return;
+    // A socket drop also ends the IIFE's playout wait: that is a cut, not heard.
+    if (ws.readyState !== WebSocket.OPEN) return;
+    if (noticeTracker && noticeTracker.state === 'pending') {
+      noticeTracker.heardInGreeting();
+      syncNotice();
+    }
     callOpening.onGreetingDone(opening.session);
     if (openingSilence && !firstRealCallerTurnDone) openingSilence.arm();
   }
@@ -5768,7 +6024,7 @@ mediaWss.on('connection', (ws, req) => {
 
       let composedOpening = null;
       if (openingOn) {
-        composedOpening = setupOpening();
+        composedOpening = await setupOpening();
         if (opening.resumed && opening.action !== 'greet') {
           await resumeOpening();
           return;
@@ -5814,6 +6070,7 @@ mediaWss.on('connection', (ws, req) => {
           language: callLanguage,
         });
         if (openingOn) agentReplay.beginSpeech(greetingLine);
+        if (openingOn) greetingClipMs = pcmDurationMs(found.pcm, 16000);
         await playCachedFillerPcm(found.pcm, { text: greetingLine, trace: false, kind: openingOn ? 'greeting' : 'filler' });
         if (openingOn && !greetingInterrupted) agentReplay.commitPlayback();
         callTranscript.pushAgent(greetingLine);
@@ -5984,7 +6241,7 @@ mediaWss.on('connection', (ws, req) => {
               }
               sessionCallSid = String(maybeSid);
               endedCalls.noteMediaOpen(sessionCallSid, connectedAt);
-              if (openingOn && !opening) opening = openingStore.attach(sessionCallSid);
+              if (openingOn && !opening) beginOpeningAttach(sessionCallSid);
               callSpokenTranscripts.set(sessionCallSid, callTranscript);
               ttsSpeedScale = 1;
               publishVoiceTrace();
@@ -6060,6 +6317,38 @@ mediaWss.on('connection', (ws, req) => {
     idleNudge.close();
     unfinishedHold.close();
     if (openingSilence) openingSilence.close();
+    if (sessionCallSid) callNoticeGates.delete(sessionCallSid);
+    if (openingOn && opening && noticeTracker) {
+      // Per stream close (ended=1 is the call's final record): was the
+      // recording notice given, how and when (ms from stream start).
+      const n = noticeTracker.snapshot();
+      opening.session.notice = n;
+      console.log(
+        `[ws/media][${sessionCallSid}] recording_notice_given given=${n.given} how=${n.how} at_ms=${n.at_ms == null ? 'none' : n.at_ms} cut_at_ms=${n.cut_at_ms == null ? 'none' : n.cut_at_ms} state=${n.state} ended=${endedByThisSession ? 1 : 0}`
+      );
+      voiceTrace.noteCall({ stage: 'recording_notice_given', ...n, ended: Boolean(endedByThisSession) });
+    }
+    // contacts.last_language (#844): the language this caller settled on, so
+    // their next call greets in it. Helper maps sheng -> sw and skips mixed;
+    // it updates an existing contact only. Absent before #844 merges.
+    if (
+      openingOn &&
+      endedByThisSession &&
+      firstRealCallerTurnDone &&
+      typeof db.saveCallerLanguage === 'function' &&
+      brainProfile?.id &&
+      (callLanguage === 'en' || callLanguage === 'sw' || callLanguage === 'sheng')
+    ) {
+      const lang = callLanguage;
+      const tenantId = brainProfile.id;
+      const sid = sessionCallSid;
+      void Promise.resolve(brainProfile.callerMemory?.phone || db.getCall(sid).then((c) => c?.from_number))
+        .then((phone) => (phone ? db.saveCallerLanguage({ tenantId, phone, language: lang }) : null))
+        .then((r) => {
+          if (r) console.log(`[ws/media][${sid}] caller_language saved=${r.updated || 0} lang=${lang}${r.skipped ? ` skipped=${r.skipped}` : ''}`);
+        })
+        .catch(() => {});
+    }
     if (openingOn && opening && sessionCallSid && !endedRefused) {
       const cut = speaking && openingLineReal;
       const detached = openingStore.detach(sessionCallSid, {
@@ -7186,6 +7475,15 @@ async function applyGeminiTools(callSid, parsed) {
     : null;
   if (closedLine) {
     console.warn(`[${callSid}] tool writes refused: tenant line closed (${closedLine.reason})`);
+  }
+  // VOICE_OPENING_V2: a recording notice cut by a barge is spoken before the
+  // first save (KDPA). No-op when it was heard or is not owed.
+  if (!closedLine && brainToolsWantWrite(enforcedParsed) && callNoticeGates.has(callSid)) {
+    try {
+      await callNoticeGates.get(callSid)('before_save');
+    } catch (err) {
+      console.warn(`[${callSid}] recording notice before save failed:`, err?.message || err);
+    }
   }
   const execution = await executeBrainTools({
     parsed: enforcedParsed,

@@ -10,7 +10,10 @@
 //     owner's ending (greeting_invite, or a future greeting_text) is kept word
 //     for word, and the language invite is never spoken;
 //   - returning callers: "Karibu tena" / "Welcome back", the name only when it
-//     was confirmed on an earlier call, and no recording notice;
+//     was confirmed on an earlier call. They hear the recording notice too
+//     unless VOICE_RETURNING_SKIP_NOTICE=on (default off, KDPA-conservative);
+//   - a recording notice cut by a barge is owed: one short notice line before
+//     the first save or the first personal-details ask (createNoticeTracker);
 //   - bare Hello before the first real turn (max 2 re-invites; folds in
 //     VOICE_BARE_GREETING_REPLY);
 //   - the silence ladder before the first real turn: 5 s after greeting
@@ -42,8 +45,12 @@ const {
   greetingHelpLine,
 } = require('../conversation/businessAssistantIntro');
 const { isBareGreetingOrAffirmation, bareGreetingLanguage } = require('./bareGreetingReply');
+const { createMemorySessionStore } = require('./openingSessionStore');
 
 const FLAG = 'VOICE_OPENING_V2';
+const RETURNING_SKIP_NOTICE_FLAG = 'VOICE_RETURNING_SKIP_NOTICE';
+/** Notice counts as heard only this far past its estimated end in the clip. */
+const NOTICE_HEARD_MARGIN_MS = 300;
 const MAX_BARE_HELLO = 2;
 const BARGE_MIN_SPEECH_MS = 600;
 const DETACH_MS = 20000;
@@ -64,6 +71,11 @@ function silenceLadderMs(env = process.env) {
 
 function openingV2Enabled(env = process.env) {
   return /^(1|true|on|yes)$/i.test(String(env[FLAG] || '').trim());
+}
+
+/** VOICE_RETURNING_SKIP_NOTICE=on: returning callers skip the notice (default off: they hear it). */
+function returningSkipNoticeOn(env = process.env) {
+  return /^(1|true|on|yes)$/i.test(String(env[RETURNING_SKIP_NOTICE_FLAG] || '').trim());
 }
 
 function clean(value) {
@@ -120,14 +132,30 @@ function shopLanguage(profile = {}) {
  */
 function callerOpeningFacts(card) {
   if (!card || typeof card !== 'object') {
-    return { isReturning: false, knownName: '', nameConfirmed: false };
+    return { isReturning: false, knownName: '', nameConfirmed: false, lastLanguage: null };
   }
   const knownName = clean(card.fileOwnerName || card.name);
   const nameConfirmed =
     Boolean(knownName) &&
     card.sharedLine !== true &&
     (card.nameConfirmed === true || card.name_confirmed === true);
-  return { isReturning: true, knownName, nameConfirmed };
+  // contacts.last_language (#844): en | sw, null when never saved.
+  const ll = String(card.lastLanguage || card.last_language || '').toLowerCase();
+  const lastLanguage = ll === 'en' || ll === 'sw' ? ll : null;
+  return { isReturning: true, knownName, nameConfirmed, lastLanguage };
+}
+
+/**
+ * The greeting language: a returning caller's last settled language
+ * (contacts.last_language), else the shop's language.
+ * @returns {{ language: 'en'|'sw', shopLanguage: 'en'|'sw', source: 'caller_last'|'shop' }}
+ */
+function openingLanguageFor(profile = {}, facts = {}) {
+  const shop = shopLanguage(profile);
+  if (facts && facts.isReturning && (facts.lastLanguage === 'en' || facts.lastLanguage === 'sw')) {
+    return { language: facts.lastLanguage, shopLanguage: shop, source: facts.lastLanguage === shop ? 'shop' : 'caller_last' };
+  }
+  return { language: shop, shopLanguage: shop, source: 'shop' };
 }
 
 function staffNames(profile = {}) {
@@ -203,7 +231,9 @@ function shopLabel({ spokenName, businessName }) {
  *   recordingNotice?: boolean, isReturning?: boolean, knownName?: string,
  *   nameConfirmed?: boolean,
  * }} o
- * @returns {{ text: string, kind: string, language: 'en'|'sw', invite: string, notice: boolean }}
+ *   returningSkipNotice?: boolean (default VOICE_RETURNING_SKIP_NOTICE),
+ * @returns {{ text: string, kind: string, language: 'en'|'sw', invite: string, notice: boolean, noticeText: string, noticeEnd: number|null }}
+ *   noticeEnd: character offset just past the notice in text (null: no notice).
  */
 function composeOpening(o = {}) {
   const lang = langOf(o.language);
@@ -211,17 +241,26 @@ function composeOpening(o = {}) {
   const shop = shopLabel(o);
   const agentRaw = clean(o.agentName);
   const agent = isDefaultAgentName(agentRaw) ? '' : agentRaw;
-  const invite = openingInvite({ greetingInvite: o.greetingInvite, language: lang });
+  // The owner's words (greeting_text, greeting_invite) are in the shop's
+  // language; greeting a returning caller in their own language uses the
+  // template and the default question instead.
+  const ownerLang = o.shopLanguage === 'en' || o.shopLanguage === 'sw' ? o.shopLanguage : lang;
+  const ownerWordsFit = ownerLang === lang;
+  const invite = ownerWordsFit
+    ? openingInvite({ greetingInvite: o.greetingInvite, language: lang })
+    : PACK[lang].invite;
   const messageMode = String(o.afterHoursMode || 'serve').toLowerCase() === 'message';
   const closed = o.isOpen === false;
   const closure = shortenNotice(o.closureNotice);
   const returning = o.isReturning === true;
-  const noticeOn =
-    !returning && (o.recordingNotice != null ? Boolean(o.recordingNotice) : recordingNoticeOn());
+  const recording = o.recordingNotice != null ? Boolean(o.recordingNotice) : recordingNoticeOn();
+  const skipForReturning =
+    o.returningSkipNotice != null ? Boolean(o.returningSkipNotice) : returningSkipNoticeOn();
+  const noticeOn = recording && !(returning && skipForReturning);
   const name = returning && o.nameConfirmed === true ? clean(o.knownName) : '';
 
   const parts = [];
-  const owner = clean(o.greetingText);
+  const owner = ownerWordsFit ? clean(o.greetingText) : '';
   if (owner && !returning) {
     // Owner's full greeting, verbatim (future tenants.greeting_text).
     parts.push(endSentence(owner));
@@ -229,7 +268,8 @@ function composeOpening(o = {}) {
     parts.push(p.identity(shop, agent));
   }
   if (returning) parts.push(p.welcomeBack(name));
-  if (noticeOn && !(owner && /\b(record|rekodi)/i.test(owner))) parts.push(p.notice);
+  const ownerSaysRecord = Boolean(owner) && /\b(record|rekodi)/i.test(owner);
+  if (noticeOn && !ownerSaysRecord) parts.push(p.notice);
   let follow = invite;
   if (closure) {
     parts.push(endSentence(closure)); // owner's words, verbatim
@@ -249,7 +289,20 @@ function composeOpening(o = {}) {
     returning ? (name ? 'returning_named' : 'returning') : 'new',
     closure ? 'bulletin' : closed ? (messageMode ? 'closed_message' : 'closed_serve') : messageMode ? 'message' : 'open',
   ].join('_');
-  return { text: parts.filter(Boolean).join(' '), kind, language: lang, invite, notice: noticeOn };
+  const text = parts.filter(Boolean).join(' ');
+  // Where the notice ends in the line, so a barge can tell whether it was heard.
+  let noticeText = '';
+  if (noticeOn) noticeText = ownerSaysRecord ? owner : p.notice;
+  const at = noticeText ? text.indexOf(noticeText) : -1;
+  return {
+    text,
+    kind,
+    language: lang,
+    invite,
+    notice: noticeOn,
+    noticeText,
+    noticeEnd: at >= 0 ? at + noticeText.length : null,
+  };
 }
 
 function bareHelloLine({ language, invite, count = 0 }) {
@@ -443,7 +496,28 @@ function createOpeningSession(callSid, { now = Date.now() } = {}) {
     detachedAt: null,
     createdAt: now,
     carry: null,
+    // Recording notice (createNoticeTracker snapshot) and A/B variant.
+    notice: null,
+    noticeVariant: null,
+    resumedFrom: null,
   };
+}
+
+/** Rebuild a DETACHED session on this replica from the shared calls row. */
+function sessionFromShared(callSid, rec, { now = Date.now() } = {}) {
+  const s = createOpeningSession(callSid, { now });
+  s.greetedAt = rec.greetedAt;
+  s.lastAgentLine = clean(rec.lastAgentLine);
+  // The row does not say whether the line was cut; listen (a bare Hello
+  // still gets the re-invite) rather than repeat a line that was heard.
+  s.lastLineCut = false;
+  s.streamSeq = Number(rec.streamSeq) || 1;
+  s.notice = rec.noticeGiven ? { required: true, given: true, state: 'given', how: 'earlier_stream', at_ms: null, cut_at_ms: null } : null;
+  s.resumeState = STATES.AWAIT_FIRST;
+  s.state = STATES.DETACHED;
+  s.detachedAt = now;
+  s.resumedFrom = 'shared';
+  return s;
 }
 
 /**
@@ -475,6 +549,9 @@ function createOpeningStore(opts = {}) {
   const schedule = opts.setTimeout || setTimeout;
   const cancel = opts.clearTimeout || clearTimeout;
   const now = opts.now || (() => Date.now());
+  // Shared resume state (openingSessionStore: memory or Supabase calls row).
+  const shared = opts.shared || createMemorySessionStore({ now });
+  const sharedTimeoutMs = Number.isFinite(opts.sharedTimeoutMs) ? opts.sharedTimeoutMs : 800;
   const mirror = opts.mirror || createMemoryGreetedMirror();
   const sessions = new Map();
   const timers = new Map();
@@ -523,6 +600,66 @@ function createOpeningStore(opts = {}) {
   }
 
   /**
+   * attach() for a socket. A local session (same replica) resumes at once.
+   * Otherwise the session is new and, unless the incoming-call webhook ran
+   * here (fresh), must win the shared greeting claim before it greets
+   * (claimGreeting); a reconnect on another replica loses it and resumes.
+   * @returns {Promise<{ session, resumed, action, source: 'local'|'new', needsClaim: boolean }>}
+   */
+  async function attachShared(callSid, { fresh = false } = {}) {
+    const sid = String(callSid || '');
+    const local = sid && sessions.has(sid);
+    const r = attach(sid);
+    void shared.bumpStream(sid).then((seq) => {
+      if (Number.isFinite(seq) && r.session) r.session.sharedStreamSeq = seq;
+    }).catch(() => {});
+    return { ...r, source: local ? 'local' : 'new', needsClaim: Boolean(sid) && !local && !fresh };
+  }
+
+  /**
+   * Claim the greeting for this call across replicas (markCallGreeted). won
+   * true: greet. won false: another stream already greeted; the session is
+   * rebuilt from the row and resumes. won null (error, timeout, no row):
+   * fail open and greet, as today.
+   * @returns {Promise<{ won: boolean|null, attach?: object }>}
+   */
+  async function claimGreeting(callSid, { line = '', timeoutMs = sharedTimeoutMs } = {}) {
+    const sid = String(callSid || '');
+    if (!sid) return { won: null };
+    const timeout = (v) =>
+      new Promise((resolve) => {
+        const t = schedule(() => resolve(v), timeoutMs);
+        if (t && typeof t.unref === 'function') t.unref();
+      });
+    let c;
+    try {
+      c = await Promise.race([shared.claim(sid, { lastAgentLine: line }), timeout({ won: null, timeout: true })]);
+    } catch {
+      c = { won: null };
+    }
+    if (c.won !== false) return { won: c.won, timeout: Boolean(c.timeout) };
+    let rec = null;
+    try {
+      rec = await Promise.race([shared.get(sid), timeout(null)]);
+    } catch {
+      rec = null;
+    }
+    const s = sessionFromShared(sid, { greetedAt: c.greetedAt, ...(rec || {}) }, { now: now() });
+    const cur = sessions.get(sid);
+    sessions.set(sid, s);
+    const a = attach(sid);
+    // stream_seq: this stream's own bump when it has answered, else the row's
+    // count plus this stream.
+    if (cur && Number.isFinite(cur.sharedStreamSeq)) a.session.streamSeq = cur.sharedStreamSeq;
+    return { won: false, attach: { ...a, source: 'shared', needsClaim: false } };
+  }
+
+  /** Recording notice heard: keep it for a reconnect elsewhere. */
+  function noteNoticeGiven(session) {
+    if (session && session.callSid) void shared.markNoticeGiven(session.callSid).catch(() => {});
+  }
+
+  /**
    * The socket closed.
    * @param {{ ended?: boolean, speaking?: boolean, line?: string, carry?: object }} info
    */
@@ -541,6 +678,7 @@ function createOpeningStore(opts = {}) {
     s.lastLineCut = Boolean(info.speaking && clean(info.line || s.lastAgentLine));
     if (info.line) s.lastAgentLine = clean(info.line);
     if (info.carry) s.carry = info.carry;
+    if (s.lastLineCut && s.lastAgentLine) void shared.noteLine(sid, s.lastAgentLine).catch(() => {});
     const t = schedule(() => {
       timers.delete(sid);
       const cur = sessions.get(sid);
@@ -568,10 +706,15 @@ function createOpeningStore(opts = {}) {
     if (!t) return;
     session.lastAgentLine = t;
     if (session.callSid) void mirror.write(session.callSid, { last_agent_line: t });
+    if (session.callSid) void shared.noteLine(session.callSid, t).catch(() => {});
   }
 
   return {
     attach,
+    attachShared,
+    claimGreeting,
+    noteNoticeGiven,
+    shared,
     detach,
     noteGreeted,
     noteLine,
@@ -582,6 +725,124 @@ function createOpeningStore(opts = {}) {
       for (const sid of [...sessions.keys()]) drop(sid);
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Recording notice owed after a barge (KDPA, conservative)
+// ---------------------------------------------------------------------------
+
+/** The short notice line spoken when the greeting's notice was cut. */
+function noticeLine(language) {
+  return PACK[langOf(language)].notice;
+}
+
+const PERSONAL_NAME_ASK =
+  /\b(?:may i have your name|what(?:'s| is) your (?:full )?name|tell me your name|(?:could|can) i (?:have|get|take) your name|who am i speaking (?:with|to)|am i speaking with|your name,? please|name, please|jina lako|niambie jina|unaitwa nani|naomba jina|naongea na nani|naongea na)\b/i;
+const PERSONAL_PHONE_ASK =
+  /\b(?:your (?:phone |mobile |best |contact )?number|(?:phone|mobile|contact) number|number (?:to|we can) (?:reach|call)|namba yako|nambari yako|namba ya simu|nambari ya simu)\b/i;
+const PERSONAL_PLACE_ASK =
+  /\b(?:where are you(?: located| based| calling from)?\b|your (?:location|address|area|estate)|which (?:area|estate|location|town)|what (?:area|estate|location|address)|uko wapi|unaishi wapi|mko wapi|unapatikana wapi|eneo (?:gani|lako)|mtaa (?:gani|wako)|location yako|address yako|anwani yako|nyumba yako iko wapi|tukuje wapi|tuje wapi)\b/i;
+
+/**
+ * Does an agent line ask the caller for personal details (name, phone,
+ * address or location)? Used only to deliver an owed recording notice first.
+ * @returns {false|'name'|'phone'|'location'}
+ */
+function isPersonalDetailsAsk(text) {
+  const t = clean(text);
+  if (!t) return false;
+  if (PERSONAL_NAME_ASK.test(t)) return 'name';
+  if (PERSONAL_PHONE_ASK.test(t)) return 'phone';
+  if (PERSONAL_PLACE_ASK.test(t)) return 'location';
+  return false;
+}
+
+/**
+ * Per-call recording notice state.
+ *   not_required: no notice this call (not recording, or returning + skip flag)
+ *   pending:      in the greeting, not yet past it
+ *   given:        heard (greeting, before_ask, before_save, resume)
+ *   owed:         a barge or a drop cut it; deliver one short line before the
+ *                 first save or personal-details ask, whichever comes first
+ * @param {{ required: boolean, now?: () => number, startedAt?: number }} o
+ */
+function createNoticeTracker(o = {}) {
+  const now = o.now || (() => Date.now());
+  const startedAt = Number.isFinite(o.startedAt) ? o.startedAt : now();
+  const st = {
+    state: o.required ? 'pending' : 'not_required',
+    how: o.required ? '' : 'not_required',
+    atMs: null,
+    cutAt: null,
+  };
+  const t = {
+    get state() {
+      return st.state;
+    },
+    owed: () => st.state === 'owed',
+    /** Greeting audio ran to the end (or past the notice). */
+    heardInGreeting() {
+      if (st.state !== 'pending') return false;
+      st.state = 'given';
+      st.how = 'greeting';
+      st.atMs = now() - startedAt;
+      return true;
+    },
+    /**
+     * Greeting barged after playedMs of its audio. noticeEndMs is where the
+     * notice ends in the clip (null: unknown, e.g. live TTS: assume cut).
+     */
+    greetingCut({ playedMs = null, noticeEndMs = null } = {}) {
+      if (st.state !== 'pending') return st.state;
+      const heard =
+        Number.isFinite(playedMs) && Number.isFinite(noticeEndMs) && playedMs >= noticeEndMs + NOTICE_HEARD_MARGIN_MS;
+      if (heard) return t.heardInGreeting() && 'given';
+      st.state = 'owed';
+      st.cutAt = now() - startedAt;
+      return 'owed';
+    },
+    /** A reconnect before the notice was heard: still owed. */
+    resumeFromPending() {
+      if (st.state === 'pending') {
+        st.state = 'owed';
+        st.cutAt = now() - startedAt;
+      }
+    },
+    /** The owed line was spoken (how: before_ask | before_save | ...). */
+    given(how) {
+      if (st.state !== 'owed' && st.state !== 'pending') return false;
+      st.state = 'given';
+      st.how = String(how || 'line');
+      st.atMs = now() - startedAt;
+      return true;
+    },
+    /** For logs, the trace and the shared session store. */
+    snapshot() {
+      return {
+        required: st.state !== 'not_required',
+        given: st.state === 'given',
+        state: st.state,
+        how: st.how || (st.state === 'owed' ? 'owed' : st.state),
+        at_ms: st.atMs,
+        cut_at_ms: st.cutAt,
+      };
+    },
+    restore(snap) {
+      if (!snap || typeof snap !== 'object' || !snap.state) return;
+      st.state = snap.state === 'pending' ? 'owed' : snap.state;
+      st.how = snap.how || st.how;
+      st.atMs = snap.at_ms ?? null;
+      st.cutAt = snap.cut_at_ms ?? null;
+    },
+  };
+  return t;
+}
+
+/** Where the notice ends in a cached clip of durationMs (proportional to text). */
+function noticeEndMsIn({ text, noticeEnd, durationMs }) {
+  const len = clean(text).length;
+  if (!len || noticeEnd == null || !Number.isFinite(durationMs)) return null;
+  return Math.round((durationMs * Math.min(noticeEnd, len)) / len);
 }
 
 // Session transitions (pure; the server does the audio).
@@ -700,6 +961,13 @@ function openingWarmLines(profile = {}, { isOpen = null, recordingNotice } = {})
 
 module.exports = {
   FLAG,
+  RETURNING_SKIP_NOTICE_FLAG,
+  NOTICE_HEARD_MARGIN_MS,
+  returningSkipNoticeOn,
+  noticeLine,
+  isPersonalDetailsAsk,
+  createNoticeTracker,
+  noticeEndMsIn,
   MAX_BARE_HELLO,
   BARGE_MIN_SPEECH_MS,
   DETACH_MS,
@@ -710,6 +978,7 @@ module.exports = {
   silenceLadderMs,
   shopLabel,
   shopLanguage,
+  openingLanguageFor,
   callerOpeningFacts,
   staffNames,
   openingInvite,
@@ -724,6 +993,7 @@ module.exports = {
   initialLanguageState,
   createOpeningSession,
   createOpeningStore,
+  sessionFromShared,
   createMemoryGreetedMirror,
   onGreetingBarge,
   onGreetingDone,
