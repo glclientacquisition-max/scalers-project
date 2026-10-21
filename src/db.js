@@ -13,6 +13,11 @@ const { normalizeKenyaE164 } = require('./conversation/liveTransferReady');
 const { mergeContactIdentity } = require('./conversation/contactIdentity');
 const { buildCallerMemoryCard } = require('./conversation/callerMemory');
 const { tenantProfileFromRow } = require('./tenantProfile');
+const { queryBatchingEnabled, createCallIdentityMemo } = require('./speech/queryBatching');
+
+// VOICE_QUERY_BATCHING: id / tenant_id / caller number per call sid, so the
+// call path stops re-reading calls.* just to learn them (N+1 audit #3).
+const callIdentity = createCallIdentityMemo();
 
 const RECORDINGS_BUCKET = process.env.SUPABASE_RECORDINGS_BUCKET || 'call-recordings';
 const DEFAULT_TENANT_ID = process.env.TENANT_ID || null;
@@ -584,10 +589,22 @@ async function upsertCall({
     .single();
 
   throwIfError('upsertCall', error);
-  return shapeCall(data);
+  const shaped = shapeCall(data);
+  if (shaped && queryBatchingEnabled()) callIdentity.remember(shaped);
+  return shaped;
 }
 
 async function saveCallerInfo({ callSid, name, reason }) {
+  if (queryBatchingEnabled()) {
+    const patch = {};
+    if (name != null && String(name).trim()) patch.name = String(name).trim();
+    if (reason != null && String(reason).trim()) patch.reason = String(reason).trim();
+    const merged = await mergeCallSummaryInSql(callSid, patch, 'saveCallerInfo');
+    if (merged !== undefined) {
+      if (!merged) throw new Error(`[db] saveCallerInfo: no call for ${callSid}`);
+      return shapeCall(merged);
+    }
+  }
   const existing = await getCall(callSid);
   if (!existing) {
     throw new Error(`[db] saveCallerInfo: no call for ${callSid}`);
@@ -619,7 +636,8 @@ async function saveCallerInfo({ callSid, name, reason }) {
  * an array of { speaker, text, latencyMs }.
  */
 async function appendTranscript({ callSid, transcript, turns }) {
-  const call = await getCall(callSid);
+  // Only call.id is used here; VOICE_QUERY_BATCHING reads it from the memo.
+  const call = await getCallIdentity(callSid);
   if (!call) {
     console.warn(`[db] appendTranscript: no call row for ${callSid}`);
     return null;
@@ -671,7 +689,7 @@ async function appendTranscript({ callSid, transcript, turns }) {
 async function listTranscriptTurns(callSid) {
   const sid = String(callSid || '').trim();
   if (!sid) return [];
-  const call = await getCall(sid);
+  const call = await getCallIdentity(sid);
   if (!call) return [];
   const { data, error } = await supabase
     .from('transcripts')
@@ -698,7 +716,27 @@ async function getCall(callSid) {
     .maybeSingle();
 
   throwIfError('getCall', error);
-  return shapeCall(data);
+  const shaped = shapeCall(data);
+  if (shaped && queryBatchingEnabled()) callIdentity.remember(shaped);
+  return shaped;
+}
+
+/**
+ * The call row fields that do not change during a call (id, tenant_id,
+ * from_number, call_sid). VOICE_QUERY_BATCHING on: from the per-sid memo that
+ * upsertCall / getCall fill, else one getCall. Off: getCall (the full row).
+ * Callers must only read those four fields; anything in calls.summary
+ * (owner_notified, escalation_sent, ...) needs a fresh getCall.
+ */
+async function getCallIdentity(callSid) {
+  if (!queryBatchingEnabled()) return getCall(callSid);
+  const hit = callIdentity.get(callSid);
+  if (hit) return hit;
+  return getCall(callSid);
+}
+
+function forgetCallIdentity(callSid) {
+  callIdentity.forget(callSid);
 }
 
 /**
@@ -869,6 +907,10 @@ async function markEscalationSent(callSid) {
  */
 async function mergeCallSummaryMeta({ callSid, patch = {} } = {}) {
   if (!callSid || !patch || typeof patch !== 'object') return null;
+  if (queryBatchingEnabled()) {
+    const merged = await mergeCallSummaryInSql(callSid, patch, 'mergeCallSummaryMeta');
+    if (merged !== undefined) return merged ? { id: merged.id, summary: merged.summary } : null;
+  }
   const existing = await getCall(callSid);
   if (!existing) return null;
   const meta = parseSummary(existing.summary);
@@ -884,6 +926,50 @@ async function mergeCallSummaryMeta({ callSid, patch = {} } = {}) {
     .maybeSingle();
   throwIfError('mergeCallSummaryMeta', error);
   return data || null;
+}
+
+// merge_call_summary RPC (supabase/migrations/20261021220000_merge_call_summary.sql,
+// Platform applies it). Until then every merge keeps the read-then-write path;
+// a missing function is re-probed once a minute, not on every merge.
+const MERGE_RPC_REPROBE_MS = 60 * 1000;
+let mergeRpcMissingUntil = 0;
+
+function mergeRpcMissing(error) {
+  const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
+  return /PGRST202|42883|merge_call_summary|could not find the function|does not exist|schema cache/i.test(text);
+}
+
+/**
+ * One UPDATE: calls.summary = summary::jsonb || patch (keys set to undefined
+ * are left alone, like the JS merge). No read-then-write race.
+ * @returns {Promise<object|null|undefined>} the updated calls row; null when
+ *   no row has this sid; undefined when the RPC is not on this database.
+ */
+async function mergeCallSummaryInSql(callSid, patch, context) {
+  if (Date.now() < mergeRpcMissingUntil) return undefined;
+  const clean = {};
+  for (const [key, value] of Object.entries(patch || {})) {
+    if (value === undefined) continue;
+    clean[key] = value;
+  }
+  const { data, error } = await supabase.rpc('merge_call_summary', {
+    p_sid: callSid,
+    p_patch: clean,
+  });
+  if (error) {
+    if (mergeRpcMissing(error)) {
+      mergeRpcMissingUntil = Date.now() + MERGE_RPC_REPROBE_MS;
+      console.warn(`[db] ${context}: merge_call_summary RPC missing, read-then-write (${error.message})`);
+      return undefined;
+    }
+    throwIfError(`${context}(rpc)`, error);
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return row && typeof row === 'object' ? row : null;
+}
+
+function resetMergeRpcProbe() {
+  mergeRpcMissingUntil = 0;
 }
 
 async function uploadRecordingBuffer({
@@ -1512,9 +1598,12 @@ async function selectTenantRowWithLine(tenantId, columns) {
   return last;
 }
 
+// The newest getTenantById select (rung 1 of its ladder).
+const TENANT_PROFILE_COLUMNS = 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, spoken_name, greeting_invite, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active';
+
 async function getTenantById(tenantId) {
   if (!tenantId) return null;
-  let { data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, spoken_name, greeting_invite, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active');
+  let { data, error } = await selectTenantRowWithLine(tenantId, TENANT_PROFILE_COLUMNS);
 
   if (error && /spoken_name|greeting_invite/i.test(error.message || '')) {
     ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active'));
@@ -1571,10 +1660,53 @@ async function getTenantById(tenantId) {
   return data || null;
 }
 
+/** The profile when no tenants row is found (env fallbacks). */
+function defaultTenantProfile(resolvedId) {
+  return {
+    id: resolvedId,
+    businessName: process.env.BUSINESS_NAME || 'the business',
+    spokenName: null,
+    greetingInvite: null,
+    agentName: process.env.AGENT_NAME || 'Receptionist',
+    llmSystemPrompt: null,
+    knowledge: process.env.BUSINESS_KNOWLEDGE || null,
+    hoursSchedule: null,
+    businessHours: null,
+    agentTone: null,
+    afterHoursMode: 'serve',
+    servicesCatalog: [],
+    productCatalog: [],
+    socialHandles: {},
+    servicesOffered: null,
+    faqs: [],
+    teamDirectory: [],
+    unknownAnswerFallback: null,
+    unknownAnswerSpoken: null,
+    dailyBulletin: [],
+    alertEmail: null,
+    notifyChannels: { sms: true, whatsapp: true, email: true, caller_sms: false },
+    agentTools: { escalate: true, end_call: true },
+    ttsLexicon: [],
+    sonioxVoiceId: null,
+    sonioxVoiceLabel: null,
+    vertical: 'general',
+    handoffMode: 'callback',
+    businessLocations: [],
+    businessPolicies: {},
+    billingEnforcement: null,
+    walletBalanceKes: null,
+    lineState: null,
+    openAppointments: [],
+    fieldMeta: null,
+    holdGate: null,
+  };
+}
+
 /**
  * Resolve tenant profile for a live call (by callSid → tenant_id, else DID / fallback).
  */
 async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
+  if (queryBatchingEnabled()) return getTenantProfileBatched({ callSid, toNumber, tenantId });
   let resolvedId = tenantId || DEFAULT_TENANT_ID || null;
 
   if (!resolvedId && callSid) {
@@ -1588,44 +1720,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
 
   const row = await getTenantById(resolvedId);
   if (!row) {
-    return {
-      id: resolvedId,
-      businessName: process.env.BUSINESS_NAME || 'the business',
-      spokenName: null,
-      greetingInvite: null,
-      agentName: process.env.AGENT_NAME || 'Receptionist',
-      llmSystemPrompt: null,
-      knowledge: process.env.BUSINESS_KNOWLEDGE || null,
-      hoursSchedule: null,
-      businessHours: null,
-      agentTone: null,
-      afterHoursMode: 'serve',
-      servicesCatalog: [],
-      productCatalog: [],
-      socialHandles: {},
-      servicesOffered: null,
-      faqs: [],
-      teamDirectory: [],
-      unknownAnswerFallback: null,
-      unknownAnswerSpoken: null,
-      dailyBulletin: [],
-      alertEmail: null,
-      notifyChannels: { sms: true, whatsapp: true, email: true, caller_sms: false },
-      agentTools: { escalate: true, end_call: true },
-      ttsLexicon: [],
-      sonioxVoiceId: null,
-      sonioxVoiceLabel: null,
-      vertical: 'general',
-      handoffMode: 'callback',
-      businessLocations: [],
-      businessPolicies: {},
-      billingEnforcement: null,
-      walletBalanceKes: null,
-      lineState: null,
-      openAppointments: [],
-      fieldMeta: null,
-      holdGate: null,
-    };
+    return defaultTenantProfile(resolvedId);
   }
 
   return tenantProfileFromRow(row, {
@@ -1637,6 +1732,176 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     ...(await loadProvenanceForProfile(row.id)),
     ...(await loadUnknownAnswerSpoken(row.id)),
   });
+}
+
+/**
+ * VOICE_QUERY_BATCHING: the same profile as getTenantProfile in about one
+ * round trip instead of five or six one after another. service_areas and
+ * unknown_answer_spoken ride the main tenants select (service_areas under an
+ * alias, so the profile keeps service_areas: null exactly as before); open
+ * visits, tenant_field_meta and tenant_hold_gate run alongside it. Any error
+ * on the folded select falls back to the getTenantById ladder plus the
+ * separate reads.
+ */
+async function getTenantProfileBatched({ callSid, toNumber, tenantId } = {}) {
+  let resolvedId = tenantId || DEFAULT_TENANT_ID || null;
+  if (!resolvedId && callSid) {
+    const call = await getCallIdentity(callSid);
+    if (call?.tenant_id) resolvedId = call.tenant_id;
+  }
+  if (!resolvedId) {
+    resolvedId = await resolveTenantId({ toNumber, tenantId });
+  }
+  if (!resolvedId) return defaultTenantProfile(resolvedId);
+
+  const wantAreas = require('./conversation/areaTerms').areaFeesEnabled();
+  const wantUnknown = require('./conversation/factSheet').factRefsEnabled();
+  const [rowRes, visitsRes, provenanceRes] = await Promise.allSettled([
+    selectTenantProfileRow(resolvedId, { wantAreas, wantUnknown }),
+    listOpenAppointments(resolvedId),
+    loadProvenanceParallel(resolvedId),
+  ]);
+  if (rowRes.status === 'rejected') throw rowRes.reason;
+  const { row, folded } = rowRes.value;
+  if (!row) return defaultTenantProfile(resolvedId);
+  if (visitsRes.status === 'rejected') throw visitsRes.reason;
+  const provenance =
+    provenanceRes.status === 'fulfilled' ? provenanceRes.value : { fieldMeta: null, holdGate: null };
+
+  let serviceAreas;
+  let unknown = {};
+  if (folded) {
+    if (wantAreas) serviceAreas = row.qb_service_areas ?? null;
+    if (wantUnknown) unknown = { unknownAnswerSpoken: row.unknown_answer_spoken ?? null };
+  } else {
+    [serviceAreas, unknown] = await Promise.all([
+      row.service_areas !== undefined || !wantAreas ? undefined : getTenantServiceAreas(row.id),
+      loadUnknownAnswerSpoken(row.id),
+    ]);
+  }
+  delete row.qb_service_areas;
+  return tenantProfileFromRow(row, {
+    openAppointments: visitsRes.value,
+    serviceAreas,
+    ...provenance,
+    ...unknown,
+  });
+}
+
+/**
+ * The getTenantById row with service_areas (as qb_service_areas) and
+ * unknown_answer_spoken folded in when their flags want them.
+ * folded=false: the extras were not read (old schema or any error); the
+ * caller reads them separately, as getTenantProfile does.
+ */
+async function selectTenantProfileRow(tenantId, { wantAreas = false, wantUnknown = false } = {}) {
+  const extras = [];
+  if (wantAreas) extras.push('qb_service_areas:service_areas');
+  if (wantUnknown) extras.push('unknown_answer_spoken');
+  if (!extras.length) return { row: await getTenantById(tenantId), folded: true };
+  const { data, error } = await selectTenantRowWithLine(
+    tenantId,
+    `${TENANT_PROFILE_COLUMNS}, ${extras.join(', ')}`
+  );
+  if (!error) return { row: data || null, folded: true };
+  return { row: await getTenantById(tenantId), folded: false };
+}
+
+/**
+ * src/conversation/provenance.js loadProvenanceEnvelope with its two reads in
+ * parallel. Same output and the same never-throw rule.
+ */
+async function loadProvenanceParallel(tenantId) {
+  if (!tenantId) return { fieldMeta: null, holdGate: null };
+  let indexFieldMeta;
+  try {
+    ({ indexFieldMeta } = require('./conversation/provenance'));
+  } catch (err) {
+    console.warn('[db] provenance envelope', err.message);
+    return { fieldMeta: null, holdGate: null };
+  }
+  const [metaRes, gateRes] = await Promise.allSettled([
+    listTenantFieldMeta(tenantId),
+    getTenantHoldGate(tenantId),
+  ]);
+  let fieldMeta = null;
+  let holdGate = null;
+  try {
+    if (metaRes.status === 'rejected') throw metaRes.reason;
+    fieldMeta = indexFieldMeta(metaRes.value);
+  } catch (err) {
+    console.warn('[provenance] listTenantFieldMeta', err?.message || err);
+  }
+  if (gateRes.status === 'fulfilled') {
+    const gate = gateRes.value;
+    const reasons = Array.isArray(gate?.reasons) ? gate.reasons.map(String) : [];
+    if (gate && typeof gate.allowed === 'boolean' && !reasons.includes('provenance_rpc_missing')) {
+      holdGate = { allowed: gate.allowed === true, reasons };
+    }
+  } else {
+    console.warn('[provenance] getTenantHoldGate', gateRes.reason?.message || gateRes.reason);
+  }
+  return { fieldMeta, holdGate };
+}
+
+// Owner alerts read only these (server.js maybeSend*Notification, textback).
+// The escalation alert also hands the profile to maybeQueueLiveTransfer /
+// liveTransferReady (handoff mode, agent tools, hours, billing, DID).
+const TENANT_NOTIFY_COLUMNS =
+  'id, business_name, whatsapp_notification_number, alert_email, notify_channels, team_directory, handoff_mode, agent_tools, hours_schedule, billing_enforcement, wallet_balance_kes, sautikit_virtual_number';
+
+/**
+ * VOICE_QUERY_BATCHING: the owner-alert fields (businessName, whatsappNumber,
+ * alertEmail, notifyChannels, teamDirectory, id, plus the live-transfer
+ * readiness fields) in one light select, mapped
+ * by tenantProfileFromRow like the full profile. Unknown tenant, missing
+ * column or any error: the full getTenantProfile, as before.
+ */
+async function getTenantNotifyFields({ callSid, tenantId } = {}) {
+  let resolvedId = tenantId || DEFAULT_TENANT_ID || null;
+  if (!resolvedId && callSid) {
+    try {
+      resolvedId = (await getCallIdentity(callSid))?.tenant_id || null;
+    } catch {
+      resolvedId = null;
+    }
+  }
+  if (!resolvedId) return getTenantProfile({ callSid, tenantId });
+  const { data, error } = await supabase
+    .from('tenants')
+    .select(TENANT_NOTIFY_COLUMNS)
+    .eq('id', resolvedId)
+    .maybeSingle();
+  if (error || !data) return getTenantProfile({ callSid, tenantId: resolvedId });
+  return tenantProfileFromRow(data);
+}
+
+// Everything greetingWarm.greetingInputs + renderGreetingPcm read.
+const TENANT_GREETING_COLUMNS =
+  'id, business_name, agent_name, spoken_name, greeting_invite, vertical, services_catalog, services_offered, hours_schedule, after_hours_mode, daily_bulletin, soniox_voice_id, tts_lexicon';
+
+/**
+ * VOICE_QUERY_BATCHING: greeting-warm profiles for many tenants in one
+ * `.in('id', ids)` select. Map id -> profile (tenantProfileFromRow of the
+ * greeting columns only). null on any error, so the warmer falls back to one
+ * getTenantProfile per tenant.
+ */
+async function listTenantGreetingProfiles(tenantIds = []) {
+  const ids = [...new Set((tenantIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
+  const out = new Map();
+  if (!ids.length) return out;
+  try {
+    const { data, error } = await supabase.from('tenants').select(TENANT_GREETING_COLUMNS).in('id', ids);
+    if (error) {
+      console.warn('[db] listTenantGreetingProfiles (per-tenant fallback):', error.message);
+      return null;
+    }
+    for (const row of data || []) out.set(String(row.id), tenantProfileFromRow(row));
+    return out;
+  } catch (err) {
+    console.warn('[db] listTenantGreetingProfiles (per-tenant fallback):', err?.message || err);
+    return null;
+  }
 }
 
 /** tenants.service_areas (Locations area terms) when the main select did not read it. Null on an old schema or error. */
@@ -1839,25 +2104,28 @@ async function listRequestsByStatus(tenantId, contactId, phoneNorm, statuses, li
   return data || [];
 }
 
-async function listOpenRequestsForCaller(tenantId, contactId, phoneNorm) {
+async function listOpenRequestsForCaller(tenantId, contactId, phoneNorm, { parallel = false } = {}) {
   // Open rows include a past-due hold. Finished holds are loaded too so
   // "previous" can read them. window_start is required to judge the window.
-  const open = await listRequestsByStatus(
-    tenantId,
-    contactId,
-    phoneNorm,
-    ['open'],
-    30,
-    'requests'
-  );
-  const finished = await listRequestsByStatus(
-    tenantId,
-    contactId,
-    phoneNorm,
-    ['fulfilled', 'cancelled'],
-    8,
-    'finished-requests'
-  );
+  const loadOpen = () =>
+    listRequestsByStatus(tenantId, contactId, phoneNorm, ['open'], 30, 'requests');
+  const loadFinished = () =>
+    listRequestsByStatus(
+      tenantId,
+      contactId,
+      phoneNorm,
+      ['fulfilled', 'cancelled'],
+      8,
+      'finished-requests'
+    );
+  let open;
+  let finished;
+  if (parallel) {
+    [open, finished] = await Promise.all([loadOpen(), loadFinished()]);
+  } else {
+    open = await loadOpen();
+    finished = await loadFinished();
+  }
   const seen = new Set();
   const out = [];
   for (const row of [...open, ...finished]) {
@@ -2035,6 +2303,23 @@ async function getCallerMemory({ tenantId, phone } = {}) {
   }
   throwIfError('getCallerMemory(contact)', findErr);
   if (!contact) return null;
+
+  if (queryBatchingEnabled()) {
+    // Same five reads and the same card, in parallel (N+1 audit #1).
+    const [openRequests, openAppointments, nextAppointment, recentAppointments] = await Promise.all([
+      listOpenRequestsForCaller(tenantId, contact.id, phoneNorm, { parallel: true }),
+      listStillOpenAppointmentsForCaller(tenantId, contact.id, phoneNorm),
+      listNextAppointmentForCaller(tenantId, contact.id, phoneNorm),
+      listRecentAppointmentsForCaller(tenantId, contact.id, phoneNorm),
+    ]);
+    return buildCallerMemoryCard({
+      contact,
+      openRequests,
+      openAppointments,
+      nextAppointment,
+      recentAppointments,
+    });
+  }
 
   const openRequests = await listOpenRequestsForCaller(
     tenantId,
@@ -3034,6 +3319,11 @@ module.exports = {
   getCall,
   getTenantById,
   getTenantProfile,
+  getTenantNotifyFields,
+  listTenantGreetingProfiles,
+  getCallIdentity,
+  forgetCallIdentity,
+  resetMergeRpcProbe,
   tenantLineClosed,
   forgetTenantLine,
   selectTenantLineRows,

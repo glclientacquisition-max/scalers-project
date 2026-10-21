@@ -597,18 +597,37 @@ if (missingEnvironmentVariables.length > 0) {
 }
 
 const db = require('./src/db');
+const { queryBatchingEnabled } = require('./src/speech/queryBatching');
+const { loadCallStartProfile } = require('./src/speech/callStartLoad');
 
-async function hydrateCallerMemory(profile, callSid) {
+// callRow: the webhook's call row when the caller already has it
+// (VOICE_QUERY_BATCHING call start). getCallIdentity is getCall when the
+// flag is off; the card reads only tenant_id and from_number.
+async function hydrateCallerMemory(profile, callSid, callRow = null) {
   return attachCallerMemory(profile, {
     callSid,
-    getCall: (sid) => db.getCall(sid),
+    getCall: (sid) =>
+      callRow && callRow.from_number ? Promise.resolve(callRow) : db.getCallIdentity(sid),
     getCallerMemory: (opts) => db.getCallerMemory(opts),
   });
 }
 
+/**
+ * Owner-alert profile fields (businessName, whatsappNumber, alertEmail,
+ * notifyChannels, teamDirectory, id). VOICE_QUERY_BATCHING: the profile this
+ * call already loaded, else one light select (N+1 audit #2). Off: the full
+ * getTenantProfile, as before.
+ */
+async function ownerAlertProfile(callSid) {
+  if (!queryBatchingEnabled()) return db.getTenantProfile({ callSid });
+  const live = callTenantProfiles.get(callSid);
+  if (live && live.id) return live;
+  return db.getTenantNotifyFields({ callSid });
+}
+
 async function loadVisitReviewAppointments(callSid, profile) {
   try {
-    const call = await db.getCall(callSid);
+    const call = await db.getCallIdentity(callSid);
     const tenantId = profile?.id || call?.tenant_id;
     const phone = call?.from_number || profile?.callerMemory?.phone;
     if (!tenantId || !phone) return [];
@@ -811,7 +830,7 @@ app.post('/internal/desk/escalate', async (req, res) => {
     // Lookup errors answer open; the send ledger checks again per send.
     let tenantId = null;
     try {
-      tenantId = (await db.getCall(callSid))?.tenant_id || null;
+      tenantId = (await db.getCallIdentity(callSid))?.tenant_id || null;
     } catch (err) {
       console.warn(`[desk/escalate] call lookup failed ${callSid} (continuing):`, err?.message || err);
     }
@@ -1179,6 +1198,8 @@ const greetingWarmer = createGreetingWarmer({
     return warmableTenantRows(rows).map((r) => r.id);
   },
   getProfile: (tenantId) => db.getTenantProfile({ tenantId }),
+  // VOICE_QUERY_BATCHING: one select for all tenants; null = per-tenant above.
+  getProfiles: (tenantIds) => (queryBatchingEnabled() ? db.listTenantGreetingProfiles(tenantIds) : null),
   createSession: ({ voiceId }) => createSonioxTtsSession({ callSid: 'greeting-warm', voiceId }),
   log: (msg) => console.log(msg),
 });
@@ -1298,7 +1319,7 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
 
 async function writeHangupSummary(callSid, source, opts, brainState) {
   try {
-    const call = await db.getCall(callSid);
+    const call = await db.getCallIdentity(callSid);
     const spokenTurns =
       Array.isArray(opts.turns) && opts.turns.length
         ? opts.turns
@@ -1415,7 +1436,7 @@ async function maybeSendMissedTextback({ callSid, call }) {
     let notifyChannels = null;
     let tenantId = call.tenant_id || null;
     try {
-      const profile = await db.getTenantProfile({ callSid });
+      const profile = await ownerAlertProfile(callSid);
       businessName = profile.businessName || businessName;
       notifyChannels = profile.notifyChannels || null;
       tenantId = profile.id || tenantId;
@@ -2620,13 +2641,30 @@ mediaWss.on('connection', (ws, req) => {
     try {
       // The webhook writes the call row after Stream XML (fast inbound path).
       // Use the tenant it resolved, and let the row land before later reads.
-      const inboundTenantId = inboundCalls.tenantIdFor(sessionCallSid);
-      await inboundCalls.awaitRow(sessionCallSid, 2500);
-      const profile = await db.getTenantProfile({
-        callSid: sessionCallSid,
-        tenantId: inboundTenantId || undefined,
-      });
-      await hydrateCallerMemory(profile, sessionCallSid);
+      const profileLoadStartedAt = Date.now();
+      const batching = queryBatchingEnabled();
+      let profile;
+      if (batching) {
+        // VOICE_QUERY_BATCHING: profile and caller card side by side.
+        ({ profile } = await loadCallStartProfile({
+          callSid: sessionCallSid,
+          inboundCalls,
+          db,
+          hydrateCallerMemory,
+        }));
+      } else {
+        const inboundTenantId = inboundCalls.tenantIdFor(sessionCallSid);
+        await inboundCalls.awaitRow(sessionCallSid, 2500);
+        profile = await db.getTenantProfile({
+          callSid: sessionCallSid,
+          tenantId: inboundTenantId || undefined,
+        });
+        await hydrateCallerMemory(profile, sessionCallSid);
+      }
+      // Before/after measure for the N+1 fix (scripts/call-start-latency-report.js).
+      console.log(
+        `[voice-timing][${sidLabel()}] call_start_profile_ms=${Date.now() - profileLoadStartedAt} batched=${batching ? 1 : 0} card=${profile?.callerMemory ? 1 : 0}`
+      );
       brainProfile = profile;
       businessName = profile.businessName || businessName;
       agentName = profile.agentName || agentName;
@@ -5845,7 +5883,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
     let notifyChannels = null;
     let loadedProfile = null;
     try {
-      const profile = await db.getTenantProfile({ callSid });
+      const profile = await ownerAlertProfile(callSid);
       loadedProfile = profile;
       ownerNumber = profile.whatsappNumber || ownerNumber;
       ownerEmail = profile.alertEmail || ownerEmail;
@@ -6105,7 +6143,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
     let teamDirectory = [];
     let tenantId = call.tenant_id || null;
     try {
-      const profile = await db.getTenantProfile({ callSid });
+      const profile = await ownerAlertProfile(callSid);
       ownerNumber = profile.whatsappNumber || ownerNumber;
       ownerEmail = profile.alertEmail || ownerEmail;
       businessName = profile.businessName || businessName;
@@ -6199,7 +6237,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
   let teamDirectory = [];
   let tenantId = null;
   try {
-    const profile = await db.getTenantProfile({ callSid });
+    const profile = await ownerAlertProfile(callSid);
     ownerNumber = profile.whatsappNumber || ownerNumber;
     ownerEmail = profile.alertEmail || ownerEmail;
     businessName = profile.businessName || businessName;
@@ -6213,7 +6251,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
     );
   }
 
-  const callRow = await db.getCall(callSid).catch(() => null);
+  const callRow = await db.getCallIdentity(callSid).catch(() => null);
   const ledger = {
     tenantId: tenantId || callRow?.tenant_id || null,
     callId: callRow?.id || null,
@@ -6300,7 +6338,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
   let teamDirectory = [];
   let tenantId = null;
   try {
-    const profile = await db.getTenantProfile({ callSid });
+    const profile = await ownerAlertProfile(callSid);
     ownerNumber = profile.whatsappNumber || ownerNumber;
     ownerEmail = profile.alertEmail || ownerEmail;
     businessName = profile.businessName || businessName;
@@ -6314,7 +6352,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     );
   }
 
-  const callRow = await db.getCall(callSid).catch(() => null);
+  const callRow = await db.getCallIdentity(callSid).catch(() => null);
   const ledger = {
     tenantId: tenantId || callRow?.tenant_id || null,
     callId: callRow?.id || null,
