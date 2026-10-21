@@ -135,7 +135,11 @@ if (sharedDir) {
   const delay = Number(process.env.OPENING_SIM_SHARED_RTT_MS) || 0;
   const rtt = () => (delay ? new Promise((r) => setTimeout(r, delay)) : null);
   const probe = (process.env.OPENING_SIM_SHARED_PROBE || 'calls,contacts').toLowerCase();
-  if (probe !== 'absent') {
+  if (probe === 'absent') {
+    // #844 @962fb6e6 shape: no probe helper, even when this tree's db.js
+    // (#844 @d4609435 merged in) has the real one.
+    delete db.probeGreetingSchema;
+  } else {
     db.probeGreetingSchema = async () => {
       send({ ev: 'db_helper', fn: 'probeGreetingSchema' });
       return { calls: /\bcalls\b/.test(probe), contacts: /\bcontacts\b/.test(probe) };
