@@ -52,6 +52,8 @@ Code: `src/conversation/callSummaryEvent.js` (pure builder, validator, v1 receip
 }
 ```
 
+Field sources: `callId` = `db.getCall(...).id` (`calls.id`), `tenantId` = `.tenant_id`, `caller.phone` = `.from_number` (shapeCall's name for `calls.caller_number`), else a raw `caller_number`, else the brain state's caller phone, then E.164 or null (`callerPhoneFrom`).
+
 Slots used: booking `service, when, place, name`; order `pickup, name` plus `items`; callback/quote/complaint/escalation `reason, name`.
 
 ## Rules (enforced by `validateCallSummaryEvent`)

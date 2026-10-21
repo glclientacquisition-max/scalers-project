@@ -1310,7 +1310,7 @@ async function emitHangupCallSummary({ callSid, call, brainState, spokenTurns, d
     // BA v2 live owned this call: its finishCall receipts win (mergeV2Receipts).
     const v2State = callBrainV2Lives.get(callSid)?.getState?.() || null;
     const v2Fin = v2State && v2State.turn > 0
-      ? finishBrainV2Call(v2State, { businessName: profile?.businessName || '', callerPhone: call?.caller_number || null, profile })
+      ? finishBrainV2Call(v2State, { businessName: profile?.businessName || '', callerPhone: callSummaryEvent.callerPhoneFrom(call, brainState), profile })
       : null;
     const receipts = v2Fin ? callSummaryEvent.mergeV2Receipts(v2Fin.summaryReceipts, v1Receipts) : v1Receipts;
     const answeredQs = Array.isArray(derived?.answeredQuestions) ? derived.answeredQuestions.length : 0;
@@ -1321,7 +1321,7 @@ async function emitHangupCallSummary({ callSid, call, brainState, spokenTurns, d
       tenantId: call?.tenant_id || profile?.id || null,
       answered: true,
       infoAnswered: answeredQs > 0 || Boolean(brainState?.conversation?.catalogueAnswered) || Boolean(v2Fin?.infoAnswered),
-      caller: { name: (v2Fin && v2State.slots?.name) || callSummaryEvent.v1CallerName(brainState), phone: call?.caller_number || brainState?.caller?.phone || null },
+      caller: { name: (v2Fin && v2State.slots?.name) || callSummaryEvent.v1CallerName(brainState), phone: callSummaryEvent.callerPhoneFrom(call, brainState) },
       receipts,
     });
     if (!built.ok) {
