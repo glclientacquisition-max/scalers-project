@@ -63,10 +63,27 @@ function greetingInputs(profile = {}, { now = new Date() } = {}) {
   };
 }
 
-/** VOICE_OPENING_V2 lines a call at `at` can speak before its first real turn. */
+/**
+ * VOICE_OPENING_V2 (#843/#844, src/speech/callOpening.js) when it is in this
+ * build and on; null otherwise (main without #843, or the flag off).
+ */
+function openingV2Module() {
+  let mod;
+  try {
+    mod = require('./callOpening');
+  } catch {
+    return null;
+  }
+  if (typeof mod?.openingV2Enabled !== 'function' || typeof mod?.openingWarmLines !== 'function') return null;
+  return mod.openingV2Enabled() ? mod : null;
+}
+
+/** VOICE_OPENING_V2 lines a call at `at` can speak before its first real turn ([] when off / absent). */
 function openingWarmLinesAt(profile = {}, at = new Date()) {
+  const mod = openingV2Module();
+  if (!mod) return [];
   const inputs = greetingInputs(profile, { now: at });
-  return openingWarmLines(
+  return mod.openingWarmLines(
     { ...profile, businessName: inputs.businessName, agentName: inputs.agentName, closureNotice: inputs.closureNotice },
     { isOpen: inputs.isOpen }
   );
@@ -89,9 +106,9 @@ function warmInstants(now = new Date(), lookaheadMs = LOOKAHEAD_MS) {
 function sweepSignature(profile = {}, at = new Date()) {
   const instants = warmInstants(at).map((when) => {
     const { now: _now, ...inputs } = greetingInputs(profile, { now: when });
-    // VOICE_OPENING_V2 renders openingWarmLines (greeting text/language from
-    // #844, notice variants), so an edit there must change the signature too.
-    if (openingV2Enabled()) return { ...inputs, daypart: eatTimeOfDay(when), opening: openingWarmLinesAt(profile, when) };
+    // VOICE_OPENING_V2 renders openingWarmLines (greeting text / language,
+    // notice variants), so an edit there must change the signature too.
+    if (openingV2Module()) return { ...inputs, daypart: eatTimeOfDay(when), opening: openingWarmLinesAt(profile, when) };
     return { ...inputs, daypart: eatTimeOfDay(when) };
   });
   const payload = JSON.stringify({

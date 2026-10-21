@@ -1894,10 +1894,9 @@ async function getTenantProfileBatched({ callSid, toNumber, tenantId } = {}) {
   }
   if (!resolvedId) return defaultTenantProfile(resolvedId);
 
-  // Same rule as getTenantProfile: area fees, or #848's stored-first spoken
-  // catalogue (VOICE_V2_CATALOGUE), read tenants.service_areas.
-  const wantAreas =
-    require('./conversation/areaTerms').areaFeesEnabled() || require('./knowledge/spokenCatalogue').storedFirst();
+  // Area fees, or #848's stored-first spoken catalogue, read service_areas
+  // (storedFirstEnabled is false where #848 is not merged).
+  const wantAreas = require('./conversation/areaTerms').areaFeesEnabled() || storedFirstEnabled();
   const wantUnknown = require('./conversation/factSheet').factRefsEnabled();
   const [rowRes, visitsRes, provenanceRes] = await Promise.allSettled([
     selectTenantProfileRow(resolvedId, { wantAreas, wantUnknown }),
@@ -1942,15 +1941,101 @@ async function selectTenantProfileRow(tenantId, { wantAreas = false, wantUnknown
   if (wantAreas) extras.push('qb_service_areas:service_areas');
   if (wantUnknown) extras.push('unknown_answer_spoken');
   if (!extras.length) return { row: await getTenantById(tenantId), folded: true };
-  const { data, error } = await selectTenantRowWithLine(
+  // getTenantById's first-choice columns: greeting_text / greeting_language
+  // (#844, greeting_language.sql) and, under VOICE_V2_CATALOGUE,
+  // spoken_catalogue (#848). A database without them drops them and retries
+  // once (and skips them for OPTIONAL_COLUMN_RECHECK_MS); any other error
+  // goes to the full getTenantById ladder.
+  let optional = foldedOptionalColumns();
+  let { data, error } = await selectTenantRowWithLine(
     tenantId,
-    // Same rung-1 columns as getTenantById (greeting_text/greeting_language
-    // from #844, spoken_catalogue under VOICE_V2_CATALOGUE from #848). Any
-    // error (e.g. an unmigrated column) falls back to the getTenantById ladder.
-    `${TENANT_PROFILE_COLUMNS}${v2CatalogueSelectEnabled() ? ', spoken_catalogue' : ''}, ${extras.join(', ')}`
+    mergeSelectColumns(requiredTenantProfileColumns(), [...optional, ...extras])
   );
+  // PostgREST names one missing column per error: at most one retry per group.
+  for (let tries = 0; error && optional.length && tries < 2 && noteMissingOptionalColumns(error); tries += 1) {
+    optional = foldedOptionalColumns();
+    ({ data, error } = await selectTenantRowWithLine(
+      tenantId,
+      mergeSelectColumns(requiredTenantProfileColumns(), [...optional, ...extras])
+    ));
+  }
   if (!error) return { row: data || null, folded: true };
   return { row: await getTenantById(tenantId), folded: false };
+}
+
+// Optional tenants columns from later migrations (#844 greeting_language.sql,
+// #848 spoken_catalogue). Missing ones are skipped for this long, then retried.
+const OPTIONAL_COLUMN_RECHECK_MS = 10 * 60 * 1000;
+const optionalColumnMissingUntil = { greeting: 0, catalogue: 0 };
+
+/** VOICE_V2_CATALOGUE (#848): tenant selects also read tenants.spoken_catalogue. */
+function v2CatalogueColumnWanted(env = process.env) {
+  return /^(1|true|on|yes)$/i.test(String(env.VOICE_V2_CATALOGUE || '').trim());
+}
+
+/** #848 storedFirst(), false where src/knowledge/spokenCatalogue.js or storedFirst is absent. */
+function storedFirstEnabled() {
+  try {
+    const mod = require('./knowledge/spokenCatalogue');
+    return typeof mod.storedFirst === 'function' && mod.storedFirst() === true;
+  } catch {
+    return false;
+  }
+}
+
+const OPTIONAL_TENANT_COLUMNS = new Set(['greeting_text', 'greeting_language', 'spoken_catalogue']);
+
+/** TENANT_PROFILE_COLUMNS without the optional ones (a build with #844 lists greeting_* in it). */
+function requiredTenantProfileColumns() {
+  return String(TENANT_PROFILE_COLUMNS)
+    .split(',')
+    .map((c) => c.trim())
+    .filter((c) => c && !OPTIONAL_TENANT_COLUMNS.has(c))
+    .join(', ');
+}
+
+function foldedOptionalColumns(now = Date.now()) {
+  const out = [];
+  if (now >= optionalColumnMissingUntil.greeting) out.push('greeting_text', 'greeting_language');
+  if (v2CatalogueColumnWanted() && now >= optionalColumnMissingUntil.catalogue) out.push('spoken_catalogue');
+  return out;
+}
+
+/** Marks the optional columns an error names as missing. True when it named one. */
+function noteMissingOptionalColumns(error, now = Date.now()) {
+  const text = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
+  let hit = false;
+  if (/greeting_text|greeting_language/i.test(text)) {
+    optionalColumnMissingUntil.greeting = now + OPTIONAL_COLUMN_RECHECK_MS;
+    hit = true;
+  }
+  if (/spoken_catalogue/i.test(text)) {
+    optionalColumnMissingUntil.catalogue = now + OPTIONAL_COLUMN_RECHECK_MS;
+    hit = true;
+  }
+  return hit;
+}
+
+function resetOptionalColumnProbe() {
+  optionalColumnMissingUntil.greeting = 0;
+  optionalColumnMissingUntil.catalogue = 0;
+}
+
+/** `base` plus `extra` columns, each column once (a base that already lists one keeps it). */
+function mergeSelectColumns(base, extra = []) {
+  const parts = String(base || '')
+    .split(',')
+    .map((c) => c.trim())
+    .filter(Boolean);
+  const names = new Set(parts.map((c) => c.split(':').pop().trim()));
+  for (const col of extra) {
+    const name = String(col).split(':').pop().trim();
+    const isAlias = String(col).includes(':');
+    if (!isAlias && names.has(name)) continue;
+    parts.push(String(col).trim());
+    if (!isAlias) names.add(name);
+  }
+  return parts.join(', ');
 }
 
 /**
@@ -2023,11 +2108,17 @@ async function getTenantNotifyFields({ callSid, tenantId } = {}) {
 }
 
 // Everything greetingWarm.greetingInputs + renderGreetingPcm read, plus what
-// VOICE_OPENING_V2 openingWarmLines / shopLanguage read (#843/#844:
-// greeting_text, greeting_language, team_directory). A database without the
-// 13c columns errors here and the warmer falls back to one profile each.
-const TENANT_GREETING_COLUMNS =
-  'id, business_name, agent_name, spoken_name, greeting_invite, greeting_text, greeting_language, team_directory, vertical, services_catalog, services_offered, hours_schedule, after_hours_mode, daily_bulletin, soniox_voice_id, tts_lexicon';
+// VOICE_OPENING_V2 openingWarmLines / shop language read (#843/#844:
+// greeting_text, greeting_language, team_directory). Newest first; a database
+// without a column steps down instead of losing the batch.
+const TENANT_GREETING_BASE_COLUMNS =
+  'id, business_name, agent_name, spoken_name, greeting_invite, vertical, services_catalog, services_offered, hours_schedule, after_hours_mode, daily_bulletin, soniox_voice_id, tts_lexicon';
+const TENANT_GREETING_COLUMN_SETS = Object.freeze([
+  `${TENANT_GREETING_BASE_COLUMNS}, greeting_text, greeting_language, team_directory`,
+  `${TENANT_GREETING_BASE_COLUMNS}, team_directory`,
+  TENANT_GREETING_BASE_COLUMNS,
+]);
+const TENANT_GREETING_COLUMNS = TENANT_GREETING_COLUMN_SETS[0];
 
 /**
  * VOICE_QUERY_BATCHING: greeting-warm profiles for many tenants in one
@@ -2040,13 +2131,21 @@ async function listTenantGreetingProfiles(tenantIds = []) {
   const out = new Map();
   if (!ids.length) return out;
   try {
-    const { data, error } = await supabase.from('tenants').select(TENANT_GREETING_COLUMNS).in('id', ids);
-    if (error) {
-      console.warn('[db] listTenantGreetingProfiles (per-tenant fallback):', error.message);
-      return null;
+    for (const columns of TENANT_GREETING_COLUMN_SETS) {
+      const { data, error } = await supabase.from('tenants').select(columns).in('id', ids);
+      if (!error) {
+        for (const row of data || []) out.set(String(row.id), tenantProfileFromRow(row));
+        return out;
+      }
+      const missingColumn = /greeting_text|greeting_language|team_directory/i.test(error.message || '') &&
+        /column|does not exist|schema cache|42703|PGRST204/i.test(`${error.code || ''} ${error.message || ''}`);
+      if (!missingColumn) {
+        console.warn('[db] listTenantGreetingProfiles (per-tenant fallback):', error.message);
+        return null;
+      }
     }
-    for (const row of data || []) out.set(String(row.id), tenantProfileFromRow(row));
-    return out;
+    console.warn('[db] listTenantGreetingProfiles (per-tenant fallback): no column set matched');
+    return null;
   } catch (err) {
     console.warn('[db] listTenantGreetingProfiles (per-tenant fallback):', err?.message || err);
     return null;
@@ -3892,6 +3991,8 @@ module.exports = {
   getCallIdentity,
   forgetCallIdentity,
   resetMergeRpcProbe,
+  resetOptionalColumnProbe,
+  mergeSelectColumns,
   tenantLineClosed,
   forgetTenantLine,
   selectTenantLineRows,

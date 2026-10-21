@@ -780,3 +780,230 @@ describe('#859 review fixes', () => {
     assert.match(server, /callTenantProfiles\.delete\(callSid\);\n\s+db\.forgetCallIdentity\?\.\(callSid\);/);
   });
 });
+
+// Ports from the combined staging build (staging/v2-c0-opening-859, bd211fb1 /
+// 65fbc0c8). main lacks #844 / #848 / #843, so every port is feature-detected.
+// Stubs `request` as required from src/<fromDir>/: an existing module is swapped
+// in require.cache; a module this build lacks (main without #843 / #848) is
+// resolved to a stub only while fn runs, and is absent again afterwards.
+function withStubModule(fromDir, request, exportsValue, fn) {
+  const Module = require('module');
+  const path = require('path');
+  const fromAbs = path.join(__dirname, '..', 'src', fromDir);
+  const base = path.join(fromAbs, request);
+  let real = null;
+  try {
+    real = require.resolve(base);
+  } catch {
+    real = null;
+  }
+  const key = real || `${base}.__qb_absent_stub__.js`;
+  const saved = require.cache[key];
+  const original = Module._resolveFilename;
+  if (!real) {
+    Module._resolveFilename = function (req, parent, ...rest) {
+      if (req === request && parent && path.dirname(parent.filename || '') === fromAbs) return key;
+      return original.call(this, req, parent, ...rest);
+    };
+  }
+  require.cache[key] = { id: key, filename: key, loaded: true, exports: exportsValue };
+  const done = () => {
+    Module._resolveFilename = original;
+    if (saved) require.cache[key] = saved;
+    else delete require.cache[key];
+  };
+  let out;
+  try {
+    out = fn();
+  } catch (err) {
+    done();
+    throw err;
+  }
+  if (out && typeof out.then === 'function') return out.finally(done);
+  done();
+  return out;
+}
+
+describe('#859 combined-base ports', () => {
+  const tenantSelects = () => fake.log.filter((e) => e.table === 'tenants' && e.op === 'select');
+  before(() => {
+    process.env.VOICE_FACT_REFS = 'on';
+  });
+  beforeEach(() => {
+    delete process.env.VOICE_V2_CATALOGUE;
+    delete process.env.VOICE_AREA_FEES;
+  });
+  after(() => {
+    delete process.env.VOICE_FACT_REFS;
+    delete process.env.VOICE_V2_CATALOGUE;
+    delete process.env.VOICE_AREA_FEES;
+    setFlag(false);
+  });
+
+  it('batched tenant select asks for greeting_text / greeting_language (+ spoken_catalogue under VOICE_V2_CATALOGUE)', async () => {
+    setFlag(true);
+    loadFresh();
+    fake.reset();
+    await db.getTenantProfile({ tenantId: TENANT });
+    let cols = tenantSelects()[0].cols;
+    assert.match(cols, /greeting_text, greeting_language/);
+    assert.doesNotMatch(cols, /spoken_catalogue/);
+    process.env.VOICE_V2_CATALOGUE = 'on';
+    loadFresh();
+    fake.reset();
+    await db.getTenantProfile({ tenantId: TENANT });
+    cols = tenantSelects()[0].cols;
+    assert.match(cols, /spoken_catalogue/);
+    delete process.env.VOICE_V2_CATALOGUE;
+  });
+
+  it('a database without the new columns: dropped and retried once, same profile as off, skipped afterwards', async () => {
+    process.env.VOICE_V2_CATALOGUE = 'on';
+    const missingColumns = { tenants: ['greeting_text', 'greeting_language', 'spoken_catalogue'] };
+    setFlag(false);
+    loadFresh({ missingColumns });
+    const off = await db.getTenantProfile({ tenantId: TENANT });
+    setFlag(true);
+    loadFresh({ missingColumns });
+    fake.reset();
+    const on = await db.getTenantProfile({ tenantId: TENANT });
+    assert.deepEqual(on, off);
+    const first = tenantSelects();
+    // One failed select naming the columns, one retry without every one it named.
+    assert.ok(first.length <= 3, `tenant selects ${first.length}: ${first.map((e) => e.cols).join(' | ')}`);
+    assert.doesNotMatch(first[first.length - 1].cols, /greeting_text|spoken_catalogue/);
+    fake.reset();
+    const again = await db.getTenantProfile({ tenantId: TENANT });
+    assert.deepEqual(again, off);
+    assert.equal(tenantSelects().length, 1, 'missing columns remembered: one select');
+    delete process.env.VOICE_V2_CATALOGUE;
+  });
+
+  it('mergeSelectColumns adds each column once (combined TENANT_PROFILE_COLUMNS already lists greeting_*)', () => {
+    assert.equal(
+      db.mergeSelectColumns('id, greeting_text, greeting_language', ['greeting_text', 'greeting_language', 'spoken_catalogue', 'qb_service_areas:service_areas']),
+      'id, greeting_text, greeting_language, spoken_catalogue, qb_service_areas:service_areas'
+    );
+  });
+
+  it('service_areas: read under VOICE_AREA_FEES or #848 storedFirst(); absent spokenCatalogue module is off', async () => {
+    delete process.env.VOICE_AREA_FEES;
+    setFlag(true);
+    loadFresh();
+    fake.reset();
+    await db.getTenantProfile({ tenantId: TENANT });
+    assert.doesNotMatch(tenantSelects()[0].cols, /service_areas/, 'no area fees, no storedFirst: not read');
+
+    let realCatalogue = {};
+    try {
+      realCatalogue = require('../src/knowledge/spokenCatalogue');
+    } catch {
+      realCatalogue = {};
+    }
+    await withStubModule('.', './knowledge/spokenCatalogue', { ...realCatalogue, storedFirst: () => true }, async () => {
+      fake.reset();
+      await db.getTenantProfile({ tenantId: TENANT });
+      assert.match(tenantSelects()[0].cols, /qb_service_areas:service_areas/, 'storedFirst on: read');
+    });
+    await withStubModule('.', './knowledge/spokenCatalogue', { ...realCatalogue, storedFirst: () => false }, async () => {
+      fake.reset();
+      await db.getTenantProfile({ tenantId: TENANT });
+      assert.doesNotMatch(tenantSelects()[0].cols, /service_areas/);
+    });
+    // A spokenCatalogue without storedFirst (only meaningful where #848 is
+    // absent; with #848, tenantProfile.js calls storedFirst() itself).
+    if (typeof realCatalogue.storedFirst !== 'function') {
+      await withStubModule('.', './knowledge/spokenCatalogue', {}, async () => {
+        fake.reset();
+        await db.getTenantProfile({ tenantId: TENANT });
+        assert.doesNotMatch(tenantSelects()[0].cols, /service_areas/, 'module without storedFirst: off');
+      });
+    }
+  });
+
+  it('greeting batch reads greeting_text / greeting_language / team_directory; steps down when missing', async () => {
+    setFlag(true);
+    loadFresh();
+    fake.reset();
+    let batch = await db.listTenantGreetingProfiles([TENANT]);
+    assert.equal(fake.count(), 1);
+    assert.match(fake.log[0].cols, /greeting_text, greeting_language, team_directory/);
+    assert.deepEqual(batch.get(TENANT).teamDirectory, (await db.getTenantProfile({ tenantId: TENANT })).teamDirectory);
+
+    loadFresh({ missingColumns: { tenants: ['greeting_text', 'greeting_language'] } });
+    fake.reset();
+    batch = await db.listTenantGreetingProfiles([TENANT]);
+    assert.ok(batch && batch.get(TENANT), 'still batched');
+    assert.equal(fake.count(), 2);
+    assert.match(fake.log[1].cols, /team_directory$/);
+
+    loadFresh({ missingColumns: { tenants: ['greeting_text', 'greeting_language', 'team_directory'] } });
+    fake.reset();
+    batch = await db.listTenantGreetingProfiles([TENANT]);
+    assert.ok(batch && batch.get(TENANT));
+    assert.equal(fake.count(), 3);
+
+    loadFresh({ missingColumns: { tenants: ['tts_lexicon'] } });
+    batch = await db.listTenantGreetingProfiles([TENANT]);
+    assert.equal(batch, null, 'other errors: per-tenant fallback');
+  });
+
+  it('sweep signature includes VOICE_OPENING_V2 lines only when callOpening is present and on', () => {
+    const gwPath = require.resolve('../src/speech/greetingWarm');
+    const profile = { id: TENANT, businessName: 'Mama Njeri Salon', agentName: 'Wanjiru', greetingText: 'Karibu' };
+    const at = new Date('2026-10-21T07:30:00Z');
+    delete require.cache[gwPath];
+    const base = require('../src/speech/greetingWarm').sweepSignature(profile, at);
+    assert.deepEqual(require('../src/speech/greetingWarm').openingWarmLinesAt(profile, at), []);
+    let lines = ['Karibu Mama Njeri Salon.'];
+    const stub = { openingV2Enabled: () => true, openingWarmLines: (p) => lines.map((l) => `${l}|${p.greetingText}`) };
+    withStubModule('speech', './callOpening', stub, () => {
+      const gw = require('../src/speech/greetingWarm');
+      const on = gw.sweepSignature(profile, at);
+      assert.notEqual(on, base);
+      assert.equal(gw.sweepSignature(profile, at), on, 'stable');
+      assert.notEqual(gw.sweepSignature({ ...profile, greetingText: 'Habari' }, at), on, 'greeting text edit re-renders');
+      lines = ['Other line.'];
+      assert.notEqual(gw.sweepSignature(profile, at), on);
+    });
+    withStubModule('speech', './callOpening', { openingV2Enabled: () => false, openingWarmLines: () => ['x'] }, () => {
+      assert.equal(require('../src/speech/greetingWarm').sweepSignature(profile, at), base, 'flag off: unchanged');
+    });
+    assert.equal(require('../src/speech/greetingWarm').sweepSignature(profile, at), base, 'module absent: unchanged');
+  });
+
+  it('getCallerMemory: batched path shares the off path ending (card identical, no early return)', async () => {
+    const seedExtra = (tables) => {
+      Object.assign(tables.contacts[0], {
+        last_language: 'sw',
+        last_language_at: '2026-10-20T07:00:00Z',
+        name_confirmed: true,
+        name_confirmed_at: '2026-10-19T07:00:00Z',
+      });
+    };
+    setFlag(false);
+    loadFresh();
+    seedExtra(fake.tables);
+    const off = await db.getCallerMemory({ tenantId: TENANT, phone: PHONE });
+    setFlag(true);
+    loadFresh();
+    seedExtra(fake.tables);
+    const on = await db.getCallerMemory({ tenantId: TENANT, phone: PHONE });
+    assert.ok(off);
+    assert.deepEqual(on, off);
+    const src = require('fs').readFileSync(require.resolve('../src/db'), 'utf8');
+    const body = src.slice(src.indexOf('async function getCallerMemory'));
+    const branch = body.slice(body.indexOf('if (queryBatchingEnabled())'), body.indexOf('} else {'));
+    assert.doesNotMatch(branch, /\breturn\b/, 'batched branch falls through to the shared ending');
+  });
+
+  it('server.js: every identity read goes through callIdentityRow (db.getCall when off)', () => {
+    const server = require('fs').readFileSync(require('path').join(__dirname, '..', 'server.js'), 'utf8');
+    assert.match(
+      server,
+      /function callIdentityRow\(callSid\) \{\n\s+return queryBatchingEnabled\(\) \? db\.getCallIdentity\(callSid\) : db\.getCall\(callSid\);/
+    );
+    assert.equal((server.match(/db\.getCallIdentity\(/g) || []).length, 1, 'only inside callIdentityRow');
+    assert.ok((server.match(/callIdentityRow\(/g) || []).length >= 7);
+  });
+});

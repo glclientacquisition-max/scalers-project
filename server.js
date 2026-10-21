@@ -661,7 +661,7 @@ function batchedCallStartProfile(callSid) {
 }
 
 // callRow: the webhook's call row when the caller already has it
-// (VOICE_QUERY_BATCHING call start). getCallIdentity is getCall when the
+// (VOICE_QUERY_BATCHING call start). callIdentityRow is db.getCall when the
 // flag is off; the card reads only tenant_id and from_number.
 async function hydrateCallerMemory(profile, callSid, callRow = null) {
   return attachCallerMemory(profile, {
