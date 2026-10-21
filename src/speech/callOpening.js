@@ -510,16 +510,22 @@ function createOpeningSession(callSid, { now = Date.now() } = {}) {
   };
 }
 
-/** Rebuild a DETACHED session on this replica from the shared calls row. */
-function sessionFromShared(callSid, rec, { now = Date.now() } = {}) {
+/**
+ * Rebuild a DETACHED session on this replica from the shared calls row.
+ * greetingText: this replica's own composition of the call's greeting (the
+ * composer is deterministic), so a cut greeting re-asks only its question.
+ */
+function sessionFromShared(callSid, rec, { now = Date.now(), greetingText = '' } = {}) {
   const s = createOpeningSession(callSid, { now });
   s.greetedAt = rec.greetedAt;
   s.lastAgentLine = clean(rec.lastAgentLine);
-  // The row does not say whether the line was cut; listen (a bare Hello
-  // still gets the re-invite) rather than repeat a line that was heard.
-  s.lastLineCut = false;
+  s.greetingText = clean(greetingText) || s.greetingText;
+  // calls.last_line_cut (#844 next push): re-say a cut line once; absent or
+  // false: listen (a bare Hello still gets the re-invite).
+  s.lastLineCut = rec.lastLineCut === true && Boolean(s.lastAgentLine);
   s.streamSeq = Number(rec.streamSeq) || 1;
   s.notice = rec.noticeGiven ? { required: true, given: true, state: 'given', how: 'earlier_stream', at_ms: null, cut_at_ms: null } : null;
+  s.noticeMarked = rec.noticeGiven === true;
   s.resumeState = STATES.AWAIT_FIRST;
   s.state = STATES.DETACHED;
   s.detachedAt = now;
@@ -601,6 +607,9 @@ function createOpeningStore(opts = {}) {
     let action = 'listen';
     if (s.lastLineCut && s.lastAgentLine) {
       action = s.lastAgentLine === s.greetingText ? 'reinvite' : 'respeak';
+      // Re-said once: the re-said line clears it (noteLine); a cut of the
+      // re-said line sets it again.
+      s.lastLineCut = false;
     }
     s.state = prev === STATES.OPENING ? STATES.AWAIT_FIRST : prev;
     return { session: s, resumed: true, action };
@@ -651,7 +660,7 @@ function createOpeningStore(opts = {}) {
     } catch {
       rec = null;
     }
-    const s = sessionFromShared(sid, { greetedAt: c.greetedAt, ...(rec || {}) }, { now: now() });
+    const s = sessionFromShared(sid, { greetedAt: c.greetedAt, ...(rec || {}) }, { now: now(), greetingText: line });
     const cur = sessions.get(sid);
     sessions.set(sid, s);
     const a = attach(sid);
@@ -663,7 +672,9 @@ function createOpeningStore(opts = {}) {
 
   /** Recording notice heard: keep it for a reconnect elsewhere. */
   function noteNoticeGiven(session) {
-    if (session && session.callSid) void shared.markNoticeGiven(session.callSid).catch(() => {});
+    if (!session || !session.callSid || session.noticeMarked) return;
+    session.noticeMarked = true; // once per call (calls.notice_given)
+    void shared.markNoticeGiven(session.callSid).catch(() => {});
   }
 
   /**
@@ -682,10 +693,13 @@ function createOpeningStore(opts = {}) {
     s.resumeState = s.state === STATES.DETACHED ? s.resumeState : s.state;
     s.state = STATES.DETACHED;
     s.detachedAt = now();
-    s.lastLineCut = Boolean(info.speaking && clean(info.line || s.lastAgentLine));
+    // Cut by this socket loss, or earlier by a barge (noteLineCut) with no
+    // line after it.
+    const lostMidLine = Boolean(info.speaking && clean(info.line || s.lastAgentLine));
     if (info.line) s.lastAgentLine = clean(info.line);
+    s.lastLineCut = lostMidLine || (s.lastLineCut === true && Boolean(s.lastAgentLine));
     if (info.carry) s.carry = info.carry;
-    if (s.lastLineCut && s.lastAgentLine) void shared.noteLine(sid, s.lastAgentLine).catch(() => {});
+    if (lostMidLine && s.lastAgentLine) void shared.noteLine(sid, s.lastAgentLine, { cut: true }).catch(() => {});
     const t = schedule(() => {
       timers.delete(sid);
       const cur = sessions.get(sid);
@@ -712,8 +726,18 @@ function createOpeningStore(opts = {}) {
     const t = clean(line);
     if (!t) return;
     session.lastAgentLine = t;
+    session.lastLineCut = false;
     if (session.callSid) void mirror.write(session.callSid, { last_agent_line: t });
-    if (session.callSid) void shared.noteLine(session.callSid, t).catch(() => {});
+    if (session.callSid) void shared.noteLine(session.callSid, t, { cut: false }).catch(() => {});
+  }
+
+  /** A barge stopped the agent mid-line: a resume re-says it once. */
+  function noteLineCut(session, line) {
+    const t = clean(line) || session.lastAgentLine;
+    if (!t) return;
+    session.lastAgentLine = t;
+    session.lastLineCut = true;
+    if (session.callSid) void shared.noteLine(session.callSid, t, { cut: true }).catch(() => {});
   }
 
   return {
@@ -725,6 +749,7 @@ function createOpeningStore(opts = {}) {
     detach,
     noteGreeted,
     noteLine,
+    noteLineCut,
     get: (sid) => sessions.get(String(sid || '')) || null,
     size: () => sessions.size,
     mirror,

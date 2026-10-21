@@ -1546,10 +1546,22 @@ function prefetchCallOpening({ callSid, tenantId, toNumber, fromNumber }) {
 }
 
 /** The V2 opening for a loaded profile, with the stream's own fallbacks. */
+/** contacts.last_language is used (read and write) only when #844's probe says contacts is migrated. */
+function openingContactsOn() {
+  return typeof openingStore.shared.contactsOn === 'function' && openingStore.shared.contactsOn() === true;
+}
+
+/** Caller facts for the opening; last_language only when contacts is on. */
+function openingCallerFacts(card) {
+  const facts = callOpening.callerOpeningFacts(card);
+  if (!openingContactsOn()) facts.lastLanguage = null;
+  return facts;
+}
+
 function composeOpeningForProfile(profile, { callSid } = {}) {
   const hours = profile.hoursSchedule || null;
   const open = openClosedStatus(hours);
-  const facts = callOpening.callerOpeningFacts(profile.callerMemory);
+  const facts = openingCallerFacts(profile.callerMemory);
   const pick = callOpening.openingLanguageFor(profile, facts);
   return callOpening.composeOpening({
     businessName: profile.businessName || process.env.BUSINESS_NAME || '',
@@ -3590,6 +3602,10 @@ mediaWss.on('connection', (ws, req) => {
 
   function cancelSpeech(reason) {
     voiceTrace.noteBarge({ reason: String(reason || '') });
+    // VOICE_OPENING_V2: a barge cut the agent mid-line (calls.last_line_cut).
+    if (openingOn && opening && speaking && openingLineReal && lastAgentText) {
+      openingStore.noteLineCut(opening.session, lastAgentText);
+    }
     if (smooth.any) stopHoldFill();
     const endingGen = activePlaybackGeneration;
     clearFillerTimer();
@@ -5318,6 +5334,14 @@ mediaWss.on('connection', (ws, req) => {
           `[ws/media][${sidLabel()}] live transfer Dial blocked — Stream does not continue; AI stays`
         );
       }
+      // VOICE_OPENING_V2: a streamed reply that finished is the last agent
+      // line, not cut (clears a barge cut from earlier in the call).
+      if (openingOn && opening && spokeThisTurn && !bargeInActive && lastAgentText) {
+        const said = String(lastAgentText).trim();
+        if (said && (said !== opening.session.lastAgentLine || opening.session.lastLineCut)) {
+          openingStore.noteLine(opening.session, said);
+        }
+      }
       logTurnTiming(turnTiming, { outcome: turnOutcome });
       if (activeTurnTiming === turnTiming) activeTurnTiming = null;
     } catch (err) {
@@ -5835,7 +5859,7 @@ mediaWss.on('connection', (ws, req) => {
    */
   async function setupOpening() {
     if (!opening) await beginOpeningAttach(sessionCallSid || '');
-    const facts = callOpening.callerOpeningFacts(brainProfile?.callerMemory);
+    const facts = openingCallerFacts(brainProfile?.callerMemory);
     // Returning caller: greet in the language they settled on last time
     // (contacts.last_language, #844); else the shop's language.
     const langPick = callOpening.openingLanguageFor({ ...brainProfile, greetingInvite }, facts);
@@ -6365,6 +6389,7 @@ mediaWss.on('connection', (ws, req) => {
       endedByThisSession &&
       firstRealCallerTurnDone &&
       typeof db.saveCallerLanguage === 'function' &&
+      openingContactsOn() &&
       brainProfile?.id &&
       (callLanguage === 'en' || callLanguage === 'sw' || callLanguage === 'sheng')
     ) {

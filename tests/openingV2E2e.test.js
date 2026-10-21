@@ -421,13 +421,21 @@ describe('VOICE_RETURNING_SKIP_NOTICE=on: returning callers skip the notice (e2e
   });
 });
 
-describe('returning caller greeted in contacts.last_language (#844)', { concurrency: true }, () => {
+describe('returning caller greeted in contacts.last_language (#844, contacts probe on)', { concurrency: true }, () => {
   let srv;
+  let dir;
   before(async () => {
-    srv = await startServer({ VOICE_OPENING_V2: 'on', OPENING_SIM_LAST_LANGUAGE: 'en', VOICE_OPENING_SILENCE_MS: '60000,60000,60000' });
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opening-lang-'));
+    srv = await startServer({
+      VOICE_OPENING_V2: 'on',
+      OPENING_SIM_SHARED_DIR: dir,
+      OPENING_SIM_LAST_LANGUAGE: 'en',
+      VOICE_OPENING_SILENCE_MS: '60000,60000,60000',
+    });
   });
   after(() => {
     if (srv) srv.child.kill('SIGKILL');
+    if (dir) fs.rmSync(dir, { recursive: true, force: true });
   });
 
   it('Swahili shop, caller last spoke English: English greeting, notice and question; the owner text is not used', async () => {
@@ -442,10 +450,39 @@ describe('returning caller greeted in contacts.last_language (#844)', { concurre
   });
 
   it('a new caller at the same shop is greeted in the shop language', async () => {
+    // (contacts probe off: see the next describe)
     const sid = 'HD_sim_jirani_new_lang';
     const c = await connect(srv, sid);
     const g = await greetingLog(srv, sid);
     assert.match(g.line, /kind=new_open lang=sw/);
+    c.ws.close();
+  });
+});
+
+describe('contacts probe off: last_language is neither read nor written', { concurrency: true }, () => {
+  let srv;
+  let dir;
+  before(async () => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opening-nolang-'));
+    srv = await startServer({
+      VOICE_OPENING_V2: 'on',
+      OPENING_SIM_SHARED_DIR: dir,
+      OPENING_SIM_SHARED_PROBE: 'calls',
+      OPENING_SIM_LAST_LANGUAGE: 'en',
+      VOICE_OPENING_SILENCE_MS: '60000,60000,60000',
+    });
+  });
+  after(() => {
+    if (srv) srv.child.kill('SIGKILL');
+    if (dir) fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('card says en, contacts off: shop language (sw), no opening_lang line', async () => {
+    const sid = 'HD_sim_jirani_ret_nolang';
+    const c = await connect(srv, sid);
+    const g = await greetingLog(srv, sid);
+    assert.match(g.line, /kind=returning_open lang=sw/);
+    assert.equal(logsOf(srv, sid).filter((l) => l.includes('opening_lang')).length, 0);
     c.ws.close();
   });
 });
@@ -653,5 +690,113 @@ describe('two replicas share the opening store: a reconnect on B does not greet 
     const g = await greetingLog(b, sid);
     assert.ok(g, 'B greets a new call');
     c.ws.close();
+  });
+});
+
+// Platform's next #844 push: markCallNoticeGiven and calls.last_line_cut,
+// mocked on files (no database). Notice heard on A is not repeated on B; a
+// greeting cut on A is re-asked once on B, then B listens.
+describe('two replicas: notice given and cut line carry across (mocked #844 next push)', { concurrency: false }, () => {
+  let a;
+  let b;
+  let dir;
+  before(async () => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opening-carry-'));
+    const env = {
+      VOICE_OPENING_V2: 'on',
+      OPENING_SIM_SHARED_DIR: dir,
+      OPENING_SIM_PCM_MS: '1500',
+      VOICE_OPENING_SILENCE_MS: '60000,60000,60000',
+      GEMINI_API_KEY: 'sim-not-a-key',
+      OPENING_SIM_GEMINI_SCRIPT: JSON.stringify([['zulia', 'Sawa, tunaweza kusafisha zulia. Naomba jina lako?']]),
+    };
+    [a, b] = await Promise.all([startServer(env), startServer(env)]);
+  });
+  after(() => {
+    for (const s of [a, b]) if (s) s.child.kill('SIGKILL');
+    if (dir) fs.rmSync(dir, { recursive: true, force: true });
+  });
+  const row = (sid) => JSON.parse(fs.readFileSync(path.join(dir, `${sid}.json`), 'utf8'));
+
+  it('notice heard on A (markCallNoticeGiven) -> B resumes and the name ask carries no notice', async () => {
+    const sid = 'HD_sim_jirani_new_carry1';
+    const c1 = await connect(a, sid);
+    await greetingLog(a, sid);
+    const marked = await waitFor(a.events, (e) => e.ev === 'db_helper' && e.fn === 'markCallNoticeGiven' && e.callSid === sid, 4000);
+    assert.ok(marked, logsOf(a, sid).join('\n'));
+    assert.equal(row(sid).notice_given, true);
+    assert.equal(a.events.filter((e) => e.ev === 'db_helper' && e.fn === 'markCallNoticeGiven' && e.callSid === sid).length, 1, 'once');
+    c1.ws.terminate();
+    await waitFor(a.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] opening_socket_closed ended=0`), 3000);
+    const c2 = await connect(b, sid);
+    const lost = await waitFor(b.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] opening_claim lost`), 5000);
+    assert.ok(lost, logsOf(b, sid).join('\n'));
+    await sleep(300);
+    const from = b.events.length;
+    sayFinal(b, sid, 'Mnasafisha zulia?', { lang: 'sw' });
+    const ask = await waitFor(b.events, (e) => e.ev === 'speak' && mine(sid)(e) && /jina/i.test(e.text), 6000, from);
+    assert.ok(ask, logsOf(b, sid, from).join('\n'));
+    const spoken = b.events.slice(from).filter((e) => e.ev === 'speak' && mine(sid)(e)).map((e) => e.text).join(' ');
+    assert.doesNotMatch(spoken, /rekodi/, 'B owes no notice');
+    assert.equal(logsOf(b, sid).filter((l) => l.includes('recording_notice given')).length, 0);
+    c2.ws.close();
+  });
+
+  it('greeting cut on A by a socket loss -> B re-asks only the question once; a second drop on B -> listen', async () => {
+    const sid = 'HD_sim_esga_new_carry2';
+    const c1 = await connect(a, sid);
+    await greetingLog(a, sid);
+    await sleep(400); // mid-way through the 1.5 s clip
+    c1.ws.terminate();
+    await waitFor(a.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] opening_socket_closed ended=0 cut=1`), 3000);
+    const cutWrite = await waitFor(a.events, (e) => e.ev === 'db_helper' && e.fn === 'updateLastAgentLine' && e.callSid === sid && e.cut === true, 3000);
+    assert.ok(cutWrite, 'updateLastAgentLine(..., {cut:true})');
+    assert.equal(row(sid).last_line_cut, true);
+    const c2 = await connect(b, sid);
+    const r = await waitFor(b.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] opening_resume`), 5000);
+    assert.match(r.line, /action=reinvite/);
+    const line = await waitFor(b.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] opening_line`), 3000);
+    assert.ok(line.line.endsWith(': Nikusaidie vipi?'), line.line);
+    assert.equal(logsOf(b, sid).filter((l) => l.includes('greeting mode=')).length, 0);
+    await sleep(400);
+    assert.equal(row(sid).last_line_cut, false, 'the re-said line clears the cut');
+    await sleep(1500); // let the 1.5 s re-ask clip finish: this drop cuts nothing
+    c2.ws.terminate();
+    const closed = await waitFor(b.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] opening_socket_closed ended=0 cut=0`), 3000);
+    assert.ok(closed, logsOf(b, sid).join('\n'));
+    const from = b.events.length;
+    const c3 = await connect(b, sid);
+    const r2 = await waitFor(b.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] opening_resume`), 5000, from);
+    assert.match(r2.line, /action=listen/);
+    await sleep(300);
+    assert.equal(logsOf(b, sid, from).filter((l) => l.includes('opening_line')).length, 0, 're-said once only');
+    c3.ws.close();
+  });
+});
+
+describe('current #844 (no probeGreetingSchema): memory, one warning, no helper called', () => {
+  let srv;
+  let dir;
+  before(async () => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opening-cur-'));
+    srv = await startServer({ VOICE_OPENING_V2: 'on', OPENING_SIM_SHARED_DIR: dir, OPENING_SIM_SHARED_PROBE: 'absent', VOICE_OPENING_SILENCE_MS: '60000,60000,60000' });
+  });
+  after(() => {
+    if (srv) srv.child.kill('SIGKILL');
+    if (dir) fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('greets from memory; no #844 helper is called', async () => {
+    const warn = await waitFor(srv.events, (e) => e.ev === 'log' && e.line.includes('[opening-store]'), 3000);
+    assert.match(warn.line, /probeGreetingSchema not found/);
+    const sid = 'HD_sim_aris_new_cur';
+    const c = await connect(srv, sid);
+    const g = await greetingLog(srv, sid);
+    assert.ok(g);
+    assert.ok(logsOf(srv, sid).some((l) => l.includes('opening_claim won store=memory')));
+    await sleep(300);
+    c.ws.close();
+    await sleep(200);
+    assert.equal(srv.events.filter((e) => e.ev === 'db_helper').length, 0);
   });
 });
