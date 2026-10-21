@@ -209,6 +209,10 @@ export type TenantRow = {
   spoken_name?: string | null;
   /** Line after the shop and agent name. Empty uses How can I help? */
   greeting_invite?: string | null;
+  /** Owner's full greeting, spoken verbatim (max 240). NULL uses the template. Undefined before greeting_language.sql. */
+  greeting_text?: string | null;
+  /** 'en' | 'sw'. NULL: Voice detects the language from the greeting. */
+  greeting_language?: string | null;
   agent_tone?: string | null;
   team_directory?: TeamDirectoryEntry[] | null;
   faqs?: FaqEntry[] | null;

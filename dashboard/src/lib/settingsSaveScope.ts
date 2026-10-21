@@ -14,6 +14,8 @@ const SETTINGS_SCOPE_FIELDS: Record<string, readonly string[]> = {
     "businessName",
     "spokenName",
     "greetingInvite",
+    "greetingText",
+    "greetingLanguage",
     "agentName",
     "agentTone",
     "vertical",

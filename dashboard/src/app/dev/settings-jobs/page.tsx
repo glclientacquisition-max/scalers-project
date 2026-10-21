@@ -74,7 +74,18 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
   const tab = parseBusinessSettingsTab(tabRaw, panelRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
   const base = params.vertical === "home_services" ? homeTenant : tenant;
-  const t = params.policies === "messy" ? ({ ...base, business_policies: messyPolicies } as TenantRow) : base;
+  const policied = params.policies === "messy" ? ({ ...base, business_policies: messyPolicies } as TenantRow) : base;
+  // Greeting columns (greeting_language.sql). ?greeting=sw shows a saved Swahili greeting;
+  // ?greeting=missing hides the group as on a database without the columns.
+  const greetingParam = Array.isArray(params.greeting) ? params.greeting[0] : params.greeting;
+  const t =
+    greetingParam === "missing"
+      ? policied
+      : ({
+          ...policied,
+          greeting_text: greetingParam === "sw" ? "Karibu Chapter One, tukusaidie vipi leo?" : null,
+          greeting_language: greetingParam === "sw" ? "sw" : null,
+        } as TenantRow);
 
   const curatedVoices = [
     {

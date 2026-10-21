@@ -72,6 +72,7 @@ import {
 import { ownerUnknownAnswer, planUnknownAnswerSave } from "@/lib/unknownAnswerSpoken";
 import { generateUnknownAnswerSpoken } from "@/lib/unknownAnswerSpokenModel";
 import { withoutUnknownSpokenColumn } from "@/lib/peelMissingColumns";
+import { greetingPatchFromForm, withoutGreetingColumns } from "@/lib/greetingOpening";
 import { factHashModeFromEnv, loadCompileProvenance } from "@/lib/tenantFieldProvenance";
 import { overlayFieldMeta, planFactConfirm } from "@/lib/factConfirm";
 import { normalizeFactRow } from "@/lib/factRowNormalize";
@@ -270,6 +271,13 @@ export async function saveAndCompileSettings(
     clipOwnerLine(String(formData.get("greeting_invite") || ""), 80),
     clipOwnerLine(String(tenant.greeting_invite || ""), 80)
   );
+  // Owner greeting (greeting_language.sql). Identity only; the language is
+  // written only when the owner picked one.
+  const greeting = greetingPatchFromForm(
+    settingsFieldFromScope(scope, "greetingText", true, false),
+    formData
+  );
+  if (greeting.error) return { error: greeting.error, fields: { greeting_text: greeting.error } };
   const agentName = pick(
     "agentName",
     String(formData.get("agent_name") || "").trim() || "Receptionist",
@@ -491,6 +499,7 @@ export async function saveAndCompileSettings(
     business_policies: businessPoliciesForStorage(businessPolicies),
     ...(formAreas ? { service_areas: formAreas } : {}),
     tts_lexicon: ttsLexicon,
+    ...greeting.patch,
   };
 
   // FACT_HASH_MODE: confirm only what changed (plus "Looks right" paths). Both
@@ -596,6 +605,19 @@ export async function saveAndCompileSettings(
       ({ error } = await workspace.client.from("tenants").update(peeled).eq("id", tenant.id));
     }
   }
+  // A database without greeting_language.sql: save the rest, report the greeting.
+  let greetingSkipped = false;
+  if (error) {
+    const peeled = withoutGreetingColumns(error.message, patch);
+    if (peeled) {
+      greetingSkipped = true;
+      ({ error } = await workspace.client.from("tenants").update(peeled).eq("id", tenant.id));
+      if (error) {
+        const again = withoutUnknownSpokenColumn(error.message, peeled);
+        if (again) ({ error } = await workspace.client.from("tenants").update(again).eq("id", tenant.id));
+      }
+    }
+  }
   bustTenantCache(tenant.id);
   const tWrite = Date.now();
 
@@ -688,6 +710,10 @@ export async function saveAndCompileSettings(
   const spokenState = ownsUnknown ? { unknownAnswerSpoken } : {};
   if (priceIssues.length) {
     return { ok: true, source, error: priceIssueSummary(priceIssues, true), fields: priceFields, ...spokenState };
+  }
+
+  if (greetingSkipped) {
+    return { ok: true, source, error: "Saved. The greeting could not be saved on this line yet.", ...spokenState };
   }
 
   return { ok: true, source, ...spokenState };

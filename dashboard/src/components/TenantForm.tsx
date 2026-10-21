@@ -68,6 +68,8 @@ import {
   suggestImportedServices,
 } from "@/lib/catalogSuggest";
 import { CatalogImportSheet } from "@/components/settings/catalog/CatalogImportSheet";
+import { GreetingSettings } from "@/components/settings/GreetingSettings";
+import { parseGreetingLanguage, type GreetingLanguage } from "@/lib/greetingOpening";
 import { CatalogSectionShell } from "@/components/settings/catalog/CatalogSectionShell";
 import {
   emptySocialChannel,
@@ -490,6 +492,14 @@ function TenantFormInner({
   const [agentName, setAgentName] = useState(tenant.agent_name || "");
   const [spokenName, setSpokenName] = useState(tenant.spoken_name || "");
   const [greetingInvite, setGreetingInvite] = useState(tenant.greeting_invite || "");
+  // Undefined until greeting_language.sql is applied: the Greeting group stays hidden.
+  const greetingAvailable = tenant.greeting_text !== undefined;
+  const [greetingText, setGreetingText] = useState(tenant.greeting_text || "");
+  const [greetingLanguage, setGreetingLanguage] = useState<GreetingLanguage | "">(
+    () => parseGreetingLanguage(tenant.greeting_language) ?? ""
+  );
+  // NULL stays NULL until the owner picks a language.
+  const [greetingLanguagePicked, setGreetingLanguagePicked] = useState(false);
   const [tone, setTone] = useState<OnboardingTone | "">(initialTone(tenant));
   const [hoursSchedule, setHoursSchedule] = useState<HoursSchedule>(() =>
     scheduleForForm(tenant.hours_schedule, tenant.business_hours || "")
@@ -1108,6 +1118,8 @@ function TenantFormInner({
     agentName,
     spokenName,
     greetingInvite,
+    greetingText,
+    greetingLanguage,
     tone,
     unknownLine,
     spokenTouched ? `${spokenEn}\u0002${spokenSw}` : "",
@@ -1198,6 +1210,10 @@ function TenantFormInner({
       <input type="hidden" name="agent_name" value={agentName} />
       <input type="hidden" name="spoken_name" value={spokenName} />
       <input type="hidden" name="greeting_invite" value={greetingInvite} />
+      {greetingAvailable ? <input type="hidden" name="greeting_text" value={greetingText} /> : null}
+      {greetingAvailable && greetingLanguagePicked && greetingLanguage ? (
+        <input type="hidden" name="greeting_language" value={greetingLanguage} />
+      ) : null}
       <input type="hidden" name="agent_tone" value={tone} />
       <input type="hidden" name="unknown_answer_fallback" value={unknownLine} />
       <input type="hidden" name="unknown_answer_spoken_en" value={spokenEn} />
@@ -1291,6 +1307,23 @@ function TenantFormInner({
             }))}
           />
         </SettingsGroup>
+
+        {greetingAvailable ? (
+          <GreetingSettings
+            text={greetingText}
+            onText={setGreetingText}
+            language={greetingLanguage}
+            onLanguage={(lang) => {
+              setGreetingLanguage(lang);
+              setGreetingLanguagePicked(true);
+            }}
+            businessName={businessName}
+            spokenName={spokenName}
+            agentName={agentName}
+            greetingInvite={greetingInvite}
+            error={state.fields?.greeting_text}
+          />
+        ) : null}
 
         <SettingsGroup
           title="Public contacts"
