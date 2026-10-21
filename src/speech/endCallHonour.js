@@ -1,6 +1,6 @@
 'use strict';
 
-// Honour the brain's end-of-call signal (VOICE_FAREWELL_HANGUP, OFF by default).
+// Honour the brain's end-of-call signal (VOICE_END_CALL_HONOUR, OFF by default).
 //
 // Plan C3 (v2-greeting-and-path-plan, approved 21 Oct 2026): when the brain
 // says the call is over (v1 end_call tool / ###ENDCALL### marker, the v1
@@ -32,9 +32,10 @@
 
 const ON = /^(1|true|on|yes)$/i;
 
-/** VOICE_FAREWELL_HANGUP=on|1|true|yes enables it. Unset or anything else: off. */
-function farewellHangupEnabled(env = process.env) {
-  return ON.test(String(env.VOICE_FAREWELL_HANGUP ?? '').trim());
+/** VOICE_END_CALL_HONOUR=on|1|true|yes enables it. Unset or anything else: off. */
+function endCallHonourEnabled(env) {
+  const raw = env ? env.VOICE_END_CALL_HONOUR : process.env.VOICE_END_CALL_HONOUR;
+  return ON.test(String(raw ?? '').trim());
 }
 
 function boundedMs(raw, { def, min, max }) {
@@ -44,13 +45,13 @@ function boundedMs(raw, { def, min, max }) {
 }
 
 /** Grace after the last audio frame should have played (ms). */
-function endGraceMs(env = process.env) {
-  return boundedMs(env.VOICE_END_CALL_GRACE_MS, { def: 600, min: 200, max: 5000 });
+function endGraceMs(env) {
+  return boundedMs(env ? env.VOICE_END_CALL_GRACE_MS : process.env.VOICE_END_CALL_GRACE_MS, { def: 600, min: 200, max: 5000 });
 }
 
 /** Never hold a call open longer than this after the end signal (ms). */
-function endMaxWaitMs(env = process.env) {
-  return boundedMs(env.VOICE_END_CALL_MAX_WAIT_MS, { def: 12000, min: 2000, max: 30000 });
+function endMaxWaitMs(env) {
+  return boundedMs(env ? env.VOICE_END_CALL_MAX_WAIT_MS : process.env.VOICE_END_CALL_MAX_WAIT_MS, { def: 12000, min: 2000, max: 30000 });
 }
 
 const BYTES_PER_MS_16K = 32; // 16 kHz mono s16le
@@ -245,7 +246,7 @@ function outageSuppressed(s = {}) {
 }
 
 module.exports = {
-  farewellHangupEnabled,
+  endCallHonourEnabled,
   endGraceMs,
   endMaxWaitMs,
   createPlayoutClock,

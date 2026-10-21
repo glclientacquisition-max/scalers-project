@@ -94,7 +94,7 @@ const { createVoiceTrace } = require('./src/speech/voiceTrace');
 const toolSmooth = require('./src/speech/toolSmooth');
 /** VOICE_TOOL_SMOOTH: per-connection heard-audio clock. Empty when the flags are off. */
 const MEDIA_CLOCKS = new WeakMap();
-/** VOICE_FAREWELL_HANGUP: per-connection playout clock (end-call waits for it). Empty when off. */
+/** VOICE_END_CALL_HONOUR: per-connection playout clock (end-call waits for it). Empty when off. */
 const PLAYOUT_CLOCKS = new WeakMap();
 const voiceTraceBySid = new Map();
 
@@ -446,7 +446,7 @@ const endedCalls = require('./src/speech/endedCalls');
 const { createCallFinalizer } = require('./src/callFinalize');
 const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
 const {
-  farewellHangupEnabled,
+  endCallHonourEnabled,
   createPlayoutClock,
   createEndCallController,
   endSignalFromBrain,
@@ -2359,10 +2359,10 @@ mediaWss.on('connection', (ws, req) => {
       });
     },
   });
-  // VOICE_FAREWELL_HANGUP (default off): honour the brain's end signal once,
+  // VOICE_END_CALL_HONOUR (default off): honour the brain's end signal once,
   // after the final audio has played; then nothing (no clip, SMS, email)
   // treats a dead TTS as an outage. Off: null, today's timers below.
-  const endHonour = farewellHangupEnabled()
+  const endHonour = endCallHonourEnabled()
     ? (() => {
         const playout = createPlayoutClock();
         PLAYOUT_CLOCKS.set(ws, playout);
@@ -2914,7 +2914,7 @@ mediaWss.on('connection', (ws, req) => {
   async function handleSpeechProviderOutage(reason) {
     if (speechOutageStarted) return { ok: false, outage: true };
     if (endHonour) {
-      // VOICE_FAREWELL_HANGUP call-ended guard (HD_2ccfbf6e1fa4, HD_5c9056d78d02):
+      // VOICE_END_CALL_HONOUR call-ended guard (HD_2ccfbf6e1fa4, HD_5c9056d78d02):
       // a reply that lands after hangup finds tts=null. That is not an outage.
       const why = outageSuppressed({
         endRequested: endHonour.ending(),
@@ -4967,7 +4967,7 @@ mediaWss.on('connection', (ws, req) => {
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
       if (callEnding && requestEndCall('turn_error_while_ending')) {
-        // VOICE_FAREWELL_HANGUP: the same single hangup, after any queued audio.
+        // VOICE_END_CALL_HONOUR: the same single hangup, after any queued audio.
       } else if (callEnding) {
         try {
           ws.close(1000, 'end_call');

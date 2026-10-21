@@ -5,7 +5,7 @@
 // in-progress call via the PBX ... Idempotent: if the PBX reports the call
 // already ended, the request still succeeds." call_id may be the SautiKit
 // call UUID or the PBX session id (HD_...), which is our callSid.
-// Used only by VOICE_FAREWELL_HANGUP (src/speech/endCallHonour.js).
+// Used only by VOICE_END_CALL_HONOUR (src/speech/endCallHonour.js).
 
 const DEFAULT_API_BASE = 'https://api.sautikit.com';
 

@@ -92,7 +92,7 @@ async function startServer(flag, sautikitBase) {
     MEDIA_SIM_LINE_MS: String(LINE_MS),
     MEDIA_SIM_GEMINI: JSON.stringify(GEMINI_SCRIPT),
   };
-  if (flag != null) env.VOICE_FAREWELL_HANGUP = flag;
+  if (flag != null) env.VOICE_END_CALL_HONOUR = flag;
   const child = fork(path.join(ROOT, 'server.js'), [], {
     cwd: ROOT,
     env,
@@ -184,7 +184,7 @@ function assertHungUpAfterAudio(r, callSid, line) {
   assert.ok(r.logs.some((l) => /end_call hangup source=\S+ waited_ms=\d+ rest=ok:200/.test(l)));
 }
 
-describe('VOICE_FAREWELL_HANGUP=on (e2e server.js)', { concurrency: true }, () => {
+describe('VOICE_END_CALL_HONOUR=on (e2e server.js)', { concurrency: true }, () => {
   let srv;
   let rest;
   before(async () => {
@@ -226,7 +226,7 @@ describe('VOICE_FAREWELL_HANGUP=on (e2e server.js)', { concurrency: true }, () =
 });
 
 // Flag off: today's behaviour, asserted so a change is noticed.
-describe('VOICE_FAREWELL_HANGUP unset (documents current behaviour)', { concurrency: true }, () => {
+describe('VOICE_END_CALL_HONOUR unset (documents current behaviour)', { concurrency: true }, () => {
   let srv;
   let rest;
   before(async () => {

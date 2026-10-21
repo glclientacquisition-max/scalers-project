@@ -1,12 +1,12 @@
 'use strict';
-// VOICE_FAREWELL_HANGUP (default off): honour the brain's end signal once, after
+// VOICE_END_CALL_HONOUR (default off): honour the brain's end signal once, after
 // the final audio, with a call-ended outage guard. Unit tests (no network).
 const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-  farewellHangupEnabled,
+  endCallHonourEnabled,
   endGraceMs,
   endMaxWaitMs,
   createPlayoutClock,
@@ -47,9 +47,22 @@ function fakeTime(start = 1000) {
 
 describe('flag', () => {
   it('off by default; only on/1/true/yes enable', () => {
-    assert.equal(farewellHangupEnabled({}), false);
-    for (const v of ['', 'off', '0', 'false', 'no', 'enabled']) assert.equal(farewellHangupEnabled({ VOICE_FAREWELL_HANGUP: v }), false, v);
-    for (const v of ['on', '1', 'true', 'yes', 'ON', ' on ']) assert.equal(farewellHangupEnabled({ VOICE_FAREWELL_HANGUP: v }), true, v);
+    assert.equal(endCallHonourEnabled({}), false);
+    for (const v of ['', 'off', '0', 'false', 'no', 'enabled']) assert.equal(endCallHonourEnabled({ VOICE_END_CALL_HONOUR: v }), false, v);
+    for (const v of ['on', '1', 'true', 'yes', 'ON', ' on ']) assert.equal(endCallHonourEnabled({ VOICE_END_CALL_HONOUR: v }), true, v);
+  });
+  it('reads process.env.VOICE_END_CALL_HONOUR when no env is passed; the old name does nothing', () => {
+    const saved = { a: process.env.VOICE_END_CALL_HONOUR, b: process.env.VOICE_FAREWELL_HANGUP };
+    try {
+      delete process.env.VOICE_END_CALL_HONOUR;
+      process.env.VOICE_FAREWELL_HANGUP = 'on';
+      assert.equal(endCallHonourEnabled(), false);
+      process.env.VOICE_END_CALL_HONOUR = 'on';
+      assert.equal(endCallHonourEnabled(), true);
+    } finally {
+      if (saved.a === undefined) delete process.env.VOICE_END_CALL_HONOUR; else process.env.VOICE_END_CALL_HONOUR = saved.a;
+      if (saved.b === undefined) delete process.env.VOICE_FAREWELL_HANGUP; else process.env.VOICE_FAREWELL_HANGUP = saved.b;
+    }
   });
   it('grace and max wait are bounded', () => {
     assert.equal(endGraceMs({}), 600);
@@ -278,7 +291,7 @@ describe('hangupSautikitCall (POST /v1/calls/{id}/hangup)', () => {
 describe('server.js wiring', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   it('controller exists only with the flag on; flag off keeps the old timers', () => {
-    assert.match(src, /const endHonour = farewellHangupEnabled\(\)\s*\?/);
+    assert.match(src, /const endHonour = endCallHonourEnabled\(\)\s*\?/);
     assert.match(src, /: null;\n  \/\*\* Brain said the call is over/);
     // Old paths still present for flag off.
     assert.match(src, /else if \(result\?\.shouldEndCall && !bargeInActive\) \{\n\s*console\.log\(`\[ws\/media\]\[\$\{sidLabel\(\)\}\] end-call marker/);
