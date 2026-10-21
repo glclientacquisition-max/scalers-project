@@ -11,7 +11,12 @@
 const crypto = require('crypto');
 
 const ON = /^(1|true|on|yes)$/i;
-function commitSafetyEnabled(env = null) { return ON.test(String((env ? env.BRAIN_V2_COMMIT_SAFETY : process.env.BRAIN_V2_COMMIT_SAFETY) || '')); }
+// BRAIN_V2_OWNS_CALL (plan C3) removes the v1 guards from v2 writes, so it turns commit safety on with it.
+function commitSafetyEnabled(env = null) {
+  const cs = env ? env.BRAIN_V2_COMMIT_SAFETY : process.env.BRAIN_V2_COMMIT_SAFETY;
+  const owns = env ? env.BRAIN_V2_OWNS_CALL : process.env.BRAIN_V2_OWNS_CALL;
+  return ON.test(String(cs || '')) || ON.test(String(owns || ''));
+}
 
 const low = (v) => String(v == null ? '' : v).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9:]+/g, ' ').trim();
 const digits = (v) => String(v || '').replace(/\D/g, '');
