@@ -5,14 +5,19 @@ import { DEFAULT_URLS, deskRoutes, SENDERS, type Urls } from "./config.ts";
 import { EmailLayout } from "./Layout.tsx";
 import { specToText } from "./text.ts";
 import type { Audience } from "./spec.ts";
+import { envBand, envSubject, envTag, withEnv, type EmailBand, type EmailEnv } from "./env.ts";
 
 export { catalog, followUps, SENDERS, DEFAULT_URLS, deskRoutes };
 export type { EmailKind, EmailProps, Urls };
+export { envBand, envSubject, envTag, withEnv };
+export type { EmailBand, EmailEnv };
 
 export type RenderOptions = {
   urls?: Partial<Urls>;
   /** One-click unsubscribe URL. Used only on non-essential mail. */
   unsubscribeUrl?: string;
+  /** Tag any kind for an environment: subject prefix plus the top band (env.ts). */
+  env?: { env: EmailEnv; note?: string };
 };
 
 export type RenderedEmail = {
@@ -47,7 +52,8 @@ function outlookFixups(html: string): string {
 export async function renderEmail<K extends EmailKind>(kind: K, props: EmailProps<K>, opts: RenderOptions = {}): Promise<RenderedEmail> {
   const urls: Urls = { ...DEFAULT_URLS, ...opts.urls };
   const entry = catalog[kind];
-  const spec = (entry.render as (p: EmailProps<K>, c: { urls: Urls }) => ReturnType<typeof entry.render>)(props, { urls });
+  const base = (entry.render as (p: EmailProps<K>, c: { urls: Urls }) => ReturnType<typeof entry.render>)(props, { urls });
+  const spec = opts.env ? withEnv(base, opts.env.env, opts.env.note) : base;
   const unsubscribeUrl = !spec.essential ? opts.unsubscribeUrl : undefined;
   const footer = { support: urls.support, unsubscribeUrl, alertsUrl: unsubscribeUrl ? `${urls.desk}${deskRoutes.alerts}` : undefined, assets: urls.assets };
   const html = outlookFixups(await render(React.createElement(EmailLayout, { spec, footer })));

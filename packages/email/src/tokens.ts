@@ -20,6 +20,11 @@ export const light = {
   attentionTonal: "#fdf0e8",
   ok: "#15803d",
   okTonal: "#e8f5ee",
+  /** Environment band: production is red so it is never mistaken for staging. */
+  danger: "#b91c1c",
+  dangerOn: "#ffffff",
+  bandNeutral: "#5b6d85",
+  bandNeutralOn: "#ffffff",
 } as const;
 
 export const dark = {
@@ -38,6 +43,10 @@ export const dark = {
   attentionTonal: "#2b1a12",
   ok: "#4ade80",
   okTonal: "#122a1c",
+  danger: "#dc2626",
+  dangerOn: "#ffffff",
+  bandNeutral: "#3a4a62",
+  bandNeutralOn: "#e9eff7",
 } as const;
 
 /** Desk --font-sans. No web fonts: they fail in Outlook and slow Gmail. */

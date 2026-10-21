@@ -24,6 +24,7 @@ export type SautikitNumber = {
 };
 
 export type SautikitWallet = {
+  workspace_id?: string;
   balance_minor: number;
   currency: string;
   status?: string;
@@ -219,8 +220,11 @@ async function sautikitGet<T>(path: string): Promise<T> {
   return sautikitRequest<T>(path, { apiKey });
 }
 
-export async function listSautikitNumbers(): Promise<SautikitNumber[]> {
-  const json = await sautikitGet<{ numbers: SautikitNumber[] }>("/v1/numbers");
+export async function listSautikitNumbers(apiKey?: string): Promise<SautikitNumber[]> {
+  // A passed key (the ops alert renewal read) is used as is; otherwise SAUTIKIT_API_KEY.
+  const json = apiKey
+    ? await sautikitRequest<{ numbers: SautikitNumber[] }>("/v1/numbers", { apiKey })
+    : await sautikitGet<{ numbers: SautikitNumber[] }>("/v1/numbers");
   return json.numbers || [];
 }
 

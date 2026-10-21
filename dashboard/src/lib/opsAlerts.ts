@@ -3,6 +3,7 @@ import {
   noticeBaseKind,
   parseWalletThresholdsKes,
   parseRearmMargin,
+  rearmCeilingMinor,
   platformCronSignals,
   positiveNumber,
   smsSignals,
@@ -28,7 +29,14 @@ import {
 } from "@/lib/opsAlertsRun";
 import { gatherPlatformSignals } from "@/lib/platformOps";
 import { kindLabel, opsMailSubject, parseKindFlags, DEFAULT_SAUTIKIT_WARN_MINOR } from "@/lib/platformOpsModel";
-import { getSautikitWallet, isSautikitConfigured, normalizeSautikitApiKey } from "@/lib/sautikit";
+import {
+  getSautikitAdminOpsKey,
+  getSautikitWallet,
+  isSautikitConfigured,
+  listSautikitNumbers,
+  normalizeSautikitApiKey,
+} from "@/lib/sautikit";
+import { isWalletKind, nextRenewalLabel, walletMail, type WalletMailContext, type WalletReading } from "@/lib/opsWalletEmail";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { readTextSmsCredit } from "@/lib/textSmsBalance";
 
@@ -130,19 +138,43 @@ function simulateMinor(name: "wallet" | "sms"): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
+type WalletRead = { minor: number | null; workspaceId: string | null };
+
 /** Authenticated wallet read. Unknown on a missing key, a hidden balance, or an error. */
-async function readWalletMinor(): Promise<number | null> {
+async function readWallet(): Promise<WalletRead> {
   const simulated = simulateMinor("wallet");
-  if (simulated != null) return simulated;
-  if (!isSautikitConfigured()) return null;
+  if (simulated != null) return { minor: simulated, workspaceId: null };
+  if (!isSautikitConfigured()) return { minor: null, workspaceId: null };
   try {
     const wallet = await getSautikitWallet();
     const minor = Number(wallet?.balance_minor);
-    return Number.isFinite(minor) ? minor : null;
+    return { minor: Number.isFinite(minor) ? minor : null, workspaceId: wallet?.workspace_id || null };
   } catch {
     console.warn("[ops-alerts] phone wallet balance unread");
-    return null;
+    return { minor: null, workspaceId: null };
   }
+}
+
+/**
+ * What renews on the 1st, for the production low-balance mail. Read only.
+ * Tries SAUTIKIT_ADMIN_OPS_KEY, then SAUTIKIT_API_KEY; either may lack numbers.read,
+ * in which case the mail says only the date.
+ */
+async function readRenewal(now: Date): Promise<NonNullable<WalletReading["renewal"]>> {
+  const date = nextRenewalLabel(now);
+  const keys = [normalizeSautikitApiKey(getSautikitAdminOpsKey()), ""];
+  for (const key of keys) {
+    if (key === "" && !isSautikitConfigured()) break;
+    try {
+      const numbers = await listSautikitNumbers(key || undefined);
+      const held = numbers.filter((n) => !/releas|cancel/i.test(String(n.status || "")));
+      const dueMinor = held.reduce((sum, n) => sum + (Number(n.monthly_retail_minor) || 0), 0);
+      return { count: held.length, dueMinor, date };
+    } catch {
+      // Scope denied or unreachable: try the next key, then fall back to the date alone.
+    }
+  }
+  return { count: null, dueMinor: null, date };
 }
 
 /**
@@ -150,16 +182,16 @@ async function readWalletMinor(): Promise<number | null> {
  * SAUTIKIT_STAGING_WALLET_KEY: a wallet.read-only key for the staging workspace.
  * Unset means unknown: staging notices hold and nothing opens.
  */
-async function readStagingWalletMinor(): Promise<number | null> {
+async function readStagingWallet(): Promise<WalletRead> {
   const key = normalizeSautikitApiKey(process.env.SAUTIKIT_STAGING_WALLET_KEY);
-  if (!key) return null;
+  if (!key) return { minor: null, workspaceId: null };
   try {
     const wallet = await getSautikitWallet(key);
     const minor = Number(wallet?.balance_minor);
-    return Number.isFinite(minor) ? minor : null;
+    return { minor: Number.isFinite(minor) ? minor : null, workspaceId: wallet?.workspace_id || null };
   } catch {
     console.warn("[ops-alerts] staging phone wallet balance unread");
-    return null;
+    return { minor: null, workspaceId: null };
   }
 }
 
@@ -169,7 +201,20 @@ async function readSmsCredit(): Promise<{ balance: number | null; exhausted: boo
   return readTextSmsCredit();
 }
 
-function composeNotice(kind: string, recovered: boolean, detail: string): { subject: string; text: string } {
+/**
+ * Wallet notices (production and staging) use the @scalers/email ops_wallet layout,
+ * tagged by the wallet they are about. Everything else stays plain text.
+ */
+export function composeNotice(
+  kind: string,
+  recovered: boolean,
+  detail: string,
+  wallet?: WalletMailContext | null,
+): { subject: string; text: string; html?: string } {
+  if (wallet && isWalletKind(kind)) {
+    const mail = walletMail(kind, recovered, wallet);
+    if (mail) return { subject: mail.subject, text: mail.text, html: mail.html };
+  }
   const label = kindLabel(kind);
   // Wallet notices carry their own top-up line ("Phone wallet topped up: KES 600, back above KES 550").
   const walletRecovery = recovered && noticeBaseKind(kind) === "sautikit_low" && detail;
@@ -198,12 +243,12 @@ export async function runScheduledOpsAlerts(now: Date = new Date()): Promise<Ale
   }
 
   const store = supabaseAlertStore();
-  const [gathered, settings, open, walletMinor, stagingWalletMinor, sms] = await Promise.all([
+  const [gathered, settings, open, prodWallet, stagingWallet, sms] = await Promise.all([
     gatherPlatformSignals(),
     loadAlertSettings(),
     store.readOpenNotices(),
-    readWalletMinor(),
-    readStagingWalletMinor(),
+    readWallet(),
+    readStagingWallet(),
     readSmsCredit(),
   ]);
   const openNotices = open.filter((notice) => notice.status === "open" || notice.status === "acked");
@@ -217,22 +262,38 @@ export async function runScheduledOpsAlerts(now: Date = new Date()): Promise<Ale
     phone: gathered.phoneKnown,
   };
   const thresholds = walletThresholdsMinor(process.env.OPS_WALLET_ALERT_THRESHOLDS_KES, settings.sautikitWarnMinor);
+  const stagingThresholds = parseWalletThresholdsKes(
+    process.env.OPS_STAGING_WALLET_ALERT_THRESHOLDS_KES,
+    DEFAULT_STAGING_WALLET_THRESHOLDS_KES,
+  );
+  const rearmMargin = parseRearmMargin(process.env.OPS_ALERTS_REARM_MARGIN);
+  const walletMinor = prodWallet.minor;
+  const stagingWalletMinor = stagingWallet.minor;
+  // The renewal line is only needed when a production low mail can go out.
+  const topMinor = Math.max(0, ...thresholds);
+  const renewal =
+    walletMinor != null && topMinor > 0 && walletMinor <= rearmCeilingMinor(topMinor, rearmMargin)
+      ? await readRenewal(now)
+      : null;
+  const walletContext: WalletMailContext = {
+    production: { balanceMinor: walletMinor, workspaceId: prodWallet.workspaceId, thresholdsMinor: thresholds, renewal },
+    staging: { balanceMinor: stagingWalletMinor, workspaceId: stagingWallet.workspaceId, thresholdsMinor: stagingThresholds },
+    checkedAt: now,
+    rearmMargin,
+  };
   const signals: CronSignal[] = [
     ...platformCronSignals(gathered.signals, known),
     ...walletSignals({
       balanceMinor: walletMinor,
       thresholdsMinor: thresholds,
       openNotices,
-      rearmMargin: parseRearmMargin(process.env.OPS_ALERTS_REARM_MARGIN),
+      rearmMargin,
     }),
     ...walletSignals({
       balanceMinor: stagingWalletMinor,
-      thresholdsMinor: parseWalletThresholdsKes(
-        process.env.OPS_STAGING_WALLET_ALERT_THRESHOLDS_KES,
-        DEFAULT_STAGING_WALLET_THRESHOLDS_KES,
-      ),
+      thresholdsMinor: stagingThresholds,
       openNotices,
-      rearmMargin: parseRearmMargin(process.env.OPS_ALERTS_REARM_MARGIN),
+      rearmMargin,
       kindPrefix: STAGING_WALLET_PREFIX,
     }),
     ...smsSignals({
@@ -252,13 +313,14 @@ export async function runScheduledOpsAlerts(now: Date = new Date()): Promise<Ale
     dryRun,
     now,
     staleMs: positiveNumber(process.env.OPS_ALERTS_STALE_HOURS, 6) * 60 * 60 * 1000,
-    compose: composeNotice,
+    compose: (kind, recovered, detail) => composeNotice(kind, recovered, detail, walletContext),
     send: async (mail) => {
       if (staging) throw new Error("staging");
       const out = await sendOpsMail({
         to: mail.to,
         subject: mail.subject,
         text: mail.text,
+        html: mail.html,
         ledger: { kind: `platform_ops_${noticeBaseKind(mail.kind)}`, key: mail.ledgerKey },
       });
       if (!opsMailKeepsClaim(out.sent, out.skipped)) throw new Error(out.skipped || "not sent");
