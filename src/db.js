@@ -1514,15 +1514,28 @@ async function selectTenantRowWithLine(tenantId, columns) {
 
 async function getTenantById(tenantId) {
   if (!tenantId) return null;
-  const fullCols =
+  // Pre-13c column list (#848). greeting_language.sql (13c, #844) adds
+  // greeting_text + greeting_language; a database without them re-selects this list.
+  const preGreetingCols =
     'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, spoken_name, greeting_invite, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active';
+  const fullCols = preGreetingCols.replace('greeting_invite, ', 'greeting_invite, greeting_text, greeting_language, ');
   // VOICE_V2_CATALOGUE only: also read the stored spoken catalogue (migration
   // 20261015063255). Flag off: the exact select as before. A DB without the
   // column falls back to the same select; a null value means the rules baseline.
   const v2Catalogue = /^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || ''));
-  let { data, error } = await selectTenantRowWithLine(tenantId, v2Catalogue ? `${fullCols}, spoken_catalogue` : fullCols);
-  if (v2Catalogue && error && /spoken_catalogue/i.test(error.message || '')) {
-    ({ data, error } = await selectTenantRowWithLine(tenantId, fullCols));
+  let withCatalogue = v2Catalogue;
+  const cols = (base) => (withCatalogue ? `${base}, spoken_catalogue` : base);
+  let { data, error } = await selectTenantRowWithLine(tenantId, cols(fullCols));
+  if (withCatalogue && error && /spoken_catalogue/i.test(error.message || '')) {
+    withCatalogue = false;
+    ({ data, error } = await selectTenantRowWithLine(tenantId, cols(fullCols)));
+  }
+  if (error && /greeting_text|greeting_language/i.test(error.message || '')) {
+    ({ data, error } = await selectTenantRowWithLine(tenantId, cols(preGreetingCols)));
+    if (withCatalogue && error && /spoken_catalogue/i.test(error.message || '')) {
+      withCatalogue = false;
+      ({ data, error } = await selectTenantRowWithLine(tenantId, cols(preGreetingCols)));
+    }
   }
 
   if (error && /spoken_name|greeting_invite/i.test(error.message || '')) {
@@ -1602,6 +1615,8 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       businessName: process.env.BUSINESS_NAME || 'the business',
       spokenName: null,
       greetingInvite: null,
+      greetingText: null,
+      greetingLanguage: null,
       agentName: process.env.AGENT_NAME || 'Receptionist',
       llmSystemPrompt: null,
       knowledge: process.env.BUSINESS_KNOWLEDGE || null,
@@ -2028,14 +2043,25 @@ async function getCallerMemory({ tenantId, phone } = {}) {
   if (!tenantId || !phoneNorm) return null;
 
   const phoneKeys = storedPhoneLookupKeys(phoneNorm);
-  const { data: contact, error: findErr } = await supabase
-    .from('contacts')
-    .select('id, name, notes, last_reason, phone, metadata')
-    .eq('tenant_id', tenantId)
-    .in('phone', phoneKeys)
-    .order('phone', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const findContact = (columns) =>
+    supabase
+      .from('contacts')
+      .select(columns)
+      .eq('tenant_id', tenantId)
+      .in('phone', phoneKeys)
+      .order('phone', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+  // greeting_language.sql (13c) adds last_language + last_language_at. A
+  // database without it re-selects the older list.
+  let { data: contact, error: findErr } = await findContact(
+    'id, name, notes, last_reason, phone, metadata, last_language, last_language_at, name_confirmed, name_confirmed_at'
+  );
+  if (findErr && /last_language|name_confirmed/i.test(findErr.message || '')) {
+    ({ data: contact, error: findErr } = await findContact(
+      'id, name, notes, last_reason, phone, metadata'
+    ));
+  }
   if (findErr && /contacts|relation/i.test(findErr.message)) {
     console.warn(
       '[db] getCallerMemory skipped (apply contacts_and_requests.sql):',
@@ -2066,13 +2092,407 @@ async function getCallerMemory({ tenantId, phone } = {}) {
     contact.id,
     phoneNorm
   );
-  return buildCallerMemoryCard({
+  const card = buildCallerMemoryCard({
     contact,
     openRequests,
     openAppointments,
     nextAppointment,
     recentAppointments,
   });
+  if (card) {
+    // Caller's last settled language (en | sw), null when never saved.
+    card.lastLanguage = normalizeCallerLanguage(contact.last_language);
+    card.lastLanguageAt = card.lastLanguage ? contact.last_language_at || null : null;
+    // callOpening.js speaks the name only when a past call confirmed it.
+    card.nameConfirmed = contact.name_confirmed === true;
+    card.nameConfirmedAt = card.nameConfirmed ? contact.name_confirmed_at || null : null;
+  }
+  return card;
+}
+
+/**
+ * Map the in-call language state to what contacts.last_language stores.
+ * en -> en; sw and sheng -> sw; mixed, unknown and anything else -> null
+ * (write nothing, keep the previous value).
+ */
+function normalizeCallerLanguage(language) {
+  const v = String(language || '').trim().toLowerCase();
+  if (v === 'en') return 'en';
+  if (v === 'sw' || v === 'sheng') return 'sw';
+  return null;
+}
+
+/**
+ * Find the contact for tenant + phone with the same lookup keys upsertContact
+ * uses (Kenya E.164 plus legacy variants). { data, error }.
+ */
+async function findContactForWrite(tenantId, phoneNorm, columns) {
+  return supabase
+    .from('contacts')
+    .select(columns)
+    .eq('tenant_id', tenantId)
+    .in('phone', storedPhoneLookupKeys(phoneNorm))
+    .order('phone', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+}
+
+function isUniqueViolation(error) {
+  return Boolean(error) && (error.code === '23505' || /duplicate|unique/i.test(error.message || ''));
+}
+
+/**
+ * Write a patch onto the tenant + phone contact, creating it when missing.
+ * contacts_tenant_phone_uidx is a partial unique index, so PostgREST
+ * onConflict cannot target it: find, then update by id; else insert, and on a
+ * unique violation (a racing insert) re-find and update. buildPatch(existing)
+ * returns the update patch; buildInsert() the insert row.
+ * Throws only to its caller's try/catch.
+ */
+async function writeContactByPhone({ tenantId, phoneNorm, columns, buildPatch, buildInsert, label }) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const { data: existing, error: findErr } = await findContactForWrite(tenantId, phoneNorm, columns);
+    if (findErr) return { error: findErr };
+    if (existing?.id) {
+      const patch = buildPatch(existing);
+      const { error } = await supabase.from('contacts').update(patch).eq('id', existing.id);
+      if (error) return { error };
+      return { created: false, updated: 1, existing };
+    }
+    if (attempt > 0) break;
+    const { error: insErr } = await supabase.from('contacts').insert(buildInsert());
+    if (!insErr) return { created: true, updated: 0, existing: null };
+    if (!isUniqueViolation(insErr)) return { error: insErr };
+    // Another writer created it between find and insert: loop and update.
+  }
+  return { error: { message: `${label}: contact neither found nor created` } };
+}
+
+/**
+ * Save the language a caller settled on (greeting_language.sql, 13c) on the
+ * tenant + phone contact, creating the contact for a first-time caller.
+ * Never throws: { ok, created, updated, skipped?, error? } and a warning.
+ */
+async function saveCallerLanguage({ tenantId, phone, language } = {}) {
+  const lang = normalizeCallerLanguage(language);
+  const phoneNorm = normalizeStoredPhone(phone);
+  if (!tenantId || !phoneNorm) return { ok: false, created: false, updated: 0, skipped: 'no_tenant_or_phone' };
+  if (!lang) return { ok: true, created: false, updated: 0, skipped: 'no_language' };
+  if (!supabase) return { ok: false, created: false, updated: 0, skipped: 'no_supabase' };
+  try {
+    const now = new Date().toISOString();
+    const out = await writeContactByPhone({
+      tenantId,
+      phoneNorm,
+      columns: 'id',
+      label: 'saveCallerLanguage',
+      buildPatch: () => ({ last_language: lang, last_language_at: now }),
+      buildInsert: () => ({
+        tenant_id: tenantId,
+        phone: phoneNorm,
+        metadata: mergeContactIdentity(null, {}).metadata,
+        last_language: lang,
+        last_language_at: now,
+        updated_at: now,
+      }),
+    });
+    if (out.error) {
+      const message = out.error.message || String(out.error);
+      console.warn(
+        '[db] saveCallerLanguage failed' + (/last_language/i.test(message) ? ' (apply greeting_language.sql)' : '') + ':',
+        JSON.stringify({ tenantId, language: lang, error: message })
+      );
+      return { ok: false, created: false, updated: 0, error: message };
+    }
+    return { ok: true, created: out.created, updated: out.updated };
+  } catch (err) {
+    console.warn(
+      '[db] saveCallerLanguage threw:',
+      JSON.stringify({ tenantId, language: lang, error: err?.message || String(err) })
+    );
+    return { ok: false, created: false, updated: 0, error: err?.message || String(err) };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Caller name confirmed + per-call opening resume state (greeting_language.sql).
+// None of these throw: the call path gets { ok:false, error } and a warning.
+
+const NAME_CONFIRMED_SOURCES = new Set(['readback_yes', 'owner_edit']);
+const LAST_AGENT_LINE_MAX = 500;
+const RESUME_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function warnCallPath(event, fields) {
+  try {
+    console.warn(`[db] ${event}`, JSON.stringify(fields));
+  } catch {
+    console.warn(`[db] ${event}`);
+  }
+}
+
+function migrationHint(message) {
+  return /greeted_at|last_agent_line|last_line_cut|notice_given|stream_seq|last_stream_at|name_confirmed|bump_call_stream_seq/i.test(
+    message || ''
+  )
+    ? 'apply greeting_language.sql'
+    : undefined;
+}
+
+/**
+ * Save a caller-confirmed name (Brain v2 save_caller_name after readback_yes).
+ * Upserts the tenant + phone contact. A new caller gets a contact with the name
+ * and all four confirmed fields. An existing contact whose stored name differs
+ * keeps that old name in metadata.alternate_names (same format and dedupe as
+ * upsertContact), then takes the new name and the confirmed fields in one
+ * update; the fresh name_confirmed_at keeps contacts_name_confirmed_reset from
+ * clearing them. Never throws: { ok, created, updated, previousName, error? }.
+ */
+async function confirmCallerName({ tenantId, phone, name, source = 'readback_yes', callId } = {}) {
+  const base = { ok: false, created: false, updated: 0, previousName: null };
+  const phoneNorm = normalizeStoredPhone(phone);
+  const nameNorm = String(name || '').trim();
+  if (!tenantId || !phoneNorm) return { ...base, skipped: 'no_tenant_or_phone' };
+  if (!nameNorm) return { ...base, skipped: 'no_name' };
+  if (!NAME_CONFIRMED_SOURCES.has(source)) return { ...base, error: `invalid_source:${source}` };
+  if (!supabase) return { ...base, skipped: 'no_supabase' };
+  const callUuid = RESUME_UUID_RE.test(String(callId || '')) ? String(callId) : null;
+  try {
+    const now = new Date().toISOString();
+    const confirmed = {
+      name: nameNorm,
+      name_confirmed: true,
+      name_confirmed_at: now,
+      name_confirmed_source: source,
+      name_confirmed_call_id: callUuid,
+      updated_at: now,
+    };
+    const out = await writeContactByPhone({
+      tenantId,
+      phoneNorm,
+      columns: 'id, name, metadata',
+      label: 'confirmCallerName',
+      buildPatch: (existing) => ({
+        ...confirmed,
+        metadata: confirmedNameMetadata(existing, nameNorm, { seenAt: now, callId: callUuid }),
+      }),
+      buildInsert: () => ({
+        tenant_id: tenantId,
+        phone: phoneNorm,
+        ...confirmed,
+        metadata: mergeContactIdentity(null, { name: nameNorm }).metadata,
+      }),
+    });
+    if (out.error) {
+      const message = out.error.message || String(out.error);
+      warnCallPath('confirmCallerName failed', { tenantId, source, error: message, hint: migrationHint(message) });
+      return { ...base, error: message };
+    }
+    const previousName = String(out.existing?.name || '').trim() || null;
+    return { ok: true, created: out.created, updated: out.updated, previousName };
+  } catch (err) {
+    warnCallPath('confirmCallerName threw', { tenantId, source, error: err?.message || String(err) });
+    return { ...base, error: err?.message || String(err) };
+  }
+}
+
+/**
+ * metadata for a confirmed rename: the stored name (when it differs, case
+ * insensitive) goes to the front of alternate_names, then the contactIdentity
+ * dedupe/cap applies against the new primary.
+ */
+function confirmedNameMetadata(existing, newName, { seenAt, callId } = {}) {
+  const { normalizeAlternates, ALT_CAP } = require('./conversation/contactIdentity');
+  const { isJunkCallerName } = require('./conversation/callerNameQuality');
+  const meta =
+    existing?.metadata && typeof existing.metadata === 'object' && !Array.isArray(existing.metadata)
+      ? { ...existing.metadata }
+      : {};
+  const primaryKey = String(newName).trim().toLowerCase();
+  // Existing alternates keep upsertContact's dedupe and cap against the new primary.
+  let alternates = normalizeAlternates(meta.alternate_names, newName).filter(
+    (row) => row.name.toLowerCase() !== primaryKey
+  );
+  const oldName = String(existing?.name || '').trim();
+  // The replaced name is never dropped (even when it fuzzily matches the new
+  // one): case-insensitive dedupe only, newest first, same row format.
+  if (oldName && !isJunkCallerName(oldName) && oldName.toLowerCase() !== primaryKey) {
+    alternates = alternates.filter((row) => row.name.toLowerCase() !== oldName.toLowerCase());
+    alternates.unshift({ name: oldName, seen_at: seenAt || new Date().toISOString(), call_id: callId || null });
+  }
+  return { ...meta, alternate_names: alternates.slice(0, ALT_CAP) };
+}
+
+/**
+ * Claim the greeting for one call across replicas: sets greeted_at = now()
+ * only where it is still null. won=true for exactly one caller.
+ * { ok:true, won:false, greetedAt } when already greeted; { ok:true, won:false,
+ * missing:true } when no calls row; { ok:false, won:null, error } on failure
+ * (Voice should fail open and greet). Never throws.
+ */
+async function markCallGreeted({ callSid, lastAgentLine, noticeGiven } = {}) {
+  const sid = String(callSid || '').trim();
+  if (!sid) return { ok: false, won: null, error: 'no_call_sid' };
+  if (!supabase) return { ok: false, won: null, error: 'no_supabase' };
+  const now = new Date().toISOString();
+  const patch = { greeted_at: now };
+  const line = String(lastAgentLine || '').trim();
+  if (line) patch.last_agent_line = line.slice(0, LAST_AGENT_LINE_MAX);
+  if (noticeGiven === true) patch.notice_given = true;
+  try {
+    const { data, error } = await supabase
+      .from('calls')
+      .update(patch)
+      .eq('sautikit_call_sid', sid)
+      .is('greeted_at', null)
+      .select('greeted_at');
+    if (error) {
+      const message = error.message || String(error);
+      warnCallPath('markCallGreeted failed', { callSid: sid, error: message, hint: migrationHint(message) });
+      return { ok: false, won: null, error: message };
+    }
+    if (Array.isArray(data) && data.length > 0) return { ok: true, won: true, greetedAt: data[0].greeted_at || now };
+    const state = await getCallResumeState(sid);
+    if (!state) return { ok: true, won: false, missing: true };
+    return { ok: true, won: false, greetedAt: state.greetedAt };
+  } catch (err) {
+    warnCallPath('markCallGreeted threw', { callSid: sid, error: err?.message || String(err) });
+    return { ok: false, won: null, error: err?.message || String(err) };
+  }
+}
+
+/**
+ * Opening resume state for a call: { greetedAt, lastAgentLine, lastLineCut,
+ * noticeGiven, streamSeq, lastStreamAt }, or null when there is no calls row
+ * or on error.
+ */
+async function getCallResumeState(callSid) {
+  const sid = String(callSid || '').trim();
+  if (!sid || !supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('calls')
+      .select('greeted_at, last_agent_line, last_line_cut, notice_given, stream_seq, last_stream_at')
+      .eq('sautikit_call_sid', sid)
+      .maybeSingle();
+    if (error) {
+      const message = error.message || String(error);
+      warnCallPath('getCallResumeState failed', { callSid: sid, error: message, hint: migrationHint(message) });
+      return null;
+    }
+    if (!data) return null;
+    return {
+      greetedAt: data.greeted_at || null,
+      lastAgentLine: data.last_agent_line || null,
+      lastLineCut: data.last_line_cut === true,
+      noticeGiven: data.notice_given === true,
+      streamSeq: Number.isFinite(Number(data.stream_seq)) ? Number(data.stream_seq) : 0,
+      lastStreamAt: data.last_stream_at || null,
+    };
+  } catch (err) {
+    warnCallPath('getCallResumeState threw', { callSid: sid, error: err?.message || String(err) });
+    return null;
+  }
+}
+
+/**
+ * Update calls columns for one sautikit_call_sid. Never throws:
+ * { ok, updated } or { ok:false, updated:0, error }.
+ */
+async function updateCallBySid(label, callSid, patch) {
+  const sid = String(callSid || '').trim();
+  if (!sid) return { ok: false, updated: 0, skipped: 'no_call_sid' };
+  if (!supabase) return { ok: false, updated: 0, skipped: 'no_supabase' };
+  try {
+    const { data, error } = await supabase
+      .from('calls')
+      .update(patch)
+      .eq('sautikit_call_sid', sid)
+      .select('id');
+    if (error) {
+      const message = error.message || String(error);
+      warnCallPath(`${label} failed`, { callSid: sid, error: message, hint: migrationHint(message) });
+      return { ok: false, updated: 0, error: message };
+    }
+    return { ok: true, updated: Array.isArray(data) ? data.length : 0 };
+  } catch (err) {
+    warnCallPath(`${label} threw`, { callSid: sid, error: err?.message || String(err) });
+    return { ok: false, updated: 0, error: err?.message || String(err) };
+  }
+}
+
+/**
+ * Save the last line the agent spoke (trimmed to 500) and whether it was cut
+ * off (default false). Never throws: { ok, updated }.
+ */
+async function updateLastAgentLine(callSid, line, { cut = false } = {}) {
+  const text = String(line || '').trim().slice(0, LAST_AGENT_LINE_MAX);
+  if (!String(callSid || '').trim() || !text) return { ok: false, updated: 0, skipped: 'no_call_sid_or_line' };
+  return updateCallBySid('updateLastAgentLine', callSid, { last_agent_line: text, last_line_cut: cut === true });
+}
+
+/** Mark the last agent line cut (or not). Never throws: { ok, updated }. */
+async function markLastLineCut(callSid, cut = true) {
+  return updateCallBySid('markLastLineCut', callSid, { last_line_cut: cut === true });
+}
+
+/** The recording notice was heard on this call. Never throws: { ok, updated }. */
+async function markCallNoticeGiven(callSid) {
+  return updateCallBySid('markCallNoticeGiven', callSid, { notice_given: true });
+}
+
+const GREETING_PROBE_CALLS = 'greeted_at, last_agent_line, last_line_cut, notice_given, stream_seq, last_stream_at';
+const GREETING_PROBE_CONTACTS = 'last_language, last_language_at, name_confirmed';
+
+/**
+ * Read-only feature probe for greeting_language.sql: a limit 0 select of the
+ * new calls and contacts columns. { calls, contacts } booleans; false on a
+ * missing column or any error. Never throws, writes nothing.
+ */
+async function probeGreetingSchema() {
+  const probe = async (table, columns) => {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from(table).select(columns).limit(0);
+      if (error) {
+        warnCallPath('probeGreetingSchema', { table, error: error.message || String(error), hint: migrationHint(error.message) });
+        return false;
+      }
+      return true;
+    } catch (err) {
+      warnCallPath('probeGreetingSchema threw', { table, error: err?.message || String(err) });
+      return false;
+    }
+  };
+  const [calls, contacts] = await Promise.all([
+    probe('calls', GREETING_PROBE_CALLS),
+    probe('contacts', GREETING_PROBE_CONTACTS),
+  ]);
+  return { calls, contacts };
+}
+
+/**
+ * Count a new media stream for the call (atomic RPC bump_call_stream_seq).
+ * { ok:true, streamSeq } or { ok:true, streamSeq:null, missing:true } when no
+ * calls row; { ok:false, error } on failure. Never throws.
+ */
+async function bumpStreamSeq(callSid) {
+  const sid = String(callSid || '').trim();
+  if (!sid) return { ok: false, error: 'no_call_sid' };
+  if (!supabase) return { ok: false, error: 'no_supabase' };
+  try {
+    const { data, error } = await supabase.rpc('bump_call_stream_seq', { p_call_sid: sid });
+    if (error) {
+      const message = error.message || String(error);
+      warnCallPath('bumpStreamSeq failed', { callSid: sid, error: message, hint: migrationHint(message) });
+      return { ok: false, error: message };
+    }
+    const seq = Array.isArray(data) ? data[0] : data;
+    if (seq == null) return { ok: true, streamSeq: null, missing: true };
+    return { ok: true, streamSeq: Number(seq) };
+  } catch (err) {
+    warnCallPath('bumpStreamSeq threw', { callSid: sid, error: err?.message || String(err) });
+    return { ok: false, error: err?.message || String(err) };
+  }
 }
 
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
@@ -3008,6 +3428,16 @@ async function getTenantCatalogue(tenantId) {
 }
 
 module.exports = {
+  normalizeCallerLanguage,
+  saveCallerLanguage,
+  confirmCallerName,
+  markCallGreeted,
+  getCallResumeState,
+  updateLastAgentLine,
+  markLastLineCut,
+  markCallNoticeGiven,
+  probeGreetingSchema,
+  bumpStreamSeq,
   copyRecordingToStorage,
   listPendingRecordingCopies,
   listCallsForRecordingRetentionPurge,
