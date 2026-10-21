@@ -24,6 +24,7 @@ const {
 } = require('./greetingPcmCache');
 
 const { openingV2Enabled, openingWarmLines } = require('./callOpening');
+const crypto = require('crypto');
 
 const DEFAULT_SWEEP_MS = 5 * 60 * 1000;
 const LOOKAHEAD_MS = 15 * 60 * 1000;
@@ -80,6 +81,29 @@ function warmInstants(now = new Date(), lookaheadMs = LOOKAHEAD_MS) {
 }
 
 /**
+ * Everything one sweep's lines depend on: the greeting inputs at each warm
+ * instant (daypart, open/closed, bulletin closure included) plus the voice
+ * and lexicon the PCM is rendered with. Same signature + every key still
+ * cached = nothing to render or drop (VOICE_QUERY_BATCHING sweep skip).
+ */
+function sweepSignature(profile = {}, at = new Date()) {
+  const instants = warmInstants(at).map((when) => {
+    const { now: _now, ...inputs } = greetingInputs(profile, { now: when });
+    // VOICE_OPENING_V2 renders openingWarmLines (greeting text/language from
+    // #844, notice variants), so an edit there must change the signature too.
+    if (openingV2Enabled()) return { ...inputs, daypart: eatTimeOfDay(when), opening: openingWarmLinesAt(profile, when) };
+    return { ...inputs, daypart: eatTimeOfDay(when) };
+  });
+  const payload = JSON.stringify({
+    id: profile.id || null,
+    voice: profile.sonioxVoiceId || null,
+    lexicon: Array.isArray(profile.ttsLexicon) ? profile.ttsLexicon : [],
+    instants,
+  });
+  return crypto.createHash('sha1').update(payload).digest('hex');
+}
+
+/**
  * Render one greeting line into the cache with a standalone Soniox session.
  * @param {{ createSession: Function }} deps
  */
@@ -123,6 +147,7 @@ async function renderGreetingPcm({ text, profile, tenantId, createSession }) {
  * @param {{
  *   listTenantIds: () => Promise<string[]>,
  *   getProfile: (tenantId: string) => Promise<object>,
+ *   getProfiles?: (tenantIds: string[]) => Promise<Map<string, object>|null>,
  *   createSession: (opts: { voiceId?: string|null }) => object,
  *   now?: () => Date,
  *   sweepMs?: number,
@@ -137,6 +162,8 @@ function createGreetingWarmer(deps) {
   let timer = null;
   /** @type {Map<string, Promise<unknown>>} */
   const pending = new Map();
+  /** Last batched sweep per tenant: { sig, keys } (getProfiles only). */
+  const lastSweep = new Map();
 
   async function warmTenantNow(tenantId, profileIn) {
     const profile = profileIn || (await deps.getProfile(tenantId));
@@ -198,7 +225,40 @@ function createGreetingWarmer(deps) {
       log(`[greeting-warm] tenant list failed: ${err?.message || err}`);
       return [];
     }
-    return Promise.all(ids.map((id) => warmTenant(id)));
+    // VOICE_QUERY_BATCHING: one select for every tenant's greeting fields,
+    // and no render for a tenant whose lines are unchanged and still cached.
+    // getProfiles returns null when off or on any error: one profile each.
+    let profiles = null;
+    if (typeof deps.getProfiles === 'function') {
+      try {
+        profiles = await deps.getProfiles(ids);
+      } catch (err) {
+        log(`[greeting-warm] batch profile load failed: ${err?.message || err}`);
+        profiles = null;
+      }
+    }
+    if (!profiles) return Promise.all(ids.map((id) => warmTenant(id)));
+    const at = now();
+    let skipped = 0;
+    const jobs = ids.map((rawId) => {
+      const id = String(rawId || '').trim();
+      const profile = profiles.get(id);
+      if (!profile) return Promise.resolve({ tenantId: id, keys: [], rendered: 0, skipped: 'no_row' });
+      const sig = sweepSignature(profile, at);
+      const prev = lastSweep.get(id);
+      if (prev && prev.sig === sig && prev.keys.length && prev.keys.every((k) => hasGreetingPcm(k))) {
+        skipped += 1;
+        return Promise.resolve({ tenantId: id, keys: prev.keys, rendered: 0, skipped: 'unchanged' });
+      }
+      return warmTenant(id, profile).then((r) => {
+        if (r && Array.isArray(r.keys) && r.keys.length) lastSweep.set(id, { sig, keys: r.keys });
+        else lastSweep.delete(id);
+        return r;
+      });
+    });
+    const results = await Promise.all(jobs);
+    if (skipped) log(`[greeting-warm] sweep tenants=${ids.length} unchanged=${skipped}`);
+    return results;
   }
 
   function start() {
@@ -222,6 +282,7 @@ module.exports = {
   LOOKAHEAD_MS,
   greetingWarmEnabled,
   greetingInputs,
+  sweepSignature,
   warmInstants,
   renderGreetingPcm,
   createGreetingWarmer,
