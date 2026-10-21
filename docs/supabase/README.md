@@ -60,6 +60,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 5 | [`knowledge_acquisition_phase1.sql`](./knowledge_acquisition_phase1.sql) | `tenant_business_profile.sql` | `agent_name`, `team_directory`, `faqs` (+ tone) |
 | 6 | [`employee_training.sql`](./employee_training.sql) | `tenant_business_profile.sql` | `unknown_answer_fallback` |
 | 6a | [`unknown_answer_by_kind.sql`](./unknown_answer_by_kind.sql) | `employee_training.sql` | Per-type callback lines (`VOICE_FALLBACK_BY_KIND`). Rollback: [`unknown_answer_by_kind_down.sql`](./unknown_answer_by_kind_down.sql) |
+| 6b | [`tenants_unknown_answer_grant.sql`](./tenants_unknown_answer_grant.sql) | `unknown_answer_by_kind.sql`, `supabase/migrations/20261018233000_unknown_answer_spoken.sql` | `authenticated` UPDATE on `unknown_answer_spoken` + `unknown_answer_by_kind` (owner Policies save). Rollback line in the file header |
 | 7 | [`hours_schedule.sql`](./hours_schedule.sql) | `knowledge_acquisition_phase1.sql` | Structured weekly hours (live open/closed) |
 | 8 | [`services_catalog.sql`](./services_catalog.sql) | `knowledge_acquisition_phase1.sql` | Live services catalog JSON |
 | 9 | [`after_hours_mode.sql`](./after_hours_mode.sql) | `hours_schedule.sql` | `serve` \| `message` |
