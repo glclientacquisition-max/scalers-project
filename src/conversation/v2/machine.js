@@ -191,7 +191,7 @@ async function commit(state, p, handlers) {
       ok = Boolean(result && result.ok !== false); state.outcomes.push('complaint');
     }
   } catch (e) { ok = false; }
-  const rec = { tool: p.tool, action, ok, id: result?.id || null, service: p.service || null, when: p.when || null, items: p.items || null, pickup: p.pickup || null, row: p.row || null, kind: p.kind || null };
+  const rec = { tool: p.tool, action, ok, id: result?.id || null, service: p.service || null, when: p.when || null, items: p.items || null, pickup: p.pickup || null, row: p.row || null, kind: p.kind || null, place: p.place || null };
   state.receipts.push(rec);
   if (ok && (p.tool === 'create_booking' || p.tool === 'create_order') && s.name && handlers.saveCallerInfo) {
     const prior = state.file.contactName;
@@ -476,7 +476,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
   return out(st?.line || R.ask('intent', 1, lang));
 }
 
-function finishCall(state, { businessName, callerPhone }) {
+function finishCall(state, { businessName, callerPhone, profile = null } = {}) {
   const order = ['owner_only_change', 'complaint', 'booked', 'order_saved', 'moved', 'cancelled', 'handoff_callback'];
   let outcome = order.find((o) => state.outcomes.includes(o));
   const s = state.slots;
@@ -484,6 +484,8 @@ function finishCall(state, { businessName, callerPhone }) {
   const last = state.receipts[state.receipts.length - 1];
   const captured = { service: s.service || last?.service, when: (s.when.date || last?.when?.date) ? `${s.when.date || last.when.date} ${s.when.time || last?.when?.time || ''}` : null, place: s.place, items: (s.items.length ? s.items : last?.items || []).map((x) => `${x.qty || '?'} x ${x.name}`).join(', ') || null, booking: last?.row ? `${last.row.service} ${last.row.when.date}` : null };
   const intent = { booked: 'book', order_saved: 'order', moved: 'change', cancelled: 'cancel', owner_only_change: last?.kind === 'payment' ? 'payment_change' : 'address_change', complaint: 'complaint', handoff_callback: 'handoff' }[outcome] || state.intent || state.lastInfo || 'none';
-  return { outcome, ownerText: renderOwnerMessage({ businessName, callerPhone, name: s.name, intent, outcome, captured }) };
+  // A4: typed receipts for `call.summary.ready` (callSummaryEvent.js). Additive.
+  const summaryReceipts = require('./summaryReceipts').receiptsFromV2(state, profile || {});
+  return { outcome, ownerText: renderOwnerMessage({ businessName, callerPhone, name: s.name, intent, outcome, captured }), summaryReceipts, infoAnswered: Boolean(state.lastInfo) && !['greeting', 'who_are_you'].includes(state.lastInfo) };
 }
 module.exports = { createState, runTurn, finishCall };

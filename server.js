@@ -97,6 +97,7 @@ const MEDIA_CLOCKS = new WeakMap();
 const { brainV2ShadowEnabled, createBrainV2Shadow } = require('./src/conversation/v2Shadow');
 const { brainV2Enabled, brainV2Mode } = require('./src/conversation/v2/flag');
 const { createBrainV2Live } = require('./src/conversation/v2/liveTurn');
+const { finishCall: finishBrainV2Call } = require('./src/conversation/v2/machine');
 const voiceTraceBySid = new Map();
 
 function bindVoiceTrace(callSid, trace) {
@@ -214,6 +215,7 @@ const {
   reaskSlotLine,
 } = require('./src/conversation/callFixesD199');
 const { deriveCallSummary } = require('./src/conversation/callSummary');
+const callSummaryEvent = require('./src/conversation/callSummaryEvent');
 const {
   schedulePostCallTranscriptReview,
   sweepUnreviewedCalls,
@@ -279,6 +281,8 @@ const {
 const callAgentTools = new Map();
 /** Structured semantic state and actual runtime capabilities, keyed by callSid. */
 const callBrainStates = new Map();
+/** A4: BA v2 live runner per call, read at hangup for the call summary event. */
+const callBrainV2Lives = new Map();
 // Spoken transcript per live media call (rows pushed after the speech guard).
 // The hangup summary reads it when the webhook carries no turns (HD_cd0c01f28b05).
 const callSpokenTranscripts = new Map();
@@ -1299,6 +1303,39 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
   );
 }
 
+async function emitHangupCallSummary({ callSid, call, brainState, spokenTurns, derived, profile, source }) {
+  if (!callSummaryEvent.callSummaryEventEnabled()) return null;
+  try {
+    const v1Receipts = callSummaryEvent.receiptsFromV1({ brainState, turns: spokenTurns, profile });
+    // BA v2 live owned this call: its finishCall receipts win (mergeV2Receipts).
+    const v2State = callBrainV2Lives.get(callSid)?.getState?.() || null;
+    const v2Fin = v2State && v2State.turn > 0
+      ? finishBrainV2Call(v2State, { businessName: profile?.businessName || '', callerPhone: call?.caller_number || null, profile })
+      : null;
+    const receipts = v2Fin ? callSummaryEvent.mergeV2Receipts(v2Fin.summaryReceipts, v1Receipts) : v1Receipts;
+    const answeredQs = Array.isArray(derived?.answeredQuestions) ? derived.answeredQuestions.length : 0;
+    const built = callSummaryEvent.buildCallSummaryEvent({
+      path: v2Fin ? 'v2' : 'v1',
+      callLanguage: (v2Fin && v2State.lang) || brainState?.language?.current,
+      callId: call?.id || callSid,
+      tenantId: call?.tenant_id || profile?.id || null,
+      answered: true,
+      infoAnswered: answeredQs > 0 || Boolean(brainState?.conversation?.catalogueAnswered) || Boolean(v2Fin?.infoAnswered),
+      caller: { name: (v2Fin && v2State.slots?.name) || callSummaryEvent.v1CallerName(brainState), e164: call?.caller_number || brainState?.caller?.phone || null },
+      receipts,
+    });
+    if (!built.ok) {
+      console.warn(`[${source}] call summary event invalid ${callSid}: ${built.errors.join('; ')}`);
+      return null;
+    }
+    await callSummaryEvent.emitCallSummaryEvent(built.event, { db, callSid });
+    return built.event;
+  } catch (err) {
+    console.warn(`[${source}] call summary event failed ${callSid}:`, err?.message || err);
+    return null;
+  }
+}
+
 async function writeHangupSummary(callSid, source, opts, brainState) {
   try {
     const call = await db.getCall(callSid);
@@ -1361,6 +1398,9 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
       );
     }
     const profile = callTenantProfiles.get(callSid) || {};
+    // A4 (CALL_SUMMARY_EVENT, off by default): one typed owner-summary event
+    // per call for Ops' sender. Off = nothing here runs; owner SMS unchanged.
+    await emitHangupCallSummary({ callSid, call, brainState, spokenTurns, derived, profile, source });
     if (opts.review !== false) {
       schedulePostCallTranscriptReview({
         callSid,
@@ -3802,6 +3842,7 @@ mediaWss.on('connection', (ws, req) => {
                 openRows: Array.isArray(mem.openRows) ? mem.openRows : [],
               },
             });
+            if (callKey) callBrainV2Lives.set(callKey, brainV2Live);
           }
           const live = await brainV2Live.run({
             text: clean,
@@ -5828,6 +5869,7 @@ mediaWss.on('connection', (ws, req) => {
         .finally(() => {
           callAgentTools.delete(sessionCallSid);
           callBrainStates.delete(sessionCallSid);
+          callBrainV2Lives.delete(sessionCallSid);
           callSpokenTranscripts.delete(sessionCallSid);
           callBrainCapabilities.delete(sessionCallSid);
           callTenantProfiles.delete(sessionCallSid);
