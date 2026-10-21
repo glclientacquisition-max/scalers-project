@@ -2038,9 +2038,9 @@ async function getCallerMemory({ tenantId, phone } = {}) {
   // greeting_language.sql (13c) adds last_language + last_language_at. A
   // database without it re-selects the older list.
   let { data: contact, error: findErr } = await findContact(
-    'id, name, notes, last_reason, phone, metadata, last_language, last_language_at'
+    'id, name, notes, last_reason, phone, metadata, last_language, last_language_at, name_confirmed, name_confirmed_at'
   );
-  if (findErr && /last_language/i.test(findErr.message || '')) {
+  if (findErr && /last_language|name_confirmed/i.test(findErr.message || '')) {
     ({ data: contact, error: findErr } = await findContact(
       'id, name, notes, last_reason, phone, metadata'
     ));
@@ -2086,6 +2086,9 @@ async function getCallerMemory({ tenantId, phone } = {}) {
     // Caller's last settled language (en | sw), null when never saved.
     card.lastLanguage = normalizeCallerLanguage(contact.last_language);
     card.lastLanguageAt = card.lastLanguage ? contact.last_language_at || null : null;
+    // callOpening.js speaks the name only when a past call confirmed it.
+    card.nameConfirmed = contact.name_confirmed === true;
+    card.nameConfirmedAt = card.nameConfirmed ? contact.name_confirmed_at || null : null;
   }
   return card;
 }
@@ -2137,6 +2140,188 @@ async function saveCallerLanguage({ tenantId, phone, language } = {}) {
       JSON.stringify({ tenantId, language: lang, error: err?.message || String(err) })
     );
     return { ok: false, updated: 0, error: err?.message || String(err) };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Caller name confirmed + per-call opening resume state (greeting_language.sql).
+// None of these throw: the call path gets { ok:false, error } and a warning.
+
+const NAME_CONFIRMED_SOURCES = new Set(['readback_yes', 'owner_edit']);
+const LAST_AGENT_LINE_MAX = 500;
+const RESUME_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function warnCallPath(event, fields) {
+  try {
+    console.warn(`[db] ${event}`, JSON.stringify(fields));
+  } catch {
+    console.warn(`[db] ${event}`);
+  }
+}
+
+function migrationHint(message) {
+  return /greeted_at|last_agent_line|notice_given|stream_seq|last_stream_at|name_confirmed|bump_call_stream_seq/i.test(
+    message || ''
+  )
+    ? 'apply greeting_language.sql'
+    : undefined;
+}
+
+/**
+ * Save a caller-confirmed name (Brain v2 save_caller_name after readback_yes).
+ * Sets name + name_confirmed, _at, _source, _call_id in one update on the
+ * existing contact. The contacts_name_confirmed_reset trigger keeps these
+ * because name_confirmed_at changes in the same statement. Never throws.
+ */
+async function confirmCallerName({ tenantId, phone, name, source = 'readback_yes', callId } = {}) {
+  const phoneNorm = normalizeStoredPhone(phone);
+  const nameNorm = String(name || '').trim();
+  if (!tenantId || !phoneNorm) return { ok: false, updated: 0, skipped: 'no_tenant_or_phone' };
+  if (!nameNorm) return { ok: false, updated: 0, skipped: 'no_name' };
+  if (!NAME_CONFIRMED_SOURCES.has(source)) return { ok: false, updated: 0, error: `invalid_source:${source}` };
+  if (!supabase) return { ok: false, updated: 0, skipped: 'no_supabase' };
+  const callUuid = RESUME_UUID_RE.test(String(callId || '')) ? String(callId) : null;
+  try {
+    const { data, error } = await supabase
+      .from('contacts')
+      .update({
+        name: nameNorm,
+        name_confirmed: true,
+        name_confirmed_at: new Date().toISOString(),
+        name_confirmed_source: source,
+        name_confirmed_call_id: callUuid,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('tenant_id', tenantId)
+      .in('phone', storedPhoneLookupKeys(phoneNorm))
+      .select('id');
+    if (error) {
+      const message = error.message || String(error);
+      warnCallPath('confirmCallerName failed', { tenantId, source, error: message, hint: migrationHint(message) });
+      return { ok: false, updated: 0, error: message };
+    }
+    return { ok: true, updated: Array.isArray(data) ? data.length : 0 };
+  } catch (err) {
+    warnCallPath('confirmCallerName threw', { tenantId, source, error: err?.message || String(err) });
+    return { ok: false, updated: 0, error: err?.message || String(err) };
+  }
+}
+
+/**
+ * Claim the greeting for one call across replicas: sets greeted_at = now()
+ * only where it is still null. won=true for exactly one caller.
+ * { ok:true, won:false, greetedAt } when already greeted; { ok:true, won:false,
+ * missing:true } when no calls row; { ok:false, won:null, error } on failure
+ * (Voice should fail open and greet). Never throws.
+ */
+async function markCallGreeted({ callSid, lastAgentLine, noticeGiven } = {}) {
+  const sid = String(callSid || '').trim();
+  if (!sid) return { ok: false, won: null, error: 'no_call_sid' };
+  if (!supabase) return { ok: false, won: null, error: 'no_supabase' };
+  const now = new Date().toISOString();
+  const patch = { greeted_at: now };
+  const line = String(lastAgentLine || '').trim();
+  if (line) patch.last_agent_line = line.slice(0, LAST_AGENT_LINE_MAX);
+  if (noticeGiven === true) patch.notice_given = true;
+  try {
+    const { data, error } = await supabase
+      .from('calls')
+      .update(patch)
+      .eq('sautikit_call_sid', sid)
+      .is('greeted_at', null)
+      .select('greeted_at');
+    if (error) {
+      const message = error.message || String(error);
+      warnCallPath('markCallGreeted failed', { callSid: sid, error: message, hint: migrationHint(message) });
+      return { ok: false, won: null, error: message };
+    }
+    if (Array.isArray(data) && data.length > 0) return { ok: true, won: true, greetedAt: data[0].greeted_at || now };
+    const state = await getCallResumeState(sid);
+    if (!state) return { ok: true, won: false, missing: true };
+    return { ok: true, won: false, greetedAt: state.greetedAt };
+  } catch (err) {
+    warnCallPath('markCallGreeted threw', { callSid: sid, error: err?.message || String(err) });
+    return { ok: false, won: null, error: err?.message || String(err) };
+  }
+}
+
+/**
+ * Opening resume state for a call: { greetedAt, lastAgentLine, noticeGiven,
+ * streamSeq, lastStreamAt }, or null when there is no calls row or on error.
+ */
+async function getCallResumeState(callSid) {
+  const sid = String(callSid || '').trim();
+  if (!sid || !supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('calls')
+      .select('greeted_at, last_agent_line, notice_given, stream_seq, last_stream_at')
+      .eq('sautikit_call_sid', sid)
+      .maybeSingle();
+    if (error) {
+      const message = error.message || String(error);
+      warnCallPath('getCallResumeState failed', { callSid: sid, error: message, hint: migrationHint(message) });
+      return null;
+    }
+    if (!data) return null;
+    return {
+      greetedAt: data.greeted_at || null,
+      lastAgentLine: data.last_agent_line || null,
+      noticeGiven: data.notice_given === true,
+      streamSeq: Number.isFinite(Number(data.stream_seq)) ? Number(data.stream_seq) : 0,
+      lastStreamAt: data.last_stream_at || null,
+    };
+  } catch (err) {
+    warnCallPath('getCallResumeState threw', { callSid: sid, error: err?.message || String(err) });
+    return null;
+  }
+}
+
+/** Save the last line the agent spoke (trimmed to 500). Never throws. */
+async function updateLastAgentLine(callSid, line) {
+  const sid = String(callSid || '').trim();
+  const text = String(line || '').trim().slice(0, LAST_AGENT_LINE_MAX);
+  if (!sid || !text) return { ok: false, skipped: 'no_call_sid_or_line' };
+  if (!supabase) return { ok: false, skipped: 'no_supabase' };
+  try {
+    const { error } = await supabase
+      .from('calls')
+      .update({ last_agent_line: text })
+      .eq('sautikit_call_sid', sid);
+    if (error) {
+      const message = error.message || String(error);
+      warnCallPath('updateLastAgentLine failed', { callSid: sid, error: message, hint: migrationHint(message) });
+      return { ok: false, error: message };
+    }
+    return { ok: true };
+  } catch (err) {
+    warnCallPath('updateLastAgentLine threw', { callSid: sid, error: err?.message || String(err) });
+    return { ok: false, error: err?.message || String(err) };
+  }
+}
+
+/**
+ * Count a new media stream for the call (atomic RPC bump_call_stream_seq).
+ * { ok:true, streamSeq } or { ok:true, streamSeq:null, missing:true } when no
+ * calls row; { ok:false, error } on failure. Never throws.
+ */
+async function bumpStreamSeq(callSid) {
+  const sid = String(callSid || '').trim();
+  if (!sid) return { ok: false, error: 'no_call_sid' };
+  if (!supabase) return { ok: false, error: 'no_supabase' };
+  try {
+    const { data, error } = await supabase.rpc('bump_call_stream_seq', { p_call_sid: sid });
+    if (error) {
+      const message = error.message || String(error);
+      warnCallPath('bumpStreamSeq failed', { callSid: sid, error: message, hint: migrationHint(message) });
+      return { ok: false, error: message };
+    }
+    const seq = Array.isArray(data) ? data[0] : data;
+    if (seq == null) return { ok: true, streamSeq: null, missing: true };
+    return { ok: true, streamSeq: Number(seq) };
+  } catch (err) {
+    warnCallPath('bumpStreamSeq threw', { callSid: sid, error: err?.message || String(err) });
+    return { ok: false, error: err?.message || String(err) };
   }
 }
 
@@ -3075,6 +3260,11 @@ async function getTenantCatalogue(tenantId) {
 module.exports = {
   normalizeCallerLanguage,
   saveCallerLanguage,
+  confirmCallerName,
+  markCallGreeted,
+  getCallResumeState,
+  updateLastAgentLine,
+  bumpStreamSeq,
   copyRecordingToStorage,
   listPendingRecordingCopies,
   listCallsForRecordingRetentionPurge,

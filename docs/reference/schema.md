@@ -29,9 +29,9 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_rate_card` | `annual_discount_percent`, `email_kes`, `id`, `inbound_kes_per_second`, `outbound_kes_per_second`, `sms_kes`, `updated_at`, `whatsapp_kes` | `docs/supabase/package_catalog.sql` |
 | `billing_receipt_counters` | `last_number`, `year` | `docs/supabase/invoice_documents.sql` |
 | `call_facts` | `call_id`, `caller_area`, `competitor_mentioned`, `confidence`, `created_at`, `dow`, `est_value_ksh`, `hour_eat`, `intent`, `language`, `lost_reason`, `model`, `objection_price_ksh`, `outcome`, `owner_corrected_at`, `owner_corrected_by`, `price_objection`, `products_mentioned`, `review_snapshot`, `secondary_intents`, `sentiment`, `source`, `tenant_id`, `time_of_day`, `unanswered_question`, `updated_at` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
-| `calls` | `ai_processing_minutes`, `caller_number`, `created_at`, `duration_seconds`, `id`, `inbox_assignee`, `inbox_assignee_name`, `inbox_assignee_phone`, `inbox_labels`, `inbox_muted`, `inbox_pinned_at`, `inbox_read_at`, `inbox_snoozed_until`, `lead_status`, `package_seconds_applied`, `primary_intent`, `recording_url`, `resolution`, `resolution_note`, `sautikit_call_sid`, `sentiment`, `status`, `summary`, `tenant_id` | `docs/supabase/call_resolution.sql`<br>`docs/supabase/calls_inbox_assignee.sql`<br>`docs/supabase/foundation_bootstrap.sql`<br>`docs/supabase/inbox_triage.sql`<br>`docs/supabase/lead_status.sql`<br>`docs/supabase/package_minute_consume.sql`<br>`docs/supabase/wallet_metering.sql` |
+| `calls` | `ai_processing_minutes`, `caller_number`, `created_at`, `duration_seconds`, `greeted_at`, `id`, `inbox_assignee`, `inbox_assignee_name`, `inbox_assignee_phone`, `inbox_labels`, `inbox_muted`, `inbox_pinned_at`, `inbox_read_at`, `inbox_snoozed_until`, `last_agent_line`, `last_stream_at`, `lead_status`, `notice_given`, `package_seconds_applied`, `primary_intent`, `recording_url`, `resolution`, `resolution_note`, `sautikit_call_sid`, `sentiment`, `status`, `stream_seq`, `summary`, `tenant_id` | `docs/supabase/call_resolution.sql`<br>`docs/supabase/calls_inbox_assignee.sql`<br>`docs/supabase/foundation_bootstrap.sql`<br>`docs/supabase/greeting_language.sql`<br>`docs/supabase/inbox_triage.sql`<br>`docs/supabase/lead_status.sql`<br>`docs/supabase/package_minute_consume.sql`<br>`docs/supabase/wallet_metering.sql` |
 | `catalogue_price_history` | `amount_ksh`, `confirmed`, `effective_from`, `id`, `in_stock`, `item_key`, `item_name`, `kind`, `max_ksh`, `min_ksh`, `mode`, `source`, `tenant_id`, `unit` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
-| `contacts` | `created_at`, `id`, `last_language`, `last_language_at`, `last_reason`, `metadata`, `name`, `notes`, `phone`, `tenant_id`, `updated_at` | `docs/supabase/contacts_and_requests.sql`<br>`docs/supabase/greeting_language.sql` |
+| `contacts` | `created_at`, `id`, `last_language`, `last_language_at`, `last_reason`, `metadata`, `name`, `name_confirmed`, `name_confirmed_at`, `name_confirmed_call_id`, `name_confirmed_source`, `notes`, `phone`, `tenant_id`, `updated_at` | `docs/supabase/contacts_and_requests.sql`<br>`docs/supabase/greeting_language.sql` |
 | `data_quality_snapshots` | `report`, `taken_on`, `tenant_id` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `invoice_lines` | `amount_kes`, `description`, `id`, `invoice_id`, `kind`, `quantity`, `sort_order`, `tenant_id`, `unit_amount_kes` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_documents.sql` |
 | `invoice_pay_tokens` | `created_at`, `expires_at`, `id`, `invoice_id`, `revoked_at`, `tenant_id`, `token_hash` | `docs/supabase/invoice_pay.sql` |
@@ -76,7 +76,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (223)
+## Functions (225)
 
 | Function | Defined in |
 | --- | --- |
@@ -182,6 +182,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_spend_allows_charge` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_spend_limit_kes` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_version_price_kes` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
+| `bump_call_stream_seq` | `docs/supabase/greeting_language.sql` |
 | `call_setup_valid` | `supabase/migrations/20261018130000_tenant_call_setup.sql` |
 | `charge_call_to_wallet` | `docs/supabase/fix_charge_call_wallet_ambiguous.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_on_demand_alerts.sql` |
 | `claim_billing_notices` | `docs/supabase/billing_data_layer.sql` |
@@ -191,6 +192,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `confirm_tenant_fields` | `docs/supabase/tenant_field_confirm_v2.sql` |
 | `consume_call_seconds` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/package_minute_consume.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `consume_sms_units` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/package_minute_consume.sql`<br>`docs/supabase/prod/owner_billing_actions.sql`<br>`docs/supabase/sms_allowance.sql` |
+| `contacts_name_confirmed_reset` | `docs/supabase/greeting_language.sql` |
 | `correct_call_facts` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012210000_three_features.sql` |
 | `create_invoice_pay_attempt` | `docs/supabase/invoice_pay.sql`<br>`docs/supabase/invoice_pay_checkout_review.sql`<br>`docs/supabase/invoice_pay_collections.sql`<br>`docs/supabase/invoice_pay_held.sql`<br>`docs/supabase/invoice_pay_session.sql` |
 | `create_tenant_invite` | `supabase/migrations/20261011000000_team_invites.sql` |
