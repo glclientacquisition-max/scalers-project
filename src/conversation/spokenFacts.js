@@ -209,7 +209,10 @@ function compileSpokenPolicies(profile = {}) {
 
 function compileSpokenFaqs(profile = {}, opts = {}) {
   const cap = Number.isFinite(opts.limit) && opts.limit > 0 ? opts.limit : 4;
-  const rows = (Array.isArray(profile.faqs) ? profile.faqs : [])
+  // Same gate as the CONFIRMED FAQs block (GIGO #572): a seed or unconfirmed
+  // FAQ is not a fact, so it is never given a spoken form either.
+  const { factFaqs } = require('./provenance');
+  const rows = factFaqs(profile.faqs, profile.fieldMeta || null)
     .map((row) => ({
       question: String(row?.question || '').trim(),
       answer: String(row?.answer || '').trim(),
