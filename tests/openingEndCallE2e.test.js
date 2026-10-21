@@ -4,8 +4,9 @@
 // tests/helpers/endCallSim.js); on #843 alone it is skipped, and
 // tests/openingV2E2e.test.js covers the unchanged close there.
 //
-// Real server.js under tests/helpers/openingSim.js + tests/helpers/endCallSim.js
-// (each spoken line plays MEDIA_SIM_LINE_MS of PCM at the far end). A local
+// Real server.js under tests/helpers/openingSim.js + tests/helpers/endCallSim.js.
+// The ladder lines play from the greeting PCM cache (OPENING_SIM_PCM_MS long);
+// a live-TTS line would play MEDIA_SIM_LINE_MS. Both are LINE_MS here. A local
 // HTTP server stands in for the SautiKit REST API and records hangups.
 //
 // Run: node --test tests/openingEndCallE2e.test.js   (Node 22)
@@ -86,6 +87,7 @@ async function startServer(extraEnv, sautikitBase) {
     VOICE_OPENING_V2: 'on',
     VOICE_OPENING_SILENCE_MS: '600,900,900',
     MEDIA_SIM_LINE_MS: String(LINE_MS),
+    OPENING_SIM_PCM_MS: String(LINE_MS),
     ...extraEnv,
   };
   const child = fork(path.join(ROOT, 'server.js'), [], {
@@ -126,12 +128,17 @@ async function silentCall(srv, rest, sid) {
   const greeting = await waitFor(srv.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] greeting mode=`), 15000);
   assert.ok(greeting, `${sid}: greeting never played`);
   // The caller never speaks: invite, Halo? invite, goodbye.
-  const goodbye = await waitFor(
+  // The goodbye starts playing: cached clip (opening_line cached=1) or live TTS.
+  const hit = await waitFor(
     srv.events,
-    (e) => e.ev === 'speak' && String(e.callSid || '') === sid && String(e.text || '').includes('Kwaheri'),
-    15000
+    (e) =>
+      (e.ev === 'speak' && String(e.callSid || '') === sid && String(e.text || '').includes('Kwaheri')) ||
+      (e.ev === 'log' && e.line.includes(`[ws/media][${sid}] opening_line cached=`) && e.line.includes('Kwaheri')),
+    20000
   );
-  await waitFor([0], () => Boolean(closed), 10000);
+  const goodbye = hit && { t: hit.t, text: hit.ev === 'speak' ? hit.text : hit.line.split(': ').slice(1).join(': ') };
+  const deadline = Date.now() + 10000;
+  while (!closed && Date.now() < deadline) await sleep(20);
   await sleep(1200); // anything late (a second hangup, an outage alert) shows up here
   if (ws.readyState === WebSocket.OPEN) ws.close();
   return {
