@@ -177,7 +177,7 @@ function propose(state, p) {
   if (csOn()) {
     if (p.tool === 'create_handoff') {
       p.phone = p.phone || state.callerPhone || null; p.phoneSaid = CS.sayPhone(p.phone);
-      const w = state.intent === 'handoff' && (state.slots.when.date || state.slots.when.time) ? { ...state.slots.when } : null;
+      const w = p.callbackAt ? { ...p.callbackAt } : state.intent === 'handoff' && (state.slots.when.date || state.slots.when.time) ? { ...state.slots.when } : null;
       p.callbackWhen = CS.callbackWhen({ profile: state.profileRef || {}, now: state.now || new Date(), when: w, L });
     }
     p.issuedTurn = state.turn; p.slotHash = CS.slotHash(p); p.token = `ct_${p.slotHash.slice(0, 8)}_${state.turn}x${state.tokenSeq}`;
@@ -408,9 +408,9 @@ function resetIntent(state) {
 
 function echoAffirms(p, u) {
   if (u.negation || u.no) return false;
-  // Alvin (15 Oct): the caller repeating the read-back TIME exactly ("saa 4", "Uh, 10am") is a yes; a day alone is not
-  if ((p.tool === 'create_booking' || p.tool === 'update_booking') && u.when && u.when.time && u.when.time === p.when.time && (!u.when.date || u.when.date === p.when.date)) return true;
-  return false;
+  // Alvin (15 Oct): the caller repeating the read-back TIME exactly ("saa 4", "Uh, 10am") is a yes; a day alone is not.
+  // One shared rule for every read-back that states a time (CS.timeEcho), not a per-tool copy.
+  return CS.timeEcho(p, u) === 'same';
 }
 function pendingChanged(p, state) {
   const s = state.slots;
@@ -440,10 +440,18 @@ async function confirmSafe(state, u, profile, handlers, out, results, myTurn = s
     return null;
   }
   const nextTurn = myTurn === p.issuedTurn + 1;
-  const yesDone = u.done && /^\W*(yes|ndio|ndiyo)\b/i.test(u.text) && !/\?|\b(but|lakini|ila|wait|ngoja|subiri|no|hapana)\b/i.test(u.text);
-  // a repeat of the read-back time is a yes (Alvin's rule); the same time asked as a question is not
-  const echo = echoAffirms(p, u) && !/\?|\b(is it|will it|ni saa|je|but|lakini|ila|wait|ngoja)\b/i.test(u.text);
-  const yes = !u.no && !u.negation && (CS.explicitYes(u.text) || yesDone || echo);
+  // the shared read-back classifier (Alvin's rule): exact repeat of the read-back time = yes, a different
+  // time = change, "okay wait" / a question = unclear (one re-ask)
+  const ans = CS.readbackAnswer(p, u);
+  const yesDone = ans.done;
+  const yes = ans.kind === 'yes';
+  if (ans.kind === 'change' && p.tool === 'create_handoff') {
+    // a different callback time re-proposes with that time (bookings re-propose through the slot diff above)
+    const rt = CS.readbackTime(p) || {};
+    state.record?.('rejected', p, { errorCode: 'slot_diff' });
+    const at = { date: u.when.date || rt.date || null, time: u.when.time || null };
+    return out(propose(state, { ...p, callbackAt: at }));
+  }
   if (yes && nextTurn) {
     state.pending = null; state.phase = 'committing'; // consumed before any await: a second yes cannot redeem it
     state.record?.('confirmed', p, { confirmedTurn: state.turn });
