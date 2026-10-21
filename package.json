@@ -35,7 +35,7 @@
     "test:dead-air": "node --test tests/greetingPreroll.test.js tests/turnEndCompleteQuestion.test.js tests/toolHoldDeferred.test.js tests/spokenAddress.test.js tests/notifyOutcome.test.js tests/inboundFastPath.test.js tests/inboundDirectoryLineState.test.js tests/greetingWarm.test.js tests/prodDeadAirReplay.test.js",
     "test:interim": "node tests/interimBarge.test.js",
     "test:stt-context": "node tests/sttContext.test.js",
-    "test:gemini-voice": "node --test tests/geminiVoice.test.js tests/geminiProviderHealth.test.js tests/spokenChunkPath.test.js",
+    "test:gemini-voice": "node --test tests/geminiVoice.test.js tests/geminiProviderHealth.test.js tests/spokenChunkPath.test.js tests/promptCachePrefix.test.js tests/geminiUsage.test.js",
     "test:live-transfer": "node --test tests/liveTransferXml.test.js tests/liveTransferLegs.test.js",
     "test:caller-file-voice": "node --test tests/callerFileVoice.test.js tests/hdSpeakReplay.test.js",
     "test:prompt-facts": "node --test tests/tenantPromptFacts.test.js tests/areaFees.test.js",

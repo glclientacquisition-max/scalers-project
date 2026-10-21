@@ -295,6 +295,12 @@ CLI version timestamps are **INFERRED** from version string `YYYYMMDDHHMMSS` (UT
 | --- | --- | --- |
 | `supabase/migrations/20261011000000_team_invites.sql` | Roles owner/admin/staff/viewer (member→staff), one owner per tenant, `tenant_invites`, `tenant_member_audit`, seat/invite/accept/transfer RPCs, restrictive RLS (owner/admin settings; viewer read-only), signup trigger skips invitees. | **Not applied.** Staging first. App flag `TEAM_INVITES_ENABLED` default off. Re-check `handle_new_user_tenant` body against production before applying. |
 
+
+## Pending (not applied): call usage
+
+| File | Purpose | Status |
+| --- | --- | --- |
+| `supabase/migrations/20261018230000_call_usage.sql` | `public.call_usage`: Gemini tokens per voice media session (input, cached, uncached input, output, thinking, tool use, requests, models). RLS on, service role only. Written best effort by `src/conversation/geminiUsage.js`. | **Not applied** on staging or production. Staging first. Production waits for the owner's OK and a backup. Voice runs without it: one warning, then the `[usage]` log line only. Kill switches: `CALL_USAGE_PERSIST=off`, `CALL_USAGE_LOG=off`. |
 ---
 
 ## Recorded drift (18 Oct 2026)
