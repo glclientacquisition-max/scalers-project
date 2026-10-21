@@ -9,6 +9,8 @@ import {
   inboxTogglePin as writeInboxPin,
 } from "@/app/(desk)/calls/inboxTriageActions";
 import { inboxBulkAction } from "@/app/(desk)/calls/bulkActions";
+import { inboxArchiveCallsAction, inboxUndoArchiveAction } from "@/app/(desk)/calls/archiveActions";
+import { sendInboxArchive, sendInboxCascadeUndo } from "@/lib/inboxArchiveCascade";
 import { sendInboxArchiveUndo, sendInboxBulk, type InboxBulkKind } from "@/lib/inboxBulk";
 import type { InboxItem } from "@/lib/inboxPurpose";
 
@@ -29,11 +31,55 @@ export async function inboxWhatsAppFollowUp(item: InboxItem) {
   return logWhatsAppFollowUp(item.callId);
 }
 
-/** Same handler as ticket Archive (`MarkLeadArchiveButton` → `updateLeadStatus`). */
-export async function inboxArchive(item: InboxItem) {
+export type InboxArchiveOne = {
+  ok?: boolean;
+  error?: string;
+  /** The call was archived by this request (false: it already was). */
+  archived?: boolean;
+  /** Undo record (cascade). Null on the calls-only fallback. */
+  undoId?: string | null;
+  /** Open requests archived with the call beyond this row's own. */
+  extraRequestIds?: string[];
+};
+
+/**
+ * Row menu Archive: archive this row's call and its open holds and visits in
+ * one transaction (inbox_archive_calls), same server action as the bulk bar
+ * and the ticket menu.
+ */
+export async function inboxArchive(item: InboxItem): Promise<InboxArchiveOne> {
   if (!item.callId) return { error: "Missing call." };
-  if (isDeskHarness()) return { ok: true };
-  return updateLeadStatus(item.callId, "archived");
+  if (isDeskHarness()) return { ok: true, archived: true, undoId: null, extraRequestIds: [] };
+  const own = new Set([item.hold?.id, item.job?.id].filter(Boolean) as string[]);
+  return inboxArchiveCall(item.callId, own);
+}
+
+/** Archive one call (row menu, ticket menu). `own`: request ids not counted as "plus". */
+export async function inboxArchiveCall(callId: string, own: ReadonlySet<string> = new Set()): Promise<InboxArchiveOne> {
+  const res = await inboxArchiveCallsAction([callId]);
+  if (res.error) return { error: res.error };
+  const flagged = [...(res.holds || []), ...(res.visits || [])];
+  return {
+    ok: true,
+    archived: (res.updatedIds || []).includes(callId),
+    undoId: res.mode === "cascade" ? res.undoId ?? null : null,
+    extraRequestIds: flagged.filter((id) => !own.has(id)),
+  };
+}
+
+/** Bulk Archive: one server request (inbox_archive_calls) for every selected row. */
+export async function inboxArchiveItems(items: InboxItem[]) {
+  return sendInboxArchive(items, inboxArchiveCallsAction, { harness: isDeskHarness() });
+}
+
+/** Archive Undo with the server's undo record: calls and their requests in one transaction. */
+export async function inboxUndoArchiveCascade(payload: {
+  undoId: string;
+  rows: Array<{ id: string; callId: string }>;
+  requests?: Array<{ id: string; callId: string }>;
+  extraRequestIds?: string[];
+}) {
+  return sendInboxCascadeUndo(payload, inboxUndoArchiveAction);
 }
 
 /** Same handler as list Confirm (`InboxJobActions` → `updateAppointmentStatus`). */
@@ -69,7 +115,7 @@ export async function inboxBulk(kind: InboxBulkKind, items: InboxItem[]) {
   return sendInboxBulk(kind, items, inboxBulkAction, { harness: isDeskHarness() });
 }
 
-/** Archive Undo: every archived call back to New in one request. */
+/** Archive Undo without an undo record (calls-only fallback): every archived call back to New in one request. */
 export async function inboxUndoArchive(rows: Array<{ id: string; callId: string }>) {
   return sendInboxArchiveUndo(rows, inboxBulkAction);
 }

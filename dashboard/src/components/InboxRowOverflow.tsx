@@ -122,9 +122,10 @@ export function InboxRowShell({
     setError(null);
     const view = inboxItemWithLocal(item, local);
     let res: { error?: string; ok?: boolean } = { ok: true };
+    let archivedNow: Awaited<ReturnType<typeof inboxArchive>> | null = null;
     if (id === "pin" || id === "unpin") res = await inboxTogglePin(view);
     if (id === "mark_done") res = await inboxMarkDone(item);
-    if (id === "archive") res = await inboxArchive(item);
+    if (id === "archive") res = archivedNow = await inboxArchive(item);
     if (id === "unarchive") res = await inboxUnarchive(item);
     busyRef.current = false;
     setPendingId(null);
@@ -132,8 +133,12 @@ export function InboxRowShell({
       setError(res.error);
       return;
     }
-    if (id === "archive" && item.callId) {
-      writeInboxArchiveUndo([{ id: item.id, callId: item.callId }]);
+    if (id === "archive" && item.callId && archivedNow?.archived !== false) {
+      // Call plus its open requests (one transaction); Undo uses the record.
+      writeInboxArchiveUndo([{ id: item.id, callId: item.callId }], undefined, undefined, {
+        undoId: archivedNow?.undoId,
+        extraRequestIds: archivedNow?.extraRequestIds,
+      });
     }
     if (id === "archive" || id === "unarchive") {
       patch({ hidden: true });

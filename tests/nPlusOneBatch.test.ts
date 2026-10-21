@@ -269,7 +269,7 @@ test("inbox wiring: the bar and Undo call the bulk action, not a per-row loop", 
   const select = src("components/InboxRowSelect.tsx");
   assert.match(select, /await inboxBulk\(kind, chosen\)/);
   // Undo is offered for applied rows only; leftovers stay selected with the reason.
-  assert.match(select, /res\.applied\s*\.filter\(\(target\) => target\.callId\)/);
+  assert.match(select, /archive\.applied\s*\.filter\(\(target\) => target\.callId\)/);
   assert.match(select, /replace\(left\)/);
   assert.match(select, /inboxBulkOutcomeText\(kind, res\)/);
   assert.doesNotMatch(select, /for \(const item of chosen\)/);

@@ -8,8 +8,21 @@ export type InboxArchiveUndoRow = {
 };
 
 export type InboxArchiveUndoPayload = {
+  /** Call rows archived (the toast counts these). */
   rows: InboxArchiveUndoRow[];
   expiresAt: number;
+  /** inbox_archive_undo id (cascade). Absent: Undo sends the calls back to New (#860 path). */
+  undoId?: string;
+  /** Selected request rows archived with their call (hidden with it, back with it). */
+  requests?: InboxArchiveUndoRow[];
+  /** Open requests archived with the calls beyond the one on each call row. */
+  extraRequestIds?: string[];
+};
+
+export type InboxArchiveUndoExtra = {
+  undoId?: string | null;
+  requests?: InboxArchiveUndoRow[];
+  extraRequestIds?: string[];
 };
 
 export type InboxArchiveUndoStore = {
@@ -27,7 +40,19 @@ function browserStore(): InboxArchiveUndoStore | null {
   }
 }
 
-export function inboxArchiveUndoLabel(count: number): string {
+/**
+ * Toast label. `extraRequests`: open requests archived with the calls (one
+ * transaction, inbox_archive_calls), e.g. "29 archived, plus 1 open request
+ * on the same call".
+ */
+export function inboxArchiveUndoLabel(count: number, extraRequests = 0): string {
+  const head = archivedHead(count);
+  if (extraRequests <= 0) return head;
+  const where = count > 1 && extraRequests > 1 ? "the same calls" : "the same call";
+  return `${head}, plus ${extraRequests} open ${extraRequests === 1 ? "request" : "requests"} on ${where}`;
+}
+
+function archivedHead(count: number): string {
   if (count <= 1) return "Archived";
   return `${count} archived`;
 }
@@ -56,23 +81,34 @@ export function parseInboxArchiveUndo(
     if (parsed.expiresAt <= now) return null;
     const rows = usableRows(parsed.rows as InboxArchiveUndoRow[]);
     if (!rows.length) return null;
-    return { rows, expiresAt: parsed.expiresAt };
+    return withExtra({ rows, expiresAt: parsed.expiresAt }, parsed);
   } catch {
     return null;
   }
 }
 
+function withExtra(payload: InboxArchiveUndoPayload, extra?: InboxArchiveUndoExtra | null): InboxArchiveUndoPayload {
+  const undoId = typeof extra?.undoId === "string" ? extra.undoId.trim() : "";
+  if (!undoId) return payload;
+  const requests = usableRows(Array.isArray(extra?.requests) ? extra.requests : []);
+  const extraRequestIds = (Array.isArray(extra?.extraRequestIds) ? extra.extraRequestIds : [])
+    .map((id) => String(id || "").trim())
+    .filter(Boolean);
+  return { ...payload, undoId, requests, extraRequestIds };
+}
+
 export function writeInboxArchiveUndo(
   rows: InboxArchiveUndoRow[],
   now = Date.now(),
-  store: InboxArchiveUndoStore | null = browserStore()
+  store: InboxArchiveUndoStore | null = browserStore(),
+  extra: InboxArchiveUndoExtra | null = null
 ): InboxArchiveUndoPayload | null {
   const usable = usableRows(rows);
   if (!usable.length) return null;
-  const payload: InboxArchiveUndoPayload = {
-    rows: usable,
-    expiresAt: now + INBOX_ARCHIVE_UNDO_MS,
-  };
+  const payload: InboxArchiveUndoPayload = withExtra(
+    { rows: usable, expiresAt: now + INBOX_ARCHIVE_UNDO_MS },
+    extra
+  );
   try {
     store?.setItem(INBOX_ARCHIVE_UNDO_KEY, JSON.stringify(payload));
   } catch {

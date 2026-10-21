@@ -72,7 +72,8 @@ describe("inbox archive folder and leave verbs", () => {
   const board = read("dashboard/src/components/InboxPileBoard.tsx");
 
   it("archives live rows and unarchives Archived rows through the same lead_status path", () => {
-    assert.match(actions, /updateLeadStatus\(item\.callId, "archived"\)/);
+    assert.match(actions, /inboxArchiveCall\(item\.callId, own\)/);
+    assert.match(actions, /inboxArchiveCallsAction\(\[callId\]\)/);
     assert.match(actions, /updateLeadStatus\(item\.callId, "new"\)/);
     assert.match(overflow, /inboxArchive\(item\)/);
     assert.match(overflow, /inboxUnarchive\(item\)/);
@@ -112,10 +113,11 @@ describe("inbox archive folder and leave verbs", () => {
     assert.match(ticket, /archived=\{archived\}/);
     assert.match(ticket, /<InboxTicketActionDock/);
     assert.match(ticket, /canMarkDone=\{canMarkDone\}/);
-    assert.match(ticket, /id === "unarchive" \|\| archived \? "new" : "archived"/);
+    assert.match(ticket, /const leaving = !\(id === "unarchive" \|\| archived\)/);
+    assert.match(ticket, /leaving \? await inboxArchiveCall\(callId\) : await updateLeadStatus\(callId, "new"\)/);
     assert.match(ticket, /action\.label/);
-    assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\]\)/);
-    assert.match(ticket, /id === "archive" && !archived/);
+    assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\], undefined, undefined, \{/);
+    assert.match(ticket, /if \(leaving\) \{/);
     assert.match(ticket, /router\.push\(backHref\)/);
     assert.match(ticket, /!archived && String\(job\?\.status/);
     assert.match(ticket, /!archived && String\(hold\?\.status/);
@@ -159,17 +161,17 @@ describe("inbox archive folder and leave verbs", () => {
     assert.match(toast, /busy \? "Saving" : "Undo"/);
     assert.match(toast, /inboxUndoArchive\(notice\.rows\)/);
     assert.match(read("dashboard/src/lib/inboxBulk.ts"), /send\("unarchive", ids\)/);
-    assert.match(toast, /DeskNotice open=\{!!notice\}/);
+    assert.match(toast, /DeskNotice open=\{!!notice \|\| !!result\}/);
     assert.match(notice, /z-30/);
     assert.match(notice, /desk-tabbar-h/);
     assert.doesNotMatch(toast, /btnPrimary|btnDock|bg-accent-fill/);
     assert.match(ui, /InboxArchiveToast/);
     assert.match(ui, /INBOX_ARCHIVE_UNDO_EVENT/);
-    assert.match(overflow, /if \(id === "archive" && item.callId\) \{\s*writeInboxArchiveUndo/);
-    assert.match(select, /writeInboxArchiveUndo\(archivedRows\)/);
-    assert.match(select, /if \(kind === "archive"\) \{[\s\S]{0,200}target\.callId/);
-    assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\]\)/);
-    assert.match(ticket, /id === "archive" && !archived/);
+    assert.match(overflow, /if \(id === "archive" && item.callId && archivedNow\?\.archived !== false\) \{[\s\S]{0,120}writeInboxArchiveUndo/);
+    assert.match(select, /writeInboxArchiveUndo\(archivedRows, undefined, undefined, \{/);
+    assert.match(select, /if \(archive\) \{[\s\S]{0,200}target\.callId/);
+    assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\], undefined, undefined, \{/);
+    assert.match(ticket, /if \(leaving\) \{/);
     assert.match(ticket, /router\.push\(backHref\)/);
   });
 });
