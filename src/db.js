@@ -781,22 +781,26 @@ async function markWhatsappSent(callSid, outcome) {
   if (!existing) return false;
   if (existing.whatsapp_sent || existing.owner_notified) return false;
 
-  const keys = { owner_notified: true };
+  const meta = parseSummary(existing.summary);
+  meta.owner_notified = true;
   if (outcome && typeof outcome === 'object') {
-    keys.whatsapp_sent = outcome.whatsapp_delivered === true;
+    meta.whatsapp_sent = outcome.whatsapp_delivered === true;
     if (outcome.owner_notify_channels && typeof outcome.owner_notify_channels === 'object') {
-      keys.owner_notify_channels = { ...outcome.owner_notify_channels };
+      meta.owner_notify_channels = { ...outcome.owner_notify_channels };
     }
   } else {
-    keys.whatsapp_sent = true;
+    meta.whatsapp_sent = true;
   }
   if (queryBatchingEnabled()) {
-    // The read above stays (already-sent guard); the write is one UPDATE.
+    // The read above stays (already-sent guard); the write merges only the
+    // keys set here, in one UPDATE.
+    const keys = { owner_notified: meta.owner_notified, whatsapp_sent: meta.whatsapp_sent };
+    if (outcome && typeof outcome === 'object' && outcome.owner_notify_channels && typeof outcome.owner_notify_channels === 'object') {
+      keys.owner_notify_channels = meta.owner_notify_channels;
+    }
     const merged = await mergeCallSummaryInSql(callSid, keys, 'markWhatsappSent');
     if (merged !== undefined) return Boolean(merged);
   }
-  const meta = parseSummary(existing.summary);
-  Object.assign(meta, keys);
 
   const { data, error } = await supabase
     .from('calls')
@@ -990,10 +994,18 @@ async function mergeCallSummaryInSql(callSid, patch, context) {
     if (value === undefined) continue;
     clean[key] = value;
   }
-  const { data, error } = await supabase.rpc('merge_call_summary', {
-    p_sid: callSid,
-    p_patch: clean,
-  });
+  if (typeof supabase.rpc !== 'function') return undefined;
+  let data;
+  let error;
+  try {
+    ({ data, error } = await supabase.rpc('merge_call_summary', {
+      p_sid: callSid,
+      p_patch: clean,
+    }));
+  } catch (err) {
+    // Transport / client failure: same as any other RPC error.
+    error = { code: err?.code || null, message: err?.message || String(err) };
+  }
   if (error) {
     if (mergeRpcMissing(error)) {
       mergeRpcMissingUntil = Date.now() + MERGE_RPC_REPROBE_MS;
