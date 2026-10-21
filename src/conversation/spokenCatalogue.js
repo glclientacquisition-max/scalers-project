@@ -189,20 +189,26 @@ function sizeLabels(family, language) {
   return family.members.map((m) => speakSize(family.kind, m.value, language));
 }
 
+/**
+ * Spoken catalogue list. A capped list ends on the closer ("and more" /
+ * "na zingine"), so the closer is the only conjunction: "A, B, C and more",
+ * never "A, B, and C, and more". A full list keeps joinList ("A, B, and C").
+ * @param {string[]} items
+ * @param {boolean} more
+ * @param {string} [language]
+ */
+function joinCatalogueList(items, more, language) {
+  const list = (items || []).map((x) => String(x || '').trim()).filter(Boolean);
+  if (!more || !list.length) return joinList(list, language);
+  return `${list.join(', ')} ${isSw(language) ? 'na zingine' : 'and more'}`;
+}
+
 function openerFor(labels, more, language, messageOnly) {
   const sw = isSw(language);
-  const list = joinList(labels, language);
+  const list = joinCatalogueList(labels, more, language);
   if (!list) return sw ? 'Niambie unahitaji nini.' : 'Tell me what you need done.';
-  if (messageOnly) {
-    if (sw) return more ? `Tuna ${list}, na zingine.` : `Tuna ${list}.`;
-    return more ? `We offer ${list}, and more.` : `We offer ${list}.`;
-  }
-  if (sw) {
-    return more ? `Tuna ${list}, na zingine. Unahitaji gani?` : `Tuna ${list}. Unahitaji gani?`;
-  }
-  return more
-    ? `We offer ${list}, and more. Which one do you need?`
-    : `We offer ${list}. Which one do you need?`;
+  if (messageOnly) return sw ? `Tuna ${list}.` : `We offer ${list}.`;
+  return sw ? `Tuna ${list}. Unahitaji gani?` : `We offer ${list}. Which one do you need?`;
 }
 
 /**
@@ -283,4 +289,5 @@ module.exports = {
   compileSpokenCatalogue,
   parseSize,
   joinList,
+  joinCatalogueList,
 };

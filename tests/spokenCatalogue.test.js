@@ -140,3 +140,26 @@ describe('local catalogue line and v2 receipts share the same names', () => {
     assert.doesNotMatch(sw, /KSh|moja bedroom/);
   });
 });
+
+describe('catalogue list joiner (eval:release services_live_order)', () => {
+  const { joinCatalogueList } = require('../src/conversation/spokenCatalogue');
+  const four = ['Sofa cleaning', 'Carpet cleaning', 'Mattress cleaning', 'Curtain cleaning'];
+  it('EN: a capped list has one conjunction, the closer', () => {
+    assert.equal(joinCatalogueList(four, true, 'en'), 'Sofa cleaning, Carpet cleaning, Mattress cleaning, Curtain cleaning and more');
+    assert.doesNotMatch(joinCatalogueList(four, true, 'en'), /, and .*, and more|\band\b.*\band more/);
+  });
+  it('SW: a capped list ends on na zingine with no na before the last item', () => {
+    assert.equal(joinCatalogueList(four, true, 'sw'), 'Sofa cleaning, Carpet cleaning, Mattress cleaning, Curtain cleaning na zingine');
+    assert.doesNotMatch(joinCatalogueList(four, true, 'sw'), /, na .*na zingine/);
+  });
+  it('a full list keeps the normal joiner', () => {
+    assert.equal(joinCatalogueList(['A', 'B', 'C'], false, 'en'), 'A, B, and C');
+    assert.equal(joinCatalogueList(['A', 'B'], false, 'sw'), 'A na B');
+    assert.equal(joinCatalogueList(['A'], true, 'en'), 'A and more');
+  });
+  it('the compiled opener uses it (EN + SW)', () => {
+    const c = compileSpokenCatalogue({ servicesCatalog: [...four, 'Oven cleaning'].map((name) => ({ name })) }, { limit: 4 });
+    assert.equal(c.opener('en'), 'We offer Sofa cleaning, Carpet cleaning, Mattress cleaning, Curtain cleaning and more. Which one do you need?');
+    assert.equal(c.opener('sw'), 'Tuna Sofa cleaning, Carpet cleaning, Mattress cleaning, Curtain cleaning na zingine. Unahitaji gani?');
+  });
+});
