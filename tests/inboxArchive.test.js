@@ -92,7 +92,7 @@ describe("inbox archive folder and leave verbs", () => {
     assert.match(verbs, /export function inboxBulkLeaveAction/);
     assert.match(select, /inboxBulkActions\(chosen\)/);
     assert.match(select, /inboxBulk\(kind, chosen\)/);
-    assert.match(read("dashboard/src/lib/inboxBulk.ts"), /kind === "unarchive"/);
+    assert.match(read("dashboard/src/lib/inboxBulk.ts"), /else eligible = archived\(item\)/);
     assert.match(select, /kind === "unarchive"/);
     assert.match(select, /aria-label=\{action\.label\}/);
     const live = [item({ id: "a" }), item({ id: "b" })];

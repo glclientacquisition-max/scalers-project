@@ -14,6 +14,11 @@ export type InboxBulkResult = {
   error?: string;
   /** Rows the update matched in this business. */
   count?: number;
+  /**
+   * Ids the update actually changed. Requested ids missing here were not
+   * updated (already handled, gone, or another business); the client reports them.
+   */
+  updatedIds?: string[];
   message?: string;
   /** Saved, but a caller text did not go out (line paused or business closed). */
   notice?: string;
@@ -81,5 +86,8 @@ export async function inboxBulkAction(kind: InboxBulkKind, ids: string[]): Promi
   }
   for (const callId of callIds) revalidatePath(`/calls/${callId}`);
 
-  return notice ? { ok: true, count: rows.length, notice } : { ok: true, count: rows.length };
+  const requested = new Set(clean);
+  const updatedIds = rows.map((row) => String(row.id)).filter((id) => requested.has(id));
+  const result: InboxBulkResult = { ok: true, count: updatedIds.length, updatedIds };
+  return notice ? { ...result, notice } : result;
 }

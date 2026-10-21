@@ -11,7 +11,7 @@ import { focusRingVisible } from "@/components/ui/deskChrome";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { inboxBulk } from "@/lib/inboxLeadActions";
 import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
-import { isInboxBulkKind } from "@/lib/inboxBulk";
+import { inboxBulkOutcomeText, isInboxBulkKind } from "@/lib/inboxBulk";
 import { inboxBulkActions, type InboxListActionId } from "@/lib/inboxListVerbs";
 import type { InboxItem } from "@/lib/inboxPurpose";
 
@@ -144,6 +144,7 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   if (!ui || !ui.selecting) return null;
 
   const { selected, patch, clear, replace } = ui;
@@ -156,7 +157,9 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
     if (!isInboxBulkKind(kind)) return;
     setBusy(true);
     setError(null);
-    // One server request for every selected row (inboxBulkAction).
+    setNote(null);
+    // One server request for every selected row (inboxBulkAction). Each row
+    // comes back as applied, missed (server did not change it) or skipped.
     const res = await inboxBulk(kind, chosen);
     if (res.error) {
       setError(res.error);
@@ -164,15 +167,24 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
       return;
     }
     if (kind === "archive") {
-      const archivedRows = res.targets
+      // Undo restores exactly the calls the server archived.
+      const archivedRows = res.applied
         .filter((target) => target.callId)
         .map((target) => ({ id: target.itemId, callId: String(target.callId) }));
       if (archivedRows.length) writeInboxArchiveUndo(archivedRows);
     }
     if (kind === "archive" || kind === "unarchive") {
-      for (const target of res.targets) patch(target.itemId, { hidden: true });
+      for (const target of res.applied) patch(target.itemId, { hidden: true });
     }
-    clear();
+    const outcome = inboxBulkOutcomeText(kind, res);
+    if (outcome) {
+      // Keep the rows that did not change selected, and say why.
+      const left = [...res.missed.map((t) => t.itemId), ...res.skipped.map((s) => s.itemId)];
+      replace(left);
+      setNote(outcome);
+    } else {
+      clear();
+    }
     setBusy(false);
     router.refresh();
   }
@@ -214,6 +226,11 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
       {error ? (
         <p className="w-full text-caption text-attention" role="alert">
           {error}
+        </p>
+      ) : null}
+      {note && !error ? (
+        <p className="w-full pb-2 text-caption text-ink" role="status">
+          {note}
         </p>
       ) : null}
     </div>

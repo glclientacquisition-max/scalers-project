@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { DeskNotice } from "@/components/ui/DeskNotice";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import { inboxUndoArchive } from "@/lib/inboxLeadActions";
+import { inboxUndoOutcomeText } from "@/lib/inboxBulk";
 import { inboxArchiveUndoLabel, type InboxArchiveUndoPayload } from "@/lib/inboxArchiveUndo";
 
 export function InboxArchiveToast({
@@ -31,16 +32,24 @@ export function InboxArchiveToast({
     if (!notice || busy) return;
     setBusy(true);
     setError(null);
-    // One server request restores every archived row (inboxBulkAction).
+    // One server request restores exactly the archived rows (inboxBulkAction).
     const res = await inboxUndoArchive(notice.rows);
     if (res.error) {
       setError(res.error);
       setBusy(false);
       return;
     }
-    for (const row of notice.rows) {
+    for (const row of res.restored) {
       patch(row.id, { hidden: false });
       if (row.callId !== row.id) patch(row.callId, { hidden: false });
+    }
+    const outcome = inboxUndoOutcomeText(res);
+    if (outcome) {
+      // Some rows changed since the archive: say so, never count them as restored.
+      setError(outcome);
+      setBusy(false);
+      router.refresh();
+      return;
     }
     dismissArchive();
     setBusy(false);

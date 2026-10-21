@@ -7,6 +7,9 @@ import {
   INBOX_BULK_MAX,
   cleanInboxBulkIds,
   inboxBulkTargets,
+  inboxBulkOutcomeText,
+  inboxBulkPlan,
+  inboxUndoOutcomeText,
   sendInboxArchiveUndo,
   sendInboxBulk,
   type InboxBulkKind,
@@ -22,7 +25,7 @@ const src = (p: string) => readFileSync(new URL(`../dashboard/src/${p}`, import.
 
 function item(i: number, partial: Record<string, unknown> = {}) {
   return {
-    id: `row-${i}`,
+    id: `call-${i}`,
     callId: `call-${i}`,
     lead: { leadStatus: "new" },
     hold: null,
@@ -33,9 +36,10 @@ function item(i: number, partial: Record<string, unknown> = {}) {
 
 function countingSend() {
   const calls: Array<{ kind: InboxBulkKind; ids: string[] }> = [];
+  // The server answers with every id it updated (all of them here).
   const send = async (kind: InboxBulkKind, ids: string[]) => {
     calls.push({ kind, ids });
-    return { ok: true };
+    return { ok: true, updatedIds: ids };
   };
   return { calls, send };
 }
@@ -47,8 +51,9 @@ test("inbox: archiving 30 rows is ONE server request with all 30 call ids (was 3
   assert.equal(calls.length, 1);
   assert.equal(calls[0].kind, "archive");
   assert.deepEqual(calls[0].ids, items.map((r) => r.callId));
-  assert.equal(res.targets.length, 30);
+  assert.equal(res.applied.length, 30);
   assert.equal(res.error, undefined);
+  assert.equal(inboxBulkOutcomeText("archive", res), null);
 });
 
 test("inbox: Undo of 30 archived rows is ONE request back to New (was 30)", async () => {
@@ -58,7 +63,8 @@ test("inbox: Undo of 30 archived rows is ONE request back to New (was 30)", asyn
   assert.equal(calls.length, 1);
   assert.equal(calls[0].kind, "unarchive");
   assert.equal(calls[0].ids.length, 30);
-  assert.deepEqual(res, {});
+  assert.equal(res.restored.length, 30);
+  assert.equal(res.missed.length, 0);
 });
 
 test("inbox: every bulk kind keeps the old skip rules and sends once", async () => {
@@ -74,6 +80,7 @@ test("inbox: every bulk kind keeps the old skip rules and sends once", async () 
     confirm: ["job-1"],
     done: ["hold-3"],
     mark_done: ["call-5"],
+    // Rows 1 to 4 have a lead plus their request: they are call rows, so they archive.
     archive: ["call-1", "call-2", "call-3", "call-4", "call-5"],
     unarchive: ["call-6"],
   };
@@ -89,17 +96,18 @@ test("inbox: nothing eligible sends nothing; a server error hides nothing", asyn
   const { calls, send } = countingSend();
   const none = await sendInboxBulk("confirm", [item(1)], send);
   assert.equal(calls.length, 0);
-  assert.deepEqual(none.targets, []);
+  assert.deepEqual(none.applied, []);
+  assert.deepEqual(none.skipped, [{ itemId: "call-1", reason: "not_eligible" }]);
   const failed = await sendInboxBulk("archive", [item(1), item(2)], async () => ({ error: "Could not archive." }));
   assert.equal(failed.error, "Could not archive.");
-  assert.deepEqual(failed.targets, []);
+  assert.deepEqual(failed.applied, []);
 });
 
 test("inbox: dev harness skips the server for calls-only kinds, as before", async () => {
   const { calls, send } = countingSend();
   const res = await sendInboxBulk("archive", [item(1)], send, { harness: true });
   assert.equal(calls.length, 0);
-  assert.equal(res.targets.length, 1);
+  assert.equal(res.applied.length, 1);
 });
 
 test("inbox: ids are cleaned, de-duplicated and capped", () => {
@@ -107,7 +115,76 @@ test("inbox: ids are cleaned, de-duplicated and capped", () => {
   assert.equal(cleanInboxBulkIds([]), null);
   assert.equal(cleanInboxBulkIds("a"), null);
   assert.equal(cleanInboxBulkIds(Array.from({ length: INBOX_BULK_MAX + 1 }, (_, i) => `id-${i}`)), null);
-  assert.equal(inboxBulkTargets("archive", [item(1), item(1)]).length, 1);
+  // Two rows on one id: both are targets, the server gets the id once.
+  const twice = inboxBulkPlan("archive", [item(1), item(1)]);
+  assert.equal(twice.targets.length, 2);
+  assert.deepEqual(twice.ids, ["call-1"]);
+});
+
+// Staging repro, Done and Dusted, 21 Oct: the first 30 rows of Needs you (81).
+// Row 19 is hold 93ab7756 with no call row of its own: it is a second open
+// request on call 2af42c11, whose call row (row 20) already carries hold 8c713352.
+// Both rows had callId 2af42c11. The old plan de-duplicated by call id and
+// dropped row 19 silently: 30 selected, "29 archived". Archiving the call never
+// closes that hold, so the row stays in Needs you either way.
+function doneAndDustedFirst30() {
+  const rows = Array.from({ length: 30 }, (_, i) => item(i));
+  rows[18] = {
+    id: "93ab7756-fad0-4997-8e18-f12eb677f3ac",
+    callId: "2af42c11-4344-46d0-ad48-92d0a38e0dfb",
+    lead: null,
+    hold: { id: "93ab7756-fad0-4997-8e18-f12eb677f3ac", status: "open", request_type: "enquiry" },
+    job: null,
+  } as any;
+  rows[19] = item(19, {
+    id: "2af42c11-4344-46d0-ad48-92d0a38e0dfb",
+    callId: "2af42c11-4344-46d0-ad48-92d0a38e0dfb",
+    hold: { id: "8c713352-8f9f-4cef-b80d-3f0fe848c489", status: "open", request_type: "enquiry" },
+  });
+  return rows;
+}
+
+test("repro: 30 selected with a second request on one call: every row accounted for", async () => {
+  const rows = doneAndDustedFirst30();
+  const { calls, send } = countingSend();
+  const res = await sendInboxBulk("archive", rows, send);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].ids.length, 29);
+  assert.equal(res.applied.length, 29);
+  assert.deepEqual(res.skipped, [{ itemId: "93ab7756-fad0-4997-8e18-f12eb677f3ac", reason: "open_request" }]);
+  assert.equal(res.applied.length + res.missed.length + res.skipped.length, 30);
+  assert.equal(
+    inboxBulkOutcomeText("archive", res),
+    "29 of 30 archived. 1 is an open request on a call, so use Done or Confirm on it."
+  );
+  assert.ok(res.applied.some((t) => t.itemId === "2af42c11-4344-46d0-ad48-92d0a38e0dfb"));
+});
+
+test("ids the server did not update are reported, not counted, and not offered for Undo", async () => {
+  const rows = Array.from({ length: 30 }, (_, i) => item(i));
+  const res = await sendInboxBulk("archive", rows, async (_kind, ids) => ({ ok: true, updatedIds: ids.filter((id) => id !== "call-7") }));
+  assert.equal(res.applied.length, 29);
+  assert.deepEqual(res.missed.map((t) => t.itemId), ["call-7"]);
+  assert.equal(inboxBulkOutcomeText("archive", res), "29 of 30 archived. 1 was already handled.");
+  // An older server without updatedIds changes nothing as far as the client claims.
+  const old = await sendInboxBulk("archive", rows, async () => ({ ok: true }));
+  assert.equal(old.applied.length, 0);
+  assert.equal(old.missed.length, 30);
+});
+
+test("Undo restores exactly the archived rows and reports any that changed since", async () => {
+  const archived = Array.from({ length: 29 }, (_, i) => ({ id: `call-${i}`, callId: `call-${i}` }));
+  const sent: string[][] = [];
+  const res = await sendInboxArchiveUndo(archived, async (_kind, ids) => {
+    sent.push(ids);
+    return { ok: true, updatedIds: ids.filter((id) => id !== "call-3") };
+  });
+  assert.equal(sent.length, 1);
+  assert.deepEqual(sent[0], archived.map((r) => r.callId));
+  assert.equal(res.restored.length, 28);
+  assert.deepEqual(res.missed, [{ id: "call-3", callId: "call-3" }]);
+  assert.equal(inboxUndoOutcomeText(res), "28 of 29 restored. 1 was changed since.");
+  assert.equal(inboxUndoOutcomeText({ restored: archived, missed: [] }), null);
 });
 
 /** Fake supabase-js query builder: records every terminal round trip. */
@@ -191,15 +268,21 @@ test("inbox server: Confirm and hold Done still text each caller when caller tex
 test("inbox wiring: the bar and Undo call the bulk action, not a per-row loop", () => {
   const select = src("components/InboxRowSelect.tsx");
   assert.match(select, /await inboxBulk\(kind, chosen\)/);
+  // Undo is offered for applied rows only; leftovers stay selected with the reason.
+  assert.match(select, /res\.applied\s*\.filter\(\(target\) => target\.callId\)/);
+  assert.match(select, /replace\(left\)/);
+  assert.match(select, /inboxBulkOutcomeText\(kind, res\)/);
   assert.doesNotMatch(select, /for \(const item of chosen\)/);
   const toast = src("components/InboxArchiveToast.tsx");
   assert.match(toast, /await inboxUndoArchive\(notice\.rows\)/);
+  assert.match(toast, /for \(const row of res\.restored\)/);
   assert.doesNotMatch(toast, /updateLeadStatus/);
   const action = src("app/(desk)/calls/bulkActions.ts");
   assert.match(action, /memberDenied\("inbox\.act"\)/);
   assert.match(action, /isAuthenticated\(\)/);
   assert.match(action, /getCurrentTenant\(\)/);
   assert.match(action, /tenantId: tenant\.id/);
+  assert.match(action, /updatedIds/);
 });
 
 // --------------------------------------------------------------- prices ----
