@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-190 variables.
+193 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -105,8 +105,8 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `RECORDING_RETENTION_PURGE` | voice | `src/lib/recordingRetention.js` |
 | `RESEND_API_KEY` | desk, voice | `dashboard/src/lib/opsMail.ts`<br>`src/notifications/email.js` |
 | `SAUTIKIT_ADMIN_OPS_KEY` | desk | `dashboard/src/lib/sautikit.ts` |
-| `SAUTIKIT_API_BASE` | desk, voice | `dashboard/src/lib/sautikit.ts`<br>`src/notifications/whatsapp.js`<br>`src/sautikit/lineUnavailableAudio.js`<br>+3 more |
-| `SAUTIKIT_API_KEY` | desk, scripts, voice | `dashboard/src/lib/sautikit.ts`<br>`scripts/smoke-whatsapp-did.js`<br>`server.js`<br>+5 more |
+| `SAUTIKIT_API_BASE` | desk, voice | `dashboard/src/lib/sautikit.ts`<br>`src/notifications/whatsapp.js`<br>`src/sautikit/callHangup.js`<br>+4 more |
+| `SAUTIKIT_API_KEY` | desk, scripts, voice | `dashboard/src/lib/sautikit.ts`<br>`scripts/smoke-whatsapp-did.js`<br>`server.js`<br>+6 more |
 | `SAUTIKIT_DID` | scripts, voice | `scripts/smoke-whatsapp-did.js`<br>`server.js`<br>`src/db.js`<br>+1 more |
 | `SAUTIKIT_VALIDATE_WEBHOOKS` | voice | `server.js`<br>`src/sautikit/webhook.js` |
 | `SAUTIKIT_VOICE_SIGNING_SECRET` | voice | `src/sautikit/webhook.js` |
@@ -163,6 +163,9 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_BARGE_GRACE_MS` | voice | `src/speech/turnTaking.js` |
 | `VOICE_BARGE_MIN_CHARS` | voice | `src/speech/turnTaking.js` |
 | `VOICE_CLOSED_TENANT_GUARD` | voice | `src/sautikit/closedTenantGuard.js` |
+| `VOICE_END_CALL_GRACE_MS` | voice | `src/speech/endCallHonour.js` |
+| `VOICE_END_CALL_HONOUR` | voice | `src/speech/endCallHonour.js` |
+| `VOICE_END_CALL_MAX_WAIT_MS` | voice | `src/speech/endCallHonour.js` |
 | `VOICE_FACT_REFS` | voice | `src/conversation/factSheet.js`<br>`src/conversation/numberWords.js` |
 | `VOICE_FALLBACK_BY_KIND` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
 | `VOICE_FAST_INBOUND` | scripts | `scripts/bench-inbound-webhook.js` |
