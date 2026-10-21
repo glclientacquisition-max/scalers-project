@@ -66,11 +66,11 @@ export function structuredSettingsSlots({
   const unpriced = unpricedCount(tenant);
   return {
     identity: (
-      <BusinessCategoryPicker businessType={businessType} initial={businessCategory} canEdit={canEdit} save={saveBusinessCategoryAction} />
+      <BusinessCategoryPicker key="business-category" businessType={businessType} initial={businessCategory} canEdit={canEdit} save={saveBusinessCategoryAction} />
     ),
     catalog:
       prices.length || unpriced ? (
-        <div className="space-y-4">
+        <div key="catalog-checks" className="space-y-4">
           {unpriced ? <AddPricesRow count={unpriced} href={UNPRICED_HREF} /> : null}
           {prices.length ? <PriceConfirmCards items={prices} canEdit={canEdit} save={confirmPriceAction} /> : null}
         </div>

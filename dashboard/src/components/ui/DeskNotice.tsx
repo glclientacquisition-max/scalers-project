@@ -14,8 +14,16 @@ const PLACE_CLASS =
   "pointer-events-none fixed inset-x-0 z-30 px-4 bottom-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px)+0.75rem)] md:bottom-6";
 
 const NOTIFY_HOLD_MS = 4000;
+/** Errors stay up longer: the owner has to read them and act. */
+export const NOTIFY_ERROR_HOLD_MS = 8000;
 
-type NoticeRecord = { id: string; message: string };
+type NoticeTone = "info" | "error";
+type NoticeRecord = { id: string; message: string; tone: NoticeTone };
+
+/** How long a notice stays on screen. */
+export function noticeHoldMs(tone: NoticeTone | undefined): number {
+  return tone === "error" ? NOTIFY_ERROR_HOLD_MS : NOTIFY_HOLD_MS;
+}
 
 let current: NoticeRecord | null = null;
 const listeners = new Set<() => void>();
@@ -24,10 +32,13 @@ function emit() {
   for (const listener of listeners) listener();
 }
 
-export function notify(message: string) {
+let seq = 0;
+
+export function notify(message: string, options?: { tone?: NoticeTone }) {
   const text = message.trim();
   if (!text) return;
-  current = { id: `${Date.now()}-${text}`, message: text };
+  seq += 1;
+  current = { id: `${Date.now()}-${seq}`, message: text, tone: options?.tone ?? "info" };
   emit();
 }
 
@@ -130,7 +141,7 @@ export function NotifyHost() {
     if (!notice) return;
     const timer = window.setTimeout(() => {
       if (current?.id === notice.id) dismissNotice();
-    }, NOTIFY_HOLD_MS);
+    }, noticeHoldMs(notice.tone));
     return () => window.clearTimeout(timer);
   }, [notice]);
 
@@ -138,7 +149,9 @@ export function NotifyHost() {
     <DeskNotice open={!!notice}>
       {notice ? (
         <div className="rounded-2xl border border-hairline bg-surface px-4 py-3 shadow-sheet">
-          <p className="text-body text-ink">{notice.message}</p>
+          <p className={notice.tone === "error" ? "text-body text-warn" : "text-body text-ink"} role={notice.tone === "error" ? "alert" : undefined}>
+            {notice.message}
+          </p>
         </div>
       ) : null}
     </DeskNotice>

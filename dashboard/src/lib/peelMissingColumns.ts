@@ -6,12 +6,29 @@
  */
 export const UNKNOWN_ANSWER_SPOKEN_COLUMN = "unknown_answer_spoken";
 
-/** When the spoken column is not migrated yet, drop only that key and retry. */
+/**
+ * Owner sessions write tenants through column grants. A column the owner role
+ * may not update fails the whole row with "permission denied for table tenants"
+ * (no column named), so callers can only peel a column they know is optional.
+ */
+export function isTenantPermissionDenied(message: string | null | undefined): boolean {
+  return /permission denied for (table|relation) "?tenants"?/i.test(String(message || ""));
+}
+
+/**
+ * When the spoken column is not migrated yet, or the owner role has no UPDATE
+ * grant on it (staging and prod as of 21 Oct), drop only that key and retry.
+ */
 export function withoutUnknownSpokenColumn(
   message: string | null | undefined,
   patch: Record<string, unknown>
 ): Record<string, unknown> | null {
-  if (missingColumnFromError(message) !== UNKNOWN_ANSWER_SPOKEN_COLUMN) return null;
+  if (
+    missingColumnFromError(message) !== UNKNOWN_ANSWER_SPOKEN_COLUMN &&
+    !isTenantPermissionDenied(message)
+  ) {
+    return null;
+  }
   if (!(UNKNOWN_ANSWER_SPOKEN_COLUMN in patch)) return null;
   const next = { ...patch };
   delete next[UNKNOWN_ANSWER_SPOKEN_COLUMN];
