@@ -8,13 +8,16 @@ const L = require('./lexicon');
 const N = require('./nlu');
 const R = require('./receipts');
 const { buildCatalogue, validateCall } = require('./catalogue');
-const { listedAreaIds } = require('../listedAreas');
+const { listedAreaIds, listedAreaRows } = require('../listedAreas');
 const { compileSpokenCatalogue, joinList } = require('../spokenCatalogue');
 const { compileSpokenCoverage, compileSpokenPolicies } = require('../spokenFacts');
 const { compileAskReceipt } = require('./askReceipt');
 const { applyTicket, needsClassify, normalizeTicket } = require('./classifyAsk');
 const { renderOwnerMessage } = require('./owner');
 const { buildRequest } = require('./gemini');
+// BRAIN_V2_COMMIT_SAFETY (default off): two-phase commit, validators, idempotency, write receipts, outbox (plan row C1).
+const CS = require('./commitSafety');
+const csOn = () => CS.commitSafetyEnabled();
 // VOICE_V2_CATALOGUE: catalogue words, categories, explanations and prices come from the
 // tenant's spoken catalogue (src/knowledge/spokenCatalogue.js). Off: unchanged behaviour.
 const SC = require('../../knowledge/spokenCatalogue');
@@ -37,9 +40,9 @@ const POLICY_KEY = { policy_returns: 'returns', policy_deposit: 'deposit', polic
 const FEE_ASK = /\b(travel fee|delivery fee|fee to|fare|ada ya|usafiri|transport|how much|ngapi|bei)\b|\bfair\b.{0,24}\b(kuja|come|to)\b/i;
 const DELIVER_ASK = /\b(deliver|delivery|mnafika|come to|do you come)\b/i;
 
-function createState({ profile = {}, callerPhone, contactName = null, openRows = [], pendingTasks = [] } = {}) {
+function createState({ profile = {}, callerPhone, contactName = null, openRows = [], pendingTasks = [], callId = null } = {}) {
   return {
-    v: 2, turn: 0, lang: null, intent: null, phase: 'collect', expecting: null,
+    v: 2, callId, turn: 0, lang: null, intent: null, phase: 'collect', expecting: null,
     slots: { service: null, when: { date: null, time: null }, place: null, name: null, items: [], row: null, new_when: { date: null, time: null }, new_place: null, kind: null, topic: null, complaint: [] },
     asked: {}, pending: null, tokenSeq: 0, lastLine: '', lastInfo: null, infoRepeat: {}, unknownCount: 0,
     callerPhone, file: { contactName, openRows: openRows.map(normRow), pendingTasks },
@@ -69,6 +72,8 @@ function pickIntent(u, state, profile) {
 }
 
 function mergeSlots(state, u, profile) {
+  // BRAIN_V2_COMMIT_SAFETY: a bare yes/no word is never a place ("Tuje wapi?" -> "Ndio")
+  if (csOn() && u.place && /^\W*(ndio|ndiyo|yes|yeah|sawa|ok|okay|hapana|no|haya|poa)\W*$/i.test(String(u.place))) u.place = null;
   if (u.name || u.place || u.service || u.when?.date || u.when?.time || u.products?.length) state.progressTurn = state.turn;
   const s = state.slots;
   if (u.name) {
@@ -88,7 +93,7 @@ function mergeSlots(state, u, profile) {
   }
   if (u.place && state.intent !== 'cancel') { if (state.intent === 'address_change') s.new_place = u.place; else if (s.place && !u.landmark && isArea(s.place, profile) && !isArea(u.place, profile)) { s.landmark = u.place; } // HD_513: "Simba Drive" after "Rongai" is an address note, not a new area
     else { s.landmark = u.landmark || (u.place === s.place ? s.landmark : null); s.place = u.place; } }
-  if (u.service && (!s.service || !state.intent || state.phase !== 'readback')) s.service = u.service.name;
+  if (u.service && (!s.service || !state.intent || state.phase !== 'readback' || (csOn() && state.pending?.tool === 'create_booking'))) s.service = u.service.name;
   if (u.products.length) {
     for (const p of u.products) {
       const ex = s.items.find((x) => x.product_id === p.product_id);
@@ -96,6 +101,8 @@ function mergeSlots(state, u, profile) {
     }
   }
   if (state.expecting === 'qty' && u.quantity) { const it = s.items.find((x) => !x.qty); if (it) it.qty = u.quantity; }
+  // BRAIN_V2_COMMIT_SAFETY: "make it 3" at an order read-back changes the one item's quantity (a slot diff, so it re-proposes)
+  if (csOn() && state.phase === 'readback' && state.pending?.tool === 'create_order' && u.quantity && !u.products.length && s.items.length === 1) s.items[0] = { ...s.items[0], qty: u.quantity };
 }
 
 function resolveRow(state, u) {
@@ -161,7 +168,51 @@ function askSlot(state, slot, ctx) {
 }
 
 function mint(state) { state.tokenSeq += 1; return `ct_${state.turn}x${state.tokenSeq}`; }
-function propose(state, p) { state.echoAsked = false; p.token = mint(state); state.pending = p; state.phase = 'readback'; state.expecting = 'confirm'; return R.readback(p, state.lang); }
+function propose(state, p) {
+  state.echoAsked = false; p.token = mint(state);
+  if (csOn()) {
+    if (p.tool === 'create_handoff') {
+      p.phone = p.phone || state.callerPhone || null; p.phoneSaid = CS.sayPhone(p.phone);
+      const w = state.intent === 'handoff' && (state.slots.when.date || state.slots.when.time) ? { ...state.slots.when } : null;
+      p.callbackWhen = CS.callbackWhen({ profile: state.profileRef || {}, now: state.now || new Date(), when: w, L });
+    }
+    p.issuedTurn = state.turn; p.slotHash = CS.slotHash(p); p.token = `ct_${p.slotHash.slice(0, 8)}_${state.turn}x${state.tokenSeq}`;
+    p.idemKey = CS.idempotencyKey({ callId: state.callId, p }); p.validators = p.validators || state.lastValidators || {}; state.lastValidators = null;
+    state.record?.('proposed', p);
+  }
+  state.pending = p; state.phase = 'readback'; state.expecting = 'confirm'; return R.readback(p, state.lang);
+}
+// Validators before a booking is proposed (BRAIN_V2_COMMIT_SAFETY): hours ran above; service area and
+// availability here. A failed validator returns a spoken template alternative; it never says booked.
+function bookingValidators(state, profile) {
+  const s = state.slots; const v = { hours: 'ok' };
+  const listed = listedAreaIds(profile);
+  if (listed.length && s.place) {
+    const m = N.matchArea(s.place, profile);
+    if (!(m && m.listed)) {
+      v.area = 'unlisted'; state.lastValidators = v;
+      const place = s.place; s.place = null; s.landmark = null;
+      const areas = joinList(listedAreaRows(profile).map((r) => r.name).filter(Boolean).slice(0, 4), state.lang);
+      const cb = propose(state, { tool: 'create_handoff', kind: 'callback', reason: 'callback', place, topic: s.service }); state.intent = 'handoff';
+      // never read a mis-heard sentence back as a place name
+      const say = String(place).split(/\s+/).length <= 3 && !/\b(nataka|naomba|book|clean\w*|usafi|saa|asubuhi|ijumaa|friday)\b/i.test(place) ? place : (L.isSw(state.lang) ? 'eneo hilo' : 'that area');
+      if (say !== place) { state.pending.place = null; }
+      return { line: `${R.info({ kind: 'area_out', place: say, areas }, state.lang)} ${say === place ? cb : R.readback(state.pending, state.lang)}` };
+    }
+    v.area = 'ok';
+  } else v.area = listed.length ? 'ok' : 'no_area_list';
+  // availability: the caller's own open visit at that slot, then the tenant's known busy slots (none = unchecked)
+  const mine = state.file.openRows.find((r) => r.kind === 'visit' && !/cancel|done/.test(r.status || '') && r.when.date === s.when.date && r.when.time === s.when.time);
+  if (mine) { v.availability = 'caller_has_booking'; const label = R.rowLabel(mine, state.lang); s.when.time = null; state.expecting = 'time'; return { line: R.info({ kind: 'already_booked', label }, state.lang) }; }
+  const busy = Array.isArray(profile.busySlots) ? profile.busySlots : null;
+  if (busy) {
+    const taken = busy.some((b) => b && b.date === s.when.date && b.time === s.when.time && (!b.service || String(b.service).toLowerCase() === String(s.service || '').toLowerCase()));
+    if (taken) { v.availability = 'taken'; s.when.time = null; state.expecting = 'time'; return { line: R.info({ kind: 'slot_taken' }, state.lang) }; }
+    v.availability = 'ok';
+  } else v.availability = 'unchecked';
+  state.lastValidators = v;
+  return null;
+}
 
 // Returns { line } or { ladder:true } when a slot ask is exhausted.
 function stepIntent(state, u, profile) {
@@ -181,6 +232,7 @@ function stepIntent(state, u, profile) {
     }
     if (!s.place) return slotOr(state, 'place');
     if (!s.name && (state.asked.name || 0) < 2) return slotOr(state, 'name');
+    if (csOn()) { const bad = bookingValidators(state, profile); if (bad) return bad; }
     return { line: propose(state, { tool: 'create_booking', service: s.service, when: { ...s.when }, place: s.place, landmark: s.landmark || null, name: nameSpeakable(state) }) };
   }
   if (it === 'order') {
@@ -194,6 +246,7 @@ function stepIntent(state, u, profile) {
     const noQty = s.items.find((x) => !x.qty);
     if (noQty) return slotOr(state, 'qty', { item: noQty.name });
     if (!s.when.date) return slotOr(state, 'pickup');
+    if (csOn()) { const hp = hoursProblem(profile, { date: s.when.date, time: '12:00' }, null); if (hp && hp.kind === 'closed_day') { s.when.date = null; state.expecting = 'pickup'; return { line: R.info({ kind: 'pickup_closed', dayLabel: L.cap((L.isSw(state.lang) ? L.DOW_SW : L.DOW_EN)[hp.dow]) }, state.lang) }; } state.lastValidators = { hours: 'ok', availability: 'unchecked' }; }
     if (!s.name && (state.asked.name || 0) < 2) return slotOr(state, 'name');
     return { line: propose(state, { tool: 'create_order', items: s.items.map((x) => ({ ...x })), pickup: { ...s.when }, name: nameSpeakable(state) }) };
   }
@@ -258,17 +311,51 @@ function slotOr(state, slot, ctx) {
 }
 
 async function commit(state, p, handlers) {
+  if (csOn()) return commitSafe(state, p, handlers);
+  return commitRaw(state, p, handlers);
+}
+// BRAIN_V2_COMMIT_SAFETY commit: one write per idempotency key; receipts for confirmed / committed / failed;
+// a failed write opens an outbox owner task and is never counted as booked.
+async function commitSafe(state, p, handlers) {
+  const key = p.idemKey || CS.idempotencyKey({ callId: state.callId, p });
+  state.committedKeys = state.committedKeys || {};
+  const prior = state.committedKeys[key];
+  if (prior) { const rec = { ...prior, duplicate: true }; state.receipts.push(rec); return { rec, toolResult: { action: prior.action, status: 'duplicate', code: null, v2: true, idempotencyKey: key } }; }
+  const t0 = Date.now();
+  const before = state.outcomes.length;
+  const out = await commitRaw(state, p, handlers, { idempotencyKey: key });
+  const { rec } = out;
+  if (!rec.ok) {
+    state.outcomes.length = before; // a failed write is not booked / saved (A4)
+    let task = null;
+    try { task = await handlers.escalate({ reason: `write_failed:${p.tool}`, kind: 'outbox', name: state.slots.name || null, captured: { tool: p.tool, idempotencyKey: key, service: p.service || null, when: p.when ? `${p.when.date || ''} ${p.when.time || ''}`.trim() : null, place: p.place || null, items: p.items ? p.items.map((x) => `${x.qty} x ${x.name}`).join(', ') : null, callback_when: p.callbackWhen ? p.callbackWhen.say('en') : null } }); } catch { task = null; }
+    rec.outbox = task && task.ok !== false ? 'queued' : 'failed';
+    state.outcomes.push('write_failed');
+    state.record?.('failed', p, { errorCode: 'write_failed', outboxTaskId: task?.id || null, latencyMs: Date.now() - t0 });
+    out.toolResult.outbox = rec.outbox;
+  } else {
+    rec.idempotencyKey = key;
+    if (p.callbackWhen) rec.callbackSay = `${p.phoneSaid ? (L.isSw(state.lang) ? `kwa namba ${p.phoneSaid}` : `on ${p.phoneSaid}`) : (L.isSw(state.lang) ? 'kwa namba hii' : 'on this number')}, ${p.callbackWhen.say(state.lang)}`;
+    state.committedKeys[key] = rec;
+    state.record?.('committed', p, { writeTable: { create_booking: 'appointments', update_booking: 'appointments', cancel_booking: 'appointments', create_order: 'service_requests' }[p.tool] || 'tasks', writeId: rec.id || null, latencyMs: Date.now() - t0 });
+  }
+  out.toolResult.idempotencyKey = key;
+  return out;
+}
+async function commitRaw(state, p, handlers, extra = {}) {
   const s = state.slots;
   const name = s.name || null;
+  const ik = extra.idempotencyKey ? { idempotencyKey: extra.idempotencyKey } : {};
+  const cb = p.callbackWhen ? { phone: p.phone || null, callbackWhen: p.callbackWhen.say('en') } : {};
   let ok = false; let result = null; let action = p.tool;
   try {
     if (p.tool === 'create_booking') {
       action = 'create_appointment';
-      result = await handlers.createAppointment({ serviceName: p.service, whenText: `${p.when.date} ${p.when.time}`, windowStart: L.whenToIso(p.when), landmark: p.place, notes: p.landmark || undefined, name, ...(openCallbacks(state).length ? { supersedes: openCallbacks(state) } : {}) });
+      result = await handlers.createAppointment({ ...ik, serviceName: p.service, whenText: `${p.when.date} ${p.when.time}`, windowStart: L.whenToIso(p.when), landmark: p.place, notes: p.landmark || undefined, name, ...(openCallbacks(state).length ? { supersedes: openCallbacks(state) } : {}) });
       ok = Boolean(result && (result.id || result.dryRun === true)); state.outcomes.push('booked');
     } else if (p.tool === 'create_order') {
       action = 'create_service_request';
-      result = await handlers.createServiceRequest({ type: 'order', item: p.items.map((x) => `${x.qty} x ${x.name}`).join(', '), quantity: String(p.items.reduce((a, x) => a + x.qty, 0)), whenText: p.pickup.date, name, notes: p.items.map((x) => x.name).join(', ') });
+      result = await handlers.createServiceRequest({ ...ik, type: 'order', item: p.items.map((x) => `${x.qty} x ${x.name}`).join(', '), quantity: String(p.items.reduce((a, x) => a + x.qty, 0)), whenText: p.pickup.date, name, notes: p.items.map((x) => x.name).join(', ') });
       ok = Boolean(result && (result.id || result.dryRun === true)); state.outcomes.push('order_saved');
     } else if (p.tool === 'cancel_booking') {
       action = 'update_appointment';
@@ -279,7 +366,7 @@ async function commit(state, p, handlers) {
       result = await handlers.updateAppointment({ appointmentId: p.row.id, whenText: `${p.when.date} ${p.when.time}`, windowStart: L.whenToIso(p.when) });
       ok = Boolean(result && (result.id === p.row.id || result.dryRun === true)); state.outcomes.push('moved');
     } else if (p.tool === 'create_handoff') {
-      result = await handlers.escalate({ reason: p.reason === 'owner_only_change' ? `owner_only_change:${p.kind}` : `callback:${p.kind}`, name, captured: { place: p.place || null, booking: p.row?.id || null, missing: p.missing || null } });
+      result = await handlers.escalate({ ...ik, reason: p.reason === 'owner_only_change' ? `owner_only_change:${p.kind}` : `callback:${p.kind}`, name, captured: { place: p.place || null, booking: p.row?.id || null, missing: p.missing || null, ...cb } });
       ok = Boolean(result && result.ok !== false); state.outcomes.push(p.reason === 'owner_only_change' ? 'owner_only_change' : 'handoff_callback');
       // HD_4ec204aafa93: remember this call's open callback so a later booking supersedes it.
       if (ok && p.reason !== 'owner_only_change') state.callbacks.push({ id: result.id || result.taskId || null, kind: p.kind || 'callback', open: true });
@@ -321,6 +408,58 @@ function pendingChanged(p, state) {
   if (p.tool === 'create_booking') return p.service !== s.service || p.when.date !== s.when.date || p.when.time !== s.when.time || p.place !== s.place || (p.landmark || null) !== (s.landmark || null);
   if (p.tool === 'update_booking') return (s.new_when.date && s.new_when.date !== p.when.date) || (s.new_when.time && s.new_when.time !== p.when.time);
   return false;
+}
+
+// BRAIN_V2_COMMIT_SAFETY: any slot change against the proposal's hash re-proposes.
+function csChanged(p, state) {
+  const s = state.slots;
+  if (p.tool === 'create_booking') return CS.slotHash({ ...p, service: s.service, when: { ...s.when }, place: s.place, landmark: s.landmark || null }) !== p.slotHash;
+  if (p.tool === 'create_order') return CS.slotHash({ ...p, items: s.items, pickup: { ...s.when } }) !== p.slotHash;
+  return Boolean(pendingChanged(p, state));
+}
+// BRAIN_V2_COMMIT_SAFETY read-back turn: confirm only on the NEXT turn after the read-back, on an explicit
+// whole-answer yes or a repeat of the read-back time, with no slot diff. Returns a turn result, or null to
+// let the turn fall through to intent handling (after one re-read the read-back is dropped).
+async function confirmSafe(state, u, profile, handlers, out, results, myTurn = state.turn) {
+  const p = state.pending; const lang = state.lang || 'en';
+  mergeSlots(state, u, profile);
+  const q = () => (String(R.readback(p, lang) || '').match(/[^.!?]+\?\s*$/) || [''])[0].trim();
+  if (csChanged(p, state)) {
+    state.record?.('rejected', p, { errorCode: 'slot_diff' });
+    state.phase = 'collect'; state.pending = null;
+    const st = stepIntent(state, u, profile); if (st?.line) return out(st.line);
+    return null;
+  }
+  const nextTurn = myTurn === p.issuedTurn + 1;
+  const yesDone = u.done && /^\W*(yes|ndio|ndiyo)\b/i.test(u.text) && !/\?|\b(but|lakini|ila|wait|ngoja|subiri|no|hapana)\b/i.test(u.text);
+  // a repeat of the read-back time is a yes (Alvin's rule); the same time asked as a question is not
+  const echo = echoAffirms(p, u) && !/\?|\b(is it|will it|ni saa|je|but|lakini|ila|wait|ngoja)\b/i.test(u.text);
+  const yes = !u.no && !u.negation && (CS.explicitYes(u.text) || yesDone || echo);
+  if (yes && nextTurn) {
+    state.pending = null; state.phase = 'committing'; // consumed before any await: a second yes cannot redeem it
+    state.record?.('confirmed', p, { confirmedTurn: state.turn });
+    if (p.name && state.slots.name && typeof handlers.confirmCallerName === 'function') { try { const r = handlers.confirmCallerName({ name: state.slots.name, source: 'readback_yes' }); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch { /* never blocks */ } }
+    const { rec, toolResult } = await commit(state, p, handlers);
+    results.push(toolResult);
+    let line = R.receipt(rec, lang);
+    resetIntent(state);
+    if (rec.ok && p.tool === 'cancel_booking' && state.queuedBook) {
+      const qb = N.understand(state.queuedBook, { profile, now: state.now }); state.queuedBook = null;
+      if (qb.service) { state.intent = 'book'; mergeSlots(state, qb, profile); const st = stepIntent(state, qb, profile); if (st?.line) line = `${line.replace(/\s*(Anything else\?|Kuna kingine\?)$/, '')} ${st.line}`; }
+    }
+    if (yesDone && rec.ok) { state.ended = true; return out(`${line.replace(/\s*(Anything else\?|Kuna kingine\?)$/, '')} ${R.info({ kind: 'bye' }, lang)}`, { ackOk: true, end: true }); }
+    return out(line, { ackOk: true });
+  }
+  if (yes) return out(propose(state, { ...p })); // a yes that is not on the next turn: read back again, fresh token
+  if (u.no || u.done) { state.record?.('rejected', p, { errorCode: u.done ? 'caller_done' : 'caller_no' }); resetIntent(state); state.outcomes.push('declined'); return out(u.done ? R.info({ kind: 'bye' }, lang) : R.info({ kind: 'decline' }, lang), { end: u.done }); }
+  // "okay wait, let me check with my wife": nothing saved; the read-back stays open for the next turn
+  if (u.intents.includes('hold') || /\b(wait|ngoja|subiri|hold on|let me (check|ask|confirm|think)|nitaangalia|niulize|nifikirie)\b/i.test(u.text)) { p.issuedTurn = state.turn; return out(`${R.info({ kind: 'hold' }, lang)} ${q()}`); }
+  state.pendingRepeats = (state.pendingRepeats || 0) + 1;
+  if (state.pendingRepeats <= 1 && !state.echoAsked && !u.intents.length) { state.echoAsked = true; p.issuedTurn = state.turn; return out(R.ask('yes_no', 0, lang, { q: q() })); }
+  if (state.pendingRepeats <= 1) return out(propose(state, { ...p }));
+  state.pendingRepeats = 0; state.record?.('rejected', p, { errorCode: 'unclear' });
+  if (p.tool === 'create_handoff') resetIntent(state); else { state.phase = 'collect'; state.pending = null; }
+  return null;
 }
 
 function infoAnswer(state, u, profile, kind) {
@@ -483,6 +622,11 @@ function noteAck(state, line) { state.lastAckLed = isAckLed(line); if (state.las
 
 async function runTurnInner(state, { text, profile = {}, now = new Date(), handlers, model = null, classify = null, langLock = null, acked = false }) {
   state.turn += 1; state.now = now;
+  const myTurn = state.turn; // this turn's number even if another turn starts while this one awaits
+  if (csOn()) { // non-enumerable: never serialized with the state
+    Object.defineProperty(state, 'profileRef', { value: profile, writable: true, configurable: true, enumerable: false });
+    Object.defineProperty(state, 'record', { value: CS.makeRecorder(handlers, state), writable: true, configurable: true, enumerable: false });
+  }
   const prevLang = state.lang;
   // langLock (Voice #677): the call language is owned by Voice; never flip mid-turn.
   state.lang = (langLock === 'en' || langLock === 'sw') ? langLock : (L.nextLanguage(state.lang, text) || state.lang);
@@ -531,7 +675,11 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     } catch { /* keep regex reading */ }
   }
   const lang = state.lang || 'en';
-  const out = (line0, extra = {}) => { const line = applyAckRule(state, line0, { ackOk: !!extra.ackOk, acked: !!acked, callerAck: !!u.ack, lang }); const l = line && (line === state.lastLine || line === state.lastBase) ? (() => { const n = state.repeatN = (state.repeatN || 0) + 1; let v = R.vary(line, lang, n); if (v === state.lastLine) v = R.vary(line, lang, n, true); return v; })() : line; state.lastBase = line; state.lastLine = l; noteAck(state, l); return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end, ...(extra.end ? { endReason: extra.endReason || 'caller_done' } : {}) }; };
+  let out = (line0, extra = {}) => { const line = applyAckRule(state, line0, { ackOk: !!extra.ackOk, acked: !!acked, callerAck: !!u.ack, lang }); const l = line && (line === state.lastLine || line === state.lastBase) ? (() => { const n = state.repeatN = (state.repeatN || 0) + 1; let v = R.vary(line, lang, n); if (v === state.lastLine) v = R.vary(line, lang, n, true); return v; })() : line; state.lastBase = line; state.lastLine = l; noteAck(state, l); return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end, ...(extra.end ? { endReason: extra.endReason || 'caller_done' } : {}) }; };
+  if (csOn()) { // any line that ends on the read-back question re-arms the confirm token for the caller's next turn
+    const out0 = out;
+    out = (line0, extra) => { const r = out0(line0, extra); const p = state.phase === 'readback' && state.pending; if (p) { const q = (String(R.readback(p, lang) || '').match(/[^.!?]+\?\s*$/) || [''])[0].trim(); if (q && String(r.line || '').trim().endsWith(q)) p.issuedTurn = state.turn; } return r; };
+  }
   if (areaQ) return out(areaQ);
 
   // HD_db0e864043c1 fixes -------------------------------------------------
@@ -590,9 +738,11 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     const infoKind = u.intents.find((i) => INFO.includes(i) && i !== 'want_know') || (u.intents.includes('want_know') ? 'want_know' : null);
     if (infoKind) {
       state.lastInfo = infoKind;
+      if (csOn()) { const ans = infoAnswer(state, u, profile, infoKind).replace(/\s*(Anything else\?|Kuna kingine\?)$/, ''); return out(`${ans} ${propose(state, { ...state.pending })}`); }
       return out(infoAnswer(state, u, profile, infoKind));
     }
   }
+  if (csOn() && state.phase === 'readback' && state.pending) { const r = await confirmSafe(state, u, profile, handlers, out, results, myTurn); if (r) return r; }
   if (state.phase === 'readback' && state.pending) {
     const p = state.pending;
     mergeSlots(state, u, profile);
@@ -699,13 +849,13 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
 }
 
 function finishCall(state, { businessName, callerPhone }) {
-  const order = ['owner_only_change', 'complaint', 'booked', 'order_saved', 'moved', 'cancelled', 'handoff_callback'];
+  const order = ['owner_only_change', 'complaint', 'booked', 'order_saved', 'moved', 'cancelled', 'handoff_callback', 'write_failed'];
   let outcome = order.find((o) => state.outcomes.includes(o));
   const s = state.slots;
   if (!outcome) outcome = state.intent && (s.service || s.items.length || s.when.date) ? 'abandoned_with_capture' : state.lastInfo ? 'answered' : 'no_action';
   const last = state.receipts[state.receipts.length - 1];
   const captured = { service: s.service || last?.service, when: (s.when.date || last?.when?.date) ? `${s.when.date || last.when.date} ${s.when.time || last?.when?.time || ''}` : null, place: s.place, items: (s.items.length ? s.items : last?.items || []).map((x) => `${x.qty || '?'} x ${x.name}`).join(', ') || null, booking: last?.row ? `${last.row.service} ${last.row.when.date}` : null };
-  const intent = { booked: 'book', order_saved: 'order', moved: 'change', cancelled: 'cancel', owner_only_change: last?.kind === 'payment' ? 'payment_change' : 'address_change', complaint: 'complaint', handoff_callback: 'handoff' }[outcome] || state.intent || state.lastInfo || 'none';
+  const intent = { booked: 'book', order_saved: 'order', moved: 'change', cancelled: 'cancel', owner_only_change: last?.kind === 'payment' ? 'payment_change' : 'address_change', complaint: 'complaint', handoff_callback: 'handoff', write_failed: INTENT_OF_TOOL[last?.tool] || 'none' }[outcome] || state.intent || state.lastInfo || 'none';
   const superseded = (state.callbacks || []).some((c) => c.supersededBy !== undefined && !c.open);
   if (superseded && outcome === 'booked') captured.note = 'earlier callback request closed: booked instead';
   return { outcome, superseded: (state.callbacks || []).filter((c) => !c.open).map((c) => c.id).filter(Boolean), ownerText: renderOwnerMessage({ businessName, callerPhone, name: s.name, intent, outcome, captured }) };

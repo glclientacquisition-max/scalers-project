@@ -274,7 +274,7 @@ test('HD_db0e864043c1: no memory claim without file evidence; never "wewe ni nan
   assert.equal(b.out[1].line, b.out[0].line);
   const c = await run(['I want to book sofa cleaning.', 'Of Naivasha?', 'Yeah.', 'Oh, ume-escalatea nani specifically?'], handlers);
   assert.match(c.out[1].line, /Naivasha isn't on our list.*call you back/);
-  assert.match(c.out[2].line, /call you back on this number/);
+  assert.match(c.out[2].line, /call you back on (this number|0700 000 001, today before 18:00)/); // BRAIN_V2_COMMIT_SAFETY states the number + when
   assert.match(c.out[3].line, /asked the business team to call you back/);
   const d = await run(['Uh, and where do you serve, like, so that I know if I can place a booking?'], handlers);
   assert.match(d.out[0].line, /We serve/);
@@ -329,7 +329,9 @@ test('an hours ask during an open booking does not glue the next slot', async ()
     'Mnafungua saa ngapi?',
   ]);
   assert.match(out[1].line, /08:00|18:00|wazi|open/i);
-  assert.doesNotMatch(out[1].line, /Shall I book|Nithibitishe|Siku gani/);
+  // BRAIN_V2_COMMIT_SAFETY restates the whole read-back after an info answer (fresh confirm token); never a glued slot ask
+  if (/^(1|true|on|yes)$/i.test(String(process.env.BRAIN_V2_COMMIT_SAFETY || ''))) assert.match(out[1].line, /wazi.*\. Sofa Cleaning, Ijumaa 16 Oktoba saa nne asubuhi, Kitengela, kwa Alvin\. Nithibitishe\?$/);
+  else assert.doesNotMatch(out[1].line, /Shall I book|Nithibitishe|Siku gani/);
 });
 
 const JIRANI = {

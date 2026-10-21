@@ -2077,6 +2077,13 @@ async function getCallerMemory({ tenantId, phone } = {}) {
 
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
 
+// BRAIN_V2_COMMIT_SAFETY: v2's idempotency key (call + tool + slot hash) lands on the row's
+// idempotency_key column (Platform #691) only when WRITE_RECEIPTS is on, i.e. that SQL is applied.
+function writeReceiptKeyColumn(key) {
+  if (!key || !/^(1|true|on|yes)$/i.test(String(process.env.WRITE_RECEIPTS || ''))) return {};
+  return { idempotency_key: String(key).slice(0, 200) };
+}
+
 /**
  * Create a service request (hold / enquiry / order) for retail completion.
  * Also upserts contact and mirrors a short note into call summary when callSid given.
@@ -2091,6 +2098,7 @@ async function createServiceRequest({
   quantity,
   whenText,
   notes,
+  idempotencyKey,
 } = {}) {
   let resolvedTenantId = tenantId || null;
   let callRow = null;
@@ -2135,6 +2143,7 @@ async function createServiceRequest({
       caller_name: callerName,
       caller_phone: callerPhone,
       updated_at: new Date().toISOString(),
+      ...writeReceiptKeyColumn(idempotencyKey),
     })
     .select('*')
     .maybeSingle();
@@ -2245,6 +2254,7 @@ async function createAppointment({
   address,
   notes,
   windowStart,
+  idempotencyKey,
   windowEnd,
 } = {}) {
   let resolvedTenantId = tenantId || null;
@@ -2295,6 +2305,7 @@ async function createAppointment({
       caller_name: callerName,
       caller_phone: callerPhone,
       updated_at: new Date().toISOString(),
+      ...writeReceiptKeyColumn(idempotencyKey),
     })
     .select('*')
     .maybeSingle();

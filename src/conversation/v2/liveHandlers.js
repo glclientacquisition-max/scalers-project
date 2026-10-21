@@ -10,7 +10,7 @@ function succeeded(row) {
   return row && (row.status === 'succeeded' || row.status === 'updated' || row.status === 'ok');
 }
 
-function createLiveHandlers({ applyTools } = {}) {
+function createLiveHandlers({ applyTools, ctx = {} } = {}) {
   if (typeof applyTools !== 'function') {
     throw new Error('createLiveHandlers needs applyTools');
   }
@@ -33,7 +33,16 @@ function createLiveHandlers({ applyTools } = {}) {
     escalate: async (args) => {
       const execution = await applyTools({ escalate: args });
       const row = first(execution?.results, 'escalate');
-      return { ok: !row || succeeded(row) || row.status !== 'failed' };
+      return { ok: !row || succeeded(row) || row.status !== 'failed', id: row?.id || row?.taskId || null };
+    },
+    // BRAIN_V2_COMMIT_SAFETY: Platform #845 receipts (never throws) and #844 name confirm (after a read-back yes).
+    recordWriteReceipt: async (rec) => {
+      if (typeof ctx.recordWriteReceipt !== 'function') return { ok: false, skipped: 'no_sink' };
+      try { return await ctx.recordWriteReceipt({ ...rec, tenantId: ctx.tenantId || null, callId: ctx.callId || ctx.callSid || null, callSid: ctx.callSid || null }); } catch (e) { return { ok: false, error: String(e?.message || e) }; }
+    },
+    confirmCallerName: async ({ name, source = 'readback_yes' } = {}) => {
+      if (typeof ctx.confirmCallerName !== 'function') return { ok: false, skipped: 'no_confirm_caller_name' };
+      try { return await ctx.confirmCallerName({ tenantId: ctx.tenantId || null, phone: ctx.callerPhone || null, name, source, callId: ctx.callId || null }); } catch (e) { return { ok: false, error: String(e?.message || e) }; }
     },
     saveCallerInfo: async (args) => {
       const execution = await applyTools({ saveCallerInfo: args, name: args?.name });
