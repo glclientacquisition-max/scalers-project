@@ -95,7 +95,24 @@ test('server wiring: the owned v2 turn returns before any v1 path, and skips the
 test('server wiring: no turn re-opens after v2 ended (runCallerTurn guard), finishCall at hangup', () => {
   const rc = SERVER.slice(SERVER.indexOf('async function runCallerTurn('), SERVER.indexOf('async function runCallerTurn(') + 1500);
   assert.match(rc, /ownedV2Calls\.ended\(sidLabel\(\)\)/);
-  assert.match(SERVER, /async function markCallTerminalFromWebhook\(args\) \{\n  finishOwnedV2Call\(args\?\.callSid/);
+  assert.match(SERVER, /onTerminal: \(\{ callSid, provisional, source \}\) => finishOwnedV2Call\(callSid, \{ provisional, source \}\)/);
+});
+
+test('the shared finalizer calls onTerminal on every terminal event, before its own work, and survives a throwing hook', async () => {
+  const { createCallFinalizer } = require('../src/callFinalize');
+  const seen = [];
+  const fin = createCallFinalizer({
+    db: { updateCallStatus: async () => ({ finalizeWinner: true }), mergeCallSummaryMeta: async () => ({}) },
+    endedCalls: { endedCallGuardEnabled: () => false },
+    persistCallResolution: async () => { seen.push('persist'); },
+    persistFirstForwardAcceptance: async () => {},
+    finalizeOnceEnabled: () => false,
+    finalizeDecision: () => 'run',
+    onTerminal: (e) => { seen.push(`hook:${e.callSid}:${e.provisional}`); throw new Error('hook boom'); },
+    log: { log() {}, warn() {}, error() {} },
+  });
+  await fin({ callSid: 'HD_x', status: 'complete', source: 'test', provisional: true });
+  assert.deepEqual(seen, ['hook:HD_x:true', 'persist']);
 });
 
 test('finishCall runs exactly once per call: double hangup, reconnect and a second terminal webhook get the cached result', withEnv(LIVE_ON, async () => {

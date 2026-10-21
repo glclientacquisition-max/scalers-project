@@ -1438,6 +1438,8 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
 // src/callFinalize.js and src/speech/endedCalls.js.
 const markCallTerminal = createCallFinalizer({
   db,
+  // BRAIN_V2_OWNS_CALL: v2's machine.finishCall, once per call, on the first terminal event.
+  onTerminal: ({ callSid, provisional, source }) => finishOwnedV2Call(callSid, { provisional, source }),
   endedCalls,
   persistCallResolution: (...args) => persistCallResolution(...args),
   persistFirstForwardAcceptance: (...args) => persistFirstForwardAcceptance(...args),
@@ -1480,7 +1482,6 @@ function finishOwnedV2Call(callSid, { provisional = false, source = 'hangup' } =
 }
 
 async function markCallTerminalFromWebhook(args) {
-  finishOwnedV2Call(args?.callSid, { provisional: args?.provisional === true, source: args?.source || 'hangup' });
   return markCallTerminal(args);
 }
 

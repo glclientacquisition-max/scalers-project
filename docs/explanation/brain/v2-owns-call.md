@@ -5,7 +5,7 @@ last_reviewed: 2026-10-21
 
 # BA v2 owns the call (`BRAIN_V2_OWNS_CALL`, off by default)
 
-Plan row C3 (`briefs/v2-greeting-and-path-plan.md`). Code: `src/conversation/v2/ownsCall.js`, wired in `server.js` (the `/ws/media` turn, `applyGeminiTools`, `markCallTerminalFromWebhook`).
+Plan row C3 (`briefs/v2-greeting-and-path-plan.md`). Code: `src/conversation/v2/ownsCall.js`, wired in `server.js` (the `/ws/media` turn, `applyGeminiTools`) and `src/callFinalize.js` (`onTerminal` hook).
 
 It acts only with `BRAIN_V2=on` and `BRAIN_V2_MODE=live`, for tenants allowed by `BRAIN_V2_TENANTS`. With the flag on:
 
