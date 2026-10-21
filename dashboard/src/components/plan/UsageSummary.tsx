@@ -17,7 +17,7 @@ export type UsageListRow = {
   left: number;
 };
 
-const TEAM_HREF = "/settings?tab=train&panel=team";
+const TEAM_HREF = "/settings/team";
 
 function AllowanceRow({ row, footer }: { row: UsageListRow; footer?: (tone: MeterTone) => ReactNode }) {
   const tone = meterTone(row.used, row.included, null);

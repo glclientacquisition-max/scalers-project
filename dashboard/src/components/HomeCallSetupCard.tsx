@@ -7,7 +7,7 @@ import { saveCallSetupAction } from "@/app/onboarding/line/callSetupActions";
 import { browserCallSetupStore, showFinishCallsCard } from "@/lib/callSetupStore";
 import { callSetupCardMode, shortDay, worksTitle, type CallSetupCardMode, type CallSetupStatus } from "@/lib/callSetupStatus";
 
-export const CALLS_SETTINGS_HREF = "/settings?tab=calls";
+export const CALLS_SETTINGS_HREF = "/settings/calls";
 
 const cardClass =
   "mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-2xl border border-hairline bg-surface px-4 py-3";

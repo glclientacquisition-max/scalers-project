@@ -68,12 +68,91 @@ export function parseBusinessSettingsPanel(
   return "identity";
 }
 
+/**
+ * Settings sections live at `/settings/[section]`. One slug per destination.
+ * Old `?tab=` / `?panel=` links get a 308 to these paths (see `legacySettingsRedirect`).
+ * `/settings/plan` and `/settings/billing` are their own static routes and are not slugs here.
+ */
+export type SettingsSection =
+  | "identity"
+  | "hours"
+  | "locations"
+  | "policies"
+  | "catalogue"
+  | "import"
+  | "faqs"
+  | "assistant-say"
+  | "voice"
+  | "pronunciation"
+  | "test"
+  | "calls"
+  | "team"
+  | "notify";
+
+type SectionView = { tab: Exclude<BusinessSettingsTab, "menu">; trainPanel: SettingsPanel };
+
+const SECTION_VIEWS: Record<SettingsSection, SectionView> = {
+  identity: { tab: "train", trainPanel: "identity" },
+  hours: { tab: "train", trainPanel: "hours" },
+  locations: { tab: "train", trainPanel: "locations" },
+  policies: { tab: "train", trainPanel: "policies" },
+  catalogue: { tab: "catalog", trainPanel: "identity" },
+  import: { tab: "import", trainPanel: "identity" },
+  faqs: { tab: "train", trainPanel: "faqs" },
+  "assistant-say": { tab: "assistant-say", trainPanel: "identity" },
+  voice: { tab: "train", trainPanel: "tools" },
+  pronunciation: { tab: "train", trainPanel: "pronunciation" },
+  test: { tab: "test", trainPanel: "identity" },
+  calls: { tab: "calls", trainPanel: "identity" },
+  team: { tab: "train", trainPanel: "team" },
+  notify: { tab: "alerts", trainPanel: "identity" },
+};
+
+export const SETTINGS_SECTIONS = Object.keys(SECTION_VIEWS) as SettingsSection[];
+
+/** `/settings/[section]` slug to the tab and panel the existing shell renders. Unknown slug: null. */
+export function parseSettingsSection(raw: string | undefined | null): SectionView | null {
+  const key = String(raw || "");
+  return Object.prototype.hasOwnProperty.call(SECTION_VIEWS, key)
+    ? SECTION_VIEWS[key as SettingsSection]
+    : null;
+}
+
+/** Tab and panel to its slug. The Settings home (`menu`) has none. */
+export function settingsSectionSlug(tab: BusinessSettingsTab, panel?: SettingsPanel | null): SettingsSection | null {
+  if (tab === "menu") return null;
+  if (tab === "train") {
+    if (panel === "catalog") return "catalogue";
+    const p = panel ?? "identity";
+    return p === "tools" ? "voice" : p;
+  }
+  if (tab === "catalog") return "catalogue";
+  if (tab === "alerts") return "notify";
+  return tab;
+}
+
 export function businessSettingsHref(tab: BusinessSettingsTab, panel?: SettingsPanel) {
-  if (tab === "menu") return "/settings";
-  const q = new URLSearchParams();
-  q.set("tab", tab);
-  if (tab === "train" && panel) q.set("panel", panel);
-  return `/settings?${q.toString()}`;
+  const slug = settingsSectionSlug(tab, panel);
+  return slug ? `/settings/${slug}` : "/settings";
+}
+
+/**
+ * Old bookmark or link: `/settings?tab=..&panel=..` to `/settings/[section]`.
+ * Other query params (Team paging: members, invites) ride along. Returns null when there is
+ * nothing to redirect (no `tab` or `panel`), so plain `/settings` stays the Settings home.
+ */
+export function legacySettingsRedirect(search: string | URLSearchParams | null | undefined): string | null {
+  const params = new URLSearchParams(typeof search === "string" ? search.replace(/^\?/, "") : search ?? undefined);
+  if (!params.has("tab") && !params.has("panel")) return null;
+  const tabRaw = params.get("tab");
+  const panelRaw = params.get("panel");
+  const tab = parseBusinessSettingsTab(tabRaw, panelRaw);
+  const panel = parseBusinessSettingsPanel(panelRaw, tabRaw);
+  params.delete("tab");
+  params.delete("panel");
+  const rest = params.toString();
+  const path = businessSettingsHref(tab, panel);
+  return rest ? `${path}?${rest}` : path;
 }
 
 /** Sidebar target. Same tabs and panels. Grouped by owner job. */
@@ -102,7 +181,7 @@ export type SettingsNavSection = {
  * Import sits directly under Catalog. Team is People, ahead of Alerts.
  * Plan and Billing are the last section. The rail shows them to the owner and an admin.
  * Appearance is the account-menu theme cluster. It is not a settings tab.
- * URLs stay `?tab=` / `?panel=`.
+ * URLs are `/settings/[section]`; old `?tab=` / `?panel=` links redirect.
  */
 export const SETTINGS_NAV: SettingsNavSection[] = [
   {

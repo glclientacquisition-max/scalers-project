@@ -324,7 +324,7 @@ describe("wiring and write path", () => {
 
   it("Overview card: nudge links to Settings and saves dismissal on the account", () => {
     const card = readFileSync("dashboard/src/components/HomeCallSetupCard.tsx", "utf8");
-    assert.match(card, /CALLS_SETTINGS_HREF = "\/settings\?tab=calls"/);
+    assert.match(card, /CALLS_SETTINGS_HREF = "\/settings\/calls"/);
     assert.match(card, /Check your call setup/);
     assert.match(card, /nudge_dismissed_at/);
     assert.match(card, /auto_seen_at/);

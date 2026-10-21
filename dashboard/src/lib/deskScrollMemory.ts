@@ -7,6 +7,9 @@ const LIST_ROOTS = new Set([
   "/contacts",
   "/wallet",
   "/settings",
+  // Settings sections that were never nested (old ?tab=calls, ?tab=assistant-say).
+  "/settings/calls",
+  "/settings/assistant-say",
   "/requests",
   "/appointments",
 ]);

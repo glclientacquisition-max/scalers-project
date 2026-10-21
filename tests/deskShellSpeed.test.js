@@ -28,7 +28,7 @@ describe("desk shell speed", () => {
   const layout = read("dashboard/src/app/(desk)/layout.tsx");
   const home = read("dashboard/src/app/(desk)/home/page.tsx");
   const inbox = read("dashboard/src/app/(desk)/calls/page.tsx");
-  const settings = read("dashboard/src/app/(desk)/settings/page.tsx");
+  const settings = read("dashboard/src/app/(desk)/settings/SettingsBody.tsx");
 
   it("gates chrome on the cookie and a thin tenant, then suspends the page slot", () => {
     assert.match(layout, /getAuthUser\(\)/);

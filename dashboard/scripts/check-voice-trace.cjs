@@ -8,7 +8,7 @@ const { VOICE_ENTRIES } = require('./voice-modules.cjs');
 
 const DASH = path.join(__dirname, '..');
 const SERVER = path.join(DASH, '.next', 'server', 'app');
-const ROUTES = ['(desk)/settings/page', '(desk)/home/page'];
+const ROUTES = ['(desk)/settings/page', '(desk)/settings/[section]/page', '(desk)/home/page'];
 const need = VOICE_ENTRIES.map((e) => path.join(DASH, '.voice', e));
 
 let bad = 0;

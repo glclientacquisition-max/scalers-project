@@ -10,6 +10,7 @@ import {
 } from "@/lib/adminHost";
 import { rootAuthForward } from "@/lib/authRedirect";
 import { ADMIN_CACHE_CONTROL, adminGateRedirect, isNoStoreAdminPath } from "@/lib/adminGate";
+import { legacySettingsRedirect } from "@/lib/businessSettingsNav";
 
 /**
  * Super Admin gate. Runs before any page code: no admin cookie means a redirect with no body.
@@ -55,6 +56,12 @@ export function proxy(request: NextRequest) {
     dest.host = adminHost;
     dest.port = "";
     return NextResponse.redirect(dest);
+  }
+
+  // Old Settings links (`/settings?tab=..&panel=..`) moved to `/settings/[section]`.
+  if (path === "/settings") {
+    const moved = legacySettingsRedirect(request.nextUrl.searchParams);
+    if (moved) return NextResponse.redirect(new URL(moved, request.url), 308);
   }
 
   const split = appHostRedirect(hostname, path);

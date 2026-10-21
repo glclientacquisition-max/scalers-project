@@ -23,16 +23,17 @@ test("route: ?tab=train&panel=catalog opens the Catalogue, not Identity", () => 
   assert.equal(nav.parseBusinessSettingsTab("catalog", null), "catalog");
   assert.equal(nav.parseBusinessSettingsTab("train", "policies"), "train");
   assert.equal(nav.parseBusinessSettingsTab("identity", "catalog"), "train");
-  assert.equal(nav.businessSettingsHref("catalog"), "/settings?tab=catalog");
+  assert.equal(nav.businessSettingsHref("catalog"), "/settings/catalogue");
 });
 
 test("route: Overview links use the Catalogue tab and both pages pass the panel", () => {
   const slots = read("dashboard/src/components/structured/StructuredSettingsSlots.tsx");
   assert.doesNotMatch(slots, /businessSettingsHref\("train", "catalog"\)/);
-  assert.match(slots, /UNPRICED_HREF = `\$\{businessSettingsHref\("catalog"\)\}&filter=unpriced`/);
-  for (const page of ["dashboard/src/app/(desk)/settings/page.tsx", "dashboard/src/app/dev/settings-jobs/page.tsx"]) {
-    assert.match(read(page), /parseBusinessSettingsTab\(tabRaw, panelRaw\)/);
-  }
+  assert.match(slots, /UNPRICED_HREF = `\$\{businessSettingsHref\("catalog"\)\}\?filter=unpriced`/);
+  // Live Settings: /settings/[section]; old ?tab=&panel= links 308 there via the same parser.
+  assert.match(read("dashboard/src/lib/businessSettingsNav.ts"), /parseBusinessSettingsTab\(tabRaw, panelRaw\)/);
+  assert.match(read("dashboard/src/app/dev/settings-jobs/page.tsx"), /parseBusinessSettingsTab\(tabRaw, panelRaw\)/);
+  assert.equal(nav.legacySettingsRedirect("tab=train&panel=catalog"), "/settings/catalogue");
 });
 
 // --- 2. Policies copy ------------------------------------------------------------
