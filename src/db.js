@@ -2464,43 +2464,41 @@ async function getCallerMemory({ tenantId, phone } = {}) {
   throwIfError('getCallerMemory(contact)', findErr);
   if (!contact) return null;
 
+  let openRequests;
+  let openAppointments;
+  let nextAppointment;
+  let recentAppointments;
   if (queryBatchingEnabled()) {
-    // Same five reads and the same card, in parallel (N+1 audit #1).
-    const [openRequests, openAppointments, nextAppointment, recentAppointments] = await Promise.all([
+    // Same five reads and the same card, in parallel (N+1 audit #1). Falls
+    // through so #844's lastLanguage / nameConfirmed land on both paths.
+    [openRequests, openAppointments, nextAppointment, recentAppointments] = await Promise.all([
       listOpenRequestsForCaller(tenantId, contact.id, phoneNorm, { parallel: true }),
       listStillOpenAppointmentsForCaller(tenantId, contact.id, phoneNorm),
       listNextAppointmentForCaller(tenantId, contact.id, phoneNorm),
       listRecentAppointmentsForCaller(tenantId, contact.id, phoneNorm),
     ]);
-    return buildCallerMemoryCard({
-      contact,
-      openRequests,
-      openAppointments,
-      nextAppointment,
-      recentAppointments,
-    });
+  } else {
+    openRequests = await listOpenRequestsForCaller(
+      tenantId,
+      contact.id,
+      phoneNorm
+    );
+    openAppointments = await listStillOpenAppointmentsForCaller(
+      tenantId,
+      contact.id,
+      phoneNorm
+    );
+    nextAppointment = await listNextAppointmentForCaller(
+      tenantId,
+      contact.id,
+      phoneNorm
+    );
+    recentAppointments = await listRecentAppointmentsForCaller(
+      tenantId,
+      contact.id,
+      phoneNorm
+    );
   }
-
-  const openRequests = await listOpenRequestsForCaller(
-    tenantId,
-    contact.id,
-    phoneNorm
-  );
-  const openAppointments = await listStillOpenAppointmentsForCaller(
-    tenantId,
-    contact.id,
-    phoneNorm
-  );
-  const nextAppointment = await listNextAppointmentForCaller(
-    tenantId,
-    contact.id,
-    phoneNorm
-  );
-  const recentAppointments = await listRecentAppointmentsForCaller(
-    tenantId,
-    contact.id,
-    phoneNorm
-  );
   const card = buildCallerMemoryCard({
     contact,
     openRequests,
