@@ -25,8 +25,10 @@ test('flag: off by default and for falsy values; on for on/1/true; tenant allowl
 
 test('flag off: server.js hook is fully guarded and lazy (no v2 load, no runner)', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  const i = src.indexOf('if (brainV2ShadowEnabled({ tenantId: brainProfile?.id }))');
+  // Guard: shadow flag on AND not BA v2 live (live speaks; shadow is skipped while live).
+  const i = src.search(/if \(\s*brainV2ShadowEnabled\(\{ tenantId: brainProfile\?\.id \}\)/);
   assert.ok(i > 0, 'hook guarded by flag');
+  assert.match(src.slice(i, i + 240), /!\(brainV2Enabled\(\{ tenantId: brainProfile\?\.id \}\) && brainV2Mode\(\) === 'live'\)/, 'shadow skipped while live');
   const hook = src.slice(i, src.indexOf('const turnMatches', i));
   assert.match(hook, /void brainV2Shadow/);
   assert.doesNotMatch(hook, /await /, 'never awaited on the live path');
