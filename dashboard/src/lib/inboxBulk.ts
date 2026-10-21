@@ -115,6 +115,18 @@ export function inboxBulkPlan(kind: InboxBulkKind, items: InboxItem[]): InboxBul
       rowId = item.hold?.id;
     } else {
       if (!item.lead) {
+        // A request archived with its call (inbox_archived_at): Unarchive
+        // brings its call back, and the request with it.
+        const withCall = Boolean(item.hold?.inbox_archived_at || item.job?.inbox_archived_at);
+        const callId = String(item.callId || "").trim();
+        if (kind === "unarchive" && withCall && callId) {
+          targets.push({ itemId: item.id, rowId: callId, callId });
+          if (!seen.has(callId)) {
+            seen.add(callId);
+            ids.push(callId);
+          }
+          continue;
+        }
         skipped.push({ itemId: item.id, reason: item.hold || item.job ? "open_request" : "not_eligible" });
         continue;
       }
@@ -172,6 +184,11 @@ export type InboxBulkRun = {
   skipped: InboxBulkSkip[];
   /** Rows selected. */
   selected: number;
+  /**
+   * Archive only: selected request rows (no call row of their own) the
+   * server archived together with their call (inbox_archive_calls).
+   */
+  cascaded?: InboxBulkTarget[];
   error?: string;
   notice?: string;
 };
@@ -215,7 +232,8 @@ export function inboxBulkOutcomeText(kind: InboxBulkKind, run: InboxBulkRun): st
   if (run.error) return run.error;
   const left = run.missed.length + run.skipped.length;
   if (!left) return null;
-  const parts = [`${run.applied.length} of ${run.selected} ${DONE_WORD[kind]}.`];
+  const done = run.applied.length + (run.cascaded?.length ?? 0);
+  const parts = [`${done} of ${run.selected} ${DONE_WORD[kind]}.`];
   const open = run.skipped.filter((s) => s.reason === "open_request").length;
   const other = run.skipped.length - open;
   if (open) {

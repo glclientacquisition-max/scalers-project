@@ -484,7 +484,8 @@ describe("inbox verb workflows: surfaces as shipped", () => {
     assert.doesNotMatch(ticket, /MarkLeadDoneButton/);
     assert.match(view, /InboxPurposeChip/);
     assert.match(view, /<InboxTicketActionDock/);
-    assert.match(view, /updateLeadStatus\(callId, next\)/);
+    assert.match(view, /inboxUnarchiveCall\(callId\)/);
+    assert.match(view, /inboxArchiveCall\(callId\)/);
     const dock = read("dashboard/src/components/InboxTicketActionDock.tsx");
     assert.match(dock, /updateLeadStatus\(callId, "resolved"\)/);
   });

@@ -16,8 +16,8 @@ export type CountableItem = {
   needsYou: boolean;
   createdAt: string;
   lead?: { leadStatus?: string | null } | null;
-  hold?: { status?: string | null; request_type?: string | null } | null;
-  job?: { status?: string | null } | null;
+  hold?: { status?: string | null; request_type?: string | null; inbox_archived_at?: string | null } | null;
+  job?: { status?: string | null; inbox_archived_at?: string | null } | null;
 };
 
 /** A call row still "in progress" after this long is a stale status, not a live call. */
@@ -34,8 +34,15 @@ function lower(raw: unknown): string {
   return String(raw || "").trim().toLowerCase();
 }
 
+/**
+ * The call row is archived, or a hold/visit row with no call row of its own
+ * was archived with its call (inbox_archive_calls stamps inbox_archived_at).
+ * The loader clears a stamp whose call is no longer archived, so an
+ * Unarchive of the call brings its requests back.
+ */
 export function countIsArchived(item: CountableItem): boolean {
-  return item.lead?.leadStatus === "archived";
+  if (item.lead) return item.lead.leadStatus === "archived";
+  return Boolean(item.hold?.inbox_archived_at || item.job?.inbox_archived_at);
 }
 
 /** Live only while the call is recent. An old in_progress row is history. */

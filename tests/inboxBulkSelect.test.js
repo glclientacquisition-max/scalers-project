@@ -122,9 +122,9 @@ describe("inbox bulk select", () => {
     assert.doesNotMatch(select, /inboxDelete/);
     assert.doesNotMatch(select, /inboxToggleRead/);
     assert.doesNotMatch(select, /inboxSnooze/);
-    assert.match(select, /if \(kind === "archive" \|\| kind === "unarchive"\) \{\n      for \(const target of res\.applied\) patch\(target\.itemId, \{ hidden: true \}\);/);
+    assert.match(select, /if \(kind === "archive" \|\| kind === "unarchive"\) \{\n      for \(const target of \[\.\.\.res\.applied, \.\.\.\(res\.cascaded \?\? \[\]\)\]\) patch\(target\.itemId, \{ hidden: true \}\);/);
     assert.doesNotMatch(select, /kind === "mark_done"[\s\S]{0,400}patch\(target.itemId, \{ hidden/);
-    assert.match(actions, /updateLeadStatus\(item\.callId, "archived"\)/);
+    assert.match(actions, /sendInboxArchive\(items, inboxArchiveCallsAction/);
     assert.match(actions, /status", "confirmed"/);
     assert.match(actions, /status", "fulfilled"/);
     assert.match(select, />\s*Cancel\s*</);
