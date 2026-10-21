@@ -3954,6 +3954,11 @@ mediaWss.on('connection', (ws, req) => {
             if (spoken?.ok !== false) {
               spokeThisTurn = true;
               messages.push({ role: 'assistant', content: live.line, local: true });
+              // VOICE_END_CALL_HONOUR: v2 { end: true } hangs up once, after this line plays.
+              const v2End = endSignalFromBrain(live);
+              if (v2End.end && requestEndCall(v2End.source, v2End.reason)) {
+                console.log(`[ws/media][${callKey}] end-call signal source=${v2End.source}: hangup after audio`);
+              }
               return;
             }
           }

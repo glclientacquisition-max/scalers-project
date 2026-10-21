@@ -309,4 +309,7 @@ describe('server.js wiring', () => {
     const flag = body.indexOf('speechOutageStarted = true');
     assert.ok(guard > 0 && guard < flag && flag < alert, 'guard runs first');
   });
+  it('v2 live: { end: true } after the spoken line requests the one hangup', () => {
+    assert.match(src, /const v2End = endSignalFromBrain\(live\);\n\s*if \(v2End\.end && requestEndCall\(v2End\.source, v2End\.reason\)\)/);
+  });
 });
