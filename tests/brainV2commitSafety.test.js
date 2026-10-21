@@ -237,6 +237,35 @@ for (const [lang, ask, echoWindow, other, otherRb, hold, question] of [
   }));
 }
 
+// SW re-ask parity: "okay wait" / an unclear answer re-asks the same content in EN and SW: a short
+// "take your time" (or "sorry") plus that tool's yes/no question; the SW callback question keeps the
+// number and when, as EN's does, never a bare "Ni sawa?".
+test('re-ask parity: every tool re-asks the same content in EN and SW', withFlag(async () => {
+  const cases = {
+    booking: [{}, [BOOK_EN], [BOOK_SW], 'Shall I book it?', 'Nithibitishe?'],
+    order: [{ profile: RS }, ["I'd like to order 2 diaries, pick up tomorrow. I am Brian."], ['Habari, nataka kuagiza diary moja, nitaichukua kesho. Naitwa Brian.'], 'Shall I place the order?', 'Nithibitishe?'],
+    cancel: [{ openRows: ROWS }, ['I want to cancel my booking.'], ['Nataka kufuta booking yangu ya carpet.'], 'Shall I go ahead?', 'Niendelee?'],
+    move: [{ openRows: ROWS }, ['Can you move my carpet cleaning to Saturday at 11am?'], ['Songesha booking yangu ya carpet hadi Jumamosi saa tano asubuhi.'], 'Shall I go ahead?', 'Niendelee?'],
+    callback: [{}, ['Can someone call me back?'], ['Nipigie simu tafadhali'], 'Shall I ask the owner to call you back on 0700 000 001, today before 18:00?', 'Nimwombe mwenye biashara akupigie simu kwa namba 0700 000 001, leo kabla ya saa kumi na mbili jioni, ni sawa?'],
+    manager: [{}, ['Can I talk to the manager?'], ['Nataka kuongea na meneja.'], 'Shall I ask the manager to call you back on 0700 000 001, today before 18:00?', 'Nimwombe meneja akupigie simu kwa namba 0700 000 001, leo kabla ya saa kumi na mbili jioni, ni sawa?'],
+    quote: [{}, ['How much is gutter cleaning?', 'Yes.'], ['Bei ya kusafisha gutter ni ngapi?', 'Ndio.'], 'Shall I ask the owner to call you back on 0700 000 001, today before 18:00, with a quote?', 'Nimwombe mwenye biashara akupigie simu kwa namba 0700 000 001, leo kabla ya saa kumi na mbili jioni, kukupa bei, ni sawa?'],
+  };
+  for (const [tool, [opts, en, sw, qEn, qSw]] of Object.entries(cases)) {
+    const wEn = await talk([...en, 'Okay wait.'], opts); const wSw = await talk([...sw, 'Sawa ngoja kidogo.'], opts);
+    assert.equal(wEn.out.at(-1).line, `Take your time. ${qEn}`, `${tool} en hold`);
+    assert.equal(wSw.out.at(-1).line, `Chukua muda wako. ${qSw}`, `${tool} sw hold`);
+    const uEn = await talk([...en, 'Hmm'], opts); const uSw = await talk([...sw, 'Hmm'], opts);
+    const tail = (l) => l.replace(/^(Sorry, I didn't catch that\.|Samahani, sijakusikia vizuri\.|Please say yes or no:|Tafadhali sema ndio au hapana:)\s*/, '');
+    assert.equal(tail(uEn.out.at(-1).line).toLowerCase(), qEn.toLowerCase(), `${tool} en unclear`);
+    assert.equal(tail(uSw.out.at(-1).line).toLowerCase(), qSw.toLowerCase(), `${tool} sw unclear`);
+    for (const r of [wEn, wSw, uEn, uSw]) assert.equal(r.writes.length, 0, `${tool}: a re-ask writes nothing`);
+    assert.doesNotMatch(wSw.out.at(-1).line, /^Chukua muda wako\. Ni sawa\?$/);
+    // the re-ask re-arms the read-back: a yes on the next turn confirms
+    const y = await talk([...sw, 'Sawa ngoja kidogo.', 'Ndio.'], opts);
+    assert.ok(y.receipts.some((x) => x.phase === 'committed'), `${tool} sw yes after re-ask`);
+  }
+}));
+
 test('one shared read-back classifier: bookings and callbacks follow the same rule', () => {
   const book = { tool: 'create_booking', when: { date: '2026-10-16', time: '10:00' } };
   const cb = { tool: 'create_handoff', kind: 'callback', callbackWhen: { key: 'today<18:00', at: { date: '2026-10-14', time: '18:00', rel: 'before' } } };
