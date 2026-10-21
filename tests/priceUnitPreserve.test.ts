@@ -161,7 +161,8 @@ test("a shortened line is repaired from parsed_from when the amount is unchanged
 test("wiring: Yes uses confirmPriceFields; the card shows spokenPrice", () => {
   const action = read("dashboard/src/app/(desk)/settings/structuredActions.ts");
   const price = action.slice(action.indexOf("export async function confirmPriceAction"), action.indexOf("export async function saveBusinessCategoryAction"));
-  assert.match(price, /confirmPriceFields\(/);
+  assert.match(price, /runPriceBatch\(/);
+  assert.match(read("dashboard/src/lib/priceBatch.ts"), /confirmPriceFields\(/);
   assert.doesNotMatch(price, /parsed_from: label/);
   assert.doesNotMatch(price, /const label = priceLabel/);
   assert.match(read("dashboard/src/components/structured/PriceConfirmCards.tsx"), /spokenPrice\(/);

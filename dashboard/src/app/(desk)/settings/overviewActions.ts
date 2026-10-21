@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { saveAndCompileSettings, type SettingsCompileState } from "@/app/(desk)/settings/actions";
-import { confirmPriceAction, type StructuredResult } from "@/app/(desk)/settings/structuredActions";
+import { confirmPricesAction, type StructuredResult } from "@/app/(desk)/settings/structuredActions";
 import {
   applyStructuredPolicies,
   businessPoliciesForStorage,
@@ -57,7 +57,10 @@ export async function saveOverviewPaymentsAction(payments: Payments): Promise<St
   return { ok: true, message: "Payment details saved." };
 }
 
-/** Overview sheet: one confirmPriceAction per row (Catalogue save path). */
+/**
+ * Overview sheet: every price in one confirmPricesAction (one catalogue write,
+ * one hash re-stamp, one prompt rebuild), not one full save per row.
+ */
 export async function saveOverviewPricesAction(
   items: Array<{ kind: "product" | "service"; id?: string | null; name: string; pricing: StructuredPrice }>
 ): Promise<StructuredResult> {
@@ -65,10 +68,8 @@ export async function saveOverviewPricesAction(
   if (denied) return { ok: false, error: denied.error };
   if (!items.length) return { ok: false, error: "Nothing to save." };
 
-  for (const item of items) {
-    const res = await confirmPriceAction(item);
-    if (!res.ok) return res;
-  }
+  const res = await confirmPricesAction(items);
+  if (!res.ok) return res;
   revalidatePath("/home");
   return { ok: true, message: items.length === 1 ? "Price saved." : "Prices saved." };
 }

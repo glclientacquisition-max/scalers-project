@@ -9,16 +9,11 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { focusRingVisible } from "@/components/ui/deskChrome";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import {
-  inboxArchive,
-  inboxConfirm,
-  inboxHoldDone,
-  inboxMarkDone,
-  inboxUnarchive,
-} from "@/lib/inboxLeadActions";
+import { inboxBulk } from "@/lib/inboxLeadActions";
 import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
+import { isInboxBulkKind } from "@/lib/inboxBulk";
 import { inboxBulkActions, type InboxListActionId } from "@/lib/inboxListVerbs";
-import { itemIsArchived, type InboxItem } from "@/lib/inboxPurpose";
+import type { InboxItem } from "@/lib/inboxPurpose";
 
 /**
  * Select hit. From `md` up it stays in the row. Below `md` it stays in the
@@ -158,49 +153,26 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
   const actions = inboxBulkActions(chosen);
 
   async function run(kind: InboxListActionId) {
-    if (kind === "pin" || kind === "unpin") return;
+    if (!isInboxBulkKind(kind)) return;
     setBusy(true);
     setError(null);
-    const archivedRows: { id: string; callId: string }[] = [];
-    for (const item of chosen) {
-      if (kind === "confirm" && String(item.job?.status || "").toLowerCase() !== "requested") {
-        continue;
-      }
-      if (kind === "done" && String(item.hold?.status || "").toLowerCase() !== "open") {
-        continue;
-      }
-      if (kind === "mark_done" && (item.job || item.hold || itemIsArchived(item))) {
-        continue;
-      }
-      if (kind === "archive" && itemIsArchived(item)) continue;
-      if (kind === "unarchive" && !itemIsArchived(item)) continue;
-      const res =
-        kind === "confirm"
-          ? await inboxConfirm(item)
-          : kind === "done"
-            ? await inboxHoldDone(item)
-            : kind === "mark_done"
-              ? await inboxMarkDone(item)
-              : kind === "unarchive"
-                ? await inboxUnarchive(item)
-                : await inboxArchive(item);
-      if (res.error) {
-        if (archivedRows.length) writeInboxArchiveUndo(archivedRows);
-        setError(res.error);
-        setBusy(false);
-        return;
-      }
-      if (kind === "archive" && item.callId) {
-        archivedRows.push({ id: item.id, callId: item.callId });
-      }
-      if (kind === "archive" || kind === "unarchive") {
-        patch(item.id, { hidden: true });
-      }
+    // One server request for every selected row (inboxBulkAction).
+    const res = await inboxBulk(kind, chosen);
+    if (res.error) {
+      setError(res.error);
+      setBusy(false);
+      return;
     }
-    if (archivedRows.length) writeInboxArchiveUndo(archivedRows);
-    if (kind === "done" || kind === "archive" || kind === "unarchive" || kind === "confirm" || kind === "mark_done") {
-      clear();
+    if (kind === "archive") {
+      const archivedRows = res.targets
+        .filter((target) => target.callId)
+        .map((target) => ({ id: target.itemId, callId: String(target.callId) }));
+      if (archivedRows.length) writeInboxArchiveUndo(archivedRows);
     }
+    if (kind === "archive" || kind === "unarchive") {
+      for (const target of res.targets) patch(target.itemId, { hidden: true });
+    }
+    clear();
     setBusy(false);
     router.refresh();
   }

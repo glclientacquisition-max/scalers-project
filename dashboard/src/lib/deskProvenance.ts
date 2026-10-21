@@ -30,6 +30,7 @@ import {
   type TenantHoldGate,
 } from "@/lib/tenantFieldProvenance";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ownerStampApplies, ownerStampPatch } from "@/lib/ownerAttestBatch";
 
 export type { TenantCompletenessScore, TenantHoldGate };
 export { recompileAfterCatalogImport, upsertTenantFieldMeta };
@@ -108,19 +109,16 @@ export async function getTenantHoldGate(tenantId: string): Promise<TenantHoldGat
   return holdCaptureTenant(tenant);
 }
 
-const POLICY_PATH = /^policies\.(payment|deposit|returns|delivery|cancellation|warranty|other)$/;
-
-/** Writes owner on the JSON row so the compiler can read the confirm. */
+/**
+ * Writes owner on the JSON row so the compiler can read the confirm. One path;
+ * ownerAttestFields stamps a whole save in one update (ownerStampPatch).
+ */
 export async function persistOwnerConfirm(
   client: SupabaseClient,
   tenantId: string,
   fieldPath: string
 ): Promise<boolean> {
-  const product = fieldPath.match(/^catalog\.product\.(.+)\.name$/);
-  const service = fieldPath.match(/^catalog\.service\.(\d+)\.name$/);
-  const faq = fieldPath.match(/^faqs\.(\d+)/);
-  const policy = fieldPath.match(POLICY_PATH);
-  if (!product && !service && !faq && !policy) return false;
+  if (!ownerStampApplies(fieldPath)) return false;
 
   const { data, error } = await client
     .from("tenants")
@@ -129,58 +127,8 @@ export async function persistOwnerConfirm(
     .maybeSingle();
   if (error || !data) return false;
 
-  const patch: Record<string, unknown> = {};
-  if (product) {
-    const key = product[1];
-    const rows = Array.isArray(data.product_catalog) ? data.product_catalog : [];
-    let hit = false;
-    patch.product_catalog = rows.map((row: Record<string, unknown>, index: number) => {
-      const sku = String(row?.sku || "").trim() || String(index + 1);
-      if (sku !== key && String(index + 1) !== key) return row;
-      hit = true;
-      return { ...row, source: "owner" };
-    });
-    if (!hit) return false;
-  } else if (service) {
-    const index = Number(service[1]) - 1;
-    const rows = Array.isArray(data.services_catalog) ? [...data.services_catalog] : [];
-    const row = rows[index];
-    if (!row || typeof row !== "object") return false;
-    rows[index] = { ...(row as Record<string, unknown>), source: "owner" };
-    patch.services_catalog = rows;
-  } else if (faq) {
-    const index = Number(faq[1]) - 1;
-    const rows = Array.isArray(data.faqs) ? [...data.faqs] : [];
-    const row = rows[index];
-    if (!row || typeof row !== "object") return false;
-    const prevStatus = String((row as Record<string, unknown>).status || "").toLowerCase();
-    rows[index] = {
-      ...(row as Record<string, unknown>),
-      source: "owner",
-      status: prevStatus === "golden" ? "golden" : "confirmed",
-      confirmed: true,
-    };
-    patch.faqs = rows;
-  } else if (policy) {
-    const key = policy[1];
-    const current =
-      data.business_policies &&
-      typeof data.business_policies === "object" &&
-      !Array.isArray(data.business_policies)
-        ? (data.business_policies as Record<string, unknown>)
-        : {};
-    const prev =
-      current.provenance && typeof current.provenance === "object" && !Array.isArray(current.provenance)
-        ? (current.provenance as Record<string, unknown>)
-        : {};
-    patch.business_policies = {
-      ...current,
-      provenance: {
-        ...prev,
-        [key]: { source: "owner", confirmed: true },
-      },
-    };
-  }
+  const patch = ownerStampPatch(data as Record<string, unknown>, [fieldPath]);
+  if (!patch) return false;
 
   const updated = await client.from("tenants").update(patch).eq("id", tenantId);
   bustTenantCache(tenantId);

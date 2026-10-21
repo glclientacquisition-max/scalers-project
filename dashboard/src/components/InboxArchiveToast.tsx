@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DeskNotice } from "@/components/ui/DeskNotice";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
-import { updateLeadStatus } from "@/app/(desk)/calls/actions";
+import { inboxUndoArchive } from "@/lib/inboxLeadActions";
 import { inboxArchiveUndoLabel, type InboxArchiveUndoPayload } from "@/lib/inboxArchiveUndo";
 
 export function InboxArchiveToast({
@@ -31,13 +31,14 @@ export function InboxArchiveToast({
     if (!notice || busy) return;
     setBusy(true);
     setError(null);
+    // One server request restores every archived row (inboxBulkAction).
+    const res = await inboxUndoArchive(notice.rows);
+    if (res.error) {
+      setError(res.error);
+      setBusy(false);
+      return;
+    }
     for (const row of notice.rows) {
-      const res = await updateLeadStatus(row.callId, "new");
-      if (res.error) {
-        setError(res.error);
-        setBusy(false);
-        return;
-      }
       patch(row.id, { hidden: false });
       if (row.callId !== row.id) patch(row.callId, { hidden: false });
     }

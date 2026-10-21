@@ -91,7 +91,8 @@ describe("inbox archive folder and leave verbs", () => {
   it("bulk Archives live rows and Unarchives when every selected row is archived", () => {
     assert.match(verbs, /export function inboxBulkLeaveAction/);
     assert.match(select, /inboxBulkActions\(chosen\)/);
-    assert.match(select, /inboxUnarchive\(item\)/);
+    assert.match(select, /inboxBulk\(kind, chosen\)/);
+    assert.match(read("dashboard/src/lib/inboxBulk.ts"), /kind === "unarchive"/);
     assert.match(select, /kind === "unarchive"/);
     assert.match(select, /aria-label=\{action\.label\}/);
     const live = [item({ id: "a" }), item({ id: "b" })];
@@ -156,7 +157,8 @@ describe("inbox archive folder and leave verbs", () => {
     assert.match(toast, /text-accent-deep/);
     assert.match(toast, /min-h-11/);
     assert.match(toast, /busy \? "Saving" : "Undo"/);
-    assert.match(toast, /updateLeadStatus\(row\.callId, "new"\)/);
+    assert.match(toast, /inboxUndoArchive\(notice\.rows\)/);
+    assert.match(read("dashboard/src/lib/inboxBulk.ts"), /send\("unarchive", ids\)/);
     assert.match(toast, /DeskNotice open=\{!!notice\}/);
     assert.match(notice, /z-30/);
     assert.match(notice, /desk-tabbar-h/);
@@ -165,7 +167,7 @@ describe("inbox archive folder and leave verbs", () => {
     assert.match(ui, /INBOX_ARCHIVE_UNDO_EVENT/);
     assert.match(overflow, /if \(id === "archive" && item.callId\) \{\s*writeInboxArchiveUndo/);
     assert.match(select, /writeInboxArchiveUndo\(archivedRows\)/);
-    assert.match(select, /kind === "archive" && item.callId/);
+    assert.match(select, /if \(kind === "archive"\) \{[\s\S]{0,200}target\.callId/);
     assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\]\)/);
     assert.match(ticket, /id === "archive" && !archived/);
     assert.match(ticket, /router\.push\(backHref\)/);

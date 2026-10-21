@@ -125,7 +125,7 @@ test("wiring: form remounts on catalogue content, not lengths", () => {
 
 test("wiring: confirm-price patches one item by id from a fresh read", () => {
   const src = read("dashboard/src/app/(desk)/settings/structuredActions.ts");
-  assert.ok(src.includes("patchCatalogItem("));
+  assert.ok(read("dashboard/src/lib/priceBatch.ts").includes("patchCatalogItem("));
   assert.ok(/readCatalogFresh\(/.test(src));
 });
 
@@ -180,11 +180,16 @@ test("confirm rewrite: the re-stamped .price hash matches the saved row, and the
 
 test("confirmPriceAction re-stamps the .price hash after it writes the row", () => {
   const src = fs.readFileSync(path.join(process.cwd(), "dashboard/src/app/(desk)/settings/structuredActions.ts"), "utf8");
-  const body = src.slice(src.indexOf("export async function confirmPriceAction"));
+  const body = src.slice(src.indexOf("export async function confirmPricesAction"));
   const write = body.indexOf('.from("tenants").update(');
   const stamp = body.indexOf("restampPriceHash(");
   assert.ok(write > 0 && stamp > write, "re-stamp runs after the tenants update");
-  assert.match(src, /explicitPaths: \[path, namePath\]/);
+  assert.match(src, /explicitPaths: paths/);
+  // runPriceBatch: write, then re-stamp, then rebuild.
+  const batch = read("dashboard/src/lib/priceBatch.ts");
+  const run = batch.slice(batch.indexOf("export async function runPriceBatch"));
+  assert.ok(run.indexOf("deps.write(") < run.indexOf("deps.restamp(") && run.indexOf("deps.restamp(") < run.indexOf("deps.recompile("));
+  assert.match(batch, /out\.add\(path\.replace\(\/\\\.price\$\/, "\.name"\)\)/);
 });
 
 test("confirm with no real change: re-stamped .price and .name both match the stored row", async () => {
