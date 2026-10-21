@@ -234,6 +234,7 @@ Rollback of P1 and P2 is [`billing_data_layer_down.sql`](./billing_data_layer_do
 | File | Depends on | Notes |
 | --- | --- | --- |
 | [`fix_p0_rls_remove_legacy_allow_all.sql`](./fix_p0_rls_remove_legacy_allow_all.sql) | `owner_rls.sql`, `lead_status.sql` member policies already applied | **P0 (2026-08-14).** Drops legacy `Enable all access for service role only` policies on `tenants`, `calls`, `transcripts`. Applied on production ALCR. Does not revoke anon grants. |
+| [`revoke_open_table_grants.sql`](./revoke_open_table_grants.sql) | `fix_p0_rls_remove_legacy_allow_all.sql`, `contacts_owner_insert.sql`, `appointments.sql`, `inbox_archive_cascade.sql` | Revokes every table privilege from `anon` on `calls`, `contacts`, `tenants`, `service_requests`, `appointments` (default privileges had given `arwdDxtm`). Revokes `authenticated` table-level DELETE, TRUNCATE, REFERENCES, TRIGGER, MAINTAIN, and INSERT except on `contacts`. Keeps owner SELECT and every column-level UPDATE grant. Idempotent; rollback grants in the header. Migration copy `supabase/migrations/20261022010000_revoke_open_table_grants.sql`. Staging `20261021221832`, production `20261021222022` (22 Oct 2026 01:20 EAT, Alvin's GO). |
 
 ---
 
