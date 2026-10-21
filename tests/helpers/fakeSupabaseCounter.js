@@ -45,6 +45,7 @@ function createFakeSupabase({
   latencyMs = 0,
   rpcs = {},
   missingColumns = {},
+  hooks = {},
 } = {}) {
   const log = [];
   let inFlight = 0;
@@ -85,6 +86,13 @@ function createFakeSupabase({
         if (kind === 'eq') return row[col] === value;
         if (kind === 'in') return value.includes(row[col]);
         if (kind === 'gte') return row[col] >= value;
+        if (kind === 'like') {
+          const re = new RegExp(
+            `^${String(value).split('%').map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`,
+            's'
+          );
+          return re.test(String(row[col] ?? ''));
+        }
         return true;
       });
     const missingFor = (col) => (missingColumns[table] || []).includes(col);
@@ -120,12 +128,14 @@ function createFakeSupabase({
           return { data: project(row, state.returning || '*'), error: null };
         }
         if (state.op === 'insert') {
+          const hookError = hooks.insert ? hooks.insert(table, state.payload, tables) : null;
+          if (hookError) return { data: null, error: hookError };
           const list = (Array.isArray(state.payload) ? state.payload : [state.payload]).map((r, i) => ({
             id: `${table}-${rowsOf().length + i + 1}`,
             ...r,
           }));
           rowsOf().push(...list);
-          return { data: list, error: null };
+          return { data: state.single ? list[0] || null : list, error: null };
         }
         if (state.op === 'delete') {
           tables[table] = rowsOf().filter((r) => !matches(r));
@@ -167,6 +177,10 @@ function createFakeSupabase({
         state.filters.push(['eq', col, value]);
         return q;
       },
+      like(col, pattern) {
+        state.filters.push(['like', col, pattern]);
+        return q;
+      },
       in(col, values) {
         state.filters.push(['in', col, values]);
         return q;
@@ -201,6 +215,10 @@ function createFakeSupabase({
           op: state.op,
           cols: state.op === 'select' ? state.cols : state.returning,
           filters: state.filters.map(([k, c]) => `${k}:${c}`).join(','),
+          payloadKeys:
+            state.payload && !Array.isArray(state.payload) && typeof state.payload === 'object'
+              ? Object.keys(state.payload)
+              : null,
         };
         return roundTrip(entry, execute).then(resolve, reject);
       },
@@ -224,7 +242,7 @@ function createFakeSupabase({
             try {
               return { data: fn(args, tables), error: null };
             } catch (err) {
-              return { data: null, error: { message: err.message } };
+              return { data: null, error: { message: err.message, code: err.code } };
             }
           }).then(resolve, reject);
         },

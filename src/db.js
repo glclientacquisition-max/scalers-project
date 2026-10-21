@@ -679,6 +679,14 @@ async function appendTranscript({ callSid, transcript, turns }) {
     .insert(payload)
     .select('*');
 
+  // VOICE_QUERY_BATCHING: call.id came from the memo. A call row deleted
+  // mid-call (23503 on transcripts.call_id) is the old "no call row" case.
+  if (error && String(error.code || '') === '23503' && queryBatchingEnabled()) {
+    forgetCallIdentity(callSid);
+    console.warn(`[db] appendTranscript: no call row for ${callSid}`);
+    return null;
+  }
+
   throwIfError('appendTranscript(insert)', error);
   return data;
 }
@@ -773,16 +781,22 @@ async function markWhatsappSent(callSid, outcome) {
   if (!existing) return false;
   if (existing.whatsapp_sent || existing.owner_notified) return false;
 
-  const meta = parseSummary(existing.summary);
-  meta.owner_notified = true;
+  const keys = { owner_notified: true };
   if (outcome && typeof outcome === 'object') {
-    meta.whatsapp_sent = outcome.whatsapp_delivered === true;
+    keys.whatsapp_sent = outcome.whatsapp_delivered === true;
     if (outcome.owner_notify_channels && typeof outcome.owner_notify_channels === 'object') {
-      meta.owner_notify_channels = { ...outcome.owner_notify_channels };
+      keys.owner_notify_channels = { ...outcome.owner_notify_channels };
     }
   } else {
-    meta.whatsapp_sent = true;
+    keys.whatsapp_sent = true;
   }
+  if (queryBatchingEnabled()) {
+    // The read above stays (already-sent guard); the write is one UPDATE.
+    const merged = await mergeCallSummaryInSql(callSid, keys, 'markWhatsappSent');
+    if (merged !== undefined) return Boolean(merged);
+  }
+  const meta = parseSummary(existing.summary);
+  Object.assign(meta, keys);
 
   const { data, error } = await supabase
     .from('calls')
@@ -800,22 +814,31 @@ async function markWhatsappSent(callSid, outcome) {
  * @param {{ callSid: string, teammate?: { name?: string, role?: string, phone?: string } | null, reason?: string|null }} opts
  */
 async function saveEscalation({ callSid, teammate, reason }) {
-  const existing = await getCall(callSid);
-  if (!existing) {
-    throw new Error(`[db] saveEscalation: no call for ${callSid}`);
-  }
-
-  const meta = parseSummary(existing.summary);
+  const keys = {};
   if (teammate && (teammate.name || teammate.role)) {
-    meta.escalated_to = {
+    keys.escalated_to = {
       name: String(teammate.name || '').trim() || null,
       role: String(teammate.role || '').trim() || null,
       phone: String(teammate.phone || '').trim() || null,
     };
   }
   if (reason != null && String(reason).trim()) {
-    meta.escalate_reason = String(reason).trim();
+    keys.escalate_reason = String(reason).trim();
   }
+  if (queryBatchingEnabled()) {
+    const merged = await mergeCallSummaryInSql(callSid, keys, 'saveEscalation');
+    if (merged !== undefined) {
+      if (!merged) throw new Error(`[db] saveEscalation: no call for ${callSid}`);
+      return shapeCall(merged);
+    }
+  }
+  const existing = await getCall(callSid);
+  if (!existing) {
+    throw new Error(`[db] saveEscalation: no call for ${callSid}`);
+  }
+
+  const meta = parseSummary(existing.summary);
+  Object.assign(meta, keys);
 
   const { data, error } = await supabase
     .from('calls')
@@ -888,6 +911,11 @@ async function markEscalationSent(callSid) {
   if (!existing) return false;
   if (existing.escalation_sent) return false;
 
+  if (queryBatchingEnabled()) {
+    // Guard read above stays; the write no longer rewrites the summary.
+    const merged = await mergeCallSummaryInSql(callSid, { escalation_sent: true }, 'markEscalationSent');
+    if (merged !== undefined) return Boolean(merged);
+  }
   const meta = parseSummary(existing.summary);
   meta.escalation_sent = true;
 
@@ -934,9 +962,19 @@ async function mergeCallSummaryMeta({ callSid, patch = {} } = {}) {
 const MERGE_RPC_REPROBE_MS = 60 * 1000;
 let mergeRpcMissingUntil = 0;
 
+/** The function is not on this database: PostgREST PGRST202 or Postgres 42883 only. */
 function mergeRpcMissing(error) {
-  const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
-  return /PGRST202|42883|merge_call_summary|could not find the function|does not exist|schema cache/i.test(text);
+  const code = String(error?.code || '').trim().toUpperCase();
+  return code === 'PGRST202' || code === '42883';
+}
+
+/**
+ * A patch the RPC cannot take as jsonb or text: 22P02 (invalid text
+ * representation) or 22P05 (untranslatable character, e.g. \u0000).
+ */
+function mergeRpcBadPatch(error) {
+  const code = String(error?.code || '').trim().toUpperCase();
+  return code === '22P02' || code === '22P05';
 }
 
 /**
@@ -962,7 +1000,13 @@ async function mergeCallSummaryInSql(callSid, patch, context) {
       console.warn(`[db] ${context}: merge_call_summary RPC missing, read-then-write (${error.message})`);
       return undefined;
     }
-    throwIfError(`${context}(rpc)`, error);
+    // Bad patch (22P02 / 22P05), permission, timeout or anything else: the
+    // old path for this call only. The RPC stays on for the next merge.
+    const kind = mergeRpcBadPatch(error) ? 'bad patch' : 'rpc error';
+    console.warn(
+      `[db] ${context}: merge_call_summary ${kind} ${error.code || '-'}, read-then-write for ${callSid} (${error.message})`
+    );
+    return undefined;
   }
   const row = Array.isArray(data) ? data[0] : data;
   return row && typeof row === 'object' ? row : null;
@@ -1369,29 +1413,55 @@ async function attachRecording({
   copy = 'background',
   copyOptions = {},
 }) {
-  const existing = await getCall(callSid);
-  if (!existing) {
-    throw new Error(`[db] attachRecording: no call for ${callSid}`);
-  }
-
   const finalUrl = recordingUrl || sourceUrl || null;
   const downloadUrl = sourceUrl || recordingUrl;
 
-  const meta = parseSummary(existing.summary);
-  if (recordingSid) meta.recording_sid = recordingSid;
+  let data = null;
+  let written = false;
+  if (queryBatchingEnabled()) {
+    // recording_sid merges in SQL; the columns update without touching
+    // summary, so a concurrent merge is never overwritten.
+    const merged = recordingSid
+      ? await mergeCallSummaryInSql(callSid, { recording_sid: recordingSid }, 'attachRecording')
+      : null;
+    if (merged !== undefined) {
+      if (recordingSid && !merged) throw new Error(`[db] attachRecording: no call for ${callSid}`);
+      const res = await supabase
+        .from('calls')
+        .update({ recording_url: finalUrl, status: 'complete' })
+        .eq('sautikit_call_sid', callSid)
+        .select('*')
+        .maybeSingle();
+      throwIfError('attachRecording', res.error);
+      if (!res.data) throw new Error(`[db] attachRecording: no call for ${callSid}`);
+      data = res.data;
+      written = true;
+    }
+  }
 
-  const { data, error } = await supabase
-    .from('calls')
-    .update({
-      recording_url: finalUrl,
-      status: 'complete',
-      summary: serializeSummary(meta),
-    })
-    .eq('sautikit_call_sid', callSid)
-    .select('*')
-    .maybeSingle();
+  if (!written) {
+    const existing = await getCall(callSid);
+    if (!existing) {
+      throw new Error(`[db] attachRecording: no call for ${callSid}`);
+    }
 
-  throwIfError('attachRecording', error);
+    const meta = parseSummary(existing.summary);
+    if (recordingSid) meta.recording_sid = recordingSid;
+
+    const res = await supabase
+      .from('calls')
+      .update({
+        recording_url: finalUrl,
+        status: 'complete',
+        summary: serializeSummary(meta),
+      })
+      .eq('sautikit_call_sid', callSid)
+      .select('*')
+      .maybeSingle();
+
+    throwIfError('attachRecording', res.error);
+    data = res.data;
+  }
 
   if (downloadUrl && copy) {
     const job = copyRecordingToStorage({
@@ -1463,6 +1533,24 @@ async function copyRecordingToStorage({
     sweepAttempts >= recordingCopy.MAX_SWEEP_ATTEMPTS
       ? recordingCopy.COPY_FAILED
       : recordingCopy.PENDING_COPY;
+  if (queryBatchingEnabled()) {
+    // Failure marks are a plain key merge (the attempt count needs the read above).
+    const merged = await mergeCallSummaryInSql(
+      callSid,
+      {
+        recording_copy_attempts: meta.recording_copy_attempts,
+        recording_copy_last_error: meta.recording_copy_last_error,
+        recording_status: meta.recording_status,
+      },
+      'copyRecordingToStorage'
+    );
+    if (merged !== undefined) {
+      console.warn(
+        `[db] recording copy ${meta.recording_status} callSid=${callSid}, keeping provider URL: ${meta.recording_copy_last_error}`
+      );
+      return result;
+    }
+  }
   const { error } = await supabase
     .from('calls')
     .update({ summary: serializeSummary(meta) })
@@ -1476,14 +1564,19 @@ async function copyRecordingToStorage({
 
 /** Calls whose recording copy is still owed (summary.recording_status = pending_copy). */
 async function listPendingRecordingCopies({ limit = 20 } = {}) {
+  // Spacing-agnostic: JSON.stringify writes "recording_status":"pending_copy";
+  // merge_call_summary (jsonb text) writes "recording_status": "pending_copy".
+  // The LIKE only narrows; the parsed summary decides.
   const { data, error } = await supabase
     .from('calls')
     .select('sautikit_call_sid, summary, recording_url, created_at')
-    .like('summary', `%"recording_status":"${recordingCopy.PENDING_COPY}"%`)
+    .like('summary', `%"recording_status":%${recordingCopy.PENDING_COPY}%`)
     .order('created_at', { ascending: false })
-    .limit(limit);
+    .limit(limit * 3);
   throwIfError('listPendingRecordingCopies', error);
-  return data || [];
+  return (data || [])
+    .filter((row) => parseSummary(row.summary).recording_status === recordingCopy.PENDING_COPY)
+    .slice(0, limit);
 }
 
 function recordingRetentionCutoffIso(olderThanDays) {
@@ -2427,9 +2520,8 @@ async function createServiceRequest({
     const existing = await getCall(callSid);
     if (existing) {
       const meta = parseSummary(existing.summary);
-      meta.service_request_id = data.id;
-      meta.service_request_type = requestType;
-      if (itemText) meta.service_request_item = itemText;
+      const keys = { service_request_id: data.id, service_request_type: requestType };
+      if (itemText) keys.service_request_item = itemText;
       const reasonBits = [
         requestType,
         itemText,
@@ -2437,10 +2529,14 @@ async function createServiceRequest({
         when,
       ].filter(Boolean);
       if (!meta.reason && reasonBits.length) {
-        meta.reason = reasonBits.join(' — ');
+        keys.reason = reasonBits.join(' — ');
       }
-      if (callerName) meta.name = callerName;
-      await supabase
+      if (callerName) keys.name = callerName;
+      Object.assign(meta, keys);
+      const merged = queryBatchingEnabled()
+        ? await mergeCallSummaryInSql(callSid, keys, 'createServiceRequest')
+        : undefined;
+      if (merged === undefined) await supabase
         .from('calls')
         .update({ summary: serializeSummary(meta) })
         .eq('sautikit_call_sid', callSid);
@@ -2587,16 +2683,19 @@ async function createAppointment({
     const existing = await getCall(callSid);
     if (existing) {
       const meta = parseSummary(existing.summary);
-      meta.appointment_id = data.id;
-      meta.appointment_service = service;
+      const keys = { appointment_id: data.id, appointment_service: service };
       const reasonBits = ['visit', service, when, addressLandmark].filter(
         Boolean
       );
       if (!meta.reason && reasonBits.length) {
-        meta.reason = reasonBits.join(' — ');
+        keys.reason = reasonBits.join(' — ');
       }
-      if (callerName) meta.name = callerName;
-      await supabase
+      if (callerName) keys.name = callerName;
+      Object.assign(meta, keys);
+      const merged = queryBatchingEnabled()
+        ? await mergeCallSummaryInSql(callSid, keys, 'createAppointment')
+        : undefined;
+      if (merged === undefined) await supabase
         .from('calls')
         .update({ summary: serializeSummary(meta) })
         .eq('sautikit_call_sid', callSid);

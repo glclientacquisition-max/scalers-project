@@ -5784,6 +5784,8 @@ mediaWss.on('connection', (ws, req) => {
           callSpokenTranscripts.delete(sessionCallSid);
           callBrainCapabilities.delete(sessionCallSid);
           callTenantProfiles.delete(sessionCallSid);
+          // VOICE_QUERY_BATCHING call-identity memo (no-op when off).
+          db.forgetCallIdentity?.(sessionCallSid);
         });
     }
   });
@@ -6663,6 +6665,7 @@ wss.on('connection', (ws) => {
           callBrainStates.delete(callSid);
           callBrainCapabilities.delete(callSid);
           callTenantProfiles.delete(callSid);
+          db.forgetCallIdentity?.(callSid);
         });
     }
   });

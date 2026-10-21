@@ -40,5 +40,9 @@ grant update (lead_status) on public.calls to authenticated;
 
 -- Backfill: mark previously handled calls as resolved if the owner was alerted.
 -- (Optional; leave commented if you prefer everything to start as 'new'.)
+-- Spacing-agnostic: JSON.stringify writes "whatsapp_sent":true, jsonb text
+-- (merge_call_summary) writes "whatsapp_sent": true. LIKE narrows, the regex decides.
 -- update public.calls set lead_status = 'resolved'
--- where summary like '%"whatsapp_sent":true%' and lead_status = 'new';
+-- where summary like '%"whatsapp_sent":%true%'
+--   and summary ~ '"whatsapp_sent"\s*:\s*true'
+--   and lead_status = 'new';

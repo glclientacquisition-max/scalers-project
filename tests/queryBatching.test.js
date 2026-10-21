@@ -100,8 +100,24 @@ function mergeCallSummaryRpc({ p_sid, p_patch }, tables) {
       base = { text: raw };
     }
   }
-  row.summary = JSON.stringify({ ...base, ...(p_patch || {}) });
+  const patch = p_patch || {};
+  if (JSON.stringify(patch).includes('\\u0000')) {
+    const err = new Error('unsupported Unicode escape sequence');
+    err.code = '22P05';
+    throw err;
+  }
+  // jsonb text output puts a space after ':' and ',' (Postgres jsonb_out).
+  row.summary = jsonbText({ ...base, ...patch });
   return [{ ...row }];
+}
+
+function jsonbText(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(jsonbText).join(', ')}]`;
+  return `{${Object.entries(value)
+    .filter(([, v]) => v !== undefined)
+    .map(([k, v]) => `${JSON.stringify(k)}: ${jsonbText(v)}`)
+    .join(', ')}}`;
 }
 
 const RPCS = {
@@ -113,8 +129,8 @@ let db;
 let callStart;
 let callerMemory;
 
-function loadFresh({ rpcs = RPCS, missingColumns = {} } = {}) {
-  fake = createFakeSupabase({ tables: seedTables(), latencyMs: LATENCY_MS, rpcs, missingColumns });
+function loadFresh({ rpcs = RPCS, missingColumns = {}, hooks = {} } = {}) {
+  fake = createFakeSupabase({ tables: seedTables(), latencyMs: LATENCY_MS, rpcs, missingColumns, hooks });
   const clientPath = require.resolve('../src/lib/supabaseClient');
   require.cache[clientPath] = { id: clientPath, filename: clientPath, loaded: true, exports: { supabase: fake.client } };
   delete require.cache[require.resolve('../src/db')];
@@ -526,5 +542,241 @@ describe('VOICE_QUERY_BATCHING wiring and report', () => {
     assert.equal(queryBatchingEnabled({}), false);
     assert.equal(queryBatchingEnabled({ VOICE_QUERY_BATCHING: 'off' }), false);
     assert.equal(queryBatchingEnabled({ VOICE_QUERY_BATCHING: 'on' }), true);
+  });
+});
+
+
+describe('#859 review fixes', () => {
+  const WITH_RPC = () => ({ ...RPCS, merge_call_summary: mergeCallSummaryRpc });
+  const summaryWrites = () =>
+    fake.log.filter((e) => e.table === 'calls' && e.op === 'update' && (e.payloadKeys || []).includes('summary')).length;
+  const rpcCalls = () => fake.count((e) => e.rpc === 'merge_call_summary');
+
+  for (const on of [false, true]) {
+    it(`listPendingRecordingCopies matches both JSON spacings (flag ${on ? 'on' : 'off'})`, async () => {
+      setFlag(on);
+      loadFresh();
+      const t = '2026-10-21T10:00:00Z';
+      fake.tables.calls.push(
+        { id: 'p1', sautikit_call_sid: 'P1', created_at: t, summary: '{"recording_status":"pending_copy","provider":"sautikit"}' },
+        { id: 'p2', sautikit_call_sid: 'P2', created_at: t, summary: '{"provider": "sautikit", "recording_status": "pending_copy"}' },
+        { id: 'p3', sautikit_call_sid: 'P3', created_at: t, summary: '{"recording_status": "copy_failed", "recording_copy_last_error": "was pending_copy"}' },
+        { id: 'p4', sautikit_call_sid: 'P4', created_at: t, summary: '{"recording_status":"copied"}' }
+      );
+      const rows = await db.listPendingRecordingCopies({ limit: 10 });
+      assert.deepEqual(rows.map((r) => r.sautikit_call_sid).sort(), ['P1', 'P2']);
+    });
+  }
+
+  it('a pending_copy mark written by the RPC (jsonb spacing) is found by the sweep', async () => {
+    setFlag(true);
+    loadFresh({ rpcs: WITH_RPC() });
+    await webhookRow('CA-pend');
+    await db.mergeCallSummaryMeta({ callSid: 'CA-pend', patch: { recording_status: 'pending_copy' } });
+    assert.match(fake.tables.calls[0].summary, /"recording_status": "pending_copy"/);
+    const rows = await db.listPendingRecordingCopies();
+    assert.deepEqual(rows.map((r) => r.sautikit_call_sid), ['CA-pend']);
+  });
+
+  it('simple key merges go through the RPC (no summary rewrite) and keep RPC-merged keys', async () => {
+    setFlag(true);
+    loadFresh({ rpcs: WITH_RPC() });
+    await webhookRow('CA-k');
+    await db.mergeCallSummaryMeta({ callSid: 'CA-k', patch: { brain_key: 'keep me' } });
+    fake.reset();
+    assert.equal(await db.markWhatsappSent('CA-k', { whatsapp_delivered: true, owner_notify_channels: { sms: 'sent' } }), true);
+    assert.equal(await db.markWhatsappSent('CA-k'), false, 'already-sent guard still holds');
+    const esc = await db.saveEscalation({ callSid: 'CA-k', teammate: { name: 'Njeri', role: 'owner' }, reason: 'angry caller' });
+    assert.equal(esc.escalated_to.name, 'Njeri');
+    assert.equal(await db.markEscalationSent('CA-k'), true);
+    assert.equal(await db.markEscalationSent('CA-k'), false);
+    const rec = await db.attachRecording({ callSid: 'CA-k', recordingUrl: 'https://rec/1.mp3', recordingSid: 'RS1', copy: false });
+    assert.equal(rec.recording_url, 'https://rec/1.mp3');
+    assert.equal(rec.status, 'complete');
+    assert.equal(summaryWrites(), 0, 'no read-then-write of calls.summary');
+    assert.equal(rpcCalls(), 4);
+    const meta = JSON.parse(fake.tables.calls[0].summary);
+    assert.equal(meta.brain_key, 'keep me');
+    assert.equal(meta.owner_notified, true);
+    assert.equal(meta.whatsapp_sent, true);
+    assert.deepEqual(meta.owner_notify_channels, { sms: 'sent' });
+    assert.equal(meta.escalate_reason, 'angry caller');
+    assert.equal(meta.escalation_sent, true);
+    assert.equal(meta.recording_sid, 'RS1');
+    await assert.rejects(db.saveEscalation({ callSid: 'CA-gone', reason: 'x' }), /saveEscalation: no call for CA-gone/);
+    await assert.rejects(db.attachRecording({ callSid: 'CA-gone', recordingUrl: 'u', copy: false }), /attachRecording: no call for CA-gone/);
+    await assert.rejects(db.attachRecording({ callSid: 'CA-gone', recordingUrl: 'u', recordingSid: 'R', copy: false }), /attachRecording: no call for CA-gone/);
+  });
+
+  it('flag off: the same calls still read-then-write and give the same summary', async () => {
+    const run = async () => {
+      await webhookRow('CA-k');
+      await db.mergeCallSummaryMeta({ callSid: 'CA-k', patch: { brain_key: 'keep me' } });
+      await db.markWhatsappSent('CA-k', { whatsapp_delivered: true, owner_notify_channels: { sms: 'sent' } });
+      await db.saveEscalation({ callSid: 'CA-k', teammate: { name: 'Njeri', role: 'owner' }, reason: 'angry caller' });
+      await db.markEscalationSent('CA-k');
+      await db.attachRecording({ callSid: 'CA-k', recordingUrl: 'https://rec/1.mp3', recordingSid: 'RS1', copy: false });
+      return JSON.parse(fake.tables.calls[0].summary);
+    };
+    setFlag(false);
+    loadFresh({ rpcs: WITH_RPC() });
+    const off = await run();
+    assert.equal(rpcCalls(), 0);
+    assert.ok(summaryWrites() >= 5);
+    setFlag(true);
+    loadFresh({ rpcs: WITH_RPC() });
+    const on = await run();
+    assert.deepEqual(on, off);
+  });
+
+  it('createAppointment: summary keys via the RPC, reason kept when already set', async () => {
+    setFlag(true);
+    loadFresh({ rpcs: WITH_RPC() });
+    await webhookRow('CA-ap');
+    await db.mergeCallSummaryMeta({ callSid: 'CA-ap', patch: { reason: 'Braids Friday' } });
+    fake.reset();
+    const appt = await db.createAppointment({ callSid: 'CA-ap', serviceName: 'Braids', name: 'Achieng', whenText: 'Friday 10am' });
+    assert.ok(appt && appt.id);
+    assert.equal(summaryWrites(), 0);
+    const meta = JSON.parse(fake.tables.calls.find((r) => r.sautikit_call_sid === 'CA-ap').summary);
+    assert.equal(meta.appointment_id, appt.id);
+    assert.equal(meta.appointment_service, 'Braids');
+    assert.equal(meta.reason, 'Braids Friday');
+    assert.equal(meta.name, 'Achieng');
+  });
+
+  it('createServiceRequest: summary keys via the RPC; reason set when empty', async () => {
+    setFlag(true);
+    loadFresh({ rpcs: WITH_RPC() });
+    await webhookRow('CA-sr');
+    fake.reset();
+    const req = await db.createServiceRequest({ callSid: 'CA-sr', type: 'hold', name: 'Achieng', item: 'Hair oil', quantity: 2, whenText: 'tomorrow' });
+    assert.ok(req && req.id);
+    assert.equal(summaryWrites(), 0);
+    const meta = JSON.parse(fake.tables.calls.find((r) => r.sautikit_call_sid === 'CA-sr').summary);
+    assert.equal(meta.service_request_id, req.id);
+    assert.equal(meta.service_request_type, 'hold');
+    assert.equal(meta.service_request_item, 'Hair oil');
+    assert.match(meta.reason, /^hold — Hair oil/);
+    assert.equal(meta.name, 'Achieng');
+  });
+
+  it('22P05 (\\u0000 in the patch): old path for that call, RPC stays on', async () => {
+    setFlag(true);
+    loadFresh({ rpcs: WITH_RPC() });
+    await webhookRow('CA-nul');
+    fake.reset();
+    await db.mergeCallSummaryMeta({ callSid: 'CA-nul', patch: { note: 'a\u0000b' } });
+    assert.equal(rpcCalls(), 1);
+    assert.equal(summaryWrites(), 1, 'fell back to read-then-write');
+    await db.mergeCallSummaryMeta({ callSid: 'CA-nul', patch: { ok: 1 } });
+    assert.equal(rpcCalls(), 2, 'no 60 s missing window');
+    assert.equal(summaryWrites(), 1);
+  });
+
+  it('22P02 is a bad patch too: fallback without the missing window', async () => {
+    setFlag(true);
+    let calls = 0;
+    loadFresh({
+      rpcs: {
+        ...RPCS,
+        merge_call_summary: (args, tables) => {
+          calls += 1;
+          if (calls === 1) {
+            const err = new Error('invalid input syntax for type json');
+            err.code = '22P02';
+            throw err;
+          }
+          return mergeCallSummaryRpc(args, tables);
+        },
+      },
+    });
+    await webhookRow('CA-22p02');
+    await db.mergeCallSummaryMeta({ callSid: 'CA-22p02', patch: { a: 1 } });
+    await db.mergeCallSummaryMeta({ callSid: 'CA-22p02', patch: { b: 2 } });
+    assert.equal(calls, 2);
+    const meta = JSON.parse(fake.tables.calls[0].summary);
+    assert.equal(meta.a, 1);
+    assert.equal(meta.b, 2);
+  });
+
+  it('only PGRST202 / 42883 count as missing; permission errors fall back per call', async () => {
+    for (const [code, missing] of [['42501', false], ['57014', false], ['PGRST202', true], ['42883', true]]) {
+      setFlag(true);
+      let calls = 0;
+      loadFresh({
+        rpcs: {
+          ...RPCS,
+          merge_call_summary: () => {
+            calls += 1;
+            const err = new Error(`rpc failed ${code}`);
+            err.code = code;
+            throw err;
+          },
+        },
+      });
+      await webhookRow(`CA-${code}`);
+      await db.mergeCallSummaryMeta({ callSid: `CA-${code}`, patch: { a: 1 } });
+      await db.mergeCallSummaryMeta({ callSid: `CA-${code}`, patch: { b: 2 } });
+      const meta = JSON.parse(fake.tables.calls[0].summary);
+      assert.equal(meta.a, 1, code);
+      assert.equal(meta.b, 2, code);
+      assert.equal(calls, missing ? 1 : 2, `${code}: missing window ${missing}`);
+    }
+  });
+
+  it('appendTranscript: call row gone mid-call (23503) warns and returns null; memo forgotten', async () => {
+    setFlag(true);
+    loadFresh({
+      rpcs: WITH_RPC(),
+      hooks: {
+        insert: (table, payload, tables) => {
+          if (table !== 'transcripts') return null;
+          const ids = new Set((tables.calls || []).map((r) => r.id));
+          const bad = (Array.isArray(payload) ? payload : [payload]).some((r) => !ids.has(r.call_id));
+          return bad
+            ? { code: '23503', message: 'insert or update on table "transcripts" violates foreign key constraint "transcripts_call_id_fkey"' }
+            : null;
+        },
+      },
+    });
+    await webhookRow('CA-fk');
+    fake.tables.calls = []; // row deleted mid-call (memo still has its id)
+    const warnings = [];
+    const realWarn = console.warn;
+    console.warn = (...a) => warnings.push(a.join(' '));
+    let out;
+    try {
+      out = await db.appendTranscript({ callSid: 'CA-fk', turns: [{ speaker: 'caller', text: 'Hi' }] });
+    } finally {
+      console.warn = realWarn;
+    }
+    assert.equal(out, null);
+    assert.ok(warnings.some((w) => /appendTranscript: no call row for CA-fk/.test(w)));
+    fake.reset();
+    assert.equal(await db.getCallIdentity('CA-fk'), null);
+    assert.equal(fake.count((e) => e.table === 'calls' && e.op === 'select'), 1, 'memo dropped: fresh getCall');
+  });
+
+  it('other transcript insert errors still throw', async () => {
+    setFlag(true);
+    loadFresh({ hooks: { insert: (table) => (table === 'transcripts' ? { code: '42501', message: 'permission denied' } : null) } });
+    await webhookRow('CA-perm');
+    await assert.rejects(db.appendTranscript({ callSid: 'CA-perm', turns: [{ speaker: 'agent', text: 'x' }] }), /permission denied/);
+  });
+
+  it('forgetCallIdentity drops the memo; server.js calls it on media close and relay cleanup', async () => {
+    setFlag(true);
+    loadFresh();
+    await webhookRow('CA-forget');
+    fake.reset();
+    await db.getCallIdentity('CA-forget');
+    assert.equal(fake.count(), 0, 'memo hit');
+    db.forgetCallIdentity('CA-forget');
+    await db.getCallIdentity('CA-forget');
+    assert.equal(fake.count(), 1, 'fresh getCall after forget');
+    const server = require('fs').readFileSync(require('path').join(__dirname, '..', 'server.js'), 'utf8');
+    assert.match(server, /callTenantProfiles\.delete\(sessionCallSid\);\n.*\n\s+db\.forgetCallIdentity\?\.\(sessionCallSid\);/);
+    assert.match(server, /callTenantProfiles\.delete\(callSid\);\n\s+db\.forgetCallIdentity\?\.\(callSid\);/);
   });
 });
