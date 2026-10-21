@@ -226,6 +226,7 @@ function releaseInstanceFlight(key) {
 
 function resetInstanceFlights() {
   instanceFlights.clear();
+  unrecordedSends.clear();
 }
 
 function ledgerTableMissing(found) {
@@ -297,9 +298,24 @@ async function closedTenantSendGate(ledger, to) {
   return { ok: false, reason: 'tenant_line_closed', lineState: line.reason, key: null };
 }
 
+// A4 metering fix: a send the provider accepted but the ledger could not
+// record. Its units were never claimed; this blocks a retry of the same
+// message in this process so a resend can never charge (or text) twice.
+const unrecordedSends = new Set();
+
+function noteUnrecordedSend(key) {
+  if (!key) return;
+  unrecordedSends.add(key);
+  if (unrecordedSends.size > 5000) unrecordedSends.delete(unrecordedSends.values().next().value);
+}
+
 async function beginInstanceSend(ledger, to) {
   const closed = await closedTenantSendGate(ledger, to);
   if (closed) return closed;
+  const unrecordedKey = instanceFlightKey(ledger, to);
+  if (unrecordedKey && unrecordedSends.has(unrecordedKey) && !ledger.force) {
+    return { ok: false, reason: 'instance_already_sent', key: null };
+  }
   const flight = claimInstanceFlight(ledger, to);
   if (!flight.ok) return { ok: false, reason: flight.reason, key: null };
   const prior = await instanceAlreadyDelivered(ledger, to);
@@ -349,6 +365,90 @@ async function claimTenantSms(ledger, body) {
     console.warn('[notify-ledger] consume SMS skipped:', err?.message || err);
     return { allowed: true, reason: 'consume_skipped', overage: false };
   }
+}
+
+/**
+ * Read-only SMS allowance check (no units counted). Legacy path only, used
+ * BEFORE the provider call so the cap still stops a send; units are claimed
+ * only after the provider accepts (sendTenantSmsLegacy).
+ */
+async function precheckTenantSms(ledger, body) {
+  if (!ledger?.tenantId) return { allowed: true, reason: 'no_tenant', overage: false };
+  if (billedTo(ledger.kind) === 'platform') {
+    return { allowed: true, reason: 'platform', overage: false };
+  }
+  let db;
+  try {
+    db = require('../db');
+  } catch {
+    return { allowed: true, reason: 'precheck_skipped', overage: false };
+  }
+  if (typeof db.getTenantSmsUsage !== 'function') {
+    return { allowed: true, reason: 'precheck_skipped', overage: false };
+  }
+  let usage = null;
+  try {
+    usage = await db.getTenantSmsUsage(ledger.tenantId);
+  } catch (err) {
+    usage = { error: err?.message || String(err) };
+  }
+  if (usage?.error) {
+    // Same rule as consume_sms_units missing: no allowance SQL, no tenant SMS.
+    if (/sms_included_units|sms_used_units|column|schema cache/i.test(usage.error)) {
+      return { allowed: false, reason: 'rpc_missing', overage: false };
+    }
+    console.warn('[notify-ledger] SMS precheck skipped:', usage.error);
+    return { allowed: true, reason: 'precheck_skipped', overage: false };
+  }
+  if (!usage) return { allowed: true, reason: 'precheck_skipped', overage: false };
+  return smsAllowanceDecision({
+    enforcement: usage.enforcement,
+    included: usage.smsIncluded,
+    used: usage.smsUsed,
+    units: smsSegments(body),
+    onDemand: usage.onDemand,
+  });
+}
+
+/**
+ * Legacy tenant SMS (reserve_notify_send not applied): claim units only after
+ * the provider accepts, and only once the ledger row exists.
+ *   1. read-only allowance precheck (cap still stops the send)
+ *   2. provider call; a throw or no result claims nothing
+ *   3. notify_sends row (one retry)
+ *   4. consume_sms_units, only now. If the row never lands, the units are
+ *      never claimed (that is the compensation) and the key is blocked here
+ *      so a retry cannot text or charge twice.
+ * Returns { sent, result?, reason?, overage, accepted? }.
+ */
+async function sendTenantSmsLegacy({ ledger, body, send, flightKey } = {}) {
+  const pre = await precheckTenantSms(ledger, body);
+  if (!pre.allowed) return { sent: false, reason: pre.reason || 'sms_allowance_exhausted', overage: false };
+  if (ledger && typeof ledger === 'object') ledger.overage = Boolean(pre.overage);
+  const result = await send();
+  if (!result) return { sent: false, reason: 'sms_unavailable', overage: false };
+  let recorded = await recordDispatchResult(ledger, result, body);
+  let claim = durableSendClaim(recorded);
+  if (!claim.ok && claim.reason !== 'table_missing') {
+    recorded = await recordDispatchResult(ledger, result, body);
+    claim = durableSendClaim(recorded);
+  }
+  if (!claim.ok) {
+    noteUnrecordedSend(flightKey || instanceFlightKey(ledger, result.to));
+    console.warn(
+      `[notify-ledger] SMS accepted but ledger row not written (${claim.reason}); units not claimed, resend blocked` +
+        (ledger?.callSid ? ` call=${ledger.callSid}` : '')
+    );
+    return { sent: false, accepted: true, reason: claim.reason, result, overage: false };
+  }
+  // A duplicate key means a concurrent send already wrote and claimed it.
+  if (ledger?.tenantId && recorded?.reason !== 'duplicate') {
+    const units = await claimTenantSms(ledger, body);
+    if (units?.reason === 'rpc_missing') {
+      console.warn('[notify-ledger] SMS sent and recorded; consume_sms_units missing (counter not advanced)');
+    }
+  }
+  return { sent: true, result, overage: Boolean(pre.overage) };
 }
 
 /**
@@ -545,12 +645,17 @@ async function settleSend(reservation, { ok, result, error } = {}) {
   if (reservation?.mode !== 'reserved' || !reservation.id) return { ok: true, skipped: true };
   try {
     const db = require('../db');
-    const settled = await db.settleNotifySend({
+    const args = {
       id: reservation.id,
       status: ok ? 'sent' : 'failed',
       providerMessageId: ok ? providerMessageId(result) : null,
       failureReason: ok ? null : String(error?.message || error || 'send_failed'),
-    });
+    };
+    let settled = await db.settleNotifySend(args).catch((err) => ({ ok: false, reason: err?.message || 'settle_failed' }));
+    // A4: one retry. A lost settle leaves the row pending, which blocks a
+    // resend (in_flight) until the stale sweep releases it: never a double
+    // charge, but a sent SMS would end up unbilled, so try once more.
+    if (!settled?.ok) settled = await db.settleNotifySend(args).catch((err) => ({ ok: false, reason: err?.message || 'settle_failed' }));
     if (!settled?.ok) {
       // The stale sweep releases a pending row after 15 min.
       console.warn(`[notify-ledger] settle failed id=${reservation.id} (${settled?.reason})`);
@@ -606,6 +711,9 @@ module.exports = {
   callerKey,
   claimInstanceFlight,
   claimTenantSms,
+  precheckTenantSms,
+  sendTenantSmsLegacy,
+  noteUnrecordedSend,
   durableSendClaim,
   instanceFlightKey,
   idempotencyKey,
