@@ -9,8 +9,8 @@ import {
   inboxTogglePin as writeInboxPin,
 } from "@/app/(desk)/calls/inboxTriageActions";
 import { inboxBulkAction } from "@/app/(desk)/calls/bulkActions";
-import { inboxArchiveCallsAction, inboxUndoArchiveAction } from "@/app/(desk)/calls/archiveActions";
-import { sendInboxArchive, sendInboxCascadeUndo } from "@/lib/inboxArchiveCascade";
+import { inboxArchiveCallsAction, inboxUnarchiveCallsAction, inboxUndoArchiveAction } from "@/app/(desk)/calls/archiveActions";
+import { inboxUnarchiveText, sendInboxArchive, sendInboxCascadeUndo, sendInboxUnarchive } from "@/lib/inboxArchiveCascade";
 import { sendInboxArchiveUndo, sendInboxBulk, type InboxBulkKind } from "@/lib/inboxBulk";
 import type { InboxItem } from "@/lib/inboxPurpose";
 
@@ -99,11 +99,32 @@ export async function inboxHoldDone(item: InboxItem) {
   return updateServiceRequestStatus({}, form);
 }
 
-/** Same handler as ticket Unarchive (`MarkLeadUnarchiveButton` → `updateLeadStatus`). */
+/**
+ * Row menu Unarchive: the call back to New and its holds and visits back in
+ * the inbox, one transaction (inbox_unarchive_calls). Same action as the
+ * bulk bar and the ticket menu.
+ */
 export async function inboxUnarchive(item: InboxItem) {
   if (!item.callId) return { error: "Missing call." };
-  if (isDeskHarness()) return { ok: true };
-  return updateLeadStatus(item.callId, "new");
+  if (isDeskHarness()) return { ok: true, text: null as string | null };
+  return inboxUnarchiveCall(item.callId);
+}
+
+/** Unarchive one call (row menu, ticket menu). `text`: the toast line. */
+export async function inboxUnarchiveCall(callId: string): Promise<{ ok?: boolean; error?: string; text: string | null }> {
+  const res = await inboxUnarchiveCallsAction([callId]);
+  if (res.error) return { error: res.error, text: null };
+  const calls = (res.updatedIds || []).includes(callId) ? 1 : 0;
+  const cascade = res.mode === "cascade";
+  return {
+    ok: true,
+    text: inboxUnarchiveText({ calls, holds: cascade ? res.holds || 0 : 0, visits: cascade ? res.visits || 0 : 0 }),
+  };
+}
+
+/** Bulk Unarchive: one server request (inbox_unarchive_calls) for every selected row. */
+export async function inboxUnarchiveItems(items: InboxItem[]) {
+  return sendInboxUnarchive(items, inboxUnarchiveCallsAction, { harness: isDeskHarness() });
 }
 
 /**

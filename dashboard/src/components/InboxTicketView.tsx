@@ -32,10 +32,9 @@ import {
 import { ownerAssistLabel, ownerDeskLine, plainOwnerCopy } from "@/lib/deskTicketChat";
 import { THREAD_PIN_PX, threadScrollAnchor, type ThreadAnchor } from "@/lib/endlessList";
 import { transcriptRefreshTop } from "@/lib/deskFresh";
-import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import type { InboxPingPerson } from "@/components/InboxPingTeammate";
-import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
-import { inboxArchiveCall, inboxMarkSeen } from "@/lib/inboxLeadActions";
+import { announceInboxResult, writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
+import { inboxArchiveCall, inboxMarkSeen, inboxUnarchiveCall } from "@/lib/inboxLeadActions";
 import {
   inboxTicketCanMarkDone,
   inboxTicketOverflowActions,
@@ -116,7 +115,7 @@ function InboxTicketMore({
     // Archive: the call and its open holds and visits in one transaction
     // (inbox_archive_calls). Unarchive: the call back to New; its requests
     // show again with it.
-    const res = leaving ? await inboxArchiveCall(callId) : await updateLeadStatus(callId, "new");
+    const res = leaving ? await inboxArchiveCall(callId) : await inboxUnarchiveCall(callId);
     setBusy(false);
     setPendingId(null);
     if (res.error) {
@@ -134,6 +133,8 @@ function InboxTicketMore({
         });
       }
       router.push(backHref);
+    } else if ("text" in res) {
+      announceInboxResult(res.text);
     }
     router.refresh();
   }

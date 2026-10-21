@@ -12,7 +12,7 @@
  * request rows are then skipped exactly as before.
  */
 import type { InboxHold, InboxItem, InboxJob } from "@/lib/inboxPurpose";
-import { inboxArchiveUndoLabel, inboxCascadeCountParts } from "@/lib/inboxArchiveUndo";
+import { inboxArchiveUndoLabel, inboxCascadeCountParts, inboxUnarchivedLabel } from "@/lib/inboxArchiveUndo";
 import { inboxBulkPlan, type InboxBulkRun, type InboxBulkSkip, type InboxBulkTarget } from "@/lib/inboxBulk";
 
 export type InboxArchiveSkip = { id: string; reason: "already_archived" | "not_found" | string };
@@ -46,6 +46,84 @@ export type InboxUndoResult = {
 };
 
 export type InboxUndoSend = (undoId: string) => Promise<InboxUndoResult>;
+
+/** What the server action answers for Unarchive. */
+export type InboxUnarchiveResult = {
+  ok?: boolean;
+  error?: string;
+  /** cascade: inbox_unarchive_calls ran. legacy: RPC missing, calls set to New (#860 update). */
+  mode?: "cascade" | "legacy";
+  /** Calls set back to New in this run. */
+  updatedIds?: string[];
+  /** Holds / visits whose inbox_archived_at the server cleared (counts). */
+  holds?: number;
+  visits?: number;
+  skipped?: InboxArchiveSkip[];
+};
+
+export type InboxUnarchiveSend = (callIds: string[]) => Promise<InboxUnarchiveResult>;
+
+function count(raw: unknown): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+/** inbox_unarchive_calls jsonb -> InboxUnarchiveResult (cascade). */
+export function parseInboxUnarchiveRpc(data: unknown): InboxUnarchiveResult {
+  const d = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+  const detail = Array.isArray(d.skipped_detail) ? (d.skipped_detail as Array<Record<string, unknown>>) : [];
+  return {
+    ok: true,
+    mode: "cascade",
+    updatedIds: idList(d.call_ids),
+    holds: count(d.holds),
+    visits: count(d.visits),
+    skipped: detail
+      .map((row) => ({ id: String(row?.id ?? "").trim(), reason: String(row?.reason ?? "not_found") }))
+      .filter((row) => row.id),
+  };
+}
+
+export type InboxUnarchiveRun = InboxBulkRun & {
+  mode: "cascade" | "legacy" | "harness" | "none";
+  /** Calls set back to New (unique). */
+  calls: number;
+  holds: number;
+  visits: number;
+};
+
+/**
+ * Client side of Unarchive (bulk, row menu, ticket): ONE server request with
+ * the call ids. A request row archived with its call unarchives that call.
+ */
+export async function sendInboxUnarchive(
+  items: InboxItem[],
+  send: InboxUnarchiveSend,
+  opts: { harness?: boolean } = {}
+): Promise<InboxUnarchiveRun> {
+  const plan = inboxBulkPlan("unarchive", items);
+  const base = { selected: items.length, skipped: plan.skipped };
+  if (!plan.ids.length) return { ...base, applied: [], missed: [], mode: "none", calls: 0, holds: 0, visits: 0 };
+  if (opts.harness) return { ...base, applied: plan.targets, missed: [], mode: "harness", calls: plan.ids.length, holds: 0, visits: 0 };
+  const res = await send(plan.ids);
+  if (res?.error) return { ...base, applied: [], missed: [], mode: "none", calls: 0, holds: 0, visits: 0, error: res.error };
+  const updated = new Set(Array.isArray(res?.updatedIds) ? res.updatedIds : []);
+  return {
+    ...base,
+    applied: plan.targets.filter((t) => updated.has(t.rowId)),
+    missed: plan.targets.filter((t) => !updated.has(t.rowId)),
+    mode: res?.mode === "cascade" ? "cascade" : "legacy",
+    calls: updated.size,
+    holds: res?.mode === "cascade" ? count(res.holds) : 0,
+    visits: res?.mode === "cascade" ? count(res.visits) : 0,
+  };
+}
+
+/** Toast line after Unarchive. Null when nothing came back. */
+export function inboxUnarchiveText(run: { calls: number; holds: number; visits: number }): string | null {
+  if (run.calls <= 0) return null;
+  return inboxUnarchivedLabel(run.calls, run.holds, run.visits);
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -101,14 +179,17 @@ export function isInboxCascadeMissing(error: { code?: string | null; message?: s
   const msg = String(error.message || "");
   if (code === "PGRST202" || code === "42883") return true;
   if ((code === "42703" || code === "PGRST204") && /inbox_archived_at/i.test(msg)) return true;
-  return /inbox_archive_calls|inbox_undo_archive|inbox_archived_at/i.test(msg) && /does not exist|could not find|schema cache/i.test(msg);
+  return /inbox_archive_calls|inbox_undo_archive|inbox_unarchive_calls|inbox_archived_at/i.test(msg) && /does not exist|could not find|schema cache/i.test(msg);
 }
 
 /** Owner copy for an RPC refusal. Null: use the generic save error. */
-export function inboxCascadeErrorText(error: { code?: string | null } | null | undefined, step: "archive" | "undo"): string | null {
+export function inboxCascadeErrorText(
+  error: { code?: string | null } | null | undefined,
+  step: "archive" | "unarchive" | "undo"
+): string | null {
   const code = String(error?.code || "");
-  if (code === "42501") return step === "archive" ? "Your role cannot archive in this business." : "Your role cannot undo in this business.";
-  if (code === "22023") return step === "archive" ? "Pick 200 or fewer to archive at once." : "Nothing to undo.";
+  if (code === "42501") return `Your role cannot ${step} in this business.`;
+  if (code === "22023") return step === "undo" ? "Nothing to undo." : `Pick 200 or fewer to ${step} at once.`;
   if (code === "P0002") return "Nothing to undo. It may have expired.";
   return null;
 }

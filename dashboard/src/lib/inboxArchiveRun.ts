@@ -12,7 +12,9 @@ import {
   isUuid,
   parseInboxArchiveRpc,
   parseInboxUndoRpc,
+  parseInboxUnarchiveRpc,
   type InboxArchiveResult,
+  type InboxUnarchiveResult,
   type InboxUndoResult,
 } from "@/lib/inboxArchiveCascade";
 import { runInboxBulkUpdate } from "@/lib/inboxBulkRun";
@@ -84,4 +86,47 @@ export async function runInboxUndoArchive(opts: {
   });
   if (error) return { result: null, error: { code: error.code, message: error.message } };
   return { result: parseInboxUndoRpc(data), error: null };
+}
+
+/**
+ * ONE call to inbox_unarchive_calls (one transaction: archived calls back to
+ * New + clear inbox_archived_at on their holds and visits). If the function
+ * is not on this database (#866 not applied), set the calls back to New with
+ * the #860 single update and answer mode "legacy".
+ */
+export async function runInboxUnarchiveCalls(opts: {
+  client: SupabaseClient;
+  tenantId: string;
+  callIds: string[];
+}): Promise<{ result: InboxUnarchiveResult; error: null } | { result: null; error: RpcError }> {
+  const uuids = opts.callIds.filter(isUuid);
+  const notIds = opts.callIds.filter((id) => !isUuid(id)).map((id) => ({ id, reason: "not_found" }));
+  if (uuids.length) {
+    const { data, error } = await opts.client.rpc("inbox_unarchive_calls", {
+      p_tenant_id: opts.tenantId,
+      p_call_ids: uuids,
+    });
+    if (!error) {
+      const result = parseInboxUnarchiveRpc(data);
+      return { result: { ...result, skipped: [...(result.skipped || []), ...notIds] }, error: null };
+    }
+    if (!isInboxCascadeMissing(error)) return { result: null, error: { code: error.code, message: error.message } };
+    console.warn("[inbox unarchive] inbox_unarchive_calls not on this database, using the calls-only update");
+  }
+  const legacy = await runInboxBulkUpdate({ client: opts.client, tenantId: opts.tenantId, kind: "unarchive", ids: opts.callIds });
+  if (legacy.error) return { result: null, error: { message: legacy.error.message } };
+  const requested = new Set(opts.callIds);
+  const updatedIds = legacy.rows.map((row) => String(row.id)).filter((id) => requested.has(id));
+  const done = new Set(updatedIds);
+  return {
+    result: {
+      ok: true,
+      mode: "legacy",
+      updatedIds,
+      holds: 0,
+      visits: 0,
+      skipped: opts.callIds.filter((id) => !done.has(id)).map((id) => ({ id, reason: "not_found" })),
+    },
+    error: null,
+  };
 }

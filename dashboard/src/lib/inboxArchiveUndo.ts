@@ -1,6 +1,14 @@
 export const INBOX_ARCHIVE_UNDO_MS = 5000;
 export const INBOX_ARCHIVE_UNDO_KEY = "scalers-inbox-archive-undo";
 export const INBOX_ARCHIVE_UNDO_EVENT = "scalers-inbox-archive-undo";
+/** A short status line (Unarchive result) the inbox toast shows for a few seconds. */
+export const INBOX_RESULT_EVENT = "scalers-inbox-result";
+
+export function announceInboxResult(text: string | null | undefined) {
+  const line = String(text || "").trim();
+  if (!line || typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(INBOX_RESULT_EVENT, { detail: line }));
+}
 
 export type InboxArchiveUndoRow = {
   id: string;
@@ -61,6 +69,18 @@ export function inboxCascadeCountParts(holds: number, visits: number): string {
  */
 export function inboxArchiveUndoLabel(count: number, holds = 0, visits = 0): string {
   const head = archivedHead(count);
+  const parts = inboxCascadeCountParts(holds, visits);
+  if (!parts) return head;
+  return `${head}, plus ${parts} on ${count > 1 ? "those calls" : "that call"}`;
+}
+
+/**
+ * Unarchive result, same style as the archive toast. `holds` / `visits`:
+ * what inbox_unarchive_calls cleared, e.g. "24 unarchived, plus 9 open
+ * requests and 4 visits on those calls".
+ */
+export function inboxUnarchivedLabel(count: number, holds = 0, visits = 0): string {
+  const head = count <= 1 ? "Unarchived" : `${count} unarchived`;
   const parts = inboxCascadeCountParts(holds, visits);
   if (!parts) return head;
   return `${head}, plus ${parts} on ${count > 1 ? "those calls" : "that call"}`;

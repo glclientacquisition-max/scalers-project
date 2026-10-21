@@ -7,7 +7,7 @@ import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import { inboxUndoArchive, inboxUndoArchiveCascade } from "@/lib/inboxLeadActions";
 import { inboxUndoOutcomeText } from "@/lib/inboxBulk";
 import { inboxCascadeUndoText } from "@/lib/inboxArchiveCascade";
-import { inboxArchiveUndoLabel, type InboxArchiveUndoPayload } from "@/lib/inboxArchiveUndo";
+import { INBOX_RESULT_EVENT, inboxArchiveUndoLabel, type InboxArchiveUndoPayload } from "@/lib/inboxArchiveUndo";
 
 const RESULT_MS = 4000;
 
@@ -31,6 +31,15 @@ export function InboxArchiveToast({
     setError(null);
     if (notice) setResult(null);
   }, [notice]);
+
+  useEffect(() => {
+    function onResult(event: Event) {
+      const text = (event as CustomEvent<string>).detail;
+      if (typeof text === "string" && text) setResult(text);
+    }
+    window.addEventListener(INBOX_RESULT_EVENT, onResult);
+    return () => window.removeEventListener(INBOX_RESULT_EVENT, onResult);
+  }, []);
 
   useEffect(() => {
     if (!result) return;

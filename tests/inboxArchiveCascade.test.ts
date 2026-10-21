@@ -415,3 +415,78 @@ test("calendar: a visit or hold archived with its call stays on the run sheets (
     assert.doesNotMatch(src(f), /inbox_archived_at|itemIsArchived\(/, f);
   }
 });
+
+// ------------------------------------------------- unarchive (#866) ----
+
+test("unarchive: ONE inbox_unarchive_calls request; toast names the holds and visits it cleared", async () => {
+  const { parseInboxUnarchiveRpc, sendInboxUnarchive, inboxUnarchiveText } = await import("../dashboard/src/lib/inboxArchiveCascade.ts");
+  const stamp = "2026-10-22T00:50:00.000Z";
+  const calls24 = [CALL, ...Array.from({ length: 23 }, (_, i) => uuid(i + 201))];
+  const items: any[] = calls24.map((id) => ({ id, callId: id, lead: { leadStatus: "archived" }, hold: null, job: null }));
+  items.push({ id: HOLD_EXTRA, callId: CALL, lead: null, hold: hold(HOLD_EXTRA, CALL, { inbox_archived_at: stamp }), job: null });
+  const sent: string[][] = [];
+  const run = await sendInboxUnarchive(items, async (ids) => {
+    sent.push(ids);
+    return parseInboxUnarchiveRpc({ unarchived: 24, holds: 9, visits: 4, skipped: 0, call_ids: ids, skipped_detail: [] });
+  });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].length, 24, "hold 93ab7756 maps to its call, sent once");
+  assert.equal(run.mode, "cascade");
+  assert.equal(run.applied.length, 25);
+  assert.equal(inboxBulkOutcomeText("unarchive", run), null);
+  assert.equal(inboxUnarchiveText(run), "24 unarchived, plus 9 open requests and 4 visits on those calls");
+});
+
+test("unarchive copy: plural / zero combos, that call vs those calls, skipped reads already handled", async () => {
+  const { inboxUnarchiveText, sendInboxUnarchive, parseInboxUnarchiveRpc } = await import("../dashboard/src/lib/inboxArchiveCascade.ts");
+  const cases: Array<[number, number, number, string | null]> = [
+    [0, 0, 0, null],
+    [1, 0, 0, "Unarchived"],
+    [1, 2, 0, "Unarchived, plus 2 open requests on that call"],
+    [1, 1, 1, "Unarchived, plus 1 open request and 1 visit on that call"],
+    [3, 0, 1, "3 unarchived, plus 1 visit on those calls"],
+    [24, 1, 4, "24 unarchived, plus 1 open request and 4 visits on those calls"],
+  ];
+  for (const [calls, holds, visits, want] of cases) assert.equal(inboxUnarchiveText({ calls, holds, visits }), want);
+  const items: any[] = [CALL, uuid(301)].map((id) => ({ id, callId: id, lead: { leadStatus: "archived" }, hold: null, job: null }));
+  const run = await sendInboxUnarchive(items, async () =>
+    parseInboxUnarchiveRpc({ unarchived: 1, holds: 2, visits: 0, skipped: 1, call_ids: [CALL], skipped_detail: [{ id: uuid(301), reason: "not_archived" }] })
+  );
+  assert.equal(inboxBulkOutcomeText("unarchive", run), "1 of 2 moved back to the Inbox. 1 was already handled.");
+  assert.equal(inboxUnarchiveText(run), "Unarchived, plus 2 open requests on that call");
+});
+
+test("unarchive server: ONE rpc; missing RPC falls back to the calls-only update; refusals reported", async () => {
+  const { runInboxUnarchiveCalls } = await import("../dashboard/src/lib/inboxArchiveRun.ts");
+  const ok = fakeClient(() => ({ data: { unarchived: 1, holds: 2, visits: 0, skipped: 0, call_ids: [CALL], skipped_detail: [] }, error: null }));
+  const a = await runInboxUnarchiveCalls({ client: ok.client, tenantId: TENANT, callIds: [CALL] });
+  assert.deepEqual(ok.log, [["rpc", "inbox_unarchive_calls", { p_tenant_id: TENANT, p_call_ids: [CALL] }]]);
+  assert.equal(a.result?.mode, "cascade");
+  assert.equal(a.result?.holds, 2);
+
+  const missing = fakeClient(() => ({ data: null, error: { code: "PGRST202", message: "Could not find the function public.inbox_unarchive_calls(p_call_ids, p_tenant_id) in the schema cache" } }));
+  const b = await runInboxUnarchiveCalls({ client: missing.client, tenantId: TENANT, callIds: [CALL] });
+  assert.equal(b.result?.mode, "legacy");
+  assert.deepEqual(missing.log.find((l) => l[0] === "update")[1], { lead_status: "new" });
+  assert.deepEqual(b.result?.updatedIds, [CALL]);
+
+  for (const code of ["42501", "22023"]) {
+    const refused = fakeClient(() => ({ data: null, error: { code, message: "no" } }));
+    const c = await runInboxUnarchiveCalls({ client: refused.client, tenantId: TENANT, callIds: [CALL] });
+    assert.equal(c.error?.code, code);
+    assert.equal(refused.log.filter((l) => l[0] === "update").length, 0);
+  }
+  assert.equal(inboxCascadeErrorText({ code: "42501" }, "unarchive"), "Your role cannot unarchive in this business.");
+  assert.equal(inboxCascadeErrorText({ code: "22023" }, "unarchive"), "Pick 200 or fewer to unarchive at once.");
+  assert.equal(inboxCascadeErrorText({ code: "22023" }, "archive"), "Pick 200 or fewer to archive at once.");
+});
+
+test("unarchive wiring: bulk bar, row menu and ticket use inbox_unarchive_calls and announce the result", () => {
+  assert.match(src("lib/inboxArchiveRun.ts"), /rpc\("inbox_unarchive_calls"/);
+  assert.match(src("app/(desk)/calls/archiveActions.ts"), /export async function inboxUnarchiveCallsAction/);
+  assert.match(src("components/InboxRowSelect.tsx"), /inboxUnarchiveItems\(chosen\)/);
+  assert.match(src("components/InboxRowSelect.tsx"), /announceInboxResult\(inboxUnarchiveText\(unarchive\)\)/);
+  assert.match(src("components/InboxRowOverflow.tsx"), /announceInboxResult\(unarchivedText\)/);
+  assert.match(src("components/InboxTicketView.tsx"), /await inboxUnarchiveCall\(callId\)/);
+  assert.match(src("components/InboxArchiveToast.tsx"), /INBOX_RESULT_EVENT/);
+});

@@ -10,9 +10,10 @@ import {
   inboxCascadeErrorText,
   isUuid,
   type InboxArchiveResult,
+  type InboxUnarchiveResult,
   type InboxUndoResult,
 } from "@/lib/inboxArchiveCascade";
-import { runInboxArchiveCalls, runInboxUndoArchive } from "@/lib/inboxArchiveRun";
+import { runInboxArchiveCalls, runInboxUnarchiveCalls, runInboxUndoArchive } from "@/lib/inboxArchiveRun";
 
 function revalidateInbox(callIds: string[]) {
   revalidatePath("/home");
@@ -68,5 +69,32 @@ export async function inboxUndoArchiveAction(undoId: string): Promise<InboxUndoR
     return ownerSaveFailed("inbox-undo-archive", error.message, "Could not undo.");
   }
   revalidateInbox(result.restored?.calls || []);
+  return result;
+}
+
+/**
+ * Unarchive (bulk bar, row menu, ticket menu): archived calls back to New and
+ * their holds and visits back in the inbox, in one transaction
+ * (inbox_unarchive_calls). Runs as the signed-in member.
+ */
+export async function inboxUnarchiveCallsAction(callIds: string[]): Promise<InboxUnarchiveResult> {
+  const denied = await memberDenied("inbox.act");
+  if (denied) return { error: denied.error };
+  if (!(await isAuthenticated())) return { error: "Not signed in." };
+  const clean = cleanInboxBulkIds(callIds);
+  if (!clean) return { error: "Nothing selected." };
+
+  const tenant = await getCurrentTenant();
+  if (!tenant) return { error: "No workspace linked to this account." };
+  const workspace = await createWorkspaceDataClient();
+  if (!workspace) return { error: "Not signed in." };
+
+  const { result, error } = await runInboxUnarchiveCalls({ client: workspace.client, tenantId: tenant.id, callIds: clean });
+  if (error) {
+    const text = inboxCascadeErrorText(error, "unarchive");
+    if (text) return { error: text };
+    return ownerSaveFailed("inbox-unarchive", error.message, "Could not save.");
+  }
+  revalidateInbox(result.updatedIds || []);
   return result;
 }

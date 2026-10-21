@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { focusRingVisible } from "@/components/ui/deskChrome";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import { inboxArchiveItems, inboxBulk } from "@/lib/inboxLeadActions";
-import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
+import { inboxArchiveItems, inboxBulk, inboxUnarchiveItems } from "@/lib/inboxLeadActions";
+import { announceInboxResult, writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
+import { inboxUnarchiveText } from "@/lib/inboxArchiveCascade";
 import { inboxBulkOutcomeText, isInboxBulkKind } from "@/lib/inboxBulk";
 import { inboxBulkActions, type InboxListActionId } from "@/lib/inboxListVerbs";
 import type { InboxItem } from "@/lib/inboxPurpose";
@@ -163,8 +164,10 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
     // the rest through inboxBulkAction. Each row comes back as applied,
     // cascaded (archived with its call), missed (server did not change it)
     // or skipped.
+    // Unarchive goes through inbox_unarchive_calls (calls + their requests).
     const archive = kind === "archive" ? await inboxArchiveItems(chosen) : null;
-    const res = archive ?? (await inboxBulk(kind, chosen));
+    const unarchive = kind === "unarchive" ? await inboxUnarchiveItems(chosen) : null;
+    const res = archive ?? unarchive ?? (await inboxBulk(kind, chosen));
     if (res.error) {
       setError(res.error);
       setBusy(false);
@@ -187,6 +190,7 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
         });
       }
     }
+    if (unarchive) announceInboxResult(inboxUnarchiveText(unarchive));
     if (kind === "archive" || kind === "unarchive") {
       for (const target of [...res.applied, ...(res.cascaded ?? [])]) patch(target.itemId, { hidden: true });
     }

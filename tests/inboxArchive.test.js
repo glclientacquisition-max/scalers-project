@@ -74,7 +74,7 @@ describe("inbox archive folder and leave verbs", () => {
   it("archives live rows and unarchives Archived rows through the same lead_status path", () => {
     assert.match(actions, /inboxArchiveCall\(item\.callId\)/);
     assert.match(actions, /inboxArchiveCallsAction\(\[callId\]\)/);
-    assert.match(actions, /updateLeadStatus\(item\.callId, "new"\)/);
+    assert.match(actions, /inboxUnarchiveCallsAction\(\[callId\]\)/);
     assert.match(overflow, /inboxArchive\(item\)/);
     assert.match(overflow, /inboxUnarchive\(item\)/);
     assert.match(verbs, /id: "unarchive"/);
@@ -114,7 +114,7 @@ describe("inbox archive folder and leave verbs", () => {
     assert.match(ticket, /<InboxTicketActionDock/);
     assert.match(ticket, /canMarkDone=\{canMarkDone\}/);
     assert.match(ticket, /const leaving = !\(id === "unarchive" \|\| archived\)/);
-    assert.match(ticket, /leaving \? await inboxArchiveCall\(callId\) : await updateLeadStatus\(callId, "new"\)/);
+    assert.match(ticket, /leaving \? await inboxArchiveCall\(callId\) : await inboxUnarchiveCall\(callId\)/);
     assert.match(ticket, /action\.label/);
     assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\], undefined, undefined, \{/);
     assert.match(ticket, /if \(leaving\) \{/);
