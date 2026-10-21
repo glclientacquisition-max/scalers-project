@@ -9,11 +9,11 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (51)
+## Tables (52)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
-| `appointments` | `address_landmark`, `call_id`, `caller_name`, `caller_phone`, `contact_id`, `created_at`, `id`, `metadata`, `notes`, `service_name`, `status`, `tenant_id`, `updated_at`, `when_text`, `window_end`, `window_start` | `docs/supabase/appointments.sql` |
+| `appointments` | `address_landmark`, `call_id`, `caller_name`, `caller_phone`, `contact_id`, `created_at`, `id`, `inbox_archived_at`, `metadata`, `notes`, `service_name`, `status`, `tenant_id`, `updated_at`, `when_text`, `window_end`, `window_start` | `docs/supabase/appointments.sql`<br>`docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `billing_audit_log` | `action`, `actor`, `created_at`, `detail`, `id`, `tenant_id` | `docs/supabase/billing_data_layer.sql` |
 | `billing_company` | `address`, `city`, `email`, `id`, `kra_pin`, `legal_name`, `phone`, `product`, `updated_at` | `docs/supabase/billing_company.sql` |
 | `billing_features` | `key`, `label` | `docs/supabase/billing_data_layer.sql` |
@@ -33,6 +33,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `catalogue_price_history` | `amount_ksh`, `confirmed`, `effective_from`, `id`, `in_stock`, `item_key`, `item_name`, `kind`, `max_ksh`, `min_ksh`, `mode`, `source`, `tenant_id`, `unit` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `contacts` | `created_at`, `id`, `last_reason`, `metadata`, `name`, `notes`, `phone`, `tenant_id`, `updated_at` | `docs/supabase/contacts_and_requests.sql` |
 | `data_quality_snapshots` | `report`, `taken_on`, `tenant_id` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
+| `inbox_archive_undo` | `consumed_at`, `created_at`, `created_by`, `id`, `payload`, `tenant_id` | `docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `invoice_lines` | `amount_kes`, `description`, `id`, `invoice_id`, `kind`, `quantity`, `sort_order`, `tenant_id`, `unit_amount_kes` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_documents.sql` |
 | `invoice_pay_tokens` | `created_at`, `expires_at`, `id`, `invoice_id`, `revoked_at`, `tenant_id`, `token_hash` | `docs/supabase/invoice_pay.sql` |
 | `invoice_receipts` | `amount_kes`, `created_at`, `id`, `invoice_id`, `method`, `paid_at`, `payment_id`, `provider_ref`, `receipt_number`, `tenant_id` | `docs/supabase/invoice_documents.sql` |
@@ -47,7 +48,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `platform_soniox_voices` | `created_at`, `description`, `id`, `is_active`, `is_default`, `sort_order`, `updated_at` | `docs/supabase/soniox_voice_id.sql` |
 | `rate_limit_hits` | `bucket`, `hits`, `window_start` | `supabase/migrations/20261011150000_onboarding_setup.sql` |
 | `sautikit_did_pool` | `assigned_at`, `created_at`, `e164`, `id`, `last_tenant_id`, `notes`, `quarantine_until`, `quarantined_at`, `sautikit_number_id`, `status`, `tenant_id` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/did_number_pool.sql` |
-| `service_requests` | `call_id`, `caller_name`, `caller_phone`, `contact_id`, `created_at`, `id`, `item`, `metadata`, `notes`, `quantity`, `request_type`, `status`, `tenant_id`, `updated_at`, `when_text`, `window_end`, `window_start` | `docs/supabase/contacts_and_requests.sql`<br>`docs/supabase/service_request_windows.sql` |
+| `service_requests` | `call_id`, `caller_name`, `caller_phone`, `contact_id`, `created_at`, `id`, `inbox_archived_at`, `item`, `metadata`, `notes`, `quantity`, `request_type`, `status`, `tenant_id`, `updated_at`, `when_text`, `window_end`, `window_start` | `docs/supabase/contacts_and_requests.sql`<br>`docs/supabase/inbox_archive_cascade.sql`<br>`docs/supabase/service_request_windows.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `subscription_events` | `actor`, `created_at`, `detail`, `from_status`, `id`, `reason`, `tenant_id`, `to_status` | `docs/supabase/billing_data_layer.sql` |
 | `tenant_credits` | `amount_kes`, `created_at`, `id`, `idempotency_key`, `payment_id`, `reason`, `tenant_id` | `docs/supabase/billing_data_layer.sql` |
 | `tenant_field_history` | `actor`, `created_at`, `field_path`, `id`, `new_value`, `old_value`, `source`, `tenant_id` | `docs/supabase/tenant_field_provenance.sql` |
@@ -76,7 +77,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (223)
+## Functions (226)
 
 | Function | Defined in |
 | --- | --- |
@@ -88,6 +89,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `_catalogue_item_key` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `_catalogue_name_path` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `_data_quality_rows` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
+| `_inbox_archive_assert_writer` | `docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `_owner_apply_allowances` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `_owner_billing_finish` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `_owner_billing_gate` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
@@ -208,6 +210,8 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `grant_tenant_package_minutes` | `docs/supabase/fix_grant_package_minutes.sql` |
 | `handle_new_user_tenant` | `docs/supabase/did_number_pool.sql`<br>`docs/supabase/multi_tenant_onboarding.sql`<br>`docs/supabase/voice_languages.sql`<br>`supabase/migrations/20261011000000_team_invites.sql` |
 | `hit_rate_limit` | `supabase/migrations/20261011150000_onboarding_setup.sql` |
+| `inbox_archive_calls` | `docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
+| `inbox_undo_archive` | `docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `invite_email_has_account` | `supabase/migrations/20261011120000_invite_account_lookup.sql` |
 | `invoice_kes_parts` | `docs/supabase/invoice_pay.sql` |
 | `invoice_lines_freeze` | `docs/supabase/billing_data_layer.sql` |
