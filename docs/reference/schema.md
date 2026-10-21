@@ -77,7 +77,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (226)
+## Functions (228)
 
 | Function | Defined in |
 | --- | --- |
@@ -185,6 +185,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_version_price_kes` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `bump_call_stream_seq` | `docs/supabase/greeting_language.sql` |
 | `call_setup_valid` | `supabase/migrations/20261018130000_tenant_call_setup.sql` |
+| `call_summary_jsonb` | `supabase/migrations/20261021220000_merge_call_summary.sql` |
 | `charge_call_to_wallet` | `docs/supabase/fix_charge_call_wallet_ambiguous.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_on_demand_alerts.sql` |
 | `claim_billing_notices` | `docs/supabase/billing_data_layer.sql` |
 | `claim_wallet_balance_alerts` | `docs/supabase/wallet_on_demand_alerts.sql` |
@@ -226,6 +227,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `mark_payment_event_retry` | `docs/supabase/invoice_pay_checkout_review.sql` |
 | `member_can_admin` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `member_can_write` | `supabase/migrations/20261011000000_team_invites.sql` |
+| `merge_call_summary` | `supabase/migrations/20261021220000_merge_call_summary.sql` |
 | `mint_invoice_pay_token` | `docs/supabase/invoice_pay.sql` |
 | `notify_sends_deny_mutation` | `docs/supabase/notify_send_ledger.sql`<br>`docs/supabase/notify_send_reserve_settle.sql`<br>`docs/supabase/purge_archived_tenants.sql` |
 | `open_checkout_total_review` | `docs/supabase/invoice_pay_checkout_review.sql`<br>`docs/supabase/invoice_pay_checkout_review_round8.sql`<br>`docs/supabase/invoice_pay_checkout_review_round9.sql` |
