@@ -30,7 +30,7 @@ Code: `src/conversation/callSummaryEvent.js` (pure builder, validator, v1 receip
 
 ```js
 {
-  event: 'call.summary.ready',
+  event: 'call.summary.ready',   // final (Ops ruling 21 Oct)
   schemaVersion: 1,
   path: 'v1' | 'v2',
   callLanguage: 'en' | 'sw',
@@ -38,14 +38,14 @@ Code: `src/conversation/callSummaryEvent.js` (pure builder, validator, v1 receip
   tenantId,
   outcome: 'booked' | 'ordered' | 'callback_needed' | 'info_only' | 'abandoned' | 'missed' | 'escalated',
   urgent: boolean,   // true ONLY if an escalation receipt exists
-  caller: { name?, phone },        // phone = E.164 (+2547…), or null if not normalisable; no other keys
+  caller: { name?, phone },        // phone = E.164 (+2547…) or null (not captured / not normalisable); no other keys
   receipts: [{
     receiptId,
     type: 'booking' | 'order' | 'callback' | 'quote' | 'complaint' | 'escalation',
     status: 'confirmed' | 'unconfirmed',
     writtenRowId?,   // appointments.id / service_requests.id actually written
     slots: { <name>: { value?, status: 'given' | 'not_given' } },
-    items?: [{ catalogueId, name, qty: { value?, status }, unitPrice?: { min, max, unit }, stock: 'in_stock' | 'out_of_stock' | 'unconfirmed' }]
+    items?: [{ catalogueId /* real catalogue id or null */, name, qty: { value?, status }, unitPrice?: { min, max, unit }, stock: 'in_stock' | 'out_of_stock' | 'unconfirmed' }]
   }],
   escalationReason?, // present iff an escalation receipt exists
   emittedAt          // ISO 8601 (UTC)
@@ -60,10 +60,11 @@ Slots used: booking `service, when, place, name`; order `pickup, name` plus `ite
    - v2: commits only run on the redeemed `confirm_token`, and a row id must come back.
    - v1: the transcript needs an agent read-back cue followed directly by a whole-answer yes. "Okay wait…", "Sawa lakini…?" and "Yes but make it three" are not yes.
    - A written row with no read-back stays `unconfirmed` (HD_e75a669780d4).
-2. callback / complaint / escalation are confirmed when the backend write succeeds, with **no read-back needed** (the caller's own ask or report). Old-path escalations have no row id, and that is fine: `writtenRowId` is optional for these types. A v1 "soft" escalation (desk note only) is unconfirmed. *(Final, Ops ruling 21 Oct.)*
-3. **Price and stock come only from catalogue facts.** Stock is `in_stock`/`out_of_stock` only when the catalogue row says so. A null or empty `in_stock` is `unconfirmed` (HD_8a8aa14db292). An off-catalogue item has `catalogueId: null`, no `unitPrice` and `unconfirmed` stock.
+2. **Callback** receipts are `confirmed` only when the agent read back **both the number and the time**, the caller gave an explicit yes (repeating the read-back time counts as yes; "okay wait", a question or "but" does not), **and** the callback write succeeded. Otherwise `unconfirmed`. Either way the outcome is `callback_needed`, never urgent. On the old path, no read-back evidence in the transcript means `unconfirmed`. On BA v2, the receipt keeps the spoken read-back line and the caller's reply; today's v2 handoff read-back templates do not say a time, so live v2 callbacks come out `unconfirmed` until those templates change. *(Final, Ops ruling 21 Oct.)*
+   **Complaint** and **escalation** receipts are confirmed when the backend write succeeds, with no read-back. Old-path escalations have no row id, and that is fine (`writtenRowId` is required only for booking / order / quote). A v1 "soft" escalation (desk note only) is unconfirmed. *(Final.)*
+3. **Price and stock come only from catalogue facts.** Stock is `in_stock`/`out_of_stock` only when the catalogue row says so. A null or empty `in_stock` is `unconfirmed` (HD_8a8aa14db292). `catalogueId` is the catalogue row's real id or `null`; synthetic ids (`name:<slug>`, `prd_<n>`) are never emitted. `null` means off-catalogue (no `unitPrice`, `unconfirmed` stock) or a matched catalogue row that has no id (price and stock still come from that row). *(Final, Ops ruling 21 Oct.)*
 4. Missing slot means `{ status: 'not_given' }` with no value. Values are never guessed.
-5. Outcome precedence: missed (never answered) > escalated > booked (confirmed) > ordered (confirmed) > callback_needed (any callback/complaint receipt, or a confirmed quote) > abandoned (answered, **no receipt and nothing answered**) > info_only. **Unconfirmed receipts never upgrade the outcome.** Interest with no confirmed write is `info_only` plus an unconfirmed receipt.
+5. Outcome precedence: missed (never answered) > escalated > booked (confirmed) > ordered (confirmed) > callback_needed (any callback/complaint receipt, or a confirmed quote) > abandoned (answered, **no receipt and nothing answered**) > info_only. **Unconfirmed receipts never upgrade the outcome**, except that any callback or complaint receipt (confirmed or not) gives `callback_needed`. Interest with no confirmed write is `info_only` plus an unconfirmed receipt.
 6. `missed` and `abandoned` carry no receipts. `urgent === (an escalation receipt exists)`.
 7. BA v2 handoffs: **only a manager request is urgent** (`escalation` receipt, outcome `escalated`). The ladder, address and payment handoffs are `callback` receipts and a complaint is a `complaint` receipt; all of these give outcome `callback_needed`, never urgent. *(Final, Ops ruling 21 Oct.)*
 8. Never-answered calls: Brain emits no typed `missed` event on v1 (no brain state exists). **Ops' 2-min fallback covers them** ("Missed call from X"). Retiring the mid-call owner SMS/WhatsApp sends is **Ops' job**; Brain does not touch them. *(Final, Ops ruling 21 Oct.)*
@@ -72,7 +73,7 @@ Slots used: booking `service, when, place, name`; order `pickup, name` plus `ite
 
 - Confirmed receipts render as an order/booking. Unconfirmed ones render as "Interested in X, not confirmed".
 - Stock is shown only when `in_stock` or `out_of_stock`. `unconfirmed` shows "stock to confirm". Price is shown as a range from `unitPrice` (`min`–`max` per `unit`; a single price when min = max).
-- `callLanguage` picks the EN/SW template. Missing slots show "not given".
+- `callLanguage` picks the EN/SW template. Missing slots show "not given". `caller.phone: null` shows "number not captured".
 - A 30 s settle after call end, unless `urgent` (send now, still once per call). Dedup on `(callId, channel)` server-side. Channel order: WhatsApp if the 24 h window is open, then SMS, then email.
 - 2-min fallback with no event, worded by outcome: missed gets "Missed call from X", answered gets "Call from X, no details captured".
 - Only `missed` may be labelled "missed-call lead".
@@ -82,12 +83,15 @@ Slots used: booking `service, when, place, name`; order `pickup, name` plus `ite
 | # | Topic | Final |
 |---|---|---|
 | 1 | Caller field | `caller.phone` only, holding the E.164 value; no other phone key. |
-| 3 | Confirmation without read-back | callback / complaint / escalation are confirmed on backend write success; booking / order / quote still need read-back + yes + `writtenRowId`; old-path escalations without a row id are fine. |
+| 3 | Confirmation | Callback: number + time read back, explicit yes (repeated time counts; "okay wait" does not) and a successful write, else `unconfirmed`; still `callback_needed`, non-urgent. Complaint / escalation: confirmed on a successful write; old-path escalations without a row id are fine. Booking / order / quote: read-back + yes + `writtenRowId`. |
 | 4 | Never-answered calls | Covered by Ops' 2-min fallback; no Brain event. |
 | 5 | Mid-call SMS | Retiring them is Ops' job. |
 | 7 | v2 handoffs | Only a manager request is urgent; other handoffs are `callback_needed`. |
+| 2 | Event name field | Top-level `event: 'call.summary.ready'` stays. |
+| 6 | `catalogueId` | The real catalogue id or `null`; no synthetic ids. |
+| 8 | Null phone | `caller.phone` may be `null`; the sender shows "number not captured". |
 
-Still open (not ruled, no change): #2, the emitter adds `event: 'call.summary.ready'`; #6, `catalogueId` is `null` off-catalogue and `name:<slug>` when the row has no id (treat as opaque).
+No open items remain.
 
 ## Proposed durable outbox (NOT applied; Platform to review)
 
