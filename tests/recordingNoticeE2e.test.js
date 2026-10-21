@@ -167,15 +167,14 @@ describe('VOICE_RECORDING_NOTICE_VARIANT=a (V2 on)', { concurrency: true }, () =
     assert.ok(Number(/since_greeting_end_ms=(\d+)/.exec(out.line)[1]) > 5000);
   });
 
-  it('returning caller: no notice, no variant, no outcome', async () => {
+  it('returning caller hears the variant after the question (KDPA default)', async () => {
     const sid = 'HD_sim_aris_ret_rn';
     const c = await connect(srv, sid);
     const g = await greetingLog(srv, sid);
-    assert.doesNotMatch(g.line, /rekodi|record/i);
+    assert.ok(g.line.endsWith('Karibu tena. Tukusaidie vipi? Na kwa ubora wa huduma, tunarekodi simu.'), g.line);
+    assert.ok(logsOf(srv, sid).some((l) => l.includes('recording_notice variant=a')));
     await sleep(300);
     c.ws.close(1000);
-    await sleep(500);
-    assert.equal(logsOf(srv, sid).filter((l) => l.includes('recording_notice')).length, 0);
   });
 
   it('a reconnect keeps the variant and logs one outcome at the real end', async () => {
@@ -257,5 +256,46 @@ describe('VOICE_RECORDING_NOTICE_VARIANT set, VOICE_OPENING_V2 off', { concurren
     c.ws.close(1000);
     await sleep(400);
     assert.equal(logsOf(srv, sid).filter((l) => l.includes('recording_notice')).length, 0);
+  });
+});
+
+// KDPA with a variant: the variant comes after the question, so an early
+// barge cuts it; the owed line is the standalone wording (no joining "Na ")
+// before the first name ask.
+describe('VOICE_RECORDING_NOTICE_VARIANT=a: barge cuts the variant, owed line before the name ask', () => {
+  let srv;
+  before(async () => {
+    srv = await startServer({
+      VOICE_OPENING_V2: 'on',
+      VOICE_RECORDING_NOTICE_VARIANT: 'a',
+      OPENING_SIM_PCM_MS: '3000',
+      VOICE_OPENING_SILENCE_MS: '60000,60000,60000',
+      GEMINI_API_KEY: 'sim-not-a-key',
+      OPENING_SIM_GEMINI_SCRIPT: JSON.stringify([['zulia', 'Sawa, tunaweza kusafisha zulia. Naomba jina lako?']]),
+    });
+  });
+  after(() => {
+    if (srv) srv.child.kill('SIGKILL');
+  });
+
+  it('cut -> owed -> "Kwa ubora wa huduma, tunarekodi simu." prefixes the name ask', async () => {
+    const sid = 'HD_sim_jirani_new_rnkdpa';
+    const c = await connect(srv, sid);
+    const g = await greetingLog(srv, sid);
+    assert.ok(g.line.endsWith('Na kwa ubora wa huduma, tunarekodi simu.'), g.line);
+    await sleep(600);
+    sayInterim(srv, sid, 'Mnafanya carpet cleaning', { startMs: 500, endMs: 900, lang: 'sw' });
+    const cut = await waitFor(srv.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] recording_notice cut `), 2000);
+    assert.match(cut.line, /-> owed/);
+    await sleep(300);
+    const from = srv.events.length;
+    sayFinal(srv, sid, 'Mnasafisha zulia?', { lang: 'sw' });
+    const ask = await waitFor(srv.events, (e) => e.ev === 'speak' && mine(sid)(e) && /jina/i.test(e.text), 6000, from);
+    assert.ok(ask, logsOf(srv, sid, from).join('\n'));
+    const spoken = srv.events.slice(from).filter((e) => e.ev === 'speak' && mine(sid)(e)).map((e) => e.text).join(' ');
+    // The ask sentence carries it: "... Kwa ubora wa huduma, tunarekodi simu. Naomba jina lako?"
+    assert.match(spoken, /Kwa ubora wa huduma, tunarekodi simu\. Naomba jina/);
+    assert.doesNotMatch(spoken, /Na kwa ubora/);
+    c.ws.close(1000);
   });
 });

@@ -14,7 +14,10 @@
 //                   reconnect of the same call keeps its variant
 //
 // The notice is spoken only while VOICE_STREAM_RECORD records the call, and
-// never to a returning caller (same rules as the V2 opening).
+// to returning callers too unless VOICE_RETURNING_SKIP_NOTICE is on (same
+// rules as the V2 opening). Cut by a barge, it is owed: said once, as a
+// standalone line without the joining "Na " / "And ", before the first
+// personal-details ask or save.
 
 const FLAG = 'VOICE_RECORDING_NOTICE_VARIANT';
 const VARIANTS = ['a', 'b', 'c'];

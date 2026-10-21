@@ -25,7 +25,7 @@ function profileOf(key, overrides = {}) {
 }
 
 /** The opening a call speaks for this tenant/language/state. */
-function render(key, { lang, isOpen, returning = false, named = false }) {
+function render(key, { lang, isOpen, returning = false, named = false, skipNotice = false }) {
   // English shop: the language is typed (future tenants.greeting_language)
   // and the owner's invite is the stock English one, so nothing mixes.
   const profile = profileOf(key, lang === 'en' ? { greetingLanguage: 'en', greetingInvite: '' } : {});
@@ -42,6 +42,7 @@ function render(key, { lang, isOpen, returning = false, named = false }) {
     isOpen,
     afterHoursMode: 'serve',
     recordingNotice: true,
+    returningSkipNotice: skipNotice,
     ...op.callerOpeningFacts(card),
   });
 }
@@ -51,12 +52,14 @@ function matrix() {
   for (const key of Object.keys(TENANTS)) {
     for (const lang of ['sw', 'en']) {
       for (const open of [true, false]) {
-        for (const who of ['new', 'returning', 'returning_named']) {
+        // returning_skip: VOICE_RETURNING_SKIP_NOTICE=on (default off: returning callers hear it).
+        for (const who of ['new', 'returning', 'returning_named', 'returning_skip']) {
           const r = render(key, {
             lang,
             isOpen: open,
             returning: who !== 'new',
             named: who === 'returning_named',
+            skipNotice: who === 'returning_skip',
           });
           out[`${key}.${lang}.${open ? 'open' : 'closed'}.${who}`] = r.text;
         }
@@ -66,14 +69,14 @@ function matrix() {
   return out;
 }
 
-describe('opening snapshots per tenant (Aris, Esga, Jirani; sw/en; open/closed; returning)', () => {
+describe('opening snapshots per tenant (Aris, Esga, Jirani; sw/en; open/closed; returning, notice skip)', () => {
   const got = matrix();
   if (process.env.UPDATE_OPENING_SNAPSHOTS === '1') {
     fs.writeFileSync(SNAP, `${JSON.stringify(got, null, 2)}\n`);
   }
   const want = JSON.parse(fs.readFileSync(SNAP, 'utf8'));
-  it('covers 36 cases', () => {
-    assert.equal(Object.keys(want).length, 36);
+  it('covers 48 cases', () => {
+    assert.equal(Object.keys(want).length, 48);
     assert.deepEqual(Object.keys(got).sort(), Object.keys(want).sort());
   });
   for (const k of Object.keys(want)) {
@@ -100,12 +103,34 @@ describe('wording rules', () => {
   it('no daypart word (it changed the cache key and was inconsistent)', () => {
     for (const text of Object.values(matrix())) assert.doesNotMatch(text, /good (morning|afternoon|evening)|habari za/i);
   });
-  it('returning callers: Karibu tena / Welcome back, no recording notice', () => {
+  it('returning callers: Karibu tena / Welcome back, and the notice (VOICE_RETURNING_SKIP_NOTICE off)', () => {
     const sw = render('esga', { lang: 'sw', isOpen: true, returning: true });
-    assert.equal(sw.text, 'Hapa ni Esga, naitwa Lucy. Karibu tena. Nikusaidie vipi?');
-    assert.equal(sw.notice, false);
+    assert.equal(sw.text, 'Hapa ni Esga, naitwa Lucy. Karibu tena. Simu hii inaweza kurekodiwa. Nikusaidie vipi?');
+    assert.equal(sw.notice, true);
     const en = render('esga', { lang: 'en', isOpen: true, returning: true });
-    assert.equal(en.text, 'Esga, this is Lucy. Welcome back. How can I help?');
+    assert.equal(en.text, 'Esga, this is Lucy. Welcome back. This call may be recorded. How can I help?');
+  });
+  it('VOICE_RETURNING_SKIP_NOTICE=on: returning callers skip it; new callers never do', () => {
+    const back = render('esga', { lang: 'sw', isOpen: true, returning: true, skipNotice: true });
+    assert.equal(back.text, 'Hapa ni Esga, naitwa Lucy. Karibu tena. Nikusaidie vipi?');
+    assert.equal(back.notice, false);
+    assert.equal(back.noticeEnd, null);
+    assert.equal(render('esga', { lang: 'sw', isOpen: true, skipNotice: true }).notice, true);
+    const prev = process.env.VOICE_RETURNING_SKIP_NOTICE;
+    try {
+      delete process.env.VOICE_RETURNING_SKIP_NOTICE;
+      assert.equal(op.returningSkipNoticeOn(), false, 'default off');
+      process.env.VOICE_RETURNING_SKIP_NOTICE = 'on';
+      assert.equal(op.returningSkipNoticeOn(), true);
+    } finally {
+      if (prev == null) delete process.env.VOICE_RETURNING_SKIP_NOTICE;
+      else process.env.VOICE_RETURNING_SKIP_NOTICE = prev;
+    }
+  });
+  it('noticeEnd points just past the notice in the line', () => {
+    const o = render('jirani', { lang: 'sw', isOpen: true });
+    assert.equal(o.text.slice(0, o.noticeEnd).endsWith('Simu hii inaweza kurekodiwa.'), true);
+    assert.equal(o.noticeText, 'Simu hii inaweza kurekodiwa.');
   });
   it('the name is spoken only when it was confirmed on an earlier call', () => {
     assert.doesNotMatch(render('aris', { lang: 'sw', isOpen: true, returning: true }).text, /Alvin/);
@@ -441,5 +466,80 @@ describe('flag', () => {
     assert.equal(op.openingV2Enabled({ VOICE_OPENING_V2: 'off' }), false);
     assert.equal(op.openingV2Enabled({ VOICE_OPENING_V2: 'on' }), true);
     assert.equal(op.openingV2Enabled({ VOICE_OPENING_V2: '1' }), true);
+  });
+});
+
+describe('recording notice owed after a barge (KDPA)', () => {
+  function clock(start = 1000) {
+    let t = start;
+    return { now: () => t, add: (ms) => (t += ms) };
+  }
+
+  it('personal-details asks: name, phone, location (en/sw); other lines are not', () => {
+    const yes = {
+      name: ['May I have your name?', 'Naomba jina lako?', 'Unaitwa nani?', 'Am I speaking with Alvin?', "What's your name, please?"],
+      phone: ['What is your phone number?', 'Namba yako ya simu ni gani?', 'Is this the best number to reach you?'],
+      location: ['Where are you located?', 'Uko wapi?', 'Which area are you in?', 'Tukuje wapi?', 'What is your address?'],
+    };
+    for (const [kind, lines] of Object.entries(yes)) {
+      for (const l of lines) assert.equal(op.isPersonalDetailsAsk(l), kind, l);
+    }
+    for (const l of ['Nikusaidie vipi?', 'Deep cleaning ni shilingi elfu tano.', 'We are in Kilimani.', 'Tuko Westlands.', 'How can I help?']) {
+      assert.equal(op.isPersonalDetailsAsk(l), false, l);
+    }
+  });
+
+  it('greeting heard to the end: given, how=greeting', () => {
+    const c = clock();
+    const t = op.createNoticeTracker({ required: true, now: c.now });
+    c.add(4000);
+    t.heardInGreeting();
+    assert.deepEqual(
+      { given: t.snapshot().given, how: t.snapshot().how, at: t.snapshot().at_ms },
+      { given: true, how: 'greeting', at: 4000 }
+    );
+  });
+
+  it('barge before the notice ends: owed; barge well after it: heard', () => {
+    const o = op.composeOpening({ businessName: 'Esga', agentName: 'Lucy', language: 'sw', recordingNotice: true });
+    const endMs = op.noticeEndMsIn({ text: o.text, noticeEnd: o.noticeEnd, durationMs: 4000 });
+    assert.ok(endMs > 1000 && endMs < 4000, String(endMs));
+    const early = op.createNoticeTracker({ required: true });
+    assert.equal(early.greetingCut({ playedMs: endMs - 200, noticeEndMs: endMs }), 'owed');
+    assert.equal(early.owed(), true);
+    const late = op.createNoticeTracker({ required: true });
+    assert.equal(late.greetingCut({ playedMs: endMs + op.NOTICE_HEARD_MARGIN_MS + 10, noticeEndMs: endMs }), 'given');
+    // Live TTS (no clip length): a barge always owes the notice.
+    const live = op.createNoticeTracker({ required: true });
+    assert.equal(live.greetingCut({ playedMs: 9000, noticeEndMs: null }), 'owed');
+  });
+
+  it('owed notice is given once, before the first ask or save, then never again', () => {
+    const c = clock();
+    const t = op.createNoticeTracker({ required: true, now: c.now });
+    t.greetingCut({ playedMs: 100, noticeEndMs: 2000 });
+    c.add(6000);
+    assert.equal(t.given('before_ask'), true);
+    assert.equal(t.given('before_save'), false, 'only once');
+    assert.deepEqual(
+      { given: t.snapshot().given, how: t.snapshot().how, at: t.snapshot().at_ms, cut: t.snapshot().cut_at_ms },
+      { given: true, how: 'before_ask', at: 6000, cut: 0 }
+    );
+  });
+
+  it('not required: no recording, or returning with the skip flag', () => {
+    const t = op.createNoticeTracker({ required: false });
+    assert.equal(t.greetingCut({ playedMs: 0, noticeEndMs: 100 }), 'not_required');
+    assert.deepEqual({ g: t.snapshot().given, how: t.snapshot().how }, { g: false, how: 'not_required' });
+  });
+
+  it('a drop before the notice was heard leaves it owed on the resumed stream', () => {
+    const t = op.createNoticeTracker({ required: true });
+    const snap = t.snapshot();
+    const r = op.createNoticeTracker({ required: true });
+    r.restore(snap);
+    assert.equal(r.owed(), true);
+    assert.equal(op.noticeLine('sw'), 'Simu hii inaweza kurekodiwa.');
+    assert.equal(op.noticeLine('en'), 'This call may be recorded.');
   });
 });

@@ -18,6 +18,8 @@ const assert = require('node:assert/strict');
 const { fork } = require('node:child_process');
 const net = require('node:net');
 const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
 const WebSocket = require('ws');
 
 const ROOT = path.join(__dirname, '..');
@@ -155,13 +157,16 @@ describe('VOICE_OPENING_V2=on (e2e server.js)', { concurrency: true }, () => {
     c.ws.close();
   });
 
-  it('Aris returning caller hears Karibu tena, no name, no notice', async () => {
+  it('Aris returning caller hears Karibu tena, no name, and the short notice (KDPA default)', async () => {
     const sid = 'HD_sim_aris_ret_1';
     const c = await connect(srv, sid);
     const g = await greetingLog(srv, sid);
     assert.match(g.line, /kind=returning_open lang=sw/);
-    assert.ok(g.line.endsWith(': Hapa ni Aris - The Home of Affordable Stationery, naitwa Lynn. Karibu tena. Tukusaidie vipi?'), g.line);
-    assert.doesNotMatch(g.line, /Alvin|rekodi/);
+    assert.ok(
+      g.line.endsWith(': Hapa ni Aris - The Home of Affordable Stationery, naitwa Lynn. Karibu tena. Simu hii inaweza kurekodiwa. Tukusaidie vipi?'),
+      g.line
+    );
+    assert.doesNotMatch(g.line, /Alvin/);
     c.ws.close();
   });
 
@@ -169,7 +174,7 @@ describe('VOICE_OPENING_V2=on (e2e server.js)', { concurrency: true }, () => {
     const sid = 'HD_sim_esga_retnamed_1';
     const c = await connect(srv, sid);
     const g = await greetingLog(srv, sid);
-    assert.ok(g.line.endsWith(': Hapa ni Esga, naitwa Lucy. Karibu tena, Alvin. Nikusaidie vipi?'), g.line);
+    assert.ok(g.line.endsWith(': Hapa ni Esga, naitwa Lucy. Karibu tena, Alvin. Simu hii inaweza kurekodiwa. Nikusaidie vipi?'), g.line);
     c.ws.close();
   });
 
@@ -382,5 +387,271 @@ describe('VOICE_OPENING_V2 unset: today exactly (e2e server.js)', { concurrency:
     const g = await greetingLog(srv, sid, from);
     assert.ok(g, 'today: the reconnect greets again');
     b.ws.close();
+  });
+});
+
+describe('VOICE_RETURNING_SKIP_NOTICE=on: returning callers skip the notice (e2e)', { concurrency: true }, () => {
+  let srv;
+  before(async () => {
+    srv = await startServer({ VOICE_OPENING_V2: 'on', VOICE_RETURNING_SKIP_NOTICE: 'on', VOICE_OPENING_SILENCE_MS: '60000,60000,60000' });
+  });
+  after(() => {
+    if (srv) srv.child.kill('SIGKILL');
+  });
+
+  it('returning caller: no notice; notice_given=false how=skipped_returning logged', async () => {
+    const sid = 'HD_sim_aris_ret_skip';
+    const c = await connect(srv, sid);
+    const g = await greetingLog(srv, sid);
+    assert.ok(g.line.endsWith(': Hapa ni Aris - The Home of Affordable Stationery, naitwa Lynn. Karibu tena. Tukusaidie vipi?'), g.line);
+    assert.doesNotMatch(g.line, /rekodi/);
+    await sleep(500);
+    c.ws.close();
+    const n = await waitFor(srv.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] recording_notice_given `), 3000);
+    assert.ok(n, logsOf(srv, sid).join('\n'));
+    assert.match(n.line, /given=false .*state=not_required/);
+  });
+
+  it('a new caller still hears the notice with the flag on', async () => {
+    const sid = 'HD_sim_aris_new_skip';
+    const c = await connect(srv, sid);
+    const g = await greetingLog(srv, sid);
+    assert.match(g.line, /Simu hii inaweza kurekodiwa\./);
+    c.ws.close();
+  });
+});
+
+describe('returning caller greeted in contacts.last_language (#844)', { concurrency: true }, () => {
+  let srv;
+  before(async () => {
+    srv = await startServer({ VOICE_OPENING_V2: 'on', OPENING_SIM_LAST_LANGUAGE: 'en', VOICE_OPENING_SILENCE_MS: '60000,60000,60000' });
+  });
+  after(() => {
+    if (srv) srv.child.kill('SIGKILL');
+  });
+
+  it('Swahili shop, caller last spoke English: English greeting, notice and question; the owner text is not used', async () => {
+    const sid = 'HD_sim_jirani_ret_en';
+    const c = await connect(srv, sid);
+    const g = await greetingLog(srv, sid);
+    assert.match(g.line, /kind=returning_open lang=en/);
+    assert.match(g.line, /Welcome back\. This call may be recorded\. How can I help\?$/);
+    assert.doesNotMatch(g.line, /Karibu|rekodi|Nikusaidie/);
+    assert.ok(logsOf(srv, sid).some((l) => l.includes('opening_lang caller_last=en shop=sw')));
+    c.ws.close();
+  });
+
+  it('a new caller at the same shop is greeted in the shop language', async () => {
+    const sid = 'HD_sim_jirani_new_lang';
+    const c = await connect(srv, sid);
+    const g = await greetingLog(srv, sid);
+    assert.match(g.line, /kind=new_open lang=sw/);
+    c.ws.close();
+  });
+});
+
+// KDPA ruling: a barge that cuts the recording notice leaves it owed; the
+// agent says it in one short line before the first personal-details ask or
+// save, whichever comes first. A fake Gemini scripts the agent's turns.
+describe('KDPA: notice cut by a barge is given before the name ask / save (e2e)', { concurrency: true }, () => {
+  let srv;
+  before(async () => {
+    srv = await startServer({
+      VOICE_OPENING_V2: 'on',
+      OPENING_SIM_PCM_MS: '3000',
+      VOICE_OPENING_SILENCE_MS: '60000,60000,60000',
+      GEMINI_API_KEY: 'sim-not-a-key',
+      OPENING_SIM_GEMINI_SCRIPT: JSON.stringify([
+        ['zulia', 'Sawa, tunaweza kusafisha zulia. Naomba jina lako?'],
+        ['naitwa peter', 'Asante Peter. ###TOOL###{"save_caller_info":{"name":"Peter","reason":"carpet cleaning"}}###ENDTOOL###'],
+        ['bei', 'Bei inategemea ukubwa wa nyumba.'],
+      ]),
+    });
+  });
+  after(() => {
+    if (srv) srv.child.kill('SIGKILL');
+  });
+
+  async function bargeEarly(sid) {
+    const c = await connect(srv, sid);
+    const g = await greetingLog(srv, sid);
+    assert.match(g.line, /Simu hii inaweza kurekodiwa\./);
+    await sleep(600);
+    sayInterim(srv, sid, 'Mnafanya carpet cleaning', { startMs: 500, endMs: 900, lang: 'sw' });
+    const cut = await waitFor(srv.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] recording_notice cut `), 2000);
+    assert.ok(cut, logsOf(srv, sid).join('\n'));
+    assert.match(cut.line, /-> owed/);
+    await sleep(300);
+    return c;
+  }
+
+  it('barge cuts the notice; the name ask carries it in one line first', async () => {
+    const sid = 'HD_sim_jirani_new_kdpa1';
+    const c = await bargeEarly(sid);
+    const from = srv.events.length;
+    sayFinal(srv, sid, 'Mnasafisha zulia?', { lang: 'sw' });
+    const ask = await waitFor(srv.events, (e) => e.ev === 'speak' && mine(sid)(e) && /jina/i.test(e.text), 6000, from);
+    assert.ok(ask, `${logsOf(srv, sid, from).join('\n')}`);
+    const spoken = srv.events.slice(from).filter((e) => e.ev === 'speak' && mine(sid)(e)).map((e) => e.text).join(' ');
+    const at = spoken.indexOf('Simu hii inaweza kurekodiwa.');
+    assert.ok(at >= 0 && at < spoken.search(/Naomba jina/i), spoken);
+    assert.ok(logsOf(srv, sid).some((l) => /recording_notice given how=before_ask ask=name/.test(l)));
+    c.ws.close();
+    const n = await waitFor(srv.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] recording_notice_given `), 3000);
+    assert.match(n.line, /given=true how=before_ask at_ms=\d+ cut_at_ms=\d+ state=given/);
+  });
+
+  it('barge cuts the notice; a save comes first: the notice is spoken before the save runs', async () => {
+    const sid = 'HD_sim_jirani_new_kdpa2';
+    const c = await bargeEarly(sid);
+    const from = srv.events.length;
+    sayFinal(srv, sid, 'Naitwa Peter, nataka carpet cleaning', { lang: 'sw' });
+    const given = await waitFor(
+      srv.events,
+      (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] recording_notice given how=before_save`),
+      5000,
+      from
+    );
+    assert.ok(given, logsOf(srv, sid, from).join('\n'));
+    const save = await waitFor(srv.events, (e) => e.ev === 'db_write' && e.fn === 'saveCallerInfo' && e.callSid === sid, 3000, from);
+    assert.ok(save, 'save ran (sim stub, no database)');
+    const noticeSpeak = srv.events.slice(from).find((e) => e.ev === 'speak' && mine(sid)(e) && /Simu hii inaweza kurekodiwa/.test(e.text));
+    assert.ok(noticeSpeak, 'notice spoken');
+    assert.ok(srv.events.indexOf(noticeSpeak) < srv.events.indexOf(save), 'notice spoken before the save');
+    const turn = await waitFor(srv.events, (e) => e.ev === 'log' && e.line.includes(`[voice-timing][${sid}] turn_ms=`), 3000, from);
+    assert.ok(turn && Number(/turn_ms=(\d+)/.exec(turn.line)[1]) < 1500, `the gate must not stall the turn: ${turn && turn.line}`);
+    c.ws.close();
+  });
+
+  it('a turn with no ask and no save does not spend the owed notice', async () => {
+    const sid = 'HD_sim_jirani_new_kdpa3';
+    const c = await bargeEarly(sid);
+    const from = srv.events.length;
+    sayFinal(srv, sid, 'Bei ni ngapi?', { lang: 'sw' });
+    await waitFor(srv.events, (e) => e.ev === 'speak' && mine(sid)(e), 6000, from);
+    await sleep(300);
+    const spoken = srv.events.slice(from).filter((e) => e.ev === 'speak' && mine(sid)(e)).map((e) => e.text).join(' ');
+    assert.doesNotMatch(spoken, /rekodi/);
+    c.ws.close();
+    const n = await waitFor(srv.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] recording_notice_given `), 3000);
+    assert.match(n.line, /given=false .*state=owed/);
+  });
+});
+
+// Latency ruling: the incoming-call webhook loads the tenant profile (and
+// warms the greeting PCM) keyed by callSid before the stream opens.
+describe('webhook prefetch: 2.5 s profile load, cache hit greets under 600 ms (e2e)', { concurrency: true }, () => {
+  let srv;
+  before(async () => {
+    srv = await startServer({ VOICE_OPENING_V2: 'on', OPENING_SIM_PROFILE_DELAY_MS: '2500', VOICE_OPENING_SILENCE_MS: '60000,60000,60000' });
+  });
+  after(() => {
+    if (srv) srv.child.kill('SIGKILL');
+  });
+
+  async function webhook(sid, did = '+254709000003', from = '+254700000001') {
+    const r = await fetch(`http://127.0.0.1:${srv.port}/`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid, callerNumber: from, destinationNumber: did, isActive: true, direction: 'inbound' }),
+    });
+    assert.equal(r.status, 200);
+    return r.text();
+  }
+  const firstPcm = async (sid) => {
+    const t = await waitFor(srv.events, (e) => e.ev === 'log' && e.line.includes(`[voice-timing][${sid}] greeting.first_pcm_ms=`), 8000);
+    assert.ok(t, logsOf(srv, sid).join('\n'));
+    return { ms: Number(/first_pcm_ms=(\d+)/.exec(t.line)[1]), line: t.line };
+  };
+
+  it('hit: webhook then stream -> first PCM < 600 ms, prefetch=hit, profile read once', async () => {
+    const sid = 'HD_sim_jirani_new_pfhit';
+    await webhook(sid);
+    const ready = await waitFor(srv.events, (e) => e.ev === 'log' && e.line.includes(`[${sid}] opening_prefetch ready`), 5000);
+    assert.ok(ready, logsOf(srv, sid).join('\n'));
+    const c = await connect(srv, sid);
+    const t = await firstPcm(sid);
+    assert.match(t.line, /prefetch=hit/);
+    assert.match(t.line, /cached=1/);
+    assert.ok(t.ms < 600, `first PCM ${t.ms} ms`);
+    c.ws.close();
+  });
+
+  it('miss: stream with no webhook falls back to today\'s load (slow, still greets)', async () => {
+    const sid = 'HD_sim_jirani_new_pfmiss';
+    const c = await connect(srv, sid);
+    const t = await firstPcm(sid);
+    assert.match(t.line, /prefetch=miss/);
+    assert.ok(t.ms >= 2400, `miss should pay the 2.5 s load, got ${t.ms} ms`);
+    c.ws.close();
+  });
+
+  it('in flight: stream opens 1 s after the webhook -> waits for the same load, no second read', async () => {
+    const sid = 'HD_sim_esga_new_pfwait';
+    await webhook(sid, '+254709000002');
+    await sleep(1000);
+    const c = await connect(srv, sid);
+    const t = await firstPcm(sid);
+    assert.match(t.line, /prefetch=inflight/);
+    assert.ok(t.ms < 2400, `in-flight prefetch should save ~1 s, got ${t.ms} ms`);
+    c.ws.close();
+  });
+});
+
+// Shared resume ruling: two replicas share Platform's calls helpers (#844,
+// mocked on files here; no database is written). The markCallGreeted claim
+// decides who greets.
+describe('two replicas share the opening store: a reconnect on B does not greet (e2e)', { concurrency: false }, () => {
+  let a;
+  let b;
+  let dir;
+  before(async () => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opening-shared-'));
+    const env = { VOICE_OPENING_V2: 'on', OPENING_SIM_SHARED_DIR: dir, VOICE_OPENING_SILENCE_MS: '60000,60000,60000' };
+    [a, b] = await Promise.all([startServer(env), startServer(env)]);
+  });
+  after(() => {
+    for (const s of [a, b]) if (s) s.child.kill('SIGKILL');
+    if (dir) fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('both replicas detect the helpers once and use them', async () => {
+    for (const s of [a, b]) {
+      const on = await waitFor(s.events, (e) => e.ev === 'log' && e.line.includes('[opening-store]'), 3000);
+      assert.ok(on, 'opening-store logged');
+      assert.match(on.line, /shared resume on/);
+      assert.equal(s.events.filter((e) => e.ev === 'log' && e.line.includes('[opening-store]')).length, 1);
+    }
+  });
+
+  it('greet on A, drop, reconnect on B: claim lost, resume (listen), no greeting on B', async () => {
+    const sid = 'HD_sim_jirani_new_2rep';
+    const c1 = await connect(a, sid);
+    const g = await greetingLog(a, sid);
+    assert.ok(g, 'A greets');
+    assert.ok(logsOf(a, sid).some((l) => l.includes('opening_claim won store=db')), logsOf(a, sid).join('\n'));
+    await sleep(500);
+    c1.ws.terminate();
+    await waitFor(a.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] opening_socket_closed ended=0`), 3000);
+    const c2 = await connect(b, sid);
+    const lost = await waitFor(b.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] opening_claim lost store=db -> resume action=listen`), 5000);
+    assert.ok(lost, logsOf(b, sid).join('\n'));
+    await sleep(600);
+    const bLogs = logsOf(b, sid);
+    assert.equal(bLogs.filter((l) => l.includes('greeting mode=')).length, 0, bLogs.join('\n'));
+    assert.equal(b.events.filter((e) => e.ev === 'speak' && mine(sid)(e)).length, 0, 'B spoke nothing');
+    assert.ok(bLogs.some((l) => /opening_resume .*action=listen/.test(l)), bLogs.join('\n'));
+    const row = JSON.parse(fs.readFileSync(path.join(dir, `${sid}.json`), 'utf8'));
+    assert.ok(row.greeted_at);
+    assert.equal(row.stream_seq, 2);
+    c2.ws.close();
+  });
+
+  it('a different call on B still greets (wins its own claim)', async () => {
+    const sid = 'HD_sim_esga_new_2rep';
+    const c = await connect(b, sid);
+    const g = await greetingLog(b, sid);
+    assert.ok(g, 'B greets a new call');
+    c.ws.close();
   });
 });

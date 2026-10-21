@@ -109,11 +109,15 @@ describe('wording and placement', () => {
       assert.match(opening('esga').text, /Simu hii inaweza kurekodiwa\. Nikusaidie vipi\?$/);
     }));
 
-  it('no notice for returning callers or while the call is not recorded', () => {
+  it('returning callers hear the variant (KDPA default); skipped only with VOICE_RETURNING_SKIP_NOTICE; none while not recorded', () => {
     withEnv(REC, () => {
       const back = opening('esga', { noticeVariant: 'a', isReturning: true });
-      assert.equal(back.noticeVariant, null);
-      assert.doesNotMatch(back.text, /rekodi/);
+      assert.equal(back.noticeVariant, 'a');
+      assert.ok(back.text.endsWith('Na kwa ubora wa huduma, tunarekodi simu.'), back.text);
+      assert.equal(back.text.slice(0, back.noticeEnd).endsWith('tunarekodi simu.'), true);
+      const skipped = opening('esga', { noticeVariant: 'a', isReturning: true, returningSkipNotice: true });
+      assert.equal(skipped.noticeVariant, null);
+      assert.doesNotMatch(skipped.text, /rekodi/);
     });
     withEnv({ VOICE_STREAM_RECORD: null }, () => {
       const o = opening('esga', { noticeVariant: 'a' });
@@ -138,5 +142,15 @@ describe('early hang-up', () => {
     assert.deepEqual(rnv.earlyHangup({ greetingEndAt: 1000, closedAt: 6001 }), { early: false, sinceEndMs: 5001 });
     assert.deepEqual(rnv.earlyHangup({ greetingEndAt: null, closedAt: 500 }), { early: true, sinceEndMs: null });
     assert.equal(rnv.earlyHangup({ greetingEndAt: 1000, closedAt: 2000, byAgent: true }).early, false);
+  });
+});
+
+describe('owed notice line with a variant (barge cut it)', () => {
+  it('standalone: no joining Na / And, capitalised; no variant -> today\'s notice', () => {
+    assert.equal(callOpening.noticeLine('sw', 'a'), 'Kwa ubora wa huduma, tunarekodi simu.');
+    assert.equal(callOpening.noticeLine('en', 'a'), 'For service quality, we record calls.');
+    assert.equal(callOpening.noticeLine('sw', 'b'), 'Kwa ubora wa huduma, simu hii inarekodiwa.');
+    assert.equal(callOpening.noticeLine('en', 'c'), 'We record calls so we can serve you better.');
+    assert.equal(callOpening.noticeLine('sw', null), 'Simu hii inaweza kurekodiwa.');
   });
 });
