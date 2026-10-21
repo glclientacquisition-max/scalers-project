@@ -13,7 +13,6 @@ const {
   createDbSessionStore,
   createOpeningSessionStore,
   dbHasOpeningHelpers,
-  PROBE_SID,
   RECHECK_MS,
 } = require('../src/speech/openingSessionStore');
 const callOpening = require('../src/speech/callOpening');
@@ -29,18 +28,24 @@ function quietLog() {
 
 /**
  * Mock of Platform's #844 helpers on a shared in-test "calls" table, same
- * return shapes as src/db.js @962fb6e6 (none throw). Two mocks over one
- * table = two replicas over one database.
+ * return shapes as src/db.js (none throw). Two mocks over one table = two
+ * replicas over one database. `push` picks the helper set:
+ *   'next'    - #844 @d4609435: probeGreetingSchema, markCallNoticeGiven
+ *               -> {ok, updated}, last_line_cut via
+ *               updateLastAgentLine(sid, line, {cut}) / markLastLineCut(sid, cut=true)
+ *   'current' - #844 @962fb6e6: no probe, no notice helper, no cut column
+ * Every call is recorded; WRITES lists the helpers that write.
  */
-function mockDb(table = new Map(), { probeError = null, failClaim = false } = {}) {
+const WRITES = new Set(['markCallGreeted', 'updateLastAgentLine', 'bumpStreamSeq', 'markCallNoticeGiven', 'markLastLineCut']);
+function mockDb(table = new Map(), { push = 'next', probe = { calls: true, contacts: true }, probeThrows = false, failClaim = false } = {}) {
   const calls = [];
   const row = (sid) => table.get(sid);
-  return {
+  const db = {
     table,
     calls,
+    writes: () => calls.filter(([f]) => WRITES.has(f)),
     async markCallGreeted({ callSid, lastAgentLine, noticeGiven } = {}) {
       calls.push(['markCallGreeted', callSid]);
-      if (callSid === PROBE_SID && probeError) return { ok: false, won: null, error: probeError };
       if (failClaim) return { ok: false, won: null, error: 'boom' };
       const r = row(callSid);
       if (!r) return { ok: true, won: false, missing: true };
@@ -54,13 +59,23 @@ function mockDb(table = new Map(), { probeError = null, failClaim = false } = {}
       calls.push(['getCallResumeState', callSid]);
       const r = row(callSid);
       if (!r) return null;
-      return { greetedAt: r.greeted_at || null, lastAgentLine: r.last_agent_line || null, noticeGiven: r.notice_given === true, streamSeq: r.stream_seq || 0 };
+      const out = {
+        greetedAt: r.greeted_at || null,
+        lastAgentLine: r.last_agent_line || null,
+        noticeGiven: r.notice_given === true,
+        streamSeq: r.stream_seq || 0,
+      };
+      if (push === 'next') out.lastLineCut = r.last_line_cut === true;
+      return out;
     },
-    async updateLastAgentLine(callSid, line) {
-      calls.push(['updateLastAgentLine', callSid]);
+    async updateLastAgentLine(callSid, line, opts) {
+      calls.push(['updateLastAgentLine', callSid, opts]);
       const r = row(callSid);
-      if (r) r.last_agent_line = String(line).slice(0, 500);
-      return { ok: true };
+      if (r) {
+        r.last_agent_line = String(line).slice(0, 500);
+        if (push === 'next') r.last_line_cut = Boolean(opts && opts.cut === true);
+      }
+      return { ok: true, updated: r ? 1 : 0 };
     },
     async bumpStreamSeq(callSid) {
       calls.push(['bumpStreamSeq', callSid]);
@@ -70,71 +85,155 @@ function mockDb(table = new Map(), { probeError = null, failClaim = false } = {}
       return { ok: true, streamSeq: r.stream_seq };
     },
   };
+  if (push === 'next') {
+    db.probeGreetingSchema = async () => {
+      calls.push(['probeGreetingSchema']);
+      if (probeThrows) throw new Error('fetch failed');
+      return probe;
+    };
+    db.markCallNoticeGiven = async (callSid) => {
+      calls.push(['markCallNoticeGiven', callSid]);
+      const r = row(callSid);
+      if (r) r.notice_given = true;
+      return { ok: true, updated: r ? 1 : 0 };
+    };
+  }
+  return db;
 }
 
 describe('openingSessionStore: memory adapter', () => {
-  it('claim: exactly one winner per call; get/noteLine/bumpStream/markNoticeGiven', async () => {
+  it('claim: exactly one winner per call; get/noteLine(cut)/bumpStream/markNoticeGiven', async () => {
     const m = createMemorySessionStore({ now: () => 5000 });
     assert.deepEqual(await m.claim('CA1', { lastAgentLine: 'Hello' }), { won: true, greetedAt: 5000 });
     assert.deepEqual(await m.claim('CA1'), { won: false, greetedAt: 5000 });
     assert.equal(await m.bumpStream('CA1'), 1);
     assert.equal(await m.bumpStream('CA1'), 2);
-    await m.noteLine('CA1', 'Tukusaidie vipi?');
+    await m.noteLine('CA1', 'Tukusaidie vipi?', { cut: true });
     await m.markNoticeGiven('CA1');
-    assert.deepEqual(await m.get('CA1'), { greetedAt: 5000, lastAgentLine: 'Tukusaidie vipi?', noticeGiven: true, streamSeq: 2 });
+    assert.deepEqual(await m.get('CA1'), {
+      greetedAt: 5000,
+      lastAgentLine: 'Tukusaidie vipi?',
+      lastLineCut: true,
+      noticeGiven: true,
+      streamSeq: 2,
+    });
+    await m.noteLine('CA1', 'Sawa.');
+    assert.equal((await m.get('CA1')).lastLineCut, false);
     assert.equal(await m.get('nope'), null);
-    assert.deepEqual(await m.claim(''), { won: null, greetedAt: null });
+    assert.equal(m.contactsOn(), false);
   });
 });
 
-describe('openingSessionStore: db adapter on #844 helpers (mocked)', () => {
-  it('feature-detect: main has no helpers -> memory, one warning', async () => {
+describe('openingSessionStore: db adapter on #844 helpers (mocked, no DB)', () => {
+  it('probe false -> memory, one warning, nothing written', async () => {
     const log = quietLog();
-    assert.equal(dbHasOpeningHelpers({ getCall() {} }), false);
-    const s = createDbSessionStore({ db: { getCall() {} }, log });
-    assert.equal(s.kind(), 'memory');
-    assert.equal(s.mode(), 'no_helpers');
-    assert.equal((await s.claim('CA1')).won, true);
-    assert.equal((await s.claim('CA1')).won, false, 'memory still decides on one replica');
-    assert.equal(log.lines.warn.length, 1);
-    assert.match(log.lines.warn[0], /Platform #844 not merged/);
-  });
-
-  it('feature-detect: helpers present but columns missing -> memory, one warning, no retry', async () => {
-    const log = quietLog();
-    const db = mockDb(new Map(), { probeError: 'column calls.greeted_at does not exist' });
+    const db = mockDb(new Map([['CA1', {}]]), { probe: { calls: false, contacts: false } });
     const s = createDbSessionStore({ db, log });
     assert.equal(await s.detect(), 'missing');
-    await s.claim('CA1');
-    await s.claim('CA2');
+    assert.equal((await s.claim('CA1')).won, true, 'memory decides');
+    await s.noteLine('CA1', 'x', { cut: true });
+    await s.markNoticeGiven('CA1');
+    await s.bumpStream('CA1');
     assert.equal(s.kind(), 'memory');
-    assert.equal(db.calls.filter(([f]) => f === 'markCallGreeted').length, 1, 'only the probe');
+    assert.equal(s.contactsOn(), false);
+    assert.deepEqual(db.writes(), [], 'no helper that writes was called');
+    assert.deepEqual(db.calls.map(([f]) => f), ['probeGreetingSchema'], 'probed once');
     assert.equal(log.lines.warn.length, 1);
-    assert.match(log.lines.warn[0], /greeting_language\.sql/);
+    assert.match(log.lines.warn[0], /migration/);
   });
 
-  it('feature-detect: helper error -> memory, rechecks after RECHECK_MS, one warning', async () => {
+  it('probe false is re-probed (read-only); a later true turns db on, still one warning', async () => {
     let t = 0;
     const log = quietLog();
-    const db = mockDb(new Map(), { probeError: 'fetch failed' });
+    const db = mockDb(new Map([['CA1', {}]]), { probe: { calls: false, contacts: false } });
+    const s = createDbSessionStore({ db, log, now: () => t });
+    assert.equal(await s.detect(), 'missing');
+    t = RECHECK_MS - 1;
+    assert.equal(await s.detect(), 'missing');
+    db.probeGreetingSchema = async () => {
+      db.calls.push(['probeGreetingSchema']);
+      return { calls: true, contacts: true };
+    };
+    t = RECHECK_MS + 1;
+    assert.equal(await s.detect(), 'ready');
+    assert.equal(s.contactsOn(), true);
+    assert.deepEqual(db.writes(), []);
+    assert.equal(log.lines.warn.length, 1);
+  });
+
+  it('probe true -> db; contacts gated separately from calls', async () => {
+    const both = createDbSessionStore({ db: mockDb(), log: quietLog() });
+    assert.equal(await both.detect(), 'ready');
+    assert.equal(both.kind(), 'db');
+    assert.equal(both.contactsOn(), true);
+    const callsOnly = createDbSessionStore({ db: mockDb(new Map(), { probe: { calls: true, contacts: false } }), log: quietLog() });
+    await callsOnly.detect();
+    assert.equal(callsOnly.kind(), 'db');
+    assert.equal(callsOnly.contactsOn(), false);
+    const contactsOnly = createDbSessionStore({ db: mockDb(new Map(), { probe: { calls: false, contacts: true } }), log: quietLog() });
+    await contactsOnly.detect();
+    assert.equal(contactsOnly.kind(), 'memory');
+    assert.equal(contactsOnly.contactsOn(), true);
+  });
+
+  it('detection never writes: the probe is the only call before the first claim', async () => {
+    const db = mockDb(new Map());
+    const s = createDbSessionStore({ db, log: quietLog() });
+    await s.detect();
+    await s.detect();
+    assert.deepEqual(db.calls, [['probeGreetingSchema']]);
+  });
+
+  it('current #844 (no probeGreetingSchema) -> memory, one warning naming it, nothing called', async () => {
+    const log = quietLog();
+    const db = mockDb(new Map([['CA1', {}]]), { push: 'current' });
+    assert.equal(dbHasOpeningHelpers(db), false);
+    const s = createDbSessionStore({ db, log });
+    assert.equal(s.mode(), 'no_helpers');
+    assert.equal((await s.claim('CA1')).won, true);
+    assert.deepEqual(db.calls, []);
+    assert.equal(log.lines.warn.length, 1);
+    assert.match(log.lines.warn[0], /probeGreetingSchema/);
+  });
+
+  it('main (no helpers at all) -> memory, one warning', () => {
+    const log = quietLog();
+    const s = createDbSessionStore({ db: { getCall() {} }, log });
+    assert.equal(s.kind(), 'memory');
+    assert.equal(log.lines.warn.length, 1);
+  });
+
+  it('probe error -> memory, re-probed (read-only) after RECHECK_MS, one warning', async () => {
+    let t = 0;
+    const log = quietLog();
+    const db = mockDb(new Map(), { probeThrows: true });
     const s = createDbSessionStore({ db, log, now: () => t });
     assert.equal(await s.detect(), 'down');
     assert.equal(await s.detect(), 'down');
     assert.equal(db.calls.length, 1);
     t = RECHECK_MS + 1;
     await s.detect();
-    assert.equal(db.calls.length, 2, 'rechecked');
+    assert.deepEqual(db.calls.map(([f]) => f), ['probeGreetingSchema', 'probeGreetingSchema']);
     assert.equal(log.lines.warn.length, 1);
   });
 
-  it('probe ok -> db; the probe sid matches no calls row (nothing written)', async () => {
-    const table = new Map();
+  it('helpers are detected one by one: a probe-only db still works without the optional ones', async () => {
+    const table = new Map([['CA1', {}]]);
     const db = mockDb(table);
+    delete db.markCallNoticeGiven;
+    delete db.bumpStreamSeq;
+    delete db.updateLastAgentLine;
     const s = createDbSessionStore({ db, log: quietLog() });
-    assert.equal(await s.detect(), 'ready');
-    assert.equal(s.kind(), 'db');
-    assert.equal(table.size, 0);
-    assert.deepEqual(db.calls[0], ['markCallGreeted', PROBE_SID]);
+    assert.equal((await s.claim('CA1')).won, true);
+    assert.equal(await s.markNoticeGiven('CA1'), false);
+    assert.equal(await s.noteLine('CA1', 'x', { cut: true }), false);
+    assert.equal(await s.bumpStream('CA1'), 1, 'no bumpStreamSeq: own count on this replica');
+    db.markLastLineCut = async (sid, cut = true) => {
+      table.get(sid).last_line_cut = cut === true;
+      return { ok: true, updated: 1 };
+    };
+    assert.equal(await s.noteLine('CA1', 'x', { cut: true }), true, 'markLastLineCut when updateLastAgentLine is absent');
+    assert.equal((await s.get('CA1')).lastLineCut, true);
   });
 
   it('two replicas, one table: the first claim wins, the second loses and reads the row', async () => {
@@ -144,12 +243,12 @@ describe('openingSessionStore: db adapter on #844 helpers (mocked)', () => {
     const ca = await a.claim('CA9', { lastAgentLine: 'Hapa ni Aris. Tukusaidie vipi?' });
     assert.equal(ca.won, true);
     assert.equal(ca.greetedAt, 1700000000000);
-    const cb = await b.claim('CA9');
-    assert.equal(cb.won, false);
+    assert.equal((await b.claim('CA9')).won, false);
     assert.equal(await b.bumpStream('CA9'), 1);
     assert.deepEqual(await b.get('CA9'), {
       greetedAt: 1700000000000,
       lastAgentLine: 'Hapa ni Aris. Tukusaidie vipi?',
+      lastLineCut: false,
       noticeGiven: false,
       streamSeq: 1,
     });
@@ -159,21 +258,7 @@ describe('openingSessionStore: db adapter on #844 helpers (mocked)', () => {
     const s = createDbSessionStore({ db: mockDb(new Map()), log: quietLog() });
     assert.deepEqual(await s.claim('CA_none'), { won: null, greetedAt: null, missing: true });
     const bad = createDbSessionStore({ db: mockDb(new Map([['CA1', {}]]), { failClaim: true }), log: quietLog() });
-    // The probe also fails (failClaim) -> down -> memory decides.
-    assert.equal((await bad.claim('CA1')).won, true);
-  });
-
-  it('markNoticeGiven: needs db.markCallNoticeGiven (Platform ask); used when present', async () => {
-    const table = new Map([['CA1', {}]]);
-    const db = mockDb(table);
-    const s = createDbSessionStore({ db, log: quietLog() });
-    assert.equal(await s.markNoticeGiven('CA1'), false);
-    db.markCallNoticeGiven = async (sid) => {
-      table.get(sid).notice_given = true;
-      return { ok: true };
-    };
-    assert.equal(await s.markNoticeGiven('CA1'), true);
-    assert.equal((await s.get('CA1')).noticeGiven, true);
+    assert.equal((await bad.claim('CA1')).won, null);
   });
 
   it('createOpeningSessionStore: no db or VOICE_OPENING_STORE=memory -> memory', () => {
@@ -184,35 +269,117 @@ describe('openingSessionStore: db adapter on #844 helpers (mocked)', () => {
   });
 });
 
-describe('createOpeningStore + shared claim (who greets)', () => {
-  function replica(table) {
+describe('createOpeningStore across replicas (who greets, notice, cut line)', () => {
+  const GREETING = 'Hapa ni Esga, naitwa Lucy. Simu hii inaweza kurekodiwa. Nikusaidie vipi?';
+  function replica(table, opts) {
     return callOpening.createOpeningStore({
-      shared: createDbSessionStore({ db: mockDb(table), log: quietLog() }),
+      shared: createDbSessionStore({ db: mockDb(table, opts), log: quietLog() }),
       setTimeout: () => null,
       clearTimeout: () => {},
     });
+  }
+  async function greetOnA(A, sid) {
+    const a = await A.attachShared(sid);
+    assert.equal((await A.claimGreeting(sid, { line: GREETING })).won, true);
+    A.noteGreeted(a.session, { text: GREETING, at: 1 });
+    return a;
   }
 
   it('reconnect on replica B: claim lost -> resumed session, action listen, no greet', async () => {
     const table = new Map([['CA7', {}]]);
     const A = replica(table);
     const B = replica(table);
-    const a = await A.attachShared('CA7');
-    assert.equal(a.needsClaim, true);
-    assert.equal((await A.claimGreeting('CA7', { line: 'Hapa ni Esga. Simu hii inaweza kurekodiwa. Nikusaidie vipi?' })).won, true);
-    A.noteGreeted(a.session, { text: 'Hapa ni Esga. Simu hii inaweza kurekodiwa. Nikusaidie vipi?', at: 1 });
+    await greetOnA(A, 'CA7');
     const b = await B.attachShared('CA7');
-    assert.equal(b.resumed, false);
     assert.equal(b.needsClaim, true);
     await tick();
-    const c = await B.claimGreeting('CA7', { line: 'x' });
+    const c = await B.claimGreeting('CA7', { line: GREETING });
     assert.equal(c.won, false);
     assert.equal(c.attach.resumed, true);
     assert.equal(c.attach.action, 'listen');
     assert.equal(c.attach.source, 'shared');
-    assert.equal(c.attach.session.resumedFrom, 'shared');
     assert.equal(c.attach.session.streamSeq, 2);
     assert.equal(c.attach.session.notice, null, 'notice_given false on the row: the stream treats it as owed');
+  });
+
+  it('notice given on A (markCallNoticeGiven) -> B restores it as given, owes nothing', async () => {
+    const table = new Map([['CA10', {}]]);
+    const A = replica(table);
+    const B = replica(table);
+    const a = await greetOnA(A, 'CA10');
+    A.noteNoticeGiven(a.session);
+    A.noteNoticeGiven(a.session);
+    await tick();
+    assert.equal(table.get('CA10').notice_given, true);
+    await B.attachShared('CA10');
+    const c = await B.claimGreeting('CA10', { line: GREETING });
+    assert.equal(c.attach.session.notice.given, true);
+    const t = callOpening.createNoticeTracker({ required: true, startedAt: 0 });
+    t.restore(c.attach.session.notice);
+    assert.equal(t.owed(), false, 'B owes no notice');
+    B.noteNoticeGiven(c.attach.session);
+    await tick();
+  });
+
+  it('cut line on A -> re-said once on B, then listen', async () => {
+    const table = new Map([['CA11', {}]]);
+    const A = replica(table);
+    const B = replica(table);
+    const a = await greetOnA(A, 'CA11');
+    A.noteLine(a.session, 'Deep clean ya vyumba viwili ni shilingi elfu nane.');
+    A.noteLineCut(a.session, 'Tunaweza kuja Jumamosi asubuhi, inakufaa?');
+    await tick();
+    assert.equal(table.get('CA11').last_line_cut, true);
+    // Replica A dies (no detach). B resumes.
+    await B.attachShared('CA11');
+    const c = await B.claimGreeting('CA11', { line: GREETING });
+    assert.equal(c.attach.action, 'respeak');
+    assert.equal(c.attach.session.lastAgentLine, 'Tunaweza kuja Jumamosi asubuhi, inakufaa?');
+    // B re-says it (speakText -> noteLine): the cut is cleared on the row.
+    B.noteLine(c.attach.session, c.attach.session.lastAgentLine);
+    await tick();
+    assert.equal(table.get('CA11').last_line_cut, false);
+    // Another drop on B with nothing playing: listen, not a second re-say.
+    B.detach('CA11', { speaking: false });
+    const again = await B.attachShared('CA11');
+    assert.equal(again.action, 'listen');
+  });
+
+  it('greeting cut on A by a socket loss -> B re-asks only the question (reinvite)', async () => {
+    const table = new Map([['CA12', {}]]);
+    const A = replica(table);
+    const B = replica(table);
+    await greetOnA(A, 'CA12');
+    A.detach('CA12', { speaking: true, line: GREETING });
+    await tick();
+    assert.equal(table.get('CA12').last_line_cut, true);
+    await B.attachShared('CA12');
+    const c = await B.claimGreeting('CA12', { line: GREETING });
+    assert.equal(c.attach.action, 'reinvite');
+  });
+
+  it('current #844 (no cut column): a cut is not visible across replicas -> listen', async () => {
+    const table = new Map([['CA13', {}]]);
+    const opts = { push: 'current' };
+    const A = replica(table, opts);
+    const B = replica(table, opts);
+    // Current push has no probe: both replicas stay in memory, so B (another
+    // process) cannot see A's claim at all and greets: the documented gap.
+    await greetOnA(A, 'CA13');
+    await B.attachShared('CA13');
+    assert.equal((await B.claimGreeting('CA13', { line: GREETING })).won, true);
+  });
+
+  it('local barge cut then drop on the same replica: re-said once', async () => {
+    const A = replica(new Map([['CA14', {}]]));
+    const a = await A.attachShared('CA14', { fresh: true });
+    A.noteGreeted(a.session, { text: GREETING, at: 1 });
+    A.noteLineCut(a.session, 'Naomba jina lako?');
+    A.detach('CA14', { speaking: false });
+    const r = await A.attachShared('CA14');
+    assert.equal(r.action, 'respeak');
+    A.detach('CA14', { speaking: false });
+    assert.equal((await A.attachShared('CA14')).action, 'listen');
   });
 
   it('webhook ran on this replica (fresh): no awaited claim needed', async () => {
@@ -222,18 +389,7 @@ describe('createOpeningStore + shared claim (who greets)', () => {
     assert.equal(a.action, 'greet');
   });
 
-  it('local reconnect on the same replica resumes from memory without a claim', async () => {
-    const A = replica(new Map([['CA6', {}]]));
-    const a = await A.attachShared('CA6', { fresh: true });
-    A.noteGreeted(a.session, { text: 'Hi', at: 1 });
-    A.detach(a.session, {});
-    const again = await A.attachShared('CA6');
-    assert.equal(again.source, 'local');
-    assert.equal(again.needsClaim, false);
-    assert.equal(again.resumed, true);
-  });
-
-  it('claim timeout or error fails open (won null -> greet)', async () => {
+  it('claim timeout fails open (won null -> greet)', async () => {
     const slow = {
       kind: () => 'db',
       claim: () => new Promise(() => {}),

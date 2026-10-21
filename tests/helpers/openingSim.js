@@ -13,11 +13,13 @@
 // The incoming-call webhook (POST /) works too: tenant by destinationNumber
 // (SIM_DIDS), caller kind by callerNumber (PHONE). No Gemini or Soniox
 // network; Supabase is a dead port, nothing is written to any database.
-// OPENING_SIM_SHARED_DIR mocks Platform's #844 calls helpers (markCallGreeted,
-// getCallResumeState, updateLastAgentLine, bumpStreamSeq) on files in that
+// OPENING_SIM_SHARED_DIR mocks Platform's #844 helpers (probeGreetingSchema,
+// markCallGreeted, getCallResumeState, updateLastAgentLine(sid, line, {cut}),
+// markLastLineCut, markCallNoticeGiven, bumpStreamSeq) on files in that
 // directory, so two forked replicas share one "calls row" per callSid; the
 // claim is an O_EXCL create, atomic across processes like the SQL
-// update ... where greeted_at is null.
+// update ... where greeted_at is null. OPENING_SIM_SHARED_PROBE: 'calls,contacts'
+// (default), 'calls', 'none' (both false) or 'absent' (no probe helper).
 'use strict';
 
 const path = require('path');
@@ -132,6 +134,26 @@ if (sharedDir) {
   const isSimCall = (sid) => /^HD_sim_/.test(String(sid || ''));
   const delay = Number(process.env.OPENING_SIM_SHARED_RTT_MS) || 0;
   const rtt = () => (delay ? new Promise((r) => setTimeout(r, delay)) : null);
+  const probe = (process.env.OPENING_SIM_SHARED_PROBE || 'calls,contacts').toLowerCase();
+  if (probe !== 'absent') {
+    db.probeGreetingSchema = async () => {
+      send({ ev: 'db_helper', fn: 'probeGreetingSchema' });
+      return { calls: /\bcalls\b/.test(probe), contacts: /\bcontacts\b/.test(probe) };
+    };
+  }
+  // Shapes as #844 @d4609435 (src/db.js): { ok, updated }, never throw.
+  db.markCallNoticeGiven = async (callSid) => {
+    send({ ev: 'db_helper', fn: 'markCallNoticeGiven', callSid });
+    if (!isSimCall(callSid)) return { ok: true, updated: 0 };
+    writeRow(callSid, { notice_given: true });
+    return { ok: true, updated: 1 };
+  };
+  db.markLastLineCut = async (callSid, cut = true) => {
+    send({ ev: 'db_helper', fn: 'markLastLineCut', callSid, cut: cut === true });
+    if (!isSimCall(callSid)) return { ok: true, updated: 0 };
+    writeRow(callSid, { last_line_cut: cut === true });
+    return { ok: true, updated: 1 };
+  };
   db.markCallGreeted = async ({ callSid, lastAgentLine, noticeGiven } = {}) => {
     await rtt();
     send({ ev: 'db_helper', fn: 'markCallGreeted', callSid });
@@ -153,13 +175,21 @@ if (sharedDir) {
     send({ ev: 'db_helper', fn: 'getCallResumeState', callSid });
     const r = readRow(callSid);
     if (!r) return null;
-    return { greetedAt: r.greeted_at || null, lastAgentLine: r.last_agent_line || null, noticeGiven: r.notice_given === true, streamSeq: r.stream_seq || 0 };
+    return {
+      greetedAt: r.greeted_at || null,
+      lastAgentLine: r.last_agent_line || null,
+      lastLineCut: r.last_line_cut === true,
+      noticeGiven: r.notice_given === true,
+      streamSeq: r.stream_seq || 0,
+    };
   };
-  db.updateLastAgentLine = async (callSid, line) => {
-    send({ ev: 'db_helper', fn: 'updateLastAgentLine', callSid });
-    if (!isSimCall(callSid)) return { ok: true };
-    writeRow(callSid, { last_agent_line: String(line || '').slice(0, 500) });
-    return { ok: true };
+  db.updateLastAgentLine = async (callSid, line, { cut = false } = {}) => {
+    send({ ev: 'db_helper', fn: 'updateLastAgentLine', callSid, cut: cut === true, line: String(line || '') });
+    const text = String(line || '').trim().slice(0, 500);
+    if (!text) return { ok: false, updated: 0, skipped: 'no_call_sid_or_line' };
+    if (!isSimCall(callSid)) return { ok: true, updated: 0 };
+    writeRow(callSid, { last_agent_line: text, last_line_cut: cut === true });
+    return { ok: true, updated: 1 };
   };
   db.bumpStreamSeq = async (callSid) => {
     send({ ev: 'db_helper', fn: 'bumpStreamSeq', callSid });

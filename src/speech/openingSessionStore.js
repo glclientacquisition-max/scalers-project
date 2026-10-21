@@ -8,29 +8,31 @@
 //   claim(callSid, { lastAgentLine, noticeGiven }) -> { won: true|false|null, greetedAt }
 //       Exactly one stream per call wins the greeting. won:null = unknown
 //       (error, timeout, no calls row): the caller fails open and greets.
-//   get(callSid)            -> { greetedAt, lastAgentLine, noticeGiven, streamSeq } | null
-//   noteLine(callSid, line) -> last line spoken (re-spoken after a cut)
+//   get(callSid)  -> { greetedAt, lastAgentLine, lastLineCut, noticeGiven, streamSeq } | null
+//   noteLine(callSid, line, { cut }) -> last line spoken; cut = a barge or a
+//       socket loss stopped it mid-way (re-said once on a resume)
 //   bumpStream(callSid)     -> new stream_seq | null
-//   markNoticeGiven(callSid)-> recording notice heard (needs a Platform helper)
+//   markNoticeGiven(callSid)-> the recording notice was spoken
 //   kind()                  -> 'memory' | 'db'
+//   contactsOn()            -> contacts.last_language usable (read + write)
 //
 //   memory - this process only (one replica, tests).
-//   db     - Platform's helpers from #844 (docs/supabase/greeting_language.sql,
-//            src/db.js): markCallGreeted (atomic claim: update ... where
-//            greeted_at is null), getCallResumeState, updateLastAgentLine,
-//            bumpStreamSeq (RPC bump_call_stream_seq) on calls.greeted_at,
-//            last_agent_line, notice_given, stream_seq, last_stream_at.
-//            Feature-detected: the helpers must exist (main has none until
-//            #844 merges) and a one-time probe must not report missing
-//            columns; otherwise memory with one warning.
-//            notice_given is only written by markCallGreeted at the claim;
-//            a later "notice heard" needs db.markCallNoticeGiven (Platform
-//            ask). It is used when present.
+//   db     - Platform's helpers from #844 (src/db.js) on calls.greeted_at,
+//            last_agent_line, last_line_cut, notice_given, stream_seq,
+//            last_stream_at: markCallGreeted (atomic claim), getCallResumeState,
+//            updateLastAgentLine(callSid, line, { cut }), markLastLineCut,
+//            bumpStreamSeq, markCallNoticeGiven.
+//            Feature detection never writes: db.probeGreetingSchema() (a
+//            read-only limit-0 select of all 6 calls columns, and of
+//            contacts.last_language/last_language_at/name_confirmed) ->
+//            { calls, contacts }; no column-error parsing here. Missing
+//            probe, calls false or a throw -> memory with one warning; false
+//            and throws are re-probed every RECHECK_MS (read-only). contacts gates last_language reads
+//            and writes on its own. Every other helper is checked one by one
+//            (typeof db.x === 'function'), so both #844 pushes work.
 
 const RECHECK_MS = 60000;
 const MEMORY_TTL_MS = 10 * 60 * 1000;
-const PROBE_SID = '__voice_opening_probe__';
-const MIGRATION_HINT = /greeted_at|last_agent_line|notice_given|stream_seq|last_stream_at|bump_call_stream_seq|apply greeting_language\.sql/i;
 
 function clean(v) {
   return String(v == null ? '' : v).trim();
@@ -52,7 +54,7 @@ function createMemorySessionStore({ now = () => Date.now(), ttlMs = MEMORY_TTL_M
         const cutoff = now() - ttlMs;
         for (const [k, v] of rows) if (v.touchedAt < cutoff) rows.delete(k);
       }
-      r = { greetedAt: null, lastAgentLine: '', noticeGiven: false, streamSeq: 0, touchedAt: now() };
+      r = { greetedAt: null, lastAgentLine: '', lastLineCut: false, noticeGiven: false, streamSeq: 0, touchedAt: now() };
       rows.set(sid, r);
     }
     r.touchedAt = now();
@@ -60,6 +62,7 @@ function createMemorySessionStore({ now = () => Date.now(), ttlMs = MEMORY_TTL_M
   }
   return {
     kind: () => 'memory',
+    contactsOn: () => false,
     async claim(callSid, { lastAgentLine, noticeGiven } = {}) {
       const sid = clean(callSid);
       if (!sid) return { won: null, greetedAt: null };
@@ -73,12 +76,20 @@ function createMemorySessionStore({ now = () => Date.now(), ttlMs = MEMORY_TTL_M
     async get(callSid) {
       const r = rows.get(clean(callSid));
       if (!r) return null;
-      return { greetedAt: r.greetedAt, lastAgentLine: r.lastAgentLine, noticeGiven: r.noticeGiven, streamSeq: r.streamSeq };
+      return {
+        greetedAt: r.greetedAt,
+        lastAgentLine: r.lastAgentLine,
+        lastLineCut: r.lastLineCut,
+        noticeGiven: r.noticeGiven,
+        streamSeq: r.streamSeq,
+      };
     },
-    async noteLine(callSid, line) {
+    async noteLine(callSid, line, { cut = false } = {}) {
       const sid = clean(callSid);
       if (!sid || !clean(line)) return false;
-      row(sid).lastAgentLine = clean(line).slice(0, 500);
+      const r = row(sid);
+      r.lastAgentLine = clean(line).slice(0, 500);
+      r.lastLineCut = cut === true;
       return true;
     },
     async bumpStream(callSid) {
@@ -98,15 +109,11 @@ function createMemorySessionStore({ now = () => Date.now(), ttlMs = MEMORY_TTL_M
   };
 }
 
-/** Does db carry Platform's #844 opening helpers? */
+const has = (db, name) => Boolean(db) && typeof db[name] === 'function';
+
+/** Does db carry what shared resume needs (#844)? The rest is optional. */
 function dbHasOpeningHelpers(db) {
-  return Boolean(
-    db &&
-      typeof db.markCallGreeted === 'function' &&
-      typeof db.getCallResumeState === 'function' &&
-      typeof db.updateLastAgentLine === 'function' &&
-      typeof db.bumpStreamSeq === 'function'
-  );
+  return has(db, 'probeGreetingSchema') && has(db, 'markCallGreeted') && has(db, 'getCallResumeState');
 }
 
 /**
@@ -117,7 +124,9 @@ function createDbSessionStore(o = {}) {
   const log = o.log || console;
   const now = o.now || (() => Date.now());
   const memory = o.memory || createMemorySessionStore({ now });
-  let mode = dbHasOpeningHelpers(db) ? 'unknown' : 'no_helpers'; // unknown | ready | missing | down | no_helpers
+  // calls: unknown | ready | missing | down | no_helpers
+  let mode = dbHasOpeningHelpers(db) ? 'unknown' : 'no_helpers';
+  let contacts = false;
   let checkedAt = 0;
   let detecting = null;
   let warned = '';
@@ -128,38 +137,43 @@ function createDbSessionStore(o = {}) {
     log.warn(msg);
   }
   if (mode === 'no_helpers') {
-    warnOnce(
-      'no_helpers',
-      '[opening-store] db.markCallGreeted/getCallResumeState/updateLastAgentLine/bumpStreamSeq not found (Platform #844 not merged); resume state stays in this replica\'s memory'
-    );
+    const missing = ['probeGreetingSchema', 'markCallGreeted', 'getCallResumeState'].filter((n) => !has(db, n));
+    warnOnce('no_helpers', `[opening-store] db.${missing.join('/db.')} not found (Platform #844); resume state stays in this replica's memory`);
   }
 
-  /**
-   * One probe: a claim on a sid no calls row has. It updates nothing; an
-   * unmigrated database answers with the missing-column error.
-   */
+  /** One read-only probe (limit-0 selects). Never writes. */
   async function detect() {
-    if (mode === 'ready' || mode === 'missing' || mode === 'no_helpers') return mode;
-    if (mode === 'down' && now() - checkedAt < RECHECK_MS) return mode;
+    if (mode === 'ready' || mode === 'no_helpers') return mode;
+    // #844's probe answers false on a missing column *or* any error, so a
+    // false is re-probed (read-only) every RECHECK_MS: a blip at boot or a
+    // migration applied later turns shared resume on without a restart.
+    if ((mode === 'down' || mode === 'missing') && now() - checkedAt < RECHECK_MS) return mode;
     if (detecting) return detecting;
     detecting = (async () => {
       try {
-        const r = await db.markCallGreeted({ callSid: PROBE_SID });
+        const r = await db.probeGreetingSchema();
         checkedAt = now();
-        if (r && r.ok) {
+        contacts = Boolean(r && r.contacts === true);
+        if (r && r.calls === true) {
           mode = 'ready';
-          log.log?.('[opening-store] calls.greeted_at/last_agent_line/notice_given/stream_seq present: shared resume on');
-        } else if (MIGRATION_HINT.test(String(r?.error || ''))) {
+          log.log?.(
+            `[opening-store] calls opening columns present: shared resume on (contacts.last_language ${contacts ? 'on' : 'off'})`
+          );
+        } else if (r && r.calls === false) {
           mode = 'missing';
-          warnOnce('missing', '[opening-store] calls opening columns missing (apply greeting_language.sql, Platform #844); memory');
+          warnOnce(
+            'missing',
+            `[opening-store] probeGreetingSchema: calls opening columns not readable (migration missing or DB error); memory, re-probing every ${RECHECK_MS / 1000}s (contacts.last_language ${contacts ? 'on' : 'off'})`
+          );
         } else {
           mode = 'down';
-          warnOnce('down', `[opening-store] opening helpers failed (${r?.error || 'unknown'}); memory until they answer`);
+          warnOnce('down', `[opening-store] probeGreetingSchema failed (${r?.error || 'no answer'}); memory until it answers`);
         }
       } catch (err) {
         checkedAt = now();
         mode = 'down';
-        warnOnce('down', `[opening-store] opening helpers failed (${err?.message || err}); memory until they answer`);
+        contacts = false;
+        warnOnce('down', `[opening-store] probeGreetingSchema failed (${err?.message || err}); memory until it answers`);
       } finally {
         detecting = null;
       }
@@ -169,16 +183,24 @@ function createDbSessionStore(o = {}) {
   }
 
   const ready = async () => (await detect()) === 'ready';
+  const safe = async (fn) => {
+    try {
+      return await fn();
+    } catch {
+      return null;
+    }
+  };
 
   return {
     kind: () => (mode === 'ready' ? 'db' : 'memory'),
     mode: () => mode,
+    contactsOn: () => contacts,
     detect,
     async claim(callSid, opts = {}) {
       const sid = clean(callSid);
       const mem = await memory.claim(sid, opts);
       if (!(await ready())) return mem;
-      const r = await db.markCallGreeted({ callSid: sid, lastAgentLine: opts.lastAgentLine, noticeGiven: opts.noticeGiven });
+      const r = await safe(() => db.markCallGreeted({ callSid: sid, lastAgentLine: opts.lastAgentLine, noticeGiven: opts.noticeGiven }));
       if (!r || !r.ok) return { won: null, greetedAt: null, error: r?.error || 'unknown' };
       if (r.missing) return { won: null, greetedAt: null, missing: true };
       return { won: r.won === true, greetedAt: toMs(r.greetedAt) };
@@ -186,31 +208,43 @@ function createDbSessionStore(o = {}) {
     async get(callSid) {
       const sid = clean(callSid);
       if (!(await ready())) return memory.get(sid);
-      const s = await db.getCallResumeState(sid);
-      if (!s) return memory.get(sid);
+      const st = await safe(() => db.getCallResumeState(sid));
+      if (!st) return memory.get(sid);
       return {
-        greetedAt: toMs(s.greetedAt),
-        lastAgentLine: clean(s.lastAgentLine),
-        noticeGiven: s.noticeGiven === true,
-        streamSeq: Number(s.streamSeq) || 0,
+        greetedAt: toMs(st.greetedAt),
+        lastAgentLine: clean(st.lastAgentLine),
+        // Absent on the first #844 push: never cut (listen).
+        lastLineCut: st.lastLineCut === true,
+        noticeGiven: st.noticeGiven === true,
+        streamSeq: Number(st.streamSeq) || 0,
       };
     },
-    async noteLine(callSid, line) {
-      await memory.noteLine(callSid, line);
+    async noteLine(callSid, line, { cut = false } = {}) {
+      const sid = clean(callSid);
+      await memory.noteLine(sid, line, { cut });
       if (!(await ready())) return true;
-      const r = await db.updateLastAgentLine(clean(callSid), line);
-      return Boolean(r && r.ok);
+      if (has(db, 'updateLastAgentLine')) {
+        // The first #844 push ignores the third argument; the next stores
+        // calls.last_line_cut from it.
+        const r = await safe(() => db.updateLastAgentLine(sid, line, { cut: cut === true }));
+        return Boolean(r && r.ok);
+      }
+      if (cut && has(db, 'markLastLineCut')) {
+        const r = await safe(() => db.markLastLineCut(sid));
+        return Boolean(r && r.ok);
+      }
+      return false;
     },
     async bumpStream(callSid) {
       const local = await memory.bumpStream(callSid);
-      if (!(await ready())) return local;
-      const r = await db.bumpStreamSeq(clean(callSid));
+      if (!(await ready()) || !has(db, 'bumpStreamSeq')) return local;
+      const r = await safe(() => db.bumpStreamSeq(clean(callSid)));
       return r && r.ok && r.streamSeq != null ? r.streamSeq : null;
     },
     async markNoticeGiven(callSid) {
       await memory.markNoticeGiven(callSid);
-      if (!(await ready()) || typeof db.markCallNoticeGiven !== 'function') return false;
-      const r = await db.markCallNoticeGiven(clean(callSid));
+      if (!(await ready()) || !has(db, 'markCallNoticeGiven')) return false;
+      const r = await safe(() => db.markCallNoticeGiven(clean(callSid)));
       return Boolean(r && r.ok);
     },
   };
@@ -228,7 +262,6 @@ function createOpeningSessionStore({ db = null, env = process.env, log = console
 
 module.exports = {
   RECHECK_MS,
-  PROBE_SID,
   createMemorySessionStore,
   createDbSessionStore,
   createOpeningSessionStore,
