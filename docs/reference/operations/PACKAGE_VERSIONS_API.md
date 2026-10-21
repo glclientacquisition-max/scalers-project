@@ -23,7 +23,7 @@ The actor is the signed-in admin (`adminActorName`). Desk must not send `actor`.
 
 Every write needs `reason`: a non-empty string, at most 500 characters. The database writes that actor and reason to `billing_audit_log` and `ops_audit_log`. After the write succeeds, the route also calls `recordAdminAction` with the same action name, the signed-in actor, and the business id when the write is for one business. A move writes one Activity row per business. Package drafts, edits, publish, archive, discard, approve, the signup trial, and the price threshold have no business id. Both rows stay.
 
-Writes also refuse when the configured database URL is production, unless `ADMIN_PACKAGE_EDITOR_ALLOW_PROD` is exactly `on`. That response is `403` `{ "error": "package_editor_staging_only" }`. GET still lists. Do not set the flag.
+Writes are not blocked by which database the app uses. Super Admin auth and the package editor switch (Payments) are the gates.
 
 ## GET `/api/admin/package-versions`
 
@@ -241,7 +241,6 @@ Audit action `set_new_signup_trial`.
 | HTTP | `error` | When |
 | --- | --- | --- |
 | 403 | `ops_only` | Not a Super Admin. |
-| 403 | `package_editor_staging_only` | Write while the app is pointed at production. |
 | 403 | `package_editor_off` | `package_editor_enabled` is false. |
 | 400 | `invalid` | Body is not JSON, or a field failed a check. `message` is the reason. |
 | 409 | `approval_required` | Publish needs a second admin. |

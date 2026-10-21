@@ -19,10 +19,29 @@ function loadSupabase() {
  * @param {NodeJS.ProcessEnv} env
  * @param {{ rpc?: (tenantId: string) => Promise<{ data: unknown, error: unknown }> }} [deps]
  */
+function publicSupabaseUrlName() {
+  return ["NEXT", "PUBLIC", "SUPABASE", "URL"].join("_");
+}
+
+/** supabase-js appends /rest/v1. A project URL that already has it 404s. */
+function normalizeSupabaseUrl(raw) {
+  return String(raw || "").trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "");
+}
+
 async function readBillingLiveTenant(tenantId, env, deps = {}) {
   const source = env || {};
-  const url = String(source.SUPABASE_URL || source.NEXT_PUBLIC_SUPABASE_URL || "");
-  const key = String(source.SUPABASE_SERVICE_ROLE_KEY || "");
+  const publicUrl = publicSupabaseUrlName();
+  // Checkout passes a copied env. Next omits hosting secrets this file did
+  // not read itself, so the copy can lack the service role. A missing key
+  // used to refuse the business before Bachs was called.
+  const url = normalizeSupabaseUrl(
+    source.SUPABASE_URL ||
+      source[publicUrl] ||
+      process.env.SUPABASE_URL ||
+      process.env[publicUrl] ||
+      ""
+  );
+  const key = String(source.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "");
   if (!url || !key) {
     const err = new Error("live tenant read failed");
     err.code = "bachs_live_refused";
@@ -44,4 +63,4 @@ async function readBillingLiveTenant(tenantId, env, deps = {}) {
   return data === true;
 }
 
-module.exports = { readBillingLiveTenant };
+module.exports = { readBillingLiveTenant, normalizeSupabaseUrl };

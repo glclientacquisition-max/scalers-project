@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { effectivePaymentEnv } from "@/lib/billingRuntimeSettings";
 import { retryStoredReads, sweepOpenCheckouts } from "@/lib/invoicePay/retryReads";
 import { invoicePayLedger } from "@/lib/invoicePay/ledger";
 import { billingCronAllows } from "@/lib/invoicePay/cronAuth";
@@ -21,15 +22,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    BACHS_MODE: process.env.BACHS_MODE,
-    BACHS_API_KEY: process.env.BACHS_API_KEY,
-    BACHS_LIVE_ALLOWED: process.env.BACHS_LIVE_ALLOWED,
-    BACHS_LIVE_TENANT_ALLOWLIST: process.env.BACHS_LIVE_TENANT_ALLOWLIST,
-    SUPABASE_URL: process.env.SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  };
+  const env = await effectivePaymentEnv(process.env);
 
   try {
     assertBachsAllowed(env);

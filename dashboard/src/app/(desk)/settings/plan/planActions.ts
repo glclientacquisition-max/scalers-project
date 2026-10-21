@@ -1,5 +1,6 @@
 "use server";
 
+import { effectivePaymentEnv } from "@/lib/billingRuntimeSettings";
 import { memberDenied } from "@/lib/requireMember";
 import { planChangePort, type PlanCycle } from "@/lib/deskPlanChange";
 
@@ -28,7 +29,8 @@ export async function confirmPlanChange(
   if (!["starter", "growth", "scale"].includes(sku) || (cycle !== "month" && cycle !== "year")) {
     return { ok: false, error: "Choose a plan first." };
   }
-  return closed(await planChangePort().changePlan({ sku, cycle: cycle as PlanCycle }));
+  const env = await effectivePaymentEnv();
+  return closed(await planChangePort(env).changePlan({ sku, cycle: cycle as PlanCycle }));
 }
 
 /** Total extra seats, 0 to 100. Same bound as owner_set_extra_seats. */
@@ -46,5 +48,6 @@ export async function setExtraSeatsAction(
     return { ok: false, error: "Choose how many seats." };
   }
   if (!idempotencyKey) return { ok: false, error: "Try again." };
-  return closed(await planChangePort().setExtraSeats({ extraSeats, idempotencyKey }));
+  const env = await effectivePaymentEnv();
+  return closed(await planChangePort(env).setExtraSeats({ extraSeats, idempotencyKey }));
 }

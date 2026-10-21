@@ -230,9 +230,14 @@ function changedLines(before: PackageVersionRow, form: DraftForm): string[] {
 export function AdminPackageVersionsPanel({
   catalog,
   businesses,
+  planWritesEnabled = true,
+  readOnlyHint = null,
 }: {
   catalog: PackageVersionCatalog;
   businesses: BusinessPlanRow[];
+  /** When false, drafts, signup trial, move, and billing mode stay view-only. */
+  planWritesEnabled?: boolean;
+  readOnlyHint?: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -296,6 +301,7 @@ export function AdminPackageVersionsPanel({
       .map((version) => ({ id: version.id, label: `${pack.name} version ${version.version}` })),
   );
   const target = publishedChoices.find((choice) => choice.id === targetVersionId) || null;
+  const writesBlockedLine = planWritesEnabled ? null : readOnlyHint;
 
   function closeSheet() {
     if (pending) return;
@@ -305,6 +311,10 @@ export function AdminPackageVersionsPanel({
 
   async function post(body: Record<string, unknown>) {
     setError(null);
+    if (!planWritesEnabled) {
+      setError(readOnlyHint || "Plans are read-only here.");
+      return null;
+    }
     const res = await fetch("/api/admin/package-versions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -481,6 +491,11 @@ export function AdminPackageVersionsPanel({
 
       {tab === "versions" ? (
         <div className="space-y-4">
+          {writesBlockedLine ? (
+            <p className="px-4 text-body text-ink-2" role="status">
+              {writesBlockedLine}
+            </p>
+          ) : null}
           <div className="space-y-3 px-4">
             <Segmented
               label="Plan versions"
@@ -496,6 +511,7 @@ export function AdminPackageVersionsPanel({
               size="md"
               className="w-full"
               pending={pending}
+              disabled={!planWritesEnabled}
               onClick={() => {
                 setError(null);
                 setSheet("newDraft");
@@ -540,7 +556,9 @@ export function AdminPackageVersionsPanel({
                       {version.status === "draft" ? "Draft" : version.status === "retired" ? "Retired" : "Live"}
                     </Stamp>
                   }
-                  onOpen={version.status === "draft" ? () => openEdit(pack, version) : undefined}
+                  onOpen={
+                    planWritesEnabled && version.status === "draft" ? () => openEdit(pack, version) : undefined
+                  }
                 />
               ))}
             </ul>
@@ -554,6 +572,7 @@ export function AdminPackageVersionsPanel({
               </div>
               <Switch
                 checked={catalog.newSignupTrialEnabled}
+                disabled={!planWritesEnabled}
                 label="New signups get a trial"
                 onCheckedChange={(next) => {
                   setSignupEnabled(next);
@@ -603,21 +622,23 @@ export function AdminPackageVersionsPanel({
                           <Stamp tone="ok">Billing on</Stamp>
                         )
                       }
-                      onOpen={() => openMove(row)}
+                      onOpen={planWritesEnabled ? () => openMove(row) : undefined}
                       actions={
-                        <Button
-                          variant="tonal"
-                          size="sm"
-                          onClick={() =>
-                            openBilling(
-                              row,
-                              row.billingStatus === "beta" || row.billingEnforcement === "off",
-                              row.billingEnforcement,
-                            )
-                          }
-                        >
-                          Billing
-                        </Button>
+                        planWritesEnabled ? (
+                          <Button
+                            variant="tonal"
+                            size="sm"
+                            onClick={() =>
+                              openBilling(
+                                row,
+                                row.billingStatus === "beta" || row.billingEnforcement === "off",
+                                row.billingEnforcement,
+                              )
+                            }
+                          >
+                            Billing
+                          </Button>
+                        ) : undefined
                       }
                     />
                   ))}
