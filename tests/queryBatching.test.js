@@ -910,11 +910,15 @@ describe('#859 combined-base ports', () => {
       await db.getTenantProfile({ tenantId: TENANT });
       assert.doesNotMatch(tenantSelects()[0].cols, /service_areas/);
     });
-    await withStubModule('.', './knowledge/spokenCatalogue', {}, async () => {
-      fake.reset();
-      await db.getTenantProfile({ tenantId: TENANT });
-      assert.doesNotMatch(tenantSelects()[0].cols, /service_areas/, 'module without storedFirst: off');
-    });
+    // A spokenCatalogue without storedFirst (only meaningful where #848 is
+    // absent; with #848, tenantProfile.js calls storedFirst() itself).
+    if (typeof realCatalogue.storedFirst !== 'function') {
+      await withStubModule('.', './knowledge/spokenCatalogue', {}, async () => {
+        fake.reset();
+        await db.getTenantProfile({ tenantId: TENANT });
+        assert.doesNotMatch(tenantSelects()[0].cols, /service_areas/, 'module without storedFirst: off');
+      });
+    }
   });
 
   it('greeting batch reads greeting_text / greeting_language / team_directory; steps down when missing', async () => {
