@@ -2,8 +2,10 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 import { cleanFieldPaths, isKnownFieldPath } from "@/lib/fieldPathRegistry";
-import { confirmTenantField, persistOwnerConfirm } from "@/lib/deskProvenance";
+import { bustTenantCache } from "@/lib/tenantCache";
+import { runOwnerAttest } from "@/lib/ownerAttestBatch";
 import {
+  confirmTenantField as confirmTenantFieldRpc,
   confirmTenantFieldsBatch,
   reopenTenantField,
   upsertTenantFieldMeta,
@@ -13,17 +15,9 @@ import { createWorkspaceDataClient } from "@/lib/tenant";
 import { FACT_ROW_COLUMNS, FACT_ROW_CORE_COLUMNS } from "@/lib/factRowColumns";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-async function attestOne(
-  client: SupabaseClient,
-  tenantId: string,
-  fieldPath: string,
-  userId: string | null
-): Promise<void> {
-  const confirm = await confirmTenantField({
-    tenantId,
-    fieldPath,
-    userId,
-  });
+/** The old per-path meta confirm. Only runs when the batch RPC fails. */
+async function confirmOneLegacy(tenantId: string, fieldPath: string, userId: string | null): Promise<void> {
+  const confirm = await confirmTenantFieldRpc({ tenantId, fieldPath, userId });
   if (confirm.error) {
     await upsertTenantFieldMeta({
       tenantId,
@@ -32,12 +26,14 @@ async function attestOne(
       actor: "desk",
     });
   }
-  await persistOwnerConfirm(client, tenantId, fieldPath);
 }
 
 /**
  * Mark field paths as owner-confirmed (meta + JSON rows where applicable).
  * Settings Save is the owner approval step — call after every successful save.
+ *
+ * Fixed round trips, not per path (runOwnerAttest): one saved-row read, one
+ * tenants update stamping every JSON row, one confirm_tenant_fields batch.
  */
 export async function ownerAttestFields(
   tenantId: string,
@@ -50,23 +46,26 @@ export async function ownerAttestFields(
 
   const workspace = await createWorkspaceDataClient();
   if (!workspace) return;
+  const client = workspace.client;
 
-  for (const fieldPath of paths) {
-    try {
-      await attestOne(workspace.client, tenantId, fieldPath, userId);
-    } catch {
-      try {
-        await upsertTenantFieldMeta({
-          tenantId,
-          fieldPath,
-          source: "owner",
-          actor: "desk",
-        });
-      } catch {
-        /* local database without RPC */
-      }
-    }
-  }
+  await runOwnerAttest(
+    {
+      readRow: () => readSavedFactRow(client, tenantId),
+      writePatch: async (patch) => {
+        const { error } = await client.from("tenants").update(patch).eq("id", tenantId);
+        bustTenantCache(tenantId);
+        if (error) console.warn("[ownerAttestFields] owner stamp", error.message);
+        return { error };
+      },
+      confirmBatch: async (batchPaths, hashes) => {
+        const { error } = await confirmTenantFieldsBatch({ tenantId, paths: batchPaths, hashes });
+        if (error) console.warn("[ownerAttestFields] confirm_tenant_fields, per-path fallback", error.message);
+        return { error };
+      },
+      confirmOne: (fieldPath) => confirmOneLegacy(tenantId, fieldPath, userId),
+    },
+    paths
+  );
 
   revalidatePath("/settings");
   revalidatePath("/home");

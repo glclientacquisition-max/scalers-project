@@ -8,6 +8,8 @@ import {
   inboxToggleMute as writeInboxMute,
   inboxTogglePin as writeInboxPin,
 } from "@/app/(desk)/calls/inboxTriageActions";
+import { inboxBulkAction } from "@/app/(desk)/calls/bulkActions";
+import { sendInboxArchiveUndo, sendInboxBulk, type InboxBulkKind } from "@/lib/inboxBulk";
 import type { InboxItem } from "@/lib/inboxPurpose";
 
 function isDeskHarness() {
@@ -57,6 +59,19 @@ export async function inboxUnarchive(item: InboxItem) {
   if (!item.callId) return { error: "Missing call." };
   if (isDeskHarness()) return { ok: true };
   return updateLeadStatus(item.callId, "new");
+}
+
+/**
+ * Bulk Confirm / Done / Mark done / Archive / Unarchive: one server request for
+ * every selected row (was one request per row).
+ */
+export async function inboxBulk(kind: InboxBulkKind, items: InboxItem[]) {
+  return sendInboxBulk(kind, items, inboxBulkAction, { harness: isDeskHarness() });
+}
+
+/** Archive Undo: every archived call back to New in one request. */
+export async function inboxUndoArchive(rows: Array<{ id: string; callId: string }>) {
+  return sendInboxArchiveUndo(rows, inboxBulkAction);
 }
 
 /** Owners cannot hard-delete calls. Delete is Archive. */

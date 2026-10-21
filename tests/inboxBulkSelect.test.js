@@ -108,18 +108,22 @@ describe("inbox bulk select", () => {
   });
 
   it("loops the same per-row handlers for bulk Archive, Confirm, hold Done, and Mark done", () => {
-    assert.match(select, /for \(const item of chosen\)/);
-    assert.match(select, /inboxArchive\(item\)/);
-    assert.match(select, /inboxConfirm\(item\)/);
-    assert.match(select, /inboxHoldDone\(item\)/);
-    assert.match(select, /inboxMarkDone\(item\)/);
-    assert.match(select, /inboxUnarchive\(item\)/);
+    // One server request for the whole selection (N+1 fix), same writes as the per-row handlers.
+    const bulk = read("dashboard/src/lib/inboxBulk.ts");
+    assert.doesNotMatch(select, /for \(const item of chosen\)/);
+    assert.match(select, /await inboxBulk\(kind, chosen\)/);
+    assert.match(actions, /sendInboxBulk\(kind, items, inboxBulkAction/);
+    assert.match(bulk, /archive: \{ table: "calls", column: "lead_status", value: "archived"/);
+    assert.match(bulk, /confirm: \{\s*table: "appointments",\s*column: "status",\s*value: "confirmed"/);
+    assert.match(bulk, /done: \{\s*table: "service_requests",\s*column: "status",\s*value: "fulfilled"/);
+    assert.match(bulk, /mark_done: \{ table: "calls", column: "lead_status", value: "resolved"/);
+    assert.match(bulk, /unarchive: \{ table: "calls", column: "lead_status", value: "new"/);
     assert.doesNotMatch(select, /inboxTogglePin/);
     assert.doesNotMatch(select, /inboxDelete/);
     assert.doesNotMatch(select, /inboxToggleRead/);
     assert.doesNotMatch(select, /inboxSnooze/);
-    assert.match(select, /if \(kind === "archive" \|\| kind === "unarchive"\) \{\n        patch\(item.id, \{ hidden: true \}\);/);
-    assert.doesNotMatch(select, /kind === "mark_done"[\s\S]{0,400}patch\(item.id, \{ hidden/);
+    assert.match(select, /if \(kind === "archive" \|\| kind === "unarchive"\) \{\n      for \(const target of res\.applied\) patch\(target\.itemId, \{ hidden: true \}\);/);
+    assert.doesNotMatch(select, /kind === "mark_done"[\s\S]{0,400}patch\(target.itemId, \{ hidden/);
     assert.match(actions, /updateLeadStatus\(item\.callId, "archived"\)/);
     assert.match(actions, /status", "confirmed"/);
     assert.match(actions, /status", "fulfilled"/);
@@ -139,7 +143,7 @@ describe("inbox bulk select", () => {
     assert.match(select, /className=\{ui\?\.selecting \? "hidden"/);
     assert.match(select, /kind === "archive"/);
     assert.match(select, /kind === "unarchive"/);
-    assert.match(select, /kind === "mark_done"/);
+    assert.match(read("dashboard/src/lib/inboxBulk.ts"), /kind === "mark_done"/);
     assert.match(select, /\{chosen\.length\}/);
     assert.doesNotMatch(select, /\{chosen\.length\} selected/);
     assert.doesNotMatch(select, /md:hidden/);
@@ -159,8 +163,9 @@ describe("inbox bulk select", () => {
     assert.match(verbs, /items\.every\(inboxCanHoldDone\)/);
     assert.match(verbs, /items\.every\(inboxCanMarkDone\)/);
     assert.match(select, /inboxBulkActions\(chosen\)/);
-    assert.match(select, /status \|\| ""\)\.toLowerCase\(\) !== "requested"/);
-    assert.match(select, /status \|\| ""\)\.toLowerCase\(\) !== "open"/);
+    const bulkRules = read("dashboard/src/lib/inboxBulk.ts");
+    assert.match(bulkRules, /status \|\| ""\)\.toLowerCase\(\) === "requested"/);
+    assert.match(bulkRules, /status \|\| ""\)\.toLowerCase\(\) === "open"/);
     const visits = [
       item({ id: "a", job: { id: "j1", status: "requested" } }),
       item({ id: "b", job: { id: "j2", status: "requested" } }),
