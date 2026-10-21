@@ -1,0 +1,43 @@
+{
+  "_source": "Prod Aris Kenya (tenant 24ca3d5e) save turns, read-only from voice_turn_traces + service_requests, see brain-gaps-2026-10-21 section 1. Caller phones omitted. Catalogue rows as stored in tenants.product_catalog (in_stock empty on every row).",
+  "catalog": [
+    { "id": "prd_acc3153400bbd5cc", "name": "360 Degrees Protractor", "price": "200", "in_stock": "" },
+    { "id": "prd_24174b3b18d2b474", "name": "180\u00c2\u00b0 transparent protractor", "price": "180", "in_stock": "" },
+    { "id": "prd_493fa696fb8662af", "name": "Pvc detachable t square", "price": "400", "in_stock": "" },
+    { "id": "prd_9d8a1452ff5af4e4", "name": "Mg zipper bag-a4", "price": "135", "in_stock": "" },
+    { "id": "prd_17b88d6a4316a45d", "name": "Mg zipper bag-a6", "price": "70", "in_stock": "" },
+    { "id": "prd_d53d480994b6676a", "name": "Mg gel pen", "price": "30", "in_stock": "" }
+  ],
+  "calls": [
+    {
+      "call": "HD_c427511e5773",
+      "written": { "type": "enquiry", "item": "PVC detachable T-square", "quantity": null, "whenText": "tomorrow" },
+      "turns": [
+        ["", "Do you have, like, T-squares?"],
+        ["Yes, we have the PVC detachable T-square in stock. Would you like to check the price or place an order?", "Uh, how many centimeters can I get?"],
+        ["I don't have the exact length measurements listed for the T-square, Alvin.", "Okay, thank you. I'll pass by tomorrow."]
+      ]
+    },
+    {
+      "call": "HD_6862135bc8af",
+      "written": { "type": "enquiry", "item": "Protractor", "quantity": "10", "whenText": "" },
+      "turns": [
+        ["", "Uh, I wanted to know if you guys have the protractor"],
+        ["Am I speaking with Alvin Yegon?", "Yeah, you're speaking with Alvin Yegon."],
+        ["Yes, we have 180\u00b0 transparent protractors and 360\u00b0 protractors, though I need to check with the team for the exact price. How many would you like me to note down for an inquiry?", "10, 10 pieces."]
+      ]
+    },
+    {
+      "call": "HD_e75a669780d4",
+      "written": { "type": "order", "item": "Mg zipper bag-a4", "quantity": "", "whenText": "", "name": "Chris" },
+      "turns": [
+        ["", "mnakwanga na zipper bag?"],
+        ["Ndiyo, tunazo MG zipper bags, za size A4 ni shilingi mia moja thelathini na tano na za size A6 ni shilingi sabini. Ungependa ni ku we kee gani?", "Um, rudia tena?"],
+        ["Ndiyo, tunazo MG zipper bags, za size A4 ni shilingi mia moja thelathini na tano na za size A6 ni shilingi sabini. Ungependa kuwekea gani tayari?", "which one do you prefer?"],
+        ["Za A4 ziko sawa zaidi kwa sababu zinaenea exam papers, clipboards, na geometrical set bila kufinywa. Ungependa nikuwekee zipper bag ya A4?", "Eeh, iko sawa nipatie hiyo yeah."],
+        ["Za A4 ziko sawa zaidi kwa sababu zinaenea exam papers, clipboards, na geometrical set bila kufinywa. Ungependa nikuwekee zipper bag ya A4?", "Nipatie hiyo. So what is my order? I want you to repeat loud what I've just ordered."],
+        ["I li nikuwekee A4 zipper bag tayari, naomba unipe jina lako kamili tafadhali?", "Mimi naitwa Chris."]
+      ]
+    }
+  ]
+}
