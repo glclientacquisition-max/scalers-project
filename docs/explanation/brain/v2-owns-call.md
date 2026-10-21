@@ -24,6 +24,10 @@ It acts only with `BRAIN_V2=on` and `BRAIN_V2_MODE=live`, for tenants allowed by
 
 Not changed: Voice turn-taking runs before Brain and stays Voice's. That covers barge-in, the non-substantive-turn skip, the bare-greeting re-invite, idle nudges and the greeting. The greeting module is C6.
 
+## Accepted risk: no caller-file identity check in v2
+
+Decided by Alvin on 21 Oct 2026 at 16:36 EAT: v2 has **no** caller-file identity check. v2 lines skip the v1 caller-file gate (`skipFileGate`), and v2 has no binding rule of its own. So v2 can say the name on file ("I have your name as X") and read back open bookings on file to anyone calling from that number. Alvin accepts this risk. Staging call 11 records what is said; it is an observation, not a pass/fail gate.
+
 ## Staging flags
 
 `BRAIN_V2=on BRAIN_V2_MODE=live BRAIN_V2_TENANTS=<staging tenant id> BRAIN_V2_COMMIT_SAFETY=1 BRAIN_V2_OWNS_CALL=1 VOICE_END_CALL_HONOUR=on`. Add `WRITE_RECEIPTS=1` only after #691's SQL is applied. Receipts land only after #845's `brain_write_receipts.sql` is applied.
