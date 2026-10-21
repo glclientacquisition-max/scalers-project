@@ -2847,11 +2847,11 @@ mediaWss.on('connection', (ws, req) => {
   // webhook prefetch) instead of loading the profile again.
   let tenantPromptInflight = null;
   let tenantPromptInflightSid = '';
-  function ensureTenantPrompt() {
-    if (!openingOn) return loadTenantPrompt();
+  function ensureTenantPromptOnce() {
+    if (!openingOn) return ensureTenantPrompt();
     if (tenantPromptInflight && tenantPromptInflightSid === sessionCallSid) return tenantPromptInflight;
     tenantPromptInflightSid = sessionCallSid;
-    const p = loadTenantPrompt();
+    const p = ensureTenantPrompt();
     tenantPromptInflight = p;
     p.finally(() => {
       if (tenantPromptInflight === p) tenantPromptInflight = null;
@@ -2859,7 +2859,7 @@ mediaWss.on('connection', (ws, req) => {
     return p;
   }
 
-  async function loadTenantPrompt() {
+  async function ensureTenantPrompt() {
     if (profileLoaded && profileCallSid === sessionCallSid) {
       return buildSttContext(sttTenantSnapshot);
     }
@@ -5755,7 +5755,7 @@ mediaWss.on('connection', (ws, req) => {
   // Warm tenant prompt early when callSid is already on the WS URL.
   const tenantWarm =
     sessionCallSid
-      ? ensureTenantPrompt().catch(() => null)
+      ? ensureTenantPromptOnce().catch(() => null)
       : Promise.resolve(null);
 
   if (isSonioxConfigured()) {
@@ -6007,7 +6007,7 @@ mediaWss.on('connection', (ws, req) => {
     if (greetingStarted) return;
     greetingStarted = true;
     try {
-      await ensureTenantPrompt();
+      await ensureTenantPromptOnce();
       if (speechOutageStarted) return;
       if (endedRefused) return;
       // Every answered call starts at profile pace. A faster ask on the last
@@ -6246,7 +6246,7 @@ mediaWss.on('connection', (ws, req) => {
               ttsSpeedScale = 1;
               publishVoiceTrace();
               console.log(`[ws/media] bound session callSid=${sessionCallSid}`);
-              ensureTenantPrompt().catch(() => {});
+              ensureTenantPromptOnce().catch(() => {});
             }
           } catch (parseErr) {
             console.log(
