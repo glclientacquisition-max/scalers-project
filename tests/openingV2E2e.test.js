@@ -774,6 +774,33 @@ describe('two replicas: notice given and cut line carry across (mocked #844 next
   });
 });
 
+// #843 alone (no #842 end-call controller in this tree): the silence goodbye
+// keeps its own timed close even with VOICE_END_CALL_HONOUR=on. With #842 in
+// the tree, tests/openingEndCallE2e.test.js covers the controller path.
+const HAS_842 = fs.existsSync(path.join(ROOT, 'src/speech/endCallHonour.js'));
+describe('silence goodbye without #842: close path unchanged even with VOICE_END_CALL_HONOUR=on', { skip: HAS_842 ? '#842 is in this tree (see openingEndCallE2e)' : false }, () => {
+  let srv;
+  before(async () => {
+    srv = await startServer({ VOICE_OPENING_V2: 'on', VOICE_END_CALL_HONOUR: 'on', VOICE_OPENING_SILENCE_MS: '600,900,900' });
+  });
+  after(() => {
+    if (srv) srv.child.kill('SIGKILL');
+  });
+
+  it('goodbye, then ws.close(1000, silence_end) on the byte timer', async () => {
+    const sid = 'HD_sim_jirani_silent_alone';
+    const c = await connect(srv, sid);
+    await greetingLog(srv, sid);
+    const end = await waitFor(srv.events, (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] opening_silence_end missed_call=1`), 8000);
+    assert.ok(end, 'silence end reached');
+    assert.match(end.line, /hangup in \d+ms/);
+    await waitFor(srv.events, () => Boolean(c.closed()), 3000);
+    await sleep(100);
+    assert.deepEqual(c.closed() && { code: c.closed().code, reason: c.closed().reason }, { code: 1000, reason: 'silence_end' });
+    assert.ok(!logsOf(srv, sid).some((l) => l.includes('end_call')));
+  });
+});
+
 describe('current #844 (no probeGreetingSchema): memory, one warning, no helper called', () => {
   let srv;
   let dir;

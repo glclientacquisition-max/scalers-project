@@ -6357,6 +6357,17 @@ mediaWss.on('connection', (ws, req) => {
       callTranscript.pushAgent(line);
       messages.push({ role: 'assistant', content: line, local: true });
     }
+    // #842's end-call controller (VOICE_END_CALL_HONOUR) when this build has
+    // it and the flag is on: one hangup after the goodbye has played (playout
+    // wait, SautiKit REST hangup, ended-call guard, no outage alert).
+    // Feature-detected: requestEndCall is #842's per-connection function;
+    // typeof on a name this build doesn't declare is 'undefined', not a throw.
+    // eslint-disable-next-line no-undef
+    const endCall = typeof requestEndCall === 'function' ? requestEndCall : null;
+    if (endCall && endCall('opening_silence', 'silence_ladder') === true) {
+      console.log(`[ws/media][${sidLabel()}] opening_silence_end missed_call=1 hangup via end_call`);
+      return;
+    }
     const delay = farewellHangupDelayMs({ bytes: playbackBytes, startedAt: playbackStartedAt });
     console.log(`[ws/media][${sidLabel()}] opening_silence_end missed_call=1 hangup in ${delay}ms`);
     setTimeout(() => {
