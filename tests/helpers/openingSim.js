@@ -140,6 +140,10 @@ if (sharedDir) {
       send({ ev: 'db_helper', fn: 'probeGreetingSchema' });
       return { calls: /\bcalls\b/.test(probe), contacts: /\bcontacts\b/.test(probe) };
     };
+  } else {
+    // 'absent' simulates a db.js without the probe. Once #844 is merged the real
+    // db.js has one, so remove it here to keep the pre-probe path under test.
+    delete db.probeGreetingSchema;
   }
   // Shapes as #844 @d4609435 (src/db.js): { ok, updated }, never throw.
   db.markCallNoticeGiven = async (callSid) => {
