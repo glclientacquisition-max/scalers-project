@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckIcon } from "@heroicons/react/20/solid";
 import {
   btnPrimaryFill,
   deskShiftClass,
@@ -9,12 +10,25 @@ import {
 
 export const TENANT_SETTINGS_FORM_ID = "tenant-settings-form";
 
-export function TenantSettingsSaveButton({ pending = false }: { pending?: boolean }) {
+/**
+ * Settings header Save. Reads "Saving" while the save runs and "Saved" for a
+ * moment after it lands (useFormSave justSaved), then goes back to "Save".
+ */
+export function TenantSettingsSaveButton({
+  pending = false,
+  saved = false,
+  form = TENANT_SETTINGS_FORM_ID,
+}: {
+  pending?: boolean;
+  saved?: boolean;
+  form?: string;
+}) {
   return (
     <button
       type="submit"
-      form={TENANT_SETTINGS_FORM_ID}
+      form={form}
       disabled={pending}
+      data-save-state={pending ? "saving" : saved ? "saved" : "idle"}
       className={[
         "inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-body",
         btnPrimaryFill,
@@ -27,6 +41,11 @@ export function TenantSettingsSaveButton({ pending = false }: { pending?: boolea
         <>
           <span aria-hidden="true" className={pendingSpinnerClass} />
           Saving
+        </>
+      ) : saved ? (
+        <>
+          <CheckIcon aria-hidden="true" className="size-4" />
+          Saved
         </>
       ) : (
         "Save"

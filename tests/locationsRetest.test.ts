@@ -20,9 +20,12 @@ test("save is fast: template prompt in the write, model prompt after the respons
   assert.match(pc, /opts\.localOnly \|\| !process\.env\.GEMINI_API_KEY/);
 });
 
-test("unload warning only while a save is pending", () => {
-  const form = read("../dashboard/src/components/TenantForm.tsx");
-  assert.match(form, /if \(!pending\) return;[\s\S]{0,200}beforeunload/);
+test("unload warning only while edits are unsaved or a save is pending", () => {
+  // Shared save pattern: useFormDraft owns the guard; a clean, idle form never asks.
+  const hook = read("../dashboard/src/components/useFormSave.ts");
+  assert.match(hook, /shouldGuardUnload\(\{ dirty, pending, disabled: guardDisabled \}\)/);
+  assert.match(hook, /if \(!guarded\) return;[\s\S]{0,200}beforeunload/);
+  assert.doesNotMatch(read("../dashboard/src/components/TenantForm.tsx"), /beforeunload/);
 });
 
 test("switching how customers get your service moves every area to that mode (not in mixed)", async () => {
