@@ -249,3 +249,19 @@ test('caller is { name?, phone } only; phone normalised to E.164, never guessed'
   assert.equal(E.validateCallSummaryEvent({ ...base, caller: { phone: '+254712345678', number: '+254712345678' } }).ok, false);
   assert.equal(E.validateCallSummaryEvent({ ...base, caller: { phone: '0712345678' } }).ok, false);
 });
+
+test('caller.phone from the shaped call row: from_number (db.getCall), else caller_number, else brain state, else null', () => {
+  // db.getCall → shapeCall exposes calls.caller_number as from_number.
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '../src/db.js'), 'utf8');
+  assert.match(src, /from_number: row\.caller_number/);
+  assert.equal(E.callerPhoneFrom({ id: 'c1', tenant_id: 't1', call_sid: 'sid', from_number: '0712345678' }, null), '+254712345678');
+  assert.equal(E.callerPhoneFrom({ caller_number: '254712345678' }, null), '+254712345678');
+  assert.equal(E.callerPhoneFrom({ id: 'c1' }, { caller: { phone: '+254711000111' } }), '+254711000111');
+  assert.equal(E.callerPhoneFrom({ id: 'c1', tenant_id: 't1' }, { caller: { phone: null } }), null);
+  assert.equal(E.callerPhoneFrom(null, null), null);
+  const out = E.buildCallSummaryEvent({ path: 'v1', callLanguage: 'en', callId: 'c1', tenantId: 't1', answered: true, caller: { phone: E.callerPhoneFrom({ from_number: '0712345678' }, null) }, receipts: [] });
+  assert.equal(out.event.caller.phone, '+254712345678');
+  const none = E.buildCallSummaryEvent({ path: 'v1', callLanguage: 'en', callId: 'c1', tenantId: 't1', answered: true, caller: { phone: E.callerPhoneFrom({ id: 'c1' }, null) }, receipts: [] });
+  assert.equal(none.ok, true);
+  assert.equal(none.event.caller.phone, null);
+});
