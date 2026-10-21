@@ -353,10 +353,8 @@ function createOwnerSummarySender(deps = {}) {
       rendered = renderFallback({
         answered: answeredStatus(entry.status || call?.status),
         callerName: call?.name || null,
-        callerPhone: (() => {
-          const { toE164 } = require('../conversation/callSummaryEvent');
-          return toE164(call?.from_number) || null;
-        })(),
+        // Same rule as Brain's event (#837 callerPhoneFrom): from_number, then caller_number, E.164 or null.
+        callerPhone: require('../conversation/callSummaryEvent').callerPhoneFrom(call, null),
         businessName,
         callUrl,
         // No call language without a Brain event: English.
