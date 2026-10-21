@@ -77,7 +77,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (226)
+## Functions (229)
 
 | Function | Defined in |
 | --- | --- |
@@ -86,6 +86,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `_billing_mark_spend_blocked` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `_billing_package_snapshot` | `docs/supabase/package_state_rules.sql` |
 | `_billing_package_snapshot_of` | `docs/supabase/package_state_rules.sql` |
+| `_calls_summary_object` | `docs/supabase/calls_record_caller_reply.sql`<br>`supabase/migrations/20261022013500_calls_record_caller_reply.sql` |
 | `_catalogue_item_key` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `_catalogue_name_path` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `_data_quality_rows` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
@@ -185,6 +186,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_spend_limit_kes` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_version_price_kes` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `call_setup_valid` | `supabase/migrations/20261018130000_tenant_call_setup.sql` |
+| `calls_record_caller_reply` | `docs/supabase/calls_record_caller_reply.sql`<br>`supabase/migrations/20261022013500_calls_record_caller_reply.sql` |
 | `charge_call_to_wallet` | `docs/supabase/fix_charge_call_wallet_ambiguous.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_on_demand_alerts.sql` |
 | `claim_billing_notices` | `docs/supabase/billing_data_layer.sql` |
 | `claim_wallet_balance_alerts` | `docs/supabase/wallet_on_demand_alerts.sql` |
@@ -211,6 +213,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `handle_new_user_tenant` | `docs/supabase/did_number_pool.sql`<br>`docs/supabase/multi_tenant_onboarding.sql`<br>`docs/supabase/voice_languages.sql`<br>`supabase/migrations/20261011000000_team_invites.sql` |
 | `hit_rate_limit` | `supabase/migrations/20261011150000_onboarding_setup.sql` |
 | `inbox_archive_calls` | `docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
+| `inbox_unarchive_calls` | `docs/supabase/inbox_unarchive_calls.sql`<br>`supabase/migrations/20261022013000_inbox_unarchive_calls.sql` |
 | `inbox_undo_archive` | `docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `invite_email_has_account` | `supabase/migrations/20261011120000_invite_account_lookup.sql` |
 | `invoice_kes_parts` | `docs/supabase/invoice_pay.sql` |
