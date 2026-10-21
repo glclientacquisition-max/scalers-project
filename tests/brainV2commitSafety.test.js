@@ -50,7 +50,7 @@ test('flag is off by default; explicit whole-answer yes classifier', () => {
   assert.equal(CS.commitSafetyEnabled({}), false);
   assert.equal(CS.commitSafetyEnabled({ BRAIN_V2_COMMIT_SAFETY: '1' }), true);
   for (const y of ['Yes', 'Yes please', 'Yes, that is correct', 'yes book it', 'Ndio', 'Ndiyo, weka', 'Sawa', 'Okay.']) assert.equal(CS.explicitYes(y), true, y);
-  for (const n of ['Okay wait', 'Okay wait, let me check with my wife', 'Yes but make it 11', 'Is it at 10?', 'Ndio, lakini Jumamosi', 'Sawa, ni hayo tu. Baadaye basi.', 'Sawa ngoja kidogo', 'Hmm', 'Yes, and also a carpet']) assert.equal(CS.explicitYes(n), false, n);
+  for (const n of ['Okay wait', 'Okay wait, let me check with my wife', 'Yes but make it 11', 'Is it at 10?', 'Ndio, lakini Jumamosi', 'Sawa, ni hayo tu. Baadaye basi.', 'Sawa ngoja kidogo', 'Hmm', 'Yes, and also a carpet', 'Eeh...']) assert.equal(CS.explicitYes(n), false, n);
 });
 
 test('slot hash is stable over spelling/case and changes with any slot', () => {
@@ -192,6 +192,15 @@ for (const [lang, book, yes] of [['en', BOOK_EN, 'Yes'], ['sw', BOOK_SW, 'Ndio']
     assert.match(r.out[3].line, lang === 'en' ? /already saved/ : /tayari limehifadhiwa/);
   }));
 }
+
+test('a phone number is not a place; a place word at the name prompt keeps the place (edge E105/E128)', withFlag(async () => {
+  const a = await talk(["I'd like to schedule sofa cleaning on Friday at 10am.", 'Also, my other number is 0712 345 678.']);
+  assert.match(a.out[1].line, /^Where should we come\?/);
+  const b = await talk(['Uh, book sofa cleaning Friday at 10am.', 'Kitengela', 'Ngong.', 'Njeri.']);
+  assert.match(b.out[3].line, /in Kitengela, for Njeri\. Shall I book it\?$/);
+  const c = await talk(['Book sofa cleaning Friday at 10am in Simba Drive, I am Alvin.']); // unknown word: confirmed by the read-back, not refused
+  assert.match(c.out[0].line, /Simba Drive.*Shall I book it\?$/); assert.equal(c.receipts[0].validators.area, 'unknown');
+}));
 
 test('a yes that is not on the next turn after the read-back reads it back again', withFlag(async () => {
   const H = handlers();

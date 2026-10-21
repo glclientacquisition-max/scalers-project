@@ -46,7 +46,7 @@ function idempotencyKey({ callId, p }) { return `${String(callId || 'nocall')}:$
 
 // Explicit whole-answer yes. "okay wait", "but ...", questions and anything that adds
 // content are not a yes. Words allowed around the yes are confirmations only.
-const YES_WORD = /\b(yes|yeah|yep|yup|ok|okay|sure|correct|right|exactly|absolutely|definitely|perfect|fine|confirm(ed)?|ndio|ndiyo|eeh|sawa|poa|fiti|kabisa|haya|sahihi|bila shaka|weka|endelea|thibitisha)\b/i;
+const YES_WORD = /\b(yes|yeah|yep|yup|ok|okay|sure|correct|right|exactly|absolutely|definitely|perfect|fine|confirm(ed)?|ndio|ndiyo|sawa|poa|fiti|kabisa|haya|sahihi|bila shaka|weka|endelea|thibitisha)\b/i;
 const NOT_YES = /\?|\b(but|lakini|ila|wait|ngoja|subiri|hold on|let me|nikuulize|first|kwanza|check|nitaangalia|nitaangalia|maybe|labda|i think|sijui|not sure|hmm+|actually|instead|change|badilisha|badala|no|not|hapana|si|sio|siyo|don'?t|usi\w*|later|baadaye|ni hayo tu|that'?s all|bye|kwaheri)\b/i;
 const FILLER = new Set(['uh', 'um', 'ah', 'oh', 'eh', 'mm', 'please', 'go', 'ahead', 'do', 'it', 'that', 'thats', "that's", 'is', 'its', "it's", 'all', 'good', 'great', 'book', 'place', 'the', 'order', 'yes', 'yeah', 'yep', 'yup', 'ok', 'okay', 'sure', 'correct', 'right', 'exactly', 'absolutely', 'definitely', 'perfect', 'fine', 'confirm', 'confirmed', 'thank', 'you', 'thanks', 'ndio', 'ndiyo', 'eeh', 'sawa', 'poa', 'fiti', 'kabisa', 'haya', 'sahihi', 'bila', 'shaka', 'weka', 'endelea', 'thibitisha', 'iko', 'asante', 'sana', 'ni', 'vizuri', 'alright', 'sounds', 'so', 'just', 'very', 'much', 'nithibitishie', 'naam', 'hiyo', 'hio']);
 function explicitYes(text) {

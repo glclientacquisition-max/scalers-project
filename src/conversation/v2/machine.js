@@ -71,9 +71,13 @@ function pickIntent(u, state, profile) {
   return t || null;
 }
 
+const s0 = (state) => state.slots;
 function mergeSlots(state, u, profile) {
   // BRAIN_V2_COMMIT_SAFETY: a bare yes/no word is never a place ("Tuje wapi?" -> "Ndio")
   if (csOn() && u.place && /^\W*(ndio|ndiyo|yes|yeah|sawa|ok|okay|hapana|no|haya|poa)\W*$/i.test(String(u.place))) u.place = null;
+  // a phone number or a whole sentence is not a place; a place word given when we asked the name keeps the place we have
+  if (csOn() && u.place && (/\d{3,}/.test(String(u.place)) || String(u.place).split(/\s+/).length > 4)) u.place = null;
+  if (csOn() && u.place && state.expecting === 'name' && s0(state).place && !u.name) u.place = null;
   if (u.name || u.place || u.service || u.when?.date || u.when?.time || u.products?.length) state.progressTurn = state.turn;
   const s = state.slots;
   if (u.name) {
@@ -184,12 +188,16 @@ function propose(state, p) {
 }
 // Validators before a booking is proposed (BRAIN_V2_COMMIT_SAFETY): hours ran above; service area and
 // availability here. A failed validator returns a spoken template alternative; it never says booked.
+const KNOWN_TOWNS = /^(mombasa|kisumu|nakuru|eldoret|naivasha|nyeri|machakos|malindi|kitale|meru|kakamega|garissa|nanyuki|kericho|embu|kisii|lamu|diani|kilifi|voi|narok|nyahururu|bungoma|busia|migori|homa bay|isiolo|marsabit|lodwar|wajir|mandera|kitui|makueni|murang'?a|kerugoya|othaya|limuru|naro moru)$/i;
 function bookingValidators(state, profile) {
   const s = state.slots; const v = { hours: 'ok' };
   const listed = listedAreaIds(profile);
   if (listed.length && s.place) {
     const m = N.matchArea(s.place, profile);
-    if (!(m && m.listed)) {
+    // reject only a place we know is outside the tenant's areas; an unknown word (an estate, a street) is confirmed by the read-back
+    const known = (m && m.listed === false) || (!m && KNOWN_TOWNS.test(String(s.place).trim()));
+    if (m && m.listed) v.area = 'ok'; else if (!known) v.area = 'unknown';
+    if (known) {
       v.area = 'unlisted'; state.lastValidators = v;
       const place = s.place; s.place = null; s.landmark = null;
       const areas = joinList(listedAreaRows(profile).map((r) => r.name).filter(Boolean).slice(0, 4), state.lang);
@@ -199,7 +207,6 @@ function bookingValidators(state, profile) {
       if (say !== place) { state.pending.place = null; }
       return { line: `${R.info({ kind: 'area_out', place: say, areas }, state.lang)} ${say === place ? cb : R.readback(state.pending, state.lang)}` };
     }
-    v.area = 'ok';
   } else v.area = listed.length ? 'ok' : 'no_area_list';
   // availability: the caller's own open visit at that slot, then the tenant's known busy slots (none = unchecked)
   const mine = state.file.openRows.find((r) => r.kind === 'visit' && !/cancel|done/.test(r.status || '') && r.when.date === s.when.date && r.when.time === s.when.time);
