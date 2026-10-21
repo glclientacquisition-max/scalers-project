@@ -1,4 +1,4 @@
-const { describe, it, beforeEach } = require('node:test');
+const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   greetingInputs,
@@ -84,7 +84,17 @@ describe('greeting PCM cache bounds', () => {
 });
 
 describe('greeting warmer', () => {
-  beforeEach(() => resetGreetingPcmCache());
+  // Today's opener (VOICE_OPENING_V2 unset); the V2 warmer is covered below.
+  let prevOpening;
+  beforeEach(() => {
+    resetGreetingPcmCache();
+    prevOpening = process.env.VOICE_OPENING_V2;
+    delete process.env.VOICE_OPENING_V2;
+  });
+  afterEach(() => {
+    if (prevOpening == null) delete process.env.VOICE_OPENING_V2;
+    else process.env.VOICE_OPENING_V2 = prevOpening;
+  });
 
   it('renders the exact line a live call speaks now, so the call hits the cache', async () => {
     const now = new Date('2026-10-09T17:18:22Z'); // 20:18 EAT, evening
@@ -160,5 +170,52 @@ describe('greeting warmer', () => {
       if (prev == null) delete process.env.VOICE_GREETING_WARM;
       else process.env.VOICE_GREETING_WARM = prev;
     }
+  });
+});
+
+describe('greeting warmer, VOICE_OPENING_V2=on', () => {
+  let prevOpening;
+  beforeEach(() => {
+    resetGreetingPcmCache();
+    prevOpening = process.env.VOICE_OPENING_V2;
+    process.env.VOICE_OPENING_V2 = 'on';
+  });
+  afterEach(() => {
+    if (prevOpening == null) delete process.env.VOICE_OPENING_V2;
+    else process.env.VOICE_OPENING_V2 = prevOpening;
+  });
+
+  it('renders the V2 opening set once, with no daypart edge re-render, and the call hits it', async () => {
+    const callOpening = require('../src/speech/callOpening');
+    const now = new Date('2026-10-09T13:50:00Z'); // 16:50 EAT, near the daypart edge
+    const counter = { renders: 0 };
+    const profile = { ...ARIS, greetingInvite: 'Tukusaidie vipi' };
+    const warmer = createGreetingWarmer({
+      listTenantIds: async () => [ARIS.id],
+      getProfile: async () => profile,
+      createSession: fakeSessionFactory(counter),
+      now: () => now,
+    });
+    const r = await warmer.warmTenant(ARIS.id);
+    const lines = callOpening.openingWarmLines(profile, { isOpen: null });
+    assert.equal(r.rendered, lines.length, 'no daypart word, so one set for both instants');
+    const first = callOpening.composeOpening({
+      businessName: profile.businessName,
+      spokenName: profile.spokenName,
+      agentName: profile.agentName,
+      greetingInvite: profile.greetingInvite,
+      language: callOpening.shopLanguage(profile),
+      isOpen: null,
+    }).text;
+    assert.match(first, /^Hapa ni Aris, naitwa Lynn\./);
+    const hit = lookupGreetingPcm({
+      voiceId: ARIS.sonioxVoiceId,
+      text: first,
+      extraLexicon: ARIS.ttsLexicon,
+      businessName: ARIS.businessName,
+      agentName: ARIS.agentName,
+    });
+    assert.ok(hit.pcm, 'live V2 greeting hits the warmed clip');
+    assert.equal((await warmer.warmTenant(ARIS.id)).rendered, 0);
   });
 });

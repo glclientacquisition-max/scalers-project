@@ -23,6 +23,8 @@ const {
   isGreetingCacheEnabled,
 } = require('./greetingPcmCache');
 
+const { openingV2Enabled, openingWarmLines } = require('./callOpening');
+
 const DEFAULT_SWEEP_MS = 5 * 60 * 1000;
 const LOOKAHEAD_MS = 15 * 60 * 1000;
 
@@ -58,6 +60,15 @@ function greetingInputs(profile = {}, { now = new Date() } = {}) {
     mode: 'instant',
     now,
   };
+}
+
+/** VOICE_OPENING_V2 lines a call at `at` can speak before its first real turn. */
+function openingWarmLinesAt(profile = {}, at = new Date()) {
+  const inputs = greetingInputs(profile, { now: at });
+  return openingWarmLines(
+    { ...profile, businessName: inputs.businessName, agentName: inputs.agentName, closureNotice: inputs.closureNotice },
+    { isOpen: inputs.isOpen }
+  );
 }
 
 /** Instants to render for: now, plus just past the next daypart edge if near. */
@@ -134,6 +145,12 @@ function createGreetingWarmer(deps) {
     let rendered = 0;
     const lines = new Set();
     for (const at of warmInstants(now())) {
+      if (openingV2Enabled()) {
+        // VOICE_OPENING_V2: the first greeting, the returning greeting, the
+        // bare-Hello re-invites and the silence ladder, in the shop language.
+        for (const line of openingWarmLinesAt(profile, at)) lines.add(line);
+        continue;
+      }
       lines.add(await generateDynamicGreeting(greetingInputs(profile, { now: at })));
     }
     for (const text of lines) {
@@ -200,6 +217,7 @@ function createGreetingWarmer(deps) {
 }
 
 module.exports = {
+  openingWarmLinesAt,
   DEFAULT_SWEEP_MS,
   LOOKAHEAD_MS,
   greetingWarmEnabled,

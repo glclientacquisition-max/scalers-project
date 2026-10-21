@@ -61,6 +61,9 @@ const {
   bareGreetingReplyEnabled,
 } = require('./src/speech/bareGreetingReply');
 const { classifySonioxError } = require('./src/speech/sonioxErrors');
+// VOICE_OPENING_V2 (default off): one call opening for v1 and v2.
+const callOpening = require('./src/speech/callOpening');
+const openingStore = callOpening.createOpeningStore();
 const { createLineFallback } = require('./src/speech/ttsRespeak');
 const { getSonioxProviderHealth } = require('./src/speech/sonioxProviderHealth');
 const {
@@ -2281,6 +2284,24 @@ mediaWss.on('connection', (ws, req) => {
   // the caller's first real turn (src/speech/bareGreetingReply.js).
   let firstRealCallerTurnDone = false;
   let bareGreetingReinvites = 0;
+  // VOICE_OPENING_V2 (src/speech/callOpening.js, default off). Read once per
+  // socket. Off: none of the opening* state below is used.
+  const openingOn = callOpening.openingV2Enabled();
+  /** { session, resumed, action } from openingStore.attach (per callSid). */
+  let opening = openingOn && sessionCallSid ? openingStore.attach(sessionCallSid) : null;
+  let openingLang = 'en';
+  let openingInviteLine = '';
+  let openingKind = '';
+  /** First media frame (text or binary) on this socket: greeting.first_pcm_ms clock. */
+  let firstMediaFrameAt = 0;
+  /** Caller speech span over the greeting (STT audio clock), for the 600 ms barge rule. */
+  let openingSpeechStartMs = null;
+  let openingSpeechMs = 0;
+  /** The playing line is a real agent line (not a filler): a socket cut re-speaks it. */
+  let openingLineReal = false;
+  let openingSilence = null;
+  /** Bare Hello re-invites (VOICE_BARE_GREETING_REPLY) are folded into VOICE_OPENING_V2. */
+  const bareReplyOn = () => openingOn || bareGreetingReplyEnabled();
   /** Brain END is in flight. No idle nudge and no next caller turn. */
   let callEnding = false;
   const overlapHold = createOverlapHold();
@@ -2303,6 +2324,7 @@ mediaWss.on('connection', (ws, req) => {
   const idleNudge = createIdleNudgeController({
     canFire: () =>
       ws.readyState === WebSocket.OPEN &&
+      !(openingOn && !firstRealCallerTurnDone) &&
       !callEnding &&
       !speaking &&
       !turnBusy &&
@@ -2368,6 +2390,11 @@ mediaWss.on('connection', (ws, req) => {
     if (!sample || sample.length < 3) return;
     if (looksLikeEcho(text)) return;
     idleNudge.clear();
+    if (openingSilence && !firstRealCallerTurnDone) {
+      // The caller is there: restart the ladder from step 1.
+      openingSilence.reset();
+      if (!speaking) openingSilence.arm();
+    }
   }
   let fillerTimer = null;
   /** When true, discard the in-flight Gemini/TTS reply and wait for the caller turn. */
@@ -2464,6 +2491,23 @@ mediaWss.on('connection', (ws, req) => {
       patchFirstForward(sessionCallSid, {
         greetingPlayed: true,
         connectToGreetingPcmMs: logged.connect_to_greeting_pcm_ms,
+      });
+    }
+    if (openingOn && opening) {
+      const from = firstMediaFrameAt || connectedAt;
+      const firstPcmMs = Math.max(0, at - from);
+      openingStore.noteGreeted(opening.session, { text: greetingLine, at });
+      console.log(
+        `[voice-timing][${sidLabel()}] greeting.first_pcm_ms=${firstPcmMs} cached=${cached ? 1 : 0} from=${firstMediaFrameAt ? 'first_media_frame' : 'connect'} kind=${openingKind} lang=${openingLang}`
+      );
+      voiceTrace.noteCall({
+        stage: 'opening',
+        path: 'greeting',
+        firstPcmMs,
+        cached: Boolean(cached),
+        kind: openingKind,
+        language: openingLang,
+        streamSeq: opening.session.streamSeq,
       });
     }
   }
@@ -2613,6 +2657,12 @@ mediaWss.on('connection', (ws, req) => {
     return buildSttContext(sttTenantSnapshot);
   }
 
+  /** VOICE_OPENING_V2: what a resumed socket carries over from the last one. */
+  function openingCarry() {
+    if (!openingOn || !opening || !opening.resumed) return null;
+    return opening.session.carry || null;
+  }
+
   async function ensureTenantPrompt() {
     if (profileLoaded && profileCallSid === sessionCallSid) {
       return buildSttContext(sttTenantSnapshot);
@@ -2649,7 +2699,8 @@ mediaWss.on('connection', (ws, req) => {
         const parsedTools = parseAgentTools(profile.agentTools);
         callAgentTools.set(sessionCallSid, parsedTools);
         callTenantProfiles.set(sessionCallSid, profile);
-        callBrainStates.set(sessionCallSid, createBrainState(profile));
+        const carried = openingCarry();
+        callBrainStates.set(sessionCallSid, carried?.brainState || createBrainState(profile));
         callBrainCapabilities.set(
           sessionCallSid,
           capabilitiesForProfile(profile, parsedTools)
@@ -2666,6 +2717,8 @@ mediaWss.on('connection', (ws, req) => {
           afterHoursMode === 'message' ? messageFileOwnerName(profile) : '',
       });
       messages = [{ role: 'system', content: systemPrompt }];
+      const carriedHistory = openingCarry()?.messages;
+      if (Array.isArray(carriedHistory) && carriedHistory.length) messages.push(...carriedHistory);
       profileLoaded = true;
       profileCallSid = sessionCallSid;
       const tools = parseAgentTools(profile.agentTools);
@@ -2704,6 +2757,7 @@ mediaWss.on('connection', (ws, req) => {
   // A bare "Hello" / "Yes" / "Halo" / "Uko?" before the first real turn gets a
   // short spoken re-invite, never silence (VOICE_BARE_GREETING_REPLY, off).
   function maybeReinviteBareGreeting(text, source) {
+    if (openingOn) return maybeOpeningReinvite(text, source);
     if (
       !shouldReinviteBareGreeting({
         text,
@@ -2741,6 +2795,90 @@ mediaWss.on('connection', (ws, req) => {
     return true;
   }
 
+  /** VOICE_OPENING_V2 bare-Hello check (max 2, before the first real turn). */
+  function openingWantsReinvite(text, { speakingNow = speaking } = {}) {
+    if (!openingOn || !opening) return false;
+    if (callEnding || callIsOver() || speechOutageStarted) return false;
+    if (firstRealCallerTurnDone || speakingNow || turnBusy) return false;
+    if (opening.session.bareCount >= callOpening.MAX_BARE_HELLO) return false;
+    return isBareGreetingOrAffirmation(text);
+  }
+
+  function maybeOpeningReinvite(text, source) {
+    if (!openingWantsReinvite(text)) return false;
+    const r = callOpening.onBareHello(opening.session, text);
+    if (!r.reinvite) return false;
+    bareGreetingReinvites = r.count;
+    const invite = openingInviteFor(callLanguage);
+    const line = callOpening.bareHelloLine({
+      language: callLanguage === 'sw' ? 'sw' : callLanguage === 'en' ? 'en' : openingLang,
+      invite,
+      count: r.count - 1,
+    });
+    idleNudge.clear();
+    if (openingSilence) openingSilence.reset();
+    console.log(
+      `[ws/media][${sidLabel()}] bare_greeting_reinvite n=${r.count} src=${source} opening=v2: ${String(text || '').slice(0, 40)}`
+    );
+    void speakOpeningLine(line, { replayLine: invite })
+      .then((spoken) => {
+        if (spoken?.ok) {
+          callTranscript.pushAgent(line);
+          messages.push({ role: 'assistant', content: line, local: true });
+        }
+        if (openingSilence && !firstRealCallerTurnDone) openingSilence.arm();
+      })
+      .catch((err) => {
+        console.error(`[ws/media][${sidLabel()}] bare_greeting_reinvite failed:`, err?.message || err);
+      });
+    return true;
+  }
+
+  /** The owner's invite in the shop language; the default question in the other one. */
+  function openingInviteFor(lang) {
+    const code = lang === 'sw' || lang === 'en' ? lang : openingLang;
+    if (code === openingLang && openingInviteLine) return openingInviteLine;
+    return callOpening.PACK[code].invite;
+  }
+
+  /**
+   * Speak a fixed opening line (re-invite, nudge, resume): cached PCM when the
+   * warmer rendered it, else live TTS. Both feed agentReplay so a hear-again
+   * after it replays the line (the #735 root cause on the cached path).
+   */
+  async function speakOpeningLine(line, opts = {}) {
+    const found =
+      isGreetingCacheEnabled() && ttsSpeedScale === 1
+        ? lookupGreetingPcm({
+            voiceId: tenantSonioxVoiceId,
+            text: line,
+            extraLexicon: ttsLexiconOverrides,
+            businessName,
+            agentName,
+          })
+        : null;
+    openingLineReal = true;
+    if (opening) openingStore.noteLine(opening.session, line);
+    console.log(`[ws/media][${sidLabel()}] opening_line cached=${found && found.pcm ? 1 : 0}: ${line}`);
+    // A hear-again after "Nakusikia. Nikusaidie vipi?" asks the question,
+    // not the filler in front of it.
+    const replayLine = String(opts.replayLine || line);
+    if (found && found.pcm) {
+      agentReplay.beginSpeech(replayLine);
+      voiceTrace.noteCall({ stage: 'tts', path: 'opening', text: line, language: callLanguage, cached: true });
+      const r = await playCachedFillerPcm(found.pcm, { text: line, trace: false, kind: 'opening' });
+      agentReplay.commitPlayback();
+      return r;
+    }
+    const { replayLine: _omit, ...speakOpts } = opts;
+    const r = await speakText(line, { isIdleNudge: true, skipFileGate: true, ...speakOpts });
+    if (r?.ok && replayLine !== line) {
+      agentReplay.beginSpeech(replayLine);
+      agentReplay.commitPlayback();
+    }
+    return r;
+  }
+
   function releaseQueuedCallerSpeech(endedGeneration) {
     const gen =
       endedGeneration != null ? endedGeneration : activePlaybackGeneration;
@@ -2750,7 +2888,7 @@ mediaWss.on('connection', (ws, req) => {
     if (
       text &&
       !firstRealCallerTurnDone &&
-      bareGreetingReplyEnabled() &&
+      bareReplyOn() &&
       isBareGreetingOrAffirmation(text)
     ) {
       console.log(`[ws/media][${sidLabel()}] bare_greeting_over_greeting dropped gen=${gen}`);
@@ -2815,6 +2953,7 @@ mediaWss.on('connection', (ws, req) => {
     lastAgentText = String(text || '');
     activePlaybackGeneration = ++playbackGeneration;
     const gen = activePlaybackGeneration;
+    if (openingOn) openingLineReal = kind === 'opening' || kind === 'receipt' || kind === 'greeting';
     fillerStreamId = streamId;
     activeOutboundStreamId = streamId;
     if (activeTurnTiming) activeTurnTiming.markFirstPcm();
@@ -3102,6 +3241,10 @@ mediaWss.on('connection', (ws, req) => {
     if (!opts.isFiller && !opts.isReplay) {
       agentReplay.beginSpeech(text);
     }
+    if (openingOn) {
+      openingLineReal = !opts.isFiller;
+      if (opening && !opts.isFiller) openingStore.noteLine(opening.session, text);
+    }
     activePlaybackGeneration = ++playbackGeneration;
     const gen = activePlaybackGeneration;
     // Hold a placeholder stream id until Soniox binds the real one.
@@ -3282,6 +3425,53 @@ mediaWss.on('connection', (ws, req) => {
       replayText: hearAgainReplayText(),
       now: Date.now(),
     });
+    // VOICE_OPENING_V2: over the greeting, barge after 600 ms of caller
+    // speech or at once on a real word; anything else waits for the greeting
+    // to finish. A barged greeting is never replayed.
+    if (
+      openingOn &&
+      greetingStarted &&
+      !greetingSettled &&
+      speaking &&
+      phaseInputs.speaking &&
+      decision.reason !== 'echo'
+    ) {
+      const g = callOpening.decideGreetingBarge({ text, speechMs: openingSpeechMs });
+      if (!g.barge) {
+        return {
+          ...decision,
+          action: 'queue',
+          reason: 'opening_hold',
+          interrupt: false,
+          stopTts: false,
+          queue: true,
+          skip: false,
+          replay: false,
+          runGemini: false,
+        };
+      }
+      const forced = decision.interrupt
+        ? { ...decision, replay: false }
+        : {
+            ...decision,
+            action: 'barge_gemini',
+            reason: `opening_${g.reason}`,
+            interrupt: true,
+            stopTts: true,
+            runGemini: true,
+            queue: false,
+            skip: false,
+            replay: false,
+          };
+      greetingInterrupted = true;
+      if (opening) callOpening.onGreetingBarge(opening.session);
+      if (openingSilence) openingSilence.clear();
+      console.log(
+        `[ws/media][${sidLabel()}] opening_barge reason=${g.reason} speech_ms=${openingSpeechMs} src=${source}: ${String(text || '').slice(0, 60)}`
+      );
+      cancelSpeech(`${source}/opening_${g.reason}`);
+      return forced;
+    }
     if (!decision.interrupt) {
       // Rate-limited diagnostics (interim STT is chatty).
       const now = Date.now();
@@ -3490,7 +3680,12 @@ mediaWss.on('connection', (ws, req) => {
       voiceTrace.commitTurn({ outcome: 'skip' });
       return;
     }
+    const wasFirstRealTurn = !firstRealCallerTurnDone;
     if (!isBareGreetingOrAffirmation(clean)) firstRealCallerTurnDone = true;
+    if (openingOn && firstRealCallerTurnDone && opening && !opening.session.firstRealTurnDone) {
+      callOpening.onRealTurn(opening.session);
+      if (openingSilence) openingSilence.close();
+    }
 
     overlapHold.discardExcept(0);
     turnBusy = true;
@@ -3531,7 +3726,17 @@ mediaWss.on('connection', (ws, req) => {
     const languageEvidence = analyzeCallerLanguage(clean, {
       tokenLanguages: opts.tokenLanguages,
     });
-    callLanguageState = resolveLanguageState(callLanguageState, languageEvidence);
+    callLanguageState = openingOn
+      ? callOpening.resolveOpeningLanguage(callLanguageState, languageEvidence, {
+          firstTurn: wasFirstRealTurn,
+          shopLanguage: openingLang,
+        })
+      : resolveLanguageState(callLanguageState, languageEvidence);
+    if (openingOn && callLanguageState.current !== callLanguage) {
+      console.log(
+        `[ws/media][${callKey}] lang.switch from=${callLanguage} to=${callLanguageState.current} first_turn=${wasFirstRealTurn ? 1 : 0} evidence=${languageEvidence.language}`
+      );
+    }
     callLanguage = callLanguageState.current;
 
     // Caller asking for slower/faster speech adjusts the actual voice speed,
@@ -5096,6 +5301,16 @@ mediaWss.on('connection', (ws, req) => {
       if (preroll.applied && preroll.droppedText) {
         noteGreetingPrerollSkip(preroll, isInterim ? 'interim' : 'final');
       }
+      if (openingOn && greetingStarted && !greetingSettled && Array.isArray(evt.tokens)) {
+        for (const tok of evt.tokens) {
+          const st = Number(tok && tok.start_ms);
+          const en = Number(tok && tok.end_ms);
+          if (!Number.isFinite(st) || !Number.isFinite(en)) continue;
+          if (greetingPrerollMs != null && st < greetingPrerollMs) continue;
+          if (openingSpeechStartMs == null || st < openingSpeechStartMs) openingSpeechStartMs = st;
+          openingSpeechMs = Math.max(openingSpeechMs, en - openingSpeechStartMs);
+        }
+      }
 
       // Instant barge-in on accumulated interim tokens while TTS/LLM is busy.
       if (isInterim) {
@@ -5158,14 +5373,18 @@ mediaWss.on('connection', (ws, req) => {
           decision.action === 'ignore' ||
           decision.action === 'skip' ||
           decision.action === 'barge_listen') &&
-        shouldReinviteBareGreeting({
-          text: preroll.applied ? preroll.text : text,
-          firstRealTurnDone: firstRealCallerTurnDone,
-          reinvites: bareGreetingReinvites,
-          speaking: decision.interrupt ? false : speaking,
-          turnBusy,
-          callEnding: callEnding || callIsOver() || speechOutageStarted,
-        })
+        (openingOn
+          ? openingWantsReinvite(preroll.applied ? preroll.text : text, {
+              speakingNow: decision.interrupt ? false : speaking,
+            })
+          : shouldReinviteBareGreeting({
+              text: preroll.applied ? preroll.text : text,
+              firstRealTurnDone: firstRealCallerTurnDone,
+              reinvites: bareGreetingReinvites,
+              speaking: decision.interrupt ? false : speaking,
+              turnBusy,
+              callEnding: callEnding || callIsOver() || speechOutageStarted,
+            }))
       ) {
         noteCallerSpeechForIdle(text);
         voiceTrace.noteTurnEnd({ decision: 'queue', reason: 'bare_greeting' });
@@ -5180,6 +5399,9 @@ mediaWss.on('connection', (ws, req) => {
         // The cached-PCM greeting never reaches agentReplay, so a hear-again
         // right after it found no line and went silent. Fall back to the last
         // spoken question (VOICE_BARE_GREETING_REPLY).
+        if (!replay && openingOn && agentAwaitingReply(lastAgentText)) {
+          replay = String(lastAgentText || '').trim();
+        }
         if (!replay && bareGreetingReplyEnabled() && agentAwaitingReply(lastAgentText)) {
           replay = String(lastAgentText || '').trim();
         }
@@ -5383,6 +5605,146 @@ mediaWss.on('connection', (ws, req) => {
     callBrainStates.set(sessionCallSid, state);
   }
 
+  /**
+   * VOICE_OPENING_V2: compose this call's opening from the loaded profile,
+   * set the call language to the shop language (or restore it on resume),
+   * and build the silence ladder.
+   */
+  function setupOpening() {
+    if (!opening) opening = openingStore.attach(sessionCallSid || '');
+    openingLang = callOpening.shopLanguage({ ...brainProfile, greetingInvite });
+    const facts = callOpening.callerOpeningFacts(brainProfile?.callerMemory);
+    const composed = callOpening.composeOpening({
+      businessName,
+      spokenName,
+      agentName,
+      greetingText: brainProfile?.greetingText || '',
+      greetingInvite,
+      language: openingLang,
+      isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
+      afterHoursMode,
+      closureNotice,
+      ...facts,
+    });
+    openingInviteLine = composed.invite;
+    openingKind = composed.kind;
+    const carry = opening.resumed ? opening.session.carry : null;
+    if (carry && carry.languageState) {
+      callLanguageState = carry.languageState;
+      callLanguage = callLanguageState.current;
+      firstRealCallerTurnDone = Boolean(carry.firstRealTurnDone);
+    } else {
+      callLanguageState = callOpening.initialLanguageState(openingLang);
+      callLanguage = callLanguageState.current;
+    }
+    bareGreetingReinvites = opening.session.bareCount;
+    if (opening.session.firstRealTurnDone) firstRealCallerTurnDone = true;
+    openingSilence = callOpening.createSilenceLadder({
+      delays: callOpening.silenceLadderMs(),
+      canFire: () =>
+        ws.readyState === WebSocket.OPEN &&
+        !callEnding &&
+        !speaking &&
+        !turnBusy &&
+        !speechOutageStarted &&
+        !utteranceParts.length &&
+        !pendingUtterance &&
+        !firstRealCallerTurnDone &&
+        !callIsOver(),
+      speak: (step) => speakOpeningSilence(step),
+    });
+    const check = callOpening.checkOpeningLine(composed.text, {
+      shopName: callOpening.shopLabel({ spokenName, businessName }),
+      staff: callOpening.staffNames(brainProfile),
+      agentName,
+    });
+    if (!check.ok) {
+      console.warn(`[ws/media][${sidLabel()}] opening check failed ${check.problems.join(',')}: ${composed.text}`);
+    }
+    return composed;
+  }
+
+  async function speakOpeningSilence(step) {
+    if (callIsOver() || callEnding) return;
+    const lang = callLanguage === 'sw' || callLanguage === 'en' ? callLanguage : openingLang;
+    const invite = openingInviteFor(lang);
+    const line = callOpening.silenceLine({ language: lang, invite, step });
+    const last = step >= callOpening.silenceLadderMs().length;
+    console.log(`[ws/media][${sidLabel()}] opening_silence step=${step}${last ? ' goodbye' : ''}: ${line}`);
+    voiceTrace.noteCall({ stage: 'opening', path: 'silence', step });
+    if (!last) {
+      const spoken = await speakOpeningLine(line, { replayLine: invite });
+      if (spoken?.ok) {
+        callTranscript.pushAgent(line);
+        messages.push({ role: 'assistant', content: line, local: true });
+      }
+      if (openingSilence && !firstRealCallerTurnDone) openingSilence.arm();
+      return;
+    }
+    // Third step: goodbye, hang up after the audio. The call ends with no
+    // caller speech, so finalize labels it as a missed call.
+    callEnding = true;
+    unfinishedHold.close();
+    idleNudge.close();
+    playbackBytes = 0;
+    playbackStartedAt = 0;
+    const spoken = await speakOpeningLine(line);
+    if (spoken?.ok) {
+      callTranscript.pushAgent(line);
+      messages.push({ role: 'assistant', content: line, local: true });
+    }
+    const delay = farewellHangupDelayMs({ bytes: playbackBytes, startedAt: playbackStartedAt });
+    console.log(`[ws/media][${sidLabel()}] opening_silence_end missed_call=1 hangup in ${delay}ms`);
+    setTimeout(() => {
+      try {
+        ws.close(1000, 'silence_end');
+      } catch {
+        /* ignore */
+      }
+    }, delay);
+  }
+
+  /** Greeting playout ended (not barged): AWAIT_FIRST, silence ladder armed. */
+  function openingGreetingDone() {
+    if (!openingOn || !opening) return;
+    openingSpeechStartMs = null;
+    openingSpeechMs = 0;
+    if (greetingInterrupted) return;
+    callOpening.onGreetingDone(opening.session);
+    if (openingSilence && !firstRealCallerTurnDone) openingSilence.arm();
+  }
+
+  /**
+   * A second /ws/media for a callSid already greeted: no greeting. Re-speak a
+   * line the drop cut mid-way, or (greeting cut) only its question; else listen.
+   */
+  async function resumeOpening() {
+    greetingSettled = true;
+    greetingAwaitingFirstPcm = false;
+    firstForward.greetingLogged = true;
+    firstForward.greetingPlayed = true;
+    greetingPrerollMs = pcmBytesToMs(sttAudioBytes);
+    const s = opening.session;
+    console.log(
+      `[ws/media][${sidLabel()}] opening_resume stream_seq=${s.streamSeq} action=${opening.action} state=${s.state} first_turn_done=${firstRealCallerTurnDone ? 1 : 0}: no greeting`
+    );
+    voiceTrace.noteCall({ stage: 'opening', path: 'resume', action: opening.action, streamSeq: s.streamSeq });
+    let line = '';
+    if (opening.action === 'respeak') line = s.lastAgentLine;
+    else if (opening.action === 'reinvite') line = openingInviteFor(callLanguage);
+    if (line) {
+      const spoken =
+        opening.action === 'reinvite'
+          ? await speakOpeningLine(line)
+          : await speakText(line, { skipFileGate: true });
+      if (spoken?.ok) {
+        callTranscript.pushAgent(line);
+        messages.push({ role: 'assistant', content: line, local: true });
+      }
+    }
+    if (openingSilence && !firstRealCallerTurnDone) openingSilence.arm();
+  }
+
   // Greet once the tenant profile is loaded (correct shop name). Cached PCM
   // plays before TTS-ready wait so answer-to-greeting is not dead air.
   (async () => {
@@ -5404,8 +5766,17 @@ mediaWss.on('connection', (ws, req) => {
         return;
       }
 
+      let composedOpening = null;
+      if (openingOn) {
+        composedOpening = setupOpening();
+        if (opening.resumed && opening.action !== 'greet') {
+          await resumeOpening();
+          return;
+        }
+      }
+
       // Instant local greeting (correct tenant name). Do not wait on Gemini.
-      greetingLine = await generateDynamicGreeting({
+      greetingLine = composedOpening ? composedOpening.text : await generateDynamicGreeting({
         businessName,
         agentName,
         spokenName,
@@ -5423,7 +5794,7 @@ mediaWss.on('connection', (ws, req) => {
       });
       if (speechOutageStarted) return;
       console.log(
-        `[ws/media][${sidLabel()}] greeting mode=instant agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)}: ${greetingLine}`
+        `[ws/media][${sidLabel()}] greeting mode=${composedOpening ? `opening_v2 kind=${openingKind} lang=${openingLang}` : 'instant'} agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)}: ${greetingLine}`
       );
 
       const found = lookupGreetingPcm({
@@ -5442,7 +5813,9 @@ mediaWss.on('connection', (ws, req) => {
           text: greetingLine,
           language: callLanguage,
         });
-        await playCachedFillerPcm(found.pcm, { text: greetingLine, trace: false });
+        if (openingOn) agentReplay.beginSpeech(greetingLine);
+        await playCachedFillerPcm(found.pcm, { text: greetingLine, trace: false, kind: openingOn ? 'greeting' : 'filler' });
+        if (openingOn && !greetingInterrupted) agentReplay.commitPlayback();
         callTranscript.pushAgent(greetingLine);
         messages.push({ role: 'assistant', content: greetingLine, local: true });
         if (!greetingInterrupted) markGreetingFileNameAsk(greetingLine);
@@ -5526,6 +5899,7 @@ mediaWss.on('connection', (ws, req) => {
           .catch(() => {});
       }
       greetingSettled = true;
+      openingGreetingDone();
     } catch (err) {
       greetingSettled = true;
       console.error(`[ws/media][${sidLabel()}] greeting failed:`, err?.message || err);
@@ -5556,6 +5930,7 @@ mediaWss.on('connection', (ws, req) => {
 
   ws.on('message', (data, isBinary) => {
     if (endedRefused) return;
+    if (!firstMediaFrameAt) firstMediaFrameAt = Date.now();
     try {
       const buf = toNodeBuffer(data);
       const asText = buf.toString('utf8');
@@ -5609,6 +5984,7 @@ mediaWss.on('connection', (ws, req) => {
               }
               sessionCallSid = String(maybeSid);
               endedCalls.noteMediaOpen(sessionCallSid, connectedAt);
+              if (openingOn && !opening) opening = openingStore.attach(sessionCallSid);
               callSpokenTranscripts.set(sessionCallSid, callTranscript);
               ttsSpeedScale = 1;
               publishVoiceTrace();
@@ -5683,6 +6059,26 @@ mediaWss.on('connection', (ws, req) => {
     speakCommit.clear();
     idleNudge.close();
     unfinishedHold.close();
+    if (openingSilence) openingSilence.close();
+    if (openingOn && opening && sessionCallSid && !endedRefused) {
+      const cut = speaking && openingLineReal;
+      const detached = openingStore.detach(sessionCallSid, {
+        ended: endedByThisSession,
+        speaking: cut,
+        line: cut ? lastAgentText : '',
+        carry: endedByThisSession
+          ? null
+          : {
+              brainState: callBrainStates.get(sessionCallSid) || null,
+              messages: messages.filter((m) => m && m.role !== 'system'),
+              languageState: callLanguageState,
+              firstRealTurnDone: firstRealCallerTurnDone,
+            },
+      });
+      console.log(
+        `[ws/media][${sessionCallSid}] opening_socket_closed ended=${endedByThisSession ? 1 : 0} cut=${cut ? 1 : 0}${detached && !detached.ended ? ` detached_ms=${detached.detachMs}` : ''}`
+      );
+    }
     if (utteranceTimer) {
       clearTimeout(utteranceTimer);
       utteranceTimer = null;
