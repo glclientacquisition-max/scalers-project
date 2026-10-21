@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-200 variables.
+201 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -36,6 +36,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BUSINESS_KNOWLEDGE` | voice | `src/db.js`<br>`src/prompts.js`<br>`src/tenantProfile.js` |
 | `BUSINESS_NAME` | voice | `server.js`<br>`src/conversation/businessAssistantIntro.js`<br>`src/db.js`<br>+2 more |
 | `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js` |
+| `CALL_SUMMARY_EVENT` | voice | `src/conversation/callSummaryEvent.js` |
 | `CRON_SECRET` | desk | `dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/cron/ops-alerts/route.ts` |
 | `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+48 more |
 | `DASHBOARD_PASSWORD` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |

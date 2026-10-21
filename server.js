@@ -220,6 +220,7 @@ const {
   reaskSlotLine,
 } = require('./src/conversation/callFixesD199');
 const { deriveCallSummary } = require('./src/conversation/callSummary');
+const callSummaryEvent = require('./src/conversation/callSummaryEvent');
 const {
   schedulePostCallTranscriptReview,
   sweepUnreviewedCalls,
@@ -1345,6 +1346,49 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
   );
 }
 
+// A4: hangup summaries of v2-owned calls whose one finishCall is still waiting
+// out the reconnect grace; finishOwnedV2Call emits them when it runs.
+const a4PendingV2Summaries = new Map();
+
+async function emitHangupCallSummary({ callSid, call, brainState, spokenTurns, derived, profile, source }) {
+  if (!callSummaryEventEnabled()) return null;
+  try {
+    // C3's cached once-only finish result; finishCall is never run a second time here.
+    const v2 = v2OwnsCall.a4V2Source(ownedV2Calls, callSid);
+    if (v2.state === 'pending') {
+      a4PendingV2Summaries.set(callSid, { callSid, call, brainState, spokenTurns, derived, profile, source });
+      console.log(`[${source}] call summary event ${callSid}: waiting for the v2 finish`);
+      return null;
+    }
+    a4PendingV2Summaries.delete(callSid);
+    const v2Fin = v2.state === 'finished' && Array.isArray(v2.fin.summaryReceipts) ? v2.fin : null;
+    const v1Receipts = callSummaryEvent.receiptsFromV1({ brainState, turns: spokenTurns, profile });
+    // BA v2 owned this call: its finishCall receipts win (mergeV2Receipts).
+    const receipts = v2Fin ? callSummaryEvent.mergeV2Receipts(v2Fin.summaryReceipts, v1Receipts) : v1Receipts;
+    const answeredQs = Array.isArray(derived?.answeredQuestions) ? derived.answeredQuestions.length : 0;
+    const built = callSummaryEvent.buildCallSummaryEvent({
+      path: v2Fin ? 'v2' : 'v1',
+      callLanguage: (v2Fin && v2Fin.lang) || brainState?.language?.current,
+      callId: call?.id || callSid,
+      tenantId: call?.tenant_id || profile?.id || null,
+      answered: true,
+      infoAnswered: answeredQs > 0 || Boolean(brainState?.conversation?.catalogueAnswered) || Boolean(v2Fin?.infoAnswered),
+      caller: { name: (v2Fin && v2Fin.name) || callSummaryEvent.v1CallerName(brainState), phone: callSummaryEvent.callerPhoneFrom(call, brainState) },
+      receipts,
+    });
+    if (!built.ok) {
+      console.warn(`[${source}] call summary event invalid ${callSid}: ${built.errors.join('; ')}`);
+      return null;
+    }
+    await callSummaryEvent.emitCallSummaryEvent(built.event, { db, callSid });
+    return built.event;
+  } catch (err) {
+    console.warn(`[${source}] call summary event failed ${callSid}:`, err?.message || err);
+    return null;
+  }
+}
+const callSummaryEventEnabled = () => callSummaryEvent.callSummaryEventEnabled();
+
 async function writeHangupSummary(callSid, source, opts, brainState) {
   try {
     const call = await db.getCall(callSid);
@@ -1407,6 +1451,9 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
       );
     }
     const profile = callTenantProfiles.get(callSid) || {};
+    // A4 (CALL_SUMMARY_EVENT, off by default): one typed owner-summary event
+    // per call for Ops' sender. Off = nothing here runs; owner SMS unchanged.
+    await emitHangupCallSummary({ callSid, call, brainState, spokenTurns, derived, profile, source });
     if (opts.review !== false) {
       schedulePostCallTranscriptReview({
         callSid,
@@ -1477,6 +1524,12 @@ function finishOwnedV2Call(callSid, { provisional = false, source = 'hangup' } =
     Promise.resolve()
       .then(() => db.mergeCallSummaryMeta({ callSid, patch }))
       .catch((err) => console.warn(`[${source}] brain_v2 summary patch failed:`, err?.message || err));
+    // A4 seam: a hangup summary that waited for this one finish goes out now.
+    const a4 = a4PendingV2Summaries.get(callSid);
+    if (a4) {
+      a4PendingV2Summaries.delete(callSid);
+      emitHangupCallSummary({ ...a4, source: `${a4.source}/v2_finish` }).catch(() => {});
+    }
   }
   return fin;
 }

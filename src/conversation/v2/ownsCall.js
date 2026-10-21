@@ -111,4 +111,18 @@ function summaryPatch(fin) {
   };
 }
 
-module.exports = { ownsCallEnabled, repairLine, runOwnedTurn, createOwnedCalls, summaryPatch };
+// A4 seam (CALL_SUMMARY_EVENT): where the owner summary gets its v2 receipts.
+// Reads the cached once-only finish result; it never runs finishCall itself.
+//   finished: v2 owned the call and finishCall ran (fin carries summaryReceipts);
+//   pending:  v2 owns a live call whose finish waits out the reconnect window,
+//             so the summary waits for that one finish;
+//   none:     v2 does not own this call (flag off or no owned turn): v1 receipts.
+function a4V2Source(owned, callSid, { ownsCallOn = ownsCallEnabled() } = {}) {
+  if (!ownsCallOn || !owned || !callSid) return { state: 'none', fin: null };
+  const fin = owned.finished(callSid);
+  if (fin) return { state: 'finished', fin };
+  if (owned.getLive(callSid)) return { state: 'pending', fin: null };
+  return { state: 'none', fin: null };
+}
+
+module.exports = { ownsCallEnabled, repairLine, runOwnedTurn, createOwnedCalls, summaryPatch, a4V2Source };

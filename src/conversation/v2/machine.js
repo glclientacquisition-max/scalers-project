@@ -184,7 +184,9 @@ function propose(state, p) {
     p.idemKey = CS.idempotencyKey({ callId: state.callId, p }); p.validators = p.validators || state.lastValidators || {}; state.lastValidators = null;
     state.record?.('proposed', p);
   }
-  state.pending = p; state.phase = 'readback'; state.expecting = 'confirm'; return R.readback(p, state.lang);
+  state.pending = p; state.phase = 'readback'; state.expecting = 'confirm';
+  const line = R.readback(p, state.lang); p.readbackLine = line; // A4: what the caller heard read back
+  return line;
 }
 // Validators before a booking is proposed (BRAIN_V2_COMMIT_SAFETY): hours ran above; service area and
 // availability here. A failed validator returns a spoken template alternative; it never says booked.
@@ -384,7 +386,7 @@ async function commitRaw(state, p, handlers, extra = {}) {
   } catch (e) { ok = false; }
   const sup = ok && p.tool === 'create_booking' ? openCallbacks(state) : [];
   if (sup.length || (ok && p.tool === 'create_booking')) for (const c of state.callbacks) if (c.open) { c.open = false; c.supersededBy = result?.id || null; }
-  const rec = { tool: p.tool, action, ok, id: result?.id || null, ...(sup.length ? { supersedes: sup } : {}), notify: result?.notify || null, service: p.service || null, when: p.when || null, items: p.items || null, pickup: p.pickup || null, row: p.row || null, kind: p.kind || null };
+  const rec = { tool: p.tool, action, ok, id: result?.id || null, ...(sup.length ? { supersedes: sup } : {}), notify: result?.notify || null, service: p.service || null, when: p.when || null, items: p.items || null, pickup: p.pickup || null, row: p.row || null, kind: p.kind || null, place: p.place || null, readbackLine: p.readbackLine || null, replyText: p.replyText || null, idempotencyKey: extra.idempotencyKey || p.idemKey || null };
   state.receipts.push(rec);
   if (ok && (p.tool === 'create_booking' || p.tool === 'create_order') && s.name && handlers.saveCallerInfo) {
     const prior = state.file.contactName;
@@ -445,6 +447,7 @@ async function confirmSafe(state, u, profile, handlers, out, results, myTurn = s
   if (yes && nextTurn) {
     state.pending = null; state.phase = 'committing'; // consumed before any await: a second yes cannot redeem it
     state.record?.('confirmed', p, { confirmedTurn: state.turn });
+    p.replyText = String(u.text || '').slice(0, 160); // A4: callback read-back evidence
     if (p.name && state.slots.name && typeof handlers.confirmCallerName === 'function') { try { const r = handlers.confirmCallerName({ name: state.slots.name, source: 'readback_yes' }); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch { /* never blocks */ } }
     const { rec, toolResult } = await commit(state, p, handlers);
     results.push(toolResult);
@@ -755,6 +758,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     mergeSlots(state, u, profile);
     // a read-back commits only on an explicit yes; a caller repeating the time back is asked yes/no once
     if (u.done && !/^\W*(yes|ndio|ndiyo)\b/i.test(u.text) ? false : (u.yes || echoAffirms(p, u)) && !pendingChanged(p, state)) {
+      p.replyText = String(u.text || '').slice(0, 160); // A4: callback read-back evidence
       if (p.tool === 'create_handoff' && p.kind === 'quote') {}
       const { rec, toolResult } = await commit(state, p, handlers);
       results.push(toolResult);
@@ -855,7 +859,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   return out(st?.line || R.ask('intent', 1, lang));
 }
 
-function finishCall(state, { businessName, callerPhone }) {
+function finishCall(state, { businessName, callerPhone, profile = null } = {}) {
   const order = ['owner_only_change', 'complaint', 'booked', 'order_saved', 'moved', 'cancelled', 'handoff_callback', 'write_failed'];
   let outcome = order.find((o) => state.outcomes.includes(o));
   const s = state.slots;
@@ -865,7 +869,14 @@ function finishCall(state, { businessName, callerPhone }) {
   const intent = { booked: 'book', order_saved: 'order', moved: 'change', cancelled: 'cancel', owner_only_change: last?.kind === 'payment' ? 'payment_change' : 'address_change', complaint: 'complaint', handoff_callback: 'handoff', write_failed: INTENT_OF_TOOL[last?.tool] || 'none' }[outcome] || state.intent || state.lastInfo || 'none';
   const superseded = (state.callbacks || []).some((c) => c.supersededBy !== undefined && !c.open);
   if (superseded && outcome === 'booked') captured.note = 'earlier callback request closed: booked instead';
-  return { outcome, superseded: (state.callbacks || []).filter((c) => !c.open).map((c) => c.id).filter(Boolean), ownerText: renderOwnerMessage({ businessName, callerPhone, name: s.name, intent, outcome, captured }) };
+  const fin = { outcome, superseded: (state.callbacks || []).filter((c) => !c.open).map((c) => c.id).filter(Boolean), ownerText: renderOwnerMessage({ businessName, callerPhone, name: s.name, intent, outcome, captured }) };
+  // A4 (CALL_SUMMARY_EVENT, off): typed receipts for `call.summary.ready`, built once here so the
+  // C3 cached finish result (ownsCall.finish -> summaryPatch summary_receipts) carries them. Additive.
+  if (require('../callSummaryEvent').callSummaryEventEnabled()) {
+    fin.summaryReceipts = require('./summaryReceipts').receiptsFromV2(state, profile || {});
+    fin.infoAnswered = Boolean(state.lastInfo) && !['greeting', 'who_are_you'].includes(state.lastInfo);
+  }
+  return fin;
 }
 // Catalogue/discovery step only (VOICE_V2_CATALOGUE live wiring): intent from nlu.js
 // (or a checked model command), reply from receipts.js via the spoken catalogue.
