@@ -232,7 +232,9 @@ function bindGeneric(text, catalog = []) {
 // §6c bare name: one capitalised token that is no service, place, lexicon or filler word
 const NOT_NAME = /^(okay|ok|sawa|asante|karibu|thanks|hello|halo|hallo|hi|yes|no|ndio|ndiyo|hapana|like|mmh|eeh|haya|poa|fine|good|great|sure|right|yeah|nani|wewe|mimi|leo|kesho|jana|today|tomorrow|bye|kwaheri|pardon|sorry|what|why|when|where|who|how|stop|wait|ngoja|subiri|basi|tena|sasa|niulize|anduna|shy)$/i;
 function bareName(t, profile) {
-  const m = String(t || '').trim().match(/^\W*([A-Z][a-z']{2,15})\W*$/);
+  // "Chris." / "Ni Wanjiru." / "Mimi ni Achieng." (§6c, EN + SW)
+  const m = String(t || '').trim().match(/^\W*(?:(?:mimi\s+)?ni\s+)?([A-Z][a-z']{2,15})\W*$/i);
+  if (m && !/^[A-Z]/.test(m[1])) return null;
   if (!m || NOT_NAME.test(m[1])) return null;
   if (matchService(m[1], profile.servicesCatalog || []) || matchProducts(m[1], profile.productCatalog || []).length) return null;
   if (isBareArea(m[1]) || Object.values(COUNTY_OF).some((ps) => ps.includes(m[1].toLowerCase())) || L.parseWhen(m[1], new Date())) return null;
@@ -275,6 +277,8 @@ function understand(text, { profile = {}, now, expecting = null, topic = null, p
   if (G) {
     if (SERVICES_X.test(norm) && !intents.includes('services')) intents.push('services');
     if (EXPLAIN_X.test(norm) && !intents.includes('explain')) intents.push('explain');
+    // §6b (HD_2847152f6c1e): "Mko na X?" / "Mnauza X?" is a stock question, answered before any order
+    if (!intents.length && /^\W*(mko na|mnauza\w*|mnayo)\b/i.test(norm) && askedItem(norm)) intents.push('availability');
     if (!service && (intents.includes('explain') || intents.includes('price'))) { const b = bindGeneric(norm, catalog); service = b.service; serviceCandidates = b.candidates; }
     // §4: a named catalogue service in a "do you do X / mnaosha X / mpaka X?" turn is a service check, not a list
     if (service && CHECK_X.test(norm) && !intents.includes('price') && !intents.includes('book')) {
