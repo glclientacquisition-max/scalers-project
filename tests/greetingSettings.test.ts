@@ -160,3 +160,38 @@ test("ui: Identity shows the greeting with a counter, segmented language and a p
   assert.match(form, /greetingAvailable && greetingLanguagePicked && greetingLanguage \?/);
   assert.match(form, /tenant\.greeting_text !== undefined/);
 });
+
+// --- Dirty state (shared save pattern, PR #851) --------------------------------
+
+const fs2 = await import("../dashboard/src/lib/formSave.ts");
+
+test("dirty: a greeting loaded as NULL with no language is clean on first load", () => {
+  // TenantForm seeds the textarea with "" and the switch with "" for NULL columns.
+  const stored = { greetingText: null, greetingLanguage: null };
+  const onScreen = { greetingText: "", greetingLanguage: g.parseGreetingLanguage(null) ?? "" };
+  assert.ok(fs2.draftsEqual(stored, onScreen));
+});
+
+test("dirty: picking a language or typing a greeting is an edit; undoing it is clean", () => {
+  const base = fs2.draftSignature({ greetingText: "", greetingLanguage: "" });
+  assert.notEqual(fs2.draftSignature({ greetingText: "", greetingLanguage: "sw" }), base);
+  assert.notEqual(fs2.draftSignature({ greetingText: "Karibu", greetingLanguage: "" }), base);
+  assert.equal(fs2.draftSignature({ greetingText: "", greetingLanguage: "" }), base);
+});
+
+test("dirty: after a landed save the saved greeting is the baseline, so reload does not ask", () => {
+  const submitted = fs2.draftSignature({ greetingText: "Karibu Done and Dusted. Tukusaidie vipi?", greetingLanguage: "sw" });
+  const baseline = fs2.nextBaseline({ ok: true }, submitted, fs2.draftSignature({ greetingText: "", greetingLanguage: "" }));
+  assert.equal(baseline, submitted);
+  assert.equal(fs2.shouldGuardUnload({ dirty: submitted !== baseline, pending: false }), false);
+  // A failed save keeps the edit unsaved.
+  const kept = fs2.nextBaseline({ error: "Could not save." }, submitted, "old");
+  assert.equal(fs2.shouldGuardUnload({ dirty: submitted !== kept, pending: false }), true);
+});
+
+test("dirty: the greeting fields are in the Identity draft the shared hook compares", () => {
+  const form = read("dashboard/src/components/TenantForm.tsx");
+  const draft = form.slice(form.indexOf("const draftValues = ["), form.indexOf("useFormDraft(save"));
+  assert.match(draft, /greetingText,\n\s*greetingLanguage,/);
+  assert.match(form, /successMessage: "Saved · training line"/);
+});
