@@ -480,6 +480,8 @@ const { finalizeOnceEnabled, finalizeDecision } = require('./src/callFinalizeOnc
 const { createRecordingFetchScheduler } = require('./src/sautikit/recordingSchedule');
 const { createInboundDirectory, fastInboundEnabled } = require('./src/sautikit/inboundDirectory');
 const { createInboundCalls, completedIsCallSetup } = require('./src/sautikit/inboundCalls');
+const { createVoiceDrain, gracefulDrainEnabled, BUSY_XML: DRAIN_BUSY_XML } = require('./src/voiceDrain');
+const voiceDrain = createVoiceDrain();
 const {
   summarizeHeaders,
   summarizeBody,
@@ -680,8 +682,12 @@ function resolveVoiceGitBranch() {
 
 app.get('/healthz', (_req, res) => {
   const sms = getSmsStatus();
-  res.status(200).json({
-    ok: true,
+  const drain = voiceDrain.stats();
+  res.status(drain.draining ? 503 : 200).json({
+    ok: !drain.draining,
+    status: drain.draining ? 'draining' : 'ok',
+    activeCalls: drain.activeCalls,
+    drain,
     gitSha: resolveVoiceGitSha(),
     gitBranch: resolveVoiceGitBranch(),
     startedAt: PROCESS_STARTED_AT,
@@ -1291,8 +1297,10 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
   if (!callSid) return null;
   const brainState = callBrainStates.get(callSid);
   if (!brainState) return null;
-  return withSummaryWriteLock(callSid, () =>
-    writeHangupSummary(callSid, source, opts, brainState)
+  return voiceDrain.trackWork(
+    withSummaryWriteLock(callSid, () =>
+      writeHangupSummary(callSid, source, opts, brainState)
+    )
   );
 }
 
@@ -1397,8 +1405,9 @@ const markCallTerminal = createCallFinalizer({
   finalizeDecision,
 });
 
-async function markCallTerminalFromWebhook(args) {
-  return markCallTerminal(args);
+// Graceful drain (#696): call-end work is tracked so a draining process waits for it.
+function markCallTerminalFromWebhook(args) {
+  return voiceDrain.trackWork(markCallTerminal(args));
 }
 
 // One in-flight text-back per call; the summary marker closes the rest.
@@ -1484,6 +1493,8 @@ function packageGateRefuses(callSid, gate) {
 
 async function handleVoiceIncoming(req, res) {
   const webhookStartedAt = Date.now();
+  // SIGTERM drain: new calls go to the next deployment (POST / and /voice too).
+  if (drainRefusesNewCall(req, res)) return;
   try {
     const extracted = extractInboundCallFields(req.body);
     let fromNumber = extracted.fromNumber;
@@ -1862,6 +1873,19 @@ function handleSautikitRootPost(req, res) {
 }
 
 app.post('/', sautikitWebhookGuard, handleSautikitRootPost);
+/** Draining: refuse NEW calls politely; a call already live here passes. */
+function drainRefusesNewCall(req, res) {
+  if (!voiceDrain.isDraining()) return false;
+  const ids = extractEventCallSids(req.body || {});
+  for (const k of ['CallSid', 'callSid', 'call_sid', 'session_id', 'sessionId']) {
+    if (req.body?.[k]) ids.push(String(req.body[k]));
+    if (req.query?.[k]) ids.push(String(req.query[k]));
+  }
+  if (voiceDrain.isActiveCall(ids)) return false;
+  console.warn(`[drain] refusing new call ids=${ids.join(',') || '-'}`);
+  res.set('Retry-After', '5').type('text/xml').status(200).send(DRAIN_BUSY_XML);
+  return true;
+}
 app.post('/voice/incoming', sautikitWebhookGuard, handleVoiceIncoming);
 app.post('/voice', sautikitWebhookGuard, handleVoiceIncoming);
 // Workspace WhatsApp inbound (whatsapp.event.received). Do not resolveTenantId(DID).
@@ -2103,6 +2127,15 @@ server.on('upgrade', (req, socket, head) => {
     console.log(`[upgrade] pathname=${pathname} proto=${req.headers['sec-websocket-protocol'] || ''}`);
 
     if (pathname === '/ws/media') {
+      // Graceful drain (#696, VOICE_GRACEFUL_DRAIN): while draining, a /ws/media for a
+      // call not already live here goes to the next deployment.
+      const drainSid = mediaSidFromUrl(req.url);
+      if (voiceDrain.isDraining() && !voiceDrain.isActiveCall([drainSid])) {
+        console.warn(`[drain] refusing /ws/media upgrade callSid=${drainSid || '-'}`);
+        socket.write('HTTP/1.1 503 Service Unavailable\r\nRetry-After: 5\r\nConnection: close\r\n\r\n');
+        socket.destroy();
+        return;
+      }
       // VOICE_ENDED_CALL_GUARD (HD_49d726c3dc9b): SautiKit re-opened
       // /ws/media 1.2 s after our end_call closed it. A call that is over is
       // closed at once: no prompt load, no greeting, no finalize.
@@ -2226,6 +2259,14 @@ function clearMediaPlayback(ws) {
 }
 
 mediaWss.on('connection', (ws, req) => {
+  try {
+    const qsSid = new URL(req?.url || '', 'http://localhost').searchParams.get('callSid');
+    voiceDrain.trackSession(ws, qsSid || null);
+  } catch {
+    voiceDrain.trackSession(ws);
+  }
+  // Release after close handlers ran their call-end work (tracked separately).
+  ws.once('close', () => setImmediate(() => voiceDrain.untrackSession(ws)));
   const connectedAt = Date.now();
   let sessionCallSid = null;
   try {
@@ -7548,6 +7589,14 @@ function startReviewSweep() {
   };
   setTimeout(tick, 60_000).unref?.();
   setInterval(tick, 10 * 60_000).unref?.();
+}
+
+// VOICE_GRACEFUL_DRAIN (default off): only when on does SIGTERM drain instead of
+// Node's default immediate exit. Off: no handler, today's behaviour.
+if (gracefulDrainEnabled()) {
+  process.once('SIGTERM', () => {
+    voiceDrain.start('SIGTERM');
+  });
 }
 
 server.listen(PORT, () => {

@@ -409,6 +409,7 @@ describe('server.js wiring', () => {
   });
   it('every terminal path goes through the shared finalizer', () => {
     assert.match(src, /const markCallTerminal = createCallFinalizer\(/);
-    assert.match(src, /async function markCallTerminalFromWebhook\(args\) \{\s*return markCallTerminal\(args\);/);
+    // #696 graceful drain wraps the shared finalizer in voiceDrain.trackWork.
+    assert.match(src, /function markCallTerminalFromWebhook\(args\) \{\s*return (?:voiceDrain\.trackWork\()?markCallTerminal\(args\)\)?;/);
   });
 });
