@@ -75,6 +75,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 12b | [`pronunciation_gemini_scan.sql`](./pronunciation_gemini_scan.sql) | `tts_lexicon.sql` | Gemini Scan review queue + dismissals + run logs (never auto-applies to `tts_lexicon`) |
 | 13 | [`soniox_voice_id.sql`](./soniox_voice_id.sql) | `tenants` + `platform_soniox_voices` | Per-tenant voice pick/label + Super Admin curated Soniox catalog |
 | 13b | [`greeting_spoken_name.sql`](./greeting_spoken_name.sql) | `soniox_voice_id.sql` | `tenants.spoken_name` and `tenants.greeting_invite`. Empty keeps today's greeting. Not applied by deploy. |
+| 13c | [`greeting_language.sql`](./greeting_language.sql) | `greeting_spoken_name.sql`, `contacts_and_requests.sql` | Greeting module (plan B3). `tenants.greeting_text` (<= 240) and `tenants.greeting_language` (en/sw), owner-editable by column grant. `contacts.last_language` (en/sw) and `last_language_at`, written by Voice (service role), owner read-only. Empty keeps today's greeting. Not applied by deploy. |
 
 ### 5. Owner CRM
 

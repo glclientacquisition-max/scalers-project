@@ -1514,7 +1514,13 @@ async function selectTenantRowWithLine(tenantId, columns) {
 
 async function getTenantById(tenantId) {
   if (!tenantId) return null;
-  let { data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, spoken_name, greeting_invite, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active');
+  // greeting_language.sql (13c) adds greeting_text + greeting_language. A
+  // database without it re-selects the pre-13c list and keeps the row.
+  let { data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, spoken_name, greeting_invite, greeting_text, greeting_language, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active');
+
+  if (error && /greeting_text|greeting_language/i.test(error.message || '')) {
+    ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, spoken_name, greeting_invite, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active'));
+  }
 
   if (error && /spoken_name|greeting_invite/i.test(error.message || '')) {
     ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active'));
@@ -1593,6 +1599,8 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       businessName: process.env.BUSINESS_NAME || 'the business',
       spokenName: null,
       greetingInvite: null,
+      greetingText: null,
+      greetingLanguage: null,
       agentName: process.env.AGENT_NAME || 'Receptionist',
       llmSystemPrompt: null,
       knowledge: process.env.BUSINESS_KNOWLEDGE || null,
@@ -2018,14 +2026,25 @@ async function getCallerMemory({ tenantId, phone } = {}) {
   if (!tenantId || !phoneNorm) return null;
 
   const phoneKeys = storedPhoneLookupKeys(phoneNorm);
-  const { data: contact, error: findErr } = await supabase
-    .from('contacts')
-    .select('id, name, notes, last_reason, phone, metadata')
-    .eq('tenant_id', tenantId)
-    .in('phone', phoneKeys)
-    .order('phone', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const findContact = (columns) =>
+    supabase
+      .from('contacts')
+      .select(columns)
+      .eq('tenant_id', tenantId)
+      .in('phone', phoneKeys)
+      .order('phone', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+  // greeting_language.sql (13c) adds last_language + last_language_at. A
+  // database without it re-selects the older list.
+  let { data: contact, error: findErr } = await findContact(
+    'id, name, notes, last_reason, phone, metadata, last_language, last_language_at'
+  );
+  if (findErr && /last_language/i.test(findErr.message || '')) {
+    ({ data: contact, error: findErr } = await findContact(
+      'id, name, notes, last_reason, phone, metadata'
+    ));
+  }
   if (findErr && /contacts|relation/i.test(findErr.message)) {
     console.warn(
       '[db] getCallerMemory skipped (apply contacts_and_requests.sql):',
@@ -2056,13 +2075,69 @@ async function getCallerMemory({ tenantId, phone } = {}) {
     contact.id,
     phoneNorm
   );
-  return buildCallerMemoryCard({
+  const card = buildCallerMemoryCard({
     contact,
     openRequests,
     openAppointments,
     nextAppointment,
     recentAppointments,
   });
+  if (card) {
+    // Caller's last settled language (en | sw), null when never saved.
+    card.lastLanguage = normalizeCallerLanguage(contact.last_language);
+    card.lastLanguageAt = card.lastLanguage ? contact.last_language_at || null : null;
+  }
+  return card;
+}
+
+/**
+ * Map the in-call language state to what contacts.last_language stores.
+ * en -> en; sw and sheng -> sw; mixed, unknown and anything else -> null
+ * (write nothing, keep the previous value).
+ */
+function normalizeCallerLanguage(language) {
+  const v = String(language || '').trim().toLowerCase();
+  if (v === 'en') return 'en';
+  if (v === 'sw' || v === 'sheng') return 'sw';
+  return null;
+}
+
+/**
+ * Save the language a caller settled on (greeting_language.sql, 13c).
+ * Updates the existing contact for tenant + phone only; never creates one
+ * (upsertContact owns that). Never throws: the call path gets
+ * { ok, updated, skipped?, error? } and a warning in the log.
+ */
+async function saveCallerLanguage({ tenantId, phone, language } = {}) {
+  const lang = normalizeCallerLanguage(language);
+  const phoneNorm = normalizeStoredPhone(phone);
+  if (!tenantId || !phoneNorm) return { ok: false, updated: 0, skipped: 'no_tenant_or_phone' };
+  if (!lang) return { ok: true, updated: 0, skipped: 'no_language' };
+  if (!supabase) return { ok: false, updated: 0, skipped: 'no_supabase' };
+  try {
+    const { data, error } = await supabase
+      .from('contacts')
+      .update({ last_language: lang, last_language_at: new Date().toISOString() })
+      .eq('tenant_id', tenantId)
+      .in('phone', storedPhoneLookupKeys(phoneNorm))
+      .select('id');
+    if (error) {
+      console.warn(
+        '[db] saveCallerLanguage failed' +
+          (/last_language/i.test(error.message || '') ? ' (apply greeting_language.sql)' : '') +
+          ':',
+        JSON.stringify({ tenantId, language: lang, error: error.message || String(error) })
+      );
+      return { ok: false, updated: 0, error: error.message || String(error) };
+    }
+    return { ok: true, updated: Array.isArray(data) ? data.length : 0 };
+  } catch (err) {
+    console.warn(
+      '[db] saveCallerLanguage threw:',
+      JSON.stringify({ tenantId, language: lang, error: err?.message || String(err) })
+    );
+    return { ok: false, updated: 0, error: err?.message || String(err) };
+  }
 }
 
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
@@ -2998,6 +3073,8 @@ async function getTenantCatalogue(tenantId) {
 }
 
 module.exports = {
+  normalizeCallerLanguage,
+  saveCallerLanguage,
   copyRecordingToStorage,
   listPendingRecordingCopies,
   listCallsForRecordingRetentionPurge,
