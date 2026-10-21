@@ -288,6 +288,16 @@ function toE164(raw) {
   return /^\+/.test(String(raw || '').trim()) && /^\d{8,15}$/.test(digits) ? `+${digits}` : null;
 }
 
+/**
+ * Caller phone for the event from the shaped call row. db.getCall returns
+ * shapeCall(row): the staging `calls.caller_number` column is exposed as
+ * `from_number` (no `caller_number` key). Raw rows still carry
+ * `caller_number`. Then the brain state; then E.164 or null.
+ */
+function callerPhoneFrom(call, brainState) {
+  return toE164(call?.from_number || call?.caller_number || brainState?.caller?.phone || null);
+}
+
 // ---- builder ---------------------------------------------------------------
 
 function deriveOutcome({ answered, receipts, infoAnswered }) {
@@ -434,6 +444,7 @@ module.exports = {
   v1CallerName,
   mergeV2Receipts,
   toE164,
+  callerPhoneFrom,
   readbackConfirmedInTurns,
   callbackReadbackConfirmedInTurns,
   callbackReplyIsYes,
