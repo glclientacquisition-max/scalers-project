@@ -230,6 +230,7 @@ const {
   reaskSlotLine,
 } = require('./src/conversation/callFixesD199');
 const { deriveCallSummary } = require('./src/conversation/callSummary');
+const callSummaryEvent = require('./src/conversation/callSummaryEvent');
 const {
   schedulePostCallTranscriptReview,
   sweepUnreviewedCalls,
@@ -1364,6 +1365,33 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
   );
 }
 
+async function emitHangupCallSummary({ callSid, call, brainState, spokenTurns, derived, profile, source }) {
+  if (!callSummaryEvent.callSummaryEventEnabled()) return null;
+  try {
+    const receipts = callSummaryEvent.receiptsFromV1({ brainState, turns: spokenTurns, profile });
+    const answeredQs = Array.isArray(derived?.answeredQuestions) ? derived.answeredQuestions.length : 0;
+    const built = callSummaryEvent.buildCallSummaryEvent({
+      path: 'v1',
+      callLanguage: brainState?.language?.current,
+      callId: call?.id || callSid,
+      tenantId: call?.tenant_id || profile?.id || null,
+      answered: true,
+      infoAnswered: answeredQs > 0 || Boolean(brainState?.conversation?.catalogueAnswered),
+      caller: { name: callSummaryEvent.v1CallerName(brainState), phone: callSummaryEvent.callerPhoneFrom(call, brainState) },
+      receipts,
+    });
+    if (!built.ok) {
+      console.warn(`[${source}] call summary event invalid ${callSid}: ${built.errors.join('; ')}`);
+      return null;
+    }
+    await callSummaryEvent.emitCallSummaryEvent(built.event, { db, callSid });
+    return built.event;
+  } catch (err) {
+    console.warn(`[${source}] call summary event failed ${callSid}:`, err?.message || err);
+    return null;
+  }
+}
+
 async function writeHangupSummary(callSid, source, opts, brainState) {
   try {
     const call = await db.getCall(callSid);
@@ -1426,6 +1454,9 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
       );
     }
     const profile = callTenantProfiles.get(callSid) || {};
+    // A4 (CALL_SUMMARY_EVENT, off by default): one typed owner-summary event
+    // per call for Ops' sender. Off = nothing here runs; owner SMS unchanged.
+    await emitHangupCallSummary({ callSid, call, brainState, spokenTurns, derived, profile, source });
     if (opts.review !== false) {
       schedulePostCallTranscriptReview({
         callSid,
