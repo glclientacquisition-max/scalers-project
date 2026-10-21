@@ -72,7 +72,7 @@ describe("business settings craft", () => {
     assert.match(ui, /Line live/);
     assert.match(ui, /Number pending/);
     assert.match(form, /Assistant name/);
-    assert.match(form, /notify\("Saved · training line"\)/);
+    assert.match(form, /successMessage: "Saved · training line"/);
     assert.doesNotMatch(form, /notify\("Saved"\)/);
     assert.doesNotMatch(form, /Your assistant will use this on the next call/);
     assert.doesNotMatch(form, /Your receptionist/);

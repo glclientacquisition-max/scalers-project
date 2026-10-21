@@ -6,7 +6,7 @@ import { withRoleGate } from "@/components/DeskRole";
 import { CharCount as KitCharCount, FieldCard, TextAreaField, TextField } from "@/components/ui/TextField";
 import { POLICY_TEXT_MAX } from "@/lib/lengthLimits";
 import { normalizeContactPhone } from "@/lib/teamValidation";
-import { Fragment, useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import {
@@ -129,7 +129,7 @@ import {
 } from "@/lib/businessPolicies";
 import { PlacesEditor } from "@/components/structured/PlacesEditor";
 import { ServiceAreasEditor } from "@/components/structured/ServiceAreasEditor";
-import { savedBaseline, serviceAreasForForm, suggestHomeAreas, type ServiceAreas } from "@/lib/serviceAreas";
+import { serviceAreasForForm, suggestHomeAreas, type ServiceAreas } from "@/lib/serviceAreas";
 import { stableRowId } from "@/lib/factHash";
 import { catalogBaseline, isUnpricedRow } from "@/lib/catalogPricing";
 import { DeskSelect } from "@/components/ui/DeskSelect";
@@ -139,8 +139,7 @@ import dynamic from "next/dynamic";
 // Pronunciation is one panel of many; load it only when that panel renders.
 const PronunciationCoach = dynamic(() => import("@/components/PronunciationCoach").then((m) => m.PronunciationCoach));
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
-import { notify } from "@/components/ui/DeskNotice";
-import { useSettingsLeaveSource } from "@/components/SettingsLeaveGuard";
+import { useFormDraft, useFormSave } from "@/components/useFormSave";
 import { carrySavedRow, isSavedRow, markSavedRow } from "@/lib/savedRow";
 import { Pagination } from "@/components/ui/Pagination";
 import {
@@ -268,25 +267,6 @@ function placeLocationLine(loc: Pick<BusinessLocation, "label" | "address" | "la
 }
 
 const initial: SettingsCompileState = {};
-
-/**
- * A dropped connection (TypeError: network error) must not throw the page into the error
- * boundary: the write has usually landed, so report it and let the form refetch.
- */
-async function saveSettingsSafely(
-  prev: SettingsCompileState,
-  formData: FormData
-): Promise<SettingsCompileState> {
-  try {
-    const res = await saveAndCompileSettings(prev, formData);
-    // Toast here, not from component state: a save can remount the form.
-    if (res.ok) notify("Saved · training line");
-    return res;
-  } catch (err) {
-    console.warn("[settings] save response lost:", err instanceof Error ? err.message : err);
-    return { networkError: true };
-  }
-}
 
 const tableFieldClass = settingsTableFieldClass;
 const denseFieldClass = settingsDenseFieldClass;
@@ -424,6 +404,7 @@ function TenantFormInner({
   membersSlot = null,
   seatNoteSlot = null,
   structuredSlot = null,
+  onSaveActivity,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
@@ -438,6 +419,8 @@ function TenantFormInner({
   seatNoteSlot?: ReactNode;
   /** Typed-data groups (payments, price checks, category) rendered by the server page per panel. */
   structuredSlot?: Partial<Record<"identity" | "catalog", ReactNode>> | null;
+  /** Shared save pattern: a save started or landed (BusinessSettingsShell keeps the mount). */
+  onSaveActivity?: () => void;
 }) {
   const voiceOptions =
     curatedVoices && curatedVoices.length
@@ -571,7 +554,17 @@ function TenantFormInner({
     parseTtsLexicon(tenant.tts_lexicon)
   );
   const router = useRouter();
-  const [state, formAction, pending] = useActionState(saveSettingsSafely, initial);
+  // Shared save pattern (useFormSave): toast, inline Saved, errors with retry,
+  // dropped connections. The draft side (dirty, guard) is useFormDraft below.
+  const save = useFormSave<SettingsCompileState>({
+    action: saveAndCompileSettings,
+    initialState: initial,
+    successMessage: "Saved · training line",
+    formId: TENANT_SETTINGS_FORM_ID,
+    onSaveStart: onSaveActivity,
+    onLanded: onSaveActivity,
+  });
+  const { state, pending } = save;
   // Price text as loaded. The server keeps the stored (maybe just confirmed) price for any row
   // whose text the owner did not touch in this form.
   const [catalogBaseJson] = useState(() =>
@@ -741,10 +734,8 @@ function TenantFormInner({
 
   useEffect(() => {
     // Compile finished before ok - owners should hear the line was trained, not only "Saved".
-    if (state.networkError) {
-      notify("Connection dropped. Showing your latest saved details.");
-      router.refresh();
-    }
+    // The write has usually landed: refetch so the page shows what is stored.
+    if (state.networkError) router.refresh();
   }, [state, router]);
 
   useEffect(() => {
@@ -992,17 +983,6 @@ function TenantFormInner({
     [bulkProductsText]
   );
 
-  // Warn before leaving only while a save is actually in flight.
-  useEffect(() => {
-    if (!pending) return;
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [pending]);
-
   // Locations drawers ("Save 3 areas", "Done") save the page straight away.
   const saveAfterLocationsRef = useRef(false);
   useEffect(() => {
@@ -1089,7 +1069,8 @@ function TenantFormInner({
   const firstPlaceLine = placeLocationLine(locations[0] || emptyLocation());
   const locationNotesField =
     panel === "locations" && firstPlaceLine ? firstPlaceLine : locationNotes;
-  const draftKey = [
+  // Everything the Save button posts. Compared normalised (useFormDraft).
+  const draftValues = [
     businessName,
     servicesOfferedSummary,
     servicesJson,
@@ -1118,16 +1099,9 @@ function TenantFormInner({
     sonioxVoiceId,
     sonioxVoiceLabel,
     ttsLexiconJson,
-  ].join("\u0001");
-  const [baseline, setBaseline] = useState(draftKey);
-  const formDirty = draftKey !== baseline;
-  const savedStateRef = useRef(state);
-  useEffect(() => {
-    if (!state.ok || savedStateRef.current === state) return;
-    savedStateRef.current = state;
-    setBaseline((prev) => savedBaseline(state, draftKey, prev));
-  }, [state, draftKey]);
-  useSettingsLeaveSource("form", formDirty);
+  ];
+  // adoptsResult: a save hands back the spoken When unsure pair, synced above in render.
+  const { justSaved } = useFormDraft(save, { id: "form", values: draftValues, adoptsResult: true });
   const [removeAsk, setRemoveAsk] = useState<{
     title: string;
     body: string;
@@ -1148,11 +1122,16 @@ function TenantFormInner({
   return (
     <form
       id={TENANT_SETTINGS_FORM_ID}
-      action={formAction}
       onSubmit={(event) => {
         // Pronunciation saves live via its own actions. Enter inside the coach
         // must not post this form (feels like a full Settings reload).
-        if (panel === "pronunciation") event.preventDefault();
+        if (panel === "pronunciation") {
+          event.preventDefault();
+          return;
+        }
+        // Shared save pattern: posts without React's form reset, which would put
+        // the Voice tool switches back to their first-render state.
+        save.onSubmit(event);
       }}
     >
       <div className={settingsConsoleClass}>
@@ -1164,14 +1143,15 @@ function TenantFormInner({
             lineLive={false}
             showBack={showBack}
             title={heading}
-            alert={state.error}
+            alert={save.error}
+            onRetry={save.retry}
             action={
               panel === "pronunciation" ? (
                 <p className="max-w-[11rem] text-right text-meta leading-snug text-ink-2">
                   Changes save as you go
                 </p>
               ) : (
-                <TenantSettingsSaveButton pending={pending} />
+                <TenantSettingsSaveButton pending={pending} saved={justSaved} />
               )
             }
           />

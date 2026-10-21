@@ -19,8 +19,11 @@ test("Add areas drawer: a just-ticked area is ticked, never 'Already added'", as
 
 test("a dropped connection after a save refetches instead of the page error boundary", () => {
   const form = read("../dashboard/src/components/TenantForm.tsx");
-  assert.match(form, /useActionState\(saveSettingsSafely/);
-  assert.match(form, /catch[\s\S]{0,300}networkError: true/);
+  // Shared save pattern: useFormSave turns a thrown save into { networkError }.
+  assert.match(form, /useFormSave<SettingsCompileState>\(\{\s*action: saveAndCompileSettings/);
+  const hook = read("../dashboard/src/components/useFormSave.ts");
+  assert.match(hook, /catch \(err\) \{\s*result = thrownSaveResult<R>\(err\)/);
+  assert.match(read("../dashboard/src/lib/formSave.ts"), /return \{ networkError: true/);
   assert.match(form, /networkError[\s\S]{0,400}router\.refresh\(\)/);
 });
 
