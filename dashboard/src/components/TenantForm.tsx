@@ -406,6 +406,7 @@ function TenantFormInner({
   membersSlot = null,
   seatNoteSlot = null,
   structuredSlot = null,
+  onSaveActivity,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
@@ -420,6 +421,8 @@ function TenantFormInner({
   seatNoteSlot?: ReactNode;
   /** Typed-data groups (payments, price checks, category) rendered by the server page per panel. */
   structuredSlot?: Partial<Record<"identity" | "catalog", ReactNode>> | null;
+  /** Shared save pattern: a save started or landed (BusinessSettingsShell keeps the mount). */
+  onSaveActivity?: () => void;
 }) {
   const voiceOptions =
     curatedVoices && curatedVoices.length
@@ -568,6 +571,8 @@ function TenantFormInner({
     initialState: initial,
     successMessage: "Saved · training line",
     formId: TENANT_SETTINGS_FORM_ID,
+    onSaveStart: onSaveActivity,
+    onLanded: onSaveActivity,
   });
   const { state, formAction, pending } = save;
   // Price text as loaded. The server keeps the stored (maybe just confirmed) price for any row

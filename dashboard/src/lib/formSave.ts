@@ -119,3 +119,40 @@ export function thrownSaveResult<R extends FormSaveResult>(err: unknown): R {
   if (isNavigationError(err)) throw err;
   return { networkError: true, error: FORM_SAVE_NETWORK_ERROR } as R;
 }
+
+/**
+ * How long after its own save a form keeps its mount. The save response, the
+ * Realtime-driven revalidation and the router refresh each re-render the page,
+ * and one of them can carry the row from before the write. Remounting on that
+ * would snap the fields back to the old values and drop the Saved state.
+ */
+export const OWN_SAVE_SETTLE_MS = 15_000;
+
+export type FormMountKey = {
+  /** Tenant and panel: a change here always remounts. */
+  scope: string;
+  /** Last content fingerprint seen from props. */
+  seen: string;
+  /** Content fingerprint the form is mounted with. */
+  mounted: string;
+};
+
+/**
+ * Next mount key for a form whose props carry content fingerprints. A content
+ * change right after the form's own save is the save echoing back (or a stale
+ * render of it): note it, keep the mount. Any other change remounts, so edits
+ * made elsewhere (a price confirmed on another card) still reach the form.
+ */
+export function nextFormMountKey(
+  current: FormMountKey,
+  next: { scope: string; content: string },
+  ownSaveAt: number,
+  now: number
+): FormMountKey {
+  if (current.scope !== next.scope) return { scope: next.scope, seen: next.content, mounted: next.content };
+  if (current.seen === next.content) return current;
+  const settling = ownSaveAt > 0 && now - ownSaveAt < OWN_SAVE_SETTLE_MS;
+  return settling
+    ? { ...current, seen: next.content }
+    : { scope: next.scope, seen: next.content, mounted: next.content };
+}

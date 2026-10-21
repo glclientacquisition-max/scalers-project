@@ -48,6 +48,13 @@ type SaveOptions<R extends FormSaveResult, P> = {
   formId?: string;
   onSaved?: (result: R) => void;
   onFailed?: (result: R) => void;
+  /**
+   * Called inside the action, before the response re-renders the page: when a
+   * save starts and when it lands. Lets a parent keep the form mounted while
+   * its own save echoes back (see nextFormMountKey).
+   */
+  onSaveStart?: () => void;
+  onLanded?: (result: R) => void;
 };
 
 export type FormSave<R extends FormSaveResult, P = FormData> = {
@@ -82,6 +89,7 @@ export function useFormSave<R extends FormSaveResult, P = FormData>(
       const opts = optionsRef.current;
       lastPayload.current = payload;
       const submitted = signatureRef.current;
+      opts.onSaveStart?.();
       let result: R;
       try {
         result = await opts.action(prev, payload);
@@ -93,12 +101,13 @@ export function useFormSave<R extends FormSaveResult, P = FormData>(
         result,
         typeof opts.successMessage === "string" ? opts.successMessage : FORM_SAVE_DEFAULT_SUCCESS
       );
+      if (outcome.kind === "ok") optionsRef.current.onLanded?.(result);
       // Toast here, not from component state: a save can remount the form.
       if (outcome.kind === "ok") {
-        if (result.error) notify(result.error);
+        if (result.error) notify(result.error, { tone: "error" });
         else if (opts.successMessage !== false) notify(outcome.message);
       } else if (opts.errorToast !== false) {
-        notify(outcome.message);
+        notify(outcome.message, { tone: "error" });
       }
       if (submitted !== null) submittedFor.set(result, submitted);
       return result;
