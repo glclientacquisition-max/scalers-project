@@ -19,7 +19,10 @@ function priceTxt(p, S) {
     const lang = S ? 'sw' : 'en';
     let money = speakMoney(num(m[2]), lang);
     if (m[3] && Number.isFinite(num(m[3])) && num(m[3]) > 0) money = `${money} ${S ? 'hadi' : 'to'} ${speakMoney(num(m[3]), lang)}`;
-    const unit = String(m[4] || '').trim();
+    let unit = String(m[4] || '').trim();
+    // Units are spoken, not read as symbols: "per m²" -> "per square metre" / "kwa mita mraba".
+    unit = unit.replace(/^(?:per|\/)\s*(?:m²|m2|sqm|sq\.?\s*m)(?![a-z])/i, S ? 'kwa mita mraba' : 'per square metre')
+      .replace(/^per\s+seat\b/i, S ? 'kwa kiti' : 'per seat').replace(/^per\s+room\b/i, S ? 'kwa chumba' : 'per room');
     const said = unit ? `${money} ${unit}` : money;
     return m[1] ? `${S ? 'kuanzia' : 'from'} ${said}` : said;
   }

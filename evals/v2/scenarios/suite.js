@@ -116,9 +116,9 @@ module.exports = [
     turns: ['Habari, nilikuwa nataka kujua.', ['Saa ngapi mnafungua?', 'Mnafungua saa ngapi?']], facts: {}, expect: { noWrites: true } },
   { id: 'S32_sw_do_you_clean_carpet', area: 'sw_coverage', lang: 'sw', tenant: 'done_and_dusted', mustSay: SC ? ['tunafanya usafi wa zulia, bei ni kuanzia shilingi 2,200 kwa mita mraba\\b'] : ['tunafanya Carpet'], mustNotSay: SC ? ['\\bKSh\\b', '\\bshillings?\\b', 'per m²'] : [],
     turns: [['Mnasafisha carpet?', 'Mnawashanga carpet?']], facts: {}, expect: { noWrites: true } },
-  { id: 'S28e_en_sofa_price', area: 'services', lang: 'en', tenant: 'done_and_dusted', mustSay: SC ? ['\\b800 shillings per seat\\b'] : ['\\bKSh 800\\b'], mustNotSay: SC ? ['\\bKSh\\b', '\\bshilingi\\b', BOOK_ASK] : [BOOK_ASK],
+  { id: 'S28e_en_sofa_price', area: 'services', lang: 'en', tenant: 'done_and_dusted', mustSay: SC ? ['\\b800 shillings per seat\\b'] : ['\\bKSh 800\\b|\\beight hundred shillings\\b'], mustNotSay: SC ? ['\\bKSh\\b', '\\bshilingi\\b', BOOK_ASK] : [BOOK_ASK],
     turns: ['How much is sofa cleaning?'], facts: {}, expect: { noWrites: true } },
-  { id: 'S32e_en_carpet_price', area: 'services', lang: 'en', tenant: 'done_and_dusted', mustSay: SC ? ['\\bfrom 2,200 shillings per (m²|square metre)'] : ['\\bKSh 2,200 per m²'], mustNotSay: SC ? ['\\bKSh\\b', '\\bshilingi\\b', BOOK_ASK] : [BOOK_ASK],
+  { id: 'S32e_en_carpet_price', area: 'services', lang: 'en', tenant: 'done_and_dusted', mustSay: SC ? ['\\bfrom 2,200 shillings per (m²|square metre)'] : ['\\bKSh 2,200 per m²|\\bfrom two thousand two hundred shillings per square metre'], mustNotSay: SC ? ['\\bKSh\\b', '\\bshilingi\\b', BOOK_ASK] : [BOOK_ASK],
     turns: ['How much for carpet cleaning?'], facts: {}, expect: { noWrites: true } },
   // Area + landmark: the area is the place, the landmark is a note (v2 read-back fix).
   { id: 'S33_book_en_area_landmark', area: 'booking', lang: 'en', tenant: 'done_and_dusted',
