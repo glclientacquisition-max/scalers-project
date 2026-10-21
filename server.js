@@ -600,14 +600,26 @@ const db = require('./src/db');
 const { queryBatchingEnabled } = require('./src/speech/queryBatching');
 const { loadCallStartProfile } = require('./src/speech/callStartLoad');
 
+// The calls row by sid for identity reads (id, tenant_id, from_number).
+// VOICE_QUERY_BATCHING: db.getCallIdentity (memoised). Off: db.getCall, the
+// exact export main calls (simulators and tests stub db.getCall).
+function callIdentityRow(callSid) {
+  return queryBatchingEnabled() ? db.getCallIdentity(callSid) : db.getCall(callSid);
+}
+
+// VOICE_QUERY_BATCHING call start (src/speech/callStartLoad.js).
+function batchedCallStartProfile(callSid) {
+  return loadCallStartProfile({ callSid, inboundCalls, db, hydrateCallerMemory });
+}
+
 // callRow: the webhook's call row when the caller already has it
-// (VOICE_QUERY_BATCHING call start). getCallIdentity is getCall when the
+// (VOICE_QUERY_BATCHING call start). callIdentityRow is db.getCall when the
 // flag is off; the card reads only tenant_id and from_number.
 async function hydrateCallerMemory(profile, callSid, callRow = null) {
   return attachCallerMemory(profile, {
     callSid,
     getCall: (sid) =>
-      callRow && callRow.from_number ? Promise.resolve(callRow) : db.getCallIdentity(sid),
+      callRow && callRow.from_number ? Promise.resolve(callRow) : callIdentityRow(sid),
     getCallerMemory: (opts) => db.getCallerMemory(opts),
   });
 }
@@ -627,7 +639,7 @@ async function ownerAlertProfile(callSid) {
 
 async function loadVisitReviewAppointments(callSid, profile) {
   try {
-    const call = await db.getCallIdentity(callSid);
+    const call = await callIdentityRow(callSid);
     const tenantId = profile?.id || call?.tenant_id;
     const phone = call?.from_number || profile?.callerMemory?.phone;
     if (!tenantId || !phone) return [];
@@ -830,7 +842,7 @@ app.post('/internal/desk/escalate', async (req, res) => {
     // Lookup errors answer open; the send ledger checks again per send.
     let tenantId = null;
     try {
-      tenantId = (await db.getCallIdentity(callSid))?.tenant_id || null;
+      tenantId = (await callIdentityRow(callSid))?.tenant_id || null;
     } catch (err) {
       console.warn(`[desk/escalate] call lookup failed ${callSid} (continuing):`, err?.message || err);
     }
@@ -1319,7 +1331,7 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
 
 async function writeHangupSummary(callSid, source, opts, brainState) {
   try {
-    const call = await db.getCallIdentity(callSid);
+    const call = await callIdentityRow(callSid);
     const spokenTurns =
       Array.isArray(opts.turns) && opts.turns.length
         ? opts.turns
@@ -2646,12 +2658,7 @@ mediaWss.on('connection', (ws, req) => {
       let profile;
       if (batching) {
         // VOICE_QUERY_BATCHING: profile and caller card side by side.
-        ({ profile } = await loadCallStartProfile({
-          callSid: sessionCallSid,
-          inboundCalls,
-          db,
-          hydrateCallerMemory,
-        }));
+        ({ profile } = await batchedCallStartProfile(sessionCallSid));
       } else {
         const inboundTenantId = inboundCalls.tenantIdFor(sessionCallSid);
         await inboundCalls.awaitRow(sessionCallSid, 2500);
@@ -6253,7 +6260,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
     );
   }
 
-  const callRow = await db.getCallIdentity(callSid).catch(() => null);
+  const callRow = await callIdentityRow(callSid).catch(() => null);
   const ledger = {
     tenantId: tenantId || callRow?.tenant_id || null,
     callId: callRow?.id || null,
@@ -6354,7 +6361,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     );
   }
 
-  const callRow = await db.getCallIdentity(callSid).catch(() => null);
+  const callRow = await callIdentityRow(callSid).catch(() => null);
   const ledger = {
     tenantId: tenantId || callRow?.tenant_id || null,
     callId: callRow?.id || null,

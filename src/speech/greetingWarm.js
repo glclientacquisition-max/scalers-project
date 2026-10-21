@@ -62,6 +62,32 @@ function greetingInputs(profile = {}, { now = new Date() } = {}) {
   };
 }
 
+/**
+ * VOICE_OPENING_V2 (#843/#844, src/speech/callOpening.js) when it is in this
+ * build and on; null otherwise (main without #843, or the flag off).
+ */
+function openingV2Module() {
+  let mod;
+  try {
+    mod = require('./callOpening');
+  } catch {
+    return null;
+  }
+  if (typeof mod?.openingV2Enabled !== 'function' || typeof mod?.openingWarmLines !== 'function') return null;
+  return mod.openingV2Enabled() ? mod : null;
+}
+
+/** VOICE_OPENING_V2 lines a call at `at` can speak before its first real turn ([] when off / absent). */
+function openingWarmLinesAt(profile = {}, at = new Date()) {
+  const mod = openingV2Module();
+  if (!mod) return [];
+  const inputs = greetingInputs(profile, { now: at });
+  return mod.openingWarmLines(
+    { ...profile, businessName: inputs.businessName, agentName: inputs.agentName, closureNotice: inputs.closureNotice },
+    { isOpen: inputs.isOpen }
+  );
+}
+
 /** Instants to render for: now, plus just past the next daypart edge if near. */
 function warmInstants(now = new Date(), lookaheadMs = LOOKAHEAD_MS) {
   const out = [now];
@@ -79,6 +105,9 @@ function warmInstants(now = new Date(), lookaheadMs = LOOKAHEAD_MS) {
 function sweepSignature(profile = {}, at = new Date()) {
   const instants = warmInstants(at).map((when) => {
     const { now: _now, ...inputs } = greetingInputs(profile, { now: when });
+    // VOICE_OPENING_V2 renders openingWarmLines (greeting text / language,
+    // notice variants), so an edit there must change the signature too.
+    if (openingV2Module()) return { ...inputs, daypart: eatTimeOfDay(when), opening: openingWarmLinesAt(profile, when) };
     return { ...inputs, daypart: eatTimeOfDay(when) };
   });
   const payload = JSON.stringify({
@@ -258,6 +287,7 @@ function createGreetingWarmer(deps) {
 }
 
 module.exports = {
+  openingWarmLinesAt,
   DEFAULT_SWEEP_MS,
   LOOKAHEAD_MS,
   greetingWarmEnabled,
