@@ -30,6 +30,8 @@ export type EmailSpec = {
   preheader: string;
   heading: string;
   pill?: { tone: Tone; text: string };
+  /** Full-width environment band above the header, e.g. PRODUCTION (red) or STAGING (grey). */
+  band?: { tone: "production" | "staging"; text: string }; // see env.ts: withEnv / envBand
   blocks: Block[];
   cta?: Cta;
   secondary?: Cta;

@@ -32,6 +32,7 @@ export const catalog = {
   ops_incident: { render: ops.opsIncident, audience: "ops" },
   ops_incident_reminder: { render: ops.opsIncidentReminder, audience: "ops" },
   ops_digest: { render: ops.opsDigest, audience: "ops" },
+  ops_wallet: { render: ops.opsWallet, audience: "ops" },
 } as const satisfies Record<string, { render: (p: never, ctx: Ctx) => EmailSpec; audience: "owner" | "ops" }>;
 
 export type EmailKind = keyof typeof catalog;

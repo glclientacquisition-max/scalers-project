@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-190 variables.
+192 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -84,6 +84,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `OPS_EMAIL_FROM` | desk | `dashboard/src/lib/opsMail.ts` |
 | `OPS_SMS_CREDIT_CRITICAL_AT` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OPS_SMS_CREDIT_WARN_BELOW` | desk | `dashboard/src/lib/opsAlerts.ts` |
+| `OPS_STAGING_WALLET_ALERT_THRESHOLDS_KES` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OPS_WALLET_ALERT_THRESHOLDS_KES` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OWNER_ALERT_EMAIL` | voice | `server.js` |
 | `PATH` | scripts | `scripts/smoke-recording-webhook.js` |
@@ -108,6 +109,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SAUTIKIT_API_BASE` | desk, voice | `dashboard/src/lib/sautikit.ts`<br>`src/notifications/whatsapp.js`<br>`src/sautikit/lineUnavailableAudio.js`<br>+3 more |
 | `SAUTIKIT_API_KEY` | desk, scripts, voice | `dashboard/src/lib/sautikit.ts`<br>`scripts/smoke-whatsapp-did.js`<br>`server.js`<br>+5 more |
 | `SAUTIKIT_DID` | scripts, voice | `scripts/smoke-whatsapp-did.js`<br>`server.js`<br>`src/db.js`<br>+1 more |
+| `SAUTIKIT_STAGING_WALLET_KEY` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `SAUTIKIT_VALIDATE_WEBHOOKS` | voice | `server.js`<br>`src/sautikit/webhook.js` |
 | `SAUTIKIT_VOICE_SIGNING_SECRET` | voice | `src/sautikit/webhook.js` |
 | `SAUTIKIT_WEBHOOK_SECRET` | voice | `src/sautikit/webhook.js` |
