@@ -103,3 +103,63 @@ test('phantom cancel: a dated visit still reads back its date', async () => {
   await live.run({ text: 'Yes.', profile: PHANTOM_PROFILE, langLock: 'en' });
   assert.equal(writes.length, 1);
 });
+
+// End-call contract (plan C3): { line, end: true, reason } once, goodbye in the same line,
+// never with a write proposed and not committed, never when the owner turned end_call off.
+const END_PROFILE = { ...PHANTOM_PROFILE, agentTools: { escalate: true, end_call: true } };
+function endLive() {
+  return createBrainV2Live({
+    env: { BRAIN_V2: 'on', BRAIN_V2_MODE: 'live' },
+    classify: async () => ({ kind: 'unknown', place: '' }),
+    applyTools: async () => ({ results: [{ action: 'create_appointment', status: 'succeeded', id: 'apt_1' }] }),
+  });
+}
+
+test('end-call: "No thanks, that\'s all. Bye." ends once, with the goodbye in the same line', async () => {
+  const live = endLive();
+  const out = await live.run({ text: "No thanks, that's all. Bye.", profile: END_PROFILE, langLock: 'en' });
+  assert.equal(out.end, true);
+  assert.equal(out.reason, 'caller_done');
+  assert.match(out.line, /goodbye/i);
+  const again = await live.run({ text: 'Bye.', profile: END_PROFILE, langLock: 'en' });
+  assert.equal(again.end, false, 'emitted once per call');
+});
+
+test('end-call: owner end_call off means no end signal (the goodbye is still spoken)', async () => {
+  const live = endLive();
+  const out = await live.run({ text: "No thanks, that's all. Bye.", profile: { ...END_PROFILE, agentTools: { escalate: true, end_call: false } }, langLock: 'en' });
+  assert.match(out.line, /goodbye/i);
+  assert.equal(out.end, false);
+  assert.equal(out.endHeld, 'end_call_off');
+});
+
+test('end-call: never while a write is proposed and not committed', () => {
+  const { endDecision } = require('../src/conversation/v2/liveTurn');
+  const done = { end: true, endReason: 'caller_done' };
+  assert.deepEqual(endDecision({ done, machine: { phase: 'readback', pending: { tool: 'create_booking' } }, profile: END_PROFILE, line: 'Goodbye.' }), { end: false, held: 'write_pending' });
+  assert.deepEqual(endDecision({ done: { ...done, awaitingConfirm: true }, machine: { phase: 'collect' }, profile: END_PROFILE, line: 'Goodbye.' }), { end: false, held: 'write_pending' });
+  assert.deepEqual(endDecision({ done: { ...done, toolResults: [{ status: 'failed' }] }, machine: { phase: 'collect' }, profile: END_PROFILE, line: 'Goodbye.' }), { end: false, held: 'write_failed' });
+  assert.deepEqual(endDecision({ done, machine: { phase: 'collect' }, profile: END_PROFILE, line: '' }), { end: false, held: 'empty_line' });
+  assert.deepEqual(endDecision({ done, machine: { phase: 'collect' }, profile: END_PROFILE, line: 'Goodbye.' }), { end: true, reason: 'caller_done' });
+});
+
+test('end-call: an ack run ("sawa" x3) says goodbye but does not hang up on a listener', async () => {
+  const live = endLive();
+  let out;
+  for (const t of ['Sawa.', 'Sawa.', 'Sawa.']) out = await live.run({ text: t, profile: END_PROFILE, langLock: 'sw' });
+  assert.match(out.line, /Kwaheri/);
+  assert.equal(out.end, false);
+  assert.equal(out.endHeld, 'ack_run');
+});
+
+test('end-call: declining the read-back with a goodbye ends (the proposal is dropped, nothing pending)', async () => {
+  const live = endLive();
+  const P = { ...END_PROFILE, vertical: 'home_services', serviceAreas: { areas: [{ id: 'place:kilimani' }] } };
+  const rb = await live.run({ text: 'I want sofa cleaning tomorrow at 10am in Kilimani, my name is Alvin.', profile: P, langLock: 'en' });
+  assert.match(rb.line, /Shall I book it\?/);
+  assert.equal(rb.end, false);
+  const out = await live.run({ text: "No thanks, that's all. Bye.", profile: P, langLock: 'en' });
+  assert.equal(live.getState().pending, null);
+  assert.match(out.line, /Goodbye/);
+  assert.equal(out.end, true);
+});

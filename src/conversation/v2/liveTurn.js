@@ -52,10 +52,30 @@ function callerFile(opts = {}) {
   };
 }
 
+// End-call contract (plan C3; Voice reads it with endSignalFromBrain): v2 emits { line, end: true, reason }
+// once per call, on the turn whose line is the goodbye. Never while a write is proposed and
+// not committed, never after a failed write this turn, never when the owner turned the
+// end_call tool off (tenants.agent_tools.end_call = false), never with an empty line.
+// An ack run ("sawa, sawa, sawa") says goodbye but does not hang up: a caller who is
+// listening is not a caller who is done (bottleneck row 18).
+const NO_HANGUP_REASONS = new Set(['ack_run']);
+function endDecision({ done, machine, profile, line, alreadyEnded }) {
+  if (!done || done.end !== true) return { end: false };
+  const reason = String(done.endReason || 'caller_done').slice(0, 120);
+  if (alreadyEnded) return { end: false, held: 'already_ended' };
+  if (!String(line || '').trim()) return { end: false, held: 'empty_line' };
+  if (done.awaitingConfirm || machine?.phase === 'readback' || machine?.pending) return { end: false, held: 'write_pending' };
+  if ((done.toolResults || []).some((r) => r && (r.status === 'failed' || r.ok === false || r.error))) return { end: false, held: 'write_failed' };
+  if (profile?.agentTools && profile.agentTools.end_call === false) return { end: false, held: 'end_call_off' };
+  if (NO_HANGUP_REASONS.has(reason)) return { end: false, held: reason };
+  return { end: true, reason };
+}
+
 function createBrainV2Live(opts = {}) {
   const env = opts.env || process.env;
   const applyTools = opts.applyTools;
   let state = null;
+  let endSent = false;
 
   function ensureState(profile) {
     if (state) return state;
@@ -93,11 +113,15 @@ function createBrainV2Live(opts = {}) {
       if (ev.type === 'done') done = ev;
     }
     const line = sentences.map((s) => s.text).join(' ').trim() || String(done?.line || '').trim();
+    const endCall = endDecision({ done, machine, profile, line, alreadyEnded: endSent });
+    if (endCall.end) endSent = true;
     return {
       line,
       lang: sentences[0]?.lang || machine.lang || langLock || 'en',
       sentences,
-      end: !!done?.end,
+      end: endCall.end,
+      ...(endCall.end ? { reason: endCall.reason } : {}),
+      ...(endCall.held ? { endHeld: endCall.held } : {}),
       phase: done?.phase || machine.phase,
     };
   }
@@ -105,4 +129,4 @@ function createBrainV2Live(opts = {}) {
   return { run, getState: () => state };
 }
 
-module.exports = { createBrainV2Live, callerFile };
+module.exports = { createBrainV2Live, callerFile, endDecision };

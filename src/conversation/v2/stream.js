@@ -63,7 +63,7 @@ async function* runTurnStream(state, opts = {}) {
     said.push(text); const atMs = now(); if (firstSentenceMs == null) firstSentenceMs = atMs;
     yield { type: 'sentence', text, lang: res.lang, source: res.source || 'receipt', atMs };
   }
-  yield { type: 'done', end: !!res.end, toolResults: res.toolResults || [], line: res.line, aborted: said.length < parts.length,
+  yield { type: 'done', end: !!res.end, ...(res.end ? { endReason: res.endReason || 'caller_done' } : {}), toolResults: res.toolResults || [], line: res.line, aborted: said.length < parts.length,
     awaitingConfirm, phase: state.phase, ackLed: !!state.lastAckLed, timing: { turnMs: now(), toolMs, firstSentenceMs }, atMs: now() };
 }
 // Prefetch for Voice at call start (relay item 4). Pure read of state + profile:

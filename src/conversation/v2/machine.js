@@ -527,7 +527,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     } catch { /* keep regex reading */ }
   }
   const lang = state.lang || 'en';
-  const out = (line0, extra = {}) => { const line = applyAckRule(state, line0, { ackOk: !!extra.ackOk, acked: !!acked, callerAck: !!u.ack, lang }); const l = line && (line === state.lastLine || line === state.lastBase) ? (() => { const n = state.repeatN = (state.repeatN || 0) + 1; let v = R.vary(line, lang, n); if (v === state.lastLine) v = R.vary(line, lang, n, true); return v; })() : line; state.lastBase = line; state.lastLine = l; noteAck(state, l); return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end }; };
+  const out = (line0, extra = {}) => { const line = applyAckRule(state, line0, { ackOk: !!extra.ackOk, acked: !!acked, callerAck: !!u.ack, lang }); const l = line && (line === state.lastLine || line === state.lastBase) ? (() => { const n = state.repeatN = (state.repeatN || 0) + 1; let v = R.vary(line, lang, n); if (v === state.lastLine) v = R.vary(line, lang, n, true); return v; })() : line; state.lastBase = line; state.lastLine = l; noteAck(state, l); return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end, ...(extra.end ? { endReason: extra.endReason || 'caller_done' } : {}) }; };
   if (areaQ) return out(areaQ);
 
   // HD_db0e864043c1 fixes -------------------------------------------------
@@ -562,7 +562,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   // HD_89aa48bf657f T5: "what do you mean by 1-Bedroom?" gets a short plain explanation, no price, no booking push
   if (u.intents.includes('explain') && u.service) { const svc = u.service; if (state.intent === 'book' && state.slots.service === svc.name && state.phase === 'collect' && !state.slots.when.date) state.slots.service = state.slotsServiceBefore || null; const sp = spoken(profile, svc, lang); return out(sp && sp.explain ? R.info({ kind: 'explain_text', text: sp.explain }, lang) : R.info({ kind: 'explain', name: svc.name, notes: svc.notes || '' }, lang)); }
   // thanks-only while collecting and nothing new: the caller is closing
-  if (state.phase === 'collect' && state.turn > 2 && /^\W*((okay|ok|sawa|alright)\W+)?(thank you|thanks|asante( sana)?)\W*$/i.test(text)) { resetIntent(state); state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true }); }
+  if (state.phase === 'collect' && state.turn > 2 && /^\W*((okay|ok|sawa|alright)\W+)?(thank you|thanks|asante( sana)?)\W*$/i.test(text)) { resetIntent(state); state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true, endReason: 'caller_thanks' }); }
   // after "anything else?": a no, thanks or a compliment closes the call
   const askedElse = /(anything else|Kuna kingine)[^?]*\?\s*$/i.test(state.lastLine || '');
   // a cut-off turn ("Hapana, n") is never a no / decline / slot answer: ask again, keep everything
@@ -674,7 +674,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     // acknowledgements continue from the call's own state instead of restarting
     if (u.ack) {
       state.acks = (state.acks || 0) + 1;
-      if (state.acks >= 3) { state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true }); }
+      if (state.acks >= 3) { state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true, endReason: 'ack_run' }); }
       return out(R.info({ kind: 'ack', service: state.slots.service }, lang));
     }
     if (u.fragment && state.turn > 1) { state.repairs = (state.repairs || 0) + 1; if (state.repairs <= 2) return out(R.info({ kind: 'repair' }, lang)); }
