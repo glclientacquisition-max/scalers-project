@@ -7,7 +7,24 @@ const { createState } = require('./machine');
 const { runTurnStream } = require('./stream');
 const { createLiveHandlers } = require('./liveHandlers');
 const { createClassifyAsk } = require('./classifyAsk');
-const { createGeminiSend } = require('./transport');
+const { createGeminiSend, createGeminiStreamModel } = require('./transport');
+const MS = require('./modelShadow');
+
+// C7 BRAIN_V2_MODEL: off (default) = nothing; shadow = the model runs beside the rules turn,
+// never awaited, logged per turn; on = NOT for staging (explicit only): the capped model is also
+// handed to the machine's existing consultModel hook. The key is Platform's env (GEMINI_API_KEY).
+function resolveModelShadow(opts = {}, env = process.env) {
+  const mode = MS.modelMode(env);
+  if (mode === 'off') return null;
+  let model = typeof opts.shadowModel === 'function' ? opts.shadowModel : null;
+  if (!model) {
+    const key = env.GEMINI_API_KEY;
+    if (!key) { (opts.log || console.log)('[brain_v2_model] no GEMINI_API_KEY; model shadow off for this call'); return null; }
+    try { model = createGeminiStreamModel({ apiKey: key, model: String(env.BRAIN_V2_MODEL_ID || '').trim() || MS.MODEL_ID }); } catch { return null; }
+  }
+  const shadow = MS.createModelShadow({ model, mode, onStage: typeof opts.onModelStage === 'function' ? opts.onModelStage : () => {}, log: opts.log || ((m) => console.log(m)), modelId: String(env.BRAIN_V2_MODEL_ID || '').trim() || MS.MODEL_ID });
+  return { mode, shadow, model };
+}
 
 function defaultClassify(opts = {}) {
   if (typeof opts.classify === 'function') return opts.classify;
@@ -76,6 +93,8 @@ function createBrainV2Live(opts = {}) {
   const applyTools = opts.applyTools;
   let state = null;
   let endSent = false;
+  let modelRun; // undefined = not resolved yet (C7)
+  let lastShadow = Promise.resolve(null);
 
   function ensureState(profile) {
     if (state) return state;
@@ -98,12 +117,15 @@ function createBrainV2Live(opts = {}) {
     const handlers = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName } });
     const sentences = [];
     let done = null;
+    if (modelRun === undefined) modelRun = resolveModelShadow(opts, env);
+    // shadow: snapshot before the rules turn; the model call starts now and is never awaited here
+    const finishShadow = modelRun ? modelRun.shadow.begin({ text, state: machine, profile: profile || {}, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, openRows: machine.file?.openRows || [] }) : null;
     const it = runTurnStream(machine, {
       text,
       profile: { ...(profile || {}) },
       now: new Date(),
       handlers,
-      model: opts.model || null,
+      model: opts.model || (modelRun && modelRun.mode === 'on' ? async ({ request }) => MS.capped(modelRun.model, request) : null),
       classify: defaultClassify(opts),
       langLock: langLock === 'en' || langLock === 'sw' ? langLock : null,
       shouldAbort: typeof shouldAbort === 'function' ? shouldAbort : () => false,
@@ -113,6 +135,7 @@ function createBrainV2Live(opts = {}) {
       if (ev.type === 'sentence') sentences.push({ text: ev.text, lang: ev.lang });
       if (ev.type === 'done') done = ev;
     }
+    if (finishShadow) lastShadow = finishShadow(machine, done); // compared and logged off the critical path
     const line = sentences.map((s) => s.text).join(' ').trim() || String(done?.line || '').trim();
     const endCall = endDecision({ done, machine, profile, line, alreadyEnded: endSent });
     if (endCall.end) endSent = true;
@@ -127,7 +150,7 @@ function createBrainV2Live(opts = {}) {
     };
   }
 
-  return { run, getState: () => state };
+  return { run, getState: () => state, lastModelShadow: () => lastShadow };
 }
 
-module.exports = { createBrainV2Live, callerFile, endDecision };
+module.exports = { createBrainV2Live, callerFile, endDecision, resolveModelShadow };
