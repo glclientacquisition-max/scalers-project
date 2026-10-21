@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { bustTenantCache } from "@/lib/tenantCache";
+import { requestSpokenCatalogueCompile } from "@/lib/spokenCatalogueOnSave";
 import { revalidatePath } from "next/cache";
 import { memberDenied } from "@/lib/requireMember";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -93,6 +94,7 @@ export async function confirmPriceAction(input: { kind: "product" | "service"; i
   // row as saved, so the rewrite above does not leave a stale value_hash.
   // Failures are reported inside restampPriceHash (structured log); never block the save.
   await restampPriceHash(ws.client, ws.tenant.id, input.kind, next, { id: input.id, name: input.name });
+  requestSpokenCatalogueCompile(ws.tenant.id, { [column]: next });
   // Same as payments: the prompt quotes prices, so rebuild it with the confirmed one.
   await recompileAfterCatalogImport({
     client: ws.client,

@@ -71,6 +71,9 @@ function tenantProfileFromRow(row, extras = {}) {
     handoffMode: parseHandoffMode(row.handoff_mode),
     businessLocations: row.business_locations || [],
     service_areas: row.service_areas ?? null,
+    // SPOKEN_CATALOGUE_STORED_FIRST only: v2 area logic reads profile.serviceAreas,
+    // so loading it changes call behaviour; gated with the stored-first flag.
+    ...(require('./knowledge/spokenCatalogue').storedFirst() ? { serviceAreas: require('./knowledge/spokenCatalogue').catalogueProfileFromRow({ ...row, service_areas: row.service_areas !== undefined ? row.service_areas : extras.serviceAreas }).serviceAreas } : {}),
     businessPolicies: row.business_policies || {},
     billingEnforcement:
       row.billing_enforcement != null ? String(row.billing_enforcement) : null,
@@ -82,6 +85,8 @@ function tenantProfileFromRow(row, extras = {}) {
     openAppointments: Array.isArray(extras.openAppointments) ? extras.openAppointments : [],
     fieldMeta: extras.fieldMeta || null,
     holdGate: extras.holdGate || null,
+    // VOICE_V2_CATALOGUE only: stored speech-ready KB (null until Platform's column exists / backfill runs).
+    ...(/^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || '')) ? { spokenCatalogue: row.spoken_catalogue || null } : {}),
   };
 }
 

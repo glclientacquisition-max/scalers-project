@@ -1514,7 +1514,16 @@ async function selectTenantRowWithLine(tenantId, columns) {
 
 async function getTenantById(tenantId) {
   if (!tenantId) return null;
-  let { data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, spoken_name, greeting_invite, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active');
+  const fullCols =
+    'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, spoken_name, greeting_invite, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active';
+  // VOICE_V2_CATALOGUE only: also read the stored spoken catalogue (migration
+  // 20261015063255). Flag off: the exact select as before. A DB without the
+  // column falls back to the same select; a null value means the rules baseline.
+  const v2Catalogue = /^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || ''));
+  let { data, error } = await selectTenantRowWithLine(tenantId, v2Catalogue ? `${fullCols}, spoken_catalogue` : fullCols);
+  if (v2Catalogue && error && /spoken_catalogue/i.test(error.message || '')) {
+    ({ data, error } = await selectTenantRowWithLine(tenantId, fullCols));
+  }
 
   if (error && /spoken_name|greeting_invite/i.test(error.message || '')) {
     ({ data, error } = await selectTenantRowWithLine(tenantId, 'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active'));
@@ -1631,7 +1640,8 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
   return tenantProfileFromRow(row, {
     openAppointments: await listOpenAppointments(row.id),
     serviceAreas:
-      row.service_areas !== undefined || !require('./conversation/areaTerms').areaFeesEnabled()
+      row.service_areas !== undefined ||
+      !(require('./conversation/areaTerms').areaFeesEnabled() || require('./knowledge/spokenCatalogue').storedFirst())
         ? undefined
         : await getTenantServiceAreas(row.id),
     ...(await loadProvenanceForProfile(row.id)),

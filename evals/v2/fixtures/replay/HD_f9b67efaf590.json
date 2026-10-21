@@ -1,0 +1,55 @@
+{
+ "id": "R_HD_f9b67efaf590",
+ "sid": "HD_f9b67efaf590",
+ "env": "staging",
+ "tenant": "done_and_dusted",
+ "createdAt": "2026-10-15 20:57:03.979561+00",
+ "callerPhone": "+254700000011",
+ "replayMode": "transcript-only",
+ "lang": "sw",
+ "commitment": false,
+ "turns": [
+  {
+   "caller": "Niulize?",
+   "model": "",
+   "agent": ""
+  },
+  {
+   "caller": "Niulize, ni services gani mna- mna offer?",
+   "model": "",
+   "agent": "(live: v2 categories AND legacy \"Tuna Apartment na House Cleaning, ...\" in one turn)"
+  },
+  {
+   "caller": "Karibu.",
+   "model": "",
+   "agent": "(live: legacy raw list read again)"
+  },
+  {
+   "caller": "Hebu niambie kuhusu hiyo usafi wa apartment",
+   "model": "",
+   "agent": ""
+  }
+ ],
+ "observed": {
+  "service_requests": [],
+  "appointments": [],
+  "resolution": "needs_human"
+ },
+ "expect": {
+  "noWrites": true
+ },
+ "mustNotSay": [
+  "Tuna Apartment na House Cleaning",
+  "Apartment and House Cleaning"
+ ],
+ "perTurn": {
+  "maxCatalogue": 1,
+  "maxWhichService": 1,
+  "noConsecutiveWhichService": true
+ },
+ "label": {
+  "by": "brain-lead",
+  "why": "Swahili services enquiry. One catalogue line per turn, never the legacy raw list; Karibu keeps the topic; apartment follow-up is explained or clarified. No writes."
+ },
+ "seed": {}
+}

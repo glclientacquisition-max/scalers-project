@@ -1,0 +1,482 @@
+{
+ "I want to book mattress cleaning tomorrow at 2pm.": [
+  "Hello, I need to schedule mattress cleaning tomorrow at 2pm.",
+  "Haki nataka booking ya mattress cleaning kesho saa nane mchana."
+ ],
+ "I want to book window cleaning tomorrow at 2pm.": [
+  "Hi, please book window cleaning for tomorrow at 2pm.",
+  "Bila, nataka kupanga window cleaning kesho saa nane mchana."
+ ],
+ "Nataka kubook mattress cleaning kesho saa nane mchana.": [
+  "Hodi, nataka mattress cleaning kesho saa nane mchana tafadhali.",
+  "Bro, niko naihitaji mattress cleaning kesho saa nane mchana."
+ ],
+ "Niaje, nataka ku-book mattress cleaning kesho saa nane mchana.": [
+  "Mambo, nataka kufanya booking ya mattress cleaning kesho saa nane mchana.",
+  "Sasa, naomba ku-book mattress cleaning kesho saa nane mchana."
+ ],
+ "Niaje, nataka ku-book window cleaning kesho saa nane mchana.": [
+  "Mambo, nataka window cleaning kesho saa nane mchana.",
+  "Sasa, naomba ku-book window cleaning kesho saa nane mchana."
+ ],
+ "Nataka kubook sofa cleaning kesho saa nane mchana.": [
+  "Nataka kupanga sofa cleaning kesho saa nane mchana.",
+  "Naomba ku-book sofa cleaning kesho saa nane mchana."
+ ],
+ "Nataka kubook window cleaning kesho saa nane mchana.": [
+  "Nataka window cleaning kesho saa nane mchana bila kukosa.",
+  "Naomba ku-book window cleaning kesho saa nane mchana."
+ ],
+ "Niaje, nataka ku-book sofa cleaning kesho saa nane mchana.": [
+  "Mambo, nataka sofa cleaning kesho saa nane mchana.",
+  "Sasa, naomba ku-book sofa cleaning kesho saa nane mchana."
+ ],
+ "I want to book sofa cleaning tomorrow at 2pm.": [
+  "Hi, I would like sofa cleaning booked for tomorrow at 2pm.",
+  "Hello, please book sofa cleaning tomorrow at 2pm."
+ ],
+ "Nataka kubook carpet cleaning kesho saa nane mchana.": [
+  "Nataka carpet cleaning kesho saa nane mchana tafadhali.",
+  "Naomba ku-book carpet cleaning kesho saa nane mchana."
+ ],
+ "Niaje, nataka ku-book carpet cleaning kesho saa nane mchana.": [
+  "Mambo, nataka carpet cleaning kesho saa nane mchana.",
+  "Sasa, naomba ku-book carpet cleaning kesho saa nane mchana."
+ ],
+ "Can I book carpet cleaning the day after tomorrow at 10am?": [
+  "Hi, is it possible to book carpet cleaning the day after tomorrow at 10am?",
+  "Hello, I want carpet cleaning booked the day after tomorrow at 10am."
+ ],
+ "Naomba kubook mattress cleaning keshokutwa saa nne asubuhi.": [
+  "Nataka mattress cleaning keshokutwa saa nne asubuhi.",
+  "Tafadhali nataka ku-book mattress cleaning keshokutwa saa nne asubuhi."
+ ],
+ "Maze, Naomba kubook window cleaning keshokutwa saa nne asubuhi.": [
+  "Bro, nataka ku-book window cleaning keshokutwa saa nne asubuhi.",
+  "Wadau, naomba window cleaning keshokutwa saa nne asubuhi."
+ ],
+ "Maze, Naomba kubook sofa cleaning keshokutwa saa nne asubuhi.": [
+  "Bro, nataka ku-book sofa cleaning keshokutwa saa nne asubuhi.",
+  "Wadau, naomba sofa cleaning keshokutwa saa nne asubuhi."
+ ],
+ "I'd like carpet cleaning on Friday at 11am.": [
+  "Hi, I need carpet cleaning on Friday at 11am.",
+  "Hello, please arrange carpet cleaning on Friday at 11am."
+ ],
+ "Nataka carpet cleaning Ijumaa saa tano asubuhi.": [
+  "Naomba carpet cleaning Ijumaa saa tano asubuhi.",
+  "Haki nataka ku-book carpet cleaning Ijumaa saa tano asubuhi."
+ ],
+ "I'd like mattress cleaning on Saturday at 11am.": [
+  "Hi, I need mattress cleaning on Saturday at 11am.",
+  "Hello, please arrange mattress cleaning on Saturday at 11am."
+ ],
+ "Nataka window cleaning Jumamosi saa tano asubuhi.": [
+  "Naomba window cleaning Jumamosi saa tano asubuhi.",
+  "Haki nataka ku-book window cleaning Jumamosi saa tano asubuhi."
+ ],
+ "I'd like carpet cleaning on Monday at 11am.": [
+  "Hi, I need carpet cleaning on Monday at 11am.",
+  "Hello, please arrange carpet cleaning on Monday at 11am."
+ ],
+ "Nataka sofa cleaning Jumatatu saa tano asubuhi.": [
+  "Naomba sofa cleaning Jumatatu saa tano asubuhi.",
+  "Haki nataka ku-book sofa cleaning Jumatatu saa tano asubuhi."
+ ],
+ "I'd like sofa cleaning on Thursday at 11am.": [
+  "Hi, I need sofa cleaning on Thursday at 11am.",
+  "Hello, please arrange sofa cleaning on Thursday at 11am."
+ ],
+ "Nataka sofa cleaning Alhamisi saa tano asubuhi.": [
+  "Naomba sofa cleaning Alhamisi saa tano asubuhi.",
+  "Haki nataka ku-book sofa cleaning Alhamisi saa tano asubuhi."
+ ],
+ "Book carpet cleaning this Friday at 10am.": [
+  "Hi, please book carpet cleaning this Friday at 10am.",
+  "Hello, I need carpet cleaning this Friday at 10am."
+ ],
+ "Book carpet cleaning next Friday at 10am.": [
+  "Hi, please book carpet cleaning next Friday at 10am.",
+  "Hello, I need carpet cleaning next Friday at 10am."
+ ],
+ "I need sofa cleaning sometime next week.": [
+  "Naeza pata sofa cleaning wiki yenye inakuja?",
+  "Hata mimi nataka sofa cleaning next week."
+ ],
+ "Nataka kubook carpet cleaning Ijumaa hii saa nne asubuhi.": [
+  "Boss, niko na biz ya carpet cleaning Ijumaa hii saa nne asubuhi.",
+  "Unisaidie ku-book carpet cleaning ya Ijumaa hii saa nne asubuhi."
+ ],
+ "Nataka kubook carpet cleaning Ijumaa ijayo saa nne asubuhi.": [
+  "Nataka booking ya carpet cleaning Ijumaa ijayo saa nne asubuhi.",
+  "Naomba carpet cleaning Ijumaa ijayo saa nne asubuhi."
+ ],
+ "Nataka sofa cleaning wiki ijayo.": [
+  "Nahitaji sofa cleaning wiki ijayo.",
+  "Nataka kupanga sofa cleaning wiki inayokuja."
+ ],
+ "Nataka kubook window cleaning Ijumaa saa nane mchana.": [
+  "Nisaidie ku-book window cleaning Ijumaa saa nane mchana.",
+  "Nataka window cleaning Ijumaa saa nane mchana."
+ ],
+ "Niaje, nimekam ku-book window cleaning Ijumaa saa nane mchana.": [
+  "Mambo, nikuwekee window cleaning Ijumaa saa nane mchana.",
+  "Niaje, nataka ku-book window cleaning Ijumaa saa nane mchana."
+ ],
+ "Nataka kubook window cleaning Ijumaa saa tatu asubuhi.": [
+  "Ningependa ku-book window cleaning Ijumaa saa tatu asubuhi.",
+  "Naomba window cleaning Ijumaa saa tatu asubuhi."
+ ],
+ "Niaje, nimekam ku-book carpet cleaning Ijumaa saa tatu asubuhi.": [
+  "Sasa, niko hapa ku-book carpet cleaning Ijumaa saa tatu asubuhi.",
+  "Niaje, nataka ku-book carpet cleaning Ijumaa saa tatu asubuhi."
+ ],
+ "Nataka kubook window cleaning Ijumaa saa kumi jioni.": [
+  "Naomba ku-book window cleaning Ijumaa saa kumi jioni.",
+  "Nataka window cleaning Ijumaa saa kumi jioni."
+ ],
+ "Niaje, nimekam ku-book window cleaning Ijumaa saa kumi jioni.": [
+  "Sasa, nimefika niku-book window cleaning Ijumaa saa kumi jioni.",
+  "Niaje, nimekam ku-book window cleaning Ijumaa saa kumi jioni."
+ ],
+ "Nataka kubook carpet cleaning Ijumaa saa tano.": [
+  "Naomba ku-book carpet cleaning Ijumaa saa tano.",
+  "Nataka carpet cleaning Ijumaa saa tano."
+ ],
+ "Niaje, nimekam ku-book mattress cleaning Ijumaa saa tano.": [
+  "Sasa, nimekam ku-book mattress cleaning Ijumaa saa tano.",
+  "Niaje, niko na job ya mattress cleaning Ijumaa saa tano."
+ ],
+ "Nataka kubook carpet cleaning Ijumaa saa nne na nusu asubuhi.": [
+  "Ningependa ku-book carpet cleaning Ijumaa saa nne na nusu asubuhi.",
+  "Nataka carpet cleaning Ijumaa saa nne na nusu asubuhi."
+ ],
+ "Niaje, nimekam ku-book mattress cleaning Ijumaa saa nne na nusu asubuhi.": [
+  "Sasa, nimekam ku-book mattress cleaning Ijumaa saa nne na nusu asubuhi.",
+  "Niaje, nataka mattress cleaning Ijumaa saa nne na nusu asubuhi."
+ ],
+ "Nataka kubook window cleaning Ijumaa saa mbili asubuhi.": [
+  "Naomba ku-book window cleaning Ijumaa saa mbili asubuhi.",
+  "Nataka window cleaning Ijumaa saa mbili asubuhi."
+ ],
+ "Niaje, nimekam ku-book mattress cleaning Ijumaa saa mbili asubuhi.": [
+  "Sasa, nimekam ku-book mattress cleaning Ijumaa saa mbili asubuhi.",
+  "Niaje, nataka mattress cleaning Ijumaa saa mbili asubuhi."
+ ],
+ "Nataka kubook carpet cleaning Ijumaa saa saba mchana.": [
+  "Naomba ku-book carpet cleaning Ijumaa saa saba mchana.",
+  "Nataka carpet cleaning Ijumaa saa saba mchana."
+ ],
+ "Niaje, nimekam ku-book carpet cleaning Ijumaa saa saba mchana.": [
+  "Sasa, nimekam ku-book carpet cleaning Ijumaa saa saba mchana.",
+  "Niaje, nataka carpet cleaning Ijumaa saa saba mchana."
+ ],
+ "Nataka kubook sofa cleaning Ijumaa saa 4.": [
+  "Naomba ku-book sofa cleaning Ijumaa saa nne.",
+  "Nataka sofa cleaning Ijumaa saa nne."
+ ],
+ "Niaje, nimekam ku-book window cleaning Ijumaa saa 4.": [
+  "Sasa, nimekam ku-book window cleaning Ijumaa saa nne.",
+  "Niaje, nataka window cleaning Ijumaa saa nne."
+ ],
+ "Nataka kubook sofa cleaning Ijumaa saa mbili.": [
+  "Naomba ku-book sofa cleaning Ijumaa saa mbili.",
+  "Nataka sofa cleaning Ijumaa saa mbili."
+ ],
+ "Nataka kubook sofa cleaning Ijumaa saa mbili usiku.": [
+  "Naomba ku-book sofa cleaning Ijumaa saa mbili usiku.",
+  "Nataka sofa cleaning Ijumaa saa mbili usiku."
+ ],
+ "Nataka kubook sofa cleaning Ijumaa saa moja jioni.": [
+  "Naomba ku-book sofa cleaning Ijumaa saa moja jioni.",
+  "Nataka sofa cleaning Ijumaa saa moja jioni."
+ ],
+ "Nataka kubook sofa cleaning Ijumaa saa tatu usiku.": [
+  "Naomba ku-book sofa cleaning Ijumaa saa tatu usiku.",
+  "Nataka sofa cleaning Ijumaa saa tatu usiku."
+ ],
+ "Book carpet cleaning on Friday at 10am.": [
+  "Kindly book carpet cleaning for me on Friday at 10am.",
+  "I want to book carpet cleaning on Friday at 10am."
+ ],
+ "Book sofa cleaning on Friday at 2pm.": [
+  "Hosi, nataka sofa cleaning Ijumaa saa nane mchana.",
+  "Please book sofa cleaning for Friday at 2 pm."
+ ],
+ "Book sofa cleaning on Friday at 2.": [
+  "Sofa cleaning siku ya Ijumaa saa nane, iko vipi?",
+  "Book me sofa cleaning on Friday at 2."
+ ],
+ "Book sofa cleaning on Friday at half past ten.": [
+  "Nataka sofa cleaning Ijumaa saa nne na nusu asubuhi.",
+  "Can you arrange sofa cleaning on Friday at half past ten?"
+ ],
+ "Book mattress cleaning on Friday at noon.": [
+  "Naomba mattress cleaning Ijumaa saa sita mchana.",
+  "Book mattress cleaning for Friday at noon."
+ ],
+ "Book window cleaning on Friday at 10:30.": [
+  "Window cleaning Ijumaa saa nne na nusu asubuhi tafadhali.",
+  "Book window cleaning on Friday at 10:30."
+ ],
+ "Book window cleaning on Friday at 3 in the afternoon.": [
+  "Nataka window cleaning Ijumaa saa tisa alasiri.",
+  "Book window cleaning for Friday at 3 in the afternoon."
+ ],
+ "Book carpet cleaning on Friday at 9 a.m..": [
+  "Carpet cleaning Ijumaa saa tatu asubuhi.",
+  "Book carpet cleaning on Friday at 9 a.m."
+ ],
+ "Book sofa cleaning on Friday at 7am.": [
+  "Sofa cleaning Ijumaa saa moja asubuhi.",
+  "Book sofa cleaning on Friday at 7am."
+ ],
+ "Book sofa cleaning on Friday at 8 in the evening.": [
+  "Nataka sofa cleaning Ijumaa saa mbili usiku.",
+  "Book sofa cleaning on Friday at 8 in the evening."
+ ],
+ "Book sofa cleaning on Friday at 6pm.": [
+  "Sofa cleaning Ijumaa saa kumi na mbili jioni.",
+  "Book sofa cleaning on Friday at 6pm."
+ ],
+ "Book sofa cleaning on Friday at 11pm.": [
+  "Sofa cleaning Ijumaa saa tano usiku.",
+  "Book sofa cleaning on Friday at 11pm."
+ ],
+ "Can you come today at 10am for sofa cleaning?": [
+  "Mnaweza kuja leo saa nne asubuhi kwa sofa cleaning?",
+  "Can you guys come today at 10am for sofa cleaning?"
+ ],
+ "Book carpet cleaning on Sunday at 10am.": [
+  "Nataka carpet cleaning Jumapili saa nne asubuhi.",
+  "Book carpet cleaning on Sunday at 10am."
+ ],
+ "Can you come on Mashujaa Day for carpet cleaning?": [
+  "Mnaweza kuja siku ya Mashujaa kwa carpet cleaning?",
+  "Can someone come on Mashujaa Day for carpet cleaning?"
+ ],
+ "Can someone come today for sofa cleaning, like now?": [
+  "Mtu anaweza kuja leo sasa hivi kwa sofa cleaning?",
+  "Can you guys come today for sofa cleaning, like right now?"
+ ],
+ "Mnaweza kuja leo saa nne asubuhi kwa sofa cleaning?": [
+  "Je, mnaweza kufika leo saa nne asubuhi kufanya sofa cleaning?",
+  "Heri mkuje leo saa nne asubuhi kwa sofa cleaning."
+ ],
+ "Nataka carpet cleaning Jumapili saa nne asubuhi.": [
+  "Ningependa carpet cleaning Jumapili saa nne asubuhi.",
+  "Weka booking ya carpet cleaning Jumapili saa nne asubuhi."
+ ],
+ "Mnaweza kuja siku ya Mashujaa kwa carpet cleaning?": [
+  "Je, mnaweza kufika siku ya Mashujaa kwa ajili ya carpet cleaning?",
+  "Kuna mtu wa kuja siku ya Mashujaa kufanya carpet cleaning?"
+ ],
+ "Mtu anaweza kuja leo sasa hivi kwa sofa cleaning?": [
+  "Heri mkuje leo sasa hivi kwa sofa cleaning.",
+  "Kuna anayeweza kuja leo sasa hivi kufanya sofa cleaning?"
+ ],
+ "Book sofa cleaning on the 16th at 10am.": [
+  "Nataka sofa cleaning tarehe kumi na sita saa nne asubuhi.",
+  "Book sofa cleaning on the 16th at 10am."
+ ],
+ "Book sofa cleaning on 16th October at 10am.": [
+  "Sofa cleaning tarehe kumi na sita mwezi wa kumi saa nne asubuhi.",
+  "Book sofa cleaning on 16th October at 10am."
+ ],
+ "Nataka sofa cleaning tarehe 16 saa nne asubuhi.": [
+  "Naomba sofa cleaning tarehe kumi na sita saa nne asubuhi.",
+  "Nataka mkuje tarehe 16 saa nne asubuhi kwa sofa cleaning."
+ ],
+ "Nataka sofa cleaning tarehe kumi na sita saa nne asubuhi.": [
+  "Ningependa sofa cleaning tarehe 16 saa nne asubuhi.",
+  "Weka booking ya sofa cleaning tarehe kumi na sita saa nne asubuhi."
+ ],
+ "Book sofa cleaning Friday at two pm.": [
+  "Nataka sofa cleaning Ijumaa saa nane mchana.",
+  "Book sofa cleaning on Friday at two pm."
+ ],
+ "Book sofa cleaning Friday at ten o'clock.": [
+  "Sofa cleaning Ijumaa saa nne asubuhi tafadhali.",
+  "Book sofa cleaning Friday at ten o'clock."
+ ],
+ "Nataka sofa cleaning Ijumaa saa 10 jioni.": [
+  "Naomba sofa cleaning Ijumaa saa kumi jioni.",
+  "Hodi, nataka kusafishiwa sofa Ijumaa saa kumi jioni."
+ ],
+ "Nataka sofa cleaning Ijumaa saa 8 mchana.": [
+  "Ningependa sofa cleaning Ijumaa saa nane mchana.",
+  "Nataka wafanyakazi wa sofa cleaning waje Ijumaa saa nane mchana."
+ ],
+ "Book sofa cleaning Friday morning.": [
+  "I need to book sofa cleaning for Friday morning.",
+  "Please schedule sofa cleaning for Friday morning."
+ ],
+ "Nataka sofa cleaning Ijumaa asubuhi.": [
+  "Naomba kufanya booking ya sofa cleaning Ijumaa asubuhi.",
+  "Nataka sofa cleaning ifanyike Ijumaa asubuhi."
+ ],
+ "Book sofa cleaning Friday after lunch.": [
+  "Can I book sofa cleaning for Friday after lunch?",
+  "Please book sofa cleaning for Friday afternoon."
+ ],
+ "Nataka sofa cleaning kesho jioni.": [
+  "Naomba sofa cleaning kesho jioni.",
+  "Ningependa kusafishwa sofa kesho jioni."
+ ],
+ "Book sofa cleaning Friday the 17th at 10am.": [
+  "Please book sofa cleaning for Friday the 17th at 10am.",
+  "I want to schedule sofa cleaning on Friday the 17th at 10am."
+ ],
+ "Can you come tonight for sofa cleaning?": [
+  "Are you available for sofa cleaning tonight?",
+  "Can someone come tonight for sofa cleaning?"
+ ],
+ "Book sofa cleaning Friday at 10am.": [
+  "Please book sofa cleaning for Friday at 10am.",
+  "I'd like to schedule sofa cleaning on Friday at 10am."
+ ],
+ "Nataka sofa cleaning Ijumaa tarehe 17 saa nne asubuhi.": [
+  "Naomba sofa cleaning Ijumaa tarehe 17 saa nne asubuhi.",
+  "Ningependa kusafishiwa sofa Ijumaa tarehe 17 saa nne asubuhi."
+ ],
+ "Mnaweza kuja leo usiku kwa sofa cleaning?": [
+  "Je, mnaweza kuja leo usiku kufanya sofa cleaning?",
+  "Naweza kupata huduma ya sofa cleaning leo usiku?"
+ ],
+ "Nataka sofa cleaning Ijumaa saa nne asubuhi.": [
+  "Naomba sofa cleaning Ijumaa saa nne asubuhi.",
+  "Ningependa kusafishwa sofa Ijumaa saa nne asubuhi."
+ ],
+ "Book carpet cleaning Friday at 10am.": [
+  "Please book carpet cleaning for Friday at 10am.",
+  "I need to schedule carpet cleaning on Friday at 10am."
+ ],
+ "Nataka carpet cleaning Ijumaa saa nne asubuhi.": [
+  "Naomba carpet cleaning Ijumaa saa nne asubuhi.",
+  "Ningependa kusafishiwa carpet Ijumaa saa nne asubuhi."
+ ],
+ "I need sofa cleaning for five seats on Friday at 10am.": [
+  "I want to book sofa cleaning for 5 seats on Friday at 10am.",
+  "Please book sofa cleaning for five seats on Friday at 10am."
+ ],
+ "Nataka sofa cleaning viti tano Ijumaa saa nne asubuhi.": [
+  "Naomba sofa cleaning ya viti tano Ijumaa saa nne asubuhi.",
+  "Ningependa kusafishiwa viti vitano Ijumaa saa nne asubuhi."
+ ],
+ "I want to book sofa cleaning on Friday at 10am.": [
+  "I'd like to book sofa cleaning for Friday at 10am.",
+  "Please arrange sofa cleaning on Friday at 10am."
+ ],
+ "Nataka kubook sofa cleaning Ijumaa saa nne asubuhi.": [
+  "Nataka kuweka booking ya sofa cleaning Ijumaa saa nne asubuhi.",
+  "Naomba kubook sofa cleaning Ijumaa saa nne asubuhi."
+ ],
+ "I want to book carpet cleaning on Friday at 10am.": [
+  "I need to book carpet cleaning for Friday at 10am.",
+  "Please schedule carpet cleaning on Friday at 10am."
+ ],
+ "Nataka kubook carpet cleaning Ijumaa saa nne asubuhi.": [
+  "Naomba kubook carpet cleaning Ijumaa saa nne asubuhi.",
+  "Nataka kuweka booking ya carpet cleaning Ijumaa saa nne asubuhi."
+ ],
+ "Book sofa cleaning Friday, no, Saturday at 10am.": [
+  "Book sofa cleaning Friday, actually Saturday at 10am.",
+  "Please book sofa cleaning on Friday - wait, Saturday at 10am."
+ ],
+ "Book sofa cleaning Saturday, sorry, Friday at 10am.": [
+  "Book sofa cleaning Saturday, my bad, Friday at 10am.",
+  "Please book sofa cleaning on Saturday, sorry, Friday at 10am."
+ ],
+ "Book sofa cleaning Friday at 10am, no, 11am.": [
+  "Book sofa cleaning Friday at 10am, actually 11am.",
+  "Please book sofa cleaning Friday at 10am - no, make it 11am."
+ ],
+ "Book sofa cleaning on Monday, actually make it Friday, at 2pm.": [
+  "Book sofa cleaning on Monday, no, Friday, at 2pm.",
+  "Please book sofa cleaning on Monday, actually Friday, at 2pm."
+ ],
+ "Nataka sofa cleaning Ijumaa, hapana, Jumamosi saa nne asubuhi.": [
+  "Nataka sofa cleaning Ijumaa, la, Jumamosi saa nne asubuhi.",
+  "Naomba sofa cleaning Ijumaa, simaanishi, Jumamosi saa nne asubuhi."
+ ],
+ "Nataka sofa cleaning Jumamosi, samahani, Ijumaa saa nne asubuhi.": [
+  "Nataka sofa cleaning Jumamosi, hapa, Ijumaa saa nne asubuhi.",
+  "Naomba sofa cleaning Jumamosi, vibaya hivyo, Ijumaa saa nne asubuhi."
+ ],
+ "Nataka sofa cleaning Ijumaa saa nne, hapana, saa tano asubuhi.": [
+  "Nahitaji sofa cleaning Ijumaa saa nne, sema saa tano asubuhi.",
+  "Nataka sofa cleaning Ijumaa saa nne, la, saa tano asubuhi."
+ ],
+ "Book sofa cleaning Friday at 10am, and how much is it?": [
+  "Kindly book sofa cleaning Friday at 10am, and what's the cost?",
+  "I want sofa cleaning Friday at 10am, plus how much is it?"
+ ],
+ "Cancel my Friday carpet cleaning and book sofa cleaning on Saturday at 10am instead.": [
+  "Drop my Friday carpet cleaning and book sofa cleaning on Saturday at 10am instead.",
+  "Cancel my carpet cleaning on Friday and schedule sofa cleaning Saturday at 10am instead."
+ ],
+ "I need to cancel my Friday booking.": [
+  "I have to cancel my Friday booking.",
+  "Please cancel my booking for Friday."
+ ],
+ "Please cancel the carpet cleaning.": [
+  "Kindly cancel that carpet cleaning.",
+  "Just cancel the carpet cleaning please."
+ ],
+ "I won't be home Friday, cancel it.": [
+  "I'll not be home Friday, cancel it.",
+  "I am not going to be home Friday, cancel it."
+ ],
+ "Can you move my Friday booking to Saturday at 10am?": [
+  "Could you shift my Friday booking to Saturday at 10am?",
+  "Please push my Friday booking to Saturday at 10am."
+ ],
+ "Reschedule the carpet cleaning to Saturday at 10am.": [
+  "Change the carpet cleaning to Saturday at 10am.",
+  "Move the carpet cleaning over to Saturday at 10am."
+ ],
+ "Nataka sofa cleaning Ijumaa saa nne asubuhi, na bei ni ngapi?": [
+  "Nahitaji sofa cleaning Ijumaa saa nne asubuhi, alafu bei ni ngapi?",
+  "Nataka kufanya sofa cleaning Ijumaa saa nne asubuhi, kiasi gani?"
+ ],
+ "Futa booking yangu ya carpet Ijumaa, nataka sofa cleaning Jumamosi saa nne asubuhi badala yake.": [
+  "Ondoa booking ya carpet Ijumaa, nataka sofa cleaning Jumamosi saa nne asubuhi badala yake.",
+  "Futa booking ya carpet ya Ijumaa,eka sofa cleaning Jumamosi saa nne asubuhi badala yake."
+ ],
+ "Nataka kufuta booking yangu ya Ijumaa.": [
+  "Nahitaji kufuta booking yangu ya Ijumaa.",
+  "Nataka nifute booking ya Ijumaa."
+ ],
+ "Futa ile carpet cleaning tafadhali.": [
+  "Ondoa ile carpet cleaning tafadhali.",
+  "Tafadhali futa hiyo carpet cleaning."
+ ],
+ "Sitakuwa nyumbani Ijumaa, futa booking.": [
+  "Mimi sitakuwa nyumbani Ijumaa, futa booking.",
+  "Sitakuwepo nyumbani Ijumaa, futa hiyo booking."
+ ],
+ "Songesha booking yangu ya Ijumaa hadi Jumamosi saa nne asubuhi.": [
+  "Hamisha booking yangu ya Ijumaa iende Jumamosi saa nne asubuhi.",
+  " peleka booking yangu ya Ijumaa mpaka Jumamosi saa nne asubuhi."
+ ],
+ "Badilisha siku ya carpet cleaning iwe Jumamosi saa nne asubuhi.": [
+  "Sogeza siku ya carpet cleaning iwe Jumamosi saa nne asubuhi.",
+  "Weka carpet cleaning iwe Jumamosi saa nne asubuhi."
+ ],
+ "This is useless, just book sofa cleaning Friday at 10am.": [
+  "This is annoying, just book sofa cleaning Friday at 10am.",
+  "Hii ni upuzi, just book sofa cleaning Friday at 10am."
+ ],
+ "Stop wasting my time and book carpet cleaning Friday at 10am.": [
+  "Stop wasting my time and just book carpet cleaning Friday at 10am.",
+  "Don't waste my time and book carpet cleaning Friday at 10am."
+ ],
+ "Wewe ni mjinga, nataka sofa cleaning Ijumaa saa nne asubuhi.": [
+  "Unanisumbua, nataka sofa cleaning Ijumaa saa nne asubuhi.",
+  "Wewe huna akili, nataka sofa cleaning Ijumaa saa nne asubuhi."
+ ],
+ "Maze acha upuss, book carpet cleaning Ijumaa saa nne.": [
+  "Bro acha ufala, book carpet cleaning Ijumaa saa nne.",
+  "Acha upuzi maze, book carpet cleaning Ijumaa saa nne."
+ ]
+}

@@ -91,9 +91,15 @@ const {
   VOICE_SYSTEM_PROMPT_VERSION,
 } = require('./src/prompts');
 const { createVoiceTrace } = require('./src/speech/voiceTrace');
+const { brainV2ShadowEnabled, createBrainV2Shadow } = require('./src/conversation/v2Shadow');
+const { brainV2Enabled, brainV2Mode } = require('./src/conversation/v2/flag');
+const { createBrainV2Live } = require('./src/conversation/v2/liveTurn');
+const ackRule = require('./src/speech/ackRule');
 const toolSmooth = require('./src/speech/toolSmooth');
 /** VOICE_TOOL_SMOOTH: per-connection heard-audio clock. Empty when the flags are off. */
 const MEDIA_CLOCKS = new WeakMap();
+/** VOICE_END_CALL_HONOUR: per-connection playout clock (end-call waits for it). Empty when off. */
+const PLAYOUT_CLOCKS = new WeakMap();
 const voiceTraceBySid = new Map();
 
 function bindVoiceTrace(callSid, trace) {
@@ -360,6 +366,10 @@ const { usableLeadReason } = require('./src/conversation/leadReason');
 const { noteSpokenPendingAsk } = require('./src/conversation/callCorrectives');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
+const { planV2CatalogueMouth } = require('./src/conversation/v2CatalogueTurn');
+const { createTurnArbiter, turnArbiterEnabled } = require('./src/speech/turnArbiter');
+const { buildTurnProposals, bookOutranksListTurn } = require('./src/conversation/turnProposals');
+const { pinSpokenCatalogue } = require('./src/knowledge/spokenCatalogue');
 const {
   catalogueGeminiDirective,
   geminiCatalogueEnabled,
@@ -443,6 +453,14 @@ const { noteCallTerminal, callTerminalSince } = require('./src/speech/callLifecy
 const endedCalls = require('./src/speech/endedCalls');
 const { createCallFinalizer } = require('./src/callFinalize');
 const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
+const {
+  endCallHonourEnabled,
+  createPlayoutClock,
+  createEndCallController,
+  endSignalFromBrain,
+  outageSuppressed,
+} = require('./src/speech/endCallHonour');
+const { hangupSautikitCall } = require('./src/sautikit/callHangup');
 const {
   createVoiceTurnTiming,
   createCallTranscript,
@@ -837,6 +855,34 @@ app.post('/internal/desk/escalate', async (req, res) => {
     });
   }
 });
+
+/**
+ * SPOKEN_CATALOGUE_ON_SAVE (default off): Desk pings after an owner Save on
+ * services / products / areas / locations. Answers at once; the compile runs in
+ * the background and only when the catalogue hash changed. Secret required.
+ */
+app.post('/internal/desk/spoken-catalogue', (req, res) => {
+  const secret = String(process.env.VOICE_INTERNAL_SECRET || '').trim();
+  if (!secret || String(req.headers['x-voice-internal-secret'] || '').trim() !== secret) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const onSave = require('./src/knowledge/spokenCatalogueOnSave');
+  if (!onSave.enabled()) return res.status(200).json({ ok: true, skipped: 'flag_off' });
+  const tenantId = String(req.body?.tenantId || '').trim();
+  const { supabase } = require('./src/lib/supabaseClient');
+  const r = onSave.scheduleSpokenCatalogueCompile(tenantId, { db: supabase, generate: spokenCatalogueGenerate() });
+  return res.status(202).json({ ok: true, scheduled: r.scheduled, coalesced: Boolean(r.coalesced) });
+});
+
+let spokenCatalogueGen;
+function spokenCatalogueGenerate() {
+  if (spokenCatalogueGen !== undefined) return spokenCatalogueGen;
+  // SPOKEN_CATALOGUE_MODEL=off disables the AI pass; a missing key is recorded as compile_error=no_key.
+  if (/^(0|off|false|no)$/i.test(String(process.env.SPOKEN_CATALOGUE_MODEL || ''))) return (spokenCatalogueGen = null);
+  const { createSpokenCatalogueGenerate } = require('./src/knowledge/spokenCatalogueGenerate');
+  spokenCatalogueGen = createSpokenCatalogueGenerate({ apiKey: process.env.GEMINI_API_KEY, model: process.env.SPOKEN_CATALOGUE_MODEL || 'gemini-3.5-flash', timeoutMs: 10000 });
+  return spokenCatalogueGen;
+}
 
 app.get('/api/voices', async (_req, res) => {
   try {
@@ -2185,6 +2231,8 @@ function sendPcmToMedia(ws, pcm) {
   if (!ws || ws.readyState !== WebSocket.OPEN || !pcm || !pcm.length) return;
   const mediaClock = MEDIA_CLOCKS.get(ws);
   if (mediaClock) mediaClock.onSend(pcm.length);
+  const playout = PLAYOUT_CLOCKS.get(ws);
+  if (playout) playout.note(pcm.length);
   // Fixed phone gain on the whole utterance. Do not even-out 20 ms frames (pumping).
   const boosted = applyPcmGain(pcm, resolveVoiceProfile().gain);
   // Prefer small frames for smoother playback on the telephony side.
@@ -2207,6 +2255,8 @@ function clearMediaPlayback(ws) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   const mediaClock = MEDIA_CLOCKS.get(ws);
   if (mediaClock) mediaClock.onClear();
+  const playout = PLAYOUT_CLOCKS.get(ws);
+  if (playout) playout.clear();
   const payloads = [
     { type: 'killAudio' },
     // Compatibility fallbacks seen across forks / Twilio-style bridges.
@@ -2345,6 +2395,43 @@ mediaWss.on('connection', (ws, req) => {
       });
     },
   });
+  // VOICE_END_CALL_HONOUR (default off): honour the brain's end signal once,
+  // after the final audio has played; then nothing (no clip, SMS, email)
+  // treats a dead TTS as an outage. Off: null, today's timers below.
+  const endHonour = endCallHonourEnabled()
+    ? (() => {
+        const playout = createPlayoutClock();
+        PLAYOUT_CLOCKS.set(ws, playout);
+        return createEndCallController({
+          playoutRemainingMs: () => playout.remainingMs(),
+          onEnded: (info) => {
+            callEnding = true;
+            idleNudge.close();
+            unfinishedHold.close();
+            if (sessionCallSid) {
+              endedCalls.noteCallEnded(sessionCallSid, { reason: `end_call:${info?.source || ''}` });
+            }
+          },
+          hangupRest: () => hangupSautikitCall(sessionCallSid || sidLabel()),
+          closeMedia: (reason) => {
+            try {
+              ws.close(1000, reason);
+            } catch {
+              /* ignore */
+            }
+          },
+          log: (line) => console.log(`[ws/media][${sidLabel()}] ${line}`),
+        });
+      })()
+    : null;
+  /** Brain said the call is over: flag on → one hangup after the audio. */
+  function requestEndCall(source, reason = '') {
+    if (!endHonour) return false;
+    callEnding = true;
+    idleNudge.close();
+    void endHonour.request({ source, reason });
+    return true;
+  }
   function commitAgentQuestionIfNeeded(opts = {}) {
     const snap = agentReplay.snapshot();
     const committed = agentReplay.commitPlayback();
@@ -2400,6 +2487,10 @@ mediaWss.on('connection', (ws, req) => {
   let messages = [{ role: 'system', content: systemPrompt }];
   const callTranscript = createCallTranscript();
   if (sessionCallSid) callSpokenTranscripts.set(sessionCallSid, callTranscript);
+  /** BA v2 shadow runner; created on first caller turn only when BRAIN_V2_SHADOW is on. */
+  let brainV2Shadow = null;
+  /** BA v2 live mouth; created on first caller turn only when BRAIN_V2=on and MODE=live. */
+  let brainV2Live = null;
   function logTurnTiming(timing, extra) {
     if (!timing) return null;
     const summary = timing.log(extra);
@@ -2476,6 +2567,13 @@ mediaWss.on('connection', (ws, req) => {
   let callLanguage = 'unknown';
   let callLanguageState = createLanguageState();
   let brainProfile = {};
+  // VOICE_TURN_ARBITER (off by default): one speak decision per caller turn.
+  const turnLockState = {};
+  const turnArbiter = createTurnArbiter({
+    enabled: turnArbiterEnabled(),
+    state: turnLockState,
+    trace: (e) => console.log(`[ws/media][${sidLabel()}] turn_arbiter ${JSON.stringify(e)}`),
+  });
   /** Caller-requested TTS speed scale for this call (1 = profile default). */
   let ttsSpeedScale = 1;
   /** Soniox stream id for the in-flight thinking-ack (cancel this only — keep reply prefetch). */
@@ -2550,6 +2648,7 @@ mediaWss.on('connection', (ws, req) => {
   }
   // Item 3: a receipt already rendered at call start plays with no TTS start-up seam.
   function playCachedReceipt(line) {
+    if (turnArbiter.enabled && !turnArbiter.admit(line, { tracePath: 'cached_receipt' }).ok) return null;
     if (!isFillerCacheEnabled() || ttsSpeedScale !== 1) return null;
     const found = lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage: toolSmooth.holdLanguage(callLanguage), extraLexicon: ttsLexiconOverrides });
     if (!found.pcm) return null;
@@ -2558,6 +2657,10 @@ mediaWss.on('connection', (ws, req) => {
     console.log(`[ws/media][${sidLabel()}] tool-smooth receipt cached bytes=${found.pcm.length}: ${line}`);
     return playCachedFillerPcm(found.pcm, { text: line, trace: false, kind: 'receipt' });
   }
+  // VOICE_ACK_RULE (default off): per-call heard-ack tracker. null = rule off.
+  const ackTracker = ackRule.ackRuleEnabled() ? ackRule.createAckTracker() : null;
+  /** VOICE_ACK_RULE: the turn on which a word filler (not Mm.) actually played. */
+  let wordAckTurn = null;
   /** Rolling interim hypothesis while agent is busy (for barge-in). */
   let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
@@ -2627,6 +2730,13 @@ mediaWss.on('connection', (ws, req) => {
         tenantId: inboundTenantId || undefined,
       });
       await hydrateCallerMemory(profile, sessionCallSid);
+      if (turnArbiter.enabled) {
+        // Pin the spoken catalogue once, via Platform's resolver. Never recompiled mid-call.
+        const pin = pinSpokenCatalogue(profile);
+        console.log(
+          `[ws/media][${sessionCallSid}] spoken catalogue pinned v=${pin?.version ?? 'none'} hash=${String(pin?.sourceHash || '').slice(0, 12)} stale=${pin?.stale === true} degraded=${pin?.degraded === true}`
+        );
+      }
       brainProfile = profile;
       businessName = profile.businessName || businessName;
       agentName = profile.agentName || agentName;
@@ -2862,6 +2972,22 @@ mediaWss.on('connection', (ws, req) => {
    */
   async function handleSpeechProviderOutage(reason) {
     if (speechOutageStarted) return { ok: false, outage: true };
+    if (endHonour) {
+      // VOICE_END_CALL_HONOUR call-ended guard (HD_2ccfbf6e1fa4, HD_5c9056d78d02):
+      // a reply that lands after hangup finds tts=null. That is not an outage.
+      const why = outageSuppressed({
+        endRequested: endHonour.ending(),
+        callEnding,
+        wsOpen: ws.readyState === WebSocket.OPEN,
+        terminal: Boolean(callTerminalSince(sidLabel(), connectedAt)),
+      });
+      if (why) {
+        console.warn(
+          `[ws/media][${sidLabel()}] speech outage suppressed (${reason}): call ended why=${why}; no clip, no owner alert`
+        );
+        return { ok: false, closed: true, suppressed: why };
+      }
+    }
     speechOutageStarted = true;
     unfinishedHold.close();
     greetingStarted = true;
@@ -3061,6 +3187,11 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   async function speakText(text, opts = {}) {
+    // VOICE_TURN_ARBITER: the only TTS entry. A claimed turn speaks its sealed packet only.
+    if (turnArbiter.enabled) {
+      const admitted = turnArbiter.admit(text, opts);
+      if (!admitted.ok) return { ok: false, arbiter: admitted.reason };
+    }
     if (!opts.skipFileGate && !opts.isFiller && !opts.isReplay && !opts.isIdleNudge) {
       const gated = gateCallerFileSpeech(text, callBrainStates.get(sidLabel()));
       if (!gated.speak) {
@@ -3633,6 +3764,58 @@ mediaWss.on('connection', (ws, req) => {
     );
     callTranscript.pushCaller(clean);
     messages.push({ role: 'user', content: clean });
+    if (ackTracker) ackTracker.beginTurn({ callerText: clean });
+    // BA v2 shadow (BRAIN_V2_SHADOW, default off): log-only, never awaited,
+    // never spoken, dry-run writes only. Flag off = no code below runs.
+    if (
+      brainV2ShadowEnabled({ tenantId: brainProfile?.id }) &&
+      !(brainV2Enabled({ tenantId: brainProfile?.id }) && brainV2Mode() === 'live')
+    ) {
+      try {
+        if (!brainV2Shadow) {
+          brainV2Shadow = createBrainV2Shadow({
+            callLabel: () => callKey,
+            // Read once at the shadow's first turn (after caller memory hydrated).
+            callerFile: () => {
+              const mem = brainProfile?.callerMemory || {};
+              return {
+                callerPhone: brainState?.caller?.phone || mem.phone || null,
+                contactName: mem.fileOwnerName || mem.name || null,
+                openRows: Array.isArray(mem.openRows) ? mem.openRows : [],
+              };
+            },
+          });
+        }
+        const shadowTurnIndex = voiceTrace.currentTurnIndex();
+        void brainV2Shadow
+          .fire({
+            text: clean,
+            profile: brainProfile,
+            langLock: callLanguage,
+            turnIndex: shadowTurnIndex,
+            ...(ackTracker
+              ? {
+                  // true only when a word filler actually played this turn (read after the filler delay)
+                  acked: () => wordAckTurn === turnTiming,
+                  ackWaitMs: resolveVoiceProfile().fillerDelayMs + 80,
+                  ackRule: true,
+                  stripAck: ackRule.stripAckLead,
+                }
+              : {}),
+            onResult: (stage) => {
+              console.log(
+                `[brain_v2_shadow][${callKey}] turn=${shadowTurnIndex} ttft=${stage.ttftMs}` +
+                  ` total=${stage.totalMs} tools=${stage.toolIntents.map((t) => t.name).join(',') || '-'}` +
+                  ` timedOut=${stage.timedOut}`
+              );
+              if (shadowTurnIndex != null) voiceTrace.noteBrainV2Shadow(stage);
+            },
+          })
+          .catch(() => null);
+      } catch (err) {
+        console.warn(`[ws/media][${callKey}] brain_v2_shadow failed:`, err?.message || err);
+      }
+    }
 
     const turnMatches = selectProductsForTurn({
       catalog: brainProfile.productCatalog,
@@ -3705,6 +3888,7 @@ mediaWss.on('connection', (ws, req) => {
         );
         if (removed.length) voiceTrace.noteSpeakSlots({ action: 'drain', slots: removed });
       }
+      if (turnArbiter.enabled) turnArbiter.beginTurn(clean);
       // A booking or callback confirmed after a barge-in is still owed.
       // Speak it first, before a local fact or the model reply.
       // VOICE_OWED_CONFIRM_FOLD=on folds it into the next reply as one line
@@ -3741,6 +3925,47 @@ mediaWss.on('connection', (ws, req) => {
         return folded;
       }
       const slotsBeforeReply = slotRows(brainState);
+      if (brainV2Enabled({ tenantId: brainProfile?.id }) && brainV2Mode() === 'live') {
+        try {
+          if (!brainV2Live) {
+            const mem = brainProfile?.callerMemory || {};
+            brainV2Live = createBrainV2Live({
+              applyTools: (parsed) => applyGeminiTools(callKey, parsed),
+              callerFile: {
+                callerPhone: brainState?.caller?.phone || mem.phone || null,
+                contactName: mem.fileOwnerName || mem.name || brainState?.caller?.name || null,
+                openRows: Array.isArray(mem.openRows) ? mem.openRows : [],
+              },
+            });
+          }
+          const live = await brainV2Live.run({
+            text: clean,
+            profile: brainProfile,
+            langLock: callLanguage === 'en' || callLanguage === 'sw' ? callLanguage : null,
+            shouldAbort: () => bargeInActive === true,
+          });
+          if (live?.line) {
+            console.log(`[ws/media][${callKey}] brain_v2_live lang=${live.lang}: ${live.line}`);
+            callTranscript.pushAgent(live.line);
+            if (turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') {
+              turnTiming.markFirstSpokenChunk();
+            }
+            const spoken = await speakText(live.line, { tracePath: 'brain_v2_live' });
+            if (spoken?.ok !== false) {
+              spokeThisTurn = true;
+              messages.push({ role: 'assistant', content: live.line, local: true });
+              // VOICE_END_CALL_HONOUR: v2 { end: true } hangs up once, after this line plays.
+              const v2End = endSignalFromBrain(live);
+              if (v2End.end && requestEndCall(v2End.source, v2End.reason)) {
+                console.log(`[ws/media][${callKey}] end-call signal source=${v2End.source}: hangup after audio`);
+              }
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn(`[ws/media][${callKey}] brain_v2_live failed, using v1:`, err?.message || err);
+        }
+      }
       const lookupPlan = planLookupTurn({
         text: clean,
         state: brainState,
@@ -3790,7 +4015,7 @@ mediaWss.on('connection', (ws, req) => {
       }
       // Local Phase-0 breath owns a services ask, including one the name gate
       // would otherwise take, and a Yes while that list is still pending.
-      const catalogueMouth = planCatalogueMouth({
+      const legacyCatalogueMouth = planCatalogueMouth({
         localReply,
         text: clean,
         profile: brainProfile,
@@ -3803,27 +4028,63 @@ mediaWss.on('connection', (ws, req) => {
           !String(process.env.GEMINI_API_KEY || '').trim(),
         geminiCatalogue: geminiCatalogueEnabled(),
       });
+      // VOICE_V2_CATALOGUE off: same object back, nothing logged.
+      const catalogueMouth = await planV2CatalogueMouth(legacyCatalogueMouth, {
+        text: clean,
+        profile: brainProfile,
+        language: callLanguage,
+        state: brainState,
+        log: (m) => console.log(`[ws/media][${callKey}] ${m}`),
+        topicLocked: turnArbiter.enabled && turnArbiter.lock()?.topic === 'catalogue',
+      });
+      // BRAIN_V2_NLU_GAPS §6a (HD_69f53a46339b T2): "Which service do you offer? I want Deep cleaning
+      // tomorrow, Kilimani." names a service plus a date/place, so it is a booking. No catalogue list
+      // (local, legacy or v2) speaks this turn; the booking reply owns it. Off: same objects as before.
+      const bookOutranksList = bookOutranksListTurn(clean, brainProfile);
+      if (bookOutranksList) console.log(`[ws/media][${callKey}] catalogue yields: booking outranks list`);
+      const turnLocalReply = bookOutranksList && localReply?.outcome === 'catalogue' ? null : localReply;
+      const turnLegacyMouth = bookOutranksList ? null : legacyCatalogueMouth;
+      const turnCatalogueMouth = bookOutranksList ? { speakLocal: false, line: '', v2Proposals: [] } : catalogueMouth;
+      const groundedPriceLine = groundFilePriceLine({
+        profile: brainProfile,
+        text: clean,
+        callerTurns: brainState?.conversation?.answersReceived,
+        state: brainState,
+        language: callLanguage,
+      });
+      // VOICE_TURN_ARBITER: every mouth proposes; the decision is made after the
+      // visit-read / rejected-create paths below (those own their turns).
+      const arbiterProposals = turnArbiter.enabled
+        ? buildTurnProposals({
+            text: clean,
+            lang: callLanguage,
+            doc: brainProfile?.spokenCataloguePin?.doc || null,
+            docVersion: brainProfile?.spokenCataloguePin?.version ?? null,
+            localReply: turnLocalReply,
+            legacyMouth: turnLegacyMouth,
+            v2Mouth: turnCatalogueMouth,
+            groundedPrice: groundedPriceLine,
+            nameJustConfirmed: brainState?.caller?.nameJustConfirmed === true,
+            callerName: brainState?.caller?.name || '',
+            callerNameConfirmed: brainState?.caller?.nameConfirmed === true,
+            catalogueListed: brainState?.conversation?.catalogueListed === true,
+            lock: turnArbiter.lock(),
+          }).concat(turnCatalogueMouth.v2Proposals || []) // BRAIN_V2_TOPIC_PROPOSALS: v2 submits to the arbiter
+        : [];
+      const arbiterClaims = arbiterProposals.length > 0;
       const packetsBeforeFacts = packetRows();
-      const localPacket = commitTurnFacts(speakCommit, {
-        localReply,
+      const localPacket = arbiterClaims ? null : commitTurnFacts(speakCommit, {
+        localReply: turnLocalReply,
         catalogueLine: lookupPlan?.handled
           ? ''
-          : catalogueMouth.speakLocal && catalogueMouth.line
-            ? catalogueMouth.line
+          : turnCatalogueMouth.speakLocal && turnCatalogueMouth.line
+            ? turnCatalogueMouth.line
             : '',
         catalogueListed: brainState?.conversation?.catalogueListed === true,
-        groundedPrice: lookupPlan?.handled
-          ? ''
-          : groundFilePriceLine({
-              profile: brainProfile,
-              text: clean,
-              callerTurns: brainState?.conversation?.answersReceived,
-              state: brainState,
-              language: callLanguage,
-            }),
+        groundedPrice: lookupPlan?.handled ? '' : groundedPriceLine,
       });
       traceCommittedPackets(packetsBeforeFacts);
-      if (localReply && !localPacket && !authorizeSpeak(localReply)) {
+      if (turnLocalReply && !localPacket && !arbiterClaims && !authorizeSpeak(turnLocalReply)) {
         voiceTrace.noteSpeakPacket({
           tier: 'private',
           outcome: localReply.outcome,
@@ -3914,7 +4175,17 @@ mediaWss.on('connection', (ws, req) => {
         language: callLanguage,
       });
       const packetsBeforeSlots = packetRows();
-      if (askingName || nameJustConfirmed || endClose.close) {
+      const arbPacket = arbiterClaims && !endClose.close ? turnArbiter.speak(arbiterProposals) : null;
+      if (arbPacket) {
+        // One sealed packet. Brain localReply and live Gemini are no-ops this turn.
+        for (const line of arbPacket.lines) {
+          speakCommit.commit(authorizeSpeak({ outcome: arbPacket.topic === 'price' ? 'price' : 'catalogue', line }));
+        }
+        if (askingName && fileNameAsk) turnArbiter.extend(fileNameAsk, 'file_name_ask');
+      } else if (arbiterClaims && localReply && !authorizeSpeak(localReply)) {
+        voiceTrace.noteSpeakPacket({ tier: 'private', outcome: localReply.outcome, text: localReply.line, committed: false });
+      }
+      if (!arbPacket && (askingName || nameJustConfirmed || endClose.close)) {
         commitReadySpeakSlots(speakCommit, brainState, {
           nameJustConfirmed: nameJustConfirmed || endClose.close,
           catalogueListed: brainState?.conversation?.catalogueListed === true,
@@ -3948,6 +4219,7 @@ mediaWss.on('connection', (ws, req) => {
             spokeThisTurn = true;
           },
           hangup: () => {
+            if (requestEndCall('brain_end')) return;
             const delay = farewellHangupDelayMs({
               bytes: playbackBytes,
               startedAt: playbackStartedAt,
@@ -3969,11 +4241,12 @@ mediaWss.on('connection', (ws, req) => {
         drainSpokenSpeakSlots(brainState, planned.lines);
         noteSlotDrain(slotsBeforePlanned);
         callBrainStates.set(callKey, brainState);
-        const spokeCatalogue =
-          catalogueMouth.speakLocal &&
-          Boolean(catalogueMouth.line) &&
-          planned.lines.includes(catalogueMouth.line);
-        if (spokeCatalogue && catalogueMouth.reason === 'outage') {
+        const spokeCatalogue = arbPacket
+          ? arbPacket.topic === 'catalogue'
+          : turnCatalogueMouth.speakLocal &&
+            Boolean(turnCatalogueMouth.line) &&
+            planned.lines.includes(turnCatalogueMouth.line);
+        if (spokeCatalogue && !arbPacket && catalogueMouth.reason === 'outage') {
           await resolveLlmRecoverySpeech(clean, { consumeOffer: false });
         }
         if (spokeCatalogue) {
@@ -4030,13 +4303,19 @@ mediaWss.on('connection', (ws, req) => {
             });
           }
         }
+        if (arbPacket) turnArbiter.release();
+        return;
+      }
+      if (arbPacket) {
+        // Claimed but nothing planned (already spoken): stay silent rather than let Gemini speak.
+        turnArbiter.release();
         return;
       }
       // Name Yes: a public fact the name gate did not speak is still the answer.
       // SpeakPacket already returned when it spoke the fact. This speaks a
       // public slot that is still unanswered, then Voice drains that line.
       if (
-        localReply &&
+        turnLocalReply &&
         nameJustConfirmed &&
         isSpeakSlotOutcome(localReply.outcome) &&
         !speakCommit.wasSpoken(localReply.line)
@@ -4167,8 +4446,21 @@ mediaWss.on('connection', (ws, req) => {
         fillerMode !== 'off' &&
         !bareCloser && shouldSpeakThinkingAck(clean);
       const fillerDelayMs = resolveVoiceProfile().fillerDelayMs;
-      const fillerText =
-        fillerMode === 'ack' || fillerMode === 'auto'
+      const ruleFiller =
+        ackTracker && (fillerMode === 'ack' || fillerMode === 'auto')
+          ? ackRule.pickRuleFiller({
+              lang: fillerLanguage(callLanguage),
+              toolTurn: Boolean(needsImmediateProgress),
+              tracker: ackTracker,
+              callerText: clean,
+            })
+          : undefined;
+      // Rule on: null = rate-limited, no filler this turn.
+      const fillerText = ruleFiller === null
+        ? ''
+        : ruleFiller
+        ? ruleFiller.text
+        : fillerMode === 'ack' || fillerMode === 'auto'
           ? pickContextualAck(clean, fillerLanguage(callLanguage))
           : process.env.VOICE_FILLER;
       if (smooth.hold) turnFillerText = fillerText || '';
@@ -4183,7 +4475,10 @@ mediaWss.on('connection', (ws, req) => {
             fillerStarted = true;
             thinkingAckTurn = turnTiming;
             thinkingAckAtMs = Date.now();
+            // Any filler (Mm included) makes the reply drop its leading ack.
             ackPlayedTurn = turnTiming;
+            if (ruleFiller && ruleFiller.word) wordAckTurn = turnTiming;
+            if (ackTracker) ackTracker.noteHeard(fillerText);
             turnTiming.markFiller();
             console.log(
               `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`
@@ -4191,6 +4486,31 @@ mediaWss.on('connection', (ws, req) => {
             speakThinkingAck(fillerText).catch(() => {});
           }
         }, fillerDelayMs);
+      } else if (ackTracker && ruleFiller === null && tts && ackRule.gapGuardEnabled()) {
+        // VOICE_NO_ANSWER_DELETE gap guard (HD_b401138c8ffd: ~1.6 s silence, no
+        // filler on any turn). Neutral Mm., not an ack-led reply; the reply's ack
+        // lead is stripped so it cannot stack.
+        // Measured from end of turn (not from here), so the clip reaches the caller
+        // under 900 ms; cached clip only (no live TTS start-up), one per turn.
+        const gapDelay = ackRule.gapGuardDelay(turnTiming.turnStartedAt, Date.now());
+        fillerTimer = setTimeout(() => {
+          fillerTimer = null;
+          if (!turnBusy || speaking || bargeInActive || firstSpokenChunk || fillerStarted) return;
+          const found = isFillerCacheEnabled() && ttsSpeedScale === 1
+            ? lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: ackRule.GAP_FILL, callLanguage, extraLexicon: ttsLexiconOverrides })
+            : { pcm: null };
+          if (!found.pcm) {
+            console.log(`[ws/media][${sidLabel()}] gap-guard miss (not cached) lang=${callLanguage}`);
+            return;
+          }
+          fillerStarted = true;
+          thinkingAckTurn = turnTiming;
+          thinkingAckAtMs = Date.now();
+          ackPlayedTurn = turnTiming;
+          turnTiming.markFiller();
+          console.log(`[ws/media][${sidLabel()}] gap-guard lang=${callLanguage} at=${Date.now() - turnTiming.turnStartedAt}ms: ${ackRule.GAP_FILL}`);
+          playCachedFillerPcm(found.pcm, { text: ackRule.GAP_FILL }).catch(() => {});
+        }, gapDelay);
       }
 
       const streamOn =
@@ -4273,6 +4593,10 @@ mediaWss.on('connection', (ws, req) => {
       async function onSpokenChunk(chunk) {
         // Visit, hold, and order lookups speak nameConfirmSpeech, not the model.
         if (suppressModelSpeech) return;
+        // VOICE_TURN_ARBITER: live Gemini is a proposer; never races a sealed packet.
+        if (typeof turnArbiter !== 'undefined' && turnArbiter.enabled && !turnArbiter.geminiAllowed()) return;
+        // Unclaimed turn: a Gemini line may only name services that are in the pinned doc (Brain #707 itemNamePostCheck).
+        if (typeof turnArbiter !== 'undefined' && turnArbiter.enabled && !turnArbiter.geminiLineOk(String(chunk || ''), brainProfile?.spokenCataloguePin?.doc)) return;
         // Streamed chunks are spoken before tools run, so a saved claim or a
         // number the caller never said must not reach TTS. Confirmation of a
         // save comes from formatToolConfirmation after the tool result.
@@ -4286,6 +4610,7 @@ mediaWss.on('connection', (ws, req) => {
           capabilities,
           state: brainState,
           language: callLanguage,
+          streamChunk: true,
           spokenThisTurn: spokeThisTurn === true,
         });
         const polished = polishedDetail.text;
@@ -4327,7 +4652,20 @@ mediaWss.on('connection', (ws, req) => {
             reason: gated.reason || 'trimmed',
           });
         }
-        const text = cutNoAiSlop(gated.line);
+        let text = cutNoAiSlop(gated.line);
+        if (typeof ackTracker !== 'undefined' && ackTracker && text) {
+          // Thinking-ack/never-two backstop: drop the lead if an ack already played or the rule forbids one.
+          const backstopped = ackRule.applyAckBackstop(text, {
+            tracker: ackTracker,
+            acked: ackPlayedTurn === turnTiming,
+            dropBare: true,
+          });
+          if (backstopped !== text && typeof voiceTrace !== 'undefined' && voiceTrace) {
+            voiceTrace.noteTransform({ stage: 'ack_rule', before: text, after: backstopped, reason: 'ack_lead' });
+          }
+          text = backstopped;
+          ackTracker.noteHeard(text);
+        }
         if (typeof voiceTrace !== 'undefined' && voiceTrace) {
           voiceTrace.noteTransform({
             stage: 'no_ai_slop',
@@ -4456,6 +4794,21 @@ mediaWss.on('connection', (ws, req) => {
         return true;
       }
 
+      // VOICE_INTENT_IN_MAIN_TURN (shadow): fold the catalogue command into this Gemini turn.
+      const intentGate = require('./src/conversation/v2/intentGate');
+      const foldDoc = intentGate.intentInMainTurnEnabled() ? brainProfile?.spokenCataloguePin?.doc || null : null;
+      const foldNote = foldDoc ? intentGate.foldInstruction(foldDoc) : '';
+      if (foldNote) catalogueSystemPrompt = `${catalogueSystemPrompt}\n\n${foldNote}`;
+      function logFoldedIntent(result) {
+        if (!foldNote) return;
+        try {
+          const folded = intentGate.foldedFromParsed(parseGeminiResponse(String(result?.rawText || '')), foldDoc);
+          const nlu = intentGate.nluIntent(clean, { profile: brainProfile, doc: foldDoc, topic: brainState?.v2CatalogueState?.lastInfo || null });
+          console.log(`[ws/media][${callKey}] intent_fold ${JSON.stringify({ folded, nlu, agree: Boolean(folded && folded.intent === nlu.intent && (folded.service_id || null) === (nlu.service_id || null)) })}`);
+        } catch (err) {
+          console.log(`[ws/media][${callKey}] intent_fold error ${String(err?.message || err).slice(0, 60)}`);
+        }
+      }
       function traceModelResult(result) {
         voiceTrace.noteModelOutput({
           provider: 'gemini',
@@ -4531,6 +4884,7 @@ mediaWss.on('connection', (ws, req) => {
           catalogueBreath: catalogueMouth.letGemini,
         });
         traceModelResult(result);
+        logFoldedIntent(result);
         stopFillerForReply();
 
         if (suppressModelSpeech) {
@@ -4784,12 +5138,16 @@ mediaWss.on('connection', (ws, req) => {
           await actionProgressSpeak;
           // "Alright." already played: say "They'll call you back.", not
           // "Okay. They'll call you back." (HD_4d6ac592aeb3 t4).
-          const outcomeLine = trimAckLead(confirmation, {
+          const outcomeSource = ackTracker
+            ? ackRule.applyAckBackstop(confirmation, { tracker: ackTracker, acked: ackPlayedTurn === turnTiming })
+            : confirmation;
+          const outcomeLine = trimAckLead(outcomeSource, {
             acked: ackPlayedTurn === turnTiming,
           });
           callTranscript.pushAgent(outcomeLine);
           if (smooth.any) stopHoldFill();
           await ((smooth.receipt && playCachedReceipt(outcomeLine)) || speakText(outcomeLine));
+          if (ackTracker) ackTracker.noteHeard(outcomeLine);
           spokeThisTurn = true;
         }
       } else if (owedConfirmFoldEnabled() && owedReceiptForFold && !bargeInActive) {
@@ -4873,7 +5231,11 @@ mediaWss.on('connection', (ws, req) => {
         }
       }
 
-      if (result?.shouldEndCall && !bargeInActive) {
+      if (endHonour && endSignalFromBrain(result).end && !bargeInActive) {
+        const sig = endSignalFromBrain(result);
+        console.log(`[ws/media][${sidLabel()}] end-call signal source=${sig.source}: hangup after audio`);
+        requestEndCall(sig.source, sig.reason);
+      } else if (result?.shouldEndCall && !bargeInActive) {
         console.log(`[ws/media][${sidLabel()}] end-call marker — closing media shortly`);
         setTimeout(() => {
           try {
@@ -4894,7 +5256,9 @@ mediaWss.on('connection', (ws, req) => {
       if (activeTurnTiming === turnTiming) activeTurnTiming = null;
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
-      if (callEnding) {
+      if (callEnding && requestEndCall('turn_error_while_ending')) {
+        // VOICE_END_CALL_HONOUR: the same single hangup, after any queued audio.
+      } else if (callEnding) {
         try {
           ws.close(1000, 'end_call');
         } catch {
@@ -5497,12 +5861,23 @@ mediaWss.on('connection', (ws, req) => {
         }
       }
       if (tts && isFillerCacheEnabled()) {
-        void warmFillerAckPcm({
+        // VOICE_NO_ANSWER_DELETE: the gap-guard clip is warmed first, keyed per call
+        // language (HD_89aa48bf657f T1 missed: the ack warm keyed "Mm." as en only).
+        const gapWarm = ackRule.gapGuardEnabled()
+          ? warmFillerAckPcm({
+              tts,
+              voiceId: tenantSonioxVoiceId,
+              extraLexicon: ttsLexiconOverrides,
+              phrases: ackRule.gapWarmPhrases(callLanguage),
+              shouldAbort: () => speechOutageStarted || !tts,
+            }).catch(() => null)
+          : Promise.resolve(null);
+        void gapWarm.then(() => warmFillerAckPcm({
           tts,
           voiceId: tenantSonioxVoiceId,
           extraLexicon: ttsLexiconOverrides,
           shouldAbort: () => speechOutageStarted || turnBusy || !tts,
-        })
+        }))
           .then((result) => {
             if (result?.warmed) {
               console.log(

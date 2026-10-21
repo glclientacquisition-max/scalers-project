@@ -13,6 +13,7 @@ function parseGeminiResponse(responseText) {
     serviceRequest: null,
     appointment: null,
     appointmentUpdate: null,
+    catalogueIntent: null,
     errors: [],
   };
   let spoken = String(responseText || '');
@@ -31,6 +32,8 @@ function parseGeminiResponse(responseText) {
           output.reason = parsed.save_caller_info.reason;
         }
       }
+      // VOICE_INTENT_IN_MAIN_TURN shadow: folded catalogue command, logged only.
+      if (parsed.catalogue_intent && typeof parsed.catalogue_intent === 'object') output.catalogueIntent = parsed.catalogue_intent;
       if (parsed.escalate) {
         output.escalate = {
           teammate: String(

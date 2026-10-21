@@ -211,7 +211,7 @@ test('EN and SW lookups make the same decision', () => {
 
 test('services list is capped, and a closed holds gate does not silence facts', () => {
   const list = say('services', 'which services', profiles().list, 'en');
-  assert.match(list.speech, /deep cleaning, standard cleaning, sofa cleaning, carpet cleaning and more/);
+  assert.match(list.speech, /Deep cleaning, Standard cleaning, Sofa cleaning, Carpet cleaning and more\./);
   // tenant_hold_gate is the reservation capability. Most tenants have it closed.
   const closed = { allowed: false, reasons: ['Holds are not enabled in policies.'] };
   const priced = say('price', 'sofa cleaning', { ...profiles().carry, holdGate: closed }, 'en');

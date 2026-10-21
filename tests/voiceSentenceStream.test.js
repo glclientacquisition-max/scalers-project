@@ -48,7 +48,7 @@ describe('mid-call one-shots do not speak-and-return', () => {
     assert.match(turn, /planCatalogueMouth\(\{/);
     assert.match(turn, /geminiCatalogueEnabled\(\)/);
     assert.match(turn, /catalogue fallback reason=/);
-    assert.match(turn, /catalogueMouth\.speakLocal && catalogueMouth\.line/);
+    assert.match(turn, /(?:turnC|c)atalogueMouth\.speakLocal && (?:turnC|c)atalogueMouth\.line/); // BRAIN_V2_NLU_GAPS §6a yield object or the mouth itself
     assert.match(turn, /text: clean/);
     assert.match(turn, /catalogueListed/);
     assert.match(turn, /groundFilePriceLine\(\{/);
