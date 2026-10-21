@@ -18,7 +18,7 @@ const { errorCode } = require('./spokenCatalogueGenerate');
 
 const ON = /^(1|true|on|yes)$/i;
 const enabled = (env = process.env) => ON.test(String(env.SPOKEN_CATALOGUE_ON_SAVE || '').trim());
-const TENANT_COLS = require('./spokenCatalogue').CATALOGUE_COLS.join(',');
+const tenantCols = () => require('./spokenCatalogue').factStoreCols().join(','); // + faqs, business_policies with BRAIN_V2_FACT_STORE
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const profileFromRow = (r) => require('./spokenCatalogue').catalogueProfileFromRow(r);
@@ -78,7 +78,7 @@ async function runSpokenCatalogueCompile(tenantId, { db, generate = null, timeou
   if (!UUID.test(String(tenantId || ''))) return { ok: false, skipped: 'bad_tenant' };
   const t0 = Date.now();
   try {
-    const { data, error } = await db.from('tenants').select(TENANT_COLS).eq('id', tenantId).maybeSingle();
+    const { data, error } = await db.from('tenants').select(tenantCols()).eq('id', tenantId).maybeSingle();
     if (error || !data) return { ok: false, skipped: 'no_tenant' };
     const profile = profileFromRow(data);
     const previous = data.spoken_catalogue || null;

@@ -22,6 +22,22 @@ const csOn = () => CS.commitSafetyEnabled();
 // tenant's spoken catalogue (src/knowledge/spokenCatalogue.js). Off: unchanged behaviour.
 const SC = require('../../knowledge/spokenCatalogue');
 const scOn = () => /^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || ''));
+const FS = require('../../knowledge/factStore');
+const fsOn = () => FS.factStoreEnabled();
+// C2: the which-one question for a choice the binder could not settle (size, family or item).
+function choiceLine(profile, ch, lang) {
+  const facts = FS.factsFor(profile); const sw = L.isSw(lang);
+  const pool = ch.kind === 'item' ? facts.products : facts.services;
+  const opts = ch.options.map((id) => pool.find((x) => x.id === id)).filter(Boolean);
+  if (ch.kind === 'service' && ch.axis === 'size') {
+    const fam = compileSpokenCatalogue({ servicesCatalog: opts.map((o) => ({ name: o.row.name || o.name })) }).families.find((f) => f.askSize);
+    if (fam) { const sz = compileSpokenCatalogue({ servicesCatalog: opts.map((o) => ({ name: o.row.name || o.name })) }).sizeAsk(fam, lang); return R.info({ kind: 'which_size', head: sw ? fam.labelSw : fam.labelEn, sizes: sz.charAt(0).toUpperCase() + sz.slice(1) }, lang); }
+  }
+  const names = opts.map((o) => (ch.kind === 'item' ? String(o.name).replace(/\s*°\s*/g, ' degree ').replace(/\s+/g, ' ').trim() : R.svcName(o.row.name || o.name, lang)));
+  const list = names.length === 2 ? `${names[0]} ${sw ? 'au' : 'or'} ${names[1]}` : `${names.slice(0, -1).join(', ')} ${sw ? 'au' : 'or'} ${names[names.length - 1]}`;
+  return sw ? `Ni ipi kati ya ${list}?` : `Which one do you mean: ${list}?`;
+}
+const CHOICE_ASK = { service: ['price', 'explain', 'check', 'availability', 'book', 'services'], item: ['price', 'availability', 'order', 'check', 'explain'] };
 function spoken(profile, svc, lang) {
   if (!scOn() || !svc) return null;
   const sc = SC.resolveSpokenCatalogue(profile); const e = SC.entryForRaw(sc, svc.name); const Lg = L.isSw(lang) ? 'sw' : 'en';
@@ -533,6 +549,10 @@ function infoAnswer(state, u, profile, kind) {
       if (others.length && baseListed) { state.coverageAsk = state.turn; return R.info({ kind: 'coverage_outside', base: L.cap(base), names: joinList(others.slice(0, 4), state.lang), more: others.length > 4 }, state.lang); }
     }
     if (!u.area && !u.place) state.coverageAsk = state.turn;
+    if (fsOn() && u.area?.listed) {
+      const a = FS.areaFact(FS.factsFor(profile), u.area.name); const fee = a && a.say && a.say[L.isSw(state.lang) ? 'sw' : 'en'];
+      if (fee && a.confirmed && (a.fee.mode === 'free' || (a.fee.mode === 'fixed' && a.fee.ksh != null))) return `${R.info({ kind: 'coverage', area: u.area, general, fromList: listed.length > 0, more: compiled.more }, state.lang).replace(/\s*(The team confirms when you book\.|Timu itathibitisha ukibook\.)$/, '')} ${fee}`;
+    }
     return R.info({
       kind: 'coverage',
       area: u.area,
@@ -562,7 +582,18 @@ function infoAnswer(state, u, profile, kind) {
   if (kind === 'want_know') return R.info({ kind: 'want_know' }, state.lang, n);
   if (kind === 'price') {
     const named = /\b(cleaning|clean|for (an?|the)? ?\w+|ya \w+)\b/i.test(u.text);
-    const svc = u.service || (!named && u.text.split(/\s+/).length <= 5 && state.slots.service && (profile.servicesCatalog || []).find((x) => x.name === state.slots.service)); const prod = u.products[0];
+    const svc = u.service || (!named && u.text.split(/\s+/).length <= 5 && state.slots.service && (fsOn() ? (() => { const f = FS.factsFor(profile).services.find((x) => x.row.name === state.slots.service); return f ? { ...f.row, factId: f.id } : null; })() : (profile.servicesCatalog || []).find((x) => x.name === state.slots.service))); const prod = u.products[0];
+    // C2: the price is the store's typed price (amount, range, from, unit); ask/unconfirmed is never spoken
+    if (fsOn() && (svc || prod)) {
+      const facts = FS.factsFor(profile);
+      const f = svc ? facts.services.find((x) => x.id === svc.factId || x.row.name === svc.name) : facts.products.find((x) => x.id === prod.product_id);
+      if (f) {
+        const sp = svc && scOn() ? spoken(profile, svc, state.lang) : null;
+        if (f.price.say) return R.info({ kind: 'price', found: true, label: svc ? (sp?.label || f.row.name || f.name) : f.name, price: (sp && sp.price) || f.price.say }, state.lang);
+        state.offer = 'quote';
+        return R.info({ kind: 'price', found: false }, state.lang);
+      }
+    }
     if (!svc && !prod && !/\b(oven|fridge|gutter|\w+ cleaning)\b/i.test(u.text)) return R.info({ kind: 'which_price' }, state.lang);
     if (svc && scOn()) { const sp = spoken(profile, svc, state.lang); if (sp.price && svc.pricing?.confirmed !== false) return R.info({ kind: 'price', found: true, label: sp.label, price: sp.price }, state.lang); if (svc.price_range) return R.info({ kind: 'price', found: false }, state.lang); }
     if (svc && svc.price_range && svc.pricing?.confirmed !== false) return R.info({ kind: 'price', found: true, label: svc.name, price: svc.price_range }, state.lang);
@@ -650,6 +681,26 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   }
   // §6c "Chris." early in the call with no name yet: the caller's name, never "help regarding Chris?"
   if (u.nameCandidate && !u.name && !state.slots.name && !state.intent && state.turn <= 3) { u.name = u.nameCandidate; u.kind = 'give_name'; u.confidence = 0.6; u.clear = false; u.reason = 'bare_name_intro'; }
+  // C2 (BRAIN_V2_FACT_STORE): the caller's answer to our which-one question re-reads the held turn with it
+  if (fsOn() && state.pick) {
+    const pk = state.pick; state.pick = null;
+    const n = FS.bareSize(text); const facts = FS.factsFor(profile);
+    const first = pk.kind === 'service' ? facts.services.find((x) => x.id === pk.options[0]) : null;
+    const addon = n != null && first?.variant ? ` ${n} ${first.variant.kind === 'bedroom' ? 'bedroom' : first.variant.kind}` : '';
+    const h = N.understand(`${pk.text} ${text}${addon}`, { profile, now, expecting: pk.expecting, topic: state.lastInfo });
+    const settled = pk.kind === 'service' ? h.service && pk.options.includes(h.service.factId) : h.products.some((x) => pk.options.includes(x.product_id));
+    if (settled && !h.choice) { u = h; text = u.text; state.trace.push({ turn: state.turn, pick: 'settled' }); }
+    else state.trace.push({ turn: state.turn, pick: 'dropped' });
+  } else if (fsOn() && u.choice && !state.areaPick && !(FS.matchFaq(text, FS.factsFor(profile))?.score >= 0.7)) {
+    const ch = u.choice; const want = CHOICE_ASK[ch.kind] || [];
+    const pending = ch.kind === 'service' ? (state.intent === 'book' && !state.slots.service) || state.expecting === 'service' : (state.intent === 'order' || state.expecting === 'items');
+    if ((u.intents.some((i) => want.includes(i)) || pending || !u.intents.filter((i) => i !== 'want_know').length) && state.phase !== 'readback') {
+      state.pick = { ...ch, text, expecting: state.expecting };
+      const lang0 = state.lang || 'en'; const line = choiceLine(profile, ch, lang0);
+      state.lastBase = line; state.lastLine = line; noteAck(state, line);
+      return { line, lang: lang0, source: 'receipt', toolResults: [], end: false };
+    }
+  }
   // area clarify (only groups touching the tenant's own places): ask once, then re-read the held turn with the chosen place
   if (state.areaPick) {
     const pk = state.areaPick; state.areaPick = null;
@@ -717,6 +768,17 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   if (state.intent && state.expecting && N.nonAnswer(text) && !u.when && !u.service) {
     const q = (String(state.lastBase || state.lastLine || '').match(/[^.!?]+\?\s*$/) || [])[0];
     if (q) return out(u.intents.includes('hold') ? `${R.info({ kind: 'hold' }, lang)} ${q.trim()}` : `${R.info({ kind: 'repair' }, lang).split(/(?<=[.!?])\s/)[0]} ${q.trim()}`);
+  }
+  // C2 (BRAIN_V2_FACT_STORE): a question the owner answered in a CONFIRMED FAQ gets that answer;
+  // a seed/suggested FAQ is not in the store, so it is never spoken.
+  if (fsOn() && state.phase !== 'readback' && !u.intents.some((i) => TRANSACTIONAL.includes(i)) && (/\?\s*$/.test(text) || /^\W*(what|how|do|does|is|are|can|will|should|who|which|when|je|mna|kuna|naweza|unaweza|mnaweza|lazima)\b/i.test(text))) {
+    const hit = FS.matchFaq(text, FS.factsFor(profile));
+    if (hit && hit.score >= 0.7) {
+      const ans = hit.faq[L.isSw(lang) ? 'sw' : 'en'] || hit.faq.answer;
+      state.lastInfo = 'faq'; state.trace.push({ turn: state.turn, faq: hit.faq.question });
+      if (state.intent) { mergeSlots(state, u, profile); const st = stepIntent(state, u, profile); return out(st?.line ? `${ans} ${st.line}` : ans); }
+      return out(`${ans} ${L.isSw(lang) ? 'Kuna kingine?' : 'Anything else?'}`);
+    }
   }
   // HD_89aa48bf657f T5: "what do you mean by 1-Bedroom?" gets a short plain explanation, no price, no booking push
   if (u.intents.includes('explain') && u.service) { const svc = u.service; if (state.intent === 'book' && state.slots.service === svc.name && state.phase === 'collect' && !state.slots.when.date) state.slots.service = state.slotsServiceBefore || null; const sp = spoken(profile, svc, lang); return out(sp && sp.explain ? R.info({ kind: 'explain_text', text: sp.explain }, lang) : R.info({ kind: 'explain', name: svc.name, notes: svc.notes || '' }, lang)); }

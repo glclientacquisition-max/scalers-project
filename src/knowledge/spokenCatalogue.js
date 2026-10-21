@@ -261,12 +261,17 @@ function buildDoc(profile, rows, { ai = null, aiError = null, previous = null, n
   const order = ['items', 'house', 'deep', 'office'];
   categories.sort((a, b) => (order.indexOf(a.id) + 1 || 99) - (order.indexOf(b.id) + 1 || 99));
   const h = sourceHash(profile);
+  // C2 (BRAIN_V2_FACT_STORE): the one typed fact store rides in the same doc (no new column)
+  const FS = require('./factStore');
+  const facts = FS.factStoreEnabled() ? FS.compileFacts(profile) : null;
+  const factsChanged = facts ? previous?.facts?.sourceHash !== facts.sourceHash : false;
   return {
     schemaVersion: SCHEMA_VERSION, tenantId: profile.tenantId || null,
-    version: (previous?.version || 0) + (changed || previous?.sourceHash !== h ? 1 : 0),
+    version: (previous?.version || 0) + (changed || previous?.sourceHash !== h || factsChanged ? 1 : 0),
     sourceHash: h, generatedAt: now.toISOString(), generator: ai ? 'ai+rules' : 'rules', aiError,
     status: entries.every((e) => e.status === 'approved') && entries.length ? 'approved' : 'draft',
     entries, categories, coverage: coverageRules(profile), issues,
+    ...(facts ? { facts } : {}),
   };
 }
 async function compileSpokenCatalogue(profile = {}, { generate = null, previous = null, now = new Date() } = {}) {
@@ -279,7 +284,7 @@ async function compileSpokenCatalogue(profile = {}, { generate = null, previous 
   return buildDoc(profile, rows, { ai, aiError, previous, now });
 }
 function compileSync(profile = {}) { const d = buildDoc(profile, prepRows(profile), { now: new Date(0) }); d.version = 0; return d; }
-const needsRegeneration = (stored, profile) => !stored || stored.schemaVersion !== SCHEMA_VERSION || stored.sourceHash !== sourceHash(profile);
+const needsRegeneration = (stored, profile) => !stored || stored.schemaVersion !== SCHEMA_VERSION || stored.sourceHash !== sourceHash(profile) || (require('./factStore').factStoreEnabled() && require('./factStore').factsStale(stored, profile));
 // Owner edit: one field of one entry. Edited text survives regeneration while name/notes are unchanged (price may change).
 function applyOwnerEdit(sc, { id, field, lang, value }) {
   const e = sc.entries.find((x) => x.id === id);
@@ -372,7 +377,13 @@ function resolveSpokenCatalogue(profile = {}, opts = {}) { return resolveSpokenC
 // reader (backfill, on-save compile, Voice call path), so sourceHash agrees.
 const CATALOGUE_COLS = ['id', 'services_catalog', 'product_catalog', 'service_areas', 'business_locations', 'spoken_catalogue'];
 function catalogueProfileFromRow(r = {}) {
-  return { tenantId: r.id, servicesCatalog: r.services_catalog || [], productCatalog: r.product_catalog || [], serviceAreas: r.service_areas || null, businessLocations: r.business_locations || [] };
+  const p = { tenantId: r.id, servicesCatalog: r.services_catalog || [], productCatalog: r.product_catalog || [], serviceAreas: r.service_areas || null, businessLocations: r.business_locations || [] };
+  // C2 fact store: FAQs and policies are read only when selected (factStoreCols); otherwise unchanged
+  if (r.faqs !== undefined) p.faqs = r.faqs || [];
+  if (r.business_policies !== undefined) p.businessPolicies = r.business_policies || {};
+  return p;
 }
+// Columns the Save rebuild selects: the catalogue columns, plus FAQs and policies for the fact store.
+const factStoreCols = () => (require('./factStore').factStoreEnabled() ? [...CATALOGUE_COLS, 'faqs', 'business_policies'] : CATALOGUE_COLS);
 
-module.exports = { CATALOGUE_COLS, catalogueProfileFromRow, storedFirst, resolveSpokenCatalogueMeta, pinSpokenCatalogue, SCHEMA_VERSION, AI_SCHEMA, sourceHash, compileSpokenCatalogue, compileSync, needsRegeneration, applyOwnerEdit, approve, approvePrices, spokenName, sayName, entryForRaw, findEntry, resolveSpokenCatalogue, priceRules, swNameRules, explainRules, coverageRules, checkField, categoryLabel, slug };
+module.exports = { CATALOGUE_COLS, factStoreCols, catalogueProfileFromRow, storedFirst, resolveSpokenCatalogueMeta, pinSpokenCatalogue, SCHEMA_VERSION, AI_SCHEMA, sourceHash, compileSpokenCatalogue, compileSync, needsRegeneration, applyOwnerEdit, approve, approvePrices, spokenName, sayName, entryForRaw, findEntry, resolveSpokenCatalogue, priceRules, swNameRules, explainRules, coverageRules, checkField, categoryLabel, slug };

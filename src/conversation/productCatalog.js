@@ -224,6 +224,17 @@ function formatProductsBlock(products) {
  * @returns {{product: object, matched: string, score: number}|null}
  */
 function findProductMatch(item, rawCatalog) {
+  // C2 (BRAIN_V2_FACT_STORE): normalized whole-token match from the fact store (case, punctuation,
+  // hyphens, plurals, mojibake); never a substring or prefix. Equal rows: ambiguous + candidates.
+  const FS = require('../knowledge/factStore');
+  if (FS.factStoreEnabled()) {
+    const raw = Array.isArray(rawCatalog) ? rawCatalog : [];
+    const hit = FS.findItem(item, FS.compileFacts({ productCatalog: raw }));
+    if (!hit) return null;
+    const asProduct = (f) => normalizeProducts([raw[f.index]])[0] || { name: f.name };
+    const product = asProduct(hit.fact);
+    return { product, matched: product.name, score: Math.round(hit.score * 1000), ambiguous: hit.ambiguous, candidates: hit.candidates.map(asProduct) };
+  }
   const needle = normalizeMatchText(item);
   if (!needle || needle.length < 2) return null;
   const products = normalizeProducts(rawCatalog);
