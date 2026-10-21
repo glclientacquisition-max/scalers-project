@@ -235,6 +235,7 @@ Rollback of P1 and P2 is [`billing_data_layer_down.sql`](./billing_data_layer_do
 | File | Depends on | Notes |
 | --- | --- | --- |
 | [`fix_p0_rls_remove_legacy_allow_all.sql`](./fix_p0_rls_remove_legacy_allow_all.sql) | `owner_rls.sql`, `lead_status.sql` member policies already applied | **P0 (2026-08-14).** Drops legacy `Enable all access for service role only` policies on `tenants`, `calls`, `transcripts`. Applied on production ALCR. Does not revoke anon grants. |
+| [`revoke_anon_default_privileges.sql`](./revoke_anon_default_privileges.sql) | any | **2026-10-22.** Default privileges: new `public` tables, sequences and functions created by `postgres` no longer grant `anon`. `authenticated` and `service_role` unchanged. `supabase_admin` defaults unchanged (not alterable as `postgres`). Existing objects unchanged. Future objects anon must reach need an explicit `grant ... to anon`; new functions still need `revoke ... from public, anon`. Applied staging + production. |
 
 ---
 
