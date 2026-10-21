@@ -221,7 +221,15 @@ describe('lines', () => {
     assert.match(op.silenceLine({ language: 'en', step: 3 }), /Goodbye\.$/);
   });
   it('warm lines: first, returning, 2 re-invites, 3 ladder lines (cacheable, no names)', () => {
-    const lines = op.openingWarmLines(profileOf('jirani'), { isOpen: true, recordingNotice: true });
+    // Notice variants add their own lines (tests/recordingNoticeVariant.test.js).
+    const prevVariant = process.env.VOICE_RECORDING_NOTICE_VARIANT;
+    delete process.env.VOICE_RECORDING_NOTICE_VARIANT;
+    let lines;
+    try {
+      lines = op.openingWarmLines(profileOf('jirani'), { isOpen: true, recordingNotice: true });
+    } finally {
+      if (prevVariant != null) process.env.VOICE_RECORDING_NOTICE_VARIANT = prevVariant;
+    }
     assert.equal(lines.length, 7);
     for (const l of lines) assert.doesNotMatch(l, /Alvin/);
     assert.ok(lines.includes('Hapa ni Jirani Cleaning Services, naitwa Wanjiru. Simu hii inaweza kurekodiwa. Nikusaidie vipi?'));

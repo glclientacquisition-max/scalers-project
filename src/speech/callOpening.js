@@ -33,6 +33,7 @@ const {
   RECORDING_NOTICE_SW,
   recordingNoticeOn,
 } = require('../conversation/recordingNotice');
+const { noticeVariants, noticeWording } = require('./recordingNoticeVariant');
 const {
   analyzeCallerLanguage,
   createLanguageState,
@@ -229,10 +230,12 @@ function shopLabel({ spokenName, businessName }) {
  *   greetingText?: string, greetingInvite?: string, language?: 'en'|'sw',
  *   isOpen?: boolean|null, afterHoursMode?: string, closureNotice?: string,
  *   recordingNotice?: boolean, isReturning?: boolean, knownName?: string,
- *   nameConfirmed?: boolean,
+ *   nameConfirmed?: boolean, noticeVariant?: 'a'|'b'|'c'|null,
  * }} o
+ *   noticeVariant (VOICE_RECORDING_NOTICE_VARIANT): the notice moves after the
+ *   question and uses that reason-led wording; null keeps today's notice.
  *   returningSkipNotice?: boolean (default VOICE_RETURNING_SKIP_NOTICE),
- * @returns {{ text: string, kind: string, language: 'en'|'sw', invite: string, notice: boolean, noticeText: string, noticeEnd: number|null }}
+ * @returns {{ text: string, kind: string, language: 'en'|'sw', invite: string, notice: boolean, noticeVariant: string|null, noticeText: string, noticeEnd: number|null }}
  *   noticeEnd: character offset just past the notice in text (null: no notice).
  */
 function composeOpening(o = {}) {
@@ -269,7 +272,8 @@ function composeOpening(o = {}) {
   }
   if (returning) parts.push(p.welcomeBack(name));
   const ownerSaysRecord = Boolean(owner) && /\b(record|rekodi)/i.test(owner);
-  if (noticeOn && !ownerSaysRecord) parts.push(p.notice);
+  const variantLine = noticeOn && !ownerSaysRecord ? noticeWording(o.noticeVariant, lang) : '';
+  if (noticeOn && !ownerSaysRecord && !variantLine) parts.push(p.notice);
   let follow = invite;
   if (closure) {
     parts.push(endSentence(closure)); // owner's words, verbatim
@@ -285,6 +289,8 @@ function composeOpening(o = {}) {
   // message-mode name ask is added after it.
   const ownerUsed = Boolean(owner) && !returning;
   if (!ownerUsed || follow === p.nameAsk) parts.push(follow);
+  // Greet and ask first, then the reason-led notice in the same voice.
+  if (variantLine) parts.push(variantLine);
   const kind = [
     returning ? (name ? 'returning_named' : 'returning') : 'new',
     closure ? 'bulletin' : closed ? (messageMode ? 'closed_message' : 'closed_serve') : messageMode ? 'message' : 'open',
@@ -292,7 +298,7 @@ function composeOpening(o = {}) {
   const text = parts.filter(Boolean).join(' ');
   // Where the notice ends in the line, so a barge can tell whether it was heard.
   let noticeText = '';
-  if (noticeOn) noticeText = ownerSaysRecord ? owner : p.notice;
+  if (noticeOn) noticeText = ownerSaysRecord ? owner : variantLine || p.notice;
   const at = noticeText ? text.indexOf(noticeText) : -1;
   return {
     text,
@@ -300,6 +306,7 @@ function composeOpening(o = {}) {
     language: lang,
     invite,
     notice: noticeOn,
+    noticeVariant: variantLine ? o.noticeVariant : null,
     noticeText,
     noticeEnd: at >= 0 ? at + noticeText.length : null,
   };
@@ -732,8 +739,16 @@ function createOpeningStore(opts = {}) {
 // ---------------------------------------------------------------------------
 
 /** The short notice line spoken when the greeting's notice was cut. */
-function noticeLine(language) {
-  return PACK[langOf(language)].notice;
+/**
+ * The notice as one standalone line (owed after a barge). With a recording
+ * notice variant, its wording without the joining "Na " / "And ".
+ */
+function noticeLine(language, variant = null) {
+  const lang = langOf(language);
+  const w = variant ? noticeWording(variant, lang) : '';
+  if (!w) return PACK[lang].notice;
+  const bare = w.replace(/^(?:na|and)\s+/i, '');
+  return `${bare.charAt(0).toUpperCase()}${bare.slice(1)}`;
 }
 
 const PERSONAL_NAME_ASK =
@@ -954,6 +969,8 @@ function openingWarmLines(profile = {}, { isOpen = null, recordingNotice } = {})
   const first = composeOpening(base);
   const back = composeOpening({ ...base, isReturning: true });
   const lines = [first.text, back.text];
+  // Every configured notice wording, so whichever a call draws is a cache hit.
+  for (const v of noticeVariants()) lines.push(composeOpening({ ...base, noticeVariant: v }).text);
   for (let i = 0; i < MAX_BARE_HELLO; i += 1) lines.push(bareHelloLine({ language, invite: first.invite, count: i }));
   for (let s = 1; s <= SILENCE_LADDER_MS.length; s += 1) lines.push(silenceLine({ language, invite: first.invite, step: s }));
   return [...new Set(lines.filter(Boolean))];
