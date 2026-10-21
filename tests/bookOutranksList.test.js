@@ -36,5 +36,5 @@ test('a plain services question still lists, gaps on', () => withGaps('1', () =>
 test('server wiring: every catalogue mouth reads the yielded objects', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.match(src, /const bookOutranksList = bookOutranksListTurn\(clean, brainProfile\);/);
-  for (const re of [/localReply: turnLocalReply,\n\s*legacyMouth: turnLegacyMouth,\n\s*v2Mouth: turnCatalogueMouth,/, /\.concat\(turnCatalogueMouth\.v2Proposals \|\| \[\]\)/, /commitTurnFacts\(speakCommit, \{\n\s*localReply: turnLocalReply,/, /turnCatalogueMouth\.speakLocal && turnCatalogueMouth\.line \? turnCatalogueMouth\.line : ''/]) assert.match(src, re);
+  for (const re of [/localReply: turnLocalReply,\n\s*legacyMouth: turnLegacyMouth,\n\s*v2Mouth: turnCatalogueMouth,/, /\.concat\(turnCatalogueMouth\.v2Proposals \|\| \[\]\)/, /commitTurnFacts\(speakCommit, \{\n\s*localReply: turnLocalReply,/, /turnCatalogueMouth\.speakLocal && turnCatalogueMouth\.line\s*\?\s*turnCatalogueMouth\.line\s*:\s*''/]) assert.match(src, re);
 });

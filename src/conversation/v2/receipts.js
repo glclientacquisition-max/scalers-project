@@ -8,14 +8,22 @@ const sw = (lang) => L.isSw(lang);
 function priceTxt(p, S) {
   const raw = String(p || '').trim();
   if (!raw) return '';
-  const amount = Number(String(raw).replace(/[^\d.]/g, ''));
-  const lang = S ? 'sw' : 'en';
-  if (Number.isFinite(amount) && amount > 0) {
-    const money = speakMoney(amount, lang);
-    if (/^from\b/i.test(raw)) return S ? `kuanzia ${money}` : `from ${money}`;
-    return money;
+  const fromWord = (t) => t.replace(/^From\s+/i, S ? 'kuanzia ' : 'from ');
+  // Already speech-ready (spoken catalogue: "2,200 shillings per square metre"): keep it.
+  if (/\b(shillings?|shilingi|bob)\b/i.test(raw)) return fromWord(raw);
+  // "KSh 2,200", "From KSh 2,500 per seat", "KSh 800-1,200": amount or range spoken as
+  // words, unit kept. Never strip every non-digit (that read "800-1,200" as millions).
+  const m = raw.match(/^(from\s+)?(?:ksh\.?|kes)?\s*([\d,]+(?:\.\d+)?)\s*(?:(?:-|–|to|hadi)\s*(?:ksh\.?|kes)?\s*([\d,]+(?:\.\d+)?))?\s*(.*)$/i);
+  const num = (x) => Number(String(x).replace(/,/g, ''));
+  if (m && Number.isFinite(num(m[2])) && num(m[2]) > 0) {
+    const lang = S ? 'sw' : 'en';
+    let money = speakMoney(num(m[2]), lang);
+    if (m[3] && Number.isFinite(num(m[3])) && num(m[3]) > 0) money = `${money} ${S ? 'hadi' : 'to'} ${speakMoney(num(m[3]), lang)}`;
+    const unit = String(m[4] || '').trim();
+    const said = unit ? `${money} ${unit}` : money;
+    return m[1] ? `${S ? 'kuanzia' : 'from'} ${said}` : said;
   }
-  return raw.replace(/^From\s+/i, S ? 'kuanzia ' : 'from ');
+  return fromWord(raw);
 }
 const svcName = (s, lang) => speakCatalogueName(s, lang || 'en');
 const period = (hhmm) => { const h = Number(String(hhmm).slice(0, 2)); return h < 12 ? 'asubuhi' : h < 16 ? 'mchana' : h < 19 ? 'jioni' : 'usiku'; };

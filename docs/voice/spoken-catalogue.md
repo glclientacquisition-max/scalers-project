@@ -1,3 +1,8 @@
+---
+owner: voice
+last_reviewed: 2026-10-21
+---
+
 # Spoken catalogue + v2 catalogue step (VOICE_V2_CATALOGUE, off by default)
 
 Migration step 3 of `research/proven-voice-pipeline.md`: catalogue/discovery moves from

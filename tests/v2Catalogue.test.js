@@ -168,5 +168,5 @@ test('owner approval lets a flagged price be spoken; unapproved odd prices stay 
   // The approved price is spoken on the live path.
   const M = require('../src/conversation/v2/machine'); const st = M.createState(); const r = M.catalogueTurn(st, { text: 'Post-construction ni bei gani?', profile: { ...profile, spokenCatalogue: ok }, lang: 'sw' });
   if (/^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || ''))) { assert.match(r.line, /\bshilingi 40\b/, r.line); assert.doesNotMatch(r.line, /\bKSh\b|Ungependa kubook/); }
-  else assert.strictEqual(r.line, 'Bei ya Post-Construction Clean ni KSh 40.'); // flag off: legacy line unchanged
+  else assert.strictEqual(r.line, 'Bei ya Post-Construction Clean ni shilingi arobaini.'); // flag off: #833 live line (price spoken as words)
 });

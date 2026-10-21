@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-193 variables.
+197 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -30,6 +30,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BILLING_NOTICES_SEND` | voice | `src/billing/billingNoticeSend.js` |
 | `BRAIN_CALL_FIXES_D199` | desk | `dashboard/src/lib/tenantFieldProvenance.ts` |
 | `BRAIN_GEMINI_CATALOGUE` | voice | `src/conversation/catalogueMouth.js` |
+| `BRAIN_V2_NLU_GAPS` | voice | `src/conversation/turnProposals.js`<br>`src/conversation/v2/nlu.js` |
 | `BUSINESS_KNOWLEDGE` | voice | `src/db.js`<br>`src/prompts.js`<br>`src/tenantProfile.js` |
 | `BUSINESS_NAME` | voice | `server.js`<br>`src/conversation/businessAssistantIntro.js`<br>`src/db.js`<br>+2 more |
 | `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js` |
@@ -45,10 +46,10 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `DESK_PLAN_CHANGE` | desk | `dashboard/src/lib/deskPlanChange.ts` |
 | `DESK_PUBLIC_URL` | voice | `server.js` |
 | `DOCS_STALE_DAYS` | scripts | `scripts/docs/check-docs.js` |
-| `FACT_HASH_MODE` | desk, scripts, voice | `dashboard/src/lib/tenantFieldProvenance.ts`<br>`scripts/replay-voice-suite.js`<br>`scripts/smoke-mvp-retail.js`<br>+1 more |
+| `FACT_HASH_MODE` | desk, scripts, voice | `dashboard/src/lib/tenantFieldProvenance.ts`<br>`scripts/ack-rule-report.js`<br>`scripts/replay-voice-suite.js`<br>+2 more |
 | `FACT_PAYMENTS_V2_HASH` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
 | `FACT_SAVE_IS_CONFIRM` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
-| `GEMINI_API_KEY` | desk, voice | `dashboard/src/app/(desk)/settings/catalogActions.ts`<br>`dashboard/src/app/(desk)/settings/pronunciationGeminiScanActions.ts`<br>`dashboard/src/lib/faqFromTranscript.ts`<br>+10 more |
+| `GEMINI_API_KEY` | desk, scripts, voice | `dashboard/src/app/(desk)/settings/catalogActions.ts`<br>`dashboard/src/app/(desk)/settings/pronunciationGeminiScanActions.ts`<br>`dashboard/src/lib/faqFromTranscript.ts`<br>+12 more |
 | `GEMINI_AUDIO_MODEL` | desk | `dashboard/src/lib/gemini.ts` |
 | `GEMINI_BACKUP_MODEL` | voice | `src/conversation/geminiVoice.js` |
 | `GEMINI_MAX_OUTPUT_TOKENS` | voice | `server.js`<br>`src/speech/replayVoice.js` |
@@ -136,6 +137,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SONIOX_VOICE` | voice | `src/speech/sonioxVoice.js` |
 | `SONIOX_VOICE_CATALOG_CACHE_MS` | voice | `src/speech/sonioxVoiceCatalog.js` |
 | `SONIOX_VOICES_API` | voice | `src/speech/sonioxVoice.js` |
+| `SPOKEN_CATALOGUE_MODEL` | scripts, voice | `scripts/backfill-spoken-catalogue.js`<br>`server.js` |
 | `STAGE_PR_HOLD` | scripts | `scripts/stage-pull-request-hold.js` |
 | `STAGE_RESULT_PATH` | scripts | `scripts/stage-desk-alias.js`<br>`scripts/stage-pull-request-note.js`<br>`scripts/stage-pull-request.js` |
 | `STAGING_DATABASE_URL` | scripts | `scripts/verify-staging-schema.js` |
@@ -146,8 +148,8 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SUPABASE_ANON_KEY` | desk | `dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_PUBLISHABLE_KEY` | desk | `dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_RECORDINGS_BUCKET` | voice | `src/db.js` |
-| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/supabase.ts`<br>+9 more |
-| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/invoicePay/provider.js`<br>+12 more |
+| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/supabase.ts`<br>+10 more |
+| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/invoicePay/provider.js`<br>+13 more |
 | `TENANT_DID` | voice | `server.js`<br>`src/db.js` |
 | `TENANT_ID` | scripts, voice | `scripts/bench-inbound-webhook.js`<br>`scripts/smoke-db.js`<br>`server.js`<br>+1 more |
 | `TEXTSMS_API_KEY` | desk, voice | `dashboard/src/lib/callerSms.ts`<br>`src/notifications/sms.js` |
@@ -177,7 +179,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_GREETING_CACHE` | voice | `src/speech/greetingPcmCache.js` |
 | `VOICE_GREETING_MODE` | voice | `src/conversation/dynamicSpeech.js` |
 | `VOICE_GREETING_TIMEOUT_MS` | voice | `src/conversation/dynamicSpeech.js` |
-| `VOICE_INTERNAL_SECRET` | desk, voice | `dashboard/src/app/(desk)/calls/escalateActions.ts`<br>`dashboard/src/lib/voicePreview.ts`<br>`server.js` |
+| `VOICE_INTERNAL_SECRET` | desk, voice | `dashboard/src/app/(desk)/calls/escalateActions.ts`<br>`dashboard/src/lib/spokenCatalogueOnSave.ts`<br>`dashboard/src/lib/voicePreview.ts`<br>+1 more |
 | `VOICE_LINE_UNAVAILABLE_CLIP_DIR` | voice | `src/sautikit/lineUnavailableAudio.js` |
 | `VOICE_LINE_UNAVAILABLE_REFRESH` | voice | `src/sautikit/lineUnavailableAudio.js` |
 | `VOICE_LINE_UNAVAILABLE_REFRESH_MS` | voice | `src/sautikit/lineUnavailableAudio.js` |
@@ -204,6 +206,8 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_TTS_RESPEAK_CONNECT_MS` | voice | `src/speech/sonioxTts.js` |
 | `VOICE_TTS_RESPEAK_MAX` | voice | `src/speech/sonioxTts.js` |
 | `VOICE_TURN_END_CAP_MS` | voice | `src/speech/turnTaking.js` |
+| `VOICE_V2_CATALOGUE` | scripts, voice | `scripts/v2-catalogue-sense.js`<br>`src/conversation/v2/machine.js`<br>`src/db.js`<br>+1 more |
+| `VOICE_V2_CATALOGUE_MODEL_NAME` | scripts | `scripts/score-intent-set.js` |
 | `WALLET_CHARGING_ENABLED` | voice | `src/db.js` |
 | `WALLET_RATE_KES_PER_MINUTE` | desk, voice | `dashboard/src/lib/wallet.ts`<br>`src/billing/liveTransferLegs.js`<br>`src/db.js` |
 | `WALLET_TRANSFER_RATE_KES_PER_MINUTE` | voice | `src/billing/liveTransferLegs.js` |

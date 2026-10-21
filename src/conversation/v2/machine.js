@@ -8,6 +8,7 @@ const L = require('./lexicon');
 const N = require('./nlu');
 const R = require('./receipts');
 const { buildCatalogue, validateCall } = require('./catalogue');
+const { listedAreaIds } = require('../listedAreas');
 const { compileSpokenCatalogue, joinList } = require('../spokenCatalogue');
 const { compileSpokenCoverage, compileSpokenPolicies } = require('../spokenFacts');
 const { compileAskReceipt } = require('./askReceipt');
@@ -357,9 +358,10 @@ function infoAnswer(state, u, profile, kind) {
     if (!cat.length && !compiled.families.length) return R.info({ kind: 'want_know' }, state.lang);
     // HD_89aa48bf657f (VOICE_V2_CATALOGUE): home services as plain categories from the tenant's spoken catalogue
     if (vertical(profile) === 'home' && scOn() && !(u.followup || n >= 1)) { const sc = SC.resolveSpokenCatalogue(profile); const lg = L.isSw(state.lang) ? 'sw' : 'en'; const house = sc.categories.find((c) => c.id === 'house'); if (house && /\b(saizi|sizes?|ukubwa|vyumba|bedrooms?)\b/i.test(u.text || '')) return R.info({ kind: 'house_sizes', sizes: house.entryIds.map((id) => (sc.entries.find((e) => e.id === id).raw.name.match(/(\d)-Bedroom/i) || [])[1]).filter(Boolean) }, state.lang); const labels = sc.categories.map((c) => c[lg]).filter(Boolean).slice(0, 4); if (labels.length) return R.info({ kind: 'service_categories', labels }, state.lang); }
-    // 7d377196 topic context: "what exactly / zipi hasa" right after a services answer goes one level deeper; "what sizes?" lists bedroom sizes
-    if (vertical(profile) === 'home' && cat.length) { const cats = R.serviceCategories(cat); const house = cats.find((c) => c.k === 'house'); if (u.followup) return R.info({ kind: 'service_detail', cats }, state.lang); if (house && /\b(saizi|sizes?|ukubwa|vyumba|bedrooms?)\b/i.test(u.text || '')) return R.info({ kind: 'house_sizes', sizes: house.names.map((x) => (x.match(/(\d)-Bedroom/i) || [])[1]).filter(Boolean) }, state.lang); }
-    // #833 live spoken catalogue: families, never raw SKU titles
+    // HD_89aa48bf657f + 7d377196 (lineage wins for home services): plain categories in the caller's language;
+    // a repeat or "what exactly / zipi hasa" goes one level deeper; "what sizes?" lists bedroom sizes
+    if (vertical(profile) === 'home' && cat.length) { const cats = R.serviceCategories(cat); const house = cats.find((c) => c.k === 'house'); if (u.followup || n >= 1) return R.info({ kind: 'service_detail', cats }, state.lang); if (house && /\b(saizi|sizes?|ukubwa|vyumba|bedrooms?)\b/i.test(u.text || '')) return R.info({ kind: 'house_sizes', sizes: house.names.map((x) => (x.match(/(\d)-Bedroom/i) || [])[1]).filter(Boolean) }, state.lang); if (cats.length) return R.info({ kind: 'service_categories', cats }, state.lang); }
+    // #833 live spoken catalogue (other verticals): families, never raw SKU titles
     if (compiled.families.length) return R.info({ kind: 'services', names: compiled.labels(state.lang), more: compiled.more }, state.lang);
     const start = (n * 4) % cat.length;
     return R.info({ kind: 'services', names: [...cat, ...cat].slice(start, start + 4), more: cat.length > 4 }, state.lang);
@@ -380,7 +382,9 @@ function infoAnswer(state, u, profile, kind) {
     const om = String(u.text || '').match(/\b(?:outside|out of|beyond|nje ya)\s+(?:the\s+)?([A-Za-z]+)/i);
     if (om && listed.length && !(u.area && u.area.name.toLowerCase() !== om[1].toLowerCase()) && !(u.place && u.place.toLowerCase() !== om[1].toLowerCase())) {
       const base = om[1].toLowerCase(); const others = listed.filter((a) => a.toLowerCase() !== base);
-      if (others.length && others.length < listed.length) { state.coverageAsk = state.turn; return R.info({ kind: 'coverage_outside', base: L.cap(base), names: joinList(others.slice(0, 4), state.lang), more: others.length > 4 }, state.lang); }
+      // the base may be a listed county (county:nairobi), which the spoken place list leaves out
+      const baseListed = listedAreaIds(profile).some((a) => a.toLowerCase() === base) || others.length < listed.length;
+      if (others.length && baseListed) { state.coverageAsk = state.turn; return R.info({ kind: 'coverage_outside', base: L.cap(base), names: joinList(others.slice(0, 4), state.lang), more: others.length > 4 }, state.lang); }
     }
     if (!u.area && !u.place) state.coverageAsk = state.turn;
     return R.info({

@@ -164,7 +164,7 @@ for (const sc of [null, '1']) {
       for (const [lang, t] of CHECKS) {
         const st = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] });
         const r = await V2.runTurn(st, { text: t, profile: DD, now: NOW, handlers: {}, langLock: lang });
-        const price = sc ? (lang === 'sw' ? /bei ni kuanzia shilingi 2,200 kwa mita mraba/ : /from 2,200 shillings per square metre/) : /KSh 2,200/;
+        const price = sc ? (lang === 'sw' ? /bei ni kuanzia shilingi 2,200 kwa mita mraba/ : /from 2,200 shillings per square metre/) : /from two thousand two hundred shillings|kuanzia shilingi elfu mbili na mia mbili/; // #833 live: prices spoken as words
         assert.match(r.line, price, t);
         assert.match(r.line, lang === 'sw' ? /^Ndio, tunafanya/ : /^Yes, we do carpet cleaning/, t);
         assert.doesNotMatch(r.line, /slot|nafasi|available|inapatikana|confirm|thibitisha/i, t); // no availability claim
