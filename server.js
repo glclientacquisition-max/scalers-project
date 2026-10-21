@@ -98,6 +98,8 @@ const ackRule = require('./src/speech/ackRule');
 const toolSmooth = require('./src/speech/toolSmooth');
 /** VOICE_TOOL_SMOOTH: per-connection heard-audio clock. Empty when the flags are off. */
 const MEDIA_CLOCKS = new WeakMap();
+/** VOICE_END_CALL_HONOUR: per-connection playout clock (end-call waits for it). Empty when off. */
+const PLAYOUT_CLOCKS = new WeakMap();
 const voiceTraceBySid = new Map();
 
 function bindVoiceTrace(callSid, trace) {
@@ -451,6 +453,14 @@ const { noteCallTerminal, callTerminalSince } = require('./src/speech/callLifecy
 const endedCalls = require('./src/speech/endedCalls');
 const { createCallFinalizer } = require('./src/callFinalize');
 const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
+const {
+  endCallHonourEnabled,
+  createPlayoutClock,
+  createEndCallController,
+  endSignalFromBrain,
+  outageSuppressed,
+} = require('./src/speech/endCallHonour');
+const { hangupSautikitCall } = require('./src/sautikit/callHangup');
 const {
   createVoiceTurnTiming,
   createCallTranscript,
@@ -2221,6 +2231,8 @@ function sendPcmToMedia(ws, pcm) {
   if (!ws || ws.readyState !== WebSocket.OPEN || !pcm || !pcm.length) return;
   const mediaClock = MEDIA_CLOCKS.get(ws);
   if (mediaClock) mediaClock.onSend(pcm.length);
+  const playout = PLAYOUT_CLOCKS.get(ws);
+  if (playout) playout.note(pcm.length);
   // Fixed phone gain on the whole utterance. Do not even-out 20 ms frames (pumping).
   const boosted = applyPcmGain(pcm, resolveVoiceProfile().gain);
   // Prefer small frames for smoother playback on the telephony side.
@@ -2243,6 +2255,8 @@ function clearMediaPlayback(ws) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   const mediaClock = MEDIA_CLOCKS.get(ws);
   if (mediaClock) mediaClock.onClear();
+  const playout = PLAYOUT_CLOCKS.get(ws);
+  if (playout) playout.clear();
   const payloads = [
     { type: 'killAudio' },
     // Compatibility fallbacks seen across forks / Twilio-style bridges.
@@ -2381,6 +2395,43 @@ mediaWss.on('connection', (ws, req) => {
       });
     },
   });
+  // VOICE_END_CALL_HONOUR (default off): honour the brain's end signal once,
+  // after the final audio has played; then nothing (no clip, SMS, email)
+  // treats a dead TTS as an outage. Off: null, today's timers below.
+  const endHonour = endCallHonourEnabled()
+    ? (() => {
+        const playout = createPlayoutClock();
+        PLAYOUT_CLOCKS.set(ws, playout);
+        return createEndCallController({
+          playoutRemainingMs: () => playout.remainingMs(),
+          onEnded: (info) => {
+            callEnding = true;
+            idleNudge.close();
+            unfinishedHold.close();
+            if (sessionCallSid) {
+              endedCalls.noteCallEnded(sessionCallSid, { reason: `end_call:${info?.source || ''}` });
+            }
+          },
+          hangupRest: () => hangupSautikitCall(sessionCallSid || sidLabel()),
+          closeMedia: (reason) => {
+            try {
+              ws.close(1000, reason);
+            } catch {
+              /* ignore */
+            }
+          },
+          log: (line) => console.log(`[ws/media][${sidLabel()}] ${line}`),
+        });
+      })()
+    : null;
+  /** Brain said the call is over: flag on → one hangup after the audio. */
+  function requestEndCall(source, reason = '') {
+    if (!endHonour) return false;
+    callEnding = true;
+    idleNudge.close();
+    void endHonour.request({ source, reason });
+    return true;
+  }
   function commitAgentQuestionIfNeeded(opts = {}) {
     const snap = agentReplay.snapshot();
     const committed = agentReplay.commitPlayback();
@@ -2921,6 +2972,22 @@ mediaWss.on('connection', (ws, req) => {
    */
   async function handleSpeechProviderOutage(reason) {
     if (speechOutageStarted) return { ok: false, outage: true };
+    if (endHonour) {
+      // VOICE_END_CALL_HONOUR call-ended guard (HD_2ccfbf6e1fa4, HD_5c9056d78d02):
+      // a reply that lands after hangup finds tts=null. That is not an outage.
+      const why = outageSuppressed({
+        endRequested: endHonour.ending(),
+        callEnding,
+        wsOpen: ws.readyState === WebSocket.OPEN,
+        terminal: Boolean(callTerminalSince(sidLabel(), connectedAt)),
+      });
+      if (why) {
+        console.warn(
+          `[ws/media][${sidLabel()}] speech outage suppressed (${reason}): call ended why=${why}; no clip, no owner alert`
+        );
+        return { ok: false, closed: true, suppressed: why };
+      }
+    }
     speechOutageStarted = true;
     unfinishedHold.close();
     greetingStarted = true;
@@ -4147,6 +4214,7 @@ mediaWss.on('connection', (ws, req) => {
             spokeThisTurn = true;
           },
           hangup: () => {
+            if (requestEndCall('brain_end')) return;
             const delay = farewellHangupDelayMs({
               bytes: playbackBytes,
               startedAt: playbackStartedAt,
@@ -5158,7 +5226,11 @@ mediaWss.on('connection', (ws, req) => {
         }
       }
 
-      if (result?.shouldEndCall && !bargeInActive) {
+      if (endHonour && endSignalFromBrain(result).end && !bargeInActive) {
+        const sig = endSignalFromBrain(result);
+        console.log(`[ws/media][${sidLabel()}] end-call signal source=${sig.source}: hangup after audio`);
+        requestEndCall(sig.source, sig.reason);
+      } else if (result?.shouldEndCall && !bargeInActive) {
         console.log(`[ws/media][${sidLabel()}] end-call marker — closing media shortly`);
         setTimeout(() => {
           try {
@@ -5179,7 +5251,9 @@ mediaWss.on('connection', (ws, req) => {
       if (activeTurnTiming === turnTiming) activeTurnTiming = null;
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
-      if (callEnding) {
+      if (callEnding && requestEndCall('turn_error_while_ending')) {
+        // VOICE_END_CALL_HONOUR: the same single hangup, after any queued audio.
+      } else if (callEnding) {
         try {
           ws.close(1000, 'end_call');
         } catch {
