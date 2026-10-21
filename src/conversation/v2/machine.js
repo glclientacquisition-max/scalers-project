@@ -420,6 +420,12 @@ function resetIntent(state) {
   state.intent = null; state.phase = 'collect'; state.pending = null; state.expecting = null; state.asked = { name: state.asked.name || 0 };
 }
 
+// The open question a re-ask repeats: during a read-back, that tool's yes/no question (R.reaskQ, EN/SW
+// parity); otherwise the last question spoken.
+function openQ(state, lang) {
+  if (state.phase === 'readback' && state.pending) return R.reaskQ(state.pending, lang) || null;
+  return (String(state.lastBase || state.lastLine || '').match(/[^.!?]+\?\s*$/) || [])[0] || null;
+}
 function echoAffirms(p, u) {
   if (u.negation || u.no) return false;
   // Alvin (15 Oct): the caller repeating the read-back TIME exactly ("saa 4", "Uh, 10am") is a yes; a day alone is not.
@@ -446,7 +452,7 @@ function csChanged(p, state) {
 async function confirmSafe(state, u, profile, handlers, out, results, myTurn = state.turn) {
   const p = state.pending; const lang = state.lang || 'en';
   mergeSlots(state, u, profile);
-  const q = () => (String(R.readback(p, lang) || '').match(/[^.!?]+\?\s*$/) || [''])[0].trim();
+  const q = () => R.reaskQ(p, lang);
   if (csChanged(p, state)) {
     state.record?.('rejected', p, { errorCode: 'slot_diff' });
     state.phase = 'collect'; state.pending = null;
@@ -744,7 +750,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   let out = (line0, extra = {}) => { const line = applyAckRule(state, line0, { ackOk: !!extra.ackOk, acked: !!acked, callerAck: !!u.ack, lang }); const l = line && (line === state.lastLine || line === state.lastBase) ? (() => { const n = state.repeatN = (state.repeatN || 0) + 1; let v = R.vary(line, lang, n); if (v === state.lastLine) v = R.vary(line, lang, n, true); return v; })() : line; state.lastBase = line; state.lastLine = l; noteAck(state, l); return { line: l, lang, source: extra.source || 'receipt', toolResults: results, end: !!extra.end, ...(extra.end ? { endReason: extra.endReason || 'caller_done' } : {}) }; };
   if (csOn()) { // any line that ends on the read-back question re-arms the confirm token for the caller's next turn
     const out0 = out;
-    out = (line0, extra) => { const r = out0(line0, extra); const p = state.phase === 'readback' && state.pending; if (p) { const q = (String(R.readback(p, lang) || '').match(/[^.!?]+\?\s*$/) || [''])[0].trim(); if (q && String(r.line || '').trim().endsWith(q)) p.issuedTurn = state.turn; } return r; };
+    out = (line0, extra) => { const r = out0(line0, extra); const p = state.phase === 'readback' && state.pending; if (p) { const q = (String(R.readback(p, lang) || '').match(/[^.!?]+\?\s*$/) || [''])[0].trim(); const rq = R.reaskQ(p, lang); const ln = String(r.line || '').trim(); if ((q && ln.endsWith(q)) || (rq && ln.endsWith(rq))) p.issuedTurn = state.turn; } return r; };
   }
   if (areaQ) return out(areaQ);
 
@@ -769,12 +775,12 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   if ((u.place || /^\W*(of|in|kama|like|what about|na je|je)\s+[A-Z][a-z]{3,}\W*$/i.test(text)) && /\?\s*$/.test(text) && !u.intents.includes('coverage') && !u.intents.includes('book')) u.intents.push('coverage');
   // "are you a bot?": always honest, then back to the open question (never a booking change)
   if (u.intents.includes('bot_q')) {
-    const q = state.expecting && (String(state.lastBase || state.lastLine || '').match(/[^.!?]+\?\s*$/) || [])[0];
+    const q = state.expecting && openQ(state, lang);
     return out(`${R.info({ kind: 'bot', agent: profile.agentName || 'Shy', biz: profile.businessName || '' }, lang)}${q ? ` ${q.trim()}` : ''}`);
   }
   // hold / line checks / ASR tags while collecting: keep every slot, re-ask the open question
   if (state.intent && state.expecting && N.nonAnswer(text) && !u.when && !u.service) {
-    const q = (String(state.lastBase || state.lastLine || '').match(/[^.!?]+\?\s*$/) || [])[0];
+    const q = openQ(state, lang);
     if (q) return out(u.intents.includes('hold') ? `${R.info({ kind: 'hold' }, lang)} ${q.trim()}` : `${R.info({ kind: 'repair' }, lang).split(/(?<=[.!?])\s/)[0]} ${q.trim()}`);
   }
   // C2 (BRAIN_V2_FACT_STORE): a question the owner answered in a CONFIRMED FAQ gets that answer;
@@ -798,7 +804,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   if (N.cutOff(text) && state.turn > 1 && (state.repairs || 0) < 2) {
     state.repairs = (state.repairs || 0) + 1;
     // re-ask the open question so the caller knows what to answer ("Sorry, I didn't catch that. Where should we come?")
-    const q = (String(state.lastBase || state.lastLine || '').match(/[^.!?]+\?\s*$/) || [])[0];
+    const q = openQ(state, lang);
     const sorry = R.info({ kind: 'repair' }, lang).split(/(?<=[.!?])\s/)[0];
     return out(q && state.expecting ? `${sorry} ${q.trim()}` : R.info({ kind: 'repair' }, lang));
   }
@@ -842,7 +848,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     // unrelated answer: re-read once, then hand off
     state.pendingRepeats = (state.pendingRepeats || 0) + 1;
     // not clearly yes or no and no new question: one yes/no re-ask; otherwise re-read once
-    if (state.pendingRepeats <= 1 && !state.echoAsked && !u.intents.length) { state.echoAsked = true; return out(R.ask('yes_no', 0, lang, { q: (String(R.readback(p, lang) || '').match(/[^.!?]+\?\s*$/) || [''])[0].trim() })); }
+    if (state.pendingRepeats <= 1 && !state.echoAsked && !u.intents.length) { state.echoAsked = true; return out(R.ask('yes_no', 0, lang, { q: R.reaskQ(p, lang) })); }
     if (state.pendingRepeats <= 1) { const line = propose(state, { ...p }); return out(line); }
     state.pendingRepeats = 0;
     if (p.tool === 'create_handoff') { resetIntent(state); } else { state.phase = 'collect'; state.pending = null; }

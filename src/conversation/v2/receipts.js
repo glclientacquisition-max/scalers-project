@@ -126,6 +126,18 @@ function readback(p, lang) {
   }
 }
 
+// The yes/no question a re-ask ("okay wait", unclear) repeats: the read-back's own question sentence.
+// EN's callback question carries the number and when, so the SW one does too ("Nimwombe ..., ni sawa?")
+// rather than a bare "Ni sawa?"; the lead sentence ("I can't change ...", "The manager isn't ...") is not repeated.
+function reaskQ(p, lang) {
+  const rb = String(readback(p, lang) || '');
+  if (sw(lang) && p && p.tool === 'create_handoff' && p.callbackWhen) {
+    const m = rb.match(/(Nimwombe [^.?]*)\. Ni sawa\?\s*$/);
+    if (m) return `${m[1]}, ni sawa?`;
+  }
+  return (rb.match(/[^.!?]+\?\s*$/) || [''])[0].trim();
+}
+
 function receipt(r, lang) {
   const S = sw(lang);
   // BRAIN_V2_COMMIT_SAFETY: a failed write is never a promise we did not make; the outbox owner task is real.
@@ -239,4 +251,4 @@ function vary(line, lang, n = 1, plain = false) {
   // No "As I said" / "Just to repeat" filler (Alvin, 14 Oct): a repeat is said plainly.
   return line;
 }
-module.exports = { serviceCategories, vary, ask, readback, receipt, info, svcName, rowLabel };
+module.exports = { serviceCategories, vary, ask, readback, reaskQ, receipt, info, svcName, rowLabel };
