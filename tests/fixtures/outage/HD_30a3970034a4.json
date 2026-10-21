@@ -1,0 +1,22 @@
+{
+  "callSid": "HD_30a3970034a4",
+  "env": "prod",
+  "build": "9b6d35f6",
+  "tenant": "24ca3d5e-db5c-4cc3-b745-a87a68cf3ce0",
+  "business": "Aris Kenya",
+  "startedEat": "2026-10-15T21:40:21+03:00",
+  "note": "Railway prod deploy logs, times are ms after ws connect (18:40:21.356Z). The caller hung up while Gemini was streaming; ws close nulled tts; the reply then hit speakText with tts=null. Old path: downtime clip + owner SMS. Expected with VOICE_OUTAGE_DEBOUNCE: no clip, no SMS.",
+  "events": [
+    { "t": 1290, "type": "tts_ok", "text": "Good evening, Aris, The Home of Affordable Stationery, this is Lynn. We're closed now. Tukusaidie vipi." },
+    { "t": 2540, "type": "caller_final", "text": "Okay, listen—" },
+    { "t": 4800, "type": "tts_ok", "text": "Poa." },
+    { "t": 5110, "type": "llm_start" },
+    { "t": 5133, "type": "telephony_completed" },
+    { "t": 5757, "type": "ws_close", "code": 1000 },
+    { "t": 5892, "type": "tts_stale_stream_error", "message": "400 Stream tts-a44d1bcf-fd6f-47fd-ae14-c273b507aeab not found. Send a start message first.", "classified": { "staleStream": true, "billing": false, "fatal": false } },
+    { "t": 5892, "type": "tts_closed", "code": 1005 },
+    { "t": 7233, "type": "speak", "text": "Am I speaking with Alvin Yegon?", "tts": null }
+  ],
+  "observed": { "downtimeClip": true, "ownerSms": true, "logs": ["speakText skipped — TTS unavailable: Am I speaking with Alvin Yegon?", "speech provider outage (tts unavailable): speaking clone-voice downtime clip", "owner alert kind=speech tenant=24ca3d5e-db5c-4cc3-b745-a87a68cf3ce0 channel=sms"] },
+  "expectedWithFlag": { "downtimeClip": false, "ownerSms": false, "decision": "ignore_closed" }
+}
