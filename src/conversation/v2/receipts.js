@@ -141,7 +141,7 @@ function receipt(r, lang) {
     case 'update_booking': return (S ? `Sawa, nimebadilisha ${svcName(r.row.service, lang)} hadi ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.` : `Done, your ${svcName(r.row.service, lang).toLowerCase()} is moved to ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.`) + more;
     case 'create_handoff':
       if (r.kind === 'address' || r.kind === 'payment') return S ? 'Sawa. Mwenye biashara atakupigia simu. Kwa sasa, mabadiliko bado yanasubiri.' : 'Okay. The owner will call you back on this number. Until then, the change is still pending.';
-      if (r.callbackSay) return (S ? `Sawa. Mwenye biashara atakupigia simu ${r.callbackSay}.` : `Okay. ${r.kind === 'manager' ? 'The manager' : 'The owner'} will call you back ${r.callbackSay}.`) + more;
+      if (r.callbackSay) return (S ? `Sawa. ${r.kind === 'manager' ? 'Meneja' : 'Mwenye biashara'} atakupigia simu ${r.callbackSay}.` : `Okay. ${r.kind === 'manager' ? 'The manager' : 'The owner'} will call you back ${r.callbackSay}.`) + more;
       return (S ? 'Sawa. Mwenye biashara atakupigia simu kwa namba hii.' : (r.kind === 'manager' ? 'Okay. The manager will call you back on this number.' : 'Okay. The team will call you back on this number.')) + more;
     case 'log_complaint': return S ? 'Asante. Nimepeleka malalamiko yako kwa mwenye biashara, atakupigia simu. Kuna kingine?' : 'Thank you. Your complaint is with the owner, who will call you back. Anything else?';
     default: return '';

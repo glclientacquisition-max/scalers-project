@@ -202,6 +202,12 @@ test('a phone number is not a place; a place word at the name prompt keeps the p
   assert.match(c.out[0].line, /Simba Drive.*Shall I book it\?$/); assert.equal(c.receipts[0].validators.area, 'unknown');
 }));
 
+test('SW manager callback: the receipt names the same person as the read-back (parity)', withFlag(async () => {
+  const a = await talk(['Naomba mwenye biashara anipigie.', 'Ndio'], { lang: 'sw' });
+  assert.match(a.out[0].line, /Nimwombe meneja akupigie simu kwa namba 0700 000 001, leo kabla ya/);
+  assert.match(a.out[1].line, /^Sawa\. Meneja atakupigia simu kwa namba 0700 000 001, leo kabla ya/);
+}));
+
 test('a yes that is not on the next turn after the read-back reads it back again', withFlag(async () => {
   const H = handlers();
   const st = V2.createState({ profile: DD, callerPhone: '+254700000001', callId: 'HD_stale' });
