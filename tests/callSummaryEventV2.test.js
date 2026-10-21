@@ -138,3 +138,44 @@ test('v2 + v1 merge: same row once, v2 owns handoffs (no phantom urgent escalati
   assert.equal(built.event.urgent, false);
   assert.equal(built.event.outcome, 'ordered');
 });
+
+test('v2 callback unconfirmed EN and SW: the handoff read-back gives no time, so a yes is not enough', async () => {
+  for (const langLock of [null, 'sw']) {
+    const { e } = await call(DD, ['I want to pay to a different M-Pesa number, can you change my payment details?', langLock ? 'Ndio.' : 'Yes.'], { langLock });
+    const [r] = e.receipts;
+    assert.equal(r.type, 'callback');
+    assert.equal(r.status, 'unconfirmed', String(langLock));
+    assert.equal(e.outcome, 'callback_needed');
+    assert.equal(e.urgent, false);
+  }
+});
+
+test('v2 callback confirmed EN and SW: number + time read back, yes or the time repeated, write ok', () => {
+  const { receiptsFromV2 } = require('../src/conversation/v2/summaryReceipts');
+  const mk = (readbackLine, replyText, ok = true) => ({
+    v: 2, slots: { name: null, items: [], when: {} }, staffNames: [], pending: null, intent: null,
+    receipts: [{ tool: 'create_handoff', kind: 'ladder', ok, id: null, readbackLine, replyText }],
+  });
+  const cases = [
+    ['The team will call you on this number tomorrow at 3 pm. Is that okay?', 'Yes.', true, 'confirmed'],
+    ['Timu itakupigia kwa namba hii kesho saa tisa, ni sawa?', 'Kesho saa tisa.', true, 'confirmed'],
+    ['The team will call you on this number tomorrow at 3 pm. Is that okay?', 'Okay wait.', true, 'unconfirmed'],
+    ['Timu itakupigia kwa namba hii kesho saa tisa, ni sawa?', 'Ndio.', false, 'unconfirmed'],
+  ];
+  for (const [line, reply, ok, want] of cases) {
+    const [r] = receiptsFromV2(mk(line, reply, ok), DD);
+    assert.equal(r.type, 'callback');
+    assert.equal(r.status, want, `${line} / ${reply} / ok=${ok}`);
+    const built = E.buildCallSummaryEvent({ path: 'v2', callLanguage: 'en', callId: 'c', tenantId: 't', answered: true, caller: { phone: null }, receipts: [r] });
+    assert.equal(built.ok, true, built.errors.join('; '));
+    assert.equal(built.event.outcome, 'callback_needed');
+    assert.equal(built.event.urgent, false);
+  }
+});
+
+test('v2 order items carry the real catalogue id or null (never prd_<n> or name:<slug>)', async () => {
+  const { e } = await call(RS, ["I'd like to order 2 diaries, pick up tomorrow. I am Brian.", 'Yes.']);
+  assert.equal(e.receipts[0].items[0].catalogueId, null, 'fixture Diary row has no id');
+  const p = await call(RS, ['I want to order protractors.']);
+  assert.equal(p.e.receipts[0].items[0].catalogueId, 'prd_protractor');
+});

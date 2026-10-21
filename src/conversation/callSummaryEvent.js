@@ -14,8 +14,8 @@ const RECEIPT_STATUS = ['confirmed', 'unconfirmed'];
 const SLOT_STATUS = ['given', 'not_given'];
 const STOCK = ['in_stock', 'out_of_stock', 'unconfirmed'];
 // Receipts whose confirmation is the backend outcome itself (the caller's own
-// report or ask), not a read-back of a transaction.
-const NO_READBACK_TYPES = new Set(['callback', 'complaint', 'escalation']);
+// report), not a read-back. Callbacks need a number + time read-back + yes.
+const NO_READBACK_TYPES = new Set(['complaint', 'escalation']);
 
 function callSummaryEventEnabled(env) {
   const raw = env ? env.CALL_SUMMARY_EVENT : process.env.CALL_SUMMARY_EVENT;
@@ -45,13 +45,14 @@ function catalogueRows(profile = {}) {
   }
   return rows;
 }
-function catalogueId(row, index) {
-  return clean(row.id || row.product_id || `name:${slug(row.name)}` || `row_${index}`, 80);
+/** The catalogue row's own id, or null (never synthesised). */
+function catalogueId(row) {
+  return clean(row?.id || row?.product_id || '', 80) || null;
 }
 function findCatalogueRow(profile, { id, name } = {}) {
   const rows = catalogueRows(profile);
   if (id) {
-    const byId = rows.find((r, i) => catalogueId(r, i) === id || r.id === id || r.product_id === id);
+    const byId = rows.find((r) => catalogueId(r) === id);
     if (byId) return byId;
   }
   const want = slug(name);
@@ -86,7 +87,7 @@ function itemFromCatalogue(profile, { id, name, qty }) {
   const row = findCatalogueRow(profile, { id, name });
   const q = Number(qty);
   const item = {
-    catalogueId: row ? catalogueId(row, 0) : null,
+    catalogueId: row ? catalogueId(row) : null,
     name: clean(row?.name || name, 120),
     qty: Number.isInteger(q) && q > 0 ? { value: q, status: 'given' } : { status: 'not_given' },
     stock: stockFromRow(row),
@@ -108,6 +109,37 @@ function isExplicitYes(text) {
   const core = raw.toLowerCase().replace(/[.!,]+/g, ' ').replace(/\s+/g, ' ').trim();
   return YES_WHOLE.test(core);
 }
+// Callback read-back (Ops ruling 21 Oct): the agent read back the NUMBER and
+// the TIME, and the caller's next turn is a whole-answer yes or repeats that
+// time. "Okay wait" / a question / "but" never count.
+const NUMBER_CUE = /(\bthis number\b|\bon this (phone|line)\b|\bnamba hii\b|\bnambari hii\b|\bnumber ending\b|\bnamba inayoishia\b|\+?254\s?\d[\d\s]{7,}|\b0[17]\d{2}[\s-]?\d{3}[\s-]?\d{3}\b)/i;
+const TIME_TOKEN = /\b(\d{1,2}(?::\d{2})?\s?(?:am|pm)|\d{1,2}:\d{2}|at \d{1,2}|saa (?:moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi(?: na (?:moja|mbili))?|\d{1,2})|tomorrow|today|tonight|this (?:morning|afternoon|evening)|kesho(?:kutwa)?|leo|asubuhi|mchana|jioni|usiku|in (?:an hour|\d+ (?:minutes|hours))|(?:mon|tues|wednes|thurs|fri|satur|sun)day|jumatatu|jumanne|jumatano|alhamisi|ijumaa|jumamosi|jumapili)\b/gi;
+function timeTokens(text) {
+  return new Set((String(text || '').match(TIME_TOKEN) || []).map((t) => t.toLowerCase().replace(/\s+/g, ' ')));
+}
+/** The caller's reply to a callback read-back counts as yes: whole-answer yes, or repeats the read-back time. */
+function callbackReplyIsYes(readbackText, replyText) {
+  if (isExplicitYes(replyText)) return true;
+  const reply = String(replyText || '').trim();
+  if (!reply || NOT_YES.test(reply)) return false;
+  const said = timeTokens(readbackText);
+  for (const t of timeTokens(reply)) if (said.has(t)) return true;
+  return false;
+}
+/** A line that reads back both the callback number and the time. */
+function readsBackNumberAndTime(text) {
+  return NUMBER_CUE.test(String(text || '')) && timeTokens(text).size > 0;
+}
+function callbackReadbackConfirmedInTurns(turns) {
+  const rows = Array.isArray(turns) ? turns : [];
+  for (let i = 0; i < rows.length - 1; i += 1) {
+    const a = rows[i];
+    const b = rows[i + 1];
+    if (a?.speaker === 'agent' && readsBackNumberAndTime(a.text) && b?.speaker === 'caller' && callbackReplyIsYes(a.text, b.text)) return true;
+  }
+  return false;
+}
+
 /** True when an agent read-back is followed directly by a whole-answer yes. */
 function readbackConfirmedInTurns(turns) {
   const rows = Array.isArray(turns) ? turns : [];
@@ -160,6 +192,7 @@ function receiptsFromV1({ brainState, toolResults, turns, profile = {} } = {}) {
   const { hangupResults } = require('./callResolution');
   const rows = hangupResults(state, toolResults).filter((r) => r && r.action && r.action !== 'save_caller_info');
   const readback = readbackConfirmedInTurns(turns);
+  const callbackReadback = callbackReadbackConfirmedInTurns(turns);
   const callerName = v1CallerName(state);
   const out = [];
   let n = 0;
@@ -173,7 +206,9 @@ function receiptsFromV1({ brainState, toolResults, turns, profile = {} } = {}) {
     if (row.action === 'update_appointment' && row.appointmentStatus === 'cancelled') continue;
     const confirmed = NO_READBACK_TYPES.has(type)
       ? written && (type !== 'escalation' || !row.soft)
-      : written && Boolean(rowId) && readback;
+      : type === 'callback'
+        ? written && callbackReadback
+        : written && Boolean(rowId) && readback;
     const v = row.value || {};
     const receipt = {
       receiptId: `v1_${++n}`,
@@ -327,7 +362,7 @@ function validateCallSummaryEvent(e) {
     req(typeof r.receiptId === 'string' && r.receiptId, `${at}.receiptId`);
     req(RECEIPT_TYPES.includes(r.type), `${at}.type`);
     req(RECEIPT_STATUS.includes(r.status), `${at}.status`);
-    if (r.status === 'confirmed' && !NO_READBACK_TYPES.has(r.type)) req(Boolean(r.writtenRowId), `${at} confirmed without writtenRowId`);
+    if (r.status === 'confirmed' && ['booking', 'order', 'quote'].includes(r.type)) req(Boolean(r.writtenRowId), `${at} confirmed without writtenRowId`);
     req(r.slots && typeof r.slots === 'object', `${at}.slots`);
     for (const [k, s] of Object.entries(r.slots || {})) {
       req(s && SLOT_STATUS.includes(s.status), `${at}.slots.${k}.status`);
@@ -339,11 +374,10 @@ function validateCallSummaryEvent(e) {
       for (const [j, it] of (r.items || []).entries()) {
         const ip = `${at}.items[${j}]`;
         req(typeof it.name === 'string' && it.name, `${ip}.name`);
-        req('catalogueId' in it, `${ip}.catalogueId`);
+        req(it.catalogueId === null || (typeof it.catalogueId === 'string' && it.catalogueId && !/^name:/.test(it.catalogueId)), `${ip}.catalogueId must be the real catalogue id or null`);
         req(it.qty && SLOT_STATUS.includes(it.qty.status), `${ip}.qty.status`);
         req(STOCK.includes(it.stock), `${ip}.stock`);
         if (it.unitPrice) req(Number.isFinite(it.unitPrice.min) && Number.isFinite(it.unitPrice.max) && it.unitPrice.max >= it.unitPrice.min && typeof it.unitPrice.unit === 'string', `${ip}.unitPrice`);
-        if (!it.catalogueId) req(it.stock === 'unconfirmed' && !it.unitPrice, `${ip} off-catalogue item has no stock or price`);
       }
     }
   }
@@ -401,6 +435,9 @@ module.exports = {
   mergeV2Receipts,
   toE164,
   readbackConfirmedInTurns,
+  callbackReadbackConfirmedInTurns,
+  callbackReplyIsYes,
+  readsBackNumberAndTime,
   isExplicitYes,
   itemFromCatalogue,
   stockFromRow,

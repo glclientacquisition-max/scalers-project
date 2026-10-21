@@ -103,7 +103,7 @@ function askSlot(state, slot, ctx) {
 }
 
 function mint(state) { state.tokenSeq += 1; return `ct_${state.turn}x${state.tokenSeq}`; }
-function propose(state, p) { p.token = mint(state); state.pending = p; state.phase = 'readback'; state.expecting = 'confirm'; return R.readback(p, state.lang); }
+function propose(state, p) { p.token = mint(state); state.pending = p; state.phase = 'readback'; state.expecting = 'confirm'; const line = R.readback(p, state.lang); p.readbackLine = line; return line; }
 
 // Returns { line } or { ladder:true } when a slot ask is exhausted.
 function stepIntent(state, u, profile) {
@@ -191,7 +191,7 @@ async function commit(state, p, handlers) {
       ok = Boolean(result && result.ok !== false); state.outcomes.push('complaint');
     }
   } catch (e) { ok = false; }
-  const rec = { tool: p.tool, action, ok, id: result?.id || null, service: p.service || null, when: p.when || null, items: p.items || null, pickup: p.pickup || null, row: p.row || null, kind: p.kind || null, place: p.place || null };
+  const rec = { tool: p.tool, action, ok, id: result?.id || null, service: p.service || null, when: p.when || null, items: p.items || null, pickup: p.pickup || null, row: p.row || null, kind: p.kind || null, place: p.place || null, readbackLine: p.readbackLine || null, replyText: p.replyText || null };
   state.receipts.push(rec);
   if (ok && (p.tool === 'create_booking' || p.tool === 'create_order') && s.name && handlers.saveCallerInfo) {
     const prior = state.file.contactName;
@@ -390,6 +390,7 @@ async function runTurn(state, { text, profile = {}, now = new Date(), handlers, 
     mergeSlots(state, u, profile);
     if (u.done && !/^\W*(yes|ndio|ndiyo)\b/i.test(u.text) ? false : (u.yes || echoAffirms(p, u)) && !pendingChanged(p, state)) {
       if (p.tool === 'create_handoff' && p.kind === 'quote') {}
+      p.replyText = String(u.text || '').slice(0, 160); // A4: callback read-back evidence
       const { rec, toolResult } = await commit(state, p, handlers);
       results.push(toolResult);
       const line = R.receipt(rec, lang);

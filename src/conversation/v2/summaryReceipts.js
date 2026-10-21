@@ -4,7 +4,7 @@
 // the confirm_token, except log_complaint) and from interest still on the
 // slots or a read-back the caller never answered. Price and stock come only
 // from the tenant catalogue (itemFromCatalogue); null stock is unconfirmed.
-const { slot, itemFromCatalogue } = require('../callSummaryEvent');
+const { slot, itemFromCatalogue, readsBackNumberAndTime, callbackReplyIsYes } = require('../callSummaryEvent');
 
 const TYPE_OF_TOOL = {
   create_booking: 'booking',
@@ -41,8 +41,14 @@ function receiptsFromV2(state, profile = {}) {
     if (!type) continue;
     const rowId = rec.ok && rec.id ? String(rec.id) : null;
     // book/order/handoff commits only run on the redeemed confirm_token
-    // (read-back + yes). A complaint is the caller's own report.
-    const confirmed = type === 'booking' || type === 'order' ? Boolean(rowId) : Boolean(rec.ok);
+    // (read-back + yes). A callback is confirmed only when that read-back said
+    // the number AND the time and the reply was a whole-answer yes or repeated
+    // the time (Ops ruling 21 Oct). Complaint / escalation: the write itself.
+    const confirmed = type === 'booking' || type === 'order'
+      ? Boolean(rowId)
+      : type === 'callback'
+        ? Boolean(rec.ok) && readsBackNumberAndTime(rec.readbackLine) && callbackReplyIsYes(rec.readbackLine, rec.replyText)
+        : Boolean(rec.ok);
     const r = { receiptId: `v2_${++n}`, type, status: confirmed ? 'confirmed' : 'unconfirmed', slots: {} };
     if (rowId) r.writtenRowId = rowId;
     if (type === 'booking') {

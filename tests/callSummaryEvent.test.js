@@ -125,18 +125,37 @@ test('"Okay wait, let me check with my wife" at the read-back is not a yes', () 
   for (const yes of ['Yes.', 'Ndiyo', 'Sawa sawa', 'Yes please', 'Go ahead']) assert.equal(E.isExplicitYes(yes), true, yes);
 });
 
-test('callback_needed EN and SW (written callback, no read-back needed)', () => {
-  for (const lang of ['en', 'sw']) {
-    const st = state(HOME, {
-      intent: 'human', lang,
-      results: [{ action: 'create_service_request', status: 'succeeded', id: 'sr_cb', requestType: 'callback', value: { type: 'callback', notes: 'Wants a quote for office cleaning' } }],
-    });
-    const e = build(HOME, st, [t('caller', lang === 'sw' ? 'Nipigie baadaye.' : 'Please call me back.')]);
-    assert.equal(e.outcome, 'callback_needed');
+const CALLBACK_ROW = { action: 'create_service_request', status: 'succeeded', id: 'sr_cb', requestType: 'callback', value: { type: 'callback', notes: 'Wants a quote for office cleaning' } };
+
+test('callback confirmed EN and SW: number + time read back, explicit yes or the time repeated', () => {
+  for (const [lang, turns] of [
+    ['en', [t('caller', 'Please call me back.'), t('agent', 'The owner will call you on this number tomorrow at 3 pm. Is that right?'), t('caller', 'Yes.')]],
+    ['sw', [t('caller', 'Nipigie baadaye.'), t('agent', 'Mwenye biashara atakupigia kwa namba hii kesho saa tisa, ni sawa?'), t('caller', 'Kesho saa tisa.')]],
+  ]) {
+    const st = state(HOME, { intent: 'human', lang, results: [CALLBACK_ROW] });
+    const e = build(HOME, st, turns);
+    assert.equal(e.outcome, 'callback_needed', lang);
     assert.equal(e.receipts[0].type, 'callback');
-    assert.equal(e.receipts[0].status, 'confirmed');
+    assert.equal(e.receipts[0].status, 'confirmed', lang);
     assert.equal(e.urgent, false);
     assert.equal(e.callLanguage, lang);
+  }
+});
+
+test('callback unconfirmed EN and SW: no read-back, no time, or "okay wait"', () => {
+  for (const [lang, turns] of [
+    ['en', [t('caller', 'Please call me back.'), t('agent', 'Okay, the owner will call you back.')]],
+    ['en', [t('agent', 'The owner will call you back on this number. Is that okay?'), t('caller', 'Yes.')]],
+    ['en', [t('agent', 'The owner will call you on this number tomorrow at 3 pm. Is that right?'), t('caller', 'Okay wait.')]],
+    ['sw', [t('caller', 'Nipigie baadaye.'), t('agent', 'Sawa, mwenye biashara atakupigia.')]],
+    ['sw', [t('agent', 'Mwenye biashara atakupigia kwa namba hii kesho saa tisa, ni sawa?'), t('caller', 'Ngoja kwanza.')]],
+  ]) {
+    const st = state(HOME, { intent: 'human', lang, results: [CALLBACK_ROW] });
+    const e = build(HOME, st, turns);
+    assert.equal(e.receipts[0].type, 'callback');
+    assert.equal(e.receipts[0].status, 'unconfirmed', `${lang}: ${turns.map((x) => x.text).join(' / ')}`);
+    assert.equal(e.outcome, 'callback_needed', 'still callback_needed, never urgent');
+    assert.equal(e.urgent, false);
   }
 });
 
@@ -178,8 +197,16 @@ test('validator rejects confirmed-without-row, urgent mismatch and invented stoc
   const base = { event: E.EVENT_NAME, schemaVersion: 1, path: 'v1', callLanguage: 'en', callId: 'c', tenantId: 't', outcome: 'booked', urgent: false, caller: { phone: null }, emittedAt: new Date().toISOString() };
   assert.equal(E.validateCallSummaryEvent({ ...base, receipts: [{ receiptId: 'r1', type: 'booking', status: 'confirmed', slots: {} }] }).ok, false);
   assert.equal(E.validateCallSummaryEvent({ ...base, urgent: true, receipts: [] }).ok, false);
-  assert.equal(E.validateCallSummaryEvent({ ...base, outcome: 'info_only', receipts: [{ receiptId: 'r1', type: 'order', status: 'unconfirmed', slots: {}, items: [{ catalogueId: null, name: 'Mystery pen', qty: { status: 'not_given' }, stock: 'in_stock' }] }] }).ok, false);
+  assert.equal(E.validateCallSummaryEvent({ ...base, outcome: 'info_only', receipts: [{ receiptId: 'r1', type: 'order', status: 'unconfirmed', slots: {}, items: [{ catalogueId: 'name:mystery-pen', name: 'Mystery pen', qty: { status: 'not_given' }, stock: 'unconfirmed' }] }] }).ok, false, 'no synthetic catalogue ids');
   assert.equal(E.validateCallSummaryEvent({ ...base, outcome: 'missed', receipts: [] }).ok, true);
+});
+
+test('catalogueId is the real id or null: a catalogue row with no id keeps its price and stock', () => {
+  const profile = { productCatalog: [{ name: 'Diary', price: '350', in_stock: 'yes' }] };
+  const it = E.itemFromCatalogue(profile, { id: 'prd_0', name: 'Diary', qty: 2 });
+  assert.equal(it.catalogueId, null);
+  assert.deepEqual(it.unitPrice, { min: 350, max: 350, unit: 'each' });
+  assert.equal(it.stock, 'in_stock');
 });
 
 test('off-catalogue item: no catalogueId, no price, stock unconfirmed', () => {
