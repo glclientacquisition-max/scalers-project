@@ -1,7 +1,7 @@
 "use client";
 
 import { withRoleGate } from "@/components/DeskRole";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
 import { NotifyChannelPicker } from "@/components/NotifyChannelPicker";
@@ -12,7 +12,6 @@ import {
   ToolSwitch,
   settingsValueFieldClass,
   settingsFormBodyClass,
-  settingsPrimaryButtonClass,
 } from "@/components/settingsUi";
 import {
   parseNotifyChannels,
@@ -22,9 +21,8 @@ import {
   saveAlertsAction,
   type AlertsActionState,
 } from "@/app/(desk)/settings/alertsActions";
-import { pendingSpinnerClass } from "@/components/ui/deskChrome";
-import { notify } from "@/components/ui/DeskNotice";
-import { useSettingsLeaveSource } from "@/components/SettingsLeaveGuard";
+import { TenantSettingsSaveButton } from "@/components/TenantSettingsSaveButton";
+import { useFormDraft, useFormSave } from "@/components/useFormSave";
 
 const initial: AlertsActionState = {};
 
@@ -45,16 +43,20 @@ function AlertsPanelInner({
   const [notifyChannels, setNotifyChannels] = useState<NotifyChannels>(() =>
     parseNotifyChannels(tenant.notify_channels)
   );
-  const [state, formAction, pending] = useActionState(saveAlertsAction, initial);
-  const alertsDraft = [
-    ownerWhatsapp,
-    alertEmail,
-    JSON.stringify(notifyChannels),
-  ].join("\u0001");
-  const [alertsBaseline, setAlertsBaseline] = useState(alertsDraft);
-  const alertsDirty = alertsDraft !== alertsBaseline;
-  const savedAlertsRef = useRef(state);
-  useSettingsLeaveSource("alerts", alertsDirty);
+  // Shared save pattern: toast, inline Saved, errors with retry, dirty and guard.
+  const save = useFormSave({
+    action: saveAlertsAction,
+    initialState: initial,
+    successMessage: "Saved",
+    formId: ALERTS_SETTINGS_FORM_ID,
+    // Stored phone is E.164: refetch so the fields show what was written.
+    onSaved: () => router.refresh(),
+  });
+  const { pending } = save;
+  const { justSaved, markClean } = useFormDraft(save, {
+    id: "alerts",
+    values: { ownerWhatsapp, alertEmail, notifyChannels },
+  });
 
   useEffect(() => {
     const phone = tenant.whatsapp_notification_number || "";
@@ -63,20 +65,14 @@ function AlertsPanelInner({
     setOwnerWhatsapp(phone);
     setAlertEmail(email);
     setNotifyChannels(channels);
-    setAlertsBaseline([phone, email, JSON.stringify(channels)].join("\u0001"));
+    markClean({ ownerWhatsapp: phone, alertEmail: email, notifyChannels: channels });
+    // markClean changes with the draft; only a new stored row should reset it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     tenant.whatsapp_notification_number,
     tenant.alert_email,
     tenant.notify_channels,
   ]);
-
-  useEffect(() => {
-    if (!state.ok || savedAlertsRef.current === state) return;
-    savedAlertsRef.current = state;
-    setAlertsBaseline(alertsDraft);
-    notify(state.message || "Saved");
-    router.refresh();
-  }, [state, alertsDraft, router]);
 
   return (
     <section className="min-w-0 w-full space-y-6">
@@ -85,28 +81,19 @@ function AlertsPanelInner({
         lineLive={false}
         showBack
         title="How we notify"
-        alert={state.error}
+        alert={save.error}
+        onRetry={save.retry}
         action={
-          <button
-            type="submit"
+          <TenantSettingsSaveButton
             form={ALERTS_SETTINGS_FORM_ID}
-            disabled={pending}
-            className={`${settingsPrimaryButtonClass} gap-2`}
-          >
-            {pending ? (
-              <>
-                <span aria-hidden="true" className={pendingSpinnerClass} />
-                Saving
-              </>
-            ) : (
-              "Save"
-            )}
-          </button>
+            pending={pending}
+            saved={justSaved}
+          />
         }
       />
       <form
         id={ALERTS_SETTINGS_FORM_ID}
-        action={formAction}
+        onSubmit={save.onSubmit}
         className={`${settingsFormBodyClass} space-y-6`}
       >
         <input type="hidden" name="tenant_id" value={tenant.id} />

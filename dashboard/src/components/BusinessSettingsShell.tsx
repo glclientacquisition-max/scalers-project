@@ -2,7 +2,8 @@
 
 import { policiesFormKey } from "@/lib/serviceAreas";
 import { catalogContentKey } from "@/lib/catalogPricing";
-import type { ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
+import { nextFormMountKey, type FormMountKey } from "@/lib/formSave";
 
 import type { TenantRow } from "@/lib/supabase";
 import { AlertsPanel } from "@/components/AlertsPanel";
@@ -103,9 +104,8 @@ export function BusinessSettingsShell({
   // per panel, but TenantForm only reads those fields in useState initializers.
   // Without remounting on panel change, Hours → Policies keeps empty openPolicyIds
   // until a hard refresh. Length fingerprints alone miss policies/locations/lexicon.
-  const tenantFormKey = [
-    tenant.id,
-    formPanel,
+  const tenantFormScope = `${tenant.id}:${formPanel}`;
+  const tenantFormContent = [
     // Catalogue content, not lengths: a price confirm changes no length, and a form that kept
     // the old rows would post them back on Save and undo the confirm.
     catalogContentKey(tenant.services_catalog, tenant.product_catalog),
@@ -118,6 +118,24 @@ export function BusinessSettingsShell({
     tenant.vertical || "",
     JSON.stringify(tenant.social_handles || {}),
   ].join(":");
+  // Shared save pattern: the form's own save re-renders the page up to three times
+  // (action response, Realtime revalidation, router refresh), and one render can
+  // still carry the row from before the write. Keep the mount while it settles,
+  // so the fields keep the saved values and the Save button can say Saved.
+  const ownSaveAt = useRef(0);
+  const markOwnSave = useCallback(() => {
+    ownSaveAt.current = Date.now();
+  }, []);
+  const [formMount, setFormMount] = useState<FormMountKey>(() => ({
+    scope: tenantFormScope,
+    seen: tenantFormContent,
+    mounted: tenantFormContent,
+  }));
+  if (formMount.scope !== tenantFormScope || formMount.seen !== tenantFormContent) {
+    const next = nextFormMountKey(formMount, { scope: tenantFormScope, content: tenantFormContent }, ownSaveAt.current, Date.now());
+    if (next !== formMount) setFormMount(next);
+  }
+  const tenantFormKey = `${formMount.scope}:${formMount.mounted}`;
 
   const rail = (
     <SettingsRail
@@ -162,6 +180,7 @@ export function BusinessSettingsShell({
       {showForm ? (
         <TenantForm
           key={tenantFormKey}
+          onSaveActivity={markOwnSave}
           tenant={tenant}
           panel={formPanel}
           curatedVoices={curatedVoices}
