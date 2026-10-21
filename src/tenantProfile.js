@@ -19,6 +19,12 @@ function tenantRowLineState(row) {
   return reason ? { closed: true, reason, tenantId: row?.id || null } : null;
 }
 
+// tenants.greeting_language is en or sw (check constraint). Anything else is null.
+function parseGreetingLanguage(value) {
+  const v = String(value || '').trim().toLowerCase();
+  return v === 'en' || v === 'sw' ? v : null;
+}
+
 function tenantProfileFromRow(row, extras = {}) {
   const { parseAgentTools } = require('./conversation/agentTools');
   const { parseLexiconOverrides } = require('./speech/pronunciationLexicon');
@@ -35,6 +41,9 @@ function tenantProfileFromRow(row, extras = {}) {
     businessName: row.business_name,
     spokenName: row.spoken_name || null,
     greetingInvite: row.greeting_invite || null,
+    // greeting_language.sql (13c). null on an unmigrated database or empty field.
+    greetingText: row.greeting_text || null,
+    greetingLanguage: parseGreetingLanguage(row.greeting_language),
     agentName: row.agent_name || 'Receptionist',
     agentTone: row.agent_tone || null,
     llmSystemPrompt: row.llm_system_prompt || null,

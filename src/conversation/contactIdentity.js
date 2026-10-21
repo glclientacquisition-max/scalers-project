@@ -102,6 +102,7 @@ module.exports = {
   ALT_CAP,
   mergeContactIdentity,
   namesMatch,
+  normalizeAlternates,
   normalizeStoredPhone,
   parseStoredContactPhone,
   trimName,
