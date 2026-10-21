@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useFormSave } from "@/components/useFormSave";
 import {
   completeOnboardingAction,
   type OnboardingState,
@@ -66,7 +67,15 @@ export function OnboardingWizard() {
   const [tone, setTone] = useState<OnboardingTone | "">(DEFAULT_AGENT_TONE);
   const [handoffMode, setHandoffMode] = useState<HandoffMode>("callback");
   const [agentName, setAgentName] = useState("Receptionist");
-  const [state, formAction, pending] = useActionState(completeOnboardingAction, initial);
+  // Shared save pattern. Success redirects to Home, so no success toast; the
+  // draft is kept on this device, so no reload guard either.
+  const save = useFormSave<OnboardingState>({
+    action: completeOnboardingAction,
+    initialState: initial,
+    successMessage: false,
+    errorToast: false,
+  });
+  const { state, formAction, pending } = save;
   const [visible, setVisible] = useState(true);
 
   const [draftLoaded, setDraftLoaded] = useState(false);
@@ -457,9 +466,9 @@ export function OnboardingWizard() {
         {step === 3 && !agentNameCheck.ok ? (
           <p className="mt-5 text-body text-warn" role="status">{agentNameCheck.error}</p>
         ) : null}
-        {state.error ? (
+        {save.error ? (
           <p className="mt-5 text-body text-warn" role="alert">
-            {state.error}
+            {save.error}
           </p>
         ) : null}
 

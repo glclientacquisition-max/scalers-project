@@ -84,11 +84,12 @@ test("fee hint says what callers hear, or the quote hint when blank", () => {
   assert.match(src, /useEffect\(\(\) => \{\s*setOutsideFee/);
 });
 
-test("a successful save clears unsaved changes, Locations included", () => {
+test("a successful save clears unsaved changes, Locations included", async () => {
   const src = read("dashboard/src/components/TenantForm.tsx");
   assert.match(src, /serviceAreasJson,\n/);
-  assert.match(src, /savedBaseline\(/);
-  const { savedBaseline } = sa;
-  assert.equal(savedBaseline({ ok: true }, "k2", "k1"), "k2");
-  assert.equal(savedBaseline({ ok: false }, "k2", "k1"), "k1");
+  // Shared save pattern: the baseline moves only when a save lands.
+  assert.match(src, /useFormDraft\(save,/);
+  const { nextBaseline } = await import("../dashboard/src/lib/formSave.ts");
+  assert.equal(nextBaseline({ ok: true }, "k2", "k1"), "k2");
+  assert.equal(nextBaseline({ ok: false }, "k2", "k1"), "k1");
 });
