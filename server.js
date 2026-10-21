@@ -598,6 +598,14 @@ if (missingEnvironmentVariables.length > 0) {
 }
 
 const db = require('./src/db');
+// A4 Ops sender (OWNER_CALL_SUMMARY, off by default): one owner message per
+// call from Brain's `call.summary.ready` event. See
+// src/notifications/ownerCallSummary.js for flags and behaviour.
+const ownerCallSummary = require('./src/notifications/ownerCallSummary');
+const ownerSummarySender = ownerCallSummary.createOwnerSummarySender({ db, callDeskUrl });
+callSummaryEvent.onCallSummaryReady((event, meta) =>
+  ownerSummarySender.onEvent(event, meta)
+);
 
 async function hydrateCallerMemory(profile, callSid) {
   return attachCallerMemory(profile, {
@@ -1418,10 +1426,23 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
 
 // VOICE_ENDED_CALL_GUARD (HD_49d726c3dc9b): finalize once per call; see
 // src/callFinalize.js and src/speech/endedCalls.js.
+// A4 (OWNER_CALL_SUMMARY): the owner-summary settle / 2-min fallback clock
+// starts when the finalizer runs, before the hangup summary emits, so an
+// urgent summary sends at once. Mid-call persists do not pass through here.
+async function noteOwnerSummaryCallEnd(callSid, status) {
+  if (!callSid || !ownerCallSummary.ownerCallSummaryEnabled()) return;
+  await ownerSummarySender
+    .noteCallEnded({ callSid, status })
+    .catch((err) => console.warn(`[owner-summary] note end failed ${callSid}:`, err?.message || err));
+}
+
 const markCallTerminal = createCallFinalizer({
   db,
   endedCalls,
-  persistCallResolution: (...args) => persistCallResolution(...args),
+  persistCallResolution: async (...args) => {
+    if (args[2]?.writeResolution !== false) await noteOwnerSummaryCallEnd(args[0], args[2]?.callStatus);
+    return persistCallResolution(...args);
+  },
   persistFirstForwardAcceptance: (...args) => persistFirstForwardAcceptance(...args),
   maybeSendMissedTextback: (...args) => maybeSendMissedTextback(...args),
   finalizeOnceEnabled,
@@ -6109,6 +6130,13 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
   }
   if (!call) return;
 
+  // A4: the one end-of-call owner summary replaces every lead send (mid-call,
+  // recording, hangup and LLM-recovery) and the "missed-call lead" label.
+  if (ownerCallSummary.legacyOwnerSendsSuppressed()) {
+    console.log(`[${callSid}] owner lead send suppressed (OWNER_SUMMARY_SUPPRESS_LEGACY)${opts.midCall ? ' mid-call' : ''}`);
+    return;
+  }
+
   if (!shouldSendOwnerLead(call)) return;
 
   if (staffInboxAlreadyNotified(call)) return;
@@ -6265,15 +6293,22 @@ async function maybeSendServiceRequestNotification(callSid, request) {
     ownerPhone: ownerNumber,
     ownerEmail,
   });
-  const { sent, errors: staffNotifyErrors } = await dispatchToStaff({
-    recipients: inbox.recipients,
-    body,
-    lead,
-    channels: notifyChannels,
-    subject: renderEventSubject(event),
-    ledger: { ...ledger, kind: 'service_request' },
-  });
-  const result = sent[0] || { channel: null, reason: 'no_inbox_recipient' };
+  // A4: the end-of-call owner summary carries this request; no per-tool staff SMS.
+  const suppressStaff = ownerCallSummary.legacyOwnerSendsSuppressed();
+  if (suppressStaff) {
+    console.log(`[${callSid}] request staff send suppressed (OWNER_SUMMARY_SUPPRESS_LEGACY)`);
+  }
+  const { sent, errors: staffNotifyErrors } = suppressStaff
+    ? { sent: [], errors: [] }
+    : await dispatchToStaff({
+        recipients: inbox.recipients,
+        body,
+        lead,
+        channels: notifyChannels,
+        subject: renderEventSubject(event),
+        ledger: { ...ledger, kind: 'service_request' },
+      });
+  const result = sent[0] || { channel: null, reason: suppressStaff ? 'owner_summary' : 'no_inbox_recipient' };
   if (result.channel) {
     console.log(
       `[${callSid}] Request notify (${event.title}) via ${result.channel}` +
@@ -6368,15 +6403,22 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     ownerPhone: ownerNumber,
     ownerEmail,
   });
-  const { sent, errors: staffNotifyErrors } = await dispatchToStaff({
-    recipients: inbox.recipients,
-    body,
-    lead,
-    subject: renderEventSubject(event),
-    channels: notifyChannels,
-    ledger: { ...ledger, kind: 'appointment' },
-  });
-  const result = sent[0] || { channel: null, reason: 'no_inbox_recipient' };
+  // A4: the end-of-call owner summary carries this booking; no per-tool staff SMS.
+  const suppressStaff = ownerCallSummary.legacyOwnerSendsSuppressed();
+  if (suppressStaff) {
+    console.log(`[${callSid}] appointment staff send suppressed (OWNER_SUMMARY_SUPPRESS_LEGACY)`);
+  }
+  const { sent, errors: staffNotifyErrors } = suppressStaff
+    ? { sent: [], errors: [] }
+    : await dispatchToStaff({
+        recipients: inbox.recipients,
+        body,
+        lead,
+        subject: renderEventSubject(event),
+        channels: notifyChannels,
+        ledger: { ...ledger, kind: 'appointment' },
+      });
+  const result = sent[0] || { channel: null, reason: suppressStaff ? 'owner_summary' : 'no_inbox_recipient' };
   if (result.channel) {
     console.log(
       `[${callSid}] Appointment notify (${kind}) via ${result.channel}` +
