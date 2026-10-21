@@ -38,7 +38,7 @@ Code: `src/conversation/callSummaryEvent.js` (pure builder, validator, v1 receip
   tenantId,
   outcome: 'booked' | 'ordered' | 'callback_needed' | 'info_only' | 'abandoned' | 'missed' | 'escalated',
   urgent: boolean,   // true ONLY if an escalation receipt exists
-  caller: { name?, e164, phone },   // phone mirrors e164 (Ops spec says `phone`; contract says `e164`)
+  caller: { name?, phone },        // phone = E.164 (+2547…), or null if not normalisable; no other keys
   receipts: [{
     receiptId,
     type: 'booking' | 'order' | 'callback' | 'quote' | 'complaint' | 'escalation',
@@ -56,15 +56,17 @@ Slots used: booking `service, when, place, name`; order `pickup, name` plus `ite
 
 ## Rules (enforced by `validateCallSummaryEvent`)
 
-1. **Confirmed** booking/order = a read-back, then an explicit, whole-answer yes, **and** a row written (`writtenRowId`).
+1. **Confirmed** booking / order / quote = a read-back, then an explicit, whole-answer yes, **and** a row written (`writtenRowId`). *(Final, Ops ruling 21 Oct.)*
    - v2: commits only run on the redeemed `confirm_token`, and a row id must come back.
    - v1: the transcript needs an agent read-back cue followed directly by a whole-answer yes. "Okay wait…", "Sawa lakini…?" and "Yes but make it three" are not yes.
    - A written row with no read-back stays `unconfirmed` (HD_e75a669780d4).
-2. callback / complaint / escalation are confirmed when the backend outcome succeeded (the caller's own ask or report, so no read-back of a transaction). A v1 "soft" escalation (desk note only) is unconfirmed.
+2. callback / complaint / escalation are confirmed when the backend write succeeds, with **no read-back needed** (the caller's own ask or report). Old-path escalations have no row id, and that is fine: `writtenRowId` is optional for these types. A v1 "soft" escalation (desk note only) is unconfirmed. *(Final, Ops ruling 21 Oct.)*
 3. **Price and stock come only from catalogue facts.** Stock is `in_stock`/`out_of_stock` only when the catalogue row says so. A null or empty `in_stock` is `unconfirmed` (HD_8a8aa14db292). An off-catalogue item has `catalogueId: null`, no `unitPrice` and `unconfirmed` stock.
 4. Missing slot means `{ status: 'not_given' }` with no value. Values are never guessed.
 5. Outcome precedence: missed (never answered) > escalated > booked (confirmed) > ordered (confirmed) > callback_needed (any callback/complaint receipt, or a confirmed quote) > abandoned (answered, **no receipt and nothing answered**) > info_only. **Unconfirmed receipts never upgrade the outcome.** Interest with no confirmed write is `info_only` plus an unconfirmed receipt.
 6. `missed` and `abandoned` carry no receipts. `urgent === (an escalation receipt exists)`.
+7. BA v2 handoffs: **only a manager request is urgent** (`escalation` receipt, outcome `escalated`). The ladder, address and payment handoffs are `callback` receipts and a complaint is a `complaint` receipt; all of these give outcome `callback_needed`, never urgent. *(Final, Ops ruling 21 Oct.)*
+8. Never-answered calls: Brain emits no typed `missed` event on v1 (no brain state exists). **Ops' 2-min fallback covers them** ("Missed call from X"). Retiring the mid-call owner SMS/WhatsApp sends is **Ops' job**; Brain does not touch them. *(Final, Ops ruling 21 Oct.)*
 
 ## Ops sender notes (Ops owns; restated for alignment)
 
@@ -75,17 +77,17 @@ Slots used: booking `service, when, place, name`; order `pickup, name` plus `ite
 - 2-min fallback with no event, worded by outcome: missed gets "Missed call from X", answered gets "Call from X, no details captured".
 - Only `missed` may be labelled "missed-call lead".
 
-## Mismatches vs Ops' spec (`a4-owner-summary-sender-spec.md`), flagged
+## Ops rulings (21 Oct, final)
 
-| # | Ops spec | Emitter | Resolution needed |
-|---|---|---|---|
-| 1 | `caller.phone` | `caller.e164` **and** `caller.phone` (same value) | Ops picks one; Brain drops the other in v1.1 |
-| 2 | Event lists no `event` field | Adds `event: 'call.summary.ready'` | Harmless; tell Ops |
-| 3 | "confirmed = read-back + yes + written row" for all receipts | callback/complaint/escalation are confirmed on backend success; v1 escalations have no row id | Ops OK? Otherwise they would always render as "not confirmed" |
-| 4 | Fallback "no event within 2 min" | `missed` is built, but v1 has no brain state on a never-answered call, so **no event is emitted for missed calls yet**. Ops' fallback (and the existing missed textback) covers them | Platform/Voice hook in `callFinalize` if Ops wants a typed missed event |
-| 5 | Spec item 9 (retire mid-call sends, default ON for staging) | Brain does not touch the existing sends | Ops owns the suppress flag |
-| 6 | `catalogueId` required | `null` for off-catalogue items; `name:<slug>` when the catalogue row has no id (e.g. Jirani/Aris rows without `id`) | Ops treats it as opaque |
-| 7 | v2 handoff kinds | `manager` is an escalation (urgent); `ladder`, `address` and `payment` are callbacks; a complaint is `complaint` (not urgent) | Confirm |
+| # | Topic | Final |
+|---|---|---|
+| 1 | Caller field | `caller.phone` only, holding the E.164 value; no other phone key. |
+| 3 | Confirmation without read-back | callback / complaint / escalation are confirmed on backend write success; booking / order / quote still need read-back + yes + `writtenRowId`; old-path escalations without a row id are fine. |
+| 4 | Never-answered calls | Covered by Ops' 2-min fallback; no Brain event. |
+| 5 | Mid-call SMS | Retiring them is Ops' job. |
+| 7 | v2 handoffs | Only a manager request is urgent; other handoffs are `callback_needed`. |
+
+Still open (not ruled, no change): #2, the emitter adds `event: 'call.summary.ready'`; #6, `catalogueId` is `null` off-catalogue and `name:<slug>` when the row has no id (treat as opaque).
 
 ## Proposed durable outbox (NOT applied; Platform to review)
 
