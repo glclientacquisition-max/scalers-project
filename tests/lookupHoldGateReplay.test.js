@@ -85,7 +85,7 @@ const CALL = [
   ['Mattress Cleaning ni pesa ngapi?', 'sw', 'price', /mia nane hadi shilingi elfu moja na mia mbili/],
   ['How much is Curtain Cleaning?', 'en', 'price', new RegExp(`^${EN_CB}$`)],
   ['How much is Office Deep Clean?', 'en', 'price', new RegExp(`^${EN_CB}$`)],
-  ['How much is the—', 'en', 'catalogue', /carpet cleaning/],
+  ['How much is the—', 'en', 'catalogue', /carpet cleaning/i],
   ['Mnafungua saa ngapi Jumamosi?', 'sw', 'hours', /Jumamosi .*saa tatu asubuhi hadi saa saba mchana/],
   ['And by till ni gani?', 'sw', 'service_facts', new RegExp(`^${SW_CB}$`)],
 ];
