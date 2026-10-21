@@ -131,3 +131,73 @@ test("slots: server-built settings slots carry keys", () => {
   assert.match(src, /<BusinessCategoryPicker key="business-category"/);
   assert.match(src, /<div key="catalog-checks"/);
 });
+
+// --- 6. Voice switch read its old state at Saved ----------------------------
+// React resets a form after its action prop runs. Controlled switches keep
+// their first-render defaultChecked, so the DOM (and what assistive tech and the
+// next tap see) went back to the old state until a later render.
+
+test("voice switch: settings forms post through onSubmit, never the action prop", () => {
+  for (const file of [
+    "dashboard/src/components/TenantForm.tsx",
+    "dashboard/src/components/AlertsPanel.tsx",
+    "dashboard/src/components/assistantSay/AssistantSayFallbackEditor.tsx",
+  ]) {
+    const src = read(file);
+    assert.match(src, /save\.onSubmit/, file);
+    assert.doesNotMatch(src, /action=\{(save\.)?formAction\}/, file);
+  }
+  // Pronunciation still blocks a post from inside the coach.
+  const form = read("dashboard/src/components/TenantForm.tsx");
+  assert.match(form, /if \(panel === "pronunciation"\) \{\s+event\.preventDefault\(\);\s+return;\s+\}\s+[^]*?save\.onSubmit\(event\);/);
+});
+
+test("voice switch: the hook posts the form data itself, inside a transition", () => {
+  const hook = read("dashboard/src/components/useFormSave.ts");
+  assert.match(hook, /event\.preventDefault\(\);/);
+  assert.match(hook, /new FormData\(event\.currentTarget, submitter\)/);
+  assert.match(hook, /startTransition\(\(\) => dispatch\(payload\)\)/);
+});
+
+// --- 7. Policies: Save stayed on Saving seconds after the Saved toast --------
+// The toast fires when the result returns. The action transition stays pending
+// until the page re-rendered by revalidatePath has streamed and committed.
+
+test("saving: a returned save is not saving, even while the transition is pending", () => {
+  const raw = { ok: false };
+  const landed = { ok: true };
+  // Running, nothing returned yet.
+  assert.deepEqual(
+    f.liveSaveView({ rawState: raw, transitionPending: true, started: 1, landed: 0, landedResult: null }),
+    { state: raw, pending: true }
+  );
+  // Returned (toast shown), page re-render still streaming: Saved, with the result.
+  const view = f.liveSaveView({ rawState: raw, transitionPending: true, started: 1, landed: 1, landedResult: landed });
+  assert.equal(view.pending, false);
+  assert.equal(view.state, landed);
+  // A second save started before the first transition ended: Saving again.
+  assert.equal(
+    f.liveSaveView({ rawState: raw, transitionPending: true, started: 2, landed: 1, landedResult: landed }).pending,
+    true
+  );
+  // Before any save: the action state and its pending as they are.
+  assert.deepEqual(
+    f.liveSaveView({ rawState: raw, transitionPending: false, started: 0, landed: 0, landedResult: null }),
+    { state: raw, pending: false }
+  );
+});
+
+test("saving: the hook publishes the result next to the toast, outside the transition", () => {
+  const hook = read("dashboard/src/components/useFormSave.ts");
+  const toast = hook.indexOf('notify(outcome.message, { tone: "error" })');
+  const publish = hook.indexOf("setLive((prevLive) =>\n");
+  assert.ok(toast > 0 && publish > toast, "result published right after the toast");
+  assert.match(hook, /liveSaveView\(\{/);
+  assert.match(hook, /queueMicrotask\(/);
+  // Saved waits for the save, not for the transition.
+  assert.match(hook, /const justSaved = savedAt > 0 && clearedAt !== savedAt && !pending;/);
+  assert.match(hook, /useActionState<R, P>\([^)]*\)/s);
+  assert.match(hook, /transitionPending/);
+  // The When unsure "updating" note uses the same save pending.
+  assert.match(read("dashboard/src/components/TenantForm.tsx"), /const \{ state, pending \} = save;/);
+});

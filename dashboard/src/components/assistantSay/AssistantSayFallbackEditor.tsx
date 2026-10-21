@@ -70,7 +70,7 @@ export function AssistantSayFallbackEditor({ initial, legacyGeneral }: Props) {
       <p className="px-4 pb-2 text-meta text-ink-3">
         Fallback lines only offer a callback. They never promise a transfer, a booking slot, or open today.
       </p>
-      <form id={FALLBACK_FORM_ID} className="divide-y divide-hairline" action={save.formAction}>
+      <form id={FALLBACK_FORM_ID} className="divide-y divide-hairline" onSubmit={save.onSubmit}>
         {FALLBACK_KINDS.map((kind) => (
           <div key={kind} className="px-4 py-3">
             <p className="text-body font-medium text-ink">{FALLBACK_KIND_LABELS[kind]}</p>

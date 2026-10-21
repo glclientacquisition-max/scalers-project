@@ -574,7 +574,7 @@ function TenantFormInner({
     onSaveStart: onSaveActivity,
     onLanded: onSaveActivity,
   });
-  const { state, formAction, pending } = save;
+  const { state, pending } = save;
   // Price text as loaded. The server keeps the stored (maybe just confirmed) price for any row
   // whose text the owner did not touch in this form.
   const [catalogBaseJson] = useState(() =>
@@ -1134,11 +1134,16 @@ function TenantFormInner({
   return (
     <form
       id={TENANT_SETTINGS_FORM_ID}
-      action={formAction}
       onSubmit={(event) => {
         // Pronunciation saves live via its own actions. Enter inside the coach
         // must not post this form (feels like a full Settings reload).
-        if (panel === "pronunciation") event.preventDefault();
+        if (panel === "pronunciation") {
+          event.preventDefault();
+          return;
+        }
+        // Shared save pattern: posts without React's form reset, which would put
+        // the Voice tool switches back to their first-render state.
+        save.onSubmit(event);
       }}
     >
       <div className={settingsConsoleClass}>

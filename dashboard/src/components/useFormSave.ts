@@ -7,6 +7,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type FormEvent,
 } from "react";
 import { notify } from "@/components/ui/DeskNotice";
 import { useSettingsLeaveSource } from "@/components/SettingsLeaveGuard";
@@ -14,6 +15,7 @@ import {
   FORM_SAVE_DEFAULT_SUCCESS,
   draftSignature,
   formSaveUnloadHandler,
+  liveSaveView,
   nextBaseline,
   saveOutcome,
   shouldGuardUnload,
@@ -32,6 +34,16 @@ import {
  * normalised dirty tracking (NULL, undefined and "" are equal), the baseline
  * moved to exactly what was submitted when a save lands, and the leave and
  * reload guard. useFormSaveDraft is both in one call for simple forms.
+ *
+ * Forms post with onSubmit={save.onSubmit}, not action={save.formAction}:
+ * React resets a form after an action prop runs, which puts every controlled
+ * switch back to its first-render state in the DOM (the switch reads stale
+ * until the next render, and the first tap after a save does nothing).
+ *
+ * Saving and Saved follow the save itself, not the transition around it. The
+ * transition stays pending until the page re-rendered by revalidatePath has
+ * streamed and committed, seconds after the result and its toast. So the
+ * landed result is published the moment it returns, next to the toast.
  */
 
 /** How long the Save button reads "Saved" after a landed save. */
@@ -65,6 +77,8 @@ export type FormSave<R extends FormSaveResult, P = FormData> = {
   retry: () => void;
   pending: boolean;
   error: string | null;
+  /** Form submit handler: posts the form through the save without React's form reset. */
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   /** True for FORM_SAVED_HOLD_MS after a landed save. */
   justSaved: boolean;
   /** @internal Draft signature at submit time, written by useFormDraft. */
@@ -83,12 +97,24 @@ export function useFormSave<R extends FormSaveResult, P = FormData>(
   const [submittedFor] = useState(() => new WeakMap<object, string>());
   const lastPayload = useRef<P | null>(null);
   const signatureRef = useRef<string | null>(null);
+  // Runs started and the last one that returned, published outside the
+  // transition (see liveSaveView) so the button and the toast flip together.
+  const startedRef = useRef(0);
+  const [live, setLive] = useState<{ started: number; landed: number; result: R | null }>({
+    started: 0,
+    landed: 0,
+    result: null,
+  });
 
   const run = useCallback(
     async (prev: R, payload: P): Promise<R> => {
       const opts = optionsRef.current;
       lastPayload.current = payload;
       const submitted = signatureRef.current;
+      const seq = ++startedRef.current;
+      // A microtask runs outside the transition, so Saving shows at once even
+      // when an earlier transition is still pending.
+      queueMicrotask(() => setLive((prevLive) => ({ ...prevLive, started: Math.max(prevLive.started, seq) })));
       opts.onSaveStart?.();
       let result: R;
       try {
@@ -110,16 +136,27 @@ export function useFormSave<R extends FormSaveResult, P = FormData>(
         notify(outcome.message, { tone: "error" });
       }
       if (submitted !== null) submittedFor.set(result, submitted);
+      // After an await this update is urgent: it commits now, with the toast,
+      // not when the revalidated page finally commits the transition.
+      setLive((prevLive) =>
+        seq < prevLive.landed ? prevLive : { started: Math.max(prevLive.started, seq), landed: seq, result }
+      );
       return result;
     },
     [submittedFor]
   );
 
-  const [rawState, dispatch, pending] = useActionState<R, P>(
+  const [rawState, dispatch, transitionPending] = useActionState<R, P>(
     run as (prev: Awaited<R>, payload: P) => Promise<R>,
     options.initialState as Awaited<R>
   );
-  const state = rawState as R;
+  const { state, pending } = liveSaveView({
+    rawState: rawState as R,
+    transitionPending,
+    started: live.started,
+    landed: live.landed,
+    landedResult: live.result,
+  });
 
   const [handled, setHandled] = useState(state);
   const [savedAt, setSavedAt] = useState(0);
@@ -149,6 +186,22 @@ export function useFormSave<R extends FormSaveResult, P = FormData>(
     startTransition(() => dispatch(payload));
   }, [dispatch]);
 
+  const onSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const native = event.nativeEvent as SubmitEvent;
+      const submitter = native.submitter instanceof HTMLElement ? native.submitter : null;
+      let data: FormData;
+      try {
+        data = submitter ? new FormData(event.currentTarget, submitter) : new FormData(event.currentTarget);
+      } catch {
+        data = new FormData(event.currentTarget);
+      }
+      submit(data as P);
+    },
+    [submit]
+  );
+
   const retry = useCallback(() => {
     const formId = optionsRef.current.formId;
     const form = formId ? document.getElementById(formId) : null;
@@ -167,6 +220,7 @@ export function useFormSave<R extends FormSaveResult, P = FormData>(
     state,
     initialState: options.initialState,
     formAction: dispatch,
+    onSubmit,
     submit,
     retry,
     pending,
