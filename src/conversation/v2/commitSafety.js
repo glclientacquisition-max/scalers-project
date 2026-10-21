@@ -56,30 +56,65 @@ function explicitYes(text) {
   return words.length <= 8 && words.every((w) => FILLER.has(w));
 }
 
+// Alvin's rule (15 Oct), one classifier for every read-back that states a time (booking, move,
+// callback / manager / quote / owner-only handoff): the caller repeating the exact read-back time is
+// a yes, a different time is a change (re-propose), and anything unclear ("okay wait", a question)
+// gets one yes/no re-ask. A day alone is never a yes.
+const HEDGE = /\?|\b(is it|will it|ni saa|je|but|lakini|ila|wait|ngoja|subiri|hold on|let me)\b/i;
+const REL = { before: /\b(before|by|kabla)\b/i, from: /\b(from|after|starting|kuanzia|baada)\b/i };
+function readbackTime(p = {}) {
+  if ((p.tool === 'create_booking' || p.tool === 'update_booking') && p.when?.time) return { date: p.when.date || null, time: p.when.time, rel: 'at' };
+  if (p.tool === 'create_handoff' && p.callbackWhen) return p.callbackWhen.at || { date: null, time: null, rel: 'window' };
+  return null;
+}
+// 'same' | 'different' | null (no time stated, or this read-back states no time)
+function timeEcho(p, u = {}) {
+  const rt = readbackTime(p); const w = u.when;
+  if (!rt || !w || !(w.time || w.date)) return null;
+  if (!w.time) return w.date && rt.date && w.date !== rt.date ? 'different' : null;
+  if (!rt.time) return 'different'; // "during working hours" read back; a stated time is a new time
+  const t = String(u.text || '');
+  const relOk = rt.rel === 'at' ? !(REL.before.test(t) || REL.from.test(t)) : REL[rt.rel].test(t);
+  return w.time === rt.time && (!w.date || !rt.date || w.date === rt.date) && relOk ? 'same' : 'different';
+}
+// -> { kind: 'yes' | 'no' | 'change' | 'unclear', done }
+function readbackAnswer(p, u = {}) {
+  const text = String(u.text || '');
+  const done = !!u.done && /^\W*(yes|ndio|ndiyo)\b/i.test(text) && !/\?|\b(but|lakini|ila|wait|ngoja|subiri|no|hapana)\b/i.test(text);
+  if (u.no || u.negation) return { kind: 'no', done: false };
+  if (explicitYes(text) || done) return { kind: 'yes', done };
+  const e = timeEcho(p, u);
+  if (e === 'same') return { kind: HEDGE.test(text) ? 'unclear' : 'yes', done: false };
+  if (e === 'different') return { kind: 'change', done: false };
+  return { kind: 'unclear', done: false };
+}
+
 // Callback time stated in the read-back so the owner (A4) knows when they promised to call.
 const KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 function callbackWhen({ profile = {}, now = new Date(), when = null, L }) {
   const sw = (lang) => L.isSw(lang);
   const per = (hh) => { const h = Number(String(hh).slice(0, 2)); return h < 12 ? 'asubuhi' : h < 16 ? 'mchana' : h < 19 ? 'jioni' : 'usiku'; };
   const swT = (hh, lang) => `${L.sayTime(hh, lang)} ${per(hh)}`;
+  const todayIso = L.isoDate(L.eatParts(now));
+  const plusDays = (i) => { const q = L.eatParts(now); const x = new Date(Date.UTC(q.y, q.mo, q.d + i)); return L.isoDate({ y: x.getUTCFullYear(), mo: x.getUTCMonth(), d: x.getUTCDate() }); };
   if (when?.date || when?.time) {
-    return { key: `${when.date || ''}T${when.time || ''}`, say: (lang) => `${when.date ? L.sayDate(when.date, lang) : (sw(lang) ? 'leo' : 'today')}${when.time ? (sw(lang) ? ` ${swT(when.time, lang)}` : ` at ${when.time}`) : ''}` };
+    return { key: `${when.date || ''}T${when.time || ''}`, at: when.time ? { date: when.date || todayIso, time: when.time, rel: 'at' } : null, say: (lang) => `${when.date ? L.sayDate(when.date, lang) : (sw(lang) ? 'leo' : 'today')}${when.time ? (sw(lang) ? ` ${swT(when.time, lang)}` : ` at ${when.time}`) : ''}` };
   }
   const days = profile.hoursSchedule?.days;
   if (!days) return { key: 'working_hours', say: (lang) => (sw(lang) ? 'wakati wa saa za kazi' : 'during working hours') };
   const p = L.eatParts(now); const hhmm = `${String(p.h).padStart(2, '0')}:${String(p.mi).padStart(2, '0')}`;
   const today = days[KEYS[p.dow]];
   if (today && !today.closed && today.open && today.close && hhmm < today.close && hhmm >= today.open) {
-    return { key: `today<${today.close}`, say: (lang) => (sw(lang) ? `leo kabla ya ${swT(today.close, lang)}` : `today before ${today.close}`) };
+    return { key: `today<${today.close}`, at: { date: todayIso, time: today.close, rel: 'before' }, say: (lang) => (sw(lang) ? `leo kabla ya ${swT(today.close, lang)}` : `today before ${today.close}`) };
   }
   if (today && !today.closed && today.open && hhmm < today.open) {
-    return { key: `today>=${today.open}`, say: (lang) => (sw(lang) ? `leo kuanzia ${swT(today.open, lang)}` : `today from ${today.open}`) };
+    return { key: `today>=${today.open}`, at: { date: todayIso, time: today.open, rel: 'from' }, say: (lang) => (sw(lang) ? `leo kuanzia ${swT(today.open, lang)}` : `today from ${today.open}`) };
   }
   for (let i = 1; i <= 7; i += 1) {
     const dow = (p.dow + i) % 7; const h = days[KEYS[dow]];
     if (h && !h.closed && h.open) {
       const label = (lang) => (i === 1 ? (sw(lang) ? 'kesho' : 'tomorrow') : L.cap((sw(lang) ? L.DOW_SW : L.DOW_EN)[dow]));
-      return { key: `d+${i}>=${h.open}`, say: (lang) => (sw(lang) ? `${label(lang)} kuanzia ${swT(h.open, lang)}` : `${label(lang)} from ${h.open}`) };
+      return { key: `d+${i}>=${h.open}`, at: { date: plusDays(i), time: h.open, rel: 'from' }, say: (lang) => (sw(lang) ? `${label(lang)} kuanzia ${swT(h.open, lang)}` : `${label(lang)} from ${h.open}`) };
     }
   }
   return { key: 'working_hours', say: (lang) => (sw(lang) ? 'wakati wa saa za kazi' : 'during working hours') };
@@ -103,4 +138,4 @@ function makeRecorder(handlers, state) {
   };
 }
 
-module.exports = { commitSafetyEnabled, normSlots, slotHash, receiptTool, idempotencyKey, explicitYes, callbackWhen, sayPhone, makeRecorder };
+module.exports = { commitSafetyEnabled, normSlots, slotHash, receiptTool, idempotencyKey, explicitYes, readbackTime, timeEcho, readbackAnswer, callbackWhen, sayPhone, makeRecorder };

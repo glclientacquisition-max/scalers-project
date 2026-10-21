@@ -193,6 +193,73 @@ for (const [lang, book, yes] of [['en', BOOK_EN, 'Yes'], ['sw', BOOK_SW, 'Ndio']
   }));
 }
 
+// Alvin's rule (15 Oct) for every read-back that states a time, callbacks included: the exact
+// read-back time repeated = yes; a different time = change (re-propose); "okay wait" / a question = one re-ask.
+for (const [lang, ask, echoWindow, other, otherRb, hold, question] of [
+  ['en', 'Can someone call me back?', 'Today before 18:00.', 'At 3pm please.', /call you back on 0700 000 001, Wednesday 14 October at 15:00\?$/, 'Okay wait.', 'Before 18:00?'],
+  ['sw', 'Nipigie simu tafadhali', 'Leo kabla ya saa kumi na mbili jioni.', 'Saa tisa mchana.', /kwa namba 0700 000 001, Jumatano 14 Oktoba saa tisa mchana\. Ni sawa\?$/, 'Sawa ngoja kidogo.', 'Kabla ya saa kumi na mbili jioni?'],
+]) {
+  test(`[${lang}] callback: repeating the exact read-back time confirms (one owner task)`, withFlag(async () => {
+    const r = await talk([ask, echoWindow]);
+    assert.match(r.out[1].line, lang === 'en' ? /^Okay\. The owner will call you back on 0700 000 001, today before 18:00\./ : /^Sawa\. Mwenye biashara atakupigia simu kwa namba 0700 000 001, leo kabla ya saa kumi na mbili jioni\./);
+    assert.equal(r.writes.length, 1);
+    assert.deepEqual(r.receipts.map((x) => `${x.tool}:${x.phase}`), ['request_callback:proposed', 'request_callback:confirmed', 'request_callback:committed']);
+    // an explicit callback time repeated exactly also confirms
+    const t = await talk([ask, other, other]);
+    assert.equal(t.writes.length, 1);
+    assert.equal(t.log.find((x) => x[0] === 'esc')[1].captured.callbackWhen, 'Wednesday 14 October at 15:00');
+  }));
+
+  test(`[${lang}] callback: a different time re-proposes with that time; nothing is written`, withFlag(async () => {
+    const r = await talk([ask, other]);
+    assert.match(r.out[1].line, otherRb);
+    assert.equal(r.writes.length, 0);
+    assert.deepEqual(r.receipts.map((x) => `${x.tool}:${x.phase}`), ['request_callback:proposed', 'request_callback:rejected', 'request_callback:proposed']);
+    assert.equal(r.receipts[1].errorCode, 'slot_diff');
+    assert.notEqual(r.receipts[2].confirmToken, r.receipts[0].confirmToken);
+    // "at 18:00" is not "before 18:00": a new time, not a yes
+    const at = await talk([ask, lang === 'en' ? '18:00' : 'Saa kumi na mbili jioni.']);
+    assert.equal(at.writes.length, 0);
+    assert.match(at.out[1].line, lang === 'en' ? /at 18:00\?$/ : /saa kumi na mbili jioni\. Ni sawa\?$/);
+  }));
+
+  test(`[${lang}] callback: 'okay wait' or the time as a question does not confirm; one re-ask`, withFlag(async () => {
+    const w = await talk([ask, hold]);
+    assert.equal(w.writes.length, 0);
+    assert.ok(!w.receipts.some((x) => x.phase === 'confirmed'));
+    assert.match(w.out[1].line, /\?$/);
+    const q = await talk([ask, question]);
+    assert.equal(q.writes.length, 0);
+    assert.match(q.out[1].line, lang === 'en' ? /^Please say yes or no/ : /\?$/);
+    // after the re-ask, a yes confirms
+    const y = await talk([ask, hold, lang === 'en' ? 'Yes.' : 'Ndio.']);
+    assert.equal(y.writes.length, 1);
+  }));
+}
+
+test('one shared read-back classifier: bookings and callbacks follow the same rule', () => {
+  const book = { tool: 'create_booking', when: { date: '2026-10-16', time: '10:00' } };
+  const cb = { tool: 'create_handoff', kind: 'callback', callbackWhen: { key: 'today<18:00', at: { date: '2026-10-14', time: '18:00', rel: 'before' } } };
+  const quote = { tool: 'create_handoff', kind: 'quote', callbackWhen: { key: '2026-10-15T09:00', at: { date: '2026-10-15', time: '09:00', rel: 'at' } } };
+  const k = (p, text, when) => CS.readbackAnswer(p, { text, when }).kind;
+  assert.equal(k(book, '10am', { time: '10:00' }), 'yes');
+  assert.equal(k(book, '11am', { time: '11:00' }), 'change');
+  assert.equal(k(book, 'is it at 10?', { time: '10:00' }), 'unclear');
+  assert.equal(k(book, 'Friday', { date: '2026-10-16' }), 'unclear'); // a day alone is not a yes
+  assert.equal(k(cb, 'before 6pm', { time: '18:00' }), 'yes');
+  assert.equal(k(cb, 'kabla ya saa kumi na mbili', { time: '18:00' }), 'yes');
+  assert.equal(k(cb, '6pm', { time: '18:00' }), 'change');
+  assert.equal(k(cb, 'before 6pm?', { time: '18:00' }), 'unclear');
+  assert.equal(k(cb, 'okay wait', null), 'unclear');
+  assert.equal(k(quote, '9am', { time: '09:00' }), 'yes');
+  assert.equal(k(quote, 'kesho saa tatu', { date: '2026-10-15', time: '09:00' }), 'yes');
+  assert.equal(k(quote, '10am', { time: '10:00' }), 'change');
+  assert.equal(k({ tool: 'create_handoff', callbackWhen: { key: 'working_hours', at: null } }, '3pm', { time: '15:00' }), 'change');
+  assert.equal(k(cb, 'Yes', null), 'yes');
+  assert.equal(k(cb, 'No', null), 'unclear'); // u.no is set by the NLU; text alone is not a no here
+  assert.equal(CS.readbackAnswer(cb, { text: 'no', no: true }).kind, 'no');
+});
+
 test('a phone number is not a place; a place word at the name prompt keeps the place (edge E105/E128)', withFlag(async () => {
   const a = await talk(["I'd like to schedule sofa cleaning on Friday at 10am.", 'Also, my other number is 0712 345 678.']);
   assert.match(a.out[1].line, /^Where should we come\?/);
