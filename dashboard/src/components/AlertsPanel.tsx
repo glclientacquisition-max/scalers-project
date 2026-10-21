@@ -52,7 +52,7 @@ function AlertsPanelInner({
     // Stored phone is E.164: refetch so the fields show what was written.
     onSaved: () => router.refresh(),
   });
-  const { formAction, pending } = save;
+  const { pending } = save;
   const { justSaved, markClean } = useFormDraft(save, {
     id: "alerts",
     values: { ownerWhatsapp, alertEmail, notifyChannels },
@@ -93,7 +93,7 @@ function AlertsPanelInner({
       />
       <form
         id={ALERTS_SETTINGS_FORM_ID}
-        action={formAction}
+        onSubmit={save.onSubmit}
         className={`${settingsFormBodyClass} space-y-6`}
       >
         <input type="hidden" name="tenant_id" value={tenant.id} />

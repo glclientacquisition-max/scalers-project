@@ -121,6 +121,30 @@ export function thrownSaveResult<R extends FormSaveResult>(err: unknown): R {
 }
 
 /**
+ * What a form shows for its save: the result and whether it is still saving.
+ *
+ * React keeps a form action's transition pending until everything it caused
+ * has committed, including the page re-render that revalidatePath streams after
+ * the result. A save that has returned is not saving any more: the button
+ * flips to Saved with the toast, and the landed result is the form's state even
+ * before that re-render commits. A newer run that has not returned is saving.
+ */
+export function liveSaveView<R>(input: {
+  rawState: R;
+  transitionPending: boolean;
+  /** Runs started so far (1, 2, 3...). */
+  started: number;
+  /** Last run that returned, 0 for none. */
+  landed: number;
+  landedResult: R | null;
+}): { state: R; pending: boolean } {
+  const { rawState, transitionPending, started, landed, landedResult } = input;
+  const state = landed > 0 && landedResult !== null ? landedResult : rawState;
+  const latestReturned = landed > 0 && landed >= started;
+  return { state, pending: transitionPending && !latestReturned };
+}
+
+/**
  * How long after its own save a form keeps its mount. The save response, the
  * Realtime-driven revalidation and the router refresh each re-render the page,
  * and one of them can carry the row from before the write. Remounting on that
