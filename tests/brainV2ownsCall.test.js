@@ -86,6 +86,8 @@ test('server wiring: owned v2 writes pass v2Owned to applyGeminiTools, which rou
   assert.match(SERVER, /applyTools: \(parsed\) => applyGeminiTools\(callKey, parsed, \{ v2Owned: true \}\)/);
   assert.match(SERVER, /async function applyGeminiTools\(callSid, parsed, toolOpts = \{\}\)/);
   assert.match(SERVER, /v2OwnsCall\.toolPlanFor\(parsed, \{\s*owned: toolOpts\.v2Owned === true/);
+  // the v1 old-path request de-dupe (type + item, quantity ignored) is skipped for v2 writes
+  assert.match(SERVER, /if \(owedConfirmFoldEnabled\(\) && toolOpts\.v2Owned !== true\) \{\n\s+const dup = findDuplicateServiceRequest/);
   // v1's own applyGeminiTools callers are unchanged (no third argument)
   assert.match(SERVER, /applyGeminiTools\(callKey, rescue\.parsed\)/);
   assert.match(SERVER, /return await applyGeminiTools\(callSid, parsed\);/);

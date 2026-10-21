@@ -7307,7 +7307,9 @@ async function applyGeminiTools(callSid, parsed, toolOpts = {}) {
     fieldMeta: groundedProfile.fieldMeta || null,
     handlers: {
       createServiceRequest: async (request) => {
-        if (owedConfirmFoldEnabled()) {
+        // BRAIN_V2_OWNS_CALL: the v1 old-path request de-dupe (type + item, quantity ignored) never
+        // swallows a v2 write; C1's idempotency key is the de-dupe there.
+        if (owedConfirmFoldEnabled() && toolOpts.v2Owned !== true) {
           const dup = findDuplicateServiceRequest(state, request);
           if (dup) {
             console.log(
