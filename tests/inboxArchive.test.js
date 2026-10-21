@@ -72,7 +72,7 @@ describe("inbox archive folder and leave verbs", () => {
   const board = read("dashboard/src/components/InboxPileBoard.tsx");
 
   it("archives live rows and unarchives Archived rows through the same lead_status path", () => {
-    assert.match(actions, /inboxArchiveCall\(item\.callId, own\)/);
+    assert.match(actions, /inboxArchiveCall\(item\.callId\)/);
     assert.match(actions, /inboxArchiveCallsAction\(\[callId\]\)/);
     assert.match(actions, /updateLeadStatus\(item\.callId, "new"\)/);
     assert.match(overflow, /inboxArchive\(item\)/);

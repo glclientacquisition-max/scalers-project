@@ -137,7 +137,8 @@ export function InboxRowShell({
       // Call plus its open requests (one transaction); Undo uses the record.
       writeInboxArchiveUndo([{ id: item.id, callId: item.callId }], undefined, undefined, {
         undoId: archivedNow?.undoId,
-        extraRequestIds: archivedNow?.extraRequestIds,
+        holdIds: archivedNow?.holdIds,
+        visitIds: archivedNow?.visitIds,
       });
     }
     if (id === "archive" || id === "unarchive") {

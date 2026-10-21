@@ -15,14 +15,17 @@ export type InboxArchiveUndoPayload = {
   undoId?: string;
   /** Selected request rows archived with their call (hidden with it, back with it). */
   requests?: InboxArchiveUndoRow[];
-  /** Open requests archived with the calls beyond the one on each call row. */
-  extraRequestIds?: string[];
+  /** Holds (service_requests) the server stamped with these calls (inbox_archive_calls `holds`). */
+  holdIds?: string[];
+  /** Visits (appointments) the server stamped with these calls (inbox_archive_calls `visits`). */
+  visitIds?: string[];
 };
 
 export type InboxArchiveUndoExtra = {
   undoId?: string | null;
   requests?: InboxArchiveUndoRow[];
-  extraRequestIds?: string[];
+  holdIds?: string[];
+  visitIds?: string[];
 };
 
 export type InboxArchiveUndoStore = {
@@ -41,15 +44,26 @@ function browserStore(): InboxArchiveUndoStore | null {
 }
 
 /**
- * Toast label. `extraRequests`: open requests archived with the calls (one
- * transaction, inbox_archive_calls), e.g. "29 archived, plus 1 open request
- * on the same call".
+ * "1 open request", "2 open requests and 4 visits". Zero parts dropped.
+ * Empty when both are zero.
  */
-export function inboxArchiveUndoLabel(count: number, extraRequests = 0): string {
+export function inboxCascadeCountParts(holds: number, visits: number): string {
+  const parts: string[] = [];
+  if (holds > 0) parts.push(`${holds} open ${holds === 1 ? "request" : "requests"}`);
+  if (visits > 0) parts.push(`${visits} ${visits === 1 ? "visit" : "visits"}`);
+  return parts.join(" and ");
+}
+
+/**
+ * Toast label. `holds` / `visits`: what inbox_archive_calls stamped with
+ * these calls (every open hold and visit on them, not only selected rows),
+ * e.g. "24 archived, plus 9 open requests and 4 visits on those calls".
+ */
+export function inboxArchiveUndoLabel(count: number, holds = 0, visits = 0): string {
   const head = archivedHead(count);
-  if (extraRequests <= 0) return head;
-  const where = count > 1 && extraRequests > 1 ? "the same calls" : "the same call";
-  return `${head}, plus ${extraRequests} open ${extraRequests === 1 ? "request" : "requests"} on ${where}`;
+  const parts = inboxCascadeCountParts(holds, visits);
+  if (!parts) return head;
+  return `${head}, plus ${parts} on ${count > 1 ? "those calls" : "that call"}`;
 }
 
 function archivedHead(count: number): string {
@@ -91,10 +105,9 @@ function withExtra(payload: InboxArchiveUndoPayload, extra?: InboxArchiveUndoExt
   const undoId = typeof extra?.undoId === "string" ? extra.undoId.trim() : "";
   if (!undoId) return payload;
   const requests = usableRows(Array.isArray(extra?.requests) ? extra.requests : []);
-  const extraRequestIds = (Array.isArray(extra?.extraRequestIds) ? extra.extraRequestIds : [])
-    .map((id) => String(id || "").trim())
-    .filter(Boolean);
-  return { ...payload, undoId, requests, extraRequestIds };
+  const ids = (raw: unknown) =>
+    (Array.isArray(raw) ? raw : []).map((id) => String(id || "").trim()).filter(Boolean);
+  return { ...payload, undoId, requests, holdIds: ids(extra?.holdIds), visitIds: ids(extra?.visitIds) };
 }
 
 export function writeInboxArchiveUndo(

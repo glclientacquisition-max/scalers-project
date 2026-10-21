@@ -38,8 +38,9 @@ export type InboxArchiveOne = {
   archived?: boolean;
   /** Undo record (cascade). Null on the calls-only fallback. */
   undoId?: string | null;
-  /** Open requests archived with the call beyond this row's own. */
-  extraRequestIds?: string[];
+  /** Holds and visits the server stamped with the call (RPC result). */
+  holdIds?: string[];
+  visitIds?: string[];
 };
 
 /**
@@ -49,21 +50,20 @@ export type InboxArchiveOne = {
  */
 export async function inboxArchive(item: InboxItem): Promise<InboxArchiveOne> {
   if (!item.callId) return { error: "Missing call." };
-  if (isDeskHarness()) return { ok: true, archived: true, undoId: null, extraRequestIds: [] };
-  const own = new Set([item.hold?.id, item.job?.id].filter(Boolean) as string[]);
-  return inboxArchiveCall(item.callId, own);
+  if (isDeskHarness()) return { ok: true, archived: true, undoId: null, holdIds: [], visitIds: [] };
+  return inboxArchiveCall(item.callId);
 }
 
-/** Archive one call (row menu, ticket menu). `own`: request ids not counted as "plus". */
-export async function inboxArchiveCall(callId: string, own: ReadonlySet<string> = new Set()): Promise<InboxArchiveOne> {
+/** Archive one call (row menu, ticket menu). */
+export async function inboxArchiveCall(callId: string): Promise<InboxArchiveOne> {
   const res = await inboxArchiveCallsAction([callId]);
   if (res.error) return { error: res.error };
-  const flagged = [...(res.holds || []), ...(res.visits || [])];
   return {
     ok: true,
     archived: (res.updatedIds || []).includes(callId),
     undoId: res.mode === "cascade" ? res.undoId ?? null : null,
-    extraRequestIds: flagged.filter((id) => !own.has(id)),
+    holdIds: res.mode === "cascade" ? res.holds || [] : [],
+    visitIds: res.mode === "cascade" ? res.visits || [] : [],
   };
 }
 
@@ -77,7 +77,6 @@ export async function inboxUndoArchiveCascade(payload: {
   undoId: string;
   rows: Array<{ id: string; callId: string }>;
   requests?: Array<{ id: string; callId: string }>;
-  extraRequestIds?: string[];
 }) {
   return sendInboxCascadeUndo(payload, inboxUndoArchiveAction);
 }

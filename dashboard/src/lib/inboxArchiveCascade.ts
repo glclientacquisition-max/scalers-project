@@ -12,7 +12,7 @@
  * request rows are then skipped exactly as before.
  */
 import type { InboxHold, InboxItem, InboxJob } from "@/lib/inboxPurpose";
-import { inboxArchiveUndoLabel } from "@/lib/inboxArchiveUndo";
+import { inboxArchiveUndoLabel, inboxCascadeCountParts } from "@/lib/inboxArchiveUndo";
 import { inboxBulkPlan, type InboxBulkRun, type InboxBulkSkip, type InboxBulkTarget } from "@/lib/inboxBulk";
 
 export type InboxArchiveSkip = { id: string; reason: "already_archived" | "not_found" | string };
@@ -173,23 +173,22 @@ export function planInboxArchive(items: InboxItem[]): InboxArchivePlan {
 export type InboxArchiveRun = InboxBulkRun & {
   cascaded: InboxBulkTarget[];
   mode: "cascade" | "legacy" | "harness" | "none";
-  /**
-   * Open requests archived with the calls that are not the request shown on
-   * an archived call row: "plus 1 open request on the same call".
-   */
-  extraRequestIds: string[];
+  /** Holds and visits the server stamped with the archived calls (RPC `holds` / `visits`). */
+  holdIds: string[];
+  visitIds: string[];
   undoId: string | null;
 };
 
-function attachedRequestIds(items: InboxItem[], targets: InboxBulkTarget[]): Set<string> {
-  const byId = new Map(items.map((item) => [item.id, item]));
+/** Dev harness (no server): the open requests on the selected rows. */
+function harnessIds(items: InboxItem[], plan: InboxArchivePlan, kind: "hold" | "job"): string[] {
+  const chosen = new Set([...plan.targets, ...plan.riders].map((t) => t.itemId));
   const out = new Set<string>();
-  for (const t of targets) {
-    const item = byId.get(t.itemId);
-    if (item?.hold?.id) out.add(item.hold.id);
-    if (item?.job?.id) out.add(item.job.id);
+  for (const item of items) {
+    if (!chosen.has(item.id)) continue;
+    const id = kind === "hold" ? item.hold?.id : item.job?.id;
+    if (id) out.add(id);
   }
-  return out;
+  return [...out];
 }
 
 /**
@@ -206,7 +205,7 @@ export async function sendInboxArchive(
   const plan = planInboxArchive(items);
   const base = { selected: items.length, undoId: null as string | null };
   if (!plan.ids.length) {
-    return { ...base, applied: [], missed: [], cascaded: [], skipped: plan.skipped, mode: "none", extraRequestIds: [] };
+    return { ...base, applied: [], missed: [], cascaded: [], skipped: plan.skipped, mode: "none", holdIds: [], visitIds: [] };
   }
   if (opts.harness) {
     return {
@@ -216,12 +215,13 @@ export async function sendInboxArchive(
       cascaded: plan.riders,
       skipped: plan.skipped,
       mode: "harness",
-      extraRequestIds: plan.riders.map((t) => t.rowId),
+      holdIds: harnessIds(items, plan, "hold"),
+      visitIds: harnessIds(items, plan, "job"),
     };
   }
   const res = await send(plan.ids);
   if (res?.error) {
-    return { ...base, applied: [], missed: [], cascaded: [], skipped: plan.skipped, mode: "none", extraRequestIds: [], error: res.error };
+    return { ...base, applied: [], missed: [], cascaded: [], skipped: plan.skipped, mode: "none", holdIds: [], visitIds: [], error: res.error };
   }
   const updated = new Set(Array.isArray(res?.updatedIds) ? res.updatedIds : []);
   const applied = plan.targets.filter((t) => updated.has(t.rowId));
@@ -229,12 +229,11 @@ export async function sendInboxArchive(
   if (res?.mode !== "cascade") {
     // #862 not on this database: the calls were archived, requests were not.
     const skipped = [...plan.skipped, ...plan.riders.map((t) => ({ itemId: t.itemId, reason: "open_request" as const }))];
-    return { ...base, applied, missed, cascaded: [], skipped, mode: "legacy", extraRequestIds: [] };
+    return { ...base, applied, missed, cascaded: [], skipped, mode: "legacy", holdIds: [], visitIds: [] };
   }
   const flagged = new Set([...(res.holds || []), ...(res.visits || [])]);
   const cascaded = plan.riders.filter((t) => flagged.has(t.rowId));
   const ridersMissed = plan.riders.filter((t) => !flagged.has(t.rowId));
-  const attached = attachedRequestIds(items, applied);
   return {
     ...base,
     applied,
@@ -242,36 +241,30 @@ export async function sendInboxArchive(
     cascaded,
     skipped: plan.skipped,
     mode: "cascade",
-    extraRequestIds: [...flagged].filter((id) => !attached.has(id)),
+    holdIds: [...new Set(res.holds || [])],
+    visitIds: [...new Set(res.visits || [])],
     undoId: res.undoId || null,
   };
 }
 
-function plural(n: number, one: string, many: string): string {
-  return n === 1 ? one : many;
+
+/** "24 archived, plus 1 open request and 4 visits on those calls" (the toast label). */
+export function inboxArchivedLabel(calls: number, holds = 0, visits = 0): string {
+  return inboxArchiveUndoLabel(calls, holds, visits);
 }
 
-/** "29 archived, plus 1 open request on the same call" (same as the toast label). */
-export function inboxArchivedLabel(calls: number, extraRequests = 0): string {
-  return inboxArchiveUndoLabel(calls, extraRequests);
-}
-
-/** Undo copy: what came back, and what changed since the archive. */
+/** Undo copy from inbox_undo_archive `restored`: "24 restored, plus 1 open request and 4 visits." */
 export function inboxCascadeUndoText(opts: {
   restoredCalls: number;
-  restoredRequests: number;
+  restoredHolds: number;
+  restoredVisits: number;
   changedSince: number;
   alreadyUndone?: boolean;
 }): string {
   if (opts.alreadyUndone) return "Already restored.";
-  const parts: string[] = [];
-  let head = `${opts.restoredCalls} restored`;
-  if (opts.restoredRequests > 0) {
-    head += `, plus ${opts.restoredRequests} open ${plural(opts.restoredRequests, "request", "requests")}`;
-  }
-  parts.push(`${head}.`);
-  if (opts.changedSince > 0) parts.push(`${opts.changedSince} changed since.`);
-  return parts.join(" ");
+  const parts = inboxCascadeCountParts(opts.restoredHolds, opts.restoredVisits);
+  const head = `${opts.restoredCalls} restored${parts ? `, plus ${parts}` : ""}.`;
+  return opts.changedSince > 0 ? `${head} ${opts.changedSince} changed since.` : head;
 }
 
 /**
@@ -284,29 +277,29 @@ export async function sendInboxCascadeUndo(
     undoId: string;
     rows: Array<{ id: string; callId: string }>;
     requests?: Array<{ id: string; callId: string }>;
-    extraRequestIds?: string[];
   },
   send: InboxUndoSend
 ): Promise<{
   restored: Array<{ id: string; callId: string }>;
   missed: Array<{ id: string; callId: string }>;
   restoredCalls: number;
-  restoredRequests: number;
+  restoredHolds: number;
+  restoredVisits: number;
   changedSince: number;
   alreadyUndone: boolean;
   error?: string;
 }> {
   const res = await send(payload.undoId);
-  const empty = { restored: [], missed: [], restoredCalls: 0, restoredRequests: 0, changedSince: 0, alreadyUndone: false };
+  const empty = { restored: [], missed: [], restoredCalls: 0, restoredHolds: 0, restoredVisits: 0, changedSince: 0, alreadyUndone: false };
   if (res?.error) return { ...empty, error: res.error };
   const calls = new Set(res.restored?.calls || []);
-  const requests = new Set([...(res.restored?.holds || []), ...(res.restored?.visits || [])]);
   const all = [...payload.rows, ...(payload.requests || [])];
   return {
     restored: all.filter((row) => calls.has(row.callId)),
     missed: payload.rows.filter((row) => !calls.has(row.callId)),
     restoredCalls: payload.rows.filter((row) => calls.has(row.callId)).length,
-    restoredRequests: (payload.extraRequestIds || []).filter((id) => requests.has(id)).length,
+    restoredHolds: new Set(res.restored?.holds || []).size,
+    restoredVisits: new Set(res.restored?.visits || []).size,
     changedSince: (res.changedSince || []).length,
     alreadyUndone: Boolean(res.alreadyUndone),
   };

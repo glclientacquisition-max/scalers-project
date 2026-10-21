@@ -129,7 +129,8 @@ function InboxTicketMore({
       if (one.archived !== false) {
         writeInboxArchiveUndo([{ id: callId, callId }], undefined, undefined, {
           undoId: one.undoId,
-          extraRequestIds: one.extraRequestIds,
+          holdIds: one.holdIds,
+          visitIds: one.visitIds,
         });
       }
       router.push(backHref);

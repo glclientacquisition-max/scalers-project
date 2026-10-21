@@ -182,7 +182,8 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
         writeInboxArchiveUndo(archivedRows, undefined, undefined, {
           undoId: archive.undoId,
           requests,
-          extraRequestIds: archive.extraRequestIds,
+          holdIds: archive.holdIds,
+          visitIds: archive.visitIds,
         });
       }
     }

@@ -98,7 +98,7 @@ test("plan: hold 93ab7756 rides with call 2af42c11 when that call is selected (n
   assert.deepEqual(plan.skipped, []);
 });
 
-test("archive 30 selected: ONE request, 29 archived plus 1 open request on the same call, no leftover note", async () => {
+test("archive 30 selected: ONE request, toast counts every hold the RPC stamped, no leftover note", async () => {
   const { items } = repro();
   const { calls, send } = cascadeSend();
   const run = await sendInboxArchive(items, send);
@@ -109,11 +109,14 @@ test("archive 30 selected: ONE request, 29 archived plus 1 open request on the s
   assert.deepEqual(run.cascaded.map((t) => t.itemId), [HOLD_EXTRA]);
   assert.deepEqual(run.missed, []);
   assert.deepEqual(run.skipped, []);
-  // 8c713352 is the request on the call row itself; 93ab7756 is the "plus 1".
-  assert.deepEqual(run.extraRequestIds, [HOLD_EXTRA]);
+  // Counts come from the RPC result: every open hold it stamped on the 29
+  // calls (8c713352 on the call row and 93ab7756 on its own row included).
+  assert.equal(run.holdIds.length, 30);
+  assert.ok(run.holdIds.includes(HOLD_ON_ROW) && run.holdIds.includes(HOLD_EXTRA));
+  assert.deepEqual(run.visitIds, []);
   assert.equal(run.undoId, "11111111-1111-4111-8111-111111111111");
   assert.equal(inboxBulkOutcomeText("archive", run), null);
-  assert.equal(inboxArchivedLabel(run.applied.length, run.extraRequestIds.length), "29 archived, plus 1 open request on the same call");
+  assert.equal(inboxArchivedLabel(run.applied.length, run.holdIds.length, run.visitIds.length), "29 archived, plus 30 open requests on those calls");
 });
 
 test("archive: a standalone hold whose call is NOT selected keeps the skip", async () => {
@@ -162,7 +165,7 @@ test("undo: ONE request with the undo id; texts for restored, changed since and 
   const requests = [{ id: HOLD_EXTRA, callId: CALL }];
   const sent: string[] = [];
   const res = await sendInboxCascadeUndo(
-    { undoId: "u-1", rows, requests, extraRequestIds: [HOLD_EXTRA] },
+    { undoId: "u-1", rows, requests },
     async (undoId) => {
       sent.push(undoId);
       return { ok: true, restored: { calls: rows.map((r) => r.callId), holds: [HOLD_ON_ROW, HOLD_EXTRA], visits: [] }, changedSince: [], alreadyUndone: false };
@@ -170,19 +173,20 @@ test("undo: ONE request with the undo id; texts for restored, changed since and 
   );
   assert.deepEqual(sent, ["u-1"]);
   assert.equal(res.restoredCalls, 29);
-  assert.equal(res.restoredRequests, 1);
+  assert.equal(res.restoredHolds, 2);
+  assert.equal(res.restoredVisits, 0);
   assert.ok(res.restored.some((r) => r.id === HOLD_EXTRA));
-  assert.equal(inboxCascadeUndoText(res), "29 restored, plus 1 open request.");
+  assert.equal(inboxCascadeUndoText(res), "29 restored, plus 2 open requests.");
 
-  const partial = await sendInboxCascadeUndo({ undoId: "u-1", rows, requests, extraRequestIds: [HOLD_EXTRA] }, async () => ({
+  const partial = await sendInboxCascadeUndo({ undoId: "u-1", rows, requests }, async () => ({
     ok: true,
     restored: { calls: rows.slice(1).map((r) => r.callId), holds: [HOLD_ON_ROW, HOLD_EXTRA], visits: [] },
     changedSince: [rows[0].callId],
     alreadyUndone: false,
   }));
   assert.equal(partial.missed.length, 1);
-  assert.equal(inboxCascadeUndoText(partial), "28 restored, plus 1 open request. 1 changed since.");
-  assert.equal(inboxCascadeUndoText({ restoredCalls: 0, restoredRequests: 0, changedSince: 0, alreadyUndone: true }), "Already restored.");
+  assert.equal(inboxCascadeUndoText(partial), "28 restored, plus 2 open requests. 1 changed since.");
+  assert.equal(inboxCascadeUndoText({ restoredCalls: 0, restoredHolds: 0, restoredVisits: 0, changedSince: 0, alreadyUndone: true }), "Already restored.");
 });
 
 test("rpc jsonb parsing matches the #862 shapes", () => {
@@ -312,11 +316,12 @@ test("undo record survives the session store round trip", () => {
   const mem = new Map<string, string>();
   const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) };
   const now = 1_000;
-  writeInboxArchiveUndo([{ id: CALL, callId: CALL }], now, store, { undoId: "u-4", requests: [{ id: HOLD_EXTRA, callId: CALL }], extraRequestIds: [HOLD_EXTRA] });
+  writeInboxArchiveUndo([{ id: CALL, callId: CALL }], now, store, { undoId: "u-4", requests: [{ id: HOLD_EXTRA, callId: CALL }], holdIds: [HOLD_ON_ROW, HOLD_EXTRA], visitIds: ["v-1"] });
   const back = parseInboxArchiveUndo(mem.get("scalers-inbox-archive-undo")!, now + 1);
   assert.equal(back?.undoId, "u-4");
   assert.deepEqual(back?.requests, [{ id: HOLD_EXTRA, callId: CALL }]);
-  assert.deepEqual(back?.extraRequestIds, [HOLD_EXTRA]);
+  assert.deepEqual(back?.holdIds, [HOLD_ON_ROW, HOLD_EXTRA]);
+  assert.deepEqual(back?.visitIds, ["v-1"]);
   writeInboxArchiveUndo([{ id: CALL, callId: CALL }], now, store);
   assert.equal(parseInboxArchiveUndo(mem.get("scalers-inbox-archive-undo")!, now + 1)?.undoId, undefined);
 });
@@ -336,4 +341,77 @@ test("wiring: bulk bar, row menu and ticket archive through inbox_archive_calls;
   assert.match(load, /INBOX_ARCHIVED_COLUMN = "inbox_archived_at"/);
   assert.match(load, /stampMissing\(res\.error\) \? openHoldsQuery\(HOLD_SELECT\)/);
   assert.match(load, /stampMissing\(res\.error\) \? openJobsQuery\(JOB_SELECT\)/);
+});
+
+test("staging retest (25 rows: 24 calls + hold 93ab7756): RPC stamped 9 holds and 4 visits, toasts say so", async () => {
+  const calls24 = [CALL, ...Array.from({ length: 23 }, (_, i) => uuid(i + 101))];
+  const items: any[] = calls24.map((id) => ({ id, callId: id, lead: { leadStatus: "new" }, hold: id === CALL ? hold(HOLD_ON_ROW, CALL) : null, job: null }));
+  items.push({ id: HOLD_EXTRA, callId: CALL, lead: null, hold: hold(HOLD_EXTRA, CALL), job: null });
+  const holds9 = [HOLD_ON_ROW, HOLD_EXTRA, ...Array.from({ length: 7 }, (_, i) => `h-${i}`)];
+  const visits4 = ["v-1", "v-2", "v-3", "v-4"];
+  const run = await sendInboxArchive(items, async (ids) => ({ ok: true, mode: "cascade", updatedIds: ids, holds: holds9, visits: visits4, skipped: [], undoId: "u-25" }));
+  assert.equal(run.applied.length, 24);
+  assert.equal(run.cascaded.length, 1);
+  assert.equal(inboxBulkOutcomeText("archive", run), null);
+  assert.equal(inboxArchivedLabel(run.applied.length, run.holdIds.length, run.visitIds.length), "24 archived, plus 9 open requests and 4 visits on those calls");
+  const rows = items.filter((i) => i.lead).map((i) => ({ id: i.id, callId: i.callId }));
+  const undo = await sendInboxCascadeUndo({ undoId: "u-25", rows, requests: [{ id: HOLD_EXTRA, callId: CALL }] }, async () => ({
+    ok: true, restored: { calls: calls24, holds: holds9, visits: visits4 }, changedSince: [], alreadyUndone: false,
+  }));
+  assert.equal(inboxCascadeUndoText(undo), "24 restored, plus 9 open requests and 4 visits.");
+});
+
+test("copy: every plural / zero combination, that call vs those calls", () => {
+  const cases: Array<[number, number, number, string]> = [
+    [1, 0, 0, "Archived"],
+    [24, 0, 0, "24 archived"],
+    [1, 1, 0, "Archived, plus 1 open request on that call"],
+    [1, 2, 0, "Archived, plus 2 open requests on that call"],
+    [1, 0, 1, "Archived, plus 1 visit on that call"],
+    [1, 0, 3, "Archived, plus 3 visits on that call"],
+    [1, 1, 1, "Archived, plus 1 open request and 1 visit on that call"],
+    [24, 1, 4, "24 archived, plus 1 open request and 4 visits on those calls"],
+    [24, 2, 1, "24 archived, plus 2 open requests and 1 visit on those calls"],
+    [2, 1, 0, "2 archived, plus 1 open request on those calls"],
+    [2, 0, 2, "2 archived, plus 2 visits on those calls"],
+  ];
+  for (const [c, h, v, want] of cases) assert.equal(inboxArchivedLabel(c, h, v), want, `${c}/${h}/${v}`);
+  const undo: Array<[number, number, number, number, string]> = [
+    [24, 1, 4, 0, "24 restored, plus 1 open request and 4 visits."],
+    [24, 0, 0, 0, "24 restored."],
+    [1, 1, 0, 0, "1 restored, plus 1 open request."],
+    [1, 0, 1, 0, "1 restored, plus 1 visit."],
+    [3, 2, 2, 0, "3 restored, plus 2 open requests and 2 visits."],
+    [23, 9, 4, 1, "23 restored, plus 9 open requests and 4 visits. 1 changed since."],
+    [0, 0, 0, 3, "0 restored. 3 changed since."],
+  ];
+  for (const [c, h, v, ch, want] of undo) {
+    assert.equal(inboxCascadeUndoText({ restoredCalls: c, restoredHolds: h, restoredVisits: v, changedSince: ch }), want, want);
+  }
+  for (const [c, h, v] of cases) assert.doesNotMatch(inboxArchivedLabel(c, h, v), /[\u2013\u2014]/);
+});
+
+test("fallback (no RPC): toast has no plus part", async () => {
+  const { items } = repro();
+  const run = await sendInboxArchive(items, async (ids) => ({ ok: true, mode: "legacy", updatedIds: ids, holds: [], visits: [], skipped: [], undoId: null }));
+  assert.deepEqual([run.holdIds, run.visitIds], [[], []]);
+  assert.equal(inboxArchivedLabel(run.applied.length, run.holdIds.length, run.visitIds.length), "29 archived");
+});
+
+test("calendar: a visit or hold archived with its call stays on the run sheets (stamp only filters the inbox)", async () => {
+  const { visitBoardItems } = await import("../dashboard/src/lib/runSheet.ts");
+  const { isHoldBoardItem } = await import("../dashboard/src/lib/holdSheet.ts");
+  const stamp = "2026-10-22T00:50:00.000Z";
+  const job = (id: string, status: string, extra: Record<string, unknown> = {}) => ({
+    id, created_at: "2026-10-14T04:33:00.000Z", service_name: "Deep clean", status, when_text: null,
+    address_landmark: null, notes: null, caller_name: null, caller_phone: "+254700000001", call_id: CALL, ...extra,
+  }) as any;
+  const visitRow: any = { id: "v-2", callId: CALL, lead: null, hold: null, job: job("v-2", "confirmed", { inbox_archived_at: stamp }) };
+  const holdRow: any = { id: HOLD_EXTRA, callId: CALL, lead: null, hold: hold(HOLD_EXTRA, CALL, { inbox_archived_at: stamp }), job: null };
+  assert.equal(itemIsArchived(visitRow), true, "out of the inbox");
+  assert.deepEqual(visitBoardItems([visitRow]).map((i) => i.id), ["v-2"], "still on the visit calendar");
+  assert.equal(isHoldBoardItem(holdRow), true, "still on the holds sheet");
+  for (const f of ["lib/runSheet.ts", "lib/holdSheet.ts", "lib/contactsLoad.ts", "app/(desk)/calls/[id]/page.tsx"]) {
+    assert.doesNotMatch(src(f), /inbox_archived_at|itemIsArchived\(/, f);
+  }
 });

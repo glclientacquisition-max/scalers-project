@@ -39,7 +39,8 @@ export function InboxArchiveToast({
   }, [result]);
 
   const count = notice?.rows.length ?? 0;
-  const extra = notice?.extraRequestIds?.length ?? 0;
+  const holds = notice?.holdIds?.length ?? 0;
+  const visits = notice?.visitIds?.length ?? 0;
 
   async function undo() {
     if (!notice || busy) return;
@@ -52,7 +53,6 @@ export function InboxArchiveToast({
         undoId: notice.undoId,
         rows: notice.rows,
         requests: notice.requests,
-        extraRequestIds: notice.extraRequestIds,
       });
       if (res.error) {
         setError(res.error);
@@ -66,7 +66,8 @@ export function InboxArchiveToast({
       setResult(
         inboxCascadeUndoText({
           restoredCalls: res.restoredCalls,
-          restoredRequests: res.restoredRequests,
+          restoredHolds: res.restoredHolds,
+          restoredVisits: res.restoredVisits,
           changedSince: res.changedSince,
           alreadyUndone: res.alreadyUndone,
         })
@@ -111,7 +112,7 @@ export function InboxArchiveToast({
       ) : notice ? (
         <div className="flex w-full flex-col rounded-xl border border-hairline bg-surface shadow-xl">
           <div className="flex items-center gap-2 px-3">
-            <p className="min-w-0 flex-1 py-2 text-body text-ink">{inboxArchiveUndoLabel(count, extra)}</p>
+            <p className="min-w-0 flex-1 py-2 text-body text-ink">{inboxArchiveUndoLabel(count, holds, visits)}</p>
             <button
               type="button"
               disabled={busy}
