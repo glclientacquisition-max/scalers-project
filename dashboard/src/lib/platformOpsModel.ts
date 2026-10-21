@@ -192,7 +192,7 @@ export function kindLabel(kind: string): string {
   if (base === "speech") return "Speech";
   if (base === "reasoning") return "Reasoning";
   if (base === "phone_line") return "Phone";
-  if (base === "sautikit_low") return "Money";
+  if (base === "sautikit_low") return String(kind).startsWith("sautikit_low:staging:") ? "Staging money" : "Money";
   if (base === "sms_credit") return "SMS";
   if (base === "pool_empty") return "Numbers";
   if (base === "beta_expired") return "Beta";
@@ -346,7 +346,10 @@ export function reconcileNotices(
 
 export function opsMailSubject(kind: string, recovered = false): string {
   const name = kindLabel(kind);
-  return recovered ? `Scalers ops: ${name} recovered` : `Scalers ops: ${name}`;
+  if (!recovered) return `Scalers ops: ${name}`;
+  // A wallet notice resolves when the balance is back above the re-arm line.
+  if (String(kind || "").split(":")[0] === "sautikit_low") return `Scalers ops: ${name} topped up`;
+  return `Scalers ops: ${name} recovered`;
 }
 
 export function mergeQueueRows(input: {
