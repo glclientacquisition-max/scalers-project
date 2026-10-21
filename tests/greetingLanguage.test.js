@@ -101,7 +101,7 @@ beforeEach(() => {
     contacts: [{ id: 'c1', tenant_id: 't1', phone: '+254712345678', name: 'Wanjiku', notes: null, last_reason: null, metadata: {}, last_language: 'sw', last_language_at: '2026-10-20T08:00:00Z' }],
     service_requests: [],
     appointments: [],
-    calls: [{ id: '55555555-5555-4555-8555-555555555555', sautikit_call_sid: 'HD_a1', greeted_at: null, last_agent_line: null, notice_given: false, stream_seq: 0, last_stream_at: null }],
+    calls: [{ id: '55555555-5555-4555-8555-555555555555', sautikit_call_sid: 'HD_a1', greeted_at: null, last_agent_line: null, last_line_cut: false, notice_given: false, stream_seq: 0, last_stream_at: null }],
   };
 });
 
@@ -329,13 +329,13 @@ describe('calls resume state', () => {
     tables.calls[0].greeted_at = '2026-10-21T10:00:00Z';
     tables.calls[0].last_agent_line = 'Karibu';
     tables.calls[0].stream_seq = 2;
-    assert.deepEqual(await db.getCallResumeState('HD_a1'), { greetedAt: '2026-10-21T10:00:00Z', lastAgentLine: 'Karibu', noticeGiven: false, streamSeq: 2, lastStreamAt: null });
+    assert.deepEqual(await db.getCallResumeState('HD_a1'), { greetedAt: '2026-10-21T10:00:00Z', lastAgentLine: 'Karibu', lastLineCut: false, noticeGiven: false, streamSeq: 2, lastStreamAt: null });
     assert.equal(await db.getCallResumeState('HD_none'), null);
     missing = new Set(['stream_seq']);
     assert.equal((await quiet(() => db.getCallResumeState('HD_a1'))).out, null);
   });
   it('updateLastAgentLine trims to 500 and never throws', async () => {
-    assert.deepEqual(await db.updateLastAgentLine('HD_a1', 'x'.repeat(800)), { ok: true });
+    assert.deepEqual(await db.updateLastAgentLine('HD_a1', 'x'.repeat(800)), { ok: true, updated: 1 });
     assert.equal(tables.calls[0].last_agent_line.length, 500);
     throwUpdate = true;
     assert.equal((await quiet(() => db.updateLastAgentLine('HD_a1', 'hi'))).out.ok, false);
@@ -416,5 +416,58 @@ describe('contact upserts by tenant + phone (Brain review)', () => {
     r = await quiet(() => db.confirmCallerName({ tenantId: 't1', phone: '+254712345678', name: 'Wanjiru' }));
     assert.equal(r.out.ok, false);
     assert.ok(r.logs.some((l) => /confirmCallerName failed/.test(l) && /apply greeting_language\.sql/.test(l)));
+  });
+});
+
+describe('notice, cut line and schema probe (Voice #843 @1ac7f6c0)', () => {
+  it('greeting_language.sql adds calls.last_line_cut idempotently with no owner grant', () => {
+    const sql = fs.readFileSync(path.join(__dirname, '../docs/supabase/greeting_language.sql'), 'utf8');
+    assert.match(sql, /alter table public\.calls add column if not exists last_line_cut boolean not null default false/);
+    assert.doesNotMatch(sql, /grant update \([^)]*last_line_cut/i);
+  });
+  it('markCallNoticeGiven sets notice_given for the sid; {ok, updated}', async () => {
+    assert.deepEqual(await db.markCallNoticeGiven('HD_a1'), { ok: true, updated: 1 });
+    assert.equal(tables.calls[0].notice_given, true);
+    assert.deepEqual(await db.markCallNoticeGiven('HD_none'), { ok: true, updated: 0 });
+    assert.equal((await db.markCallNoticeGiven('')).ok, false);
+  });
+  it('markCallNoticeGiven never throws', async () => {
+    throwUpdate = true;
+    const r = await quiet(() => db.markCallNoticeGiven('HD_a1'));
+    assert.equal(r.out.ok, false);
+    assert.ok(r.logs.some((l) => /markCallNoticeGiven threw/.test(l)));
+  });
+  it('updateLastAgentLine writes last_line_cut (default false, {cut:true} sets it)', async () => {
+    await db.updateLastAgentLine('HD_a1', 'Nikusaidie vipi?', { cut: true });
+    assert.equal(tables.calls[0].last_line_cut, true);
+    assert.equal((await db.getCallResumeState('HD_a1')).lastLineCut, true);
+    await db.updateLastAgentLine('HD_a1', 'Asante.');
+    assert.equal(tables.calls[0].last_line_cut, false);
+    assert.equal(tables.calls[0].last_agent_line, 'Asante.');
+  });
+  it('markLastLineCut defaults to true and can clear', async () => {
+    assert.deepEqual(await db.markLastLineCut('HD_a1'), { ok: true, updated: 1 });
+    assert.equal(tables.calls[0].last_line_cut, true);
+    await db.markLastLineCut('HD_a1', false);
+    assert.equal(tables.calls[0].last_line_cut, false);
+    missing = new Set(['last_line_cut']);
+    const r = await quiet(() => db.markLastLineCut('HD_a1'));
+    assert.equal(r.out.ok, false);
+    assert.ok(r.logs.some((l) => /apply greeting_language\.sql/.test(l)));
+  });
+  it('probeGreetingSchema: limit-0 selects only, true when migrated', async () => {
+    assert.deepEqual(await db.probeGreetingSchema(), { calls: true, contacts: true });
+    assert.ok(calls.every((c) => c.op === 'select'), 'read-only');
+    const probed = calls.map((c) => `${c.table}:${c.cols}`);
+    assert.ok(probed.some((p) => /^calls:.*greeted_at.*notice_given.*/.test(p) && /last_line_cut/.test(p)));
+    assert.ok(probed.some((p) => /^contacts:.*last_language/.test(p)));
+  });
+  it('probeGreetingSchema: false per table when a column is missing; never throws', async () => {
+    missing = new Set(['last_line_cut']);
+    let r = await quiet(() => db.probeGreetingSchema());
+    assert.deepEqual(r.out, { calls: false, contacts: true });
+    missing = new Set(['last_language', 'greeted_at']);
+    r = await quiet(() => db.probeGreetingSchema());
+    assert.deepEqual(r.out, { calls: false, contacts: false });
   });
 });

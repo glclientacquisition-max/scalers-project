@@ -105,6 +105,9 @@ alter table public.calls add column if not exists last_agent_line text;
 alter table public.calls add column if not exists notice_given boolean not null default false;
 alter table public.calls add column if not exists stream_seq integer not null default 0;
 alter table public.calls add column if not exists last_stream_at timestamptz;
+-- Added after the first staging apply (21 Oct): safe on a database that
+-- already has the columns above.
+alter table public.calls add column if not exists last_line_cut boolean not null default false;
 
 alter table public.calls drop constraint if exists calls_last_agent_line_len;
 alter table public.calls add constraint calls_last_agent_line_len
@@ -120,6 +123,8 @@ comment on column public.calls.stream_seq is
   'Media streams opened for this call (1 = first). Bumped by bump_call_stream_seq.';
 comment on column public.calls.last_stream_at is
   'When the latest media stream for this call opened.';
+comment on column public.calls.last_line_cut is
+  'True when last_agent_line was cut off (socket dropped mid-line); a reconnect re-speaks it.';
 
 -- Atomic stream counter. Returns the new value, or null when no calls row.
 create or replace function public.bump_call_stream_seq(p_call_sid text)

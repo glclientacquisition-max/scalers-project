@@ -2214,7 +2214,7 @@ function warnCallPath(event, fields) {
 }
 
 function migrationHint(message) {
-  return /greeted_at|last_agent_line|notice_given|stream_seq|last_stream_at|name_confirmed|bump_call_stream_seq/i.test(
+  return /greeted_at|last_agent_line|last_line_cut|notice_given|stream_seq|last_stream_at|name_confirmed|bump_call_stream_seq/i.test(
     message || ''
   )
     ? 'apply greeting_language.sql'
@@ -2344,8 +2344,9 @@ async function markCallGreeted({ callSid, lastAgentLine, noticeGiven } = {}) {
 }
 
 /**
- * Opening resume state for a call: { greetedAt, lastAgentLine, noticeGiven,
- * streamSeq, lastStreamAt }, or null when there is no calls row or on error.
+ * Opening resume state for a call: { greetedAt, lastAgentLine, lastLineCut,
+ * noticeGiven, streamSeq, lastStreamAt }, or null when there is no calls row
+ * or on error.
  */
 async function getCallResumeState(callSid) {
   const sid = String(callSid || '').trim();
@@ -2353,7 +2354,7 @@ async function getCallResumeState(callSid) {
   try {
     const { data, error } = await supabase
       .from('calls')
-      .select('greeted_at, last_agent_line, notice_given, stream_seq, last_stream_at')
+      .select('greeted_at, last_agent_line, last_line_cut, notice_given, stream_seq, last_stream_at')
       .eq('sautikit_call_sid', sid)
       .maybeSingle();
     if (error) {
@@ -2365,6 +2366,7 @@ async function getCallResumeState(callSid) {
     return {
       greetedAt: data.greeted_at || null,
       lastAgentLine: data.last_agent_line || null,
+      lastLineCut: data.last_line_cut === true,
       noticeGiven: data.notice_given === true,
       streamSeq: Number.isFinite(Number(data.stream_seq)) ? Number(data.stream_seq) : 0,
       lastStreamAt: data.last_stream_at || null,
@@ -2375,27 +2377,80 @@ async function getCallResumeState(callSid) {
   }
 }
 
-/** Save the last line the agent spoke (trimmed to 500). Never throws. */
-async function updateLastAgentLine(callSid, line) {
+/**
+ * Update calls columns for one sautikit_call_sid. Never throws:
+ * { ok, updated } or { ok:false, updated:0, error }.
+ */
+async function updateCallBySid(label, callSid, patch) {
   const sid = String(callSid || '').trim();
-  const text = String(line || '').trim().slice(0, LAST_AGENT_LINE_MAX);
-  if (!sid || !text) return { ok: false, skipped: 'no_call_sid_or_line' };
-  if (!supabase) return { ok: false, skipped: 'no_supabase' };
+  if (!sid) return { ok: false, updated: 0, skipped: 'no_call_sid' };
+  if (!supabase) return { ok: false, updated: 0, skipped: 'no_supabase' };
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('calls')
-      .update({ last_agent_line: text })
-      .eq('sautikit_call_sid', sid);
+      .update(patch)
+      .eq('sautikit_call_sid', sid)
+      .select('id');
     if (error) {
       const message = error.message || String(error);
-      warnCallPath('updateLastAgentLine failed', { callSid: sid, error: message, hint: migrationHint(message) });
-      return { ok: false, error: message };
+      warnCallPath(`${label} failed`, { callSid: sid, error: message, hint: migrationHint(message) });
+      return { ok: false, updated: 0, error: message };
     }
-    return { ok: true };
+    return { ok: true, updated: Array.isArray(data) ? data.length : 0 };
   } catch (err) {
-    warnCallPath('updateLastAgentLine threw', { callSid: sid, error: err?.message || String(err) });
-    return { ok: false, error: err?.message || String(err) };
+    warnCallPath(`${label} threw`, { callSid: sid, error: err?.message || String(err) });
+    return { ok: false, updated: 0, error: err?.message || String(err) };
   }
+}
+
+/**
+ * Save the last line the agent spoke (trimmed to 500) and whether it was cut
+ * off (default false). Never throws: { ok, updated }.
+ */
+async function updateLastAgentLine(callSid, line, { cut = false } = {}) {
+  const text = String(line || '').trim().slice(0, LAST_AGENT_LINE_MAX);
+  if (!String(callSid || '').trim() || !text) return { ok: false, updated: 0, skipped: 'no_call_sid_or_line' };
+  return updateCallBySid('updateLastAgentLine', callSid, { last_agent_line: text, last_line_cut: cut === true });
+}
+
+/** Mark the last agent line cut (or not). Never throws: { ok, updated }. */
+async function markLastLineCut(callSid, cut = true) {
+  return updateCallBySid('markLastLineCut', callSid, { last_line_cut: cut === true });
+}
+
+/** The recording notice was heard on this call. Never throws: { ok, updated }. */
+async function markCallNoticeGiven(callSid) {
+  return updateCallBySid('markCallNoticeGiven', callSid, { notice_given: true });
+}
+
+const GREETING_PROBE_CALLS = 'greeted_at, last_agent_line, last_line_cut, notice_given, stream_seq, last_stream_at';
+const GREETING_PROBE_CONTACTS = 'last_language, last_language_at, name_confirmed';
+
+/**
+ * Read-only feature probe for greeting_language.sql: a limit 0 select of the
+ * new calls and contacts columns. { calls, contacts } booleans; false on a
+ * missing column or any error. Never throws, writes nothing.
+ */
+async function probeGreetingSchema() {
+  const probe = async (table, columns) => {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from(table).select(columns).limit(0);
+      if (error) {
+        warnCallPath('probeGreetingSchema', { table, error: error.message || String(error), hint: migrationHint(error.message) });
+        return false;
+      }
+      return true;
+    } catch (err) {
+      warnCallPath('probeGreetingSchema threw', { table, error: err?.message || String(err) });
+      return false;
+    }
+  };
+  const [calls, contacts] = await Promise.all([
+    probe('calls', GREETING_PROBE_CALLS),
+    probe('contacts', GREETING_PROBE_CONTACTS),
+  ]);
+  return { calls, contacts };
 }
 
 /**
@@ -3362,6 +3417,9 @@ module.exports = {
   markCallGreeted,
   getCallResumeState,
   updateLastAgentLine,
+  markLastLineCut,
+  markCallNoticeGiven,
+  probeGreetingSchema,
   bumpStreamSeq,
   copyRecordingToStorage,
   listPendingRecordingCopies,
