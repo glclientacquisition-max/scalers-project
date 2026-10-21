@@ -25,13 +25,26 @@ function defaultClassify(opts = {}) {
 
 function callerFile(opts = {}) {
   const file = opts.callerFile || {};
-  const openRows = (Array.isArray(file.openRows) ? file.openRows : []).map((r) => ({
-    id: r.id || null,
-    service_name: r.service_name || r.job || null,
-    window_start: r.window_start || r.windowStart || null,
-    address_landmark: r.address_landmark || r.place || null,
-    status: r.status || 'requested',
-  }));
+  // Rows come from callerMemory.structuredOpenRows ({ kind, type, job, when, windowStart })
+  // or raw DB rows. Keep what the row is (a visit, or a callback / enquiry request) and the
+  // caller's own date words, so a request is never read back as a cancellable visit
+  // with an empty date ("... one bedroom on . Shall I go ahead?").
+  const openRows = (Array.isArray(file.openRows) ? file.openRows : []).map((r) => {
+    const type = r.type || r.request_type || null;
+    const kind = r.kind === 'visit' || r.kind === 'request'
+      ? r.kind
+      : (r.request_type || (type && type !== 'visit') ? 'request' : 'visit');
+    return {
+      id: r.id || null,
+      kind,
+      type,
+      service_name: r.service_name || r.job || r.item || null,
+      window_start: r.window_start || r.windowStart || null,
+      when_text: r.when_text || r.whenText || (typeof r.when === 'string' ? r.when : null) || null,
+      address_landmark: r.address_landmark || r.place || null,
+      status: r.status || 'requested',
+    };
+  });
   return {
     callerPhone: file.callerPhone || opts.callerPhone || null,
     contactName: file.contactName || null,

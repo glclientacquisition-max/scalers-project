@@ -50,7 +50,7 @@ function normRow(r) {
   const iso = r.window_start;
   let when = { date: null, time: null };
   if (iso) { const p = L.eatParts(new Date(iso)); when = { date: L.isoDate(p), time: `${String(p.h).padStart(2, '0')}:${String(p.mi).padStart(2, '0')}` }; }
-  return { id: r.id, service: r.service_name, when, place: r.address_landmark, status: r.status };
+  return { id: r.id, kind: r.kind === 'request' ? 'request' : 'visit', type: r.type || null, service: r.service_name, when, whenText: String(r.when_text || '').trim() || null, place: r.address_landmark, status: r.status };
 }
 
 const nameSpeakable = (state) => state.slots.name && !state.staffNames.includes(state.slots.name.toLowerCase()) ? state.slots.name : null;
@@ -98,7 +98,9 @@ function mergeSlots(state, u, profile) {
 }
 
 function resolveRow(state, u) {
-  const rows = state.file.openRows.filter((r) => !/cancel|done/.test(r.status));
+  // Cancel / move / address change act on visits only. An open callback or enquiry
+  // request is not a booking the caller can cancel here.
+  const rows = state.file.openRows.filter((r) => r.kind !== 'request' && !/cancel|done/.test(r.status));
   if (!rows.length) return { none: true };
   const hint = u.rowHint || u.text;
   const svc = N.matchService(hint, rows.map((r) => ({ name: r.service })));

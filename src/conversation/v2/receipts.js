@@ -47,7 +47,13 @@ function ask(slot, n, lang, ctx = {}) {
   const xs = typeof set === 'function' ? set(ctx) : set;
   return xs[Math.min(n, xs.length - 1)];
 }
-function rowLabel(r, lang) { const d = r.when?.date; return sw(lang) ? `${svcName(r.service, lang)} ya ${L.sayDate(d, lang)}` : `${svcName(r.service, lang).toLowerCase()} on ${L.sayDate(d, lang)}`; }
+// Never speak an empty date: a row with no window uses the caller's own words ("kesho"),
+// or no date at all.
+function rowLabel(r, lang) {
+  const d = r.when?.date ? L.sayDate(r.when.date, lang) : (r.whenText || '');
+  if (sw(lang)) return d ? `${svcName(r.service, lang)} ya ${d}` : `${svcName(r.service, lang)}`;
+  return d ? `${svcName(r.service, lang).toLowerCase()} on ${d}` : `${svcName(r.service, lang).toLowerCase()}`;
+}
 
 // HD_89aa48bf657f: plain service categories from the tenant catalogue (names never read raw)
 const CATS = [
