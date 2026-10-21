@@ -135,15 +135,15 @@ if (sharedDir) {
   const delay = Number(process.env.OPENING_SIM_SHARED_RTT_MS) || 0;
   const rtt = () => (delay ? new Promise((r) => setTimeout(r, delay)) : null);
   const probe = (process.env.OPENING_SIM_SHARED_PROBE || 'calls,contacts').toLowerCase();
-  if (probe !== 'absent') {
+  if (probe === 'absent') {
+    // #844 @962fb6e6 shape: no probe helper, even when this tree's db.js
+    // (#844 @d4609435 merged in) has the real one.
+    delete db.probeGreetingSchema;
+  } else {
     db.probeGreetingSchema = async () => {
       send({ ev: 'db_helper', fn: 'probeGreetingSchema' });
       return { calls: /\bcalls\b/.test(probe), contacts: /\bcontacts\b/.test(probe) };
     };
-  } else {
-    // 'absent' simulates a db.js without the probe. Once #844 is merged the real
-    // db.js has one, so remove it here to keep the pre-probe path under test.
-    delete db.probeGreetingSchema;
   }
   // Shapes as #844 @d4609435 (src/db.js): { ok, updated }, never throw.
   db.markCallNoticeGiven = async (callSid) => {
