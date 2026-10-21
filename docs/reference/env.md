@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-190 variables.
+193 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -31,8 +31,9 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BRAIN_CALL_FIXES_D199` | desk | `dashboard/src/lib/tenantFieldProvenance.ts` |
 | `BRAIN_GEMINI_CATALOGUE` | voice | `src/conversation/catalogueMouth.js` |
 | `BUSINESS_KNOWLEDGE` | voice | `src/db.js`<br>`src/prompts.js`<br>`src/tenantProfile.js` |
-| `BUSINESS_NAME` | voice | `server.js`<br>`src/conversation/businessAssistantIntro.js`<br>`src/db.js`<br>+2 more |
-| `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js` |
+| `BUSINESS_NAME` | voice | `server.js`<br>`src/conversation/businessAssistantIntro.js`<br>`src/db.js`<br>+3 more |
+| `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js`<br>`src/notifications/ownerCallSummary.js` |
+| `CALL_SUMMARY_EVENT` | voice | `src/conversation/callSummaryEvent.js` |
 | `CRON_SECRET` | desk | `dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/cron/ops-alerts/route.ts` |
 | `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+48 more |
 | `DASHBOARD_PASSWORD` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
@@ -85,10 +86,12 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `OPS_SMS_CREDIT_CRITICAL_AT` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OPS_SMS_CREDIT_WARN_BELOW` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OPS_WALLET_ALERT_THRESHOLDS_KES` | desk | `dashboard/src/lib/opsAlerts.ts` |
-| `OWNER_ALERT_EMAIL` | voice | `server.js` |
+| `OWNER_ALERT_EMAIL` | voice | `server.js`<br>`src/notifications/ownerCallSummary.js` |
+| `OWNER_CALL_SUMMARY` | voice | `src/notifications/ownerCallSummary.js` |
+| `OWNER_SUMMARY_SUPPRESS_LEGACY` | voice | `src/notifications/ownerCallSummary.js` |
 | `PATH` | scripts | `scripts/smoke-recording-webhook.js` |
 | `PLATFORM_WHATSAPP_ACK` | voice | `src/sautikit/whatsappInbound.js` |
-| `PLATFORM_WHATSAPP_PHONE_NUMBER_ID` | voice | `src/notifications/whatsapp.js`<br>`src/sautikit/whatsappInbound.js` |
+| `PLATFORM_WHATSAPP_PHONE_NUMBER_ID` | voice | `src/notifications/ownerCallSummary.js`<br>`src/notifications/whatsapp.js`<br>`src/sautikit/whatsappInbound.js` |
 | `PORT` | scripts, voice | `scripts/bench-inbound-webhook.js`<br>`scripts/tunnel.js`<br>`server.js` |
 | `POST_CALL_GEMINI_REVIEW` | voice | `src/conversation/callTranscriptReview.js` |
 | `POST_CALL_REVIEW_MODEL` | voice | `src/conversation/callTranscriptReview.js` |
@@ -113,7 +116,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SAUTIKIT_WEBHOOK_SECRET` | voice | `src/sautikit/webhook.js` |
 | `SAUTIKIT_WHATSAPP_CONNECTION_ID` | voice | `src/notifications/whatsapp.js` |
 | `SAUTIKIT_WHATSAPP_NUMBER_ID` | voice | `src/notifications/whatsapp.js` |
-| `SAUTIKIT_WHATSAPP_PHONE_NUMBER_ID` | voice | `src/notifications/whatsapp.js`<br>`src/sautikit/whatsappInbound.js` |
+| `SAUTIKIT_WHATSAPP_PHONE_NUMBER_ID` | voice | `src/notifications/ownerCallSummary.js`<br>`src/notifications/whatsapp.js`<br>`src/sautikit/whatsappInbound.js` |
 | `SAUTIKIT_WHATSAPP_TEMPLATE_ALLOW_LEGACY` | voice | `src/notifications/whatsappTemplates.js` |
 | `SCALERS_OPS_ALERT_EMAIL` | desk | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/setupNotify.ts` |
 | `SCALERS_OPS_ALERT_EMAILS` | desk | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/setupNotify.ts` |
@@ -146,8 +149,8 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SUPABASE_ANON_KEY` | desk | `dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_PUBLISHABLE_KEY` | desk | `dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_RECORDINGS_BUCKET` | voice | `src/db.js` |
-| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/supabase.ts`<br>+9 more |
-| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/invoicePay/provider.js`<br>+12 more |
+| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/supabase.ts`<br>+10 more |
+| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/invoicePay/provider.js`<br>+13 more |
 | `TENANT_DID` | voice | `server.js`<br>`src/db.js` |
 | `TENANT_ID` | scripts, voice | `scripts/bench-inbound-webhook.js`<br>`scripts/smoke-db.js`<br>`server.js`<br>+1 more |
 | `TEXTSMS_API_KEY` | desk, voice | `dashboard/src/lib/callerSms.ts`<br>`src/notifications/sms.js` |

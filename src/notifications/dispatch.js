@@ -22,12 +22,12 @@ const { isSmsConfigured, normalizeSmsTo, sendSms } = require('./sms');
 const { parseNotifyChannels } = require('./notifyChannels');
 const {
   beginInstanceSend,
-  claimTenantSms,
   durableSendClaim,
   personKey,
   recordDispatchResult,
   releaseInstanceFlight,
   sendReserved,
+  sendTenantSmsLegacy,
 } = require('./sendLedger');
 
 function whatsAppSenderReady() {
@@ -161,21 +161,31 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
           }
         }
         if (!handled) {
-          const claim = await claimTenantSms(ledger, text);
-          if (!claim.allowed) {
-            errors.push(`sms:${claim.reason || 'sms_allowance_exhausted'}`);
-            console.warn(
-              `[notify] tenant SMS skipped (${claim.reason || 'sms_allowance_exhausted'})`
-            );
-          } else {
-            if (ledger && typeof ledger === 'object') ledger.overage = Boolean(claim.overage);
-            try {
-              const sms = await trySendSms({ to, body: text });
-              if (sms) return accept(sms);
-            } catch (err) {
-              errors.push(`sms:${err?.message || err}`);
-              console.warn(`[notify] SMS send failed (${err?.message || err}); trying next channel`);
+          // Legacy path (reserve_notify_send not applied). A4 fix: units are
+          // claimed only after TextSMS accepts and the ledger row exists
+          // (was: consume_sms_units before the send, never released).
+          try {
+            const out = await sendTenantSmsLegacy({
+              ledger,
+              body: text,
+              flightKey: gate.key,
+              send: () => trySendSms({ to, body: text }),
+            });
+            if (out.sent) {
+              return out.result && typeof out.result === 'object'
+                ? { ...out.result, errors: [...errors] }
+                : out.result;
             }
+            if (out.accepted) {
+              // The SMS went out but is unrecorded: never fall through to a
+              // second channel for the same message.
+              return { channel: null, reason: out.reason, errors: [...errors] };
+            }
+            errors.push(`sms:${out.reason || 'sms_allowance_exhausted'}`);
+            console.warn(`[notify] tenant SMS skipped (${out.reason || 'sms_allowance_exhausted'})`);
+          } catch (err) {
+            errors.push(`sms:${err?.message || err}`);
+            console.warn(`[notify] SMS send failed (${err?.message || err}); nothing claimed, trying next channel`);
           }
         }
       }
