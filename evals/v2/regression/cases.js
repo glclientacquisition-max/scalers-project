@@ -200,6 +200,20 @@ module.exports = [
   { bug: 'J-B8', id: 'JB8_en_greeting_reply_clean', title: 'Greeting-turn wording (HD_b4396ad63677 B8), English', kind: 'call', lang: 'en', tenant: 'synthetic_cleaner',
     turns: [['Hello, how are you?', 'Hi, how are you doing?']], facts: {},
     check: (r) => { const l = t(r, 0); return BAD_SW.test(l) || /\b(nzuri|karibu|ungependa)\b/i.test(l) || !/\b(well|good|fine|help|service)\b/i.test(l) ? [`bad_greeting "${l}"`] : []; } },
+  // Bare Hello / bare number (synthetic, drafted 21 Oct for the #833 staging script; no source
+  // fixture existed). A bare opener gets a short re-invite, never an answer to a question the
+  // caller did not ask ("I'm well, thank you") and never a service dump. "1001" is read as a bare
+  // number with no context: ask what it is, never book, save, or quote from it.
+  { bug: 'BH', id: 'BH_en_bare_hello', title: 'Bare "Hello." after the greeting', kind: 'call', lang: 'en', tenant: 'synthetic_cleaner', callLanguage: 'en',
+    turns: ['Hello.', 'Hello?'], facts: {},
+    xfail: { owner: 'Brain', note: 'v2 greeting rule answers a bare "Hello." as if asked "how are you" ("I\'m well, thank you. Which service do you need?"). Fix: bare opener -> short re-invite ("Hi, I\'m here. How can I help?"); only answer "how are you" when asked' },
+    check: (r) => { const f = []; r.turns.slice(0, 2).forEach((x, i) => { const l = x.agentLine || ''; if (/\b(i'?m (well|fine|good)|thank you)\b/i.test(l)) f.push(`answered_unasked_how_are_you t${i} "${l}"`); if (LIST.test(l)) f.push(`listed_services t${i} "${l}"`); if (!/\?\s*$/.test(l)) f.push(`no_reinvite t${i} "${l}"`); }); if (r.db.writes.some((w) => /create|update/.test(w[0]))) f.push('wrote_on_bare_hello'); return f; } },
+  { bug: 'BH', id: 'BH_sw_bare_halo', title: 'Bare "Halo?" after the greeting', kind: 'call', lang: 'sw', tenant: 'synthetic_cleaner', callLanguage: 'sw',
+    turns: ['Halo?'], facts: {},
+    check: (r) => { const l = t(r, 0); const f = []; if (LIST.test(l)) f.push(`listed_services "${l}"`); if (BAD_SW.test(l) || !/\?\s*$/.test(l)) f.push(`no_reinvite "${l}"`); if (r.db.writes.some((w) => /create|update/.test(w[0]))) f.push('wrote_on_bare_hello'); return f; } },
+  { bug: 'BH', id: 'BH_en_bare_number_1001', title: 'Bare number "1001." with no context', kind: 'call', lang: 'en', tenant: 'synthetic_cleaner', callLanguage: 'en',
+    turns: ['1001.'], facts: {},
+    check: (r) => { const l = t(r, 0); const f = []; if (r.db.writes.some((w) => /create|update/.test(w[0]))) f.push('wrote_on_bare_number'); if (/\b(shillings?|KSh|price is|costs)\b/i.test(l)) f.push(`quoted_from_number "${l}"`); if (!/\?\s*$/.test(l)) f.push(`no_clarify "${l}"`); return f; } },
 ];
 module.exports.lint = lint;
 module.exports.writeNeedsReadback = writeNeedsReadback;
