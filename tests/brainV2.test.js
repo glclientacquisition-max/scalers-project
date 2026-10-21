@@ -330,7 +330,7 @@ test('an hours ask during an open booking does not glue the next slot', async ()
   ]);
   assert.match(out[1].line, /08:00|18:00|wazi|open/i);
   // BRAIN_V2_COMMIT_SAFETY restates the whole read-back after an info answer (fresh confirm token); never a glued slot ask
-  if (/^(1|true|on|yes)$/i.test(String(process.env.BRAIN_V2_COMMIT_SAFETY || ''))) assert.match(out[1].line, /wazi.*\. Sofa Cleaning, Ijumaa 16 Oktoba saa nne asubuhi, Kitengela, kwa Alvin\. Nithibitishe\?$/);
+  if (require('../src/conversation/v2/commitSafety').commitSafetyEnabled()) assert.match(out[1].line, /wazi.*\. Sofa Cleaning, Ijumaa 16 Oktoba saa nne asubuhi, Kitengela, kwa Alvin\. Nithibitishe\?$/);
   else assert.doesNotMatch(out[1].line, /Shall I book|Nithibitishe|Siku gani/);
 });
 

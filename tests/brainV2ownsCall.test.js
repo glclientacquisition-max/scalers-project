@@ -51,21 +51,6 @@ test('a good v2 turn passes through untouched, end signal included', async () =>
   assert.equal(r.line, 'Thank you for calling. Goodbye.'); assert.equal(r.end, true); assert.equal(r.reason, 'caller_done'); assert.equal(r.repaired, undefined);
 });
 
-test('a v2-owned tool plan reaches the executor as is: no guardToolPlan, no ensureRequired*', () => {
-  const calls = [];
-  const guards = {
-    guardToolPlan: (p) => { calls.push('guardToolPlan'); return { ...p, consentBlocked: true }; },
-    ensureRequiredEscalate: (p) => { calls.push('ensureRequiredEscalate'); return p; },
-    ensureRequiredCreateRequest: (p) => { calls.push('ensureRequiredCreateRequest'); return p; },
-  };
-  const parsed = { appointment: { serviceName: 'Sofa Cleaning', whenText: 'Friday 10:00', idempotencyKey: 'k' } };
-  const owned = O.toolPlanFor(parsed, { owned: true, state: {}, capabilities: {}, guards });
-  assert.equal(owned.plan, parsed); assert.equal(owned.guarded, false); assert.deepEqual(calls, []);
-  const v1 = O.toolPlanFor(parsed, { owned: false, state: {}, capabilities: {}, guards });
-  assert.equal(v1.guarded, true); assert.equal(v1.plan.consentBlocked, true);
-  assert.deepEqual(calls, ['ensureRequiredCreateRequest', 'ensureRequiredEscalate', 'guardToolPlan'], 'v1 order unchanged');
-});
-
 test('a v2 booking writes through live handlers with v2Owned set, once, with the C1 key', withEnv(LIVE_ON, async () => {
   const plans = [];
   const live = createBrainV2Live({
@@ -82,10 +67,10 @@ test('a v2 booking writes through live handlers with v2Owned set, once, with the
   void now;
 }));
 
-test('server wiring: owned v2 writes pass v2Owned to applyGeminiTools, which routes them through toolPlanFor', () => {
+test('server wiring: owned v2 writes pass v2Owned to applyGeminiTools, which hands them to the executor with no guardToolPlan / ensureRequired*', () => {
   assert.match(SERVER, /applyTools: \(parsed\) => applyGeminiTools\(callKey, parsed, \{ v2Owned: true \}\)/);
   assert.match(SERVER, /async function applyGeminiTools\(callSid, parsed, toolOpts = \{\}\)/);
-  assert.match(SERVER, /v2OwnsCall\.toolPlanFor\(parsed, \{\s*owned: toolOpts\.v2Owned === true/);
+  assert.match(SERVER, /const enforcedParsed =\n\s+toolOpts\.v2Owned === true\n\s+\? parsed\n\s+: guardToolPlan\(\n\s+ensureRequiredEscalate\(\n\s+ensureRequiredCreateRequest\(parsed, state, capabilities\)/);
   // the v1 old-path request de-dupe (type + item, quantity ignored) is skipped for v2 writes
   assert.match(SERVER, /if \(owedConfirmFoldEnabled\(\) && toolOpts\.v2Owned !== true\) \{\n\s+const dup = findDuplicateServiceRequest/);
   // v1's own applyGeminiTools callers are unchanged (no third argument)

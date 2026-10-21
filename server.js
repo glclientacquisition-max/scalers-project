@@ -7264,12 +7264,18 @@ async function applyGeminiTools(callSid, parsed, toolOpts = {}) {
   // visits). Gemini's own markers pass through the same gate as injected ones.
   // BRAIN_V2_OWNS_CALL: a v2 write is already read back and confirmed (C1 commit
   // safety), so it goes to the executor as is: no ensureRequired*, no guardToolPlan.
-  const { plan: enforcedParsed } = v2OwnsCall.toolPlanFor(parsed, {
-    owned: toolOpts.v2Owned === true,
-    state,
-    capabilities,
-    guards: { guardToolPlan, ensureRequiredEscalate, ensureRequiredCreateRequest },
-  });
+  const enforcedParsed =
+    toolOpts.v2Owned === true
+      ? parsed
+      : guardToolPlan(
+          ensureRequiredEscalate(
+            ensureRequiredCreateRequest(parsed, state, capabilities),
+            state,
+            capabilities
+          ),
+          state,
+          capabilities
+        );
   if (enforcedParsed.consentBlocked || enforcedParsed.needsVisitTime || enforcedParsed.fragmentBlocked) {
     console.log(
       `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : enforcedParsed.fragmentBlocked ? 'fragment_turn' : 'needs_visit_time'}`

@@ -42,17 +42,6 @@ async function runOwnedTurn(live, input = {}, { log = () => {} } = {}) {
   }
 }
 
-// What the executor runs for one tool plan. A v2-owned plan goes through as is.
-function toolPlanFor(parsed, { owned, state, capabilities, guards }) {
-  if (owned) return { plan: parsed, guarded: false };
-  const plan = guards.guardToolPlan(
-    guards.ensureRequiredEscalate(guards.ensureRequiredCreateRequest(parsed, state, capabilities), state, capabilities),
-    state,
-    capabilities
-  );
-  return { plan, guarded: true };
-}
-
 // Per-process registry: the call's v2 live runner, whether v2 ended it, and its
 // one finishCall result. Keyed by call sid, so a reconnecting media session
 // for the same call reuses the same state.
@@ -122,4 +111,4 @@ function summaryPatch(fin) {
   };
 }
 
-module.exports = { ownsCallEnabled, repairLine, runOwnedTurn, toolPlanFor, createOwnedCalls, summaryPatch };
+module.exports = { ownsCallEnabled, repairLine, runOwnedTurn, createOwnedCalls, summaryPatch };

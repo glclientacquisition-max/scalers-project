@@ -15,8 +15,13 @@ const ROWS = [{ id: 'a', caller_phone: '+254700000001', service_name: 'Carpet Cl
 function withFlag(fn, v = '1') {
   return async () => {
     const prev = process.env.BRAIN_V2_COMMIT_SAFETY;
+    const prevOwns = process.env.BRAIN_V2_OWNS_CALL; // BRAIN_V2_OWNS_CALL (C3) implies commit safety: clear it so 'off' means off
     process.env.BRAIN_V2_COMMIT_SAFETY = v;
-    try { await fn(); } finally { if (prev === undefined) delete process.env.BRAIN_V2_COMMIT_SAFETY; else process.env.BRAIN_V2_COMMIT_SAFETY = prev; }
+    delete process.env.BRAIN_V2_OWNS_CALL;
+    try { await fn(); } finally {
+      if (prev === undefined) delete process.env.BRAIN_V2_COMMIT_SAFETY; else process.env.BRAIN_V2_COMMIT_SAFETY = prev;
+      if (prevOwns !== undefined) process.env.BRAIN_V2_OWNS_CALL = prevOwns;
+    }
   };
 }
 function handlers(opts = {}) {
