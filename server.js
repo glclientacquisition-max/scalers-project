@@ -655,6 +655,11 @@ function callIdentityRow(callSid) {
   return queryBatchingEnabled() ? db.getCallIdentity(callSid) : db.getCall(callSid);
 }
 
+// VOICE_QUERY_BATCHING call start (src/speech/callStartLoad.js).
+function batchedCallStartProfile(callSid) {
+  return loadCallStartProfile({ callSid, inboundCalls, db, hydrateCallerMemory });
+}
+
 // callRow: the webhook's call row when the caller already has it
 // (VOICE_QUERY_BATCHING call start). getCallIdentity is getCall when the
 // flag is off; the card reads only tenant_id and from_number.
@@ -3075,7 +3080,6 @@ mediaWss.on('connection', (ws, req) => {
       // Use the tenant it resolved, and let the row land before later reads.
       const inboundTenantId = inboundCalls.tenantIdFor(sessionCallSid);
       const profileLoadStartedAt = Date.now();
-      const batchingOn = queryBatchingEnabled();
       // VOICE_OPENING_V2: the webhook already loaded the profile + caller card.
       const pre = openingOn ? callPrefetch.take(sessionCallSid) : null;
       let profile = null;
@@ -3085,16 +3089,9 @@ mediaWss.on('connection', (ws, req) => {
         if (got && got.profile) profile = got.profile;
         else openingPrefetch = 'failed';
       }
-      // VOICE_QUERY_BATCHING (prefetch miss only): profile and caller card side by side.
-      const batching = !profile && batchingOn;
-      if (batching) {
-        ({ profile } = await loadCallStartProfile({
-          callSid: sessionCallSid,
-          inboundCalls,
-          db,
-          hydrateCallerMemory,
-        }));
-      }
+      // VOICE_QUERY_BATCHING, prefetch miss: profile + card side by side.
+      const batching = !profile && queryBatchingEnabled();
+      if (batching) ({ profile } = await batchedCallStartProfile(sessionCallSid));
       if (!profile) {
         await inboundCalls.awaitRow(sessionCallSid, 2500);
         profile = await db.getTenantProfile({
