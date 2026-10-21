@@ -36,9 +36,11 @@ Suggested interval: every 10 minutes. Overlapping calls are safe.
 - Ledger reason `already_sent` keeps the claim. Reason `in_flight` (a pending row, not a sent one) does not: the claim is released and a later pass retries.
 - A notice opened more than `OPS_ALERTS_STALE_HOURS` ago (default 6) is claimed and not mailed. Turning dry run off does not send the old backlog in one go. A notice opened inside the window still mails once.
 - Phone wallet re-arms only when the balance is strictly above the threshold plus `OPS_ALERTS_REARM_MARGIN` (default `0.10`, so KES 100 holds until the balance is above KES 110).
+- Phone wallet top-up: one "topped up" mail (subject `Scalers ops: Money topped up`) when the highest open wallet threshold re-arms. With 500 and 100 that is above KES 550. Lower thresholds, the empty notice, and the legacy `sautikit_low` row resolve quietly when a threshold notice carries the mail, so one top-up sends one mail.
+- Staging phone wallet: when `SAUTIKIT_STAGING_WALLET_KEY` (a wallet.read-only key for the staging workspace) is set on prod Desk, the same pass reads that wallet too. Kinds `sautikit_low:staging:<minor>` and `sautikit_low:staging:empty`, thresholds `OPS_STAGING_WALLET_ALERT_THRESHOLDS_KES` (default `300`), same dedupe, re-arm and top-up mail. Label "Staging money". The Money toggle covers both. Unset key: staging kinds hold and nothing opens.
 - Speech and reasoning notices are recorded for Admin and are not mailed from here. Voice `notePlatformOpsDegrade` owns those mails.
 - Recovery mail goes out once, only if the opening notice was actually sent and the signal asks for it. A failed recovery mail is not retried. The notice is already resolved. The next downward crossing opens a new notice.
 
 ## What this pass reads
 
-Phone wallet: SautiKit `GET /v1/wallet` with the API key. TextSMS: server-side `getbalance`. Neither uses the public Voice health URL.
+Phone wallet: SautiKit `GET /v1/wallet` with the API key, and the staging wallet with `SAUTIKIT_STAGING_WALLET_KEY` when set. TextSMS: server-side `getbalance`. Neither uses the public Voice health URL.

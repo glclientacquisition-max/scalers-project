@@ -155,7 +155,9 @@ describe("ops alert cron", () => {
     const store = memoryStore();
     await pass(store, 1_500);
     const recovered = await pass(store, 80_000);
-    assert.deepEqual(recovered.result.sent, []);
+    // One top-up mail, on the highest threshold. The lower one resolves quietly.
+    assert.deepEqual(recovered.result.sent, [{ kind: walletThresholdKind(50_000), recovered: true }]);
+    assert.equal(recovered.sent.length, 1);
     assert.deepEqual(recovered.result.resolved.sort(), [walletThresholdKind(50_000), walletThresholdKind(10_000)].sort());
     assert.equal(store.rows.filter((row) => row.status === "open").length, 0);
 
@@ -181,7 +183,7 @@ describe("ops alert cron", () => {
     const repeat = await pass(store, 0);
     assert.deepEqual(repeat.result.sent, []);
     const up = await pass(store, 90_000);
-    assert.deepEqual(up.result.sent, []);
+    assert.deepEqual(up.result.sent, [{ kind: walletThresholdKind(50_000), recovered: true }]);
     const down = await pass(store, 0);
     assert.deepEqual(down.result.sent.map((row) => row.kind), [WALLET_EMPTY_KIND]);
   });
@@ -335,7 +337,7 @@ describe("ops alert cron", () => {
 
     const clear = await pass(store, 11_001, { thresholds });
     assert.deepEqual(clear.result.resolved, [walletThresholdKind(10_000)]);
-    assert.deepEqual(clear.result.sent, []);
+    assert.deepEqual(clear.result.sent, [{ kind: walletThresholdKind(10_000), recovered: true }]);
     assert.equal(balanceStillLow(11_001, 10_000, false, 0.1), false);
 
     const again = await pass(store, 9_000, { thresholds });

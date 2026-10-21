@@ -1,6 +1,7 @@
 import { isMissingTableError } from "@/lib/adminErrors";
 import {
   noticeBaseKind,
+  parseWalletThresholdsKes,
   parseRearmMargin,
   platformCronSignals,
   positiveNumber,
@@ -10,6 +11,8 @@ import {
   walletThresholdsMinor,
   DEFAULT_SMS_CRITICAL_AT,
   DEFAULT_SMS_WARN_BELOW,
+  DEFAULT_STAGING_WALLET_THRESHOLDS_KES,
+  STAGING_WALLET_PREFIX,
   type CronSignal,
 } from "@/lib/balanceAlerts";
 import { isOpsMailConfigured, sendOpsMail } from "@/lib/opsMail";
@@ -25,7 +28,7 @@ import {
 } from "@/lib/opsAlertsRun";
 import { gatherPlatformSignals } from "@/lib/platformOps";
 import { kindLabel, opsMailSubject, parseKindFlags, DEFAULT_SAUTIKIT_WARN_MINOR } from "@/lib/platformOpsModel";
-import { getSautikitWallet, isSautikitConfigured } from "@/lib/sautikit";
+import { getSautikitWallet, isSautikitConfigured, normalizeSautikitApiKey } from "@/lib/sautikit";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { readTextSmsCredit } from "@/lib/textSmsBalance";
 
@@ -142,6 +145,24 @@ async function readWalletMinor(): Promise<number | null> {
   }
 }
 
+/**
+ * Staging phone wallet, read from prod Desk because staging Desk never mails.
+ * SAUTIKIT_STAGING_WALLET_KEY: a wallet.read-only key for the staging workspace.
+ * Unset means unknown: staging notices hold and nothing opens.
+ */
+async function readStagingWalletMinor(): Promise<number | null> {
+  const key = normalizeSautikitApiKey(process.env.SAUTIKIT_STAGING_WALLET_KEY);
+  if (!key) return null;
+  try {
+    const wallet = await getSautikitWallet(key);
+    const minor = Number(wallet?.balance_minor);
+    return Number.isFinite(minor) ? minor : null;
+  } catch {
+    console.warn("[ops-alerts] staging phone wallet balance unread");
+    return null;
+  }
+}
+
 async function readSmsCredit(): Promise<{ balance: number | null; exhausted: boolean }> {
   const simulated = simulateMinor("sms");
   if (simulated != null) return { balance: simulated, exhausted: simulated <= 0 };
@@ -150,9 +171,12 @@ async function readSmsCredit(): Promise<{ balance: number | null; exhausted: boo
 
 function composeNotice(kind: string, recovered: boolean, detail: string): { subject: string; text: string } {
   const label = kindLabel(kind);
+  // Wallet notices carry their own top-up line ("Phone wallet topped up: KES 600, back above KES 550").
+  const walletRecovery = recovered && noticeBaseKind(kind) === "sautikit_low" && detail;
+  const line = walletRecovery ? detail : recovered ? `${label} recovered` : detail || label;
   return {
     subject: opsMailSubject(kind, recovered),
-    text: `${recovered ? `${label} recovered` : detail || label}\n\nOpen Platform in Admin.`,
+    text: `${line}\n\nOpen Platform in Admin.`,
   };
 }
 
@@ -174,11 +198,12 @@ export async function runScheduledOpsAlerts(now: Date = new Date()): Promise<Ale
   }
 
   const store = supabaseAlertStore();
-  const [gathered, settings, open, walletMinor, sms] = await Promise.all([
+  const [gathered, settings, open, walletMinor, stagingWalletMinor, sms] = await Promise.all([
     gatherPlatformSignals(),
     loadAlertSettings(),
     store.readOpenNotices(),
     readWalletMinor(),
+    readStagingWalletMinor(),
     readSmsCredit(),
   ]);
   const openNotices = open.filter((notice) => notice.status === "open" || notice.status === "acked");
@@ -199,6 +224,16 @@ export async function runScheduledOpsAlerts(now: Date = new Date()): Promise<Ale
       thresholdsMinor: thresholds,
       openNotices,
       rearmMargin: parseRearmMargin(process.env.OPS_ALERTS_REARM_MARGIN),
+    }),
+    ...walletSignals({
+      balanceMinor: stagingWalletMinor,
+      thresholdsMinor: parseWalletThresholdsKes(
+        process.env.OPS_STAGING_WALLET_ALERT_THRESHOLDS_KES,
+        DEFAULT_STAGING_WALLET_THRESHOLDS_KES,
+      ),
+      openNotices,
+      rearmMargin: parseRearmMargin(process.env.OPS_ALERTS_REARM_MARGIN),
+      kindPrefix: STAGING_WALLET_PREFIX,
     }),
     ...smsSignals({
       balance: sms.balance,
