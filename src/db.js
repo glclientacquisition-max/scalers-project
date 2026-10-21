@@ -1914,14 +1914,14 @@ async function selectTenantProfileRow(tenantId, { wantAreas = false, wantUnknown
   let optional = foldedOptionalColumns();
   let { data, error } = await selectTenantRowWithLine(
     tenantId,
-    mergeSelectColumns(TENANT_PROFILE_COLUMNS, [...optional, ...extras])
+    mergeSelectColumns(requiredTenantProfileColumns(), [...optional, ...extras])
   );
   // PostgREST names one missing column per error: at most one retry per group.
   for (let tries = 0; error && optional.length && tries < 2 && noteMissingOptionalColumns(error); tries += 1) {
     optional = foldedOptionalColumns();
     ({ data, error } = await selectTenantRowWithLine(
       tenantId,
-      mergeSelectColumns(TENANT_PROFILE_COLUMNS, [...optional, ...extras])
+      mergeSelectColumns(requiredTenantProfileColumns(), [...optional, ...extras])
     ));
   }
   if (!error) return { row: data || null, folded: true };
@@ -1946,6 +1946,17 @@ function storedFirstEnabled() {
   } catch {
     return false;
   }
+}
+
+const OPTIONAL_TENANT_COLUMNS = new Set(['greeting_text', 'greeting_language', 'spoken_catalogue']);
+
+/** TENANT_PROFILE_COLUMNS without the optional ones (a build with #844 lists greeting_* in it). */
+function requiredTenantProfileColumns() {
+  return String(TENANT_PROFILE_COLUMNS)
+    .split(',')
+    .map((c) => c.trim())
+    .filter((c) => c && !OPTIONAL_TENANT_COLUMNS.has(c))
+    .join(', ');
 }
 
 function foldedOptionalColumns(now = Date.now()) {

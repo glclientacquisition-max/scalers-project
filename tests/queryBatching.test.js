@@ -783,18 +783,34 @@ describe('#859 review fixes', () => {
 
 // Ports from the combined staging build (staging/v2-c0-opening-859, bd211fb1 /
 // 65fbc0c8). main lacks #844 / #848 / #843, so every port is feature-detected.
-function withStubModule(request, exportsValue, fn) {
+// Stubs `request` as required from src/<fromDir>/: an existing module is swapped
+// in require.cache; a module this build lacks (main without #843 / #848) is
+// resolved to a stub only while fn runs, and is absent again afterwards.
+function withStubModule(fromDir, request, exportsValue, fn) {
   const Module = require('module');
+  const path = require('path');
+  const fromAbs = path.join(__dirname, '..', 'src', fromDir);
+  const base = path.join(fromAbs, request);
+  let real = null;
+  try {
+    real = require.resolve(base);
+  } catch {
+    real = null;
+  }
+  const key = real || `${base}.__qb_absent_stub__.js`;
+  const saved = require.cache[key];
   const original = Module._resolveFilename;
-  const fakePath = `/__qb_stub__/${request.replace(/[^\w]/g, '_')}.js`;
-  Module._resolveFilename = function (req, ...rest) {
-    if (req === request) return fakePath;
-    return original.call(this, req, ...rest);
-  };
-  require.cache[fakePath] = { id: fakePath, filename: fakePath, loaded: true, exports: exportsValue };
+  if (!real) {
+    Module._resolveFilename = function (req, parent, ...rest) {
+      if (req === request && parent && path.dirname(parent.filename || '') === fromAbs) return key;
+      return original.call(this, req, parent, ...rest);
+    };
+  }
+  require.cache[key] = { id: key, filename: key, loaded: true, exports: exportsValue };
   const done = () => {
     Module._resolveFilename = original;
-    delete require.cache[fakePath];
+    if (saved) require.cache[key] = saved;
+    else delete require.cache[key];
   };
   let out;
   try {
@@ -812,6 +828,10 @@ describe('#859 combined-base ports', () => {
   const tenantSelects = () => fake.log.filter((e) => e.table === 'tenants' && e.op === 'select');
   before(() => {
     process.env.VOICE_FACT_REFS = 'on';
+  });
+  beforeEach(() => {
+    delete process.env.VOICE_V2_CATALOGUE;
+    delete process.env.VOICE_AREA_FEES;
   });
   after(() => {
     delete process.env.VOICE_FACT_REFS;
@@ -850,7 +870,7 @@ describe('#859 combined-base ports', () => {
     assert.deepEqual(on, off);
     const first = tenantSelects();
     // One failed select naming the columns, one retry without every one it named.
-    assert.ok(first.length <= 3, `tenant selects ${first.length}`);
+    assert.ok(first.length <= 3, `tenant selects ${first.length}: ${first.map((e) => e.cols).join(' | ')}`);
     assert.doesNotMatch(first[first.length - 1].cols, /greeting_text|spoken_catalogue/);
     fake.reset();
     const again = await db.getTenantProfile({ tenantId: TENANT });
@@ -874,17 +894,23 @@ describe('#859 combined-base ports', () => {
     await db.getTenantProfile({ tenantId: TENANT });
     assert.doesNotMatch(tenantSelects()[0].cols, /service_areas/, 'no area fees, no storedFirst: not read');
 
-    await withStubModule('./knowledge/spokenCatalogue', { storedFirst: () => true }, async () => {
+    let realCatalogue = {};
+    try {
+      realCatalogue = require('../src/knowledge/spokenCatalogue');
+    } catch {
+      realCatalogue = {};
+    }
+    await withStubModule('.', './knowledge/spokenCatalogue', { ...realCatalogue, storedFirst: () => true }, async () => {
       fake.reset();
       await db.getTenantProfile({ tenantId: TENANT });
       assert.match(tenantSelects()[0].cols, /qb_service_areas:service_areas/, 'storedFirst on: read');
     });
-    await withStubModule('./knowledge/spokenCatalogue', { storedFirst: () => false }, async () => {
+    await withStubModule('.', './knowledge/spokenCatalogue', { ...realCatalogue, storedFirst: () => false }, async () => {
       fake.reset();
       await db.getTenantProfile({ tenantId: TENANT });
       assert.doesNotMatch(tenantSelects()[0].cols, /service_areas/);
     });
-    await withStubModule('./knowledge/spokenCatalogue', {}, async () => {
+    await withStubModule('.', './knowledge/spokenCatalogue', {}, async () => {
       fake.reset();
       await db.getTenantProfile({ tenantId: TENANT });
       assert.doesNotMatch(tenantSelects()[0].cols, /service_areas/, 'module without storedFirst: off');
@@ -927,7 +953,7 @@ describe('#859 combined-base ports', () => {
     assert.deepEqual(require('../src/speech/greetingWarm').openingWarmLinesAt(profile, at), []);
     let lines = ['Karibu Mama Njeri Salon.'];
     const stub = { openingV2Enabled: () => true, openingWarmLines: (p) => lines.map((l) => `${l}|${p.greetingText}`) };
-    withStubModule('./callOpening', stub, () => {
+    withStubModule('speech', './callOpening', stub, () => {
       const gw = require('../src/speech/greetingWarm');
       const on = gw.sweepSignature(profile, at);
       assert.notEqual(on, base);
@@ -936,7 +962,7 @@ describe('#859 combined-base ports', () => {
       lines = ['Other line.'];
       assert.notEqual(gw.sweepSignature(profile, at), on);
     });
-    withStubModule('./callOpening', { openingV2Enabled: () => false, openingWarmLines: () => ['x'] }, () => {
+    withStubModule('speech', './callOpening', { openingV2Enabled: () => false, openingWarmLines: () => ['x'] }, () => {
       assert.equal(require('../src/speech/greetingWarm').sweepSignature(profile, at), base, 'flag off: unchanged');
     });
     assert.equal(require('../src/speech/greetingWarm').sweepSignature(profile, at), base, 'module absent: unchanged');
