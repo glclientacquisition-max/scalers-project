@@ -39,6 +39,25 @@ export function numberFragment(q: string): string | null {
   return frag.length >= 3 ? frag : null;
 }
 
+const UUID_HEX = 32;
+const CALL_ID_MIN_HEX = 4;
+
+function asUuid(hex: string): string {
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/**
+ * Call ids are uuid, and Postgres has no ILIKE on uuid. A hex prefix becomes an inclusive
+ * uuid range instead ("8f2c" → 8f2c0000-… to 8f2cffff-…). Null if the query is not a hex prefix of 4+.
+ */
+export function callIdRange(q: string): { lo: string; hi: string } | null {
+  const raw = String(q || "").trim().toLowerCase();
+  if (!/^[0-9a-f-]+$/.test(raw)) return null;
+  const hex = raw.replace(/-/g, "");
+  if (hex.length < CALL_ID_MIN_HEX || hex.length > UUID_HEX) return null;
+  return { lo: asUuid(hex.padEnd(UUID_HEX, "0")), hi: asUuid(hex.padEnd(UUID_HEX, "f")) };
+}
+
 export function escapeIlike(raw: string): string {
   return raw.replace(/[%_\\]/g, "\\$&");
 }
