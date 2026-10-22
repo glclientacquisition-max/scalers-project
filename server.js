@@ -2434,7 +2434,7 @@ mediaWss.on('connection', (ws, req) => {
   const unregisterMediaSession = transcriptWriter
     ? openMediaSessions.add(transcriptWriter.sessionKey, () =>
         Promise.all([
-          transcriptWriter.flushAll(),
+          transcriptWriter.flushAll({ liveKeys: callTranscript.liveKeys() }),
           finishTraceOnce().catch(() => null),
         ])
       )
@@ -5798,7 +5798,7 @@ mediaWss.on('connection', (ws, req) => {
     if (transcriptWriter) {
       // Incremental: upsert by row id, never delete (a reconnect session's
       // rows and this one's both survive).
-      transcriptWriter.flushAll().then(() => transcriptWriter.close());
+      transcriptWriter.flushAll({ liveKeys: callTranscript.liveKeys() }).then(() => transcriptWriter.close());
     } else if (sessionCallSid && callTranscript.size()) {
       db.appendTranscript({ callSid: sessionCallSid, turns: callTranscript.turns() }).catch(
         (err) => {

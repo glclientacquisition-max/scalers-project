@@ -153,6 +153,16 @@ describe('composes with #745 (reserve/release) and #843', () => {
     assert.ok(table.rows.has(callerId), 'caller row id unchanged after the release');
     assert.equal(table.rows.size, 1);
   });
+  it('close flush reconciles: a row no longer in the transcript is removed by id', async () => {
+    const table = fakeTable();
+    const removed = [];
+    const w = createIncrementalTranscriptWriter({ callSid: () => 'HD_r745', sessionKey: 's1', upsert: table.upsert, removeIds: async ({ ids }) => { removed.push(...ids); for (const id of ids) table.rows.delete(id); } });
+    w.onChange(0, { speaker: 'agent', text: 'Reserved greeting' });
+    w.onChange(1, { speaker: 'caller', text: 'Hi' });
+    await w.flushAll({ liveKeys: [1] });
+    assert.deepEqual(removed, [stableRowId('HD_r745', 's1', 0)]);
+    assert.equal(table.rows.size, 1);
+  });
   it('resume defers to #843 when VOICE_OPENING_V2 is on', () => {
     const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
     assert.match(src, /VOICE_OPENING_V2 \|\| ''\)\.trim\(\) === 'on'\) return false;/);
@@ -226,7 +236,7 @@ describe('reconnect resume plan', () => {
 describe('server wiring', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   it('flag off keeps the close-time full replace; on never calls appendTranscript for media', () => {
-    assert.match(src, /if \(transcriptWriter\) \{[\s\S]{0,300}flushAll\(\)[\s\S]{0,80}\} else if \(sessionCallSid && callTranscript\.size\(\)\) \{\s*db\.appendTranscript/);
+    assert.match(src, /if \(transcriptWriter\) \{[\s\S]{0,300}flushAll\(\{ liveKeys: callTranscript\.liveKeys\(\) \}\)[\s\S]{0,80}\} else if \(sessionCallSid && callTranscript\.size\(\)\) \{\s*db\.appendTranscript/);
   });
   it('SIGTERM handler only when the flag is on', () => {
     assert.match(src, /if \(transcriptIncrementalOn\) \{\s*installSigtermFlush\(\{ registry: openMediaSessions, exitAfter: !gracefulDrainOn\(\) \}\)/);

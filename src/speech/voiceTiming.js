@@ -195,6 +195,10 @@ function createCallTranscript(opts = {}) {
       onChange = typeof fn === 'function' ? fn : null;
     },
     keyOf,
+    /** Keys of the rows still in the transcript (a #745 release drops one). */
+    liveKeys() {
+      return rows.map((row) => keys.get(row)).filter((k) => k != null);
+    },
     pushCaller(text) {
       return push('caller', text);
     },

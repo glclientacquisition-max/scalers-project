@@ -112,7 +112,13 @@ function createIncrementalTranscriptWriter(opts) {
    * transcript's stable push key (never the array index), so the writer must
    * be hooked before the first push (server.js does it at creation).
    */
-  function flushAll() {
+  function flushAll(opts2 = {}) {
+    // Reconcile: a row taken back out of the transcript (#745 release of a
+    // reserved greeting that never played) is removed by its own id.
+    if (Array.isArray(opts2.liveKeys)) {
+      const live = new Set(opts2.liveKeys);
+      for (const k of [...rows.keys()]) if (!live.has(k)) remove(k);
+    }
     for (const i of rows.keys()) dirty.add(i);
     return flush();
   }
