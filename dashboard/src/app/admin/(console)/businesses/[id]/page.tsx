@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminShopPeople } from "@/components/admin/AdminShopPeople";
@@ -22,6 +22,8 @@ export default async function AdminBusinessPage({
 }) {
   await requireSuperAdmin();
   const { id } = await params;
+  // ADMIN_V2 (locked 23 Oct, t178u): no full business page; the list opens with this business in the pane.
+  if (process.env.ADMIN_V2 === "on") redirect(`/admin/businesses?pane=${encodeURIComponent(id)}`);
   const { money } = await searchParams;
   let business;
   let badges;
