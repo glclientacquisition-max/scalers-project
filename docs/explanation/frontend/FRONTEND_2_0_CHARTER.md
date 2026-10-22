@@ -1,6 +1,6 @@
 ---
 owner: desk
-last_reviewed: 2026-10-12
+last_reviewed: 2026-10-22
 ---
 
 # Scalers Frontend 2.0 Charter
@@ -230,3 +230,29 @@ Canonical copies in `.agents/skills/`, linked into `.cursor/skills/`, pinned in 
 - `deskChrome.ts` is deleted.
 - `.cursor/rules/scalers-design-ux.mdc` is under 40 lines and describes the kit, not exceptions.
 - A new engineer can build a new screen from `PageHeader`, `ListRow`, `Segmented`, `Button`, `Sheet`, and `Empty` without reading a rule file.
+
+## 11. Admin amendment: Ops layer (2026-10-22)
+
+Status: **proposed**. Takes effect when Desk Engineer and Scalers Chief sign below and Alvin answers yes to [`ADMIN_FOUNDATION_PLAN.md`](../../reference/operations/ADMIN_FOUNDATION_PLAN.md) §9 question 9. Until then the rows above apply to `/admin` unchanged.
+
+`/admin` is an operator console, not the owner's phone app. It gets its own density layer, [`OPS.md`](../../reference/design-system/OPS.md), on the same brand, font, colours, themes and Base UI behaviour. The rows below amend this charter for `/admin` only. Owner Desk rules do not change.
+
+| Charter line | Was | For `/admin` |
+| --- | --- | --- |
+| §1 Type scale (line 31) | 11/13/15/17/22/28 everywhere | Ops scale: 11 caption, 12 label, 13 body, 15 heading, 20 title, 28 KPI. Tabular numerals stay |
+| §1 Navigation (line 36) | One `AppShell` for desk and admin | Admin v2 uses `OpsShell` (grouped sidebar, top bar, env band) behind `ADMIN_V2`. v1 keeps `AppShell` until each module reaches parity |
+| §1 Lists (line 37) | One `ListRow` for Inbox, Contacts, Admin lists | Admin entity lists use `DataTable` (rows 28/36/44, URL-synced state). `ListRow` stays for phone lists |
+| §3 Dense tables (line 80) | `ListRow` at every width for admin entity lists | Tables for admin lists at `md`+, `ListRow` below `md` |
+| §3 Ownership (line 88) | Same shell, same kit | Same brand and tokens; Ops primitives live in `components/ops/**`. Desk controls get `size="ops"` variants, not forks |
+| §4.3 Admin nav (line 170) | 6-item `ADMIN_LINKS` | Module registry `lib/ops/modules.ts` (4 groups, hidden modules 404). See [`pages/admin.md`](../../reference/design-system/pages/admin.md) |
+
+Rules that do **not** change for `/admin`:
+
+- **No centred modals.** Confirms are `ConfirmSheet`-style: a bottom sheet on phones and a right side drawer at `md` and up. The plan's `ConfirmDialog` and `StepUpDialog` are built as `OpsConfirm` and `StepUpSheet` on that pattern (locked 22 Oct 2026, Scalers Chief relaying Alvin).
+- No motion packages; Desk motion verbs only.
+- No vendor or infrastructure names on screen.
+- Zero hex in `.tsx`; new hex only in `styles/ops.css`.
+- Light and dark; 4.5:1 contrast, checked by test.
+- Phone-safe at 360 and 390.
+
+Sign-off: Desk Engineer ☐ · Scalers Chief ☐ · Alvin ☐

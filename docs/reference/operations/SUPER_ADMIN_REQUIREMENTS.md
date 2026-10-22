@@ -1,6 +1,6 @@
 ---
 owner: ops-billing
-last_reviewed: 2026-10-10
+last_reviewed: 2026-10-22
 ---
 
 # Scalers — Super Admin Requirements
@@ -151,3 +151,34 @@ Business-owner nav stays: Calls · Business · Sign out.
 - [ ] Every admin write shows in Activity: who, what, which business, before and after, when.
 - [ ] Business-owner login never sees Admin nav or `/admin` data.
 - [ ] UI copy says Business, not Tenant.
+
+---
+
+## Rebuild (proposed, 22 Oct 2026)
+
+The Super Admin rebuild is planned in [`ADMIN_FOUNDATION_PLAN.md`](ADMIN_FOUNDATION_PLAN.md) (research: [`ADMIN_REBUILD_RESEARCH.md`](ADMIN_REBUILD_RESEARCH.md)). Nothing in this section is built. The v1 requirements above stay true until a module is rebuilt.
+
+| Topic | Requirement | Spec |
+| --- | --- | --- |
+| IA | 12 modules in 4 groups behind `ADMIN_V2`; same URLs | [`pages/admin.md`](../design-system/pages/admin.md#v2-ia-and-module-registry-proposed) |
+| Design | Ops density layer for `/admin` only | [`OPS.md`](../design-system/OPS.md), charter §11 |
+| Overlays | No centred modals. Confirms: bottom sheet on phones, side drawer at `md`+ | `OPS.md` §3 |
+| Sessions | Revocable Postgres sessions; operators are real rows with real email | [`ADMIN_STEP_UP.md`](../platform/ADMIN_STEP_UP.md) §3 |
+| Step-up | Authenticator code before sensitive writes, Tier A window and Tier B per action | `ADMIN_STEP_UP.md` §1 |
+| Billing IA | Package / Beta-or-Charging / invoices as three layers (folded from #812) | [`admin-billing-ia-research.md`](../../rfcs/admin-billing-ia-research.md) |
+
+### Open questions for Alvin (plan §9)
+
+1. Admin sign-in length: recommend 12 hours (today 14 days).
+2. How often to ask for a code: recommend 15-minute window for routine money work; a fresh code for prod switches, number buy or provider release, payments over KES 20,000 and security changes.
+3. Authenticator at sign-in too: recommend yes, after step-up has run two weeks.
+4. Who the operators are: recommend Alvin as `owner` only; others `viewer`. Needs username and real email for each.
+5. Backup-code inbox: recommend Alvin's personal email with its own 2FA.
+6. Same rules on staging: recommend yes.
+7. Trying v2 on prod: recommend `ADMIN_V2=alvin` after slice 9 is on staging.
+8. Money and number writes on phone: recommend read-only below 768px; approvals and step-up allowed.
+9. Approve the Ops design layer for `/admin` only: recommend yes.
+
+### Open Platform issues (22 Oct 2026)
+
+See [`ADMIN_STEP_UP.md` §7](../platform/ADMIN_STEP_UP.md#7-open-before-slice-1-platforms-known-issues-22-oct-2026): secret-setting access on the box, PUBLIC execute on `public` functions, `twoFactor.verified` default, `rateLimit` key. No `admin_auth` schema exists on staging or prod.
