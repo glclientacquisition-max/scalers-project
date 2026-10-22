@@ -27,7 +27,7 @@ New agent or new human: read this whole page before you touch code.
 
 - **Railway outage.** Railway builds have been paused for non-Enterprise plans since 21 Oct 10:24 EAT, and Railway invalidated API tokens (*per platform notes*; Railway's 21 Oct notice). So nothing merged after #834 has reached prod Voice, and the combined staging builds below are not deployed. A routine retries the staging build until 13:00 EAT on 22 Oct (*per platform notes*). Railway's notice recommends rotating Railway env vars; a rotation plan is open with Alvin (*per Ops & Billing, unverified in repo*).
 - **Combined staging builds, not deployed:** `staging/v2-c0-opening-2026-10-21` @ `f07f9c8a` (#848 + #843 + #846 + #844 + #837 + #850; #838 skipped for conflicts, #842 is inside #848) and `staging/v2-c0-opening-859-2026-10-21` @ `b2422702` (the same plus #859). Rollback for when they deploy: Railway `e552fae7`, or the 3e8f branch pinned to `a0fc061c` (*per platform notes*).
-- **Stage-PR hold is on**: open PRs #839, #840, #841, #842 and #868 carry `hold-staging` (checked 22 Oct), so Stage-PR does not re-point staging Voice.
+- **Stage-PR hold is on**: many open PRs carry `hold-staging` (among them #839–#842, #868 and #871); the Stage-PR run on 22 Oct 08:32 EAT reported "Stage-PR hold active", so it does not re-point staging Voice.
 - Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Product is **callbacks only** (#658). Billing: packages + on-demand only, beta charging off; see [Billing](#billing).
 
 ### 1a. Flags (22 Oct 2026)
