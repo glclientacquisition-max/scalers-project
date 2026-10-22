@@ -11,8 +11,8 @@ export const instant = false;
 
 export default async function AdminBillingPage() {
   await requireSuperAdmin();
-  // ADMIN_V2: Billing opens on Invoices; this list's views move to Overview and Invoices.
-  if (process.env.ADMIN_V2 === "on") redirect("/admin/billing/invoices");
+  // ADMIN_V2: Billing opens on Billing home (this month's money and who owes).
+  if (process.env.ADMIN_V2 === "on") redirect("/admin/billing/home");
   let overview;
   let attention;
   try {

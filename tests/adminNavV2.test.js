@@ -26,7 +26,7 @@ test("v2 shell chevron stays off outside /admin", async () => {
 test("redirect map sends old routes to their one home", async () => {
   const { adminV2Redirect } = await load();
   const cases = {
-    "/admin/billing": "/admin/billing/invoices",
+    "/admin/billing": "/admin/billing/home",
     "/admin/packages": "/admin/billing/packages",
     "/admin/billing/catalog": "/admin/billing/packages",
     "/admin/platform": "/admin/settings/services",
@@ -36,13 +36,13 @@ test("redirect map sends old routes to their one home", async () => {
     "/admin/billing/t1": "/admin/businesses?pane=t1&section=money",
   };
   for (const [from, to] of Object.entries(cases)) assert.equal(adminV2Redirect(from), to, from);
-  for (const stay of ["/admin", "/admin/billing/invoices", "/admin/billing/payments", "/admin/businesses/b1/usage", "/admin/quality/call/c1", "/admin/numbers"]) {
+  for (const stay of ["/admin", "/admin/billing/home", "/admin/billing/invoices", "/admin/billing/payments", "/admin/businesses/b1/usage", "/admin/quality/call/c1", "/admin/numbers"]) {
     assert.equal(adminV2Redirect(stay), null, stay);
   }
 });
 
 test("pages apply the map only under ADMIN_V2 and stay as-is otherwise", () => {
-  for (const [p, to] of [["billing", "/admin/billing/invoices"], ["packages", "/admin/billing/packages"], ["platform", "/admin/settings/services"], ["voices", "/admin/settings/voices"], ["activity", "/admin/settings/audit"]]) {
+  for (const [p, to] of [["billing", "/admin/billing/home"], ["packages", "/admin/billing/packages"], ["platform", "/admin/settings/services"], ["voices", "/admin/settings/voices"], ["activity", "/admin/settings/audit"]]) {
     const s = page(p);
     assert.match(s, /process\.env\.ADMIN_V2 === "on"\) redirect\(/, p);
     assert.ok(s.includes(to), `${p} → ${to}`);

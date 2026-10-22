@@ -4,7 +4,7 @@ import { ADMIN_BUSINESSES } from "./adminBusinesses";
 /** Synthetic invoices: made-up numbers and amounts, no real business. */
 export const ADMIN_INVOICES_NOW = "2026-10-22T09:00:00Z";
 const STATUSES = ["open", "open", "paid", "open", "paid", "draft", "open", "void", "paid", "open", "uncollectible", "paid"];
-export const ADMIN_INVOICES: InvoiceRow[] = Array.from({ length: 40 }, (_, i) => {
+export const ADMIN_INVOICES: InvoiceRow[] = Array.from({ length: 88 }, (_, i) => {
   const b = ADMIN_BUSINESSES[i % 22];
   const status = STATUSES[i % STATUSES.length];
   const total = (2500 + ((i * 1370) % 9000)) * 100;
