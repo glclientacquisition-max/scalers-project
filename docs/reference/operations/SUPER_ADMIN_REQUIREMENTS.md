@@ -167,17 +167,22 @@ The Super Admin rebuild is planned in [`ADMIN_FOUNDATION_PLAN.md`](ADMIN_FOUNDAT
 | Step-up | Authenticator code before sensitive writes, Tier A window and Tier B per action | `ADMIN_STEP_UP.md` §1 |
 | Billing IA | Package / Beta-or-Charging / invoices as three layers (folded from #812) | [`admin-billing-ia-research.md`](../../rfcs/admin-billing-ia-research.md) |
 
-### Open questions for Alvin (plan §9)
+### Answers to plan §9 (per Scalers Chief relaying Alvin, 22 Oct 16:36 EAT)
 
-1. Admin sign-in length: recommend 12 hours (today 14 days).
-2. How often to ask for a code: recommend 15-minute window for routine money work; a fresh code for prod switches, number buy or provider release, payments over KES 20,000 and security changes.
-3. Authenticator at sign-in too: recommend yes, after step-up has run two weeks.
-4. Who the operators are: recommend Alvin as `owner` only; others `viewer`. Needs username and real email for each.
-5. Backup-code inbox: recommend Alvin's personal email with its own 2FA.
-6. Same rules on staging: recommend yes.
-7. Trying v2 on prod: recommend `ADMIN_V2=alvin` after slice 9 is on staging.
+1. **Sign-in length:** 12 hours (today 14 days).
+2. **Code frequency:** one code covers 15 minutes of routine money work up to KES 20,000. A fresh code for prod switches, buying or releasing a number, payments over KES 20,000, and security changes.
+3. **Authenticator at sign-in:** required, starting after step 1, as the plan recommends.
+4. **Operators:** only Alvin, role `owner`, email alvin@scalers.co.ke.
+5. **Backup-code inbox:** yegonalvin20@gmail.com.
+6. **Staging:** same rules as prod.
+7. **v2 on prod:** trial `ADMIN_V2=alvin` after slice 9.
+
+Still open:
+
 8. Money and number writes on phone: recommend read-only below 768px; approvals and step-up allowed.
 9. Approve the Ops design layer for `/admin` only: recommend yes.
+
+Slice 1 (auth schema) is unblocked as a staging draft once Platform's four fixes below land. Staging secrets go in only through a masked input.
 
 ### Open Platform issues (22 Oct 2026)
 

@@ -8,13 +8,13 @@ status: proposed
 
 Spec for asking an operator for a code before a sensitive Admin action, even when signed in. Source: [`ADMIN_FOUNDATION_PLAN.md`](../operations/ADMIN_FOUNDATION_PLAN.md) §4. Nothing here is built or applied yet: no `admin_auth` schema exists on staging or prod (read-only check, 22 Oct 2026).
 
-Status: **proposed**. Values marked *(Q n)* wait on Alvin's answer to plan §9 question n.
+Status: **proposed**. Values marked *(Q n)* are decided by Alvin's answer to plan §9 question n (per Scalers Chief relaying Alvin, 22 Oct 16:36 EAT): 12 h sessions, 15-minute Tier A window up to KES 20,000, authenticator at sign-in after step 1, one operator (Alvin, owner, alvin@scalers.co.ke), backup codes to yegonalvin20@gmail.com, same rules on staging.
 
 ## 1. Tiers
 
 | Tier | Rule | Intents |
 | --- | --- | --- |
-| A | One code opens a 15-minute window for that session (fixed, not extended by activity) *(Q2)* | `billing.grant_minutes`, `billing.package.assign`, `billing.checkout_review.resolve`, `pricing.rates.save`, `pricing.package.save`, `pricing.version.publish`, `numbers.pool.release`, `numbers.pool.assign`, `business.archive`, `business.transfer_owner`, `payments.record` (≤ KES 20,000), `ledger.adjust` |
+| A | One code opens a 15-minute window for that session (fixed, not extended by activity) *(Q2, decided)* | `billing.grant_minutes`, `billing.package.assign`, `billing.checkout_review.resolve`, `pricing.rates.save`, `pricing.package.save`, `pricing.version.publish`, `numbers.pool.release`, `numbers.pool.assign`, `business.archive`, `business.transfer_owner`, `payments.record` (≤ KES 20,000), `ledger.adjust` |
 | B | Fresh code per action, bound to it, single use, valid 5 minutes | `switch.billing_flag`, `switch.billing_mode`, `numbers.buy`, `numbers.provider_release`, `payments.record_large` (> KES 20,000), `security.factor_change`, `operators.change` |
 
 Action digest: `sha256(intent | target id | amount | new value)`. The step-up sheet shows the same facts in words, with the environment in the title.
@@ -26,7 +26,7 @@ Not step-up: reads, search, voice catalogue edits, profile edits, pay-link creat
 | Factor | Role |
 | --- | --- |
 | Authenticator app (TOTP) | Primary, required. 6 digits, 30 s, ±1 step. Issuer differs on staging and prod |
-| Email code | Backup only. 6 digits, 5 min, stored hashed, single use, max 3 sends per 15 min. Every use sends a security alert *(Q5: which inbox)* |
+| Email code | Backup only. 6 digits, 5 min, stored hashed, single use, max 3 sends per 15 min. Every use sends a security alert *(Q5: yegonalvin20@gmail.com)* |
 | Backup codes | 10 single-use codes shown once |
 | SMS | Not offered |
 
@@ -34,7 +34,7 @@ Not step-up: reads, search, voice catalogue edits, profile edits, pay-link creat
 
 | Item | Rule |
 | --- | --- |
-| Session | Row in `admin_auth.session`, revocable. 12 h hard cap, no sliding *(Q1; today 14 days)* |
+| Session | Row in `admin_auth.session`, revocable. 12 h hard cap, no sliding *(Q1, decided; today 14 days)* |
 | Failures | 5 wrong codes in 15 min locks step-up for that operator for 15 min, audit row plus alert |
 | TOTP replay | An accepted code is refused for 90 s |
 | Not enrolled | `403 step_up_enrolment_required`, sheet links to Settings › Security |
@@ -70,7 +70,9 @@ Never rotate `BETTER_AUTH_SECRET` by replacing it: that makes every enrolled aut
 
 ## 7. Open before slice 1 (Platform's known issues, 22 Oct 2026)
 
-- Setting `ADMIN_AUTH_DATABASE_URL` and `BETTER_AUTH_SECRETS` on Vercel staging needs a staging DB URL and a Vercel token on the box.
+- Setting `ADMIN_AUTH_DATABASE_URL` and `BETTER_AUTH_SECRETS` on staging goes only through a masked input. Setting and `BETTER_AUTH_SECRETS` on Vercel staging needs a staging DB URL and a Vercel token on the box.
 - `admin_auth_app` would inherit PUBLIC execute: 101 `public` functions on staging (15 SECURITY DEFINER), 103 on prod (15). Needs `revoke execute … from public` or a role that cannot reach `public`.
 - Better Auth 1.7.6 `twoFactor.verified` defaults to `true`. The table must not default `verified` to true.
 - `rateLimit` has no `id` in Better Auth core. Key the table on `key`, or add an `id` it will not write.
+
+Slice 1 is unblocked as a staging draft once these four land.

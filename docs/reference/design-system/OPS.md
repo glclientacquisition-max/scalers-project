@@ -10,7 +10,7 @@ The Ops layer is the dense design layer for the Super Admin console. It sits on 
 
 Source: [`ADMIN_FOUNDATION_PLAN.md`](../operations/ADMIN_FOUNDATION_PLAN.md) §2 and [`ADMIN_REBUILD_RESEARCH.md`](../operations/ADMIN_REBUILD_RESEARCH.md) §2. Charter amendment: [`FRONTEND_2_0_CHARTER.md` §11](../../explanation/frontend/FRONTEND_2_0_CHARTER.md#11-admin-amendment-ops-layer-2026-10-22).
 
-Status: **proposed**. Needs Alvin's yes on question 9 of the plan before any Ops UI merges.
+Status: **proposed**. Needs Alvin's yes on question 9 of the plan (still open) before any Ops UI merges.
 
 ## 1. Scope
 
