@@ -69,7 +69,7 @@ describe("admin v2 shell", () => {
     assert.match(nav, /aria-expanded=\{!collapsed\}/);
   });
   it("top bar is 40px and main is full width with 16px margins", () => {
-    assert.match(nav, /<AdminAccountMenu name=\{operatorName\} compact \/>/);
+    assert.match(nav, /<AdminAccountMenu name=\{operatorName\} compact palette \/>/);
     assert.match(read("dashboard/src/components/AdminAccountMenu.tsx"), /md:h-10/);
     const main = links.match(/adminMainV2Class =\s*"([^"]+)"/)[1];
     assert.match(main, /\bw-full\b/);

@@ -515,7 +515,7 @@ export function AdminShell({
       <div data-admin-shell="" data-admin-v2="" data-admin-nested={nested ? "" : undefined} className={adminShellClass}>
         <AdminSideNav />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <AdminAccountMenu name={operatorName} compact />
+          <AdminAccountMenu name={operatorName} compact palette />
           <main data-admin-main="" data-pull-dirty-guard="" className={adminMainV2Class}>
             <AdminNestedBack />
             {children}
