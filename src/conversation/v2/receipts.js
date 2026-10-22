@@ -107,6 +107,15 @@ function readback(p, lang) {
     case 'update_booking': return S ? `Nihamishe ${svcName(p.row.service, lang)} hadi ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}. Niendelee?` : `Move your ${svcName(p.row.service, lang).toLowerCase()} to ${L.sayDate(p.when.date, lang)}${at(p.when, lang)}. Shall I go ahead?`;
     case 'create_handoff': {
       const k = p.kind;
+      // BRAIN_V2_COMMIT_SAFETY: a callback reads back the number AND when, so the owner's promise is confirmed (A4).
+      if (p.callbackWhen) {
+        const num = p.phoneSaid ? (S ? ` kwa namba ${p.phoneSaid}` : ` on ${p.phoneSaid}`) : (S ? ' kwa namba hii' : ' on this number');
+        const when = p.callbackWhen.say(lang);
+        const who = k === 'manager' ? (S ? 'meneja' : 'the manager') : (S ? 'mwenye biashara' : 'the owner');
+        const pre = k === 'address' ? (S ? 'Siwezi kubadilisha mahali kwenye simu hii. ' : "I can't change the address on this call. ") : k === 'payment' ? (S ? 'Siwezi kubadilisha malipo kwenye simu hii. ' : "I can't change payment details on this call. ") : k === 'manager' ? (S ? 'Meneja hayupo kwenye simu sasa. ' : "The manager isn't on the line now. ") : '';
+        const about = k === 'address' && p.place ? (S ? `, kuhusu kuhamia ${p.place}` : `, about moving it to ${p.place}`) : k === 'quote' ? (S ? ', kukupa bei' : ', with a quote') : p.place && k === 'callback' ? (S ? `, kuhusu ${p.place}` : `, about ${p.place}`) : p.topic ? (S ? `, kuhusu ${svcName(p.topic, lang)}` : `, about the ${svcName(p.topic, lang).toLowerCase()}`) : '';
+        return S ? `${pre}Nimwombe ${who} akupigie simu${num}, ${when}${about}. Ni sawa?` : `${pre}Shall I ask ${who} to call you back${num}, ${when}${about}?`;
+      }
       if (k === 'address') return S ? 'Siwezi kubadilisha mahali kwenye simu hii. Nimwombe mwenye biashara akupigie simu, ni sawa?' : `I can't change the address on this call. Shall I ask the owner to call you back about ${p.place ? `moving it to ${p.place}` : 'it'}?`;
       if (k === 'payment') return S ? 'Siwezi kubadilisha malipo kwenye simu hii. Nimwombe mwenye biashara akupigie simu, ni sawa?' : "I can't change payment details on this call. Shall I ask the owner to call you back about it?";
       if (k === 'callback') return S ? 'Nimwombe mwenye biashara akupigie simu kwa namba hii, ni sawa?' : 'Shall I ask the team to call you back on this number?';
@@ -117,8 +126,24 @@ function readback(p, lang) {
   }
 }
 
+// The yes/no question a re-ask ("okay wait", unclear) repeats: the read-back's own question sentence.
+// EN's callback question carries the number and when, so the SW one does too ("Nimwombe ..., ni sawa?")
+// rather than a bare "Ni sawa?"; the lead sentence ("I can't change ...", "The manager isn't ...") is not repeated.
+function reaskQ(p, lang) {
+  const rb = String(readback(p, lang) || '');
+  if (sw(lang) && p && p.tool === 'create_handoff' && p.callbackWhen) {
+    const m = rb.match(/(Nimwombe [^.?]*)\. Ni sawa\?\s*$/);
+    if (m) return `${m[1]}, ni sawa?`;
+  }
+  return (rb.match(/[^.!?]+\?\s*$/) || [''])[0].trim();
+}
+
 function receipt(r, lang) {
   const S = sw(lang);
+  // BRAIN_V2_COMMIT_SAFETY: a failed write is never a promise we did not make; the outbox owner task is real.
+  if (!r.ok && r.outbox === 'queued') return S ? 'Samahani, sikuweza kuhifadhi hilo. Nimemwomba mwenye biashara akupigie simu.' : "Sorry, I couldn't save that. I've asked the owner to call you back.";
+  if (!r.ok && r.outbox === 'failed') return S ? 'Samahani, sikuweza kuhifadhi hilo sasa hivi. Tafadhali piga simu tena baadaye kidogo.' : "Sorry, I couldn't save that just now. Please call us again a little later.";
+  if (r.ok && r.duplicate) return S ? `Hilo tayari limehifadhiwa, sijaweka mara mbili. Kuna kingine?` : "That's already saved; I haven't added it twice. Anything else?";
   if (!r.ok) return S ? 'Samahani, sikuweza kuhifadhi hilo sasa. Timu itakupigia simu.' : "Sorry, I couldn't save that just now. The team will call you back.";
   const more = S ? ' Kuna kingine?' : ' Anything else?';
   switch (r.tool) {
@@ -128,6 +153,7 @@ function receipt(r, lang) {
     case 'update_booking': return (S ? `Sawa, nimebadilisha ${svcName(r.row.service, lang)} hadi ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.` : `Done, your ${svcName(r.row.service, lang).toLowerCase()} is moved to ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.`) + more;
     case 'create_handoff':
       if (r.kind === 'address' || r.kind === 'payment') return S ? 'Sawa. Mwenye biashara atakupigia simu. Kwa sasa, mabadiliko bado yanasubiri.' : 'Okay. The owner will call you back on this number. Until then, the change is still pending.';
+      if (r.callbackSay) return (S ? `Sawa. ${r.kind === 'manager' ? 'Meneja' : 'Mwenye biashara'} atakupigia simu ${r.callbackSay}.` : `Okay. ${r.kind === 'manager' ? 'The manager' : 'The owner'} will call you back ${r.callbackSay}.`) + more;
       return (S ? 'Sawa. Mwenye biashara atakupigia simu kwa namba hii.' : (r.kind === 'manager' ? 'Okay. The manager will call you back on this number.' : 'Okay. The team will call you back on this number.')) + more;
     case 'log_complaint': return S ? 'Asante. Nimepeleka malalamiko yako kwa mwenye biashara, atakupigia simu. Kuna kingine?' : 'Thank you. Your complaint is with the owner, who will call you back. Anything else?';
     default: return '';
@@ -196,6 +222,10 @@ function info(r, lang, n = 0) {
     case 'time_past': return S ? `Saa hiyo imeshapita. Saa ngapi au siku gani nyingine ingekufaa?` : 'That time has already passed. What later day and time would you like?';
     case 'bot': return S ? `Mimi ni ${r.agent}, msaidizi wa kidijitali wa ${r.biz}. Timu halisi inapata ujumbe wako.` : `I'm ${r.agent}, a virtual assistant for ${r.biz}. The real team gets your request.`;
     case 'hold': return S ? 'Sawa, chukua muda wako.' : 'Sure, take your time.';
+    case 'area_out': return S ? `Bado hatufiki ${r.place}${r.areas ? `. Tunafika ${r.areas}` : ''}.` : `We don't cover ${r.place} yet${r.areas ? `. We serve ${r.areas}` : ''}.`;
+    case 'slot_taken': return S ? `Saa hiyo imeshachukuliwa${r.alt ? `. Naweza ${r.alt}` : ''}. Ungependa saa ngapi?` : `That time is already taken${r.alt ? `. I can do ${r.alt}` : ''}. What time would suit you?`;
+    case 'already_booked': return S ? `Tayari una ${r.label} wakati huo. Ungependa saa nyingine?` : `You already have ${r.label} at that time. Would you like another time?`;
+    case 'pickup_closed': return S ? `${r.dayLabel} tumefunga. Ungependa kuchukua siku gani?` : `We're closed on ${r.dayLabel}. Which day would you like to pick up?`;
     case 'repair': return S ? 'Samahani, sijakusikia vizuri. Unaweza kurudia?' : "Sorry, I didn't catch that. Could you say it again?";
     case 'no_rows': return S ? 'Sioni booking iliyo wazi kwa namba hii.' : "I don't see an open booking on this number.";
     case 'not_offered': return S ? 'Hiyo haipo kwenye huduma zetu.' : "That isn't on our list of services.";
@@ -221,4 +251,4 @@ function vary(line, lang, n = 1, plain = false) {
   // No "As I said" / "Just to repeat" filler (Alvin, 14 Oct): a repeat is said plainly.
   return line;
 }
-module.exports = { serviceCategories, vary, ask, readback, receipt, info, svcName, rowLabel };
+module.exports = { serviceCategories, vary, ask, readback, reaskQ, receipt, info, svcName, rowLabel };

@@ -9,7 +9,7 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (52)
+## Tables (53)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
@@ -28,6 +28,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_packages` | `dids`, `email`, `id`, `is_active`, `minutes`, `monthly_price_kes`, `name`, `seats`, `sku`, `sms`, `sort_order`, `staff_wa`, `updated_at` | `docs/supabase/package_catalog.sql` |
 | `billing_rate_card` | `annual_discount_percent`, `email_kes`, `id`, `inbound_kes_per_second`, `outbound_kes_per_second`, `sms_kes`, `updated_at`, `whatsapp_kes` | `docs/supabase/package_catalog.sql` |
 | `billing_receipt_counters` | `last_number`, `year` | `docs/supabase/invoice_documents.sql` |
+| `brain_write_receipts` | `call_id`, `call_sid`, `confirm_token`, `created_at`, `error_code`, `error_detail`, `id`, `idempotency_key`, `latency_ms`, `outbox_task_id`, `path`, `phase`, `slots`, `tenant_id`, `token_confirmed_turn`, `token_issued_turn`, `tool`, `turn_index`, `validators`, `write_id`, `write_table` | `docs/supabase/brain_write_receipts.sql` |
 | `call_facts` | `call_id`, `caller_area`, `competitor_mentioned`, `confidence`, `created_at`, `dow`, `est_value_ksh`, `hour_eat`, `intent`, `language`, `lost_reason`, `model`, `objection_price_ksh`, `outcome`, `owner_corrected_at`, `owner_corrected_by`, `price_objection`, `products_mentioned`, `review_snapshot`, `secondary_intents`, `sentiment`, `source`, `tenant_id`, `time_of_day`, `unanswered_question`, `updated_at` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `calls` | `ai_processing_minutes`, `caller_number`, `created_at`, `duration_seconds`, `id`, `inbox_assignee`, `inbox_assignee_name`, `inbox_assignee_phone`, `inbox_labels`, `inbox_muted`, `inbox_pinned_at`, `inbox_read_at`, `inbox_snoozed_until`, `lead_status`, `package_seconds_applied`, `primary_intent`, `recording_url`, `resolution`, `resolution_note`, `sautikit_call_sid`, `sentiment`, `status`, `summary`, `tenant_id` | `docs/supabase/call_resolution.sql`<br>`docs/supabase/calls_inbox_assignee.sql`<br>`docs/supabase/foundation_bootstrap.sql`<br>`docs/supabase/inbox_triage.sql`<br>`docs/supabase/lead_status.sql`<br>`docs/supabase/package_minute_consume.sql`<br>`docs/supabase/wallet_metering.sql` |
 | `catalogue_price_history` | `amount_ksh`, `confirmed`, `effective_from`, `id`, `in_stock`, `item_key`, `item_name`, `kind`, `max_ksh`, `min_ksh`, `mode`, `source`, `tenant_id`, `unit` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
