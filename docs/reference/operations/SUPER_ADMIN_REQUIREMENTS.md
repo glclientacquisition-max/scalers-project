@@ -167,12 +167,12 @@ The Super Admin rebuild is planned in [`ADMIN_FOUNDATION_PLAN.md`](ADMIN_FOUNDAT
 | Step-up | Authenticator code before sensitive writes, Tier A window and Tier B per action | `ADMIN_STEP_UP.md` §1 |
 | Billing IA | Package / Beta-or-Charging / invoices as three layers (folded from #812) | [`admin-billing-ia-research.md`](../../rfcs/admin-billing-ia-research.md) |
 
-### Answers to plan §9 (per Scalers Chief relaying Alvin, 22 Oct 16:36 EAT)
+### Answers to plan §9 (per Scalers Chief relaying Alvin, 22 Oct 16:36 EAT; operator email corrected 16:37 EAT)
 
 1. **Sign-in length:** 12 hours (today 14 days).
 2. **Code frequency:** one code covers 15 minutes of routine money work up to KES 20,000. A fresh code for prod switches, buying or releasing a number, payments over KES 20,000, and security changes.
 3. **Authenticator at sign-in:** required, starting after step 1, as the plan recommends.
-4. **Operators:** only Alvin, role `owner`, email alvin@scalers.co.ke.
+4. **Operators:** only Alvin, role `owner`, email scalersventures@gmail.com.
 5. **Backup-code inbox:** yegonalvin20@gmail.com.
 6. **Staging:** same rules as prod.
 7. **v2 on prod:** trial `ADMIN_V2=alvin` after slice 9.

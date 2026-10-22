@@ -8,7 +8,7 @@ status: proposed
 
 Spec for asking an operator for a code before a sensitive Admin action, even when signed in. Source: [`ADMIN_FOUNDATION_PLAN.md`](../operations/ADMIN_FOUNDATION_PLAN.md) §4. Nothing here is built or applied yet: no `admin_auth` schema exists on staging or prod (read-only check, 22 Oct 2026).
 
-Status: **proposed**. Values marked *(Q n)* are decided by Alvin's answer to plan §9 question n (per Scalers Chief relaying Alvin, 22 Oct 16:36 EAT): 12 h sessions, 15-minute Tier A window up to KES 20,000, authenticator at sign-in after step 1, one operator (Alvin, owner, alvin@scalers.co.ke), backup codes to yegonalvin20@gmail.com, same rules on staging.
+Status: **proposed**. Values marked *(Q n)* are decided by Alvin's answer to plan §9 question n (per Scalers Chief relaying Alvin, 22 Oct 16:36 EAT): 12 h sessions, 15-minute Tier A window up to KES 20,000, authenticator at sign-in after step 1, one operator (Alvin, owner, scalersventures@gmail.com), backup codes to yegonalvin20@gmail.com, same rules on staging.
 
 ## 1. Tiers
 
@@ -70,7 +70,7 @@ Never rotate `BETTER_AUTH_SECRET` by replacing it: that makes every enrolled aut
 
 ## 7. Open before slice 1 (Platform's known issues, 22 Oct 2026)
 
-- Setting `ADMIN_AUTH_DATABASE_URL` and `BETTER_AUTH_SECRETS` on staging goes only through a masked input. Setting and `BETTER_AUTH_SECRETS` on Vercel staging needs a staging DB URL and a Vercel token on the box.
+- Setting `ADMIN_AUTH_DATABASE_URL` and `BETTER_AUTH_SECRETS` on Vercel staging needs a staging DB URL and a Vercel token on the box, and the values go in only through a masked input.
 - `admin_auth_app` would inherit PUBLIC execute: 101 `public` functions on staging (15 SECURITY DEFINER), 103 on prod (15). Needs `revoke execute … from public` or a role that cannot reach `public`.
 - Better Auth 1.7.6 `twoFactor.verified` defaults to `true`. The table must not default `verified` to true.
 - `rateLimit` has no `id` in Better Auth core. Key the table on `key`, or add an `id` it will not write.
