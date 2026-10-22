@@ -8,7 +8,7 @@ status: proposed
 
 Spec for asking an operator for a code before a sensitive Admin action, even when signed in. Source: [`ADMIN_FOUNDATION_PLAN.md`](../operations/ADMIN_FOUNDATION_PLAN.md) §4. Nothing here is built or applied yet: no `admin_auth` schema exists on staging or prod (read-only check, 22 Oct 2026).
 
-Status: **proposed**. Values marked *(Q n)* are decided by Alvin's answer to plan §9 question n (per Scalers Chief relaying Alvin, 22 Oct 16:36 EAT): 12 h sessions, 15-minute Tier A window up to KES 20,000, authenticator at sign-in after step 1, one operator (Alvin, owner, scalersventures@gmail.com), backup codes to yegonalvin20@gmail.com, same rules on staging.
+Status: **proposed**. Values marked *(Q n)* are decided by Alvin's answer to plan §9 question n (per Scalers Chief relaying Alvin, 22 Oct 16:36 EAT): 12 h sessions, 15-minute Tier A window up to KES 20,000, authenticator at sign-in after step 1, one operator (Alvin, owner, scalersventures@gmail.com), backup codes to scalersventures@gmail.com, same rules on staging.
 
 ## 1. Tiers
 
@@ -26,9 +26,11 @@ Not step-up: reads, search, voice catalogue edits, profile edits, pay-link creat
 | Factor | Role |
 | --- | --- |
 | Authenticator app (TOTP) | Primary, required. 6 digits, 30 s, ±1 step. Issuer differs on staging and prod |
-| Email code | Backup only. 6 digits, 5 min, stored hashed, single use, max 3 sends per 15 min. Every use sends a security alert *(Q5: yegonalvin20@gmail.com)* |
+| Email code | Backup only. 6 digits, 5 min, stored hashed, single use, max 3 sends per 15 min. Every use sends a security alert *(Q5: scalersventures@gmail.com)* |
 | Backup codes | 10 single-use codes shown once |
 | SMS | Not offered |
+
+**Risk (one inbox):** scalersventures@gmail.com is both the owner operator email and the backup-code inbox. Whoever controls it can both sign in and receive backup codes, so that inbox must have its own strong 2FA (authenticator or passkey, not SMS).
 
 ## 3. Session and limits
 
