@@ -1,4 +1,5 @@
 import type { AdminBusiness } from "@/lib/admin";
+import type { BusinessPaneData } from "@/lib/ops/businessPane";
 import type { QualityBadge } from "@/lib/adminQualityModel";
 
 const NAMES = [
@@ -47,4 +48,25 @@ export const ADMIN_BUSINESS_CALLS = Object.fromEntries(
       status: "completed",
     })),
   ]),
+);
+
+/** Synthetic shared-pane reads: made-up minutes and amounts. */
+export const ADMIN_BUSINESS_PANES: Record<string, BusinessPaneData & { business: AdminBusiness }> = Object.fromEntries(
+  ADMIN_BUSINESSES.map((b, i) => {
+    const included = b.package_name ? [300, 800, 2000][i % 3] : 0;
+    const used = included ? Math.round(included * (((i * 37) % 95) + 5) / 100) : 0;
+    return [b.id, {
+      business: b,
+      usage: b.package_name ? {
+        packageName: b.package_name, period: b.package_period, periodEndLabel: "31 Oct 2026",
+        minutesIncluded: included, minutesUsed: used, minutesRemaining: included - used, onDemand: i % 2 === 0, statusLabel: i % 4 === 0 ? "Beta" : "Charging",
+      } : null,
+      money: { openCount: i % 3, overdueCount: i % 5 === 0 && i % 3 ? 1 : 0, balanceCents: (i % 3) * 450000, lastPaidAt: i % 3 === 0 ? null : "2026-10-03T09:12:00Z", lastInvoice: i % 3 === 0 ? null : { id: `inv-${i}`, number: `SCL-2026-${String(180 - i).padStart(4, "0")}`, status: "open" } },
+      calls: ADMIN_BUSINESS_CALLS[b.id],
+      audit: [
+        { id: `${b.id}-a1`, when: "2026-10-20T08:30:00Z", action: "Package changed", actor: "alvin" },
+        { id: `${b.id}-a2`, when: "2026-10-02T11:05:00Z", action: "Minutes granted", actor: "operator not recorded" },
+      ],
+    }];
+  }),
 );

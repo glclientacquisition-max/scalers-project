@@ -3,7 +3,7 @@ import { connection } from "next/server";
 import "@/styles/admin-v2.css";
 import { AdminShell } from "@/components/AdminNav";
 import { AdminBusinessesV2 } from "@/components/admin/v2/AdminBusinessesV2";
-import { ADMIN_BUSINESSES, ADMIN_BUSINESS_BADGES, ADMIN_BUSINESS_CALLS } from "../fixtures/adminBusinesses";
+import { ADMIN_BUSINESSES, ADMIN_BUSINESS_BADGES, ADMIN_BUSINESS_PANES } from "../fixtures/adminBusinesses";
 
 export const instant = false;
 
@@ -13,7 +13,7 @@ export default async function DevAdminBusinessesV2Page() {
   if (process.env.DASHBOARD_OPEN !== "true") notFound();
   return (
     <AdminShell operatorName="alvin" v2>
-      <AdminBusinessesV2 businesses={ADMIN_BUSINESSES} badges={ADMIN_BUSINESS_BADGES} callsFixture={ADMIN_BUSINESS_CALLS} />
+      <AdminBusinessesV2 businesses={ADMIN_BUSINESSES} badges={ADMIN_BUSINESS_BADGES} paneFixture={ADMIN_BUSINESS_PANES} />
     </AdminShell>
   );
 }

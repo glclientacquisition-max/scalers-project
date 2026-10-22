@@ -3,6 +3,11 @@
  * Results: businesses, numbers, invoices, calls. Archived businesses stay findable, labelled.
  */
 
+/** Same URL as businessPaneHref in ./businessPane (kept local: this module has no imports). A test checks they agree. */
+function paneHref(id: string, section?: string): string {
+  return `/admin/businesses?pane=${encodeURIComponent(id)}${section && section !== "summary" ? `&section=${section}` : ""}`;
+}
+
 export type CommandKind = "business" | "number" | "invoice" | "call";
 
 export type CommandHit = {
@@ -74,7 +79,7 @@ export function businessHit(row: { id: string; business_name: string; number?: s
     kind: "business",
     title: row.business_name || "Business",
     preview: line && !line.startsWith("pending:") ? line : "No number yet",
-    href: `/admin/businesses/${row.id}`,
+    href: paneHref(row.id),
     archived: row.archived,
   };
 }
@@ -102,7 +107,7 @@ export function numberHit(row: {
     kind: "number",
     title: row.e164,
     preview: owner ? `${status} · ${owner}` : status,
-    href: row.tenant_id ? `/admin/businesses/${row.tenant_id}` : "/admin/numbers",
+    href: row.tenant_id ? paneHref(row.tenant_id, "number") : "/admin/numbers",
     archived: Boolean(row.archived),
   };
 }

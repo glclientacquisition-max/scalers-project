@@ -1,5 +1,6 @@
 "use client";
 
+import { businessPaneHref } from "@/lib/ops/businessPane";
 import { useEffect, useState } from "react";
 import { EmptyState, Headline, SplitLayout, SplitPane, StatusPill } from "@/components/ops";
 import { BREAKDOWN_MIN, FLOOR, INSIGHT_RANGES, shown, shownShare, type GroupCount, type InsightsData } from "@/lib/ops/insightsView";
@@ -138,9 +139,8 @@ export function AdminInsightsV2({ data }: { data: InsightsData }) {
               what: `${shown(w.calls)} calls · ${shown(w.missed)} price or buying missed`,
             })) : undefined}
             related={selB ? [
-              { label: "Calls and quality", href: `/admin/quality/${selB.tenantId}` },
+              { label: "Calls and quality", href: businessPaneHref(selB.tenantId, "calls") },
               { label: "Usage this period", href: `/admin/businesses/${selB.tenantId}/usage` },
-              { label: "Business", href: `/admin/businesses/${selB.tenantId}` },
             ] : undefined}
           />
         }

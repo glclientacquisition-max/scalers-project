@@ -8,6 +8,7 @@ const { spawnSync } = require("node:child_process");
 const root = path.join(__dirname, "..");
 const read = (rel) => fs.readFileSync(path.join(root, rel), "utf8");
 const ui = read("dashboard/src/components/admin/v2/AdminBusinessesV2.tsx");
+const pane = read("dashboard/src/components/admin/v2/BusinessPane.tsx");
 const page = read("dashboard/src/app/admin/(console)/businesses/page.tsx");
 
 function call(expr) {
@@ -45,21 +46,23 @@ describe("businesses v2 screen", () => {
   });
   it("uses the split pane, a table, and phone rows instead of cards", () => {
     assert.match(ui, /SplitLayout/);
-    assert.match(ui, /SplitPane/);
+    assert.match(ui, /<BusinessPane/);
+    assert.match(pane, /SplitPane/);
     assert.match(ui, /data-businesses-table/);
     assert.match(ui, /data-phone-rows/);
     assert.doesNotMatch(ui, /ListRow|Card/);
   });
   it("makes no writes", () => {
     assert.doesNotMatch(ui, /method:\s*"(POST|PATCH|DELETE)"/);
-    const fetches = ui.match(/fetch\(`[^`]*`/g) || [];
-    assert.deepEqual(fetches, ["fetch(`/api/admin/businesses/${sel}/calls`"]);
-    const route = read("dashboard/src/app/api/admin/businesses/[id]/calls/route.ts");
+    assert.deepEqual(ui.match(/fetch\(`[^`]*`/g) || [], []);
+    assert.doesNotMatch(pane, /method:\s*"(POST|PATCH|DELETE)"/);
+    assert.deepEqual(pane.match(/fetch\(`[^`]*`/g) || [], ["fetch(`/api/admin/businesses/${businessId}/pane`"]);
+    const route = read("dashboard/src/app/api/admin/businesses/[id]/pane/route.ts");
     assert.doesNotMatch(route, /export async function (POST|PATCH|PUT|DELETE)/);
     assert.match(route, /isLegacyAuthenticated/);
   });
   it("names no vendor and no prepaid model on screen", () => {
-    const text = ui.replace(/sautikit_virtual_number/g, "");
+    const text = (ui + pane).replace(/sautikit_virtual_number/g, "");
     assert.doesNotMatch(text, /sautikit|bachs|elevenlabs|twilio|wallet|prepaid|top.?up/i);
   });
 });
