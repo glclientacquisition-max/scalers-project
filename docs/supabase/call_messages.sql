@@ -31,8 +31,11 @@
 --   table call_messages (+ indexes, RLS on, no policies)
 --   _call_messages_ke_phone(text) -> text            (helper, no client grants)
 --   _call_messages_assert_member(uuid)               (helper, no client grants)
---   call_messages_list(p_tenant_id, p_call_id, p_before timestamptz default null, p_limit int default 50)
+--   call_messages_list(p_tenant_id, p_call_id, p_before_created_at timestamptz default null,
+--                      p_before_id uuid default null, p_limit int default 50)
 --     -> jsonb {"messages": [...oldest first], "unread_in": int, "has_more": bool}
+--     Keyset paging on (created_at, id): pass the oldest message's created_at
+--     and id to get the page before it. Both or neither, else 22023.
 --   call_messages_mark_read(p_tenant_id, p_call_id) -> jsonb {"marked": int}
 --   call_messages_unread_counts(p_tenant_id, p_call_ids uuid[]) -> jsonb {"<call_id>": n, ...} (only n > 0)
 --   call_messages_record_out(p_tenant_id, p_call_id, p_key, p_source, p_body, p_notify_send_id,
@@ -53,8 +56,8 @@
 --   drop function if exists public.call_messages_record_out(uuid, uuid, text, text, text, uuid, uuid, uuid);
 --   drop function if exists public.call_messages_unread_counts(uuid, uuid[]);
 --   drop function if exists public.call_messages_mark_read(uuid, uuid);
---   drop function if exists public.call_messages_list(uuid, uuid, timestamptz, integer);
---   drop function if exists public._call_messages_rows(uuid, uuid, timestamptz, integer);
+--   drop function if exists public.call_messages_list(uuid, uuid, timestamptz, uuid, integer);
+--   drop function if exists public._call_messages_rows(uuid, uuid, timestamptz, uuid, integer);
 --   drop function if exists public._call_messages_assert_member(uuid);
 --   drop table if exists public.call_messages;
 --   drop function if exists public._call_messages_ke_phone(text);
@@ -161,6 +164,13 @@ create unique index if not exists call_messages_notify_send_uidx
 create unique index if not exists call_messages_retry_of_uidx
   on public.call_messages (retry_of)
   where retry_of is not null;
+-- Thread paging: call_messages_list filters (tenant_id, call_id), seeks
+-- (created_at, id) < cursor and reads "order by created_at desc, id desc
+-- limit n". This index matches that exactly (backward scan, stops after n
+-- rows, no sort). The sent_at index below cannot: sent_at is null while
+-- pending and is not the paging key.
+create index if not exists call_messages_tenant_call_created_id_idx
+  on public.call_messages (tenant_id, call_id, created_at, id);
 create index if not exists call_messages_tenant_call_sent_idx
   on public.call_messages (tenant_id, call_id, sent_at);
 create index if not exists call_messages_tenant_phone_sent_idx
@@ -208,10 +218,13 @@ revoke all on function public._call_messages_assert_member(uuid) from public, an
 --    While a message is 'pending', status/sent_at/failed_at/failure_reason/
 --    provider_message_id come from its notify_sends row.
 -- ---------------------------------------------------------------------------
+drop function if exists public._call_messages_rows(uuid, uuid, timestamptz, integer);
+
 create or replace function public._call_messages_rows(
   p_tenant_id uuid,
   p_call_id uuid,
-  p_before timestamptz,
+  p_before_created_at timestamptz,
+  p_before_id uuid,
   p_limit integer
 )
 returns setof jsonb
@@ -256,7 +269,8 @@ as $$
     from public.call_messages m
     where m.tenant_id = p_tenant_id
       and m.call_id = p_call_id
-      and (p_before is null or m.created_at < p_before)
+      and (p_before_created_at is null
+           or (m.created_at, m.id) < (p_before_created_at, p_before_id))
     order by m.created_at desc, m.id desc
     limit p_limit
   ) m
@@ -275,16 +289,23 @@ as $$
   order by m.created_at, m.id;
 $$;
 
-revoke all on function public._call_messages_rows(uuid, uuid, timestamptz, integer) from public, anon, authenticated;
+revoke all on function public._call_messages_rows(uuid, uuid, timestamptz, uuid, integer) from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 5. call_messages_list: one page of a call's thread, oldest first.
---    p_before: only rows created before it (page backwards). p_limit 1..100.
+--    Keyset paging on (created_at, id): rows with (created_at, id) below the
+--    cursor, newest p_limit of them, returned oldest first. Pass the first
+--    (oldest) message's created_at + id to page back. Ties on created_at are
+--    split by id, so no row is skipped or repeated across pages.
+--    p_before_created_at and p_before_id: both or neither. p_limit 1..100.
 -- ---------------------------------------------------------------------------
+drop function if exists public.call_messages_list(uuid, uuid, timestamptz, integer);
+
 create or replace function public.call_messages_list(
   p_tenant_id uuid,
   p_call_id uuid,
-  p_before timestamptz default null,
+  p_before_created_at timestamptz default null,
+  p_before_id uuid default null,
   p_limit integer default 50
 )
 returns jsonb
@@ -298,12 +319,16 @@ declare
   v_rows jsonb;
   v_unread integer;
   v_more boolean;
-  v_oldest timestamptz;
+  v_oldest_at timestamptz;
+  v_oldest_id uuid;
 begin
   perform public._call_messages_assert_member(p_tenant_id);
 
   if p_call_id is null then
     raise exception 'call id required' using errcode = '22023';
+  end if;
+  if (p_before_created_at is null) <> (p_before_id is null) then
+    raise exception 'p_before_created_at and p_before_id go together' using errcode = '22023';
   end if;
   if v_limit < 1 or v_limit > 100 then
     raise exception 'limit must be 1..100 (got %)', v_limit using errcode = '22023';
@@ -312,16 +337,17 @@ begin
     raise exception 'call not found' using errcode = 'P0002';
   end if;
 
-  select coalesce(jsonb_agg(r order by (r ->> 'created_at')::timestamptz, r ->> 'id'), '[]'::jsonb)
+  select coalesce(jsonb_agg(r order by (r ->> 'created_at')::timestamptz, (r ->> 'id')::uuid), '[]'::jsonb)
     into v_rows
-  from public._call_messages_rows(p_tenant_id, p_call_id, p_before, v_limit) as r;
+  from public._call_messages_rows(p_tenant_id, p_call_id, p_before_created_at, p_before_id, v_limit) as r;
 
   if jsonb_array_length(v_rows) > 0 then
-    v_oldest := (v_rows -> 0 ->> 'created_at')::timestamptz;
+    v_oldest_at := (v_rows -> 0 ->> 'created_at')::timestamptz;
+    v_oldest_id := (v_rows -> 0 ->> 'id')::uuid;
     select exists (
       select 1 from public.call_messages m
       where m.tenant_id = p_tenant_id and m.call_id = p_call_id
-        and m.created_at < v_oldest
+        and (m.created_at, m.id) < (v_oldest_at, v_oldest_id)
     ) into v_more;
   else
     v_more := false;
@@ -336,8 +362,8 @@ begin
 end;
 $$;
 
-revoke all on function public.call_messages_list(uuid, uuid, timestamptz, integer) from public, anon;
-grant execute on function public.call_messages_list(uuid, uuid, timestamptz, integer) to authenticated, service_role;
+revoke all on function public.call_messages_list(uuid, uuid, timestamptz, uuid, integer) from public, anon;
+grant execute on function public.call_messages_list(uuid, uuid, timestamptz, uuid, integer) to authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- 6. call_messages_mark_read: stamp read_at on the call's unread inbound rows.

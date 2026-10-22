@@ -30,7 +30,7 @@ const NS_OTHER_T = 'e0000000-0000-4000-8000-000000000003';
 const NS_FAILED = 'e0000000-0000-4000-8000-000000000004';
 
 const FUNCS = [
-  'public.call_messages_list(uuid, uuid, timestamptz, integer)',
+  'public.call_messages_list(uuid, uuid, timestamptz, uuid, integer)',
   'public.call_messages_mark_read(uuid, uuid)',
   'public.call_messages_unread_counts(uuid, uuid[])',
   'public.call_messages_record_out(uuid, uuid, text, text, text, uuid, uuid, uuid)',
@@ -39,7 +39,7 @@ const FUNCS = [
 const HELPERS = [
   'public._call_messages_ke_phone(text)',
   'public._call_messages_assert_member(uuid)',
-  'public._call_messages_rows(uuid, uuid, timestamptz, integer)',
+  'public._call_messages_rows(uuid, uuid, timestamptz, uuid, integer)',
 ];
 
 /** member_can_write + current_member_role, lifted verbatim from team_invites. */
@@ -71,7 +71,13 @@ async function as(user, fn) {
 
 const rpc = (sql, args, user = OWNER) => as(user, () => db.query(sql, args)).then((x) => x.rows[0].r);
 const list = (callId, opts = {}, user = OWNER, tenant = TENANT) =>
-  rpc('select call_messages_list($1, $2, $3, $4) as r', [tenant, callId, opts.before ?? null, opts.limit ?? 50], user);
+  rpc('select call_messages_list($1, $2, $3, $4, $5) as r', [
+    tenant,
+    callId,
+    opts.before?.created_at ?? opts.beforeAt ?? null,
+    opts.before?.id ?? opts.beforeId ?? null,
+    opts.limit ?? 50,
+  ], user);
 const recordOut = (o, user = OWNER, tenant = TENANT) =>
   rpc('select call_messages_record_out($1, $2, $3, $4, $5, $6, $7, $8) as r', [
     tenant,
@@ -95,11 +101,11 @@ const code = (c) => (e) => {
   return true;
 };
 
-async function inbound(callId, body, at) {
+async function inbound(callId, body, at, id = null) {
   await db.query(
-    `insert into call_messages (tenant_id, call_id, phone, direction, body, status, source, idempotency_key, created_at, sent_at)
-     values ($1, $2, '254712345678', 'in', $3, 'received', 'inbound', 'in:' || gen_random_uuid(), $4, $4)`,
-    [TENANT, callId, body, at]
+    `insert into call_messages (id, tenant_id, call_id, phone, direction, body, status, source, idempotency_key, created_at, sent_at)
+     values (coalesce($5::uuid, gen_random_uuid()), $1, $2, '254712345678', 'in', $3, 'received', 'inbound', 'in:' || gen_random_uuid(), $4, $4)`,
+    [TENANT, callId, body, at, id]
   );
 }
 
@@ -367,7 +373,7 @@ describe('call_messages_record_out', () => {
 });
 
 describe('call_messages_list', () => {
-  it('oldest first, paging with p_before, has_more', async () => {
+  it('oldest first, keyset paging on (created_at, id), has_more', async () => {
     await db.query(`delete from call_messages where call_id = $1`, [C2]);
     const times = ['2026-10-22T04:00:00Z', '2026-10-22T04:01:00Z', '2026-10-22T04:02:00Z'];
     for (const t of times) await inbound(C2, `in ${t}`, t);
@@ -381,7 +387,7 @@ describe('call_messages_list', () => {
     const page = await list(C2, { limit: 2 });
     assert.deepEqual(page.messages.map((m) => m.body), [`in ${times[1]}`, `in ${times[2]}`]);
     assert.equal(page.has_more, true);
-    const older = await list(C2, { limit: 2, before: page.messages[0].created_at });
+    const older = await list(C2, { limit: 2, before: page.messages[0] });
     assert.deepEqual(older.messages.map((m) => m.body), [`in ${times[0]}`]);
     assert.equal(older.has_more, false);
   });
@@ -392,6 +398,46 @@ describe('call_messages_list', () => {
     await assert.rejects(list(C1, {}, null), code('42501'));
     await assert.rejects(list(C_OTHER), code('P0002'));
     assert.deepEqual((await list(C_OTHER, {}, STRANGER, OTHER)).messages, []);
+  });
+
+  it('same created_at across a page boundary: split by id, nothing skipped or repeated', async () => {
+    // In the future so they sort after C3's earlier outbound row.
+    const T = '2099-01-01T00:00:00Z';
+    const ids = [
+      'f0000000-0000-4000-8000-000000000001',
+      'f0000000-0000-4000-8000-000000000002',
+      'f0000000-0000-4000-8000-000000000003',
+    ];
+    // Insert out of id order; two share T with the first-page boundary between them.
+    await inbound(C3, 'tie-b', T, ids[1]);
+    await inbound(C3, 'tie-a', T, ids[0]);
+    await inbound(C3, 'early', '2098-12-31T23:59:59Z', 'f0000000-0000-4000-8000-000000000000');
+    await inbound(C3, 'tie-c', T, ids[2]);
+    const p1 = await list(C3, { limit: 2 });
+    assert.deepEqual(p1.messages.map((m) => m.body), ['tie-b', 'tie-c']);
+    assert.equal(p1.has_more, true);
+    const p2 = await list(C3, { limit: 2, before: p1.messages[0] });
+    assert.deepEqual(p2.messages.map((m) => m.body), ['early', 'tie-a']);
+    assert.equal(p2.has_more, true); // C3's older outbound row
+    const seen = [...p2.messages, ...p1.messages].filter((m) => m.direction === 'in').map((m) => m.body);
+    assert.deepEqual(seen, ['early', 'tie-a', 'tie-b', 'tie-c']);
+    // limit 1 walks every row one at a time
+    const walk = [];
+    let cur = null;
+    for (;;) {
+      const pg = await list(C3, { limit: 1, before: cur });
+      if (!pg.messages.length) break;
+      walk.unshift(pg.messages[0].body);
+      cur = pg.messages[0];
+      if (!pg.has_more) break;
+    }
+    assert.deepEqual(walk.filter((b) => ['early', 'tie-a', 'tie-b', 'tie-c'].includes(b)), ['early', 'tie-a', 'tie-b', 'tie-c']);
+    await db.query(`delete from call_messages where call_id = $1 and direction = 'in'`, [C3]);
+  });
+
+  it('cursor needs both parts (22023)', async () => {
+    await assert.rejects(list(C1, { beforeAt: '2026-10-22T03:00:00Z' }), code('22023'));
+    await assert.rejects(list(C1, { beforeId: C1 }), code('22023'));
   });
 
   it('limit bounds are 22023', async () => {
