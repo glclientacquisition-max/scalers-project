@@ -815,6 +815,7 @@ export function InboxTicketView({
           callerPhone={callerPhone}
           facts={smsFacts}
           smsAllowance={smsAllowance}
+          callerName={callerName}
           onSent={texts ? () => selectTab("texts") : undefined}
         />
       ) : null}

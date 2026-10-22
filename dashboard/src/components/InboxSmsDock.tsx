@@ -14,7 +14,7 @@ import { deskShiftClass } from "@/components/ui/deskChrome";
 import type { InboxSmsFacts } from "@/lib/polishInboxSms";
 import { emptyInboxSmsFacts } from "@/lib/polishInboxSms";
 import { smsSegments } from "@/lib/smsSegments";
-import { smsMeterLine } from "@/lib/callTextThread";
+import { composerPlaceholder, smsMeterLine } from "@/lib/callTextThread";
 
 const polishInitial: PolishCallerNoteState = {};
 const sendInitial: SendCallerNoteState = {};
@@ -24,6 +24,7 @@ function InboxSmsDockInner({
   callerPhone,
   facts = emptyInboxSmsFacts(),
   smsAllowance = null,
+  callerName = null,
   onSent,
 }: {
   callId: string;
@@ -31,7 +32,9 @@ function InboxSmsDockInner({
   facts?: InboxSmsFacts;
   /** Package SMS (business row): shows "1 SMS · N of M included left". */
   smsAllowance?: { included: number | null; used: number | null } | null;
-  /** After a successful send (call view switches to Texts). */
+  /** For the placeholder: "Text Chris". */
+  callerName?: string | null;
+  /** After a send was tried, sent or failed (call view switches to Texts). */
   onSent?: () => void;
 }) {
   const [note, setNote] = useState("");
@@ -63,8 +66,11 @@ function InboxSmsDockInner({
   }, [onSent]);
 
   useEffect(() => {
+    if (sendState.attempted) onSentRef.current?.();
+  }, [sendState]);
+
+  useEffect(() => {
     if (sendState.ok) {
-      onSentRef.current?.();
       setNote("");
       setReplyId(crypto.randomUUID());
       if (areaRef.current) {
@@ -115,7 +121,7 @@ function InboxSmsDockInner({
           name="note"
           value={note}
           rows={2}
-          placeholder="SMS"
+          placeholder={composerPlaceholder(callerName)}
           onChange={(event) => {
             setNote(event.target.value);
             const el = event.currentTarget;

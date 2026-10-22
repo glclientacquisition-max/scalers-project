@@ -17,6 +17,7 @@ import {
   callViewTab,
   smsMeterLine,
   textBubble,
+  composerPlaceholder,
   textBubbleTime,
   textFailureReason,
   textThreadBubbles,
@@ -115,7 +116,7 @@ test("failure reasons in owner words", () => {
   assert.equal(textFailureReason(null), null);
   assert.equal(textFailureReason("no_caller_phone"), "No valid number.");
   assert.equal(textFailureReason("sms_allowance_exhausted"), "Included SMS used.");
-  assert.equal(textFailureReason("sms_not_configured"), "Text is unavailable.");
+  assert.equal(textFailureReason("sms_not_configured"), "Texting is not set up for this business yet.");
   assert.equal(textFailureReason("weird"), "Send failed.");
 });
 
@@ -257,7 +258,7 @@ test("allowance copy points to Usage, shared by send and Retry", () => {
   assert.equal(deskSmsSendError({ reason: "x", message: "Line paused." }), "Line paused.");
   const notes = src("app/(desk)/calls/noteActions.ts");
   assert.doesNotMatch(notes, /on Wallet/);
-  assert.match(notes, /deskSmsSendError\(sent\)/);
+  assert.match(notes, /return \{ error: deskSmsSendError\(sent\) \}/);
 });
 
 test("Retry: call_messages_retry key, sent without a second thread row", () => {
@@ -303,4 +304,34 @@ test("normalize keeps inbound shape for later", () => {
   assert.equal(m?.direction, "in");
   assert.equal(m?.status, "received");
   assert.equal(normalizeCallMessage(null), null);
+});
+
+test("not set up: plain copy in the composer error and the bubble, and no Retry", () => {
+  const copy = "Texting is not set up for this business yet.";
+  assert.equal(deskSmsSendError({ reason: "sms_not_configured" }), copy);
+  const b = textBubble(msg({ status: "failed", failureReason: "sms_not_configured" }));
+  assert.equal(b.reason, copy);
+  assert.equal(b.canRetry, false);
+  assert.equal(textBubble(msg({ status: "failed", failureReason: "textsms_502" })).canRetry, true);
+  assert.equal(textBubble(msg({ status: "refused", failureReason: "sms_allowance_exhausted" })).canRetry, true);
+  assert.doesNotMatch(copy, /[\u2013\u2014]/);
+});
+
+test("composer placeholder: first name, else caller", () => {
+  assert.equal(composerPlaceholder("Chris Otieno"), "Text Chris");
+  assert.equal(composerPlaceholder("  "), "Text caller");
+  assert.equal(composerPlaceholder(null), "Text caller");
+  const dock = src("components/InboxSmsDock.tsx");
+  assert.match(dock, /placeholder=\{composerPlaceholder\(callerName\)\}/);
+  assert.doesNotMatch(dock, /placeholder="SMS"/);
+});
+
+test("after Send, sent or failed: refresh the thread and switch to Texts", () => {
+  const notes = src("app/(desk)/calls/noteActions.ts");
+  const fail = notes.slice(notes.indexOf("if (!sent.ok) {"));
+  assert.ok(fail.indexOf("revalidatePath(`/calls/${callId}`)") < fail.indexOf("return {"), "failed send refreshes the call");
+  assert.match(notes, /return \{ \.\.\.ownerSmsFailure\(sent\), attempted: true, token: Date\.now\(\) \}/);
+  assert.match(notes, /return \{ ok: true, attempted: true, token: Date\.now\(\) \}/);
+  const dock = src("components/InboxSmsDock.tsx");
+  assert.match(dock, /if \(sendState\.attempted\) onSentRef\.current\?\.\(\);\n\s+\}, \[sendState\]\);/);
 });

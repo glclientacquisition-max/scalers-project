@@ -35,7 +35,7 @@ export function textFailureReason(raw: string | null | undefined): string | null
   if (!r) return null;
   if (r === "no_caller_phone") return "No valid number.";
   if (r === "sms_allowance_exhausted" || r === "allowance_exhausted") return "Included SMS used.";
-  if (r === "sms_not_configured") return "Text is unavailable.";
+  if (r === "sms_not_configured") return "Texting is not set up for this business yet.";
   if (r === "line_paused" || r === "line_closed" || r.includes("paused")) return "Line is paused.";
   if (r.startsWith("textsms_")) return "Text service error.";
   return "Send failed.";
@@ -64,7 +64,8 @@ export function textBubble(m: CallMessage): TextBubble {
     ticks: m.status === "delivered" ? 2 : m.status === "sent" ? 1 : 0,
     failed,
     reason: failed ? textFailureReason(m.failureReason) : null,
-    canRetry: failed,
+    // Not set up: a retry fails the same way, so no Retry.
+    canRetry: failed && String(m.failureReason || "").trim().toLowerCase() !== "sms_not_configured",
     at: m.sentAt || m.createdAt,
   };
 }
@@ -78,6 +79,12 @@ export function textThreadBubbles(messages: CallMessage[]): TextBubble[] {
 /** Count for the tab: visible thread bubbles. */
 export function textThreadCount(messages: CallMessage[]): number {
   return textThreadBubbles(messages).length;
+}
+
+/** Composer placeholder: "Text Chris", or "Text caller". */
+export function composerPlaceholder(name: string | null | undefined): string {
+  const first = String(name || "").trim().split(/\s+/)[0] || "";
+  return first ? `Text ${first}` : "Text caller";
 }
 
 export function textThreadEmpty(name: string | null | undefined): string {
