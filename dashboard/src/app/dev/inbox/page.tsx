@@ -6,7 +6,6 @@ import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
 import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/InboxArchivedRow";
 import { InboxRowUiProvider } from "@/components/InboxRowUi";
 import { InboxSelectChrome } from "@/components/InboxRowSelect";
-import { ThemePicker } from "@/components/ThemePicker";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import type { InboxItem } from "@/lib/inboxPurpose";
 import type { TranscriptRow } from "@/lib/supabase";
@@ -215,12 +214,6 @@ export default function DevInboxPage() {
           }}
           q=""
         />
-        <div className="mt-6 max-w-lg">
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Appearance</p>
-          <div className="mt-2">
-            <ThemePicker />
-          </div>
-        </div>
         </InboxSelectChrome>
         <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface lg:hidden">
           <InboxArchivedPhoneRow count={14} />
@@ -234,7 +227,7 @@ export default function DevInboxPage() {
             />
           ))}
         </ul>
-        <div className="mt-8 hidden lg:block">
+        <div className="mt-4 hidden lg:block">
           <DeskDataTable minWidthClass="min-w-0">
             <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
               <tr>
