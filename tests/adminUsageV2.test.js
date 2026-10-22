@@ -57,7 +57,7 @@ test("usage page is ADMIN_V2, read-only, no caller numbers", () => {
 
 test("invoice and business panes link to usage", () => {
   assert.match(read("dashboard/src/components/admin/v2/AdminInvoicesV2.tsx"), /Usage for this period/);
-  assert.match(read("dashboard/src/components/admin/v2/AdminBusinessesV2.tsx"), /\/usage`/);
+  assert.match(read("dashboard/src/components/admin/v2/BusinessPane.tsx"), /\/usage`/);
 });
 
 test("loading mirrors the page: 5-column table at row height and the pane, no tall blocks", () => {

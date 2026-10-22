@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireSuperAdmin } from "@/lib/adminGuard";
+import { businessPaneHref } from "@/lib/ops/businessPane";
 
 export default async function AdminBillingClientRedirect({
   params,
@@ -8,6 +9,6 @@ export default async function AdminBillingClientRedirect({
 }) {
   await requireSuperAdmin();
   const { tenantId } = await params;
-  if (process.env.ADMIN_V2 === "on") redirect(`/admin/businesses?pane=${encodeURIComponent(tenantId)}&section=money`);
+  if (process.env.ADMIN_V2 === "on") redirect(businessPaneHref(tenantId, "money"));
   redirect(`/admin/businesses/${tenantId}?money=1`);
 }

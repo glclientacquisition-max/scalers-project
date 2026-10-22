@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ComponentProps } from "react";
 import type { AdminBusiness } from "@/lib/admin";
 import type { QualityBadge } from "@/lib/adminQualityModel";
 import { formatScore } from "@/lib/adminQualityModel";
@@ -14,36 +14,34 @@ import {
   matchesQuery,
   numberLabel,
   viewCounts,
-  callLength,
-  intentLabel,
   type BusinessView,
-  type PaneCall,
 } from "@/lib/ops/businessesView";
-import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState } from "@/components/ops";
-import { ButtonLink } from "@/components/ui/Button";
+import { parsePaneSection, type BusinessPaneSection } from "@/lib/ops/businessPane";
+import { PageHeader, SplitLayout, StatusPill, EmptyState } from "@/components/ops";
+import { BusinessPane } from "./BusinessPane";
 import "@/styles/ops.css";
 
 const DATE = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" });
 const day = (iso: string) => (iso ? DATE.format(new Date(iso)) : "—");
-const STAMP = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Africa/Nairobi" });
-const stamp = (iso: string) => STAMP.format(new Date(iso));
 
-/** Businesses as a table plus split pane (ADMIN_V2). Read-only: actions stay on the business page until step-up codes land. */
+/** Businesses as a table plus the shared BusinessPane (ADMIN_V2). Read-only until step-up codes land. */
 export function AdminBusinessesV2({
   businesses,
   badges = {},
-  callsFixture,
+  paneFixture,
 }: {
   businesses: AdminBusiness[];
   badges?: Record<string, QualityBadge>;
-  /** Dev fixture only: skips the read. */
-  callsFixture?: Record<string, PaneCall[]>;
+  /** Dev fixture only: skips the pane read. */
+  paneFixture?: ComponentProps<typeof BusinessPane>["fixture"];
 }) {
   const [view, setView] = useState<BusinessView>(() => defaultView(businesses));
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState<string | null>(null);
+  const [section, setSection] = useState<BusinessPaneSection>("summary");
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    setSection(parsePaneSection(params.get("section")));
     const asked = BUSINESS_VIEWS.find((x) => x.id === params.get("view"));
     if (asked) setView(asked.id);
     const q = params.get("pane");
@@ -59,25 +57,6 @@ export function AdminBusinessesV2({
     [businesses, view, query],
   );
   const b = businesses.find((x) => x.id === sel) ?? null;
-  const [calls, setCalls] = useState<Record<string, PaneCall[] | "error">>({});
-  useEffect(() => {
-    if (!sel || calls[sel]) return;
-    if (callsFixture) { setCalls((c) => ({ ...c, [sel]: callsFixture[sel] || [] })); return; }
-    let live = true;
-    fetch(`/api/admin/businesses/${sel}/calls`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((j: { calls: PaneCall[] }) => { if (live) setCalls((c) => ({ ...c, [sel]: j.calls })); })
-      .catch(() => { if (live) setCalls((c) => ({ ...c, [sel]: "error" })); });
-    return () => { live = false; };
-  }, [sel, calls, callsFixture]);
-  const paneCalls = sel ? calls[sel] : undefined;
-  const history = b ? [
-    ...(Array.isArray(paneCalls) ? paneCalls.map((c) => ({ when: stamp(c.created_at), what: `${intentLabel(c.primary_intent)} · ${callLength(c.duration_seconds)}` })) : []),
-    ...(b.archived_at ? [{ when: day(b.archived_at), what: "Archived" }] : []),
-    ...(b.suspended_at ? [{ when: day(b.suspended_at), what: "Line suspended" }] : []),
-    { when: day(b.created_at), what: "Signed up" },
-  ] : undefined;
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!sel || (e.target as HTMLElement)?.closest("input,textarea,select")) return;
@@ -176,40 +155,18 @@ export function AdminBusinessesV2({
     </div>
   );
 
-  const badge = b ? badges[b.id] : undefined;
   return (
     <div className="ops-theme flex min-h-0 w-full flex-col">
       <SplitLayout
         list={list}
         pane={
-          <SplitPane
-            open={!!b}
+          <BusinessPane
+            businessId={sel}
+            seed={b}
+            badge={b ? badges[b.id] : undefined}
+            section={section}
             onClose={() => setSel(null)}
-            title={b?.business_name || ""}
-            facts={b ? [
-              { label: "Status", value: <StatusPill tone={businessTone(b.status)}>{statusLabel(b.status)}</StatusPill> },
-              { label: "Number", value: numberLabel(b) },
-              { label: "Package", value: b.package_name ? `${b.package_name}${b.package_period ? ` · ${b.package_period === "year" ? "yearly" : "monthly"}` : ""}` : "No package" },
-              { label: "Charging", value: chargingLabel(b) },
-              { label: "Owner alerts", value: b.whatsapp_notification_number || "Not set" },
-              { label: "Quality", value: badge ? `${formatScore(badge.score)}${badge.dropping ? " · dropping" : ""}` : "Not logged" },
-              { label: "Last call", value: Array.isArray(paneCalls) ? (paneCalls[0] ? stamp(paneCalls[0].created_at) : "No calls yet") : paneCalls === "error" ? "Could not load calls" : "Loading…" },
-              { label: "Since", value: day(b.created_at) },
-              ...(b.archived_at ? [{ label: "Archived", value: day(b.archived_at) }] : []),
-            ] : undefined}
-            history={history}
-            related={b ? [
-              { label: "Usage this period", href: `/admin/businesses/${b.id}/usage` },
-              { label: "Invoices", href: `/admin/billing/invoices?business=${b.id}` },
-              { label: "Billing history", href: `/admin/billing/${b.id}` },
-              { label: "Call quality", href: `/admin/quality/${b.id}` },
-            ] : undefined}
-            footer={b ? (
-              <div className="flex w-full items-center justify-between gap-2">
-                <span className="text-ops-label text-ink-2">Number, package and lifecycle actions are on the business page.</span>
-                <ButtonLink href={`/admin/businesses/${b.id}`} variant="primary" size="md">Open business</ButtonLink>
-              </div>
-            ) : undefined}
+            fixture={paneFixture}
           />
         }
       />

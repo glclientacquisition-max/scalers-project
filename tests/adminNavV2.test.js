@@ -41,8 +41,8 @@ test("pages apply the map only under ADMIN_V2 and stay as-is otherwise", () => {
     assert.match(s, /process\.env\.ADMIN_V2 === "on"\) redirect\(/, p);
     assert.ok(s.includes(to), `${p} → ${to}`);
   }
-  assert.match(page("businesses/[id]"), /ADMIN_V2 === "on"\) redirect\(`\/admin\/businesses\?pane=/);
-  assert.match(page("billing/[tenantId]"), /ADMIN_V2 === "on"\) redirect\(`\/admin\/businesses\?pane=.*section=money/);
+  assert.match(page("businesses/[id]"), /ADMIN_V2 === "on"\) redirect\(businessPaneHref\(id\)\)/);
+  assert.match(page("billing/[tenantId]"), /ADMIN_V2 === "on"\) redirect\(businessPaneHref\(tenantId, "money"\)\)/);
   for (const p of ["billing/packages", "settings/services", "settings/voices", "settings/audit", "settings"]) {
     assert.match(page(p), /ADMIN_V2 !== "on"\) notFound\(\)/, `${p} is v2-only`);
   }
