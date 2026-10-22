@@ -1,5 +1,6 @@
 "use client";
 
+import { businessPaneHref } from "@/lib/ops/businessPane";
 import { useEffect, useMemo, useState } from "react";
 import {
   ATTENTION_VIEWS,
@@ -181,9 +182,9 @@ export function AdminAttentionV2({
                 : [{ when: "Calls", what: paneCalls === "error" ? "Could not load calls" : "Loading…" }]),
             ] : undefined}
             related={it ? [
-              { label: "Business", href: `/admin/businesses/${it.businessId}` },
+              { label: "Business", href: businessPaneHref(it.businessId) },
               { label: "Invoices", href: `/admin/billing/invoices?business=${it.businessId}` },
-              { label: "Call quality", href: `/admin/quality/${it.businessId}` },
+              { label: "Call quality", href: businessPaneHref(it.businessId, "calls") },
             ] : undefined}
             footer={it ? (
               <div className="flex w-full items-center justify-between gap-2">

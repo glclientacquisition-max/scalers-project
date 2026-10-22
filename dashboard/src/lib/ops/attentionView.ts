@@ -5,6 +5,11 @@
  * missed demand (price or buying questions missed in 7 days; counts only, from call insights).
  */
 
+/** Same URL as businessPaneHref in ./businessPane (kept local: this module has no imports). A test checks they agree. */
+function paneHref(id: string, section?: string): string {
+  return `/admin/businesses?pane=${encodeURIComponent(id)}${section && section !== "summary" ? `&section=${section}` : ""}`;
+}
+
 export const NEAR_LIMIT = 0.8;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -118,7 +123,7 @@ export function buildAttention(input: {
       businessName: b.name,
       detail: `Signed up ${waited ? `${dayWord(waited)} ago` : "today"}, no number yet`,
       since: b.createdAt,
-      href: `/admin/businesses/${b.id}`,
+      href: paneHref(b.id, "number"),
       weight: waited,
       facts: [{ label: "Waiting", value: dayWord(waited) }],
     });
@@ -137,7 +142,7 @@ export function buildAttention(input: {
       businessName: b.name,
       detail: `${used} of ${u.includedMinutes} min used · ${pct}%${share >= 1 ? " · over" : ""}`,
       since: null,
-      href: `/admin/billing/${b.id}`,
+      href: paneHref(b.id, "usage"),
       weight: share,
       facts: [
         { label: "Package", value: u.packageName || "No package" },
@@ -157,7 +162,7 @@ export function buildAttention(input: {
       businessName: b.name,
       detail: q.reason || "Call quality is dropping",
       since: null,
-      href: `/admin/quality/${b.id}`,
+      href: paneHref(b.id, "calls"),
       weight: q.score === null ? 0 : 100 - q.score,
       facts: [{ label: "Score", value: q.score === null ? "Not logged" : String(Math.round(q.score * 10) / 10) }],
     });

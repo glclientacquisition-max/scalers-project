@@ -89,13 +89,15 @@ type Props = PaneSections & {
   /** Confirm action and any code field. Always pinned to the bottom of the pane. */
   footer?: ReactNode;
   dismissible?: boolean;
+  /** Custom body (BusinessPane). Replaces the four standard parts when set. */
+  children?: ReactNode;
 };
 
 /**
  * Split pane. md and up: sits beside the list in the page flow (no overlay, the list stays usable).
  * Width 560px, 640px from 1440. Below md: the shared bottom sheet. Never a centred modal.
  */
-export function SplitPane({ open, onClose, title, subtitle, footer, dismissible = true, ...sections }: Props) {
+export function SplitPane({ open, onClose, title, subtitle, footer, dismissible = true, children, ...sections }: Props) {
   const phone = useIsPhone();
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -117,7 +119,7 @@ export function SplitPane({ open, onClose, title, subtitle, footer, dismissible 
       <Sheet open={open} onOpenChange={(n) => { if (!n && dismissible) onClose(); }} title={title} footer={footer} dismissible={dismissible} theme="admin">
         <div className="ops-theme">
           {subtitle ? <p className="mb-ops-3 text-ops-body text-ink-2">{subtitle}</p> : null}
-          <PaneBody {...sections} />
+          {children ?? <PaneBody {...sections} />}
         </div>
       </Sheet>
     );
@@ -141,7 +143,7 @@ export function SplitPane({ open, onClose, title, subtitle, footer, dismissible 
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-ops-4 py-ops-3">
         {subtitle ? <p className="mb-ops-3 text-ops-body text-ink-2">{subtitle}</p> : null}
-        <PaneBody {...sections} />
+        {children ?? <PaneBody {...sections} />}
       </div>
       {footer ? <div data-pane-footer="" className="shrink-0 border-t border-hairline px-ops-4 py-ops-3">{footer}</div> : null}
     </aside>

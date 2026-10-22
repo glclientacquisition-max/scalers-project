@@ -1,5 +1,6 @@
 "use client";
 
+import { businessPaneHref } from "@/lib/ops/businessPane";
 import { useEffect, useMemo, useState } from "react";
 import {
   INVOICE_VIEWS,
@@ -226,9 +227,8 @@ export function AdminInvoicesV2({
             related={it ? [
               ...(it.status !== "draft" ? [{ label: "Download PDF", href: `/api/admin/billing/invoices/${it.id}/pdf` }] : []),
               ...(it.periodStart && it.periodEnd ? [{ label: "Usage for this period", href: `/admin/businesses/${it.businessId}/usage?from=${encodeURIComponent(it.periodStart)}&to=${encodeURIComponent(it.periodEnd)}` }] : []),
-              { label: "Billing history", href: `/admin/billing/${it.businessId}` },
               { label: "All invoices for this business", href: `/admin/billing/invoices?business=${it.businessId}` },
-              { label: "Business", href: `/admin/businesses/${it.businessId}` },
+              { label: "Business", href: businessPaneHref(it.businessId, "money") },
             ] : undefined}
             footer={it ? (
               <div className="flex w-full items-center justify-between gap-2">

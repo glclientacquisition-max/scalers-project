@@ -1,5 +1,6 @@
 "use client";
 
+import { businessPaneHref } from "@/lib/ops/businessPane";
 import { useEffect, useMemo, useState } from "react";
 import { Headline, SplitLayout, SplitPane, StatusPill, EmptyState } from "@/components/ops";
 import {
@@ -45,7 +46,7 @@ export function AdminUsageV2({ data, tenantId, nowIso, currentPeriod }: { data: 
         sub={<span className="inline-flex flex-wrap items-center gap-ops-2">{pct != null ? <StatusPill tone={tone}>{pct}% used</StatusPill> : null}<span>{paceLine(v, data.onDemandEnabled)}</span></span>}
         actions={[
           { label: "Invoices", href: `/admin/billing/invoices?business=${tenantId}` },
-          { label: "Calls", href: `/admin/quality/${tenantId}` },
+          { label: "Calls", href: businessPaneHref(tenantId, "calls") },
         ]}
       >
         {includedSec > 0 ? (
@@ -163,8 +164,7 @@ export function AdminUsageV2({ data, tenantId, nowIso, currentPeriod }: { data: 
             })) : undefined}
             related={selDay ? [
               { label: "Invoices for this business", href: `/admin/billing/invoices?business=${tenantId}` },
-              { label: "Billing history", href: `/admin/billing/${tenantId}` },
-              { label: "Business", href: `/admin/businesses/${tenantId}` },
+              { label: "Business", href: businessPaneHref(tenantId, "usage") },
             ] : undefined}
           />
         }
