@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-200 variables.
+201 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -31,6 +31,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BRAIN_CALL_FIXES_D199` | desk | `dashboard/src/lib/tenantFieldProvenance.ts` |
 | `BRAIN_GEMINI_CATALOGUE` | voice | `src/conversation/catalogueMouth.js` |
 | `BRAIN_V2_COMMIT_SAFETY` | voice | `src/conversation/v2/commitSafety.js` |
+| `BRAIN_V2_FACT_STORE` | voice | `src/knowledge/factStore.js` |
 | `BRAIN_V2_NLU_GAPS` | voice | `src/conversation/turnProposals.js`<br>`src/conversation/v2/nlu.js` |
 | `BRAIN_V2_OWNS_CALL` | voice | `src/conversation/v2/commitSafety.js`<br>`src/conversation/v2/ownsCall.js` |
 | `BUSINESS_KNOWLEDGE` | voice | `src/db.js`<br>`src/prompts.js`<br>`src/tenantProfile.js` |

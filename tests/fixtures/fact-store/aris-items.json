@@ -1,0 +1,13 @@
+{
+  "_note": "Aris stationery rows as stored in tenants.product_catalog (brain-gaps 2026-10-21 section 2), incl. the mojibake 180 degree row. No aliases, no stock data.",
+  "catalog": [
+    { "id": "prd_acc3153400bbd5cc", "name": "360 Degrees Protractor", "price": 200 },
+    { "id": "prd_24174b3b18d2b474", "name": "180\u00c2\u00b0 transparent protractor", "price": 180 },
+    { "id": "prd_493fa696fb8662af", "name": "Pvc detachable t square", "price": 400 },
+    { "id": "prd_41626a61502ed746", "name": "35cm set squares (drawing & engineering)", "price": 349 },
+    { "id": "prd_fd908672c400f8e8", "name": "Adjustable set square", "price": 849 },
+    { "id": "prd_d53d480994b6676a", "name": "Mg gel pen", "price": 30 },
+    { "id": "prd_9d8a1452ff5af4e4", "name": "Mg zipper bag-a4", "price": 135 },
+    { "id": "prd_17b88d6a4316a45d", "name": "Mg zipper bag-a6", "price": 70 }
+  ]
+}

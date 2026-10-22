@@ -10,7 +10,8 @@ import { getVoicePublicBase } from "./voicePublicBase.js";
  */
 // service_areas carries the Locations areas and delivery fees (#667, outside-area fee #672);
 // business_policies carries their mirror (coverage_areas / coverage_outside) the voice server reads.
-export const SPOKEN_CATALOGUE_FIELDS = ["services_catalog", "product_catalog", "service_areas", "business_locations", "business_policies"] as const;
+// faqs: the C2 fact store (BRAIN_V2_FACT_STORE) holds confirmed FAQs, so an FAQ save also pings; Brain skips it when nothing it compiles changed.
+export const SPOKEN_CATALOGUE_FIELDS = ["services_catalog", "product_catalog", "service_areas", "business_locations", "business_policies", "faqs"] as const;
 
 export function spokenCatalogueOnSaveEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return /^(1|true|on|yes)$/i.test(String(env.SPOKEN_CATALOGUE_ON_SAVE || "").trim());
