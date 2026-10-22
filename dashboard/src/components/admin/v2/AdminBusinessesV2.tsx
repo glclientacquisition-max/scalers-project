@@ -199,6 +199,7 @@ export function AdminBusinessesV2({
             ] : undefined}
             history={history}
             related={b ? [
+              { label: "Usage this period", href: `/admin/businesses/${b.id}/usage` },
               { label: "Invoices", href: `/admin/billing/invoices?business=${b.id}` },
               { label: "Billing history", href: `/admin/billing/${b.id}` },
               { label: "Call quality", href: `/admin/quality/${b.id}` },

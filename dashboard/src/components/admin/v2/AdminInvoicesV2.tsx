@@ -225,6 +225,7 @@ export function AdminInvoicesV2({
             ] : undefined}
             related={it ? [
               ...(it.status !== "draft" ? [{ label: "Download PDF", href: `/api/admin/billing/invoices/${it.id}/pdf` }] : []),
+              ...(it.periodStart && it.periodEnd ? [{ label: "Usage for this period", href: `/admin/businesses/${it.businessId}/usage?from=${encodeURIComponent(it.periodStart)}&to=${encodeURIComponent(it.periodEnd)}` }] : []),
               { label: "Billing history", href: `/admin/billing/${it.businessId}` },
               { label: "All invoices for this business", href: `/admin/billing/invoices?business=${it.businessId}` },
               { label: "Business", href: `/admin/businesses/${it.businessId}` },
