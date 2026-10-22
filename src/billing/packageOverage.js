@@ -52,6 +52,16 @@ function isEnforced(enforcement) {
 }
 
 /**
+ * On-demand is off for this call when the spend limit has already stopped it.
+ * A missing column (undefined) stays on the owner's on-demand flag, so a
+ * database that has not applied the column behaves as before.
+ * Included minutes never consult this. Callers pass the result into inboundOpen.
+ */
+function effectiveOnDemand(onDemand, spendLimitBlocked) {
+  return Boolean(onDemand) && spendLimitBlocked !== true;
+}
+
+/**
  * Inbound gate at the package minute cap.
  *
  * hasPackage comes from tenant_subscriptions.status ('active' = true,
@@ -124,5 +134,6 @@ module.exports = {
   inboundOpen,
   packageRefusalXml,
   isEnforced,
+  effectiveOnDemand,
   packageUsageThreshold,
 };

@@ -53,14 +53,24 @@ function tenantProfileFromRow(row, extras = {}) {
     faqs: row.faqs || [],
     teamDirectory: row.team_directory || [],
     unknownAnswerFallback: row.unknown_answer_fallback || null,
+    unknownAnswerSpoken: extras.unknownAnswerSpoken ?? row.unknown_answer_spoken ?? null,
+    unknownAnswerByKind: require('./conversation/unknownAnswerByKind').parseByKind(
+      row.unknown_answer_by_kind
+    ),
     dailyBulletin: row.daily_bulletin || [],
     agentTools: parseAgentTools(row.agent_tools),
     ttsLexicon: parseLexiconOverrides(row.tts_lexicon),
     sonioxVoiceId: row.soniox_voice_id || null,
     sonioxVoiceLabel: row.soniox_voice_label || null,
     vertical: parseVertical(row.vertical),
+    // Settings › Locations area terms (fee, time, mode) from tenants.service_areas.
+    areaTerms: require('./conversation/areaTerms').readAreaTerms(
+      row.service_areas !== undefined ? row.service_areas : extras.serviceAreas,
+      { vertical: parseVertical(row.vertical) }
+    ),
     handoffMode: parseHandoffMode(row.handoff_mode),
     businessLocations: row.business_locations || [],
+    service_areas: row.service_areas ?? null,
     businessPolicies: row.business_policies || {},
     billingEnforcement:
       row.billing_enforcement != null ? String(row.billing_enforcement) : null,

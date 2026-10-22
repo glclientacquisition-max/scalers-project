@@ -10,6 +10,7 @@
  * Pure. Relative imports only so node tests can load it.
  */
 
+import { deskAttestServiceAreas } from "@/lib/deskFeatureFlags";
 import { factValueForPath, hashFactValue, stableRowId } from "./factHash";
 
 export const FACT_HASH_RE = /^[0-9a-f]{64}$/;
@@ -101,6 +102,17 @@ const SCOPE_SCALARS: Record<string, string[]> = {
 
 const KNOWN_SCOPES = new Set(["identity", "catalog", "hours", "locations", "policies", "tools", "pronunciation", "team", "faqs"]);
 
+function serviceAreaPathsFromRow(row: Row): string[] {
+  if (!deskAttestServiceAreas()) return [];
+  const bag = row.service_areas;
+  if (!bag || typeof bag !== "object") return [];
+  const areas = asList((bag as Row).areas);
+  return areas
+    .map((item) => String((item as Row | null)?.id || "").trim())
+    .filter(Boolean)
+    .map((id) => `service_areas.${id}`);
+}
+
 /** Fact paths a scoped Settings save owns, as they appear in one tenants row. */
 export function scopeFactPaths(scope: string, row: Row): string[] {
   const s = String(scope || "").trim();
@@ -115,6 +127,9 @@ export function scopeFactPaths(scope: string, row: Row): string[] {
   }
   if (all || s === "faqs") {
     asList(row.faqs).forEach((_, index) => out.push(`faqs.${index + 1}`));
+  }
+  if (all || s === "locations") {
+    out.push(...serviceAreaPathsFromRow(row));
   }
   return out;
 }
@@ -157,6 +172,8 @@ export function planFactConfirm(input: {
   after: Row;
   explicitPaths?: string[];
   normalize?: (row: Row) => Row;
+  /** FACT_SAVE_IS_CONFIRM: skip explicit confirm when the value did not change. */
+  saveIsConfirm?: boolean;
 }): FactConfirmPlan {
   const normalize = input.normalize || ((row: Row) => row);
   const saved = input.after || {};
@@ -227,6 +244,9 @@ export function planFactConfirm(input: {
   for (const raw of input.explicitPaths || []) {
     const path = String(raw || "").trim();
     if (!path || confirm.has(path)) continue;
+    const prevHash = hashOrNull(factValueForPath(path, before), path);
+    const nowHash = hashOrNull(factValueForPath(path, after), path);
+    if (input.saveIsConfirm && nowHash && nowHash === prevHash) continue;
     const stamp = savedHash(path);
     if (stamp) confirm.set(path, stamp);
   }

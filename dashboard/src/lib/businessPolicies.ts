@@ -282,7 +282,8 @@ const STARTER_KEYS = [
   ["returns", "Returns"],
   ["delivery", "Delivery"],
   ["payment", "Payment"],
-  ["deposit", "Deposit"],
+  // Retail stores hold notes here, home services a booking deposit.
+  ["deposit", "Holds and deposits"],
   ["cancellation", "Cancellation"],
   ["warranty", "Warranty"],
   ["other", "Other rules"],

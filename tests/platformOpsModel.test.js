@@ -163,9 +163,9 @@ describe("platform ops model", () => {
     assert.equal(got.queue.length, 3);
     assert.equal(got.queue[0].href, "/admin/platform#escalate");
     assert.equal(got.queue[0].stamp, "Open");
-    assert.equal(got.queue[1].href, "/admin/businesses#biz-b1");
+    assert.equal(got.queue[1].href, "/admin/businesses/b1");
     assert.equal(got.queue[1].stamp, "Waiting");
-    assert.equal(got.queue[2].href, "/admin/businesses#biz-b2");
+    assert.equal(got.queue[2].href, "/admin/businesses/b2");
     assert.equal(got.queue[2].detail, "No package");
     assert.equal(got.queue[2].stamp, "Package");
   });

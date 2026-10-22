@@ -27,6 +27,10 @@ export const fixtures = [
   f("ops-incident-client", "ops_incident", { state: "open", title: "Alerts failing", fact: "Owner alerts failed on every channel for 3 calls in the last hour.", action: "Check the owner's phone and email in Admin.", startedAt: "18 Oct, 09:40 EAT", tenant: { id: "00000000-0000-4000-8000-000000000001", name: "Kamau Plumbing" } }),
   f("ops-incident-recovered", "ops_incident", { state: "recovered", title: "Speech down", fact: "Speech calls are succeeding again.", startedAt: "18 Oct, 09:14 EAT", lasted: "42 min", affected: "All clients" }),
   f("ops-incident-reminder", "ops_incident_reminder", { title: "Phone line balance at zero", fact: "The phone line supplier balance is KES 0. New calls can't connect.", action: "Pay the phone line supplier, then check Platform.", startedAt: "18 Oct, 05:02 EAT", openFor: "4h", affected: "All clients" }),
+  f("ops-wallet-prod-low", "ops_wallet", { env: "production", state: "low", workspace: "Production (e0e57aa5)", balance: "KES 28.27", threshold: "KES 100", checkedAt: "21 Oct 2026, 18:49 EAT", risk: "2 numbers renew on 1 Nov: KES 200 due." }),
+  f("ops-wallet-prod-empty", "ops_wallet", { env: "production", state: "empty", workspace: "Production (e0e57aa5)", balance: "KES -273.14", threshold: "KES 0", checkedAt: "1 Oct 2026, 05:10 EAT", risk: "Numbers renew on 1 Nov." }),
+  f("ops-wallet-prod-topped", "ops_wallet", { env: "production", state: "topped_up", workspace: "Production (e0e57aa5)", balance: "KES 600", threshold: "KES 550", checkedAt: "21 Oct 2026, 19:20 EAT", nextAlert: "KES 500" }),
+  f("ops-wallet-staging-low", "ops_wallet", { env: "staging", state: "low", workspace: "Staging (1f85601c)", balance: "KES 45.08", threshold: "KES 300", checkedAt: "21 Oct 2026, 18:49 EAT" }),
   f("ops-digest", "ops_digest", {
     date: "Sun 18 Oct",
     yesterday: { calls: 37, texts: 52, signups: 1 },

@@ -163,9 +163,9 @@ describe("A0: a live number can't be released", () => {
   });
 
   it("Businesses and Numbers show a disabled Release with the reason", () => {
-    for (const rel of [`${DASH}/components/AdminBusinessesPanel.tsx`, `${DASH}/components/DidPoolManager.tsx`]) {
+    for (const rel of [`${DASH}/components/AdminShopPanel.tsx`, `${DASH}/components/DidPoolManager.tsx`]) {
       const src = read(rel);
-      assert.match(src, /releaseBlockReason/, rel);
+      assert.match(src, /releaseBlockReason|releaseReason/, rel);
       assert.match(src, /disabled\s*\n\s*(title=[^\n]*\n\s*)?aria-describedby=\{`release-why-/, rel);
     }
   });
@@ -241,12 +241,12 @@ describe("A0: confirms are ConfirmSheet bottom drawers", () => {
   });
 
   it("release and every lifecycle action confirm in a ConfirmSheet", () => {
-    const biz = read(`${DASH}/components/AdminBusinessesPanel.tsx`);
+    const biz = read(`${DASH}/components/AdminShopPanel.tsx`);
     const rel = biz.indexOf('title="Release this number?"');
     assert.ok(rel > 0);
     const opener = biz.lastIndexOf("<", biz.lastIndexOf("open={", rel));
     assert.equal(biz.slice(opener, opener + 13), "<ConfirmSheet");
-    const life = biz.indexOf('open={sheet?.kind === "lifecycle"}');
+    const life = biz.indexOf('open={sheet === "lifecycle"}');
     assert.ok(life > 0);
     assert.equal(biz.slice(biz.lastIndexOf("<", life), biz.lastIndexOf("<", life) + 13), "<ConfirmSheet");
     for (const title of ["Suspend this line?", "Restore this line?", "Archive this business?", "Unarchive this business?"]) {

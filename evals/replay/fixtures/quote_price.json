@@ -1,0 +1,14 @@
+{
+  "id": "quote_price",
+  "bug": "quote",
+  "profile": "quote",
+  "language": "en",
+  "turns": [
+    {
+      "caller": "How much is gutter cleaning?",
+      "mustSay": ["I'll check with the team and they'll call you back."],
+      "mustNotSay": ["4,500", "4500", "four thousand"],
+      "status": "not_on_file"
+    }
+  ]
+}

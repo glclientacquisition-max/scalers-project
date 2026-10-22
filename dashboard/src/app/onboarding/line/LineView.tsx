@@ -2,7 +2,7 @@ import { BrandWordmark } from "@/components/brand/BrandMark";
 import { ButtonLink } from "@/components/ui/Button";
 import { formatKenyaNumber, numberPending } from "@/lib/setupFlow";
 import { toLocal07 } from "@/lib/callForwarding";
-import type { CallSetupOption } from "@/lib/callSetupStore";
+import type { CallSetup, CallSetupOption } from "@/lib/callSetupStore";
 import { CallSetupStep } from "./CallSetupStep";
 import { PendingNumber } from "./PendingNumber";
 
@@ -12,12 +12,18 @@ export function LineView({
   tenantId,
   raw,
   initialOption = null,
+  server = null,
+  testFromSuggestion = null,
 }: {
   businessName: string;
   tenantId: string;
   raw: string | null;
   /** Dev fixture only (/dev/setup/line?option=...). */
   initialOption?: CallSetupOption | null;
+  /** Account call setup (tenants.call_setup); null in the dev fixture. */
+  server?: { supported: boolean; setup: CallSetup | null } | null;
+  /** Teammate's number (+254) to pre-fill the test phone. */
+  testFromSuggestion?: string | null;
 }) {
   const pending = numberPending(raw);
   const pretty = formatKenyaNumber(raw);
@@ -54,7 +60,7 @@ export function LineView({
           </section>
         )}
 
-        {local ? <CallSetupStep tenantId={tenantId} number={local} pretty={pretty} initialOption={initialOption} /> : null}
+        {local ? <CallSetupStep tenantId={tenantId} number={local} pretty={pretty} initialOption={initialOption} server={server} testFromSuggestion={testFromSuggestion} /> : null}
 
         <ButtonLink href="/home" prefetch variant={local ? "tonal" : "primary"} size="lg" block className="mt-8">
           Go to Overview

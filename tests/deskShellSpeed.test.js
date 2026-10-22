@@ -422,7 +422,7 @@ describe("settings save scope", () => {
         hasTone: true,
       })})`
     );
-    assert.equal(name, "Assistant name should be under 40 characters.");
+    assert.equal(name, "Business Assistant name should be under 40 characters.");
   });
 
   it("clears an emptied alert phone and says Saved only when the write matches", () => {
@@ -466,7 +466,8 @@ describe("settings save scope", () => {
     assert.match(form, /displaySonioxVoiceLabel\("", voice\.id, voiceOptions\)/);
     assert.doesNotMatch(catalog, /Open Train to review/);
     assert.doesNotMatch(ingest, /Open Train to review/);
-    assert.match(catalog, /Catalogue saved for the next call/);
+    assert.doesNotMatch(catalog, /Catalogue saved for the next call/);
+    assert.match(catalog, /Added to your catalogue\. Check the prices to confirm them\./);
     assert.match(ingest, /Catalogue saved for the next call/);
     assert.match(read("dashboard/src/app/(desk)/settings/actions.ts"), /settingsScopeValidationError/);
   });

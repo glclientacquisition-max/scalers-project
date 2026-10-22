@@ -19,8 +19,9 @@ const DEFAULT_TENANT_ID = process.env.TENANT_ID || null;
 const WALLET_CHARGING_ENABLED = String(process.env.WALLET_CHARGING_ENABLED || 'true').toLowerCase() !== 'false';
 const WALLET_RATE_KES_PER_MINUTE = Number(process.env.WALLET_RATE_KES_PER_MINUTE || 0);
 const { envTransferRateKesPerMin } = require('./billing/liveTransferLegs');
-const { billableTalkSeconds, inboundOpen } = require('./billing/packageOverage');
+const { billableTalkSeconds, inboundOpen, effectiveOnDemand } = require('./billing/packageOverage');
 const recordingCopy = require('./sautikit/recordingCopy');
+const recordingEncode = require('./sautikit/recordingEncode');
 
 function throwIfError(context, error) {
   if (error) {
@@ -331,7 +332,7 @@ async function listInboundTenantRows() {
   const selects = [
     // archived_at / line_status drive the closed-line gate (#639/#651).
     // billing_enforcement: beta (off) never rejects at the cap (#631).
-    'id, business_name, sautikit_virtual_number, is_active, archived_at, line_status, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement',
+    'id, business_name, sautikit_virtual_number, is_active, archived_at, line_status, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement, spend_limit_blocked',
     'id, sautikit_virtual_number, is_active, archived_at, line_status, minutes_included, seconds_used, on_demand_usage_enabled',
     'id, sautikit_virtual_number, is_active, archived_at, minutes_included, seconds_used, on_demand_usage_enabled',
     'id, sautikit_virtual_number, is_active, line_status, minutes_included, seconds_used, on_demand_usage_enabled',
@@ -363,11 +364,19 @@ async function listInboundTenantRows() {
  */
 async function getTenantPackageUsage(tenantId) {
   if (!tenantId) return null;
-  const { data, error } = await supabase
+  const baseSelect = 'id, business_name, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement';
+  let { data, error } = await supabase
     .from('tenants')
-    .select('id, business_name, minutes_included, seconds_used, on_demand_usage_enabled, billing_enforcement')
+    .select(`${baseSelect}, spend_limit_blocked`)
     .eq('id', tenantId)
     .maybeSingle();
+  if (error && /spend_limit_blocked|column|schema cache/i.test(error.message || '')) {
+    ({ data, error } = await supabase
+      .from('tenants')
+      .select(baseSelect)
+      .eq('id', tenantId)
+      .maybeSingle());
+  }
   if (error) {
     if (!/minutes_included|seconds_used|on_demand_usage_enabled|billing_enforcement|column|schema cache/i.test(error.message || '')) {
       console.warn('[db] getTenantPackageUsage:', error.message);
@@ -399,6 +408,7 @@ async function getTenantPackageUsage(tenantId) {
     minutesIncluded: data.minutes_included,
     secondsUsed: data.seconds_used,
     onDemand: Boolean(data.on_demand_usage_enabled),
+    spendLimitBlocked: data.spend_limit_blocked === true,
     enforcement: data.billing_enforcement || 'off',
     periodStart,
     hasPackage,
@@ -434,7 +444,7 @@ async function packageInboundOpen({ toNumber, fromNumber, tenantId } = {}) {
     ...inboundOpen({
       minutesIncluded: usage.minutesIncluded,
       secondsUsed: usage.secondsUsed,
-      onDemand: usage.onDemand,
+      onDemand: effectiveOnDemand(usage.onDemand, usage.spendLimitBlocked),
       enforcement: usage.enforcement,
       hasPackage: usage.hasPackage,
     }),
@@ -883,16 +893,33 @@ async function uploadRecordingBuffer({
   contentType = 'audio/mpeg',
   extension = 'mp3',
 }) {
-  const objectPath = `${callSid}/${recordingSid || Date.now()}.${extension}`;
+  const prepared = await recordingEncode.prepareRecordingForUpload(buffer, contentType, extension);
+  if (prepared.encodeError) {
+    console.warn(
+      `[recording-copy] MP3 encode failed callSid=${callSid}, uploading WAV:`,
+      prepared.encodeError.message
+    );
+  }
+  const objectPath = `${callSid}/${recordingSid || Date.now()}.${prepared.extension}`;
 
   const { error: uploadError } = await supabase.storage
     .from(RECORDINGS_BUCKET)
-    .upload(objectPath, buffer, {
-      contentType,
+    .upload(objectPath, prepared.buffer, {
+      contentType: prepared.contentType,
       upsert: true,
     });
 
   throwIfError('uploadRecordingBuffer', uploadError);
+
+  if (prepared.extension === 'mp3' && recordingSid) {
+    const wavPath = `${callSid}/${recordingSid}.wav`;
+    if (wavPath !== objectPath) {
+      const { error: removeError } = await supabase.storage.from(RECORDINGS_BUCKET).remove([wavPath]);
+      if (removeError) {
+        console.warn(`[recording-copy] could not remove old WAV ${wavPath}:`, removeError.message);
+      }
+    }
+  }
 
   const { data: signed, error: signError } = await supabase.storage
     .from(RECORDINGS_BUCKET)
@@ -1373,6 +1400,100 @@ async function listPendingRecordingCopies({ limit = 20 } = {}) {
   return data || [];
 }
 
+function recordingRetentionCutoffIso(olderThanDays) {
+  const days = Math.max(1, Number(olderThanDays) || 30);
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+/**
+ * Calls older than minOlderThanDays that still have a recording pointer.
+ * Per-tenant retention is applied in the purge batch (recordingRetention.js).
+ */
+async function listCallsForRecordingRetentionPurge({ olderThanDays, minOlderThanDays, limit = 50 } = {}) {
+  const days = minOlderThanDays ?? olderThanDays ?? 7;
+  const cutoff = recordingRetentionCutoffIso(days);
+  const { data, error } = await supabase
+    .from('calls')
+    .select('id, tenant_id, sautikit_call_sid, recording_url, summary, created_at')
+    .lt('created_at', cutoff)
+    .or('recording_url.not.is.null,summary.like.%recording_path%')
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  throwIfError('listCallsForRecordingRetentionPurge', error);
+  return (data || []).filter((row) => {
+    const meta = parseSummary(row.summary);
+    if (meta.recording_deleted_at) return false;
+    return Boolean(row.recording_url || meta.recording_path);
+  });
+}
+
+/** Scan cap for admin purge preview counts. */
+async function listCallsWithRecordingsForRetentionScan({ minOlderThanDays = 7, limit = 5000 } = {}) {
+  const cutoff = recordingRetentionCutoffIso(minOlderThanDays);
+  const { data, error } = await supabase
+    .from('calls')
+    .select('tenant_id, created_at, recording_url, summary')
+    .lt('created_at', cutoff)
+    .or('recording_url.not.is.null,summary.like.%recording_path%')
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  throwIfError('listCallsWithRecordingsForRetentionScan', error);
+  return (data || []).filter((row) => {
+    const meta = parseSummary(row.summary);
+    if (meta.recording_deleted_at) return false;
+    return Boolean(row.recording_url || meta.recording_path);
+  });
+}
+
+/**
+ * Remove Storage object(s), clear recording_url / recording_path, stamp deleted_at.
+ * Idempotent when the row is already purged.
+ */
+async function purgeCallRecordingRetention({
+  callSid,
+  tenantId,
+  recordingPath,
+  deletedAt = new Date().toISOString(),
+} = {}) {
+  if (!callSid) return { purged: false, reason: 'no_call_sid' };
+  const existing = await getCall(callSid);
+  if (!existing) return { purged: false, reason: 'missing_call' };
+  if (tenantId && existing.tenant_id && String(existing.tenant_id) !== String(tenantId)) {
+    return { purged: false, reason: 'tenant_mismatch' };
+  }
+  const meta = parseSummary(existing.summary);
+  if (meta.recording_deleted_at && !existing.recording_url && !meta.recording_path) {
+    return { purged: false, reason: 'already_purged', deletedAt: meta.recording_deleted_at };
+  }
+  const path =
+    recordingPath ||
+    (typeof meta.recording_path === 'string' ? meta.recording_path.trim() : '') ||
+    null;
+  const pathsToRemove = [];
+  if (path && !path.includes('..') && !path.startsWith('/')) {
+    pathsToRemove.push(path);
+    if (path.endsWith('.mp3')) pathsToRemove.push(path.replace(/\.mp3$/i, '.wav'));
+    if (path.endsWith('.wav')) pathsToRemove.push(path.replace(/\.wav$/i, '.mp3'));
+  }
+  if (pathsToRemove.length) {
+    const { error: removeError } = await supabase.storage.from(RECORDINGS_BUCKET).remove(pathsToRemove);
+    if (removeError) {
+      console.warn(`[recording-retention] storage remove failed ${callSid}:`, removeError.message);
+    }
+  }
+  delete meta.recording_path;
+  delete meta.recording_status;
+  delete meta.recording_copy_attempts;
+  delete meta.recording_copy_last_error;
+  meta.recording_deleted_at = deletedAt;
+  const { error } = await supabase
+    .from('calls')
+    .update({ recording_url: null, summary: serializeSummary(meta) })
+    .eq('sautikit_call_sid', callSid);
+  throwIfError('purgeCallRecordingRetention', error);
+  return { purged: true, deletedAt, pathsRemoved: pathsToRemove };
+}
+
 // Line-state columns tried on top of each getTenantById select, newest first.
 // A schema without one of them drops it and keeps the rest of the row.
 const TENANT_ROW_LINE_COLUMNS = Object.freeze([', archived_at, line_status', ', archived_at', ', line_status', '']);
@@ -1486,6 +1607,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       faqs: [],
       teamDirectory: [],
       unknownAnswerFallback: null,
+      unknownAnswerSpoken: null,
       dailyBulletin: [],
       alertEmail: null,
       notifyChannels: { sms: true, whatsapp: true, email: true, caller_sms: false },
@@ -1508,8 +1630,46 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
 
   return tenantProfileFromRow(row, {
     openAppointments: await listOpenAppointments(row.id),
+    serviceAreas:
+      row.service_areas !== undefined || !require('./conversation/areaTerms').areaFeesEnabled()
+        ? undefined
+        : await getTenantServiceAreas(row.id),
     ...(await loadProvenanceForProfile(row.id)),
+    ...(await loadUnknownAnswerSpoken(row.id)),
   });
+}
+
+/** tenants.service_areas (Locations area terms) when the main select did not read it. Null on an old schema or error. */
+async function getTenantServiceAreas(tenantId) {
+  if (!tenantId) return null;
+  try {
+    const { data, error } = await supabase.from('tenants').select('service_areas').eq('id', tenantId).maybeSingle();
+    if (error) return null;
+    return data?.service_areas ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * tenants.unknown_answer_spoken ({en, sw, source, updated_at}), written by the
+ * Desk. Read only with VOICE_FACT_REFS on, in its own query so a database
+ * without the column (or any error) still loads the call: null, never a throw.
+ */
+async function loadUnknownAnswerSpoken(tenantId) {
+  try {
+    const { factRefsEnabled } = require('./conversation/factSheet');
+    if (!tenantId || !factRefsEnabled()) return {};
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('unknown_answer_spoken')
+      .eq('id', tenantId)
+      .maybeSingle();
+    if (error) return { unknownAnswerSpoken: null };
+    return { unknownAnswerSpoken: data?.unknown_answer_spoken ?? null };
+  } catch {
+    return { unknownAnswerSpoken: null };
+  }
 }
 
 async function loadProvenanceForProfile(tenantId) {
@@ -2840,6 +3000,10 @@ async function getTenantCatalogue(tenantId) {
 module.exports = {
   copyRecordingToStorage,
   listPendingRecordingCopies,
+  listCallsForRecordingRetentionPurge,
+  listCallsWithRecordingsForRetentionScan,
+  purgeCallRecordingRetention,
+  recordingRetentionCutoffIso,
   upsertCallFacts,
   getTenantCatalogue,
   resolveTenantId,

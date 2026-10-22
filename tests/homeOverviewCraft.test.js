@@ -95,8 +95,10 @@ describe("home overview craft", () => {
   it("splits the aside into Today, Line, and Usage sections", () => {
     assert.match(page, /aria-label="Today"/);
     assert.match(page, /aria-label="Line"/);
-    assert.match(page, /aria-label="Usage"/);
-    assert.match(page, /min left/);
+    const usage = read("dashboard/src/components/HomeUsageSection.tsx");
+    assert.match(page, /<HomeUsageSection/);
+    assert.match(usage, /aria-label="Usage"/);
+    assert.match(usage, /min left/);
     assert.match(page, /loadOwnerPackageMeter/);
     assert.doesNotMatch(page, /Top up/);
     assert.doesNotMatch(page, /KES \{kes\.toLocaleString/);
@@ -137,8 +139,9 @@ describe("home overview craft", () => {
   });
 
   it("shows Setup capture only before the line is live", () => {
-    assert.match(page, /score && line !== "live"/);
+    assert.match(page, /score && line !== "live" && !assistantSayPage/);
     assert.match(page, /<HomeCapture/);
+    assert.match(page, /!assistantSayPage && overviewChecks\.length/);
     assert.match(page, /line === "live" && !score\.ready_badge/);
     assert.match(page, /<HomeReviewSettingsNudge/);
     const nudge = read("dashboard/src/components/HomeReviewSettingsNudge.tsx");

@@ -374,7 +374,14 @@ function checkCoverage(profile = {}, place, opts = {}) {
   if (reading.status !== 'known') return { status: 'unknown', reason: reading.reason };
   if (!normalizePlaceKey(place)) return { status: 'unknown', reason: 'no_place' };
   const areas = formatCoverageList(reading.value);
-  if (coveredByAreas(place, reading.value)) return { status: 'covered', reason: null, areas };
+  if (coveredByAreas(place, reading.value)) {
+    // Settings › Locations terms (#667): the matched area's fee, time and mode.
+    // A fee is spoken only when the owner set and confirmed that area.
+    const { matchArea, areaTermsValue, coveredAreaLine } = require('../areaTerms');
+    const hit = matchArea(place, profile.areaTerms);
+    if (!hit) return { status: 'covered', reason: null, areas };
+    return { status: 'covered', reason: null, areas, area: areaTermsValue(hit), say: coveredAreaLine(hit, opts.language || 'en') };
+  }
   // "Yes, anywhere in Kenya": listed areas keep their terms; other Kenyan places get these.
   const anywhere = readCoverageOutside(profile.businessPolicies);
   if (anywhere) {
@@ -440,13 +447,18 @@ const SW_LANGS = new Set(['sw', 'sheng']);
 function unknownFactLine({ topic = '', language = 'en', afterHoursMode = 'serve' } = {}) {
   const sw = SW_LANGS.has(String(language || '').toLowerCase());
   const message = isMessageOnlyMode(afterHoursMode);
+  // VOICE_FACT_REFS: serve mode uses the team default cannot-answer line
+  // (owner decision, 18 Oct). Message mode is unchanged.
+  const team = !message && require('../factSheet').factRefsEnabled();
   if (sw) {
+    if (team) return `Sina habari hiyo kwa uhakika. ${require('../factSheet').TEAM_DEFAULT_LINE.sw}`;
     return message
       ? 'Sina habari hiyo kwa uhakika. Naweza kuchukua ujumbe kwa mwenye biashara.'
       : 'Sina habari hiyo kwa uhakika. Nitathibitisha na mwenye biashara.';
   }
   const what = String(topic || '').trim().toLowerCase();
   const lead = what ? `I don't have the ${what} confirmed.` : "I don't have that confirmed.";
+  if (team) return `${lead} ${require('../factSheet').TEAM_DEFAULT_LINE.en}`;
   return message ? `${lead} I can take a message for the owner.` : `${lead} Let me confirm with the owner.`;
 }
 

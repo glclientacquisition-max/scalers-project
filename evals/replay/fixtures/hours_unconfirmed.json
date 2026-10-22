@@ -1,0 +1,15 @@
+{
+  "id": "hours_unconfirmed",
+  "bug": "hours_unconfirmed",
+  "profile": "hours",
+  "language": "en",
+  "hashMode": true,
+  "turns": [
+    {
+      "caller": "What are your opening hours?",
+      "mustSay": ["I'll check with the team and they'll call you back."],
+      "mustNotSay": ["Monday", "every day", "eight AM"],
+      "status": "unconfirmed"
+    }
+  ]
+}

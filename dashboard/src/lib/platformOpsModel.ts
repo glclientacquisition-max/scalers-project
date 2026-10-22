@@ -5,6 +5,7 @@ export const OPS_NOTICE_KINDS = [
   "reasoning",
   "phone_line",
   "sautikit_low",
+  "sms_credit",
   "pool_empty",
   "beta_expired",
 ] as const;
@@ -29,6 +30,8 @@ export type OpsSettings = {
   people: OpsPerson[];
   kinds: OpsKindFlags;
   sautikitWarnMinor: number;
+  /** null = RECORDING_RETENTION_DAYS env (default 30). -1 = never delete. */
+  recordingRetentionDays: number | null;
 };
 
 export type OpsSignal = {
@@ -41,7 +44,7 @@ export type OpsSignal = {
 
 export type OpsNotice = {
   id: string;
-  kind: OpsNoticeKind;
+  kind: string;
   status: OpsNoticeStatus;
   detail: string | null;
   notified_at: string | null;
@@ -88,6 +91,7 @@ export function defaultKindFlags(): OpsKindFlags {
     reasoning: true,
     phone_line: true,
     sautikit_low: true,
+    sms_credit: true,
     pool_empty: true,
     beta_expired: true,
   };
@@ -99,7 +103,18 @@ export function defaultOpsSettings(): OpsSettings {
     people: [],
     kinds: defaultKindFlags(),
     sautikitWarnMinor: DEFAULT_SAUTIKIT_WARN_MINOR,
+    recordingRetentionDays: null,
   };
+}
+
+export function parseRecordingRetentionDays(raw: unknown): number | null {
+  if (raw === undefined || raw === null || raw === "") return null;
+  if (raw === "never" || raw === "Never") return -1;
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n)) return null;
+  if (n === -1) return -1;
+  if (n >= 7 && n <= 365) return n;
+  return null;
 }
 
 export function normalizeOpsEmail(raw: string): string {
@@ -172,13 +187,22 @@ export function parseKindFlags(raw: unknown): OpsKindFlags {
   return flags;
 }
 
-export function kindLabel(kind: OpsNoticeKind): string {
-  if (kind === "speech") return "Speech";
-  if (kind === "reasoning") return "Reasoning";
-  if (kind === "phone_line") return "Phone";
-  if (kind === "sautikit_low") return "Money";
-  if (kind === "pool_empty") return "Numbers";
-  return "Beta";
+export function kindLabel(kind: string): string {
+  const base = String(kind || "").split(":")[0];
+  if (base === "speech") return "Speech";
+  if (base === "reasoning") return "Reasoning";
+  if (base === "phone_line") return "Phone";
+  if (base === "sautikit_low") return String(kind).startsWith("sautikit_low:staging:") ? "Staging money" : "Money";
+  if (base === "sms_credit") return "SMS";
+  if (base === "pool_empty") return "Numbers";
+  if (base === "beta_expired") return "Beta";
+  return "Notice";
+}
+
+/** Ack accepts a toggle kind and a threshold key such as sautikit_low:10000. */
+export function isAckableOpsKind(kind: string): boolean {
+  const base = String(kind || "").split(":")[0];
+  return (OPS_NOTICE_KINDS as readonly string[]).includes(base) && /^[a-z0-9_:-]+$/.test(kind);
 }
 
 export type HealthSlice = { tone: OpsHealthTone; detail: string | null };
@@ -320,13 +344,16 @@ export function reconcileNotices(
   return { open, resolve, notify };
 }
 
-export function opsMailSubject(kind: OpsNoticeKind, recovered = false): string {
+export function opsMailSubject(kind: string, recovered = false): string {
   const name = kindLabel(kind);
-  return recovered ? `Scalers ops: ${name} recovered` : `Scalers ops: ${name}`;
+  if (!recovered) return `Scalers ops: ${name}`;
+  // A wallet notice resolves when the balance is back above the re-arm line.
+  if (String(kind || "").split(":")[0] === "sautikit_low") return `Scalers ops: ${name} topped up`;
+  return `Scalers ops: ${name} recovered`;
 }
 
 export function mergeQueueRows(input: {
-  notices: Array<{ kind: OpsNoticeKind; detail: string | null; status: OpsNoticeStatus }>;
+  notices: Array<{ kind: string; detail: string | null; status: OpsNoticeStatus }>;
   businesses: Array<{ id: string; name: string; status: string; packageName?: string | null }>;
 }): Array<{ key: string; title: string; detail: string; href: string; stamp: string }> {
   const rows: Array<{ key: string; title: string; detail: string; href: string; stamp: string }> = [];
@@ -349,7 +376,7 @@ export function mergeQueueRows(input: {
       key: `biz-${business.id}`,
       title: business.name,
       detail: "Waiting for a number",
-      href: `/admin/businesses#biz-${business.id}`,
+      href: `/admin/businesses/${business.id}`,
       stamp: "Waiting",
     });
   }
@@ -358,7 +385,7 @@ export function mergeQueueRows(input: {
       key: `biz-${business.id}`,
       title: business.name,
       detail: "No package",
-      href: `/admin/businesses#biz-${business.id}`,
+      href: `/admin/businesses/${business.id}`,
       stamp: "Package",
     });
   }

@@ -36,7 +36,8 @@ export const settingsConsoleClass =
 export const settingsRailWrapClass =
   "hidden min-w-0 shrink-0 md:block md:w-64";
 
-export const settingsRailClass = "min-w-0 md:sticky md:top-0 md:pt-4";
+export const settingsRailClass =
+  "min-w-0 md:sticky md:top-0 md:max-h-[calc(100dvh-3rem)] md:overflow-y-auto md:overscroll-contain md:pt-4";
 
 export const settingsPanelClass =
   "min-w-0 flex-1 pb-[var(--desk-tabbar-clearance)] md:pb-0";
@@ -385,6 +386,7 @@ export function SettingsPageHeader({
   lineDetail,
   action,
   alert,
+  onRetry,
   showBack = false,
   index = false,
   showLine = false,
@@ -395,6 +397,8 @@ export function SettingsPageHeader({
   lineDetail?: string;
   action?: ReactNode;
   alert?: string | null;
+  /** Failed save: a Try again button beside the alert (useFormSave retry). */
+  onRetry?: (() => void) | null;
   showBack?: boolean;
   index?: boolean;
   showLine?: boolean;
@@ -445,9 +449,20 @@ export function SettingsPageHeader({
       </div>
       {action}
       {alert ? (
-        <p className="w-full text-body text-warn" role="alert">
-          {alert}
-        </p>
+        <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1" data-save-error="">
+          <p className="min-w-0 flex-1 text-body text-warn" role="alert">
+            {alert}
+          </p>
+          {onRetry ? (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="min-h-11 shrink-0 rounded-xl px-2 text-body font-medium text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              Try again
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </header>
   );

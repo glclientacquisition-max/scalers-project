@@ -5,7 +5,20 @@
 // Fixtures here use P0 owner rows (no value_hash). An ambient FACT_HASH_MODE=on
 // in the shell must not flip them; hash-mode cases set the flag per test.
 delete process.env.FACT_HASH_MODE;
-const { describe, it } = require('node:test');
+const { describe, it, before, after } = require('node:test');
+
+// These cases pin the flag-off wording ("confirm with the owner"). With
+// VOICE_FACT_REFS on, the team wording is covered in tests/factSheet.test.js,
+// so a suite run with the flag on must not leak in.
+let prevFactRefs;
+before(() => {
+  prevFactRefs = process.env.VOICE_FACT_REFS;
+  delete process.env.VOICE_FACT_REFS;
+});
+after(() => {
+  if (prevFactRefs == null) delete process.env.VOICE_FACT_REFS;
+  else process.env.VOICE_FACT_REFS = prevFactRefs;
+});
 const assert = require('node:assert/strict');
 const {
   validatePrice,
@@ -79,6 +92,7 @@ describe('gigo validators never fill a default', () => {
     assert.deepEqual(validatePrice('KES 1,500 - 3,000'), { ok: true, value: { text: 'KES 1,500 - 3,000' } });
     assert.deepEqual(validatePrice('Quoted on site'), { ok: true, value: { text: 'Quoted on site', mode: 'ask' } });
     assert.deepEqual(validatePrice('', 'ask'), { ok: true, value: { text: '', mode: 'ask' } });
+    assert.deepEqual(validatePrice('', 'quote'), { ok: true, value: { text: '', mode: 'quote' } });
     assert.deepEqual(validatePrice('ask'), { ok: true, value: { text: '', mode: 'ask' } });
     assert.equal(validatePrice('').reason, 'missing');
     for (const bad of ['tbd', '0', 'N/A', '-500', 'cheap', '???', '999999999999']) {

@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // TS twin of src/conversation/factHash.js (GIGO confirm v2 value hash).
+import { factPaymentsV2Hash } from '@/lib/deskFeatureFlags';
+import { paymentsFactHashValue } from '@/lib/payments';
 // Pure and sync: no Node crypto, so it runs in the client graph too.
 // Keep lockstep with the JS module. Both run tests/fixtures/factHashVectors.json.
 //
@@ -191,12 +193,32 @@ function isEmptyLeaf(v: any): boolean {
   return false;
 }
 
-/** Catalogue row minus envelope keys and empty leaves ('' / null / []). */
+/**
+ * Envelope keys inside a row's typed `pricing` object. They record who set the
+ * price and from what text, not the price: confirmPriceAction rewrites them on
+ * every confirm, so they must not move the row's .name hash.
+ */
+export const PRICING_ENVELOPE_KEYS = new Set<string>(['source', 'confirmed', 'parsed_from']);
+
+/** `pricing` minus its envelope keys and empty leaves; undefined when nothing is left. */
+function pricingFactValue(pricing: any): any {
+  if (!pricing || typeof pricing !== 'object' || Array.isArray(pricing)) return pricing;
+  const out: Record<string, any> = {};
+  for (const [key, v] of Object.entries(pricing)) {
+    if (PRICING_ENVELOPE_KEYS.has(key) || isEmptyLeaf(v)) continue;
+    out[key] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Catalogue row minus envelope keys (row and pricing) and empty leaves ("" / null / []). */
 export function catalogRowFactValue(row: any): Record<string, any> | null {
   if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
   const out: Record<string, any> = {};
-  for (const [key, v] of Object.entries(row)) {
-    if (ROW_META_KEYS.has(key) || isEmptyLeaf(v)) continue;
+  for (const [key, raw] of Object.entries(row)) {
+    if (ROW_META_KEYS.has(key)) continue;
+    const v = key === 'pricing' ? pricingFactValue(raw) : raw;
+    if (v === undefined || isEmptyLeaf(v)) continue;
     out[key] = v;
   }
   return out;
@@ -301,6 +323,16 @@ export function stableRowId(row: any): string | null {
   return id;
 }
 
+function serviceAreaFeeFactValue(area: any) {
+  if (!area) return null;
+  return {
+    id: String(area.id || '').trim().toLowerCase(),
+    fee_mode: area.fee_mode ?? null,
+    fee_ksh: area.fee_ksh ?? null,
+    modes: Array.isArray(area.modes) ? area.modes : null,
+  };
+}
+
 function findCatalogRow(list: any[], key: string, kind: string): any {
   for (let i = 0; i < list.length; i += 1) {
     const row = list[i];
@@ -326,7 +358,21 @@ export function factValueForPath(fieldPath: string, tenant: any = {}): any {
   const t: any = tenant && typeof tenant === 'object' ? tenant : {};
   if (SCALAR_COLUMNS[path]) return t[SCALAR_COLUMNS[path]] ?? null;
   const policies = asObj(t.business_policies);
-  if (path === 'payments.methods') return policies.payment ?? null;
+  if (path === 'payments.methods') {
+    if (factPaymentsV2Hash()) {
+      const structured = paymentsFactHashValue(policies?.payments);
+      if (structured) return structured;
+    }
+    return policies.payment ?? null;
+  }
+  const areaMatch = path.match(/^service_areas\.(.+)$/);
+  if (areaMatch) {
+    const id = String(areaMatch[1] || '').trim().toLowerCase();
+    const bag = asObj(t.service_areas);
+    const areas = asList(bag?.areas);
+    const area = areas.find((row) => String(row?.id || '').trim().toLowerCase() === id);
+    return area ? serviceAreaFeeFactValue(area) : null;
+  }
   if (path === 'policies.holds' || path === 'policies.holds.allowed') return holdsFactValue(policies);
   let m = path.match(/^policies\.([A-Za-z0-9_]+)$/);
   if (m) return policies[m[1]] ?? null;
@@ -368,6 +414,7 @@ export function tenantRowFromProfile(profile: any = {}): Record<string, any> {
     hours_schedule: p.hoursSchedule ?? null,
     business_locations: p.businessLocations ?? null,
     business_policies: p.businessPolicies ?? null,
+    service_areas: p.serviceAreas ?? p.service_areas ?? null,
     whatsapp_notification_number: p.whatsappNumber ?? null,
     alert_email: p.alertEmail ?? null,
     notify_channels: p.notifyChannels ?? null,

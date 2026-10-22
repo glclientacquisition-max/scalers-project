@@ -1,5 +1,6 @@
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminVoicesManager } from "@/components/AdminVoicesManager";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { logAdminError } from "@/lib/adminErrors";
 import { listPlatformSonioxVoicesAdmin } from "@/lib/sonioxVoiceCatalog";
 import { requireSuperAdmin } from "@/lib/adminGuard";
@@ -18,6 +19,7 @@ export default async function AdminVoicesPage() {
 
   return (
     <div className="space-y-4">
+      <AdminPageHeader title="Voices" subtitle="What the desk hears." />
       <AdminVoicesManager initialVoices={voices} />
     </div>
   );

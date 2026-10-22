@@ -1,15 +1,14 @@
+import Link from "next/link";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ButtonLink } from "@/components/ui/Button";
 import { Empty } from "@/components/ui/Empty";
 import { ListRow } from "@/components/ui/ListRow";
 import { Stamp } from "@/components/ui/Stamp";
-import type { TodayNumberRow, TodayQueueRow } from "@/lib/adminTodayModel";
+import { todayQueueGroups, type TodayNumberRow, type TodayQueueRow } from "@/lib/adminTodayModel";
 
 export type TodayStatus = { tone: "ok" | "attention" | "down"; text: string };
 
-/**
- * Super Admin Today. Status line, one merged Needs you queue, then today's calls.
- * Plain rows, no tiles. Every figure comes from recorded calls; gaps say so.
- */
+/** Super Admin Today. Platform, then shops that need a person. */
 export function AdminTodayPanel({
   dayLabel,
   status,
@@ -29,16 +28,20 @@ export function AdminTodayPanel({
     ) : (
       <Stamp tone="attention">{status.tone === "down" ? "Down" : "Check"}</Stamp>
     );
-  const showAddNumber = queue.length > 0 && needsNumber;
+  const groups = todayQueueGroups(queue);
+  const showAddNumber = queue.some((row) => row.stamp === "Waiting" || row.stamp === "Stuck") && needsNumber;
+  const calls = numbers.find((row) => row.key === "calls");
 
   return (
     <div className="space-y-8">
+      <AdminPageHeader title="Today" subtitle={dayLabel} />
+
       <section aria-labelledby="today-status">
-        <h1 id="today-status" className="px-4 text-caption text-ink-3">
-          Today · {dayLabel}
-        </h1>
+        <h2 id="today-status" className="px-4 text-caption text-ink-3">
+          Platform
+        </h2>
         <ul className="divide-y divide-hairline">
-          <ListRow href="/admin/platform" title={status.text} preview="Platform" stamp={statusStamp} />
+          <ListRow href="/admin/platform" title={status.text} preview="Notices and line" stamp={statusStamp} />
         </ul>
       </section>
 
@@ -49,22 +52,29 @@ export function AdminTodayPanel({
         {queue.length === 0 ? (
           <Empty
             title="Nothing waiting."
-            line={needsNumber ? "Add a number before the next business signs up." : "New problems show up here first."}
+            line={needsNumber ? "Add a number before the next signup." : undefined}
             action={needsNumber ? <ButtonLink href="/admin/numbers">Add number</ButtonLink> : undefined}
           />
         ) : (
-          <ul className="divide-y divide-hairline">
-            {queue.map((row) => (
-              <ListRow
-                key={row.key}
-                href={row.href}
-                title={row.title}
-                preview={row.detail || undefined}
-                unread
-                stamp={<Stamp tone="attention">{row.stamp}</Stamp>}
-              />
+          <div className="space-y-5">
+            {groups.map((group) => (
+              <div key={group.key}>
+                <p className="px-4 pb-1 text-meta text-ink-3">{group.title}</p>
+                <ul className="divide-y divide-hairline">
+                  {group.rows.map((row) => (
+                    <ListRow
+                      key={row.key}
+                      href={row.href}
+                      title={row.title}
+                      preview={row.detail || undefined}
+                      unread
+                      stamp={<Stamp tone="attention">{row.stamp}</Stamp>}
+                    />
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
         {showAddNumber ? (
           <div className="px-4 pt-3">
@@ -73,24 +83,13 @@ export function AdminTodayPanel({
         ) : null}
       </section>
 
-      <section id="calls" aria-labelledby="today-calls" className="scroll-mt-4">
-        <h2 id="today-calls" className="px-4 text-caption text-ink-3">
-          Calls today
-        </h2>
-        <ul className="divide-y divide-hairline">
-          {numbers.map((row) => (
-            <ListRow
-              key={row.key}
-              href={row.href}
-              title={row.title}
-              preview={row.detail}
-              when={row.available ? <span className="text-body text-ink">{row.value}</span> : undefined}
-              stamp={row.available ? undefined : <Stamp tone="neutral">{row.href ? "Open" : "Not yet"}</Stamp>}
-            />
-          ))}
-        </ul>
-        <p className="px-4 pt-2 text-meta text-ink-3">Counted from midnight, East Africa time.</p>
-      </section>
+      {calls?.available ? (
+        <p className="px-4 text-meta tabular-nums text-ink-2">
+          <Link href="/admin/quality" className="text-ink underline-offset-2 hover:underline">
+            {calls.value} calls today
+          </Link>
+        </p>
+      ) : null}
     </div>
   );
 }

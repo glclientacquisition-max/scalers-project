@@ -51,10 +51,16 @@ const tokenGuard = {
 
 const eslintConfig = [
   {
-    ignores: [".next/**", "node_modules/**", "out/**", "playwright-report/**", "test-results/**"],
+    // .voice/ is the build-time copy of repo src/ voice modules (scripts/sync-voice-modules.cjs).
+    ignores: [".next/**", ".voice/**", "node_modules/**", "out/**", "playwright-report/**", "test-results/**"],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   tokenGuard,
+  {
+    // Node build scripts are CommonJS by design (.cjs).
+    files: ["scripts/**/*.cjs"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
 ];
 
 export default eslintConfig;

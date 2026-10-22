@@ -75,24 +75,22 @@ describe("dark palette", () => {
     assert.match(css, /--tw-ring-offset-color: var\(--surface\)/);
   });
 
-  it("defines glass chrome for elevated shells only", () => {
+  it("defines glass chrome for elevated shells, not the sheet", () => {
     assert.match(css, /\.glass-chrome \{/);
     assert.match(css, /backdrop-filter: blur\(var\(--glass-blur\)\)/);
     assert.match(css, /prefers-reduced-transparency: reduce/);
     const sheet = read("dashboard/src/components/ui/Sheet.tsx");
-    assert.match(sheet, /desk-drawer glass-chrome/);
+    assert.doesNotMatch(sheet, /glass-chrome/);
+    assert.match(sheet, /bg-surface/);
     assert.match(sheet, /themeClass/);
   });
 
-  it("makes the dark sheet opaque surface so iOS backdrop-filter cannot milk it", () => {
+  it("makes every sheet an opaque surface so page buttons cannot show through", () => {
     assert.match(
       css,
-      /:root\[data-theme="dark"\] \.desk-drawer\.glass-chrome \{[\s\S]*?background-color: var\(--surface\);[\s\S]*?backdrop-filter: none;/,
+      /\.desk-drawer \{[\s\S]*?background-color: var\(--surface\);[\s\S]*?backdrop-filter: none;/,
     );
-    assert.match(
-      css,
-      /:root:not\(\[data-theme="light"\]\) \.desk-drawer\.glass-chrome \{[\s\S]*?background-color: var\(--surface\);[\s\S]*?backdrop-filter: none;/,
-    );
+    assert.doesNotMatch(css, /\.desk-drawer\.glass-chrome/);
     const nav = read("dashboard/src/components/DeskNav.tsx");
     assert.match(nav, /glass-chrome/);
     assert.doesNotMatch(nav, /desk-drawer/);

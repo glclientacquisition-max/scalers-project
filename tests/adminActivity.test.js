@@ -18,9 +18,14 @@ const SELF_AUDITING = {
   restoreBusiness: "dashboard/src/lib/adminBusinessActions.ts",
   suspendBusiness: "dashboard/src/lib/adminBusinessActions.ts",
   unsuspendBusiness: "dashboard/src/lib/adminBusinessActions.ts",
+  updateBusinessProfile: "dashboard/src/lib/adminBusinessProfile.ts",
+  sendOwnerPasswordReset: "dashboard/src/lib/adminBusinessProfile.ts",
+  adminTransferOwnership: "dashboard/src/lib/adminBusinessProfile.ts",
   // These call billing RPCs that insert into ops_audit_log themselves.
   grantTenantPackageMinutes: "rpc:grant_tenant_package_minutes",
+  resolveCheckoutTotalReview: "rpc:resolve_checkout_total_review",
   setTenantBillingMode: "rpc:set_tenant_billing_mode",
+  confirmTenantBillingMode: "rpc:admin_set_tenant_billing_mode",
 };
 
 function fnBody(src, name) {
@@ -67,7 +72,11 @@ describe("Activity: every admin write is recorded", () => {
   it("the self-auditing helpers really record", () => {
     for (const [fn, where] of Object.entries(SELF_AUDITING)) {
       if (where.startsWith("rpc:")) {
-        const lib = read(fn === "setTenantBillingMode" ? "dashboard/src/lib/adminWallets.ts" : "dashboard/src/lib/adminBilling.ts");
+        const lib = read(
+          fn === "setTenantBillingMode" || fn === "confirmTenantBillingMode"
+            ? "dashboard/src/lib/adminWallets.ts"
+            : "dashboard/src/lib/adminBilling.ts",
+        );
         assert.match(fnBody(lib, fn), new RegExp(where.slice(4)), fn);
         continue;
       }
@@ -165,7 +174,7 @@ describe("Activity: screen", () => {
     assert.equal(item.href, "/admin/activity");
     assert.equal(item.pending, undefined);
     assert.ok(links.ADMIN_MORE_LINKS.some((l) => l.href === "/admin/activity"));
-    assert.match(read("dashboard/src/components/AdminBusinessesPanel.tsx"), /\/admin\/activity\?business=\$\{open\.id\}/);
+    assert.match(read("dashboard/src/components/AdminShopPanel.tsx"), /\/admin\/activity\?business=\$\{b\.id\}/);
   });
 
   it("filters in Sheets and opens detail in a Sheet; no centred dialog", () => {

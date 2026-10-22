@@ -1,4 +1,7 @@
 import { memberCan } from "@/lib/requireMember";
+
+/** Voice lookup on assistant-say uses runtime clock; opt out of static prerender. */
+export const instant = false;
 import { structuredSettingsSlots } from "@/components/structured/StructuredSettingsSlots";
 import { readBusinessType } from "@/lib/structuredServer";
 import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
@@ -16,13 +19,26 @@ import {
   parseBusinessSettingsTab,
 } from "@/lib/businessSettingsNav";
 import { listCuratedSonioxVoices, type CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
-import { settingsIndexStatuses } from "@/lib/settingsOptionStatus";
+import { settingsIndexStatuses, type SettingsListStatus } from "@/lib/settingsOptionStatus";
 import { tenantForSettingsView } from "@/lib/settingsPanelPayload";
 import { getCurrentTenant } from "@/lib/tenant";
+import { loadPlanRowStatus } from "@/lib/ownerPlanLoad";
+import { loadSeatCount } from "@/lib/billingStateLoad";
+import { planEntry } from "@/lib/planEntry";
+import { TeamSeatsNote } from "@/components/plan/TeamSeatsNote";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
 import { DeskPageGate } from "@/components/DeskPageGate";
+import { deskAssistantSayPage } from "@/lib/deskFeatureFlags";
+import { loadAssistantSayState } from "@/lib/assistantSayVoice.server";
+import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
+import { assistantSayBelowList } from "@/components/assistantSay/AssistantSayExtras";
+import { CallsForwardingPanel } from "@/components/CallsForwardingPanel";
+import { loadCallSetupState } from "@/lib/callSetupServer";
+import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
+import { toLocal07 } from "@/lib/callForwarding";
+import { formatKenyaNumber } from "@/lib/setupFlow";
 
 /** Allow URL fetch + Gemini extract/compile without premature platform cutoffs. */
 export const maxDuration = 60;
@@ -56,8 +72,11 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   if (!tenant) {
     return <DeskNoWorkspace />;
   }
-  const tab = parseBusinessSettingsTab(tabRaw);
+  const planRowPromise = loadPlanRowStatus(tenant.id);
+  const tab = parseBusinessSettingsTab(tabRaw, panelRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
+  const assistantSayPage = deskAssistantSayPage();
+  if (tab === "assistant-say" && !assistantSayPage) redirect("/settings");
   const needsVoices = tab === "test" || (tab === "train" && trainPanel === "tools");
 
   let curatedVoices: CuratedSonioxVoice[] = [];
@@ -69,15 +88,23 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     }
   }
 
+  // Team: seats full gets one note. Alert contacts never use a seat.
+  const teamPanel = tab === "train" && trainPanel === "team";
+  const [seatCount, planRowNow, canBilling] = teamPanel
+    ? await Promise.all([loadSeatCount(tenant.id), planRowPromise, memberCan("billing.manage")])
+    : [null, null, false];
+  const teamEntry = planRowNow ? planEntry(planRowNow.billingStatus, canBilling) : null;
+  const seatsFull = Boolean(seatCount && seatCount.included > 0 && seatCount.used >= seatCount.included);
+
   // Team & access: Members (logins, paid seats) when the feature flag is on.
   let membersSlot = null;
-  if (tab === "train" && trainPanel === "team" && teamInvitesEnabled(tenant.id)) {
+  if (teamPanel && teamInvitesEnabled(tenant.id)) {
     const [role, user] = await Promise.all([currentMemberRole(), getAuthUser()]);
     if (role && user && can(role, "members.view")) {
       try {
         const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
         const data = await loadMembers(tenant.id, { members: one(params.members), invites: one(params.invites) });
-        membersSlot = <MembersPanel data={data} viewerRole={role} viewerId={user.id} />;
+        membersSlot = <MembersPanel data={data} viewerRole={role} viewerId={user.id} planEntry={teamEntry} />;
       } catch {
         membersSlot = <MembersLoadError />;
       }
@@ -97,7 +124,41 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     });
   }
 
+  let assistantSaySlot = null;
+  if (tab === "assistant-say" && assistantSayPage) {
+    try {
+      const state = await loadAssistantSayState(tenant);
+      assistantSaySlot = <AssistantSayPanel state={state} belowList={assistantSayBelowList(tenant)} />;
+    } catch {
+      assistantSaySlot = <DeskLoadError>Could not load what your Business Assistant will say.</DeskLoadError>;
+    }
+  }
+
+  let callsSlot = null;
+  if (tab === "calls") {
+    const number = toLocal07(tenant.sautikit_virtual_number);
+    const state = number ? await loadCallSetupState(tenant.id) : null;
+    const status = resolveCallSetupStatus({
+      numberReady: Boolean(number),
+      setup: state?.setup ?? null,
+      activity: state?.activity ?? null,
+      now: Date.now(),
+    });
+    callsSlot = (
+      <CallsForwardingPanel
+        tenantId={tenant.id}
+        number={number}
+        pretty={formatKenyaNumber(tenant.sautikit_virtual_number)}
+        supported={Boolean(state?.supported)}
+        setup={state?.setup ?? null}
+        status={status}
+      />
+    );
+  }
+
   const navTargets = SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target));
+  const planRow = await planRowPromise;
+  const planStatus: Record<string, SettingsListStatus> = planRow.row ? { "/settings/plan": planRow.row } : {};
 
   return (
     <BusinessSettingsShell
@@ -105,10 +166,18 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
       tab={tab}
       trainPanel={trainPanel}
       curatedVoices={curatedVoices}
-      optionStatus={settingsIndexStatuses(tenant, curatedVoices, navTargets)}
+      optionStatus={{ ...settingsIndexStatuses(tenant, curatedVoices, navTargets), ...planStatus }}
       liveTransferExecutor={deskLiveTransferExecutorEnabled()}
       membersSlot={membersSlot}
+      seatNoteSlot={
+        teamPanel && seatsFull && !membersSlot && seatCount ? (
+          <TeamSeatsNote included={seatCount.included} entry={teamEntry} />
+        ) : null
+      }
       structuredSlot={structuredSlot}
+      callsSlot={callsSlot}
+      assistantSaySlot={assistantSaySlot}
+      assistantSayPage={assistantSayPage}
     />
   );
 }

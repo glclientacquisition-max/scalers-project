@@ -18,6 +18,9 @@ import {
   shapeTicketChat,
 } from "@/lib/callSummarySentence";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { playableCallRecordingUrl } from "@/lib/recordingPlayback";
+import { recordingDeletedByRetention } from "@/lib/recordingSource";
+import { effectiveRecordingRetentionForTenant } from "@/lib/recordingRetentionDesk";
 import { InboxTicketView } from "@/components/InboxTicketView";
 import { LiveTicket } from "@/components/LiveTicket";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
@@ -47,6 +50,8 @@ import { formatLiveConnectStamp } from "@/lib/deskLiveTransfer";
 import { normalizeTeamDirectory } from "@/lib/teamNotify";
 
 import { DeskPageGate } from "@/components/DeskPageGate";
+import { loadCallMessages } from "@/lib/callMessages";
+import { callViewTab } from "@/lib/callTextThread";
 
 /** Allow Gemini FAQ suggest + compile without premature cutoffs. */
 export const maxDuration = 60;
@@ -67,6 +72,8 @@ type CallDetailPageProps = {
     day?: string;
     q?: string;
     page?: string;
+    /** "texts" opens the Texts tab when the call has a thread. */
+    tab?: string;
   }>;
 };
 
@@ -128,7 +135,8 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
     return { call, error };
   };
 
-  const [{ call, error }, transcriptRes, holdRes, jobRes, facts, canCorrect] = await Promise.all([
+  const [{ call, error }, transcriptRes, holdRes, jobRes, facts, canCorrect, effectiveRecordingRetention, thread] =
+    await Promise.all([
     loadCall(),
     loadTranscriptTurns(workspace.client, id),
     workspace.client
@@ -150,6 +158,9 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
       .order("created_at", { ascending: false }),
     readCallFacts(id),
     memberCan("inbox.act"),
+    effectiveRecordingRetentionForTenant(tenant.id),
+    // call_messages_list (#868). Not available: no Texts tab, view as before.
+    loadCallMessages(workspace.client, tenant.id, id),
   ]);
   timer.mark("call");
 
@@ -184,6 +195,9 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
   timer.mark("contact");
   console.info(timer.line("call-detail"));
   const meta = parseSummary(row.summary);
+  // Row is already scoped to this tenant above; re-sign its private recording.
+  const recordingRetentionDeleted = recordingDeletedByRetention(meta);
+  const recordingUrl = await playableCallRecordingUrl(row, meta);
   const summaryName = typeof meta.name === "string" ? meta.name.trim() : "";
   const contactName = person?.name?.trim() || "";
   const name = contactName || summaryName || null;
@@ -301,7 +315,9 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
         job={job}
         hold={hold}
         turns={turns}
-        recordingUrl={row.recording_url}
+        recordingUrl={recordingUrl}
+        recordingRetentionDeleted={recordingRetentionDeleted}
+        effectiveRecordingRetention={effectiveRecordingRetention}
         durationLabel={row.duration_seconds != null ? `${row.duration_seconds}s` : "N/A"}
         assistLabel={
           row.resolution != null || row.resolution_note
@@ -321,6 +337,13 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
         archived={archived}
         leadStatus={leadStatus}
         businessName={businessName}
+        texts={thread.available ? { messages: thread.messages } : null}
+        initialTab={callViewTab(sp.tab, thread.available)}
+        smsAllowance={
+          tenant.sms_included_units != null
+            ? { included: tenant.sms_included_units, used: tenant.sms_used_units ?? 0 }
+            : null
+        }
         factsSlot={
           facts ? (
             <CallFactsCorrection callId={row.id} facts={facts} canEdit={canCorrect} save={correctCallFactsAction} />

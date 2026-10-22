@@ -1,3 +1,5 @@
+import type { SettingsNavTarget } from "@/lib/businessSettingsNav";
+
 export type SettingsStatusVoice = {
   id: string;
   description?: string;
@@ -26,13 +28,10 @@ export type SettingsStatusTenant = {
   tts_lexicon?: unknown;
 };
 
-type SettingsStatusTarget =
-  | { tab: "catalog" | "import" | "test" | "alerts" }
-  | { tab: "train"; panel: string };
-
 const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
-export function settingsStatusKey(target: SettingsStatusTarget): string {
+export function settingsStatusKey(target: SettingsNavTarget): string {
+  if ("href" in target) return target.href;
   return target.tab === "train" ? `train:${target.panel}` : target.tab;
 }
 
@@ -162,10 +161,11 @@ function identityStatus(
 export const NEEDS_SETUP = "Needs setup";
 
 export function settingsOptionStatus(
-  target: SettingsStatusTarget,
+  target: SettingsNavTarget,
   tenant: SettingsStatusTenant,
   voices: SettingsStatusVoice[] = []
 ): string {
+  if ("href" in target) return "";
   if (target.tab === "test") {
     const did = String(tenant.sautikit_virtual_number || "").trim();
     return did && !/^pending:/i.test(did) ? "Line live" : "Not live yet";
@@ -215,7 +215,7 @@ export type SettingsListStatus = {
 export function settingsIndexStatuses(
   tenant: SettingsStatusTenant,
   voices: SettingsStatusVoice[],
-  targets: SettingsStatusTarget[]
+  targets: SettingsNavTarget[]
 ): Record<string, SettingsListStatus> {
   const out: Record<string, SettingsListStatus> = {};
   for (const target of targets) {
@@ -223,7 +223,7 @@ export function settingsIndexStatuses(
     const text = settingsOptionStatus(target, tenant, voices);
     if (!text) continue;
     const title =
-      target.tab === "train" && target.panel === "tools"
+      "tab" in target && target.tab === "train" && target.panel === "tools"
         ? voiceFull(tenant, voices) || text
         : text;
     out[key] = { text, title };

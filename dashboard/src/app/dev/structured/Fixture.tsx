@@ -48,7 +48,7 @@ export function StructuredFixture({ view, vertical }: { view: string; vertical: 
         ];
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
-      <DataChecksCard checks={[{ href: "/settings?tab=train&panel=catalog", label: "Check 3 prices", detail: "We read them from your notes. Callers hear these." }, { href: "/settings?tab=train&panel=policies", label: "Check how customers pay", detail: "We read it from your payment notes." }]} />
+      <DataChecksCard checks={[{ href: "/settings?tab=catalog", label: "Check 3 prices", detail: "We read them from your notes. Callers hear these." }, { href: "/settings?tab=train&panel=policies", label: "Check how customers pay", detail: "We read it from your payment notes." }]} />
       <BusinessCategoryPicker businessType={vertical} initial={null} canEdit save={ok} />
       <PriceConfirmCards items={items} canEdit save={ok} />
       <FixturePayments vertical={vertical} />

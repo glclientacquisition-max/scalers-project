@@ -1,0 +1,3413 @@
+{
+ "0f1a7c00-0000-4000-8000-00000000a002": {
+  "_note": "Mstari Supplies (retail, three branches in Nakuru). Fictional business for the fact-refs replay eval. Names, places, numbers and wording are invented; the shape of the data (catalogue, hours, locations, policies, area fees, confirmation rows) follows a real snapshot so the speech checks behave the same.",
+  "tenant": {
+   "id": "0f1a7c00-0000-4000-8000-00000000a002",
+   "business_name": "Mstari Supplies",
+   "spoken_name": "Mstari",
+   "agent_name": "Neema",
+   "vertical": "retail",
+   "handoff_mode": "callback",
+   "after_hours_mode": "serve",
+   "services_catalog": [
+    {
+     "id": "svc_972da9b8c6df535d",
+     "name": "Wholesale Printing Materials & Stationery",
+     "notes": "Bulk orders of stationery, toner and printers.",
+     "source": "owner",
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "owner",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": true,
+      "amount_ksh": null,
+      "parsed_from": "Ask"
+     },
+     "category": "Wholesale",
+     "in_stock": "",
+     "price_range": "Ask",
+     "out_of_scope": "Giving exact prices on the phone before the team confirms; retail rates."
+    },
+    {
+     "id": "svc_47ad98cd56515ea1",
+     "name": "Retail Printing Materials & Stationery",
+     "notes": "Single or small orders of stationery, toner and printers.",
+     "source": "owner",
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "owner",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": true,
+      "amount_ksh": null,
+      "parsed_from": "Ask"
+     },
+     "category": "Retail",
+     "in_stock": "",
+     "price_range": "Ask",
+     "out_of_scope": "Giving exact prices on the phone before the team confirms; wholesale discounts on small orders."
+    },
+    {
+     "id": "svc_dd844c6b71bd51f6",
+     "name": "General Pricing Inquiries",
+     "notes": "Find out if the caller wants retail or wholesale, take details and pass to the team.",
+     "source": "owner",
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "owner",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": true,
+      "amount_ksh": null,
+      "parsed_from": "Ask"
+     },
+     "category": "Inquiries",
+     "in_stock": "",
+     "price_range": "Ask",
+     "out_of_scope": "Guessing amounts on the call."
+    }
+   ],
+   "product_catalog": [],
+   "hours_schedule": {
+    "days": {
+     "fri": {
+      "open": "07:00",
+      "close": "19:00"
+     },
+     "mon": {
+      "open": "07:00",
+      "close": "19:00"
+     },
+     "sat": {
+      "open": "07:00",
+      "close": "19:00"
+     },
+     "sun": null,
+     "thu": {
+      "open": "07:00",
+      "close": "19:00"
+     },
+     "tue": {
+      "open": "07:00",
+      "close": "19:00"
+     },
+     "wed": {
+      "open": "07:00",
+      "close": "19:00"
+     }
+    },
+    "location": "Baraka Plaza branch · Nakuru town, opposite Tumaini supermarket, through the back door · Baraka Plaza branch (opposite Tumaini)",
+    "timezone": "Africa/Nairobi"
+   },
+   "business_hours": "Mon-Sat: 07:00-19:00 EAT; Sun: closed. Location: Baraka Plaza branch · Nakuru town, opposite Tumaini supermarket, through the back door · Baraka Plaza branch (opposite Tumaini)",
+   "business_locations": [
+    {
+     "hours": "",
+     "label": "Baraka Plaza branch",
+     "address": "Nakuru town, opposite Tumaini supermarket, through the back door",
+     "area_id": "",
+     "landmark": "Baraka Plaza branch (opposite Tumaini)",
+     "directions": "We're directly opposite Tumaini Supermarket, next to the matatu stage. From Tumaini, just cross the road and you'll see us.",
+     "coverage_notes": "We deliver stationery across Kenya, wholesale and retail, wherever you are."
+    },
+    {
+     "hours": "",
+     "label": "Jabali House Branch",
+     "address": "Jabali House, Soko stage",
+     "area_id": "place:nakuru town",
+     "landmark": "Jabali House branch (Free Area stage)",
+     "directions": "We're at Soko stage, upstairs in the blue Jabali House building. Look for the blue building when you reach the stage.",
+     "coverage_notes": "We deliver stationery across Kenya, wholesale and retail, wherever you are."
+    },
+    {
+     "hours": "",
+     "label": "upendo branch",
+     "address": "Upendo Arcade",
+     "area_id": "place:nakuru town",
+     "landmark": "Upendo branch (Nakuru town, Market Lane)",
+     "directions": "We're in Nakuru town, on Market Lane. Ask anyone for Market Lane and you'll find us.",
+     "coverage_notes": "We deliver stationery across Kenya, wholesale and retail, wherever you are."
+    }
+   ],
+   "business_policies": {
+    "other": "Retail and wholesale orders require price confirmation by the Mstari team",
+    "deposit": "We can hold items for pickup when we have the caller name and pickup time.",
+    "payment": "M-Pesa and cash. Confirm other methods with the team if asked.",
+    "returns": "Returns and exchanges follow shop policy; check details with the team.",
+    "delivery": "",
+    "payments": {
+     "bank": null,
+     "card": null,
+     "note": null,
+     "pochi": null,
+     "airtel": null,
+     "source": "parsed",
+     "methods": [
+      "mpesa_send",
+      "cash"
+     ],
+     "timings": [],
+     "version": 2,
+     "confirmed": false,
+     "mpesa_send": null,
+     "mpesa_till": null,
+     "mpesa_paybill": null,
+     "deposit_percent": null
+    },
+    "warranty": "Warranty claims go to the manager; share the manager's contact.",
+    "cancellation": "Cancellations go to the manager; share the manager's contact so they can follow up.",
+    "coverage_areas": [
+     "place:nakuru town"
+    ],
+    "coverage_outside": {
+     "fee_ksh": null,
+     "anywhere_kenya": true
+    }
+   },
+   "service_areas": {
+    "areas": [
+     {
+      "id": "place:nakuru town",
+      "eta": "Same day",
+      "modes": [
+       "delivery"
+      ],
+      "source": "owner",
+      "fee_ksh": null,
+      "fee_mode": "ask",
+      "confirmed": true,
+      "min_order_ksh": null
+     }
+    ],
+    "reach": "deliver",
+    "version": 1,
+    "rider_paid": null,
+    "no_premises": false,
+    "delivered_by": [],
+    "anywhere_kenya": true,
+    "outside_fee_ksh": null
+   },
+   "daily_bulletin": []
+  },
+  "field_meta": [
+   {
+    "field_path": "identity.business_name",
+    "source": "owner",
+    "confirmed_at": "2026-10-13T05:55:06.51667+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "identity.primary_phone",
+    "source": "owner",
+    "confirmed_at": "2026-10-15T10:07:59.032626+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "identity.language",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "identity.spoken_name",
+    "source": "owner",
+    "confirmed_at": "2026-10-13T05:55:06.587975+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "hours.weekly_grid",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "locations.branches",
+    "source": "owner",
+    "confirmed_at": "2026-10-13T06:30:30.068812+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "policies.other",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "policies.deposit",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "policies.payment",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "policies.returns",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "policies.delivery",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "policies.warranty",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "policies.cancellation",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "payments.methods",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "faqs.1",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "faqs.2",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "faqs.3",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "team.notify.whatsapp",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "team.notify.email",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.service.svc_bb6b127c24ac47a8.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-15T10:07:58.777382+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "team.notify.channels",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "assistant.agent_name",
+    "source": "owner",
+    "confirmed_at": "2026-10-13T05:55:06.617773+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "assistant.tools",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "identity.social_handles",
+    "source": "owner",
+    "confirmed_at": "2026-10-13T05:55:06.681132+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.service.svc_c8cac52f66e04618.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-15T10:07:58.855387+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "identity.vertical",
+    "source": "owner",
+    "confirmed_at": "2026-10-13T05:55:06.555402+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "assistant.tone",
+    "source": "owner",
+    "confirmed_at": "2026-10-13T05:55:06.651863+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.service.svc_29ac058cb5484fb6.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-15T10:07:58.894464+00:00",
+    "value_hash": null
+   }
+  ]
+ },
+ "0f1a7c00-0000-4000-8000-00000000a001": {
+  "_note": "Penpoint Stationers (retail, Nairobi). Fictional business for the fact-refs replay eval. Names, places, numbers and wording are invented; the shape of the data (catalogue, hours, locations, policies, area fees, confirmation rows) follows a real snapshot so the speech checks behave the same.",
+  "tenant": {
+   "id": "0f1a7c00-0000-4000-8000-00000000a001",
+   "business_name": "Penpoint Stationers",
+   "spoken_name": "Penpoint - Your Neighbourhood Stationer",
+   "agent_name": "Amani",
+   "vertical": "retail",
+   "handoff_mode": "callback",
+   "after_hours_mode": "serve",
+   "services_catalog": [
+    {
+     "id": "svc_00ef4742e9e55a9f",
+     "name": "Quotation",
+     "notes": "Free",
+     "source": "owner",
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": "",
+     "price_range": "",
+     "out_of_scope": ""
+    }
+   ],
+   "product_catalog": [
+    {
+     "sku": "",
+     "name": "Circle Template",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": "unknown"
+    },
+    {
+     "sku": "",
+     "name": "360 Degrees Protractor",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": "unknown"
+    },
+    {
+     "sku": "",
+     "name": "A3 Drawing Books",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Mrija (Drawing Tube)",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota 4-way extension cable",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Electric Kettle (Stainless Steel)",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "180° transparent protractor",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Adjustable set square",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Foolscaps (3 scaps)",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "A5 swala notebook",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "200 pages a4 eco single rule exe book",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Architectural scale ruler",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "A5 artistic notebook",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "A6 classic strap notebook",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "A6 business leather notebook",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "A6 active notebook",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "A6 colourful strap notebook",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "A5 flowers notebook",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "3 piece french curve set",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "35cm set squares (drawing & engineering)",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota fx 991 ex (upgraded version)",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota fx 82 ms",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Pvc detachable t square",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota all in one set",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Tausi Pencils",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Fine jua pen",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Crystal jua pen",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Special spiral notebook",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "3 in 1 executive gift set",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Simba blue pen box",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Study table",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota box files",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Simba hb pencil",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Black whiteboard ink (simba)",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota fx 82 ex",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota fx 991 es plus",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Kifaru staples small packet",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Mood diary a8",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Kipepeo scissors",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Tausi sharperner",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Exam standard accord dust free black eraser",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota metal school set",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "A6 brown strap notebook",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Tausi dustless eraser",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota coloured sticky notes 3x3",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Kifaru staples 24-6x5m -many",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Simba blue pen",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Asst permanent marker kifaru",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Simba red pen",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Simba balck pen",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Kifaru stapler hd-45",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Kifaru stapler hd-45s",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Jua blue whiteboard pen (refillable)",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Super scissors",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Permanent blue ink",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota whiteboard markpen",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota set (metallic)",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota zipper bag-a6",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "30cm jua ruler",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota sticky note 3x2",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Hb office point pencils",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota modern drawing sharperner",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Half size 2 quire eco counter book",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Half size 4 quire eco counter book",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Half size 3 quire eco counter book",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "120 pages a4 eco single rule exe book",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "96 pages a4 eco single rule exe book",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota gel pen",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota correction pen",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota mini stapler",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota stapler mgs 14..180",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota double clip file",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota single clip file",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Big engineering drawing set",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Display book with 30 pockets",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Display book with 20 pockets",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Display books with 10 pockets",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Jua cellotape small-2 inch",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Jua cellotape small- 1 inch",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Jua cellotape small- 3/4 inch",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Jua cellotape small- 0.5 inch",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Jua masking tape small- 2 inch",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Jua masking tape small- 1 inch",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Jua masking tape small- 3/4 inch",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Jua masking tape small- 0.5 inch",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Full size 4q eco counter book",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Full size 3 quire eco counter book",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Full size 2 quire eco counter book",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Kifaru ruler",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota highlighter",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Spring file teepee (pvc)",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Spring file till (pvc)",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    },
+    {
+     "sku": "",
+     "name": "Nyota zipper bag-A4",
+     "unit": "",
+     "notes": "",
+     "price": "",
+     "source": "owner",
+     "aliases": [],
+     "pricing": {
+      "mode": "ask",
+      "unit": null,
+      "source": "parsed",
+      "max_ksh": null,
+      "min_ksh": null,
+      "in_stock": null,
+      "confirmed": false,
+      "amount_ksh": null
+     },
+     "category": "",
+     "in_stock": ""
+    }
+   ],
+   "hours_schedule": {
+    "days": {
+     "fri": {
+      "open": "09:30",
+      "close": "18:00"
+     },
+     "mon": {
+      "open": "09:30",
+      "close": "18:00"
+     },
+     "sat": null,
+     "sun": null,
+     "thu": {
+      "open": "09:30",
+      "close": "18:00"
+     },
+     "tue": {
+      "open": "09:30",
+      "close": "18:00"
+     },
+     "wed": {
+      "open": "09:30",
+      "close": "18:00"
+     }
+    },
+    "location": "Main · We sell online with delivery across Kenya, or you can pick up in person at our shop. · Inside RVU premises",
+    "timezone": "Africa/Nairobi"
+   },
+   "business_hours": "Mon-Fri: 09:30-18:00 EAT; Sat-Sun: closed. Location: Main · We sell online with delivery across Kenya, or you can pick up in person at our shop. · Inside RVU premises",
+   "business_locations": [
+    {
+     "hours": "",
+     "label": "Main",
+     "address": "We sell online with delivery across Kenya, or you can pick up in person at our shop.",
+     "area_id": "",
+     "landmark": "Inside RVU premises",
+     "directions": "Along State Lane, ground floor of Block 7",
+     "coverage_notes": "Delivery across Kenya by courier"
+    }
+   ],
+   "business_policies": {
+    "holds": {
+     "source": "owner",
+     "allowed": "yes",
+     "confirmed": true,
+     "max_hours": 48,
+     "deposit_required": "yes"
+    },
+    "other": "",
+    "deposit": "Available",
+    "payment": "You can pay by M-Pesa Paybill 000000, account 00000 or cash.",
+    "returns": "Consult with the team",
+    "delivery": "Country wide delivery",
+    "payments": {
+     "bank": null,
+     "card": null,
+     "note": null,
+     "pochi": null,
+     "airtel": null,
+     "source": "owner",
+     "methods": [
+      "mpesa_paybill",
+      "cash"
+     ],
+     "timings": [],
+     "version": 2,
+     "confirmed": true,
+     "mpesa_send": null,
+     "mpesa_till": null,
+     "mpesa_paybill": {
+      "account": "00000",
+      "business_no": "000000",
+      "account_mode": "fixed"
+     },
+     "deposit_percent": null
+    },
+    "warranty": "Depends with the product",
+    "provenance": {
+     "deposit": {
+      "source": "owner",
+      "confirmed": true
+     },
+     "payment": {
+      "source": "owner",
+      "confirmed": true
+     },
+     "returns": {
+      "source": "owner",
+      "confirmed": true
+     },
+     "delivery": {
+      "source": "owner",
+      "confirmed": true
+     },
+     "warranty": {
+      "source": "owner",
+      "confirmed": true
+     },
+     "cancellation": {
+      "source": "owner",
+      "confirmed": true
+     }
+    },
+    "cancellation": "Consult with the team",
+    "coverage_areas": [
+     "place:nairobi cbd"
+    ],
+    "coverage_outside": {
+     "fee_ksh": null,
+     "anywhere_kenya": true
+    }
+   },
+   "service_areas": {
+    "areas": [
+     {
+      "id": "place:nairobi cbd",
+      "eta": "Same day",
+      "modes": [
+       "delivery"
+      ],
+      "source": "owner",
+      "fee_ksh": null,
+      "fee_mode": "free",
+      "confirmed": true,
+      "min_order_ksh": null
+     }
+    ],
+    "reach": "deliver",
+    "version": 1,
+    "rider_paid": "on_arrival",
+    "no_premises": false,
+    "delivered_by": [
+     "courier",
+     "rider"
+    ],
+    "anywhere_kenya": true,
+    "outside_fee_ksh": null
+   },
+   "daily_bulletin": [
+    {
+     "id": "b677e4ca-9222-51fb-8391-04284387f727",
+     "text": "We are out of pens today.",
+     "active": false,
+     "ends_at": "2026-08-13T06:00:29.047Z",
+     "starts_at": "2026-08-13T06:00:22.348Z",
+     "created_at": "2026-08-13T06:00:22.348Z"
+    },
+    {
+     "id": "6e91b065-04dd-5337-bc54-4186cf7b5df5",
+     "text": "Closed today for the public holiday.",
+     "active": true,
+     "ends_at": "2026-08-09T20:59:59.999Z",
+     "starts_at": "2026-08-09T13:14:48.828Z",
+     "created_at": "2026-08-09T13:14:48.828Z"
+    },
+    {
+     "id": "37c2a0cf-5f18-5d81-ab61-3708ac73523f",
+     "text": "Orders taken today; delivery tomorrow.",
+     "active": false,
+     "ends_at": "2026-08-09T13:14:21.332Z",
+     "starts_at": "2026-08-09T13:13:52.980Z",
+     "created_at": "2026-08-09T13:13:52.980Z"
+    },
+    {
+     "id": "b24c0fdb-a6f6-5b1d-b0a0-216215237a5c",
+     "text": "We are out of pens today.",
+     "active": false,
+     "ends_at": "2026-08-09T13:13:40.981Z",
+     "starts_at": "2026-08-09T13:11:58.732Z",
+     "created_at": "2026-08-09T13:11:58.732Z"
+    },
+    {
+     "id": "d97341c0-4168-5769-a457-499fba5b16c7",
+     "text": "Closed today for the public holiday.",
+     "active": false,
+     "ends_at": "2026-08-09T13:11:04.448Z",
+     "starts_at": "2026-08-09T08:27:58.492Z",
+     "created_at": "2026-08-09T08:27:58.492Z"
+    },
+    {
+     "id": "71dc319c-c576-5788-8799-47718f00e825",
+     "text": "Orders taken today; delivery tomorrow.",
+     "active": false,
+     "ends_at": "2026-08-09T13:11:27.169Z",
+     "starts_at": "2026-08-09T13:11:01.926Z",
+     "created_at": "2026-08-09T13:11:01.926Z"
+    },
+    {
+     "id": "7b6ef64a-be43-5bbd-8c05-f4b48169d50a",
+     "text": "We are out of pens today.",
+     "active": false,
+     "ends_at": "2026-08-08T16:06:24.946Z",
+     "starts_at": "2026-08-07T23:07:25.436Z",
+     "created_at": "2026-08-07T23:07:25.436Z"
+    }
+   ]
+  },
+  "field_meta": [
+   {
+    "field_path": "identity.business_name",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:48:47.978682+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "identity.vertical",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:48:48.026579+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "identity.language",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "identity.spoken_name",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:48:48.055505+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "hours.weekly_grid",
+    "source": "owner",
+    "confirmed_at": "2026-10-10T07:07:48.001611+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "locations.branches",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:57:30.036815+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "policies.deposit",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:49:45.912489+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "policies.payment",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:49:45.786476+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "policies.delivery",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:49:46.139392+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "policies.warranty",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:49:46.328973+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "policies.cancellation",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:49:46.22297+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.3.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:24.31728+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.4.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:24.669811+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.5.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:25.170261+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.7.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:25.996352+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.8.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:26.318583+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.9.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:26.646236+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.11.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:27.292001+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.12.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:27.613763+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.13.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:28.112251+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.15.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:28.762977+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.16.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:29.080877+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.17.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:29.402538+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.19.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:30.036753+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.20.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:30.363324+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.21.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:30.68652+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.22.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:31.007708+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.24.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:31.821281+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.25.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:32.142143+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.26.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:32.465273+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.28.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:33.114653+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.29.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:33.429213+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.30.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:33.948132+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.32.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:34.800633+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.33.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:35.124088+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.34.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:35.449106+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.36.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:36.108856+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.37.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:36.438277+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.38.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:36.764336+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.42.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:38.067115+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.43.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:38.38584+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.44.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:38.883+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.46.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:39.525226+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.47.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:40.060784+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.48.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:40.381257+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.50.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:41.022239+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.51.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:41.344159+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.52.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:41.691059+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.54.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:42.342501+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.55.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:42.65467+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.56.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:42.97046+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.58.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:43.626905+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.59.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:43.943313+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.60.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:44.272084+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.61.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:44.5877+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.63.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:45.229872+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.64.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:45.550872+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.65.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:45.898282+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.67.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:46.58196+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.68.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:46.905145+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.69.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:47.226171+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.71.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:48.042067+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.72.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:48.37179+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.73.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:48.689743+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.75.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:49.388398+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.76.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:49.711391+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.77.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:50.030796+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.79.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:50.682749+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.80.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:50.997962+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.81.name",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.82.name",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.83.name",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.84.name",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.85.name",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.86.name",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.87.name",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.88.name",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.89.name",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.90.name",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.91.name",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.92.name",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.93.name",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "faqs.1",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T11:23:14.097484+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "faqs.2",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T11:23:14.225631+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "faqs.4",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T11:23:14.506349+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "faqs.5",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T11:23:14.651864+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "faqs.7",
+    "source": "owner",
+    "confirmed_at": "2026-10-09T06:34:35.978255+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "team.notify.whatsapp",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "team.notify.email",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "team.notify.channels",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "assistant.agent_name",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:48:48.090781+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "assistant.tone",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:48:48.119758+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "assistant.tools",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "bulletin.items",
+    "source": "seed",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "identity.social_handles",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:48:48.155398+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.1.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:23.476167+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.2.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:23.989757+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.6.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:25.498782+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.10.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:26.971492+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.14.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:28.443699+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.18.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:29.715643+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.23.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:31.326417+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.27.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:32.784716+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.31.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:34.445444+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.35.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:35.777209+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.39.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:37.091162+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.40.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:37.407848+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.41.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:37.747621+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.45.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:39.205353+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.49.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:40.703666+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.53.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:42.01431+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.57.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:43.302104+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.62.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:44.909544+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.66.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:46.229165+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.70.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:47.543273+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.74.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:49.037589+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "catalog.product.78.name",
+    "source": "owner",
+    "confirmed_at": "2026-10-11T07:03:50.359656+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "faqs.3",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T11:23:14.367587+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "faqs.6",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T11:23:14.784379+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "policies.returns",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:49:46.015783+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "payments.methods",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:49:46.420098+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "identity.primary_phone",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T11:23:14.917618+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "policies.holds",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:49:46.45602+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "policies.holds.allowed",
+    "source": "owner",
+    "confirmed_at": "2026-10-18T09:49:46.489628+00:00",
+    "value_hash": null
+   }
+  ]
+ },
+ "0f1a7c00-0000-4000-8000-00000000a003": {
+  "_note": "Kurasa Booksellers (retail, Nairobi CBD). Fictional business for the fact-refs replay eval. Names, places, numbers and wording are invented; the shape of the data (catalogue, hours, locations, policies, area fees, confirmation rows) follows a real snapshot so the speech checks behave the same.",
+  "tenant": {
+   "id": "0f1a7c00-0000-4000-8000-00000000a003",
+   "business_name": "Kurasa Booksellers",
+   "spoken_name": "Kurasa",
+   "agent_name": "Zawadi",
+   "vertical": "retail",
+   "handoff_mode": "callback",
+   "after_hours_mode": "serve",
+   "services_catalog": [],
+   "product_catalog": [],
+   "hours_schedule": {
+    "days": {
+     "fri": {
+      "open": "09:00",
+      "close": "18:00"
+     },
+     "mon": {
+      "open": "09:00",
+      "close": "18:00"
+     },
+     "sat": {
+      "open": "09:00",
+      "close": "18:00"
+     },
+     "sun": null,
+     "thu": {
+      "open": "09:00",
+      "close": "18:00"
+     },
+     "tue": {
+      "open": "09:00",
+      "close": "18:00"
+     },
+     "wed": {
+      "open": "09:00",
+      "close": "18:00"
+     }
+    },
+    "location": "",
+    "timezone": "Africa/Nairobi"
+   },
+   "business_hours": "Mon-Sat: 09:00-18:00 EAT; Sun: closed.",
+   "business_locations": [
+    {
+     "label": "Main",
+     "address": "on the Ground Floor (Shop B14) of Mvule House on Kimathi Lane in Nairobi, Kenya, directly opposite the former Savanna Hotel",
+     "landmark": "on the Ground Floor (Shop B14) of Mvule House on Kimathi Lane in Nairobi, Kenya, directly opposite the former Savanna Hotel",
+     "directions": "",
+     "coverage_notes": ""
+    }
+   ],
+   "business_policies": {
+    "other": "",
+    "deposit": "",
+    "payment": "",
+    "returns": "",
+    "delivery": "",
+    "warranty": "",
+    "cancellation": "",
+    "coverage_areas": null
+   },
+   "service_areas": null,
+   "daily_bulletin": []
+  },
+  "field_meta": [
+   {
+    "field_path": "faqs.2",
+    "source": "owner",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "faqs.1",
+    "source": "owner",
+    "confirmed_at": null,
+    "value_hash": null
+   },
+   {
+    "field_path": "identity.business_name",
+    "source": "owner",
+    "confirmed_at": "2026-10-10T09:40:09.565817+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "identity.vertical",
+    "source": "owner",
+    "confirmed_at": "2026-10-10T09:40:09.860946+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "identity.spoken_name",
+    "source": "owner",
+    "confirmed_at": "2026-10-10T09:40:09.981671+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "assistant.agent_name",
+    "source": "owner",
+    "confirmed_at": "2026-10-10T09:40:10.098865+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "assistant.tone",
+    "source": "owner",
+    "confirmed_at": "2026-10-10T09:40:10.207949+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "identity.primary_phone",
+    "source": "owner",
+    "confirmed_at": "2026-10-10T09:45:33.311044+00:00",
+    "value_hash": null
+   },
+   {
+    "field_path": "hours.weekly_grid",
+    "source": "owner",
+    "confirmed_at": "2026-10-10T09:45:33.188665+00:00",
+    "value_hash": null
+   }
+  ]
+ }
+}

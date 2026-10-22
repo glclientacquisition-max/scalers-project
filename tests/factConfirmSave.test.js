@@ -272,7 +272,8 @@ before(() => {
       'identity.spoken_name', 'identity.social_handles', 'hours.weekly_grid', 'locations.branches',
       'policies.payment', 'policies.deposit', 'policies.returns', 'policies.delivery', 'policies.cancellation',
       'policies.warranty', 'policies.other', 'policies.coverage_areas', 'policies.holds', 'policies.holds.allowed',
-      'payments.methods', 'catalog.product.SKU-1.name', 'catalog.product.2.price',
+      'payments.methods', 'service_areas.place:kilimani',
+      'catalog.product.SKU-1.name', 'catalog.product.2.price',
       'catalog.service.svc_aaaaaaaaaaaaaaaa.name', 'catalog.service.1.price', 'catalog.service.svc_x.site_visit',
       'faqs.1', 'team.notify.whatsapp', 'team.notify.email', 'team.notify.channels',
       'assistant.agent_name', 'assistant.tone', 'assistant.language', 'assistant.tools', 'bulletin.items',
@@ -503,7 +504,7 @@ describe('wiring (static)', () => {
     assert.doesNotMatch(actions, /before: tenant/);
     assert.match(actions, /fieldMeta: compileFieldMeta/);
     // Services keep stable ids; prices are settled against the stored row first (catalogPricing).
-    assert.match(actions, /assignServiceIds\(\s*settleCatalogPrices\(pickedServices, storedServices, "service"/);
+    assert.match(actions, /assignServiceIds\(\s*settleCatalogPrices\(serviceSplit\.rows, storedServices, "service"/);
   });
 
   it('the unused stampOwnerFieldPaths action is gone', () => {

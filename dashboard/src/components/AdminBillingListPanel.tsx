@@ -1,182 +1,311 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
+import type { AdminBillingOverview, AdminBillingRow } from "@/lib/adminBillingTypes";
+import { modeName as adminModeLabel } from "@/lib/adminBillingCopy";
 import {
-  chargingModeLabel,
-  type AdminBillingOverview,
-  type AdminBillingRow,
-} from "@/lib/adminBilling";
-import { adminRowActionClass, adminTdClass, adminThClass } from "@/components/AdminIdentityList";
-import { deskFieldClass, deskPreviewClass } from "@/components/ui/deskChrome";
-import { DeskSelect } from "@/components/ui/DeskSelect";
+  attentionRows,
+  filterAttentionKind,
+  rowPreviewLine,
+  rowWhenLabel,
+  sortBillingQueue,
+  stampToneForBillingStatus,
+  type BillingAttentionKind,
+} from "@/lib/adminBillingHub";
+import { AdminBillingFilterChips, buildFilterChips } from "@/components/AdminBillingFilterChips";
+import { CheckoutReviewResolve } from "@/components/CheckoutReviewResolve";
+import { deskFieldClass } from "@/components/ui/deskChrome";
 import { Empty } from "@/components/ui/Empty";
+import { ButtonLink } from "@/components/ui/Button";
 import { ListRow } from "@/components/ui/ListRow";
+import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/ui/Pagination";
+import { Segmented } from "@/components/ui/Segmented";
+import { Stamp } from "@/components/ui/Stamp";
 import { numberLabel, searchableNumber } from "@/lib/adminBillingCopy";
-import { usedOfIncluded } from "@/lib/packageUsageAlign";
+import type { AttentionItem } from "@/lib/adminPayCopy";
 
-type BillingFilter = "all" | "beta" | "charging" | "low" | "exhausted";
+type BillingFilter = "all" | "needs" | "attention" | "beta" | "charging";
 
-const FILTER_OPTIONS: { value: BillingFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "beta", label: "Beta only" },
-  { value: "charging", label: "Charging only" },
-  { value: "low", label: "Low minutes" },
-  { value: "exhausted", label: "Exhausted" },
-];
-
-function onDemandLine(row: AdminBillingRow): string {
-  if (row.billing_enforcement !== "off" && row.minutesRemaining <= 0 && row.on_demand_usage_enabled) {
-    return "Active past included";
-  }
-  return "Off";
+function shopMoneyHref(id: string) {
+  return `/admin/businesses/${id}?money=1`;
 }
 
-export function AdminBillingListPanel({ overview }: { overview: AdminBillingOverview }) {
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<BillingFilter>("all");
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return overview.rows.filter((r) => {
-      if (filter === "beta" && r.billing_enforcement !== "off") return false;
-      if (filter === "charging" && r.billing_enforcement === "off") return false;
-      if (filter === "low" && r.status !== "low_minutes") return false;
-      if (filter === "exhausted" && r.status !== "exhausted") return false;
-      if (!q) return true;
-      return (
-        r.business_name.toLowerCase().includes(q) ||
-        searchableNumber(r.sautikit_virtual_number).includes(q) ||
-        (r.packageName || "").toLowerCase().includes(q)
-      );
-    });
-  }, [overview.rows, query, filter]);
-
+function PeriodLine({ label }: { label: string | null }) {
+  if (!label) return null;
   return (
-    <div className="space-y-4">
-      <section
-        className="grid grid-cols-2 border-y border-hairline/70 sm:grid-cols-4"
-        aria-label="Billing totals"
-      >
-        <Kpi label="Beta (free)" value={overview.betaCount} />
-        <Kpi label="Charging" value={overview.chargingCount} />
-        <Kpi label="Low minutes" value={overview.lowMinutesCount} warn={overview.lowMinutesCount > 0} />
-        <Kpi label="Exhausted" value={overview.exhaustedCount} warn={overview.exhaustedCount > 0} />
-      </section>
+    <p className="px-4 text-meta text-ink-2">
+      Period ends <span className="font-medium text-ink">{label}</span>
+    </p>
+  );
+}
 
-      <p className="text-body text-ink-2">
-        Package minutes and charging for every business. Open a business to change its package.
-        Prices and rates live on{" "}
-        <Link href="/admin/packages" className="font-medium text-accent underline-offset-2 hover:underline">
-          Packages
-        </Link>
-        .
-      </p>
+function OpenInvoicesRow({ overview }: { overview: AdminBillingOverview }) {
+  if (overview.invoicesMissing) return null;
+  const overdue = overview.overdueInvoiceCount > 0;
+  return (
+    <ul className="divide-y divide-hairline/70 border-y border-hairline/70" aria-label="Open invoices">
+      <ListRow
+        href="/admin/billing/invoices"
+        title={`${overview.openInvoiceKesLabel} open`}
+        preview={
+          overdue
+            ? `${overview.openInvoiceCount} invoices · ${overview.overdueInvoiceCount} overdue`
+            : `${overview.openInvoiceCount} invoices`
+        }
+        stamp={overdue ? <Stamp tone="attention">Overdue</Stamp> : undefined}
+      />
+    </ul>
+  );
+}
 
-      <div className="flex flex-wrap items-end gap-2 sm:gap-3">
-        <label className="min-w-[200px] grow text-body">
-          Search
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className={`mt-1 ${deskFieldClass}`}
-            placeholder="Business, number, or package"
-          />
-        </label>
-        <div className="text-body">
-          <span className="font-medium text-ink">Filter</span>
-          <DeskSelect
-            aria-label="Filter businesses"
-            className={`mt-1 min-w-[11rem] ${deskFieldClass}`}
-            portalThemeClass="admin-theme"
-            value={filter}
-            onChange={setFilter}
-            options={FILTER_OPTIONS}
-          />
-        </div>
-      </div>
-
-      <div className="sm:hidden">
-        {filtered.length === 0 ? (
-          <Empty title="No businesses match." line="Widen your filter or search for another name." />
-        ) : (
-          <ul className="divide-y divide-hairline/70 border-y border-hairline/70" aria-label="Businesses">
-            {filtered.map((r) => (
-              <ListRow
-                key={r.id}
-                href={`/admin/billing/${r.id}`}
-                title={r.business_name}
-                when={r.statusLabel}
-                preview={[
-                  `${r.packageName || "No package"}${r.period ? ` / ${r.period}` : ""}`,
-                  `${usedOfIncluded(r.minutesUsed, r.minutesIncluded)} min`,
-                  chargingModeLabel(r.billing_enforcement),
-                ].join(" · ")}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div className="hidden overflow-x-auto sm:block">
-        <table className="w-full min-w-[880px] text-left text-body">
-          <thead className="text-ink-2">
-            <tr className="border-b border-hairline/70">
-              <th className={adminThClass}>Business</th>
-              <th className={adminThClass}>Package</th>
-              <th className={adminThClass}>Minutes</th>
-              <th className={adminThClass}>Charging</th>
-              <th className={adminThClass}>On-demand</th>
-              <th className={adminThClass}>Status</th>
-              <th className={adminThClass}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={7}>
-                  <Empty title="No businesses match." line="Widen your filter or search for another name." />
-                </td>
-              </tr>
-            ) : (
-              filtered.map((r) => (
-                <tr key={r.id} className="border-t border-hairline/70">
-                  <td className={adminTdClass}>
-                    <p className={`text-body font-medium text-ink ${deskPreviewClass}`}>{r.business_name}</p>
-                    <p className={`mt-0.5 text-meta text-ink-2 ${deskPreviewClass}`}>{numberLabel(r.sautikit_virtual_number)}</p>
-                  </td>
-                  <td className={`${adminTdClass} text-ink-2`}>
-                    {r.packageName || "No package"}
-                    {r.period ? ` / ${r.period}` : ""}
-                  </td>
-                  <td className={`${adminTdClass} tabular-nums text-ink`}>
-                    {usedOfIncluded(r.minutesUsed, r.minutesIncluded)}
-                  </td>
-                  <td className={`${adminTdClass} text-meta text-ink-2`}>
-                    {chargingModeLabel(r.billing_enforcement)}
-                  </td>
-                  <td className={`${adminTdClass} text-meta text-ink-2`}>{onDemandLine(r)}</td>
-                  <td className={`${adminTdClass} text-meta text-ink`}>{r.statusLabel}</td>
-                  <td className={adminTdClass}>
-                    <Link href={`/admin/billing/${r.id}`} className={adminRowActionClass}>
-                      Open
-                    </Link>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+function ReviewQueue({
+  warning,
+  reviews,
+  rows,
+  empty,
+}: {
+  warning: string | null;
+  reviews: NonNullable<AttentionItem["review"]>[];
+  rows: AttentionItem[];
+  empty: boolean;
+}) {
+  if (empty && !warning) {
+    return <Empty title="No reviews." line="Checkout and payment reviews." />;
+  }
+  return (
+    <div className="space-y-3">
+      {warning ? (
+        <p className="px-4 text-body text-attention" role="alert">
+          {warning}
+        </p>
+      ) : null}
+      <ul className="divide-y divide-hairline/70 border-y border-hairline/70" aria-label="Reviews">
+        <CheckoutReviewResolve reviews={reviews} showBusiness />
+        {rows.map((item) => (
+          <ListRow key={item.id} href={item.href} title={item.title} preview={item.preview} when={item.when} />
+        ))}
+      </ul>
     </div>
   );
 }
 
-function Kpi({ label, value, warn }: { label: string; value: number; warn?: boolean }) {
+export function AdminBillingListPanel({
+  overview,
+  attention = [],
+  attentionWarning = null,
+  initialFilter = "all",
+}: {
+  overview: AdminBillingOverview;
+  attention?: AttentionItem[];
+  attentionWarning?: string | null;
+  initialFilter?: BillingFilter;
+}) {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<BillingFilter>(initialFilter);
+  const [waitKind, setWaitKind] = useState<BillingAttentionKind | null>(null);
+  const [page, setPage] = useState(1);
+
+  const liveRows = useMemo(
+    () => overview.rows.filter((r) => r.status !== "archived"),
+    [overview.rows],
+  );
+  const needs = useMemo(() => attentionRows(overview.rows), [overview.rows]);
+  const chips = useMemo(
+    () => buildFilterChips(needs, overview.rolloverSoonCount),
+    [needs, overview.rolloverSoonCount],
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    let base = liveRows;
+
+    if (filter === "needs") {
+      base =
+        waitKind === "rollover_soon"
+          ? filterAttentionKind(overview.rows, "rollover_soon")
+          : waitKind
+            ? filterAttentionKind(needs, waitKind)
+            : needs;
+    } else if (filter === "all" && waitKind) {
+      base = filterAttentionKind(base, waitKind);
+    } else if (filter === "beta") {
+      base = base.filter((r) => r.billing_enforcement === "off");
+    } else if (filter === "charging") {
+      base = base.filter((r) => r.billing_enforcement !== "off");
+    }
+
+    if (q) {
+      base = base.filter(
+        (r) =>
+          r.business_name.toLowerCase().includes(q) ||
+          searchableNumber(r.sautikit_virtual_number).includes(q) ||
+          (r.packageName || "").toLowerCase().includes(q),
+      );
+    }
+
+    return sortBillingQueue(base);
+  }, [overview.rows, liveRows, query, filter, waitKind, needs]);
+
+  const attentionFiltered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return attention;
+    return attention.filter(
+      (item) =>
+        item.title.toLowerCase().includes(q) ||
+        item.preview.toLowerCase().includes(q) ||
+        (item.review?.businessName || "").toLowerCase().includes(q),
+    );
+  }, [attention, query]);
+
+  const reviewRows = attentionFiltered.flatMap((item) => (item.review ? [item.review] : []));
+  const otherAttention = attentionFiltered.filter((item) => !item.review);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / DEFAULT_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = filtered.slice((safePage - 1) * DEFAULT_PAGE_SIZE, safePage * DEFAULT_PAGE_SIZE);
+
+  function selectFilter(next: BillingFilter) {
+    setFilter(next);
+    setWaitKind(null);
+    setQuery("");
+    setPage(1);
+  }
+
+  function toggleWaitKind(kind: FilterChipKind) {
+    setWaitKind((prev) => (prev === kind ? null : kind));
+    setQuery("");
+    setPage(1);
+  }
+
+  const showShopList = filter !== "attention";
+  const showChips = filter === "all" || filter === "needs";
+
   return (
-    <div className="border-t border-hairline/70 px-3 py-2 sm:border-t-0 sm:border-l sm:px-4 sm:py-2.5 sm:first:border-l-0">
-      <p className={`text-body font-medium tabular-nums ${warn ? "text-attention" : "text-ink"}`}>{value}</p>
-      <p className="mt-0.5 truncate text-meta text-ink-2">{label}</p>
+    <div className="space-y-5 pb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4">
+        <PeriodLine label={overview.platformPeriodEndLabel} />
+        <div className="ms-auto flex flex-wrap items-center gap-2">
+          <ButtonLink href="/admin/billing/invoices" size="sm" variant="ghost">
+            Invoices
+          </ButtonLink>
+          <ButtonLink href="/admin/packages" size="sm" variant="tonal">
+            Plans
+          </ButtonLink>
+        </div>
+      </div>
+
+      <OpenInvoicesRow overview={overview} />
+
+      <Segmented
+        className="px-4"
+        label="Billing view"
+        items={[
+          { key: "all", label: "All", count: liveRows.length, active: filter === "all" },
+          { key: "needs", label: "Waiting", count: needs.length, active: filter === "needs" },
+          { key: "attention", label: "Reviews", count: attention.length, active: filter === "attention" },
+          { key: "beta", label: "Beta", count: overview.betaCount, active: filter === "beta" },
+          { key: "charging", label: "Charging", count: overview.chargingCount, active: filter === "charging" },
+        ]}
+        onSelect={(key) => selectFilter(key as BillingFilter)}
+      />
+
+      {filter === "all" ? (
+        <p className="px-4 text-meta tabular-nums text-ink-2">
+          {overview.betaCount} beta · {overview.chargingCount} charging
+        </p>
+      ) : null}
+
+      {showChips && chips.some((c) => c.count > 0) ? (
+        <AdminBillingFilterChips chips={chips} active={waitKind} onSelect={toggleWaitKind} />
+      ) : null}
+
+      {filter === "attention" ? (
+        <>
+          <label className="block px-4 text-body">
+            <span className="sr-only">Search reviews</span>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className={deskFieldClass}
+              placeholder="Shop or issue"
+            />
+          </label>
+          <ReviewQueue
+            warning={attentionWarning}
+            reviews={reviewRows}
+            rows={otherAttention}
+            empty={attentionFiltered.length === 0}
+          />
+        </>
+      ) : null}
+
+      {showShopList ? (
+        <>
+          <label className="block px-4 text-body">
+            <span className="sr-only">Search shops</span>
+            <input
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(1);
+              }}
+              className={deskFieldClass}
+              placeholder="Shop, number, or plan"
+            />
+          </label>
+
+          {filtered.length === 0 ? (
+            <Empty
+              title={filter === "needs" ? "No shops waiting." : "No shops match."}
+              line={filter === "needs" ? "Shops with no plan, low minutes, or none left." : "Try another name or number."}
+              action={
+                filter === "needs" ? (
+                  <ButtonLink href="/admin/businesses" size="sm" variant="tonal">
+                    Businesses
+                  </ButtonLink>
+                ) : undefined
+              }
+            />
+          ) : (
+            <>
+              <ul className="divide-y divide-hairline/70 border-y border-hairline/70" aria-label="Billing shops">
+                {pageRows.map((r) => (
+                  <BillingQueueRow key={r.id} row={r} />
+                ))}
+              </ul>
+              <Pagination
+                page={safePage}
+                pageSize={DEFAULT_PAGE_SIZE}
+                total={filtered.length}
+                noun="shop"
+                onPage={setPage}
+                className="px-4 py-3"
+              />
+            </>
+          )}
+        </>
+      ) : null}
     </div>
+  );
+}
+
+type FilterChipKind = Exclude<BillingAttentionKind, "all">;
+
+function BillingQueueRow({ row }: { row: AdminBillingRow }) {
+  const preview = rowPreviewLine(row, adminModeLabel);
+  const displayNumber = numberLabel(row.sautikit_virtual_number);
+  const line =
+    displayNumber === "Waiting for a number"
+      ? preview
+      : `${displayNumber} · ${row.packageName || "No plan"} · ${adminModeLabel(row.billing_enforcement)}`;
+
+  return (
+    <ListRow
+      href={shopMoneyHref(row.id)}
+      title={row.business_name}
+      when={rowWhenLabel(row)}
+      preview={line}
+      stamp={<Stamp tone={stampToneForBillingStatus(row.status)}>{row.statusLabel}</Stamp>}
+    />
   );
 }

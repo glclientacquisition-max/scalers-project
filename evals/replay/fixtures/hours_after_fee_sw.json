@@ -1,0 +1,20 @@
+{
+  "id": "hours_after_fee_sw",
+  "bug": "hours",
+  "profile": "hours",
+  "language": "sw",
+  "turns": [
+    {
+      "caller": "Ada ya usafiri hadi Kileleshwa?",
+      "mustSay": ["mia tatu"],
+      "value": 300,
+      "status": "found"
+    },
+    {
+      "caller": "Mnafungua saa ngapi?",
+      "mustSay": ["saa mbili asubuhi"],
+      "mustNotSay": ["mia tatu", "shilingi mia tatu"],
+      "status": "found"
+    }
+  ]
+}
