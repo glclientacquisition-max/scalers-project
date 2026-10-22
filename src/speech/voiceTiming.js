@@ -127,15 +127,27 @@ function persistableLatencyMs(summary = {}) {
 /**
  * Structured media-call transcript so appendTranscript can write latency_ms.
  */
-function createCallTranscript() {
+function createCallTranscript(opts = {}) {
   /** @type {{ speaker: string, text: string, latencyMs: number|null }[]} */
   const rows = [];
+  // VOICE_TRANSCRIPT_INCREMENTAL: told about every new or changed row.
+  let onChange = typeof opts.onChange === 'function' ? opts.onChange : null;
+
+  function changed(index) {
+    if (!onChange) return;
+    try {
+      onChange(index, { ...rows[index] });
+    } catch {
+      /* never throw into the media loop */
+    }
+  }
 
   function push(speaker, text) {
     const clean = String(text || '').trim();
     if (!clean) return null;
     const row = { speaker, text: clean, latencyMs: null };
     rows.push(row);
+    changed(rows.length - 1);
     return row;
   }
 
@@ -146,6 +158,7 @@ function createCallTranscript() {
     for (let i = start; i < rows.length; i += 1) {
       if (rows[i].speaker === 'agent' && rows[i].latencyMs == null) {
         rows[i].latencyMs = ms;
+        changed(i);
         return rows[i];
       }
     }
@@ -165,6 +178,9 @@ function createCallTranscript() {
   }
 
   return {
+    setOnChange(fn) {
+      onChange = typeof fn === 'function' ? fn : null;
+    },
     pushCaller(text) {
       return push('caller', text);
     },

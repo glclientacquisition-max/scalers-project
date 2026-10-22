@@ -666,6 +666,38 @@ async function appendTranscript({ callSid, transcript, turns }) {
 }
 
 /**
+ * VOICE_TRANSCRIPT_INCREMENTAL: idempotent per-row upsert on the primary key
+ * (ids are deterministic per call, media session and row index; see
+ * src/speech/transcriptIncremental.js). Never deletes. No schema change.
+ * @param {{ callSid: string, rows: Array<{ id: string, speaker: string, text: string, latencyMs?: number|null, createdAt?: string }>, callId?: string }} args
+ */
+const transcriptCallIds = new Map();
+async function upsertTranscriptRows({ callSid, rows, callId } = {}) {
+  if (!callSid || !Array.isArray(rows) || !rows.length) return [];
+  let id = callId || transcriptCallIds.get(callSid);
+  if (!id) {
+    const call = await getCall(callSid);
+    if (!call) throw new Error(`upsertTranscriptRows: no call row for ${callSid}`);
+    id = call.id;
+    if (transcriptCallIds.size > 2000) transcriptCallIds.clear();
+    transcriptCallIds.set(callSid, id);
+  }
+  const payload = rows.map((row) => ({
+    id: row.id,
+    call_id: id,
+    speaker: row.speaker,
+    text_content: row.text,
+    latency_ms: row.latencyMs ?? null,
+    ...(row.createdAt ? { created_at: row.createdAt } : {}),
+  }));
+  const { error } = await supabase
+    .from('transcripts')
+    .upsert(payload, { onConflict: 'id', ignoreDuplicates: false });
+  throwIfError('upsertTranscriptRows', error);
+  return payload.length;
+}
+
+/**
  * Load transcript turns for a call (post-call review). Empty array on miss.
  */
 async function listTranscriptTurns(callSid) {
@@ -3018,6 +3050,7 @@ module.exports = {
   saveTransferAttempt,
   persistOutboundTransferLeg,
   appendTranscript,
+  upsertTranscriptRows,
   listTranscriptTurns,
   attachRecording,
   updateCallStatus,
