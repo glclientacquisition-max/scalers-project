@@ -74,6 +74,7 @@ export async function updateServiceRequestStatus(
       kind,
       to: row.caller_phone,
       body,
+      requestId: id || null,
     });
     if (!sent.ok) console.warn("[request caller sms]", sent.reason);
     if (sent.message) notice = sent.message;
@@ -174,6 +175,7 @@ export async function updateServiceRequestSchedule(
       kind: "caller_hold_updated",
       to: row.caller_phone,
       body,
+      requestId: id || null,
     });
     if (!sent.ok) console.warn("[request caller sms]", sent.reason);
     if (sent.message) notice = sent.message;

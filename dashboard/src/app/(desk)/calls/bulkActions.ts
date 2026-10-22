@@ -69,6 +69,8 @@ export async function inboxBulkAction(kind: InboxBulkKind, ids: string[]): Promi
       kind: text.kind,
       to: text.to,
       body: text.body,
+      appointmentId: text.appointmentId || null,
+      requestId: text.requestId || null,
     });
     if (!sent.ok) console.warn("[inbox bulk caller sms]", sent.reason);
     if (sent.message) notice = sent.message;

@@ -13,6 +13,8 @@ import { IconButton } from "@/components/ui/IconButton";
 import { deskShiftClass } from "@/components/ui/deskChrome";
 import type { InboxSmsFacts } from "@/lib/polishInboxSms";
 import { emptyInboxSmsFacts } from "@/lib/polishInboxSms";
+import { smsSegments } from "@/lib/smsSegments";
+import { smsMeterLine } from "@/lib/callTextThread";
 
 const polishInitial: PolishCallerNoteState = {};
 const sendInitial: SendCallerNoteState = {};
@@ -21,10 +23,16 @@ function InboxSmsDockInner({
   callId,
   callerPhone,
   facts = emptyInboxSmsFacts(),
+  smsAllowance = null,
+  onSent,
 }: {
   callId: string;
   callerPhone: string | null;
   facts?: InboxSmsFacts;
+  /** Package SMS (business row): shows "1 SMS · N of M included left". */
+  smsAllowance?: { included: number | null; used: number | null } | null;
+  /** After a successful send (call view switches to Texts). */
+  onSent?: () => void;
 }) {
   const [note, setNote] = useState("");
   const [replyId, setReplyId] = useState(() => crypto.randomUUID());
@@ -49,8 +57,14 @@ function InboxSmsDockInner({
     el.style.height = `${el.scrollHeight}px`;
   }, [note]);
 
+  const onSentRef = useRef(onSent);
+  useEffect(() => {
+    onSentRef.current = onSent;
+  }, [onSent]);
+
   useEffect(() => {
     if (sendState.ok) {
+      onSentRef.current?.();
       setNote("");
       setReplyId(crypto.randomUUID());
       if (areaRef.current) {
@@ -60,6 +74,13 @@ function InboxSmsDockInner({
   }, [sendState.ok, sendState.token]);
 
   const canSend = Boolean(callerPhone) && note.trim().length > 0;
+  const meter = smsAllowance
+    ? smsMeterLine({
+        segments: smsSegments(note.trim()) || 1,
+        included: smsAllowance.included,
+        used: smsAllowance.used,
+      })
+    : null;
   const wandLabel = note.trim() ? "Polish" : "Suggest";
 
   function fillPolishForm(fd: FormData) {
@@ -146,6 +167,11 @@ function InboxSmsDockInner({
       {sendState.ok ? (
         <p className="mt-1 text-caption text-ok" role="status">
           Sent
+        </p>
+      ) : null}
+      {meter && callerPhone ? (
+        <p data-sms-meter="" className="mt-1 text-right text-caption tabular-nums text-ink-2">
+          {meter}
         </p>
       ) : null}
     </div>

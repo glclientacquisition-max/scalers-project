@@ -22,6 +22,7 @@ import { parseNotifyChannels } from "@/lib/notifyChannels";
 import { sendRecordedDeskCallerSms } from "@/lib/sendLedger";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { recordCallerReply } from "@/lib/callerReplyRecord";
+import { deskSmsSendError } from "@/lib/deskSmsError";
 
 export type PolishCallerNoteState = {
   error?: string;
@@ -184,12 +185,7 @@ async function sendOwnerCallerSms(
   });
   if (!sent.ok) {
     if (sent.message) return { error: sent.message };
-    if (sent.reason === "sms_not_configured") return { error: "Text is unavailable." };
-    if (sent.reason === "sms_allowance_exhausted") {
-      return { error: "Included SMS used. Enable on-demand on Wallet." };
-    }
-    if (sent.reason === "instance_already_sent") return { error: "Already sent." };
-    return { error: "SMS failed." };
+    return { error: deskSmsSendError(sent) };
   }
 
   if (callId) {

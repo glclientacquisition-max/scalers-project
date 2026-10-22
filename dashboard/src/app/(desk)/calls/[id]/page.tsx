@@ -50,6 +50,8 @@ import { formatLiveConnectStamp } from "@/lib/deskLiveTransfer";
 import { normalizeTeamDirectory } from "@/lib/teamNotify";
 
 import { DeskPageGate } from "@/components/DeskPageGate";
+import { loadCallMessages } from "@/lib/callMessages";
+import { callViewTab } from "@/lib/callTextThread";
 
 /** Allow Gemini FAQ suggest + compile without premature cutoffs. */
 export const maxDuration = 60;
@@ -70,6 +72,8 @@ type CallDetailPageProps = {
     day?: string;
     q?: string;
     page?: string;
+    /** "texts" opens the Texts tab when the call has a thread. */
+    tab?: string;
   }>;
 };
 
@@ -131,7 +135,7 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
     return { call, error };
   };
 
-  const [{ call, error }, transcriptRes, holdRes, jobRes, facts, canCorrect, effectiveRecordingRetention] =
+  const [{ call, error }, transcriptRes, holdRes, jobRes, facts, canCorrect, effectiveRecordingRetention, thread] =
     await Promise.all([
     loadCall(),
     loadTranscriptTurns(workspace.client, id),
@@ -155,6 +159,8 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
     readCallFacts(id),
     memberCan("inbox.act"),
     effectiveRecordingRetentionForTenant(tenant.id),
+    // call_messages_list (#868). Not available: no Texts tab, view as before.
+    loadCallMessages(workspace.client, tenant.id, id),
   ]);
   timer.mark("call");
 
@@ -331,6 +337,13 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
         archived={archived}
         leadStatus={leadStatus}
         businessName={businessName}
+        texts={thread.available ? { messages: thread.messages } : null}
+        initialTab={callViewTab(sp.tab, thread.available)}
+        smsAllowance={
+          tenant.sms_included_units != null
+            ? { included: tenant.sms_included_units, used: tenant.sms_used_units ?? 0 }
+            : null
+        }
         factsSlot={
           facts ? (
             <CallFactsCorrection callId={row.id} facts={facts} canEdit={canCorrect} save={correctCallFactsAction} />
