@@ -82,7 +82,8 @@ describe("settings list rest", () => {
     assert.match(editor, /Add a rule/);
     assert.match(form, /<PolicyRulesEditor/);
     assert.match(form, /title="When unsure"/);
-    assert.match(form, /What to say/);
+    assert.match(form, /<UnknownAnswerField/);
+    assert.match(read("dashboard/src/components/UnknownAnswerField.tsx"), /What to say/);
   });
 
   it("starts FAQs empty, drops the answer count, and does not refill a blank row", () => {

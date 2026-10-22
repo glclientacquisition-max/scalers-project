@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { loadSetupContext } from "@/lib/setupServer";
+import { loadCallSetupState, loadTestPhoneSuggestion } from "@/lib/callSetupServer";
 import { LineView } from "./LineView";
 
 export const instant = false;
@@ -11,5 +12,17 @@ export default async function SetupLinePage() {
   if (ctx.kind !== "ready") redirect("/onboarding");
   if (!ctx.row.setup_completed_at) redirect("/onboarding");
 
-  return <LineView businessName={ctx.row.business_name} tenantId={ctx.row.id} raw={ctx.row.sautikit_virtual_number} />;
+  const [callSetup, testFromSuggestion] = await Promise.all([
+    loadCallSetupState(ctx.row.id),
+    loadTestPhoneSuggestion(ctx.row.id, [ctx.row.sautikit_virtual_number, ctx.row.whatsapp_notification_number]),
+  ]);
+  return (
+    <LineView
+      businessName={ctx.row.business_name}
+      tenantId={ctx.row.id}
+      raw={ctx.row.sautikit_virtual_number}
+      server={{ supported: callSetup.supported, setup: callSetup.setup }}
+      testFromSuggestion={testFromSuggestion}
+    />
+  );
 }

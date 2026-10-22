@@ -72,6 +72,33 @@ describe('inbound directory (resolveTenantId parity, no reads on the hot path)',
     assert.equal(od.gate.open, true);
   });
 
+  it('a spend-limit hold refuses past the allowance and still answers inside it', async () => {
+    const held = await dirWith(rowsFor({
+      seconds_used: 6000,
+      billing_enforcement: 'soft',
+      on_demand_usage_enabled: true,
+      spend_limit_blocked: true,
+    })).dir.lookup({ toNumber: DID });
+    assert.equal(held.gate.open, false);
+    assert.equal(held.gate.reason, 'package_exhausted');
+    const inside = await dirWith(rowsFor({
+      seconds_used: 60,
+      billing_enforcement: 'soft',
+      on_demand_usage_enabled: true,
+      spend_limit_blocked: true,
+    })).dir.lookup({ toNumber: DID });
+    assert.equal(inside.gate.open, true);
+    assert.equal(inside.gate.reason, 'included');
+    const beta = await dirWith(rowsFor({
+      seconds_used: 6000,
+      billing_enforcement: 'off',
+      on_demand_usage_enabled: true,
+      spend_limit_blocked: true,
+    })).dir.lookup({ toNumber: DID });
+    assert.equal(beta.gate.open, true);
+    assert.equal(beta.gate.reason, 'beta_over_cap');
+  });
+
   it('beta (billing_enforcement off or missing) never closes at the cap (#631)', async () => {
     const beta = await dirWith(rowsFor({ seconds_used: 6000 })).dir.lookup({ toNumber: DID });
     assert.equal(beta.gate.open, true);

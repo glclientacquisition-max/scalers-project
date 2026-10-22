@@ -55,6 +55,10 @@ export type TodayNumberRow = {
   detail: string;
   /** False when the data does not exist yet. The row says why instead of showing a number. */
   available: boolean;
+  /** Today minus same stretch last week; null when the count is missing. */
+  delta: number | null;
+  /** When true, a negative delta is good (fewer needs-human or abandoned calls). */
+  lowerIsBetter?: boolean;
   href?: string;
 };
 
@@ -67,20 +71,38 @@ function compareLine(count: { today: number; lastWeek: number }, weekday: string
  */
 export function todayNumberRows(counts: CallCounts, now: Date): TodayNumberRow[] {
   const weekday = WEEKDAYS[new Date(now.getTime() + EAT_OFFSET_MS).getUTCDay()];
-  const row = (key: string, title: string, count: CallCount, missing: string): TodayNumberRow =>
+  const row = (
+    key: string,
+    title: string,
+    count: CallCount,
+    missing: string,
+    lowerIsBetter = false,
+  ): TodayNumberRow =>
     count
-      ? { key, title, value: String(count.today), detail: compareLine(count, weekday), available: true }
-      : { key, title, value: "", detail: missing, available: false };
+      ? {
+          key,
+          title,
+          value: String(count.today),
+          detail: compareLine(count, weekday),
+          available: true,
+          delta: count.today - count.lastWeek,
+          lowerIsBetter,
+        }
+      : { key, title, value: "", detail: missing, available: false, delta: null };
   return [
-    row("calls", "Calls today", counts.total, "Could not count calls."),
-    row("needs-human", "Needed a person", counts.needsHuman, "Call outcomes are not recorded here yet."),
-    row("abandoned", "Caller hung up early", counts.abandoned, "Call outcomes are not recorded here yet."),
+    {
+      ...row("calls", "Calls today", counts.total, "Could not count calls."),
+      href: "/admin/quality",
+    },
+    row("needs-human", "Needed a person", counts.needsHuman, "Call outcomes are not recorded here yet.", true),
+    row("abandoned", "Caller hung up early", counts.abandoned, "Call outcomes are not recorded here yet.", true),
     {
       key: "couldnt-answer",
       title: "Couldn't answer",
       value: "",
-      detail: "Per business on Calls. Traced calls only.",
+      detail: "Per business on Quality. Traced calls only.",
       available: false,
+      delta: null,
       href: "/admin/quality",
     },
   ];
@@ -107,6 +129,38 @@ export function statusSentence(signals: StatusSignal[]): { tone: "ok" | "attenti
 }
 
 export type TodayQueueRow = { key: string; title: string; detail: string; href: string; stamp: string };
+
+export type TodayQueueGroup = { key: string; title: string; rows: TodayQueueRow[] };
+
+/** Shop detail. Never the list hash. */
+export function shopHref(id: string): string {
+  return `/admin/businesses/${id}`;
+}
+
+export function todayQueueGroups(rows: TodayQueueRow[]): TodayQueueGroup[] {
+  const buckets: Record<string, TodayQueueRow[]> = {
+    alert: [],
+    line: [],
+    package: [],
+    quality: [],
+    quiet: [],
+  };
+  for (const row of rows) {
+    if (row.stamp === "Open" || row.stamp === "Overdue") buckets.alert.push(row);
+    else if (row.stamp === "Waiting" || row.stamp === "Stuck") buckets.line.push(row);
+    else if (row.stamp === "Package") buckets.package.push(row);
+    else if (row.stamp === "Dropping") buckets.quality.push(row);
+    else if (row.stamp === "Quiet") buckets.quiet.push(row);
+    else buckets.alert.push(row);
+  }
+  return [
+    { key: "alert", title: "Alerts", rows: buckets.alert },
+    { key: "line", title: "Line", rows: buckets.line },
+    { key: "package", title: "Package", rows: buckets.package },
+    { key: "quality", title: "Quality", rows: buckets.quality },
+    { key: "quiet", title: "Quiet", rows: buckets.quiet },
+  ].filter((group) => group.rows.length > 0);
+}
 
 export type TodayBusiness = {
   id: string;
@@ -142,7 +196,7 @@ export function todayQueue(input: {
   now: Date;
 }): TodayQueueRow[] {
   const { now } = input;
-  const href = (id: string) => `/admin/businesses#biz-${id}`;
+  const href = (id: string) => shopHref(id);
   const rows: TodayQueueRow[] = [...input.noticeRows];
 
   const waiting = input.businesses

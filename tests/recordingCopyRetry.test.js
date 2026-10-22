@@ -7,8 +7,11 @@ const {
   copyRecordingWithRetry,
   RETRY_DELAYS_MS,
 } = require('../src/sautikit/recordingCopy');
+const { pcmToWav } = require('../src/speech/wavPack');
 
-function res(status, body = 'RIFFwav') {
+const SAMPLE_WAV = pcmToWav(Buffer.alloc(1600), 8000);
+
+function res(status, body = SAMPLE_WAV) {
   return {
     ok: status >= 200 && status < 300,
     status,
@@ -58,6 +61,7 @@ function fakeSupabase() {
       from: () => ({
         upload: async (path, buffer) => { uploads.push({ path, size: buffer.length }); return { error: null }; },
         createSignedUrl: async (path) => ({ data: { signedUrl: `https://supa.example/signed/${path}` }, error: null }),
+        remove: async () => ({ error: null }),
       }),
     },
   };
@@ -137,10 +141,11 @@ describe('db.attachRecording', () => {
     });
     const row = rows.get('HD_2');
     assert.equal(uploads.length, 1);
-    assert.equal(uploads[0].path, 'HD_2/rs.wav');
-    assert.match(row.recording_url, /supa\.example\/signed\/HD_2\/rs\.wav/);
+    assert.equal(uploads[0].path, 'HD_2/rs.mp3');
+    assert.ok(uploads[0].size < SAMPLE_WAV.length);
+    assert.match(row.recording_url, /supa\.example\/signed\/HD_2\/rs\.mp3/);
     const meta = JSON.parse(row.summary);
-    assert.equal(meta.recording_path, 'HD_2/rs.wav');
+    assert.equal(meta.recording_path, 'HD_2/rs.mp3');
     assert.equal(meta.recording_status, undefined);
   });
 

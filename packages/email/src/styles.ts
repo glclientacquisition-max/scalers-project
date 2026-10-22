@@ -6,6 +6,14 @@ import { dark, layout, light } from "./tokens.ts";
  * [data-ogsc], new Outlook). Gmail ignores prefers-color-scheme and applies its
  * own inversion, which these colours survive.
  */
+/** Dark-mode band colours. Added only to mail that has an environment band, so other exports stay byte-identical. */
+export const bandCss = `
+@media (prefers-color-scheme: dark) {
+  .band-prod { background-color:${dark.danger} !important; color:${dark.dangerOn} !important; }
+  .band-neu { background-color:${dark.bandNeutral} !important; color:${dark.bandNeutralOn} !important; }
+}
+`;
+
 export const headCss = `
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 body { margin:0; padding:0; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }

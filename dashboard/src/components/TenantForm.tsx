@@ -6,7 +6,7 @@ import { withRoleGate } from "@/components/DeskRole";
 import { CharCount as KitCharCount, FieldCard, TextAreaField, TextField } from "@/components/ui/TextField";
 import { POLICY_TEXT_MAX } from "@/lib/lengthLimits";
 import { normalizeContactPhone } from "@/lib/teamValidation";
-import { useActionState, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import {
@@ -34,6 +34,16 @@ import {
   parseAgentTools,
   type AgentTools,
 } from "@/lib/agentTools";
+import { CatalogPriceEditor } from "@/components/settings/catalog/CatalogPriceEditor";
+import {
+  transitionCatalogPriceKind,
+  type CatalogPriceDraft,
+} from "@/lib/catalogPriceEditorState";
+import {
+  applyCatalogPriceFields,
+  catalogPriceInputsFromRow,
+  type PriceKind,
+} from "@/lib/catalogPricingMode";
 import {
   emptyService,
   extractServicesNotes,
@@ -47,7 +57,8 @@ import {
   formatProductsForCompiler,
   normalizeProductCatalog,
   parseBulkProducts,
-  PRODUCT_CATALOG_MAX,
+  mergeProductCatalog,
+  productImportWarnings,
   type ProductItem,
 } from "@/lib/productCatalog";
 import {
@@ -66,6 +77,7 @@ import {
   type SocialChannel,
   type SocialHandles,
 } from "@/lib/socialHandles";
+import { catalogPriceFieldKey } from "@/lib/catalogValidation";
 import {
   saveAndCompileSettings,
   type SettingsCompileState,
@@ -117,7 +129,7 @@ import {
 } from "@/lib/businessPolicies";
 import { PlacesEditor } from "@/components/structured/PlacesEditor";
 import { ServiceAreasEditor } from "@/components/structured/ServiceAreasEditor";
-import { savedBaseline, serviceAreasForForm, suggestHomeAreas, type ServiceAreas } from "@/lib/serviceAreas";
+import { serviceAreasForForm, suggestHomeAreas, type ServiceAreas } from "@/lib/serviceAreas";
 import { stableRowId } from "@/lib/factHash";
 import { catalogBaseline, isUnpricedRow } from "@/lib/catalogPricing";
 import { DeskSelect } from "@/components/ui/DeskSelect";
@@ -127,8 +139,7 @@ import dynamic from "next/dynamic";
 // Pronunciation is one panel of many; load it only when that panel renders.
 const PronunciationCoach = dynamic(() => import("@/components/PronunciationCoach").then((m) => m.PronunciationCoach));
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
-import { notify } from "@/components/ui/DeskNotice";
-import { useSettingsLeaveSource } from "@/components/SettingsLeaveGuard";
+import { useFormDraft, useFormSave } from "@/components/useFormSave";
 import { carrySavedRow, isSavedRow, markSavedRow } from "@/lib/savedRow";
 import { Pagination } from "@/components/ui/Pagination";
 import {
@@ -155,6 +166,13 @@ import {
   TenantSettingsSaveButton,
   TENANT_SETTINGS_FORM_ID,
 } from "@/components/TenantSettingsSaveButton";
+import { UnknownAnswerField } from "@/components/UnknownAnswerField";
+import {
+  UNKNOWN_ANSWER_DEFAULT_EN,
+  ownerUnknownAnswer,
+  parseUnknownAnswerSpoken,
+  unknownAnswerBoxText,
+} from "@/lib/unknownAnswerSpoken";
 import {
   parseTtsLexicon,
   lexiconForStorage,
@@ -250,27 +268,56 @@ function placeLocationLine(loc: Pick<BusinessLocation, "label" | "address" | "la
 
 const initial: SettingsCompileState = {};
 
-/**
- * A dropped connection (TypeError: network error) must not throw the page into the error
- * boundary: the write has usually landed, so report it and let the form refetch.
- */
-async function saveSettingsSafely(
-  prev: SettingsCompileState,
-  formData: FormData
-): Promise<SettingsCompileState> {
-  try {
-    const res = await saveAndCompileSettings(prev, formData);
-    // Toast here, not from component state: a save can remount the form.
-    if (res.ok) notify("Saved · training line");
-    return res;
-  } catch (err) {
-    console.warn("[settings] save response lost:", err instanceof Error ? err.message : err);
-    return { networkError: true };
-  }
-}
-
 const tableFieldClass = settingsTableFieldClass;
 const denseFieldClass = settingsDenseFieldClass;
+/** Phone service rows: labels stay visible (no placeholder-only fields at 360/390). */
+const serviceMobileLabelClass = "mb-1 block text-meta text-ink-2";
+
+function catalogPriceError(
+  fields: SettingsCompileState["fields"],
+  name: string
+): string | null {
+  const key = name.trim().toLowerCase();
+  if (!key || !fields) return null;
+  return fields[catalogPriceFieldKey(name)] ?? null;
+}
+
+type CatalogPriceDraftMap = Record<string, CatalogPriceDraft>;
+
+function servicePriceDraftKey(row: ServiceItem, index: number): string {
+  return stableRowId(row) || `service:${index}`;
+}
+
+function productPriceDraftKey(row: ProductItem, index: number): string {
+  const sku = row.sku.trim();
+  return stableRowId(row) || (sku ? `product:${sku}` : `product:${index}`);
+}
+
+function getServicePriceFields(
+  row: ServiceItem,
+  index: number,
+  drafts: CatalogPriceDraftMap
+): CatalogPriceDraft {
+  const key = servicePriceDraftKey(row, index);
+  return drafts[key] ?? catalogPriceInputsFromRow(row);
+}
+
+function getProductPriceFields(
+  row: ProductItem,
+  index: number,
+  drafts: CatalogPriceDraftMap
+): CatalogPriceDraft {
+  const key = productPriceDraftKey(row, index);
+  return drafts[key] ?? catalogPriceInputsFromRow(row);
+}
+
+function applyDraftToCatalogRow<T extends ServiceItem | ProductItem>(
+  row: T,
+  draft: CatalogPriceDraft,
+  textKey: "price_range" | "price"
+): T {
+  return applyCatalogPriceFields(row, draft.kind, draft.minInput, draft.maxInput, textKey);
+}
 
 const STOCK_OPTIONS = [
   { value: "yes", label: "In stock" },
@@ -355,7 +402,9 @@ function TenantFormInner({
   liveTransferExecutor = false,
   showBack = true,
   membersSlot = null,
+  seatNoteSlot = null,
   structuredSlot = null,
+  onSaveActivity,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
@@ -366,8 +415,12 @@ function TenantFormInner({
   showBack?: boolean;
   /** Team & access: Members section (feature flag TEAM_INVITES_ENABLED). */
   membersSlot?: ReactNode;
+  /** Team: one note when every seat is taken. */
+  seatNoteSlot?: ReactNode;
   /** Typed-data groups (payments, price checks, category) rendered by the server page per panel. */
   structuredSlot?: Partial<Record<"identity" | "catalog", ReactNode>> | null;
+  /** Shared save pattern: a save started or landed (BusinessSettingsShell keeps the mount). */
+  onSaveActivity?: () => void;
 }) {
   const voiceOptions =
     curatedVoices && curatedVoices.length
@@ -385,15 +438,19 @@ function TenantFormInner({
     const rows = normalizeProductCatalog(tenant.product_catalog);
     return rows.length ? rows.map((row) => markSavedRow(row)) : [];
   });
+  const [servicePriceDrafts, setServicePriceDrafts] = useState<CatalogPriceDraftMap>({});
+  const [productPriceDrafts, setProductPriceDrafts] = useState<CatalogPriceDraftMap>({});
   const [socialHandles, setSocialHandles] = useState<SocialHandles>(() => {
     const next = normalizeSocialHandles(tenant.social_handles);
     return { channels: next.channels.map((row) => markSavedRow(row)) };
   });
   const [bulkServicesText, setBulkServicesText] = useState("");
   const [bulkServicesError, setBulkServicesError] = useState<string | null>(null);
+  const [bulkServicesNote, setBulkServicesNote] = useState<string | null>(null);
   const [servicesImportOpen, setServicesImportOpen] = useState(false);
   const [productsImportOpen, setProductsImportOpen] = useState(false);
   const [bulkProductsText, setBulkProductsText] = useState("");
+  const [bulkProductsUpdate, setBulkProductsUpdate] = useState(false);
   const [bulkProductsError, setBulkProductsError] = useState<string | null>(null);
   const [servicePage, setServicePage] = useState(0);
   const [productPage, setProductPage] = useState(0);
@@ -403,9 +460,16 @@ function TenantFormInner({
     if (new URLSearchParams(window.location.search).get("filter") === "unpriced") setUnpricedOnly(true);
   }, []);
   const [faqPage, setFaqPage] = useState(0);
-  const [unknownFallback, setUnknownFallback] = useState(
-    tenant.unknown_answer_fallback || ""
-  );
+  const [unknownText, setUnknownText] = useState(() => unknownAnswerBoxText(tenant.unknown_answer_fallback));
+  const unknownLine = ownerUnknownAnswer(unknownText);
+  const [storedSpoken] = useState(() => {
+    const pair = parseUnknownAnswerSpoken(tenant.unknown_answer_spoken);
+    return pair && pair.source === ownerUnknownAnswer(tenant.unknown_answer_fallback) ? pair : null;
+  });
+  const [spokenEn, setSpokenEn] = useState(storedSpoken?.en ?? "");
+  const [spokenSw, setSpokenSw] = useState(storedSpoken?.sw ?? "");
+  const [spokenSource, setSpokenSource] = useState(storedSpoken?.source ?? "");
+  const [spokenTouched, setSpokenTouched] = useState(false);
   const [agentName, setAgentName] = useState(tenant.agent_name || "");
   const [spokenName, setSpokenName] = useState(tenant.spoken_name || "");
   const [greetingInvite, setGreetingInvite] = useState(tenant.greeting_invite || "");
@@ -442,6 +506,10 @@ function TenantFormInner({
   );
   const [starterClear, setStarterClear] = useState<StarterPolicyKey | null>(null);
   const starterPolicies = seedStarterPolicies(policies);
+  // Starter text shows once, in the Starter text group; not again as an old rule line,
+  // a payment quote, or the Hold note.
+  const starterKeys = new Set<string>(starterPolicies.map((row) => row.key));
+  const ownerLegacy = (key: StarterPolicyKey) => (starterKeys.has(key) ? undefined : policies[key]);
   const markPolicyOwner = (key: StarterPolicyKey, clear: boolean) => {
     queueOwnerPath(`policies.${key}`);
     setPolicies((prev) => {
@@ -486,7 +554,17 @@ function TenantFormInner({
     parseTtsLexicon(tenant.tts_lexicon)
   );
   const router = useRouter();
-  const [state, formAction, pending] = useActionState(saveSettingsSafely, initial);
+  // Shared save pattern (useFormSave): toast, inline Saved, errors with retry,
+  // dropped connections. The draft side (dirty, guard) is useFormDraft below.
+  const save = useFormSave<SettingsCompileState>({
+    action: saveAndCompileSettings,
+    initialState: initial,
+    successMessage: "Saved · training line",
+    formId: TENANT_SETTINGS_FORM_ID,
+    onSaveStart: onSaveActivity,
+    onLanded: onSaveActivity,
+  });
+  const { state, pending } = save;
   // Price text as loaded. The server keeps the stored (maybe just confirmed) price for any row
   // whose text the owner did not touch in this form.
   const [catalogBaseJson] = useState(() =>
@@ -554,12 +632,28 @@ function TenantFormInner({
     return dups;
   }, [faqs]);
   const servicesJson = useMemo(
-    () => JSON.stringify(services.filter((s) => s.name.trim())),
-    [services]
+    () =>
+      JSON.stringify(
+        services
+          .map((row, index) => {
+            const draft = getServicePriceFields(row, index, servicePriceDrafts);
+            return applyDraftToCatalogRow(row, draft, "price_range");
+          })
+          .filter((s) => s.name.trim())
+      ),
+    [services, servicePriceDrafts]
   );
   const productsJson = useMemo(
-    () => JSON.stringify(products.filter((p) => p.name.trim())),
-    [products]
+    () =>
+      JSON.stringify(
+        products
+          .map((row, index) => {
+            const draft = getProductPriceFields(row, index, productPriceDrafts);
+            return applyDraftToCatalogRow(row, draft, "price");
+          })
+          .filter((p) => p.name.trim())
+      ),
+    [products, productPriceDrafts]
   );
   // ?filter=unpriced (from the Overview "Add prices" row) shows only items with no price.
   // The set is frozen while you type (a row must not vanish on its first digit) and is
@@ -625,12 +719,23 @@ function TenantFormInner({
     [hoursSchedule, locationNotes]
   );
 
+  // Synced during render, not in an effect, so the saved baseline below already holds the new pair.
+  const [spokenSyncedState, setSpokenSyncedState] = useState(state);
+  if (spokenSyncedState !== state) {
+    setSpokenSyncedState(state);
+    if (state.ok && Object.prototype.hasOwnProperty.call(state, "unknownAnswerSpoken")) {
+      const next = state.unknownAnswerSpoken;
+      setSpokenEn(next?.en ?? "");
+      setSpokenSw(next?.sw ?? "");
+      setSpokenSource(next?.source ?? "");
+      setSpokenTouched(false);
+    }
+  }
+
   useEffect(() => {
     // Compile finished before ok - owners should hear the line was trained, not only "Saved".
-    if (state.networkError) {
-      notify("Connection dropped. Showing your latest saved details.");
-      router.refresh();
-    }
+    // The write has usually landed: refetch so the page shows what is stored.
+    if (state.networkError) router.refresh();
   }, [state, router]);
 
   useEffect(() => {
@@ -735,6 +840,69 @@ function TenantFormInner({
     );
   }
 
+  function updateServicePrice(index: number, kind: PriceKind, minInput: string, maxInput: string) {
+    const current = services[index];
+    if (!current) return;
+    if (current.name.trim()) {
+      queueOwnerPath(`catalog.service.${stableRowId(current) || String(index + 1)}.name`);
+    }
+    const key = servicePriceDraftKey(current, index);
+    const prevDraft = getServicePriceFields(current, index, servicePriceDrafts);
+    const nextDraft =
+      kind !== prevDraft.kind
+        ? transitionCatalogPriceKind(prevDraft, kind)
+        : { kind, minInput, maxInput };
+    setServicePriceDrafts((prev) => ({ ...prev, [key]: nextDraft }));
+    setServices((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        const next =
+          nextDraft.kind === "quote"
+            ? applyCatalogPriceFields(row, "quote", "", "", "price_range")
+            : applyCatalogPriceFields(
+                row,
+                nextDraft.kind,
+                nextDraft.minInput,
+                nextDraft.maxInput,
+                "price_range"
+              );
+        return carrySavedRow({ ...next, source: "owner" }, row);
+      })
+    );
+  }
+
+  function updateProductPrice(index: number, kind: PriceKind, minInput: string, maxInput: string) {
+    const current = products[index];
+    if (!current) return;
+    if (current.name.trim()) {
+      const sku = current.sku.trim() || String(index + 1);
+      queueOwnerPath(`catalog.product.${sku}.name`);
+    }
+    const key = productPriceDraftKey(current, index);
+    const prevDraft = getProductPriceFields(current, index, productPriceDrafts);
+    const nextDraft =
+      kind !== prevDraft.kind
+        ? transitionCatalogPriceKind(prevDraft, kind)
+        : { kind, minInput, maxInput };
+    setProductPriceDrafts((prev) => ({ ...prev, [key]: nextDraft }));
+    setProducts((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        const next =
+          nextDraft.kind === "quote"
+            ? applyCatalogPriceFields(row, "quote", "", "", "price")
+            : applyCatalogPriceFields(
+                row,
+                nextDraft.kind,
+                nextDraft.minInput,
+                nextDraft.maxInput,
+                "price"
+              );
+        return carrySavedRow({ ...next, source: "owner" }, row);
+      })
+    );
+  }
+
   function updateProduct(index: number, key: keyof ProductItem, value: string) {
     const current = products[index];
     if (current && String(current[key] ?? "") !== value && current.name.trim()) {
@@ -815,17 +983,6 @@ function TenantFormInner({
     [bulkProductsText]
   );
 
-  // Warn before leaving only while a save is actually in flight.
-  useEffect(() => {
-    if (!pending) return;
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [pending]);
-
   // Locations drawers ("Save 3 areas", "Done") save the page straight away.
   const saveAfterLocationsRef = useRef(false);
   useEffect(() => {
@@ -852,10 +1009,15 @@ function TenantFormInner({
       );
       return;
     }
-    setServices((prev) => {
-      const existing = prev.filter((s) => s.name.trim());
-      return [...existing, ...parsed].slice(0, 40);
-    });
+    const existing = services.filter((s) => s.name.trim());
+    const combined = [...existing, ...parsed];
+    const dropped = Math.max(0, combined.length - 40);
+    setServices(combined.slice(0, 40));
+    setBulkServicesNote(
+      dropped > 0
+        ? `Services stay at 40. ${dropped} more ${dropped === 1 ? "was" : "were"} left out.`
+        : null,
+    );
     saveAfterPasteRef.current = true;
     setBulkServicesText("");
     setBulkServicesError(null);
@@ -869,14 +1031,13 @@ function TenantFormInner({
       );
       return;
     }
-    setProducts((prev) => {
-      const existing = prev.filter((p) => p.name.trim());
-      const map = new Map(existing.map((p) => [p.name.toLowerCase(), p]));
-      for (const p of parsed) {
-        if (!map.has(p.name.toLowerCase())) map.set(p.name.toLowerCase(), p);
-      }
-      return [...map.values()].slice(0, PRODUCT_CATALOG_MAX);
-    });
+    setProducts((prev) =>
+      mergeProductCatalog(
+        prev.filter((p) => p.name.trim()),
+        parsed,
+        bulkProductsUpdate ? "update" : "merge"
+      )
+    );
     saveAfterPasteRef.current = true;
     setBulkProductsText("");
     setBulkProductsError(null);
@@ -908,7 +1069,8 @@ function TenantFormInner({
   const firstPlaceLine = placeLocationLine(locations[0] || emptyLocation());
   const locationNotesField =
     panel === "locations" && firstPlaceLine ? firstPlaceLine : locationNotes;
-  const draftKey = [
+  // Everything the Save button posts. Compared normalised (useFormDraft).
+  const draftValues = [
     businessName,
     servicesOfferedSummary,
     servicesJson,
@@ -928,7 +1090,8 @@ function TenantFormInner({
     spokenName,
     greetingInvite,
     tone,
-    unknownFallback,
+    unknownLine,
+    spokenTouched ? `${spokenEn}\u0002${spokenSw}` : "",
     teamJson,
     faqsJson,
     agentTools.escalate ? "1" : "0",
@@ -936,16 +1099,9 @@ function TenantFormInner({
     sonioxVoiceId,
     sonioxVoiceLabel,
     ttsLexiconJson,
-  ].join("\u0001");
-  const [baseline, setBaseline] = useState(draftKey);
-  const formDirty = draftKey !== baseline;
-  const savedStateRef = useRef(state);
-  useEffect(() => {
-    if (!state.ok || savedStateRef.current === state) return;
-    savedStateRef.current = state;
-    setBaseline((prev) => savedBaseline(state, draftKey, prev));
-  }, [state, draftKey]);
-  useSettingsLeaveSource("form", formDirty);
+  ];
+  // adoptsResult: a save hands back the spoken When unsure pair, synced above in render.
+  const { justSaved } = useFormDraft(save, { id: "form", values: draftValues, adoptsResult: true });
   const [removeAsk, setRemoveAsk] = useState<{
     title: string;
     body: string;
@@ -966,11 +1122,16 @@ function TenantFormInner({
   return (
     <form
       id={TENANT_SETTINGS_FORM_ID}
-      action={formAction}
       onSubmit={(event) => {
         // Pronunciation saves live via its own actions. Enter inside the coach
         // must not post this form (feels like a full Settings reload).
-        if (panel === "pronunciation") event.preventDefault();
+        if (panel === "pronunciation") {
+          event.preventDefault();
+          return;
+        }
+        // Shared save pattern: posts without React's form reset, which would put
+        // the Voice tool switches back to their first-render state.
+        save.onSubmit(event);
       }}
     >
       <div className={settingsConsoleClass}>
@@ -982,14 +1143,15 @@ function TenantFormInner({
             lineLive={false}
             showBack={showBack}
             title={heading}
-            alert={state.error}
+            alert={save.error}
+            onRetry={save.retry}
             action={
               panel === "pronunciation" ? (
                 <p className="max-w-[11rem] text-right text-meta leading-snug text-ink-2">
                   Changes save as you go
                 </p>
               ) : (
-                <TenantSettingsSaveButton pending={pending} />
+                <TenantSettingsSaveButton pending={pending} saved={justSaved} />
               )
             }
           />
@@ -1017,7 +1179,10 @@ function TenantFormInner({
       <input type="hidden" name="spoken_name" value={spokenName} />
       <input type="hidden" name="greeting_invite" value={greetingInvite} />
       <input type="hidden" name="agent_tone" value={tone} />
-      <input type="hidden" name="unknown_answer_fallback" value={unknownFallback} />
+      <input type="hidden" name="unknown_answer_fallback" value={unknownLine} />
+      <input type="hidden" name="unknown_answer_spoken_en" value={spokenEn} />
+      <input type="hidden" name="unknown_answer_spoken_sw" value={spokenSw} />
+      <input type="hidden" name="unknown_answer_spoken_touched" value={spokenTouched ? "1" : "0"} />
       <input type="hidden" name="team_directory" value={teamJson} />
       <input type="hidden" name="faqs" value={faqsJson} />
       <input type="hidden" name="owner_field_paths" value={JSON.stringify(ownerPaths)} />
@@ -1030,7 +1195,7 @@ function TenantFormInner({
       <section className={panel === "identity" ? "space-y-3" : "hidden"}>
         {panel === "identity" ? structuredSlot?.identity : null}
         <SettingsGroup title="Business Assistant">
-          <SettingsRow label="Assistant name" htmlFor="agent_name">
+          <SettingsRow label="Business Assistant name" htmlFor="agent_name">
             <input
               id="agent_name"
               value={agentName}
@@ -1074,7 +1239,7 @@ function TenantFormInner({
               id="spoken_name"
               value={spokenName}
               onChange={(e) => setSpokenName(e.target.value)}
-              placeholder="Done and Dusted"
+              placeholder={businessName.trim() || "Your business name"}
               maxLength={40}
               title={spokenName || undefined}
               className={settingsValueFieldClass}
@@ -1335,7 +1500,12 @@ function TenantFormInner({
           isEmpty={false}
         >
         <div className="space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-3">
+          {state.error ? (
+            <p className="text-body text-warn" role="alert">
+              {state.error}
+            </p>
+          ) : null}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className={settingsBlockTitleClass}>Services</p>
             <div className="flex flex-wrap gap-2">
               <button
@@ -1378,19 +1548,22 @@ function TenantFormInner({
               {bulkServicesError}
             </p>
           ) : null}
+          {bulkServicesNote ? (
+            <p className="text-body text-ink-2" role="status">
+              {bulkServicesNote}
+            </p>
+          ) : null}
 
           <div className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline lg:hidden">
             {visibleServices.map((service, localIndex) => {
               const index = serviceIdx[safeServicePage * SERVICE_PAGE_SIZE + localIndex];
+              const priceError = catalogPriceError(state.fields, service.name);
+              const priceFields = getServicePriceFields(service, index, servicePriceDrafts);
               return (
-                <div key={`service-m-${index}`} className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_2.75rem] items-center gap-2 px-3 py-2">
+                <div key={`service-m-${index}`} className="grid grid-cols-[minmax(0,1fr)_2.75rem] items-start gap-x-2 gap-y-2 px-3 py-2.5">
                   <div className="min-w-0">
-                    <label className="sr-only" htmlFor={`svc-name-m-${index}`}>Name</label>
+                    <label className={serviceMobileLabelClass} htmlFor={`svc-name-m-${index}`}>Service</label>
                     <input id={`svc-name-m-${index}`} value={service.name} onChange={(e) => updateService(index, "name", e.target.value)} placeholder={vertical === "retail" ? "Book sourcing / special orders" : "Home cleaning"} className={denseFieldClass} />
-                  </div>
-                  <div className="min-w-0">
-                    <label className="sr-only" htmlFor={`svc-price-m-${index}`}>Price</label>
-                    <input id={`svc-price-m-${index}`} value={service.price_range} onChange={(e) => updateService(index, "price_range", e.target.value)} placeholder="from 2,500 KES" className={denseFieldClass} />
                   </div>
                   <button
                     type="button"
@@ -1412,13 +1585,36 @@ function TenantFormInner({
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>
-                  <div className="min-w-0">
-                    <label className="sr-only" htmlFor={`svc-notes-m-${index}`}>Notes</label>
-                    <input id={`svc-notes-m-${index}`} value={service.notes} onChange={(e) => updateService(index, "notes", e.target.value)} placeholder="Free quotation" className={denseFieldClass} />
+                  <CatalogPriceEditor
+                    idPrefix={`svc-price-m-${index}`}
+                    kind={priceFields.kind}
+                    minInput={priceFields.minInput}
+                    maxInput={priceFields.maxInput}
+                    fieldClass={denseFieldClass}
+                    labelClass={serviceMobileLabelClass}
+                    onKindChange={(kind) =>
+                      updateServicePrice(index, kind, priceFields.minInput, priceFields.maxInput)
+                    }
+                    onMinChange={(value) =>
+                      updateServicePrice(index, priceFields.kind, value, priceFields.maxInput)
+                    }
+                    onMaxChange={(value) =>
+                      updateServicePrice(index, priceFields.kind, priceFields.minInput, value)
+                    }
+                    revealAllErrors={Boolean(priceError)}
+                  />
+                  {priceError ? (
+                    <p id={`svc-price-m-${index}-error`} className="col-span-2 text-meta text-warn" role="alert">
+                      {priceError}
+                    </p>
+                  ) : null}
+                  <div className="col-span-3 min-w-0">
+                    <label className={serviceMobileLabelClass} htmlFor={`svc-notes-m-${index}`}>Notes</label>
+                    <input id={`svc-notes-m-${index}`} value={service.notes} onChange={(e) => updateService(index, "notes", e.target.value)} className={denseFieldClass} />
                   </div>
                   <div className="col-span-2 min-w-0">
-                    <label className="sr-only" htmlFor={`svc-oos-m-${index}`}>Out of scope</label>
-                    <input id={`svc-oos-m-${index}`} value={service.out_of_scope} onChange={(e) => updateService(index, "out_of_scope", e.target.value)} placeholder="No commercial offices" className={denseFieldClass} />
+                    <label className={serviceMobileLabelClass} htmlFor={`svc-oos-m-${index}`}>Not offered</label>
+                    <input id={`svc-oos-m-${index}`} value={service.out_of_scope} onChange={(e) => updateService(index, "out_of_scope", e.target.value)} className={denseFieldClass} />
                   </div>
                 </div>
               );
@@ -1438,7 +1634,6 @@ function TenantFormInner({
                 <thead>
                   <tr className="border-b border-hairline bg-surface-canvas text-left text-meta font-medium text-ink-2">
                     <th className="min-w-0 px-3 py-2.5 font-medium">Name</th>
-                    <th className="px-3 py-2.5 font-medium">Price</th>
                     <th className="px-3 py-2.5 font-medium">Notes</th>
                     <th className="px-3 py-2.5 font-medium">Out of scope</th>
                     <th className="px-3 py-2.5 font-medium w-16">
@@ -1449,88 +1644,102 @@ function TenantFormInner({
                 <tbody className="divide-y divide-hairline bg-surface">
                   {visibleServices.map((service, localIndex) => {
                     const index = serviceIdx[safeServicePage * SERVICE_PAGE_SIZE + localIndex];
+                    const priceError = catalogPriceError(state.fields, service.name);
+                    const priceFields = getServicePriceFields(service, index, servicePriceDrafts);
                     return (
-                      <tr key={`service-${index}`} className="align-middle">
-                        <td className="min-w-0 px-3 py-2">
-                          <label className="sr-only" htmlFor={`svc-name-${index}`}>
-                            Service name
-                          </label>
-                          <input
-                            id={`svc-name-${index}`}
-                            value={service.name}
-                            title={service.name || undefined}
-                            onChange={(e) => updateService(index, "name", e.target.value)}
-                            placeholder={
-                              vertical === "retail"
-                                ? "Book sourcing / special orders"
-                                : "Home cleaning"
-                            }
-                            className={tableFieldClass}
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <label className="sr-only" htmlFor={`svc-price-${index}`}>
-                            Price range
-                          </label>
-                          <input
-                            id={`svc-price-${index}`}
-                            value={service.price_range}
-                            onChange={(e) =>
-                              updateService(index, "price_range", e.target.value)
-                            }
-                            placeholder="from 2,500 KES"
-                            className={tableFieldClass}
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <label className="sr-only" htmlFor={`svc-notes-${index}`}>
-                            Notes
-                          </label>
-                          <input
-                            id={`svc-notes-${index}`}
-                            value={service.notes}
-                            onChange={(e) => updateService(index, "notes", e.target.value)}
-                            placeholder="Free quotation"
-                            className={tableFieldClass}
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <label className="sr-only" htmlFor={`svc-oos-${index}`}>
-                            Out of scope
-                          </label>
-                          <input
-                            id={`svc-oos-${index}`}
-                            value={service.out_of_scope}
-                            onChange={(e) =>
-                              updateService(index, "out_of_scope", e.target.value)
-                            }
-                            placeholder="No commercial offices"
-                            className={tableFieldClass}
-                          />
-                        </td>
-                        <td className="px-2 py-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              requestRemove(
-                                service,
-                                `Remove ${service.name.trim() || "this service"}?`,
-                                "It leaves the catalogue when you save.",
-                                () =>
-                                  setServices((prev) =>
-                                    prev.length <= 1
-                                      ? [emptyService()]
-                                      : prev.filter((_, i) => i !== index)
-                                  )
-                              )
-                            }
-                            className={settingsTrashButtonClass}
-                            aria-label={`Remove service ${index + 1}`}
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
+                      <Fragment key={`service-${index}`}>
+                        <tr className="align-top">
+                          <td className="min-w-0 px-3 py-2">
+                            <label className="sr-only" htmlFor={`svc-name-${index}`}>
+                              Service name
+                            </label>
+                            <input
+                              id={`svc-name-${index}`}
+                              value={service.name}
+                              title={service.name || undefined}
+                              onChange={(e) => updateService(index, "name", e.target.value)}
+                              placeholder={
+                                vertical === "retail"
+                                  ? "Book sourcing / special orders"
+                                  : "Home cleaning"
+                              }
+                              className={tableFieldClass}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <label className="sr-only" htmlFor={`svc-notes-${index}`}>
+                              Notes
+                            </label>
+                            <input
+                              id={`svc-notes-${index}`}
+                              value={service.notes}
+                              onChange={(e) => updateService(index, "notes", e.target.value)}
+                              className={tableFieldClass}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <label className="sr-only" htmlFor={`svc-oos-${index}`}>
+                              Out of scope
+                            </label>
+                            <input
+                              id={`svc-oos-${index}`}
+                              value={service.out_of_scope}
+                              onChange={(e) =>
+                                updateService(index, "out_of_scope", e.target.value)
+                              }
+                              className={tableFieldClass}
+                            />
+                          </td>
+                          <td className="px-2 py-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                requestRemove(
+                                  service,
+                                  `Remove ${service.name.trim() || "this service"}?`,
+                                  "It leaves the catalogue when you save.",
+                                  () =>
+                                    setServices((prev) =>
+                                      prev.length <= 1
+                                        ? [emptyService()]
+                                        : prev.filter((_, i) => i !== index)
+                                    )
+                                )
+                              }
+                              className={settingsTrashButtonClass}
+                              aria-label={`Remove service ${index + 1}`}
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                        <tr className="border-b border-hairline">
+                          <td colSpan={4} className="px-3 pb-3 pt-0">
+                            <CatalogPriceEditor
+                              idPrefix={`svc-price-${index}`}
+                              kind={priceFields.kind}
+                              minInput={priceFields.minInput}
+                              maxInput={priceFields.maxInput}
+                              fieldClass={tableFieldClass}
+                              onKindChange={(kind) =>
+                                updateServicePrice(index, kind, priceFields.minInput, priceFields.maxInput)
+                              }
+                              onMinChange={(value) =>
+                                updateServicePrice(index, priceFields.kind, value, priceFields.maxInput)
+                              }
+                              onMaxChange={(value) =>
+                                updateServicePrice(index, priceFields.kind, priceFields.minInput, value)
+                              }
+                              revealAllErrors={Boolean(priceError)}
+                            />
+                            {priceError ? (
+                              <p id={`svc-price-${index}-error`} className="mt-1 text-meta text-warn" role="alert">
+                                {priceError}
+                              </p>
+                            ) : null}
+                          </td>
+                        </tr>
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -1601,6 +1810,8 @@ function TenantFormInner({
             previewRows={bulkProductPreview}
             onApply={applyBulkProducts}
             applyLabel="Add and save"
+            warningsFor={(row) => productImportWarnings(row as ProductItem)}
+            updateExisting={{ checked: bulkProductsUpdate, onChange: setBulkProductsUpdate }}
           />
           {bulkProductsError ? (
             <p className="text-body text-warn" role="alert">
@@ -1611,7 +1822,7 @@ function TenantFormInner({
           {unpricedOnly ? (
             <div data-unpriced-filter="" className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-accent-tonal px-4 py-2">
               <p className="text-meta text-ink">
-                Showing {productIdx.length + serviceIdx.length} without a price. Add one, or choose Ask so callers get a call back.
+                Showing {productIdx.length + serviceIdx.length} without a price. Add one, or choose Quote on request for a callback.
               </p>
               <button
                 type="button"
@@ -1630,15 +1841,13 @@ function TenantFormInner({
             <div className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline lg:hidden">
               {visibleProducts.map((product, localIndex) => {
                 const index = productIdx[safeProductPage * PRODUCT_PAGE_SIZE + localIndex];
+                const priceError = catalogPriceError(state.fields, product.name);
+                const priceFields = getProductPriceFields(product, index, productPriceDrafts);
                 return (
-                  <div key={`product-m-${index}`} className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_2.75rem] items-center gap-2 px-3 py-2">
+                  <div key={`product-m-${index}`} className="grid grid-cols-[minmax(0,1fr)_2.75rem] items-start gap-2 px-3 py-2">
                     <div className="min-w-0">
                       <label className="sr-only" htmlFor={`prod-name-m-${index}`}>Name</label>
                       <input id={`prod-name-m-${index}`} value={product.name} onChange={(e) => updateProduct(index, "name", e.target.value)} placeholder="Atomic Habits" className={denseFieldClass} />
-                    </div>
-                    <div className="min-w-0">
-                      <label className="sr-only" htmlFor={`prod-price-m-${index}`}>Price</label>
-                      <input id={`prod-price-m-${index}`} value={product.price} onChange={(e) => updateProduct(index, "price", e.target.value)} placeholder="2,500 KES" className={denseFieldClass} />
                     </div>
                     <button
                       type="button"
@@ -1655,6 +1864,28 @@ function TenantFormInner({
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>
+                    <CatalogPriceEditor
+                      idPrefix={`prod-price-m-${index}`}
+                      kind={priceFields.kind}
+                      minInput={priceFields.minInput}
+                      maxInput={priceFields.maxInput}
+                      fieldClass={denseFieldClass}
+                      onKindChange={(kind) =>
+                        updateProductPrice(index, kind, priceFields.minInput, priceFields.maxInput)
+                      }
+                      onMinChange={(value) =>
+                        updateProductPrice(index, priceFields.kind, value, priceFields.maxInput)
+                      }
+                      onMaxChange={(value) =>
+                        updateProductPrice(index, priceFields.kind, priceFields.minInput, value)
+                      }
+                      revealAllErrors={Boolean(priceError)}
+                    />
+                    {priceError ? (
+                      <p id={`prod-price-m-${index}-error`} className="col-span-2 text-meta text-warn" role="alert">
+                        {priceError}
+                      </p>
+                    ) : null}
                     <div className="min-w-0">
                       <label className="sr-only" htmlFor={`prod-cat-m-${index}`}>Category</label>
                       <input id={`prod-cat-m-${index}`} value={product.category} onChange={(e) => updateProduct(index, "category", e.target.value)} placeholder="Self-help" className={denseFieldClass} />
@@ -1702,7 +1933,6 @@ function TenantFormInner({
                   <thead>
                     <tr className="border-b border-hairline bg-surface-canvas text-left text-meta font-medium text-ink-2">
                       <th className="min-w-0 px-3 py-2.5 font-medium">Name</th>
-                      <th className="px-3 py-2.5 font-medium">Price</th>
                       <th className="px-3 py-2.5 font-medium">Category</th>
                       <th className="px-3 py-2.5 font-medium">Stock</th>
                       <th className="px-3 py-2.5 font-medium w-12">
@@ -1713,93 +1943,111 @@ function TenantFormInner({
                   <tbody className="divide-y divide-hairline bg-surface">
                     {visibleProducts.map((product, localIndex) => {
                       const index = productIdx[safeProductPage * PRODUCT_PAGE_SIZE + localIndex];
+                      const priceError = catalogPriceError(state.fields, product.name);
+                      const priceFields = getProductPriceFields(product, index, productPriceDrafts);
                       return (
-                        <tr key={`product-${index}`} className="align-middle">
-                          <td className="min-w-0 px-3 py-2">
-                            <label className="sr-only" htmlFor={`prod-name-${index}`}>
-                              Product name
-                            </label>
-                            <input
-                              id={`prod-name-${index}`}
-                              value={product.name}
-                              title={product.name || undefined}
-                              onChange={(e) => updateProduct(index, "name", e.target.value)}
-                              placeholder="Atomic Habits"
-                              className={tableFieldClass}
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <label className="sr-only" htmlFor={`prod-price-${index}`}>
-                              Price
-                            </label>
-                            <input
-                              id={`prod-price-${index}`}
-                              value={product.price}
-                              onChange={(e) => updateProduct(index, "price", e.target.value)}
-                              placeholder="2,500 KES"
-                              className={tableFieldClass}
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <label className="sr-only" htmlFor={`prod-cat-${index}`}>
-                              Category
-                            </label>
-                            <input
-                              id={`prod-cat-${index}`}
-                              value={product.category}
-                              onChange={(e) => updateProduct(index, "category", e.target.value)}
-                              placeholder="Self-help"
-                              className={tableFieldClass}
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <label className="sr-only" htmlFor={`prod-stock-${index}`}>
-                              Stock status
-                            </label>
-                            <DeskSelect
-                              id={`prod-stock-${index}`}
-                              aria-label="Stock status"
-                              value={
-                                product.in_stock === "yes" ||
-                                product.in_stock === "no" ||
-                                product.in_stock === "unknown"
-                                  ? product.in_stock
-                                  : ""
-                              }
-                              placeholder="Not set"
-                              className={tableFieldClass}
-                              options={STOCK_OPTIONS}
-                              onChange={(next) =>
-                                updateProduct(index, "in_stock", next)
-                              }
-                            />
-                            <span className="mt-1 flex items-center justify-between gap-2 text-meta text-ink-2">
-                              Hold
-                              <ToolSwitch
-                                checked={product.holdable === true}
-                                label={`Can hold ${product.name.trim() || `product ${index + 1}`}`}
-                                onChange={(next) => setProductHoldable(index, next)}
+                        <Fragment key={`product-${index}`}>
+                          <tr className="align-top">
+                            <td className="min-w-0 px-3 py-2">
+                              <label className="sr-only" htmlFor={`prod-name-${index}`}>
+                                Product name
+                              </label>
+                              <input
+                                id={`prod-name-${index}`}
+                                value={product.name}
+                                title={product.name || undefined}
+                                onChange={(e) => updateProduct(index, "name", e.target.value)}
+                                placeholder="Atomic Habits"
+                                className={tableFieldClass}
                               />
-                            </span>
-                          </td>
-                          <td className="px-2 py-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                requestRemove(
-                                  product,
-                                  `Remove ${product.name.trim() || "this product"}?`,
-                                  "It leaves the catalogue when you save.",
-                                  () => setProducts((prev) => prev.filter((_, i) => i !== index))
-                                )
-                              }
-                              className={settingsTrashButtonClass}
-                              aria-label={`Remove product ${index + 1}`}
-                            >
-                              <TrashIcon className="h-4 w-4" />
-                            </button>
-                          </td>
-                        </tr>
+                            </td>
+                            <td className="px-3 py-2">
+                              <label className="sr-only" htmlFor={`prod-cat-${index}`}>
+                                Category
+                              </label>
+                              <input
+                                id={`prod-cat-${index}`}
+                                value={product.category}
+                                onChange={(e) => updateProduct(index, "category", e.target.value)}
+                                placeholder="Self-help"
+                                className={tableFieldClass}
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <label className="sr-only" htmlFor={`prod-stock-${index}`}>
+                                Stock status
+                              </label>
+                              <DeskSelect
+                                id={`prod-stock-${index}`}
+                                aria-label="Stock status"
+                                value={
+                                  product.in_stock === "yes" ||
+                                  product.in_stock === "no" ||
+                                  product.in_stock === "unknown"
+                                    ? product.in_stock
+                                    : ""
+                                }
+                                placeholder="Not set"
+                                className={tableFieldClass}
+                                options={STOCK_OPTIONS}
+                                onChange={(next) =>
+                                  updateProduct(index, "in_stock", next)
+                                }
+                              />
+                              <span className="mt-1 flex items-center justify-between gap-2 text-meta text-ink-2">
+                                Hold
+                                <ToolSwitch
+                                  checked={product.holdable === true}
+                                  label={`Can hold ${product.name.trim() || `product ${index + 1}`}`}
+                                  onChange={(next) => setProductHoldable(index, next)}
+                                />
+                              </span>
+                            </td>
+                            <td className="px-2 py-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  requestRemove(
+                                    product,
+                                    `Remove ${product.name.trim() || "this product"}?`,
+                                    "It leaves the catalogue when you save.",
+                                    () => setProducts((prev) => prev.filter((_, i) => i !== index))
+                                  )
+                                }
+                                className={settingsTrashButtonClass}
+                                aria-label={`Remove product ${index + 1}`}
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </td>
+                          </tr>
+                          <tr className="border-b border-hairline">
+                            <td colSpan={4} className="px-3 pb-3 pt-0">
+                              <CatalogPriceEditor
+                                idPrefix={`prod-price-${index}`}
+                                kind={priceFields.kind}
+                                minInput={priceFields.minInput}
+                                maxInput={priceFields.maxInput}
+                                fieldClass={tableFieldClass}
+                                onKindChange={(kind) =>
+                                  updateProductPrice(index, kind, priceFields.minInput, priceFields.maxInput)
+                                }
+                                onMinChange={(value) =>
+                                  updateProductPrice(index, priceFields.kind, value, priceFields.maxInput)
+                                }
+                                onMaxChange={(value) =>
+                                  updateProductPrice(index, priceFields.kind, priceFields.minInput, value)
+                                }
+                                revealAllErrors={Boolean(priceError)}
+                              />
+                              {priceError ? (
+                                <p id={`prod-price-${index}-error`} className="mt-1 text-meta text-warn" role="alert">
+                                  {priceError}
+                                </p>
+                              ) : null}
+                            </td>
+                          </tr>
+                        </Fragment>
                       );
                     })}
                   </tbody>
@@ -1961,7 +2209,8 @@ function TenantFormInner({
         {panel === "policies" ? (
           <PaymentsEditor
             value={policies.payments ?? null}
-            legacyText={policies.payment}
+            legacyText={ownerLegacy("payment")}
+            quoteSource={!starterKeys.has("payment")}
             errors={state.fields}
             onChange={(payments) => {
               queueOwnerPath("policies.payment");
@@ -1975,7 +2224,7 @@ function TenantFormInner({
               <SettingsRow
                 label="Book a time slot directly"
                 control="switch"
-                hint="Off: callers ask for a time and you confirm it. On: your Business Assistant books the time."
+                hint="Off: callers ask for a time and you confirm it. On: your Business Assistant notes the time they ask for, and you confirm it."
               >
                 <ToolSwitch
                   checked={readBookingMode(policies) === "confirmed_slot"}
@@ -2041,7 +2290,7 @@ function TenantFormInner({
                   </SettingsRow>
                 </>
               ) : null}
-              {policies.deposit ? (
+              {policies.deposit && !starterKeys.has("deposit") ? (
                 <SettingsStack label="Hold note" htmlFor="policy-deposit">
                   <PolicyTextarea
                     id="policy-deposit"
@@ -2103,7 +2352,12 @@ function TenantFormInner({
 
         <PolicyRulesEditor
           rules={policies.rules ?? {}}
-          legacy={{ returns: policies.returns, delivery: policies.delivery, cancellation: policies.cancellation, warranty: policies.warranty }}
+          legacy={{
+            returns: ownerLegacy("returns"),
+            delivery: ownerLegacy("delivery"),
+            cancellation: ownerLegacy("cancellation"),
+            warranty: ownerLegacy("warranty"),
+          }}
           vertical={vertical}
           errors={state.fields}
           onChange={(rules) => {
@@ -2131,14 +2385,27 @@ function TenantFormInner({
         </SettingsGroup>
 
         <SettingsGroup title="When unsure">
-          <SettingsStack label="What to say" htmlFor="unknown_answer_fallback">
-            <PolicyTextarea
-              id="unknown_answer_fallback"
-              value={unknownFallback}
-              onChange={setUnknownFallback}
-              placeholder="A teammate will call you back today."
-            />
-          </SettingsStack>
+          <UnknownAnswerField
+            text={unknownText}
+            onText={setUnknownText}
+            onReset={() => {
+              setUnknownText(UNKNOWN_ANSWER_DEFAULT_EN);
+              setSpokenEn("");
+              setSpokenSw("");
+              setSpokenTouched(false);
+            }}
+            english={spokenEn}
+            swahili={spokenSw}
+            updating={pending && Boolean(unknownLine) && unknownLine !== spokenSource}
+            onEnglish={(value) => {
+              setSpokenEn(value);
+              setSpokenTouched(true);
+            }}
+            onSwahili={(value) => {
+              setSpokenSw(value);
+              setSpokenTouched(true);
+            }}
+          />
         </SettingsGroup>
       </section>
 
@@ -2277,6 +2544,7 @@ function TenantFormInner({
 
       <section className={panel === "team" ? "space-y-4" : "hidden"}>
         {membersSlot}
+        {seatNoteSlot}
         {/* Live connect only appears once the runtime supports it. Today Scalers is callbacks only. */}
         {liveTransferExecutor ? (
           <>

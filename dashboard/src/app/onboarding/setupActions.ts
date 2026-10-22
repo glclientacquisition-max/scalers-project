@@ -179,7 +179,6 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
     whatsapp: alerts.phone || null,
     email: alerts.emailOn ? alerts.email : null,
   });
-  const unknownAnswerFallback = "I'll check with the owner and get back to you.";
   const voice = draft.voice;
 
   // The local prompt is instant and complete; the model-written one (seconds) replaces it
@@ -196,14 +195,12 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
     policiesText: "",
     productsText,
     faqs,
-    unknownAnswerFallback,
     teamDirectory,
   };
   const answers: OnboardingAnswers = { servicesPricing: servicesOffered, hoursLocation: businessHours, tone: voice.tone };
   const prompt = compilePromptLocally(row.business_name, answers, {
       agentName: voice.agentName,
       faqs,
-      unknownAnswerFallback,
       teamDirectory,
       vertical,
       handoffMode: voice.handoff,
@@ -229,7 +226,6 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
     llm_system_prompt: prompt,
     agent_tools: { escalate: true, end_call: true },
     after_hours_mode: "serve",
-    unknown_answer_fallback: unknownAnswerFallback,
     whatsapp_notification_number: alerts.phone || null,
     alert_email: alerts.email || null,
     notify_channels: notifyChannelsFor(alerts),

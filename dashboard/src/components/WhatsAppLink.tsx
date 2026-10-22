@@ -7,11 +7,34 @@
 
 import { buttonClass } from "@/components/ui/Button";
 import { IconButtonAnchor } from "@/components/ui/IconButton";
-import { logWhatsAppFollowUp } from "@/app/(desk)/calls/actions";
+import { kePhoneDigits } from "@/lib/kePhone";
+
+/** Route that appends the follow-up note. Never changes lead_status. */
+export const WHATSAPP_FOLLOWUP_URL = "/api/inbox/whatsapp-followup";
+
+/**
+ * Fire-and-forget log of the wa.me tap. sendBeacon (or fetch keepalive) survives
+ * the page leaving for WhatsApp, which iOS Safari otherwise drops.
+ */
+export function logWhatsAppFollowUpBeacon(callId: string) {
+  const body = JSON.stringify({ callId });
+  try {
+    if (navigator.sendBeacon?.(WHATSAPP_FOLLOWUP_URL, new Blob([body], { type: "text/plain;charset=UTF-8" }))) return;
+  } catch {
+    /* fall through to fetch */
+  }
+  void fetch(WHATSAPP_FOLLOWUP_URL, {
+    method: "POST",
+    headers: { "content-type": "text/plain;charset=UTF-8" },
+    body,
+    keepalive: true,
+    credentials: "same-origin",
+  }).catch(() => {});
+}
 
 export function waMeHref(rawNumber: string, message?: string): string | null {
-  const digits = String(rawNumber || "").replace(/\D/g, "");
-  if (digits.length < 9) return null;
+  const digits = kePhoneDigits(rawNumber);
+  if (!digits) return null;
   const base = `https://wa.me/${digits}`;
   const text = String(message || "").trim();
   if (!text) return base;
@@ -49,14 +72,14 @@ export function WhatsAppLink({
   message?: string;
   variant?: "inline" | "primary" | "icon" | "link" | "ghost";
   className?: string;
-  /** When set, click writes the follow-up note and exits Needs you. */
+  /** When set, click logs the follow-up note. Mark done stays with the owner. */
   callId?: string | null;
 }) {
   const href = waMeHref(number, message);
   const text = label ?? number;
   const onOpen = callId
     ? () => {
-        void logWhatsAppFollowUp(callId);
+        logWhatsAppFollowUpBeacon(callId);
       }
     : undefined;
 

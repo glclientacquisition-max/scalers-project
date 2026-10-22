@@ -2,7 +2,7 @@ import * as React from "react";
 import { Body, Container, Head, Html, Img, Preview } from "@react-email/components";
 import type { Block, EmailSpec, Rich } from "./spec.ts";
 import { buttonHtml } from "./button.ts";
-import { headCss } from "./styles.ts";
+import { bandCss, headCss } from "./styles.ts";
 import { fontStack, layout, light, toneColors, type Tone } from "./tokens.ts";
 
 type FooterProps = {
@@ -45,6 +45,22 @@ function RichText({ r }: { r: Rich }) {
         ),
       )}
     </>
+  );
+}
+
+/** Environment band. Colour and text both say which environment, so it reads with colours off too. */
+function Band({ band }: { band: NonNullable<EmailSpec["band"]> }) {
+  const prod = band.tone === "production";
+  const bg = prod ? light.danger : light.bandNeutral;
+  const fg = prod ? light.dangerOn : light.bandNeutralOn;
+  return (
+    <T style={{ margin: "16px 0 0" }}>
+      <tr>
+        <td className={prod ? "band-prod" : "band-neu"} bgcolor={bg} style={{ backgroundColor: bg, color: fg, borderRadius: 8, padding: "8px 14px", fontFamily: fontStack, fontSize: 13, lineHeight: "18px", fontWeight: 700, letterSpacing: "0.06em" }}>
+          {band.text}
+        </td>
+      </tr>
+    </T>
   );
 }
 
@@ -321,7 +337,7 @@ export function EmailLayout({
         <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
         <meta name="x-apple-disable-message-reformatting" />
         <title>{spec.subject}</title>
-        <style>{headCss}</style>
+        <style>{spec.band ? headCss + bandCss : headCss}</style>
       </Head>
       <Preview>{spec.preheader}</Preview>
       <Body className="bg-canvas" style={{ backgroundColor: light.canvas, margin: 0, padding: 0, fontFamily: fontStack }}>
@@ -329,6 +345,7 @@ export function EmailLayout({
           <tr>
             <td align="center" className="wrap" style={{ padding: "0 16px" }}>
               <Container style={{ maxWidth: layout.maxWidth, width: "100%" }}>
+                {spec.band && <Band band={spec.band} />}
                 {/* Header: mark + text wordmark. Text stays readable with images off. */}
                 <T>
                   <tr>

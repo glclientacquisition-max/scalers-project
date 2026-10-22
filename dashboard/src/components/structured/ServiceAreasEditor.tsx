@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { Sheet } from "@/components/ui/Sheet";
 import { TextField } from "@/components/ui/TextField";
 import { SettingsGroup } from "@/components/settingsUi";
@@ -95,6 +96,8 @@ export function ServiceAreasEditor({
   const [error, setError] = useState<string>("");
   const [feesDiffer, setFeesDiffer] = useState(false);
   const [draft, setDraft] = useState<ServiceArea | null>(null);
+  /** Area id waiting on "Remove …?". Remove saves the page at once. */
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [more, setMore] = useState(false);
   const [who, setWho] = useState<{ by: DeliveredBy[]; paid: RiderPaid | null }>({ by: [], paid: null });
 
@@ -180,7 +183,7 @@ export function ServiceAreasEditor({
       {!copy.areas ? null : value.areas.length === 0 ? (
         <div className="space-y-3 rounded-2xl border border-hairline bg-surface px-4 py-5 text-center">
           <p className="text-body font-medium text-ink">{copy.title}</p>
-          <p className="text-meta text-ink-2">{copy.empty} Your Business Assistant tells callers the price.</p>
+          <p className="text-meta text-ink-2">{copy.empty} Callers do not hear this fee on the call yet. You confirm it when you call back.</p>
           {canEdit ? (
             <Button onClick={() => openBulk()} data-areas-add="">
               Add areas
@@ -408,7 +411,7 @@ export function ServiceAreasEditor({
             <Button
               variant="ghost"
               onClick={() => {
-                if (editing) onSave({ ...value, areas: value.areas.filter((a) => a.id !== editing.id) });
+                if (editing) setConfirmRemove(editing.id);
                 setSheet(null);
               }}
             >
@@ -490,6 +493,24 @@ export function ServiceAreasEditor({
           ) : null}
         </div>
       </Sheet>
+
+      <ConfirmSheet
+        open={confirmRemove != null}
+        title={confirmRemove ? `Remove ${coverageAreaLabel(confirmRemove)}?` : "Remove this area?"}
+        confirmLabel="Remove"
+        danger
+        onClose={() => {
+          // Back to the area drawer, edits as they were.
+          if (confirmRemove && draft?.id === confirmRemove) setSheet(confirmRemove);
+          setConfirmRemove(null);
+        }}
+        onConfirm={() => {
+          if (confirmRemove) onSave({ ...value, areas: value.areas.filter((a) => a.id !== confirmRemove) });
+          setConfirmRemove(null);
+        }}
+      >
+        It comes off your list of areas. This saves straight away.
+      </ConfirmSheet>
     </div>
   );
 }

@@ -125,7 +125,7 @@ test("wiring: form remounts on catalogue content, not lengths", () => {
 
 test("wiring: confirm-price patches one item by id from a fresh read", () => {
   const src = read("dashboard/src/app/(desk)/settings/structuredActions.ts");
-  assert.ok(src.includes("patchCatalogItem("));
+  assert.ok(read("dashboard/src/lib/priceBatch.ts").includes("patchCatalogItem("));
   assert.ok(/readCatalogFresh\(/.test(src));
 });
 
@@ -140,4 +140,169 @@ test("wiring: Add prices list freezes while typing and uses the shared rule", ()
   assert.ok(src.includes("isUnpricedRow("));
   assert.ok(src.includes("unpricedFrozen"));
   assert.ok(!/products\.length \/ PRODUCT_PAGE_SIZE/.test(src), "Add product uses the visible list");
+});
+
+// --- fact hash contract: confirmPriceAction re-stamps the .price hash -------
+
+test("catalogPricePath keys a service by stable id and a product by sku, else position", () => {
+  const services = [{ id: "svc_a", name: "A" }, { id: "7", name: "B" }, { name: "C" }];
+  assert.equal(cp.catalogPricePath("service", services, 0), "catalog.service.svc_a.price");
+  assert.equal(cp.catalogPricePath("service", services, 1), "catalog.service.2.price");
+  assert.equal(cp.catalogPricePath("service", services, 2), "catalog.service.3.price");
+  const products = [{ sku: " P1 ", name: "Ream" }, { name: "Pens" }];
+  assert.equal(cp.catalogPricePath("product", products, 0), "catalog.product.P1.price");
+  assert.equal(cp.catalogPricePath("product", products, 1), "catalog.product.2.price");
+  assert.equal(cp.catalogPricePath("service", services, -1), null);
+  assert.equal(cp.catalogPricePath("service", services, 9), null);
+});
+
+test("confirm rewrite: the re-stamped .price hash matches the saved row, and the envelope does not move .name", async () => {
+  const { planFactConfirm } = await import("../dashboard/src/lib/factConfirm.ts");
+  const { factValueForPath, hashFactValue } = await import("../dashboard/src/lib/factHash.ts");
+  const before = {
+    services_catalog: [
+      { id: "svc_a", name: "Carpet", price_range: "KES 900", pricing: { mode: "fixed", amount_ksh: 900, source: "parsed", confirmed: false, parsed_from: "900" } },
+    ],
+  };
+  const saved = {
+    services_catalog: [
+      { id: "svc_a", name: "Carpet", price_range: "KES 900", source: "owner", pricing: { mode: "fixed", amount_ksh: 900, source: "owner", confirmed: true, parsed_from: "KES 900" } },
+    ],
+  };
+  const path = cp.catalogPricePath("service", saved.services_catalog, 0)!;
+  const plan = planFactConfirm({ scope: "catalog", before: saved, after: saved, explicitPaths: [path] });
+  assert.deepEqual(plan.confirm, [{ path, hash: hashFactValue(factValueForPath(path, saved)) }]);
+  assert.deepEqual(plan.reopen, []);
+  // Only the envelope changed, so the row's .name hash is the same as before the confirm.
+  const name = "catalog.service.svc_a.name";
+  assert.equal(hashFactValue(factValueForPath(name, saved)), hashFactValue(factValueForPath(name, before)));
+});
+
+test("confirmPriceAction re-stamps the .price hash after it writes the row", () => {
+  const src = fs.readFileSync(path.join(process.cwd(), "dashboard/src/app/(desk)/settings/structuredActions.ts"), "utf8");
+  const body = src.slice(src.indexOf("export async function confirmPricesAction"));
+  const write = body.indexOf('.from("tenants").update(');
+  const stamp = body.indexOf("restampPriceHash(");
+  assert.ok(write > 0 && stamp > write, "re-stamp runs after the tenants update");
+  assert.match(src, /explicitPaths: paths/);
+  // runPriceBatch: write, then re-stamp, then rebuild.
+  const batch = read("dashboard/src/lib/priceBatch.ts");
+  const run = batch.slice(batch.indexOf("export async function runPriceBatch"));
+  assert.ok(run.indexOf("deps.write(") < run.indexOf("deps.restamp(") && run.indexOf("deps.restamp(") < run.indexOf("deps.recompile("));
+  assert.match(batch, /out\.add\(path\.replace\(\/\\\.price\$\/, "\.name"\)\)/);
+});
+
+test("confirm with no real change: re-stamped .price and .name both match the stored row", async () => {
+  const { planFactConfirm } = await import("../dashboard/src/lib/factConfirm.ts");
+  const { factValueForPath, hashFactValue } = await import("../dashboard/src/lib/factHash.ts");
+  for (const text of ["KSh 3,000 flat", "Ksh 800-1200"]) {
+    const row = parsedRow(text, 1);
+    const before = { services_catalog: [row] };
+    const saved = { services_catalog: [{ ...confirm(row), source: "owner" }] };
+    const pricePath = cp.catalogPricePath("service", saved.services_catalog, 0)!;
+    const namePath = pricePath.replace(/\.price$/, ".name");
+    // priceLabel rewrites the text, so the .name value moves even though the owner said "yes".
+    assert.notEqual(saved.services_catalog[0].price_range, text);
+    assert.notEqual(hashFactValue(factValueForPath(namePath, saved)), hashFactValue(factValueForPath(namePath, before)));
+    const plan = planFactConfirm({ scope: "catalog", before: saved, after: saved, explicitPaths: [pricePath, namePath] });
+    const got = Object.fromEntries(plan.confirm.map((c: { path: string; hash: string }) => [c.path, c.hash]));
+    assert.equal(got[pricePath], hashFactValue(factValueForPath(pricePath, saved)));
+    assert.equal(got[namePath], hashFactValue(factValueForPath(namePath, saved)));
+    assert.deepEqual(plan.reopen, []);
+  }
+});
+
+// --- fact hash re-stamp failure visibility -----------------------------------
+
+test("factHashRestampFailurePayload is structured: tenant id, item path, error; no PII fields", async () => {
+  const { factHashRestampFailurePayload } = await import("../dashboard/src/lib/factHashRestampReport.ts");
+  const payload = factHashRestampFailurePayload({
+    tenantId: "df4ad9d8-aaaa-bbbb-cccc-ddddeeeeffff",
+    itemPath: "catalog.service.svc_a.price",
+    error: new Error("rpc confirm_tenant_fields_batch failed"),
+  });
+  assert.deepEqual(payload, {
+    tenantId: "df4ad9d8-aaaa-bbbb-cccc-ddddeeeeffff",
+    itemPath: "catalog.service.svc_a.price",
+    error: "rpc confirm_tenant_fields_batch failed",
+  });
+  assert.equal("name" in payload, false);
+  assert.equal("price" in payload, false);
+  assert.equal("price_range" in payload, false);
+});
+
+test("reportFactHashRestampFailure logs a structured fact_hash_restamp_failed error", async () => {
+  const { reportFactHashRestampFailure } = await import("../dashboard/src/lib/factHashRestampReport.ts");
+  const errors: unknown[] = [];
+  const orig = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args[0]); };
+  try {
+    reportFactHashRestampFailure({
+      tenantId: "t1",
+      itemPath: "catalog.service.svc_a.price",
+      error: "stamp failed",
+    });
+  } finally {
+    console.error = orig;
+  }
+  assert.equal(errors.length, 1);
+  const parsed = JSON.parse(String(errors[0]));
+  assert.equal(parsed.event, "fact_hash_restamp_failed");
+  assert.equal(parsed.tenantId, "t1");
+  assert.equal(parsed.itemPath, "catalog.service.svc_a.price");
+  assert.equal(parsed.error, "stamp failed");
+});
+
+test("legacy fixed save does not move the price fact hash; editor Fixed and non-fixed imports do", async () => {
+  const { createRequire } = await import("node:module");
+  const { applyCatalogPriceFields, structureImportedCatalogRow } = await import(
+    "../dashboard/src/lib/catalogPricingMode.ts"
+  );
+  const jsFactHash = createRequire(import.meta.url)("../src/conversation/factHash.js") as {
+    priceFactValue: (row: unknown, kind: "service" | "product") => unknown;
+    hashFactValue: (value: unknown) => string;
+  };
+
+  const legacy = {
+    id: "svc_aaaaaaaaaaaaaaaa",
+    name: "Sofa clean",
+    price_range: "KES 2,500",
+  };
+  const storedHash = jsFactHash.hashFactValue(jsFactHash.priceFactValue(legacy, "service"));
+  assert.deepEqual(jsFactHash.priceFactValue(legacy, "service"), { price: "KES 2,500" });
+
+  const settled = cp.settleCatalogPrices([legacy], [legacy], "service")[0] as typeof legacy & {
+    pricing_mode?: string;
+  };
+  assert.equal(settled.pricing_mode, undefined);
+  assert.equal(jsFactHash.hashFactValue(jsFactHash.priceFactValue(settled, "service")), storedHash);
+  assert.deepEqual(jsFactHash.priceFactValue(settled, "service"), jsFactHash.priceFactValue(legacy, "service"));
+
+  const edited = applyCatalogPriceFields(legacy, "fixed", "2500", "", "price_range");
+  assert.equal(edited.pricing_mode, "fixed");
+  assert.notEqual(jsFactHash.hashFactValue(jsFactHash.priceFactValue(edited, "service")), storedHash);
+
+  const importedFixed = structureImportedCatalogRow(
+    { name: "Carpet wash", price_range: "KSh 60 per sq ft" },
+    "price_range"
+  );
+  assert.equal(importedFixed.pricing_mode, undefined);
+  assert.equal(importedFixed.price_mode, undefined);
+  assert.equal(importedFixed.price_range, "KSh 60 per sq ft");
+  assert.equal(importedFixed.price, "60");
+
+  const importedFrom = structureImportedCatalogRow(
+    { name: "Rooms", price_range: "from KSh 1,500" },
+    "price_range"
+  );
+  assert.equal(importedFrom.pricing_mode, "from");
+});
+
+test("confirmPriceAction reports re-stamp failures instead of a silent console.warn", () => {
+  const src = read("dashboard/src/app/(desk)/settings/structuredActions.ts");
+  const body = src.slice(src.indexOf("async function restampPriceHash"));
+  assert.ok(src.includes('reportFactHashRestampFailure'), "imports/uses the reporter");
+  assert.ok(body.includes("reportFactHashRestampFailure({"), "failure path calls the reporter");
+  assert.ok(body.includes("itemPath: path"), "logs the item path, not the item name");
+  assert.ok(!/console\.warn\(\s*"\[confirmPriceAction\] price hash"/.test(src), "old silent warn removed");
 });

@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { ThemePicker, appearanceLabel, useThemeChoice } from "@/components/ThemePicker";
-import { iconButtonClass } from "@/components/ui/IconButton";
+import { IconButton, iconButtonClass } from "@/components/ui/IconButton";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
+import { Sheet } from "@/components/ui/Sheet";
 import { SignOutButton } from "@/components/ui/SignOutButton";
+import { AdminGlobalSearch } from "@/components/admin/AdminGlobalSearch";
 import { cx } from "@/lib/cx";
 import { deskRowInitials } from "@/components/ui/deskRow";
 
@@ -17,6 +20,7 @@ function accountInitials(name: string): string {
 export function AdminAccountMenu({ name }: { name: string }) {
   const [open, setOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const theme = useThemeChoice();
   const initials = accountInitials(name);
 
@@ -25,7 +29,10 @@ export function AdminAccountMenu({ name }: { name: string }) {
       data-account-bar=""
       className="relative flex min-h-12 shrink-0 items-center justify-end gap-2 border-b border-hairline bg-surface px-3 sm:px-4"
     >
-      <div className="me-auto md:hidden">
+      <div className="me-auto hidden min-w-0 flex-1 md:block md:max-w-md lg:max-w-lg">
+        <AdminGlobalSearch />
+      </div>
+      <div className="me-auto flex items-center gap-1 md:hidden">
         <BrandLockup
           href="/admin"
           name="Scalers"
@@ -34,7 +41,13 @@ export function AdminAccountMenu({ name }: { name: string }) {
           scroll={false}
           className="min-h-11 min-w-11 justify-center"
         />
+        <IconButton label="Search" onClick={() => setSearchOpen(true)}>
+          <MagnifyingGlassIcon />
+        </IconButton>
       </div>
+      <Sheet open={searchOpen} onOpenChange={setSearchOpen} title="Search" theme="admin">
+        <AdminGlobalSearch layout="sheet" />
+      </Sheet>
       <Menu
         onOpenChange={(next) => {
           setOpen(next);

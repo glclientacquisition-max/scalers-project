@@ -52,6 +52,9 @@ const mail = await renderEmail("usage_80", {
 | `ops_incident` (open/recovered) | ops | yes | Open client (`/admin/billing/<id>`) or Open Platform |
 | `ops_incident_reminder` (follow-up, 4h) | ops | yes | same |
 | `ops_digest` (07:30 EAT) | ops | yes | Open Platform; per-client "Open client" links |
+| `ops_wallet` (low, empty, topped up; `[PRODUCTION]` red band or `[STAGING]` grey band) | ops | yes | Top up in SautiKit, or Open Platform once topped up. Exported to Desk with `npm run export:ops-wallet` |
+
+Environment tag: `src/env.ts` (`envTag`, `envSubject`, `envBand`, `withEnv`) is the one helper for every email. Pass `renderEmail(kind, props, { env: { env: "staging", note } })` to tag any kind, or call `withEnv` in a template. The layout draws the band (red production, grey staging) and the plain text leads with it. Tag by what the mail is about, not the sending host.
 
 Essential mail has no unsubscribe link or `List-Unsubscribe` header. Non-essential mail gets both (one-click) when the caller passes `unsubscribeUrl`.
 

@@ -24,6 +24,7 @@ export type SautikitNumber = {
 };
 
 export type SautikitWallet = {
+  workspace_id?: string;
   balance_minor: number;
   currency: string;
   status?: string;
@@ -219,8 +220,11 @@ async function sautikitGet<T>(path: string): Promise<T> {
   return sautikitRequest<T>(path, { apiKey });
 }
 
-export async function listSautikitNumbers(): Promise<SautikitNumber[]> {
-  const json = await sautikitGet<{ numbers: SautikitNumber[] }>("/v1/numbers");
+export async function listSautikitNumbers(apiKey?: string): Promise<SautikitNumber[]> {
+  // A passed key (the ops alert renewal read) is used as is; otherwise SAUTIKIT_API_KEY.
+  const json = apiKey
+    ? await sautikitRequest<{ numbers: SautikitNumber[] }>("/v1/numbers", { apiKey })
+    : await sautikitGet<{ numbers: SautikitNumber[] }>("/v1/numbers");
   return json.numbers || [];
 }
 
@@ -275,16 +279,19 @@ export async function claimSautikitNumber(inventoryId: string): Promise<Sautikit
  * one server-side warning so the blind low-balance alert leaves a trace.
  * Never logs the key.
  */
-export async function getSautikitWallet(): Promise<SautikitWallet | null> {
+export async function getSautikitWallet(apiKey?: string): Promise<SautikitWallet | null> {
   try {
-    return await sautikitGet<SautikitWallet>("/v1/wallet");
+    // A passed key (the staging wallet read) is used as is; otherwise SAUTIKIT_API_KEY.
+    return apiKey
+      ? await sautikitRequest<SautikitWallet>("/v1/wallet", { apiKey })
+      : await sautikitGet<SautikitWallet>("/v1/wallet");
   } catch (err) {
     const status = (err as { status?: number }).status;
     const code = (err as { code?: string }).code;
     if (status === 403 || code === "api_key.scope_denied") {
       console.warn(
         `[sautikit:wallet] GET /v1/wallet denied (HTTP ${status ?? "?"}, ${code || "no code"}). ` +
-          "SAUTIKIT_API_KEY needs the wallet.read scope; balance and low-balance alerts are blind until then."
+          `${apiKey ? "SAUTIKIT_STAGING_WALLET_KEY" : "SAUTIKIT_API_KEY"} needs the wallet.read scope; balance and low-balance alerts are blind until then.`
       );
       return null;
     }

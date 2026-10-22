@@ -9,16 +9,12 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { focusRingVisible } from "@/components/ui/deskChrome";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import {
-  inboxArchive,
-  inboxConfirm,
-  inboxHoldDone,
-  inboxMarkDone,
-  inboxUnarchive,
-} from "@/lib/inboxLeadActions";
-import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
+import { inboxArchiveItems, inboxBulk, inboxUnarchiveItems } from "@/lib/inboxLeadActions";
+import { announceInboxResult, writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
+import { inboxUnarchiveText } from "@/lib/inboxArchiveCascade";
+import { inboxBulkOutcomeText, isInboxBulkKind } from "@/lib/inboxBulk";
 import { inboxBulkActions, type InboxListActionId } from "@/lib/inboxListVerbs";
-import { itemIsArchived, type InboxItem } from "@/lib/inboxPurpose";
+import type { InboxItem } from "@/lib/inboxPurpose";
 
 /**
  * Select hit. From `md` up it stays in the row. Below `md` it stays in the
@@ -149,6 +145,7 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   if (!ui || !ui.selecting) return null;
 
   const { selected, patch, clear, replace } = ui;
@@ -158,47 +155,52 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
   const actions = inboxBulkActions(chosen);
 
   async function run(kind: InboxListActionId) {
-    if (kind === "pin" || kind === "unpin") return;
+    if (!isInboxBulkKind(kind)) return;
     setBusy(true);
     setError(null);
-    const archivedRows: { id: string; callId: string }[] = [];
-    for (const item of chosen) {
-      if (kind === "confirm" && String(item.job?.status || "").toLowerCase() !== "requested") {
-        continue;
-      }
-      if (kind === "done" && String(item.hold?.status || "").toLowerCase() !== "open") {
-        continue;
-      }
-      if (kind === "mark_done" && (item.job || item.hold || itemIsArchived(item))) {
-        continue;
-      }
-      if (kind === "archive" && itemIsArchived(item)) continue;
-      if (kind === "unarchive" && !itemIsArchived(item)) continue;
-      const res =
-        kind === "confirm"
-          ? await inboxConfirm(item)
-          : kind === "done"
-            ? await inboxHoldDone(item)
-            : kind === "mark_done"
-              ? await inboxMarkDone(item)
-              : kind === "unarchive"
-                ? await inboxUnarchive(item)
-                : await inboxArchive(item);
-      if (res.error) {
-        if (archivedRows.length) writeInboxArchiveUndo(archivedRows);
-        setError(res.error);
-        setBusy(false);
-        return;
-      }
-      if (kind === "archive" && item.callId) {
-        archivedRows.push({ id: item.id, callId: item.callId });
-      }
-      if (kind === "archive" || kind === "unarchive") {
-        patch(item.id, { hidden: true });
+    setNote(null);
+    // One server request for every selected row. Archive goes through
+    // inbox_archive_calls (calls + their open requests in one transaction);
+    // the rest through inboxBulkAction. Each row comes back as applied,
+    // cascaded (archived with its call), missed (server did not change it)
+    // or skipped.
+    // Unarchive goes through inbox_unarchive_calls (calls + their requests).
+    const archive = kind === "archive" ? await inboxArchiveItems(chosen) : null;
+    const unarchive = kind === "unarchive" ? await inboxUnarchiveItems(chosen) : null;
+    const res = archive ?? unarchive ?? (await inboxBulk(kind, chosen));
+    if (res.error) {
+      setError(res.error);
+      setBusy(false);
+      return;
+    }
+    if (archive) {
+      // Undo restores exactly what the server archived (its undo record).
+      const archivedRows = archive.applied
+        .filter((target) => target.callId)
+        .map((target) => ({ id: target.itemId, callId: String(target.callId) }));
+      const requests = archive.cascaded
+        .filter((target) => target.callId)
+        .map((target) => ({ id: target.itemId, callId: String(target.callId) }));
+      if (archivedRows.length) {
+        writeInboxArchiveUndo(archivedRows, undefined, undefined, {
+          undoId: archive.undoId,
+          requests,
+          holdIds: archive.holdIds,
+          visitIds: archive.visitIds,
+        });
       }
     }
-    if (archivedRows.length) writeInboxArchiveUndo(archivedRows);
-    if (kind === "done" || kind === "archive" || kind === "unarchive" || kind === "confirm" || kind === "mark_done") {
+    if (unarchive) announceInboxResult(inboxUnarchiveText(unarchive));
+    if (kind === "archive" || kind === "unarchive") {
+      for (const target of [...res.applied, ...(res.cascaded ?? [])]) patch(target.itemId, { hidden: true });
+    }
+    const outcome = inboxBulkOutcomeText(kind, res);
+    if (outcome) {
+      // Keep the rows that did not change selected, and say why.
+      const left = [...res.missed.map((t) => t.itemId), ...res.skipped.map((s) => s.itemId)];
+      replace(left);
+      setNote(outcome);
+    } else {
       clear();
     }
     setBusy(false);
@@ -242,6 +244,11 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
       {error ? (
         <p className="w-full text-caption text-attention" role="alert">
           {error}
+        </p>
+      ) : null}
+      {note && !error ? (
+        <p className="w-full pb-2 text-caption text-ink" role="status">
+          {note}
         </p>
       ) : null}
     </div>

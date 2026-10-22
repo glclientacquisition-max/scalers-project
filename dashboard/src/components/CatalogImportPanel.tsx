@@ -1,10 +1,11 @@
 "use client";
 
 import { withRoleGate } from "@/components/DeskRole";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
-import type { ProductItem } from "@/lib/productCatalog";
+import { catalogImportPriceHintText } from "@/components/settings/catalog/CatalogImportPriceLine";
+import { productImportWarnings, type ProductItem } from "@/lib/productCatalog";
 import type { SocialHandles } from "@/lib/socialHandles";
 import { socialHandlesHaveContent } from "@/lib/socialHandles";
 import {
@@ -29,6 +30,17 @@ const fieldClass = settingsFieldClass;
 const initial: CatalogImportState = {};
 
 type Mode = "paste" | "csv" | "url";
+type MergeMode = "merge" | "update" | "replace";
+
+/** Plain-text exports only; a spreadsheet's own format would need its app to save as CSV. */
+const FILE_ACCEPT = ".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values";
+const FILE_MAX_BYTES = 1_000_000;
+
+const MERGE_HINT: Record<MergeMode, string> = {
+  merge: "New items are added. Items you already have stay as they are.",
+  update: "Items with the same name get the new price. New items are added. Nothing is removed.",
+  replace: "Your product list becomes only what is ticked here.",
+};
 
 function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
   const router = useRouter();
@@ -38,7 +50,23 @@ function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
   const [products, setProducts] = useState<ProductItem[] | null>(null);
   const [social, setSocial] = useState<SocialHandles | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [mergeMode, setMergeMode] = useState<"merge" | "replace">("merge");
+  const [mergeMode, setMergeMode] = useState<MergeMode>("merge");
+  const [fileNote, setFileNote] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function readFile(file: File | undefined) {
+    if (!file) return;
+    if (file.size > FILE_MAX_BYTES) {
+      setFileNote("That file is too large. Keep it under 1 MB, or paste the rows.");
+      return;
+    }
+    if (/\.(xlsx?|numbers|ods)$/i.test(file.name)) {
+      setFileNote("Save the sheet as CSV first, then choose it here.");
+      return;
+    }
+    setPaste(await file.text());
+    setFileNote(`Read ${file.name}. Check the text, then scan.`);
+  }
   const [includeSocial, setIncludeSocial] = useState(false);
   // Preview result the owner already finished with (Start over / applied): never re-show its message.
   const [dismissed, setDismissed] = useState<CatalogImportState | null>(null);
@@ -161,7 +189,27 @@ function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
                   }
                   className={`${fieldClass} mt-0 text-body leading-relaxed`}
                 />
-                <div className="flex justify-end self-end">
+                {fileNote ? (
+                  <p className="text-meta text-ink-2" role="status">
+                    {fileNote}
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap justify-end gap-2 self-end">
+                  <input
+                    ref={fileRef}
+                    id="catalog_file"
+                    type="file"
+                    accept={FILE_ACCEPT}
+                    className="sr-only"
+                    tabIndex={-1}
+                    onChange={(e) => {
+                      void readFile(e.target.files?.[0]);
+                      e.target.value = "";
+                    }}
+                  />
+                  <button type="button" className={settingsActionClass} onClick={() => fileRef.current?.click()}>
+                    Choose a file
+                  </button>
                   <button
                     type="submit"
                     disabled={previewPending}
@@ -180,11 +228,24 @@ function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
             {previewState.message || "Tick products to keep."}
           </p>
           <SettingsGroup title="Products">
-            {products.map((p, i) => (
+            {products.map((p, i) => {
+              const warnings = productImportWarnings(p);
+              return (
               <SettingsRow
                 key={`p-${i}`}
-                label={p.name}
-                hint={[p.price, p.category, p.in_stock ? `stock ${p.in_stock}` : ""]
+                label={
+                  warnings.length ? (
+                    <>
+                      {p.name}
+                      <span className="ms-2 inline-block rounded-md bg-attention-tonal px-1.5 text-meta font-medium text-attention">
+                        {warnings.join(" · ")}
+                      </span>
+                    </>
+                  ) : (
+                    p.name
+                  )
+                }
+                hint={[catalogImportPriceHintText(p), p.category, p.in_stock ? `stock ${p.in_stock}` : ""]
                   .filter(Boolean)
                   .join(" · ")}
                 control="switch"
@@ -200,7 +261,8 @@ function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
                   label={`Keep ${p.name}`}
                 />
               </SettingsRow>
-            ))}
+              );
+            })}
           </SettingsGroup>
 
           {social && socialHandlesHaveContent(social) ? (
@@ -228,11 +290,13 @@ function CatalogImportPanelInner({ tenant }: { tenant: TenantRow }) {
             options={
               [
                 { id: "merge" as const, label: "Keep existing" },
+                { id: "update" as const, label: "Update prices" },
                 { id: "replace" as const, label: "Replace" },
               ] as const
             }
             onChange={setMergeMode}
           />
+          <p className="-mt-2 text-meta text-ink-2">{MERGE_HINT[mergeMode]}</p>
 
           <form action={applyAction} className="flex flex-wrap items-center gap-2">
             <input type="hidden" name="tenant_id" value={tenant.id} />

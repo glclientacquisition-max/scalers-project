@@ -41,10 +41,14 @@ describe("Super Admin Today: reads only", () => {
     assert.doesNotMatch(fnBody(ops, "loadOpsSettings"), WRITES);
     assert.doesNotMatch(fnBody(admin, "getAdminOverview"), WRITES);
     assert.doesNotMatch(fnBody(admin, "listBusinesses"), WRITES);
-    // Platform still runs the check, so alerts keep firing from there.
-    assert.match(fnBody(ops, "evaluatePlatformOps"), /persistOpen/);
-    assert.match(fnBody(ops, "evaluatePlatformOps"), /mailKinds/);
-    assert.match(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /evaluatePlatformOps/);
+    // Platform reads. The cron owns opening, claiming, and mailing notices.
+    assert.doesNotMatch(fnBody(ops, "evaluatePlatformOps"), /persistOpen|mailKinds|sendOpsMail/);
+    assert.match(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /readPlatformOps/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /evaluatePlatformOps/);
+    assert.match(read("dashboard/src/app/api/cron/ops-alerts/route.ts"), /cronAuthorized/);
+    assert.match(read("dashboard/src/lib/opsAlerts.ts"), /claimNotified/);
+    assert.doesNotMatch(read("dashboard/src/lib/textSmsBalance.ts"), /healthz/);
+    assert.doesNotMatch(read("dashboard/src/lib/opsAlerts.ts"), /\/healthz|templates\.js|ownerCallMessage/);
   });
 });
 
@@ -68,12 +72,15 @@ describe("Super Admin Today: numbers from calls only", () => {
     );
     assert.deepEqual(rows.map((r) => r.title), ["Calls today", "Needed a person", "Caller hung up early", "Couldn't answer"]);
     assert.equal(rows[0].value, "14");
+    assert.equal(rows[0].delta, 3);
     assert.equal(rows[0].detail, "Last Friday by now: 11");
+    assert.equal(rows[2].delta, 2);
+    assert.equal(rows[2].lowerIsBetter, true);
     assert.equal(rows[1].available, false);
     assert.equal(rows[1].value, "");
     assert.equal(rows[2].value, "2");
     assert.equal(rows[3].available, false);
-    assert.equal(rows[3].detail, "Per business on Calls. Traced calls only.");
+    assert.equal(rows[3].detail, "Per business on Quality. Traced calls only.");
     assert.equal(rows[3].href, "/admin/quality");
   });
 
@@ -128,7 +135,18 @@ describe("Super Admin Today: status line and Needs you", () => {
       ],
     );
     assert.equal(rows[1].detail, "Waiting for a number for 7 days");
+    assert.equal(rows[1].href, "/admin/businesses/stuck");
+    assert.equal(rows[3].href, "/admin/businesses/nopack");
     for (const row of rows) assert.ok(row.href.startsWith("/admin/"), row.key);
+    assert.deepEqual(
+      model.todayQueueGroups(rows).map((g) => [g.key, g.rows.length]),
+      [
+        ["alert", 1],
+        ["line", 2],
+        ["package", 1],
+        ["quiet", 1],
+      ],
+    );
   });
 
   it("flags nobody as quiet when the call read failed", () => {
@@ -144,10 +162,10 @@ describe("Super Admin nav: eight destinations, phone 4 + More", () => {
   it("lists the eight in order and puts four on the phone bar", () => {
     assert.deepEqual(
       links.ADMIN_LINKS.map((l) => l.label),
-      ["Today", "Businesses", "Calls", "Billing", "Numbers", "Platform", "Activity", "Settings"],
+      ["Today", "Businesses", "Quality", "Billing", "Numbers", "Platform", "Activity", "Voices"],
     );
-    assert.deepEqual(links.ADMIN_PHONE_TABS.map((l) => l.label), ["Today", "Businesses", "Calls", "Billing"]);
-    assert.deepEqual(links.ADMIN_MORE_LINKS.map((l) => l.label), ["Numbers", "Platform", "Activity", "Settings"]);
+    assert.deepEqual(links.ADMIN_PHONE_TABS.map((l) => l.label), ["Today", "Businesses", "Quality", "Billing"]);
+    assert.deepEqual(links.ADMIN_MORE_LINKS.map((l) => l.label), ["Numbers", "Platform", "Activity", "Voices"]);
   });
 
   it("links only to screens that exist; nothing is pending now Activity ships", () => {

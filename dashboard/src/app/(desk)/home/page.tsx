@@ -1,5 +1,5 @@
 import { ButtonLink } from "@/components/ui/Button";
-import { DataChecksCard } from "@/components/structured/DataChecksCard";
+import { OverviewDataChecksCard } from "@/components/structured/OverviewDataChecksCard";
 import { CallInsights } from "@/components/insights/CallInsights";
 import { loadCallInsights } from "@/lib/callInsightsLoad";
 import { dataChecksFor } from "@/components/structured/StructuredSettingsSlots";
@@ -45,7 +45,10 @@ import { Stamp } from "@/components/ui/Stamp";
 import { HomeCapture } from "@/components/HomeCapture";
 import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
 import { HomeCallSetupCard } from "@/components/HomeCallSetupCard";
+import { HomeUsageSection } from "@/components/HomeUsageSection";
 import { toLocal07 } from "@/lib/callForwarding";
+import { loadCallSetupState } from "@/lib/callSetupServer";
+import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
 import { getTenantCompletenessScore, getTenantHoldGate } from "@/lib/deskProvenance";
 import { captureFilledDomains } from "@/lib/completenessStub";
 import { homeStakes, shopStakes } from "@/lib/baStakes";
@@ -53,12 +56,21 @@ import { capabilityGates } from "@/lib/capabilityGates";
 import { CapabilityGatesPanel } from "@/components/CapabilityGatesPanel";
 import { parseHoursSchedule } from "@/lib/hoursSchedule";
 import { isBetaBilling } from "@/lib/wallet";
-import { loadOwnerPackageMeter, remainingCount } from "@/lib/packageCatalog";
+import { minuteMeter } from "@/lib/minutes";
+import { loadOwnerPackageMeter } from "@/lib/packageCatalog";
 import { loadOwnerBillingView } from "@/lib/billingStateLoad";
+import { lowBalanceNotice } from "@/lib/billingStateModel";
+import { messageCreditsUsage } from "@/lib/messageCredits";
+import { loadUsageBillingExtras } from "@/lib/ownerPlanLoad";
 import { coverageDisplayList } from "@/lib/coverageAreas";
 import { homeMinuteStatus } from "@/lib/usageCap";
 import { createDeskTimer } from "@/lib/deskTiming";
 import { DeskPageGate } from "@/components/DeskPageGate";
+import { UNKNOWN_ANSWER_DEFAULT_EN } from "@/lib/unknownAnswerSpoken";
+import { deskAssistantSayPage, factSaveIsConfirm } from "@/lib/deskFeatureFlags";
+import { HomeGetReadyCallsCard } from "@/components/HomeGetReadyCallsCard";
+import { loadReadyChecklist } from "@/lib/assistantSayVoice.server";
+import { memberCan } from "@/lib/requireMember";
 
 export default function HomeOverviewPage() {
   return (
@@ -87,6 +99,15 @@ async function HomeOverviewBody() {
   const business = tenant.business_name?.trim() || "your workspace";
   const today = nairobiDateLabel();
 
+  const saveIsConfirm = factSaveIsConfirm();
+  const assistantSayPage = deskAssistantSayPage();
+  const canEditSettings = await memberCan("settings.edit");
+  const readyChecklist = assistantSayPage ? await loadReadyChecklist(tenant) : null;
+  const overviewChecks = dataChecksFor(tenant, {
+    saveIsConfirm,
+    readyItems: readyChecklist?.items,
+  });
+
   const readiness = assessMvpAnswerReadiness({
     businessName: tenant.business_name,
     sautikitVirtualNumber: tenant.sautikit_virtual_number,
@@ -97,7 +118,7 @@ async function HomeOverviewBody() {
     hoursSchedule: tenant.hours_schedule,
     businessLocations: tenant.business_locations,
     faqs: tenant.faqs,
-    unknownAnswerFallback: tenant.unknown_answer_fallback,
+    unknownAnswerFallback: tenant.unknown_answer_fallback || UNKNOWN_ANSWER_DEFAULT_EN,
     whatsappNotificationNumber: tenant.whatsapp_notification_number,
     alertEmail: tenant.alert_email,
     teamDirectory: tenant.team_directory,
@@ -109,7 +130,8 @@ async function HomeOverviewBody() {
   const vertical = tenant.vertical;
   const copy = nicheCopy(vertical);
 
-  const [todayRes, inbox, billing, score, hold, insights] = await Promise.all([
+  const numberReady = toLocal07(tenant.sautikit_virtual_number) !== null;
+  const [todayRes, inbox, billing, extras, score, hold, insights, callSetup] = await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
@@ -117,10 +139,15 @@ async function HomeOverviewBody() {
       .gte("created_at", dayStart),
     loadCachedInboxItems(tenant.id, vertical),
     loadOwnerBillingView(tenant.id),
+    loadUsageBillingExtras(tenant.id),
     getTenantCompletenessScore(tenant.id),
     getTenantHoldGate(tenant.id),
     loadCallInsights(client, tenant.id, 30, tenant.faqs),
+    numberReady ? loadCallSetupState(tenant.id) : Promise.resolve(null),
   ]);
+  const callSetupStatus = callSetup?.supported
+    ? resolveCallSetupStatus({ numberReady, setup: callSetup.setup, activity: callSetup.activity, now: Date.now() })
+    : null;
   timer.mark("data");
   console.info(timer.line("home"));
   if (inbox.error) {
@@ -129,15 +156,20 @@ async function HomeOverviewBody() {
   // tenant_billing_state first (Ops-Billing #650); tenant counters only before it exists.
   const pack = billing ? null : await loadOwnerPackageMeter(tenant.id);
   const minutesIncluded = billing ? billing.minutesIncluded : pack?.minutesIncluded ?? 0;
-  const minutesLeft = billing
-    ? billing.minutesLeft
-    : remainingCount(pack?.minutesIncluded ?? 0, pack?.minutesUsed ?? 0);
+  const packMinutes = minuteMeter(pack?.minutesIncluded ?? 0, pack?.secondsUsed ?? 0);
+  const minutesLeft = billing ? billing.minutesLeft : packMinutes.left;
+  const minutesUnderOne = billing ? billing.minutesUnderOne : packMinutes.underOneMinute;
   const packLabel = billing
     ? billing.shortLabel
     : pack?.packageName
       ? `${pack.packageName}${pack.period ? ` / ${pack.period}` : ""}`
       : "No package";
-  const minuteStatus = billing?.lowNotice
+  const low = billing
+    ? lowBalanceNotice(billing, messageCreditsUsage(extras.messageCredits, extras.creditBurns, billing.messageUse))
+    : null;
+  const lowNotice = low?.lowNotice || null;
+  const lowNoticeNote = low?.lowNoticeNote || null;
+  const minuteStatus = lowNotice
     ? null
     : homeMinuteStatus({
         isBeta,
@@ -145,7 +177,6 @@ async function HomeOverviewBody() {
         minutesIncluded,
         minutesLeft,
       });
-  const lowNotice = billing?.lowNotice || null;
   const digest = inbox.callsTruncated
     ? null
     : homeDigestLine(inbox.items, dayStart, vertical);
@@ -414,12 +445,28 @@ async function HomeOverviewBody() {
             </>
           ) : null}
         </section>
-        <HomeCallSetupCard tenantId={tenant.id} numberReady={toLocal07(tenant.sautikit_virtual_number) !== null} />
-        <DataChecksCard checks={dataChecksFor(tenant)} />
+        <RoleGate action="settings.edit" mode="hide">
+          <HomeCallSetupCard
+            tenantId={tenant.id}
+            numberReady={numberReady}
+            supported={Boolean(callSetup?.supported)}
+            status={callSetupStatus}
+          />
+        </RoleGate>
+        {assistantSayPage && readyChecklist && !readyChecklist.allDone ? (
+          <HomeGetReadyCallsCard
+            items={readyChecklist.items}
+            checks={overviewChecks}
+            canEdit={canEditSettings}
+          />
+        ) : null}
+        {!assistantSayPage && overviewChecks.length ? (
+          <OverviewDataChecksCard checks={overviewChecks} canEdit={canEditSettings} />
+        ) : null}
         {insights ? (
           <CallInsights insights={insights} />
         ) : null}
-        {score && line !== "live" ? (
+        {score && line !== "live" && !assistantSayPage ? (
           <HomeCapture
             tenantId={tenant.id}
             vertical={vertical}
@@ -492,26 +539,15 @@ async function HomeOverviewBody() {
             </section>
 
             <RoleGate action="usage.view" mode="hide">
-            <section aria-label="Usage" className="border-t border-hairline px-4 py-4">
-              <p className="text-body font-medium tabular-nums text-ink">
-                {minutesLeft.toLocaleString("en-KE")} min left
-              </p>
-              <p className="mt-0.5 text-meta text-ink-2">{packLabel}</p>
-              {minuteStatus ? (
-                <p className="mt-0.5 text-meta font-medium text-ink">{minuteStatus}</p>
-              ) : null}
-              {lowNotice ? (
-                <p role="status" className="mt-1 text-meta font-medium text-warn">{lowNotice}</p>
-              ) : null}
-              {lowNotice || (minuteStatus && !isBeta) ? (
-                <Link
-                  href="/wallet"
-                  className={`mt-1 inline-flex min-h-11 items-center text-body font-medium text-warn hover:underline ${focusRingVisible}`}
-                >
-                  Usage
-                </Link>
-              ) : null}
-            </section>
+            <HomeUsageSection
+              minutesLeft={minutesLeft}
+              minutesUnderOne={minutesUnderOne}
+              packLabel={packLabel}
+              minuteStatus={minuteStatus}
+              lowNotice={lowNotice}
+              lowNoticeNote={lowNoticeNote}
+              showLink={Boolean(lowNotice || (minuteStatus && !isBeta))}
+            />
             </RoleGate>
 
             {showCta ? (

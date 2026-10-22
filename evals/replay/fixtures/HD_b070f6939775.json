@@ -1,0 +1,40 @@
+{
+  "id": "HD_b070f6939775",
+  "bug": "C",
+  "profile": "carry",
+  "language": "en",
+  "turns": [
+    {
+      "caller": "And how much is Sofa cleaning?",
+      "mustSay": ["two thousand five hundred"],
+      "value": 2500,
+      "status": "found"
+    },
+    {
+      "caller": "Uh, how much is the travel fee to Kileleshwa?",
+      "mustSay": ["three hundred"],
+      "mustNotSay": ["sofa", "two thousand five hundred", "2,500"],
+      "value": 300,
+      "status": "found"
+    },
+    {
+      "caller": "How much is the travel fee to Kileleshwa?",
+      "mustSay": ["three hundred"],
+      "mustNotSay": ["sofa", "two thousand five hundred"],
+      "value": 300,
+      "status": "found"
+    },
+    {
+      "caller": "And how much is the.",
+      "mustSay": ["deep cleaning", "sofa cleaning"],
+      "mustNotSay": ["two thousand five hundred", "2,500", "three hundred"]
+    },
+    {
+      "caller": "Travel fee?",
+      "mustSay": ["three hundred"],
+      "mustNotSay": ["sofa", "two thousand five hundred"],
+      "value": 300,
+      "status": "found"
+    }
+  ]
+}

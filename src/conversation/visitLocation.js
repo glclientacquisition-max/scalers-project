@@ -727,9 +727,14 @@ function coverageAskSpeech(text, profile = {}, language = 'en', state = null) {
   }
   if (coverage === 'inside') {
     const next = coverageNextStepQuestion(language, state);
-    if (sw) return `Ndiyo, tunafika ${place}. ${next}`;
-    if (sheng) return `Ndio, tunafika ${place}. ${next}`;
-    return `Yes, we cover ${place}. ${next}`;
+    // Settings › Locations: the area's fee (owner-confirmed only, else the
+    // team confirms it on the callback). No saved terms: no fee sentence.
+    const { matchArea, feeSentence } = require('./areaTerms');
+    const hit = matchArea(place, profile.areaTerms);
+    const fee = hit ? `${feeSentence(hit, sheng ? 'sw' : lang)} ` : '';
+    if (sw) return `Ndiyo, tunafika ${place}. ${fee}${next}`;
+    if (sheng) return `Ndio, tunafika ${place}. ${fee}${next}`;
+    return `Yes, we cover ${place}. ${fee}${next}`;
   }
   if (coverage === 'outside') return outsideCoverageSpeech(language);
   if (hasCoverageText(profile)) return unsureCoverageSpeech(language);

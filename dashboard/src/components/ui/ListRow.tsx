@@ -21,6 +21,7 @@ export function ListRow({
   ariaLabel,
   id,
   below,
+  stampWrap = false,
 }: {
   href?: string;
   onOpen?: () => void;
@@ -41,6 +42,8 @@ export function ListRow({
   id?: string;
   /** Inline controls (e.g. a name field). Sits under the row, outside the tap target, so it is never nested in the link. */
   below?: ReactNode;
+  /** Let stamp label wrap on narrow screens (e.g. When unsure). */
+  stampWrap?: boolean;
 }) {
   const bodyClass =
     "flex min-w-0 flex-1 items-center gap-3 py-3 ps-4 pe-2 text-start outline-none transition-colors duration-fast ease-out focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand";
@@ -59,7 +62,7 @@ export function ListRow({
           ) : null}
         </span>
         {preview || stamp ? (
-          <span className="mt-0.5 flex items-center gap-3">
+          <span className={cx("mt-0.5 flex gap-3", stampWrap ? "flex-wrap items-start" : "items-center")}>
             {preview ? (
               <span className={cx("min-w-0 flex-1 truncate text-meta", unread ? "text-ink" : "text-ink-2")}>
                 {preview}
@@ -67,7 +70,9 @@ export function ListRow({
             ) : (
               <span className="flex-1" />
             )}
-            {stamp ? <span className="shrink-0">{stamp}</span> : null}
+            {stamp ? (
+              <span className={stampWrap ? "min-w-0 max-w-full" : "shrink-0"}>{stamp}</span>
+            ) : null}
           </span>
         ) : null}
       </span>

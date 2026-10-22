@@ -26,6 +26,7 @@ import {
   type Payments,
 } from "@/lib/payments";
 import { AddRow, CallersHear, CheckList, OpenRow } from "./PickList";
+import { ownerPolicySummary } from "@/lib/ownerPolicyCopy";
 
 /** Error keys that belong to each method's drawer. */
 const METHOD_ERRORS: Record<PaymentMethod, string[]> = {
@@ -67,6 +68,7 @@ function phoneValue(v: string | null | undefined): string {
 export function PaymentsEditor({
   value,
   legacyText,
+  quoteSource = true,
   onChange,
   errors = {},
   canEdit = true,
@@ -74,6 +76,8 @@ export function PaymentsEditor({
   value: Payments | null;
   /** Old free-text payment line, shown when the typed value was read from it. */
   legacyText?: string;
+  /** False when the old line is starter text shown elsewhere, so it is not quoted twice. */
+  quoteSource?: boolean;
   onChange: (next: Payments) => void;
   errors?: Record<string, string>;
   canEdit?: boolean;
@@ -83,6 +87,7 @@ export function PaymentsEditor({
   const [draft, setDraft] = useState<Payments>(p);
   const [draftErrors, setDraftErrors] = useState<Record<string, string>>({});
   const unconfirmed = Boolean(value && value.source === "parsed" && !value.confirmed);
+  const source = quoteSource ? ownerPolicySummary(legacyText || value?.parsed_from) : null;
   const available = PAYMENT_METHODS.filter((o) => !p.methods.includes(o.id));
 
   function open(which: NonNullable<typeof sheet>) {
@@ -118,10 +123,10 @@ export function PaymentsEditor({
           <div className="space-y-2 bg-accent-tonal px-4 py-3" role="note">
             <p className="text-body font-medium text-ink">Is this right?</p>
             <p className="text-meta text-ink-2 [overflow-wrap:anywhere]">
-              We read this from your old payment notes{legacyText || value?.parsed_from ? `: “${legacyText || value?.parsed_from}”.` : "."} Check each way to pay, then save.
+              We read this from your old payment notes{source ? `: “${source}”` : "."} Check each way to pay, then save.
             </p>
             {canEdit ? (
-              <Button variant="tonal" size="sm" onClick={() => onChange({ ...p, source: "owner", confirmed: true })}>
+              <Button variant="tonal" size="md" onClick={() => onChange({ ...p, source: "owner", confirmed: true })}>
                 Yes, this is right
               </Button>
             ) : null}
