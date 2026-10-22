@@ -26,4 +26,45 @@ function createGeminiModel(opts) {
   const send = createGeminiSend(opts); const onError = opts.onError || null;
   return async ({ request }) => { try { return await callModel({ send, request }); } catch (e) { if (onError) onError({ message: e.message, code: e.code, status: e.status }); return { calls: [], text: '', error: e.code || 'error' }; } };
 }
-module.exports = { createGeminiSend, createGeminiModel };
+// C7 (BRAIN_V2_MODEL): streaming generateContent (SSE) with native function calling. The caller's
+// AbortSignal is the 900 ms hard cap (modelShadow.capped). Returns {calls, text, usage}; function-call
+// parts keep their thoughtSignature so the next turn can pass it back. Key only in the header.
+function parseSse(buf, onEvent) {
+  let i;
+  while ((i = buf.indexOf('\n\n')) >= 0) {
+    const block = buf.slice(0, i); buf = buf.slice(i + 2);
+    const data = block.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5).trim()).join('');
+    if (data && data !== '[DONE]') { try { onEvent(JSON.parse(data)); } catch { /* partial or bad chunk: skipped */ } }
+  }
+  return buf;
+}
+function createGeminiStreamModel({ apiKey, model = 'gemini-3.5-flash-lite', fetchImpl = globalThis.fetch, baseUrl = 'https://generativelanguage.googleapis.com/v1beta' } = {}) {
+  if (!apiKey) throw new Error('gemini transport: apiKey missing');
+  const url = `${baseUrl}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
+  return async function streamModel({ request, signal } = {}) {
+    const calls = []; let text = ''; let usage = null;
+    const onEvent = (ev) => {
+      for (const p of ev?.candidates?.[0]?.content?.parts || []) {
+        if (p.functionCall) calls.push({ name: p.functionCall.name, args: p.functionCall.args || {}, thoughtSignature: p.thoughtSignature || undefined });
+        else if (typeof p.text === 'string' && !p.thought) text += p.text;
+        else if (p.thoughtSignature && calls.length) calls[calls.length - 1].thoughtSignature = calls[calls.length - 1].thoughtSignature || p.thoughtSignature;
+      }
+      if (ev?.usageMetadata) usage = ev.usageMetadata;
+    };
+    let res;
+    try {
+      res = await fetchImpl(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey }, body: JSON.stringify(request), signal });
+    } catch (e) {
+      const x = new Error(e?.name === 'AbortError' ? 'gemini timeout' : String(e?.message || e).split(apiKey).join('[redacted]')); x.code = e?.name === 'AbortError' ? 'TIMEOUT' : 'network'; throw x;
+    }
+    if (!res.ok) { const e = new Error(`gemini http ${res.status}`); e.status = res.status; e.code = `http_${res.status}`; throw e; }
+    let buf = '';
+    if (res.body && typeof res.body.getReader === 'function') {
+      const rd = res.body.getReader(); const dec = new TextDecoder();
+      for (;;) { const { value, done } = await rd.read(); if (done) break; buf = parseSse(buf + dec.decode(value, { stream: true }), onEvent); }
+    } else buf = parseSse(String(await res.text()), onEvent);
+    parseSse(`${buf}\n\n`, onEvent);
+    return { calls, text, usage };
+  };
+}
+module.exports = { createGeminiSend, createGeminiModel, createGeminiStreamModel, parseSse };
