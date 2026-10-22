@@ -6,6 +6,7 @@ import type { InboxItem } from "@/lib/inboxPurpose";
  * within REDIAL_WINDOW_MS, shows as a visible child line ("0 s · hang-up") under that call
  * instead of its own row. Each call keeps its own row, minutes, recording, billing and consent.
  */
+/** Ten minutes either side of the real call. */
 export const REDIAL_WINDOW_MS = 10 * 60 * 1000;
 
 export type InboxRedial = {
