@@ -9,14 +9,15 @@ import { ADMIN_SETTINGS_TABS } from "@/lib/adminLinks";
 export const instant = false;
 
 /** Settings hub fixture (ADMIN_V2 shell). DASHBOARD_OPEN=true only. */
-export default async function DevAdminSettingsV2Page() {
+export default async function DevAdminSettingsV2Page({ searchParams }: { searchParams: Promise<{ env?: string }> }) {
+  const sp = await searchParams;
   await connection();
   if (process.env.DASHBOARD_OPEN !== "true") notFound();
   return (
     <AdminShell operatorName="alvin" v2>
       <AdminSectionTabs label="Settings" tabs={ADMIN_SETTINGS_TABS} />
       <AdminSettingsHubV2
-        raw={{ voicemail_hold_days: 7, shadow_invoices: true, billing_notices_send: false, desk_plan_change_enabled: true, new_signup_trial_enabled: true, package_editor_enabled: false, price_change_approval_threshold_kes: 5000, updated_at: "2026-10-18T07:30:00.000Z" }}
+        raw={{ voicemail_hold_days: 7, shadow_invoices: true, billing_notices_send: false, desk_plan_change_enabled: true, new_signup_trial_enabled: true, package_editor_enabled: false, price_change_approval_threshold_kes: 5000, updated_at: "2026-10-18T07:30:00.000Z", hold_winback_enabled: true, number_hold_days: 14, reactivation_fee_kes: null, holdColumns: sp.env !== "prod" }}
       />
     </AdminShell>
   );

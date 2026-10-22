@@ -1,7 +1,7 @@
 /**
  * Settings hub (ADMIN_V2). Pure: no imports with values, so tests load it in node.
- * Read-only today. The hold switch and reactivation fee have no stored setting yet, so they say so
- * instead of inventing a value.
+ * Read-only (edits wait for step-up). Values come from billing_lifecycle_settings; when a column is
+ * not on this environment the row says so instead of inventing a value.
  */
 export type SettingsHubRaw = {
   voicemail_hold_days?: number | null;
@@ -12,11 +12,16 @@ export type SettingsHubRaw = {
   package_editor_enabled?: boolean | null;
   price_change_approval_threshold_kes?: number | null;
   updated_at?: string | null;
+  hold_winback_enabled?: boolean | null;
+  number_hold_days?: number | null;
+  reactivation_fee_kes?: number | null;
+  /** False when the hold columns are not on this environment (e.g. prod before #885). */
+  holdColumns?: boolean;
 };
 
-export type HubValue = { label: string; value: string; note: string; state: "set" | "placeholder" | "missing" };
+export type HubValue = { label: string; value: string; note: string; state: "set" | "missing" | "absent" };
 
-export const NUMBER_REUSE_HOLD_DAYS = 30;
+export const NOT_HERE = "Not on this environment";
 
 export function daysLabel(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "Not set";
@@ -27,32 +32,26 @@ export function onOff(v: boolean | null | undefined): string {
   return v == null ? "Not set" : v ? "On" : "Off";
 }
 
-/** Hold switch, hold length, reactivation fee: the three settings this hub owns. */
+/** Hold switch, number hold, reactivation fee (#885), plus the voicemail window. */
 export function holdSettings(raw: SettingsHubRaw | null): HubValue[] {
+  const here = !!raw && raw.holdColumns !== false;
+  const absent = (label: string, note: string): HubValue => ({ label, value: NOT_HERE, note, state: "absent" });
+  const fee = raw?.reactivation_fee_kes;
   return [
+    here
+      ? { label: "Hold switch", value: onOff(raw!.hold_winback_enabled), note: "Keep a stopped business's number so it can come back.", state: raw!.hold_winback_enabled == null ? "missing" : "set" }
+      : absent("Hold switch", "Keep a stopped business's number so it can come back."),
+    here
+      ? { label: "Number hold", value: daysLabel(raw!.number_hold_days), note: "Days a stopped business's number is kept before it is released.", state: raw!.number_hold_days == null ? "missing" : "set" }
+      : absent("Number hold", "Days a stopped business's number is kept before it is released."),
+    here
+      ? { label: "Reactivation fee", value: fee == null ? "Not set" : `KSh ${fee.toLocaleString("en-KE")}`, note: "Charged when a held business comes back.", state: "set" }
+      : absent("Reactivation fee", "Charged when a held business comes back."),
     {
-      label: "Hold switch",
-      value: "Always on",
-      note: "Suspended lines always hold for voicemail. No switch is stored yet.",
-      state: "missing",
-    },
-    {
-      label: "Hold length",
+      label: "Voicemail window",
       value: daysLabel(raw?.voicemail_hold_days ?? null),
-      note: "Days callers can still leave a voicemail after a trial ends or a line is suspended. 1 to 90.",
+      note: "Days callers can still leave a voicemail after a trial ends or a line is suspended.",
       state: raw?.voicemail_hold_days == null ? "missing" : "set",
-    },
-    {
-      label: "Number reuse hold",
-      value: daysLabel(NUMBER_REUSE_HOLD_DAYS),
-      note: "A released number waits this long before another business gets it. Placeholder, not decided.",
-      state: "placeholder",
-    },
-    {
-      label: "Reactivation fee",
-      value: "Not set",
-      note: "No fee is stored or charged when a suspended business comes back.",
-      state: "missing",
     },
   ];
 }
