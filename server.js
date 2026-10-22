@@ -438,6 +438,14 @@ const {
 } = require('./src/speech/overlapHold');
 const { createLateFinalHold } = require('./src/speech/lateFinal');
 const { createIdleNudgeController } = require('./src/speech/idleNudge');
+const {
+  RECORDING_NOTICE_EN,
+  RECORDING_NOTICE_SW,
+  recordingNoticeOn: streamRecordingOn,
+  recordingNoticeOwedEnabled,
+  recordingNoticeLine,
+  createRecordingNoticeState,
+} = require('./src/conversation/recordingNotice');
 const { createUnfinishedHold, unfinishedHoldMs } = require('./src/speech/unfinishedHold');
 const { noteCallTerminal, callTerminalSince } = require('./src/speech/callLifecycle');
 const endedCalls = require('./src/speech/endedCalls');
@@ -2428,6 +2436,33 @@ mediaWss.on('connection', (ws, req) => {
   // A barge cancels the greeting before its name ask can be heard.
   // Until this process commits that line, the caller turn must say it.
   let greetingInterrupted = false;
+  // VOICE_RECORDING_NOTICE_OWED: notice state for this media session
+  // (src/conversation/recordingNotice.js). null while the flag is off.
+  const recordingNoticeOwedOn = recordingNoticeOwedEnabled();
+  let recordingNotice = null;
+  let bargeCancelCount = 0;
+  function startRecordingNoticeState(line) {
+    if (!recordingNoticeOwedOn || recordingNotice) return;
+    const noticeLine = recordingNoticeLine({ greetingInvite, owedFlag: true });
+    recordingNotice = createRecordingNoticeState({
+      line: noticeLine,
+      onGiven: (how) => {
+        console.log(`[ws/media][${sidLabel()}] recording_notice_given how=${how}`);
+        voiceTrace.noteCall({ stage: 'recording_notice', kind: 'given', how, at: new Date().toISOString() });
+        if (!sessionCallSid || typeof db.markCallNoticeGiven !== 'function') return;
+        db.markCallNoticeGiven(sessionCallSid).catch((err) => {
+          console.warn(`[ws/media][${sidLabel()}] notice_given write failed:`, err?.message || err);
+        });
+      },
+    });
+    const text = String(line || '');
+    const noticeInGreeting =
+      streamRecordingOn() && (text.includes(RECORDING_NOTICE_EN) || text.includes(RECORDING_NOTICE_SW));
+    const cut = Boolean(greetingInterrupted);
+    const st = recordingNotice.greetingPlayed({ noticeInGreeting, cut });
+    console.log(`[ws/media][${sidLabel()}] recording_notice state=${st} in_greeting=${noticeInGreeting ? 1 : 0} cut=${cut ? 1 : 0}`);
+    voiceTrace.noteCall({ stage: 'recording_notice', kind: st, cut, at: new Date().toISOString() });
+  }
   let greetingSettled = false;
   // STT audio clock (ms of caller PCM sent to Soniox) at the greeting's first
   // PCM. Words that started before it cannot barge the greeting
@@ -2806,7 +2841,7 @@ mediaWss.on('connection', (ws, req) => {
     return waitMs;
   }
 
-  async function playCachedFillerPcm(pcm, { text, trace = true, kind = 'filler' } = {}) {
+  async function playCachedFillerPcm(pcm, { text, trace = true, kind = 'filler', reportCancel = false } = {}) {
     if (!pcm || !pcm.length) return { ok: false, empty: true };
     const streamId = newCachedFillerStreamId();
     bargeInActive = false;
@@ -2832,6 +2867,9 @@ mediaWss.on('connection', (ws, req) => {
       if (fillerStreamId === streamId) fillerStreamId = null;
       if (!speechOutageStarted) releaseQueuedCallerSpeech(gen);
     }
+    // A barge bumps the generation: the clip did not play to the end
+    // (reported only when asked, so filler callers see today's result).
+    if (reportCancel) return { ok: true, cached: true, cancelled: activePlaybackGeneration !== gen };
     return { ok: true, cached: true };
   }
 
@@ -3060,7 +3098,33 @@ mediaWss.on('connection', (ws, req) => {
     });
   }
 
+  // VOICE_RECORDING_NOTICE_OWED: a notice the caller cut off is said once,
+  // in front of the next real agent line. Given only when that line plays
+  // to the end with no barge.
   async function speakText(text, opts = {}) {
+    const owedEligible =
+      recordingNotice &&
+      text &&
+      !opts.isFiller &&
+      !opts.isReplay &&
+      !opts.isIdleNudge &&
+      !opts.isGreeting;
+    const prefix = owedEligible ? recordingNotice.takeOwedPrefix() : '';
+    if (!prefix) return speakTextInner(text, opts);
+    const bargesBefore = bargeCancelCount;
+    console.log(`[ws/media][${sidLabel()}] recording_notice owed_line attempt=${recordingNotice.attempts()}`);
+    let spoken;
+    try {
+      spoken = await speakTextInner(`${prefix} ${text}`, opts);
+    } finally {
+      const played = Boolean(spoken?.ok) && bargeCancelCount === bargesBefore;
+      recordingNotice.owedLinePlayed({ cut: !played, skipped: !spoken?.ok });
+      if (played) callTranscript.pushAgent(prefix);
+    }
+    return spoken;
+  }
+
+  async function speakTextInner(text, opts = {}) {
     if (!opts.skipFileGate && !opts.isFiller && !opts.isReplay && !opts.isIdleNudge) {
       const gated = gateCallerFileSpeech(text, callBrainStates.get(sidLabel()));
       if (!gated.speak) {
@@ -3225,6 +3289,7 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   function cancelSpeech(reason) {
+    bargeCancelCount += 1;
     voiceTrace.noteBarge({ reason: String(reason || '') });
     if (smooth.any) stopHoldFill();
     const endingGen = activePlaybackGeneration;
@@ -5442,7 +5507,13 @@ mediaWss.on('connection', (ws, req) => {
           text: greetingLine,
           language: callLanguage,
         });
-        await playCachedFillerPcm(found.pcm, { text: greetingLine, trace: false });
+        const cachedPlay = await playCachedFillerPcm(found.pcm, {
+          text: greetingLine,
+          trace: false,
+          reportCancel: recordingNoticeOwedOn,
+        });
+        if (recordingNoticeOwedOn && cachedPlay?.cancelled) greetingInterrupted = true;
+        startRecordingNoticeState(greetingLine);
         callTranscript.pushAgent(greetingLine);
         messages.push({ role: 'assistant', content: greetingLine, local: true });
         if (!greetingInterrupted) markGreetingFileNameAsk(greetingLine);
@@ -5490,6 +5561,8 @@ mediaWss.on('connection', (ws, req) => {
           extraLexicon: found.extraLexicon,
         });
         if (spoken?.outage || speechOutageStarted) return;
+        if (recordingNoticeOwedOn && spoken?.cancelled) greetingInterrupted = true;
+        startRecordingNoticeState(spoken?.ok ? greetingLine : '');
         if (spoken?.ok) {
           callTranscript.pushAgent(greetingLine);
           messages.push({ role: 'assistant', content: greetingLine, local: true });

@@ -690,6 +690,24 @@ async function listTranscriptTurns(callSid) {
   }));
 }
 
+/**
+ * VOICE_RECORDING_NOTICE_OWED: the caller has heard the full recording
+ * notice. Writes calls.notice_given = true (column from prod migration
+ * 20261021220920; staging has it too). Only ever sets true; idempotent.
+ * @returns {Promise<boolean>} true when a row was updated
+ */
+async function markCallNoticeGiven(callSid) {
+  if (!callSid) return false;
+  const { data, error } = await supabase
+    .from('calls')
+    .update({ notice_given: true })
+    .eq('sautikit_call_sid', callSid)
+    .eq('notice_given', false)
+    .select('id');
+  throwIfError('markCallNoticeGiven', error);
+  return Array.isArray(data) && data.length > 0;
+}
+
 async function getCall(callSid) {
   const { data, error } = await supabase
     .from('calls')
@@ -3018,6 +3036,7 @@ module.exports = {
   saveTransferAttempt,
   persistOutboundTransferLeg,
   appendTranscript,
+  markCallNoticeGiven,
   listTranscriptTurns,
   attachRecording,
   updateCallStatus,
