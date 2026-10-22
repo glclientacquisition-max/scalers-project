@@ -698,6 +698,24 @@ async function upsertTranscriptRows({ callSid, rows, callId } = {}) {
 }
 
 /**
+ * VOICE_TRANSCRIPT_INCREMENTAL: remove specific rows this media session wrote
+ * (a reserved greeting slot that never played, #745). By id only, scoped to
+ * the call; never a call-wide delete.
+ */
+async function deleteTranscriptRowIds({ callSid, ids } = {}) {
+  if (!callSid || !Array.isArray(ids) || !ids.length) return 0;
+  let id = transcriptCallIds.get(callSid);
+  if (!id) {
+    const call = await getCall(callSid);
+    if (!call) return 0;
+    id = call.id;
+  }
+  const { error } = await supabase.from('transcripts').delete().eq('call_id', id).in('id', ids);
+  throwIfError('deleteTranscriptRowIds', error);
+  return ids.length;
+}
+
+/**
  * Load transcript turns for a call (post-call review). Empty array on miss.
  */
 async function listTranscriptTurns(callSid) {
@@ -3051,6 +3069,7 @@ module.exports = {
   persistOutboundTransferLeg,
   appendTranscript,
   upsertTranscriptRows,
+  deleteTranscriptRowIds,
   listTranscriptTurns,
   attachRecording,
   updateCallStatus,

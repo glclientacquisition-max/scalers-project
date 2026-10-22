@@ -133,10 +133,16 @@ function createCallTranscript(opts = {}) {
   // VOICE_TRANSCRIPT_INCREMENTAL: told about every new or changed row.
   let onChange = typeof opts.onChange === 'function' ? opts.onChange : null;
 
+  // Stable per-row key (push order), so a row removed or inserted elsewhere
+  // in the array (#745 reserveAgent/release) never shifts another row's key.
+  const keys = new WeakMap();
+  let nextKey = 0;
+
   function changed(index) {
     if (!onChange) return;
+    const row = rows[index];
     try {
-      onChange(index, { ...rows[index] });
+      onChange(keys.get(row), { ...row });
     } catch {
       /* never throw into the media loop */
     }
@@ -146,9 +152,16 @@ function createCallTranscript(opts = {}) {
     const clean = String(text || '').trim();
     if (!clean) return null;
     const row = { speaker, text: clean, latencyMs: null };
+    keys.set(row, nextKey);
+    nextKey += 1;
     rows.push(row);
     changed(rows.length - 1);
     return row;
+  }
+
+  /** Key of a row object returned by push (for a later removal). */
+  function keyOf(row) {
+    return row && keys.has(row) ? keys.get(row) : null;
   }
 
   function stampFirstAgentSince(startIndex, latencyMs) {
@@ -181,6 +194,7 @@ function createCallTranscript(opts = {}) {
     setOnChange(fn) {
       onChange = typeof fn === 'function' ? fn : null;
     },
+    keyOf,
     pushCaller(text) {
       return push('caller', text);
     },

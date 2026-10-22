@@ -108,13 +108,35 @@ function createIncrementalTranscriptWriter(opts) {
   }
 
   /**
-   * Close / SIGTERM: make every known row durable. `turns` (optional) is the
-   * full in-memory list, so rows pushed before this writer saw them land too.
+   * Close / SIGTERM: make every known row durable. Rows are keyed by the
+   * transcript's stable push key (never the array index), so the writer must
+   * be hooked before the first push (server.js does it at creation).
    */
-  function flushAll(turns) {
-    if (Array.isArray(turns)) turns.forEach((row, i) => note(i, row));
-    else for (const i of rows.keys()) dirty.add(i);
+  function flushAll() {
+    for (const i of rows.keys()) dirty.add(i);
     return flush();
+  }
+
+  /**
+   * A row this session pushed was taken back out (#745 release of a reserved
+   * greeting that never played). Drop it locally; if it was already written,
+   * remove exactly that one row by id. Never a call-wide delete.
+   */
+  function remove(key) {
+    if (!rows.has(key)) return chain;
+    rows.delete(key);
+    dirty.delete(key);
+    if (typeof opts.removeIds !== 'function') return chain;
+    chain = chain.then(async () => {
+      const sid = typeof opts.callSid === 'function' ? opts.callSid() : null;
+      if (!sid) return;
+      try {
+        await opts.removeIds({ callSid: sid, ids: [stableRowId(sid, sessionKey, key)] });
+      } catch (err) {
+        if (typeof opts.log === 'function') opts.log(`transcript row remove failed: ${err?.message || err}`);
+      }
+    });
+    return chain;
   }
 
   function close() {
@@ -125,6 +147,7 @@ function createIncrementalTranscriptWriter(opts) {
     sessionKey,
     onChange,
     flushAll,
+    remove,
     close,
     stats: () => ({ rows: rows.size, dirty: dirty.size, writes, failures }),
   };

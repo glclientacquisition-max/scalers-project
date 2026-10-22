@@ -66,8 +66,8 @@ describe('incremental writer', () => {
     tr.pushCaller('Hello');
     tr.pushAgent('Hi, how can I help?');
     tr.stampFirstAgentSince(0, 640);
-    await w.flushAll(tr.turns());
-    await w.flushAll(tr.turns());
+    await w.flushAll();
+    await w.flushAll();
     assert.equal(table.rows.size, 2);
     assert.equal([...table.rows.values()].find((r) => r.speaker === 'agent').latencyMs, 640);
     assert.equal(table.deletes(), 0);
@@ -81,7 +81,7 @@ describe('incremental writer', () => {
     await w.flushAll();
     assert.equal(table.rows.size, 0);
     sid = 'HD_late';
-    await w.flushAll(tr.turns());
+    await w.flushAll();
     assert.equal(table.rows.size, 1);
   });
   it('a failed write stays dirty and is retried', async () => {
@@ -116,9 +116,46 @@ describe('incremental writer', () => {
     const w2 = createIncrementalTranscriptWriter({ callSid: () => 'HD_e75a', sessionKey: 'new', upsert: table.upsert });
     const t2 = createCallTranscript({ onChange: w2.onChange });
     t2.pushAgent('Sorry, the line dropped for a moment.');
-    await w2.flushAll(t2.turns());
+    await w2.flushAll();
     assert.equal(table.rows.size, 21);
     assert.equal([...table.rows.values()].filter((r) => r.speaker === 'caller').length, 19);
+  });
+});
+
+describe('composes with #745 (reserve/release) and #843', () => {
+  it('rows are keyed by push order, not array index', () => {
+    const seen = [];
+    const tr = createCallTranscript({ onChange: (key, row) => seen.push([key, row.text]) });
+    const a = tr.pushAgent('Greeting');
+    tr.pushCaller('Hello');
+    assert.deepEqual(seen, [[0, 'Greeting'], [1, 'Hello']]);
+    assert.equal(tr.keyOf(a), 0);
+  });
+  it('a released reserved row is removed by its own id only; other rows keep their ids', async () => {
+    const table = fakeTable();
+    const removed = [];
+    const w = createIncrementalTranscriptWriter({
+      callSid: () => 'HD_745',
+      sessionKey: 's1',
+      upsert: table.upsert,
+      removeIds: async ({ ids }) => {
+        removed.push(...ids);
+        for (const id of ids) table.rows.delete(id);
+      },
+    });
+    w.onChange(0, { speaker: 'agent', text: 'Reserved greeting' });
+    w.onChange(1, { speaker: 'caller', text: 'Niulize?' });
+    await w.flushAll();
+    const callerId = stableRowId('HD_745', 's1', 1);
+    await w.remove(0);
+    await w.flushAll();
+    assert.deepEqual(removed, [stableRowId('HD_745', 's1', 0)]);
+    assert.ok(table.rows.has(callerId), 'caller row id unchanged after the release');
+    assert.equal(table.rows.size, 1);
+  });
+  it('resume defers to #843 when VOICE_OPENING_V2 is on', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+    assert.match(src, /VOICE_OPENING_V2 \|\| ''\)\.trim\(\) === 'on'\) return false;/);
   });
 });
 
@@ -189,7 +226,7 @@ describe('reconnect resume plan', () => {
 describe('server wiring', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   it('flag off keeps the close-time full replace; on never calls appendTranscript for media', () => {
-    assert.match(src, /if \(transcriptWriter\) \{[\s\S]{0,300}flushAll\(callTranscript\.turns\(\)\)[\s\S]{0,80}\} else if \(sessionCallSid && callTranscript\.size\(\)\) \{\s*db\.appendTranscript/);
+    assert.match(src, /if \(transcriptWriter\) \{[\s\S]{0,300}flushAll\(\)[\s\S]{0,80}\} else if \(sessionCallSid && callTranscript\.size\(\)\) \{\s*db\.appendTranscript/);
   });
   it('SIGTERM handler only when the flag is on', () => {
     assert.match(src, /if \(transcriptIncrementalOn\) \{\s*installSigtermFlush\(\{ registry: openMediaSessions, exitAfter: !gracefulDrainOn\(\) \}\)/);
@@ -199,7 +236,7 @@ describe('server wiring', () => {
   });
   it('db upsert never deletes', () => {
     const db = fs.readFileSync(path.join(__dirname, '..', 'src', 'db.js'), 'utf8');
-    const fn = db.slice(db.indexOf('async function upsertTranscriptRows'), db.indexOf('async function listTranscriptTurns'));
+    const fn = db.slice(db.indexOf('async function upsertTranscriptRows'), db.indexOf('async function deleteTranscriptRowIds'));
     assert.match(fn, /\.upsert\(payload, \{ onConflict: 'id'/);
     assert.doesNotMatch(fn, /\.delete\(/);
   });

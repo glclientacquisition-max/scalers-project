@@ -2420,6 +2420,7 @@ mediaWss.on('connection', (ws, req) => {
     ? createIncrementalTranscriptWriter({
         callSid: () => sessionCallSid || null,
         upsert: (args) => db.upsertTranscriptRows(args),
+        removeIds: (args) => db.deleteTranscriptRowIds(args),
         log: (msg) => console.warn(`[ws/media][${sessionCallSid || 'unknown'}] ${msg}`),
       })
     : null;
@@ -2433,7 +2434,7 @@ mediaWss.on('connection', (ws, req) => {
   const unregisterMediaSession = transcriptWriter
     ? openMediaSessions.add(transcriptWriter.sessionKey, () =>
         Promise.all([
-          transcriptWriter.flushAll(callTranscript.turns()),
+          transcriptWriter.flushAll(),
           finishTraceOnce().catch(() => null),
         ])
       )
@@ -5423,6 +5424,9 @@ mediaWss.on('connection', (ws, req) => {
 
   async function resumeFromPriorSession() {
     if (!sessionCallSid || typeof db.listTranscriptTurns !== 'function') return false;
+    // #843 (VOICE_OPENING_V2) owns the opening and its own resume store
+    // (calls.greeted_at claim). When it is on, it decides; never both.
+    if (String(process.env.VOICE_OPENING_V2 || '').trim() === 'on') return false;
     let prior = null;
     try {
       prior = await Promise.race([
@@ -5794,7 +5798,7 @@ mediaWss.on('connection', (ws, req) => {
     if (transcriptWriter) {
       // Incremental: upsert by row id, never delete (a reconnect session's
       // rows and this one's both survive).
-      transcriptWriter.flushAll(callTranscript.turns()).then(() => transcriptWriter.close());
+      transcriptWriter.flushAll().then(() => transcriptWriter.close());
     } else if (sessionCallSid && callTranscript.size()) {
       db.appendTranscript({ callSid: sessionCallSid, turns: callTranscript.turns() }).catch(
         (err) => {
