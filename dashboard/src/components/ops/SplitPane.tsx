@@ -56,7 +56,7 @@ function PaneBody(s: PaneSections) {
           {k === "history" ? (
             <ol className="flex flex-col gap-ops-1 text-ops-body">
               {s.history!.map((e, i) => (
-                <li key={i} className="grid grid-cols-[6.5rem_1fr] gap-ops-3">
+                <li key={i} className="grid min-h-ops-row grid-cols-[7.5rem_1fr] items-center gap-ops-3 border-b border-hairline last:border-b-0">
                   <span className="text-ink-2 tabular-nums">{e.when}</span>
                   <span className="min-w-0 text-ink">{e.what}{e.who ? <span className="text-ink-2"> · {e.who}</span> : null}</span>
                 </li>
@@ -106,7 +106,7 @@ export function SplitPane({ open, onClose, title, subtitle, footer, dismissible 
   }, [open, phone]);
   useEffect(() => {
     if (!open || phone) return;
-    ref.current?.focus();
+    ref.current?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && dismissible) onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
