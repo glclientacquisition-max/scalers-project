@@ -1205,7 +1205,8 @@ async function loadTurnsForReview(ctx, deps) {
 
 /** Caller and receptionist turns from voice_turn_traces (read only). */
 async function defaultLoadTraceTurns(callSid) {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return [];
+  // readStoredTurns throws without a Supabase service client; the caller
+  // logs that and keeps the thin transcript.
   const { readStoredTurns } = require('../speech/voiceTrace');
   const payloads = await readStoredTurns(callSid);
   return require('./savedRequestOutcome').traceTurnsForReview(payloads);
