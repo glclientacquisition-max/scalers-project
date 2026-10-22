@@ -1,0 +1,117 @@
+/*
+ * Ops design layer for /admin only. Spec: docs/reference/design-system/OPS.md.
+ * New hex values live only in this file. Contrast is checked by tests/opsContrast.test.js.
+ */
+.ops-theme {
+  --ops-text-kpi: 600 1.75rem/2rem var(--font-sans);
+  --ops-text-title: 600 1.25rem/1.625rem var(--font-sans);
+  --ops-text-heading: 600 0.9375rem/1.25rem var(--font-sans);
+  --ops-text-body: 400 0.8125rem/1.125rem var(--font-sans);
+  --ops-text-label: 500 0.75rem/1rem var(--font-sans);
+  --ops-text-caption: 400 0.6875rem/0.875rem var(--font-sans);
+  --ops-space-1: 4px;
+  --ops-space-2: 8px;
+  --ops-space-3: 12px;
+  --ops-space-4: 16px;
+  --ops-space-5: 24px;
+  --ops-space-6: 32px;
+  --ops-row-compact: 28px;
+  --ops-row: 36px;
+  --ops-row-touch: 44px;
+
+  --ops-status-ok-fg: #146c34;
+  --ops-status-ok-bg: #e8f5ee;
+  --ops-status-info-fg: #005ccc;
+  --ops-status-info-bg: #e3eeff;
+  --ops-status-warn-fg: #a3360a;
+  --ops-status-warn-bg: #fdf0e8;
+  --ops-status-danger-fg: #b42318;
+  --ops-status-danger-bg: #fef3f2;
+  --ops-status-neutral-fg: #4a5b73;
+  --ops-status-neutral-bg: #e9eef5;
+  --ops-status-beta-fg: #7a5a0e;
+  --ops-status-beta-bg: #fbf3df;
+  --ops-env-prod: var(--ops-status-danger-fg);
+  --ops-env-staging: var(--ops-status-info-fg);
+
+  --ops-chart-1: #0072b2;
+  --ops-chart-2: #d55e00;
+  --ops-chart-3: #009e73;
+  --ops-chart-4: #cc79a7;
+  --ops-chart-5: #8a6d00;
+  --ops-chart-6: #56b4e9;
+  --ops-chart-7: #6b4fa1;
+  --ops-chart-8: #4a5b73;
+  --ops-chart-seq-1: #e3eeff;
+  --ops-chart-seq-2: #a8daff;
+  --ops-chart-seq-3: #3d9bff;
+  --ops-chart-seq-4: #005ccc;
+  --ops-chart-seq-5: #003d99;
+  --ops-chart-up: var(--accent);
+  --ops-chart-down: var(--ops-status-danger-fg);
+
+  font: var(--ops-text-body);
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .ops-theme {
+  --ops-status-ok-fg: #4ade80;
+  --ops-status-ok-bg: #122a1c;
+  --ops-status-info-fg: #63b0ff;
+  --ops-status-info-bg: #12294a;
+  --ops-status-warn-fg: #f4955a;
+  --ops-status-warn-bg: #2b1a12;
+  --ops-status-danger-fg: #f97066;
+  --ops-status-danger-bg: #2d1416;
+  --ops-status-neutral-fg: #9dafc6;
+  --ops-status-neutral-bg: #1a2638;
+  --ops-status-beta-fg: #d9a62e;
+  --ops-status-beta-bg: #2a2110;
+  --ops-chart-1: #56b4e9;
+  --ops-chart-2: #f0a35e;
+  --ops-chart-3: #3ccf9e;
+  --ops-chart-4: #e39ac4;
+  --ops-chart-5: #e6c84a;
+  --ops-chart-6: #9fd4f5;
+  --ops-chart-7: #b39ddb;
+  --ops-chart-8: #9dafc6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ops-theme {
+    --ops-status-ok-fg: #4ade80;
+    --ops-status-ok-bg: #122a1c;
+    --ops-status-info-fg: #63b0ff;
+    --ops-status-info-bg: #12294a;
+    --ops-status-warn-fg: #f4955a;
+    --ops-status-warn-bg: #2b1a12;
+    --ops-status-danger-fg: #f97066;
+    --ops-status-danger-bg: #2d1416;
+    --ops-status-neutral-fg: #9dafc6;
+    --ops-status-neutral-bg: #1a2638;
+    --ops-status-beta-fg: #d9a62e;
+    --ops-status-beta-bg: #2a2110;
+  }
+}
+
+.ops-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Right drawer at md and up. Below md the shared bottom sheet (.desk-drawer) is used. */
+.ops-drawer-side {
+  transform: translateX(var(--drawer-swipe-movement-x, 0px));
+  transition: transform var(--sheet-ms) var(--ease-out);
+}
+.ops-drawer-side[data-starting-style],
+.ops-drawer-side[data-ending-style] {
+  transform: translateX(100%);
+}
+.ops-drawer-side[data-swiping] {
+  transition-duration: 0ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ops-drawer-side {
+    transition: none;
+  }
+}
