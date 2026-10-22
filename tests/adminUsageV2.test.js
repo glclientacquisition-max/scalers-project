@@ -59,3 +59,12 @@ test("invoice and business panes link to usage", () => {
   assert.match(read("dashboard/src/components/admin/v2/AdminInvoicesV2.tsx"), /Usage for this period/);
   assert.match(read("dashboard/src/components/admin/v2/AdminBusinessesV2.tsx"), /\/usage`/);
 });
+
+test("loading mirrors the page: 5-column table at row height and the pane, no tall blocks", () => {
+  const s = fs.readFileSync(path.join(__dirname, "..", "dashboard/src/components/admin/v2/UsageSkeleton.tsx"), "utf8");
+  assert.match(s, /<SkelTable rows=\{16\} cols=\{\[(\{[^}]*\}, ){4}\{[^}]*\}\]\}/);
+  assert.match(s, /<SkelPane /);
+  assert.doesNotMatch(s, /OpsSkeleton className="h-(9|28|full)/);
+  const k = fs.readFileSync(path.join(__dirname, "..", "dashboard/src/components/ops/Skeletons.tsx"), "utf8");
+  assert.match(k, /h-ops-row/);
+});
