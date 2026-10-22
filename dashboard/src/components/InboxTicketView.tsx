@@ -32,10 +32,9 @@ import {
 import { ownerAssistLabel, ownerDeskLine, plainOwnerCopy } from "@/lib/deskTicketChat";
 import { THREAD_PIN_PX, threadScrollAnchor, type ThreadAnchor } from "@/lib/endlessList";
 import { transcriptRefreshTop } from "@/lib/deskFresh";
-import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import type { InboxPingPerson } from "@/components/InboxPingTeammate";
-import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
-import { inboxMarkSeen } from "@/lib/inboxLeadActions";
+import { announceInboxResult, writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
+import { inboxArchiveCall, inboxMarkSeen, inboxUnarchiveCall } from "@/lib/inboxLeadActions";
 import {
   inboxTicketCanMarkDone,
   inboxTicketOverflowActions,
@@ -112,8 +111,11 @@ function InboxTicketMore({
   async function run(id: InboxListActionId) {
     setBusy(true);
     setPendingId(id);
-    const next = id === "unarchive" || archived ? "new" : "archived";
-    const res = await updateLeadStatus(callId, next);
+    const leaving = !(id === "unarchive" || archived);
+    // Archive: the call and its open holds and visits in one transaction
+    // (inbox_archive_calls). Unarchive: the call back to New; its requests
+    // show again with it.
+    const res = leaving ? await inboxArchiveCall(callId) : await inboxUnarchiveCall(callId);
     setBusy(false);
     setPendingId(null);
     if (res.error) {
@@ -121,9 +123,18 @@ function InboxTicketMore({
       return;
     }
     setOpen(false);
-    if (id === "archive" && !archived) {
-      writeInboxArchiveUndo([{ id: callId, callId }]);
+    if (leaving) {
+      const one = res as Awaited<ReturnType<typeof inboxArchiveCall>>;
+      if (one.archived !== false) {
+        writeInboxArchiveUndo([{ id: callId, callId }], undefined, undefined, {
+          undoId: one.undoId,
+          holdIds: one.holdIds,
+          visitIds: one.visitIds,
+        });
+      }
       router.push(backHref);
+    } else if ("text" in res) {
+      announceInboxResult(res.text);
     }
     router.refresh();
   }

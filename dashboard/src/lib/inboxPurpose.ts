@@ -3,6 +3,7 @@ import type { Lead } from "@/lib/callsTriage";
 import { nicheCopy, purposeFilters, showsVisitQueue } from "@/lib/inboxNiche";
 import { storedPhoneCandidates, storedPhoneJoinKey } from "@/lib/handoffMode";
 import {
+  countIsArchived,
   deskWorkCounts,
   isHoldRequestType,
   itemIsOpenHold,
@@ -100,6 +101,8 @@ export type InboxHold = {
   caller_name: string | null;
   caller_phone: string | null;
   call_id: string | null;
+  /** Archived with its call (inbox_archive_calls). Null or absent: shown. */
+  inbox_archived_at?: string | null;
 };
 
 export type InboxJob = {
@@ -115,6 +118,8 @@ export type InboxJob = {
   caller_name: string | null;
   caller_phone: string | null;
   call_id: string | null;
+  /** Archived with its call (inbox_archive_calls). Null or absent: shown. */
+  inbox_archived_at?: string | null;
 };
 
 export type InboxItem = {
@@ -683,7 +688,22 @@ export function attachContactIds(
   });
 }
 
+/**
+ * Archived: the call row is archived, or a hold/visit row without a call row
+ * of its own was archived with its call (inbox_archived_at). Same rule as
+ * countIsArchived (inboxCounts).
+ */
 export function itemIsArchived(item: InboxItem): boolean {
+  return countIsArchived(item);
+}
+
+/**
+ * Calendar and run sheets (Visits Week / Today, Holds Today, Home "today"):
+ * only the call's own archive. inbox_archived_at is an inbox filter, so a
+ * visit or hold archived with its call stays on the calendar (as it does
+ * for Voice and the caller).
+ */
+export function itemCallIsArchived(item: InboxItem): boolean {
   return item.lead?.leadStatus === "archived";
 }
 

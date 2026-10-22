@@ -465,7 +465,7 @@ describe("inbox verb workflows: surfaces as shipped", () => {
     assert.match(select, /kind === "archive"/);
     assert.match(select, /inboxBulkActions/);
     assert.doesNotMatch(select, /inboxTogglePin/);
-    assert.match(select, /inboxMarkDone/);
+    assert.match(read("dashboard/src/lib/inboxBulk.ts"), /mark_done: \{ table: "calls"/);
     assert.doesNotMatch(select, /aria-label=\{allPinned/);
     assert.match(select, /label="Close"/);
     assert.doesNotMatch(select, /aria-label="Back"/);
@@ -484,7 +484,8 @@ describe("inbox verb workflows: surfaces as shipped", () => {
     assert.doesNotMatch(ticket, /MarkLeadDoneButton/);
     assert.match(view, /InboxPurposeChip/);
     assert.match(view, /<InboxTicketActionDock/);
-    assert.match(view, /updateLeadStatus\(callId, next\)/);
+    assert.match(view, /inboxUnarchiveCall\(callId\)/);
+    assert.match(view, /inboxArchiveCall\(callId\)/);
     const dock = read("dashboard/src/components/InboxTicketActionDock.tsx");
     assert.match(dock, /updateLeadStatus\(callId, "resolved"\)/);
   });
