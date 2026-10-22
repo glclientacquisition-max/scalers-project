@@ -25,6 +25,15 @@ export async function resolve(specifier, context, nextResolve) {
       url: new URL("./server-only-empty.mjs", import.meta.url).href,
     };
   }
+  if (specifier === "next/server" || specifier === "next/server.js") {
+    try {
+      return await nextResolve(specifier, context);
+    } catch (err) {
+      if (err?.code !== "ERR_MODULE_NOT_FOUND") throw err;
+      // Root CI installs no dashboard deps; fall back to a tiny stub (after / NextResponse).
+      return { shortCircuit: true, url: new URL("./next-server-stub.mjs", import.meta.url).href };
+    }
+  }
   let spec = specifier;
   if (spec.startsWith("@/")) {
     spec = pathToFileURL(path.join(DASH_SRC, spec.slice(2))).href;
