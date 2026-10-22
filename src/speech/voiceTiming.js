@@ -127,16 +127,41 @@ function persistableLatencyMs(summary = {}) {
 /**
  * Structured media-call transcript so appendTranscript can write latency_ms.
  */
-function createCallTranscript() {
+function createCallTranscript(opts = {}) {
   /** @type {{ speaker: string, text: string, latencyMs: number|null }[]} */
   const rows = [];
+  // VOICE_TRANSCRIPT_INCREMENTAL: told about every new or changed row.
+  let onChange = typeof opts.onChange === 'function' ? opts.onChange : null;
+
+  // Stable per-row key (push order), so a row removed or inserted elsewhere
+  // in the array (#745 reserveAgent/release) never shifts another row's key.
+  const keys = new WeakMap();
+  let nextKey = 0;
+
+  function changed(index) {
+    if (!onChange) return;
+    const row = rows[index];
+    try {
+      onChange(keys.get(row), { ...row });
+    } catch {
+      /* never throw into the media loop */
+    }
+  }
 
   function push(speaker, text) {
     const clean = String(text || '').trim();
     if (!clean) return null;
     const row = { speaker, text: clean, latencyMs: null };
+    keys.set(row, nextKey);
+    nextKey += 1;
     rows.push(row);
+    changed(rows.length - 1);
     return row;
+  }
+
+  /** Key of a row object returned by push (for a later removal). */
+  function keyOf(row) {
+    return row && keys.has(row) ? keys.get(row) : null;
   }
 
   function stampFirstAgentSince(startIndex, latencyMs) {
@@ -146,6 +171,7 @@ function createCallTranscript() {
     for (let i = start; i < rows.length; i += 1) {
       if (rows[i].speaker === 'agent' && rows[i].latencyMs == null) {
         rows[i].latencyMs = ms;
+        changed(i);
         return rows[i];
       }
     }
@@ -165,6 +191,14 @@ function createCallTranscript() {
   }
 
   return {
+    setOnChange(fn) {
+      onChange = typeof fn === 'function' ? fn : null;
+    },
+    keyOf,
+    /** Keys of the rows still in the transcript (a #745 release drops one). */
+    liveKeys() {
+      return rows.map((row) => keys.get(row)).filter((k) => k != null);
+    },
     pushCaller(text) {
       return push('caller', text);
     },

@@ -279,6 +279,22 @@ const callBrainStates = new Map();
 // Spoken transcript per live media call (rows pushed after the speech guard).
 // The hangup summary reads it when the webhook carries no turns (HD_cd0c01f28b05).
 const callSpokenTranscripts = new Map();
+// VOICE_TRANSCRIPT_INCREMENTAL (off by default; only 'on'): per-row durable
+// transcript, a SIGTERM flush of open media sessions, and reconnect resume
+// (src/speech/transcriptIncremental.js).
+const {
+  transcriptIncrementalEnabled,
+  createIncrementalTranscriptWriter,
+  createSessionRegistry,
+  installSigtermFlush,
+  gracefulDrainOn,
+  resumePlan: transcriptResumePlan,
+} = require('./src/speech/transcriptIncremental');
+const transcriptIncrementalOn = transcriptIncrementalEnabled();
+const openMediaSessions = createSessionRegistry();
+if (transcriptIncrementalOn) {
+  installSigtermFlush({ registry: openMediaSessions, exitAfter: !gracefulDrainOn() });
+}
 const callBrainCapabilities = new Map();
 /** Per-call tenant grounding (product catalogue) for hold/order validation. */
 const callTenantProfiles = new Map();
@@ -2400,6 +2416,29 @@ mediaWss.on('connection', (ws, req) => {
   let messages = [{ role: 'system', content: systemPrompt }];
   const callTranscript = createCallTranscript();
   if (sessionCallSid) callSpokenTranscripts.set(sessionCallSid, callTranscript);
+  const transcriptWriter = transcriptIncrementalOn
+    ? createIncrementalTranscriptWriter({
+        callSid: () => sessionCallSid || null,
+        upsert: (args) => db.upsertTranscriptRows(args),
+        removeIds: (args) => db.deleteTranscriptRowIds(args),
+        log: (msg) => console.warn(`[ws/media][${sessionCallSid || 'unknown'}] ${msg}`),
+      })
+    : null;
+  if (transcriptWriter) callTranscript.setOnChange(transcriptWriter.onChange);
+  // Call trace written once per session, at close or at SIGTERM, whichever first.
+  let traceFinishPromise = null;
+  function finishTraceOnce() {
+    if (!traceFinishPromise) traceFinishPromise = voiceTrace.finishCall();
+    return traceFinishPromise;
+  }
+  const unregisterMediaSession = transcriptWriter
+    ? openMediaSessions.add(transcriptWriter.sessionKey, () =>
+        Promise.all([
+          transcriptWriter.flushAll({ liveKeys: callTranscript.liveKeys() }),
+          finishTraceOnce().catch(() => null),
+        ])
+      )
+    : () => {};
   function logTurnTiming(timing, extra) {
     if (!timing) return null;
     const summary = timing.log(extra);
@@ -5383,6 +5422,45 @@ mediaWss.on('connection', (ws, req) => {
     callBrainStates.set(sessionCallSid, state);
   }
 
+  async function resumeFromPriorSession() {
+    if (!sessionCallSid || typeof db.listTranscriptTurns !== 'function') return false;
+    // #843 (VOICE_OPENING_V2) owns the opening and its own resume store
+    // (calls.greeted_at claim). When it is on, it decides; never both.
+    if (String(process.env.VOICE_OPENING_V2 || '').trim() === 'on') return false;
+    let prior = null;
+    try {
+      prior = await Promise.race([
+        db.listTranscriptTurns(sessionCallSid),
+        new Promise((resolve) => setTimeout(() => resolve(null), 800)),
+      ]);
+    } catch {
+      prior = null;
+    }
+    // Unknown (error or slow): fail open and greet as today.
+    if (!Array.isArray(prior)) return false;
+    const plan = transcriptResumePlan(prior, { lastLanguage: callLanguage });
+    if (!plan.resume) return false;
+    for (const turn of plan.turns) {
+      messages.push({
+        role: turn.speaker === 'caller' ? 'user' : 'assistant',
+        content: String(turn.text),
+        local: true,
+      });
+    }
+    if (plan.heardCaller) heardCallerUtterance = true;
+    lastAgentText = '';
+    console.log(
+      `[ws/media][${sidLabel()}] reconnect_resume prior_rows=${plan.turns.length} lang=${plan.language}: no re-greeting`
+    );
+    voiceTrace.noteCall({ stage: 'reconnect_resume', priorRows: plan.turns.length, language: plan.language, at: new Date().toISOString() });
+    const spoken = await speakText(plan.line, { skipFileGate: true });
+    if (spoken?.ok) {
+      callTranscript.pushAgent(plan.line);
+      messages.push({ role: 'assistant', content: plan.line, local: true });
+    }
+    return true;
+  }
+
   // Greet once the tenant profile is loaded (correct shop name). Cached PCM
   // plays before TTS-ready wait so answer-to-greeting is not dead air.
   (async () => {
@@ -5396,6 +5474,12 @@ mediaWss.on('connection', (ws, req) => {
       // call must not ride this greeting or the rest of this session.
       ttsSpeedScale = 1;
       console.log(`[ws/media][${sidLabel()}] caller speed scale=1`);
+      // VOICE_TRANSCRIPT_INCREMENTAL: a media reconnect for a call that already
+      // has rows from another session resumes instead of greeting again.
+      if (transcriptIncrementalOn && (await resumeFromPriorSession())) {
+        greetingSettled = true;
+        return;
+      }
       if (isDefaultShopName(businessName)) {
         console.warn(
           `[ws/media][${sidLabel()}] greeting skipped — default shop name`
@@ -5707,10 +5791,15 @@ mediaWss.on('connection', (ws, req) => {
       console.log(`[ws/media] refused session closed callSid=${sessionCallSid || 'unknown'}: nothing finalized`);
       return;
     }
-    voiceTrace.finishCall().catch((err) => {
+    finishTraceOnce().catch((err) => {
       console.warn(`[ws/media] voice trace finish failed:`, err?.message || err);
     });
-    if (sessionCallSid && callTranscript.size()) {
+    unregisterMediaSession();
+    if (transcriptWriter) {
+      // Incremental: upsert by row id, never delete (a reconnect session's
+      // rows and this one's both survive).
+      transcriptWriter.flushAll({ liveKeys: callTranscript.liveKeys() }).then(() => transcriptWriter.close());
+    } else if (sessionCallSid && callTranscript.size()) {
       db.appendTranscript({ callSid: sessionCallSid, turns: callTranscript.turns() }).catch(
         (err) => {
           console.error(`[ws/media] transcript flush failed:`, err?.message || err);
