@@ -952,7 +952,59 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review, vertical, 
     out.next = 'None.';
   }
 
+  trustedHoursCardHonesty(out, derived);
   return out;
+}
+
+// BRAIN_TRUSTED_HOURS (HD_49d726c3dc9b): "Hours were answered." on a call
+// where the caller heard "I don't have that on file" three times. When the
+// spoken ledger says the hours question went unanswered (no correct hours
+// line was spoken: a guard-replaced, contradicted, or "team will confirm"
+// line is not an answer), no card line may say the hours were answered.
+const HOURS_ANSWERED =
+  /\b(?:(?:opening|business|working)\s+)?hours?\s+(?:were|was|have\s+been|got)?\s*(?:answered|given|shared|confirmed|provided)\b|\b(?:answered|gave|shared|confirmed|provided)\s+(?:the\s+|their\s+|our\s+)?(?:opening\s+|business\s+)?hours\b/i;
+
+function trustedHoursCardHonesty(out, derived) {
+  if (!require('./trustedHours').trustedHoursEnabled()) return;
+  const unanswered = Array.isArray(derived?.unansweredQuestions) ? derived.unansweredQuestions : [];
+  if (!unanswered.includes('hours')) return;
+  const strip = (text) =>
+    String(text || '')
+      .split(/(?<=[.!?])\s+/)
+      .filter((sentence) => sentence && !HOURS_ANSWERED.test(sentence))
+      .join(' ')
+      .trim();
+  if (HOURS_ANSWERED.test(out.next || '')) out.next = strip(out.next) || 'Call them back with the hours.';
+  if (HOURS_ANSWERED.test(out.done || '')) out.done = strip(out.done) || 'None.';
+  for (const key of ['want', 'reason']) {
+    if (HOURS_ANSWERED.test(out[key] || '')) out[key] = strip(out[key]) || out[key];
+  }
+}
+
+/** Call language from the caller turns: one language at 75% or more of the known turns, else mixed. */
+function callLanguageFromTurns(callerTexts = []) {
+  const { detectCallerLanguage } = require('./language');
+  const counts = { en: 0, sw: 0, sheng: 0 };
+  let known = 0;
+  for (const text of callerTexts) {
+    const lang = detectCallerLanguage(text);
+    if (lang === 'mixed') {
+      counts.en += 0.5;
+      counts.sw += 0.5;
+      known += 1;
+    } else if (counts[lang] != null) {
+      counts[lang] += 1;
+      known += 1;
+    }
+  }
+  if (!known) return null;
+  const [top, n] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  return n / known >= 0.75 ? top : 'mixed';
+}
+
+function knownLanguage(value) {
+  const lang = String(value || '').trim().toLowerCase();
+  return lang && lang !== 'unknown' ? lang : null;
 }
 
 function formatTrustedSnapshot(ctx) {
@@ -1326,6 +1378,7 @@ async function writeReviewedSummary({ callSid, merged, review, derived, summary 
     patch.reason = merged.reason;
     patch.text = merged.reason;
   }
+  if (merged.language) patch.language = merged.language;
   if (spine) {
     patch.primary_intent = spine.primary_intent;
     patch.resolution = spine.resolution;
@@ -1595,6 +1648,11 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
     return { ok: true, skipped: true, merged, review };
   }
 
+  // BRAIN_TRUSTED_HOURS (HD_49d726c3dc9b): language "unknown" on a call with
+  // thirteen caller turns. The language comes from the caller turns.
+  if (require('./trustedHours').trustedHoursEnabled()) {
+    merged.language = knownLanguage(ctx.summary?.language) || callLanguageFromTurns(callerTurnTexts(turns));
+  }
   await save({ callSid, merged, review, derived: ctx.derived, summary: ctx.summary });
   return { ok: true, merged, review };
 }
@@ -1604,11 +1662,32 @@ function preferContext(prev, next) {
   const prevTurns = Array.isArray(prev.turns) ? prev.turns.length : 0;
   const nextTurns = Array.isArray(next.turns) ? next.turns.length : 0;
   const turns = nextTurns >= prevTurns ? next.turns : prev.turns;
-  return {
+  const merged = {
     ...prev,
     ...next,
     turns: turns || next.turns || prev.turns,
   };
+  // BRAIN_TRUSTED_HOURS (HD_49d726c3dc9b): a second hangup for the same sid
+  // from a session with no turns ("Call completed.", no intent, language
+  // unknown) must not replace the real call's Brain snapshot.
+  if (require('./trustedHours').trustedHoursEnabled() && snapshotWeight(next) < snapshotWeight(prev)) {
+    merged.summary = prev.summary;
+    merged.derived = prev.derived;
+    merged.toolFlags = prev.toolFlags;
+  }
+  return merged;
+}
+
+function snapshotWeight(ctx) {
+  const summary = ctx?.summary || {};
+  const flags = ctx?.toolFlags || {};
+  let weight = 0;
+  if (summary.primaryIntent) weight += 2;
+  if (summary.callerName || flags.callerName) weight += 1;
+  if (cleanReason(summary.reason || '')) weight += 1;
+  if (knownLanguage(summary.language)) weight += 1;
+  if (ctx?.derived?.primaryIntent) weight += 1;
+  return weight;
 }
 
 /**
@@ -1662,6 +1741,8 @@ function resetTranscriptReviewScheduleForTests() {
 
 module.exports = {
   NAME_EXTRACT_SYSTEM,
+  preferContext,
+  callLanguageFromTurns,
   REVIEW_SYSTEM,
   reviewSystemPrompt,
   callerSpeechChars,

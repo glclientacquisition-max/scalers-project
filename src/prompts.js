@@ -162,6 +162,14 @@ Still help from verified knowledge. Ask for details only when they are needed fo
       ? `HOURS NOTES: ${String(profile.businessHours).trim()}`
       : 'STRUCTURED HOURS: not set';
 
+  // BRAIN_TRUSTED_HOURS (HD_49d726c3dc9b): today and tomorrow in Nairobi,
+  // computed in code, with the grid hours for both days. Empty when off.
+  const trustedHoursBlock = require('./conversation/trustedHours').trustedHoursPromptLines(
+    profile,
+    opts.now ? new Date(opts.now) : new Date()
+  );
+  const hoursSection = trustedHoursBlock ? `${hoursLine}\n${trustedHoursBlock}` : hoursLine;
+
   const bulletinBlock = formatBulletinForPrompt(profile.dailyBulletin);
   const bulletinSection = bulletinBlock ? `\n${bulletinBlock}\n` : '\n';
   const returningBlock = formatReturningCallerForPrompt(
@@ -181,7 +189,7 @@ CONTEXT HEADER (live — highest priority on this call):
 CURRENT TIME IN KENYA: ${nowLabel}
 YOUR NAME: ${agentName}
 BUSINESS: ${businessName}
-${hoursLine}
+${hoursSection}
 ${statusBlock}
 ${bulletinSection}${returningSection}IDENTITY: You are ${agentName} from ${businessName}. The opening greeting already introduced you. If they ask who you are, say your name and the shop only. Do not disclose AI unless they ask if you are a robot. Match the caller's language after they speak (en / sw / sheng). Stay this same person on every turn.
 MOOD: Listen to the caller's tone. If they are frustrated or angry, be empathetic and concise. Do not use cheerful filler words if the user is angry.`;

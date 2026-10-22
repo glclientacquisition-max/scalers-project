@@ -660,6 +660,27 @@ function withMessageOnlyCallback(out, ctx, appendCallback) {
   return `${body} ${line}`;
 }
 
+/**
+ * BRAIN_TRUSTED_HOURS: the hours_on / hours_unknown line for a day, once per
+ * caller turn (streamed sentences each pass through the guard). Recorded on
+ * conv.pendingBrainLines like the other fact lines.
+ */
+function trustedHoursSpeak(ctx, dayKey, lang, now, out) {
+  const { hoursOnFact } = require('./trustedHours');
+  const { renderLines } = require('./factLine');
+  const conv = ctx.state && typeof ctx.state === 'object' ? (ctx.state.conversation ||= {}) : null;
+  const turn = Number(conv?.turnCount || 0);
+  const rendered = renderLines([hoursOnFact(ctx.profile || {}, dayKey, { lang: confirmationLanguage(lang), now })], { now });
+  if (!rendered.line) return '';
+  if (String(out || '').includes(rendered.line)) return '';
+  if (conv && turn > 0 && conv.trustedHoursLineTurn === turn) return '';
+  if (conv) {
+    conv.trustedHoursLineTurn = turn;
+    conv.pendingBrainLines = [...(Array.isArray(conv.pendingBrainLines) ? conv.pendingBrainLines : []), ...rendered.lines];
+  }
+  return rendered.line;
+}
+
 function guardSpokenReply(text, ctx = {}) {
   let raw = String(text || '').replace(/\s+/g, ' ').trim();
   if (!raw) return '';
@@ -711,6 +732,22 @@ function guardSpokenReply(text, ctx = {}) {
   let droppedJob = false;
   let droppedUnboundFile = false;
   const lastCallerTurn = String((ctx.callerTurns || []).slice(-1)[0] || '');
+  // BRAIN_TRUSTED_HOURS (HD_49d726c3dc9b): day and hours asks are answered from
+  // the owner weekly grid, with today and tomorrow computed in Nairobi; a model
+  // open/closed claim against the grid is replaced by that day's hours_on line.
+  const trustedHours = require('./trustedHours');
+  const trustedHoursOn = trustedHours.trustedHoursEnabled();
+  const hoursNow = ctx.now != null ? new Date(ctx.now) : new Date();
+  const hoursDay = trustedHoursOn
+    ? trustedHours.hoursAskDay(lastCallerTurn, {
+        previous: (ctx.callerTurns || []).slice(0, -1),
+        now: hoursNow,
+        looksLikeHoursAsk,
+      })
+    : '';
+  let hoursLineDay = '';
+  // Which number sentences pass on an hours ask stays Voice's guard rule
+  // (unsaid_number); Brain only checks claims against the file below.
   const hoursFacts = looksLikeHoursAsk(lastCallerTurn) ? fileHoursFacts(ctx.profile || {}) : null;
   const heldName = heldCallerName(ctx.state);
   let droppedNameAsk = false;
@@ -736,6 +773,15 @@ function guardSpokenReply(text, ctx = {}) {
       droppedNoRecord = true;
       noteDrop(ctx, 'no_record_claim', sentence);
       continue;
+    }
+    if (trustedHoursOn) {
+      const hit = trustedHours.contradictsFileHours(sentence, ctx.profile || {}, hoursNow);
+      const vsDay = !hit && hoursDay ? trustedHours.sentenceVsDay(sentence, ctx.profile || {}, hoursDay, hoursNow) : '';
+      if (hit || vsDay === 'mismatch') {
+        hoursLineDay = hoursLineDay || (hit ? hit.day : hoursDay);
+        noteDrop(ctx, hit ? 'hours_contradiction' : 'hours_not_on_file', sentence);
+        continue;
+      }
     }
     if (fixesOn && ctx.state?.caller?.nameConfirmed !== true && isPackIdentityAsk(sentence, pendingUnboundName(ctx.state))) {
       if (nameAskedBefore) {
@@ -905,8 +951,23 @@ function guardSpokenReply(text, ctx = {}) {
   // The caller asked the hours and the model's clock sentence was dropped
   // (hours on file do not authorize a model clock, #489). Speak the file's
   // hours line instead of "not on file" or a bare "Okay." (HD_ee813bcf6248).
-  const groundedHours =
-    !groundedPrice && droppedNumber ? hoursAskLine(lastCallerTurn, ctx.profile || {}, ctx.language) : '';
+  const hoursVerifiable =
+    trustedHoursOn && trustedHours.fileDay(ctx.profile || {}, hoursLineDay || hoursDay, hoursNow).status !== 'unverified';
+  const trustedHoursLine =
+    hoursVerifiable && !groundedPrice && (hoursLineDay || (hoursDay && droppedNumber))
+      ? trustedHoursSpeak(
+          ctx,
+          hoursLineDay || hoursDay,
+          String(ctx.language || '').toLowerCase() === 'sheng' && answerLanguage !== 'en' ? 'sheng' : answerLanguage,
+          hoursNow,
+          out
+        )
+      : '';
+  const groundedHours = hoursVerifiable
+    ? trustedHoursLine
+    : !groundedPrice && droppedNumber
+      ? hoursAskLine(lastCallerTurn, ctx.profile || {}, ctx.language)
+      : '';
   if (groundedHours) {
     out = !out || NOT_ON_FILE.test(out) ? groundedHours : `${groundedHours} ${out}`;
   }

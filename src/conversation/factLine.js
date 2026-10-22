@@ -21,6 +21,9 @@ const TEMPLATES = {
   reask_slot: { required: ['slot'], optional: ['day', 'pending_hour', 'ask_count'] },
   ask_area: { required: [], optional: [] },
   ask_need: { required: [], optional: [] },
+  // BRAIN_TRUSTED_HOURS: day hours from the owner weekly grid (trustedHours.js).
+  hours_on: { required: ['day', 'status'], optional: ['relative', 'open', 'close'] },
+  hours_unknown: { required: [], optional: [] },
 };
 
 let voiceRenderer;
@@ -233,6 +236,10 @@ function fallbackLine(line, now = new Date()) {
         ? `Let me just confirm who I'm speaking with. Am I speaking with ${name}?`
         : "Let me just confirm who I'm speaking with first.";
     }
+    case 'hours_on':
+    case 'hours_unknown':
+      // eslint-disable-next-line global-require
+      return require('./trustedHours').hoursFallbackLine(line);
     default:
       return '';
   }

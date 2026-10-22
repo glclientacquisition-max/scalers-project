@@ -1,0 +1,3067 @@
+{
+  "_note": "Aris Kenya prod tenant row (24ca3d5e), read-only SELECT 2026-10-18 for HD_49d726c3dc9b: hours grid, FAQs, bulletin, catalogue, compiled prompt. Billing/wallet/owner columns dropped; phones and emails redacted; team names replaced. (tests/fixtures/tenants/aris-prod.json is the older 2026-10-09 catalogue subset.)",
+  "tenant": {
+    "id": "24ca3d5e-db5c-4cc3-b745-a87a68cf3ce0",
+    "faqs": [
+      {
+        "answer": "Yes we do you can shop online with us at arisstationaries.co.ke",
+        "source": "owner",
+        "status": "confirmed",
+        "question": "Do you have a website?",
+        "confirmed": true
+      },
+      {
+        "answer": "Yes we do: we offer options couriers like pickup mtaani,super metro,buscar,easy coach g4s and so on",
+        "source": "owner",
+        "status": "confirmed",
+        "question": "Do you do country wide delivery?",
+        "confirmed": true
+      },
+      {
+        "answer": "We are active as @aris.kenya on Instagram, TikTok, and WhatsApp.",
+        "source": "owner",
+        "status": "confirmed",
+        "question": "Which social media platforms are you on?",
+        "confirmed": true
+      },
+      {
+        "answer": "You can message us directly on Instagram, TikTok, or WhatsApp for quick support or to place an order.",
+        "source": "owner",
+        "status": "confirmed",
+        "question": "How can I place an order or get support?",
+        "confirmed": true
+      },
+      {
+        "answer": "You can find us as @aris.kenya on Instagram, TikTok, and WhatsApp.",
+        "source": "owner",
+        "status": "confirmed",
+        "question": "What are your social media handles?",
+        "confirmed": true
+      },
+      {
+        "answer": "You can shop online at arisstationaries.co.ke or message us directly on Instagram, TikTok, or WhatsApp to place an order.",
+        "source": "owner",
+        "status": "confirmed",
+        "question": "Where can I shop or place an order?",
+        "confirmed": true
+      },
+      {
+        "answer": "No, we will be closed on Monday.",
+        "source": "owner",
+        "status": "confirmed",
+        "question": "Are you open on Monday?",
+        "confirmed": true
+      }
+    ],
+    "vertical": "retail",
+    "agent_name": "Lynn",
+    "agent_tone": "warm",
+    "agent_tools": {
+      "end_call": false,
+      "escalate": true
+    },
+    "spoken_name": "Aris - The Home of Affordable Stationery",
+    "handoff_mode": "callback",
+    "business_name": "Aris Kenya",
+    "business_type": "retail",
+    "service_areas": {
+      "areas": [
+        {
+          "id": "place:nairobi cbd",
+          "eta": "Same day",
+          "modes": [
+            "delivery"
+          ],
+          "source": "owner",
+          "fee_ksh": null,
+          "fee_mode": "free",
+          "confirmed": true,
+          "min_order_ksh": null
+        }
+      ],
+      "reach": "deliver",
+      "version": 1,
+      "rider_paid": "on_arrival",
+      "no_premises": false,
+      "delivered_by": [
+        "courier",
+        "rider"
+      ],
+      "anywhere_kenya": true,
+      "outside_fee_ksh": null
+    },
+    "business_hours": "Mon-Fri: 09:30-18:00 EAT; Sat-Sun: closed. Location: Main · We have a hybrid system where we operate through our e-commrce website online where you order and have it delivered country wide or pickup in our outlets in person. · Inside UON premises",
+    "daily_bulletin": [
+      {
+        "id": "dd4e3ab3-97ce-47ab-ba13-3d66ff234c9e",
+        "text": "jjjj",
+        "active": false,
+        "ends_at": "2026-08-13T06:00:29.047Z",
+        "starts_at": "2026-08-13T06:00:22.348Z",
+        "created_at": "2026-08-13T06:00:22.348Z"
+      },
+      {
+        "id": "ca4414ef-e3b9-4ed7-87f7-5d03061f6b5c",
+        "text": "today is a public holiday we take order but we cannot make same day delivery",
+        "active": true,
+        "ends_at": "2026-08-09T20:59:59.999Z",
+        "starts_at": "2026-08-09T13:14:48.828Z",
+        "created_at": "2026-08-09T13:14:48.828Z"
+      },
+      {
+        "id": "9af6d4c1-17db-43a1-afd6-945778f88151",
+        "text": "we are out of pens",
+        "active": false,
+        "ends_at": "2026-08-09T13:14:21.332Z",
+        "starts_at": "2026-08-09T13:13:52.980Z",
+        "created_at": "2026-08-09T13:13:52.980Z"
+      },
+      {
+        "id": "77264f0f-30e3-4873-9413-6536d0d601f7",
+        "text": "We are closed for the day due to maandamano interuptions in CBD",
+        "active": false,
+        "ends_at": "2026-08-09T13:13:40.981Z",
+        "starts_at": "2026-08-09T13:11:58.732Z",
+        "created_at": "2026-08-09T13:11:58.732Z"
+      },
+      {
+        "id": "c3ccd523-c964-44c3-a058-310500125935",
+        "text": "we are out of pens",
+        "active": false,
+        "ends_at": "2026-08-09T13:11:04.448Z",
+        "starts_at": "2026-08-09T08:27:58.492Z",
+        "created_at": "2026-08-09T08:27:58.492Z"
+      },
+      {
+        "id": "6d51eb61-1006-4ec9-9815-99e5a0e49fc9",
+        "text": "We are closed for the day due to maandamano interuptions in CBD",
+        "active": false,
+        "ends_at": "2026-08-09T13:11:27.169Z",
+        "starts_at": "2026-08-09T13:11:01.926Z",
+        "created_at": "2026-08-09T13:11:01.926Z"
+      },
+      {
+        "id": "d53fde81-cefb-4887-8413-33ae3a87e59f",
+        "text": "We are closed for the day due to maandamano interuptions in CBD",
+        "active": false,
+        "ends_at": "2026-08-08T16:06:24.946Z",
+        "starts_at": "2026-08-07T23:07:25.436Z",
+        "created_at": "2026-08-07T23:07:25.436Z"
+      }
+    ],
+    "hours_schedule": {
+      "days": {
+        "fri": {
+          "open": "09:30",
+          "close": "18:00"
+        },
+        "mon": {
+          "open": "09:30",
+          "close": "18:00"
+        },
+        "sat": null,
+        "sun": null,
+        "thu": {
+          "open": "09:30",
+          "close": "18:00"
+        },
+        "tue": {
+          "open": "09:30",
+          "close": "18:00"
+        },
+        "wed": {
+          "open": "09:30",
+          "close": "18:00"
+        }
+      },
+      "location": "Main · We have a hybrid system where we operate through our e-commrce website online where you order and have it delivered country wide or pickup in our outlets in person. · Inside UON premises",
+      "timezone": "Africa/Nairobi"
+    },
+    "social_handles": {
+      "channels": [
+        {
+          "kind": "phone",
+          "label": "Main",
+          "value": "+254700000000"
+        },
+        {
+          "kind": "instagram",
+          "label": "Instagram",
+          "value": "@aris.kenya"
+        },
+        {
+          "kind": "facebook",
+          "label": "facebook",
+          "value": "@aris.kenya"
+        },
+        {
+          "kind": "website",
+          "label": "Website",
+          "value": "https://www.arisstationaries.co.ke/"
+        }
+      ]
+    },
+    "team_directory": [
+      {
+        "name": "Team member 1",
+        "role": "Owner &General quiries",
+        "email": "redacted@example.invalid",
+        "phone": "+254700000000",
+        "receives_ops": true,
+        "receives_inbox": true,
+        "receives_escalation": true
+      },
+      {
+        "name": "Team member 2",
+        "role": "Owner",
+        "email": "redacted@example.invalid",
+        "phone": "+254700000000",
+        "receives_ops": true,
+        "receives_inbox": true,
+        "receives_escalation": true
+      }
+    ],
+    "greeting_invite": "Tukusaidie vipi",
+    "product_catalog": [
+      {
+        "sku": "",
+        "name": "Circle Template",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": "unknown"
+      },
+      {
+        "sku": "",
+        "name": "360 Degrees Protractor",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": "unknown"
+      },
+      {
+        "sku": "",
+        "name": "A3 Drawing Books",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Bazooka (Drawing Tube)",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Astra BAB-ASTRA 4 PORT EXTENSION",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Electric Water Kettle (Stainless Steel)",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "180° transparent protractor",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Adjustable set square",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Foolscaps (3 scaps)",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "A5 gazelle notebook",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "200 pages a4 eco single rule exe book",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Architectural scale ruler",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "A5 artistic notebook",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "A6 classic strap notebook",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "A6 business leather notebook",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "A6 active notebook",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "A6 colourful strap notebook",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "A5 flowers notebook",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "3 piece french curve set",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "35cm set squares (drawing & engineering)",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Casio fx 991 ex (upgraded version)",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Casio fx 82 ms",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Pvc detachable t square",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "M&g all in one set",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Staedtler Pencils",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Fine bic pen",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Crystal bic pen",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Special spiral notebook",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "3 in 1 executive gift set",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Obama blue pen box",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Smp table",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Mg box files",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Damasa hb pencil",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Black whiteboard ink (leto)",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Casio fx 82 ex",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Casio fx 991 es plus",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Kangaroo staples small packet",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Mood diary a8",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Red dragon fly scissors",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Nataraj sharperner",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Exam standard accord dust free black eraser",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "M&g metal school set",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "A6 brown strap notebook",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Nataraj dustless eraser",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Mg coloured sticky notes 3x3",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Kangaroo staples 24-6x5m -many",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Obama blue pen",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Asst permanent marker piang xiang",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Obama red pen",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Obama balck pen",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Kangaroo stapler hd-45",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Kangaroo stapler hd-45s",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Gem blue whiteboard pen (refillable)",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Super scissors",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Permanent blue ink",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Mg whiteboard markpen",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Oxford set (metallic)",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Mg zipper bag-a6",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "30cm rok ruler",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Mg sticky note 3x2",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Hb office point pencils",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Mg modern drawing sharperner",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Half size 2 quire eco counter book",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Half size 4 quire eco counter book",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Half size 3 quire eco counter book",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "120 pages a4 eco single rule exe book",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "96 pages a4 eco single rule exe book",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Mg gel pen",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Mg correction pen",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Mg mini stapler",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Mg stapler mgs 14..180",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Mg double clip file",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Mg single clip file",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Big engineering drawing set",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Display book with 30 pockets",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Display book with 20 pockets",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Display books with 10 pockets",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Rok cellotape small-2 inch",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Rok cellotape small- 1 inch",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Rok cellotape small- 3/4 inch",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Rok cellotape small- 0.5 inch",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Rok masking tape small- 2 inch",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Rok masking tape small- 1 inch",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Rok masking tape small- 3/4 inch",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Rok masking tape small- 0.5 inch",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Full size 4q eco counter book",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Full size 3 quire eco counter book",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Full size 2 quire eco counter book",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Haco ruler",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Mg highlighter",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Spring file teepee (pvc)",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Spring file till (pvc)",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      },
+      {
+        "sku": "",
+        "name": "Mg zipper bag-A4",
+        "unit": "",
+        "notes": "",
+        "price": "",
+        "source": "owner",
+        "aliases": [],
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": ""
+      }
+    ],
+    "voice_languages": [
+      "en",
+      "sw",
+      "sheng"
+    ],
+    "after_hours_mode": "serve",
+    "services_catalog": [
+      {
+        "id": "svc_b9094f1d31ed3236",
+        "name": "Quotation",
+        "notes": "Free",
+        "source": "owner",
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "parsed",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": false,
+          "amount_ksh": null
+        },
+        "category": "",
+        "in_stock": "",
+        "price_range": "",
+        "out_of_scope": ""
+      }
+    ],
+    "services_offered": "Services:\n- Quotation - Free\n\nProduct catalogue:\n- Circle Template - in stock unknown\n- 360 Degrees Protractor - in stock unknown\n- A3 Drawing Books\n- Bazooka (Drawing Tube)\n- Astra BAB-ASTRA 4 PORT EXTENSION\n- Electric Water Kettle (Stainless Steel)\n- 180° transparent protractor\n- Adjustable set square\n- Foolscaps (3 scaps)\n- A5 gazelle notebook\n- 200 pages a4 eco single rule exe book\n- Architectural scale ruler\n- A5 artistic notebook\n- A6 classic strap notebook\n- A6 business leather notebook\n- A6 active notebook\n- A6 colourful strap notebook\n- A5 flowers notebook\n- 3 piece french curve set\n- 35cm set squares (drawing & engineering)\n- Casio fx 991 ex (upgraded version)\n- Casio fx 82 ms\n- Pvc detachable t square\n- M&g all in one set\n- Staedtler Pencils\n- Fine bic pen\n- Crystal bic pen\n- Special spiral notebook\n- 3 in 1 executive gift set\n- Obama blue pen box\n- Smp table\n- Mg box files\n- Damasa hb pencil\n- Black whiteboard ink (leto)\n- Casio fx 82 ex\n- Casio fx 991 es plus\n- Kangaroo staples small packet\n- Mood diary a8\n- Red dragon fly scissors\n- Nataraj sharperner\n- Exam standard accord dust free black eraser\n- M&g metal school set\n- A6 brown strap notebook\n- Nataraj dustless eraser\n- Mg coloured sticky notes 3x3\n- Kangaroo staples 24-6x5m -many\n- Obama blue pen\n- Asst permanent marker piang xiang\n- Obama red pen\n- Obama balck pen\n- Kangaroo stapler hd-45\n- Kangaroo stapler hd-45s\n- Gem blue whiteboard pen (refillable)\n- Super scissors\n- Permanent blue ink\n- Mg whiteboard markpen\n- Oxford set (metallic)\n- Mg zipper bag-a6\n- 30cm rok ruler\n- Mg sticky note 3x2\n- Hb office point pencils\n- Mg modern drawing sharperner\n- Half size 2 quire eco counter book\n- Half size 4 quire eco counter book\n- Half size 3 quire eco counter book\n- 120 pages a4 eco single rule exe book\n- 96 pages a4 eco single rule exe book\n- Mg gel pen\n- Mg correction pen\n- Mg mini stapler\n- Mg stapler mgs 14..180\n- Mg double clip file\n- Mg single clip file\n- Big engineering drawing set\n- Display book with 30 pockets\n- Display book with 20 pockets\n- Display books with 10 pockets\n- Rok cellotape small-2 inch\n- Rok cellotape small- 1 inch\n- Rok cellotape small- 3/4 inch\n- Rok cellotape small- 0.5 inch\n- Rok masking tape small- 2 inch\n- Rok masking tape small- 1 inch\n- Rok masking tape small- 3/4 inch\n- Rok masking tape small- 0.5 inch\n- Full size 4q eco counter book\n- Full size 3 quire eco counter book\n- Full size 2 quire eco counter book\n- Haco ruler\n- Mg highlighter\n- Spring file teepee (pvc)\n- Spring file till (pvc)\n- Mg zipper bag-A4\n\nSocial & web:\nPhones / WhatsApp:\n- Phone (Main): +254700000000\n\nSocial & web:\n- Instagram: @aris.kenya\n- Facebook (facebook): @aris.kenya\n- Website: https://www.arisstationaries.co.ke/",
+    "business_category": "books_stationery",
+    "business_policies": {
+      "holds": {
+        "source": "owner",
+        "allowed": "yes",
+        "confirmed": true,
+        "max_hours": 48,
+        "deposit_required": "yes"
+      },
+      "other": "",
+      "deposit": "Available",
+      "payment": "You can pay by M-Pesa Paybill 542542, account 70722 or cash.",
+      "returns": "Consult with the team",
+      "delivery": "Country wide delivery",
+      "payments": {
+        "bank": null,
+        "card": null,
+        "note": null,
+        "pochi": null,
+        "airtel": null,
+        "source": "owner",
+        "methods": [
+          "mpesa_paybill",
+          "cash"
+        ],
+        "timings": [],
+        "version": 2,
+        "confirmed": true,
+        "mpesa_send": null,
+        "mpesa_till": null,
+        "mpesa_paybill": {
+          "account": "70722",
+          "business_no": "542542",
+          "account_mode": "fixed"
+        },
+        "deposit_percent": null
+      },
+      "warranty": "Depends with the product",
+      "provenance": {
+        "deposit": {
+          "source": "owner",
+          "confirmed": true
+        },
+        "payment": {
+          "source": "owner",
+          "confirmed": true
+        },
+        "returns": {
+          "source": "owner",
+          "confirmed": true
+        },
+        "delivery": {
+          "source": "owner",
+          "confirmed": true
+        },
+        "warranty": {
+          "source": "owner",
+          "confirmed": true
+        },
+        "cancellation": {
+          "source": "owner",
+          "confirmed": true
+        }
+      },
+      "cancellation": "Consult with the team",
+      "coverage_areas": [
+        "place:nairobi cbd"
+      ],
+      "coverage_outside": {
+        "fee_ksh": null,
+        "anywhere_kenya": true
+      }
+    },
+    "llm_system_prompt": "You are Lynn, the live phone business assistant for Aris Kenya in Kenya.\n\nIDENTITY:\n- Your name is Lynn. You are one calm person for the whole call. Introduce yourself naturally on the first turn (e.g. \"Aris Kenya, this is Lynn. How can I help?\"). Do not recite a script or switch character. Do not invite language on the first open.\n- Tone: warm. Helpful Kenyan receptionist. Stay brief. Do not chat past the ask.\n- Listen to the caller's mood. If they sound frustrated or angry, drop cheerful filler immediately and stay empathetic and concise. This mood rule applies for every tone.\n\nBUSINESS KNOWLEDGE:\n- Business name: Aris Kenya\n- Vertical: retail\n- Handoff preference: callback (preference only; never claim a live transfer unless runtime confirms it)\n- Services & pricing:\nServices:\n- Quotation - Free\n\nProduct catalogue:\n- Circle Template - in stock unknown\n- 360 Degrees Protractor - in stock unknown\n- A3 Drawing Books\n- Bazooka (Drawing Tube)\n- Astra BAB-ASTRA 4 PORT EXTENSION\n- Electric Water Kettle (Stainless Steel)\n- 180° transparent protractor\n- Adjustable set square\n- Foolscaps (3 scaps)\n- A5 gazelle notebook\n- 200 pages a4 eco single rule exe book\n- Architectural scale ruler\n- A5 artistic notebook\n- A6 classic strap notebook\n- A6 business leather notebook\n- A6 active notebook\n- A6 colourful strap notebook\n- A5 flowers notebook\n- 3 piece french curve set\n- 35cm set squares (drawing & engineering)\n- Casio fx 991 ex (upgraded version)\n- Casio fx 82 ms\n- Pvc detachable t square\n- M&g all in one set\n- Staedtler Pencils\n- Fine bic pen\n- Crystal bic pen\n- Special spiral notebook\n- 3 in 1 executive gift set\n- Obama blue pen box\n- Smp table\n- Mg box files\n- Damasa hb pencil\n- Black whiteboard ink (leto)\n- Casio fx 82 ex\n- Casio fx 991 es plus\n- Kangaroo staples small packet\n- Mood diary a8\n- Red dragon fly scissors\n- Nataraj sharperner\n- Exam standard accord dust free black eraser\n- M&g metal school set\n- A6 brown strap notebook\n- Nataraj dustless eraser\n- Mg coloured sticky notes 3x3\n- Kangaroo staples 24-6x5m -many\n- Obama blue pen\n- Asst permanent marker piang xiang\n- Obama red pen\n- Obama balck pen\n- Kangaroo stapler hd-45\n- Kangaroo stapler hd-45s\n- Gem blue whiteboard pen (refillable)\n- Super scissors\n- Permanent blue ink\n- Mg whiteboard markpen\n- Oxford set (metallic)\n- Mg zipper bag-a6\n- 30cm rok ruler\n- Mg sticky note 3x2\n- Hb office point pencils\n- Mg modern drawing sharperner\n- Half size 2 quire eco counter book\n- Half size 4 quire eco counter book\n- Half size 3 quire eco counter book\n- 120 pages a4 eco single rule exe book\n- 96 pages a4 eco single rule exe book\n- Mg gel pen\n- Mg correction pen\n- Mg mini stapler\n- Mg stapler mgs 14..180\n- Mg double clip file\n- Mg single clip file\n- Big engineering drawing set\n- Display book with 30 pockets\n- Display book with 20 pockets\n- Display books with 10 pockets\n- Rok cellotape small-2 inch\n- Rok cellotape small- 1 inch\n- Rok cellotape small- 3/4 inch\n- Rok cellotape small- 0.5 inch\n- Rok masking tape small- 2 inch\n- Rok masking tape small- 1 inch\n- Rok masking tape small- 3/4 inch\n- Rok masking tape small- 0.5 inch\n- Full size 4q eco counter book\n- Full size 3 quire eco counter book\n- Full size 2 quire eco counter book\n- Haco ruler\n- Mg highlighter\n- Spring file teepee (pvc)\n- Spring file till (pvc)\n- Mg zipper bag-A4\n\nSocial & web:\nPhones / WhatsApp:\n- Phone (Main): +254700000000\n\nSocial & web:\n- Instagram: @aris.kenya\n- Facebook (facebook): @aris.kenya\n- Website: https://www.arisstationaries.co.ke/\n- Product catalogue:\n- Circle Template\n- 360 Degrees Protractor\n- A3 Drawing Books\n- Bazooka (Drawing Tube)\n- Astra BAB-ASTRA 4 PORT EXTENSION\n- Electric Water Kettle (Stainless Steel)\n- 180° transparent protractor\n- Adjustable set square\n- Foolscaps (3 scaps)\n- A5 gazelle notebook\n- 200 pages a4 eco single rule exe book\n- Architectural scale ruler\n- A5 artistic notebook\n- A6 classic strap notebook\n- A6 business leather notebook\n- A6 active notebook\n- A6 colourful strap notebook\n- A5 flowers notebook\n- 3 piece french curve set\n- 35cm set squares (drawing & engineering)\n- Casio fx 991 ex (upgraded version)\n- Casio fx 82 ms\n- Pvc detachable t square\n- M&g all in one set\n- Staedtler Pencils\n- Fine bic pen\n- Crystal bic pen\n- Special spiral notebook\n- 3 in 1 executive gift set\n- Obama blue pen box\n- Smp table\n- Mg box files\n- Damasa hb pencil\n- Black whiteboard ink (leto)\n- Casio fx 82 ex\n- Casio fx 991 es plus\n- Kangaroo staples small packet\n- Mood diary a8\n- Red dragon fly scissors\n- Nataraj sharperner\n- Exam standard accord dust free black eraser\n- M&g metal school set\n- A6 brown strap notebook\n- Nataraj dustless eraser\n- Mg coloured sticky notes 3x3\n- Kangaroo staples 24-6x5m -many\n- Obama blue pen\n- Asst permanent marker piang xiang\n- Obama red pen\n- Obama balck pen\n- Kangaroo stapler hd-45\n- Kangaroo stapler hd-45s\n- Gem blue whiteboard pen (refillable)\n- Super scissors\n- Permanent blue ink\n- Mg whiteboard markpen\n- Oxford set (metallic)\n- Mg zipper bag-a6\n- 30cm rok ruler\n- Mg sticky note 3x2\n- Hb office point pencils\n- Mg modern drawing sharperner\n- Half size 2 quire eco counter book\n- Half size 4 quire eco counter book\n- Half size 3 quire eco counter book\n- 120 pages a4 eco single rule exe book\n- 96 pages a4 eco single rule exe book\n- Mg gel pen\n- Mg correction pen\n- Mg mini stapler\n- Mg stapler mgs 14..180\n- Mg double clip file\n- Mg single clip file\n- Big engineering drawing set\n- Display book with 30 pockets\n- Display book with 20 pockets\n- Display books with 10 pockets\n- Rok cellotape small-2 inch\n- Rok cellotape small- 1 inch\n- Rok cellotape small- 3/4 inch\n- Hours & location:\nMon-Fri: 09:30-18:00 EAT; Sat-Sun: closed. Location: Main · We have a hybrid system where we operate through our e-commrce website online where you order and have it delivered country wide or pickup in our outlets in person. · Inside UON premises\n- Locations / landmarks / directions:\n1. Main | Street: We have a hybrid system where we operate through our e-commrce website online where you order and have it delivered country wide or pickup in our outlets in person. | Landmark: Inside UON premises | Find us: Along State house road-ground floor Hall 7 | Coverage: Country wide delivery via parcel grid delivery system\n\nDelivery areas:\n- Nairobi CBD: delivery, free, Same day\nDelivered by: courier, rider.\nThe customer pays the rider on arrival.\nAnywhere else in Kenya: delivery, the team calls back with the fee.\nListed places keep their own terms. A place you cannot place in Kenya: ask which county it is in. Outside Kenya is not covered: say so and offer to note it. Never guess a fee that is not listed.\n- Policies:\n- Payment: You can pay by M-Pesa Paybill 542542, account 70722 or cash.\n- Returns: Consult with the team\n- Delivery: Country wide delivery\n- Holds: Available\n- Cancellation: Consult with the team\n- Warranty: Depends with the product\n- Social & web:\nPhones / WhatsApp:\n- Phone (Main): +254700000000\n\nSocial & web:\n- Instagram: @aris.kenya\n- Facebook (facebook): @aris.kenya\n- Website: https://www.arisstationaries.co.ke/\n- Languages: English, Kiswahili, and Sheng (automatic, match the caller). Tone does not change language.\n\nCAPABILITIES:\n- Enquiry and take-a-message always work, even when the file is incomplete.\n- Holds and orders are available for confirmed catalogue items when hold rules allow. Say held or reserved only after the tool result. During a hold, do not say a deposit amount or a payment number. The owner follows up.\n- Confirmed booking slots are not available. A visit is a request.\n- Speak prices and payment numbers only from the confirmed facts above.\n\nCONFIRMED FAQs (owner-confirmed facts only. Do not call unconfirmed answers GOLDEN):\nQ: Do you have a website?\nA: Yes we do you can shop online with us at arisstationaries.co.ke\n\nQ: Do you do country wide delivery?\nA: Yes we do: we offer options couriers like pickup mtaani,super metro,buscar,easy coach g4s and so on\n\nQ: Which social media platforms are you on?\nA: We are active as @aris.kenya on Instagram, TikTok, and WhatsApp.\n\nQ: How can I place an order or get support?\nA: You can message us directly on Instagram, TikTok, or WhatsApp for quick support or to place an order.\n\nQ: What are your social media handles?\nA: You can find us as @aris.kenya on Instagram, TikTok, and WhatsApp.\n\nQ: Where can I shop or place an order?\nA: You can shop online at arisstationaries.co.ke or message us directly on Instagram, TikTok, or WhatsApp to place an order.\n\nQ: Are you open on Monday?\nA: No, we will be closed on Monday.\n\nUNKNOWN (not confirmed by the owner. Do not state these as fact. Say you will confirm with the owner):\n- Other policy\n- Product catalogue\nFor an UNKNOWN topic: admit you do not have it. Say: \"Let me confirm with the owner.\" Do not guess, and do not use a pack seed as the answer.\nA fact stated elsewhere in this brief (hours, coverage, services, prices, payment) wins over an UNKNOWN line on the same topic.\n\nTEAM DIRECTORY (escalation — you are the receptionist, not the expert):\n- Team member 1; (Owner &General quiries); phone +254700000000; email redacted@example.invalid\n- Team member 2; (Owner); phone +254700000000; email redacted@example.invalid\n- Escalate only when the caller asks for a human, policy requires one, authority is missing, a tool fails, or useful repair attempts fail. Resolve first when possible.\n\nYour job on this call:\n1. Identify the caller goal and resolve it using ONLY the business knowledge and golden FAQs above.\n2. If fully answered, confirm briefly and close. Do not collect a name or force a callback.\n3. UNKNOWN ANSWERS: If the ask is outside that knowledge, admit you do not have the detail. Preferred wording: \"I am noting that down and escalating it to our team members and you will be contacted back.\", but remove unsupported timing, guarantee, transfer, booking, stock, or action promises. Offer only an authorized next step.\n4. Collect name/reason only when required for a saved request or justified handoff. Confirm an unclear name once.\n5. A tool marker requests an action. Never claim it is saved, held, booked, sent, transferred, or confirmed; backend confirmation is separate.\n6. If the caller corrects information, use the corrected value for the rest of the call.\n\nConversation rules (live phone — be conclusive and intelligent):\n- Answer the caller's actual question first — do not stall with holding phrases.\n- Name the job you already have, then one next step. No \"let me check\" or \"one moment\".\n- Never end a turn on a closed/status fact alone — say how you can still help and ask one next question.\n- Ask at most ONE clarifying question per turn.\n- You are one person for the whole call. First person, contractions, everyday words. Do not switch to a script, a second character, or legal wording.\n- Automatically match the caller in English, Kiswahili, or light Sheng. If they switch, switch with them.\n- Use the minimum speech needed to move the caller forward.\n- Never invent prices, stock, availability, quantities, policies, team members, actions, or guarantees outside the knowledge above.\n- After how-are-you or a name, ask how you can help. Do not pitch an order, WhatsApp, or a service list until they state a job.\n- Then, Okay, and Sawa are not a quantity, a time, or a yes. Ask or admit unknown. Say saved or booked only after the tool result.\n- Out of coverage: callback note only. In coverage: confirm the slots, then the tool, then those same facts.\n- Contact urgent: name, then the need, then notify. Do not recite the catalogue.\n- Speak complete words with spaces.\n- Do not volunteer today's promo/offer unless the caller asks about that product, that deal, or today's offers.",
+    "business_locations": [
+      {
+        "hours": "",
+        "label": "Main",
+        "address": "We have a hybrid system where we operate through our e-commrce website online where you order and have it delivered country wide or pickup in our outlets in person.",
+        "area_id": "",
+        "landmark": "Inside UON premises",
+        "directions": "Along State house road-ground floor Hall 7",
+        "coverage_notes": "Country wide delivery via parcel grid delivery system"
+      }
+    ],
+    "escalation_enabled": true,
+    "unknown_answer_fallback": "I am noting that down and escalating it to our team members and you will be contacted back.",
+    "tts_lexicon": [
+      {
+        "say": "Lynn",
+        "label": "Lynn",
+        "langs": [
+          "en",
+          "sw",
+          "sheng"
+        ],
+        "match": "lynn",
+        "priority": 200
+      },
+      {
+        "say": "Aris Kenya",
+        "label": "Aris Kenya",
+        "langs": [
+          "en",
+          "sw",
+          "sheng"
+        ],
+        "match": "aris\\s+kenya|aris\\s*kenya|ariskenya",
+        "priority": 200
+      },
+      {
+        "say": "Kiswahili",
+        "label": "Kiswahili",
+        "langs": [
+          "en",
+          "sw",
+          "sheng"
+        ],
+        "match": "kiswahili",
+        "priority": 200
+      }
+    ]
+  },
+  "field_meta": [
+    {
+      "field_path": "assistant.agent_name",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:48:48.090781+00:00",
+      "updated_at": "2026-10-18T09:48:48.090781+00:00"
+    },
+    {
+      "field_path": "assistant.tone",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:48:48.119758+00:00",
+      "updated_at": "2026-10-18T09:48:48.119758+00:00"
+    },
+    {
+      "field_path": "assistant.tools",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "bulletin.items",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "catalog.product.1.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:23.476167+00:00",
+      "updated_at": "2026-10-11T07:03:23.476167+00:00"
+    },
+    {
+      "field_path": "catalog.product.10.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:26.971492+00:00",
+      "updated_at": "2026-10-11T07:03:26.971492+00:00"
+    },
+    {
+      "field_path": "catalog.product.11.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:27.292001+00:00",
+      "updated_at": "2026-10-11T07:03:27.292001+00:00"
+    },
+    {
+      "field_path": "catalog.product.12.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:27.613763+00:00",
+      "updated_at": "2026-10-11T07:03:27.613763+00:00"
+    },
+    {
+      "field_path": "catalog.product.13.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:28.112251+00:00",
+      "updated_at": "2026-10-11T07:03:28.112251+00:00"
+    },
+    {
+      "field_path": "catalog.product.14.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:28.443699+00:00",
+      "updated_at": "2026-10-11T07:03:28.443699+00:00"
+    },
+    {
+      "field_path": "catalog.product.15.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:28.762977+00:00",
+      "updated_at": "2026-10-11T07:03:28.762977+00:00"
+    },
+    {
+      "field_path": "catalog.product.16.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:29.080877+00:00",
+      "updated_at": "2026-10-11T07:03:29.080877+00:00"
+    },
+    {
+      "field_path": "catalog.product.17.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:29.402538+00:00",
+      "updated_at": "2026-10-11T07:03:29.402538+00:00"
+    },
+    {
+      "field_path": "catalog.product.18.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:29.715643+00:00",
+      "updated_at": "2026-10-11T07:03:29.715643+00:00"
+    },
+    {
+      "field_path": "catalog.product.19.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:30.036753+00:00",
+      "updated_at": "2026-10-11T07:03:30.036753+00:00"
+    },
+    {
+      "field_path": "catalog.product.2.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:23.989757+00:00",
+      "updated_at": "2026-10-11T07:03:23.989757+00:00"
+    },
+    {
+      "field_path": "catalog.product.20.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:30.363324+00:00",
+      "updated_at": "2026-10-11T07:03:30.363324+00:00"
+    },
+    {
+      "field_path": "catalog.product.21.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:30.68652+00:00",
+      "updated_at": "2026-10-11T07:03:30.68652+00:00"
+    },
+    {
+      "field_path": "catalog.product.22.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:31.007708+00:00",
+      "updated_at": "2026-10-11T07:03:31.007708+00:00"
+    },
+    {
+      "field_path": "catalog.product.23.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:31.326417+00:00",
+      "updated_at": "2026-10-11T07:03:31.326417+00:00"
+    },
+    {
+      "field_path": "catalog.product.24.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:31.821281+00:00",
+      "updated_at": "2026-10-11T07:03:31.821281+00:00"
+    },
+    {
+      "field_path": "catalog.product.25.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:32.142143+00:00",
+      "updated_at": "2026-10-11T07:03:32.142143+00:00"
+    },
+    {
+      "field_path": "catalog.product.26.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:32.465273+00:00",
+      "updated_at": "2026-10-11T07:03:32.465273+00:00"
+    },
+    {
+      "field_path": "catalog.product.27.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:32.784716+00:00",
+      "updated_at": "2026-10-11T07:03:32.784716+00:00"
+    },
+    {
+      "field_path": "catalog.product.28.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:33.114653+00:00",
+      "updated_at": "2026-10-11T07:03:33.114653+00:00"
+    },
+    {
+      "field_path": "catalog.product.29.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:33.429213+00:00",
+      "updated_at": "2026-10-11T07:03:33.429213+00:00"
+    },
+    {
+      "field_path": "catalog.product.3.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:24.31728+00:00",
+      "updated_at": "2026-10-11T07:03:24.31728+00:00"
+    },
+    {
+      "field_path": "catalog.product.30.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:33.948132+00:00",
+      "updated_at": "2026-10-11T07:03:33.948132+00:00"
+    },
+    {
+      "field_path": "catalog.product.31.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:34.445444+00:00",
+      "updated_at": "2026-10-11T07:03:34.445444+00:00"
+    },
+    {
+      "field_path": "catalog.product.32.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:34.800633+00:00",
+      "updated_at": "2026-10-11T07:03:34.800633+00:00"
+    },
+    {
+      "field_path": "catalog.product.33.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:35.124088+00:00",
+      "updated_at": "2026-10-11T07:03:35.124088+00:00"
+    },
+    {
+      "field_path": "catalog.product.34.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:35.449106+00:00",
+      "updated_at": "2026-10-11T07:03:35.449106+00:00"
+    },
+    {
+      "field_path": "catalog.product.35.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:35.777209+00:00",
+      "updated_at": "2026-10-11T07:03:35.777209+00:00"
+    },
+    {
+      "field_path": "catalog.product.36.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:36.108856+00:00",
+      "updated_at": "2026-10-11T07:03:36.108856+00:00"
+    },
+    {
+      "field_path": "catalog.product.37.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:36.438277+00:00",
+      "updated_at": "2026-10-11T07:03:36.438277+00:00"
+    },
+    {
+      "field_path": "catalog.product.38.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:36.764336+00:00",
+      "updated_at": "2026-10-11T07:03:36.764336+00:00"
+    },
+    {
+      "field_path": "catalog.product.39.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:37.091162+00:00",
+      "updated_at": "2026-10-11T07:03:37.091162+00:00"
+    },
+    {
+      "field_path": "catalog.product.4.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:24.669811+00:00",
+      "updated_at": "2026-10-11T07:03:24.669811+00:00"
+    },
+    {
+      "field_path": "catalog.product.40.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:37.407848+00:00",
+      "updated_at": "2026-10-11T07:03:37.407848+00:00"
+    },
+    {
+      "field_path": "catalog.product.41.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:37.747621+00:00",
+      "updated_at": "2026-10-11T07:03:37.747621+00:00"
+    },
+    {
+      "field_path": "catalog.product.42.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:38.067115+00:00",
+      "updated_at": "2026-10-11T07:03:38.067115+00:00"
+    },
+    {
+      "field_path": "catalog.product.43.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:38.38584+00:00",
+      "updated_at": "2026-10-11T07:03:38.38584+00:00"
+    },
+    {
+      "field_path": "catalog.product.44.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:38.883+00:00",
+      "updated_at": "2026-10-11T07:03:38.883+00:00"
+    },
+    {
+      "field_path": "catalog.product.45.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:39.205353+00:00",
+      "updated_at": "2026-10-11T07:03:39.205353+00:00"
+    },
+    {
+      "field_path": "catalog.product.46.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:39.525226+00:00",
+      "updated_at": "2026-10-11T07:03:39.525226+00:00"
+    },
+    {
+      "field_path": "catalog.product.47.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:40.060784+00:00",
+      "updated_at": "2026-10-11T07:03:40.060784+00:00"
+    },
+    {
+      "field_path": "catalog.product.48.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:40.381257+00:00",
+      "updated_at": "2026-10-11T07:03:40.381257+00:00"
+    },
+    {
+      "field_path": "catalog.product.49.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:40.703666+00:00",
+      "updated_at": "2026-10-11T07:03:40.703666+00:00"
+    },
+    {
+      "field_path": "catalog.product.5.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:25.170261+00:00",
+      "updated_at": "2026-10-11T07:03:25.170261+00:00"
+    },
+    {
+      "field_path": "catalog.product.50.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:41.022239+00:00",
+      "updated_at": "2026-10-11T07:03:41.022239+00:00"
+    },
+    {
+      "field_path": "catalog.product.51.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:41.344159+00:00",
+      "updated_at": "2026-10-11T07:03:41.344159+00:00"
+    },
+    {
+      "field_path": "catalog.product.52.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:41.691059+00:00",
+      "updated_at": "2026-10-11T07:03:41.691059+00:00"
+    },
+    {
+      "field_path": "catalog.product.53.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:42.01431+00:00",
+      "updated_at": "2026-10-11T07:03:42.01431+00:00"
+    },
+    {
+      "field_path": "catalog.product.54.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:42.342501+00:00",
+      "updated_at": "2026-10-11T07:03:42.342501+00:00"
+    },
+    {
+      "field_path": "catalog.product.55.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:42.65467+00:00",
+      "updated_at": "2026-10-11T07:03:42.65467+00:00"
+    },
+    {
+      "field_path": "catalog.product.56.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:42.97046+00:00",
+      "updated_at": "2026-10-11T07:03:42.97046+00:00"
+    },
+    {
+      "field_path": "catalog.product.57.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:43.302104+00:00",
+      "updated_at": "2026-10-11T07:03:43.302104+00:00"
+    },
+    {
+      "field_path": "catalog.product.58.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:43.626905+00:00",
+      "updated_at": "2026-10-11T07:03:43.626905+00:00"
+    },
+    {
+      "field_path": "catalog.product.59.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:43.943313+00:00",
+      "updated_at": "2026-10-11T07:03:43.943313+00:00"
+    },
+    {
+      "field_path": "catalog.product.6.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:25.498782+00:00",
+      "updated_at": "2026-10-11T07:03:25.498782+00:00"
+    },
+    {
+      "field_path": "catalog.product.60.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:44.272084+00:00",
+      "updated_at": "2026-10-11T07:03:44.272084+00:00"
+    },
+    {
+      "field_path": "catalog.product.61.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:44.5877+00:00",
+      "updated_at": "2026-10-11T07:03:44.5877+00:00"
+    },
+    {
+      "field_path": "catalog.product.62.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:44.909544+00:00",
+      "updated_at": "2026-10-11T07:03:44.909544+00:00"
+    },
+    {
+      "field_path": "catalog.product.63.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:45.229872+00:00",
+      "updated_at": "2026-10-11T07:03:45.229872+00:00"
+    },
+    {
+      "field_path": "catalog.product.64.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:45.550872+00:00",
+      "updated_at": "2026-10-11T07:03:45.550872+00:00"
+    },
+    {
+      "field_path": "catalog.product.65.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:45.898282+00:00",
+      "updated_at": "2026-10-11T07:03:45.898282+00:00"
+    },
+    {
+      "field_path": "catalog.product.66.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:46.229165+00:00",
+      "updated_at": "2026-10-11T07:03:46.229165+00:00"
+    },
+    {
+      "field_path": "catalog.product.67.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:46.58196+00:00",
+      "updated_at": "2026-10-11T07:03:46.58196+00:00"
+    },
+    {
+      "field_path": "catalog.product.68.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:46.905145+00:00",
+      "updated_at": "2026-10-11T07:03:46.905145+00:00"
+    },
+    {
+      "field_path": "catalog.product.69.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:47.226171+00:00",
+      "updated_at": "2026-10-11T07:03:47.226171+00:00"
+    },
+    {
+      "field_path": "catalog.product.7.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:25.996352+00:00",
+      "updated_at": "2026-10-11T07:03:25.996352+00:00"
+    },
+    {
+      "field_path": "catalog.product.70.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:47.543273+00:00",
+      "updated_at": "2026-10-11T07:03:47.543273+00:00"
+    },
+    {
+      "field_path": "catalog.product.71.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:48.042067+00:00",
+      "updated_at": "2026-10-11T07:03:48.042067+00:00"
+    },
+    {
+      "field_path": "catalog.product.72.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:48.37179+00:00",
+      "updated_at": "2026-10-11T07:03:48.37179+00:00"
+    },
+    {
+      "field_path": "catalog.product.73.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:48.689743+00:00",
+      "updated_at": "2026-10-11T07:03:48.689743+00:00"
+    },
+    {
+      "field_path": "catalog.product.74.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:49.037589+00:00",
+      "updated_at": "2026-10-11T07:03:49.037589+00:00"
+    },
+    {
+      "field_path": "catalog.product.75.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:49.388398+00:00",
+      "updated_at": "2026-10-11T07:03:49.388398+00:00"
+    },
+    {
+      "field_path": "catalog.product.76.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:49.711391+00:00",
+      "updated_at": "2026-10-11T07:03:49.711391+00:00"
+    },
+    {
+      "field_path": "catalog.product.77.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:50.030796+00:00",
+      "updated_at": "2026-10-11T07:03:50.030796+00:00"
+    },
+    {
+      "field_path": "catalog.product.78.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:50.359656+00:00",
+      "updated_at": "2026-10-11T07:03:50.359656+00:00"
+    },
+    {
+      "field_path": "catalog.product.79.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:50.682749+00:00",
+      "updated_at": "2026-10-11T07:03:50.682749+00:00"
+    },
+    {
+      "field_path": "catalog.product.8.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:26.318583+00:00",
+      "updated_at": "2026-10-11T07:03:26.318583+00:00"
+    },
+    {
+      "field_path": "catalog.product.80.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:50.997962+00:00",
+      "updated_at": "2026-10-11T07:03:50.997962+00:00"
+    },
+    {
+      "field_path": "catalog.product.81.name",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "catalog.product.82.name",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "catalog.product.83.name",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "catalog.product.84.name",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "catalog.product.85.name",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "catalog.product.86.name",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "catalog.product.87.name",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "catalog.product.88.name",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "catalog.product.89.name",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "catalog.product.9.name",
+      "source": "owner",
+      "confirmed_at": "2026-10-11T07:03:26.646236+00:00",
+      "updated_at": "2026-10-11T07:03:26.646236+00:00"
+    },
+    {
+      "field_path": "catalog.product.90.name",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "catalog.product.91.name",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "catalog.product.92.name",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "catalog.product.93.name",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "faqs.1",
+      "source": "owner",
+      "confirmed_at": "2026-10-09T06:34:32.909734+00:00",
+      "updated_at": "2026-10-09T06:34:32.909734+00:00"
+    },
+    {
+      "field_path": "faqs.2",
+      "source": "owner",
+      "confirmed_at": "2026-10-09T06:34:33.45219+00:00",
+      "updated_at": "2026-10-09T06:34:33.45219+00:00"
+    },
+    {
+      "field_path": "faqs.3",
+      "source": "owner",
+      "confirmed_at": "2026-10-09T06:34:33.779817+00:00",
+      "updated_at": "2026-10-09T06:34:33.779817+00:00"
+    },
+    {
+      "field_path": "faqs.4",
+      "source": "owner",
+      "confirmed_at": "2026-10-09T06:34:34.104579+00:00",
+      "updated_at": "2026-10-09T06:34:34.104579+00:00"
+    },
+    {
+      "field_path": "faqs.5",
+      "source": "owner",
+      "confirmed_at": "2026-10-09T06:34:34.793683+00:00",
+      "updated_at": "2026-10-09T06:34:34.793683+00:00"
+    },
+    {
+      "field_path": "faqs.6",
+      "source": "owner",
+      "confirmed_at": "2026-10-09T06:34:35.11963+00:00",
+      "updated_at": "2026-10-09T06:34:35.11963+00:00"
+    },
+    {
+      "field_path": "faqs.7",
+      "source": "owner",
+      "confirmed_at": "2026-10-09T06:34:35.978255+00:00",
+      "updated_at": "2026-10-09T06:34:35.978255+00:00"
+    },
+    {
+      "field_path": "hours.weekly_grid",
+      "source": "owner",
+      "confirmed_at": "2026-10-10T07:07:48.001611+00:00",
+      "updated_at": "2026-10-10T07:07:48.001611+00:00"
+    },
+    {
+      "field_path": "identity.business_name",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:48:47.978682+00:00",
+      "updated_at": "2026-10-18T09:48:47.978682+00:00"
+    },
+    {
+      "field_path": "identity.language",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "identity.primary_phone",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:57:30.06579+00:00",
+      "updated_at": "2026-10-18T09:57:30.06579+00:00"
+    },
+    {
+      "field_path": "identity.social_handles",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:48:48.155398+00:00",
+      "updated_at": "2026-10-18T09:48:48.155398+00:00"
+    },
+    {
+      "field_path": "identity.spoken_name",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:48:48.055505+00:00",
+      "updated_at": "2026-10-18T09:48:48.055505+00:00"
+    },
+    {
+      "field_path": "identity.vertical",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:48:48.026579+00:00",
+      "updated_at": "2026-10-18T09:48:48.026579+00:00"
+    },
+    {
+      "field_path": "locations.branches",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:57:30.036815+00:00",
+      "updated_at": "2026-10-18T09:57:30.036815+00:00"
+    },
+    {
+      "field_path": "payments.methods",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:49:46.420098+00:00",
+      "updated_at": "2026-10-18T09:49:46.420098+00:00"
+    },
+    {
+      "field_path": "policies.cancellation",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:49:46.22297+00:00",
+      "updated_at": "2026-10-18T09:49:46.22297+00:00"
+    },
+    {
+      "field_path": "policies.delivery",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:49:46.139392+00:00",
+      "updated_at": "2026-10-18T09:49:46.139392+00:00"
+    },
+    {
+      "field_path": "policies.deposit",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:49:45.912489+00:00",
+      "updated_at": "2026-10-18T09:49:45.912489+00:00"
+    },
+    {
+      "field_path": "policies.holds",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:49:46.45602+00:00",
+      "updated_at": "2026-10-18T09:49:46.45602+00:00"
+    },
+    {
+      "field_path": "policies.holds.allowed",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:49:46.489628+00:00",
+      "updated_at": "2026-10-18T09:49:46.489628+00:00"
+    },
+    {
+      "field_path": "policies.payment",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:49:45.786476+00:00",
+      "updated_at": "2026-10-18T09:49:45.786476+00:00"
+    },
+    {
+      "field_path": "policies.returns",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:49:46.015783+00:00",
+      "updated_at": "2026-10-18T09:49:46.015783+00:00"
+    },
+    {
+      "field_path": "policies.warranty",
+      "source": "owner",
+      "confirmed_at": "2026-10-18T09:49:46.328973+00:00",
+      "updated_at": "2026-10-18T09:49:46.328973+00:00"
+    },
+    {
+      "field_path": "team.notify.channels",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "team.notify.email",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    },
+    {
+      "field_path": "team.notify.whatsapp",
+      "source": "seed",
+      "confirmed_at": null,
+      "updated_at": "2026-10-06T09:56:07.202335+00:00"
+    }
+  ]
+}
