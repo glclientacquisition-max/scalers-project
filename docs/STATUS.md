@@ -5,13 +5,26 @@ last_reviewed: 2026-10-22
 
 # Scalers status and handoff (start here)
 
-**Last updated 22 Oct 2026, 08:45 EAT** (Platform; docs-only refresh of everything since #835 on 20 Oct). `main` is `2f168419` (#867). Prod Desk runs it; **prod Voice does not**: prod Voice `/healthz` still reports `3bb1d0e3` (#834), because Railway builds have been paused for our plan since 21 Oct 10:24 EAT. Database work since 20 Oct is on both staging and prod (section 3a), except `call_messages` (#868, staging only). Every line below was checked on 22 Oct against `git`, `gh`, live read-only DB queries, `/healthz`, Vercel and Railway variable **names**. Lines marked *per platform notes* or *unverified* could not be checked that way. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule); CI check `status-md`, escape label `no-status-update`).
+**Last updated 22 Oct 2026, 10:30 EAT** (Platform; docs-only refresh of everything since #835 on 20 Oct; section 0 has what changed after 08:45). `main` is `b40f567f` (#870) since 09:17 EAT; the rest of this page was checked at `2f168419` (#867). Prod Desk runs it; **prod Voice does not**: prod Voice `/healthz` still reports `3bb1d0e3` (#834), because Railway builds have been paused for our plan since 21 Oct 10:24 EAT. Database work since 20 Oct is on both staging and prod (section 3a); `call_messages` (#868) reached prod at 09:11 EAT. Every line below was checked on 22 Oct against `git`, `gh`, live read-only DB queries, `/healthz`, Vercel and Railway variable **names**. Lines marked *per platform notes* or *unverified* could not be checked that way. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule); CI check `status-md`, escape label `no-status-update`).
 
 New agent or new human: read this whole page before you touch code.
 
 **Read order:** [`AGENTS.md`](../AGENTS.md) → your lane contract in [`docs/reference/lanes/`](reference/lanes/) ([`VOICE.md`](reference/lanes/VOICE.md), [`BRAIN.md`](reference/lanes/BRAIN.md), [`DESK_UX.md`](reference/lanes/DESK_UX.md), [`OPS_BILLING.md`](reference/lanes/OPS_BILLING.md), [`PLATFORM.md`](reference/lanes/PLATFORM.md)) → [`SYSTEM_ARCHITECTURE.md`](explanation/architecture/SYSTEM_ARCHITECTURE.md), [`CURRENT_STATE.md`](explanation/architecture/CURRENT_STATE.md), [`SOURCE_OF_TRUTH.md`](explanation/governance/SOURCE_OF_TRUTH.md) → this file. Glossary: [`CONTEXT.md`](../CONTEXT.md). **One task, one lane, one PR.**
 
-**New reference docs (22 Oct):** [Admin foundation plan](reference/operations/ADMIN_FOUNDATION_PLAN.md) and [Admin rebuild research](reference/operations/ADMIN_REBUILD_RESEARCH.md) (both **parked, plan only, not approved for build**), and the [N+1 query audit, 21 Oct](reference/platform/N_PLUS_ONE_AUDIT_2026-10-21.md).
+**New reference docs (22 Oct):** [Caller profile v2 spec](reference/brain/CALLER_PROFILE_SPEC.md) and [caller profile research](reference/brain/CALLER_PROFILE_RESEARCH_2026-10-22.md) (both **planned, not built**; Brain's 5 open questions for Alvin are in the spec's [§14](reference/brain/CALLER_PROFILE_SPEC.md#14-open-questions-for-alvin)); [SQL drift reconcile plan](reference/platform/SQL_DRIFT_RECONCILE_PLAN_2026-10-22.md) (awaits Alvin's yes) and [Voice watch-paths note](reference/platform/VOICE_WATCH_PATHS_PLAN_2026-10-22.md); v2 staging test scripts, reference only: [C0](reference/testing/STAGING_TEST_SCRIPT_V2_C0.md), [C1](reference/testing/STAGING_TEST_SCRIPT_V2_C1.md), [C2](reference/testing/STAGING_TEST_SCRIPT_V2_C2.md), [C3](reference/testing/STAGING_TEST_SCRIPT_V2_C3.md), [C7](reference/testing/STAGING_TEST_SCRIPT_V2_C7.md). Earlier today: [Admin foundation plan](reference/operations/ADMIN_FOUNDATION_PLAN.md) and [Admin rebuild research](reference/operations/ADMIN_REBUILD_RESEARCH.md) (both **parked, plan only, not approved for build**), and the [N+1 query audit, 21 Oct](reference/platform/N_PLUS_ONE_AUDIT_2026-10-21.md).
+
+---
+
+## 0. Changes since 08:45 EAT, 22 Oct 2026
+
+- **Admin build on hold, plan only** (08:23 EAT, *per Scalers Chief*). See section 4b and [`ADMIN_FOUNDATION_PLAN.md`](reference/operations/ADMIN_FOUNDATION_PLAN.md).
+- **[#869](https://github.com/glclientacquisition-max/scalers-project/pull/869) merged** 22 Oct 09:05 EAT (`24af38b3`): archived calls keep all their visits and holds on the calendar and run sheets. Scalers Chief relays this decision as **pending Alvin's yes**; the PR is nonetheless on `main`. Prod Desk deploy of it is *unverified*.
+- **[#870](https://github.com/glclientacquisition-max/scalers-project/pull/870) merged** 22 Oct 09:17 EAT (`b40f567f`): Desk Call | Texts thread on the call view, outbound only (uses #868's `call_messages`). Prod Desk deploy *unverified*.
+- **`call_messages` ([#868](https://github.com/glclientacquisition-max/scalers-project/pull/868)) is on prod**: 22 Oct 09:11 EAT (`20261022061117`, checked in prod's migration list). #868 itself is still an open draft.
+- **C0 + C1 staging approved** by Alvin at 10:12 EAT (*per Scalers Chief*), but **blocked**: since 10:06 EAT Railway builds run only for Pro and Enterprise plans, and our workspace appears to be on a lower tier (*per platform notes*). Nothing is deployed to staging Voice yet.
+- **Caller profile v2: planned, not built** (Alvin, 22 Oct). [Spec](reference/brain/CALLER_PROFILE_SPEC.md), [research](reference/brain/CALLER_PROFILE_RESEARCH_2026-10-22.md). No code, SQL or flag. Brain's 5 open questions (shared lines, precedence, numbers and counsel, spoken notice, cancelling by voice plus first prod tenant) are in [§14](reference/brain/CALLER_PROFILE_SPEC.md#14-open-questions-for-alvin).
+- **[#838](https://github.com/glclientacquisition-max/scalers-project/pull/838) closed** 22 Oct 09:27 EAT, replaced by [#856](https://github.com/glclientacquisition-max/scalers-project/pull/856).
+- **SQL drift reconcile:** [plan](reference/platform/SQL_DRIFT_RECONCILE_PLAN_2026-10-22.md), nothing applied; merges and migration-row inserts await Alvin's yes. Watch paths already exist on prod and staging Voice ([note](reference/platform/VOICE_WATCH_PATHS_PLAN_2026-10-22.md)).
 
 ---
 
@@ -25,7 +38,7 @@ New agent or new human: read this whole page before you touch code.
 | DID | **+254709221536** Aris, +254709221542 Esga | **+254709221537** Jirani |
 | SautiKit workspace | `e0e57aa5` | `1f85601c` |
 
-- **Railway outage.** Railway builds have been paused for non-Enterprise plans since 21 Oct 10:24 EAT, and Railway invalidated API tokens (*per platform notes*; Railway's 21 Oct notice). So nothing merged after #834 has reached prod Voice, and the combined staging builds below are not deployed. A routine retries the staging build until 13:00 EAT on 22 Oct (*per platform notes*). Railway's notice recommends rotating Railway env vars; a rotation plan is open with Alvin (*per Ops & Billing, unverified in repo*).
+- **Railway outage.** Railway builds have been paused for non-Enterprise plans since 21 Oct 10:24 EAT (since 22 Oct 10:06 EAT they run again for Pro and Enterprise only; our workspace appears lower-tier, *per platform notes*), and Railway invalidated API tokens (*per platform notes*; Railway's 21 Oct notice). So nothing merged after #834 has reached prod Voice, and the combined staging builds below are not deployed. A routine retries the staging build until 13:00 EAT on 22 Oct (*per platform notes*). Railway's notice recommends rotating Railway env vars; a rotation plan is open with Alvin (*per Ops & Billing, unverified in repo*).
 - **Combined staging builds, not deployed:** `staging/v2-c0-opening-2026-10-21` @ `f07f9c8a` (#848 + #843 + #846 + #844 + #837 + #850; #838 skipped for conflicts, #842 is inside #848) and `staging/v2-c0-opening-859-2026-10-21` @ `b2422702` (the same plus #859). Rollback for when they deploy: Railway `e552fae7`, or the 3e8f branch pinned to `a0fc061c` (*per platform notes*).
 - **Stage-PR hold is on**: many open PRs carry `hold-staging` (among them #839–#842, #868 and #871); the Stage-PR run on 22 Oct 08:32 EAT reported "Stage-PR hold active", so it does not re-point staging Voice.
 - Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Product is **callbacks only** (#658). Billing: packages + on-demand only, beta charging off; see [Billing](#billing).
@@ -61,10 +74,12 @@ Design: all UI follows Frontend 2.0 ([`FRONTEND_2_0_CHARTER.md`](explanation/fro
 
 ## 2. Shipped to `main` (since 14 Oct)
 
-Times EAT. SHAs are the commits on `main` (first-parent log). Since #835, `git log --first-parent 200d9c27..2f168419` has exactly these seven merges. Prod Desk (Vercel) deployed each one READY; **prod Voice (Railway) has none of them** (still `3bb1d0e3`).
+Times EAT. SHAs are the commits on `main` (first-parent log). Since #835, `git log --first-parent 200d9c27..b40f567f` has exactly these nine merges. Prod Desk (Vercel) deployed each one READY up to #867 (#869 and #870 *unverified*); **prod Voice (Railway) has none of them** (still `3bb1d0e3`).
 
 | PR | SHA | Merged | What |
 | --- | --- | --- | --- |
+| [#870](https://github.com/glclientacquisition-max/scalers-project/pull/870) | `b40f567f` | 22 Oct 09:17 | Desk: Call \| Texts thread on the call view (`call_messages`, #868), outbound only. Prod Desk deploy *unverified*. |
+| [#869](https://github.com/glclientacquisition-max/scalers-project/pull/869) | `24af38b3` | 22 Oct 09:05 | Desk: archived calls keep all their visits and holds on the calendar and run sheets. Decision relayed as pending Alvin's yes (section 0). Prod Desk deploy *unverified*. |
 | [#867](https://github.com/glclientacquisition-max/scalers-project/pull/867) | `2f168419` | 22 Oct 07:51 | Desk: after a caller SMS from call notes, stamp `caller_reply_body` / `caller_reply_at` with `calls_record_caller_reply` (#866 RPC); old read-modify-write only as a fallback when the RPC is missing. The SQL PR #866 itself is **not merged** (its RPCs are live on both DBs, section 3a). |
 | [#863](https://github.com/glclientacquisition-max/scalers-project/pull/863) | `6c0cc3ce` | 22 Oct 02:05 | Desk: archive cascades to open holds/visits on the call through `inbox_archive_calls` / `inbox_undo_archive` (#862), Unarchive through `inbox_unarchive_calls` (#866); legacy fallback when the RPCs are missing. |
 | [#860](https://github.com/glclientacquisition-max/scalers-project/pull/860) | `c1ffdd8d` | 22 Oct 01:45 | Desk N+1 fixes: inbox bulk actions in one action and one UPDATE, prices sheet saves in one pass, owner attest in 3 queries (audit items A4–A6). |
@@ -148,7 +163,7 @@ Checked 22 Oct with read-only queries on `supabase_migrations.schema_migrations`
 | `revoke_anon_default_privileges` (new `public` objects made by `postgres` no longer grant anon) | #865 | 22 Oct 01:31:15 (`20261021223115`) | 22 Oct 01:31:46 (`20261021223146`) | No (draft) |
 | `inbox_unarchive_calls`, `calls_record_caller_reply` | #866 | 22 Oct 01:31 (`20261021223101`, `20261021223103`) | 22 Oct 07:32:51 and 07:32:58 (`20261022043251`, `20261022043258`) | No (draft); used by merged #863 and #867 |
 | Owner UPDATE grant on `tenants.unknown_answer_spoken` / `unknown_answer_by_kind` | #852 | 21 Oct 15:57 (PR body); grant present | Grant present (no migration row); applied 21 Oct 17:44 *per platform notes*. #852's body still says prod not applied. | No (draft) |
-| `call_messages` table + 5 RPCs (`call_messages_list`, `_mark_read`, `_record_out`, `_retry`, `_unread_counts`), **outbound only** | #868 | 22 Oct 08:22 (`20261022052211`) | **Not applied** (no table) | No (draft) |
+| `call_messages` table + 5 RPCs (`call_messages_list`, `_mark_read`, `_record_out`, `_retry`, `_unread_counts`), **outbound only** | #868 | 22 Oct 08:22 (`20261022052211`) | 22 Oct 09:11 (`20261022061117`) | No (draft); used by merged #870 |
 | `admin_auth` schema (Admin foundation slice 1) | none | **not applied** | **not applied** | Parked (section 4a) |
 
 Known gaps after #865 (from its body): `supabase_admin` default privileges still grant anon (Supabase refuses the change), and new functions still get PUBLIC execute from the Postgres default, so each new function needs its own `revoke execute ... from public, anon`.
@@ -190,7 +205,7 @@ Source: `gh pr view` on 22 Oct. All are drafts. "Head" is the PR head SHA. None 
 | PR | Head | Base | Flag | What | Waiting on |
 | --- | --- | --- | --- | --- | --- |
 | [#837](https://github.com/glclientacquisition-max/scalers-project/pull/837) | `f7115413` | `main` | `CALL_SUMMARY_EVENT` | `call.summary.ready` emitter on the old path. In combined build `f07f9c8a`. | Staging deploy, then Alvin. |
-| [#838](https://github.com/glclientacquisition-max/scalers-project/pull/838) | `ba881557` | `cursor/v2-live-spoken-catalog-3e8f` | `CALL_SUMMARY_EVENT` | Same event from v2 `finishCall`. Superseded by #856 (per #856's body); left out of the combined build because of conflicts (*per platform notes*). | Close or keep: owner's call. |
+| [#838](https://github.com/glclientacquisition-max/scalers-project/pull/838) | `ba881557` | `cursor/v2-live-spoken-catalog-3e8f` | `CALL_SUMMARY_EVENT` | Same event from v2 `finishCall`. Superseded by #856 (per #856's body); left out of the combined build because of conflicts (*per platform notes*). | **Closed** 22 Oct 09:27 EAT; replaced by #856. |
 | [#850](https://github.com/glclientacquisition-max/scalers-project/pull/850) | `25a99443` | `main` (contains #837) | `OWNER_CALL_SUMMARY`, `OWNER_SUMMARY_SUPPRESS_LEGACY`, plus `CALL_SUMMARY_EVENT` | Ops sender: one owner summary per call per inbox recipient, 30 s settle, urgent skips the settle. In combined build `f07f9c8a`. | #837 first; staging deploy. |
 
 **Voice:**
@@ -222,7 +237,7 @@ Source: `gh pr view` on 22 Oct. All are drafts. "Head" is the PR head SHA. None 
 | [#864](https://github.com/glclientacquisition-max/scalers-project/pull/864) | `0e0b7fa4` | Revoke open anon and owner table grants on five tables. On both DBs (Alvin's GO 22 Oct 01:07, per the PR body). | Merge yes. |
 | [#865](https://github.com/glclientacquisition-max/scalers-project/pull/865) | `593bc07c` | Revoke anon from `postgres` default privileges in `public`. On both DBs. | Merge yes. |
 | [#866](https://github.com/glclientacquisition-max/scalers-project/pull/866) | `ab0f602e` | `inbox_unarchive_calls` + `calls_record_caller_reply`. On both DBs. #863 and #867 already call them. | Merge yes; body is stale on prod. |
-| [#868](https://github.com/glclientacquisition-max/scalers-project/pull/868) | `f6760559` | `call_messages` + Desk thread RPCs, outbound only; optional backfill never run. `hold-staging`. | Staging only. Prod needs Alvin's yes. Desk Texts tab is being drafted (*per Desk Engineer*). |
+| [#868](https://github.com/glclientacquisition-max/scalers-project/pull/868) | `f6760559` | `call_messages` + Desk thread RPCs, outbound only; optional backfill never run. `hold-staging`. | SQL on both DBs (prod 22 Oct 09:11 EAT). Desk Texts tab merged as #870. Merge yes. |
 
 **Ops & Billing follow-ups:**
 
@@ -247,6 +262,10 @@ Dated, with the source quoted. "Per Scalers Chief" means the decision was relaye
 | 22 Oct 01:07 / 01:26 | Revoke open table grants (#864) and anon default privileges (#865) on staging and prod. | #864: "Applied on staging and production with Alvin's GO (22 Oct 2026, 01:07 EAT)." #865: "Alvin approved in Platform chat at 01:26 EAT, 22 Oct." |
 | 22 Oct 08:20 | **#868 is outbound only**: ship an outbound-only text thread first, add caller replies later. | Relayed by Desk Engineer quoting Alvin: "Ship an outbound-only thread first, add caller replies later". *Unverified in repo*; #868's body (written before) says Alvin had not decided. |
 | 22 Oct 08:23 | **Admin build on hold, plan only.** The Admin foundation plan is parked and not approved for build; no `admin_auth` schema on either DB. | *Per Scalers Chief, unverified in repo.* Header of [`ADMIN_FOUNDATION_PLAN.md`](reference/operations/ADMIN_FOUNDATION_PLAN.md). |
+| 22 Oct (time not given) | **Archived calls keep visits on the calendar** (#869): archiving keeps all visits and holds on the calendar and run sheets. | *Per Scalers Chief*: pending Alvin's yes. [#869](https://github.com/glclientacquisition-max/scalers-project/pull/869) merged 09:05 EAT regardless (section 0). |
+| 22 Oct | **Caller profile v2 is planned, not built.** | *Per Scalers Chief* ("Status: planned, not built (Alvin, 22 Oct 2026)"). [Spec](reference/brain/CALLER_PROFILE_SPEC.md); 5 open questions for Alvin in §14. |
+| 22 Oct 09:27 | **#838 replaced by #856** (A4 summary on the v2 branch of record). | [#838](https://github.com/glclientacquisition-max/scalers-project/pull/838) closed; [#856](https://github.com/glclientacquisition-max/scalers-project/pull/856) title: "supersedes #838". |
+| 22 Oct 10:12 | **C0 + C1 staging approved**, blocked by Railway builds being Pro/Enterprise only (since 10:06 EAT). | *Per Scalers Chief, unverified in repo.* Test scripts: [C0](reference/testing/STAGING_TEST_SCRIPT_V2_C0.md), [C1](reference/testing/STAGING_TEST_SCRIPT_V2_C1.md). |
 
 ### 4c. Open PRs as of 18 Oct (carried, not re-checked)
 
