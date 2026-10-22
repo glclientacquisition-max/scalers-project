@@ -12,6 +12,7 @@ import {
 } from "@/lib/inboxPurpose";
 import { createWorkspaceDataClient } from "@/lib/tenant";
 import { collapseJobsByCall } from "@/lib/visitPlace";
+import { settleInboxArchiveStamps, stampedCallIdsToCheck } from "@/lib/inboxArchiveCascade";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 
@@ -170,6 +171,34 @@ async function loadOwnerFacts(client: SupabaseClient, callIds: string[]): Promis
   return out;
 }
 
+export const INBOX_ARCHIVED_COLUMN = "inbox_archived_at";
+
+/**
+ * lead_status for every call that has a request archived with it: from the
+ * calls tape, plus ONE lookup for stamped requests whose call is older than
+ * the tape. A failed lookup leaves those stamps as they are (archived).
+ */
+async function loadStampedCallStatus(
+  client: SupabaseClient,
+  tenantId: string,
+  calls: CallRow[],
+  rows: Array<InboxHold | InboxJob>
+): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>();
+  for (const call of calls) out.set(call.id, (call as { lead_status?: string | null }).lead_status ?? null);
+  const missing = stampedCallIdsToCheck(rows, new Set(out.keys()));
+  for (let i = 0; i < missing.length; i += 200) {
+    const { data, error } = await client
+      .from("calls")
+      .select("id, lead_status")
+      .eq("tenant_id", tenantId)
+      .in("id", missing.slice(i, i + 200));
+    if (error) break;
+    for (const row of (data || []) as Array<{ id: string; lead_status: string | null }>) out.set(row.id, row.lead_status);
+  }
+  return out;
+}
+
 export async function loadInboxItems(
   client: SupabaseClient,
   tenantId: string,
@@ -180,17 +209,35 @@ export async function loadInboxItems(
   error: string | null;
   partialError: string | null;
 }> {
-  // Calls tape, holds and jobs only need the tenant id: one round trip, not two.
-  const workPromise = Promise.all([
+  // Open holds/visits carry inbox_archived_at (archived with their call,
+  // #862). Where the column is not there yet (prod before #862), the same
+  // queries run without it and nothing is archived with its call.
+  const openHoldsQuery = (select: string) =>
     fetchPagedOpenWork<InboxHold>((from, to) =>
       client
         .from("service_requests")
-        .select(HOLD_SELECT)
+        .select(select)
         .eq("tenant_id", tenantId)
         .eq("status", OPEN_HOLD_STATUS)
         .order("created_at", { ascending: false })
-        .range(from, to)
-    ),
+        .range(from, to) as unknown as PromiseLike<{ data: InboxHold[] | null; error: { message: string } | null }>
+    );
+  const openJobsQuery = (select: string) =>
+    fetchPagedOpenWork<InboxJob>((from, to) =>
+      client
+        .from("appointments")
+        .select(select)
+        .eq("tenant_id", tenantId)
+        .in("status", [...OPEN_JOB_STATUSES])
+        .order("created_at", { ascending: false })
+        .range(from, to) as unknown as PromiseLike<{ data: InboxJob[] | null; error: { message: string } | null }>
+    );
+  const withStamp = (select: string) => `${select}, ${INBOX_ARCHIVED_COLUMN}`;
+  const stampMissing = (error: string | null) => Boolean(error && new RegExp(INBOX_ARCHIVED_COLUMN).test(error));
+
+  // Calls tape, holds and jobs only need the tenant id: one round trip, not two.
+  const workPromise = Promise.all([
+    openHoldsQuery(withStamp(HOLD_SELECT)).then((res) => (stampMissing(res.error) ? openHoldsQuery(HOLD_SELECT) : res)),
     client
       .from("service_requests")
       .select(HOLD_SELECT)
@@ -198,15 +245,7 @@ export async function loadInboxItems(
       .in("status", [...TAPE_HOLD_STATUSES])
       .order("created_at", { ascending: false })
       .limit(INBOX_WINDOW),
-    fetchPagedOpenWork<InboxJob>((from, to) =>
-      client
-        .from("appointments")
-        .select(JOB_SELECT)
-        .eq("tenant_id", tenantId)
-        .in("status", [...OPEN_JOB_STATUSES])
-        .order("created_at", { ascending: false })
-        .range(from, to)
-    ),
+    openJobsQuery(withStamp(JOB_SELECT)).then((res) => (stampMissing(res.error) ? openJobsQuery(JOB_SELECT) : res)),
     client
       .from("appointments")
       .select(JOB_SELECT)
@@ -287,12 +326,15 @@ export async function loadInboxItems(
         tapeJobs.error ? [] : ((tapeJobs.data || []) as InboxJob[])
       );
   const calls = (callsRes.data || []) as CallRow[];
-  const ownerFacts = await loadOwnerFacts(client, calls.map((c) => c.id));
+  const [ownerFacts, callStatus] = await Promise.all([
+    loadOwnerFacts(client, calls.map((c) => c.id)),
+    loadStampedCallStatus(client, tenantId, calls, [...holds, ...jobs]),
+  ]);
   const leads = calls.map((call) => toLead(call, ownerFacts.get(call.id)));
   const items = assembleInboxItems({
     leads,
-    holds,
-    jobs: collapseJobsByCall(jobs),
+    holds: settleInboxArchiveStamps(holds, callStatus),
+    jobs: collapseJobsByCall(settleInboxArchiveStamps(jobs, callStatus)),
     vertical,
   });
 

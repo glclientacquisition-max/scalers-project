@@ -1,4 +1,5 @@
 const { dispatchAlert } = require("../notifications/dispatch");
+const { effectivePaymentEnv } = require("./billingRuntimeSettingsDb");
 
 function noticesSendEnabled(env = process.env) {
   const raw = env && env !== process.env
@@ -26,7 +27,19 @@ function ledgerAlreadySent(result) {
  * @param {{ claim: Function, settle: Function, dispatch?: Function, env?: NodeJS.ProcessEnv }} input
  */
 async function sendClaimedBillingNotices(input) {
-  if (!noticesSendEnabled(input.env)) {
+  const base = input.env || process.env;
+  let env = base;
+  const useRuntimeOverlay =
+    !input.skipRuntimeOverlay && (!input.env || input.env === process.env);
+  if (useRuntimeOverlay) {
+    try {
+      const { supabase } = require("../lib/supabaseClient");
+      env = await effectivePaymentEnv(base, supabase);
+    } catch {
+      env = base;
+    }
+  }
+  if (!noticesSendEnabled(env)) {
     return { sent: 0, skipped: true, reason: "BILLING_NOTICES_SEND is off" };
   }
   const dispatch = input.dispatch || dispatchAlert;

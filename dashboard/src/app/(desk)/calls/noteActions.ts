@@ -21,7 +21,8 @@ import {
 import { parseNotifyChannels } from "@/lib/notifyChannels";
 import { sendRecordedDeskCallerSms } from "@/lib/sendLedger";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
-import { parseSummary } from "@/lib/supabase";
+import { recordCallerReply } from "@/lib/callerReplyRecord";
+import { deskSmsSendError } from "@/lib/deskSmsError";
 
 export type PolishCallerNoteState = {
   error?: string;
@@ -148,7 +149,15 @@ export type SendCallerNoteState = {
   error?: string;
   ok?: boolean;
   token?: number;
+  /** The send was tried (it may be on the call's text thread as failed). */
+  attempted?: boolean;
 };
+
+/** Line paused or closed text wins; else the owner copy for the reason. */
+function ownerSmsFailure(sent: { reason?: string; message?: string }): { error: string } {
+  if (sent.message) return { error: sent.message };
+  return { error: deskSmsSendError(sent) };
+}
 
 async function sendOwnerCallerSms(
   formData: FormData,
@@ -183,45 +192,28 @@ async function sendOwnerCallerSms(
     version: keyParts.version || null,
   });
   if (!sent.ok) {
-    if (sent.message) return { error: sent.message };
-    if (sent.reason === "sms_not_configured") return { error: "Text is unavailable." };
-    if (sent.reason === "sms_allowance_exhausted") {
-      return { error: "Included SMS used. Enable on-demand on Wallet." };
-    }
-    if (sent.reason === "instance_already_sent") return { error: "Already sent." };
-    return { error: "SMS failed." };
+    // A failed send can still be on the thread (Not delivered, Retry): refresh it.
+    if (callId) revalidatePath(`/calls/${callId}`);
+    return { ...ownerSmsFailure(sent), attempted: true, token: Date.now() };
   }
 
   if (callId) {
-    const { data: row } = await workspace.client
-      .from("calls")
-      .select("summary")
-      .eq("id", callId)
-      .eq("tenant_id", tenant.id)
-      .maybeSingle();
-    const raw = row?.summary as unknown;
-    const meta =
-      raw && typeof raw === "object" && !Array.isArray(raw)
-        ? (raw as Record<string, unknown>)
-        : parseSummary(typeof raw === "string" ? raw : null);
-    const next = {
-      ...meta,
-      caller_reply_body: body,
-      caller_reply_at: new Date().toISOString(),
-    };
-    const { error: sumErr } = await workspace.client
-      .from("calls")
-      .update({ summary: JSON.stringify(next) })
-      .eq("id", callId)
-      .eq("tenant_id", tenant.id);
-    if (sumErr) {
-      console.warn("[caller note summary]", sumErr.message);
+    // One UPDATE in the database (calls_record_caller_reply); the SMS above
+    // already went out, so a failed stamp only warns.
+    const stamp = await recordCallerReply({
+      client: workspace.client,
+      tenantId: tenant.id,
+      callId,
+      body,
+    });
+    if (stamp.error) {
+      console.warn("[caller note summary]", stamp.error.message);
     }
     revalidatePath(`/calls/${callId}`);
   }
 
   revalidatePath("/calls");
-  return { ok: true, token: Date.now() };
+  return { ok: true, attempted: true, token: Date.now() };
 }
 
 export async function sendCallerNoteAction(

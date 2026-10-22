@@ -8,10 +8,20 @@
  * several wallet thresholds opens one mailed notice, for the lowest, and
  * latches the others without a second mail. An empty wallet is the one mail
  * for that reading. An unknown balance neither alerts nor re-arms.
+ *
+ * Top-up: one "topped up" mail when the highest open wallet threshold re-arms
+ * (balance above threshold * 1.1, so KES 550 for KES 500). Lower thresholds and
+ * the empty notice resolve quietly, so one top-up sends one mail.
+ *
+ * Staging wallet: the same signals under the `sautikit_low:staging` prefix
+ * (prod Desk reads it with a wallet.read-only staging key), default KES 300.
  */
 
 export const LEGACY_WALLET_KIND = "sautikit_low";
 export const WALLET_EMPTY_KIND = "sautikit_low:empty";
+/** Staging wallet notices share the Money toggle: base kind stays sautikit_low. */
+export const STAGING_WALLET_PREFIX = "sautikit_low:staging";
+export const DEFAULT_STAGING_WALLET_THRESHOLDS_KES = [300];
 export const SMS_LEVELS = ["warn", "critical", "exhausted"] as const;
 export type SmsCreditLevel = (typeof SMS_LEVELS)[number];
 
@@ -33,8 +43,16 @@ export type CronSignal = {
   hold: boolean;
 };
 
-export function walletThresholdKind(minor: number): string {
-  return `sautikit_low:${minor}`;
+export function walletThresholdKind(minor: number, prefix: string = LEGACY_WALLET_KIND): string {
+  return `${prefix}:${minor}`;
+}
+
+export function walletEmptyKind(prefix: string = LEGACY_WALLET_KIND): string {
+  return `${prefix}:empty`;
+}
+
+export function isStagingWalletKind(kind: string): boolean {
+  return String(kind || "").startsWith(`${STAGING_WALLET_PREFIX}:`);
 }
 
 export function smsLevelKind(level: SmsCreditLevel): string {
@@ -70,12 +88,16 @@ export function kesLabel(minor: number): string {
 }
 
 /**
- * Comma-separated KES amounts. Empty or all-invalid input uses 500 and 100.
- * Returns minor units, highest first, duplicates dropped.
+ * Comma-separated KES amounts. Empty or all-invalid input uses the defaults
+ * (500 and 100 for the prod wallet). Returns minor units, highest first, duplicates dropped.
  */
-export function parseWalletThresholdsKes(raw: string | null | undefined): number[] {
+export function parseWalletThresholdsKes(
+  raw: string | null | undefined,
+  defaultsKes: readonly number[] = DEFAULT_WALLET_THRESHOLDS_KES,
+): number[] {
+  const fallback = () => [...new Set(defaultsKes.map((kes) => Math.round(kes * 100)))].sort((a, b) => b - a);
   const text = String(raw ?? "").trim();
-  if (!text) return DEFAULT_WALLET_THRESHOLDS_KES.map((kes) => kes * 100);
+  if (!text) return fallback();
   const out = new Set<number>();
   for (const part of text.split(/[\s,;]+/)) {
     if (!part) continue;
@@ -83,7 +105,7 @@ export function parseWalletThresholdsKes(raw: string | null | undefined): number
     if (!Number.isFinite(kes) || kes <= 0) continue;
     out.add(Math.round(kes * 100));
   }
-  if (!out.size) return DEFAULT_WALLET_THRESHOLDS_KES.map((kes) => kes * 100);
+  if (!out.size) return fallback();
   return [...out].sort((a, b) => b - a);
 }
 
@@ -103,7 +125,8 @@ export function parseRearmMargin(raw: string | null | undefined, fallback = DEFA
 /** Minor units. The notice stays open until the balance is strictly above this. */
 export function rearmCeilingMinor(thresholdMinor: number, margin: number): number {
   const m = Number.isFinite(margin) && margin >= 0 ? margin : DEFAULT_REARM_MARGIN;
-  return Math.ceil(thresholdMinor * (1 + m));
+  // Round first: 50000 * 1.1 is 55000.000000000007 in floating point, which must read as KES 550.
+  return Math.ceil(Math.round(thresholdMinor * (1 + m) * 1e6) / 1e6);
 }
 
 /**
@@ -139,14 +162,21 @@ export function walletSignals(input: {
   openNotices: readonly OpenNotice[];
   /** Default 0.10. Re-arm only above threshold * (1 + margin). */
   rearmMargin?: number;
+  /** Kind prefix. Default `sautikit_low` (prod wallet); STAGING_WALLET_PREFIX for staging. */
+  kindPrefix?: string;
 }): CronSignal[] {
+  const prefix = input.kindPrefix || LEGACY_WALLET_KIND;
+  const primary = prefix === LEGACY_WALLET_KIND;
+  const emptyKind = walletEmptyKind(prefix);
+  const thresholdKind = (minor: number) => walletThresholdKind(minor, prefix);
+  const walletName = primary ? "Phone wallet" : "Staging phone wallet";
   const open = liveNotices(input.openNotices);
   const openKinds = new Set(open.map((notice) => notice.kind));
   const notified = new Set(open.filter((notice) => notice.notified_at).map((notice) => notice.kind));
   const thresholds = [...new Set(input.thresholdsMinor.filter((n) => Number.isFinite(n) && n > 0))].sort(
     (a, b) => b - a,
   );
-  const managed = [LEGACY_WALLET_KIND, WALLET_EMPTY_KIND, ...thresholds.map(walletThresholdKind)];
+  const managed = [...(primary ? [LEGACY_WALLET_KIND] : []), emptyKind, ...thresholds.map(thresholdKind)];
   if (input.balanceMinor == null || !Number.isFinite(input.balanceMinor)) {
     return managed.map(hold);
   }
@@ -155,35 +185,46 @@ export function walletSignals(input: {
   const margin = input.rearmMargin ?? DEFAULT_REARM_MARGIN;
   const empty = balance <= 0;
   const crossed = thresholds.filter((threshold) => balance <= threshold);
-  const unsent = crossed.filter((threshold) => !notified.has(walletThresholdKind(threshold)));
+  const unsent = crossed.filter((threshold) => !notified.has(thresholdKind(threshold)));
   const lowestUnsent = unsent.length ? Math.min(...unsent) : null;
   const lowestOpen = crossed.length ? Math.min(...crossed) : null;
   const lowDetail =
     lowestOpen == null ? "" : `${kesLabel(balance)}, below ${kesLabel(lowestOpen)}`;
+  // The one threshold whose re-arm sends the top-up mail: the highest still open.
+  const openThresholds = thresholds.filter((threshold) => openKinds.has(thresholdKind(threshold)));
+  const topOpen = openThresholds.length ? Math.max(...openThresholds) : null;
+  const emptyDetail = `${walletName} is empty`;
+  const tag = primary ? "" : `${walletName}: `;
 
-  const legacyOpen = openKinds.has(LEGACY_WALLET_KIND);
-  const signals: CronSignal[] = [
-    legacyOpen
-      ? signal({
-          kind: LEGACY_WALLET_KIND,
-          active: empty || crossed.length > 0,
-          detail: empty ? "Phone wallet is empty" : lowDetail,
-          // Already mailed by the old page-load check. Threshold rows carry any new mail.
-          mail: false,
-          recoverMail: true,
-        })
-      : hold(LEGACY_WALLET_KIND),
+  const signals: CronSignal[] = [];
+  if (primary) {
+    const legacyOpen = openKinds.has(LEGACY_WALLET_KIND);
+    signals.push(
+      legacyOpen
+        ? signal({
+            kind: LEGACY_WALLET_KIND,
+            active: empty || crossed.length > 0,
+            detail: empty ? emptyDetail : lowDetail || `${walletName} topped up: ${kesLabel(balance)}`,
+            // Already mailed by the old page-load check. Threshold rows carry any new mail.
+            mail: false,
+            // A threshold notice carries the top-up mail when one is open.
+            recoverMail: topOpen == null,
+          })
+        : hold(LEGACY_WALLET_KIND),
+    );
+  }
+  signals.push(
     signal({
-      kind: WALLET_EMPTY_KIND,
+      kind: emptyKind,
       active: empty,
-      detail: "Phone wallet is empty",
-      mail: empty && !notified.has(WALLET_EMPTY_KIND),
+      detail: emptyDetail,
+      mail: empty && !notified.has(emptyKind),
       recoverMail: false,
     }),
-  ];
+  );
 
   for (const threshold of thresholds) {
-    const kind = walletThresholdKind(threshold);
+    const kind = thresholdKind(threshold);
     const isCrossed = balance <= threshold;
     const open = openKinds.has(kind);
     const active = balanceStillLow(balance, threshold, open, margin);
@@ -192,12 +233,13 @@ export function walletSignals(input: {
       signal({
         kind,
         active,
-        detail:
-          open && !isCrossed && active
-            ? `${kesLabel(balance)}, holding until ${kesLabel(ceiling)}`
-            : `${kesLabel(balance)}, below ${kesLabel(threshold)}`,
+        detail: !active
+          ? `${walletName} topped up: ${kesLabel(balance)}, back above ${kesLabel(ceiling)}`
+          : open && !isCrossed
+            ? `${tag}${kesLabel(balance)}, holding until ${kesLabel(ceiling)}`
+            : `${tag}${kesLabel(balance)}, below ${kesLabel(threshold)}`,
         mail: !empty && isCrossed && lowestUnsent === threshold,
-        recoverMail: false,
+        recoverMail: threshold === topOpen,
       }),
     );
   }

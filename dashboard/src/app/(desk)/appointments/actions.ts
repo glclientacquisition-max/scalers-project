@@ -79,6 +79,7 @@ export async function updateAppointmentStatus(
           : "caller_appointment_confirmed",
       to: row.caller_phone,
       body,
+      appointmentId: id || null,
     });
     if (!sent.ok) console.warn("[appointment caller sms]", sent.reason);
     if (sent.message) notice = sent.message;
@@ -161,6 +162,7 @@ export async function updateAppointmentSchedule(
       kind: "caller_appointment_rescheduled",
       to: row.caller_phone,
       body,
+      appointmentId: id || null,
     });
     if (!sent.ok) console.warn("[appointment caller sms]", sent.reason);
     if (sent.message) notice = sent.message;

@@ -13,7 +13,11 @@ export default function DevAdminPlansPage() {
   return (
     <AdminShell operatorName="alvin">
       <AdminPageHeader title="Plans" />
-      <AdminPackageVersionsPanel catalog={ADMIN_PLANS_CATALOG} businesses={ADMIN_PLANS_BUSINESSES} />
+      <AdminPackageVersionsPanel
+        catalog={ADMIN_PLANS_CATALOG}
+        businesses={ADMIN_PLANS_BUSINESSES}
+        planWritesEnabled
+      />
     </AdminShell>
   );
 }

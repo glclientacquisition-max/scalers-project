@@ -92,6 +92,8 @@ export type BachsStatusView = {
   liveSwitch: "On" | "Off";
   keySet: "Yes" | "No";
   webhookSecretSet: "Yes" | "No";
+  /** P20 applied: payment switches are stored on this database and editable in Admin. */
+  runtimeControlsAvailable: boolean;
   hosting: HostingSwitches;
   dbFlags: DbFlagSwitches;
   liveSummary: string;

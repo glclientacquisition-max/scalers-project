@@ -10,7 +10,8 @@
     "test": "node --import tsx --test test/*.test.ts",
     "render": "tsx scripts/render.tsx",
     "export:auth": "tsx scripts/export-supabase-auth.tsx",
-    "check:auth-go": "go run supabase-auth/check/main.go supabase-auth"
+    "check:auth-go": "go run supabase-auth/check/main.go supabase-auth",
+    "export:ops-wallet": "tsx scripts/export-ops-wallet.tsx"
   },
   "engines": {
     "node": ">=20"

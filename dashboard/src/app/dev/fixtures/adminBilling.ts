@@ -294,6 +294,7 @@ export const ADMIN_BACHS_STATUS: BachsStatusView = {
   liveSwitch: "Off",
   keySet: "No",
   webhookSecretSet: "No",
+  runtimeControlsAvailable: true,
   hosting: { modeOn: false, liveMasterOn: false, noticesOn: false, planChangeOn: true },
   dbFlags: { available: true, packageEditorEnabled: true, signupTrialEnabled: false },
   liveSummary: "Hosting switch is off. Environment list: 0.",

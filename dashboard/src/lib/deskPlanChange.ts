@@ -35,8 +35,8 @@ const closedPort: PlanChangePort = {
   },
 };
 
-export function planChangePort(): PlanChangePort {
-  if (!deskPlanChangeEnabled()) return closedPort;
+export function planChangePort(env: NodeJS.ProcessEnv = process.env): PlanChangePort {
+  if (!deskPlanChangeOn(env)) return closedPort;
   // Swap point: return the Ops RPC port here when the contract is in.
   return closedPort;
 }

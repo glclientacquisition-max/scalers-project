@@ -418,6 +418,7 @@ const {
   noteServiceRequestCreated,
 } = require('./src/conversation/requestDedupe');
 const { lineUnavailableResponse } = require('./src/sautikit/inactiveTenantGate');
+const { unownedNumberResponse } = require('./src/sautikit/numberHold');
 const { createClosedLineCalls } = require('./src/sautikit/closedLineCalls');
 const {
   closedTenantGuardEnabled,
@@ -1667,10 +1668,16 @@ async function handleVoiceIncoming(req, res) {
           .send(packageRefusalXml({ businessName: directoryHit.businessName }));
       }
       if (directoryHit.unassigned) {
-        console.warn(`[${callSid}] unassigned number — reject`);
-        return res
-          .type('text/xml')
-          .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+        // VOICE_NUMBER_HOLD_CLIP (off = <Reject/> as before): a number on a
+        // win-back hold plays line unavailable. No call row, no minutes.
+        const unowned = await unownedNumberResponse(toNumber, { log: (m) => console.warn(`[${callSid}] ${m}`) });
+        if (unowned.held) {
+          console.warn(`[${callSid}] unassigned number on win-back hold until ${unowned.until} — line unavailable, hang up`);
+          closedLineCalls.remember(sid, callSid, extracted.callSid);
+        } else {
+          console.warn(`[${callSid}] unassigned number — reject`);
+        }
+        return res.type('text/xml').send(unowned.xml);
       }
       // Off the critical path. /ws/media awaits this before it reads the row.
       const rowPromise = db
@@ -1718,10 +1725,14 @@ async function handleVoiceIncoming(req, res) {
         if (preTerminal) scheduleSetupTerminal();
       } catch (dbErr) {
         if (dbErr?.code === 'unassigned_did') {
-          console.warn(`[${callSid}] unassigned number — reject`);
-          return res
-            .type('text/xml')
-            .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+          const unowned = await unownedNumberResponse(toNumber, { log: (m) => console.warn(`[${callSid}] ${m}`) });
+          if (unowned.held) {
+            console.warn(`[${callSid}] unassigned number on win-back hold until ${unowned.until} — line unavailable, hang up`);
+            closedLineCalls.remember(sid, callSid, extracted.callSid);
+          } else {
+            console.warn(`[${callSid}] unassigned number — reject`);
+          }
+          return res.type('text/xml').send(unowned.xml);
         }
         // Do not fail the webhook / Stream setup if DB is briefly unavailable.
         console.error('[voice/incoming] DB upsert failed (continuing with Stream):', dbErr?.message || dbErr);

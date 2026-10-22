@@ -1,11 +1,16 @@
+import { effectivePaymentEnv } from "@/lib/billingRuntimeSettings";
 import { invoicePayLedger } from "./ledger";
 import { payView, presentPayPage } from "./view";
 import { readPayReturn } from "./returnUrl";
 
+async function gateEnv(env?: NodeJS.ProcessEnv): Promise<NodeJS.ProcessEnv> {
+  return env ?? (await effectivePaymentEnv(process.env));
+}
+
 export async function loadPayView(
   token: string,
   search: { return?: string; checkout_id?: string },
-  env: NodeJS.ProcessEnv = process.env
+  env?: NodeJS.ProcessEnv
 ) {
   const ledger = invoicePayLedger();
   const lookup = await ledger.lookup(token);
@@ -28,7 +33,7 @@ export async function loadPayView(
       };
     }
   }
-  return presentPayPage(payView({ lookup, checkout }), env);
+  return presentPayPage(payView({ lookup, checkout }), await gateEnv(env));
 }
 
 /** Status page for a Bachs return id. The id is not a pay token. */
@@ -36,16 +41,17 @@ export async function loadPayReturn(
   returnId: string,
   search: { return?: string; checkout_id?: string },
   token: string,
-  env: NodeJS.ProcessEnv = process.env
+  env?: NodeJS.ProcessEnv
 ) {
   const ledger = invoicePayLedger() as ReturnLedger;
   const byReturn = await ledger.lookupReturn(returnId);
-  if (!byReturn?.found) return presentPayPage(payView({ lookup: { found: false } }), env);
+  const resolved = await gateEnv(env);
+  if (!byReturn?.found) return presentPayPage(payView({ lookup: { found: false } }), resolved);
   if (token) {
     const lookup = await ledger.lookup(token);
     if (lookup.found && lookup.invoiceId && lookup.invoiceId === byReturn.invoiceId) {
       const checkoutId = search.checkout_id || byReturn.checkoutSessionId || "";
-      return loadPayView(token, { return: "1", checkout_id: checkoutId }, env);
+      return loadPayView(token, { return: "1", checkout_id: checkoutId }, resolved);
     }
   }
   const view = payView({
@@ -54,7 +60,7 @@ export async function loadPayReturn(
       ? { id: byReturn.checkoutSessionId, status: byReturn.attemptStatus || "pending", returning: true }
       : null,
   });
-  return presentPayPage({ ...view, payLabel: null }, env);
+  return presentPayPage({ ...view, payLabel: null }, resolved);
 }
 
 type ReturnLedger = {
