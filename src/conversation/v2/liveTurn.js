@@ -88,6 +88,7 @@ function createBrainV2Live(opts = {}) {
       callerPhone: file.callerPhone,
       contactName: file.contactName,
       openRows: file.openRows,
+      callId: opts.callSid || null,
     });
     return state;
   }
@@ -97,7 +98,7 @@ function createBrainV2Live(opts = {}) {
       return null;
     }
     const machine = ensureState(profile);
-    const handlers = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })) });
+    const handlers = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName } });
     const sentences = [];
     let done = null;
     const it = runTurnStream(machine, {

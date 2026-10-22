@@ -107,7 +107,8 @@ test('phantom cancel: a dated visit still reads back its date', async () => {
   const a = await live.run({ text: 'I want to cancel my booking.', profile: PHANTOM_PROFILE, langLock: 'en' });
   assert.match(a.line, /Cancel your sofa cleaning on Friday 23 October at 10:00\. Shall I go ahead\?/);
   await live.run({ text: 'Yes.', profile: PHANTOM_PROFILE, langLock: 'en' });
-  assert.equal(writes.length, 1);
+  // the fake answers id 'x' for apt_3; with BRAIN_V2_COMMIT_SAFETY that mismatch is a failed write and opens one outbox task
+  assert.equal(writes.filter((w) => w.appointmentUpdate).length, 1);
 });
 
 // End-call contract (plan C3): { line, end: true, reason } once, goodbye in the same line,

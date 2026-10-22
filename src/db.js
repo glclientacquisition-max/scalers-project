@@ -3003,6 +3003,13 @@ async function bumpStreamSeq(callSid) {
 
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
 
+// BRAIN_V2_COMMIT_SAFETY: v2's idempotency key (call + tool + slot hash) lands on the row's
+// idempotency_key column (Platform #691) only when WRITE_RECEIPTS is on, i.e. that SQL is applied.
+function writeReceiptKeyColumn(key) {
+  if (!key || !/^(1|true|on|yes)$/i.test(String(process.env.WRITE_RECEIPTS || ''))) return {};
+  return { idempotency_key: String(key).slice(0, 200) };
+}
+
 /**
  * Create a service request (hold / enquiry / order) for retail completion.
  * Also upserts contact and mirrors a short note into call summary when callSid given.
@@ -3017,6 +3024,7 @@ async function createServiceRequest({
   quantity,
   whenText,
   notes,
+  idempotencyKey,
 } = {}) {
   let resolvedTenantId = tenantId || null;
   let callRow = null;
@@ -3061,6 +3069,7 @@ async function createServiceRequest({
       caller_name: callerName,
       caller_phone: callerPhone,
       updated_at: new Date().toISOString(),
+      ...writeReceiptKeyColumn(idempotencyKey),
     })
     .select('*')
     .maybeSingle();
@@ -3174,6 +3183,7 @@ async function createAppointment({
   address,
   notes,
   windowStart,
+  idempotencyKey,
   windowEnd,
 } = {}) {
   let resolvedTenantId = tenantId || null;
@@ -3224,6 +3234,7 @@ async function createAppointment({
       caller_name: callerName,
       caller_phone: callerPhone,
       updated_at: new Date().toISOString(),
+      ...writeReceiptKeyColumn(idempotencyKey),
     })
     .select('*')
     .maybeSingle();
@@ -3926,6 +3937,173 @@ async function upsertCallFacts(row) {
   return next;
 }
 
+// ---------------------------------------------------------------------------
+// Brain write receipts (docs/supabase/brain_write_receipts.sql). One row per
+// write attempt and phase. Nothing on the call path depends on these: the
+// writer never throws and the reader returns [] on any error.
+
+const WRITE_RECEIPT_PATHS = new Set(['v1', 'v2']);
+const WRITE_RECEIPT_TOOLS = new Set([
+  'book_appointment',
+  'create_order',
+  'request_callback',
+  'log_complaint',
+  'escalate',
+  'quote',
+]);
+const WRITE_RECEIPT_PHASES = new Set(['proposed', 'confirmed', 'committed', 'failed', 'rejected']);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const WRITE_RECEIPT_ERROR_DETAIL_MAX = 500;
+
+function pick(r, camel, snake) {
+  if (r[camel] !== undefined) return r[camel];
+  if (r[snake] !== undefined) return r[snake];
+  return undefined;
+}
+
+function intOrNull(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
+
+function uuidOrNull(v) {
+  const s = String(v || '').trim();
+  return UUID_RE.test(s) ? s : null;
+}
+
+/**
+ * Shape one receipt (camelCase or snake_case keys) into a brain_write_receipts
+ * row. Returns { row } or { error } for a receipt the table would refuse.
+ */
+function writeReceiptRow(r = {}) {
+  if (!r || typeof r !== 'object') return { error: 'invalid_receipt' };
+  const path = String(pick(r, 'path', 'path') || '').trim();
+  const tool = String(pick(r, 'tool', 'tool') || '').trim();
+  const phase = String(pick(r, 'phase', 'phase') || '').trim();
+  const idempotencyKey = String(pick(r, 'idempotencyKey', 'idempotency_key') || '').trim();
+  if (!WRITE_RECEIPT_PATHS.has(path)) return { error: `invalid_path:${path || 'missing'}` };
+  if (!WRITE_RECEIPT_TOOLS.has(tool)) return { error: `invalid_tool:${tool || 'missing'}` };
+  if (!WRITE_RECEIPT_PHASES.has(phase)) return { error: `invalid_phase:${phase || 'missing'}` };
+  if (!idempotencyKey) return { error: 'missing_idempotency_key' };
+
+  // call_id is calls.id (uuid). A HD_ SID passed as callId lands in call_sid.
+  const rawCallId = pick(r, 'callId', 'call_id');
+  const callId = uuidOrNull(rawCallId);
+  let callSid = pick(r, 'callSid', 'call_sid');
+  if (!callSid && rawCallId && !callId) callSid = rawCallId;
+
+  const slots = pick(r, 'slots', 'slots');
+  const validators = pick(r, 'validators', 'validators');
+  const detail = pick(r, 'errorDetail', 'error_detail');
+  const writeId = uuidOrNull(pick(r, 'writeId', 'write_id'));
+
+  return {
+    row: {
+      call_id: callId,
+      call_sid: callSid ? String(callSid) : null,
+      tenant_id: uuidOrNull(pick(r, 'tenantId', 'tenant_id')),
+      turn_index: intOrNull(pick(r, 'turnIndex', 'turn_index')),
+      path,
+      tool,
+      phase,
+      confirm_token: pick(r, 'confirmToken', 'confirm_token') || null,
+      token_issued_turn: intOrNull(pick(r, 'tokenIssuedTurn', 'token_issued_turn')),
+      token_confirmed_turn: intOrNull(pick(r, 'tokenConfirmedTurn', 'token_confirmed_turn')),
+      idempotency_key: idempotencyKey,
+      slots: slots && typeof slots === 'object' ? slots : {},
+      validators: validators && typeof validators === 'object' ? validators : {},
+      write_table: pick(r, 'writeTable', 'write_table') || null,
+      // Table check: write_id only on a committed receipt.
+      write_id: phase === 'committed' ? writeId : null,
+      error_code: pick(r, 'errorCode', 'error_code') || null,
+      error_detail:
+        detail == null || detail === ''
+          ? null
+          : String(detail).slice(0, WRITE_RECEIPT_ERROR_DETAIL_MAX),
+      outbox_task_id: uuidOrNull(pick(r, 'outboxTaskId', 'outbox_task_id')),
+      latency_ms: intOrNull(pick(r, 'latencyMs', 'latency_ms')),
+    },
+  };
+}
+
+function warnWriteReceipt(event, fields) {
+  try {
+    console.warn(`[db] ${event}`, JSON.stringify(fields));
+  } catch {
+    console.warn(`[db] ${event}`);
+  }
+}
+
+/**
+ * Upsert one Brain write receipt on (idempotency_key, phase). Never throws.
+ * @returns {Promise<{ok:true,id:string|null}|{ok:false,error:string,skipped?:string}>}
+ */
+async function recordWriteReceipt(r) {
+  if (!supabase) return { ok: false, error: 'supabase_not_configured', skipped: 'no_supabase' };
+  let shaped;
+  try {
+    shaped = writeReceiptRow(r);
+  } catch (err) {
+    shaped = { error: `invalid_receipt:${err?.message || err}` };
+  }
+  if (shaped.error) {
+    warnWriteReceipt('recordWriteReceipt rejected', { error: shaped.error, tool: r?.tool, phase: r?.phase });
+    return { ok: false, error: shaped.error };
+  }
+  const row = shaped.row;
+  try {
+    const { data, error } = await supabase
+      .from('brain_write_receipts')
+      .upsert(row, { onConflict: 'idempotency_key,phase' })
+      .select('id')
+      .maybeSingle();
+    if (error) {
+      const message = error.message || String(error);
+      warnWriteReceipt('recordWriteReceipt failed', {
+        error: message,
+        code: error.code || null,
+        hint: /brain_write_receipts|relation/i.test(message) ? 'apply brain_write_receipts.sql' : undefined,
+        tool: row.tool,
+        phase: row.phase,
+        path: row.path,
+        call_sid: row.call_sid,
+        call_id: row.call_id,
+      });
+      return { ok: false, error: message };
+    }
+    return { ok: true, id: data?.id || null };
+  } catch (err) {
+    const message = err?.message || String(err);
+    warnWriteReceipt('recordWriteReceipt threw', { error: message, tool: row.tool, phase: row.phase });
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * Receipts for one call, oldest first. Pass callId (calls.id uuid) or callSid
+ * (HD_ SID). Returns [] on any error or when neither is given.
+ */
+async function getWriteReceipts({ callId, callSid } = {}) {
+  if (!supabase) return [];
+  const id = uuidOrNull(callId);
+  const sid = callSid || (callId && !id ? String(callId) : null);
+  if (!id && !sid) return [];
+  try {
+    let q = supabase.from('brain_write_receipts').select('*');
+    q = id ? q.eq('call_id', id) : q.eq('call_sid', sid);
+    const { data, error } = await q.order('created_at', { ascending: true });
+    if (error) {
+      warnWriteReceipt('getWriteReceipts failed', { error: error.message || String(error), call_id: id, call_sid: sid });
+      return [];
+    }
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    warnWriteReceipt('getWriteReceipts threw', { error: err?.message || String(err), call_id: id, call_sid: sid });
+    return [];
+  }
+}
+
 async function getTenantCatalogue(tenantId) {
   if (!tenantId) return [];
   const { data, error } = await supabase
@@ -4029,4 +4207,7 @@ module.exports = {
   normalizeStoredPhone,
   storedPhoneLookupKeys,
   mergeContactIdentity,
+  recordWriteReceipt,
+  getWriteReceipts,
+  writeReceiptRow,
 };
