@@ -1,4 +1,5 @@
 import crypto from "crypto";
+// Preview login: ADMIN_OPERATORS may be scoped to a Preview branch.
 
 export type AdminOperator = {
   username: string;
