@@ -5,6 +5,8 @@ import type { UsageCall, UsageInput } from "@/lib/ops/usageView";
 
 const num = (raw: unknown) => (Number.isFinite(Number(raw)) ? Number(raw) : 0);
 const DAY_MS = 86400 * 1000;
+/** Row cap for one period's calls (a row count, not a price). */
+const MAX_CALLS = 5 * 1000;
 
 export type UsageLoad = UsageInput & { tenantId: string; currentPeriod: boolean };
 
@@ -49,7 +51,7 @@ export async function loadUsageV2(tenantId: string, range: { from?: string | nul
     .gte("created_at", periodStart)
     .lt("created_at", periodEnd)
     .order("created_at", { ascending: true })
-    .limit(5000);
+    .limit(MAX_CALLS);
   if (error) throw error;
   const calls: UsageCall[] = ((data || []) as Array<Record<string, unknown>>).map((r) => ({
     id: String(r.id),
