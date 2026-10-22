@@ -176,13 +176,13 @@ The Super Admin rebuild is planned in [`ADMIN_FOUNDATION_PLAN.md`](ADMIN_FOUNDAT
 5. **Backup-code inbox:** scalersventures@gmail.com.
 6. **Staging:** same rules as prod.
 7. **v2 on prod:** trial `ADMIN_V2=alvin` after slice 9.
+8. **Writes on phone:** allowed, with the same step-up rules as desktop (per Scalers Chief relaying Alvin, 22 Oct 16:55 EAT).
 
 **Risk (one inbox):** scalersventures@gmail.com is both the owner operator email and the backup-code inbox. Whoever controls it can both sign in and receive backup codes, so that inbox must have its own strong 2FA (authenticator or passkey, not SMS).
 
 Still open:
 
-8. Money and number writes on phone: recommend read-only below 768px; approvals and step-up allowed.
-9. Approve the Ops design layer for `/admin` only: recommend yes.
+- Q9: approve the Ops design layer for `/admin` only: recommend yes.
 
 Slice 1 (auth schema) is unblocked as a staging draft once Platform's four fixes below land. Staging secrets go in only through a masked input.
 

@@ -54,7 +54,7 @@ Billing mental model (from #812): three layers, never mixed in copy. **Package**
 ### Shell
 
 - `md`+: 232px sidebar (collapses to 56), 48px top bar (breadcrumb, ⌘K, env pill, operator menu). Content to 1600px, 24px gutters. Right drawer 480 to 640px.
-- Below `md`: top bar plus a sheet nav. Money and number writes render disabled with the reason; approvals and step-up work.
+- Below `md`: top bar plus a sheet nav. Writes are allowed, with the same step-up rules as desktop (per Scalers Chief relaying Alvin, 22 Oct 16:55 EAT).
 - Environment: 3px band plus a pill, Production (danger) or Staging (accent), from `ADMIN_ENV`. Unknown shows Production.
 - Overlays: bottom sheet on phones, right drawer at `md`+. **No centred modals** (see [`OPS.md` §3](../OPS.md#3-overlays-locked-22-oct-2026)).
 

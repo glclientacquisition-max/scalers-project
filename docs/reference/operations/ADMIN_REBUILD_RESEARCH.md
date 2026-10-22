@@ -74,7 +74,7 @@ Notes on the nav:
 - Group headings are plain sentence-case words (HIG sidebar sections), not tracked caps. They are shown in caps above only for readability in this ASCII sketch.
 - **Manual payments** is an action on Payments and on an invoice ("Record payment"). It is not a separate module. Stripe does the same with "Mark as paid outside Stripe" ([Stripe invoicing](https://docs.stripe.com/invoicing/overview)).
 - An **environment banner** is always visible, because production payments went live on Aris by hand on 20 Oct (see the payments map, §0). Twilio and Stripe both mark test and live mode across the whole UI ([Stripe test mode](https://docs.stripe.com/test-mode)).
-- Phone (below `md`): a read-only Overview, Businesses and Invoices, plus approve and confirm actions. HIG says to consider a tab bar first on iPhone and convert to a sidebar on iPad ([HIG Sidebars](https://developer.apple.com/design/human-interface-guidelines/sidebars)). Money and number writes need at least `md` (768px), to prevent fat-finger money actions.
+- Phone (below `md`): full Admin, writes included, with the same step-up rules as desktop (per Scalers Chief relaying Alvin, 22 Oct 16:55 EAT). HIG says to consider a tab bar first on iPhone and convert to a sidebar on iPad ([HIG Sidebars](https://developer.apple.com/design/human-interface-guidelines/sidebars)). Money and number writes need at least `md` (768px), to prevent fat-finger money actions.
 
 ### 1.3 Why each module exists
 

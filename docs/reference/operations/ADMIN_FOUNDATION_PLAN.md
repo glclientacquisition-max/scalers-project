@@ -129,7 +129,7 @@ Hidden means not in the nav, not in ⌘K, and the route 404s. No "Coming soon" r
 ### 3.3 Shell geometry
 
 - `md+` (768): 232px sidebar, collapsible to 56 with ⌘\ ; top bar 48px with breadcrumb, ⌘K field, env pill, operator menu (Appearance, Security, Sign out). Content fluid to 1600px, 24px gutters. Right drawer slot 480 to 640px.
-- Below `md`: top bar plus a sheet nav. Read-only for money and numbers: write buttons render disabled with the reason in a tooltip ("Open on a larger screen to record payments"). Approvals and step-up work on phone.
+- Below `md`: top bar plus a sheet nav. Money and number writes are allowed on phone, with the same step-up rules as desktop (per Scalers Chief relaying Alvin, 22 Oct 16:55 EAT). Confirms and step-up use the bottom sheet.
 - Environment: 3px band at the very top plus a pill: "Production" (danger) or "Staging" (accent). Read from `ADMIN_ENV` (`production` | `staging`); if unset, derived from the Supabase project ref; if that is unknown, shown as Production. Wrong-red is safer than wrong-blue.
 - Keyboard: ⌘K palette, `/` search, `g` then a letter to jump module (`g b` Businesses, `g n` Numbers, `g i` Invoices), `?` shortcut list, `Esc` closes drawer and returns focus to the row.
 
@@ -450,7 +450,7 @@ Priority and the charter sign-off. Voice and Brain: nothing in step 1.
 5. **Which inbox gets the backup codes?** **Recommend your personal email that has its own 2FA**, not the shared ops list, because whoever reads that inbox can approve actions.
 6. **Same rules on staging?** **Recommend yes.** Staging money is fake, but it is where the flow gets tested, and the authenticator entry and emails are clearly labelled staging.
 7. **Trying v2 on prod.** **Recommend `ADMIN_V2=alvin` on prod once slice 9 is on staging and you have clicked through it**, so you use the new shell on real data while the old Admin stays the default.
-8. **Money and number writes on phone.** **Recommend read-only on phone below 768px**, with approvals and step-up still allowed. It prevents fat-finger money actions; everything is visible.
+8. **Money and number writes on phone.** **Decided: writes allowed on phone, same step-up rules** (per Scalers Chief relaying Alvin, 22 Oct 16:55 EAT).
 9. **Approve the Ops design layer for `/admin` only** (13px body, 28/36/44 rows, own table and chart kit, same brand colours, font and light/dark). **Recommend yes**; Desk Engineer and Scalers Chief sign the charter change in slice 0.
 
 ---

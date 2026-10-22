@@ -84,4 +84,4 @@ Plain words, sentence case, no vendor or infrastructure names on screen, no "Com
 
 - Phone-safe at 360 and 390: no horizontal scroll, touch rows 44.
 - `md`+: 232px sidebar, 48px top bar, content fluid to 1600px, 24px gutters.
-- Below `md`: money and number writes render disabled with the reason; approvals and step-up work on phone (plan question 8, open).
+- Below `md`: money and number writes are allowed on phone, with the same step-up rules as desktop (per Scalers Chief relaying Alvin, 22 Oct 16:55 EAT). Confirms and step-up use the bottom sheet.
