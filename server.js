@@ -438,6 +438,12 @@ const {
 } = require('./src/speech/overlapHold');
 const { createLateFinalHold } = require('./src/speech/lateFinal');
 const { createIdleNudgeController } = require('./src/speech/idleNudge');
+const {
+  postGreetingNudgeEnabled,
+  createPostGreetingNudge,
+  inviteLanguage: postGreetingInviteLanguage,
+  postGreetingNudgeLine,
+} = require('./src/speech/postGreetingNudge');
 const { createUnfinishedHold, unfinishedHoldMs } = require('./src/speech/unfinishedHold');
 const { noteCallTerminal, callTerminalSince } = require('./src/speech/callLifecycle');
 const endedCalls = require('./src/speech/endedCalls');
@@ -1296,6 +1302,16 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
   );
 }
 
+function silentSummaryDurationSeconds(call, opts = {}) {
+  const fromOpts = Number(opts.durationSeconds);
+  if (Number.isFinite(fromOpts) && fromOpts > 0) return fromOpts;
+  const fromRow = Number(call?.duration_seconds);
+  if (Number.isFinite(fromRow) && fromRow > 0) return fromRow;
+  const started = Date.parse(call?.created_at || '');
+  if (Number.isFinite(started)) return Math.max(0, (Date.now() - started) / 1000);
+  return null;
+}
+
 async function writeHangupSummary(callSid, source, opts, brainState) {
   try {
     const call = await db.getCall(callSid);
@@ -1308,7 +1324,12 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
       callId: call?.id || null,
       spokenTurns,
     });
-    const summary = deriveCallSummary({ brainState });
+    const summary = deriveCallSummary({
+      brainState,
+      // VOICE_SILENT_CALL_SUMMARY: a call with no caller turn gets a factual line.
+      spokenTurns,
+      durationSeconds: silentSummaryDurationSeconds(call, opts),
+    });
     const primaryIntent = summary.primaryIntent || null;
     if (opts.writeResolution === false) {
       // Run-once loser: only hand its live turns to the debounced review.
@@ -2323,6 +2344,35 @@ mediaWss.on('connection', (ws, req) => {
       });
     },
   });
+  // VOICE_POST_GREETING_NUDGE: re-invite after ~6 s of silence once the
+  // greeting has played, at most twice, until the first processed caller
+  // turn (src/speech/postGreetingNudge.js). Off: never armed.
+  const postGreetingNudgeOn = postGreetingNudgeEnabled();
+  const postGreetingNudge = createPostGreetingNudge({
+    canFire: () =>
+      ws.readyState === WebSocket.OPEN &&
+      !callEnding &&
+      !speaking &&
+      !turnBusy &&
+      !speechOutageStarted &&
+      !heardCallerUtterance &&
+      !utteranceParts.length &&
+      !pendingUtterance &&
+      !callIsOver(),
+    speak: ({ count }) => {
+      if (callIsOver() || heardCallerUtterance) return null;
+      const lang = postGreetingInviteLanguage(greetingInvite);
+      const line = postGreetingNudgeLine({ language: lang, count });
+      console.log(`[ws/media][${sidLabel()}] post_greeting_nudge n=${count + 1} lang=${lang}`);
+      voiceTrace.noteCall({ stage: 'post_greeting_nudge', n: count + 1, language: lang, at: new Date().toISOString() });
+      return speakText(line, { isIdleNudge: true }).then((spoken) => {
+        if (spoken?.ok) {
+          callTranscript.pushAgent(line);
+          messages.push({ role: 'assistant', content: line, local: true });
+        }
+      });
+    },
+  });
   // An unfinished caller turn ("Nilikuwa nauliza,") is held, not answered.
   // New caller words merge with it. If the caller stays quiet for the hold
   // window, it is answered by the model (holdTimedOut), never by an
@@ -2866,6 +2916,7 @@ mediaWss.on('connection', (ws, req) => {
     unfinishedHold.close();
     greetingStarted = true;
     idleNudge.close();
+    postGreetingNudge.close();
     const clip = loadOutageClip(callLanguage, { voiceId: tenantSonioxVoiceId });
     const line = pickSpeechOutageLine(clip?.language || callLanguage);
     console.error(
@@ -3230,6 +3281,7 @@ mediaWss.on('connection', (ws, req) => {
     const endingGen = activePlaybackGeneration;
     clearFillerTimer();
     idleNudge.clear();
+    postGreetingNudge.noteCallerSpeech();
     bargeInActive = true;
     suppressReplyRemainder = true;
     bargeCancelledText = lastAgentText;
@@ -4961,6 +5013,7 @@ mediaWss.on('connection', (ws, req) => {
     }
     console.log(`[ws/media][${sidLabel()}] caller_turn_processed`);
     heardCallerUtterance = true;
+    postGreetingNudge.noteCallerTurn();
     if (!firstForward.firstCallerTurn) {
       firstForward.firstCallerTurn = text;
       firstForward.hasStt = true;
@@ -5051,8 +5104,23 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   function onSttEvent(evt) {
+    if (evt.type === 'close') {
+      voiceTrace.noteCall({
+        stage: 'stt_lifecycle',
+        kind: 'close',
+        code: String(evt.text || ''),
+        binaryFrames,
+        at: new Date().toISOString(),
+      });
+    }
     if (evt.type === 'error') {
       const classified = evt.classified || classifySonioxError(evt.raw);
+      voiceTrace.noteCall({
+        stage: 'stt_lifecycle',
+        kind: 'error',
+        code: String(classified?.code || '').slice(0, 40),
+        at: new Date().toISOString(),
+      });
       if (classified.billing || classified.fatal) {
         handleSpeechProviderOutage(
           `stt ${classified.code || classified.message}`
@@ -5081,6 +5149,8 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       const isInterim = !evt.isFinal;
+      // Caller words restart the post-greeting silence window (never fires mid-speech).
+      if (!looksLikeEcho(text)) postGreetingNudge.noteCallerSpeech();
 
       // Any caller words keep a held unfinished turn waiting for its final,
       // even one short word the idle rules ignore (HD_015bae4a4af2 answered
@@ -5327,6 +5397,10 @@ mediaWss.on('connection', (ws, req) => {
       : Promise.resolve(null);
 
   if (isSonioxConfigured()) {
+    const sttStartAt = Date.now();
+    // STT lifecycle on the call trace (always on, a few small stages per
+    // call): a start failure used to be one log line and nothing else.
+    voiceTrace.noteCall({ stage: 'stt_lifecycle', kind: 'start', at: new Date(sttStartAt).toISOString() });
     try {
       stt = createSonioxSttSession({
         callSid: sidLabel(),
@@ -5337,12 +5411,35 @@ mediaWss.on('connection', (ws, req) => {
           .then((ctx) => ctx || buildSttContext(sttTenantSnapshot))
           .catch(() => null),
       });
-      stt.ready.catch((err) => {
-        console.error(`[ws/media] Soniox STT failed to start:`, err?.message || err);
-        stt = null;
-      });
+      stt.ready
+        .then(() => {
+          voiceTrace.noteCall({
+            stage: 'stt_lifecycle',
+            kind: 'ready',
+            ms: Date.now() - sttStartAt,
+            at: new Date().toISOString(),
+          });
+        })
+        .catch((err) => {
+          console.error(`[ws/media] Soniox STT failed to start:`, err?.message || err);
+          voiceTrace.noteCall({
+            stage: 'stt_lifecycle',
+            kind: 'failed',
+            ms: Date.now() - sttStartAt,
+            error: String(err?.message || err || '').slice(0, 120),
+            at: new Date().toISOString(),
+          });
+          stt = null;
+        });
     } catch (err) {
       console.error(`[ws/media] Soniox STT init error:`, err?.message || err);
+      voiceTrace.noteCall({
+        stage: 'stt_lifecycle',
+        kind: 'failed',
+        ms: Date.now() - sttStartAt,
+        error: String(err?.message || err || '').slice(0, 120),
+        at: new Date().toISOString(),
+      });
       stt = null;
     }
   } else {
@@ -5526,6 +5623,9 @@ mediaWss.on('connection', (ws, req) => {
           .catch(() => {});
       }
       greetingSettled = true;
+      if (postGreetingNudgeOn && !speechOutageStarted && !heardCallerUtterance) {
+        postGreetingNudge.greetingDone();
+      }
     } catch (err) {
       greetingSettled = true;
       console.error(`[ws/media][${sidLabel()}] greeting failed:`, err?.message || err);
@@ -5682,6 +5782,7 @@ mediaWss.on('connection', (ws, req) => {
     clearFillerTimer();
     speakCommit.clear();
     idleNudge.close();
+    postGreetingNudge.close();
     unfinishedHold.close();
     if (utteranceTimer) {
       clearTimeout(utteranceTimer);

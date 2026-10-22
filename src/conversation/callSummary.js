@@ -42,6 +42,43 @@ function safeGoalDescription(raw) {
  *   transcriptLines?: string[],
  * }} opts
  */
+function silentCallSummaryEnabled(env = process.env) {
+  return String(env.VOICE_SILENT_CALL_SUMMARY || '').trim() === 'on';
+}
+
+// Below this, a call with no caller words ended during or right after the
+// greeting (prod greetings run about 7-10 s; Esga 19 Oct hung up at 7-11 s).
+const GREETING_HANGUP_MAX_S = 15;
+
+/**
+ * VOICE_SILENT_CALL_SUMMARY (off by default; only 'on'). A factual line for a
+ * call where no caller speech became a turn, instead of 'Call completed.'.
+ * Needs the spoken turns: unknown turns keep the old fallback.
+ * @param {{ spokenTurns?: Array<{speaker?: string, text?: string}>|null, durationSeconds?: number|null, enabled?: boolean }} opts
+ * @returns {string} '' when not a silent call (or the flag is off)
+ */
+function silentCallSummaryText(opts = {}) {
+  const enabled = opts.silentSummary != null ? opts.silentSummary === true : silentCallSummaryEnabled();
+  if (!enabled) return '';
+  const turns = Array.isArray(opts.spokenTurns) ? opts.spokenTurns : null;
+  if (!turns) return '';
+  if (turns.some((t) => t && t.speaker === 'caller' && clean(t.text))) return '';
+  const greeted = turns.some((t) => t && t.speaker === 'agent' && clean(t.text));
+  const secs = Number(opts.durationSeconds);
+  const known = Number.isFinite(secs) && secs >= 0;
+  if (!greeted) {
+    return known
+      ? `Caller hung up during the greeting (${Math.round(secs)}s).`
+      : 'Caller hung up during the greeting.';
+  }
+  if (known && secs < GREETING_HANGUP_MAX_S) {
+    return `Caller hung up during or just after the greeting (${Math.round(secs)}s). No caller speech.`;
+  }
+  return known
+    ? `No caller speech after the greeting (${Math.round(secs)}s on the line).`
+    : 'No caller speech after the greeting.';
+}
+
 function deriveCallSummary(opts = {}) {
   const state = opts.brainState || {};
   const results = hangupResults(state, opts.toolResults);
@@ -127,6 +164,7 @@ function deriveCallSummary(opts = {}) {
         : '',
       240
     ) ||
+    silentCallSummaryText(opts) ||
     'Call completed.';
 
   return {
@@ -198,5 +236,7 @@ function buildOwnerReason({ callerName, primaryIntent, goal, products, results }
 }
 
 module.exports = {
+  silentCallSummaryText,
+  silentCallSummaryEnabled,
   deriveCallSummary,
 };
