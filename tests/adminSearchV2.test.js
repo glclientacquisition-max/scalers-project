@@ -61,3 +61,14 @@ test("v2 search is gated, read-only and behind ADMIN_V2", () => {
   assert.doesNotMatch(ui, /method:\s*"(POST|PUT|PATCH|DELETE)"/);
   assert.doesNotMatch(read("dashboard/src/lib/ops/searchView.ts"), /sautikit/i);
 });
+
+test("call id search uses a uuid range, never ILIKE on uuid", async () => {
+  const src = read("dashboard/src/lib/adminCommandSearch.ts");
+  assert.ok(!/from\("calls"\)[^\n]*ilike\("id"/.test(src), "calls.id is uuid; ilike fails with 42883");
+  const { callIdRange } = await load();
+  assert.deepEqual(callIdRange("8F2C"), { lo: "8f2c0000-0000-0000-0000-000000000000", hi: "8f2cffff-ffff-ffff-ffff-ffffffffffff" });
+  assert.equal(callIdRange("acme"), null);
+  assert.equal(callIdRange("abc"), null);
+  const full = "8f2c1a2b-0000-4000-8000-0123456789ab";
+  assert.deepEqual(callIdRange(full), { lo: full, hi: full });
+});
