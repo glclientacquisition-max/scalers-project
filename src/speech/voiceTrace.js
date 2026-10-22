@@ -245,6 +245,29 @@ function streamStats(stream) {
   };
 }
 
+function unturnedSttStage(buffer) {
+  const rows = Array.isArray(buffer) ? buffer : [];
+  if (!rows.length) return null;
+  const events = rows.slice(-STT_BUFFER_CAP).map((row) => {
+    const first = Array.isArray(row.tokens) && row.tokens.length ? row.tokens[0] : null;
+    const out = { stage: row.stage, at: row.at || null };
+    if (row.kind) out.kind = row.kind;
+    if (row.text) out.text = row.text;
+    if (row.reason) out.reason = row.reason;
+    if (row.decision) out.decision = row.decision;
+    if (first && first.startMs != null) out.startMs = first.startMs;
+    if (first && first.language) out.language = first.language;
+    return out;
+  });
+  return {
+    stage: 'stt_unturned',
+    count: rows.length,
+    finals: rows.filter((row) => row.stage === 'stt' && row.kind === 'final').length,
+    interims: rows.filter((row) => row.stage === 'stt' && row.kind === 'interim').length,
+    events,
+  };
+}
+
 function createVoiceTrace(opts = {}) {
   const enabled = opts.enabled != null ? Boolean(opts.enabled) : voiceTraceEnabled(opts.env);
   if (!enabled) return noopTrace();
@@ -591,6 +614,12 @@ function createVoiceTrace(opts = {}) {
       }
     }
     if (pendingWrites.size) await Promise.all([...pendingWrites]);
+    // STT events that never opened a turn (dead-air calls: the caller spoke
+    // but nothing was processed) used to vanish here. Keep a bounded,
+    // already-redacted copy on the call record (always on; at most
+    // STT_BUFFER_CAP rows, token detail dropped).
+    const unturned = unturnedSttStage(sttBuffer);
+    if (unturned) callStages.push(unturned);
     const record = {
       schema: CALL_SCHEMA,
       schemaVersion: SCHEMA_VERSION,
@@ -696,6 +725,7 @@ async function readStoredTurns(callId, opts = {}) {
 }
 
 module.exports = {
+  unturnedSttStage,
   SCHEMA,
   CALL_SCHEMA,
   SCHEMA_VERSION,

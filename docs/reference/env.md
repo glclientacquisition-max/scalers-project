@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-192 variables.
+193 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -160,6 +160,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `TTS_LEXICON_OVERRIDES` | voice | `src/speech/pronunciationLexicon.js` |
 | `VERCEL_ENV` | desk | `dashboard/src/lib/opsAlerts.ts`<br>`dashboard/src/lib/platformOps.ts` |
 | `VERCEL_TOKEN` | scripts | `scripts/stage-desk-alias.js` |
+| `VOICE_AFTER_HOURS_INVITE_FIRST` | voice | `src/conversation/businessAssistantIntro.js` |
 | `VOICE_AREA_FEES` | voice | `src/conversation/areaTerms.js`<br>`src/conversation/numberWords.js` |
 | `VOICE_BARGE_EARLY_MS` | voice | `src/speech/turnTaking.js` |
 | `VOICE_BARGE_GRACE_MS` | voice | `src/speech/turnTaking.js` |

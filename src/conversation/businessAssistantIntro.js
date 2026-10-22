@@ -248,6 +248,11 @@ function languageInviteClause(opts = {}) {
   return wantsLanguageInvite(opts) ? `${LANGUAGE_INVITE} ` : '';
 }
 
+function afterHoursInviteFirst(opts = {}) {
+  if (opts.afterHoursInviteFirst != null) return opts.afterHoursInviteFirst === true;
+  return String(process.env.VOICE_AFTER_HOURS_INVITE_FIRST || '').trim() === 'on';
+}
+
 function composeBusinessAssistantIntro(opts = {}) {
   const afterHoursMode =
     String(opts.afterHoursMode || 'serve').trim().toLowerCase() === 'message'
@@ -279,6 +284,11 @@ function composeBusinessAssistantIntro(opts = {}) {
   }
 
   if (closed) {
+    // VOICE_AFTER_HOURS_INVITE_FIRST: a shop that serves after hours opens
+    // like an open shop, so the caller hears the invite, not "closed", and
+    // the opener stays short. Brain's status block still knows the shop is
+    // closed and gives hours when asked. Off: today's line.
+    if (afterHoursInviteFirst(opts)) return `${identity} ${invite}${help}`;
     return `${identity} ${invite}We're closed now. ${help}`;
   }
 
@@ -365,6 +375,7 @@ module.exports = {
   summarizeOfferingForIntro,
   composeOpenerIdentity,
   composeBusinessAssistantIntro,
+  afterHoursInviteFirst,
   spokenShopLabel,
   greetingHelpLine,
   clipGreetingField,
