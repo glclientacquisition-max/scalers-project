@@ -11,12 +11,13 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-193 variables.
+194 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
 | `ADMIN_ACCESS_CODE` | desk | `dashboard/src/lib/admin-auth.ts` |
 | `ADMIN_ENV` | desk | `dashboard/src/app/admin/(console)/%5Fkit/page.tsx` |
+| `ADMIN_V2` | desk | `dashboard/src/app/admin/(console)/layout.tsx` |
 | `AGENT_NAME` | voice | `server.js`<br>`src/db.js`<br>`src/prompts.js`<br>+1 more |
 | `ALERT_EMAIL_FROM` | voice | `server.js`<br>`src/notifications/email.js` |
 | `BACHS_API_KEY` | desk | `dashboard/src/lib/adminPayRead.ts`<br>`dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/provider.js` |
