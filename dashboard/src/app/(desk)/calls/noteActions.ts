@@ -21,7 +21,7 @@ import {
 import { parseNotifyChannels } from "@/lib/notifyChannels";
 import { sendRecordedDeskCallerSms } from "@/lib/sendLedger";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
-import { parseSummary } from "@/lib/supabase";
+import { recordCallerReply } from "@/lib/callerReplyRecord";
 
 export type PolishCallerNoteState = {
   error?: string;
@@ -193,29 +193,16 @@ async function sendOwnerCallerSms(
   }
 
   if (callId) {
-    const { data: row } = await workspace.client
-      .from("calls")
-      .select("summary")
-      .eq("id", callId)
-      .eq("tenant_id", tenant.id)
-      .maybeSingle();
-    const raw = row?.summary as unknown;
-    const meta =
-      raw && typeof raw === "object" && !Array.isArray(raw)
-        ? (raw as Record<string, unknown>)
-        : parseSummary(typeof raw === "string" ? raw : null);
-    const next = {
-      ...meta,
-      caller_reply_body: body,
-      caller_reply_at: new Date().toISOString(),
-    };
-    const { error: sumErr } = await workspace.client
-      .from("calls")
-      .update({ summary: JSON.stringify(next) })
-      .eq("id", callId)
-      .eq("tenant_id", tenant.id);
-    if (sumErr) {
-      console.warn("[caller note summary]", sumErr.message);
+    // One UPDATE in the database (calls_record_caller_reply); the SMS above
+    // already went out, so a failed stamp only warns.
+    const stamp = await recordCallerReply({
+      client: workspace.client,
+      tenantId: tenant.id,
+      callId,
+      body,
+    });
+    if (stamp.error) {
+      console.warn("[caller note summary]", stamp.error.message);
     }
     revalidatePath(`/calls/${callId}`);
   }
