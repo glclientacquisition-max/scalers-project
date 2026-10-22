@@ -41,6 +41,13 @@ describe("ops status contrast", () => {
       }
     });
   }
+  it("ops-field: 44px tall, border 3:1 on surface in both themes", () => {
+    assert.match(block(ops, ".ops-field {"), /min-height:\s*44px/);
+    for (const [name, , base] of themes) {
+      const r = ratio(token(base, "ink-3"), token(base, "surface"));
+      assert.ok(r >= 3, `${name} field border is ${r.toFixed(2)}:1`);
+    }
+  });
   it("system-dark block matches the explicit dark block", () => {
     const sys = block(ops, ':root:not([data-theme="light"]) .ops-theme');
     for (const t of TONES) for (const k of ["fg", "bg"]) {

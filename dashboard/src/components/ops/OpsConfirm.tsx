@@ -46,7 +46,7 @@ export function OpsConfirm({
         </>
       }
     >
-      <div className="flex flex-col gap-ops-3 text-ops-body text-ink-2">
+      <div className="ops-theme flex flex-col gap-3 text-ops-body text-ink-2">
         <div>{children}</div>
         {strength === "money" && amount !== undefined ? (
           <div className="flex items-center justify-between rounded-sm bg-surface-2 px-ops-3 py-ops-2">
@@ -57,13 +57,13 @@ export function OpsConfirm({
         {strength === "money" ? (
           <label className="flex flex-col gap-1">
             <span className="text-ops-label text-ink">Reason</span>
-            <input value={reason} onChange={(e) => setReason(e.target.value)} className="h-ops-touch rounded-sm border border-hairline bg-surface px-ops-3 text-ops-body text-ink md:h-ops-row" />
+            <input value={reason} onChange={(e) => setReason(e.target.value)} className="ops-field text-ink" />
           </label>
         ) : null}
         {strength === "destructive" && typeToConfirm ? (
           <label className="flex flex-col gap-1">
             <span className="text-ops-label text-ink">Type {typeToConfirm} to confirm</span>
-            <input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" className="h-ops-touch rounded-sm border border-hairline bg-surface px-ops-3 text-ops-body text-ink md:h-ops-row" />
+            <input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" className="ops-field text-ink" />
           </label>
         ) : null}
       </div>
