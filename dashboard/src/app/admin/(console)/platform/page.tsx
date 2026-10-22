@@ -1,29 +1,12 @@
-import { AdminOpsNotices, AdminPlatformOpsForm } from "@/components/AdminPlatformOpsForm";
-import { AdminSetupError } from "@/components/AdminSetupError";
-import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { PlatformRunBoard } from "@/components/PlatformRunBoard";
-import { logAdminError } from "@/lib/adminErrors";
-import { readPlatformOps } from "@/lib/platformOps";
 import { requireSuperAdmin } from "@/lib/adminGuard";
+import { redirect } from "next/navigation";
+import { ServicesScreen } from "../_screens/ServicesScreen";
 
 export const instant = false;
 
-export default async function AdminPlatformPage() {
+/** ADMIN_V2: lives at /admin/settings/services. Old shell: unchanged. */
+export default async function Page() {
   await requireSuperAdmin();
-  let snapshot;
-  try {
-    snapshot = await readPlatformOps();
-  } catch (err) {
-    logAdminError("platform", err);
-    return <AdminSetupError />;
-  }
-
-  return (
-    <div className="space-y-4">
-      <AdminPageHeader title="Platform" subtitle="Health, open notices, and who to alert." />
-      <AdminOpsNotices notices={snapshot.notices.filter((notice) => notice.status === "open")} />
-      <PlatformRunBoard />
-      <AdminPlatformOpsForm settings={snapshot.settings} persisted={snapshot.persisted} />
-    </div>
-  );
+  if (process.env.ADMIN_V2 === "on") redirect("/admin/settings/services");
+  return <ServicesScreen />;
 }

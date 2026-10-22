@@ -11,6 +11,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import {
   ADMIN_LINKS,
+  ADMIN_LINKS_V2,
   adminHidesShellBack,
   adminMainClass,
   adminMainV2Class,
@@ -28,6 +29,8 @@ type AdminChrome = {
 };
 
 const AdminChromeContext = createContext<AdminChrome | null>(null);
+/** ADMIN_V2 nav set (six entries). Set by AdminShell. */
+const AdminV2Context = createContext(false);
 
 /**
  * Harness only. Production Admin uses the live path and the real hrefs.
@@ -54,8 +57,10 @@ function useAdminChrome(): AdminChrome {
   return chrome;
 }
 
-function AdminIcon({ name }: { name: string }) {
+function AdminIcon({ name: label }: { name: string }) {
   const cls = "h-5 w-5";
+  // v2 renames reuse the glyph of the screen they replace.
+  const name = label === "Overview" ? "Today" : label === "Settings" ? "Platform" : label;
   if (name === "Platform") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
@@ -325,7 +330,7 @@ export function AdminSideNav() {
         <span className="admin-side-label truncate text-sm font-semibold text-ink">Scalers</span>
       </div>
       <nav aria-label="Super Admin" className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
-        {ADMIN_LINKS.map((item) =>
+        {ADMIN_LINKS_V2.map((item) =>
           item.pending ? (
             <span key={item.href} aria-disabled="true" title={item.pending} className="flex h-9 items-center gap-3 rounded-md px-2 text-sm text-ink-3">
               <AdminIcon name={item.label} />
@@ -381,7 +386,8 @@ const phoneLabelClass = "max-w-full truncate text-center text-caption leading-no
 function AdminPhoneMore() {
   const { path, href: mapHref } = useAdminChrome();
   const [open, setOpen] = useState(false);
-  const more = adminPhoneMore();
+  const v2 = useContext(AdminV2Context);
+  const more = adminPhoneMore(v2);
   const active = more.some((item) => !item.pending && adminRouteActive(path, item.href, item.exact));
 
   return (
@@ -460,7 +466,7 @@ export function AdminTabBar() {
       className="glass-chrome fixed inset-x-0 bottom-0 z-tabbar isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-hidden border-t border-hairline/80 pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       <ul className="flex w-full">
-        {adminPhoneTabs().map((item) => (
+        {adminPhoneTabs(useContext(AdminV2Context)).map((item) => (
           <li key={item.href} className="min-w-0 flex-1">
             <AdminDestinationLink
               href={item.href}
@@ -487,7 +493,7 @@ export function AdminTabBar() {
 /** One control back to the parent admin list. The destination name is the accessible label. */
 export function AdminNestedBack() {
   const { path, href } = useAdminChrome();
-  const parent = adminParentTarget(path);
+  const parent = adminParentTarget(path, useContext(AdminV2Context));
   if (!parent || adminHidesShellBack(path)) return null;
 
   return (
@@ -508,10 +514,11 @@ export function AdminShell({
   v2?: boolean;
 }) {
   const { path } = useAdminChrome();
-  const nested = Boolean(adminParentTarget(path));
+  const nested = Boolean(adminParentTarget(path, v2));
 
   if (v2) {
     return (
+      <AdminV2Context.Provider value>
       <div data-admin-shell="" data-admin-v2="" data-admin-nested={nested ? "" : undefined} className={adminShellClass}>
         <AdminSideNav />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -523,6 +530,7 @@ export function AdminShell({
           <AdminTabBar />
         </div>
       </div>
+      </AdminV2Context.Provider>
     );
   }
 

@@ -43,8 +43,8 @@ describe("Super Admin Today: reads only", () => {
     assert.doesNotMatch(fnBody(admin, "listBusinesses"), WRITES);
     // Platform reads. The cron owns opening, claiming, and mailing notices.
     assert.doesNotMatch(fnBody(ops, "evaluatePlatformOps"), /persistOpen|mailKinds|sendOpsMail/);
-    assert.match(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /readPlatformOps/);
-    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /evaluatePlatformOps/);
+    assert.match(read("dashboard/src/app/admin/(console)/_screens/ServicesScreen.tsx"), /readPlatformOps/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/_screens/ServicesScreen.tsx"), /evaluatePlatformOps/);
     assert.match(read("dashboard/src/app/api/cron/ops-alerts/route.ts"), /cronAuthorized/);
     assert.match(read("dashboard/src/lib/opsAlerts.ts"), /claimNotified/);
     assert.doesNotMatch(read("dashboard/src/lib/textSmsBalance.ts"), /healthz/);

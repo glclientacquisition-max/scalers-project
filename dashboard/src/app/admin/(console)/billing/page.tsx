@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminBillingListPanel } from "@/components/AdminBillingListPanel";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
@@ -10,6 +11,8 @@ export const instant = false;
 
 export default async function AdminBillingPage() {
   await requireSuperAdmin();
+  // ADMIN_V2: Billing opens on Invoices; this list's views move to Overview and Invoices.
+  if (process.env.ADMIN_V2 === "on") redirect("/admin/billing/invoices");
   let overview;
   let attention;
   try {

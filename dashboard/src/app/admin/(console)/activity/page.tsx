@@ -1,34 +1,21 @@
-import { AdminActivityPanel } from "@/components/AdminActivityPanel";
-import { DeskLoadError } from "@/components/ui/DeskLoadError";
-import { ACTIVITY_LIMIT, loadAdminActivity } from "@/lib/adminActivity";
-import { activityItem, parseActivityFilters } from "@/lib/adminActivityModel";
-import { logAdminError } from "@/lib/adminErrors";
 import { requireSuperAdmin } from "@/lib/adminGuard";
+import { redirect } from "next/navigation";
+import { AuditScreen } from "../_screens/AuditScreen";
 
 export const instant = false;
 
-export default async function AdminActivityPage({
+/** ADMIN_V2: lives at /admin/settings/audit. Old shell: unchanged. */
+export default async function Page({
   searchParams,
 }: {
   searchParams: Promise<{ business?: string; actor?: string }>;
 }) {
   await requireSuperAdmin();
-  const filters = parseActivityFilters(await searchParams);
-  try {
-    const { rows, businesses, actors } = await loadAdminActivity(filters);
-    const names = new Map(businesses.map((b) => [b.id, b.name]));
-    return (
-      <AdminActivityPanel
-        items={rows.map((row) => activityItem(row, names))}
-        businesses={businesses}
-        actors={actors}
-        business={filters.business}
-        actor={filters.actor}
-        limit={ACTIVITY_LIMIT}
-      />
-    );
-  } catch (err) {
-    logAdminError("activity", err);
-    return <DeskLoadError>Could not load activity.</DeskLoadError>;
-  }
+  if (process.env.ADMIN_V2 === "on") redirect(`/admin/settings/audit${await qs(searchParams)}`);
+  return <AuditScreen searchParams={searchParams} />;
+}
+
+async function qs(sp: Promise<Record<string, string | undefined>>) {
+  const p = new URLSearchParams(Object.entries(await sp).filter((e): e is [string, string] => Boolean(e[1])));
+  return p.size ? `?${p}` : "";
 }

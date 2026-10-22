@@ -1,26 +1,12 @@
-import { AdminSetupError } from "@/components/AdminSetupError";
-import { AdminVoicesManager } from "@/components/AdminVoicesManager";
-import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { logAdminError } from "@/lib/adminErrors";
-import { listPlatformSonioxVoicesAdmin } from "@/lib/sonioxVoiceCatalog";
 import { requireSuperAdmin } from "@/lib/adminGuard";
+import { redirect } from "next/navigation";
+import { VoicesScreen } from "../_screens/VoicesScreen";
 
 export const instant = false;
 
-export default async function AdminVoicesPage() {
+/** ADMIN_V2: lives at /admin/settings/voices. Old shell: unchanged. */
+export default async function Page() {
   await requireSuperAdmin();
-  let voices;
-  try {
-    voices = await listPlatformSonioxVoicesAdmin();
-  } catch (err) {
-    logAdminError("voices", err);
-    return <AdminSetupError />;
-  }
-
-  return (
-    <div className="space-y-4">
-      <AdminPageHeader title="Voices" subtitle="What the desk hears." />
-      <AdminVoicesManager initialVoices={voices} />
-    </div>
-  );
+  if (process.env.ADMIN_V2 === "on") redirect("/admin/settings/voices");
+  return <VoicesScreen />;
 }
