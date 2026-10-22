@@ -4,11 +4,23 @@ import { DidPoolManager } from "@/components/DidPoolManager";
 import { logAdminError } from "@/lib/adminErrors";
 import { listDidPool, listPendingTenants } from "@/lib/didPool";
 import { requireSuperAdmin } from "@/lib/adminGuard";
+import { DeskLoadError } from "@/components/ui/DeskLoadError";
+import { AdminNumbersV2 } from "@/components/admin/v2/AdminNumbersV2";
+import { loadNumbersV2 } from "@/lib/adminNumbersV2Load";
 
 export const instant = false;
 
 export default async function AdminNumbersPage() {
   await requireSuperAdmin();
+  if (process.env.ADMIN_V2 === "on") {
+    try {
+      const { rows, waiting } = await loadNumbersV2();
+      return <AdminNumbersV2 rows={rows} waiting={waiting} nowIso={new Date().toISOString()} />;
+    } catch (err) {
+      logAdminError("numbers-v2", err);
+      return <DeskLoadError backHref="/admin" backLabel="Overview">Numbers could not be loaded.</DeskLoadError>;
+    }
+  }
   let pool;
   let pendingBusinesses;
   try {
