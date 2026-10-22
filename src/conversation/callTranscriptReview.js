@@ -1741,6 +1741,8 @@ function resetTranscriptReviewScheduleForTests() {
 
 module.exports = {
   NAME_EXTRACT_SYSTEM,
+  preferContext,
+  callLanguageFromTurns,
   REVIEW_SYSTEM,
   reviewSystemPrompt,
   callerSpeechChars,
@@ -1763,6 +1765,4 @@ module.exports = {
   recordReviewStatus,
   schedulePostCallTranscriptReview,
   toolFlagsFromBrain,
-  preferContext,
-  callLanguageFromTurns,
 };
