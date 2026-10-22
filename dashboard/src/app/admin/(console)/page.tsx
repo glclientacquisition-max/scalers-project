@@ -17,6 +17,9 @@ import { readPlatformOps } from "@/lib/platformOps";
 import { mergeQueueRows } from "@/lib/platformOpsModel";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { loadOverdueInvoiceTodayRows } from "@/lib/adminBillingInvoices";
+import { AdminAttentionV2 } from "@/components/admin/v2/AdminAttentionV2";
+import { loadOverdueForAttention, loadUsageForAttention } from "@/lib/adminAttentionLoad";
+import { buildAttention, type AttentionKind } from "@/lib/ops/attentionView";
 
 export const instant = false;
 
@@ -49,6 +52,23 @@ export default async function AdminTodayPage() {
     createdAt: b.created_at,
     packageName: b.package_name,
   }));
+  if (process.env.ADMIN_V2 === "on") {
+    const [overdue, usage] = await Promise.all([loadOverdueForAttention(), loadUsageForAttention()]);
+    const unavailable: AttentionKind[] = [];
+    if (!overdue) unavailable.push("overdue");
+    if (!usage) unavailable.push("near-limit");
+    const items = buildAttention({
+      businesses,
+      overdue: overdue || [],
+      usage: (usage || []).map((u) => ({ ...u, packageName: overview.businesses.find((b) => b.id === u.tenantId)?.package_name ?? null })),
+      quality: Object.entries(badges)
+        .filter(([, q]) => q.dropping)
+        .map(([tenantId, q]) => ({ tenantId, score: q.score, reason: q.droppingReason })),
+      now,
+    });
+    return <AdminAttentionV2 items={items} unavailable={unavailable} />;
+  }
+
   const [calling, overdueInvoices] = await Promise.all([
     businessesWithRecentCalls(quietCandidates(businesses, now), now),
     loadOverdueInvoiceTodayRows(),
