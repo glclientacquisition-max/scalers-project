@@ -2,6 +2,7 @@ import { type CallRow } from "@/lib/supabase";
 import { toLead } from "@/lib/callsTriage";
 import type { OwnerFacts } from "@/lib/ownerCallFacts";
 import { storedPhoneCandidates } from "@/lib/handoffMode";
+import { foldInboxRedials } from "@/lib/inboxRedialFold";
 import {
   assembleInboxItems,
   attachContactIds,
@@ -358,7 +359,7 @@ export async function loadInboxItems(
   const openWorkIncomplete = holdsFailed || jobsFailed || openWorkTruncated;
 
   return {
-    items: withPeople,
+    items: foldInboxRedials(withPeople),
     // Tape only. Open holds/visits are fetched separately and must not vanish.
     callsTruncated: (callsRes.data || []).length >= INBOX_WINDOW,
     error: null,
