@@ -17,6 +17,12 @@ test("v2 nav is the six locked entries; phone has four tabs plus More", async ()
   assert.deepEqual(adminPhoneTabs().map((l) => l.label), ["Today", "Businesses", "Quality", "Billing"]);
 });
 
+test("v2 shell chevron stays off outside /admin", async () => {
+  const { adminParentTarget } = await import("../dashboard/src/lib/adminLinks.ts");
+  assert.equal(adminParentTarget("/dev/admin-businesses-v2", true), null);
+  assert.deepEqual(adminParentTarget("/admin/billing/invoices/x", true), { href: "/admin/billing/invoices", label: "Invoices" });
+});
+
 test("redirect map sends old routes to their one home", async () => {
   const { adminV2Redirect } = await load();
   const cases = {

@@ -132,6 +132,7 @@ export function adminParentTarget(pathname: string, v2 = false): { href: string;
   if (path === "/admin") return null;
   // v2: section tabs (Billing, Settings) and panes carry the way back; no shell chevron on a tab.
   if (v2) {
+    if (!path.startsWith("/admin/")) return null;
     if (/^\/admin\/(billing|settings)(\/[^/]+)?$/.test(path) || /^\/admin\/(businesses|numbers|quality)$/.test(path)) return null;
     if (path.startsWith("/admin/billing/invoices/")) return { href: "/admin/billing/invoices", label: "Invoices" };
     const top = ADMIN_LINKS_V2.filter((i) => i.href !== "/admin").find((i) => path.startsWith(`${i.href}/`));
