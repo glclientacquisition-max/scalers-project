@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { EllipsisVerticalIcon } from "@heroicons/react/24/outline";
 import { CallRecording } from "@/components/CallRecording";
 import { CallTranscript } from "@/components/CallTranscript";
+import { CallTextThread } from "@/components/CallTextThread";
+import { useCan } from "@/components/DeskRole";
+import { Segmented } from "@/components/ui/Segmented";
+import type { CallMessage } from "@/lib/callMessages";
+import { textThreadCount, type CallViewTab } from "@/lib/callTextThread";
 import { InboxHoldEditor } from "@/components/InboxHoldEditor";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxJobEditor } from "@/components/InboxJobEditor";
@@ -231,6 +236,9 @@ export function InboxTicketView({
   leadStatus,
   businessName,
   factsSlot = null,
+  texts = null,
+  initialTab = "call",
+  smsAllowance = null,
 }: {
   callId: string;
   backHref: string;
@@ -266,6 +274,15 @@ export function InboxTicketView({
   businessName: string;
   /** "About this call" (typed intent/outcome; owner can correct). */
   factsSlot?: ReactNode;
+  /**
+   * The call's text thread (call_messages). Null where the RPCs are not on the
+   * database: no Call | Texts toggle, the view is the transcript as before.
+   */
+  texts?: { messages: CallMessage[] } | null;
+  /** From ?tab=texts. Ignored without `texts`. */
+  initialTab?: CallViewTab;
+  /** Package SMS for the composer meter. */
+  smsAllowance?: { included: number | null; used: number | null } | null;
 }) {
   const paneRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -282,6 +299,22 @@ export function InboxTicketView({
     threadFreezeRef.current = true;
   }
   const [away, setAway] = useState(false);
+  const [tabPick, setTabPick] = useState<CallViewTab>(initialTab);
+  const tab: CallViewTab = texts ? tabPick : "call";
+  const textCount = texts ? textThreadCount(texts.messages) : 0;
+  const canText = useCan("inbox.act");
+  const selectTab = useCallback((key: string) => {
+    const next: CallViewTab = key === "texts" ? "texts" : "call";
+    setTabPick(next);
+    try {
+      const url = new URL(window.location.href);
+      if (next === "texts") url.searchParams.set("tab", "texts");
+      else url.searchParams.delete("tab");
+      window.history.replaceState(window.history.state, "", url);
+    } catch {
+      /* ignore */
+    }
+  }, []);
   const [summaryW, setSummaryW] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
   const [gripHot, setGripHot] = useState(false);
@@ -388,6 +421,19 @@ export function InboxTicketView({
     el?.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }
 
+  // Texts opens at the latest text; Call goes back to where a call opens.
+  const tabSeenRef = useRef(tab);
+  useLayoutEffect(() => {
+    if (tabSeenRef.current === tab) return;
+    tabSeenRef.current = tab;
+    const el = window.matchMedia("(min-width: 1024px)").matches ? threadRef.current : paneRef.current;
+    if (!el) return;
+    const anchor: ThreadAnchor = tab === "texts" ? "latest" : "start";
+    el.setAttribute("data-thread-stick", anchor);
+    el.scrollTop = anchor === "latest" ? el.scrollHeight : 0;
+    threadPlaceRef.current = { anchor, scrollTop: el.scrollTop };
+  }, [tab]);
+
   useLayoutEffect(() => {
     let writing = false;
 
@@ -485,7 +531,7 @@ export function InboxTicketView({
       mq.removeEventListener("change", onChange);
       window.removeEventListener("resize", onResize);
     };
-  }, [turns.length]);
+  }, [turns.length, tab, textCount]);
 
   return (
     <div
@@ -528,6 +574,19 @@ export function InboxTicketView({
         </p>
       ) : null}
 
+      {texts ? (
+        <div data-call-tabs="phone" className="shrink-0 bg-surface px-4 sm:px-6 lg:hidden">
+          <Segmented
+            label="Call or texts"
+            onSelect={selectTab}
+            items={[
+                { key: "call", label: "Call", active: tab === "call" },
+                { key: "texts", label: "Texts", count: textCount, active: tab === "texts" },
+              ]}
+          />
+        </div>
+      ) : null}
+
       <div
         ref={splitRef}
         data-ticket-split=""
@@ -551,7 +610,11 @@ export function InboxTicketView({
           <aside
             data-ticket-summary=""
             data-pull-scroll=""
-            className="min-w-0 space-y-4 overflow-x-clip px-4 py-4 sm:px-6 lg:min-h-0 lg:overflow-y-auto"
+            className={[
+              "min-w-0 space-y-4 overflow-x-clip px-4 py-4 sm:px-6 lg:min-h-0 lg:overflow-y-auto",
+              // Phone Texts tab: the thread alone (summary lives on Call).
+              tab === "texts" ? "max-lg:hidden" : "",
+            ].join(" ")}
           >
             <InboxPurposeChip purpose={purpose} label={plainOwnerCopy(stamp)} />
             <TicketSummaryFacts want={want} mood={mood} done={done} />
@@ -665,15 +728,39 @@ export function InboxTicketView({
               />
             </div>
           </DeskHint>
-          <section data-ticket-thread="" className="relative min-h-0">
-            <div
-              ref={threadRef}
-              data-pull-scroll=""
-              tabIndex={0}
-              aria-label="Transcript"
-              className="outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand space-y-2.5 px-4 py-4 sm:px-6 lg:absolute lg:inset-0 lg:overflow-y-auto"
-            >
-              <CallTranscript turns={turns} mode="thread" callStartedAt={lastContactAt} />
+          <section data-ticket-thread="" className="relative min-h-0 lg:flex lg:flex-col">
+            {texts ? (
+              <div data-call-tabs="desktop" className="hidden shrink-0 bg-surface px-6 lg:block">
+                <Segmented
+                  label="Call or texts"
+                  onSelect={selectTab}
+                  items={[
+                    { key: "call", label: "Call", active: tab === "call" },
+                    { key: "texts", label: "Texts", count: textCount, active: tab === "texts" },
+                  ]}
+                />
+              </div>
+            ) : null}
+            <div className="relative min-h-0 lg:flex-1">
+              <div
+                ref={threadRef}
+                data-pull-scroll=""
+                data-call-tab={tab}
+                tabIndex={0}
+                aria-label={tab === "texts" ? "Texts" : "Transcript"}
+                className="outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand space-y-2.5 px-4 py-4 sm:px-6 lg:absolute lg:inset-0 lg:overflow-y-auto"
+              >
+                {tab === "texts" && texts ? (
+                  <CallTextThread
+                    callId={callId}
+                    callerName={callerName}
+                    messages={texts.messages}
+                    canAct={canText && !archived}
+                  />
+                ) : (
+                  <CallTranscript turns={turns} mode="thread" callStartedAt={lastContactAt} />
+                )}
+              </div>
             </div>
           </section>
         </div>
@@ -727,6 +814,9 @@ export function InboxTicketView({
           callId={callId}
           callerPhone={callerPhone}
           facts={smsFacts}
+          smsAllowance={smsAllowance}
+          callerName={callerName}
+          onSent={texts ? () => selectTab("texts") : undefined}
         />
       ) : null}
     </div>

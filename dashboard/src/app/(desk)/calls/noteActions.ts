@@ -22,6 +22,7 @@ import { parseNotifyChannels } from "@/lib/notifyChannels";
 import { sendRecordedDeskCallerSms } from "@/lib/sendLedger";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { recordCallerReply } from "@/lib/callerReplyRecord";
+import { deskSmsSendError } from "@/lib/deskSmsError";
 
 export type PolishCallerNoteState = {
   error?: string;
@@ -148,7 +149,15 @@ export type SendCallerNoteState = {
   error?: string;
   ok?: boolean;
   token?: number;
+  /** The send was tried (it may be on the call's text thread as failed). */
+  attempted?: boolean;
 };
+
+/** Line paused or closed text wins; else the owner copy for the reason. */
+function ownerSmsFailure(sent: { reason?: string; message?: string }): { error: string } {
+  if (sent.message) return { error: sent.message };
+  return { error: deskSmsSendError(sent) };
+}
 
 async function sendOwnerCallerSms(
   formData: FormData,
@@ -183,13 +192,9 @@ async function sendOwnerCallerSms(
     version: keyParts.version || null,
   });
   if (!sent.ok) {
-    if (sent.message) return { error: sent.message };
-    if (sent.reason === "sms_not_configured") return { error: "Text is unavailable." };
-    if (sent.reason === "sms_allowance_exhausted") {
-      return { error: "Included SMS used. Enable on-demand on Wallet." };
-    }
-    if (sent.reason === "instance_already_sent") return { error: "Already sent." };
-    return { error: "SMS failed." };
+    // A failed send can still be on the thread (Not delivered, Retry): refresh it.
+    if (callId) revalidatePath(`/calls/${callId}`);
+    return { ...ownerSmsFailure(sent), attempted: true, token: Date.now() };
   }
 
   if (callId) {
@@ -208,7 +213,7 @@ async function sendOwnerCallerSms(
   }
 
   revalidatePath("/calls");
-  return { ok: true, token: Date.now() };
+  return { ok: true, attempted: true, token: Date.now() };
 }
 
 export async function sendCallerNoteAction(

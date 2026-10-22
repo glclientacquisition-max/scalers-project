@@ -39,6 +39,9 @@ export type InboxBulkCallerText = {
   to: string;
   body: string;
   callId: string | null;
+  /** Thread link (call_messages): the visit or hold this text is about. */
+  appointmentId?: string | null;
+  requestId?: string | null;
 };
 
 /**
@@ -65,6 +68,7 @@ export function inboxBulkCallerTexts(opts: {
         kind,
         to,
         callId,
+        appointmentId: row.id ? String(row.id) : null,
         body: renderDeskCallerText({
           kind,
           businessName: opts.tenant.business_name,
@@ -81,6 +85,7 @@ export function inboxBulkCallerTexts(opts: {
         kind,
         to,
         callId,
+        requestId: row.id ? String(row.id) : null,
         body: renderDeskCallerText({
           kind,
           businessName: opts.tenant.business_name,
