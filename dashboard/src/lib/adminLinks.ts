@@ -60,6 +60,7 @@ export const ADMIN_BILLING_TABS: readonly AdminTab[] = [
 
 /** Settings → tabs (ADMIN_V2). Alerts, retention, payment switches and operators arrive with the hub slice. */
 export const ADMIN_SETTINGS_TABS: readonly AdminTab[] = [
+  { href: "/admin/settings/general", label: "General" },
   { href: "/admin/settings/services", label: "Services" },
   { href: "/admin/settings/voices", label: "Voices" },
   { href: "/admin/settings/audit", label: "Audit log" },
@@ -76,7 +77,7 @@ export function adminV2Redirect(pathname: string): string | null {
   if (path === "/admin/platform") return "/admin/settings/services";
   if (path === "/admin/voices") return "/admin/settings/voices";
   if (path === "/admin/activity") return "/admin/settings/audit";
-  if (path === "/admin/settings") return "/admin/settings/services";
+  if (path === "/admin/settings") return "/admin/settings/general";
   const biz = /^\/admin\/businesses\/([^/]+)$/.exec(path);
   if (biz) return `/admin/businesses?pane=${encodeURIComponent(decodeURIComponent(biz[1]))}`;
   const bill = /^\/admin\/billing\/([^/]+)$/.exec(path);
