@@ -1,13 +1,14 @@
 /**
  * Needs attention (ADMIN_V2): pure shaping. No data access, no `@/` imports, so tests load it directly.
  * Four reasons, each from a real record: an open invoice past due, a business waiting for a number,
- * package minutes at or above NEAR_LIMIT of the period, and call quality marked dropping by the trace rollup.
+ * package minutes at or above NEAR_LIMIT of the period, call quality marked dropping by the trace rollup, and
+ * missed demand (price or buying questions missed in 7 days; counts only, from call insights).
  */
 
 export const NEAR_LIMIT = 0.8;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export type AttentionKind = "overdue" | "no-number" | "near-limit" | "quality";
+export type AttentionKind = "overdue" | "no-number" | "near-limit" | "quality" | "missed-demand";
 
 export const ATTENTION_VIEWS: { id: "all" | AttentionKind; label: string }[] = [
   { id: "all", label: "All" },
@@ -15,6 +16,7 @@ export const ATTENTION_VIEWS: { id: "all" | AttentionKind; label: string }[] = [
   { id: "no-number", label: "No number" },
   { id: "near-limit", label: "Near package limit" },
   { id: "quality", label: "Quality dropping" },
+  { id: "missed-demand", label: "Missed demand" },
 ];
 
 export type AttentionItem = {
@@ -38,14 +40,17 @@ export type OverdueInput = { id: string; tenantId: string; number: string; owedC
 export type UsageInput = { tenantId: string; includedMinutes: number; usedSeconds: number; packageName: string | null };
 export type BusinessInput = { id: string; name: string; status: string; createdAt: string };
 export type QualityInput = { tenantId: string; score: number | null; reason: string };
+/** From insightsView.missedDemand: counts only, 7 days. */
+export type MissedInput = { tenantId: string; missed: number; demand: number; price: number };
 
-const KIND_ORDER: AttentionKind[] = ["overdue", "no-number", "near-limit", "quality"];
+const KIND_ORDER: AttentionKind[] = ["overdue", "no-number", "near-limit", "quality", "missed-demand"];
 
 export const KIND_LABEL: Record<AttentionKind, string> = {
   overdue: "Overdue",
   "no-number": "No number",
   "near-limit": "Near limit",
   quality: "Quality",
+  "missed-demand": "Missed demand",
 };
 
 export function daysBetween(fromIso: string, now: Date): number {
@@ -71,6 +76,7 @@ export function buildAttention(input: {
   overdue: OverdueInput[];
   usage: UsageInput[];
   quality: QualityInput[];
+  missed?: MissedInput[];
   now: Date;
 }): AttentionItem[] {
   const { now } = input;
@@ -157,13 +163,35 @@ export function buildAttention(input: {
     });
   }
 
+  for (const m of input.missed || []) {
+    const b = live(m.tenantId);
+    if (!b || !(m.demand > 0)) continue;
+    const pct = Math.round((m.missed / m.demand) * 100);
+    const what = m.price >= m.missed - m.price ? "price questions" : "price or buying questions";
+    items.push({
+      key: `missed-demand-${b.id}`,
+      kind: "missed-demand",
+      businessId: b.id,
+      businessName: b.name,
+      detail: `${m.missed} ${what} missed this week · ${pct}%`,
+      since: null,
+      href: `/admin/quality/insights?business=${b.id}&days=7`,
+      weight: m.missed,
+      facts: [
+        { label: "Missed", value: `${m.missed} of ${m.demand}` },
+        { label: "Share", value: `${pct}%` },
+        { label: "Means", value: "Unanswered, lost, or callback promised" },
+      ],
+    });
+  }
+
   return items.toSorted(
     (a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || b.weight - a.weight || a.businessName.localeCompare(b.businessName),
   );
 }
 
 export function attentionCounts(items: AttentionItem[]): Record<"all" | AttentionKind, number> {
-  const out = { all: items.length, overdue: 0, "no-number": 0, "near-limit": 0, quality: 0 };
+  const out = { all: items.length, overdue: 0, "no-number": 0, "near-limit": 0, quality: 0, "missed-demand": 0 };
   for (const i of items) out[i.kind] += 1;
   return out;
 }

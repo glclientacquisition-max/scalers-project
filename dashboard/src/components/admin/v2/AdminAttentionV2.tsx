@@ -22,12 +22,14 @@ const TONE: Record<AttentionKind, "danger" | "warn" | "neutral"> = {
   "no-number": "warn",
   "near-limit": "warn",
   quality: "neutral",
+  "missed-demand": "warn",
 };
 const GO: Record<AttentionKind, string> = {
   overdue: "Open invoice",
   "no-number": "Open business",
   "near-limit": "Open billing",
   quality: "Open quality",
+  "missed-demand": "Open insights",
 };
 
 /** Needs attention (ADMIN_V2). One row per problem, worst first. Read-only. */

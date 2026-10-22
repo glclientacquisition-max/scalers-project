@@ -16,7 +16,7 @@ export default async function AdminQualityPage({
   const range = parseQualityRange((await searchParams).range);
   try {
     const [rows, releases] = await Promise.all([listBusinessQuality(range), listReleaseDeltas()]);
-    return <QualityIndex range={range} rows={rows} releases={releases} />;
+    return <QualityIndex range={range} rows={rows} releases={releases} insights={process.env.ADMIN_V2 === "on"} />;
   } catch (err) {
     logAdminError("quality", err);
     return <DeskLoadError>Could not load quality.</DeskLoadError>;

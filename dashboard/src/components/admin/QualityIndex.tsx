@@ -57,11 +57,14 @@ export function QualityIndex({
   rows,
   releases,
   base = "/admin/quality",
+  insights,
 }: {
   range: QualityRange;
   rows: BusinessQualityRow[];
   releases: ReleaseDelta[];
   base?: string;
+  /** ADMIN_V2: show the Insights tab link. */
+  insights?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const shown = useMemo(() => {
@@ -74,6 +77,12 @@ export function QualityIndex({
     <div className="space-y-8">
       <section>
         <AdminPageHeader title="Quality" subtitle="Traced calls, worst first." />
+        {insights ? (
+          <nav aria-label="Quality views" className="flex gap-4 px-4 pb-2 text-meta">
+            <span aria-current="page" className="text-ink">Calls</span>
+            <Link href="/admin/quality/insights" className="text-ink-2 hover:text-ink">Insights</Link>
+          </nav>
+        ) : null}
         <div className="px-4 pb-2">
           <Input
             id="quality-search"
