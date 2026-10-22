@@ -697,16 +697,6 @@ export function itemIsArchived(item: InboxItem): boolean {
   return countIsArchived(item);
 }
 
-/**
- * Calendar and run sheets (Visits Week / Today, Holds Today, Home "today"):
- * only the call's own archive. inbox_archived_at is an inbox filter, so a
- * visit or hold archived with its call stays on the calendar (as it does
- * for Voice and the caller).
- */
-export function itemCallIsArchived(item: InboxItem): boolean {
-  return item.lead?.leadStatus === "archived";
-}
-
 /** Same set as `countInboxPurposes(items).needs` and the Inbox nav badge. */
 export function itemInNeedsYouPile(item: InboxItem): boolean {
   return itemNeedsYouNow(item);

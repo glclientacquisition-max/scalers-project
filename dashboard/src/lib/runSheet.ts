@@ -1,7 +1,6 @@
 /** Visits List is requested and confirmed. Work is confirmed only. */
 
 import type { InboxItem, InboxJob } from "@/lib/inboxPurpose";
-import { itemCallIsArchived } from "@/lib/inboxPurpose";
 import {
   eatYmd,
   groupVisitsForWeek,
@@ -41,8 +40,12 @@ function slotInstantFromJob(job: InboxJob, now: Date): Date | null {
   );
 }
 
+/**
+ * Calendar and run sheets keep every visit, archived call or not: archive
+ * only tidies the inbox lists and counts.
+ */
 export function visitBoardItems(items: InboxItem[]): InboxItem[] {
-  return (items || []).filter((item) => !itemCallIsArchived(item) && isVisitBoardJob(item.job));
+  return (items || []).filter((item) => isVisitBoardJob(item.job));
 }
 
 export function visitWorkItems(items: InboxItem[]): InboxItem[] {
