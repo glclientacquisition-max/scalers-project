@@ -70,3 +70,10 @@ test("no caller data or question text reaches the page; v2 only; read-only", () 
   assert.match(read("dashboard/src/app/admin/(console)/quality/insights/page.tsx"), /ADMIN_V2 !== "on"\) notFound\(\)/);
   assert.doesNotMatch(ui, /framer-motion|rounded-(xl|2xl|3xl)/);
 });
+
+test("loading mirrors the page: 4- and 5-column tables and the pane", () => {
+  const s = read("dashboard/src/components/admin/v2/InsightsSkeleton.tsx");
+  assert.match(s, /<SkelTable rows=\{9\} cols=\{\[(\{[^}]*\}, ){3}\{[^}]*\}\]\}/);
+  assert.match(s, /<SkelTable rows=\{8\} cols=\{\[(\{[^}]*\}, ){4}\{[^}]*\}\]\}/);
+  assert.match(s, /<SkelPane /);
+});
