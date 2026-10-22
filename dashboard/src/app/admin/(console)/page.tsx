@@ -16,11 +16,12 @@ import {
 import { readPlatformOps } from "@/lib/platformOps";
 import { mergeQueueRows } from "@/lib/platformOpsModel";
 import { requireSuperAdmin } from "@/lib/adminGuard";
+import { loadOverdueInvoiceTodayRows } from "@/lib/adminBillingInvoices";
 
 export const instant = false;
 
 /**
- * Today. Reads only: the notice check and alert mail run on Platform, not here.
+ * Today. Reads only. The notice check and alert mail run on the ops cron, not here.
  */
 export default async function AdminTodayPage() {
   await requireSuperAdmin();
@@ -48,7 +49,10 @@ export default async function AdminTodayPage() {
     createdAt: b.created_at,
     packageName: b.package_name,
   }));
-  const calling = await businessesWithRecentCalls(quietCandidates(businesses, now), now);
+  const [calling, overdueInvoices] = await Promise.all([
+    businessesWithRecentCalls(quietCandidates(businesses, now), now),
+    loadOverdueInvoiceTodayRows(),
+  ]);
 
   const noticeRows = mergeQueueRows({
     notices: ops.notices.map((notice) => ({ kind: notice.kind, detail: notice.detail, status: notice.status })),
@@ -60,6 +64,7 @@ export default async function AdminTodayPage() {
       dayLabel={eatDayLabel(now)}
       status={statusSentence(ops.signals)}
       queue={[
+        ...overdueInvoices,
         ...todayQueue({ noticeRows, businesses, callingBusinessIds: calling, now }),
         ...droppingAttentionRows(
           badges,

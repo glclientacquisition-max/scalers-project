@@ -1,0 +1,14 @@
+{
+  "id": "ask_price",
+  "bug": "ask",
+  "profile": "ask",
+  "language": "en",
+  "turns": [
+    {
+      "caller": "How much is window cleaning?",
+      "mustSay": ["I'll check with the team and they'll call you back."],
+      "mustNotSay": ["Ask", "ask"],
+      "status": "not_on_file"
+    }
+  ]
+}

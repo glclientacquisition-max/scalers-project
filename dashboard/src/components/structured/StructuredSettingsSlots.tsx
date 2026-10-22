@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
-import type { DataCheck } from "./DataChecksCard";
+import type { OverviewDataCheck } from "./OverviewDataChecksCard";
 import { BusinessCategoryPicker } from "./BusinessCategoryPicker";
 import { PriceConfirmCards, type PriceToConfirm } from "./PriceConfirmCards";
 import { confirmPriceAction, saveBusinessCategoryAction } from "@/app/(desk)/settings/structuredActions";
 import { needsPriceConfirm, sanitizePricing } from "@/lib/structuredData";
 import { normalizePayments, type Payments } from "@/lib/payments";
+import { parseHoursSchedule, scheduleForForm } from "@/lib/hoursSchedule";
+import type { ReadyChecklistItem } from "@/lib/assistantSayTypes";
+import { reasonNeedsOverviewConfirm } from "@/lib/overviewDataChecks";
 import { AddPricesRow } from "./AddPricesRow";
 import { isUnpricedRow } from "@/lib/catalogPricing";
 import { unpricedLabelText } from "./unpricedCopy";
@@ -63,11 +66,11 @@ export function structuredSettingsSlots({
   const unpriced = unpricedCount(tenant);
   return {
     identity: (
-      <BusinessCategoryPicker businessType={businessType} initial={businessCategory} canEdit={canEdit} save={saveBusinessCategoryAction} />
+      <BusinessCategoryPicker key="business-category" businessType={businessType} initial={businessCategory} canEdit={canEdit} save={saveBusinessCategoryAction} />
     ),
     catalog:
       prices.length || unpriced ? (
-        <div className="space-y-4">
+        <div key="catalog-checks" className="space-y-4">
           {unpriced ? <AddPricesRow count={unpriced} href={UNPRICED_HREF} /> : null}
           {prices.length ? <PriceConfirmCards items={prices} canEdit={canEdit} save={confirmPriceAction} /> : null}
         </div>
@@ -75,14 +78,76 @@ export function structuredSettingsSlots({
   };
 }
 
-/** Overview checks (same rules as the Settings cards). */
-export function dataChecksFor(tenant: { product_catalog?: unknown; services_catalog?: unknown; business_policies?: unknown }): DataCheck[] {
-  const out: DataCheck[] = [];
-  const prices = pricesToConfirm(tenant).length;
-  if (prices) out.push({ href: businessSettingsHref("catalog"), label: `Check ${prices} price${prices === 1 ? "" : "s"}`, detail: "We read them from your notes. Callers hear these." });
+/** Overview checks (import-parsed facts only when save = confirm is on). */
+export function dataChecksFor(
+  tenant: {
+    product_catalog?: unknown;
+    services_catalog?: unknown;
+    business_policies?: unknown;
+    hours_schedule?: unknown;
+    service_areas?: unknown;
+    vertical?: string | null;
+  },
+  opts?: { saveIsConfirm?: boolean; readyItems?: ReadyChecklistItem[] }
+): OverviewDataCheck[] {
+  const out: OverviewDataCheck[] = [];
+  const priceItems = pricesToConfirm(tenant);
+  if (priceItems.length) {
+    const prices = priceItems.length;
+    out.push({
+      kind: "prices",
+      href: businessSettingsHref("catalog"),
+      label: `Check ${prices} price${prices === 1 ? "" : "s"}`,
+      detail: opts?.saveIsConfirm
+        ? "Imported from your notes. Press Save on Catalogue to use it."
+        : "We read them from your notes. Callers hear these.",
+      items: priceItems,
+    });
+  }
   const unpriced = unpricedCount(tenant);
-  if (unpriced) out.push({ href: UNPRICED_HREF, label: unpricedLabelText(unpriced), detail: "Add a price, or choose Ask so callers get a call back." });
+  if (unpriced) {
+    out.push({
+      kind: "link",
+      href: UNPRICED_HREF,
+      label: unpricedLabelText(unpriced),
+      detail: "Add a price, or choose Ask so callers get a call back.",
+    });
+  }
   const pay = paymentsFrom(tenant.business_policies);
-  if (pay && !pay.confirmed) out.push({ href: businessSettingsHref("train", "policies"), label: "Check how customers pay", detail: "We read it from your payment notes." });
+  const payNeedsCheck = pay && (opts?.saveIsConfirm ? pay.source === "parsed" && !pay.confirmed : !pay.confirmed);
+  if (payNeedsCheck && pay) {
+    const legacy = String(
+      (tenant.business_policies as { payment?: string } | null)?.payment || pay.parsed_from || ""
+    ).trim();
+    out.push({
+      kind: "payments",
+      href: businessSettingsHref("train", "policies"),
+      label: "Check how customers pay",
+      detail: opts?.saveIsConfirm
+        ? "Imported from your payment notes. Press Save on Policies to use it."
+        : "We read it from your payment notes.",
+      payments: pay,
+      legacyText: legacy,
+    });
+  }
+
+  const hoursItem = opts?.readyItems?.find((i) => i.id === "hours");
+  const hoursSchedule = scheduleForForm(tenant.hours_schedule);
+  if (
+    opts?.saveIsConfirm &&
+    hoursItem &&
+    !hoursItem.complete &&
+    reasonNeedsOverviewConfirm(hoursItem.reason) &&
+    parseHoursSchedule(hoursSchedule)
+  ) {
+    out.push({
+      kind: "hours",
+      href: businessSettingsHref("train", "hours"),
+      label: "Check opening hours",
+      detail: hoursItem.reason ?? "",
+      schedule: hoursSchedule,
+    });
+  }
+
   return out;
 }

@@ -19,6 +19,17 @@
 // clears value_hash on the paths it moves, so hashing a row before it has an id
 // is wasted. Services rows without a stable id are reported per tenant, and
 // --apply refuses (exit 2) unless --allow-missing-ids is passed.
+//
+// Re-stamp mode (--restamp-old-rule): for owner rows that already have a
+// value_hash and match --key (a regex on field_path; default catalog .name
+// paths), rewrite value_hash to the current-rules hash ONLY when the stored
+// hash equals the hash of the current value under the OLD rules (pricing
+// envelope kept). That is a row the owner confirmed whose value has not
+// changed since; only the hash rule moved. Any other mismatch (owner edit,
+// genuinely stale) is left alone and counted as kept_stale. Rows without a
+// value_hash are not touched in this mode. Dry run unless --apply; the write
+// is conditional on the stored hash still being the old one.
+//   node scripts/backfillFactHashes.js --restamp-old-rule --tenant <uuid> [--key '<regex>'] [--apply]
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
 //
 // Target guard: staging (sgcdncjxauhsbunobmob) and local URLs run. Anything
@@ -28,7 +39,9 @@
 // Exit codes: 0 ok, 1 write errors, 2 bad arguments or guard refusal,
 // 3 value_hash column missing (apply docs/supabase/tenant_field_confirm_v2.sql), 4 read error.
 
-const { hashFactValue, factValueForPath, stableRowId } = require('../src/conversation/factHash');
+const { hashFactValue, factValueForPath, stableRowId, legacyNameFactValueForPath } = require('../src/conversation/factHash');
+
+const DEFAULT_RESTAMP_KEY = '^catalog\\.(service|product)\\..+\\.name$';
 
 const STAGING_REF = 'sgcdncjxauhsbunobmob';
 const PROD_REF = 'fjxcdccgyhnvnnlnovcl';
@@ -38,6 +51,7 @@ const UUIDISH = /^[0-9a-f-]{8,64}$/i;
 function usage() {
   return [
     'Usage: node scripts/backfillFactHashes.js (--tenant <id> ... | --all-except <id,id>) [--apply] [--sample N] [--i-have-alvin-ok] [--allow-missing-ids]',
+    '       node scripts/backfillFactHashes.js --restamp-old-rule (--tenant <id> ... | --all-except <id,id>) [--key <regex>] [--apply]',
     'Dry run unless --apply. Needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.',
   ].join('\n');
 }
@@ -50,6 +64,9 @@ function parseArgs(argv) {
     iHaveAlvinOk: false,
     allowMissingIds: false,
     sample: 5,
+    restampOldRule: false,
+    key: null,
+    keyRe: null,
     help: false,
     errors: [],
   };
@@ -67,6 +84,8 @@ function parseArgs(argv) {
     if (a === '--apply') out.apply = true;
     else if (a === '--i-have-alvin-ok') out.iHaveAlvinOk = true;
     else if (a === '--allow-missing-ids') out.allowMissingIds = true;
+    else if (a === '--restamp-old-rule') out.restampOldRule = true;
+    else if (a === '--key') out.key = next();
     else if (a === '--help' || a === '-h') out.help = true;
     else if (a === '--tenant') {
       const v = next().trim();
@@ -84,6 +103,14 @@ function parseArgs(argv) {
     if (out.tenants.length && out.allExcept) out.errors.push('use --tenant or --all-except, not both');
     if (!out.tenants.length && !out.allExcept) out.errors.push('scope required: --tenant <id> (repeatable) or --all-except <id,...>');
     if (out.allExcept && !out.allExcept.length) out.errors.push('--all-except needs at least one id');
+    if (out.key != null && !out.restampOldRule) out.errors.push('--key only applies with --restamp-old-rule');
+    if (out.restampOldRule) {
+      try {
+        out.keyRe = new RegExp(out.key || DEFAULT_RESTAMP_KEY);
+      } catch {
+        out.errors.push(`--key is not a valid regex: ${out.key}`);
+      }
+    }
     for (const id of [...out.tenants, ...(out.allExcept || [])]) {
       if (!UUIDISH.test(id)) out.errors.push(`not a tenant id: ${id}`);
     }
@@ -207,7 +234,8 @@ async function runBackfill({ client, supabaseUrl, args, log = console.log }) {
     log(`error: ${guard.reason}`);
     return { code: 2, summary: null };
   }
-  log(`target: ${guard.target} | mode: ${args.apply ? 'APPLY' : 'dry run'}`);
+  log(`target: ${guard.target} | mode: ${args.apply ? 'APPLY' : 'dry run'}${args.restampOldRule ? ` | restamp-old-rule key=${args.keyRe.source}` : ''}`);
+  if (args.restampOldRule) return runRestamp({ client, args, log });
 
   const read = await readOwnerRows(client, args);
   if (read.error) {
@@ -325,6 +353,94 @@ async function runBackfill({ client, supabaseUrl, args, log = console.log }) {
   return { code: summary.totals.write_errors ? 1 : 0, summary };
 }
 
+/** Hash of `path`'s current value under the OLD rules (pricing envelope kept); null when not a legacy-rule path. */
+function oldRuleHash(path, tenant) {
+  const v = legacyNameFactValueForPath(path, tenant);
+  return v == null ? null : hashFactValue(v).toLowerCase();
+}
+
+async function runRestamp({ client, args, log }) {
+  const read = await readOwnerRows(client, args);
+  if (read.error) {
+    if (isMissingValueHashColumn(read.error)) {
+      log('error: tenant_field_meta.value_hash is missing. Apply docs/supabase/tenant_field_confirm_v2.sql first.');
+      return { code: 3, summary: null };
+    }
+    log(`error: reading tenant_field_meta: ${read.error.message || read.error}`);
+    return { code: 4, summary: null };
+  }
+  const rows = read.rows.filter((r) => args.keyRe.test(String(r.field_path || '').trim()));
+  const tenantIds = [...new Set(rows.map((r) => r.tenant_id))];
+  const tenants = new Map();
+  for (let i = 0; i < tenantIds.length; i += 100) {
+    const { data, error } = await client.from('tenants').select('*').in('id', tenantIds.slice(i, i + 100));
+    if (error) {
+      log(`error: reading tenants: ${error.message || error}`);
+      return { code: 4, summary: null };
+    }
+    for (const t of data || []) tenants.set(t.id, t);
+  }
+  const keys = ['matched', 'to_restamp', 'restamped', 'unchanged', 'kept_stale', 'no_hash', 'unresolved', 'write_errors'];
+  const zero = () => Object.fromEntries(keys.map((k) => [k, 0]));
+  const summary = { tenants: [], totals: zero(), samples: [], stale: [] };
+  for (const tenantId of tenantIds) {
+    const counts = { tenant_id: tenantId, ...zero() };
+    const tenant = tenants.get(tenantId);
+    for (const row of rows.filter((r) => r.tenant_id === tenantId)) {
+      counts.matched += 1;
+      const path = String(row.field_path).trim();
+      const existing = String(row.value_hash || '').trim().toLowerCase();
+      if (!existing) {
+        counts.no_hash += 1;
+        continue;
+      }
+      const value = tenant ? factValueForPath(path, tenant) : undefined;
+      if (value == null || isEmptyFactValue(path, value)) {
+        counts.unresolved += 1;
+        continue;
+      }
+      const hash = hashFactValue(value).toLowerCase();
+      if (existing === hash) {
+        counts.unchanged += 1;
+        continue;
+      }
+      if (existing !== oldRuleHash(path, tenant)) {
+        counts.kept_stale += 1;
+        summary.stale.push({ tenant_id: tenantId, field_path: path });
+        continue;
+      }
+      counts.to_restamp += 1;
+      if (summary.samples.length < args.sample) summary.samples.push({ tenant_id: tenantId, field_path: path, from: existing, to: hash });
+      if (args.apply) {
+        const { error } = await client
+          .from('tenant_field_meta')
+          .update({ value_hash: hash })
+          .eq('tenant_id', tenantId)
+          .eq('field_path', path)
+          .eq('source', 'owner')
+          .eq('value_hash', row.value_hash);
+        if (error) {
+          counts.write_errors += 1;
+          log(`write error ${tenantId} ${path}: ${error.message || error}`);
+        } else counts.restamped += 1;
+      }
+    }
+    summary.tenants.push(counts);
+    for (const k of keys) summary.totals[k] += counts[k];
+    log(`${tenantId}: ${keys.filter((k) => args.apply || (k !== 'restamped' && k !== 'write_errors')).map((k) => `${k}=${counts[k]}`).join(' ')}`);
+  }
+  if (summary.samples.length) {
+    log(`sample (${summary.samples.length}):`);
+    for (const s of summary.samples) log(`  ${s.tenant_id} ${s.field_path} ${s.from.slice(0, 12)} -> ${s.to.slice(0, 12)}`);
+  }
+  if (summary.stale.length) {
+    log(`kept_stale (${summary.stale.length}, not re-stamped):`);
+    for (const s of summary.stale) log(`  ${s.tenant_id} ${s.field_path}`);
+  }
+  log(`totals: ${JSON.stringify(summary.totals)}`);
+  return { code: summary.totals.write_errors ? 1 : 0, summary };
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const supabaseUrl = String(process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '').replace(/\/rest\/v1$/i, '');
@@ -359,4 +475,6 @@ module.exports = {
   isEmptyFactValue,
   isMissingValueHashColumn,
   runBackfill,
+  runRestamp,
+  DEFAULT_RESTAMP_KEY,
 };

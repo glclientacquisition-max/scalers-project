@@ -15,7 +15,7 @@
 // before the webhook rejects it, so a freshly assigned DID is never refused
 // from a stale copy.
 
-const { inboundOpen } = require('../billing/packageOverage');
+const { inboundOpen, effectiveOnDemand } = require('../billing/packageOverage');
 const { isTenantLineInactive, tenantLineState, sameNumber } = require('./inactiveTenantGate');
 
 const DEFAULT_TTL_MS = 30_000;
@@ -127,7 +127,7 @@ function createInboundDirectory(opts = {}) {
       ...inboundOpen({
         minutesIncluded: tenant.minutes_included,
         secondsUsed: tenant.seconds_used,
-        onDemand: Boolean(tenant.on_demand_usage_enabled),
+        onDemand: effectiveOnDemand(tenant.on_demand_usage_enabled, tenant.spend_limit_blocked),
         enforcement,
         // tenant_subscriptions.status via db.listInboundTenantRows; unknown
         // (read failed) stays null so 0 minutes fails open.

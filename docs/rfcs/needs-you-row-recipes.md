@@ -5,6 +5,8 @@ last_reviewed: 2026-09-20
 
 # Needs you row recipes
 
+> **Superseded in part (19 Oct 2026):** `call_wa` is gone. Inbox list rows no longer carry Call or WhatsApp; those live only in the opened item (`InboxTicketActionDock`).
+
 **Status:** Shipping in this PR.  
 **Lane:** Desk UI/UX  
 **Date:** 2026-09-20  

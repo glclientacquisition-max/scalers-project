@@ -106,8 +106,9 @@ export function InboxRowUiProvider({
 
   const applyArchiveNotice = useCallback((payload: InboxArchiveUndoPayload | null) => {
     if (!payload?.rows.length) return;
-    hideArchiveRows(setRows, payload.rows);
-    const gone = new Set(payload.rows.flatMap((row) => [row.id, row.callId]));
+    const rows = [...payload.rows, ...(payload.requests || [])];
+    hideArchiveRows(setRows, rows);
+    const gone = new Set(rows.flatMap((row) => [row.id, row.callId]));
     setSelected((prev) => prev.filter((id) => !gone.has(id)));
     setArchiveNotice(payload);
   }, []);

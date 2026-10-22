@@ -1,8 +1,10 @@
 import type { BusinessPolicies } from "@/lib/businessPolicies";
 import { POLICY_FIELDS } from "@/lib/businessPolicies";
 import type { ProductItem } from "@/lib/productCatalog";
+import { deskAttestServiceAreas } from "@/lib/deskFeatureFlags";
 import { settingsScopeIncludes } from "@/lib/settingsSaveScope";
 import { stableRowId } from "@/lib/factHash";
+import type { ServiceAreas } from "@/lib/serviceAreas";
 
 type ServiceRow = { name?: string; id?: string };
 type FaqRow = { question?: string; answer?: string };
@@ -24,6 +26,7 @@ export type SettingsSaveAttestInput = {
   faqs?: FaqRow[];
   hasSocialHandles?: boolean;
   lineNumber?: string;
+  serviceAreas?: ServiceAreas | null;
 };
 
 function pushUnique(out: string[], seen: Set<string>, path: string) {
@@ -115,6 +118,19 @@ export function fieldPathsAttestedOnSettingsSave(input: SettingsSaveAttestInput)
 
   if (includes("businessLocations") && (input.businessLocationsCount ?? 0) > 0) {
     pushUnique(out, seen, "locations.branches");
+  }
+
+  if (includes("serviceAreas") && input.serviceAreas) {
+    const areas = input.serviceAreas.areas || [];
+    if (areas.length > 0) {
+      pushUnique(out, seen, "policies.coverage_areas");
+    }
+    if (deskAttestServiceAreas()) {
+      for (const area of areas) {
+        const id = String(area.id || "").trim();
+        if (id) pushUnique(out, seen, `service_areas.${id}`);
+      }
+    }
   }
 
   if (includes("businessPolicies") && input.businessPolicies) {

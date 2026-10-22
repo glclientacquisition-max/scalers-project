@@ -6,6 +6,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Switch } from "@/components/ui/Switch";
 import type { ProductItem } from "@/lib/productCatalog";
 import type { ServiceItem } from "@/lib/servicesCatalog";
+import { CatalogImportPriceLine } from "@/components/settings/catalog/CatalogImportPriceLine";
 import type { CatalogSuggestMeta } from "@/lib/catalogSuggest";
 
 type PreviewRow = (ServiceItem | ProductItem) & CatalogSuggestMeta;
@@ -147,14 +148,12 @@ export function CatalogImportSheet({
                     </span>
                   ) : null}
                 </div>
-                {"price_range" in row && row.price_range ? (
-                  <p className="truncate text-meta text-ink-2">{row.price_range}</p>
-                ) : null}
-                {"price" in row && row.price ? (
-                  <p className="truncate text-meta text-ink-2">{row.price}</p>
-                ) : null}
+                <CatalogImportPriceLine row={row} />
               </li>
             ))}
+            {previewRows.length > 8 ? (
+              <li className="px-4 py-2.5 text-meta text-ink-2">+{previewRows.length - 8} more</li>
+            ) : null}
           </ul>
         </div>
       ) : null}

@@ -336,6 +336,27 @@ export function paymentsSentence(p: Payments): string {
   return out.join(" ").trim();
 }
 
+/** Canonical payments payload for fact hash (no provenance envelope). */
+export function paymentsFactHashValue(raw: unknown): Record<string, unknown> | null {
+  const norm = normalizePayments(raw);
+  if (!norm || !paymentsHaveContent(norm)) return null;
+  const clean = cleanPayments(norm);
+  return {
+    version: clean.version,
+    methods: clean.methods,
+    mpesa_till: clean.mpesa_till,
+    mpesa_paybill: clean.mpesa_paybill,
+    pochi: clean.pochi,
+    mpesa_send: clean.mpesa_send,
+    airtel: clean.airtel,
+    bank: clean.bank,
+    card: clean.card,
+    timings: clean.timings,
+    deposit_percent: clean.deposit_percent,
+    note: clean.note,
+  };
+}
+
 export function paymentsHaveContent(p: Payments | null): boolean {
   return Boolean(p && (p.methods.length || p.timings.length || p.note));
 }

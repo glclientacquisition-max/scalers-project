@@ -123,6 +123,8 @@ During private beta:
 
 ## Related documents
 
+- [Assistant facts, fallbacks and payment answers](../explanation/voice/ASSISTANT_FACTS_AND_PAY_ANSWERS.md): staging → OK → backup/migration/merge flow used for voice releases.
+
 - [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)
 - [`TESTING_BASELINE.md`](../reference/governance/TESTING_BASELINE.md)
 - [`../operations/DEPLOYMENT.md`](DEPLOYMENT.md)

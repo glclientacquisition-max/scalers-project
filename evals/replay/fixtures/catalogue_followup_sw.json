@@ -1,0 +1,20 @@
+{
+  "id": "catalogue_followup_sw",
+  "bug": "followup",
+  "profile": "menu",
+  "language": "sw",
+  "turns": [
+    {
+      "caller": "Na sofa je?",
+      "mustSay": ["elfu mbili", "mia tano"],
+      "status": "found",
+      "value": 2500
+    },
+    {
+      "caller": "Na curtain cleaning?",
+      "mustSay": ["elfu moja", "mia nane"],
+      "status": "found",
+      "value": 1800
+    }
+  ]
+}

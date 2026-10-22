@@ -25,10 +25,13 @@ export function Stamp({
   tone = "neutral",
   children,
   className,
+  wrap = false,
 }: {
   tone?: StampTone;
   children: ReactNode;
   className?: string;
+  /** Show full label on narrow rows (e.g. When unsure). */
+  wrap?: boolean;
 }) {
   return (
     <span className={cx("inline-flex min-w-0 items-center gap-1.5 text-meta font-medium", text[tone], className)}>
@@ -38,7 +41,7 @@ export function Stamp({
         ) : null}
         <span className={cx("relative inline-flex h-2 w-2 rounded-full", dot[tone])} />
       </span>
-      <span className="truncate">{children}</span>
+      <span className={wrap ? "text-pretty leading-snug" : "truncate"}>{children}</span>
     </span>
   );
 }

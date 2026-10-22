@@ -49,6 +49,7 @@ before(() => {
   shas.desk = commit("dashboard/src/app/page.tsx", "desk change");
   shas.voice = commit("src/speech/sonioxStt.js", "voice change");
   shas.docs = commit("docs/reference/operations/ENVIRONMENTS.md", "docs change");
+  shas.server = commit("server.js", "voice server-only change");
 });
 
 after(() => {
@@ -58,10 +59,26 @@ after(() => {
 describe("vercel-ignore-build.sh on scalers-project (prod Desk)", () => {
   const base = { VERCEL_PROJECT_ID: PROD, VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "cursor/x" };
 
-  it("skips a voice-only range", () => {
-    const r = run({ ...base, VERCEL_GIT_PREVIOUS_SHA: shas.desk, VERCEL_GIT_COMMIT_SHA: shas.voice });
+  it("skips a range outside dashboard/ and src/ (server, docs)", () => {
+    const r = run({ ...base, VERCEL_GIT_PREVIOUS_SHA: shas.voice, VERCEL_GIT_COMMIT_SHA: shas.server });
     assert.equal(r.status, 0, r.out);
     assert.match(r.out, /SKIP/);
+  });
+
+  it("builds a voice src/ change: the Desk bundles voice modules (dashboard/.voice)", () => {
+    const r = run({ ...base, VERCEL_GIT_PREVIOUS_SHA: shas.desk, VERCEL_GIT_COMMIT_SHA: shas.voice });
+    assert.equal(r.status, 1, r.out);
+    assert.match(r.out, /BUILD/);
+  });
+
+  it("DESK_PATHS covers every voice entry the Desk syncs", () => {
+    const { VOICE_ENTRIES } = require(path.join(__dirname, "..", "dashboard", "scripts", "voice-modules.cjs"));
+    const line = fs.readFileSync(SCRIPT, "utf8").match(/^DESK_PATHS="([^"]*)"/m);
+    const paths = line[1].split(/\s+/).filter(Boolean);
+    for (const entry of VOICE_ENTRIES) {
+      assert.ok(paths.some((p) => entry.startsWith(p)), `${entry} not under DESK_PATHS ${line[1]}`);
+    }
+    assert.ok(paths.includes("dashboard/"));
   });
 
   it("builds a range that touches dashboard/", () => {

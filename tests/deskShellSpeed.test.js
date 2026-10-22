@@ -422,7 +422,7 @@ describe("settings save scope", () => {
         hasTone: true,
       })})`
     );
-    assert.equal(name, "Assistant name should be under 40 characters.");
+    assert.equal(name, "Business Assistant name should be under 40 characters.");
   });
 
   it("clears an emptied alert phone and says Saved only when the write matches", () => {

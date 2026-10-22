@@ -195,7 +195,8 @@ test("import: a file picker sits next to the paste box", () => {
 
 test("catalogue: phone service rows show their labels", () => {
   const form = read("dashboard/src/components/TenantForm.tsx");
-  for (const id of ["svc-name-m", "svc-price-m", "svc-notes-m", "svc-oos-m"]) {
+  assert.match(form, /CatalogPriceEditor/);
+  for (const id of ["svc-name-m", "svc-notes-m", "svc-oos-m"]) {
     assert.match(form, new RegExp(`<label className=\\{serviceMobileLabelClass\\} htmlFor=\\{\`${id}-`));
     assert.doesNotMatch(form, new RegExp(`<label className="sr-only" htmlFor=\\{\`${id}-`));
   }

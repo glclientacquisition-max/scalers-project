@@ -58,13 +58,10 @@ function inboxCanHoldDone(row) {
 }
 
 function inboxListDockRecipe(row) {
-  if (itemIsArchived(row)) {
-    return row.callerPhone ? "call_wa" : "none";
-  }
+  if (itemIsArchived(row)) return "none";
   if (inboxCanConfirm(row)) return "confirm";
   if (inboxCanVisitDone(row)) return "visit_done";
   if (inboxCanHoldDone(row)) return "hold_done";
-  if (row.callerPhone) return "call_wa";
   return "none";
 }
 
@@ -101,10 +98,10 @@ describe("Needs you row recipes", () => {
 
     assert.equal(inboxListDockRecipe(visit), "confirm");
     assert.equal(inboxListDockRecipe(hold), "hold_done");
-    assert.equal(inboxListDockRecipe(human), "call_wa");
-    assert.equal(inboxListDockRecipe(missed), "call_wa");
-    assert.equal(inboxListDockRecipe(visitIntent), "call_wa");
-    assert.equal(inboxListDockRecipe(holdIntent), "call_wa");
+    assert.equal(inboxListDockRecipe(human), "none");
+    assert.equal(inboxListDockRecipe(missed), "none");
+    assert.equal(inboxListDockRecipe(visitIntent), "none");
+    assert.equal(inboxListDockRecipe(holdIntent), "none");
     assert.equal(inboxListDockRecipe(visitIntentSilent), "none");
     assert.notEqual(inboxListDockRecipe(visitIntent), "confirm");
     assert.notEqual(inboxListDockRecipe(holdIntent), "hold_done");
@@ -137,10 +134,10 @@ describe("Needs you row recipes", () => {
       job: { id: "job-1", status: "confirmed" },
     });
 
-    assert.equal(inboxListDockRecipe(archivedVisit), "call_wa");
-    assert.equal(inboxListDockRecipe(archivedHold), "call_wa");
-    assert.equal(inboxListDockRecipe(cancelledVisit), "call_wa");
-    assert.equal(inboxListDockRecipe(cancelledHold), "call_wa");
+    assert.equal(inboxListDockRecipe(archivedVisit), "none");
+    assert.equal(inboxListDockRecipe(archivedHold), "none");
+    assert.equal(inboxListDockRecipe(cancelledVisit), "none");
+    assert.equal(inboxListDockRecipe(cancelledHold), "none");
     assert.equal(inboxListDockRecipe(confirmedVisit), "visit_done");
     assert.notEqual(inboxListDockRecipe(archivedVisit), "confirm");
     assert.notEqual(inboxListDockRecipe(archivedHold), "hold_done");
@@ -153,12 +150,13 @@ describe("Needs you row recipes", () => {
     assert.match(verbs, /if \(inboxCanConfirm\(item\)\) return "confirm"/);
     assert.match(verbs, /if \(inboxCanVisitDone\(item\)\) return "visit_done"/);
     assert.match(verbs, /if \(inboxCanHoldDone\(item\)\) return "hold_done"/);
-    assert.match(verbs, /return item.callerPhone \? "call_wa" : "none"/);
+    assert.match(verbs, /if \(itemIsArchived\(item\)\) return "none"/);
+    assert.doesNotMatch(verbs, /call_wa/);
     assert.doesNotMatch(verbs, /lead_status:\s*"resolved"/);
     assert.doesNotMatch(verbs, /notifyChannels/);
   });
 
-  it("mounts list Confirm, hold Done, and Call plus WhatsApp only through the recipe", () => {
+  it("mounts list Confirm and hold Done only through the recipe; no Call or WhatsApp on rows", () => {
     const row = read("dashboard/src/components/InboxItemRow.tsx");
     const trailing = row.slice(
       row.indexOf("function InboxTrailingAction"),
@@ -167,11 +165,9 @@ describe("Needs you row recipes", () => {
     assert.match(trailing, /inboxListDockRecipe\(item\)/);
     assert.match(trailing, /recipe === "confirm" \|\| recipe === "visit_done"/);
     assert.match(trailing, /recipe === "hold_done"/);
-    assert.match(trailing, /recipe === "call_wa"/);
     assert.match(trailing, /InboxJobActions id=\{item.job.id\} status=\{item.job.status\} extra=\{false\}/);
     assert.match(trailing, /RequestStatusToggle id=\{item.hold.id\} status=\{item.hold.status\} extra=\{false\}/);
-    assert.match(trailing, /<CallLink number=\{item.callerPhone\} \/>/);
-    assert.match(trailing, /variant="icon"/);
+    assert.doesNotMatch(trailing, /CallLink|WhatsAppLink/);
     assert.doesNotMatch(trailing, /if \(itemIsArchived\(item\)\)/);
     assert.doesNotMatch(trailing, /if \(item.job\)/);
     assert.doesNotMatch(trailing, /if \(item.hold\)/);

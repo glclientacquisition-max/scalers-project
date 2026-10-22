@@ -1,6 +1,11 @@
 -- Super Admin ops helpers (run after did_number_pool.sql)
 -- - release_did_from_business: return DID to pool as available
 -- - remove_business_and_release_did: delete a business + its calls, free the DID
+--
+-- After billing_data_layer.sql, do not re-apply release_did_from_business from
+-- this file. That script replaces it: the business number still goes to
+-- pending (voice lookup unchanged) and the pool row is quarantined so it is
+-- not reused. Re-applying this copy would skip the quarantine.
 
 create or replace function public.release_did_from_business(p_tenant_id uuid)
 returns text

@@ -1,4 +1,5 @@
 import { requireSuperAdmin } from "@/lib/adminGuard";
+import { recentCallCounts } from "@/lib/adminRecentCalls";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { QUIET_DAYS, todayWindows, type CallCount, type CallCounts, type TimeWindow } from "@/lib/adminTodayModel";
 
@@ -43,8 +44,9 @@ export async function loadTodayCallCounts(now: Date = new Date()): Promise<CallC
 }
 
 /**
- * Which of these businesses took at least one call in the last 7 days. One head count each,
- * so a busy week can't hit the row cap and wrongly mark a business quiet. Null on a failed read.
+ * Which of these businesses took at least one call in the last 7 days. One grouped read
+ * (an embedded calls count per business, computed in SQL, so a busy week can't hit the row
+ * cap and wrongly mark a business quiet). Null on a failed read.
  */
 export async function businessesWithRecentCalls(ids: string[], now: Date = new Date()): Promise<Set<string> | null> {
   await requireSuperAdmin();
@@ -52,18 +54,8 @@ export async function businessesWithRecentCalls(ids: string[], now: Date = new D
   const admin = getSupabaseAdmin();
   const since = new Date(now.getTime() - QUIET_DAYS * 24 * 60 * 60 * 1000).toISOString();
   try {
-    const counted = await Promise.all(
-      ids.map(async (id) => {
-        const { count, error } = await admin
-          .from("calls")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", id)
-          .gte("created_at", since);
-        if (error) throw error;
-        return [id, count || 0] as const;
-      }),
-    );
-    return new Set(counted.filter(([, n]) => n > 0).map(([id]) => id));
+    const counts = await recentCallCounts(admin, ids, since);
+    return new Set([...counts].filter(([, n]) => n > 0).map(([id]) => id));
   } catch (err) {
     console.error("[admin:today] recent calls", err instanceof Error ? err.message : err);
     return null;

@@ -15,32 +15,13 @@ import {
 import type { WalletLedgerRow } from "@/lib/wallet";
 import { actionLabel, eatStamp } from "@/lib/adminActivityModel";
 import { billingAuditDetail, ledgerKindLabel } from "@/lib/adminBillingCopy";
+import { periodEndLabel } from "@/lib/billingStateModel";
+import { earliestPeriodEndLabel, periodEndWithinRolloverWindow } from "@/lib/adminBillingPeriod";
+import type { AdminBillingOverview, AdminBillingRow, AdminBillingStatus } from "@/lib/adminBillingTypes";
+import { reviewReasonFromRaw } from "@/lib/adminPayCopy";
+import { logAdminError, isMissingTableError } from "@/lib/adminErrors";
 
-export type AdminBillingStatus = "archived" | "ok" | "low_minutes" | "exhausted" | "charging";
-
-export type AdminBillingRow = {
-  id: string;
-  business_name: string;
-  sautikit_virtual_number: string;
-  packageName: string | null;
-  packageSku: string | null;
-  period: "month" | "year" | null;
-  minutesIncluded: number;
-  minutesUsed: number;
-  minutesRemaining: number;
-  billing_enforcement: BillingMode;
-  on_demand_usage_enabled: boolean;
-  status: AdminBillingStatus;
-  statusLabel: string;
-};
-
-export type AdminBillingOverview = {
-  rows: AdminBillingRow[];
-  betaCount: number;
-  chargingCount: number;
-  lowMinutesCount: number;
-  exhaustedCount: number;
-};
+export type { AdminBillingOverview, AdminBillingRow, AdminBillingStatus } from "@/lib/adminBillingTypes";
 
 export type OpsAuditRow = {
   id: string;
@@ -93,14 +74,28 @@ function billingStatus(input: {
   return { status: "ok", statusLabel: "OK" };
 }
 
+/** Super Admin plan row copy (not owner desk). */
+export function adminModeLabel(mode: BillingMode): string {
+  if (mode === "off") return "Beta · Meter only";
+  if (mode === "soft") return "Charging · On-demand";
+  return "Charging · Block at cap";
+}
+
 export function chargingModeLabel(mode: BillingMode): string {
-  if (mode === "off") return "Beta";
-  if (mode === "soft") return "On-demand soft";
-  return "On-demand hard";
+  return adminModeLabel(mode);
+}
+
+function isMissingBillingState(message: string): boolean {
+  return /tenant_billing_state|does not exist|schema cache/i.test(message);
 }
 
 export async function loadAdminBillingOverview(): Promise<AdminBillingOverview> {
-  const [walletOverview, catalog] = await Promise.all([listAdminWallets(), loadPackageCatalog()]);
+  const { loadPlatformInvoiceStats } = await import("@/lib/adminBillingInvoices");
+  const [walletOverview, catalog, invoiceStats] = await Promise.all([
+    listAdminWallets(),
+    loadPackageCatalog(),
+    loadPlatformInvoiceStats(),
+  ]);
 
   const subByTenant = new Map(
     catalog.businesses.map((b) => [
@@ -137,6 +132,8 @@ export async function loadAdminBillingOverview(): Promise<AdminBillingOverview> 
       packageName: sub?.packageName ?? null,
       packageSku: sub?.packageId ? skuById.get(sub.packageId) ?? null : null,
       period: sub?.period ?? null,
+      periodEnd: null,
+      periodEndLabel: null,
       minutesIncluded,
       minutesUsed,
       minutesRemaining,
@@ -148,6 +145,25 @@ export async function loadAdminBillingOverview(): Promise<AdminBillingOverview> 
   });
 
   const admin = getSupabaseAdmin();
+  const periodRes = await admin
+    .from("tenant_billing_state")
+    .select("tenant_id, period_end")
+    .in(
+      "tenant_id",
+      rows.map((r) => r.id),
+    );
+  if (!periodRes.error) {
+    const endByTenant = new Map(
+      (periodRes.data || []).map((row) => [String(row.tenant_id), row.period_end ? String(row.period_end) : null]),
+    );
+    for (const row of rows) {
+      const periodEnd = endByTenant.get(row.id) ?? null;
+      row.periodEnd = periodEnd;
+      row.periodEndLabel = periodEnd ? periodEndLabel(periodEnd) : null;
+    }
+  } else if (!isMissingBillingState(periodRes.error.message || "")) {
+    throw periodRes.error;
+  }
   const { data: onDemandRows } = await admin
     .from("tenants")
     .select("id, on_demand_usage_enabled")
@@ -174,6 +190,9 @@ export async function loadAdminBillingOverview(): Promise<AdminBillingOverview> 
     row.statusLabel = statusLabel;
   }
 
+  const activePackaged = rows.filter((r) => r.status !== "archived" && r.packageName && r.periodEnd);
+  const rolloverSoonCount = activePackaged.filter((r) => periodEndWithinRolloverWindow(r.periodEnd)).length;
+
   return {
     rows,
     betaCount: rows.filter((r) => r.billing_enforcement === "off" && r.status !== "archived").length,
@@ -181,8 +200,23 @@ export async function loadAdminBillingOverview(): Promise<AdminBillingOverview> 
       .length,
     lowMinutesCount: rows.filter((r) => r.status === "low_minutes").length,
     exhaustedCount: rows.filter((r) => r.status === "exhausted").length,
+    rolloverSoonCount,
+    platformPeriodEndLabel: earliestPeriodEndLabel(activePackaged),
+    openInvoiceCount: invoiceStats.openCount,
+    overdueInvoiceCount: invoiceStats.overdueCount,
+    openInvoiceKesLabel: invoiceStats.openKesLabel,
+    invoicesMissing: invoiceStats.missing,
   };
 }
+
+export type CheckoutReview = {
+  provider: string;
+  providerRef: string;
+  getKes: string;
+  seenKes: string;
+  reason: string;
+  invoiceId: string | null;
+};
 
 export type AdminBillingClientDetail = {
   row: AdminBillingRow;
@@ -190,7 +224,43 @@ export type AdminBillingClientDetail = {
   rates: BillingRateCard;
   packages: BillingPackage[];
   subscription: TenantSubscriptionRow | null;
+  checkoutReviews: CheckoutReview[];
+  /** Null when the invoice table could not be read. */
+  invoiceCount: number | null;
+  /** Live payment row for this business. Unavailable when the table cannot be read. */
+  livePayments: { available: boolean; enabled: boolean; beta: boolean };
 };
+
+function reviewText(raw: unknown, key: "get_kes" | "seen_kes"): string {
+  if (!raw || typeof raw !== "object") return "0";
+  const value = (raw as Record<string, unknown>)[key];
+  if (value == null || String(value).trim() === "") return "0";
+  return String(value);
+}
+
+async function loadOpenCheckoutReviews(tenantId: string): Promise<CheckoutReview[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("payments")
+    .select("provider, provider_ref, raw, invoice_id")
+    .eq("tenant_id", tenantId)
+    .eq("match_status", "issue")
+    .like("provider_ref", "checkout-total-review:%");
+  if (error) throw error;
+  return (data || []).flatMap((row) => {
+    const raw = row.raw;
+    const status = raw && typeof raw === "object" ? (raw as { review_status?: string }).review_status : null;
+    if (status === "resolved") return [];
+    return [{
+      provider: String(row.provider || "bachs"),
+      providerRef: String(row.provider_ref),
+      getKes: reviewText(raw, "get_kes"),
+      seenKes: reviewText(raw, "seen_kes"),
+      reason: reviewReasonFromRaw(raw),
+      invoiceId: row.invoice_id ? String(row.invoice_id) : null,
+    }];
+  });
+}
 
 export async function loadAdminBillingClient(tenantId: string): Promise<AdminBillingClientDetail | null> {
   const overview = await loadAdminBillingOverview();
@@ -226,7 +296,126 @@ export async function loadAdminBillingClient(tenantId: string): Promise<AdminBil
     rates: catalog.rates,
     packages: catalog.packages,
     subscription,
+    checkoutReviews: await loadOpenCheckoutReviews(tenantId),
+    invoiceCount: await countInvoices(tenantId),
+    livePayments: await loadLivePayments(tenantId, row.billing_enforcement),
   };
+}
+
+async function loadLivePayments(
+  tenantId: string,
+  enforcement: BillingMode,
+): Promise<AdminBillingClientDetail["livePayments"]> {
+  const admin = getSupabaseAdmin();
+  const sub = await admin
+    .from("tenant_subscriptions")
+    .select("billing_status")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  let beta = enforcement === "off";
+  if (!sub.error) {
+    const status = typeof sub.data?.billing_status === "string" ? sub.data.billing_status : "beta";
+    if (status === "beta") beta = true;
+  } else if (!isMissingTableError(sub.error)) {
+    logAdminError("billing-live-status", sub.error);
+  }
+
+  const live = await admin.from("billing_live_tenants").select("enabled").eq("tenant_id", tenantId).maybeSingle();
+  if (live.error) {
+    const missing =
+      isMissingTableError(live.error) || /column .+ does not exist/i.test(String(live.error.message || ""));
+    if (!missing) logAdminError("billing-live-tenant", live.error);
+    return { available: false, enabled: false, beta };
+  }
+  return { available: true, enabled: live.data?.enabled === true, beta };
+}
+
+async function countInvoices(tenantId: string): Promise<number | null> {
+  const admin = getSupabaseAdmin();
+  const { count, error } = await admin
+    .from("invoices")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId);
+  if (error) {
+    const missing = isMissingTableError(error) || /column .+ does not exist/i.test(String(error.message || ""));
+    if (!missing) logAdminError("billing-invoice-count", error);
+    return null;
+  }
+  return count ?? 0;
+}
+
+export async function loadCheckoutReviewReading(opts: {
+  businessId: string;
+  providerRef: string;
+}): Promise<{ getKes: string; checkoutId: string }> {
+  const providerRef = opts.providerRef.trim();
+  if (!providerRef.startsWith("checkout-total-review:")) {
+    throw new Error("That review is not on this business.");
+  }
+  const admin = getSupabaseAdmin();
+  const { data: row, error: readError } = await admin
+    .from("payments")
+    .select("provider, tenant_id, match_status, raw")
+    .eq("provider_ref", providerRef)
+    .eq("tenant_id", opts.businessId)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!row || row.match_status !== "issue") {
+    throw new Error("That review is not on this business.");
+  }
+  const raw = row.raw;
+  const checkoutId = raw && typeof raw === "object" ? String((raw as { checkout_id?: string }).checkout_id || "").trim() : "";
+  return { getKes: reviewText(raw, "get_kes"), checkoutId };
+}
+
+export async function resolveCheckoutTotalReview(opts: {
+  businessId: string;
+  providerRef: string;
+  actor: string;
+  reason: string;
+  choice: string;
+  totalKes?: string | null;
+}): Promise<void> {
+  const providerRef = opts.providerRef.trim();
+  if (!providerRef.startsWith("checkout-total-review:")) {
+    throw new Error("That review is not on this business.");
+  }
+  if (opts.choice !== "book" && opts.choice !== "nothing") {
+    throw new Error("Choose book collected amount or nothing collected.");
+  }
+  if (opts.reason.trim().length < 3) {
+    throw new Error("Add a reason (3 letters or more).");
+  }
+  const admin = getSupabaseAdmin();
+  const { data: row, error: readError } = await admin
+    .from("payments")
+    .select("provider, tenant_id, match_status")
+    .eq("provider_ref", providerRef)
+    .eq("tenant_id", opts.businessId)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!row || row.match_status !== "issue") {
+    throw new Error("That review is not on this business.");
+  }
+  const args: {
+    p_provider: string;
+    p_provider_ref: string;
+    p_actor: string;
+    p_reason: string;
+    p_choice: string;
+    p_total_kes?: string;
+  } = {
+    p_provider: String(row.provider || "bachs"),
+    p_provider_ref: providerRef,
+    p_actor: opts.actor,
+    p_reason: opts.reason.trim(),
+    p_choice: opts.choice,
+  };
+  if (opts.totalKes != null && String(opts.totalKes).trim() !== "") {
+    args.p_total_kes = String(opts.totalKes);
+  }
+  const { error } = await admin.rpc("resolve_checkout_total_review", args);
+  if (error) throw error;
 }
 
 export async function grantTenantPackageMinutes(opts: {

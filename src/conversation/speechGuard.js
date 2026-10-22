@@ -8,7 +8,15 @@ const { confirmationLanguage } = require('./language');
 const { factServices, factProducts, speechFactText } = require('./provenance');
 const { entityValue, findCatalogMatch } = require('./entityExtraction');
 const { looksLikeOfferAsk } = require('./fileRead');
-const { fileServicePriceLine } = require('./catalogueMouth');
+const { fileServicePriceLine, namesOtherTopic } = require('./catalogueMouth');
+const {
+  normalisePrice,
+  priceIsSpeakable,
+  formatPriceDisplay,
+  legacyPriceText,
+  midSentencePriceDisplay,
+  SPOKEN_PLACEHOLDER_RE,
+} = require('./factPrice');
 const { hoursAskLine, looksLikeHoursAsk } = require('./knownFacts');
 const { numbersIn } = require('./numberWords');
 const {
@@ -289,6 +297,18 @@ function safeJson(value) {
   }
 }
 
+/**
+ * Profile text the place check may bind to. The raw tenants.service_areas blob
+ * (carried for lookup(), PR5) is left out: its JSON keys, e.g.
+ * "anywhere_kenya": false, would otherwise free "Kenya" as a listed place.
+ * Listed areas still bind through areaTerms / serviceAreas.
+ */
+function profilePlacesJson(profile) {
+  if (!profile || typeof profile !== 'object' || !('service_areas' in profile)) return safeJson(profile);
+  const { service_areas: _raw, ...rest } = profile;
+  return safeJson(rest);
+}
+
 /** Owner-fact text only. Seed prices and payment numbers are not speakable. */
 function profileFacts(profile) {
   return speechFactText(profile).replace(/\b\d{1,2}:\d{2}\b/g, ' ');
@@ -344,6 +364,29 @@ function sentenceHasNewNumber(sentence, known) {
   return false;
 }
 
+const SAVED_WORK_ACTIONS = new Set(['create_service_request', 'create_appointment', 'update_appointment', 'escalate']);
+
+/** A request, visit or handoff saved on any turn of this call (brain state savedWork). */
+function workSavedThisCall(state) {
+  const rows = Array.isArray(state?.actions?.savedWork) ? state.actions.savedWork : [];
+  return rows.some(
+    (row) =>
+      row &&
+      SAVED_WORK_ACTIONS.has(row.action) &&
+      (row.status === 'succeeded' || row.status === 'updated' || row.status === 'duplicate')
+  );
+}
+
+/** True the first time per caller turn for this key (state.conversation). No state: always true. */
+function onceThisTurn(ctx, key) {
+  const conv = ctx?.state && typeof ctx.state === 'object' ? (ctx.state.conversation ||= {}) : null;
+  if (!conv) return true;
+  const turn = Number(conv.turnCount || 0);
+  if (turn > 0 && conv[key] === turn) return false;
+  conv[key] = turn;
+  return true;
+}
+
 function toolSucceededThisTurn(toolResults = []) {
   return (Array.isArray(toolResults) ? toolResults : []).some(
     (result) =>
@@ -380,22 +423,18 @@ const PRICE_NAME_SKIP = new Set([
 function pricedRows(profile) {
   const fieldMeta = profile?.fieldMeta || null;
   const rows = [];
-  for (const row of factServices(profile?.servicesCatalog, fieldMeta)) {
+  const push = (row, priceField) => {
     const name = String(row?.name || '')
       .replace(/\([^)]*\)/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    const price = String(row?.price_range || row?.priceRange || '').trim();
-    if (name && price && /\d/.test(price)) rows.push({ name, price });
-  }
-  for (const row of factProducts(profile?.productCatalog, fieldMeta)) {
-    const name = String(row?.name || '')
-      .replace(/\([^)]*\)/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    const price = String(row?.price || row?.price_range || row?.priceRange || '').trim();
-    if (name && price && /\d/.test(price)) rows.push({ name, price });
-  }
+    const norm = normalisePrice(row);
+    if (!name || !priceIsSpeakable(norm)) return;
+    const price = formatPriceDisplay(norm, 'en', legacyPriceText(row));
+    if (price) rows.push({ name, price, norm, legacy: legacyPriceText(row) });
+  };
+  for (const row of factServices(profile?.servicesCatalog, fieldMeta)) push(row);
+  for (const row of factProducts(profile?.productCatalog, fieldMeta)) push(row);
   return rows;
 }
 
@@ -416,8 +455,11 @@ function priceHits(profile, ask) {
 
 function formatFilePrice(hit, language) {
   const lang = confirmationLanguage(language);
-  if (lang === 'sw' || lang === 'sheng') return `${hit.name} ni ${hit.price}.`;
-  return `${hit.name} is ${hit.price}.`;
+  const refsOn = require('./factSheet').factRefsEnabled();
+  const norm = hit.norm || normalisePrice({ price_range: hit.price });
+  const price = midSentencePriceDisplay(norm, language, refsOn, hit.legacy || hit.price);
+  if (lang === 'sw' || lang === 'sheng') return `${hit.name} ni ${price}.`;
+  return `${hit.name} is ${price}.`;
 }
 
 function filePriceAnswer(profile, callerText, language = 'en') {
@@ -446,13 +488,25 @@ function groundFilePriceLine(opts = {}) {
   const language = opts.language || opts.state?.language?.current || 'en';
   const direct = filePriceAnswer(profile, text, language);
   if (direct) return direct;
+  // VOICE_FACT_REFS (HD_b070f6939775): borrowing an earlier turn's service is
+  // only for a bare "how much is it?". A question naming something else (the
+  // Kileleshwa travel fee) never gets that price, and the walk back stops at
+  // a turn about another topic: the call moved on from that service.
+  const refsOn = require('./factSheet').factRefsEnabled();
+  if (refsOn && namesOtherTopic(text, profile)) return '';
+  let movedOn = false;
   const turns = Array.isArray(opts.callerTurns) ? opts.callerTurns : [];
   for (let i = turns.length - 1; i >= 0; i -= 1) {
     const turn = String(turns[i] || '').trim();
     if (!turn || turn.toLowerCase() === text.toLowerCase()) continue;
     const hits = priceHits(profile, turn);
     if (hits.length === 1) return formatFilePrice(hits[0], language);
+    if (refsOn && namesOtherTopic(turn, profile)) {
+      movedOn = true;
+      break;
+    }
   }
+  if (movedOn) return '';
   const named = [
     entityValue(opts.state?.entities?.service),
     entityValue(opts.state?.entities?.product),
@@ -487,8 +541,7 @@ function catalogueRowNamedWithoutPrice(text, profile) {
     return name && name === want;
   });
   if (!row) return false;
-  const price = String(row.price_range || row.priceRange || row.price || '');
-  return !/\d/.test(price);
+  return !priceIsSpeakable(normalisePrice(row));
 }
 
 function unknownFallback(language) {
@@ -637,7 +690,10 @@ function guardSpokenReply(text, ctx = {}) {
   const clockAsk = trusted ? callerClockAsk(lastCallerForFacts) : '';
   const answerLanguage = trusted ? askLanguage(lastCallerForFacts, ctx.language) : ctx.language;
   let droppedClockAnswer = false;
-  const saved = toolSucceededThisTurn(ctx.toolResults);
+  // VOICE_FACT_REFS: work saved on an earlier turn of this call still backs
+  // "the team will call you" (6 of 13 judged saved_claim drops, 18 Oct).
+  const factRefsOn = require('./factSheet').factRefsEnabled();
+  const saved = toolSucceededThisTurn(ctx.toolResults) || (factRefsOn && workSavedThisCall(ctx.state));
   const holdOk = holdOrOrderSucceeded(ctx.toolResults);
   let droppedHoldPayment = false;
   const transferOk = Boolean(ctx.capabilities?.liveTransfer || ctx.capabilities?.transfer);
@@ -645,12 +701,13 @@ function guardSpokenReply(text, ctx = {}) {
   const holdOpenSlot = !saved && missing.length > 0;
   const allowedPlaces = [
     (Array.isArray(ctx.callerTurns) ? ctx.callerTurns : []).join(' '),
-    safeJson(ctx.profile),
+    profilePlacesJson(ctx.profile),
     safeJson(ctx.state?.entities || {}),
     String(ctx.extra || ''),
   ].join(' ');
   const kept = [];
   let droppedNumber = false;
+  const droppedNumberSentences = [];
   let droppedJob = false;
   let droppedUnboundFile = false;
   const lastCallerTurn = String((ctx.callerTurns || []).slice(-1)[0] || '');
@@ -706,6 +763,10 @@ function guardSpokenReply(text, ctx = {}) {
     }
     if (sentenceIsSpeechSlop(sentence, lastCallerTurn)) {
       noteDrop(ctx, 'slop', sentence);
+      continue;
+    }
+    if (SPOKEN_PLACEHOLDER_RE.test(sentence)) {
+      noteDrop(ctx, 'placeholder_price', sentence);
       continue;
     }
     if (ACTION_NARRATION.test(sentence)) {
@@ -771,6 +832,7 @@ function guardSpokenReply(text, ctx = {}) {
       !factKind
     ) {
       droppedNumber = true;
+      droppedNumberSentences.push(sentence);
       if (clockAsk) droppedClockAnswer = true;
       noteDrop(ctx, 'unsaid_number', sentence);
       continue;
@@ -831,7 +893,11 @@ function guardSpokenReply(text, ctx = {}) {
   const groundedPrice = cataloguePrice || speechPrice;
   if (groundedPrice) {
     const digit = String(groundedPrice).match(/\d[\d,]*/);
-    const already = Boolean(digit && out.includes(digit[0]));
+    // VOICE_FACT_REFS: a price the model said in words ("elfu moja na mia
+    // tano") is already said; do not add the digit line in front of it.
+    const already = Boolean(
+      digit && (out.includes(digit[0]) || (factRefsOn && numbersIn(out).has(digit[0].replace(/,/g, ''))))
+    );
     if (!already) {
       out = !out || NOT_ON_FILE.test(out) ? groundedPrice : `${groundedPrice} ${out}`;
     }
@@ -857,10 +923,36 @@ function guardSpokenReply(text, ctx = {}) {
     out = !out || NOT_ON_FILE.test(out) ? groundedClock : `${groundedClock} ${out}`;
   }
   const askedNumber = callerAskedNumber(lastCallerTurn, trusted);
+  // VOICE_FACT_REFS: a dropped number sentence is repaired with the owner's
+  // saved value for the fact it was about (or the caller asked about), in the
+  // caller's language. An unconfirmed fact gets the cannot-answer line. Once
+  // per caller turn: streamed sentences each pass through here.
+  let groundedFact = '';
+  if (factRefsOn && droppedNumber && !groundedPrice && !groundedHours && !groundedClock) {
+    const factSheet = require('./factSheet');
+    const fact = factSheet.findFactFor(
+      [...droppedNumberSentences, lastCallerTurn],
+      factSheet.factSheetFor(ctx.profile || {})
+    );
+    // No matching fact: the confirm line only when the caller asked for a
+    // number or nothing else is left to say. An unasked guess is just dropped,
+    // and the current time is never an owner fact.
+    const line = fact
+      ? factSheet.factSentence(fact, answerLanguage, ctx.profile)
+      : clockAsk || callerClockAsk(lastCallerTurn)
+        ? ''
+        : askedNumber || !out.trim()
+          ? factSheet.unknownAnswerLine(answerLanguage, ctx.profile)
+          : '';
+    if (line && !out.includes(line) && onceThisTurn(ctx, 'factRepairTurn')) groundedFact = line;
+  }
+  if (groundedFact) {
+    out = !out || NOT_ON_FILE.test(out) ? groundedFact : `${groundedFact} ${out}`;
+  }
   const priced = groundedPrice;
   if (out) {
     const lead =
-      !groundedPrice && !groundedHours && !groundedClock && askedNumber && droppedNumber
+      !groundedPrice && !groundedHours && !groundedClock && !groundedFact && askedNumber && droppedNumber
         ? unknownFallback(answerLanguage)
         : '';
     return withMessageOnlyCallback(lead ? `${lead} ${out}` : out, ctx, appendCallback);
@@ -906,4 +998,5 @@ module.exports = {
   numbersIn,
   splitSentences,
   toolSucceededThisTurn,
+  workSavedThisCall,
 };

@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { listDidPool, listPendingTenants, type DidPoolRow, type PendingTenant } from "@/lib/didPool";
+import { pendingFromBusinesses } from "@/lib/adminWaitingModel";
+import { listDidPool, type DidPoolRow, type PendingTenant } from "@/lib/didPool";
 import { loadBusinessPackageNames } from "@/lib/packageCatalog";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { businessLifecycle, preArchiveFromAudit, type PreArchiveBilling } from "@/lib/adminBusinessModel";
@@ -23,6 +24,8 @@ export type AdminBusiness = {
   status: "active" | "waiting" | "suspended" | "archived";
   /** Archived only: charging right before archive, for the Unarchive "as before" choice. */
   pre_archive: PreArchiveBilling | null;
+  /** Super Admin only. null = platform default. -1 = never. */
+  recording_retention_days_override: number | null;
 };
 
 /**
@@ -103,12 +106,19 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
     archived_at?: string | null;
     line_status?: string | null;
     suspended_at?: string | null;
+    recording_retention_days_override?: number | null;
   };
 
   const BASE =
     "id, created_at, business_name, sautikit_virtual_number, whatsapp_notification_number, is_active";
   // Optional columns, newest first. Each one drops out if the database does not have it yet.
-  let optional = ["billing_enforcement", "archived_at", "line_status", "suspended_at"];
+  let optional = [
+    "billing_enforcement",
+    "archived_at",
+    "line_status",
+    "suspended_at",
+    "recording_retention_days_override",
+  ];
   let data: BusinessRow[] | null = null;
   let error: { message: string } | null = null;
 
@@ -144,6 +154,10 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
           : "off",
       status: businessStatus(row),
       pre_archive: preArchive.get(String(row.id)) || null,
+      recording_retention_days_override:
+        row.recording_retention_days_override != null
+          ? row.recording_retention_days_override
+          : null,
     } as AdminBusiness;
   });
 }
@@ -154,10 +168,9 @@ export async function getAdminOverview(): Promise<AdminOverview> {
   const since = new Date();
   since.setDate(since.getDate() - 7);
 
-  const [businesses, pool, pendingBusinesses, callsRes] = await Promise.all([
+  const [businesses, pool, callsRes] = await Promise.all([
     listBusinesses(),
     listDidPool(),
-    listPendingTenants(),
     admin
       .from("calls")
       .select("id", { count: "exact", head: true })
@@ -165,6 +178,8 @@ export async function getAdminOverview(): Promise<AdminOverview> {
   ]);
 
   if (callsRes.error) throw callsRes.error;
+
+  const pendingBusinesses = pendingFromBusinesses(businesses);
 
   return {
     totalBusinesses: businesses.length,
@@ -181,4 +196,16 @@ export async function getAdminOverview(): Promise<AdminOverview> {
       (b) => b.status === "waiting" || (b.status === "active" && !b.package_name),
     ),
   };
+}
+
+export async function getAdminBusinessById(id: string): Promise<{
+  business: AdminBusiness;
+  availableDids: { e164: string }[];
+} | null> {
+  await requireSuperAdmin();
+  const [businesses, pool] = await Promise.all([listBusinesses(), listDidPool()]);
+  const business = businesses.find((row) => row.id === id);
+  if (!business) return null;
+  const availableDids = pool.filter((row) => row.status === "available").map((row) => ({ e164: row.e164 }));
+  return { business, availableDids };
 }
