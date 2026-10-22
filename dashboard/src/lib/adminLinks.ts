@@ -52,6 +52,7 @@ export type AdminTab = { href: string; label: string };
 
 /** Billing → tabs (ADMIN_V2). Collections joins with the Billing home slice. */
 export const ADMIN_BILLING_TABS: readonly AdminTab[] = [
+  { href: "/admin/billing/home", label: "Home" },
   { href: "/admin/billing/invoices", label: "Invoices" },
   { href: "/admin/billing/payments", label: "Payments" },
   { href: "/admin/billing/packages", label: "Packages" },
@@ -70,7 +71,7 @@ export const ADMIN_SETTINGS_TABS: readonly AdminTab[] = [
  */
 export function adminV2Redirect(pathname: string): string | null {
   const path = pathOnly(pathname);
-  if (path === "/admin/billing") return "/admin/billing/invoices";
+  if (path === "/admin/billing") return "/admin/billing/home";
   if (path === "/admin/packages" || path === "/admin/billing/catalog") return "/admin/billing/packages";
   if (path === "/admin/platform") return "/admin/settings/services";
   if (path === "/admin/voices") return "/admin/settings/voices";
@@ -79,7 +80,7 @@ export function adminV2Redirect(pathname: string): string | null {
   const biz = /^\/admin\/businesses\/([^/]+)$/.exec(path);
   if (biz) return `/admin/businesses?pane=${encodeURIComponent(decodeURIComponent(biz[1]))}`;
   const bill = /^\/admin\/billing\/([^/]+)$/.exec(path);
-  if (bill && !["invoices", "payments", "packages", "catalog", "collections"].includes(bill[1])) {
+  if (bill && !["home", "invoices", "payments", "packages", "catalog", "collections"].includes(bill[1])) {
     return `/admin/businesses?pane=${encodeURIComponent(decodeURIComponent(bill[1]))}&section=money`;
   }
   return null;
