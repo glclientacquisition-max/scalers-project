@@ -32,7 +32,7 @@ describe("platform run board", () => {
   });
 
   it("admin Platform page uses the run board without a vendor telecom headline", () => {
-    const page = read("dashboard/src/app/admin/(console)/platform/page.tsx");
+    const page = read("dashboard/src/app/admin/(console)/_screens/ServicesScreen.tsx");
     const board = read("dashboard/src/components/PlatformRunBoard.tsx");
     assert.match(page, /PlatformRunBoard/);
     assert.doesNotMatch(page, /SautikitTelecomPanel/);

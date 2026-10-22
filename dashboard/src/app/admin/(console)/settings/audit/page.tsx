@@ -1,3 +1,4 @@
+import { requireSuperAdmin } from "@/lib/adminGuard";
 import { notFound } from "next/navigation";
 import { AuditScreen } from "../../_screens/AuditScreen";
 
@@ -9,6 +10,7 @@ export default async function Page({
 }: {
   searchParams: Promise<{ business?: string; actor?: string }>;
 }) {
+  await requireSuperAdmin();
   if (process.env.ADMIN_V2 !== "on") notFound();
   return <AuditScreen searchParams={searchParams} />;
 }
