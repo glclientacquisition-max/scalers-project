@@ -3,6 +3,7 @@ import "server-only";
 import {
   businessHit,
   callHit,
+  callIdRange,
   commandQueryReady,
   escapeIlike,
   invoiceHit,
@@ -29,6 +30,7 @@ export async function adminCommandSearch(raw: string): Promise<CommandHit[]> {
   const like = `%${escapeIlike(q)}%`;
   const frag = numberFragment(q);
   const cap = PER_GROUP + 2;
+  const callRange = callIdRange(q);
 
   const [byName, byLine, pool, invoices, calls] = await Promise.all([
     admin.from("tenants").select(TENANT_COLS).ilike("business_name", like).order("business_name").limit(cap),
@@ -39,7 +41,9 @@ export async function adminCommandSearch(raw: string): Promise<CommandHit[]> {
       ? admin.from("sautikit_did_pool").select("id, e164, status, tenant_id").ilike("e164", `%${frag}%`).limit(cap)
       : Promise.resolve({ data: [], error: null }),
     admin.from("invoices").select("id, invoice_number, status, tenant_id").ilike("invoice_number", like).order("created_at", { ascending: false }).limit(cap),
-    admin.from("calls").select("id, tenant_id").ilike("id", `${escapeIlike(q)}%`).order("created_at", { ascending: false }).limit(cap),
+    callRange
+      ? admin.from("calls").select("id, tenant_id").gte("id", callRange.lo).lte("id", callRange.hi).order("created_at", { ascending: false }).limit(cap)
+      : Promise.resolve({ data: [], error: null }),
   ]);
   for (const r of [byName, byLine, pool, invoices, calls]) if (r.error) throw r.error;
 
