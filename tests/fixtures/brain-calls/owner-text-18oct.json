@@ -1,0 +1,830 @@
+{
+  "note": "18 Oct owner review (Desk REVIEW-2026-10-18). Read-only SELECT snapshot 2026-10-18 from staging D&D and prod Esga. Caller turns and agent lines from voice_turn_traces in turn order. Phones redacted; no recording paths or notify bodies. nameConfirmed: the file name the live call bound and the caller turn it was bound on (from the stored owner text).",
+  "calls": [
+    {
+      "callId": "HD_73fa119a7435",
+      "env": "staging",
+      "tenant": "dnd",
+      "startedAtEat": "2026-10-15T23:53",
+      "nameConfirmed": {
+        "name": "Alvin",
+        "atTurn": 2
+      },
+      "stored": {
+        "primary_intent": "human",
+        "resolution": "needs_human",
+        "resolution_note": "Alvin asked about We're leaving.",
+        "reason": "Alvin asked about We're leaving.",
+        "text": "Intent: human. Caller: Alvin. Goal: We're leaving",
+        "brain_summary": "Intent: human. Caller: Alvin. Goal: We're leaving",
+        "owner_review": {
+          "at": "2026-10-15T20:55:31.465Z",
+          "done": "None.",
+          "mood": "calm",
+          "next": "Call them back.",
+          "want": "Alvin asked about We're leaving.",
+          "reason": "Alvin asked about We're leaving.",
+          "urgent": false,
+          "applied": {
+            "card": true,
+            "intent": true,
+            "reason": true,
+            "resolution": true,
+            "topicsDropped": []
+          },
+          "confidence": 0.8,
+          "needs_human": true,
+          "needs_owner": false,
+          "primary_intent": "book_visit"
+        }
+      },
+      "facts": {
+        "intent": "book_visit",
+        "outcome": "info_only",
+        "secondary_intents": [
+          "product_info"
+        ],
+        "products_mentioned": [
+          {
+            "qty": null,
+            "name": "Carpet Cleaning",
+            "catalogue_key": "svc_4dc611dcf0e74b71",
+            "listed_price_ksh": 2200,
+            "quoted_price_ksh": 2200
+          }
+        ],
+        "unanswered_question": null,
+        "confidence": 0.8,
+        "language": "mixed"
+      },
+      "savedRows": [],
+      "turns": [
+        {
+          "turn": 1,
+          "caller": "Alvin, how are you? I'm calling to contact for joining services. Gani mnapenda?",
+          "language": "en",
+          "spoken": "We offer Apartment and House Cleaning, Deep Cleaning, Office Cleaning, and Mattress cleaning, and more. Which one do you need? Am I speaking with Alvin? Am I speaking with Alvin?"
+        },
+        {
+          "turn": 2,
+          "caller": "Yes, you're speaking with Alvin.",
+          "language": "en",
+          "spoken": "I am doing well, Alvin. Which service do you need? Which service would you like to request today?"
+        },
+        {
+          "turn": 3,
+          "caller": "Uh, where did we leave off last time?",
+          "language": "en",
+          "spoken": "Last time you were inquiring about carpet cleaning. How can I assist you with it today?"
+        },
+        {
+          "turn": 4,
+          "caller": "Eeh, Carpet",
+          "language": "en",
+          "spoken": null
+        },
+        {
+          "turn": 5,
+          "caller": "Cleaning. Could you remind me, like, like accurately, what Carpet Cleaning details were we— were.",
+          "language": "en",
+          "spoken": "Carpet Cleaning is From two thousand two hundred shillings per m²."
+        },
+        {
+          "turn": 6,
+          "caller": "We going through?",
+          "language": "en",
+          "spoken": "Our carpet cleaning is from two thousand two hundred shillings per square meter. What day and time would you like us to come?"
+        },
+        {
+          "turn": 7,
+          "caller": "We're leaving",
+          "language": "en",
+          "spoken": "For carpet cleaning, what day and time would you like us to come?"
+        }
+      ]
+    },
+    {
+      "callId": "HD_ad735da7fb01",
+      "env": "staging",
+      "tenant": "dnd",
+      "startedAtEat": "2026-10-07T20:09",
+      "nameConfirmed": {
+        "name": "Alvin",
+        "atTurn": null
+      },
+      "stored": {
+        "primary_intent": "human",
+        "resolution": "needs_human",
+        "resolution_note": null,
+        "reason": "Carpet cleaning. No name.",
+        "text": "Carpet cleaning. No name.",
+        "brain_summary": "Intent: human",
+        "owner_review": {
+          "at": "2026-10-12T18:42:34.528Z",
+          "done": "None.",
+          "mood": "calm",
+          "next": "Call them back.",
+          "want": "Alvin wanted to know the price for carpet cleaning.",
+          "reason": "Carpet cleaning. No name.",
+          "urgent": false,
+          "applied": {
+            "card": true,
+            "intent": false,
+            "reason": true,
+            "resolution": false
+          },
+          "confidence": 0.9,
+          "needs_human": true,
+          "needs_owner": false,
+          "primary_intent": "human"
+        }
+      },
+      "facts": {
+        "intent": "price_check",
+        "outcome": "callback",
+        "secondary_intents": [],
+        "products_mentioned": [
+          {
+            "qty": null,
+            "name": "carpet",
+            "catalogue_key": "svc_4dc611dcf0e74b71",
+            "listed_price_ksh": 2200,
+            "quoted_price_ksh": null
+          }
+        ],
+        "unanswered_question": "bei ya kuosha carpet",
+        "confidence": 0.9,
+        "language": "sw"
+      },
+      "savedRows": [],
+      "turns": []
+    },
+    {
+      "callId": "HD_b401138c8ffd",
+      "env": "staging",
+      "tenant": "dnd",
+      "startedAtEat": "2026-10-15T08:05",
+      "nameConfirmed": null,
+      "stored": {
+        "primary_intent": "human",
+        "resolution": "needs_human",
+        "resolution_note": null,
+        "reason": "Tomorrow. No name.",
+        "text": "Intent: human. Goal: mnawashangaa nini specifically",
+        "brain_summary": "Intent: human. Goal: mnawashangaa nini specifically",
+        "owner_review": {
+          "at": "2026-10-15T05:06:37.216Z",
+          "done": "None.",
+          "mood": "confused",
+          "next": "Call them back.",
+          "want": "Tomorrow. No name.",
+          "reason": "Tomorrow. No name.",
+          "urgent": false,
+          "applied": {
+            "card": true,
+            "intent": true,
+            "reason": true,
+            "resolution": false,
+            "topicsDropped": []
+          },
+          "confidence": 0.9,
+          "needs_human": true,
+          "needs_owner": false,
+          "primary_intent": "book_visit"
+        }
+      },
+      "facts": {
+        "intent": "book_visit",
+        "outcome": "callback",
+        "secondary_intents": [
+          "product_info"
+        ],
+        "products_mentioned": [],
+        "unanswered_question": "mnawashangaa nini specifically",
+        "confidence": 0.9,
+        "language": "mixed"
+      },
+      "savedRows": [],
+      "turns": [
+        {
+          "turn": 1,
+          "caller": "Nilikuwa nataka kumweka booking for tomorrow,",
+          "language": "unknown",
+          "spoken": null
+        },
+        {
+          "turn": 2,
+          "caller": "Nilikuwa nataka kumweka booking for tomorrow,",
+          "language": "sw",
+          "spoken": "Ungetaka tusafishe nini kesho?"
+        },
+        {
+          "turn": 3,
+          "caller": "uh, mnawashangaa nini specifically?",
+          "language": "sw",
+          "spoken": "Tunaweza kusaidia. Unahitaji huduma gani? Ungetaka huduma gani kesho?"
+        },
+        {
+          "turn": 4,
+          "caller": "Nyinyi mnawashangaa nini specifically?",
+          "language": "sw",
+          "spoken": "Tunaweza kusaidia. Unahitaji huduma gani? Je, ni ipi kati ya hizi ungetaka tukufanyie kesho?"
+        },
+        {
+          "turn": 5,
+          "caller": "What exactly? Can you tell me, like, which.",
+          "language": "en",
+          "spoken": "What do you need done? Ungependa huduma gani kesho?"
+        }
+      ]
+    },
+    {
+      "callId": "HD_c19044667595",
+      "env": "staging",
+      "tenant": "dnd",
+      "startedAtEat": "2026-10-13T22:57",
+      "nameConfirmed": {
+        "name": "Alvin",
+        "atTurn": 6
+      },
+      "stored": {
+        "primary_intent": "human",
+        "resolution": "needs_human",
+        "resolution_note": "Alvin asked about Just leave it at that.",
+        "reason": "Alvin asked about Just leave it at that.",
+        "text": "Intent: human. Caller: Alvin. Goal: Just leave it at that",
+        "brain_summary": "Intent: human. Caller: Alvin. Goal: Just leave it at that",
+        "owner_review": {
+          "at": "2026-10-13T19:59:39.600Z",
+          "done": "None.",
+          "mood": "calm",
+          "next": "Call them back.",
+          "want": "Alvin wanted to discuss a previous booking.",
+          "reason": "Alvin asked about Just leave it at that.",
+          "urgent": false,
+          "applied": {
+            "card": true,
+            "intent": true,
+            "reason": true,
+            "resolution": true,
+            "topicsDropped": []
+          },
+          "confidence": 0.9,
+          "needs_human": true,
+          "needs_owner": false,
+          "primary_intent": "general_enquiry"
+        }
+      },
+      "facts": {
+        "intent": "general_enquiry",
+        "outcome": "info_only",
+        "secondary_intents": [],
+        "products_mentioned": [],
+        "unanswered_question": null,
+        "confidence": 0.9,
+        "language": "en"
+      },
+      "savedRows": [],
+      "turns": [
+        {
+          "turn": 1,
+          "caller": "Uh, how are you doing?",
+          "language": "en",
+          "spoken": "I am doing well, thank you. How can I help you today?"
+        },
+        {
+          "turn": 2,
+          "caller": "I wanted to let you discuss about my previous— previous booking.",
+          "language": "en",
+          "spoken": "Before we check on that, am I speaking with Alvin?"
+        },
+        {
+          "turn": 3,
+          "caller": "I just speak with you like a minute ago.",
+          "language": "en",
+          "spoken": null
+        },
+        {
+          "turn": 4,
+          "caller": "I don't have to discuss about my previous booking.",
+          "language": "en",
+          "spoken": "Let me just confirm who I'm speaking with first. May I have your name?"
+        },
+        {
+          "turn": 5,
+          "caller": "Alvin.",
+          "language": "en",
+          "spoken": "I need to confirm who I am speaking with. I need to confirm who I am speaking with."
+        },
+        {
+          "turn": 6,
+          "caller": "Alvin is the name.",
+          "language": "en",
+          "spoken": "Thank you, Alvin. Regarding your enquiry for the 3-Bedroom House cleaning on Friday morning, how can I assist you with it?"
+        },
+        {
+          "turn": 7,
+          "caller": "Okay.",
+          "language": "en",
+          "spoken": "Would you like to book the 3-Bedroom House cleaning for Friday morning, or change the time?"
+        },
+        {
+          "turn": 8,
+          "caller": "Just leave it at that.",
+          "language": "en",
+          "spoken": "Okay, no problem. Is there anything else I can help you with today?"
+        },
+        {
+          "turn": 9,
+          "caller": "No.",
+          "language": "en",
+          "spoken": "Thank you for calling Done and Dusted Cleaning Services. Have a great day."
+        }
+      ]
+    },
+    {
+      "callId": "HD_f9b67efaf590",
+      "env": "staging",
+      "tenant": "dnd",
+      "startedAtEat": "2026-10-15T23:57",
+      "nameConfirmed": null,
+      "stored": {
+        "primary_intent": "human",
+        "resolution": "needs_human",
+        "resolution_note": "Caller asked about apartment cleaning services.",
+        "reason": "Caller asked about apartment cleaning services.",
+        "text": "Intent: human. Goal: Niulize, ni services gani mna- mna offer",
+        "brain_summary": "Intent: human. Goal: Niulize, ni services gani mna- mna offer",
+        "owner_review": {
+          "at": "2026-10-15T20:57:56.066Z",
+          "done": "None.",
+          "mood": "calm",
+          "next": "Call them back.",
+          "want": "The caller asked about apartment cleaning services.",
+          "reason": "Caller asked about apartment cleaning services.",
+          "urgent": false,
+          "applied": {
+            "card": true,
+            "intent": true,
+            "reason": true,
+            "resolution": true,
+            "topicsDropped": []
+          },
+          "confidence": 0.9,
+          "needs_human": true,
+          "needs_owner": false,
+          "primary_intent": "general_enquiry"
+        }
+      },
+      "facts": {
+        "intent": "general_enquiry",
+        "outcome": "callback",
+        "secondary_intents": [],
+        "products_mentioned": [
+          {
+            "qty": null,
+            "name": "usafi wa apartment",
+            "catalogue_key": null,
+            "listed_price_ksh": null,
+            "quoted_price_ksh": null
+          }
+        ],
+        "unanswered_question": null,
+        "confidence": 0.9,
+        "language": "sw"
+      },
+      "savedRows": [],
+      "turns": [
+        {
+          "turn": 1,
+          "caller": "Niulize?",
+          "language": "sw",
+          "spoken": "Je, naongea na Alvin? Je, naongea na Alvin?"
+        },
+        {
+          "turn": 2,
+          "caller": "Niulize, ni services gani mna- mna offer?",
+          "language": "sw",
+          "spoken": "Tunafanya usafi wa magodoro, sofa, mazulia, madirisha, usafi wa nyumba kulingana na ukubwa, usafi wa kina, kama wa kuhamia au baada ya ujenzi na usafi wa maofisi. Ungependa ipi? Tuna Apartment na House Cleaning, Deep Cleaning, Office Cleaning, na Mattress cleaning, na zingine. Unahitaji gani?"
+        },
+        {
+          "turn": 3,
+          "caller": "Karibu.",
+          "language": "sw",
+          "spoken": "Tuna-offer 1-Bedroom, 2-Bedroom na 3-Bedroom apartment cleaning, mattress, sofa na carpet cleaning, move-in move-out clean, deep cleaning, na office cleaning. Ungependa gani kati ya hizi?"
+        },
+        {
+          "turn": 4,
+          "caller": "Hebu niambie kuhusu hiyo usafi wa apartment",
+          "language": "sw",
+          "spoken": "Kwa apartment cleaning, 1-Bedroom ni shilingi elfu tatu, 2-Bedroom ni shilingi elfu nne na mia tano, na 3-Bedroom ni shilingi elfu sita. Hii inahusisha dusting, vacuuming, mopping, sanitation ya bafu na jikoni. Ungependa kubook gani?"
+        }
+      ]
+    },
+    {
+      "callId": "HD_740090e11a2f",
+      "env": "prod",
+      "tenant": "esga",
+      "startedAtEat": "2026-10-16T07:52",
+      "nameConfirmed": null,
+      "stored": {
+        "primary_intent": "human",
+        "resolution": "needs_human",
+        "resolution_note": "Caller asked about Chris and requested directions.",
+        "reason": "Caller asked about Chris and requested directions.",
+        "text": "Intent: human. Goal: Chris",
+        "brain_summary": "Intent: human. Goal: Chris",
+        "owner_review": {
+          "at": "2026-10-16T04:53:26.474Z",
+          "done": "None",
+          "mood": "urgent",
+          "next": "Call them back.",
+          "want": "The caller asked for Chris and wanted directions to the shop.",
+          "reason": "Caller asked about Chris and requested directions.",
+          "urgent": false,
+          "applied": {
+            "card": true,
+            "intent": true,
+            "reason": true,
+            "resolution": true
+          },
+          "confidence": 0.8,
+          "needs_human": true,
+          "needs_owner": false,
+          "primary_intent": "human"
+        }
+      },
+      "facts": {
+        "intent": "human_request",
+        "outcome": "callback",
+        "secondary_intents": [
+          "directions"
+        ],
+        "products_mentioned": [],
+        "unanswered_question": "Uko wapi?",
+        "confidence": 0.8,
+        "language": "mixed"
+      },
+      "savedRows": [],
+      "turns": [
+        {
+          "turn": 1,
+          "caller": "Hello?",
+          "language": "en",
+          "spoken": null
+        },
+        {
+          "turn": 2,
+          "caller": "Chris.",
+          "language": "en",
+          "spoken": "How can I help you regarding Chris?"
+        },
+        {
+          "turn": 3,
+          "caller": "Angalia, hujafika kwa duka?",
+          "language": "sw",
+          "spoken": null
+        },
+        {
+          "turn": 4,
+          "caller": "Ninasema hivyo.",
+          "language": "sw",
+          "spoken": "Habari. Sisi tuko wazi leo kuanzia saa moja asubuhi hadi saa moja jioni. Ungependa kusaidiwa na nini dukani?"
+        },
+        {
+          "turn": 5,
+          "caller": "Uko wapi?",
+          "language": "sw",
+          "spoken": "Tuko na matawi matatu Na-koo-roo, Uchumi Main branch opposite Cleanshelf, Kirathimo branch Free Area stage, na Flamco branch Mosque Lane. Ungetaka kwenda gani?"
+        },
+        {
+          "turn": 6,
+          "caller": "oy?",
+          "language": "sw",
+          "spoken": null
+        },
+        {
+          "turn": 7,
+          "caller": "Mtu ako na labda nieleze.",
+          "language": "sw",
+          "spoken": "Sawa, nikusaidie na maelekezo ya kufika gani kati ya Uchumi Main, Kirathimo, au Flamco branch?"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e6d2aca7886c",
+      "env": "prod",
+      "tenant": "esga",
+      "startedAtEat": "2026-10-13T10:31",
+      "nameConfirmed": {
+        "name": "Chris",
+        "atTurn": 5
+      },
+      "stored": {
+        "primary_intent": "order_enquiry",
+        "resolution": "resolved",
+        "resolution_note": "Request saved (enquiry)",
+        "reason": "Chris wanted to order a long list of items.",
+        "text": "Chris wanted to order a long list of items.",
+        "brain_summary": "Intent: order_enquiry. Caller: Chris. Goal: Have you saved. Products: Because it's a really long. Actions: enquiry. From began yellow. Instructions: Caller mentioned from began yellow for long order list",
+        "owner_review": {
+          "at": "2026-10-13T07:32:29.913Z",
+          "done": "Hold saved; awaiting owner Done.",
+          "mood": "calm",
+          "next": "None.",
+          "want": "Chris wanted to order a long list of items.",
+          "reason": "Chris wanted to order a long list of items.",
+          "urgent": false,
+          "applied": {
+            "card": true,
+            "intent": false,
+            "reason": true,
+            "resolution": false
+          },
+          "confidence": 0.9,
+          "needs_human": false,
+          "needs_owner": true,
+          "primary_intent": "hold_or_pickup"
+        }
+      },
+      "facts": {
+        "intent": "order_place",
+        "outcome": "hold",
+        "secondary_intents": [],
+        "products_mentioned": [],
+        "unanswered_question": null,
+        "confidence": 0.9,
+        "language": "mixed"
+      },
+      "savedRows": [
+        {
+          "request_type": "enquiry",
+          "status": "open",
+          "item": "Long list of stationery items",
+          "quantity": null,
+          "when_text": null,
+          "notes": "Caller has a long order list and needs team assistance"
+        },
+        {
+          "request_type": "enquiry",
+          "status": "open",
+          "item": "From began yellow",
+          "quantity": null,
+          "when_text": null,
+          "notes": "Caller mentioned from began yellow for long order list"
+        }
+      ],
+      "turns": [
+        {
+          "turn": 1,
+          "caller": "I'm Lucy. Nilikuwa nataka ku-order vitu,",
+          "language": "unknown",
+          "spoken": null
+        },
+        {
+          "turn": 2,
+          "caller": "I'm Lucy. Nilikuwa nataka ku-order vitu,",
+          "language": "sw",
+          "spoken": "Karibu Lucy. Ungependa ku-order vitu gani au bidhaa gani specifically?"
+        },
+        {
+          "turn": 3,
+          "caller": "um, it's a long list. Sijui how we can proceed.",
+          "language": "sw",
+          "spoken": "Unaweza kunitajia hizo bidhaa moja baada ya nyingine, au nikuunganishe na timu yetu wazichukue zote kwa pamoja?"
+        },
+        {
+          "turn": 4,
+          "caller": "Because it's a really long",
+          "language": "en",
+          "spoken": "Tell me your name so I can save the request."
+        },
+        {
+          "turn": 5,
+          "caller": "Naitwa Chris.",
+          "language": "sw",
+          "spoken": "Nimehifadhi ombi lako."
+        },
+        {
+          "turn": 6,
+          "caller": "From began yellow.",
+          "language": "en",
+          "spoken": "I've saved your request."
+        },
+        {
+          "turn": 7,
+          "caller": "Which request?",
+          "language": "en",
+          "spoken": null
+        },
+        {
+          "turn": 8,
+          "caller": "Have you saved?",
+          "language": "sw",
+          "spoken": "Samahani, sema tena? Samahani, sema tena?"
+        },
+        {
+          "turn": 9,
+          "caller": "No.",
+          "language": "en",
+          "spoken": null
+        }
+      ]
+    },
+    {
+      "callId": "HD_dfd531f8b083",
+      "env": "prod",
+      "tenant": "esga",
+      "startedAtEat": "2026-10-13T15:13",
+      "nameConfirmed": null,
+      "stored": {
+        "primary_intent": "order_enquiry",
+        "resolution": "resolved",
+        "resolution_note": "Request saved (enquiry)",
+        "reason": "Do I need left a hold. Cartons 10 JK copy paper, pens za Damasa 20, erasers za Nataraj 15, counter book, dollar pens boxes 3, cartons 5 za big paper, na cartons 50 za Kasuku A5 notebooks",
+        "text": "Intent: order_enquiry. Caller: Do I need. Goal: Ni ngapi. Nikupe 50 cartons. Products: Cartons kama 10 za J. Actions: enquiry. Cartons 10 JK copy paper, pens za Damasa 20, erasers za Nataraj 15, counter book, dollar pens boxes 3, cartons 5 za big paper, na cartons 50 za Kasuku . Instructions: Mteja ameongeza cartons 50 za Kasuku A5 notebooks",
+        "brain_summary": "Intent: order_enquiry. Caller: Do I need. Goal: Ni ngapi. Nikupe 50 cartons. Products: Cartons kama 10 za J. Actions: enquiry. Cartons 10 JK copy paper, pens za Damasa 20, erasers za Nataraj 15, counter book, dollar pens boxes 3, cartons 5 za big paper, na cartons 50 za Kasuku . Instructions: Mteja ameongeza cartons 50 za Kasuku A5 notebooks",
+        "owner_review": null
+      },
+      "facts": null,
+      "savedRows": [
+        {
+          "request_type": "enquiry",
+          "status": "open",
+          "item": "Cartons 10 JK copy paper, pens za Damasa 20, erasers za Nataraj 15, counter book, dollar pens boxes 3",
+          "quantity": "Mbalimbali",
+          "when_text": null,
+          "notes": "Mteja anataka kununua bidhaa hizi za stationery"
+        },
+        {
+          "request_type": "enquiry",
+          "status": "open",
+          "item": "Cartons 10 JK copy, Damasa pens 20, Nataraj erasers 15, counter book, dollar pens 3 boxes, na cartons 5 za big paper",
+          "quantity": "Mbalimbali",
+          "when_text": null,
+          "notes": "Mteja ameongeza cartons 5 za big paper"
+        },
+        {
+          "request_type": "enquiry",
+          "status": "open",
+          "item": "Cartons 10 JK copy paper, pens za Damasa 20, erasers za Nataraj 15, counter book, dollar pens boxes 3, cartons 5 za big paper, na cartons 50 za Kasuku A5 notebooks",
+          "quantity": "Mbalimbali",
+          "when_text": null,
+          "notes": "Mteja ameongeza cartons 50 za Kasuku A5 notebooks"
+        }
+      ],
+      "turns": [
+        {
+          "turn": 1,
+          "caller": "Um, nilikuwa nataka kununua",
+          "language": "sw",
+          "spoken": null
+        },
+        {
+          "turn": 2,
+          "caller": "Cartons kama 10 za J",
+          "language": "en",
+          "spoken": null
+        },
+        {
+          "turn": 3,
+          "caller": "FK, cartons kama 10 za",
+          "language": "en",
+          "spoken": null
+        },
+        {
+          "turn": 4,
+          "caller": "JK copy, I mean,",
+          "language": "en",
+          "spoken": null
+        },
+        {
+          "turn": 5,
+          "caller": "JK copy, I mean, and something else is— nilikuwa nataka pia pens",
+          "language": "sw",
+          "spoken": null
+        },
+        {
+          "turn": 6,
+          "caller": "ya za Damasa, 20",
+          "language": "sw",
+          "spoken": "Tunazo. Taja jina lako tafadhali ili niweze kukuwekea ombi hili?"
+        },
+        {
+          "turn": 7,
+          "caller": ", and then erasers za Nataraj, 15, and then also counter. Halafu",
+          "language": "sw",
+          "spoken": null
+        },
+        {
+          "turn": 8,
+          "caller": ", and then erasers za Nataraj, 15, and then also counter. Halafu pia, halafu pia— si, sik",
+          "language": "sw",
+          "spoken": null
+        },
+        {
+          "turn": 9,
+          "caller": "ize— halafu pia kuna nataka n",
+          "language": "sw",
+          "spoken": "Sawa, nimepata hizo. Nipe jina lako tafadhali ndio nisaidie kuandika hiyo list yote?"
+        },
+        {
+          "turn": 10,
+          "caller": "ini kingine? Na kuna pens, hizi dollar pens, nilikuwa nataka 3 boxes, and one. Also want water.",
+          "language": "sw",
+          "spoken": null
+        },
+        {
+          "turn": 11,
+          "caller": "Do I need?",
+          "language": "en",
+          "spoken": "I've saved your request."
+        },
+        {
+          "turn": 12,
+          "caller": "I need— I need— I need— I need—",
+          "language": "en",
+          "spoken": null
+        },
+        {
+          "turn": 13,
+          "caller": "I need— I need— I need— I need— 5 cartons of big,",
+          "language": "en",
+          "spoken": null
+        },
+        {
+          "turn": 14,
+          "caller": "I need— I need— I need— I need— 5 cartons of big,",
+          "language": "sw",
+          "spoken": "Unahitaji huduma gani? Nimehifadhi ombi lako."
+        },
+        {
+          "turn": 15,
+          "caller": "Huduma?",
+          "language": "sw",
+          "spoken": "Ndio, tunakusaidia. Mambo mengine yote nimeandika, kuna kitu kingine ungependa kuongeza?"
+        },
+        {
+          "turn": 16,
+          "caller": "Um, mm-hm, maybe",
+          "language": "en",
+          "spoken": null
+        },
+        {
+          "turn": 17,
+          "caller": "maybe",
+          "language": "en",
+          "spoken": "Ukiwa tayari unaweza kuniambia, au hiyo orodha inatosha?"
+        },
+        {
+          "turn": 18,
+          "caller": "Notebooks, za.",
+          "language": "sw",
+          "spoken": "Notebooks za aina gani na unahitaji ngapi ndio niongeze kwa orodha yako?"
+        },
+        {
+          "turn": 19,
+          "caller": "Notebooks za Kasuku, A5.",
+          "language": "en",
+          "spoken": "Unahitaji notebooks za Kasuku A5 ngapi ndio nikamilishe orodha yako?"
+        },
+        {
+          "turn": 20,
+          "caller": "50 cartons.",
+          "language": "en",
+          "spoken": "light Sheng, Sheng"
+        },
+        {
+          "turn": 21,
+          "caller": "50, 50 boxes.",
+          "language": "sw",
+          "spoken": "Nimehifadhi ombi lako."
+        },
+        {
+          "turn": 22,
+          "caller": "Ni ngapi? Nikupe 50 cartons.",
+          "language": "sw",
+          "spoken": "Hatuna bei ya papo hapo kwa simu. Sawa."
+        },
+        {
+          "turn": 23,
+          "caller": "Ni hivyo ama?",
+          "language": "sw",
+          "spoken": null
+        },
+        {
+          "turn": 24,
+          "caller": "Ni hivyo ama?",
+          "language": "sw",
+          "spoken": null
+        },
+        {
+          "turn": 25,
+          "caller": "Hapana.",
+          "language": "en",
+          "spoken": "Asante sana kwa kupiga simu Esga Stationery. Uwe na siku njema."
+        }
+      ]
+    }
+  ]
+}

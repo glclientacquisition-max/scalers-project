@@ -104,12 +104,17 @@ function deriveCallSummary(opts = {}) {
 
   const name = safeCallerName(state);
   const goal = safeGoalDescription(state.goal?.description || '');
+  // BRAIN_CALL_FIXES_D199 (18 Oct owner review 1, 2): summary.topic, and the
+  // owner line built from it, never from the caller's raw goal words.
+  const ownerTextOn = fixesD199.callFixesD199Enabled();
+  const topicOut = ownerTextOn ? summaryTopicFor(state, results, primaryIntent, goal) : null;
   const reason = buildOwnerReason({
     callerName: name,
     primaryIntent,
     goal,
     products,
     results,
+    ...(topicOut ? { topic: topicOut.topic, topicSource: topicOut.source, person: topicOut.person } : {}),
   });
   const bits = [];
   if (primaryIntent) bits.push(`Intent: ${primaryIntent}`);
@@ -138,11 +143,28 @@ function deriveCallSummary(opts = {}) {
     instructions,
     callerName: name || null,
     language: state.language?.current || null,
+    ...(topicOut ? { topic: topicOut.topic, topicSource: topicOut.source } : {}),
   };
 }
 
-function buildOwnerReason({ callerName, primaryIntent, goal, products, results }) {
+function summaryTopicFor(state, results, primaryIntent, goal) {
+  const topics = require('./ownerTopic');
+  const person = state.conversation?.personAsked?.name ? state.conversation.personAsked : null;
+  const out = topics.summaryTopic({
+    results,
+    hits: state.conversation?.topicHits || [],
+    intent: primaryIntent,
+    person,
+    names: state.conversation?.topicHits || [],
+    cues: state.conversation?.topicCues || [],
+    goal,
+  });
+  return { ...out, person };
+}
+
+function buildOwnerReason({ callerName, primaryIntent, goal, products, results, topic, topicSource, person }) {
   const who = callerName || 'Caller';
+  const ownerTextOn = topic !== undefined;
   const rows = Array.isArray(results) ? results : [];
   const hold = rows.find(
     (row) =>
@@ -157,8 +179,24 @@ function buildOwnerReason({ callerName, primaryIntent, goal, products, results }
   );
 
   if (hold) {
-    const item = hold.value?.item || products?.[0] || '';
+    let item = hold.value?.item || products?.[0] || '';
+    // BRAIN_CALL_FIXES_D199 (18 Oct owner review 5): a list or a garbled
+    // piece is not read back as the item.
     const when = hold.value?.whenText || hold.value?.when_text || '';
+    if (ownerTextOn) {
+      item = topicSource === 'saved_row' ? topic : '';
+      const type = String(hold.requestType || hold.value?.type || '').toLowerCase();
+      const did =
+        type === 'enquiry'
+          ? 'left an enquiry'
+          : type === 'callback'
+            ? 'asked for a callback'
+            : type === 'order'
+              ? 'placed an order'
+              : 'left a hold';
+      const about = item ? ` about ${item.replace(/[.?!]+$/g, '')}` : '; the item was not clear';
+      return clean(`${who} ${did}${about}.${when ? ` ${when}.` : ''}`, 220);
+    }
     return clean([`${who} left a hold`, item, when].filter(Boolean).join('. '), 220);
   }
   if (visit) {
@@ -181,6 +219,9 @@ function buildOwnerReason({ callerName, primaryIntent, goal, products, results }
       return clean([`${who} ${verb}`, service, when].filter(Boolean).join('. '), 220);
     }
     return VISIT_REQUESTED_NOTE;
+  }
+  if (ownerTextOn) {
+    return require('./ownerTopic').ownerReasonFromTopic({ who, topic, person, primaryIntent });
   }
   if (primaryIntent === 'human') {
     return clean(`${who} needs you to return the call.`, 220);

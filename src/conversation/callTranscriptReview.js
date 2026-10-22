@@ -272,8 +272,42 @@ function stillWantedWhen(when) {
   return text;
 }
 
+const UNFINISHED_VERB = {
+  book_visit: 'to book',
+  booking: 'to book',
+  reschedule: 'to move',
+  cancel: 'to cancel',
+  cancellation: 'to cancel',
+};
+
+/**
+ * BRAIN_CALL_FIXES_D199 (18 Oct owner review 2): a sentence, never
+ * "Tomorrow. No name.": "Caller wanted to book a visit for tomorrow."
+ */
+function unfinishedSentence(flags) {
+  const topics = require('./ownerTopic');
+  const service = topics.topicName(cleanPiece(flags?.service)) || cleanPiece(flags?.topicName);
+  const place = cleanPiece(flags?.place);
+  let when = stillWantedWhen(flags?.when);
+  const who = cleanPiece(flags?.callerName) || 'Caller';
+  const intent = String(flags?.intent || '').toLowerCase();
+  const verb = UNFINISHED_VERB[intent] || (service || when ? 'to book' : '');
+  if (!verb) return '';
+  const object = service
+    ? service.charAt(0).toLowerCase() + service.slice(1)
+    : verb === 'to book'
+      ? 'a visit'
+      : 'their visit';
+  if (when && !/^(?:in|on|at|for|by|from|this|next|today|tonight)\b/i.test(when)) when = `for ${when.toLowerCase()}`;
+  const parts = [`${who} wanted ${verb} ${object}`];
+  if (place) parts.push(`in ${place}`);
+  if (when) parts.push(when);
+  return `${parts.join(' ').replace(/\s+/g, ' ').trim()}.`;
+}
+
 /** Last place and time they still wanted. No invented name. No refused facts. */
 function unfinishedWant(flags) {
+  if (require('./callFixesD199').callFixesD199Enabled()) return unfinishedSentence(flags);
   const service = cleanPiece(flags?.service);
   const place = cleanPiece(flags?.place);
   const when = stillWantedWhen(flags?.when);
@@ -564,6 +598,10 @@ function toolFlagsFromBrain(brainState, callId = null) {
           enquirySaved: Boolean(hold) && !realHold && holdType !== 'callback',
           enquiryItem: String(hold?.value?.item || hold?.record?.item || '').trim(),
           holdKind: hold ? holdType || 'hold' : null,
+          // 18 Oct owner review (4): the team member a bare-name turn asked for.
+          personAsked: brainState?.conversation?.personAsked?.name
+            ? { ...brainState.conversation.personAsked }
+            : null,
         }
       : {}),
     holdSaved: ok('create_service_request'),
@@ -667,7 +705,89 @@ function closingAsGoal(text) {
   return Boolean(match && require('./callFixesD199').notAGoal(match[1]));
 }
 
-function mergeTranscriptReview({ derived, summary, toolFlags, review, vertical, callerTurns } = {}) {
+function mergeTranscriptReview(opts = {}) {
+  if (!require('./callFixesD199').callFixesD199Enabled()) return mergeTranscriptReviewCore(opts);
+  // 18 Oct owner review (2): an unfinished visit names the catalogue topic
+  // when no service entity was held ("Alvin wanted to book carpet cleaning.").
+  const source = opts.summary?.topicSource;
+  const topicName =
+    opts.summary?.topic && (source === 'catalogue' || source === 'saved_row') ? opts.summary.topic : '';
+  const toolFlags = topicName ? { ...(opts.toolFlags || {}), topicName } : opts.toolFlags;
+  const out = mergeTranscriptReviewCore({ ...opts, toolFlags });
+  return finalizeOwnerText(out, { ...opts, toolFlags });
+}
+
+/**
+ * BRAIN_CALL_FIXES_D199 (18 Oct owner review 1, 2, 4, 6): the owner text is
+ * readable and true.
+ * - "asked about <caller words>" / a closing is rebuilt from summary.topic,
+ *   else the reviewer's want, else the intent label.
+ * - "asked about Chris" -> "asked for Chris (Manager)".
+ * - mood "urgent" only with review.urgent.
+ * - topic carried to the write (summary.topic).
+ */
+function finalizeOwnerText(out, { summary, toolFlags, review, callerTurns, derived } = {}) {
+  const topics = require('./ownerTopic');
+  const flags = toolFlags || {};
+  const turns = Array.isArray(callerTurns) ? callerTurns : [];
+  const person = flags.personAsked?.name ? flags.personAsked : null;
+  const who =
+    cleanPiece(flags.callerName) ||
+    (String(out.reason || '').match(/^([A-Z][\p{L}'-]+) (?:asked|wanted|needs|called)\b/u) || [])[1] ||
+    'Caller';
+  const intent = out.reviewKind || out.primaryIntent || derived?.primaryIntent || '';
+  let topic = summary && Object.prototype.hasOwnProperty.call(summary, 'topic') ? summary.topic || null : undefined;
+  let topicSource = topic ? summary.topicSource || null : null;
+  if (topic === undefined) {
+    // Sweep and replays: no hangup topic stored; the intent label only.
+    topic = topics.intentTopic(intent, { person }) || null;
+    topicSource = topic ? 'intent' : null;
+  }
+  // A saved row or a catalogue name beats the reviewer's sentence; an intent
+  // label ("booking a visit") does not.
+  const strongTopic = Boolean(topic) && topicSource !== 'intent';
+  const bad = (text) =>
+    !cleanPiece(text) ||
+    /\bno name\.?$/i.test(cleanPiece(text)) ||
+    closingAsGoal(text) ||
+    topics.askedAboutIsCallerWords(text, turns);
+  const reviewWant = review ? cleanReason(review.want || '') : '';
+  const usableReviewWant = !bad(reviewWant) && reviewWant.length >= REASON_MIN;
+  // "Caller called. No clear ask." from the hangup line gives way to the reviewer's sentence.
+  if (/\bcalled\. No clear ask\.$/.test(cleanPiece(out.reason)) && usableReviewWant && !person && !strongTopic) {
+    out.reason = reviewWant;
+    out.applied.reason = true;
+  }
+  const rebuild = () => {
+    if (person || strongTopic) return topics.ownerReasonFromTopic({ who, topic, person, primaryIntent: intent });
+    if (usableReviewWant) return reviewWant;
+    return topics.ownerReasonFromTopic({ who, topic, person: null, primaryIntent: intent });
+  };
+  if (bad(out.reason) && out.reason !== VISIT_REQUESTED_NOTE) {
+    out.reason = rebuild();
+    out.applied.reason = true;
+  }
+  if (cleanPiece(out.want) && bad(out.want)) {
+    out.want = usableReviewWant ? reviewWant : out.reason;
+    out.applied.card = true;
+  }
+  if (person) {
+    const reason = topics.askedForPerson(out.reason, person);
+    const want = topics.askedForPerson(out.want, person);
+    if (reason !== out.reason) out.applied.reason = true;
+    if (want !== out.want) out.applied.card = true;
+    out.reason = reason;
+    out.want = want;
+  }
+  if (out.mood === 'urgent' && review?.urgent !== true) out.mood = 'unknown';
+  out.topic = topic || null;
+  // The hangup patch (Voice) does not persist topic, so the review writes it
+  // whenever there is one.
+  if (out.topic !== null) out.applied.topic = true;
+  return out;
+}
+
+function mergeTranscriptReviewCore({ derived, summary, toolFlags, review, vertical, callerTurns } = {}) {
   const flags = toolFlags || {};
   const derivedIntent = derived?.primaryIntent || null;
   const derivedResolution = derived?.resolution || 'unknown';
@@ -1267,7 +1387,7 @@ function withSummaryWriteLock(callSid, fn) {
   return run;
 }
 
-async function defaultSaveFacts({ callSid, ctx, review, turns }) {
+async function defaultSaveFacts({ callSid, ctx, review, turns, merged }) {
   const db = require('../db');
   const call = ctx.call || (await db.getCall(callSid));
   if (!call?.id || !call?.tenant_id) return null;
@@ -1283,6 +1403,7 @@ async function defaultSaveFacts({ callSid, ctx, review, turns }) {
     callerText,
     catalogue,
     model: process.env.POST_CALL_REVIEW_MODEL || 'gemini',
+    merged,
   });
   return db.upsertCallFacts(row);
 }
@@ -1320,8 +1441,11 @@ async function writeReviewedSummary({ callSid, merged, review, derived, summary 
         merged.reviewKind !== undefined ? merged.reviewKind : review?.primary_intent || null,
       applied: merged.applied,
       at: new Date().toISOString(),
+      ...(merged.topic !== undefined ? { topic: merged.topic } : {}),
     },
   };
+  // BRAIN_CALL_FIXES_D199 (18 Oct owner review 1): summary.topic for Desk.
+  if (merged.topic !== undefined) patch.topic = merged.topic;
   if (merged.reason) {
     patch.reason = merged.reason;
     patch.text = merged.reason;
@@ -1581,7 +1705,7 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
   try {
     // Injected save (tests, replays) means no live db; facts then only via deps.saveFacts.
     const saveFacts = deps.saveFacts || (deps.save ? null : defaultSaveFacts);
-    if (saveFacts) await saveFacts({ callSid, ctx, review, turns });
+    if (saveFacts) await saveFacts({ callSid, ctx, review, turns, merged });
   } catch (err) {
     console.warn(`[transcript-review] ${callSid} call_facts failed:`, err?.message || err);
   }
@@ -1590,7 +1714,8 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
     !merged.applied.reason &&
     !merged.applied.intent &&
     !merged.applied.resolution &&
-    !merged.applied.card
+    !merged.applied.card &&
+    !merged.applied.topic
   ) {
     return { ok: true, skipped: true, merged, review };
   }
@@ -1684,4 +1809,5 @@ module.exports = {
   recordReviewStatus,
   schedulePostCallTranscriptReview,
   toolFlagsFromBrain,
+  writeReviewedSummary,
 };

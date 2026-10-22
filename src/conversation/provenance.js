@@ -227,6 +227,42 @@ function isPackPolicyText(text) {
   return PACK_POLICY_KEYS.has(norm(text));
 }
 
+// BRAIN_CALL_FIXES_D199 (18 Oct owner review 5): starter policy lines the
+// owner never rewrote. A line telling the receptionist what to do is an
+// instruction, not a fact for the caller; a line that is the starter
+// sentence with a word or two changed is still the starter.
+const RECEPTIONIST_INSTRUCTION =
+  /\b(?:the|our|this) (?:receptionist|assistant|agent|ai|bot)\b[^.]*\b(?:should|must|will|shall|needs? to|is to)\b|\b(?:it|she|he|they) should (?:route|redirect|transfer|refer|direct) the caller\b|\broute the caller\b/i;
+
+function isReceptionistInstruction(text) {
+  return RECEPTIONIST_INSTRUCTION.test(String(text || ''));
+}
+
+function tokenSet(value) {
+  return new Set(norm(value).split(' ').filter(Boolean));
+}
+
+/** Token Jaccard >= 0.85 with a starter line of similar length (punctuation ignored). */
+function isNearPackPolicyText(text) {
+  const mine = tokenSet(text);
+  if (mine.size < 4) return false;
+  for (const pack of PACK_POLICY_TEXTS) {
+    const theirs = tokenSet(pack);
+    let shared = 0;
+    for (const word of mine) if (theirs.has(word)) shared += 1;
+    const union = mine.size + theirs.size - shared;
+    if (union && shared / union >= 0.85) return true;
+  }
+  return false;
+}
+
+/** Flag on: exact starter, near-duplicate starter, or a receptionist instruction. */
+function isSeedPolicyText(text) {
+  if (isPackPolicyText(text)) return true;
+  if (!require('./callFixesD199').callFixesD199Enabled()) return false;
+  return isNearPackPolicyText(text) || isReceptionistInstruction(text);
+}
+
 function isPackService(row) {
   if (!row || typeof row !== 'object') return false;
   const price = row.price_range || row.priceRange || row.price || '';
@@ -356,7 +392,7 @@ function classifyFaq(faq, fieldMeta = null, fieldPath = '') {
 function classifyPolicyValue(text, meta, fieldMeta = null, fieldPath = '') {
   const value = String(text || '').trim();
   if (!value) return { source: '', confirmed: false, fact: false, status: 'suggested', empty: true };
-  const packSeed = isPackPolicyText(value);
+  const packSeed = isSeedPolicyText(value);
   const base = meta && typeof meta === 'object' && Object.keys(meta).length
     ? meta
     : { source: packSeed ? 'seed' : '' };
@@ -603,7 +639,7 @@ function buildCompileSections({
     const kept = [];
     for (const line of policyBody.split('\n')) {
       const match = line.match(/^-\s*([^:]+):\s*(.+)$/);
-      if (match && isPackPolicyText(match[2])) {
+      if (match && isSeedPolicyText(match[2])) {
         const label = match[1].trim();
         if (!unknown.includes(label)) unknown.push(label);
         continue;
@@ -773,6 +809,9 @@ module.exports = {
   classifyFaq,
   isPackFaq,
   isPackPolicyText,
+  isSeedPolicyText,
+  isNearPackPolicyText,
+  isReceptionistInstruction,
   isPackService,
   factPolicyMap,
   factProducts,
