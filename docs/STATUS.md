@@ -1,48 +1,84 @@
 ---
 owner: platform
-last_reviewed: 2026-10-20
+last_reviewed: 2026-10-22
 ---
 
 # Scalers status and handoff (start here)
 
-**Last updated 20 Oct 2026.** Production pay for Aris `SCL-2026-000001` still shows "Online payment isn't available yet" and has no payment attempt, so Bachs has not been called. Checkout calls `billing_live_tenant_allowed` at `/rest/v1/rest/v1/rpc/...` and gets 404. In flight: `cursor/pay-tenant-rpc-url-9679`. `GET /api/pay/<token>` is payable. The pay page can still be a CDN prerender (`x-nextjs-prerender`). Checked against the billing apply list. Items marked *per team notes* come from lane agents and Alvin, not from the repo. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule)).
+**Last updated 22 Oct 2026, 08:45 EAT** (Platform; docs-only refresh of everything since #835 on 20 Oct). `main` is `2f168419` (#867). Prod Desk runs it; **prod Voice does not**: prod Voice `/healthz` still reports `3bb1d0e3` (#834), because Railway builds have been paused for our plan since 21 Oct 10:24 EAT. Database work since 20 Oct is on both staging and prod (section 3a), except `call_messages` (#868, staging only). Every line below was checked on 22 Oct against `git`, `gh`, live read-only DB queries, `/healthz`, Vercel and Railway variable **names**. Lines marked *per platform notes* or *unverified* could not be checked that way. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule); CI check `status-md`, escape label `no-status-update`).
 
 New agent or new human: read this whole page before you touch code.
 
 **Read order:** [`AGENTS.md`](../AGENTS.md) → your lane contract in [`docs/reference/lanes/`](reference/lanes/) ([`VOICE.md`](reference/lanes/VOICE.md), [`BRAIN.md`](reference/lanes/BRAIN.md), [`DESK_UX.md`](reference/lanes/DESK_UX.md), [`OPS_BILLING.md`](reference/lanes/OPS_BILLING.md), [`PLATFORM.md`](reference/lanes/PLATFORM.md)) → [`SYSTEM_ARCHITECTURE.md`](explanation/architecture/SYSTEM_ARCHITECTURE.md), [`CURRENT_STATE.md`](explanation/architecture/CURRENT_STATE.md), [`SOURCE_OF_TRUTH.md`](explanation/governance/SOURCE_OF_TRUTH.md) → this file. Glossary: [`CONTEXT.md`](../CONTEXT.md). **One task, one lane, one PR.**
 
+**New reference docs (22 Oct):** [Admin foundation plan](reference/operations/ADMIN_FOUNDATION_PLAN.md) and [Admin rebuild research](reference/operations/ADMIN_REBUILD_RESEARCH.md) (both **parked, plan only, not approved for build**), and the [N+1 query audit, 21 Oct](reference/platform/N_PLUS_ONE_AUDIT_2026-10-21.md).
+
 ---
 
-## 1. Where we are
-
-Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b66e1661`** (#647, merged 17 Oct 22:12 EAT). Prod `/healthz` reports this SHA, started 17 Oct 22:13 EAT. Staging Voice is pinned to **`aa872ade`** (branch `staging/pin-738-main-8ee9`: #738 on top of `main` @ `8ee9b161`); staging `/healthz` reports it, started 17 Oct 21:51 EAT. The old kitchen pin `1374b25d` is gone.
-
-Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Esga is on prod DID +254709221542. Staging DID is **+254709221537** (staging tenant Jirani Cleaning Services, *per team notes*).
-
-**Product is callbacks only (#658, 11 Oct).** There is no live call transfer: the assistant takes a message and alerts a teammate. [`LIVE_TRANSFER.md`](archive/LIVE_TRANSFER.md) is archived as history.
-
-Billing is **packages + on-demand only**; beta charging is off; no prepaid wallet; no waive overage. Metering is live. Production has billing SQL P1–P18 and **P20** (`billing_payment_runtime_flags_p20`, 20 Oct 2026). P1–P8 are as of `553f1830`. P9 and P10 were confirmed 19 Oct. P11–P16 landed 2026-10-19 08:11-08:13 UTC as versions `20261019081159` through `20261019081339`. P17 is `20261019150641` and P18 is `20261019150654`, both via #820 `f6d7fee9`. Only P19 `invoice_pay_amount_paid_either.sql` is outstanding, including on staging. Never re-run P5, P9, P11, P12, P14, P15, P16, P17, P18, or P20. The pay page code is on `main` (`13433da3`, #780). Production has not collected through `/pay`. Live Bachs stays closed unless checkout mode is live, live master is on, and the business is on `billing_live_tenants` or `BACHS_LIVE_TENANT_ALLOWLIST` (Admin **Billing · Payments → Checkout** after #830; hosting env still holds keys). Bachs is the chosen payment provider. Prices are about to be raised. The new prices are not decided. Detail in [Billing](#billing).
-
-**Gate right now:** the next step is a clean, scored Aris call on prod. Until then, nothing else ships except live-call voice fixes Alvin approves (see section 4).
+## 1. Where we are (22 Oct 2026)
 
 | | Production | Staging |
 | --- | --- | --- |
-| Voice (Railway) | `scalers-project-production.up.railway.app`, deploys `main` on merge. `b66e1661` | `scalers-staging-staging.up.railway.app`, pinned `aa872ade` |
-| Desk (Vercel) | `scalers-project`, builds `main`. `b66e1661` | `scalers-staging` (one debounced API deploy, #665) |
+| Voice (Railway) | `scalers-project-production.up.railway.app`. `/healthz` ok, **`3bb1d0e3`** (#834), started 20 Oct 18:17 EAT. #835 and later are **not** on prod Voice yet (Railway builds paused, see below). | `scalers-staging-staging.up.railway.app`. `/healthz` ok, **`c67d76c1`** (`cursor/v2-live-spoken-catalog-3e8f`, #833's branch), started 20 Oct 17:53 EAT. Railway deploy `e552fae7` *per platform notes*. |
+| Desk (Vercel) | `scalers-project` production deploy `dpl_9gcraAyNX21Ss33T6C1rgSz89Szm` READY on **`2f168419`** (#867), created 22 Oct 07:51 EAT. | `scalers-staging`: *unverified* on 22 Oct (builds only `cursor/staging-voice-468b`). |
+| Supabase | `fjxcdccgyhnvnnlnovcl` | `sgcdncjxauhsbunobmob` |
 | DID | **+254709221536** Aris, +254709221542 Esga | **+254709221537** Jirani |
 | SautiKit workspace | `e0e57aa5` | `1f85601c` |
-| Supabase | `fjxcdccgyhnvnnlnovcl` | `sgcdncjxauhsbunobmob` |
+
+- **Railway outage.** Railway builds have been paused for non-Enterprise plans since 21 Oct 10:24 EAT, and Railway invalidated API tokens (*per platform notes*; Railway's 21 Oct notice). So nothing merged after #834 has reached prod Voice, and the combined staging builds below are not deployed. A routine retries the staging build until 13:00 EAT on 22 Oct (*per platform notes*). Railway's notice recommends rotating Railway env vars; a rotation plan is open with Alvin (*per Ops & Billing, unverified in repo*).
+- **Combined staging builds, not deployed:** `staging/v2-c0-opening-2026-10-21` @ `f07f9c8a` (#848 + #843 + #846 + #844 + #837 + #850; #838 skipped for conflicts, #842 is inside #848) and `staging/v2-c0-opening-859-2026-10-21` @ `b2422702` (the same plus #859). Rollback for when they deploy: Railway `e552fae7`, or the 3e8f branch pinned to `a0fc061c` (*per platform notes*).
+- **Stage-PR hold is on**: open PRs #839, #840, #841, #842 and #868 carry `hold-staging` (checked 22 Oct), so Stage-PR does not re-point staging Voice.
+- Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Product is **callbacks only** (#658). Billing: packages + on-demand only, beta charging off; see [Billing](#billing).
+
+### 1a. Flags (22 Oct 2026)
+
+Railway variable **names** were read on 22 Oct through the Railway connector, which returns names only, so values are *unverified* unless stated. No secret value was read.
+
+| Flag | Prod Voice | Staging Voice |
+| --- | --- | --- |
+| `VOICE_QUERY_BATCHING` (#859) | not set | not set. Plan: set to `1` on staging only after Voice confirms 10 calls with it off (*per platform notes*). Code is not on `main`. |
+| `BRAIN_V2` | not set | set. Alvin approved `on` for the combined build (*per platform notes*); value unverified. |
+| `BRAIN_V2_MODE` | not set | set. Alvin approved `live` for the combined build (*per platform notes*); value unverified. |
+| `BRAIN_V2_NLU_GAPS`, `BRAIN_V2_SHADOW`, `BRAIN_V2_SHADOW_MODEL`, `BRAIN_V2_SHADOW_TIMEOUT_MS`, `BRAIN_V2_TOPIC_PROPOSALS` | not set | set; values unverified |
+| `BRAIN_V2_COMMIT_SAFETY` (#849), `BRAIN_V2_OWNS_CALL` (#853), `BRAIN_V2_FACT_STORE` (#854), `BRAIN_V2_MODEL` (#855) | not set | not set. Code only on the draft stack; default off. |
+| `FACT_HASH_MODE` | not set | set; value unverified |
+| `VOICE_END_CALL_HONOUR`, `VOICE_OPENING_V2`, `VOICE_RECORDING_NOTICE_VARIANT` | not set | not set yet. Planned for the combined build: `on`, `on`, `a,b,c` (*per platform notes*). |
+| `CALL_SUMMARY_EVENT`, `OWNER_CALL_SUMMARY`, `OWNER_SUMMARY_SUPPRESS_LEGACY` (A4) | not set | not set |
+| `VOICE_GEMINI_CATALOGUE`, `BRAIN_GEMINI_CATALOGUE` | not set | not set. **Never set these.** |
+| Other prod Voice flag names present | `BRAIN_CALL_FIXES_D199`, `VOICE_AREA_FEES`, `VOICE_BARE_GREETING_REPLY`, `VOICE_ENDED_CALL_GUARD`, `VOICE_FACT_REFS`, `VOICE_FALLBACK_BY_KIND`, `VOICE_LOOKUPS`, `VOICE_OWED_CONFIRM_FOLD`, `VOICE_STREAM_RECORD`, `VOICE_SW_TIME`, `VOICE_TOOL_SMOOTH`, `VOICE_TRACE` (values unverified) | |
+
+Leave `VOICE_UNFINISHED_HOLD_MS`, `VOICE_TRACE`, `VOICE_IDLE_*`, `FACT_HASH_MODE`, `BRAIN_V2` and `BRAIN_V2_MODE` alone unless Alvin approves.
+
+### 1b. Previous status (20 Oct)
+
+Prod Voice and prod Desk ran `main` @ `b66e1661` (#647) from 17 Oct; staging was pinned to `aa872ade`. On 20 Oct a production pay click for Aris `SCL-2026-000001` showed "Online payment isn't available yet" because checkout called `billing_live_tenant_allowed` at `/rest/v1/rest/v1/rpc/...` (404). #835 (`200d9c27`, 20 Oct 20:20 EAT) strips the extra `/rest/v1`; prod Desk has it. Whether a prod pay click now reaches Bachs is *unverified*.
+
+**Gate (from 20 Oct, not re-checked):** the next step was a clean, scored Aris call on prod; until then only live-call voice fixes Alvin approves ship (see section 4).
 
 Design: all UI follows Frontend 2.0 ([`FRONTEND_2_0_CHARTER.md`](explanation/frontend/FRONTEND_2_0_CHARTER.md) wins, then [`design-system/MASTER.md`](reference/design-system/MASTER.md)). Staging mechanics: [`ENVIRONMENTS.md`](reference/operations/ENVIRONMENTS.md).
 
 ---
 
-## 2. Shipped to prod (since 14 Oct)
+## 2. Shipped to `main` (since 14 Oct)
 
-Times EAT. SHAs are the squash commits on `main` (first-parent log). Older history: `git log --first-parent origin/main` and the previous STATUS in git (`30086771`, #686).
+Times EAT. SHAs are the commits on `main` (first-parent log). Since #835, `git log --first-parent 200d9c27..2f168419` has exactly these seven merges. Prod Desk (Vercel) deployed each one READY; **prod Voice (Railway) has none of them** (still `3bb1d0e3`).
 
 | PR | SHA | Merged | What |
 | --- | --- | --- | --- |
+| [#867](https://github.com/glclientacquisition-max/scalers-project/pull/867) | `2f168419` | 22 Oct 07:51 | Desk: after a caller SMS from call notes, stamp `caller_reply_body` / `caller_reply_at` with `calls_record_caller_reply` (#866 RPC); old read-modify-write only as a fallback when the RPC is missing. The SQL PR #866 itself is **not merged** (its RPCs are live on both DBs, section 3a). |
+| [#863](https://github.com/glclientacquisition-max/scalers-project/pull/863) | `6c0cc3ce` | 22 Oct 02:05 | Desk: archive cascades to open holds/visits on the call through `inbox_archive_calls` / `inbox_undo_archive` (#862), Unarchive through `inbox_unarchive_calls` (#866); legacy fallback when the RPCs are missing. |
+| [#860](https://github.com/glclientacquisition-max/scalers-project/pull/860) | `c1ffdd8d` | 22 Oct 01:45 | Desk N+1 fixes: inbox bulk actions in one action and one UPDATE, prices sheet saves in one pass, owner attest in 3 queries (audit items A4–A6). |
+| [#862](https://github.com/glclientacquisition-max/scalers-project/pull/862) | `7c2e1ae0` | 22 Oct 01:25 | Supabase: inbox archive cascade. `inbox_archived_at` on `service_requests` / `appointments`, `inbox_archive_undo`, RPCs `inbox_archive_calls` + `inbox_undo_archive` (`docs/supabase/inbox_archive_cascade.sql`, migration `20261022004500`). |
+| [#857](https://github.com/glclientacquisition-max/scalers-project/pull/857) | `eba04c72` | 22 Oct 01:24 | Ops: one "Money topped up" email when the phone wallet recovers; prod Desk can watch the staging wallet when `SAUTIKIT_STAGING_WALLET_KEY` is set (not set by the PR); re-arm rounding fix. No SQL. |
+| [#858](https://github.com/glclientacquisition-max/scalers-project/pull/858) | `a2ffb8eb` | 21 Oct 23:54 | Super Admin Today: one grouped read for the quiet-business check (N+1 audit item 7). No SQL. |
+| [#851](https://github.com/glclientacquisition-max/scalers-project/pull/851) | `53694d32` | 21 Oct 23:48 | Desk: one shared save pattern (`useFormSave` / `useFormDraft`) for Settings, setup and onboarding; fixes false "Leave page?", missing toasts and uncaught save errors. |
+| [#835](https://github.com/glclientacquisition-max/scalers-project/pull/835) | `200d9c27` | 20 Oct 20:20 | Pay: strip a trailing `/rest/v1` before the live-tenant check (last STATUS update). |
+| #834 | `3bb1d0e3` | 20 Oct 18:16 | Pay checkout keeps the service role env. **Current prod Voice SHA.** |
+| #830 | `b5616e0b` | 20 Oct 12:37 | Super Admin billing and Plans on production; P20 payment runtime flags. |
+| #829, #828 | `a0e75ef1`, `aff2cc80` | 20 Oct 10:24, 09:34 | Pay page uses the same live gate as the pay API. |
+| #826 | `b5654a7b` | 20 Oct 09:57 | Admin list-first: shop lists, wait chips, Plans lenses. |
+| #827, #824 | `1fe78868`, `5e4813d7` | 20 Oct 02:00, 01:27 | Payments go-live code; Hobby cron once a day. |
+
 | #814 | `2fcb76af` | 19 Oct | Admin billing Phase 1: `/admin/billing` queue, shop Money (`AdminShopMoneyPanel`), remove package, billing detail redirect. No SQL. |
 | #778 | `62b77ac1` | 19 Oct | Admin package version editor. Production has the editor SQL (P7) with the editor flag off, and the owner-price v2 import. `set_tenant_billing_mode` refuses enforcement while `billing_status` is beta (P10, on production, owner confirmed 19 Oct). |
 | #781 | `3e051899` | 19 Oct | Owner billing actions. Production has P3 and P4. Desk plan screens stay behind `DESK_PLAN_CHANGE` (off). |
@@ -95,9 +131,31 @@ Earlier merges since 9 Oct (see git log for detail):
 
 ---
 
-## 3. On staging now (not on prod)
+## 3. Databases and staging
 
-Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since merged). So staging is behind prod: it lacks #631, #650, #647.
+### 3a. SQL applied since 20 Oct (staging first, then prod)
+
+Checked 22 Oct with read-only queries on `supabase_migrations.schema_migrations` and the catalogs (functions, tables, columns, grants, policies). Times EAT, from the migration version (UTC) unless marked.
+
+| Change | PR | Staging | Prod | Merged? |
+| --- | --- | --- | --- | --- |
+| `greeting_language` (greeting text and language, caller `last_language`, name confirmed, call resume columns, `bump_call_stream_seq`) | #844 | 21 Oct 14:04 (`20261021110439`), plus `greeting_language_last_line_cut` 14:36 | 22 Oct 01:09 (`20261021220920`); `calls.last_line_cut` present | No (draft) |
+| `brain_write_receipts` table | #845 | 21 Oct 13:59 (`20261021105918`) | 22 Oct 01:09 (`20261021220938`) | No (draft) |
+| `merge_call_summary` function | #859 | 21 Oct 22:49 (`20261021194944`) | 22 Oct 01:09:58 (`20261021220958`) | No (draft; #859 body still says prod not applied) |
+| `inbox_archive_cascade` | #862 | 22 Oct 00:46 (`20261021214659`) | Objects present (`inbox_archive_calls`, `inbox_undo_archive`, `inbox_archive_undo`, both `inbox_archived_at` columns). **No `inbox_archive_cascade` row in prod's migration list.** Applied 22 Oct 00:55 *per platform notes*. | Yes, `7c2e1ae0` |
+| `revoke_open_table_grants` (anon and owner table grants on calls, contacts, tenants, service_requests, appointments) | #864 | 22 Oct 01:18 (`20261021221832`) | 22 Oct 01:20:22 (`20261021222022`) | No (draft) |
+| `contacts_owner_insert` (owners can add contacts for their own business) | none | since 9 Sep (`20260909190154`) | 22 Oct 01:28 (`20261021222808`); policy `contacts_insert_member` present | n/a |
+| `revoke_anon_default_privileges` (new `public` objects made by `postgres` no longer grant anon) | #865 | 22 Oct 01:31:15 (`20261021223115`) | 22 Oct 01:31:46 (`20261021223146`) | No (draft) |
+| `inbox_unarchive_calls`, `calls_record_caller_reply` | #866 | 22 Oct 01:31 (`20261021223101`, `20261021223103`) | 22 Oct 07:32:51 and 07:32:58 (`20261022043251`, `20261022043258`) | No (draft); used by merged #863 and #867 |
+| Owner UPDATE grant on `tenants.unknown_answer_spoken` / `unknown_answer_by_kind` | #852 | 21 Oct 15:57 (PR body); grant present | Grant present (no migration row); applied 21 Oct 17:44 *per platform notes*. #852's body still says prod not applied. | No (draft) |
+| `call_messages` table + 5 RPCs (`call_messages_list`, `_mark_read`, `_record_out`, `_retry`, `_unread_counts`), **outbound only** | #868 | 22 Oct 08:22 (`20261022052211`) | **Not applied** (no table) | No (draft) |
+| `admin_auth` schema (Admin foundation slice 1) | none | **not applied** | **not applied** | Parked (section 4a) |
+
+Known gaps after #865 (from its body): `supabase_admin` default privileges still grant anon (Supabase refuses the change), and new functions still get PUBLIC execute from the Postgres default, so each new function needs its own `revoke execute ... from public, anon`.
+
+### 3b. Earlier staging notes (18–19 Oct, carried)
+
+(18 Oct) Staging Voice ran `aa872ade` (= `main` @ `8ee9b161` + #738, which has since merged). So staging is behind prod: it lacks #631, #650, #647.
 
 - **#737** (Desk Suspend/Archive/Purge): the functions are on staging and on production. Production recorded `admin_business_suspend_737`, `archive_tenant_billing_737` and `purge_archived_tenants_737` at 12:06 EAT on 18 Oct, before the 12:10 EAT merge. Staging has the functions. Those three names are not in staging's migration list. The purge schedule is not applied on either database.
 - Caller files memory v2 SQL (#673) is applied on **staging only** (carried from 14 Oct).
@@ -111,6 +169,86 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 ---
 
 ## 4. Open PRs
+
+### 4a. Open draft stack (22 Oct 2026)
+
+Source: `gh pr view` on 22 Oct. All are drafts. "Head" is the PR head SHA. None of these is merged; merging any of them needs Alvin's yes. Waiting-on lines come from each PR body unless marked.
+
+**Brain v2 stack** (into `main` via #848; staging test script and combined build in section 1):
+
+| PR | Head | Base | Flag | What | Waiting on |
+| --- | --- | --- | --- | --- | --- |
+| [#848](https://github.com/glclientacquisition-max/scalers-project/pull/848) | `53c6c368` | `main` | `BRAIN_V2`, `BRAIN_V2_MODE`, `VOICE_END_CALL_HONOUR` | C0: one v2 branch of record; fixed lineage plus #833's live wiring and #842's end-call honour. Supersedes #833's tree. | Staging deploy of the combined build (Railway paused), staging calls, then Alvin. |
+| [#849](https://github.com/glclientacquisition-max/scalers-project/pull/849) | `9b057aa7` | #848 | `BRAIN_V2_COMMIT_SAFETY` | C1: commit safety; one shared read-back classifier. | #848. |
+| [#853](https://github.com/glclientacquisition-max/scalers-project/pull/853) | `42197ddf` | #849 | `BRAIN_V2_OWNS_CALL` | C3: v2 owns the call. Records the accepted no-identity-check risk (section 4b). | #849. |
+| [#854](https://github.com/glclientacquisition-max/scalers-project/pull/854) | `6a438828` | #853 | `BRAIN_V2_FACT_STORE` | C2: one typed fact store compiled at owner Save. | #853. |
+| [#855](https://github.com/glclientacquisition-max/scalers-project/pull/855) | `f1be1d51` | #854 | `BRAIN_V2_MODEL=off\|shadow\|on` (default off) | C7: hybrid Gemini tool-calling, shadow only, 900 ms cap. | #854. |
+| [#856](https://github.com/glclientacquisition-max/scalers-project/pull/856) | `9003019e` | #853 | `CALL_SUMMARY_EVENT` | A4 on the v2 branch of record; supersedes #838. | #853 and review. |
+
+**A4 owner summary:**
+
+| PR | Head | Base | Flag | What | Waiting on |
+| --- | --- | --- | --- | --- | --- |
+| [#837](https://github.com/glclientacquisition-max/scalers-project/pull/837) | `f7115413` | `main` | `CALL_SUMMARY_EVENT` | `call.summary.ready` emitter on the old path. In combined build `f07f9c8a`. | Staging deploy, then Alvin. |
+| [#838](https://github.com/glclientacquisition-max/scalers-project/pull/838) | `ba881557` | `cursor/v2-live-spoken-catalog-3e8f` | `CALL_SUMMARY_EVENT` | Same event from v2 `finishCall`. Superseded by #856 (per #856's body); left out of the combined build because of conflicts (*per platform notes*). | Close or keep: owner's call. |
+| [#850](https://github.com/glclientacquisition-max/scalers-project/pull/850) | `25a99443` | `main` (contains #837) | `OWNER_CALL_SUMMARY`, `OWNER_SUMMARY_SUPPRESS_LEGACY`, plus `CALL_SUMMARY_EVENT` | Ops sender: one owner summary per call per inbox recipient, 30 s settle, urgent skips the settle. In combined build `f07f9c8a`. | #837 first; staging deploy. |
+
+**Voice:**
+
+| PR | Head | Flag | What | Waiting on |
+| --- | --- | --- | --- | --- |
+| [#859](https://github.com/glclientacquisition-max/scalers-project/pull/859) | `b530a10a` | `VOICE_QUERY_BATCHING` (off) | N+1 batching at call start, owner alerts, call record and greeting warm. `merge_call_summary` SQL is on both DBs (section 3a). In build `b2422702`. | Staging deploy, 10 calls off then 10 on, Alvin's yes in Voice's chat. |
+| [#843](https://github.com/glclientacquisition-max/scalers-project/pull/843) | `685cb2c3` | `VOICE_OPENING_V2` (off), `VOICE_RETURNING_SKIP_NOTICE` (off) | Call opening v2 (deterministic greeting, returning caller, resume). Uses #844's columns, now on both DBs. In build `f07f9c8a`. | Staging calls; Alvin's yes for any flag flip. |
+| [#846](https://github.com/glclientacquisition-max/scalers-project/pull/846) | `fd5fb03f` | `VOICE_RECORDING_NOTICE_VARIANT` (off) | Recording notice A/B, stacked on #843. In build `f07f9c8a`. | #843. |
+| [#842](https://github.com/glclientacquisition-max/scalers-project/pull/842) | `56b4bc27` | `VOICE_END_CALL_HONOUR` (off) | Honour the brain's end signal once, after the final audio. Also merged into #848. `hold-staging`. | #848 path. |
+| [#841](https://github.com/glclientacquisition-max/scalers-project/pull/841) | `6cf18cc3` | `VOICE_GRACEFUL_DRAIN` (off) | Graceful SIGTERM drain, `/healthz` `activeCalls`. Rebase of #696. `hold-staging`. | Review; Railway drain settings not changed. |
+| [#840](https://github.com/glclientacquisition-max/scalers-project/pull/840) | `f2bce7c7` | `OLD_PATH_ORDER_GUARD` (off) | Old path: an order/hold write needs grounded items, availability and an explicit read-back yes. Rebase of #720. `hold-staging`. | Review. |
+| [#839](https://github.com/glclientacquisition-max/scalers-project/pull/839) | `6da08f82` | `VOICE_OUTAGE_DEBOUNCE` (off) | One failed TTS stream is not a speech outage. Rebase of #713. `hold-staging`. | Review. |
+
+**Desk:**
+
+| PR | Head | What | Waiting on |
+| --- | --- | --- | --- |
+| [#847](https://github.com/glclientacquisition-max/scalers-project/pull/847) | `c1cef93a` | Settings › Identity › Greeting: greeting text and language with a live opening preview. | Its body said "do not merge before #844's SQL is on prod"; that SQL is on prod since 22 Oct 01:09. Remaining wait *unverified*. |
+| [#861](https://github.com/glclientacquisition-max/scalers-project/pull/861) | `fbebdf32` | Settings Phase 1.1: `/settings/[section]` routes with 308s from old links. No behaviour change. | Review. |
+
+**Platform (SQL already applied unless stated; the PRs are the repo record):**
+
+| PR | Head | What | Waiting on |
+| --- | --- | --- | --- |
+| [#844](https://github.com/glclientacquisition-max/scalers-project/pull/844) | `d4609435` | `greeting_language.sql` + `src/db.js` helpers (nothing wired). On both DBs. | Merge yes. |
+| [#845](https://github.com/glclientacquisition-max/scalers-project/pull/845) | `f70d855e` | `brain_write_receipts.sql` + `recordWriteReceipt` / `getWriteReceipts` (nothing wired). On both DBs. | Merge yes. |
+| [#852](https://github.com/glclientacquisition-max/scalers-project/pull/852) | `f310bf4f` | Owner UPDATE grant on the two `unknown_answer` columns (Policies save). Grant present on both DBs. | Merge yes; body is stale on prod. |
+| [#864](https://github.com/glclientacquisition-max/scalers-project/pull/864) | `0e0b7fa4` | Revoke open anon and owner table grants on five tables. On both DBs (Alvin's GO 22 Oct 01:07, per the PR body). | Merge yes. |
+| [#865](https://github.com/glclientacquisition-max/scalers-project/pull/865) | `593bc07c` | Revoke anon from `postgres` default privileges in `public`. On both DBs. | Merge yes. |
+| [#866](https://github.com/glclientacquisition-max/scalers-project/pull/866) | `ab0f602e` | `inbox_unarchive_calls` + `calls_record_caller_reply`. On both DBs. #863 and #867 already call them. | Merge yes; body is stale on prod. |
+| [#868](https://github.com/glclientacquisition-max/scalers-project/pull/868) | `f6760559` | `call_messages` + Desk thread RPCs, outbound only; optional backfill never run. `hold-staging`. | Staging only. Prod needs Alvin's yes. Desk Texts tab is being drafted (*per Desk Engineer*). |
+
+**Ops & Billing follow-ups:**
+
+- `SAUTIKIT_STAGING_WALLET_KEY` on prod Desk (from #857) waits for a separate ask (per #857's body); whether it is set on Vercel is *unverified*.
+- **Admin foundation:** no PR. Plan only, parked (section 4b). [Plan](reference/operations/ADMIN_FOUNDATION_PLAN.md), [research](reference/operations/ADMIN_REBUILD_RESEARCH.md).
+
+Older drafts still open and not re-checked on 22 Oct: #833 (`c67d76c1`, staging Voice's branch), #832, #831, #836, and the 18 Oct list below.
+
+### 4b. Decisions locked since 20 Oct
+
+Dated, with the source quoted. "Per Scalers Chief" means the decision was relayed by an agent and is not written in the repo or a PR.
+
+| Date (EAT) | Decision | Source |
+| --- | --- | --- |
+| 21 Oct 10:37 / 11:44 | **A4 owner summary**: one typed owner-summary event per call, then one owner message per call per inbox recipient. | #837: "Approved by Alvin 21 Oct (A4 10:37 EAT, build 11:44 EAT)." #850: "one owner summary per call (sender)… One message per call per inbox recipient." |
+| 21 Oct 13:18 | Plan C3 Voice side: honour the brain's end signal once, after the final audio (`VOICE_END_CALL_HONOUR`). | #842: "Plan C3, Voice side (approved by Alvin 21 Oct 13:18 EAT)." |
+| 21 Oct 16:36 | **v2 has no caller-file identity check**; the risk is accepted. | #853: "Decided by Alvin on 21 Oct 2026 at 16:36 EAT. v2 gets **no** caller-file identity check, and the risk is accepted… 'What's my name?' … and cancel/move read-backs can say file details to anyone calling from that number." Recorded in `docs/explanation/brain/v2-owns-call.md` on that branch. |
+| 21 Oct (time not given) | **Greeting language rule**: first greeting in the shop's language (typed `greeting_language`, else the owner's Swahili words, else the analyser, else English); no "English or Kiswahili" invite; returning callers are greeted in `contacts.last_language`; language stored as `en` or `sw` only. | #843 opening table: "Shop language (typed `greetingLanguage` → owner's Swahili words → analyser → en). Opening translated, owner's invite kept word for word, **no 'English or Kiswahili' invite**". "Returning callers are greeted in **`contacts.last_language`**". #844: "`tenants.greeting_language` text, check `in ('en','sw')`"; `sheng`→`sw`. #847: "No sheng, no language-invite option… Approved by Alvin 21 Oct (shared greeting plan, via Scalers Chief)." |
+| 21 Oct 18:56 (PR update) | Callback read-back: the caller repeating the exact read-back time confirms a callback. | #856: "the caller confirmed (an explicit yes **or the exact read-back time repeated**, Alvin's rule)". #849 cites "Read-back rule (Alvin, 15 Oct)". |
+| 22 Oct 00:42 | **Archive cascade, Option A**: archiving a call also hides its open holds and requested/confirmed visits from the inbox via a flag, not a status, and one Undo restores them atomically. | #862: "Desk inbox archive cascade, per Desk Engineer's design (Alvin chose this option in Desk's chat, 22 Oct 00:42 EAT)." The label "Option A" is *per Scalers Chief, unverified in repo*. |
+| 22 Oct 00:42 (same design) | **Archived calls keep visits on the calendar**: hold and visit status is never changed, so Voice and the calendar still see them as open. | `docs/supabase/inbox_archive_cascade.sql`: "Why a flag and not a status… Reusing cancelled / fulfilled would change Voice's caller memory… and the calendar." #862: "Status is never changed, so a flagged hold still reads as open to Voice and the calendar." That Alvin decided this separately is *per Scalers Chief, unverified in repo*. |
+| 22 Oct 01:07 / 01:26 | Revoke open table grants (#864) and anon default privileges (#865) on staging and prod. | #864: "Applied on staging and production with Alvin's GO (22 Oct 2026, 01:07 EAT)." #865: "Alvin approved in Platform chat at 01:26 EAT, 22 Oct." |
+| 22 Oct 08:20 | **#868 is outbound only**: ship an outbound-only text thread first, add caller replies later. | Relayed by Desk Engineer quoting Alvin: "Ship an outbound-only thread first, add caller replies later". *Unverified in repo*; #868's body (written before) says Alvin had not decided. |
+| 22 Oct 08:23 | **Admin build on hold, plan only.** The Admin foundation plan is parked and not approved for build; no `admin_auth` schema on either DB. | *Per Scalers Chief, unverified in repo.* Header of [`ADMIN_FOUNDATION_PLAN.md`](reference/operations/ADMIN_FOUNDATION_PLAN.md). |
+
+### 4c. Open PRs as of 18 Oct (carried, not re-checked)
 
 Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-staging` means Stage-PR leaves it out of the staging pin.
 
@@ -188,9 +326,16 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 
 ## 5. Known broken / open issues
 
+- **Prod Voice is behind `main` (22 Oct).** `/healthz` reports `3bb1d0e3` (#834). #835, #851, #857, #858, #860, #862, #863 and #867 are on prod Desk but not on prod Voice, because Railway builds are paused. When builds return, the next prod Voice build takes all of them at once; do the live-call check first (no `/voice/incoming` or `/ws/media` in the last 10 min, no non-final `calls` rows in the last 30 min).
+- **Prod migration record missing for #862.** The archive cascade objects are on prod but `inbox_archive_cascade` is not in prod's `schema_migrations`. #852's grant is also on both DBs with no migration row. Re-applying is safe (idempotent); add the records only with Alvin's yes.
+- **Stale PR bodies.** #852, #859 and #866 still say prod is not applied; the DB says it is (section 3a). #868's body predates the outbound-only decision.
+- **Merged Desk code depends on unmerged SQL PRs.** #863 and #867 call RPCs whose SQL lives only in draft #866 (and #864 removed the direct write path). Merge #866 so the repo matches the databases.
+- **No inbound SMS path.** TextSMS sends from one shared sender ID, so callers likely cannot text back; inbound and delivery-report webhooks belong to Ops/Voice (*per Desk Engineer, unverified in repo*). Hence #868 is outbound only.
+- **Railway tokens invalidated (21 Oct).** The box `RAILWAY_TOKEN` is unauthorized; the Railway connector was reconnected 22 Oct 00:20 EAT (*per platform notes*). Rotation plan for Railway env vars: open with Alvin.
+
 - **`/pay/[token]` can cache the closed sentence.** #828 (`aff2cc80`) is production Desk as of 06:35 UTC on 20 Oct. The page and `GET /api/pay/<token>` share `paymentsClosed`. Next rewrites `.NEXT_PUBLIC_*` members to the build-time URL, and `env.BACHS_MODE` is not a static read, so a prerender can look like mode off on the production database and store "Online payment isn't available yet" (`x-nextjs-prerender`, `cache-control: public`). The API is `no-store` and returns Pay KSh 10 with notice null. A fresh IAD document after #828 was already payable. `connection()` did not stop the prerender. `cacheComponents` rejects `revalidate` and `dynamic`. Follow-up `cursor/pay-page-gate-9679` reads `process.env.BACHS_MODE` directly, does not bake the public URL, sends `Cache-Control: private, no-store` on `/pay`, and loads the no-store API on the page. Billing notices and plan changes do not decide that sentence.
 - **Invoice reads while Bachs is refused (fixed on `main`, #802, `5b013c4d`).** Invoice, receipt, PDF, and `/pay/<token>` reads do not call the Bachs gate. Checkout still returns 503 `payments_unavailable` while the gate is closed. Production Desk is `b5616e0b` (#830).
-- **Pay click closed before Bachs (open, 20 Oct).** Aris invoice `SCL-2026-000001` shows "Online payment isn't available yet" and `payment_attempts` is empty. Checkout reaches Supabase, then `POST /rest/v1/rest/v1/rpc/billing_live_tenant_allowed` returns 404 because the project URL already includes `/rest/v1`. The live-tenant read fails closed. Bachs is not called. Fix: `cursor/pay-tenant-rpc-url-9679`.
+- **Pay click closed before Bachs (20 Oct; fix #835 merged 20 Oct 20:20 EAT and is on prod Desk; a fresh prod pay click is *unverified*).** Aris invoice `SCL-2026-000001` shows "Online payment isn't available yet" and `payment_attempts` is empty. Checkout reaches Supabase, then `POST /rest/v1/rest/v1/rpc/billing_live_tenant_allowed` returns 404 because the project URL already includes `/rest/v1`. The live-tenant read fails closed. Bachs is not called. Fix: `cursor/pay-tenant-rpc-url-9679`.
 - **Bachs collected total is still unconfirmed (open).** Whether `charge.amount_paid` is the sum of every collection on one checkout is unanswered. A short new receipt or a lower GET still opens a review and does not move money. The go-live follow-up (`cursor/bachs-payments-go-live-9679`) lets staff `book` add the seen total plus that event once, or `nothing` to leave the books. P19 is not applied. P15, P16, and P17 are on prod. Do not re-run them. A missed live webhook is swept by the retry cron once live mode is on. On this Vercel Hobby account that sweep is once a day at 03:07 UTC.
 - **#685 price units (open, fix in #771, not merged).** Settings "Is this right?" shows and saves "KSh 40 per sq ft" as "KSh 40", so the Business Assistant can quote the short line. Migration `20261018200000_price_unit_preserve.sql` repairs backfilled rows. Not applied. Staging first, needs backup before prod.
 - **Prod call recording is on from 19 Oct.** `VOICE_STREAM_RECORD=1` with the spoken recording notice (#792); 30-day default retention, admin-set override.
@@ -272,4 +417,4 @@ Paid-mode copy on Usage still says "next invoice". That wording is a Desk hand-o
 - **Git identity.** Never set git config. Commit with `git -c user.name='Alvin Yegon' -c user.email='alvin@scalers.co.ke'`.
 - **Test gates** (Node 22): `npm run test:voice`, `npm run test:brain`, `npm run test:mvp`, and `cd dashboard && npm run lint && npm run build`. Stage-PR changes: `npm run test:stage-pr`.
 - **Docs-only PRs** must not change runtime code. Say "docs-only" in the PR body.
-- **Before you finish:** update sections 1 to 5 of this file in the same PR when it changes what's live, in flight, or broken. Every merge to `main` updates section 2.
+- **Before you finish:** update sections 1 to 5 of this file in the same PR when it changes what's live, in flight, or broken. Every merge to `main` updates section 2. CI check `status-md` fails a PR to `main` that does not touch this file, unless it has the `no-status-update` label (typo or CI-only PRs).

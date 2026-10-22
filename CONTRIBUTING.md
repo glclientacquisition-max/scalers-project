@@ -104,7 +104,7 @@ Do not weaken tests or delete failing tests to make CI green.
 
 ### STATUS rule
 
-Every PR that merges to `main` updates [`docs/STATUS.md`](docs/STATUS.md) in the same PR: the "Last updated" line, section 2 (shipped) and any row in sections 3 to 5 it changes. A PR that changes nothing live still bumps nothing; say so in the PR body ("STATUS: no change").
+Every PR that merges to `main` updates [`docs/STATUS.md`](docs/STATUS.md) in the same PR: the "Last updated" line, section 2 (shipped) and any row in sections 3 to 5 it changes. The CI check `status-md` (`.github/workflows/status-md.yml`) fails a PR into `main` whose diff does not include `docs/STATUS.md`. For a typo-only or CI-only PR that changes nothing live, add the label `no-status-update` instead and say "STATUS: no change" in the PR body.
 
 ### Doc frontmatter
 
