@@ -1,6 +1,6 @@
 ---
 owner: ops-billing
-last_reviewed: 2026-10-10
+last_reviewed: 2026-10-22
 ---
 
 # Scalers — Super Admin Requirements
@@ -151,3 +151,41 @@ Business-owner nav stays: Calls · Business · Sign out.
 - [ ] Every admin write shows in Activity: who, what, which business, before and after, when.
 - [ ] Business-owner login never sees Admin nav or `/admin` data.
 - [ ] UI copy says Business, not Tenant.
+
+---
+
+## Rebuild (proposed, 22 Oct 2026)
+
+The Super Admin rebuild is planned in [`ADMIN_FOUNDATION_PLAN.md`](ADMIN_FOUNDATION_PLAN.md) (research: [`ADMIN_REBUILD_RESEARCH.md`](ADMIN_REBUILD_RESEARCH.md)). Nothing in this section is built. The v1 requirements above stay true until a module is rebuilt.
+
+| Topic | Requirement | Spec |
+| --- | --- | --- |
+| IA | 12 modules in 4 groups behind `ADMIN_V2`; same URLs | [`pages/admin.md`](../design-system/pages/admin.md#v2-ia-and-module-registry-proposed) |
+| Design | Ops density layer for `/admin` only | [`OPS.md`](../design-system/OPS.md), charter §11 |
+| Overlays | No centred modals. Confirms: bottom sheet on phones, side drawer at `md`+ | `OPS.md` §3 |
+| Sessions | Revocable Postgres sessions; operators are real rows with real email | [`ADMIN_STEP_UP.md`](../platform/ADMIN_STEP_UP.md) §3 |
+| Step-up | Authenticator code before sensitive writes, Tier A window and Tier B per action | `ADMIN_STEP_UP.md` §1 |
+| Billing IA | Package / Beta-or-Charging / invoices as three layers (folded from #812) | [`admin-billing-ia-research.md`](../../rfcs/admin-billing-ia-research.md) |
+
+### Answers to plan §9 (per Scalers Chief relaying Alvin, 22 Oct 16:36 EAT; operator email corrected 16:37 EAT, backup inbox 16:38 EAT)
+
+1. **Sign-in length:** 12 hours (today 14 days).
+2. **Code frequency:** one code covers 15 minutes of routine money work up to KES 20,000. A fresh code for prod switches, buying or releasing a number, payments over KES 20,000, and security changes.
+3. **Authenticator at sign-in:** required, starting after step 1, as the plan recommends.
+4. **Operators:** only Alvin, role `owner`, email scalersventures@gmail.com.
+5. **Backup-code inbox:** scalersventures@gmail.com.
+6. **Staging:** same rules as prod.
+7. **v2 on prod:** trial `ADMIN_V2=alvin` after slice 9.
+8. **Writes on phone:** allowed, with the same step-up rules as desktop (per Scalers Chief relaying Alvin, 22 Oct 16:55 EAT).
+
+**Risk (one inbox):** scalersventures@gmail.com is both the owner operator email and the backup-code inbox. Whoever controls it can both sign in and receive backup codes, so that inbox must have its own strong 2FA (authenticator or passkey, not SMS).
+
+Still open:
+
+- Q9: approve the Ops design layer for `/admin` only: recommend yes.
+
+Slice 1 (auth schema) is unblocked as a staging draft once Platform's four fixes below land. Staging secrets go in only through a masked input.
+
+### Open Platform issues (22 Oct 2026)
+
+See [`ADMIN_STEP_UP.md` §7](../platform/ADMIN_STEP_UP.md#7-open-before-slice-1-platforms-known-issues-22-oct-2026): secret-setting access on the box, PUBLIC execute on `public` functions, `twoFactor.verified` default, `rateLimit` key. No `admin_auth` schema exists on staging or prod.
