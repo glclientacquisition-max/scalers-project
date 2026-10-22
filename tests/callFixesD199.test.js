@@ -192,11 +192,15 @@ describe('HD_d199dbbf6b79 replay, BRAIN_CALL_FIXES_D199=on', () => {
       assert.equal(all.runModel, false);
       // HD_1677e57f73f9 (3): past-dated rows are a count, never read as open.
       assert.match(all.line, /^You have an enquiry for Mansion Cleaning Custom Quote\./);
+      // Visit read, last one only: newest two, the count left, and the
+      // past-dated count only when the caller asks for it.
       assert.deepEqual(
-        [...new Set(all.lines.map((l) => l.template))],
-        ['request_open', 'more_open', 'past_open']
+        all.lines.map((l) => l.template),
+        ['request_open', 'request_open', 'more_open']
       );
-      assert.match(all.line, /There are 19 past-dated requests the team still has to confirm\.$/);
+      assert.doesNotMatch(all.line, /past-dated/);
+      const past = fileRead(replay(3).state, 'What do I have on file, and the past-dated ones?');
+      assert.match(past.line, /There are 19 past-dated requests the team still has to confirm\.$/);
       assert.doesNotMatch(all.line, /today, 9 AM/);
       // t8 "ile carpet cleaning ... ya Kitengela" names that one visit: past.
       assert.equal(
