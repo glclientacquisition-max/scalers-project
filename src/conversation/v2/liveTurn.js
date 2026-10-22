@@ -74,6 +74,9 @@ function endDecision({ done, machine, profile, line, alreadyEnded }) {
 function createBrainV2Live(opts = {}) {
   const env = opts.env || process.env;
   const applyTools = opts.applyTools;
+  // Injectable clock (tests pin a daytime EAT instant; "tomorrow" before 06:00 EAT asks
+  // "later today or <next day>?", so wall-clock tests must not depend on when CI runs).
+  const nowFn = typeof opts.now === 'function' ? opts.now : opts.now ? () => new Date(opts.now) : () => new Date();
   let state = null;
   let endSent = false;
 
@@ -101,7 +104,7 @@ function createBrainV2Live(opts = {}) {
     const it = runTurnStream(machine, {
       text,
       profile: { ...(profile || {}) },
-      now: new Date(),
+      now: nowFn(),
       handlers,
       model: opts.model || null,
       classify: defaultClassify(opts),
