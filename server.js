@@ -1307,8 +1307,9 @@ async function writeHangupSummary(callSid, source, opts, brainState) {
       brainState,
       callId: call?.id || null,
       spokenTurns,
+      storedSummary: call?.summary || null,
     });
-    const summary = deriveCallSummary({ brainState });
+    const summary = deriveCallSummary({ brainState, storedSummary: call?.summary || null });
     const primaryIntent = summary.primaryIntent || null;
     if (opts.writeResolution === false) {
       // Run-once loser: only hand its live turns to the debounced review.

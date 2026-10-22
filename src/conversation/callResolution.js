@@ -316,7 +316,15 @@ function callerHadNeed(state) {
 
 function deriveCallResolution(opts = {}) {
   const state = opts.brainState || {};
-  const results = hangupResults(state, opts.toolResults);
+  let results = hangupResults(state, opts.toolResults);
+  // BRAIN_CALL_FIXES_D199 (prod HD_e75a669780d4): the stored call summary
+  // records a request or visit this call saved. When the live state lost it,
+  // that row still decides the label: a call with saved work is never
+  // abandoned (savedRequestOutcome.js).
+  const fixesOn = require('./callFixesD199').callFixesD199Enabled();
+  if (fixesOn && opts.storedSummary) {
+    results = require('./savedRequestOutcome').withStoredWork(results, opts.storedSummary);
+  }
   const turnCount = Number(
     opts.turnCount != null
       ? opts.turnCount
@@ -425,7 +433,9 @@ function deriveCallResolution(opts = {}) {
         note = fixesD199.NO_NEED_NOTE;
       }
     }
-  } else if (turnCount <= 1) {
+  } else if (turnCount <= 1 && !(fixesOn && Number(opts.callerTurnCount) > 1)) {
+    // BRAIN_CALL_FIXES_D199 (HD_e75a669780d4): "very short" only when no
+    // other record (voice_turn_traces) shows more than one caller turn.
     resolution = 'abandoned';
     note = 'Very short call — little conversation';
   } else if (ownerMustReturnCall(state)) {

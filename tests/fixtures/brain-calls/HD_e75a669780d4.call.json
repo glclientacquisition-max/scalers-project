@@ -1,0 +1,550 @@
+{
+  "_source": "prod Supabase fjxcdccgyhnvnnlnovcl, SELECT only, 2026-10-22. calls row, service_requests row, transcripts rows, voice_turn_traces turn payloads (stages trimmed to tts/canned/filler/tool/outcome). Caller phone redacted (+2547XXXXXXXX); service_requests.caller_phone not selected. to_number is the Aris business line.",
+  "callSid": "HD_e75a669780d4",
+  "call": {
+    "id": "b0a82fe0-9668-434e-bdbf-21cee977b410",
+    "tenant_id": "24ca3d5e-db5c-4cc3-b745-a87a68cf3ce0",
+    "sautikit_call_sid": "HD_e75a669780d4",
+    "status": "complete",
+    "duration_seconds": 259,
+    "resolution": "abandoned",
+    "primary_intent": null,
+    "resolution_note": "Very short call — little conversation",
+    "created_at": "2026-10-20 09:34:22.107161+00",
+    "summary": {
+      "provider": "sautikit",
+      "to_number": "+254709221536",
+      "service_request_id": "be519ced-c4ac-4af8-bde3-782879bef637",
+      "service_request_type": "order",
+      "service_request_item": "Mg zipper bag-a4",
+      "reason": "Caller called.",
+      "name": "Chris",
+      "owner_notified": true,
+      "whatsapp_sent": false,
+      "owner_notify_channels": {
+        "sms": "sent"
+      },
+      "owner_notify_body": "ORDER. Aris Kenya\nItem: Mg zipper bag-a4\nCaller: Chris\nPhone: +2547XXXXXXXX\nNotes: Order for MG zipper bag A4\nOpen Inbox Holds to mark fulfilled.",
+      "owner_notify_channel": "sms",
+      "owner_notify_kind": "service_request",
+      "caller_notify_body": "Hi Chris, Aris Kenya here. We have your order for Mg zipper bag-a4. We will confirm shortly.",
+      "caller_notify_kind": "caller_order",
+      "text": "Call completed.",
+      "brain_summary": "Call completed.",
+      "primary_intent": null,
+      "products": [],
+      "actions": [],
+      "instructions": [],
+      "language": "unknown",
+      "answered_questions": [],
+      "unanswered_questions": [],
+      "finalized_at": "2026-10-20T09:38:41.653Z",
+      "finalized_by": "ws/media",
+      "finalized_provisional": false,
+      "review_status": "thin",
+      "review_attempts": 1,
+      "review_at": "2026-10-20T09:38:42.258Z",
+      "recording_path": "HD_e75a669780d4/1792489125441.mp3"
+    }
+  },
+  "serviceRequest": {
+    "id": "be519ced-c4ac-4af8-bde3-782879bef637",
+    "call_id": "b0a82fe0-9668-434e-bdbf-21cee977b410",
+    "tenant_id": "24ca3d5e-db5c-4cc3-b745-a87a68cf3ce0",
+    "request_type": "order",
+    "item": "Mg zipper bag-a4",
+    "notes": "Order for MG zipper bag A4",
+    "quantity": null,
+    "status": "fulfilled",
+    "caller_name": "Chris",
+    "created_at": "2026-10-20T09:38:13.807365+00:00"
+  },
+  "transcripts": [
+    {
+      "speaker": "agent",
+      "text_content": "Aris - The Home of Affordable Stationery, this is Lynn. This call may be recorded. Tukusaidie vipi.",
+      "created_at": "2026-10-20T09:38:41.408318+00:00"
+    }
+  ],
+  "traceTurns": [
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 1,
+      "at": "2026-10-20T09:34:39.395Z",
+      "caller": {
+        "text": "Hello, Lin.",
+        "language": "en"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Mm-hmm."
+        },
+        {
+          "stage": "tts",
+          "text": "Hello."
+        },
+        {
+          "stage": "tts",
+          "text": "How can I help you today?"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 2,
+      "at": "2026-10-20T09:34:47.904Z",
+      "caller": {
+        "text": "Um, mnauzanga nini?",
+        "language": "sw"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Sawa."
+        },
+        {
+          "stage": "tts",
+          "text": "Tuko na vitabu, kalamu, geometric sets, calculators kama Casio, rulers, na stationery zingine za shule na office."
+        },
+        {
+          "stage": "tts",
+          "text": "Unatafuta kitu gani maalum?"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 3,
+      "at": "2026-10-20T09:35:08.412Z",
+      "caller": {
+        "text": "Nilikuwa, okay, kuna we're getting tunacome closer.",
+        "language": "sw"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Mm."
+        },
+        {
+          "stage": "tts",
+          "text": "Sawa, unahitaji bidhaa gani au nikusaidie aje leo?"
+        },
+        {
+          "stage": "outcome",
+          "value": "barge_in"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 4,
+      "at": "2026-10-20T09:35:11.122Z",
+      "caller": {
+        "text": "KCUC and.",
+        "language": "sw"
+      },
+      "stages": [
+        {
+          "stage": "outcome",
+          "value": "hold"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 5,
+      "at": "2026-10-20T09:35:11.995Z",
+      "caller": {
+        "text": "KCUC and. Looking for some stationary.",
+        "language": "en"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Mm-hmm."
+        },
+        {
+          "stage": "tts",
+          "text": "Sawa, unatafuta stationery gani spesheli kama vitabu, kalamu, ama geometry set tukunufie?"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 6,
+      "at": "2026-10-20T09:35:24.232Z",
+      "caller": {
+        "text": "I don't know.",
+        "language": "en"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Mm-hmm."
+        },
+        {
+          "stage": "tts",
+          "text": "Sawa, tuna e-commerce website aris stationaries dot co dot ke au unaweza kutembelea duka letu UON Main Campus."
+        },
+        {
+          "stage": "tts",
+          "text": "Ungependa nikuwekee order ya kitabu au kalamu?"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 7,
+      "at": "2026-10-20T09:35:51.448Z",
+      "caller": {
+        "text": "Saa hizi mimi sijasema kitabu",
+        "language": "sw"
+      },
+      "stages": [
+        {
+          "stage": "outcome",
+          "value": "barge_in"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 8,
+      "at": "2026-10-20T09:35:53.485Z",
+      "caller": {
+        "text": "wakala; mnasema ni advice, advice me on wh",
+        "language": "en"
+      },
+      "stages": [
+        {
+          "stage": "outcome",
+          "value": "barge_in"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 9,
+      "at": "2026-10-20T09:35:55.524Z",
+      "caller": {
+        "text": "at to actually pick, because we're heading",
+        "language": "en"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Mm-hmm."
+        },
+        {
+          "stage": "outcome",
+          "value": "barge_in"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 10,
+      "at": "2026-10-20T09:35:56.667Z",
+      "caller": {
+        "text": "towards, um, KCSE and I need stationaries za nini, za exam period.",
+        "language": "en"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Alright."
+        },
+        {
+          "stage": "outcome",
+          "value": "barge_in"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 11,
+      "at": "2026-10-20T09:35:59.057Z",
+      "caller": {
+        "text": "So what do you want to say about that?",
+        "language": "en"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Alright."
+        },
+        {
+          "stage": "tts",
+          "text": "Let me check with the team and get back to you."
+        },
+        {
+          "stage": "tts",
+          "text": "Ungependa kuset hold ya exam set au unahitaji kitu kingine?"
+        },
+        {
+          "stage": "outcome",
+          "value": "barge_in"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 12,
+      "at": "2026-10-20T09:36:08.998Z",
+      "caller": {
+        "text": "No, I want you I want you I want you to advise me on what to do.",
+        "language": "en"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Alright."
+        },
+        {
+          "stage": "tts",
+          "text": "Let me check with the team and get back to you."
+        },
+        {
+          "stage": "tts",
+          "text": "Ungependa kukuwekea hizi vitu uje uchukue?"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 13,
+      "at": "2026-10-20T09:36:20.029Z",
+      "caller": {
+        "text": "Vitu gani hizo?",
+        "language": "sw"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Sawa."
+        },
+        {
+          "stage": "tts",
+          "text": "Nimekupendekezea Oxford set kwa shilingi mia mbili sabini, Casio calculator fx-82 ex kwa shilingi elfu moja na mia sita, eraser ya Accord kwa shilingi thelathini, na HB pencils za shilingi ishirini na nne."
+        },
+        {
+          "stage": "tts",
+          "text": "Ungependa tuziweke tayari uje uchukue?"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 14,
+      "at": "2026-10-20T09:36:48.709Z",
+      "caller": {
+        "text": "Do you have do you guys mnakwanga na zipper bag?",
+        "language": "sw"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Sawa."
+        },
+        {
+          "stage": "tts",
+          "text": "Ndiyo, tunazo MG zipper bags, za size A4 ni shilingi mia moja thelathini na tano na za size A6 ni shilingi sabini."
+        },
+        {
+          "stage": "tts",
+          "text": "Ungependa ni ku we kee gani?"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 15,
+      "at": "2026-10-20T09:37:10.438Z",
+      "caller": {
+        "text": "Um, rudia tena?",
+        "language": "sw"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Sawa."
+        },
+        {
+          "stage": "tts",
+          "text": "Tunazo MG zipper bags, za A4 ni shilingi mia moja thelathini na tano na za A6 ni shilingi sabini."
+        },
+        {
+          "stage": "tts",
+          "text": "Ungependa kuwekea gani tayari?"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 16,
+      "at": "2026-10-20T09:37:27.960Z",
+      "caller": {
+        "text": "Um, which one do you prefer? Which one do you think iko sawa?",
+        "language": "en"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Alright."
+        },
+        {
+          "stage": "tts",
+          "text": "Za A4 ziko sawa zaidi kwa sababu zinaenea exam papers, clipboards, na geometrical set bila kufinywa."
+        },
+        {
+          "stage": "tts",
+          "text": "Ungependa nikuwekee zipper bag ya A4?"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 17,
+      "at": "2026-10-20T09:37:52.669Z",
+      "caller": {
+        "text": "Eeh, iko sawa, iko sawa, iko sawa. Eeh, nipatie hiyo yeah.",
+        "language": "sw"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Mm."
+        },
+        {
+          "stage": "outcome",
+          "value": "barge_in"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 18,
+      "at": "2026-10-20T09:37:58.079Z",
+      "caller": {
+        "text": "Nipatie hiyo. So what is my order? I want you to repeat loud what I've what I've just ordered.",
+        "language": "en"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Alright."
+        },
+        {
+          "stage": "tts",
+          "text": "I li nikuwekee A4 zipper bag tayari, naomba unipe jina lako kamili tafadhali?"
+        },
+        {
+          "stage": "outcome",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "callId": "HD_e75a669780d4",
+      "recordKind": "turn",
+      "turnIndex": 19,
+      "at": "2026-10-20T09:38:12.103Z",
+      "caller": {
+        "text": "Mimi naitwa Chris.",
+        "language": "sw"
+      },
+      "stages": [
+        {
+          "stage": "filler",
+          "text": "Mm."
+        },
+        {
+          "stage": "filler",
+          "text": "Naangalia."
+        },
+        {
+          "stage": "tool",
+          "name": "create_service_request",
+          "status": "succeeded",
+          "args": "name=Chris type=order item=Mg zipper bag-a4"
+        },
+        {
+          "stage": "tool",
+          "name": "save_caller_info",
+          "status": "succeeded",
+          "args": "name=Chris reason=Order for MG zipper bag A4"
+        },
+        {
+          "stage": "tts",
+          "text": "Sawa."
+        },
+        {
+          "stage": "outcome",
+          "value": "stream_fallback_full"
+        }
+      ]
+    }
+  ],
+  "traceCallRecord": {
+    "turnCount": 0,
+    "startedAt": "2026-10-20T09:38:27.375Z",
+    "endedAt": "2026-10-20T09:38:41.196Z",
+    "diagnosis": "No failed checks.",
+    "score": 100
+  }
+}

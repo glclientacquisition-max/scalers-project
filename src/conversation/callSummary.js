@@ -40,11 +40,18 @@ function safeGoalDescription(raw) {
  *   brainState?: object|null,
  *   toolResults?: Array<object>,
  *   transcriptLines?: string[],
+ *   storedSummary?: object|string|null,
  * }} opts
  */
 function deriveCallSummary(opts = {}) {
   const state = opts.brainState || {};
-  const results = hangupResults(state, opts.toolResults);
+  let results = hangupResults(state, opts.toolResults);
+  // BRAIN_CALL_FIXES_D199 (prod HD_e75a669780d4): a request or visit the
+  // stored call summary records is in the summary even when the live state
+  // lost it ("Call completed." on a 259 s call that saved an order).
+  if (opts.storedSummary && require('./callFixesD199').callFixesD199Enabled()) {
+    results = require('./savedRequestOutcome').withStoredWork(results, opts.storedSummary);
+  }
 
   let primaryIntent =
     highWaterPrimaryIntent({

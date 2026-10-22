@@ -1181,7 +1181,109 @@ async function loadTurnsForReview(ctx, deps) {
     if (retryMs > 0) await delay(retryMs);
     turns = (await loadTurns(callSid)) || [];
   }
-  return turns.filter(hasSpeech);
+  turns = turns.filter(hasSpeech);
+  // BRAIN_CALL_FIXES_D199 (prod HD_e75a669780d4): the transcripts table held
+  // only the greeting of a 259 s call; voice_turn_traces kept all 19 caller
+  // turns. When the transcript is thin, review the traced turns instead.
+  if (callerSpeechChars(turns) < 12 && require('./callFixesD199').callFixesD199Enabled()) {
+    const loadTraceTurns =
+      deps.loadTraceTurns || (deps.loadTurns ? null : defaultLoadTraceTurns);
+    if (loadTraceTurns) {
+      let traced = [];
+      try {
+        traced = ((await loadTraceTurns(callSid)) || []).filter(hasSpeech);
+      } catch (err) {
+        console.warn(`[transcript-review] ${callSid} trace turns failed:`, err?.message || err);
+      }
+      if (callerSpeechChars(traced) >= 12 && callerSpeechChars(traced) > callerSpeechChars(turns)) {
+        return traced;
+      }
+    }
+  }
+  return turns;
+}
+
+/** Caller and receptionist turns from voice_turn_traces (read only). */
+async function defaultLoadTraceTurns(callSid) {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return [];
+  const { readStoredTurns } = require('../speech/voiceTrace');
+  const payloads = await readStoredTurns(callSid);
+  return require('./savedRequestOutcome').traceTurnsForReview(payloads);
+}
+
+/** The stored call summary (what db wrote: request and visit ids). */
+async function loadStoredSummary(ctx, deps) {
+  if (ctx?.storedSummary) return ctx.storedSummary;
+  if (ctx?.call && ctx.call.summary) return ctx.call.summary;
+  const callSid = String(ctx?.callSid || '').trim();
+  try {
+    if (deps.loadCall) return (await deps.loadCall(callSid))?.summary || null;
+    if (deps.save) return null; // Injected save (tests, replays): no live db.
+    const call = await require('../db').getCall(callSid);
+    return call?.summary || null;
+  } catch (err) {
+    console.warn(`[transcript-review] ${callSid} stored summary read failed:`, err?.message || err);
+    return null;
+  }
+}
+
+/**
+ * BRAIN_CALL_FIXES_D199 (prod HD_e75a669780d4): a call whose stored summary
+ * records a saved request or visit is never abandoned. Returns the floored
+ * derived label, the summary patch for "Call completed." text, and the tool
+ * flags for the saved rows; null when nothing applies.
+ */
+async function savedWorkRepair(ctx, deps) {
+  if (!require('./callFixesD199').callFixesD199Enabled()) return null;
+  const stored = await loadStoredSummary(ctx, deps);
+  const saved = require('./savedRequestOutcome');
+  if (!stored || !saved.hasSavedWork(stored)) return null;
+  const derived = ctx?.derived || {};
+  const floored = saved.savedWorkFloor(derived, stored, { callId: ctx?.call?.id || null });
+  const patch = saved.savedWorkSummaryPatch(stored, floored || derived);
+  if (!floored && !patch) return null;
+  return {
+    derived: floored || derived,
+    labelChanged: Boolean(floored),
+    summaryPatch: patch,
+    toolFlags: require('./callFixesD199').storedSummaryToolFlags(saved.parseStoredSummary(stored)),
+  };
+}
+
+async function defaultSaveRepair({ callSid, repair }) {
+  const db = require('../db');
+  return withSummaryWriteLock(callSid, async () => {
+    if (repair.labelChanged) {
+      await db.setCallResolution({
+        callSid,
+        resolution: repair.derived.resolution,
+        primaryIntent: repair.derived.primaryIntent,
+        resolutionNote: repair.derived.resolutionNote,
+      });
+    }
+    if (repair.summaryPatch) {
+      await db.mergeCallSummaryMeta({ callSid, patch: repair.summaryPatch });
+    }
+  });
+}
+
+async function applySavedWorkRepair(callSid, repair, deps) {
+  if (!repair) return;
+  const saveRepair = deps.saveRepair || (deps.save ? null : defaultSaveRepair);
+  if (!saveRepair) return;
+  try {
+    await saveRepair({ callSid, repair });
+  } catch (err) {
+    console.warn(`[transcript-review] ${callSid} saved-work repair failed:`, err?.message || err);
+  }
+}
+
+/** Fill tool flags the live Brain state lost from the stored summary rows. */
+function withStoredToolFlags(flags, stored) {
+  const live = flags && typeof flags === 'object' ? flags : {};
+  if (!stored) return flags;
+  if (live.holdSaved || live.visitSaved || live.callbackSaved) return flags;
+  return { ...live, ...stored, fromStoredSummary: true };
 }
 
 async function defaultLoadTurns(callSid) {
@@ -1455,7 +1557,11 @@ async function sweepUnreviewedCalls(deps = {}) {
     const meta = call.summary && typeof call.summary === 'object' ? call.summary : {};
     const status = String(meta.review_status || '');
     const attempts = Number(meta.review_attempts) || 0;
-    if (FINAL_REVIEW_STATUSES.has(status) || attempts >= MAX_REVIEW_ATTEMPTS) continue;
+    const done = FINAL_REVIEW_STATUSES.has(status) || attempts >= MAX_REVIEW_ATTEMPTS;
+    // BRAIN_CALL_FIXES_D199 (prod HD_e75a669780d4): a "thin" call that saved
+    // a request but still reads abandoned gets one more pass, which floors
+    // the label from the stored row (and reviews traced turns if any).
+    if (done && !savedWorkNeedsRepair(call, meta)) continue;
     const callSid = String(call.sautikit_call_sid || '').trim();
     if (!callSid) continue;
     try {
@@ -1492,6 +1598,18 @@ async function sweepUnreviewedCalls(deps = {}) {
   return { checked: rows.length, reviewed, failed };
 }
 
+/** Stored row says work was saved; the stored label says nothing happened. */
+function savedWorkNeedsRepair(call, meta) {
+  if (!require('./callFixesD199').callFixesD199Enabled()) return false;
+  const saved = require('./savedRequestOutcome');
+  if (!saved.hasSavedWork(meta)) return false;
+  return saved.labelNeedsFloor({
+    resolution: call?.resolution || '',
+    primaryIntent: call?.primary_intent || meta?.primary_intent || null,
+    resolutionNote: call?.resolution_note || '',
+  });
+}
+
 async function runPostCallTranscriptReview(ctx, deps = {}) {
   const callSid = String(ctx?.callSid || '').trim();
   if (!callSid) return { ok: false, reason: 'no_call' };
@@ -1501,6 +1619,17 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
   const save = deps.save || defaultSave;
 
   const turns = await loadTurnsForReview(ctx, deps);
+  // BRAIN_CALL_FIXES_D199 (prod HD_e75a669780d4): saved work in the stored
+  // summary floors the label before anything else reads it.
+  const repair = await savedWorkRepair(ctx, deps);
+  if (repair) {
+    ctx = {
+      ...ctx,
+      derived: repair.derived,
+      toolFlags: withStoredToolFlags(ctx.toolFlags, repair.toolFlags),
+    };
+    await applySavedWorkRepair(callSid, repair, deps);
+  }
   if (!turns.length) {
     if (isSilenceStatus(ctx.callStatus)) {
       const merged = silenceReviewMerged();
@@ -1525,12 +1654,12 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
     }
     console.warn(`[transcript-review] ${callSid} no turns`);
     await recordReviewStatus(ctx, 'no_turns', deps);
-    return { ok: false, reason: 'no_turns' };
+    return { ok: false, reason: 'no_turns', ...(repair ? { repair } : {}) };
   }
 
   if (callerSpeechChars(turns) < 12) {
     await recordReviewStatus(ctx, 'thin', deps);
-    return { ok: false, reason: 'thin' };
+    return { ok: false, reason: 'thin', ...(repair ? { repair } : {}) };
   }
 
   const transcript = formatTranscriptForReview(turns);
@@ -1592,11 +1721,11 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
     !merged.applied.resolution &&
     !merged.applied.card
   ) {
-    return { ok: true, skipped: true, merged, review };
+    return { ok: true, skipped: true, merged, review, ...(repair ? { repair } : {}) };
   }
 
   await save({ callSid, merged, review, derived: ctx.derived, summary: ctx.summary });
-  return { ok: true, merged, review };
+  return { ok: true, merged, review, ...(repair ? { repair } : {}) };
 }
 
 function preferContext(prev, next) {
