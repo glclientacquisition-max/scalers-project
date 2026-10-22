@@ -54,6 +54,10 @@ export const adminShellClass =
 export const adminMainClass =
   "mx-auto w-full min-h-0 min-w-0 max-w-desk flex-1 overflow-y-auto px-4 pt-4 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-6 md:p-6";
 
+/** v2: no max-width, 16px margins at every width. */
+export const adminMainV2Class =
+  "flex w-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pt-4 pb-[var(--desk-tabbar-clearance)] md:pb-4";
+
 function pathOnly(pathname: string) {
   const bare = (pathname.split("?")[0] || "/").replace(/\/+$/, "") || "/";
   return bare;

@@ -136,3 +136,50 @@
   outline-offset: 1px;
   border-color: var(--accent);
 }
+
+/*
+ * Split pane (slice 2b). Sits in the page flow beside the list. 560px, 640px from 1440.
+ * The list never drops under 640px; between md and 1280 the pane gives way first.
+ */
+.ops-split-pane {
+  flex: 0 0 auto;
+  width: min(560px, calc(100% - 640px));
+  min-width: 360px;
+  position: sticky;
+  top: 0;
+  max-height: calc(100dvh - 72px);
+}
+@media (min-width: 1440px) {
+  .ops-split-pane {
+    width: 640px;
+  }
+}
+.ops-split-list {
+  min-width: 640px;
+}
+/* md and up the pair is one viewport tall: the list scrolls inside, the pane footer stays in view. */
+@media (min-width: 768px) {
+  .ops-split {
+    height: calc(100dvh - 72px);
+  }
+  .ops-split-pane {
+    max-height: none;
+  }
+}
+@media (max-width: 767.98px) {
+  .ops-split-list {
+    min-width: 0;
+  }
+}
+
+/* Tiles stretch to fill the row: 2 on phones, then as many as fit, never more than 6. */
+.ops-tiles {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 768px) {
+  .ops-tiles {
+    grid-template-columns: repeat(auto-fit, minmax(max(180px, calc((100% - 40px) / 6)), 1fr));
+  }
+}

@@ -13,6 +13,7 @@ import {
   ADMIN_LINKS,
   adminHidesShellBack,
   adminMainClass,
+  adminMainV2Class,
   adminParentTarget,
   adminPhoneMore,
   adminPhoneTabs,
@@ -297,6 +298,72 @@ export function AdminRail() {
   );
 }
 
+/**
+ * Admin v2 sidebar (md+). 200px with text labels; collapses to 56px icons. The choice is kept per browser.
+ * While a split pane is open below 1600px it drops to 56px so the list keeps its 640px.
+ */
+export function AdminSideNav() {
+  const { pendingHref, setPendingHref } = useAdminPending();
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    setCollapsed(window.localStorage.getItem("admin-side") === "56");
+  }, []);
+  const toggle = () => {
+    setCollapsed((c) => {
+      window.localStorage.setItem("admin-side", c ? "200" : "56");
+      return !c;
+    });
+  };
+  return (
+    <div
+      data-admin-side=""
+      data-collapsed={collapsed ? "" : undefined}
+      className="admin-side hidden h-full shrink-0 flex-col border-e border-hairline bg-surface md:flex"
+    >
+      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-hairline px-2">
+        <BrandLockup href="/admin" name="Scalers" size="sm" markOnly priority scroll={false} className="min-h-9 min-w-9 justify-center" />
+        <span className="admin-side-label truncate text-sm font-semibold text-ink">Scalers</span>
+      </div>
+      <nav aria-label="Super Admin" className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
+        {ADMIN_LINKS.map((item) =>
+          item.pending ? (
+            <span key={item.href} aria-disabled="true" title={item.pending} className="flex h-9 items-center gap-3 rounded-md px-2 text-sm text-ink-3">
+              <AdminIcon name={item.label} />
+              <span className="admin-side-label truncate">{item.label}</span>
+              <span className="sr-only">{item.pending}</span>
+            </span>
+          ) : (
+            <AdminDestinationLink
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              exact={item.exact}
+              pendingHref={pendingHref}
+              setPendingHref={setPendingHref}
+              className="flex h-9 items-center gap-3 rounded-md px-2 text-sm"
+              activeClassName="bg-accent/10 font-semibold text-accent-deep"
+              idleClassName="text-ink-2 hover:bg-surface-muted hover:text-ink"
+              labelClassName="admin-side-label truncate"
+            />
+          ),
+        )}
+      </nav>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={!collapsed}
+        aria-label={collapsed ? "Show menu labels" : "Hide menu labels"}
+        className={["flex h-10 shrink-0 items-center gap-3 border-t border-hairline px-4 text-sm text-ink-2 hover:bg-surface-muted", focusRingVisible].join(" ")}
+      >
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="admin-side-chevron h-5 w-5 shrink-0">
+          <path d="M12 5l-5 5 5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span className="admin-side-label truncate">Collapse</span>
+      </button>
+    </div>
+  );
+}
+
 function retapAdminTab() {
   const well = document.querySelector("[data-admin-main]");
   if (well instanceof HTMLElement) well.scrollTop = 0;
@@ -433,12 +500,31 @@ export function AdminNestedBack() {
 export function AdminShell({
   operatorName,
   children,
+  v2 = false,
 }: {
   operatorName: string;
   children: ReactNode;
+  /** ADMIN_V2=on: 200/56px text sidebar, 40px top bar, full-width main with 16px margins. */
+  v2?: boolean;
 }) {
   const { path } = useAdminChrome();
   const nested = Boolean(adminParentTarget(path));
+
+  if (v2) {
+    return (
+      <div data-admin-shell="" data-admin-v2="" data-admin-nested={nested ? "" : undefined} className={adminShellClass}>
+        <AdminSideNav />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <AdminAccountMenu name={operatorName} compact />
+          <main data-admin-main="" data-pull-dirty-guard="" className={adminMainV2Class}>
+            <AdminNestedBack />
+            {children}
+          </main>
+          <AdminTabBar />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div data-admin-shell="" data-admin-nested={nested ? "" : undefined} className={adminShellClass}>

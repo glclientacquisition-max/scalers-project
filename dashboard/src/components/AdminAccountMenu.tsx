@@ -17,7 +17,7 @@ function accountInitials(name: string): string {
 }
 
 /** Same account strip as the owner desk. Initials open Appearance and Sign out. */
-export function AdminAccountMenu({ name }: { name: string }) {
+export function AdminAccountMenu({ name, compact = false }: { name: string; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -27,7 +27,7 @@ export function AdminAccountMenu({ name }: { name: string }) {
   return (
     <div
       data-account-bar=""
-      className="relative flex min-h-12 shrink-0 items-center justify-end gap-2 border-b border-hairline bg-surface px-3 sm:px-4"
+      className={`relative flex ${compact ? "min-h-12 md:h-10 md:min-h-10" : "min-h-12"} shrink-0 items-center justify-end gap-2 border-b border-hairline bg-surface px-3 sm:px-4`}
     >
       <div className="me-auto hidden min-w-0 flex-1 md:block md:max-w-md lg:max-w-lg">
         <AdminGlobalSearch />

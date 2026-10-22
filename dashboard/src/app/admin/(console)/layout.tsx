@@ -3,6 +3,7 @@ import { AdminShell } from "@/components/AdminNav";
 import { AdminPhonePull } from "@/components/PhonePullSurface";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { getAdminSession } from "@/lib/auth";
+import "@/styles/admin-v2.css";
 
 // instant = false: Super Admin cookie session must run before chrome. Do not wrap the gate in Suspense.
 export const instant = false;
@@ -19,7 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const operatorName = adminSession?.user?.name || "ops";
 
   return (
-    <AdminShell operatorName={operatorName}>
+    <AdminShell operatorName={operatorName} v2={process.env.ADMIN_V2 === "on"}>
       <Suspense fallback={null}>
         <AdminPhonePull scroll="admin" />
       </Suspense>
