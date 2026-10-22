@@ -52,6 +52,10 @@ const ROWS: InboxItem[] = [
     intent: "human",
     pinnedAt: "2026-09-18T08:00:00.000Z",
     unread: true,
+    redials: [
+      { id: "rd-1", callId: "call-rd-1", sid: "HD_fixture1", createdAt: "2026-09-12T05:11:02.000Z", durationSeconds: 0 },
+      { id: "rd-2", callId: "call-rd-2", sid: "HD_fixture2", createdAt: "2026-09-12T05:11:31.000Z", durationSeconds: 0 },
+    ],
   }),
   item({
     id: "job",
