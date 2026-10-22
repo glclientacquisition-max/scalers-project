@@ -443,6 +443,7 @@ const {
   createPostGreetingNudge,
   inviteLanguage: postGreetingInviteLanguage,
   postGreetingNudgeLine,
+  postGreetingGoodbyeLine,
 } = require('./src/speech/postGreetingNudge');
 const { createUnfinishedHold, unfinishedHoldMs } = require('./src/speech/unfinishedHold');
 const { noteCallTerminal, callTerminalSince } = require('./src/speech/callLifecycle');
@@ -2371,6 +2372,38 @@ mediaWss.on('connection', (ws, req) => {
           messages.push({ role: 'assistant', content: line, local: true });
         }
       });
+    },
+    // After 2 nudges and ~8 s more silence: goodbye, then the same hang-up
+    // as a Brain END (callEnding + ws.close(1000, 'end_call')).
+    goodbye: async () => {
+      if (callIsOver() || heardCallerUtterance || callEnding) return;
+      const lang = postGreetingInviteLanguage(greetingInvite);
+      const line = postGreetingGoodbyeLine({ language: lang });
+      callEnding = true;
+      console.log(`[ws/media][${sidLabel()}] post_greeting_silent_close lang=${lang}`);
+      voiceTrace.noteCall({ stage: 'post_greeting_silent_close', language: lang, at: new Date().toISOString() });
+      let spoken = null;
+      playbackBytes = 0;
+      playbackStartedAt = 0;
+      try {
+        spoken = await speakText(line, { isIdleNudge: true });
+      } catch {
+        spoken = null;
+      }
+      if (spoken?.ok) {
+        callTranscript.pushAgent(line);
+        messages.push({ role: 'assistant', content: line, local: true });
+      }
+      // Same playback-aware delay as the Brain END hang-up.
+      const delay = farewellHangupDelayMs({ bytes: playbackBytes, startedAt: playbackStartedAt });
+      console.log(`[ws/media][${sidLabel()}] post-greeting silent hangup in ${delay}ms`);
+      setTimeout(() => {
+        try {
+          ws.close(1000, 'end_call');
+        } catch {
+          /* ignore */
+        }
+      }, delay);
     },
   });
   // An unfinished caller turn ("Nilikuwa nauliza,") is held, not answered.

@@ -19,6 +19,10 @@ const DEFAULT_DELAY_MS = 6000;
 const MIN_DELAY_MS = 3000;
 const MAX_DELAY_MS = 15000;
 const MAX_NUDGES = 2;
+// After the last nudge: this much more silence, then a goodbye and hang-up.
+// With the ~2 s nudge line itself the caller has had >= 10 s with no speech,
+// matching the approved "silent call closes after 10 s" rule (#646/#731).
+const DEFAULT_CLOSE_AFTER_MS = 8000;
 
 function postGreetingNudgeEnabled(env = process.env) {
   return String(env.VOICE_POST_GREETING_NUDGE || '').trim() === 'on';
@@ -67,6 +71,14 @@ function postGreetingNudgeLine(opts = {}) {
  *   clearTimeout?: typeof clearTimeout,
  * }} [opts]
  */
+/** Goodbye before the silent hang-up, in the invite's language. */
+function postGreetingGoodbyeLine(opts = {}) {
+  const sw = String(opts.language || '').toLowerCase() === 'sw';
+  return sw
+    ? 'Sijakusikia. Tafadhali piga tena. Kwaheri.'
+    : "I can't hear you. Please call again. Goodbye.";
+}
+
 function createPostGreetingNudge(opts = {}) {
   const delayMs = Number.isFinite(Number(opts.delayMs))
     ? Number(opts.delayMs)
@@ -74,6 +86,9 @@ function createPostGreetingNudge(opts = {}) {
   const maxNudges = Number.isFinite(Number(opts.maxNudges))
     ? Number(opts.maxNudges)
     : MAX_NUDGES;
+  const closeAfterMs = Number.isFinite(Number(opts.closeAfterMs))
+    ? Number(opts.closeAfterMs)
+    : DEFAULT_CLOSE_AFTER_MS;
   const schedule = opts.setTimeout || setTimeout;
   const cancel = opts.clearTimeout || clearTimeout;
 
@@ -82,6 +97,7 @@ function createPostGreetingNudge(opts = {}) {
   let heardCaller = false;
   let closed = false;
   let speakingNudge = false;
+  let closing = false;
 
   function clear() {
     if (timer == null) return false;
@@ -91,14 +107,34 @@ function createPostGreetingNudge(opts = {}) {
   }
 
   function stopped() {
-    return closed || heardCaller || count >= maxNudges;
+    return closed || heardCaller || closing;
   }
 
   function arm() {
     clear();
     if (stopped() || speakingNudge) return false;
+    if (count >= maxNudges) {
+      // All nudges used: the next silent window ends the call (if wired).
+      if (typeof opts.goodbye !== 'function') return false;
+      timer = schedule(fireGoodbye, closeAfterMs);
+      return true;
+    }
     timer = schedule(fire, delayMs);
     return true;
+  }
+
+  function fireGoodbye() {
+    timer = null;
+    if (stopped()) return;
+    if (typeof opts.canFire === 'function' && !opts.canFire()) {
+      if (typeof opts.onSkip === 'function') opts.onSkip('busy');
+      arm();
+      return;
+    }
+    closing = true;
+    Promise.resolve()
+      .then(() => opts.goodbye())
+      .catch(() => {});
   }
 
   function fire() {
@@ -152,6 +188,7 @@ function createPostGreetingNudge(opts = {}) {
     clear,
     close,
     count: () => count,
+    closing: () => closing,
     armed: () => timer != null,
     heardCaller: () => heardCaller,
   };
@@ -160,6 +197,8 @@ function createPostGreetingNudge(opts = {}) {
 module.exports = {
   DEFAULT_DELAY_MS,
   MAX_NUDGES,
+  DEFAULT_CLOSE_AFTER_MS,
+  postGreetingGoodbyeLine,
   postGreetingNudgeEnabled,
   postGreetingNudgeDelayMs,
   inviteLanguage,

@@ -9,6 +9,8 @@ const {
   inviteLanguage,
   postGreetingNudgeLine,
   createPostGreetingNudge,
+  postGreetingGoodbyeLine,
+  DEFAULT_CLOSE_AFTER_MS,
 } = require('../src/speech/postGreetingNudge');
 const { composeBusinessAssistantIntro, afterHoursInviteFirst } = require('../src/conversation/businessAssistantIntro');
 const { deriveCallSummary, silentCallSummaryText } = require('../src/conversation/callSummary');
@@ -91,7 +93,6 @@ describe('post-greeting nudge controller', () => {
     assert.deepEqual(said, [0, 1]);
     await clock.advance(60000);
     assert.deepEqual(said, [0, 1], 'never more than 2');
-    assert.equal(n.armed(), false);
   });
 
   it('caller speech restarts the window so it never fires mid-speech', async () => {
@@ -184,6 +185,83 @@ describe('post-greeting nudge controller', () => {
     n.close();
     await clock.advance(60000);
     assert.deepEqual(said, []);
+  });
+});
+
+describe('silent close after 2 nudges', () => {
+  function make(clock, extra = {}) {
+    const events = [];
+    const n = createPostGreetingNudge({
+      delayMs: 6000,
+      closeAfterMs: 8000,
+      setTimeout: clock.setTimeout,
+      clearTimeout: clock.clearTimeout,
+      speak: ({ count }) => events.push(`nudge${count}`),
+      goodbye: () => events.push('goodbye'),
+      ...extra,
+    });
+    return { n, events };
+  }
+  it('defaults to 8 s and the goodbye follows the invite language', () => {
+    assert.equal(DEFAULT_CLOSE_AFTER_MS, 8000);
+    assert.match(postGreetingGoodbyeLine({ language: 'sw' }), /Kwaheri\.$/);
+    assert.match(postGreetingGoodbyeLine({ language: 'en' }), /Goodbye\.$/);
+  });
+  it('silent caller: nudge, nudge, then goodbye 8 s after the 2nd nudge, once', async () => {
+    const clock = fakeClock();
+    const { n, events } = make(clock);
+    n.greetingDone();
+    await clock.advance(12000);
+    assert.deepEqual(events, ['nudge0', 'nudge1']);
+    await clock.advance(7999);
+    assert.deepEqual(events, ['nudge0', 'nudge1']);
+    await clock.advance(1);
+    assert.deepEqual(events, ['nudge0', 'nudge1', 'goodbye']);
+    assert.equal(n.closing(), true);
+    await clock.advance(60000);
+    assert.equal(events.filter((e) => e === 'goodbye').length, 1);
+  });
+  it('caller speech after the 2nd nudge restarts the 8 s window; a real turn cancels the close', async () => {
+    const clock = fakeClock();
+    const { n, events } = make(clock);
+    n.greetingDone();
+    await clock.advance(12000);
+    await clock.advance(5000);
+    n.noteCallerSpeech();
+    await clock.advance(7000);
+    assert.equal(events.includes('goodbye'), false);
+    n.noteCallerTurn();
+    await clock.advance(60000);
+    assert.equal(events.includes('goodbye'), false);
+  });
+  it('never closes while the agent speaks or a turn is busy', async () => {
+    const clock = fakeClock();
+    let busy = false;
+    const { n, events } = make(clock, { canFire: () => !busy });
+    n.greetingDone();
+    await clock.advance(12000);
+    busy = true;
+    await clock.advance(8000);
+    assert.equal(events.includes('goodbye'), false);
+    busy = false;
+    await clock.advance(8000);
+    assert.equal(events.includes('goodbye'), true);
+  });
+  it('no goodbye hook: stops after 2 nudges (old behaviour)', async () => {
+    const clock = fakeClock();
+    const said = [];
+    const n = createPostGreetingNudge({ setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout, speak: ({ count }) => said.push(count) });
+    n.greetingDone();
+    await clock.advance(120000);
+    assert.deepEqual(said, [0, 1]);
+    assert.equal(n.armed(), false);
+  });
+  it('server: goodbye uses callEnding + playback-aware ws.close(1000, end_call)', () => {
+    const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'server.js'), 'utf8');
+    const block = src.slice(src.indexOf('goodbye: async () => {'), src.indexOf('// An unfinished caller turn'));
+    assert.match(block, /callEnding = true;/);
+    assert.match(block, /farewellHangupDelayMs\(/);
+    assert.match(block, /ws\.close\(1000, 'end_call'\)/);
   });
 });
 
