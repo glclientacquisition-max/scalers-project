@@ -697,6 +697,9 @@ function infoAnswer(state, u, profile, kind) {
 
 // Mocked/real model hook: we show the model the typed catalogue, validate whatever it
 // calls, and only ever use it to PROPOSE an intent/slot. Speech never comes from it.
+// Mouth fail-fast (~700–800ms): do not hold rules/Train speech for the full HARD_CAP
+// dual cascade death. HARD_CAP_MS stays 1800 — this budget is mouth-only.
+const MOUTH_FAILFAST_MS = 750;
 async function consultModel(state, u, profile, model, catalogue) {
   if (!model) return null;
   const toolMode = state.phase === 'readback' ? 'ANY' : state.ended ? 'NONE' : 'AUTO';
@@ -712,8 +715,47 @@ async function consultModel(state, u, profile, model, catalogue) {
     if (v.ok && c.args?.confirm_token && c.args.confirm_token !== state.pending?.token) code = 'token_mismatch';
     return { name: c.name, ok: !code, code, errors: v.errors || [] };
   });
-  state.trace.push({ turn: state.turn, toolMode, allowed, modelText: (out?.text || '').slice(0, 160), calls: calls.map((c) => c.name), checks });
-  return { calls, checks };
+  // Preserve cascade honesty fields when the hook is cappedCascade (answeredBy=none on dual timeout).
+  const meta = {
+    answeredBy: out?.answeredBy || null,
+    timedOut: !!out?.timedOut,
+    cascade: !!out?.cascade,
+    latencyMs: out?.latencyMs || null,
+  };
+  state.trace.push({ turn: state.turn, toolMode, allowed, modelText: (out?.text || '').slice(0, 160), calls: calls.map((c) => c.name), checks, ...meta });
+  return { calls, checks, ...meta };
+}
+
+/** Await consult up to MOUTH_FAILFAST_MS; if still pending, mouth proceeds on rules/Train.
+ * Cascade may finish in the background for logging — never raises HARD_CAP.
+ * If a validated proposal arrives within budget, caller seeds R7a as today.
+ */
+async function consultModelForMouth(state, u, profile, model, catalogue, budgetMs = MOUTH_FAILFAST_MS) {
+  if (!model) return null;
+  const t0 = Date.now();
+  const pending = consultModel(state, u, profile, model, catalogue);
+  let settled = null;
+  const result = await Promise.race([
+    pending.then((mc) => { settled = mc; return mc; }),
+    new Promise((resolve) => setTimeout(() => resolve({ __mouthFailFast: true }), budgetMs)),
+  ]);
+  if (settled) return settled;
+  if (result && result.__mouthFailFast) {
+    state.trace.push({ turn: state.turn, mouthFailFast: true, budgetMs, waitedMs: Date.now() - t0 });
+    // Let cascade finish off-path so answeredBy=none honesty can still land in trace.
+    pending.then((mc) => {
+      if (!mc) return;
+      state.trace.push({
+        turn: state.turn,
+        cascadeLate: true,
+        answeredBy: mc.answeredBy || null,
+        timedOut: !!mc.timedOut,
+        calls: (mc.calls || []).map((c) => c.name),
+      });
+    }).catch(() => {});
+    return null;
+  }
+  return result;
 }
 const INTENT_OF_TOOL = { create_booking: 'book', create_order: 'order', cancel_booking: 'cancel', update_booking: 'change', log_complaint: 'complaint', create_handoff: 'handoff' };
 
@@ -810,10 +852,15 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   resolveSmallHoursKesho(state, u, text);
   const results = [];
   const catalogue = buildCatalogue({ profile, openRows: state.file.openRows });
-  const mc = await consultModel(state, u, profile, model, catalogue);
+  // Fail-fast: mouth on rules/Train after ~750ms if no validated proposal yet (HD_ddc993).
+  // HARD_CAP_MS stays 1800; do not raise the cap as the fix.
+  const mc = await consultModelForMouth(state, u, profile, model, catalogue);
   // R7a: validated get_price / check_availability / get_hours → seed slots (copy lookup_file→recall).
   // Applied before explain/FAQ mouth so explain can fire; override only when rules would hollow.
-  const r7seed = AM.applyValidatedReadSeed(mc, u, profile, state);
+  // Skip seed when cascade answeredBy=none / timedOut with empty calls (honesty).
+  const r7seed = (mc && mc.answeredBy === 'none' && !(mc.calls && mc.calls.length))
+    ? null
+    : AM.applyValidatedReadSeed(mc, u, profile, state);
   if (r7seed) state.trace.push({ turn: state.turn, r7a: { tool: r7seed.tool, kind: r7seed.kind } });
   if (typeof classify === 'function' && needsClassify(u, pickIntent(u, state, profile))) {
     try {
@@ -1147,4 +1194,4 @@ async function runTurn(state, args) {
   if (r) r.proposals = r.line ? [TP.proposal({ kind: kind || 'turn', text: r.line, lang: state.lang, topic: kind ? { ...state.topic, now: state.turn } : null, claim: Boolean(kind) })] : [];
   return r;
 }
-module.exports = { createState, runTurn, finishCall, catalogueTurn };
+module.exports = { createState, runTurn, finishCall, catalogueTurn, MOUTH_FAILFAST_MS, consultModelForMouth };

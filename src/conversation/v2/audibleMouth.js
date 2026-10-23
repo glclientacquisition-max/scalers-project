@@ -313,9 +313,13 @@ function rulesMouthWouldHollow(u = {}) {
   return false;
 }
 
-/** First validateCall/validateProposal-ok read tool (not lookup_file — that has its own seed). */
+/** First validateCall/validateProposal-ok read tool (not lookup_file — that has its own seed).
+ * Harden: dual-timeout / answeredBy=none with no calls never seeds (rules path unchanged).
+ */
 function validatedReadProposal(mc) {
   if (!mc || !Array.isArray(mc.calls)) return null;
+  if (mc.answeredBy === 'none' && !mc.calls.length) return null;
+  if (mc.timedOut && !mc.calls.length) return null;
   for (let i = 0; i < mc.calls.length; i++) {
     const c = mc.calls[i];
     const check = mc.checks && mc.checks[i];
@@ -413,7 +417,7 @@ function validatedReadSeeds(mc, { profile = {}, u = {} } = {}) {
     const text = String(u.text || '');
     const wantExplain = u.followup
       || (u.intents || []).includes('explain')
-      || /\b(tell me (a bit |a little |more )?about|nieleze|niambie|what (exactly|does|is)|baada|after[\s-]?build|maana|mean)\b/i.test(text);
+      || /\b(tell me (a bit |a little |more )?about|nieleze|niambie|what (exactly|does|is)|baada|after[\s-]?build|after[\s-]?construction|maana|mean)\b/i.test(text);
     const wantPrice = (u.intents || []).includes('price') || /\b(how much|ngapi|price|gharama)\b/i.test(text);
     const kind = wantPrice ? 'price' : (wantExplain ? 'explain' : 'availability');
     return { tool: prop.tool, kind, service, product, override: true };
