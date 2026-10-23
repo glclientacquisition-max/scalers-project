@@ -135,8 +135,8 @@ describe("admin pay queue labels", () => {
       tenant: livePayBlock({ modeLive: true, liveMasterOn: true, tenantEnabled: false }),
       open: livePayBlock({ modeLive: true, liveMasterOn: true, tenantEnabled: true }),
     })`), {
-      hosting: "Hosting switch is off",
-      off: "Hosting switch is off",
+      hosting: "Live payments are off",
+      off: "Live payments are off",
       tenant: "Not enabled",
       open: null,
     });
