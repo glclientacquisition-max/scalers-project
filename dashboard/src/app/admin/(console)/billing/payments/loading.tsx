@@ -1,10 +1,5 @@
-import { SkeletonList } from "@/components/ui/Skeleton";
+import { OpsLoadingPayments } from "@/components/admin/v2/OpsRouteLoading";
 
-export default function AdminPaymentsLoading() {
-  return (
-    <div className="space-y-4" aria-busy="true">
-      <SkeletonList rows={4} />
-      <SkeletonList rows={3} />
-    </div>
-  );
+export default function Loading() {
+  return <OpsLoadingPayments />;
 }

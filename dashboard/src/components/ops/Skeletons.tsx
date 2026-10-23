@@ -104,3 +104,35 @@ export function SkelPane({ facts = 8, history = 12, related = 3 }: { facts?: num
     </aside>
   );
 }
+
+/** KPI row: matches .ops-tiles (2 on phone, auto-fit on desk). */
+export function SkelKpi({ tiles = 4 }: { tiles?: number }) {
+  return (
+    <div className="ops-tiles" aria-hidden="true" data-skel-kpi="">
+      {Array.from({ length: tiles }, (_, i) => (
+        <div key={i} className="flex min-w-0 flex-col gap-1.5 rounded-lg bg-surface p-ops-3">
+          <OpsSkeleton className="h-2.5 w-1/2" />
+          <OpsSkeleton className="h-6 w-2/3" />
+          <OpsSkeleton className="h-2.5 w-1/3" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** List + optional pane: phone rows, desk table, closed-pane list fills width. */
+export function SkelSplit({ cols, rows = 10, pane = true }: { cols: SkelCol[]; rows?: number; pane?: boolean }) {
+  return (
+    <div className="ops-theme ops-split -me-4 flex min-h-0 w-[calc(100%+16px)] shrink-0" aria-busy="true" data-skel-split="">
+      <div className="ops-split-list min-w-0 flex-1 overflow-auto pe-ops-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pb-ops-3">
+          <OpsSkeleton className="h-6 w-40" />
+          <OpsSkeleton className="ms-auto h-8 w-48" />
+        </div>
+        <SkelPhoneRows rows={Math.min(rows, 8)} />
+        <div className="hidden md:block"><SkelTable cols={cols} rows={rows} /></div>
+      </div>
+      {pane ? <SkelPane /> : null}
+    </div>
+  );
+}
