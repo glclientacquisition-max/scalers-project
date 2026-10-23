@@ -196,4 +196,20 @@ function createBrainV2Live(opts = {}) {
   return { run, getState: () => state, lastModelShadow: () => lastShadow };
 }
 
-module.exports = { createBrainV2Live, callerFile, endDecision, resolveModelShadow };
+
+const AM = require('./audibleMouth');
+
+/** Voice composeOpening card from the same bind-safe facts Brain seeds into machine.file.
+ * Field names locked with Voice @ 45c2d51f — do not rename.
+ * openRows may carry D199 `job` (mapped to service_name here for Brain seed).
+ */
+function openingCardFromCallerFile(opts = {}) {
+  const file = callerFile(opts);
+  return AM.bindSafeOpeningCard(file, {
+    name: file.nameConfirmed ? file.contactName : null,
+    nameConfirmed: file.nameConfirmed === true,
+  }, opts.staffNames || [], { lastLanguage: opts.lastLanguage || file.lastLanguage || null });
+}
+
+module.exports = { createBrainV2Live, callerFile, openingCardFromCallerFile, endDecision, resolveModelShadow };
+

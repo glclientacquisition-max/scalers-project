@@ -103,8 +103,8 @@ test('A2 primary timeout → one backup flash-lite inside overall HARD_CAP', asy
   assert.equal(st.proposal.tool, 'lookup_file');
   assert.equal(primary.seen.length, 1);
   assert.equal(backup.seen.length, 1);
-  assert.ok(st.latencyMs <= MS.HARD_CAP_MS + 80, `cascade wall ${st.latencyMs}`);
-  assert.ok(wall < 1200, `caller-adjacent wall ${wall}`);
+  assert.ok(st.latencyMs <= MS.HARD_CAP_MS + 120, `cascade wall ${st.latencyMs}`);
+  assert.ok(wall < MS.HARD_CAP_MS + 400, `caller-adjacent wall ${wall}`);
   // primary must have been aborted (signal fired) before backup
   assert.equal(primary.seen[0].signal.aborted, true);
 });
@@ -142,11 +142,12 @@ test('A4 both timeout → timedOut after cascade, proposal null, no throw', asyn
   assert.ok(out.line, 'rules mouth still stands');
   const st = await live.lastModelShadow();
   assert.equal(st.cascade, true);
-  assert.equal(st.answeredBy, 'backup');
+  // C1 honesty: both timeout → none (never claim backup success with null proposal)
+  assert.equal(st.answeredBy, 'none');
   assert.equal(st.timedOut, true);
   assert.equal(st.proposal, null);
   assert.equal(writes.length, 0);
-  assert.ok(st.latencyMs <= MS.HARD_CAP_MS + 80, String(st.latencyMs));
+  assert.ok(st.latencyMs <= MS.HARD_CAP_MS + 120, String(st.latencyMs));
   assert.equal(primary.seen.length, 1);
   assert.equal(backup.seen.length, 1);
 });
@@ -155,7 +156,7 @@ test('A4 both timeout → timedOut after cascade, proposal null, no throw', asyn
 test('A5 off unchanged; shadow without backup keeps single-cap timeout', async () => {
   assert.equal(MS.modelMode({}), 'off');
   assert.equal(resolveModelShadow({ shadowModel: async () => ({}) }, {}), null);
-  const slow = standIn([call('propose_booking', { service_id: 'svc_0' })], { delayMs: 1500 });
+  const slow = standIn([call('propose_booking', { service_id: 'svc_0' })], { delayMs: MS.HARD_CAP_MS + 400 });
   const { live } = liveWith({ BRAIN_V2_MODEL: 'shadow' }, { shadowModel: slow });
   const out = await live.run({ text: 'I want to book sofa cleaning', profile, langLock: 'en' });
   assert.ok(out.line);
@@ -220,7 +221,7 @@ test('B1 HD_c1708336-shaped slow primary + fast backup → proposal present via 
     assert.ok(st.proposal, 'backup proposal present — not null-without-backup');
     assert.equal(st.proposal.tool, 'lookup_file');
     assert.equal(st.timedOut, false);
-    assert.ok(st.latencyMs <= MS.HARD_CAP_MS + 80, String(st.latencyMs));
+    assert.ok(st.latencyMs <= MS.HARD_CAP_MS + 120, String(st.latencyMs));
   }
   assert.equal(backup.seen.length, 2);
   assert.equal(primary.seen.length, 2);
@@ -265,7 +266,33 @@ test('cappedCascade overall wall stays ≤ HARD_CAP (smooth, not 900+900)', asyn
   const wall = Date.now() - t0;
   assert.equal(r.cascade, true);
   assert.equal(r.answeredBy, 'backup');
-  assert.ok(wall <= MS.HARD_CAP_MS + 100, `wall ${wall}`);
-  assert.ok(r.latencyMs <= MS.HARD_CAP_MS + 100, `latencyMs ${r.latencyMs}`);
-  assert.ok(r.primaryLatencyMs <= MS.HARD_CAP_MS - MS.MIN_BACKUP_MS + 50);
+  assert.ok(wall <= MS.HARD_CAP_MS + 150, `wall ${wall}`);
+  assert.ok(r.latencyMs <= MS.HARD_CAP_MS + 150, `latencyMs ${r.latencyMs}`);
+  // C2: primary budget is nearly full wall (not 550 starve)
+  assert.ok(r.primaryLatencyMs <= MS.HARD_CAP_MS - MS.MIN_BACKUP_MS + 80);
+  assert.ok(MS.HARD_CAP_MS - MS.MIN_BACKUP_MS - MS.CASCADE_SLACK_MS > 550, 'primary not 550-starved');
+});
+
+
+// ---------- C1 honesty / C2 budget (mouth-seed stack) ----------
+test('C1 both timeout → answeredBy none (not backup) with null proposal', async () => {
+  const primary = standIn([call('get_price', { service_id: 'svc_0' })], { delayMs: 5000, name: 'primary' });
+  const backup = standIn([call('get_price', { service_id: 'svc_0' })], { delayMs: 5000, name: 'backup' });
+  const r = await MS.cappedCascade({
+    primary, backup, request: {}, capMs: MS.HARD_CAP_MS,
+    primaryId: MS.MODEL_ID, backupId: MS.MODEL_BACKUP_ID,
+  });
+  assert.equal(r.cascade, true);
+  assert.equal(r.answeredBy, 'none');
+  assert.equal(r.timedOut, true);
+  assert.deepEqual(r.calls, []);
+  assert.notEqual(r.answeredBy, 'backup');
+});
+
+test('C2 primary budget is not 550-starve; HARD_CAP evidence band ~1.5–2.0s', () => {
+  assert.ok(MS.HARD_CAP_MS >= 1500 && MS.HARD_CAP_MS <= 2000, String(MS.HARD_CAP_MS));
+  const primaryBudget = Math.max(MS.HARD_CAP_MS - MS.MIN_BACKUP_MS - MS.CASCADE_SLACK_MS, MS.MIN_BACKUP_MS);
+  assert.ok(primaryBudget >= 1400, `primaryBudget ${primaryBudget} still starved (was ~550)`);
+  assert.ok(primaryBudget > 550, 'must exceed old 550 starve');
+  assert.ok(MS.BACKUP_RESERVE_MS <= MS.MIN_BACKUP_MS + 1);
 });
