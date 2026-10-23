@@ -26,7 +26,7 @@ export function AdminVoicesV2({ voices }: { voices: VoiceRow[] }) {
   const off = voices.length - live;
   const def = voices.find((v) => v.is_default);
   return (
-    <div className="ops-theme flex w-full flex-col gap-ops-3 text-ops-body">
+    <div className="ops-theme flex w-full flex-col gap-ops-3 pe-ops-4 text-ops-body">
       <PageHeader
         title="Voices"
         count={voices.length}
@@ -92,7 +92,7 @@ export function AdminVoicesV2({ voices }: { voices: VoiceRow[] }) {
                 </li>
               ))}
             </ul>
-            <table className="hidden w-full text-ops-body md:table">
+            <table className="hidden w-full whitespace-nowrap text-ops-body md:table" data-voices-table="">
               <thead className="bg-canvas text-ops-label text-ink-2">
                 <tr className="h-ops-row border-b border-hairline">
                   <th className="px-ops-3 text-start font-normal">Voice</th>
