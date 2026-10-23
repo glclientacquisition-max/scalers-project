@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import type { OpsNotice, OpsSettings, OpsSignal } from "@/lib/platformOpsModel";
+import { kindLabel, type OpsNoticeKind } from "@/lib/platformOpsModel";
 import { PageHeader, StatusPill, UnlockCta, type OpsTone } from "@/components/ops";
-import { AdminPlatformOpsForm } from "@/components/AdminPlatformOpsForm";
+import { AdminOpsNotices, AdminPlatformOpsForm } from "@/components/AdminPlatformOpsForm";
 import "@/styles/ops.css";
 
 type InfraRow = { id: string; title: string; tone: "ok" | "attention" | "neutral"; label: string; detail: string };
@@ -93,7 +94,7 @@ export function AdminServicesV2({ snapshot }: { snapshot: Snapshot }) {
           <ul className="divide-y divide-hairline">
             {open.map((n) => (
               <li key={n.id} className="px-ops-3 py-ops-2">
-                <span className="font-semibold text-ink">{n.kind}</span>
+                <span className="font-semibold text-ink">{kindLabel(n.kind as OpsNoticeKind) || n.kind}</span>
                 <span className="mt-0.5 block text-ops-label text-ink-2">{n.detail || "No detail"}</span>
               </li>
             ))}
@@ -151,6 +152,7 @@ export function AdminServicesV2({ snapshot }: { snapshot: Snapshot }) {
             <p className="mt-0.5 text-ops-label text-ink-2">Same writes as the Platform form — postOps.</p>
           </header>
           <div className="py-ops-2">
+            <AdminOpsNotices notices={snapshot.notices} />
             <AdminPlatformOpsForm settings={snapshot.settings} persisted={snapshot.persisted} />
           </div>
         </section>
