@@ -13,7 +13,12 @@ export default async function DevAdminNumbersV2Page() {
   if (process.env.DASHBOARD_OPEN !== "true") notFound();
   return (
     <AdminShell operatorName="alvin" v2>
-      <AdminNumbersV2 rows={ADMIN_NUMBERS} waiting={ADMIN_NUMBERS_WAITING} nowIso={ADMIN_NUMBERS_NOW} />
+      <AdminNumbersV2
+        rows={ADMIN_NUMBERS}
+        waiting={ADMIN_NUMBERS_WAITING}
+        nowIso={ADMIN_NUMBERS_NOW}
+        holdPolicy={{ columnsPresent: true, enabled: true, defaultDays: 14, reactivationFeeKes: null }}
+      />
     </AdminShell>
   );
 }
