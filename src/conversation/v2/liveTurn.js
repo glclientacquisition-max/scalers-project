@@ -11,19 +11,37 @@ const { createGeminiSend, createGeminiStreamModel } = require('./transport');
 const MS = require('./modelShadow');
 
 // C7 BRAIN_V2_MODEL: off (default) = nothing; shadow = the model runs beside the rules turn,
-// never awaited, logged per turn; on = NOT for staging (explicit only): the capped model is also
-// handed to the machine's existing consultModel hook. The key is Platform's env (GEMINI_API_KEY).
+// never awaited, logged per turn; on = the capped cascade is also handed to the machine's
+// existing consultModel hook. Cascade: primary (BRAIN_V2_MODEL_ID / gemini-3.6-flash) first;
+// on HARD_CAP timeout or hard fail, one backup (BRAIN_V2_MODEL_BACKUP_ID / gemini-3.5-flash-lite)
+// inside the same overall cap (not 900+900).
+// The key is Platform's env (GEMINI_API_KEY). Model plaintext is never TTS'd.
 function resolveModelShadow(opts = {}, env = process.env) {
   const mode = MS.modelMode(env);
   if (mode === 'off') return null;
+  const ids = MS.resolveModelIds(env);
   let model = typeof opts.shadowModel === 'function' ? opts.shadowModel : null;
+  let backupModel = typeof opts.shadowBackupModel === 'function' ? opts.shadowBackupModel : null;
   if (!model) {
     const key = env.GEMINI_API_KEY;
     if (!key) { (opts.log || console.log)('[brain_v2_model] no GEMINI_API_KEY; model shadow off for this call'); return null; }
-    try { model = createGeminiStreamModel({ apiKey: key, model: String(env.BRAIN_V2_MODEL_ID || '').trim() || MS.MODEL_ID }); } catch { return null; }
+    try {
+      model = createGeminiStreamModel({ apiKey: key, model: ids.primary });
+      if (ids.backup && ids.backup !== ids.primary) {
+        backupModel = createGeminiStreamModel({ apiKey: key, model: ids.backup });
+      }
+    } catch { return null; }
   }
-  const shadow = MS.createModelShadow({ model, mode, onStage: typeof opts.onModelStage === 'function' ? opts.onModelStage : () => {}, log: opts.log || ((m) => console.log(m)), modelId: String(env.BRAIN_V2_MODEL_ID || '').trim() || MS.MODEL_ID });
-  return { mode, shadow, model };
+  const shadow = MS.createModelShadow({
+    model,
+    backupModel,
+    mode,
+    onStage: typeof opts.onModelStage === 'function' ? opts.onModelStage : () => {},
+    log: opts.log || ((m) => console.log(m)),
+    modelId: ids.primary,
+    backupModelId: ids.backup,
+  });
+  return { mode, shadow, model, backupModel, modelId: ids.primary, backupModelId: ids.backup };
 }
 
 function defaultClassify(opts = {}) {
@@ -150,7 +168,7 @@ function createBrainV2Live(opts = {}) {
       profile: { ...(profile || {}) },
       now: nowFn(),
       handlers,
-      model: opts.model || (modelRun && modelRun.mode === 'on' ? async ({ request }) => MS.capped(modelRun.model, request) : null),
+      model: opts.model || (modelRun && modelRun.mode === 'on' ? async ({ request }) => MS.cappedCascade({ primary: modelRun.model, backup: modelRun.backupModel, request, primaryId: modelRun.modelId || MS.MODEL_ID, backupId: modelRun.backupModelId || MS.MODEL_BACKUP_ID }) : null),
       classify: defaultClassify(opts),
       langLock: langLock === 'en' || langLock === 'sw' ? langLock : null,
       shouldAbort: typeof shouldAbort === 'function' ? shouldAbort : () => false,

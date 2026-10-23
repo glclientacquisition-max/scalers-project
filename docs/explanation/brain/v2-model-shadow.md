@@ -1,6 +1,6 @@
 ---
 owner: brain
-last_reviewed: 2026-10-21
+last_reviewed: 2026-10-23
 ---
 
 # Brain v2: hybrid Gemini tool-calling, in shadow (C7)
@@ -20,10 +20,10 @@ This revives the design from closed PR #536 (native `functionDeclarations`, code
 
 Code: `src/conversation/v2/modelShadow.js` (tools, validation, request, agreement, cost), `createGeminiStreamModel` in `src/conversation/v2/transport.js` (streaming), and `resolveModelShadow` plus `run()` in `liveTurn.js` (wiring). `voiceTrace.noteBrainV2Model` writes the stage to the trace.
 
-## One model call
+## One model call (C7 cascade)
 
 - **Transport.** `POST models/<id>:streamGenerateContent?alt=sse` with native function calling. The key travels only in the `x-goog-api-key` header and is never in the URL or in error text.
-- **900 ms hard cap.** An `AbortController` cancels the call at 900 ms (`capped`). A timeout or error comes back as a result, never as an exception. The rules line is the fallback, and in shadow it is always the line spoken anyway.
+- **Primary → backup inside one 900 ms hard cap.** Defaults: primary `gemini-3.6-flash`, backup `gemini-3.5-flash-lite`. `cappedCascade` gives the primary most of the budget (reserve ~350 ms for backup). On **timeout or hard fail**, the primary AbortController is already fired, then **one** backup attempt runs on the remaining wall. Total wall stays ≤ `HARD_CAP_MS` (not a naive 900+900). If there is no backup model or the ids match, behaviour is the old single-cap path. A timeout or error comes back as a result, never as an exception. The rules line is the fallback, and in shadow it is always the line spoken anyway. Stage fields: `model` (id that answered), `answeredBy` (`primary`|`backup`), `cascade`, `primaryTimedOut`, `backupTimedOut`, `primaryError`.
 - **Request.** It carries:
   - a system instruction;
   - a `CONTEXT` block with the time in EAT and the machine state: `phase`, `intent`, `expecting`, `lang`, slots, the read-back waiting and its confirm token;
@@ -66,7 +66,7 @@ A write with no `confirm_token` is `{ok, commit:false}`: it only proposes, and t
 
 The trace stage goes to `voice_turn_traces.payload.stages[]` on the same turn row (`record_kind='turn'`). If the stage lands after the turn row was written, it updates that row through `sink.update`. It also appears as a `[brain_v2_model] ...` log line. Fields:
 
-`stage='brain_v2_model'`, `mode`, `model`, `turnIndex`, `allowed`, `rules{intent, slots}`, `proposal{tool, args, valid, error, commit, extraCalls}`, `modelIntent`, `agree`, `intentAgree`, `slotDiffs`, `latencyMs`, `timedOut`, `error`, `capMs`, `tokens{in, cached, out, thoughts, estimated, costUsd, costKes}`, `thoughtSignature` (true or false only; the signature itself is not stored).
+`stage='brain_v2_model'`, `mode`, `model`, `answeredBy` (`primary`|`backup`), `turnIndex`, `allowed`, `rules{intent, slots}`, `proposal{tool, args, valid, error, commit, extraCalls}`, `modelIntent`, `agree`, `intentAgree`, `slotDiffs`, `latencyMs`, `timedOut`, `error`, `capMs`, `cascade`, `primaryTimedOut`, `backupTimedOut`, `primaryError`, `tokens{in, cached, out, thoughts, estimated, costUsd, costKes}`, `thoughtSignature` (true or false only; the signature itself is not stored).
 
 **No raw phone numbers.** Runs of 7 or more digits become `[phone]` in the stage and in the request. The trace redactor runs again as a backstop. ISO dates are kept. For `name`, the stage records only `set`.
 
@@ -138,10 +138,13 @@ With implicit caching of the system plus facts prefix, which is most of the inpu
 
 ## Env
 
-- `BRAIN_V2_MODEL` = `off` (default) | `shadow` | `on`. `on` is not for staging.
-- `BRAIN_V2_MODEL_ID`: optional, defaults to `gemini-3.5-flash-lite`.
+- `BRAIN_V2_MODEL` = `off` (default) | `shadow` | `on`. Staging C7 may set `on` behind Alvin GO; still never for prod from this doc alone.
+- `BRAIN_V2_MODEL_ID`: optional primary id, defaults to `gemini-3.6-flash`.
+- `BRAIN_V2_MODEL_BACKUP_ID`: optional backup id, defaults to `gemini-3.5-flash-lite`. Used once on primary timeout or hard fail, inside the same overall hard cap.
 - `GEMINI_API_KEY`: Platform's env on staging. Without it, shadow turns itself off for the call and logs that. It never reads a key file.
 - The rules path needs the C3/C2 flags as before: `BRAIN_V2=on`, `BRAIN_V2_MODE=live` and, if they are being tested together, `BRAIN_V2_OWNS_CALL`, `BRAIN_V2_COMMIT_SAFETY` and `BRAIN_V2_FACT_STORE`. The shadow builds its facts with `factsFor(profile)` whether or not `BRAIN_V2_FACT_STORE` is set.
+
+Cascade is Brain-owned in `modelShadow.js` / `liveTurn.js`. Voice TTS has a related primary/backup helper in `geminiVoice.js` (`nextGeminiStreamAttempt`) — pattern reference only; C7 does not couple to the TTS stream backup.
 
 ## Limits
 

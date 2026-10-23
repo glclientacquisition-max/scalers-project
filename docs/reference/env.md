@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-206 variables.
+207 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -33,6 +33,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BRAIN_V2_COMMIT_SAFETY` | voice | `src/conversation/v2/commitSafety.js` |
 | `BRAIN_V2_FACT_STORE` | voice | `src/knowledge/factStore.js` |
 | `BRAIN_V2_MODEL` | voice | `src/conversation/v2/modelShadow.js` |
+| `BRAIN_V2_MODEL_BACKUP_ID` | voice | `src/conversation/v2/modelShadow.js` |
 | `BRAIN_V2_MODEL_ID` | voice | `src/conversation/v2/modelShadow.js` |
 | `BRAIN_V2_NLU_GAPS` | voice | `src/conversation/turnProposals.js`<br>`src/conversation/v2/nlu.js` |
 | `BRAIN_V2_OWNS_CALL` | voice | `src/conversation/v2/commitSafety.js`<br>`src/conversation/v2/ownsCall.js` |
