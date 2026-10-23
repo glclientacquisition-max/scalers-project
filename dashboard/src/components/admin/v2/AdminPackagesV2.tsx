@@ -192,7 +192,7 @@ export function AdminPackagesV2({
         <span className="font-semibold text-ink">{publishedCount} published</span>
         {" · "}
         {editorOn ? "Editor on" : "Editor off"}
-        {" · Catalog only — assign a package on the business"}
+        {" · Catalog only — assign from the business"}
         {readOnlyHint ? <span className="ms-1">· {readOnlyHint}</span> : null}
         {status ? <span className="ms-1 text-ink">· {status}</span> : null}
       </p>
