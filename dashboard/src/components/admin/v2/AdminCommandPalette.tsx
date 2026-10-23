@@ -3,6 +3,7 @@
 import { MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { ErrorState } from "@/components/ops/States";
 import { StatusPill } from "@/components/ops/StatusPill";
 import "@/styles/ops.css";
 import {
@@ -48,6 +49,8 @@ export function AdminCommandPalette({ fixture, defaultOpen = false, defaultQuery
     fixture && commandQueryReady(defaultQuery) ? fixture.filter((h) => matchCommandHit(h, defaultQuery)) : [],
   );
   const [state, setState] = useState<"idle" | "busy" | "done" | "error">(hits.length ? "done" : "idle");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [retryTick, setRetryTick] = useState(0);
   const [active, setActive] = useState(0);
 
   const groups = useMemo(() => groupCommandHits(hits), [hits]);
@@ -76,11 +79,13 @@ export function AdminCommandPalette({ fixture, defaultOpen = false, defaultQuery
     const q = normalizeCommandQuery(query);
     if (!commandQueryReady(q)) {
       setHits([]);
+      setErrorMsg("");
       setState("idle");
       return;
     }
     if (fixture) {
       setHits(fixture.filter((h) => matchCommandHit(h, q)));
+      setErrorMsg("");
       setActive(0);
       setState("done");
       return;
@@ -88,22 +93,34 @@ export function AdminCommandPalette({ fixture, defaultOpen = false, defaultQuery
     const ctrl = new AbortController();
     const t = window.setTimeout(() => {
       setState("busy");
+      setErrorMsg("");
       fetch(`/api/admin/search?v=2&q=${encodeURIComponent(q)}`, { signal: ctrl.signal })
-        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        .then(async (r) => {
+          const j = (await r.json().catch(() => ({}))) as { hits?: CommandHit[]; error?: string };
+          if (!r.ok) {
+            const msg = typeof j.error === "string" && j.error.trim() ? j.error.trim() : "Could not search. Try again.";
+            throw new Error(msg);
+          }
+          return j;
+        })
         .then((j: { hits?: CommandHit[] }) => {
           setHits(j.hits || []);
+          setErrorMsg("");
           setActive(0);
           setState("done");
         })
         .catch((err: unknown) => {
-          if ((err as { name?: string })?.name !== "AbortError") setState("error");
+          if ((err as { name?: string })?.name === "AbortError") return;
+          setHits([]);
+          setErrorMsg(err instanceof Error && err.message ? err.message : "Could not search. Try again.");
+          setState("error");
         });
     }, 180);
     return () => {
       ctrl.abort();
       window.clearTimeout(t);
     };
-  }, [query, fixture]);
+  }, [query, fixture, retryTick]);
 
   function go(hit: CommandHit | undefined) {
     if (!hit) return;
@@ -218,7 +235,9 @@ export function AdminCommandPalette({ fixture, defaultOpen = false, defaultQuery
               ) : state === "busy" && !flat.length ? (
                 <p className="px-ops-3 py-ops-3 text-ops-body text-ink-2">Searching</p>
               ) : state === "error" ? (
-                <p className="px-ops-3 py-ops-3 text-ops-body text-ink-2">Search failed. Try again.</p>
+                <div className="px-ops-2 py-ops-2">
+                  <ErrorState title={errorMsg || "Could not search. Try again."} onRetry={() => setRetryTick((n) => n + 1)} />
+                </div>
               ) : state === "done" && !flat.length ? (
                 <p className="px-ops-3 py-ops-3 text-ops-body text-ink-2">Nothing matches “{normalizeCommandQuery(query)}”. Archived businesses are included.</p>
               ) : null}

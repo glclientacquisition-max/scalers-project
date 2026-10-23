@@ -72,3 +72,25 @@ test("call id search uses a uuid range, never ILIKE on uuid", async () => {
   const full = "8f2c1a2b-0000-4000-8000-0123456789ab";
   assert.deepEqual(callIdRange(full), { lo: full, hi: full });
 });
+
+test("failed search shows reason + Retry, empty shows Nothing matches — never blanket Search failed", () => {
+  const ui = read("dashboard/src/components/admin/v2/AdminCommandPalette.tsx");
+  assert.match(ui, /ErrorState/);
+  assert.match(ui, /onRetry/);
+  assert.match(ui, /Could not search\. Try again/);
+  assert.match(ui, /Nothing matches/);
+  assert.doesNotMatch(ui, /Search failed/);
+  // Reads the API error body instead of only rejecting on status
+  assert.match(ui, /j\.error/);
+  assert.match(ui, /r\.json\(\)/);
+});
+
+test("command search soft-fails one source and never ILIKEs uuid", () => {
+  const lib = read("dashboard/src/lib/adminCommandSearch.ts");
+  assert.match(lib, /rowsOrEmpty/);
+  assert.match(lib, /logAdminError/);
+  assert.match(lib, /ran\.every/);
+  assert.ok(!/from\("calls"\)[^\n]*ilike\("id"/.test(lib), "calls.id is uuid; ilike fails with 42883");
+  assert.match(lib, /callIdRange/);
+  assert.match(lib, /gte\("id", callRange\.lo\)/);
+});
