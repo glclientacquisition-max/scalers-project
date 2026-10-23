@@ -36,6 +36,9 @@ export function OpsConfirm({
   const blocked =
     reasonShort ||
     (strength === "destructive" && !!typeToConfirm && typed.trim() !== typeToConfirm);
+  const typedShort = strength === "destructive" && !!typeToConfirm && typed.trim() !== typeToConfirm;
+  /** Laws of UX — disabled states always say why, right next to the button. */
+  const blockedWhy = reasonShort ? "Add a reason to continue." : typedShort ? `Type ${typeToConfirm} to continue.` : null;
   const close = () => { setReason(""); setTyped(""); setTouched(false); onClose(); };
   return (
     <Drawer
@@ -44,16 +47,28 @@ export function OpsConfirm({
       dismissible={!pending}
       onOpenChange={(next) => { if (!next) close(); }}
       footer={
-        <>
-          <Button variant="ghost" size="md" onClick={close} disabled={pending}>Cancel</Button>
-          <Button variant={strength === "destructive" ? "danger" : "primary"} size="md" pending={pending} disabled={blocked} onClick={() => onConfirm(reason.trim())}>
-            {confirmLabel}
-          </Button>
-        </>
+        <div className="flex w-full flex-col gap-ops-2" data-confirm-footer="">
+          {blockedWhy && !pending ? (
+            <p id="ops-confirm-blocked-why" className="text-right text-ops-label text-ink-2" data-blocked-why="">{blockedWhy}</p>
+          ) : null}
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="ghost" size="md" onClick={close} disabled={pending}>Cancel</Button>
+            <Button
+              variant={strength === "destructive" ? "dangerSolid" : "primary"}
+              size="md"
+              pending={pending}
+              disabled={blocked}
+              aria-describedby={blockedWhy ? "ops-confirm-blocked-why" : undefined}
+              onClick={() => onConfirm(reason.trim())}
+            >
+              {confirmLabel}
+            </Button>
+          </div>
+        </div>
       }
     >
-      <div className="ops-theme flex flex-col gap-3 text-ops-body text-ink-2">
-        <div>{children}</div>
+      <div className="ops-theme flex flex-col gap-ops-3 text-ops-body text-ink-2">
+        <div className={strength === "destructive" ? "border-l-2 border-attention ps-ops-3 text-ink" : "text-ink"} data-consequence="">{children}</div>
         {strength === "money" && amount !== undefined ? (
           <div className="flex items-center justify-between rounded-sm bg-surface-2 px-ops-3 py-ops-2">
             <span className="text-ops-label">Amount</span>
@@ -61,11 +76,13 @@ export function OpsConfirm({
           </div>
         ) : null}
         {needReason ? (
-          <label className="flex flex-col gap-1">
-            <span className="text-ops-label text-ink">Reason</span>
+          <label className="flex flex-col gap-1 border-t border-hairline pt-ops-3">
+            <span className="text-ops-label font-semibold text-ink">Reason</span>
             <textarea
               value={reason}
               rows={2}
+              autoFocus
+              placeholder="e.g. Test tenant, closing"
               onChange={(e) => setReason(e.target.value)}
               onBlur={() => setTouched(true)}
               aria-invalid={touched && reasonShort}
