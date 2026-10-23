@@ -171,10 +171,12 @@
     min-width: 640px;
   }
 }
-/* md and up the pair is one viewport tall: the list scrolls inside, the pane footer stays in view. */
+/* md and up: fill remaining main height (flex-1); list scrolls inside, pane footer stays in view.
+ * Do not use 100dvh here — section tabs sit above the split inside the same scroll/flex column. */
 @media (min-width: 768px) {
   .ops-split {
-    height: calc(100dvh - 72px);
+    flex: 1 1 auto;
+    min-height: 0;
   }
   .ops-split-pane {
     max-height: none;

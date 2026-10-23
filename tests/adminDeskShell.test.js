@@ -73,7 +73,8 @@ describe("admin desk standard shell", () => {
     assert.match(adminNav, /md:flex/);
     assert.match(adminNav, /md:hidden/);
     assert.match(adminNav, /min-h-12/);
-    assert.match(adminNav, /adminPhoneTabs\(\)/);
+    assert.match(adminNav, /adminPhoneTabs\(v2\)/);
+    assert.match(adminNav, /adminParentTarget\(path, v2\)/);
     assert.match(adminNav, />More</);
     assert.doesNotMatch(adminNav, /overflow-x-auto/);
     assert.doesNotMatch(adminNav, /w-\[4\.5rem\]/);
