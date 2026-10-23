@@ -1,11 +1,11 @@
 ---
 owner: platform
-last_reviewed: 2026-10-20
+last_reviewed: 2026-10-23
 ---
 
 # Scalers status and handoff (start here)
 
-**Last updated 20 Oct 2026.** Production pay for Aris `SCL-2026-000001` still shows "Online payment isn't available yet" and has no payment attempt, so Bachs has not been called. Checkout calls `billing_live_tenant_allowed` at `/rest/v1/rest/v1/rpc/...` and gets 404. In flight: `cursor/pay-tenant-rpc-url-9679`. `GET /api/pay/<token>` is payable. The pay page can still be a CDN prerender (`x-nextjs-prerender`). Checked against the billing apply list. Items marked *per team notes* come from lane agents and Alvin, not from the repo. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule)).
+**Last updated 23 Oct 2026.** Production pay for Aris `SCL-2026-000001` still shows "Online payment isn't available yet" and has no payment attempt, so Bachs has not been called. Checkout calls `billing_live_tenant_allowed` at `/rest/v1/rest/v1/rpc/...` and gets 404. In flight: `cursor/pay-tenant-rpc-url-9679`. `GET /api/pay/<token>` is payable. The pay page can still be a CDN prerender (`x-nextjs-prerender`). Checked against the billing apply list. Items marked *per team notes* come from lane agents and Alvin, not from the repo. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule)).
 
 New agent or new human: read this whole page before you touch code.
 
@@ -96,6 +96,8 @@ Earlier merges since 9 Oct (see git log for detail):
 ---
 
 ## 3. On staging now (not on prod)
+
+- **C7 audible mouth (staging only, draft):** tip base `e760d3cc` (#900 live). Branch `brain/c7-audible-mouth`. With `BRAIN_V2_MODEL=on` already logging proposals, validated known facts (bind-safe name / welcome back / last job from open rows or `lookup_file` seed) speak via templates — model plaintext never TTS'd; writes stay `commit:false` until C1. Shared line never greets by name. DID **+254709221537** only. **No prod. No Aris DID. No #894 / no `BRAIN_V2_CALLER_PROFILE` on.** Approver: Alvin escalate via Chief 2026-10-23. Harness A1–A6 + B1–B2 (no live dial). Rollback = revert branch / leave MODEL consulting-only. Restage only after Alvin Railway GO.
 
 Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since merged). So staging is behind prod: it lacks #631, #650, #647.
 
