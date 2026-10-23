@@ -31,10 +31,11 @@ function createGeminiModel(opts) {
 // parts keep their thoughtSignature so the next turn can pass it back. Key only in the header.
 function parseSse(buf, onEvent) {
   let i;
+  buf = buf.replace(/\r\n?/g, '\n'); // Gemini frames SSE with CRLF (\r\n\r\n); normalise CRLF/CR to LF before splitting
   while ((i = buf.indexOf('\n\n')) >= 0) {
     const block = buf.slice(0, i); buf = buf.slice(i + 2);
     const data = block.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5).trim()).join('');
-    if (data && data !== '[DONE]') { try { onEvent(JSON.parse(data)); } catch { /* partial or bad chunk: skipped */ } }
+    if (data && data !== '[DONE]') { try { onEvent(JSON.parse(data)); } catch (e) { console.warn('[brain_v2_model] sse parse failed', { len: data.length, err: e.message }); } }
   }
   return buf;
 }

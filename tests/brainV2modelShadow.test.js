@@ -263,3 +263,18 @@ test('eval:v2:shadow-agreement reports agreement by intent, p50/p95 and cost', (
   const good = SA.report(Array.from({ length: 20 }, () => ({ stage: 'brain_v2_model', rules: { intent: 'book' }, agree: true, latencyMs: 500, tokens: { costUsd: 0.0008 } })));
   assert.equal(good.gate.pass, true);
 });
+
+test('streaming transport: CRLF-framed SSE (as Gemini sends it), split across chunks, still yields calls + usage', async () => {
+  const body = 'data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"get_price","args":{"service_id":"svc_0"}}}]}}]}\r\n\r\n'
+    + 'data: {"candidates":[{"content":{"parts":[{"text":"x"}]}}],"usageMetadata":{"promptTokenCount":7,"candidatesTokenCount":3}}\r\n\r\n';
+  const cut = body.indexOf('\r\n\r\n') + 1; // chunk boundary between \r and \n
+  const chunks = [body.slice(0, cut), body.slice(cut)];
+  const enc = new TextEncoder(); let i = 0;
+  const fetchImpl = async () => ({ ok: true, status: 200, body: { getReader: () => ({ read: async () => (i < chunks.length ? { value: enc.encode(chunks[i++]), done: false } : { done: true }) }) } });
+  const out = await createGeminiStreamModel({ apiKey: 'test-key-not-real', model: 'stand-in', fetchImpl })({ request: {} });
+  assert.deepEqual(out.calls, [{ name: 'get_price', args: { service_id: 'svc_0' }, thoughtSignature: undefined }]);
+  assert.equal(out.usage.candidatesTokenCount, 3);
+  const { parseSse } = require('../src/conversation/v2/transport');
+  const evs = []; parseSse(body, (e) => evs.push(e));
+  assert.equal(evs.length, 2);
+});
