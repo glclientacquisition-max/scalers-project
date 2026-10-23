@@ -22,6 +22,10 @@ export type InvoiceRow = {
   periodStart: string | null;
   periodEnd: string | null;
   lines: InvoiceLine[];
+  /** Saved billing contact (tenants.alert_email). */
+  billingEmail?: string | null;
+  /** Dispute: due-soon / overdue notices paused when set. */
+  remindersPausedAt?: string | null;
 };
 
 export type InvoiceView = "overdue" | "issued" | "draft" | "paid" | "void" | "all";

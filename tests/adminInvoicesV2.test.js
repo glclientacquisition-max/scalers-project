@@ -42,11 +42,12 @@ test("CSV: EAT dates, KSh with decimals, quoted commas", async () => {
   assert.match(row, /1000\.00,0\.00,1000\.00$/);
 });
 
-test("v2 invoices: flag-gated, read-only, vendor-free", () => {
+test("v2 invoices: flag-gated, vendor-free; money actions via /actions", () => {
   assert.match(read("dashboard/src/app/admin/(console)/billing/invoices/page.tsx"), /process\.env\.ADMIN_V2 === "on"/);
   const ui = read("dashboard/src/components/admin/v2/AdminInvoicesV2.tsx");
   const ld = read("dashboard/src/lib/adminInvoicesV2Load.ts");
-  assert.doesNotMatch(ui, /fetch\(|"use server"/);
+  assert.match(ui, /\/api\/admin\/billing\/invoices\//);
+  assert.doesNotMatch(ui, /"use server"/);
   assert.doesNotMatch(ld, /\.(insert|update|upsert|delete|rpc)\(/);
   for (const s of [ui, read("dashboard/src/lib/ops/invoicesView.ts")]) assert.doesNotMatch(s, /sautikit|bachs|twilio|supabase|prepaid|wallet/i);
 });

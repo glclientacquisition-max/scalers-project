@@ -1,7 +1,6 @@
 "use client";
 
 import { businessPaneHref } from "@/lib/ops/businessPane";
-import { useEffect, useMemo, useState } from "react";
 import {
   INVOICE_VIEWS,
   balanceCents,
@@ -18,14 +17,28 @@ import {
   type InvoiceRow,
   type InvoiceView,
 } from "@/lib/ops/invoicesView";
-import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState } from "@/components/ops";
-import { ButtonLink } from "@/components/ui/Button";
+import {
+  balanceKes,
+  canCreditNote,
+  canDisputeInvoice,
+  canResendInvoice,
+  canVoidInvoice,
+  isDisputed,
+  isValidResendEmail,
+  type ResendMode,
+} from "@/lib/ops/invoiceActions";
+import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState, OpsConfirm, Drawer, UnlockCta } from "@/components/ops";
+import { Button, ButtonLink } from "@/components/ui/Button";
+import { useRouter } from "next/navigation";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import "@/styles/ops.css";
 
 const DATE = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" });
 const day = (iso: string | null) => (iso ? DATE.format(new Date(iso)) : "—");
 
-/** Invoices as a table plus pane (ADMIN_V2). Read-only: resend, credit and void wait for step-up codes. */
+type ConfirmKind = "void" | "credit" | "dispute" | "clear_dispute" | null;
+
+/** Invoices v2: list+pane with resend, full credit note, void, dispute (pause reminders). */
 export function AdminInvoicesV2({
   rows: all,
   truncated = false,
@@ -39,10 +52,19 @@ export function AdminInvoicesV2({
   /** Server time, so Overdue matches on both sides. */
   nowIso: string;
 }) {
+  const router = useRouter();
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const [view, setView] = useState<InvoiceView>(() => defaultInvoiceView(all, now));
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState<string | null>(null);
+  const [unlocked, setUnlocked] = useState(false);
+  const [confirm, setConfirm] = useState<ConfirmKind>(null);
+  const [resendOpen, setResendOpen] = useState(false);
+  const [resendMode, setResendMode] = useState<ResendMode>("saved");
+  const [typedEmail, setTypedEmail] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const v = INVOICE_VIEWS.find((x) => x.id === p.get("view"));
@@ -61,6 +83,46 @@ export function AdminInvoicesV2({
   const totals = useMemo(() => invoiceTotals(rows), [rows]);
   const it = all.find((x) => x.id === sel) ?? null;
   const isOverdueRow = (r: InvoiceRow) => daysOverdue(r, now) > 0;
+
+  async function postAction(body: Record<string, unknown>) {
+    if (!it) return;
+    setPending(true);
+    setError("");
+    setStatus("");
+    try {
+      const res = await fetch(`/api/admin/billing/invoices/${it.id}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string; to?: string[]; sent?: number; credit_kes?: number };
+      if (!res.ok) {
+        setError(json.error || "That didn't save. Nothing changed.");
+        setPending(false);
+        return;
+      }
+      setConfirm(null);
+      setResendOpen(false);
+      if (body.action === "resend") {
+        setStatus(`Sent to ${(json.to || []).join(", ") || "recipient"}.`);
+      } else if (body.action === "credit_note") {
+        setStatus(`Credit note issued for KSh ${Number(json.credit_kes || 0).toLocaleString("en-KE")}. Invoice voided.`);
+      } else if (body.action === "void") {
+        setStatus(`${it.number} voided.`);
+      } else if (body.action === "dispute") {
+        setStatus("Reminders paused on this invoice.");
+      } else if (body.action === "clear_dispute") {
+        setStatus("Reminders resumed.");
+      } else {
+        setStatus("Saved.");
+      }
+      setPending(false);
+      startTransition(() => router.refresh());
+    } catch {
+      setError("That didn't save. Nothing changed.");
+      setPending(false);
+    }
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -231,14 +293,206 @@ export function AdminInvoicesV2({
               { label: "Business", href: businessPaneHref(it.businessId, "money") },
             ] : undefined}
             footer={it ? (
-              <div className="flex w-full items-center justify-between gap-2">
-                <span className="text-ops-label text-ink-2">Resend, credit note and void need a fresh code; they arrive with step-up.</span>
-                <ButtonLink href={`/admin/billing/invoices/${it.id}`} variant="primary" size="md">Open invoice</ButtonLink>
+              <div className="flex w-full flex-col gap-ops-2">
+                {status ? <p className="text-ops-label text-ink" role="status">{status}</p> : null}
+                {error && !confirm && !resendOpen ? <p className="text-ops-label text-attention" role="alert">{error}</p> : null}
+                {it.remindersPausedAt ? (
+                  <p className="text-ops-label text-ink-2">Disputed — reminders paused.</p>
+                ) : null}
+                <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                  {!unlocked ? (
+                    <UnlockCta
+                      site="invoices"
+                      action="invoices:money"
+                      target={it.id}
+                      what="resend, credit or void this invoice"
+                      label="Unlock"
+                      variant="ghost"
+                      onUnlocked={() => setUnlocked(true)}
+                      observedHint="Money actions are open for this invoice. Authenticator enforce still waits on #876."
+                    />
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {canResendInvoice(it) ? (
+                        <Button type="button" variant="tonal" size="md" disabled={pending} onClick={() => {
+                          setError("");
+                          setResendMode(it.billingEmail ? "saved" : "typed");
+                          setTypedEmail("");
+                          setResendOpen(true);
+                        }}>Resend</Button>
+                      ) : null}
+                      {canCreditNote(it) ? (
+                        <Button type="button" variant="tonal" size="md" disabled={pending} onClick={() => { setError(""); setConfirm("credit"); }}>Credit note</Button>
+                      ) : null}
+                      {canVoidInvoice(it) ? (
+                        <Button type="button" variant="danger" size="md" disabled={pending} onClick={() => { setError(""); setConfirm("void"); }}>Void</Button>
+                      ) : null}
+                      {canDisputeInvoice(it) && !isDisputed(it) ? (
+                        <Button type="button" variant="ghost" size="md" disabled={pending} onClick={() => { setError(""); setConfirm("dispute"); }}>Mark disputed</Button>
+                      ) : null}
+                      {canDisputeInvoice(it) && isDisputed(it) ? (
+                        <Button type="button" variant="ghost" size="md" disabled={pending} onClick={() => { setError(""); setConfirm("clear_dispute"); }}>Resume reminders</Button>
+                      ) : null}
+                    </div>
+                  )}
+                  <ButtonLink href={`/admin/billing/invoices/${it.id}`} variant="primary" size="md">Open invoice</ButtonLink>
+                </div>
               </div>
             ) : undefined}
           />
         }
       />
+
+      <OpsConfirm
+        open={confirm === "void" && !!it}
+        onClose={() => { if (!pending) setConfirm(null); }}
+        onConfirm={(reason) => { void postAction({ action: "void", reason }); }}
+        title="Void this invoice?"
+        strength="destructive"
+        requireReason
+        confirmLabel="Void invoice"
+        pending={pending}
+      >
+        {error ? <p className="pb-2 text-attention" role="alert">{error}</p> : null}
+        <p>
+          {it
+            ? `${it.number} for ${it.businessName} becomes void. The balance of ${ksh(balanceCents(it))} is no longer owed. One operator is enough — no second approver.`
+            : ""}
+        </p>
+      </OpsConfirm>
+
+      <OpsConfirm
+        open={confirm === "credit" && !!it}
+        onClose={() => { if (!pending) setConfirm(null); }}
+        onConfirm={(reason) => { void postAction({ action: "credit_note", reason }); }}
+        title="Issue credit note?"
+        strength="money"
+        amount={it ? balanceKes(it) : 0}
+        confirmLabel="Issue credit note"
+        pending={pending}
+        reasonHint="3 characters or more. Full remaining balance only."
+      >
+        {error ? <p className="pb-2 text-attention" role="alert">{error}</p> : null}
+        <p>
+          {it
+            ? `Credits the full remaining balance on ${it.number} and voids the invoice. Partial credit notes are not in this slice.`
+            : ""}
+        </p>
+      </OpsConfirm>
+
+      <OpsConfirm
+        open={(confirm === "dispute" || confirm === "clear_dispute") && !!it}
+        onClose={() => { if (!pending) setConfirm(null); }}
+        onConfirm={(reason) => {
+          void postAction({ action: confirm === "dispute" ? "dispute" : "clear_dispute", reason });
+        }}
+        title={confirm === "clear_dispute" ? "Resume reminders?" : "Mark invoice disputed?"}
+        strength="light"
+        requireReason
+        confirmLabel={confirm === "clear_dispute" ? "Resume reminders" : "Pause reminders"}
+        pending={pending}
+      >
+        {error ? <p className="pb-2 text-attention" role="alert">{error}</p> : null}
+        <p>
+          {confirm === "clear_dispute"
+            ? "Due-soon and overdue notices can go out again for this invoice."
+            : "Pauses due-soon and overdue reminders only. Does not void the invoice or change the balance."}
+        </p>
+      </OpsConfirm>
+
+      <Drawer
+        open={resendOpen && !!it}
+        title="Resend invoice"
+        dismissible={!pending}
+        onOpenChange={(next) => { if (!next && !pending) setResendOpen(false); }}
+        footer={
+          <div className="flex w-full flex-col gap-ops-2">
+            {(() => {
+              const savedOk = isValidResendEmail(String(it?.billingEmail || ""));
+              const typedOk = isValidResendEmail(typedEmail);
+              const needSaved = resendMode === "saved" || resendMode === "both";
+              const needTyped = resendMode === "typed" || resendMode === "both";
+              const blocked =
+                (needSaved && !savedOk) || (needTyped && !typedOk);
+              const why = needSaved && !savedOk
+                ? "This business has no saved billing email."
+                : needTyped && !typedOk
+                  ? "Enter a valid email address."
+                  : null;
+              return (
+                <>
+                  {why && !pending ? <p className="text-right text-ops-label text-ink-2" data-blocked-why="">{why}</p> : null}
+                  <div className="flex items-center justify-end gap-2">
+                    <Button variant="ghost" size="md" disabled={pending} onClick={() => setResendOpen(false)}>Cancel</Button>
+                    <Button
+                      variant="primary"
+                      size="md"
+                      pending={pending}
+                      disabled={blocked}
+                      onClick={() => void postAction({ action: "resend", mode: resendMode, email: typedEmail, reason: "resend" })}
+                    >
+                      Send invoice
+                    </Button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        }
+      >
+        <div className="ops-theme flex flex-col gap-ops-3 text-ops-body text-ink">
+          {error ? <p className="text-attention" role="alert">{error}</p> : null}
+          <p className="text-ink-2">
+            {it ? `Send ${it.number} to the saved billing contact and/or another address.` : ""}
+          </p>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-ops-label font-semibold text-ink">Send to</legend>
+            <label className="flex min-h-ops-touch items-center gap-2">
+              <input
+                type="radio"
+                name="resend-mode"
+                checked={resendMode === "saved"}
+                disabled={pending || !isValidResendEmail(String(it?.billingEmail || ""))}
+                onChange={() => setResendMode("saved")}
+              />
+              <span>
+                Saved contact
+                <span className="text-ink-2">
+                  {it?.billingEmail ? ` · ${it.billingEmail}` : " · none on file"}
+                </span>
+              </span>
+            </label>
+            <label className="flex min-h-ops-touch items-center gap-2">
+              <input type="radio" name="resend-mode" checked={resendMode === "typed"} disabled={pending} onChange={() => setResendMode("typed")} />
+              <span>Typed address only</span>
+            </label>
+            <label className="flex min-h-ops-touch items-center gap-2">
+              <input
+                type="radio"
+                name="resend-mode"
+                checked={resendMode === "both"}
+                disabled={pending || !isValidResendEmail(String(it?.billingEmail || ""))}
+                onChange={() => setResendMode("both")}
+              />
+              <span>Saved contact and typed address</span>
+            </label>
+          </fieldset>
+          {(resendMode === "typed" || resendMode === "both") ? (
+            <label className="flex flex-col gap-1">
+              <span className="text-ops-label font-semibold text-ink">Email</span>
+              <input
+                type="email"
+                value={typedEmail}
+                onChange={(e) => setTypedEmail(e.target.value)}
+                disabled={pending}
+                placeholder="name@business.co.ke"
+                className="ops-field text-ink"
+                autoComplete="off"
+              />
+            </label>
+          ) : null}
+        </div>
+      </Drawer>
     </div>
   );
 }
