@@ -61,6 +61,40 @@ function explicitYes(text) {
   return words.length <= 8 && words.every((w) => FILLER.has(w));
 }
 
+// R2 (Alvin GO 2026-10-23): scalable utterance-complete gate — NOT a word blacklist of okay/so/bado.
+// Trailing connective / mid-phrase STT flush ("Okay, so") is incomplete; short finished affirms are complete.
+// Reuses Voice's turnTaking detector so Brain and barge share one incompleteness notion.
+function utteranceIncomplete(text) {
+  try {
+    const { utteranceLooksIncomplete } = require('../../speech/turnTaking');
+    return utteranceLooksIncomplete(text) === true;
+  } catch {
+    const raw = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!raw) return false;
+    if (/[,—–-]\s*$/.test(raw)) return true;
+    const core = raw.replace(/[.!?,;:…—–-]+$/g, '').trim();
+    return /\b(and|but|so|because|or|then|also|na|lakini|ama|halafu|basi)\s*$/i.test(core);
+  }
+}
+
+// After interrupt_wait / mid-readback hold: confirm only when the utterance is complete AND
+// a short post-utterance silence beat has elapsed (nothing added). Voice passes silenceBeat /
+// holdTimedOut / utteranceComplete once the endpoint waited; unfinished blocks. When Voice has
+// not wired the flag yet, a complete short affirm on a final flush is treated as post-silence
+// (STT finals already waited) — incompleteness alone still blocks HD_51 "Okay, so".
+function postWaitConfirmReady(p = {}, u = {}, opts = {}) {
+  const text = String(u.text || opts.text || '');
+  if (u.unfinished === true || opts.unfinished === true) return { ready: false, reason: 'unfinished' };
+  if (utteranceIncomplete(text)) return { ready: false, reason: 'incomplete' };
+  if (!p.afterWaitHold) return { ready: true, reason: 'ok' };
+  if (u.silenceBeat === false || opts.silenceBeat === false) return { ready: false, reason: 'awaiting_silence' };
+  if (u.silenceBeat === true || opts.silenceBeat === true || u.holdTimedOut === true || opts.holdTimedOut === true || u.utteranceComplete === true || opts.utteranceComplete === true) {
+    return { ready: true, reason: 'silence_beat' };
+  }
+  // Final flush of a complete short affirm: Voice already endpointed after silence.
+  return { ready: true, reason: 'complete_final' };
+}
+
 // Alvin's rule (15 Oct), one classifier for every read-back that states a time (booking, move,
 // callback / manager / quote / owner-only handoff): the caller repeating the exact read-back time is
 // a yes, a different time is a change (re-propose), and anything unclear ("okay wait", a question)
@@ -82,9 +116,13 @@ function timeEcho(p, u = {}) {
   const relOk = rt.rel === 'at' ? !(REL.before.test(t) || REL.from.test(t)) : REL[rt.rel].test(t);
   return w.time === rt.time && (!w.date || !rt.date || w.date === rt.date) && relOk ? 'same' : 'different';
 }
-// -> { kind: 'yes' | 'no' | 'change' | 'unclear', done }
+// -> { kind: 'yes' | 'no' | 'change' | 'unclear', done, incomplete? }
 function readbackAnswer(p, u = {}) {
   const text = String(u.text || '');
+  // Incomplete / trailing (HD_51 "Okay, so"): never a yes — stay pending under confirmSafe.
+  if (u.unfinished === true || utteranceIncomplete(text)) {
+    return { kind: 'unclear', done: false, incomplete: true };
+  }
   const done = !!u.done && /^\W*(yes|ndio|ndiyo)\b/i.test(text) && !/\?|\b(but|lakini|ila|wait|ngoja|subiri|no|hapana)\b/i.test(text);
   if (u.no || u.negation) return { kind: 'no', done: false };
   if (explicitYes(text) || done) return { kind: 'yes', done };
@@ -143,4 +181,4 @@ function makeRecorder(handlers, state) {
   };
 }
 
-module.exports = { commitSafetyEnabled, normSlots, slotHash, receiptTool, idempotencyKey, explicitYes, readbackTime, timeEcho, readbackAnswer, callbackWhen, sayPhone, makeRecorder };
+module.exports = { commitSafetyEnabled, normSlots, slotHash, receiptTool, idempotencyKey, explicitYes, utteranceIncomplete, postWaitConfirmReady, readbackTime, timeEcho, readbackAnswer, callbackWhen, sayPhone, makeRecorder };

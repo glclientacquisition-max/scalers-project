@@ -466,10 +466,16 @@ function csChanged(p, state) {
 // BRAIN_V2_COMMIT_SAFETY read-back turn: confirm only on the NEXT turn after the read-back, on an explicit
 // whole-answer yes or a repeat of the read-back time, with no slot diff. Returns a turn result, or null to
 // let the turn fall through to intent handling (after one re-read the read-back is dropped).
-async function confirmSafe(state, u, profile, handlers, out, results, myTurn = state.turn) {
+async function confirmSafe(state, u, profile, handlers, out, results, myTurn = state.turn, turnOpts = {}) {
   const p = state.pending; const lang = state.lang || 'en';
   mergeSlots(state, u, profile);
   const q = () => R.reaskQ(p, lang);
+  const holdPending = () => {
+    p.issuedTurn = state.turn;
+    state.pendingRepeats = 0;
+    state.echoAsked = false;
+    return out(`${R.info({ kind: 'hold' }, lang)} ${q()}`);
+  };
   if (csChanged(p, state)) {
     state.record?.('rejected', p, { errorCode: 'slot_diff' });
     state.phase = 'collect'; state.pending = null;
@@ -480,8 +486,20 @@ async function confirmSafe(state, u, profile, handlers, out, results, myTurn = s
   // the shared read-back classifier (Alvin's rule): exact repeat of the read-back time = yes, a different
   // time = change, "okay wait" / a question = unclear (one re-ask)
   const ans = CS.readbackAnswer(p, u);
+  // R2 utterance-complete gate: incomplete / trailing flush after wait must never confirm (HD_51 "Okay, so")
+  if (ans.incomplete) {
+    p.afterWaitHold = true;
+    return holdPending();
+  }
   const yesDone = ans.done;
-  const yes = ans.kind === 'yes';
+  let yes = ans.kind === 'yes';
+  if (yes && nextTurn) {
+    const gate = CS.postWaitConfirmReady(p, u, turnOpts);
+    if (!gate.ready) {
+      p.afterWaitHold = true;
+      return holdPending();
+    }
+  }
   if (ans.kind === 'change' && p.tool === 'create_handoff') {
     // a different callback time re-proposes with that time (bookings re-propose through the slot diff above)
     const rt = CS.readbackTime(p) || {};
@@ -509,10 +527,8 @@ async function confirmSafe(state, u, profile, handlers, out, results, myTurn = s
   if (u.no || u.done) { state.record?.('rejected', p, { errorCode: u.done ? 'caller_done' : 'caller_no' }); resetIntent(state); state.outcomes.push('declined'); return out(u.done ? R.info({ kind: 'bye' }, lang) : R.info({ kind: 'decline' }, lang), { end: u.done }); }
   // R2: "okay wait" / ngoja mid-readback — nothing saved; pending stays; issuedTurn bump; never burn unclear budget into false close
   if (u.intents.includes('hold') || /\b(wait|ngoja|subiri|hold on|let me (check|ask|confirm|think)|nitaangalia|niulize|nifikirie)\b|\bok(?:ay)?\s*,?\s*wait\b|\bsawa\s*,?\s*ngoja\b/i.test(u.text)) {
-    p.issuedTurn = state.turn;
-    state.pendingRepeats = 0;
-    state.echoAsked = false;
-    return out(`${R.info({ kind: 'hold' }, lang)} ${q()}`);
+    p.afterWaitHold = true;
+    return holdPending();
   }
   state.pendingRepeats = (state.pendingRepeats || 0) + 1;
   if (state.pendingRepeats <= 1 && !state.echoAsked && !u.intents.length) { state.echoAsked = true; p.issuedTurn = state.turn; return out(R.ask('yes_no', 0, lang, { q: q() })); }
@@ -698,7 +714,7 @@ function applyAckRule(state, line, { ackOk, acked, callerAck, lang }) {
 }
 function noteAck(state, line) { state.lastAckLed = isAckLed(line); if (state.lastAckLed) state.lastAckTurn = state.turn; }
 
-async function runTurnInner(state, { text, profile = {}, now = new Date(), handlers, model = null, classify = null, langLock = null, acked = false }) {
+async function runTurnInner(state, { text, profile = {}, now = new Date(), handlers, model = null, classify = null, langLock = null, acked = false, unfinished = false, silenceBeat, holdTimedOut, utteranceComplete } = {}) {
   state.turn += 1; state.now = now;
   const myTurn = state.turn; // this turn's number even if another turn starts while this one awaits
   if (csOn()) { // non-enumerable: never serialized with the state
@@ -710,6 +726,13 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   state.lang = (langLock === 'en' || langLock === 'sw') ? langLock : (L.nextLanguage(state.lang, text) || state.lang);
   let areaQ = null;
   let u = N.understand(text, { profile, now, expecting: state.expecting, topic: state.lastInfo, prev: state.nluPrev || null, opening: state.turn === 1 && !state.slots.name });
+  // R2 gate signals from Voice (optional): unfinished STT / silence beat after interrupt_wait
+  if (unfinished === true) u.unfinished = true;
+  if (silenceBeat === true) u.silenceBeat = true;
+  if (silenceBeat === false) u.silenceBeat = false;
+  if (holdTimedOut === true) u.holdTimedOut = true;
+  if (utteranceComplete === true) u.utteranceComplete = true;
+  const turnOpts = { unfinished, silenceBeat, holdTimedOut, utteranceComplete };
   state.nluPrev = { kind: u.kind, service: u.service || null };
   // §4 "do you do X?" (BRAIN_V2_NLU_GAPS): a resolved catalogue item is answered with its grounded
   // name + price from the catalogue (checkServiceLine), never a slot/availability claim and never a re-list.
@@ -804,8 +827,9 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     const q = state.expecting && openQ(state, lang);
     return out(`${R.info({ kind: 'bot', agent: profile.agentName || 'Shy', biz: profile.businessName || '' }, lang)}${q ? ` ${q.trim()}` : ''}`);
   }
-  // hold / line checks / ASR tags while collecting: keep every slot, re-ask the open question
-  if (state.intent && state.expecting && N.nonAnswer(text) && !u.when && !u.service) {
+  // hold / line checks / ASR tags while collecting: keep every slot, re-ask the open question.
+  // R2: mid-readback nonAnswer ("Wait, wait.") must reach confirmSafe, not repair-steal the turn.
+  if (state.intent && state.expecting && N.nonAnswer(text) && !u.when && !u.service && !(csOn() && state.phase === 'readback' && state.pending)) {
     const q = openQ(state, lang);
     if (q) return out(u.intents.includes('hold') ? `${R.info({ kind: 'hold' }, lang)} ${q.trim()}` : `${R.info({ kind: 'repair' }, lang).split(/(?<=[.!?])\s/)[0]} ${q.trim()}`);
   }
@@ -826,8 +850,9 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   if (state.phase === 'collect' && state.turn > 2 && /^\W*((okay|ok|sawa|alright)\W+)?(thank you|thanks|asante( sana)?)\W*$/i.test(text)) { resetIntent(state); state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true, endReason: 'caller_thanks' }); }
   // after "anything else?": a no, thanks or a compliment closes the call
   const askedElse = /(anything else|Kuna kingine)[^?]*\?\s*$/i.test(state.lastLine || '');
-  // a cut-off turn ("Hapana, n") is never a no / decline / slot answer: ask again, keep everything
-  if (N.cutOff(text) && state.turn > 1 && (state.repairs || 0) < 2) {
+  // a cut-off turn ("Hapana, n") is never a no / decline / slot answer: ask again, keep everything.
+  // R2: mid-readback cutoff / "Wait, wait." must reach confirmSafe (hold + utterance-complete gate), not repair.
+  if (N.cutOff(text) && state.turn > 1 && (state.repairs || 0) < 2 && !(csOn() && state.phase === 'readback' && state.pending)) {
     state.repairs = (state.repairs || 0) + 1;
     // re-ask the open question so the caller knows what to answer ("Sorry, I didn't catch that. Where should we come?")
     const q = openQ(state, lang);
@@ -851,7 +876,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
       return out(infoAnswer(state, u, profile, infoKind));
     }
   }
-  if (csOn() && state.phase === 'readback' && state.pending) { const r = await confirmSafe(state, u, profile, handlers, out, results, myTurn); if (r) return r; }
+  if (csOn() && state.phase === 'readback' && state.pending) { const r = await confirmSafe(state, u, profile, handlers, out, results, myTurn, turnOpts); if (r) return r; }
   if (state.phase === 'readback' && state.pending) {
     const p = state.pending;
     mergeSlots(state, u, profile);
