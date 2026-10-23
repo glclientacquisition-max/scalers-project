@@ -258,3 +258,59 @@ describe("A0: confirms are ConfirmSheet bottom drawers", () => {
     assert.ok(pool.lastIndexOf("<ConfirmSheet", at) > pool.lastIndexOf("<Sheet", at));
   });
 });
+
+describe("A0: operator-only writes + step-up observe (s21)", () => {
+  const writeRoutes = [
+    `${DASH}/app/api/did-pool/route.ts`,
+    `${DASH}/app/api/admin/businesses/route.ts`,
+  ];
+
+  it("POST write routes require a Better Auth operator and reject the legacy cookie alone", () => {
+    for (const rel of writeRoutes) {
+      const src = read(rel);
+      assert.match(src, /requireAdminOperatorWrite/, rel);
+      // POST must not lean on isLegacyAuthenticated (HMAC cookie still allowed on GET reads).
+      const post = src.slice(src.indexOf("export async function POST"));
+      assert.match(post, /requireAdminOperatorWrite/, rel);
+      assert.doesNotMatch(post, /isLegacyAuthenticated/, `${rel} POST must not accept the legacy cookie`);
+      assert.match(post, /gate\.status/, rel);
+    }
+    const guard = read(`${DASH}/lib/adminOperatorWrite.ts`);
+    assert.match(guard, /getAdminSession/);
+    assert.match(guard, /findAdminOperator/);
+    assert.match(guard, /Sign in as an operator/);
+  });
+
+  it("step-up observe is called before the write and enforce is not wired", () => {
+    const step = read(`${DASH}/lib/ops/stepUp.ts`);
+    assert.match(step, /ADMIN_STEP_UP/);
+    assert.match(step, /would-require-step-up/);
+    assert.match(step, /not implemented/);
+    for (const rel of writeRoutes) {
+      const src = read(rel);
+      const post = src.slice(src.indexOf("export async function POST"));
+      assert.match(post, /requireStepUp\(/, rel);
+      const stepAt = post.indexOf("requireStepUp(");
+      const markers = ["addDidToPool", "assign_did_from_pool", "releasePoolNumber", "releaseBusinessNumber", "assign_specific_did", "suspendBusiness"];
+      const writeAt = Math.min(
+        ...markers.map((n) => {
+          const i = post.indexOf(n);
+          return i < 0 ? Number.POSITIVE_INFINITY : i;
+        }),
+      );
+      assert.ok(stepAt >= 0 && stepAt < writeAt, `${rel}: requireStepUp before write`);
+    }
+  });
+
+  it("Numbers v2 Unlock and Hold do not fetch; Assign/Release use OpsConfirm", () => {
+    const ui = read(`${DASH}/components/admin/v2/AdminNumbersV2.tsx`);
+    assert.match(ui, /OpsConfirm/);
+    assert.match(ui, /data-honest="unlock"/);
+    assert.match(ui, /data-honest="hold"/);
+    assert.match(ui, /Secure sign-in is next/);
+    assert.match(ui, /confirmLabel="Assign number"/);
+    assert.match(ui, /confirmLabel="Release number"/);
+    assert.match(ui, /showHonest\("hold"\)/);
+    assert.match(ui, /showHonest\("unlock"\)/);
+  });
+});
