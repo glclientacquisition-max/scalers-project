@@ -59,5 +59,8 @@ describe("shared BusinessPane (t179u)", () => {
     assert.doesNotMatch(ui, /method:\s*"(POST|PATCH|PUT|DELETE)"/);
     assert.match(ui, /data-pane-section/);
     assert.doesNotMatch(ui.replace(/sautikit_virtual_number/g, ""), /sautikit|bachs|elevenlabs|twilio|wallet|prepaid|top.?up/i);
+    // Unlock/Hold (if present) stay non-writing; package/minutes/charging stay read-only.
+    assert.doesNotMatch(ui, /fetch\([^)]*method:\s*"POST"/);
+    assert.match(ui, /step-up codes/);
   });
 });

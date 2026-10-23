@@ -1,7 +1,9 @@
 "use client";
 
 import { businessPaneHref } from "@/lib/ops/businessPane";
-import { useEffect, useMemo, useState } from "react";
+import { releaseBlockReason } from "@/lib/adminBusinessModel";
+import { useRouter } from "next/navigation";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import {
   NUMBER_VIEWS,
   defaultNumberView,
@@ -10,24 +12,37 @@ import {
   isHeld,
   matchesNumber,
   numberCounts,
+  numberState,
   numberTone,
   statusLabel,
   type NumberRow,
   type NumberView,
   type WaitingBusiness,
 } from "@/lib/ops/numbersView";
-import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState } from "@/components/ops";
+import { Button } from "@/components/ui/Button";
+import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState, OpsConfirm } from "@/components/ops";
 import "@/styles/ops.css";
 
 const DATE = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" });
 const day = (iso: string | null) => (iso ? DATE.format(new Date(iso)) : "—");
 
-/** Numbers as a table plus pane (ADMIN_V2). Read-only: assign and release wait for step-up codes. */
+type ConfirmKind = "assign" | "release" | null;
+type HonestNote = "unlock" | "hold" | null;
+
+/** Numbers as a table plus pane (ADMIN_V2). Assign/Release write through OpsConfirm; Unlock/Hold stay honest until step-up enrolment. */
 export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow[]; waiting: WaitingBusiness[]; nowIso: string }) {
+  const router = useRouter();
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const [view, setView] = useState<NumberView>(() => defaultNumberView(all, waiting.length, now));
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmKind>(null);
+  const [assignTo, setAssignTo] = useState<string | null>(null);
+  const [note, setNote] = useState<HonestNote>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const v = NUMBER_VIEWS.find((x) => x.id === p.get("view"));
@@ -38,12 +53,21 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
       if (!v) setView(NUMBER_VIEWS.find((x) => x.id !== "all" && inNumberView(hit, x.id, now))?.id ?? "all");
     }
   }, [all, now]);
+
   const counts = useMemo(() => numberCounts(all, now), [all, now]);
   const rows = useMemo(
     () => all.filter((r) => (query.trim() ? true : inNumberView(r, view, now)) && matchesNumber(r, query)),
     [all, view, query, now],
   );
   const it = all.find((x) => x.id === sel) ?? null;
+  const state = it ? numberState(it, now) : null;
+  const blockRelease = it
+    ? releaseBlockReason({
+        linked: Boolean(it.businessId),
+        businessName: it.businessName,
+        isActive: it.businessActive,
+      })
+    : null;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -57,12 +81,67 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
     return () => window.removeEventListener("keydown", onKey);
   }, [rows, sel]);
 
+  useEffect(() => {
+    if (confirm === "assign") setAssignTo(waiting[0]?.id ?? null);
+  }, [confirm, waiting]);
+
   const freeingNext = useMemo(
     () => all.filter((r) => isHeld(r, now) && r.holdUntil).sort((a, b) => a.holdUntil!.localeCompare(b.holdUntil!)),
     [all, now],
   );
   const who = (r: NumberRow) =>
     r.businessName ?? (isHeld(r, now) && r.lastBusinessName ? `Was ${r.lastBusinessName}` : "—");
+
+  async function postPool(body: Record<string, string>) {
+    setPending(true);
+    setError("");
+    setStatus("");
+    try {
+      const res = await fetch("/api/did-pool", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string; e164?: string };
+      if (!res.ok) {
+        setError(json.error || "Could not save.");
+        return false;
+      }
+      setConfirm(null);
+      setStatus(
+        body.action === "release"
+          ? `${formatE164(body.e164 || "")} is Available.`
+          : `Assigned ${formatE164(json.e164 || body.e164 || "")}.`,
+      );
+      startTransition(() => router.refresh());
+      return true;
+    } catch {
+      setError("Could not save.");
+      return false;
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function openAssign() {
+    setError("");
+    setNote(null);
+    setConfirm("assign");
+  }
+
+  function openRelease() {
+    setError("");
+    setNote(null);
+    setConfirm("release");
+  }
+
+  function showHonest(kind: HonestNote) {
+    setConfirm(null);
+    setError("");
+    setNote(kind);
+  }
+
+  const assignBusiness = waiting.find((w) => w.id === assignTo) ?? null;
 
   const list = (
     <div className="flex min-h-0 flex-col pe-ops-4">
@@ -106,6 +185,11 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
           </p>
         ) : null}
       </div>
+      {status ? (
+        <p className="pb-ops-2 text-ops-body text-ok" role="status" data-numbers-status="">
+          {status}
+        </p>
+      ) : null}
       {rows.length === 0 ? (
         <EmptyState title={query.trim() ? "No number matches." : "Nothing in this view."} />
       ) : (
@@ -160,6 +244,53 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
     </div>
   );
 
+  const footer = it ? (
+    <div className="flex w-full flex-col gap-ops-2" data-numbers-actions="">
+      {note ? (
+        <p className="rounded-sm border border-hairline bg-canvas px-ops-3 py-ops-2 text-ops-label text-ink-2" role="status" data-honest-note="">
+          Secure sign-in is next. {note === "hold" ? "Hold" : "Unlock"} waits for step-up — this button does not change the number yet.{" "}
+          <button type="button" className="font-semibold text-ink underline-offset-2 hover:underline" onClick={() => setNote(null)}>
+            Dismiss
+          </button>
+        </p>
+      ) : null}
+      {error && !confirm ? (
+        <p className="text-ops-body text-attention" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        {state === "available" ? (
+          <Button type="button" variant="primary" size="sm" onClick={openAssign} disabled={waiting.length === 0} title={waiting.length === 0 ? "No business is waiting for a number" : undefined}>
+            Assign
+          </Button>
+        ) : null}
+        {state === "assigned" ? (
+          blockRelease ? (
+            <>
+              <span id={`release-why-${it.id}`} className="sr-only">
+                {blockRelease}
+              </span>
+              <Button type="button" variant="ghost" size="sm" disabled title={blockRelease} aria-describedby={`release-why-${it.id}`}>
+                Release
+              </Button>
+            </>
+          ) : (
+            <Button type="button" variant="ghost" size="sm" onClick={openRelease}>
+              Release
+            </Button>
+          )
+        ) : null}
+        <Button type="button" variant="ghost" size="sm" data-honest="hold" onClick={() => showHonest("hold")}>
+          Hold
+        </Button>
+        <Button type="button" variant="ghost" size="sm" data-honest="unlock" onClick={() => showHonest("unlock")}>
+          Unlock
+        </Button>
+      </div>
+    </div>
+  ) : undefined;
+
   return (
     <div className="ops-theme flex min-h-0 w-full flex-col">
       <SplitLayout
@@ -190,12 +321,70 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
               ...waiting.slice(0, 5).map((w) => ({ label: `Waiting: ${w.name}`, href: businessPaneHref(w.id), meta: `since ${day(w.since)}` })),
               ...freeingNext.filter((r) => r.id !== it.id).slice(0, 10).map((r) => ({ label: `Frees next: ${formatE164(r.e164)}`, href: `/admin/numbers?pane=${r.id}`, meta: day(r.holdUntil) })),
             ] : undefined}
-            footer={it ? (
-              <span className="text-ops-label text-ink-2">Assign and release need a fresh code; they arrive with step-up.</span>
-            ) : undefined}
+            footer={footer}
           />
         }
       />
+
+      <OpsConfirm
+        open={confirm === "assign" && !!it}
+        onClose={() => { if (!pending) setConfirm(null); }}
+        onConfirm={() => {
+          if (!it || !assignTo) return;
+          void postPool({ action: "assign_specific", tenant_id: assignTo, e164: it.e164 });
+        }}
+        title="Assign this number?"
+        strength="light"
+        confirmLabel="Assign number"
+        pending={pending}
+      >
+        {error ? <p className="pb-2 text-attention" role="alert">{error}</p> : null}
+        <p>
+          {it ? `${formatE164(it.e164)} goes to ${assignBusiness?.name ?? "the business you pick"}. They can take calls on it once it is live.` : ""}
+        </p>
+        {waiting.length === 0 ? (
+          <p className="text-ink-2">No business is waiting for a number.</p>
+        ) : (
+          <fieldset className="flex flex-col gap-1">
+            <legend className="text-ops-label text-ink">Business</legend>
+            {waiting.map((w) => (
+              <label key={w.id} className="flex min-h-ops-touch items-center gap-2 text-ink">
+                <input
+                  type="radio"
+                  name="assign-business"
+                  value={w.id}
+                  checked={assignTo === w.id}
+                  onChange={() => setAssignTo(w.id)}
+                  disabled={pending}
+                />
+                <span>{w.name}<span className="text-ink-2"> · since {day(w.since)}</span></span>
+              </label>
+            ))}
+          </fieldset>
+        )}
+      </OpsConfirm>
+
+      <OpsConfirm
+        open={confirm === "release" && !!it}
+        onClose={() => { if (!pending) setConfirm(null); }}
+        onConfirm={() => {
+          if (!it) return;
+          void postPool({ action: "release", e164: it.e164 });
+        }}
+        title="Release this number?"
+        strength="destructive"
+        confirmLabel="Release number"
+        pending={pending}
+      >
+        {error ? <p className="pb-2 text-attention" role="alert">{error}</p> : null}
+        <p>
+          {it
+            ? it.businessName
+              ? `${formatE164(it.e164)} returns to Available. ${it.businessName} waits for a new number.`
+              : `${formatE164(it.e164)} returns to Available.`
+            : ""}
+        </p>
+      </OpsConfirm>
     </div>
   );
 }

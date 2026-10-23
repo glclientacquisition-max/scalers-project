@@ -16,13 +16,15 @@ import {
 import { requestOrigin, resetPasswordRedirectUrl } from "@/lib/authCallback";
 import { isAdminActionBlocked } from "@/lib/adminBusinessModel";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
-import { isLegacyAuthenticated } from "@/lib/auth";
+import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
+import { requireStepUp } from "@/lib/ops/stepUp";
 import { saveTenantRecordingRetentionOverride } from "@/lib/recordingRetentionAdmin";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function POST(request: Request) {
-  if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  const gate = await requireAdminOperatorWrite();
+  if (!gate.ok) {
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
 
   const body = await request.json();
@@ -32,6 +34,8 @@ export async function POST(request: Request) {
   if (!businessId) {
     return NextResponse.json({ error: "Pick a business first." }, { status: 400 });
   }
+
+  requireStepUp({ action: `businesses:${action}`, operator: gate.operator, target: businessId });
 
   // The signed-in Super Admin, never a name from the request body.
   const actor = await adminActorName();
