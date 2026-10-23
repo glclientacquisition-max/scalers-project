@@ -21,7 +21,7 @@ import {
   type WaitingBusiness,
 } from "@/lib/ops/numbersView";
 import { Button } from "@/components/ui/Button";
-import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState, OpsConfirm } from "@/components/ops";
+import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState, OpsConfirm, StepUpSheet } from "@/components/ops";
 import "@/styles/ops.css";
 
 const DATE = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" });
@@ -40,6 +40,7 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
   const [confirm, setConfirm] = useState<ConfirmKind>(null);
   const [assignTo, setAssignTo] = useState<string | null>(null);
   const [note, setNote] = useState<HonestNote>(null);
+  const [unlockOpen, setUnlockOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
@@ -304,7 +305,7 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
         <Button type="button" variant="ghost" size="sm" data-honest="hold" onClick={() => showHonest("hold")}>
           Hold
         </Button>
-        <Button type="button" variant="ghost" size="sm" data-honest="unlock" onClick={() => showHonest("unlock")}>
+        <Button type="button" variant="ghost" size="sm" data-honest="unlock" data-stepup="numbers" onClick={() => { setNote(null); setUnlockOpen(true); }}>
           Unlock
         </Button>
       </div>
@@ -344,6 +345,14 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
             footer={footer}
           />
         }
+      />
+
+      <StepUpSheet
+        open={unlockOpen && !!it}
+        onClose={() => setUnlockOpen(false)}
+        action="numbers:write"
+        target={it?.e164 ?? null}
+        what="assign, release or archive this number"
       />
 
       <OpsConfirm
