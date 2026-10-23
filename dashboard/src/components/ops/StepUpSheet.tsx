@@ -7,7 +7,7 @@ import { Drawer } from "./Drawer";
 /**
  * Platform Unlock (s23). One sheet for every sensitive Admin write.
  * Unlock proves the operator for the next write — it never changes a number, package or switch itself.
- * Code entry waits on #876 Q9 (authenticator choice); until then the sheet says so plainly.
+ * Code entry waits on issue 876 Q9 (authenticator choice); until then the sheet says so plainly.
  */
 export function StepUpSheet({
   open, onClose, action, target, what,
