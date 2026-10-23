@@ -15,6 +15,8 @@ export type NumberRow = {
   heldAt: string | null;
   lastBusinessId: string | null;
   lastBusinessName: string | null;
+  /** True while quarantine is a win-back hold for lastBusinessId (#885). */
+  winbackHold: boolean;
 };
 
 export type WaitingBusiness = { id: string; name: string; since: string };
@@ -62,6 +64,7 @@ export function defaultNumberView(rows: NumberRow[], waiting: number, now: Date)
 export function statusLabel(r: NumberRow, now: Date): string {
   if (r.status === "reserved") return "Reserved";
   const s = numberState(r, now);
+  if (s === "held" && r.winbackHold) return "Win-back hold";
   return s === "available" ? "Available" : s === "assigned" ? "Assigned" : s === "held" ? "On hold" : "Disabled";
 }
 

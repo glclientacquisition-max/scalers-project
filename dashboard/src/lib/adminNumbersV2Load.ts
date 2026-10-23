@@ -5,20 +5,28 @@ import type { NumberRow, WaitingBusiness } from "@/lib/ops/numbersView";
 
 type Raw = {
   id: string; created_at: string; e164: string; status: string; tenant_id: string | null; assigned_at: string | null;
-  notes: string | null; quarantine_until?: string | null; quarantined_at?: string | null; last_tenant_id?: string | null;
+  notes: string | null; quarantine_until?: string | null; quarantined_at?: string | null; last_tenant_id?: string | null; winback_hold?: boolean | null;
 };
 const BASE = "id, created_at, e164, status, tenant_id, assigned_at, notes";
 const HOLD = ", quarantine_until, quarantined_at, last_tenant_id";
+const WINBACK = ", winback_hold";
 
-/** Numbers v2 (ADMIN_V2). Read-only. Hold columns are optional so an older schema still loads. */
+/** Numbers v2 (ADMIN_V2). Read-only. Hold / win-back columns are optional so an older schema still loads. */
 export async function loadNumbersV2(): Promise<{ rows: NumberRow[]; waiting: WaitingBusiness[] }> {
   const admin = getSupabaseAdmin();
-  const full = await admin.from("sautikit_did_pool").select(BASE + HOLD).order("e164");
-  let data: unknown[] | null = full.data;
-  if (full.error) {
-    const base = await admin.from("sautikit_did_pool").select(BASE).order("e164");
-    if (base.error) throw base.error;
-    data = base.data;
+  let data: unknown[] | null = null;
+  const withWinback = await admin.from("sautikit_did_pool").select(BASE + HOLD + WINBACK).order("e164");
+  if (!withWinback.error) {
+    data = withWinback.data;
+  } else {
+    const withHold = await admin.from("sautikit_did_pool").select(BASE + HOLD).order("e164");
+    if (!withHold.error) {
+      data = withHold.data;
+    } else {
+      const base = await admin.from("sautikit_did_pool").select(BASE).order("e164");
+      if (base.error) throw base.error;
+      data = base.data;
+    }
   }
   const raw = (data || []) as unknown as Raw[];
 
@@ -53,6 +61,7 @@ export async function loadNumbersV2(): Promise<{ rows: NumberRow[]; waiting: Wai
     heldAt: r.quarantined_at ?? null,
     lastBusinessId: r.last_tenant_id ?? null,
     lastBusinessName: r.last_tenant_id ? names.get(String(r.last_tenant_id))?.name ?? null : null,
+    winbackHold: Boolean(r.winback_hold),
   }));
   const waiting = ((waitingQ.data || []) as { id: string; business_name: string | null; created_at: string }[]).map((t) => ({
     id: t.id,

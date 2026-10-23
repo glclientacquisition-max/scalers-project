@@ -234,7 +234,7 @@ export function BusinessPane({
       action="business:write"
       target={businessId}
       what="change package, minutes, charging or archive this business"
-      observedHint="Archive stays on the confirm sheet. Package, minutes and charging edits land with the next BusinessPane write slice."
+      observedHint="Archive stays on the confirm sheet. Number hold, end-early and restore live on Numbers. Package and charging edits land with the next BusinessPane write slice."
     />
     <OpsConfirm
       open={archiving && !!businessId}

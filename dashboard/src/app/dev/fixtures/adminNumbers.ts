@@ -24,6 +24,7 @@ export const ADMIN_NUMBERS: NumberRow[] = Array.from({ length: 84 }, (_, i) => {
     heldAt: held ? new Date(Date.parse(ADMIN_NUMBERS_NOW) - 18 * 86400000).toISOString() : null,
     lastBusinessId: held ? last.id : null,
     lastBusinessName: held ? last.business_name : null,
+    winbackHold: held && i % 3 !== 0,
   };
 });
 export const ADMIN_NUMBERS_WAITING: WaitingBusiness[] = [
