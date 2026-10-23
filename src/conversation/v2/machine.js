@@ -8,6 +8,8 @@ const L = require('./lexicon');
 const N = require('./nlu');
 const R = require('./receipts');
 const AM = require('./audibleMouth');
+const HW = require('./hybridWeigher');
+const MS = require('./modelShadow');
 const { buildCatalogue, validateCall } = require('./catalogue');
 const { listedAreaIds, listedAreaRows } = require('../listedAreas');
 const { compileSpokenCatalogue, joinList } = require('../spokenCatalogue');
@@ -700,6 +702,11 @@ function infoAnswer(state, u, profile, kind) {
 // Mouth fail-fast (~700–800ms): do not hold rules/Train speech for the full HARD_CAP
 // dual cascade death. HARD_CAP_MS stays 1800 — this budget is mouth-only.
 const MOUTH_FAILFAST_MS = 750;
+
+function hasAnyModelCall(mc) {
+  return !!(mc && Array.isArray(mc.calls) && mc.calls.length);
+}
+
 async function consultModel(state, u, profile, model, catalogue) {
   if (!model) return null;
   const toolMode = state.phase === 'readback' ? 'ANY' : state.ended ? 'NONE' : 'AUTO';
@@ -855,13 +862,71 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   // Fail-fast: mouth on rules/Train after ~750ms if no validated proposal yet (HD_ddc993).
   // HARD_CAP_MS stays 1800; do not raise the cap as the fix.
   const mc = await consultModelForMouth(state, u, profile, model, catalogue);
-  // R7a: validated get_price / check_availability / get_hours → seed slots (copy lookup_file→recall).
-  // Applied before explain/FAQ mouth so explain can fire; override only when rules would hollow.
-  // Skip seed when cascade answeredBy=none / timedOut with empty calls (honesty).
-  const r7seed = (mc && mc.answeredBy === 'none' && !(mc.calls && mc.calls.length))
-    ? null
-    : AM.applyValidatedReadSeed(mc, u, profile, state);
+  // Hybrid weigher (path H): weigh rules/Train vs validated C7 read; Train mouth only.
+  // Fail-fast already applied above; HARD_CAP unchanged. agreement() is log-only.
+  const mouthFailFast = !mc && state.trace.some((x) => x.turn === state.turn && x.mouthFailFast);
+  const hollow = AM.rulesMouthWouldHollow(u);
+  let faqScore = null;
+  if (fsOn() && state.phase !== 'readback' && !u.intents.some((i) => TRANSACTIONAL.includes(i))) {
+    const faqHit = FS.matchFaq(text, FS.factsFor(profile));
+    if (faqHit) faqScore = faqHit.score;
+  }
+  const readProp = AM.validatedReadProposal(mc);
+  let factMissing = false;
+  if (readProp && readProp.tool === 'get_price') {
+    const svc = readProp.args.service_id ? AM.resolveServiceById(readProp.args.service_id, profile) : null;
+    const prd = readProp.args.product_id ? AM.resolveProductById(readProp.args.product_id, profile) : null;
+    const row = svc || prd;
+    if (row) {
+      const tp = FS.typedPrice(row);
+      factMissing = !(tp && tp.say);
+    } else {
+      factMissing = true;
+    }
+  }
+  // Dry R7a probe (no mutate) — area coverage can seed even when hollow=false (Kericho class).
+  const seedProbe = (mc && !(mc.answeredBy === 'none' && !(mc.calls && mc.calls.length)))
+    ? AM.validatedReadSeeds(mc, { profile, u })
+    : null;
+  // agreement() log/metrics only — never a speak gate (R7 + weigher locks).
+  let agreementAgree = null;
+  try {
+    if (mc && hasAnyModelCall(mc)) {
+      const tools = MS.buildTools({});
+      const modelIntent = (tools[mc.calls[0].name] || {}).intent || 'none';
+      const ag = MS.agreement(
+        { intent: (u.intents && u.intents[0]) || 'none', slots: { service: (u.service && u.service.name) || null } },
+        { intent: modelIntent, slots: {} },
+      );
+      agreementAgree = !!ag.agree;
+    }
+  } catch { agreementAgree = null; }
+  const weighed = HW.weighHybridTurn({
+    faqScore,
+    hollow,
+    mc,
+    mouthFailFast,
+    repairs: state.repairs || 0,
+    factMissing,
+    seedAvailable: !!seedProbe,
+    agreementAgree,
+  });
+  state.trace.push({
+    turn: state.turn,
+    weigher: weighed.trace,
+    rules_strength: weighed.rules_strength,
+    model_strength: weighed.model_strength,
+    priority: weighed.priority,
+    agreementAgree: weighed.agreementAgree,
+  });
+  // R7a seed only when weigher says so (hollow + VALID_READ / honest_miss bind).
+  // Skip when cascade answeredBy=none / empty calls (honesty) — weigher already ABSENT.
+  let r7seed = null;
+  if (HW.shouldApplyR7aSeed(weighed) && mc && !(mc.answeredBy === 'none' && !(mc.calls && mc.calls.length))) {
+    r7seed = AM.applyValidatedReadSeed(mc, u, profile, state);
+  }
   if (r7seed) state.trace.push({ turn: state.turn, r7a: { tool: r7seed.tool, kind: r7seed.kind } });
+  if (weighed.escalate) state.weigherEscalate = true;
   if (typeof classify === 'function' && needsClassify(u, pickIntent(u, state, profile))) {
     try {
       const ticket = normalizeTicket(await classify({ text: u.text, profile, lang: state.lang }), profile);
@@ -1092,6 +1157,10 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
       if (state.acks >= 3) { state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true, endReason: 'ack_run' }); }
       return out(R.info({ kind: 'ack', service: state.slots.service }, lang));
     }
+    if (state.weigherEscalate && !state.ladderOffered && !(state.callbacks || []).length) {
+      state.ladderOffered = true; state.weigherEscalate = false;
+      return out(propose(state, { tool: 'create_handoff', kind: 'ladder', reason: 'callback' }));
+    }
     if (u.fragment && state.turn > 1) { state.repairs = (state.repairs || 0) + 1; if (state.repairs <= 2) return out(R.info({ kind: 'repair' }, lang)); }
     if (midThread(state)) return out(noReopenLine(state, lang));
     const n = state.unknownCount++;
@@ -1194,4 +1263,4 @@ async function runTurn(state, args) {
   if (r) r.proposals = r.line ? [TP.proposal({ kind: kind || 'turn', text: r.line, lang: state.lang, topic: kind ? { ...state.topic, now: state.turn } : null, claim: Boolean(kind) })] : [];
   return r;
 }
-module.exports = { createState, runTurn, finishCall, catalogueTurn, MOUTH_FAILFAST_MS, consultModelForMouth };
+module.exports = { createState, runTurn, finishCall, catalogueTurn, MOUTH_FAILFAST_MS, consultModelForMouth, weighHybridTurn: HW.weighHybridTurn };
