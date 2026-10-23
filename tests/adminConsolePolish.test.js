@@ -206,7 +206,7 @@ describe("admin console polish", () => {
 
   it("lists voices as ListRows with a sheet, Live, and confirmed remove", () => {
     const panel = read("dashboard/src/components/AdminVoicesManager.tsx");
-    const page = read("dashboard/src/app/admin/(console)/voices/page.tsx");
+    const page = read("dashboard/src/app/admin/(console)/_screens/VoicesScreen.tsx");
     assert.match(page, /AdminVoicesManager/);
     assert.doesNotMatch(page, /deskListTitleClass/);
     assert.match(panel, /ListRow/);
@@ -226,13 +226,13 @@ describe("admin console polish", () => {
   });
 
   it("uses the desk list title on admin list roots", () => {
-    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/voices/page.tsx"), /deskListTitleClass/);
-    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/voices/page.tsx"), /<h1/);
-    assert.match(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /AdminPageHeader/);
-    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /from "@\/components\/PageHeader"/);
-    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/platform/page.tsx"), /deskListTitleClass/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/_screens/VoicesScreen.tsx"), /deskListTitleClass/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/_screens/VoicesScreen.tsx"), /<h1/);
+    assert.match(read("dashboard/src/app/admin/(console)/_screens/ServicesScreen.tsx"), /AdminPageHeader/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/_screens/ServicesScreen.tsx"), /from "@\/components\/PageHeader"/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/_screens/ServicesScreen.tsx"), /deskListTitleClass/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/businesses/page.tsx"), /deskListTitleClass/);
-    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/packages/page.tsx"), /deskListTitleClass/);
+    assert.doesNotMatch(read("dashboard/src/app/admin/(console)/_screens/PackagesScreen.tsx"), /deskListTitleClass/);
     assert.doesNotMatch(read("dashboard/src/app/admin/(console)/wallets/page.tsx"), /deskListTitleClass/);
     const numbers = read("dashboard/src/app/admin/(console)/numbers/page.tsx");
     assert.doesNotMatch(numbers, /deskListTitleClass/);
@@ -242,9 +242,9 @@ describe("admin console polish", () => {
   });
 
   it("opens Packages with assign and sends old Ledger to Businesses", () => {
-    const packages = read("dashboard/src/app/admin/(console)/packages/page.tsx");
+    const packages = read("dashboard/src/app/admin/(console)/_screens/PackagesScreen.tsx");
     assert.match(packages, /loadPackageVersionEditor/);
-    assert.match(packages, /title="Plans"/);
+    assert.match(packages, /"Packages" : "Plans"/);
     assert.doesNotMatch(packages, /deskListTitleClass/);
     assert.doesNotMatch(packages, /catalogOnly/);
     assert.doesNotMatch(packages, /redirect\(/);
@@ -286,7 +286,7 @@ describe("admin console polish", () => {
     const board = read("dashboard/src/components/PlatformRunBoard.tsx");
     assert.doesNotMatch(board, /KeyDiagnostics/);
     assert.doesNotMatch(board, /SAUTIKIT_API_KEY/);
-    const platform = read("dashboard/src/app/admin/(console)/platform/page.tsx");
+    const platform = read("dashboard/src/app/admin/(console)/_screens/ServicesScreen.tsx");
     assert.match(platform, /AdminOpsNotices/);
     assert.match(platform, /PlatformRunBoard/);
     assert.doesNotMatch(platform, /Infrastructure/);

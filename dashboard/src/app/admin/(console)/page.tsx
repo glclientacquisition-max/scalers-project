@@ -17,6 +17,11 @@ import { readPlatformOps } from "@/lib/platformOps";
 import { mergeQueueRows } from "@/lib/platformOpsModel";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { loadOverdueInvoiceTodayRows } from "@/lib/adminBillingInvoices";
+import { AdminAttentionV2 } from "@/components/admin/v2/AdminAttentionV2";
+import { loadOverdueForAttention, loadUsageForAttention } from "@/lib/adminAttentionLoad";
+import { buildAttention, type AttentionKind } from "@/lib/ops/attentionView";
+import { loadInsightFacts } from "@/lib/adminInsightsLoad";
+import { missedDemand } from "@/lib/ops/insightsView";
 
 export const instant = false;
 
@@ -49,6 +54,25 @@ export default async function AdminTodayPage() {
     createdAt: b.created_at,
     packageName: b.package_name,
   }));
+  if (process.env.ADMIN_V2 === "on") {
+    const [overdue, usage, facts] = await Promise.all([loadOverdueForAttention(), loadUsageForAttention(), loadInsightFacts(7)]);
+    const unavailable: AttentionKind[] = [];
+    if (!overdue) unavailable.push("overdue");
+    if (!usage) unavailable.push("near-limit");
+    if (!facts) unavailable.push("missed-demand");
+    const items = buildAttention({
+      businesses,
+      overdue: overdue || [],
+      usage: (usage || []).map((u) => ({ ...u, packageName: overview.businesses.find((b) => b.id === u.tenantId)?.package_name ?? null })),
+      quality: Object.entries(badges)
+        .filter(([, q]) => q.dropping)
+        .map(([tenantId, q]) => ({ tenantId, score: q.score, reason: q.droppingReason })),
+      missed: missedDemand(facts || [], now),
+      now,
+    });
+    return <AdminAttentionV2 items={items} unavailable={unavailable} />;
+  }
+
   const [calling, overdueInvoices] = await Promise.all([
     businessesWithRecentCalls(quietCandidates(businesses, now), now),
     loadOverdueInvoiceTodayRows(),

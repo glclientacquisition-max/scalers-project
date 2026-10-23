@@ -146,6 +146,8 @@ export type InboxItem = {
   assignee: string | null;
   labels: string[];
   snoozedUntil: string | null;
+  /** Display only: 0 s no-audio redials from this caller shown under this row (see inboxRedialFold). */
+  redials?: import("@/lib/inboxRedialFold").InboxRedial[];
 };
 
 /** Latest inbound call, hold, or visit created from the caller. */

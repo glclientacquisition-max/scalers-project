@@ -90,7 +90,7 @@ describe("Desk prices come from the pinned package version", () => {
   it("admin Packages and the billing-state loaders do not take prices from the package row or the rate card", () => {
     const figure = /monthly_price_kes|annual_price_kes|message_credits|extra_seat_monthly_kes|credit_kes|\bminutes\b|\bseats\b|inbound_kes|outbound_kes|annual_discount|\*/;
     const files = [
-      "dashboard/src/app/admin/(console)/packages/page.tsx",
+      "dashboard/src/app/admin/(console)/_screens/PackagesScreen.tsx",
       "dashboard/src/components/AdminPackagesPanel.tsx",
       "dashboard/src/lib/publishedPackagePrice.ts",
       "dashboard/src/lib/billingStateLoad.ts",
@@ -104,7 +104,7 @@ describe("Desk prices come from the pinned package version", () => {
         assert.doesNotMatch(match[2], figure, `${file} selects ${match[2]} from ${match[1]}`);
       }
     }
-    const page = read("dashboard/src/app/admin/(console)/packages/page.tsx");
+    const page = read("dashboard/src/app/admin/(console)/_screens/PackagesScreen.tsx");
     assert.match(page, /loadPackageVersionEditor/);
     assert.doesNotMatch(page, /withPublishedPackagePrices/);
     const panel = read("dashboard/src/components/AdminPackagesPanel.tsx");

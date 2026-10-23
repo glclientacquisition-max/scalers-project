@@ -238,7 +238,7 @@ export function InboxPileBoard({
                   />
                 ))}
               </ul>
-              <div className="mt-8 hidden lg:block">
+              <div className="mt-4 hidden lg:block">
                 <DeskDataTable minWidthClass="min-w-0">
                   <thead className="border-b border-hairline bg-surface-muted/60 text-ink-2">
                     <tr>
