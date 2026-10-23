@@ -311,6 +311,7 @@ describe("A0: operator-only writes + step-up observe (s21)", () => {
     assert.match(ui, /confirmLabel="Assign number"/);
     assert.match(ui, /confirmLabel="Release number"/);
     assert.match(ui, /showHonest\("hold"\)/);
-    assert.match(ui, /showHonest\("unlock"\)/);
+    assert.match(ui, /setUnlockOpen\(true\)/); // s23: Unlock opens StepUpSheet (observe)
+    assert.match(ui, /<StepUpSheet/);
   });
 });
