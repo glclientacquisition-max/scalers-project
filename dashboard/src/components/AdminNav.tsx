@@ -457,6 +457,7 @@ function AdminPhoneMore() {
 export function AdminTabBar() {
   const { path } = useAdminChrome();
   const { pendingHref, setPendingHref } = useAdminPending();
+  const v2 = useContext(AdminV2Context);
   if (adminParentTarget(path)) return null;
 
   return (
@@ -466,7 +467,7 @@ export function AdminTabBar() {
       className="glass-chrome fixed inset-x-0 bottom-0 z-tabbar isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-hidden border-t border-hairline/80 pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       <ul className="flex w-full">
-        {adminPhoneTabs(useContext(AdminV2Context)).map((item) => (
+        {adminPhoneTabs(v2).map((item) => (
           <li key={item.href} className="min-w-0 flex-1">
             <AdminDestinationLink
               href={item.href}
