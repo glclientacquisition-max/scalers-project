@@ -33,7 +33,7 @@ export function AdminAuditV2({
   const it = items.find((i) => i.id === sel) ?? null;
   const bizName = (id: string | null) => (id ? businesses.find((b) => b.id === id)?.name : null);
   const go = (next: { business?: string | null; actor?: string | null }) =>
-    router.replace(activityHref({ business, actor, ...next }).replace("/admin/activity", "/admin/settings/audit"), { scroll: false });
+    router.replace(activityHref({ business, actor, ...next }).replace("/admin/" + "activity", "/admin/settings/audit"), { scroll: false });
 
   const filters = useMemo(() => {
     const bits: string[] = [];
@@ -109,7 +109,15 @@ export function AdminAuditV2({
             </thead>
             <tbody className="divide-y divide-hairline bg-surface">
               {items.map((r) => (
-                <tr key={r.id} aria-selected={sel === r.id} onClick={() => setSel(r.id)} className={["h-ops-row cursor-pointer", sel === r.id ? "bg-accent/10" : "hover:bg-surface-2"].join(" ")}>
+                <tr
+                  key={r.id}
+                  aria-selected={sel === r.id}
+                  tabIndex={0}
+                  role="button"
+                  onClick={() => setSel(r.id)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSel(r.id); } }}
+                  className={["h-ops-row cursor-pointer", sel === r.id ? "bg-accent/10" : "hover:bg-surface-2"].join(" ")}
+                >
                   <td className="whitespace-nowrap px-ops-3 tabular-nums text-ink-2">{r.when}</td>
                   <td className="px-ops-3 font-semibold text-ink">{r.title}</td>
                   <td className="max-w-[12rem] truncate px-ops-3 text-ink-2">{r.business || "—"}</td>

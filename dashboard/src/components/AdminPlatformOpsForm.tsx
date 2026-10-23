@@ -158,8 +158,8 @@ export function AdminPlatformOpsForm({
     };
   }
 
-  async function savePeople(next: OpsPerson[], ok: string) {
-    setBusy("save");
+  async function savePeople(next: OpsPerson[], ok: string, busyKey: "save" | "remove" = "save") {
+    setBusy(busyKey);
     setError("");
     setStatus("");
     try {
@@ -295,10 +295,12 @@ export function AdminPlatformOpsForm({
                   variant="ghost"
                   size="sm"
                   pending={busy === "remove"}
+                  disabled={busy !== null}
                   onClick={() =>
                     void savePeople(
                       people.filter((row) => row.id !== person.id),
                       "Saved.",
+                      "remove",
                     )
                   }
                 >

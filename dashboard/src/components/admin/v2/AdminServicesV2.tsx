@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import type { OpsNotice, OpsSettings, OpsSignal } from "@/lib/platformOpsModel";
-import { PageHeader, StatusPill, type OpsTone } from "@/components/ops";
-import { Button } from "@/components/ui/Button";
+import { PageHeader, StatusPill, UnlockCta, type OpsTone } from "@/components/ops";
+import { AdminPlatformOpsForm } from "@/components/AdminPlatformOpsForm";
 import "@/styles/ops.css";
 
 type InfraRow = { id: string; title: string; tone: "ok" | "attention" | "neutral"; label: string; detail: string };
@@ -37,10 +37,10 @@ function infraTone(t: InfraRow["tone"]): OpsTone {
 
 /**
  * Services (ADMIN_V2): health, open notices, who to alert — definition cards.
- * View-only; Unlock for edits that wait on step-up. No dead switches.
+ * Unlock opens StepUpSheet; after observe, AdminPlatformOpsForm (postOps) appears. No dead switches.
  */
 export function AdminServicesV2({ snapshot }: { snapshot: Snapshot }) {
-  const [note, setNote] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
   const open = snapshot.notices.filter((n) => n.status === "open");
   const people = snapshot.settings.people;
   return (
@@ -48,23 +48,23 @@ export function AdminServicesV2({ snapshot }: { snapshot: Snapshot }) {
       <PageHeader
         title="Services"
         actions={
-          <Button type="button" variant="primary" size="sm" onClick={() => setNote(true)}>
-            Unlock to edit
-          </Button>
+          unlocked ? (
+            <span className="text-ops-label text-ink-2" data-unlocked="">Unlocked · edit below</span>
+          ) : (
+            <UnlockCta
+              site="services"
+              action="services:edit"
+              what="change alerts, retention or who to notify"
+              onUnlocked={() => setUnlocked(true)}
+              observedHint="Alerts, recordings and people open below — same postOps path as the old Platform form."
+            />
+          )
         }
       />
       <p className="flex flex-wrap items-center justify-between gap-2 text-ops-label text-ink-2">
         <StatusPill tone={stripTone(snapshot.strip.tone)}>{snapshot.strip.label}</StatusPill>
-        <span>View only · unlock to change</span>
+        <span>{unlocked ? "Editing unlocked" : "View only · unlock to change"}</span>
       </p>
-      {note ? (
-        <p className="rounded-sm border border-hairline bg-canvas px-ops-3 py-ops-2 text-ops-label text-ink-2" role="status">
-          Secure sign-in is next. Changing alerts or retention waits for step-up — this button does not change them yet.{" "}
-          <button type="button" className="font-semibold text-ink underline-offset-2 hover:underline" onClick={() => setNote(false)}>
-            Dismiss
-          </button>
-        </p>
-      ) : null}
 
       <article className="overflow-hidden rounded-sm border border-hairline bg-surface">
         <header className="flex justify-between border-b border-hairline px-ops-3 py-ops-2">
@@ -143,6 +143,18 @@ export function AdminServicesV2({ snapshot }: { snapshot: Snapshot }) {
           ))}
         </ul>
       </article>
+
+      {unlocked ? (
+        <section aria-label="Edit services" className="rounded-sm border border-hairline bg-surface" data-unlocked-edit="services">
+          <header className="border-b border-hairline px-ops-3 py-ops-2">
+            <h2 className="font-semibold text-ink">Edit alerts, recordings and people</h2>
+            <p className="mt-0.5 text-ops-label text-ink-2">Same writes as the classic ops form — postOps.</p>
+          </header>
+          <div className="py-ops-2">
+            <AdminPlatformOpsForm settings={snapshot.settings} persisted={snapshot.persisted} />
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

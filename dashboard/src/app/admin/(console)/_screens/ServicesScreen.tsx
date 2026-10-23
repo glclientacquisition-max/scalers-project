@@ -24,7 +24,7 @@ export async function ServicesScreen() {
 
   return (
     <div className="space-y-4">
-      <AdminPageHeader title="Platform" subtitle="Health, open notices, and who to alert." />
+      <AdminPageHeader title={process.env.ADMIN_V2 === "on" ? "Services" : "Platform"} subtitle="Health, open notices, and who to alert." />
       <AdminOpsNotices notices={snapshot.notices.filter((notice) => notice.status === "open")} />
       <PlatformRunBoard />
       <AdminPlatformOpsForm settings={snapshot.settings} persisted={snapshot.persisted} />

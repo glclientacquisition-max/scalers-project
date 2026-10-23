@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   const target = body.target == null ? null : String(body.target).slice(0, 64);
   const mode = stepUpMode();
   if (mode === "enforce") {
-    return NextResponse.json({ mode, verified: false, error: "step_up_not_enrolled" }, { status: 501 });
+    return NextResponse.json({ mode, verified: false, error: "step_up_not_enrolled", message: "Authenticator not set up yet" }, { status: 501 });
   }
   if (mode === "observe") requireStepUp({ action: `unlock:${action}`, operator: gate.operator, target });
   return NextResponse.json({ mode, verified: false });
