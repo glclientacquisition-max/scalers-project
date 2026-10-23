@@ -1,10 +1,5 @@
-import { SkeletonList } from "@/components/ui/Skeleton";
+import { OpsLoadingInvoiceDetail } from "@/components/admin/v2/OpsRouteLoading";
 
-export default function AdminInvoiceLoading() {
-  return (
-    <div className="space-y-4" aria-busy="true">
-      <SkeletonList rows={2} />
-      <SkeletonList rows={6} />
-    </div>
-  );
+export default function Loading() {
+  return <OpsLoadingInvoiceDetail />;
 }

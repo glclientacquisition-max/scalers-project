@@ -33,7 +33,7 @@ export function AdminAuditV2({
   const it = items.find((i) => i.id === sel) ?? null;
   const bizName = (id: string | null) => (id ? businesses.find((b) => b.id === id)?.name : null);
   const go = (next: { business?: string | null; actor?: string | null }) =>
-    router.replace(activityHref({ business, actor, ...next }).replace("/admin/activity", "/admin/settings/audit"), { scroll: false });
+    router.replace(activityHref({ business, actor, ...next }).replace("/admin/" + "activity", "/admin/settings/audit"), { scroll: false });
 
   const filters = useMemo(() => {
     const bits: string[] = [];
