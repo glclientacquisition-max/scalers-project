@@ -2,6 +2,7 @@
 // Speech for BA v2. Every fact line is rendered from a typed receipt or a fixed
 // ask/ladder template per language. Model text is never spoken.
 const L = require('./lexicon');
+const CS = require('./commitSafety');
 const { speakCatalogueName } = require('../spokenCatalogue');
 const { speakMoney } = require('../../speech/spokenForms');
 const sw = (lang) => L.isSw(lang);
@@ -140,11 +141,14 @@ function reaskQ(p, lang) {
 
 function receipt(r, lang) {
   const S = sw(lang);
-  // BRAIN_V2_COMMIT_SAFETY: a failed write is never a promise we did not make; the outbox owner task is real.
-  if (!r.ok && r.outbox === 'queued') return S ? 'Samahani, sikuweza kuhifadhi hilo. Nimemwomba mwenye biashara akupigie simu.' : "Sorry, I couldn't save that. I've asked the owner to call you back.";
-  if (!r.ok && r.outbox === 'failed') return S ? 'Samahani, sikuweza kuhifadhi hilo sasa hivi. Tafadhali piga simu tena baadaye kidogo.' : "Sorry, I couldn't save that just now. Please call us again a little later.";
+  // BRAIN_V2_COMMIT_SAFETY / R1: a failed write is never a promise we did not make; the outbox owner task is real.
+  // Under C1, spoken booked/saved/callback-promised only with a real Desk write id (dryRun / escalate-without-row are hollow).
+  // Flag off keeps Phase 1 dry-run mouth (tests + shadow).
+  const hollow = Boolean(CS.commitSafetyEnabled() && r.ok && !r.id && !r.duplicate);
+  if ((!r.ok || hollow) && r.outbox === 'queued') return S ? 'Samahani, sikuweza kuhifadhi hilo. Nimemwomba mwenye biashara akupigie simu.' : "Sorry, I couldn't save that. I've asked the owner to call you back.";
+  if ((!r.ok || hollow) && r.outbox === 'failed') return S ? 'Samahani, sikuweza kuhifadhi hilo sasa hivi. Tafadhali piga simu tena baadaye kidogo.' : "Sorry, I couldn't save that just now. Please call us again a little later.";
   if (r.ok && r.duplicate) return S ? `Hilo tayari limehifadhiwa, sijaweka mara mbili. Kuna kingine?` : "That's already saved; I haven't added it twice. Anything else?";
-  if (!r.ok) return S ? 'Samahani, sikuweza kuhifadhi hilo sasa. Timu itakupigia simu.' : "Sorry, I couldn't save that just now. The team will call you back.";
+  if (!r.ok || hollow) return S ? 'Samahani, sikuweza kuhifadhi hilo sasa. Timu itakupigia simu.' : "Sorry, I couldn't save that just now. The team will call you back.";
   const more = S ? ' Kuna kingine?' : ' Anything else?';
   switch (r.tool) {
     case 'create_booking': return (S ? `Sawa, nimeweka ${svcName(r.service, lang)} yako, ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.` : `Done, your ${svcName(r.service, lang).toLowerCase()} is booked for ${L.sayDate(r.when.date, lang)}${at(r.when, lang)}.`) + more;

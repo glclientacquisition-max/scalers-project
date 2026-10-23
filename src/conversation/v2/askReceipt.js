@@ -49,8 +49,9 @@ function compileAskReceipt(profile, ticket = {}, language = 'en') {
   return '';
 }
 
+// R3: travel/delivery fee only — bare how much|ngapi is not come_cost on a coverage ticket.
 function feeAsk(text, u) {
-  return Boolean(u.feeAsk) || /\b(fare|ada ya|travel fee|delivery fee|fee to|usafiri|ngapi|how much)\b/i.test(String(text || ''));
+  return Boolean(u.feeAsk) || /\b(fare|ada ya(?:\s+kuja)?|travel fee|delivery fee|fee to|usafiri|come cost|gharama ya kuja)\b|\b(how much|ngapi|bei).{0,40}\b(to (?:come|visit|deliver|kuja)|kuja|usafiri|fare|travel|delivery)\b|\b(to (?:come|visit|deliver)|kuja|usafiri|fare|travel|delivery).{0,40}\b(how much|ngapi|bei)\b/i.test(String(text || ''));
 }
 
 function ticketFromUnderstand(u) {

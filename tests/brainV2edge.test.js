@@ -56,7 +56,7 @@ test('service + day/time without "book" is a booking; multi-intent price + booki
   const a = await talk(['Nataka sofa cleaning Ijumaa saa nne asubuhi.']);
   assert.match(a.lines[0], /^Tuje wapi\?$/);
   const b = await talk(['Book sofa cleaning Friday at 10am, and how much is it?']);
-  assert.match(b.lines[0], /800.*Where should we come\?/);
+  assert.match(b.lines[0], /(?:800|eight hundred).*Where should we come\?/i);
   const row = { id: 'apt_fri', caller_phone: '+254700000001', service_name: 'Carpet Cleaning (per room)', status: 'requested', window_start: '2026-10-16T07:00:00Z', address_landmark: 'Kitengela' };
   const c = await talk(['Cancel my Friday carpet cleaning and book sofa cleaning on Saturday at 10am instead.', 'Yes.'], { seed: { rows: [row], contactName: 'Alvin' } });
   assert.match(c.lines[1], /cancelled\. .*Where should we come\?$/);

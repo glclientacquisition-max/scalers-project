@@ -142,3 +142,42 @@ test('live machine still speaks the same Karen and cancel receipts', async () =>
   assert.match(rule.line, /12 hours/i);
   assert.doesNotMatch(rule.line, /Shall I go ahead|Cancel your/i);
 });
+
+test('R3: bare how much / ngapi is not come_cost; travel lexicon still is', async () => {
+  const bare = await resolveAsk({ text: 'How much is sofa cleaning?', profile: JIRANI, lang: 'en' });
+  assert.notEqual(bare.kind, 'come_cost', bare.kind);
+  assert.doesNotMatch(bare.line || '', /eight hundred|travel|Kilimani|Home visits/i);
+
+  const swBare = await resolveAsk({ text: 'Bei ya sofa cleaning ni ngapi?', profile: JIRANI, lang: 'sw' });
+  assert.notEqual(swBare.kind, 'come_cost', swBare.kind);
+
+  const fare = await resolveAsk({ text: 'How much is the travel fee to Karen?', profile: JIRANI, lang: 'en' });
+  assert.equal(fare.kind, 'come_cost');
+  assert.match(fare.line, /eight hundred/i);
+
+  const ada = await resolveAsk({ text: 'Ada ya kuja Karen ni ngapi?', profile: JIRANI, lang: 'sw' });
+  assert.equal(ada.kind, 'come_cost');
+});
+
+test('R3 live machine: service how much is price/which_price, not travel-fee dump', async () => {
+  const prev = process.env.BRAIN_V2_COMMIT_SAFETY;
+  const prevOwns = process.env.BRAIN_V2_OWNS_CALL;
+  process.env.BRAIN_V2_COMMIT_SAFETY = '1';
+  delete process.env.BRAIN_V2_OWNS_CALL;
+  try {
+    const st = V2.createState({ profile: JIRANI, callerPhone: '+254700000001' });
+    const got = await V2.runTurn(st, {
+      text: 'How much is sofa cleaning?',
+      profile: JIRANI,
+      now: new Date('2026-10-14T05:00:00Z'),
+      handlers: {},
+      langLock: 'en',
+    });
+    // Travel-fee dump (come_cost) lists estates / "travel fee" — service price may still say "eight hundred".
+    assert.doesNotMatch(got.line, /travel fee|Home visits in Kilimani|We (?:also )?cover|come to (?:Karen|Kilimani)|ada ya kuja/i);
+    assert.match(got.line, /Sofa Cleaning|sofa|Which service|quote|don't have a price/i);
+  } finally {
+    if (prev === undefined) delete process.env.BRAIN_V2_COMMIT_SAFETY; else process.env.BRAIN_V2_COMMIT_SAFETY = prev;
+    if (prevOwns === undefined) delete process.env.BRAIN_V2_OWNS_CALL; else process.env.BRAIN_V2_OWNS_CALL = prevOwns;
+  }
+});

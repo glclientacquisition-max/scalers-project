@@ -365,3 +365,60 @@ test('the idempotency key rides through tool validation to the row args', () => 
   assert.match(srv, /request\.idempotencyKey \? \{ idempotencyKey: request\.idempotencyKey \}/);
   assert.match(srv, /recordWriteReceipt: typeof db\.recordWriteReceipt === 'function'/);
 });
+
+// --- R1–R4 trust (Alvin GO 2026-10-23): durable commit, wait-hold, no hollow reopen ---
+const R = require('../src/conversation/v2/receipts');
+
+test('R1 receipt(): under C1, ok without write id is hollow — never speaks booked/saved/callback-promised', withFlag(() => {
+  const book = { tool: 'create_booking', ok: true, id: null, service: 'Sofa Cleaning (per seat)', when: { date: '2026-10-16', time: '10:00' } };
+  assert.match(R.receipt(book, 'en'), /couldn't save/i);
+  assert.doesNotMatch(R.receipt(book, 'en'), /booked/i);
+  assert.match(R.receipt(book, 'sw'), /sikuweza kuhifadhi/i);
+  const withId = { ...book, id: 'apt_1' };
+  assert.match(R.receipt(withId, 'en'), /is booked/i);
+  const handoff = { tool: 'create_handoff', ok: true, id: null, kind: 'callback' };
+  assert.match(R.receipt(handoff, 'en'), /couldn't save/i);
+  assert.doesNotMatch(R.receipt(handoff, 'en'), /will call you back on this number/i);
+  const queued = { ...book, outbox: 'queued' };
+  assert.match(R.receipt(queued, 'en'), /asked the owner to call you back/i);
+}));
+
+test('R1 commitSafe: dryRun / ok-without-id → failed+outbox, never committed booked speech', withFlag(async () => {
+  const H = handlers();
+  H.h.createAppointment = async (a) => { H.log.push(['appt', a]); return { dryRun: true, id: null }; };
+  const st = V2.createState({ profile: DD, callerPhone: '+254700000001', callId: 'HD_r1hollow' });
+  const a = await V2.runTurn(st, { text: BOOK_EN, profile: DD, now: NOW, handlers: H.h });
+  const b = await V2.runTurn(st, { text: 'Yes', profile: DD, now: NOW, handlers: H.h });
+  assert.match(a.line, /Shall I book it\?/);
+  assert.match(b.line, /couldn't save/i);
+  assert.doesNotMatch(b.line, /booked/i);
+  assert.deepEqual(phases(H.receipts), ['proposed', 'confirmed', 'failed']);
+  assert.ok(H.receipts[2].writeId == null || H.receipts[2].phase === 'failed');
+  assert.equal(st.outcomes.includes('booked'), false);
+  assert.ok(st.outcomes.includes('write_failed'));
+}));
+
+test('R2 repeated "okay wait" never commits and never closes as saved; pending + issuedTurn bump', withFlag(async () => {
+  const r = await talk([BOOK_EN, 'Okay wait', 'Okay wait.', 'Sawa ngoja kidogo.']);
+  assert.equal(r.writes.length, 0);
+  assert.ok(!r.receipts.some((x) => x.phase === 'confirmed' || x.phase === 'committed'));
+  assert.equal(r.st.phase, 'readback');
+  assert.ok(r.st.pending);
+  assert.doesNotMatch(r.out.map((o) => o.line).join(' | '), /booked|saved|Goodbye|Kwaheri/i);
+  for (const o of r.out.slice(1)) assert.match(o.line, /take your time|chukua muda|Shall I book it|Nithibitishe/i);
+  const y = await talk([BOOK_EN, 'Okay wait', 'Okay wait.', 'Yes']);
+  assert.equal(y.log.filter((x) => x[0] === 'appt').length, 1);
+  assert.match(y.out.at(-1).line, /is booked/i);
+}));
+
+test('R4 mid-thread: after services list, aside/unknown does not reopen want_know / How can I help', withFlag(async () => {
+  const st = V2.createState({ profile: DD, callerPhone: '+254700000001', callId: 'HD_r4' });
+  const H = handlers();
+  const a = await V2.runTurn(st, { text: 'What services do you offer?', profile: DD, now: NOW, handlers: H.h });
+  assert.match(a.line, /Which would you like|We do|Tunafanya/i);
+  assert.doesNotMatch(a.line, /How can I help you today|prices, services or our hours/i);
+  const b = await V2.runTurn(st, { text: 'Aside from those', profile: DD, now: NOW, handlers: H.h });
+  assert.doesNotMatch(b.line, /How can I help you today\?/i);
+  assert.doesNotMatch(b.line, /prices, services or our hours/i);
+  assert.ok(st.lastInfo === 'services' || st.slots.service || /Which|Would you like|Okay|Sawa|Sorry/i.test(b.line));
+}));
