@@ -62,6 +62,7 @@ describe("Activity: every admin write is recorded", () => {
         branches += 1;
         const name = (part.match(/action === "([^"]+)"/) || [null, "(single)"])[1];
         if (/recordAdminAction\(/.test(part)) continue;
+        if (rel.endsWith("/number-hold/route.ts") && name === "bill_fee") continue; // s28 honest 501 stub; writes nothing
         const helper = Object.keys(SELF_AUDITING).find((fn) => new RegExp(`await ${fn}\\(`).test(part));
         if (!helper) missing.push(`${rel} ${name}`);
       }

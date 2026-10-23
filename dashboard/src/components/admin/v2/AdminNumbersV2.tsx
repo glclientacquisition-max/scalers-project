@@ -2,7 +2,19 @@
 
 import { businessPaneHref } from "@/lib/ops/businessPane";
 import { ARCHIVE_RESTORE_DAYS, releaseBlockReason } from "@/lib/adminBusinessModel";
-import { archiveThenRelease, releaseActions } from "@/lib/ops/archiveRelease";
+import {
+  archiveThenReleaseMaybeHold,
+  releaseActions,
+  releaseThenMaybeHold,
+} from "@/lib/ops/archiveRelease";
+import {
+  clampHoldDays,
+  feeLabel,
+  numberHoldActions,
+  reactivationFeeSurface,
+  type HoldPolicy,
+  type HoldReleaseMode,
+} from "@/lib/ops/numberHold";
 import { useRouter } from "next/navigation";
 import { startTransition, useEffect, useMemo, useState } from "react";
 import {
@@ -27,11 +39,22 @@ import "@/styles/ops.css";
 const DATE = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" });
 const day = (iso: string | null) => (iso ? DATE.format(new Date(iso)) : "—");
 
-type ConfirmKind = "assign" | "release" | "archive_release" | null;
-type HonestNote = "unlock" | "hold" | null;
+type ConfirmKind = "assign" | "release" | "archive_release" | "hold" | "end_hold" | "restore" | null;
 
-/** Numbers as a table plus pane (ADMIN_V2). Assign/Release write through OpsConfirm; Unlock/Hold stay honest until step-up enrolment. */
-export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow[]; waiting: WaitingBusiness[]; nowIso: string }) {
+const DEFAULT_POLICY: HoldPolicy = { columnsPresent: false, enabled: false, defaultDays: 14, reactivationFeeKes: null };
+
+/** Numbers as a table plus pane (ADMIN_V2). Assign/Release write through OpsConfirm; Hold/win-back uses #885 RPCs when present. */
+export function AdminNumbersV2({
+  rows: all,
+  waiting,
+  nowIso,
+  holdPolicy = DEFAULT_POLICY,
+}: {
+  rows: NumberRow[];
+  waiting: WaitingBusiness[];
+  nowIso: string;
+  holdPolicy?: HoldPolicy;
+}) {
   const router = useRouter();
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const [view, setView] = useState<NumberView>(() => defaultNumberView(all, waiting.length, now));
@@ -39,7 +62,8 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
   const [sel, setSel] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<ConfirmKind>(null);
   const [assignTo, setAssignTo] = useState<string | null>(null);
-  const [note, setNote] = useState<HonestNote>(null);
+  const [releaseMode, setReleaseMode] = useState<HoldReleaseMode>("hold");
+  const [holdDays, setHoldDays] = useState(holdPolicy.defaultDays);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
@@ -54,6 +78,10 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
       if (!v) setView(NUMBER_VIEWS.find((x) => x.id !== "all" && inNumberView(hit, x.id, now))?.id ?? "all");
     }
   }, [all, now]);
+
+  useEffect(() => {
+    setHoldDays(holdPolicy.defaultDays);
+  }, [holdPolicy.defaultDays]);
 
   const counts = useMemo(() => numberCounts(all, now), [all, now]);
   const rows = useMemo(
@@ -70,23 +98,13 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
       })
     : null;
   const acts = releaseActions(state, blockRelease, it?.businessId ?? null);
-
-  async function runArchiveRelease(reason: string) {
-    if (!it?.businessId) return;
-    setPending(true);
-    setError("");
-    setStatus("");
-    const r = await archiveThenRelease(it.businessId, it.e164, reason);
-    setPending(false);
-    if (!r.ok) {
-      setError(r.error);
-      if (r.step === "release") startTransition(() => router.refresh());
-      return;
-    }
-    setConfirm(null);
-    setStatus(`${it.businessName ?? "Business"} archived. ${formatE164(it.e164)} is Available.`);
-    startTransition(() => router.refresh());
-  }
+  const holdActs = numberHoldActions({
+    state,
+    winbackHold: Boolean(it?.winbackHold),
+    policy: holdPolicy,
+    lastBusinessId: it?.lastBusinessId ?? null,
+  });
+  const fee = reactivationFeeSurface(holdPolicy.reactivationFeeKes);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -102,7 +120,11 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
 
   useEffect(() => {
     if (confirm === "assign") setAssignTo(waiting[0]?.id ?? null);
-  }, [confirm, waiting]);
+    if (confirm === "release" || confirm === "archive_release" || confirm === "hold") {
+      setReleaseMode(holdActs.chooseOnRelease || holdActs.startHold ? "hold" : "free");
+      setHoldDays(holdPolicy.defaultDays);
+    }
+  }, [confirm, waiting, holdActs.chooseOnRelease, holdActs.startHold, holdPolicy.defaultDays]);
 
   const freeingNext = useMemo(
     () => all.filter((r) => isHeld(r, now) && r.holdUntil).sort((a, b) => a.holdUntil!.localeCompare(b.holdUntil!)),
@@ -142,25 +164,149 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
     }
   }
 
+  async function postHold(body: Record<string, unknown>, okStatus: string) {
+    setPending(true);
+    setError("");
+    setStatus("");
+    try {
+      const res = await fetch("/api/admin/number-hold", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(json.error || "Could not update hold.");
+        return false;
+      }
+      setConfirm(null);
+      setStatus(okStatus);
+      startTransition(() => router.refresh());
+      return true;
+    } catch {
+      setError("Could not update hold.");
+      return false;
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function runArchiveRelease(reason: string) {
+    if (!it?.businessId) return;
+    setPending(true);
+    setError("");
+    setStatus("");
+    const mode: HoldReleaseMode = holdActs.chooseOnRelease ? releaseMode : "free";
+    const days = mode === "hold" ? clampHoldDays(holdDays, holdPolicy.defaultDays) : null;
+    const r = await archiveThenReleaseMaybeHold(it.businessId, it.e164, reason, mode, days);
+    setPending(false);
+    if (!r.ok) {
+      setError(r.error);
+      if (r.step !== "archive") startTransition(() => router.refresh());
+      return;
+    }
+    setConfirm(null);
+    setStatus(
+      mode === "hold"
+        ? `${it.businessName ?? "Business"} archived. ${formatE164(it.e164)} is on win-back hold for ${days} days.`
+        : `${it.businessName ?? "Business"} archived. ${formatE164(it.e164)} is Available.`,
+    );
+    startTransition(() => router.refresh());
+  }
+
+  async function runJustRelease(reason: string) {
+    if (!it) return;
+    setPending(true);
+    setError("");
+    setStatus("");
+    const mode: HoldReleaseMode = holdActs.chooseOnRelease ? releaseMode : "free";
+    const days = mode === "hold" ? clampHoldDays(holdDays, holdPolicy.defaultDays) : null;
+    const r = await releaseThenMaybeHold(it.e164, reason || "Just release", mode, days);
+    setPending(false);
+    if (!r.ok) {
+      setError(r.error);
+      if (r.step === "hold") startTransition(() => router.refresh());
+      return;
+    }
+    setConfirm(null);
+    setStatus(
+      mode === "hold"
+        ? `${formatE164(it.e164)} is on win-back hold for ${days} days.`
+        : `${formatE164(it.e164)} is Available.`,
+    );
+    startTransition(() => router.refresh());
+  }
+
   function openAssign() {
     setError("");
-    setNote(null);
     setConfirm("assign");
   }
 
   function openRelease() {
     setError("");
-    setNote(null);
     setConfirm("release");
   }
 
-  function showHonest(kind: HonestNote) {
-    setConfirm(null);
-    setError("");
-    setNote(kind);
-  }
-
   const assignBusiness = waiting.find((w) => w.id === assignTo) ?? null;
+
+  const holdChoice = (show: boolean) =>
+    show ? (
+      <fieldset className="flex flex-col gap-2 border-t border-hairline pt-ops-3" data-hold-choice="">
+        <legend className="text-ops-label font-semibold text-ink">After release</legend>
+        <label className="flex min-h-ops-touch items-start gap-2 text-ink">
+          <input
+            type="radio"
+            name="release-mode"
+            value="hold"
+            checked={releaseMode === "hold"}
+            onChange={() => setReleaseMode("hold")}
+            disabled={pending}
+            className="mt-1"
+          />
+          <span>
+            <span className="font-semibold">Hold for win-back</span>
+            <span className="mt-0.5 block text-ops-label text-ink-2">
+              Keep the number for the previous business. Callers hear that the line is unavailable. Default {holdPolicy.defaultDays} days.
+            </span>
+          </span>
+        </label>
+        {releaseMode === "hold" ? (
+          <label className="ms-6 flex max-w-[12rem] flex-col gap-1">
+            <span className="text-ops-label text-ink">Hold length (days)</span>
+            <input
+              type="number"
+              min={1}
+              max={90}
+              value={holdDays}
+              onChange={(e) => setHoldDays(clampHoldDays(Number(e.target.value), holdPolicy.defaultDays))}
+              disabled={pending}
+              data-field="hold-days"
+              className="ops-field tabular-nums text-ink"
+            />
+          </label>
+        ) : null}
+        <label className="flex min-h-ops-touch items-start gap-2 text-ink">
+          <input
+            type="radio"
+            name="release-mode"
+            value="free"
+            checked={releaseMode === "free"}
+            onChange={() => setReleaseMode("free")}
+            disabled={pending}
+            className="mt-1"
+          />
+          <span>
+            <span className="font-semibold">Free to pool</span>
+            <span className="mt-0.5 block text-ops-label text-ink-2">No win-back. Number becomes Available after the normal wait.</span>
+          </span>
+        </label>
+        {releaseMode === "hold" && fee.kes != null ? (
+          <p className="text-ops-label text-ink-2" data-reactivation-fee="">
+            Reactivation fee if they come back: {fee.label}. {fee.note}
+          </p>
+        ) : null}
+      </fieldset>
+    ) : null;
 
   const list = (
     <div className="flex min-h-0 flex-col pe-ops-4">
@@ -207,6 +353,15 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
       {status ? (
         <p className="pb-ops-2 text-ops-body text-ok" role="status" data-numbers-status="">
           {status}
+        </p>
+      ) : null}
+      {!holdPolicy.columnsPresent ? (
+        <p className="pb-ops-2 text-ops-label text-ink-2" role="status" data-hold-sql-missing="">
+          Win-back hold controls need the hold SQL on this database (#885). Release still works.
+        </p>
+      ) : !holdPolicy.enabled ? (
+        <p className="pb-ops-2 text-ops-label text-ink-2" role="status" data-hold-off="">
+          Hold and win-back is Off in Settings. New holds are not offered; running holds can still end or restore.
         </p>
       ) : null}
       {rows.length === 0 ? (
@@ -265,14 +420,6 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
 
   const footer = it ? (
     <div className="flex w-full flex-col gap-ops-2" data-numbers-actions="">
-      {note ? (
-        <p className="rounded-sm border border-hairline bg-canvas px-ops-3 py-ops-2 text-ops-label text-ink-2" role="status" data-honest-note="">
-          Secure sign-in is next. {note === "hold" ? "Hold" : "Unlock"} waits for step-up — this button does not change the number yet.{" "}
-          <button type="button" className="font-semibold text-ink underline-offset-2 hover:underline" onClick={() => setNote(null)}>
-            Dismiss
-          </button>
-        </p>
-      ) : null}
       {error && !confirm ? (
         <p className="text-ops-body text-attention" role="alert">
           {error}
@@ -285,7 +432,7 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
           </Button>
         ) : null}
         {acts.archiveRelease ? (
-          <Button type="button" variant="primary" size="sm" data-action="archive-release" onClick={() => { setError(""); setNote(null); setConfirm("archive_release"); }}>
+          <Button type="button" variant="primary" size="sm" data-action="archive-release" onClick={() => { setError(""); setConfirm("archive_release"); }}>
             Archive &amp; release
           </Button>
         ) : null}
@@ -301,15 +448,27 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
             </Button>
           </>
         ) : null}
-        <Button type="button" variant="ghost" size="sm" data-honest="hold" onClick={() => showHonest("hold")}>
-          Hold
-        </Button>
-        <span data-honest="unlock" onClick={() => setNote(null)}>
+        {holdActs.startHold ? (
+          <Button type="button" variant="primary" size="sm" data-action="start-hold" onClick={() => { setError(""); setConfirm("hold"); }}>
+            Hold for win-back
+          </Button>
+        ) : null}
+        {holdActs.endHold ? (
+          <Button type="button" variant="ghost" size="sm" data-action="end-hold" onClick={() => { setError(""); setConfirm("end_hold"); }}>
+            End hold early
+          </Button>
+        ) : null}
+        {holdActs.restore ? (
+          <Button type="button" variant="primary" size="sm" data-action="restore-hold" onClick={() => { setError(""); setConfirm("restore"); }}>
+            Restore to {it.lastBusinessName ?? "previous business"}
+          </Button>
+        ) : null}
+        <span data-honest="unlock">
           <UnlockCta
             site="numbers"
             action="numbers:write"
             target={it?.e164 ?? null}
-            what="assign, release or archive this number"
+            what="assign, release, hold or archive this number"
             label="Unlock"
             variant="ghost"
           />
@@ -333,6 +492,7 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
               ...(it.businessId ? [{ label: "Business live", value: it.businessActive === false ? "Paused" : "Yes" }] : []),
               { label: "Assigned", value: day(it.assignedAt) },
               ...(it.status === "quarantine" ? [{ label: "Held until", value: day(it.holdUntil) }] : []),
+              ...(it.winbackHold ? [{ label: "Win-back", value: "Yes — previous business only" }] : []),
               ...(it.lastBusinessName ? [{ label: "Last business", value: it.lastBusinessName }] : []),
               { label: "Added", value: day(it.createdAt) },
               ...(it.notes ? [{ label: "Notes", value: it.notes }] : []),
@@ -394,23 +554,22 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
       <OpsConfirm
         open={confirm === "release" && !!it}
         onClose={() => { if (!pending) setConfirm(null); }}
-        onConfirm={() => {
-          if (!it) return;
-          void postPool({ action: "release", e164: it.e164 });
-        }}
+        onConfirm={(reason) => { void runJustRelease(reason || "Just release"); }}
         title="Release this number?"
         strength="destructive"
-        confirmLabel="Release number"
+        requireReason={holdActs.chooseOnRelease && releaseMode === "hold"}
+        confirmLabel={holdActs.chooseOnRelease && releaseMode === "hold" ? "Release and hold" : "Release number"}
         pending={pending}
       >
         {error ? <p className="pb-2 text-attention" role="alert">{error}</p> : null}
         <p>
           {it
             ? it.businessName
-              ? `${formatE164(it.e164)} returns to Available. ${it.businessName} waits for a new number.`
-              : `${formatE164(it.e164)} returns to Available.`
+              ? `${formatE164(it.e164)} leaves ${it.businessName}.`
+              : `${formatE164(it.e164)} returns to the pool.`
             : ""}
         </p>
+        {holdChoice(holdActs.chooseOnRelease)}
       </OpsConfirm>
       <OpsConfirm
         open={confirm === "archive_release" && !!it}
@@ -419,14 +578,106 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
         title="Archive the business and release this number?"
         strength="destructive"
         requireReason
-        confirmLabel="Archive & release"
+        confirmLabel={holdActs.chooseOnRelease && releaseMode === "hold" ? "Archive, release and hold" : "Archive & release"}
         pending={pending}
       >
         {error ? <p className="pb-2 text-attention" role="alert">{error}</p> : null}
         <p>
           {it
-            ? `${it.businessName ?? "This business"} is archived: its line closes, charging stops and the owner can't sign in. You can restore it within ${ARCHIVE_RESTORE_DAYS} days. Then ${formatE164(it.e164)} returns to Available.`
+            ? `${it.businessName ?? "This business"} is archived: its line closes, charging stops and the owner can't sign in. You can restore it within ${ARCHIVE_RESTORE_DAYS} days.`
             : ""}
+        </p>
+        {holdChoice(holdActs.chooseOnRelease)}
+      </OpsConfirm>
+
+      <OpsConfirm
+        open={confirm === "hold" && !!it}
+        onClose={() => { if (!pending) setConfirm(null); }}
+        onConfirm={(reason) => {
+          if (!it) return;
+          void postHold(
+            { action: "hold", e164: it.e164, days: clampHoldDays(holdDays, holdPolicy.defaultDays), reason },
+            `${formatE164(it.e164)} is on win-back hold for ${clampHoldDays(holdDays, holdPolicy.defaultDays)} days.`,
+          );
+        }}
+        title="Hold this number for win-back?"
+        strength="money"
+        requireReason
+        confirmLabel="Hold for win-back"
+        pending={pending}
+        amount={fee.kes ?? undefined}
+      >
+        {error ? <p className="pb-2 text-attention" role="alert">{error}</p> : null}
+        <p>
+          {it
+            ? `${formatE164(it.e164)} stays for ${it.lastBusinessName ?? "the previous business"}. Callers hear that the line is unavailable until the hold ends.`
+            : ""}
+        </p>
+        <label className="flex max-w-[12rem] flex-col gap-1">
+          <span className="text-ops-label text-ink">Hold length (days)</span>
+          <input
+            type="number"
+            min={1}
+            max={90}
+            value={holdDays}
+            onChange={(e) => setHoldDays(clampHoldDays(Number(e.target.value), holdPolicy.defaultDays))}
+            disabled={pending}
+            data-field="hold-days"
+            className="ops-field tabular-nums text-ink"
+          />
+        </label>
+        <p className="text-ops-label text-ink-2" data-reactivation-fee="">
+          {fee.label}. {fee.note}
+        </p>
+      </OpsConfirm>
+
+      <OpsConfirm
+        open={confirm === "end_hold" && !!it}
+        onClose={() => { if (!pending) setConfirm(null); }}
+        onConfirm={(reason) => {
+          if (!it) return;
+          void postHold({ action: "end_hold", e164: it.e164, reason }, `${formatE164(it.e164)} is Available.`);
+        }}
+        title="End this hold early?"
+        strength="destructive"
+        requireReason
+        confirmLabel="End hold"
+        pending={pending}
+      >
+        {error ? <p className="pb-2 text-attention" role="alert">{error}</p> : null}
+        <p>
+          {it
+            ? `${formatE164(it.e164)} becomes Available now. ${it.lastBusinessName ?? "The previous business"} can no longer reclaim it on this hold.`
+            : ""}
+        </p>
+      </OpsConfirm>
+
+      <OpsConfirm
+        open={confirm === "restore" && !!it}
+        onClose={() => { if (!pending) setConfirm(null); }}
+        onConfirm={(reason) => {
+          if (!it?.lastBusinessId) return;
+          void postHold(
+            { action: "restore", e164: it.e164, tenant_id: it.lastBusinessId, reason },
+            `${formatE164(it.e164)} restored to ${it.lastBusinessName ?? "the previous business"}.`,
+          );
+        }}
+        title="Restore this number to the previous business?"
+        strength={fee.kes != null ? "money" : "light"}
+        requireReason
+        confirmLabel="Restore number"
+        pending={pending}
+        amount={fee.kes ?? undefined}
+      >
+        {error ? <p className="pb-2 text-attention" role="alert">{error}</p> : null}
+        <p>
+          {it
+            ? `${formatE164(it.e164)} goes back to ${it.lastBusinessName ?? "the previous business"}. That business must already be active on a package.`
+            : ""}
+        </p>
+        <p className="text-ops-label text-ink-2" data-reactivation-fee="">
+          {fee.kes != null ? `Reactivation fee on the package invoice: ${feeLabel(fee.kes)}. ` : ""}
+          {fee.note}
         </p>
       </OpsConfirm>
     </div>

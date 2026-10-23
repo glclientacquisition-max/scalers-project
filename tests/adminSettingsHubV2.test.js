@@ -37,21 +37,25 @@ test("columns missing: Not on this environment; never invent values or placehold
   }
 });
 
-test("hub UI: no switches/toggles; one Unlock CTA; Services/Voices/Audit are text links", () => {
+test("hub UI: Unlock reveals edit form; Services/Voices/Audit are text links; no fake success", () => {
   const ui = read("dashboard/src/components/admin/v2/AdminSettingsHubV2.tsx");
   assert.match(ui, /UnlockCta/);
   assert.match(read("dashboard/src/components/ops/UnlockCta.tsx"), /Unlock to edit/);
   assert.match(ui, /View only · unlock to change/);
   assert.match(ui, /data-number-hold/);
-  assert.doesNotMatch(ui, /type="checkbox"|role="switch"|Coming soon|billingSwitches/);
-  assert.doesNotMatch(ui, /<input|<select|role="slider"/);
+  assert.match(ui, /data-hold-edit/);
+  assert.match(ui, /data-field="hold-enabled"/);
+  assert.match(ui, /data-field="reactivation-fee"/);
+  assert.match(ui, /\/api\/admin\/number-hold/);
+  assert.match(ui, /action: "set_settings"/);
+  assert.match(ui, /OpsConfirm/);
+  assert.doesNotMatch(ui, /Coming soon|billingSwitches/);
   assert.match(ui, /\/admin\/settings\/services/);
   assert.match(ui, /\/admin\/settings\/voices/);
   assert.match(ui, /\/admin\/settings\/audit/);
-  assert.match(ui, /UnlockCta|StepUpSheet/);
-  assert.match(ui, /site="settings"/);
   assert.match(ui, /Also in Settings/);
   assert.match(ui, /How it works/);
+  assert.match(ui, /reactivationFeeSurface|feeSurface\.note/);
 });
 
 test("loader asks for the hold columns and flags when they are missing", () => {

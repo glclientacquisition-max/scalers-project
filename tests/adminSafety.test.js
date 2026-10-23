@@ -302,15 +302,15 @@ describe("A0: operator-only writes + step-up observe (s21)", () => {
     }
   });
 
-  it("Numbers v2 Unlock and Hold do not fetch; Assign/Release use OpsConfirm", () => {
+  it("Numbers v2 Unlock is honest; Assign/Release/Hold use OpsConfirm + number-hold API", () => {
     const ui = read(`${DASH}/components/admin/v2/AdminNumbersV2.tsx`);
     assert.match(ui, /OpsConfirm/);
     assert.match(ui, /data-honest="unlock"|UnlockCta/);
-    assert.match(ui, /data-honest="hold"/);
-    assert.match(ui, /Secure sign-in is next|UnlockCta/);
+    assert.match(ui, /\/api\/admin\/number-hold/);
+    assert.match(ui, /data-hold-choice/);
     assert.match(ui, /confirmLabel="Assign number"/);
-    assert.match(ui, /confirmLabel="Release number"/);
-    assert.match(ui, /showHonest\("hold"\)/);
+    assert.match(ui, /Release number|Release and hold/);
     assert.match(ui, /UnlockCta/);
+    assert.doesNotMatch(ui, /showHonest\(/);
   });
 });
