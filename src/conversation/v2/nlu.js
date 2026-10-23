@@ -2,7 +2,6 @@
 // Deterministic caller-turn understanding for BA v2. Produces intent hints and
 // normalised slot candidates; the state machine decides what to do with them.
 const FS = require('../../knowledge/factStore');
-const { aliasService } = require('./serviceAliases');
 const L = require('./lexicon');
 const { listedAreaIds } = require('../listedAreas');
 
@@ -142,9 +141,6 @@ const SYN = { fridge: 'refrigerator', friji: 'refrigerator', viti: 'sofa', kiti:
 const WEAK = new Set(['deep', 'office', 'commercial', 'large', 'small', 'medium']);
 function tokens(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9- ]/g, ' ').split(/\s+/).filter(Boolean).map((w) => (SYN[w] || w).replace(/s$/, '')); }
 function matchService(text, catalog = []) {
-  // S1: category colloquialisms ("after building work") before token overlap
-  const aliased = aliasService(text, catalog);
-  if (aliased) return aliased;
   const tt = new Set(tokens(text));
   let best = null;
   for (const s of catalog) {
@@ -176,14 +172,6 @@ function bindService(text, facts) {
   // not one unclear one: keep the old first-row reading (the machine splits the intents)
   if (max >= 0.5 && topC.length > 1 && new Set(topC.map((x) => x.heard)).size > 1) { const f = topC[0].s; return { service: { ...f.row, name: f.row.name || f.name, factId: f.id }, choice: null }; }
   let C = max >= 0.5 ? topC.map((x) => x.s) : (cv ? svcs.filter((s) => s.variant && s.variant.kind === cv.kind) : []);
-  // S1: FACT_STORE path — same colloquialisms as matchService when family tokens miss
-  if (!C.length || max < 0.5) {
-    const aliased = aliasService(text, svcs.map((s) => ({ name: s.row?.name || s.name })));
-    if (aliased) {
-      const f = svcs.find((s) => (s.row?.name || s.name) === aliased.name);
-      if (f) return { service: { ...f.row, name: f.row.name || f.name, factId: f.id }, choice: null };
-    }
-  }
   if (!C.length) return { service: null, choice: null };
   const svcOf = (f) => ({ ...f.row, name: f.row.name || f.name, factId: f.id });
   if (cv) {
@@ -388,7 +376,7 @@ function understand(text, { profile = {}, now, expecting = null, topic = null, p
   if (intents.includes('explain') && intents.includes('book') && !/\b(book|booking|ku-?book|kubook|schedule|appointment|niwekee|weka booking|tuweke|tuieke)\b/i.test(t)) intents.splice(intents.indexOf('book'), 1);
   let followup = false;
   if (topic === 'services' && TOPIC_FOLLOWUP.test(t) && !intents.some((i) => ['book', 'cancel', 'change', 'price', 'hours', 'coverage', 'recall'].includes(i))) {
-    // S1: prefer already-bound service (FACT_STORE or catalog); else matchService (aliases)
+    // Prefer already-bound service; else matchService (token overlap). R7a seeds from model when unbound.
     const svc = service || matchService(G ? norm : t, profile.servicesCatalog || []);
     if (svc && !service) service = svc;
     for (const i of ['want_know', 'bot_q']) { const k = intents.indexOf(i); if (k >= 0) intents.splice(k, 1); }
@@ -447,4 +435,4 @@ function understand(text, { profile = {}, now, expecting = null, topic = null, p
   base.kind = sc.kind; base.confidence = sc.confidence; base.clear = sc.clear; base.reason = sc.reason;
   return base;
 }
-module.exports = { normaliseAsr, scoreTurn, gapsOn, areaAmbiguity, nonAnswer, cutOff, splitLandmark, extractLandmark, matchArea, understand, detectIntents, cancelAskIsPolicy, extractName, extractPlace, matchService, matchProducts, bindService, factProducts, aliasService, YES, NO };
+module.exports = { normaliseAsr, scoreTurn, gapsOn, areaAmbiguity, nonAnswer, cutOff, splitLandmark, extractLandmark, matchArea, understand, detectIntents, cancelAskIsPolicy, extractName, extractPlace, matchService, matchProducts, bindService, factProducts, YES, NO };
