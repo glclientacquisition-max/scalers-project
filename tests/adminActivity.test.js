@@ -54,6 +54,7 @@ describe("Activity: every admin write is recorded", () => {
     let branches = 0;
     for (const { rel, src } of writeRoutes()) {
       if (rel.endsWith("/session/route.ts")) continue; // sign in and out, not an admin change
+      if (rel.endsWith("/step-up/route.ts")) continue; // s23 observe-only step-up; writes no domain state
       const post = src.slice(src.indexOf("export async function POST"));
       const parts = post.split(/(?=if \(action === ")/);
       const scoped = parts.length > 1 ? parts.slice(1) : [post];
