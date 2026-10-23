@@ -1,4 +1,4 @@
-import { SkelHeadline, SkelKpi, SkelSplit, type SkelCol } from "@/components/ops";
+import { OpsSkeleton, SkelHeadline, SkelKpi, SkelSplit, SkelTable, type SkelCol } from "@/components/ops";
 import "@/styles/ops.css";
 
 const BIZ: SkelCol[] = [{ w: "w-[28%]" }, { w: "w-[16%]" }, { w: "w-[18%]" }, { w: "w-[18%]" }, { w: "w-[20%]", end: true }];
@@ -7,7 +7,7 @@ const QUAL: SkelCol[] = [{ w: "w-[28%]" }, { w: "w-[12%]" }, { w: "w-[16%]" }, {
 const INV: SkelCol[] = [{ w: "w-[18%]" }, { w: "w-[22%]" }, { w: "w-[14%]" }, { w: "w-[14%]", end: true }, { w: "w-[14%]", end: true }, { w: "w-[18%]" }];
 const PKG: SkelCol[] = [{ w: "w-[28%]" }, { w: "w-[18%]" }, { w: "w-[18%]", end: true }, { w: "w-[18%]", end: true }, { w: "w-[18%]" }];
 
-/** Ops-shaped route loaders (ADMIN_V2). No SkeletonList. */
+/** Ops-shaped route loaders (ADMIN_V2). No SkeletonList / ui Skeleton. MASTER canvas + ops-* density. */
 export function OpsLoadingBusinesses() {
   return <SkelSplit cols={BIZ} rows={12} />;
 }
@@ -61,6 +61,7 @@ export function OpsLoadingPayments() {
 export function OpsLoadingSettings() {
   return <OpsLoadingPayments />;
 }
+/** Overview / console root — Attention band + list density. */
 export function OpsLoadingConsole() {
   return (
     <div className="ops-theme flex flex-col gap-ops-4 pe-ops-4" aria-busy="true">
@@ -68,4 +69,65 @@ export function OpsLoadingConsole() {
       <SkelSplit cols={BIZ} rows={10} />
     </div>
   );
+}
+/** Business detail (old shell) or pane-open flash — list + pane. */
+export function OpsLoadingBusinessDetail() {
+  return <SkelSplit cols={BIZ} rows={10} />;
+}
+/** Invoice detail — headline, money line, event rows. */
+export function OpsLoadingInvoiceDetail() {
+  return (
+    <div className="ops-theme flex flex-col gap-ops-4 pe-ops-4" aria-busy="true" aria-label="Loading invoice">
+      <SkelHeadline />
+      <div className="flex flex-col gap-ops-2 border-b border-hairline pb-ops-3" aria-hidden="true">
+        <OpsSkeleton className="h-3 w-40" />
+        <OpsSkeleton className="h-5 w-24" />
+        <OpsSkeleton className="h-4 w-64 max-w-full" />
+      </div>
+      {Array.from({ length: 3 }, (_, s) => (
+        <section key={s} className="flex flex-col gap-ops-2" aria-hidden="true">
+          <OpsSkeleton className="h-2.5 w-28" />
+          {Array.from({ length: 4 }, (_, r) => (
+            <div key={r} className="grid h-ops-row grid-cols-[1fr_7rem] items-center gap-ops-3 border-b border-hairline last:border-b-0">
+              <OpsSkeleton className="h-3 w-3/5" />
+              <OpsSkeleton className="ms-auto h-3 w-16" />
+            </div>
+          ))}
+        </section>
+      ))}
+    </div>
+  );
+}
+/** Quality business drill-in — title + call table. */
+export function OpsLoadingQualityDetail() {
+  return (
+    <div className="ops-theme flex flex-col gap-ops-4 pe-ops-4" aria-busy="true" aria-label="Loading quality">
+      <div className="flex flex-col gap-ops-2 pb-ops-2" aria-hidden="true">
+        <OpsSkeleton className="h-6 w-48" />
+        <OpsSkeleton className="h-7 w-24" />
+      </div>
+      <SkelTable cols={QUAL} rows={8} label="quality-detail" />
+    </div>
+  );
+}
+/** Quality call trace — title + stacked surface blocks. */
+export function OpsLoadingQualityCall() {
+  return (
+    <div className="ops-theme flex flex-col gap-ops-4 pe-ops-4" aria-busy="true" aria-label="Loading call">
+      <div className="flex flex-col gap-ops-2" aria-hidden="true">
+        <OpsSkeleton className="h-6 w-48" />
+        <OpsSkeleton className="h-7 w-16" />
+      </div>
+      {Array.from({ length: 3 }, (_, i) => (
+        <div key={i} className="overflow-hidden rounded-sm border border-hairline bg-surface p-ops-3" aria-hidden="true">
+          <OpsSkeleton className="mb-ops-2 h-3 w-28" />
+          <OpsSkeleton className="h-16 w-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+/** Platform / Services redirect flash — settings card density. */
+export function OpsLoadingPlatform() {
+  return <OpsLoadingSettings />;
 }
