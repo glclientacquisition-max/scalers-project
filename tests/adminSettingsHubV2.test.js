@@ -39,7 +39,8 @@ test("columns missing: Not on this environment; never invent values or placehold
 
 test("hub UI: no switches/toggles; one Unlock CTA; Services/Voices/Audit are text links", () => {
   const ui = read("dashboard/src/components/admin/v2/AdminSettingsHubV2.tsx");
-  assert.match(ui, /Unlock to edit/);
+  assert.match(ui, /UnlockCta/);
+  assert.match(read("dashboard/src/components/ops/UnlockCta.tsx"), /Unlock to edit/);
   assert.match(ui, /View only · unlock to change/);
   assert.match(ui, /data-number-hold/);
   assert.doesNotMatch(ui, /type="checkbox"|role="switch"|Coming soon|billingSwitches/);
@@ -47,7 +48,8 @@ test("hub UI: no switches/toggles; one Unlock CTA; Services/Voices/Audit are tex
   assert.match(ui, /\/admin\/settings\/services/);
   assert.match(ui, /\/admin\/settings\/voices/);
   assert.match(ui, /\/admin\/settings\/audit/);
-  assert.match(ui, /Secure sign-in is next/);
+  assert.match(ui, /UnlockCta|StepUpSheet/);
+  assert.match(ui, /site="settings"/);
   assert.match(ui, /Also in Settings/);
   assert.match(ui, /How it works/);
 });

@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import type { BachsStatusView } from "@/lib/adminPayCopy";
-import { PageHeader } from "@/components/ops";
-import { Button } from "@/components/ui/Button";
+import { PageHeader, UnlockCta } from "@/components/ops";
 import "@/styles/ops.css";
 
 type Row = { label: string; value: string; note?: string };
@@ -39,7 +37,6 @@ function onOff(v: boolean): string {
  * Definition rows only. Unlock opens an honest note — step-up is next.
  */
 export function AdminPaymentsV2({ status }: { status: BachsStatusView }) {
-  const [note, setNote] = useState(false);
   const flags = status.dbFlags;
   const ready = status.runtimeControlsAvailable;
   const absent = "Not on this environment";
@@ -106,19 +103,14 @@ export function AdminPaymentsV2({ status }: { status: BachsStatusView }) {
       <PageHeader
         title="Payments"
         actions={
-          <Button type="button" variant="primary" size="sm" onClick={() => setNote(true)}>
-            Unlock to edit
-          </Button>
+          <UnlockCta
+            site="payments"
+            action="payments:flags"
+            what="change payment and checkout flags"
+            observedHint="Flag edits land with the Payments remake. Observe only logged the gate."
+          />
         }
       />
-      {note ? (
-        <p className="rounded-sm border border-hairline bg-canvas px-ops-3 py-ops-2 text-ops-label text-ink-2" role="status" data-unlock-note="">
-          Secure sign-in is next. Flipping these waits for step-up — this button does not change them yet.{" "}
-          <button type="button" className="font-semibold text-ink underline-offset-2 hover:underline" onClick={() => setNote(false)}>
-            Dismiss
-          </button>
-        </p>
-      ) : null}
       <Card title="Settings" meta="View only · unlock to change" rows={settings} />
       <Card title="Checkout" meta={ready ? "runtime controls" : "not on this environment"} rows={checkout} />
       <Card title="Keys" meta="set or not — values stay in hosting" rows={keys} />

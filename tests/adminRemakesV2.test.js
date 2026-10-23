@@ -45,8 +45,8 @@ for (const r of remakes) {
     assert.doesNotMatch(ui, /ReasonedSwitch/, r.name);
     assert.match(ui, /ops-theme/, r.name);
     if (r.name !== "Audit") {
-      assert.match(ui, /Unlock to edit/, r.name);
-      assert.match(ui, /Secure sign-in is next/, r.name);
+      assert.match(ui, /UnlockCta/, r.name);
+      assert.match(read("dashboard/src/components/ops/UnlockCta.tsx"), /Unlock to edit/);
     }
     assert.match(screen, /ADMIN_V2 === "on"/, r.name);
     assert.match(screen, new RegExp(`Admin${r.name === "Audit" ? "Audit" : r.name}V2`), r.name);
