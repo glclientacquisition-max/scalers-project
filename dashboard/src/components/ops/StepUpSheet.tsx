@@ -7,7 +7,7 @@ import { Drawer } from "./Drawer";
 /**
  * Platform Unlock (s23/s24). One sheet for every sensitive Admin write.
  * Unlock proves the operator for the next write — it never changes domain state alone.
- * observe: Check access logs would-require-step-up. enforce: 501 + “Authenticator not set up yet” (#876 Q9).
+ * observe: Check access logs would-require-step-up. enforce: 501 + “Authenticator not set up yet” (issue 876 Q9).
  */
 export function StepUpSheet({
   open, onClose, action, target, what, onObserved, observedHint,
@@ -69,7 +69,7 @@ export function StepUpSheet({
         <label className="flex flex-col gap-1 border-t border-hairline pt-ops-3">
           <span className="text-ops-label font-semibold text-ink">Authenticator code</span>
           <input disabled inputMode="numeric" placeholder="6 digits — not set up yet" className="ops-field text-ink-2" data-field="code" aria-describedby="stepup-code-why" />
-          <span id="stepup-code-why" className="text-ops-label text-ink-2">Not set up yet — waiting on the authenticator decision (#876 Q9).</span>
+          <span id="stepup-code-why" className="text-ops-label text-ink-2">Not set up yet — waiting on the authenticator decision (issue 876 Q9).</span>
         </label>
         {state === "observed" ? (
           <p className="rounded-sm border border-hairline bg-canvas px-ops-3 py-ops-2 text-ops-label text-ink-2" role="status" data-stepup-result="observed">

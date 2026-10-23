@@ -148,7 +148,7 @@ export function AdminServicesV2({ snapshot }: { snapshot: Snapshot }) {
         <section aria-label="Edit services" className="rounded-sm border border-hairline bg-surface" data-unlocked-edit="services">
           <header className="border-b border-hairline px-ops-3 py-ops-2">
             <h2 className="font-semibold text-ink">Edit alerts, recordings and people</h2>
-            <p className="mt-0.5 text-ops-label text-ink-2">Same writes as the Platform form — postOps.</p>
+            <p className="mt-0.5 text-ops-label text-ink-2">Same writes as the classic ops form — postOps.</p>
           </header>
           <div className="py-ops-2">
             <AdminPlatformOpsForm settings={snapshot.settings} persisted={snapshot.persisted} />
