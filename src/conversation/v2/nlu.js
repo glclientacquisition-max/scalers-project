@@ -1,6 +1,7 @@
 'use strict';
 // Deterministic caller-turn understanding for BA v2. Produces intent hints and
 // normalised slot candidates; the state machine decides what to do with them.
+const FS = require('../../knowledge/factStore');
 const L = require('./lexicon');
 const { listedAreaIds } = require('../listedAreas');
 
@@ -150,6 +151,62 @@ function matchService(text, catalog = []) {
   }
   return best && best.score >= 0.5 ? best.s : null;
 }
+// C2 fact store (BRAIN_V2_FACT_STORE): bind from the typed store. Family words pick the rows, the
+// caller's size words (EN/SW rooms, 1BR, studio, bedsitter, seaters, small/large) pick the variant;
+// an unclear size or a tie is a choice to ask about, never the first row (A7).
+const VARIANT_WORD = new Set(['bedroom', 'bed', 'br', 'seater', 'small', 'medium', 'large', 'mini', 'xl', 'studio', 'bedsitter', 'kg', 'litre']);
+function famTokens(name) { return tokens(name).filter((w) => !GENERIC.has(w) && !VARIANT_WORD.has(w) && w.length >= 3 && !/^\d+$/.test(w)); }
+function bindService(text, facts) {
+  const svcs = facts?.services || [];
+  if (!svcs.length) return { service: null, choice: null };
+  const tt = new Set(tokens(text));
+  const cv = FS.callerVariant(text);
+  // score = family words heard; on a tie, the rows whose distinctive words were ALL heard beat rows
+  // with unheard ones ("deep cleaning": Deep Cleaning Package over Oven Internal Deep Clean)
+  const scored = svcs.map((s) => { const ft = [...new Set(famTokens(s.family))]; let score = 0; const heard = []; for (const w of ft) if (tt.has(w)) { score += WEAK.has(w) ? 0.5 : 1; heard.push(w); } return { s, score, heard: heard.sort().join(' '), cover: ft.length ? heard.length / ft.length : 0 }; });
+  const max = Math.max(0, ...scored.map((x) => x.score));
+  const top = scored.filter((x) => x.score === max);
+  const best = Math.max(0, ...top.map((x) => x.cover));
+  const topC = top.filter((x) => x.cover === best);
+  // two services each named by their own words ("cancel the carpet, book the sofa") is two mentions,
+  // not one unclear one: keep the old first-row reading (the machine splits the intents)
+  if (max >= 0.5 && topC.length > 1 && new Set(topC.map((x) => x.heard)).size > 1) { const f = topC[0].s; return { service: { ...f.row, name: f.row.name || f.name, factId: f.id }, choice: null }; }
+  let C = max >= 0.5 ? topC.map((x) => x.s) : (cv ? svcs.filter((s) => s.variant && s.variant.kind === cv.kind) : []);
+  if (!C.length) return { service: null, choice: null };
+  const svcOf = (f) => ({ ...f.row, name: f.row.name || f.name, factId: f.id });
+  if (cv) {
+    const exact = C.filter((s) => s.variant && s.variant.kind === cv.kind && s.variant.value === cv.value);
+    if (exact.length === 1) return { service: svcOf(exact[0]), choice: null };
+    if (exact.length > 1) C = exact;
+    else if (C.length === 1) return { service: svcOf(C[0]), choice: null };
+  } else if (C.length === 1) return { service: svcOf(C[0]), choice: null };
+  if (C.length > 4) return { service: null, choice: null };
+  const fams = new Set(C.map((s) => s.family));
+  const axis = fams.size === 1 && C.every((s) => s.variant && s.variant.kind === C[0].variant.kind) ? 'size' : 'which';
+  return { service: null, choice: { kind: 'service', axis, options: C.map((s) => s.id), asked: cv } };
+}
+function qtyNear(t, start, end) {
+  if (start < 0) return null;
+  const before = t.slice(Math.max(0, start - 14), start).match(/(?:^|\s)(\d+|one|two|three|four|five|six|seven|eight|nine|ten|a|an|moja|mbili|tatu|nne|tano)\s+(?:of\s+)?(?:\w+\s+)?$/);
+  const after = t.slice(end, end + 14).match(/^\s+(moja|mbili|tatu|nne|tano|sita|\d+)\b/);
+  return before ? L.toNum(before[1]) : after ? L.toNum(after[1]) : null;
+}
+// Items from the store: whole normalized tokens only; an ambiguous mention ("protractor" with two
+// protractor rows) is a choice to ask about.
+function factProducts(text, facts) {
+  const t = String(text || '').toLowerCase();
+  const brands = (t.match(BRANDS) || []).map((b) => b.toLowerCase());
+  const { found, ambiguous } = FS.matchItems(text, facts);
+  const products = found.filter(({ fact }) => !brands.some((b) => !fact.name.toLowerCase().includes(b))).map(({ fact, heard }) => {
+    const want = new Set(heard.split(' '));
+    const spans = []; const wre = /[a-z0-9]+/g; let wm; // caller words whose normalized form is a heard token ("diaries" -> diary)
+    while ((wm = wre.exec(t))) if (FS.normTokens(wm[0]).some((x) => want.has(x))) spans.push([wm.index, wm.index + wm[0].length]);
+    const start = spans.length ? Math.min(...spans.map((x) => x[0])) : -1; const end = spans.length ? Math.max(...spans.map((x) => x[1])) : -1;
+    return { product_id: fact.id, name: fact.name, qty: qtyNear(t, start, end), in_stock: fact.row.in_stock, price: fact.row.price };
+  });
+  const amb = ambiguous[0];
+  return { products, choice: amb ? { kind: 'item', axis: 'which', options: amb.options.map((p) => p.id) } : null };
+}
 const BRANDS = /\b(canon|hp|epson|samsung|lenovo|dell|brother|kyocera|xerox|ricoh)\b/gi;
 function matchProducts(text, catalog = []) {
   const t = String(text || '').toLowerCase();
@@ -297,7 +354,10 @@ function understand(text, { profile = {}, now, expecting = null, topic = null, p
   const intents = detectIntents(t);
   if (G && norm !== t) for (const i of detectIntents(norm)) if (!intents.includes(i)) intents.push(i);
   const catalog = profile.servicesCatalog || [];
-  let service = matchService(G ? norm : t, catalog);
+  const FSON = FS.factStoreEnabled();
+  const facts = FSON ? FS.factsFor(profile) : null;
+  const bound = FSON ? bindService(G ? norm : t, facts) : null;
+  let service = FSON ? bound.service : matchService(G ? norm : t, catalog);
   let serviceCandidates = [];
   let rule = null;
   if (G) {
@@ -344,6 +404,7 @@ function understand(text, { profile = {}, now, expecting = null, topic = null, p
     // §6c a bare capitalised name at the opening or when a name is pending is the caller's name
     if (!rule && !name && !intents.length && (opening || expecting === 'name')) { const bn = bareName(t, profile); if (bn) { name = bn; rule = { kind: 'give_name', confidence: 0.6, reason: opening ? 'bare_name_opening' : 'bare_name_pending' }; } }
   }
+  const itemsFs = FSON ? factProducts(t, facts) : null;
   const base = {
     text: t,
     intents,
@@ -357,7 +418,7 @@ function understand(text, { profile = {}, now, expecting = null, topic = null, p
     landmark: extractLandmark(t),
     when: when0 || (expecting === 'time' && /^\W*(?:uh|um|ah|eh)?\W*(\d{1,2})\b/i.test(t) ? bareHour(t) : null),
     service,
-    products: matchProducts(t, profile.productCatalog || []),
+    products: FSON ? itemsFs.products : matchProducts(t, profile.productCatalog || []),
     quantity: extractQuantity(t),
     area: matchArea(t, profile),
     ack: ACK.test(t),
@@ -366,9 +427,10 @@ function understand(text, { profile = {}, now, expecting = null, topic = null, p
     followup,
     _yes: isYes,
   };
+  if (FSON) { const ch = (!service && bound.choice) || (!base.products.length && itemsFs.choice) || null; if (ch) base.choice = ch; }
   if (G) { base.serviceCandidates = serviceCandidates; base.normText = norm; if (!base.name && !rule && !intents.length) { const bn = bareName(t, profile); if (bn) base.nameCandidate = bn; } }
   const sc = scoreTurn(base, { rule, topic });
   base.kind = sc.kind; base.confidence = sc.confidence; base.clear = sc.clear; base.reason = sc.reason;
   return base;
 }
-module.exports = { normaliseAsr, scoreTurn, gapsOn, areaAmbiguity, nonAnswer, cutOff, splitLandmark, extractLandmark, matchArea, understand, detectIntents, cancelAskIsPolicy, extractName, extractPlace, matchService, matchProducts, YES, NO };
+module.exports = { normaliseAsr, scoreTurn, gapsOn, areaAmbiguity, nonAnswer, cutOff, splitLandmark, extractLandmark, matchArea, understand, detectIntents, cancelAskIsPolicy, extractName, extractPlace, matchService, matchProducts, bindService, factProducts, YES, NO };
