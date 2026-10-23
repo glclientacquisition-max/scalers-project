@@ -17,7 +17,7 @@ export default async function DevAdminSettingsV2Page({ searchParams }: { searchP
     <AdminShell operatorName="alvin" v2>
       <AdminSectionTabs label="Settings" tabs={ADMIN_SETTINGS_TABS} />
       <AdminSettingsHubV2
-        raw={{ voicemail_hold_days: 7, shadow_invoices: true, billing_notices_send: false, desk_plan_change_enabled: true, new_signup_trial_enabled: true, package_editor_enabled: false, price_change_approval_threshold_kes: 5000, updated_at: "2026-10-18T07:30:00.000Z", hold_winback_enabled: true, number_hold_days: 14, reactivation_fee_kes: null, holdColumns: sp.env !== "prod" }}
+        raw={{ updated_at: "2026-10-18T07:30:00.000Z", hold_winback_enabled: true, number_hold_days: 14, reactivation_fee_kes: null, holdColumns: sp.env !== "prod" }}
       />
     </AdminShell>
   );

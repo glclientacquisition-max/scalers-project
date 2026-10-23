@@ -84,29 +84,31 @@ export function AdminAttentionV2({
   }, [rows, sel]);
 
   const missing = view === "all" ? unavailable : unavailable.filter((k) => k === view);
+  const tabs = (
+    <div role="tablist" aria-label="Reasons" className="flex flex-wrap gap-1">
+      {ATTENTION_VIEWS.map((v) => (
+        <button
+          key={v.id}
+          role="tab"
+          type="button"
+          aria-selected={view === v.id}
+          onClick={() => setView(v.id)}
+          className={[
+            "inline-flex h-ops-touch items-center gap-1.5 rounded-sm px-ops-3 text-ops-body md:h-8",
+            view === v.id ? "bg-surface-2 font-semibold text-ink" : "text-ink-2 hover:bg-surface-2",
+          ].join(" ")}
+        >
+          {v.label}
+          <span className="tabular-nums text-ink-2">{counts[v.id]}</span>
+        </button>
+      ))}
+    </div>
+  );
   const list = (
     <div className="flex min-h-0 flex-col pe-ops-4">
-      <PageHeader title="Needs attention" count={items.length} />
-      <div role="tablist" aria-label="Reasons" className="flex flex-wrap gap-1 pb-ops-3">
-        {ATTENTION_VIEWS.map((v) => (
-          <button
-            key={v.id}
-            role="tab"
-            type="button"
-            aria-selected={view === v.id}
-            onClick={() => setView(v.id)}
-            className={[
-              "inline-flex h-ops-touch items-center gap-1.5 rounded-sm px-ops-3 text-ops-body md:h-8",
-              view === v.id ? "bg-surface-2 font-semibold text-ink" : "text-ink-2 hover:bg-surface-2",
-            ].join(" ")}
-          >
-            {v.label}
-            <span className="tabular-nums text-ink-2">{counts[v.id]}</span>
-          </button>
-        ))}
-      </div>
+      <PageHeader title="Needs attention" count={items.length} actions={tabs} />
       {missing.length ? (
-        <p className="pb-ops-3 text-ops-label text-ink-2" data-unavailable="">
+        <p className="pb-ops-2 text-ops-label text-ink-2" data-unavailable="">
           Could not check {missing.map((k) => KIND_LABEL[k].toLowerCase()).join(" or ")} right now. Those rows may be missing.
         </p>
       ) : null}
