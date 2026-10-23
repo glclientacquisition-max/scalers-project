@@ -107,6 +107,9 @@ const { createVoiceTrace } = require('./src/speech/voiceTrace');
 const { brainV2ShadowEnabled, createBrainV2Shadow } = require('./src/conversation/v2Shadow');
 const { brainV2Enabled, brainV2Mode } = require('./src/conversation/v2/flag');
 const { createBrainV2Live } = require('./src/conversation/v2/liveTurn');
+// BRAIN_V2_OWNS_CALL (plan C3, default off): v2 is the only owner of a live-mode call.
+const v2OwnsCall = require('./src/conversation/v2/ownsCall');
+const ownedV2Calls = v2OwnsCall.createOwnedCalls();
 const ackRule = require('./src/speech/ackRule');
 const toolSmooth = require('./src/speech/toolSmooth');
 /** VOICE_TOOL_SMOOTH: per-connection heard-audio clock. Empty when the flags are off. */
@@ -1507,6 +1510,8 @@ async function noteOwnerSummaryCallEnd(callSid, status) {
 
 const markCallTerminal = createCallFinalizer({
   db,
+  // BRAIN_V2_OWNS_CALL: v2's machine.finishCall, once per call, on the first terminal event.
+  onTerminal: ({ callSid, provisional, source }) => finishOwnedV2Call(callSid, { provisional, source }),
   endedCalls,
   persistCallResolution: async (...args) => {
     if (args[2]?.writeResolution !== false) await noteOwnerSummaryCallEnd(args[0], args[2]?.callStatus);
@@ -1517,6 +1522,39 @@ const markCallTerminal = createCallFinalizer({
   finalizeOnceEnabled,
   finalizeDecision,
 });
+
+const OWNED_V2_FINISH_GRACE_MS = 90000;
+const ownedV2FinishTimers = new Map();
+/** BRAIN_V2_OWNS_CALL: machine.finishCall once per call, at hangup. A provisional
+ *  close (media dropped, the call may resume) waits out the reconnect window. */
+function finishOwnedV2Call(callSid, { provisional = false, source = 'hangup' } = {}) {
+  if (!callSid || !v2OwnsCall.ownsCallEnabled() || !ownedV2Calls.getLive(callSid)) return null;
+  if (provisional) {
+    if (!ownedV2FinishTimers.has(callSid)) {
+      const t = setTimeout(() => {
+        ownedV2FinishTimers.delete(callSid);
+        finishOwnedV2Call(callSid, { source: `${source}/grace` });
+      }, OWNED_V2_FINISH_GRACE_MS);
+      if (typeof t.unref === 'function') t.unref();
+      ownedV2FinishTimers.set(callSid, t);
+    }
+    return null;
+  }
+  const timer = ownedV2FinishTimers.get(callSid);
+  if (timer) {
+    clearTimeout(timer);
+    ownedV2FinishTimers.delete(callSid);
+  }
+  const fin = ownedV2Calls.finish(callSid, ownedV2Calls.meta(callSid));
+  if (fin && fin.once) {
+    console.log(`[${source}] brain_v2 finishCall ${callSid} outcome=${fin.outcome} receipts=${fin.writeReceipts.length}`);
+    const patch = v2OwnsCall.summaryPatch(fin);
+    Promise.resolve()
+      .then(() => db.mergeCallSummaryMeta({ callSid, patch }))
+      .catch((err) => console.warn(`[${source}] brain_v2 summary patch failed:`, err?.message || err));
+  }
+  return fin;
+}
 
 async function markCallTerminalFromWebhook(args) {
   return markCallTerminal(args);
@@ -4050,6 +4088,14 @@ mediaWss.on('connection', (ws, req) => {
       });
     let flushed = labelTurn(clean);
     if (!clean) return;
+    // BRAIN_V2_OWNS_CALL: once v2 has ended the call (goodbye spoken, end honoured),
+    // no v1 path (reinvite, skip, local, Gemini) may open another turn.
+    // A media session that reconnects to a call v2 already ended asks for the same single hangup.
+    if (v2OwnsCall.ownsCallEnabled() && ownedV2Calls.ended(sidLabel())) {
+      console.log(`[ws/media][${sidLabel()}] brain_v2_owned: turn after end dropped: ${clean.slice(0, 80)}`);
+      if (!callEnding) requestEndCall('v2_already_ended', ownedV2Calls.ended(sidLabel()).reason);
+      return;
+    }
     idleNudge.clear();
     if (turnBusy) {
       // Merge continuation fragments into one pending utterance (don't drop context).
@@ -4431,7 +4477,74 @@ mediaWss.on('connection', (ws, req) => {
         return folded;
       }
       const slotsBeforeReply = slotRows(brainState);
-      if (brainV2Enabled({ tenantId: brainProfile?.id }) && brainV2Mode() === 'live') {
+      const v2Live = brainV2Enabled({ tenantId: brainProfile?.id }) && brainV2Mode() === 'live';
+      const v2Owns = v2Live && v2OwnsCall.ownsCallEnabled();
+      if (v2Owns) {
+        // BRAIN_V2_OWNS_CALL: v2 is the only owner of this turn. Its line (or the v2 repair
+        // template on an error) is spoken as is, past the v1 caller-file gate, and no v1
+        // local, lookup or Gemini path runs after it.
+        if (ownedV2Calls.ended(callKey)) {
+          console.log(`[ws/media][${callKey}] brain_v2_owned: call already ended by v2; no new turn`);
+          requestEndCall('v2_already_ended', ownedV2Calls.ended(callKey).reason);
+          return;
+        }
+        const makeLive = () => {
+          const mem = brainProfile?.callerMemory || {};
+          return createBrainV2Live({
+            applyTools: (parsed) => applyGeminiTools(callKey, parsed, { v2Owned: true }),
+            callSid: callKey,
+            recordWriteReceipt: typeof db.recordWriteReceipt === 'function' ? db.recordWriteReceipt : undefined,
+            confirmCallerName: typeof db.confirmCallerName === 'function' ? db.confirmCallerName : undefined,
+            callerFile: {
+              callerPhone: brainState?.caller?.phone || mem.phone || null,
+              contactName: mem.fileOwnerName || mem.name || brainState?.caller?.name || null,
+              openRows: Array.isArray(mem.openRows) ? mem.openRows : [],
+            },
+          });
+        };
+        // One runner per call sid: a reconnecting media session keeps the same v2 state.
+        brainV2Live = ownedV2Calls.live(callKey, makeLive, {
+          businessName: brainProfile?.businessName || businessName || '',
+          callerPhone: brainState?.caller?.phone || brainProfile?.callerMemory?.phone || null,
+          profile: brainProfile,
+        });
+        const live = await v2OwnsCall.runOwnedTurn(
+          brainV2Live,
+          {
+            text: clean,
+            profile: brainProfile,
+            langLock: callLanguage === 'en' || callLanguage === 'sw' ? callLanguage : null,
+            shouldAbort: () => bargeInActive === true,
+          },
+          { log: (m) => console.log(`[ws/media][${callKey}] ${m}`) }
+        );
+        console.log(`[ws/media][${callKey}] brain_v2_live owned lang=${live.lang}${live.endHeld ? ` end_held=${live.endHeld}` : ''}: ${live.line}`);
+        callTranscript.pushAgent(live.line);
+        if (turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') {
+          turnTiming.markFirstSpokenChunk();
+        }
+        const spoken = await speakText(live.line, {
+          tracePath: live.repaired ? 'brain_v2_repair' : 'brain_v2_live',
+          skipFileGate: true,
+        });
+        if (spoken?.ok !== false) {
+          spokeThisTurn = true;
+          messages.push({ role: 'assistant', content: live.line, local: true });
+          const v2End = endSignalFromBrain(live);
+          if (v2End.end) {
+            if (requestEndCall(v2End.source, v2End.reason)) {
+              ownedV2Calls.markEnded(callKey, v2End.reason);
+              console.log(`[ws/media][${callKey}] end-call signal source=${v2End.source}: hangup after audio`);
+            } else {
+              console.log(`[ws/media][${callKey}] brain_v2_owned: end not honoured (VOICE_END_CALL_HONOUR off); call stays open on v2`);
+            }
+          }
+        } else {
+          console.log(`[ws/media][${callKey}] brain_v2_owned: line not played (${spoken?.arbiter || (spoken?.gated ? 'gated' : spoken?.outage ? 'outage' : 'speak_failed')}); no v1 fallback`);
+        }
+        return;
+      }
+      if (v2Live) {
         try {
           if (!brainV2Live) {
             const mem = brainProfile?.callerMemory || {};
@@ -7996,7 +8109,7 @@ async function spokenFromLookupTool(callSid, calls, modelAlreadySpoke) {
 /**
  * Apply parsed tool markers (save_caller_info / escalate / create_service_request).
  */
-async function applyGeminiTools(callSid, parsed) {
+async function applyGeminiTools(callSid, parsed, toolOpts = {}) {
   const tools = callAgentTools.get(callSid) || parseAgentTools(null);
   const capabilities =
     callBrainCapabilities.get(callSid) ||
@@ -8006,15 +8119,20 @@ async function applyGeminiTools(callSid, parsed) {
   // Tool contract: required tools first, then the guard strips what the caller
   // never consented to or never said (ack turns, invented quantity, day-only
   // visits). Gemini's own markers pass through the same gate as injected ones.
-  const enforcedParsed = guardToolPlan(
-    ensureRequiredEscalate(
-      ensureRequiredCreateRequest(parsed, state, capabilities),
-      state,
-      capabilities
-    ),
-    state,
-    capabilities
-  );
+  // BRAIN_V2_OWNS_CALL: a v2 write is already read back and confirmed (C1 commit
+  // safety), so it goes to the executor as is: no ensureRequired*, no guardToolPlan.
+  const enforcedParsed =
+    toolOpts.v2Owned === true
+      ? parsed
+      : guardToolPlan(
+          ensureRequiredEscalate(
+            ensureRequiredCreateRequest(parsed, state, capabilities),
+            state,
+            capabilities
+          ),
+          state,
+          capabilities
+        );
   if (enforcedParsed.consentBlocked || enforcedParsed.needsVisitTime || enforcedParsed.fragmentBlocked) {
     console.log(
       `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : enforcedParsed.fragmentBlocked ? 'fragment_turn' : 'needs_visit_time'}`
@@ -8061,7 +8179,9 @@ async function applyGeminiTools(callSid, parsed) {
     fieldMeta: groundedProfile.fieldMeta || null,
     handlers: {
       createServiceRequest: async (request) => {
-        if (owedConfirmFoldEnabled()) {
+        // BRAIN_V2_OWNS_CALL: the v1 old-path request de-dupe (type + item, quantity ignored) never
+        // swallows a v2 write; C1's idempotency key is the de-dupe there.
+        if (owedConfirmFoldEnabled() && toolOpts.v2Owned !== true) {
           const dup = findDuplicateServiceRequest(state, request);
           if (dup) {
             console.log(

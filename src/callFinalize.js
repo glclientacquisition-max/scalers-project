@@ -20,6 +20,7 @@ function createCallFinalizer(deps) {
     maybeSendMissedTextback,
     finalizeOnceEnabled,
     finalizeDecision,
+    onTerminal = null,
     log = console,
   } = deps;
 
@@ -41,6 +42,15 @@ function createCallFinalizer(deps) {
     if (!callSid) {
       log.warn(`[${source}] termination detected but no callSid — skipping DB update`);
       return null;
+    }
+    // Optional hook for every terminal event (BRAIN_V2_OWNS_CALL: v2 finishCall once).
+    // It never blocks or fails the finalize.
+    if (typeof onTerminal === 'function') {
+      try {
+        onTerminal({ callSid, provisional, source, status });
+      } catch (err) {
+        log.warn(`[${source}] onTerminal hook failed:`, err?.message || err);
+      }
     }
     // Claim before any await, so two closers in this process cannot both run.
     const guardOn = endedCalls.endedCallGuardEnabled();
