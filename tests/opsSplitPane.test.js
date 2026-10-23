@@ -78,6 +78,16 @@ describe("admin v2 shell", () => {
     assert.match(main, /\bpx-4\b/);
     assert.doesNotMatch(main, /max-w-/);
   });
+  it("pins Billing/Settings section tabs and fills split without 100dvh crush", () => {
+    const tabs = read("dashboard/src/components/admin/v2/AdminSectionTabs.tsx");
+    assert.match(tabs, /sticky top-0 z-10/);
+    assert.match(tabs, /\bshrink-0\b/);
+    assert.match(tabs, /\bbg-canvas\b/);
+    assert.match(pane, /ops-split[\s\S]*flex-1/);
+    assert.doesNotMatch(css, /\.ops-split \{\s*height: calc\(100dvh - 72px\)/);
+    assert.match(css, /\.ops-split \{\s*flex: 1 1 auto;\s*min-height: 0;/);
+    assert.match(nav, /well\.scrollTop = 0/);
+  });
   it("tiles stretch 2 to 6 per row", () => {
     assert.match(rule(css, ".ops-tiles"), /repeat\(2, minmax\(0, 1fr\)\)/);
     assert.match(css, /repeat\(auto-fit, minmax\(max\(180px, calc\(\(100% - 40px\) \/ 6\)\), 1fr\)\)/);

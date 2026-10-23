@@ -9,7 +9,7 @@ export function AdminSectionTabs({ label, tabs }: { label: string; tabs: readonl
   const path = usePathname() || "";
   const current = tabs.find((t) => path === t.href || path.startsWith(`${t.href}/`));
   return (
-    <nav aria-label={label} className="ops-theme -mx-1 mb-ops-2 flex items-center gap-1 overflow-x-auto border-b border-hairline px-1">
+    <nav aria-label={label} className="ops-theme sticky top-0 z-10 -mx-1 mb-ops-2 flex shrink-0 items-center gap-1 overflow-x-auto border-b border-hairline bg-canvas px-1">
       {tabs.map((t) => {
         const on = path === t.href || path.startsWith(`${t.href}/`);
         return (

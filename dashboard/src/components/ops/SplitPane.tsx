@@ -153,7 +153,7 @@ export function SplitPane({ open, onClose, title, subtitle, footer, dismissible 
 /** List on the left (keeps 640px), pane on the right. The pair fills the row; no page max-width. */
 export function SplitLayout({ list, pane }: { list: ReactNode; pane?: ReactNode }) {
   return (
-    <div data-split-layout="" className="ops-split -me-4 flex min-h-0 w-[calc(100%+16px)] shrink-0">
+    <div data-split-layout="" className="ops-split -me-4 flex min-h-0 w-[calc(100%+16px)] flex-1">
       <div className="ops-split-list min-w-0 flex-1 overflow-auto">{list}</div>
       {pane}
     </div>
