@@ -411,6 +411,67 @@ test('R2 repeated "okay wait" never commits and never closes as saved; pending +
   assert.match(y.out.at(-1).line, /is booked/i);
 }));
 
+// R2 utterance-complete + post-wait silence gate (Alvin GO 2026-10-23) — not a okay/so/bado blacklist.
+test('R2 gate helpers: incomplete trailing is not complete; short affirm may be; no word blacklist', () => {
+  assert.equal(CS.utteranceIncomplete('Okay, so'), true);
+  assert.equal(CS.utteranceIncomplete('Okay, so.'), true);
+  assert.equal(CS.utteranceIncomplete('Okay so'), true);
+  assert.equal(CS.utteranceIncomplete('Okay, and'), true);
+  assert.equal(CS.utteranceIncomplete('Yes.'), false);
+  assert.equal(CS.utteranceIncomplete('Ndio.'), false);
+  assert.equal(CS.utteranceIncomplete('Okay.'), false);
+  // explicitYes may still see filler "so"; incompleteness is the gate (not removing so from FILLER)
+  assert.equal(CS.explicitYes('Okay, so'), true);
+  assert.equal(CS.readbackAnswer({ tool: 'create_booking', when: { date: '2026-10-16', time: '10:00' } }, { text: 'Okay, so' }).incomplete, true);
+  assert.equal(CS.readbackAnswer({ tool: 'create_booking', when: { date: '2026-10-16', time: '10:00' } }, { text: 'Okay, so' }).kind, 'unclear');
+  assert.equal(CS.postWaitConfirmReady({ afterWaitHold: true }, { text: 'Okay, so' }).ready, false);
+  assert.equal(CS.postWaitConfirmReady({ afterWaitHold: true }, { text: 'Yes.' }).ready, true);
+  assert.equal(CS.postWaitConfirmReady({ afterWaitHold: true }, { text: 'Yes.', silenceBeat: true }).reason, 'silence_beat');
+  assert.equal(CS.postWaitConfirmReady({ afterWaitHold: true }, { text: 'Yes.', silenceBeat: false }).ready, false);
+});
+
+test('R2 HD_51 path: wait then incomplete "Okay, so" never commits; pending stays', withFlag(async () => {
+  const r = await talk([BOOK_EN, 'Wait, wait.', 'Okay, so']);
+  assert.equal(r.writes.length, 0);
+  assert.ok(!r.receipts.some((x) => x.phase === 'confirmed' || x.phase === 'committed'));
+  assert.equal(r.st.phase, 'readback');
+  assert.ok(r.st.pending);
+  assert.equal(r.st.pending.afterWaitHold, true);
+  assert.doesNotMatch(r.out.map((o) => o.line).join(' | '), /booked|nimeweka|saved/i);
+  for (const o of r.out.slice(1)) assert.match(o.line, /take your time|Shall I book it|Nithibitishe/i);
+  // repeated incomplete flushes still never commit
+  const r2 = await talk([BOOK_EN, 'Wait, wait.', 'Okay, so', 'Okay so', 'Okay, and']);
+  assert.equal(r2.writes.length, 0);
+  assert.ok(!r2.receipts.some((x) => x.phase === 'confirmed' || x.phase === 'committed'));
+}));
+
+test('R2 after wait: short finished affirm + silence beat may confirm; unfinished / silenceBeat false stay pending', withFlag(async () => {
+  const ok = await talk([BOOK_EN, 'Wait, wait.', 'Yes.']);
+  assert.equal(ok.log.filter((x) => x[0] === 'appt').length, 1);
+  assert.match(ok.out.at(-1).line, /is booked/i);
+
+  // pass silenceBeat via runTurn directly
+  const H = handlers();
+  const st = V2.createState({ profile: DD, callerPhone: '+254700000001', callId: 'HD_r2silence' });
+  await V2.runTurn(st, { text: BOOK_EN, profile: DD, now: NOW, handlers: H.h });
+  await V2.runTurn(st, { text: 'Wait, wait.', profile: DD, now: NOW, handlers: H.h });
+  const blocked = await V2.runTurn(st, { text: 'Yes.', profile: DD, now: NOW, handlers: H.h, silenceBeat: false });
+  assert.equal(H.log.filter((x) => x[0] === 'appt').length, 0);
+  assert.match(blocked.line, /take your time|Shall I book it/i);
+  assert.equal(st.phase, 'readback');
+  const committed = await V2.runTurn(st, { text: 'Yes.', profile: DD, now: NOW, handlers: H.h, silenceBeat: true });
+  assert.equal(H.log.filter((x) => x[0] === 'appt').length, 1);
+  assert.match(committed.line, /is booked/i);
+
+  const H2 = handlers();
+  const st2 = V2.createState({ profile: DD, callerPhone: '+254700000001', callId: 'HD_r2unfin' });
+  await V2.runTurn(st2, { text: BOOK_EN, profile: DD, now: NOW, handlers: H2.h });
+  await V2.runTurn(st2, { text: 'Wait, wait.', profile: DD, now: NOW, handlers: H2.h });
+  const unfin = await V2.runTurn(st2, { text: 'Yes.', profile: DD, now: NOW, handlers: H2.h, unfinished: true });
+  assert.equal(H2.log.filter((x) => x[0] === 'appt').length, 0);
+  assert.match(unfin.line, /take your time|Shall I book it/i);
+}));
+
 test('R4 mid-thread: after services list, aside/unknown does not reopen want_know / How can I help', withFlag(async () => {
   const st = V2.createState({ profile: DD, callerPhone: '+254700000001', callId: 'HD_r4' });
   const H = handlers();
