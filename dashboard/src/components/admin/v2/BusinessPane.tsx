@@ -8,7 +8,10 @@ import { statusLabel } from "@/lib/adminBusinessUi";
 import { businessTone, callLength, chargingLabel, intentLabel, numberLabel } from "@/lib/ops/businessesView";
 import { ksh } from "@/lib/ops/invoicesView";
 import { BUSINESS_PANE_SECTIONS, usedShare, type BusinessPaneData, type BusinessPaneSection } from "@/lib/ops/businessPane";
-import { SplitPane, StatusPill } from "@/components/ops";
+import { OpsConfirm, SplitPane, StatusPill } from "@/components/ops";
+import { Button } from "@/components/ui/Button";
+import { ARCHIVE_RESTORE_DAYS } from "@/lib/adminBusinessModel";
+import { postJson } from "@/lib/ops/archiveRelease";
 
 const DATE = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" });
 const day = (iso: string | null | undefined) => (iso ? DATE.format(new Date(iso)) : "—");
@@ -166,8 +169,35 @@ export function BusinessPane({
     )),
   };
 
+  const [archiving, setArchiving] = useState(false);
+  const [archivePending, setArchivePending] = useState(false);
+  const [archiveError, setArchiveError] = useState("");
+  const [archived, setArchived] = useState(false);
+  async function archive(reason: string) {
+    if (!businessId) return;
+    setArchivePending(true);
+    setArchiveError("");
+    const r = await postJson("/api/admin/businesses", { action: "archive", business_id: businessId, reason });
+    setArchivePending(false);
+    if (!r.ok) { setArchiveError(r.error || "Could not archive. Nothing changed."); return; }
+    setArchiving(false);
+    setArchived(true);
+    setData((d) => { const n = { ...d }; delete n[businessId]; return n; });
+  }
+  const canArchive = Boolean(b) && !b?.archived_at && !archived;
+  const footer = b ? (
+    <div className="flex flex-col gap-2">
+      {archived ? <p className="text-ops-body text-ink-2" role="status">Archived. Restore within {ARCHIVE_RESTORE_DAYS} days.</p> : null}
+      {archiveError && !archiving ? <p className="text-ops-body text-attention" role="alert">{archiveError}</p> : null}
+      {canArchive ? (
+        <div><Button type="button" variant="ghost" size="sm" data-action="archive" onClick={() => { setArchiveError(""); setArchiving(true); }}>Archive</Button></div>
+      ) : null}
+    </div>
+  ) : undefined;
+
   return (
-    <SplitPane open={!!businessId} onClose={onClose} title={b?.business_name || (businessId ? "Business" : "")}>
+    <>
+    <SplitPane open={!!businessId} onClose={onClose} title={b?.business_name || (businessId ? "Business" : "")} footer={footer}>
       <div ref={body} data-business-pane="">
         <nav aria-label="Sections" className="sticky top-0 z-10 -mx-ops-4 -mt-ops-3 mb-ops-2 flex gap-1 overflow-x-auto border-b border-hairline bg-surface px-ops-4">
           {BUSINESS_PANE_SECTIONS.map((s) => (
@@ -192,5 +222,19 @@ export function BusinessPane({
         </div>
       </div>
     </SplitPane>
+    <OpsConfirm
+      open={archiving && !!businessId}
+      onClose={() => { if (!archivePending) setArchiving(false); }}
+      onConfirm={(reason) => { void archive(reason); }}
+      title="Archive this business?"
+      strength="destructive"
+      requireReason
+      confirmLabel="Archive business"
+      pending={archivePending}
+    >
+      {archiveError ? <p className="pb-2 text-attention" role="alert">{archiveError}</p> : null}
+      <p>{b?.business_name ?? "This business"}: the line closes, charging stops and the owner can&apos;t sign in. You can restore it within {ARCHIVE_RESTORE_DAYS} days. Its number stays assigned until you release it on Numbers.</p>
+    </OpsConfirm>
+    </>
   );
 }
