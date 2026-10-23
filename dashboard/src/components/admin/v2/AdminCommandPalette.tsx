@@ -17,11 +17,15 @@ import {
 
 /** Fixed places to jump to. Links only. */
 const GO_TO: { label: string; href: string; hint: string }[] = [
-  { label: "Today", href: "/admin", hint: "Needs attention" },
+  { label: "Overview", href: "/admin", hint: "Needs attention" },
+  { label: "Billing home", href: "/admin/billing/home", hint: "This month and who owes" },
+  { label: "Packages", href: "/admin/billing/packages", hint: "What businesses buy" },
   { label: "Businesses", href: "/admin/businesses", hint: "Waiting, live, suspended, archived" },
   { label: "Invoices", href: "/admin/billing/invoices", hint: "Overdue first" },
   { label: "Numbers", href: "/admin/numbers", hint: "Pool and assigned" },
   { label: "Quality", href: "/admin/quality", hint: "Calls going badly" },
+  { label: "Settings", href: "/admin/settings/general", hint: "Hold, fee, switches" },
+  { label: "Audit log", href: "/admin/settings/audit", hint: "Every admin change" },
 ];
 
 type Props = {

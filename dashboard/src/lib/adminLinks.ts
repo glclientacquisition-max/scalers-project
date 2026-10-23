@@ -74,6 +74,8 @@ export function adminV2Redirect(pathname: string): string | null {
   const path = pathOnly(pathname);
   if (path === "/admin/billing") return "/admin/billing/home";
   if (path === "/admin/packages" || path === "/admin/billing/catalog") return "/admin/billing/packages";
+  // Cut in v2: Ledger (and its KES credit view) folds into Billing home.
+  if (path === "/admin/wallets") return "/admin/billing/home";
   if (path === "/admin/platform") return "/admin/settings/services";
   if (path === "/admin/voices") return "/admin/settings/voices";
   if (path === "/admin/activity") return "/admin/settings/audit";
