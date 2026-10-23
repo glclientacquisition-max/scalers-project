@@ -8,6 +8,7 @@ test("s22b: destructive confirm uses solid dangerSolid, readable disabled state,
   const btn = read("dashboard/src/components/ui/Button.tsx");
   assert.match(btn, /dangerSolid:/);
   assert.match(btn, /disabled:bg-surface-2/);
+  assert.match(btn, /text-attention-on/);
   const c = read("dashboard/src/components/ops/OpsConfirm.tsx");
   assert.match(c, /"dangerSolid"/);
   assert.match(c, /data-blocked-why/);

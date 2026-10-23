@@ -83,7 +83,9 @@ export default {
         attention: {
           DEFAULT: token("attention"),
           tonal: token("attention-tonal"),
+          on: token("attention-on"),
         },
+        scrim: token("scrim"),
         warn: {
           DEFAULT: token("attention"),
           soft: token("attention-tonal"),

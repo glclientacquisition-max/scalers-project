@@ -202,12 +202,12 @@ export function DidPoolManager({
           onSelect={(key) => setFilter(key as PoolFilter)}
         />
         {error ? (
-          <p className="px-4 text-body text-attention" role="alert">
+          <p className="px-4 text-ops-body text-attention" role="alert">
             {error}
           </p>
         ) : null}
         {status ? (
-          <p className="px-4 text-body text-ok" role="status">
+          <p className="px-4 text-ops-body text-ok" role="status">
             {status}
           </p>
         ) : null}

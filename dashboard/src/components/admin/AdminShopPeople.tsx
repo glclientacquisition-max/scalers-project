@@ -60,12 +60,12 @@ export function AdminShopPeople({
         People
       </h2>
       {error ? (
-        <p className="px-4 pb-2 text-body text-attention" role="alert">
+        <p className="px-4 pb-2 text-ops-body text-attention" role="alert">
           {error}
         </p>
       ) : null}
       {status ? (
-        <p className="px-4 pb-2 text-body text-ok" role="status">
+        <p className="px-4 pb-2 text-ops-body text-ok" role="status">
           {status}
         </p>
       ) : null}
@@ -124,7 +124,7 @@ export function AdminShopPeople({
         onClose={() => setResetOpen(false)}
         onConfirm={() => void post("send_owner_reset")}
       >
-        <p className="text-body text-ink-2">
+        <p className="text-ops-body text-ink-2">
           {owner?.email
             ? `A reset link goes to ${owner.email}. They choose a new password on the owner desk.`
             : "No owner email on file."}
@@ -139,7 +139,7 @@ export function AdminShopPeople({
         title="Transfer ownership"
         theme="admin"
       >
-        <p className="pb-3 text-body text-ink-2">Pick the Admin who should own this business.</p>
+        <p className="pb-3 text-ops-body text-ink-2">Pick the Admin who should own this business.</p>
         <ul className="-mx-5 divide-y divide-hairline sm:-mx-6">
           {transferCandidates.map((member) => (
             <ListRow
