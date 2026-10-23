@@ -1,9 +1,9 @@
 'use strict';
 
-// VOICE_OPENING_V2 latency: what the greeting needs (tenant profile + caller
-// card, cached greeting PCM) starts loading when the incoming-call webhook
-// answers, keyed by callSid, before SautiKit opens /ws/media. The stream
-// take()s it; a miss (other replica, expired, failed) loads as today.
+// VOICE_OPENING_V2 latency: tenant profile + caller card start loading when
+// the incoming-call webhook answers, keyed by callSid, before SautiKit opens
+// /ws/media. Greeting PCM warms async (void) so media is not gated on Soniox
+// (D1). The stream take()s the profile; a miss loads as today.
 
 const TTL_MS = 60000;
 
@@ -57,4 +57,24 @@ function createCallPrefetch({ ttlMs = TTL_MS, now = () => Date.now(), log = cons
   };
 }
 
-module.exports = { createCallPrefetch, TTL_MS };
+/**
+ * Opening prefetch load body (D1): settle with `{ profile }` as soon as
+ * profile+card resolve; warm greeting PCM without awaiting it.
+ * `/ws/media` awaits the prefetch promise — awaiting Soniox render here
+ * serialized firstPcm ~8–14s when prefetch=inflight (HD_0be4).
+ *
+ * @param {{ loadProfile: () => Promise<object>, warmGreeting?: (profile: object) => Promise<unknown> }} opts
+ * @returns {Promise<{ profile: object }>}
+ */
+async function loadOpeningForPrefetch({ loadProfile, warmGreeting }) {
+  const profile = await loadProfile();
+  if (typeof warmGreeting === 'function') {
+    void Promise.resolve()
+      .then(() => warmGreeting(profile))
+      .catch(() => {});
+  }
+  return { profile };
+}
+
+module.exports = { createCallPrefetch, loadOpeningForPrefetch, TTL_MS };
+

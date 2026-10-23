@@ -68,7 +68,7 @@ if (recordingNoticeVariant.noticeVariants().length && !callOpening.openingV2Enab
   console.warn('[voice] VOICE_RECORDING_NOTICE_VARIANT is set but VOICE_OPENING_V2 is off; the variant is ignored');
 }
 const { createOpeningSessionStore } = require('./src/speech/openingSessionStore');
-const { createCallPrefetch } = require('./src/speech/callPrefetch');
+const { createCallPrefetch, loadOpeningForPrefetch } = require('./src/speech/callPrefetch');
 // VOICE_OPENING_V2: tenant profile + caller card loaded at the incoming-call
 // webhook, keyed by callSid, so the media stream greets from cache at once.
 const callPrefetch = createCallPrefetch();
@@ -1665,42 +1665,58 @@ function packageGateRefuses(callSid, gate) {
 
 /**
  * VOICE_OPENING_V2: start loading what the greeting needs (tenant profile,
- * caller card, cached greeting PCM) when the incoming-call webhook answers,
- * before SautiKit opens /ws/media. Off the webhook's critical path; the
- * stream takes it by callSid (ensureTenantPrompt) or loads as today on a miss.
+ * caller card) when the incoming-call webhook answers, before SautiKit opens
+ * /ws/media. Greeting PCM warms async (void) so media is not gated on Soniox
+ * (D1). Off the webhook's critical path; the stream takes it by callSid
+ * (ensureTenantPrompt) or loads as today on a miss.
  */
 function prefetchCallOpening({ callSid, tenantId, toNumber, fromNumber }) {
   const phone = String(fromNumber || '').trim();
   callPrefetch.start(callSid, async () => {
     const t0 = Date.now();
-    const profilePromise = db.getTenantProfile({ tenantId: tenantId || undefined, toNumber });
-    const cardFor = (id) =>
-      id && phone && phone.toLowerCase() !== 'unknown'
-        ? db.getCallerMemory({ tenantId: id, phone }).catch(() => null)
-        : Promise.resolve(null);
-    const [profile, early] = await Promise.all([profilePromise, cardFor(tenantId)]);
-    const card = tenantId ? early : await cardFor(profile?.id);
-    if (card) profile.callerMemory = card;
-    else delete profile.callerMemory;
-    const loadMs = Date.now() - t0;
-    // Render the exact greeting into the PCM cache if it is not there yet.
-    let warm = 'skipped';
-    try {
-      if (isGreetingCacheEnabled() && !isDefaultShopName(profile.businessName || '')) {
+    // D1: settle on profile+card only. Do not await Soniox greeting render —
+    // media awaits this promise; awaiting TTS gated firstPcm ~8–14s (prefetch=inflight).
+    return loadOpeningForPrefetch({
+      loadProfile: async () => {
+        const profilePromise = db.getTenantProfile({ tenantId: tenantId || undefined, toNumber });
+        const cardFor = (id) =>
+          id && phone && phone.toLowerCase() !== 'unknown'
+            ? db.getCallerMemory({ tenantId: id, phone }).catch(() => null)
+            : Promise.resolve(null);
+        const [profile, early] = await Promise.all([profilePromise, cardFor(tenantId)]);
+        const card = tenantId ? early : await cardFor(profile?.id);
+        if (card) profile.callerMemory = card;
+        else delete profile.callerMemory;
+        const loadMs = Date.now() - t0;
+        const willWarm =
+          isGreetingCacheEnabled() && !isDefaultShopName(profile.businessName || '');
+        console.log(
+          `[voice/incoming][${callSid}] opening_prefetch ready load_ms=${loadMs} total_ms=${Date.now() - t0} greeting_pcm=${willWarm ? 'warming' : 'skipped'}`
+        );
+        return profile;
+      },
+      warmGreeting: async (profile) => {
+        if (!isGreetingCacheEnabled() || isDefaultShopName(profile.businessName || '')) {
+          return;
+        }
         const composed = composeOpeningForProfile(profile, { callSid });
-        const r = await renderGreetingPcm({
-          text: composed.text,
-          profile,
-          tenantId: profile.id,
-          createSession: ({ voiceId }) => createSonioxTtsSession({ callSid: 'greeting-prefetch', voiceId }),
-        });
-        warm = r.rendered ? 'rendered' : 'cached';
-      }
-    } catch (err) {
-      warm = `failed:${err?.message || err}`;
-    }
-    console.log(`[voice/incoming][${callSid}] opening_prefetch ready load_ms=${loadMs} total_ms=${Date.now() - t0} greeting_pcm=${warm}`);
-    return { profile };
+        try {
+          const r = await renderGreetingPcm({
+            text: composed.text,
+            profile,
+            tenantId: profile.id,
+            createSession: ({ voiceId }) => createSonioxTtsSession({ callSid: 'greeting-prefetch', voiceId }),
+          });
+          console.log(
+            `[voice/incoming][${callSid}] opening_prefetch greeting_pcm=${r.rendered ? 'rendered' : 'cached'} warm_ms=${Date.now() - t0}`
+          );
+        } catch (err) {
+          console.log(
+            `[voice/incoming][${callSid}] opening_prefetch greeting_pcm=failed:${err?.message || err}`
+          );
+        }
+      },
+    });
   });
 }
 
