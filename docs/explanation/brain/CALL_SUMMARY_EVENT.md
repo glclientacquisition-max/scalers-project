@@ -10,13 +10,24 @@ Brain owns outcome, receipts, slots and the emitter. Ops owns the sender, dedup,
 (`/workspace/briefs/a4-owner-summary-sender-spec.md`).
 
 Code: `src/conversation/callSummaryEvent.js` (pure builder, validator, v1 receipts, emitter),
-`src/conversation/v2/summaryReceipts.js` (BA v2 branch only; v2 receipts, from `v2/machine.js` `finishCall`). Flag `CALL_SUMMARY_EVENT`, **off by default**.
+`src/conversation/v2/summaryReceipts.js` (v2 receipts, from `v2/machine.js` `finishCall`). Flag `CALL_SUMMARY_EVENT`, **off by default**.
 
 ## Emission
 
 - Event name `call.summary.ready`, emitted **once per call at call end** from the hangup summary write
-  (`writeHangupSummary` → `emitHangupCallSummary` in `server.js`, inside the run-once finalizer). Both paths: v1 always;
-  v2 when the BA v2 live runner took at least one turn (`finishCall(state, { profile })` → `summaryReceipts`).
+  (`writeHangupSummary` → `emitHangupCallSummary` in `server.js`, inside the run-once finalizer). v1 always.
+  v2 (branch of record, C3 #853): when **BRAIN_V2_OWNS_CALL** owns the call, A4 reads C3's **cached once-only finish
+  result** (`ownsCall.a4V2Source` → `ownedV2Calls.finished(callSid)`), never a second `finishCall`. With
+  CALL_SUMMARY_EVENT on, that one `machine.finishCall(state, { profile })` also returns `summaryReceipts`, which the C3
+  `summaryPatch` stores as `brain_v2.summary_receipts`. If the finish is still waiting out the 90 s reconnect grace
+  (provisional close), the summary waits and `finishOwnedV2Call` emits it when the one finish runs. A call v2 does not
+  own (flag off, no owned turn, or `finish_failed`) uses the v1 receipts (`path: 'v1'`).
+- v2 receipts read **C1 write receipts** (`state.writeReceipts`, phases proposed / confirmed / committed / failed, by
+  idempotency key). A `failed` phase, or a failed machine receipt, is never `confirmed` and never gives a
+  `writtenRowId` or `booked`. A commit counts only with both `confirmed` and `committed` phases. An idempotent replay
+  (`duplicate`) is not a second receipt. With C1 off there are no write receipts and the machine receipt decides.
+- Items: `itemFromCatalogue` on the tenant profile today. **Once C2 (#854, fact store) is in, items should come from
+  `itemFromFacts`** (the typed facts compiled at Save), keeping the catalogueId rule (real id or null).
 - **Idempotent per `callId`.** A re-emit replaces the stored copy and hooks see `{ replaces: true }`.
   Once a send has gone out, a re-emit **never** causes a second send. The new version is for the Desk only.
 - Sinks (no migration needed):
@@ -62,7 +73,7 @@ Slots used: booking `service, when, place, name`; order `pickup, name` plus `ite
    - v2: commits only run on the redeemed `confirm_token`, and a row id must come back.
    - v1: the transcript needs an agent read-back cue followed directly by a whole-answer yes. "Okay wait…", "Sawa lakini…?" and "Yes but make it three" are not yes.
    - A written row with no read-back stays `unconfirmed` (HD_e75a669780d4).
-2. **Callback** receipts are `confirmed` only when the agent read back **both the number and the time**, the caller gave an explicit yes (repeating the read-back time counts as yes; "okay wait", a question or "but" does not), **and** the callback write succeeded. Otherwise `unconfirmed`. Either way the outcome is `callback_needed`, never urgent. On the old path, no read-back evidence in the transcript means `unconfirmed`. On BA v2, the receipt keeps the spoken read-back line and the caller's reply; today's v2 handoff read-back templates do not say a time, so live v2 callbacks come out `unconfirmed` until those templates change. *(Final, Ops ruling 21 Oct.)*
+2. **Callback** receipts are `confirmed` only when the agent read back **both the number and the time**, the caller gave an explicit yes (repeating the read-back time counts as yes; "okay wait", a question or "but" does not), **and** the callback write succeeded. Otherwise `unconfirmed`. Either way the outcome is `callback_needed`, never urgent. On the old path, no read-back evidence in the transcript means `unconfirmed`. On BA v2, the receipt keeps the spoken read-back line and the caller's reply. With C1 commit safety on (BRAIN_V2_COMMIT_SAFETY, or BRAIN_V2_OWNS_CALL), the callback read-back says the number and when ("…call you back on 0700 000 001, today before 18:00?" / "…kwa namba 0700 000 001, leo kabla ya saa kumi na mbili jioni. Ni sawa?"), and C1's `confirmed` phase is the yes, so v2 callbacks can be `confirmed`. "During working hours" / "wakati wa saa za kazi" (no hours on file) is not a time, so that callback stays `unconfirmed`. C1 applies Alvin's rule (15 Oct) to callbacks through the same read-back classifier as bookings: the caller repeating the exact read-back time ("Today before 18:00" / "Leo kabla ya saa kumi na mbili jioni") is the yes, so with a successful write that callback is `confirmed`; a different time re-proposes (nothing confirmed until the new read-back gets its yes); "okay wait" or the time asked as a question gets one yes/no re-ask. With C1 off the handoff read-back gives no time and v2 callbacks stay `unconfirmed`. *(Final, Ops ruling 21 Oct.)*
    **Complaint** and **escalation** receipts are confirmed when the backend write succeeds, with no read-back. Old-path escalations have no row id, and that is fine (`writtenRowId` is required only for booking / order / quote). A v1 "soft" escalation (desk note only) is unconfirmed. *(Final.)*
 3. **Price and stock come only from catalogue facts.** Stock is `in_stock`/`out_of_stock` only when the catalogue row says so. A null or empty `in_stock` is `unconfirmed` (HD_8a8aa14db292). `catalogueId` is the catalogue row's real id or `null`; synthetic ids (`name:<slug>`, `prd_<n>`) are never emitted. `null` means off-catalogue (no `unitPrice`, `unconfirmed` stock) or a matched catalogue row that has no id (price and stock still come from that row). *(Final, Ops ruling 21 Oct.)*
 4. Missing slot means `{ status: 'not_given' }` with no value. Values are never guessed.
