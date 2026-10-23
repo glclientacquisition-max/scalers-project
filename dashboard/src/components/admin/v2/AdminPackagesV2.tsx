@@ -56,7 +56,7 @@ export function AdminPackagesV2({
         <span className="font-semibold text-ink">{published} published</span>
         {" · "}
         {catalog.packageEditorEnabled ? "Editor on" : "Editor off"}
-        {" · View only · unlock to change"}
+        {" · Catalog only (minutes and terms) · assign from the business"}
         {readOnlyHint ? <span className="ms-1">· {readOnlyHint}</span> : null}
       </p>
             {rows.length === 0 ? (

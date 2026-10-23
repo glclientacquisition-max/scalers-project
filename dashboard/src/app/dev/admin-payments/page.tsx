@@ -5,7 +5,7 @@ import { AdminShell } from "@/components/AdminNav";
 import { AdminSectionTabs } from "@/components/admin/v2/AdminSectionTabs";
 import { AdminPaymentsV2 } from "@/components/admin/v2/AdminPaymentsV2";
 import { ADMIN_BILLING_TABS } from "@/lib/adminLinks";
-import { ADMIN_BACHS_STATUS } from "../fixtures/adminBilling";
+import { ADMIN_PAYMENTS, ADMIN_PAYMENTS_NOW } from "../fixtures/adminPayments";
 
 export const instant = false;
 
@@ -16,7 +16,7 @@ export default async function DevAdminPaymentsPage() {
   return (
     <AdminShell operatorName="alvin" v2>
       <AdminSectionTabs label="Billing" tabs={ADMIN_BILLING_TABS} />
-      <AdminPaymentsV2 status={ADMIN_BACHS_STATUS} />
+      <AdminPaymentsV2 rows={ADMIN_PAYMENTS} nowIso={ADMIN_PAYMENTS_NOW} />
     </AdminShell>
   );
 }
