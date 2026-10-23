@@ -71,12 +71,12 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
     : null;
   const acts = releaseActions(state, blockRelease, it?.businessId ?? null);
 
-  async function runArchiveRelease() {
+  async function runArchiveRelease(reason: string) {
     if (!it?.businessId) return;
     setPending(true);
     setError("");
     setStatus("");
-    const r = await archiveThenRelease(it.businessId, it.e164);
+    const r = await archiveThenRelease(it.businessId, it.e164, reason);
     setPending(false);
     if (!r.ok) {
       setError(r.error);
@@ -408,9 +408,10 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
       <OpsConfirm
         open={confirm === "archive_release" && !!it}
         onClose={() => { if (!pending) setConfirm(null); }}
-        onConfirm={() => { void runArchiveRelease(); }}
+        onConfirm={(reason) => { void runArchiveRelease(reason); }}
         title="Archive the business and release this number?"
         strength="destructive"
+        requireReason
         confirmLabel="Archive & release"
         pending={pending}
       >

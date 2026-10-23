@@ -173,11 +173,11 @@ export function BusinessPane({
   const [archivePending, setArchivePending] = useState(false);
   const [archiveError, setArchiveError] = useState("");
   const [archived, setArchived] = useState(false);
-  async function archive() {
+  async function archive(reason: string) {
     if (!businessId) return;
     setArchivePending(true);
     setArchiveError("");
-    const r = await postJson("/api/admin/businesses", { action: "archive", business_id: businessId });
+    const r = await postJson("/api/admin/businesses", { action: "archive", business_id: businessId, reason });
     setArchivePending(false);
     if (!r.ok) { setArchiveError(r.error || "Could not archive. Nothing changed."); return; }
     setArchiving(false);
@@ -225,9 +225,10 @@ export function BusinessPane({
     <OpsConfirm
       open={archiving && !!businessId}
       onClose={() => { if (!archivePending) setArchiving(false); }}
-      onConfirm={() => { void archive(); }}
+      onConfirm={(reason) => { void archive(reason); }}
       title="Archive this business?"
       strength="destructive"
+      requireReason
       confirmLabel="Archive business"
       pending={archivePending}
     >

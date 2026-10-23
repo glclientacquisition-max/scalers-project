@@ -68,16 +68,16 @@ test("s22: live business offers Archive & release, Just release only when not bl
 test("s22: archive then release, in order, and says which step failed", async () => {
   const { archiveThenRelease } = await loadAR();
   const calls = [];
-  const ok = (url, body) => { calls.push([url, body.action]); return Promise.resolve({ ok: true }); };
-  assert.deepEqual(await archiveThenRelease("b1", "+254700000001", ok), { ok: true });
-  assert.deepEqual(calls, [["/api/admin/businesses", "archive"], ["/api/did-pool", "release"]]);
+  const ok = (url, body) => { calls.push([url, body.action, body.reason]); return Promise.resolve({ ok: true }); };
+  assert.deepEqual(await archiveThenRelease("b1", "+254700000001", "test tenant", ok), { ok: true });
+  assert.deepEqual(calls, [["/api/admin/businesses", "archive", "test tenant"], ["/api/did-pool", "release", "test tenant"]]);
   const calls2 = [];
   const failA = (url) => { calls2.push(url); return Promise.resolve({ ok: false, error: "no" }); };
-  const r1 = await archiveThenRelease("b1", "+254700000001", failA);
+  const r1 = await archiveThenRelease("b1", "+254700000001", "why", failA);
   assert.equal(r1.step, "archive");
   assert.equal(calls2.length, 1);
   const failR = (url) => Promise.resolve({ ok: url.includes("businesses") });
-  const r2 = await archiveThenRelease("b1", "+254700000001", failR);
+  const r2 = await archiveThenRelease("b1", "+254700000001", "why", failR);
   assert.equal(r2.step, "release");
   assert.match(r2.error, /archived, but the number was not released/);
 });
@@ -91,4 +91,18 @@ test("s22: UI wires Archive & release, Just release, and BusinessPane Archive vi
   assert.match(pane, /confirmLabel="Archive business"/);
   assert.match(pane, /strength="destructive"/);
   assert.match(pane, /action: "archive"/);
+});
+
+test("s22: archive confirms show the Reason they require (never require what you don't show)", () => {
+  const oc = read("dashboard/src/components/ops/OpsConfirm.tsx");
+  assert.match(oc, /requireReason/);
+  assert.match(oc, /needReason \? \(/);
+  assert.match(oc, /Add a reason \(3 characters or more\)/);
+  assert.match(oc, /reasonShort \|\|/);
+  const ui = read("dashboard/src/components/admin/v2/AdminNumbersV2.tsx");
+  assert.match(ui, /strength="destructive"\n\s+requireReason/);
+  assert.match(ui, /archiveThenRelease\(it\.businessId, it\.e164, reason\)/);
+  const pane = read("dashboard/src/components/admin/v2/BusinessPane.tsx");
+  assert.match(pane, /requireReason/);
+  assert.match(pane, /business_id: businessId, reason \}/);
 });

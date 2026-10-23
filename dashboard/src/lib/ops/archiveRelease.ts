@@ -24,10 +24,10 @@ export const postJson: Post = async (url, body) => {
 };
 
 /** Ordered: archive first (existing /api/admin/businesses action), then release (existing /api/did-pool). Says which step failed. */
-export async function archiveThenRelease(businessId: string, e164: string, post: Post = postJson): Promise<{ ok: true } | { ok: false; step: "archive" | "release"; error: string }> {
-  const a = await post("/api/admin/businesses", { action: "archive", business_id: businessId });
+export async function archiveThenRelease(businessId: string, e164: string, reason: string, post: Post = postJson): Promise<{ ok: true } | { ok: false; step: "archive" | "release"; error: string }> {
+  const a = await post("/api/admin/businesses", { action: "archive", business_id: businessId, reason });
   if (!a.ok) return { ok: false, step: "archive", error: `Could not archive the business, nothing changed. ${a.error ?? ""}`.trim() };
-  const r = await post("/api/did-pool", { action: "release", e164 });
+  const r = await post("/api/did-pool", { action: "release", e164, reason });
   if (!r.ok) return { ok: false, step: "release", error: `Business archived, but the number was not released. Try Just release. ${r.error ?? ""}`.trim() };
   return { ok: true };
 }
