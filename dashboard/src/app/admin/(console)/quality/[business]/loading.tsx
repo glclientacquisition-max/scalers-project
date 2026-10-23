@@ -1,11 +1,5 @@
-import { Skeleton, SkeletonList } from "@/components/ui/Skeleton";
+import { OpsLoadingQualityDetail } from "@/components/admin/v2/OpsRouteLoading";
 
-export default function AdminQualityBusinessLoading() {
-  return (
-    <div className="space-y-4" aria-busy="true">
-      <Skeleton className="h-8 w-48 rounded-md" />
-      <Skeleton className="h-7 w-24 rounded-md" />
-      <SkeletonList rows={5} />
-    </div>
-  );
+export default function Loading() {
+  return <OpsLoadingQualityDetail />;
 }
