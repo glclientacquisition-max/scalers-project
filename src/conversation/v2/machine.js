@@ -66,7 +66,7 @@ function createState({ profile = {}, callerPhone, contactName = null, openRows =
     pendingTasks,
     sharedLine: sharedLine === true,
     nameConfirmed: nameConfirmed === true,
-    returning: returning === true || nameConfirmed === true || openRows.some((r) => r && (r.service_name || r.service)),
+    returning: returning === true || nameConfirmed === true || openRows.some((r) => r && (r.service_name || r.job || r.service || r.item)),
     lastVisit: lastVisit ? normRow(lastVisit) : null,
   };
   const slots = { service: null, when: { date: null, time: null }, place: null, name: null, items: [], row: null, new_when: { date: null, time: null }, new_place: null, kind: null, topic: null, complaint: [] };
@@ -83,14 +83,14 @@ function createState({ profile = {}, callerPhone, contactName = null, openRows =
     slots, asked: {}, pending: null, tokenSeq: 0, lastLine: '', lastInfo: null, infoRepeat: {}, unknownCount: 0,
     callerPhone, file,
     staffNames: (profile.staffNames || []).map((s) => String(s).toLowerCase()),
-    outcomes: [], receipts: [], callbacks: [], trace: [], ended: false, welcomed: false,
+    outcomes: [], receipts: [], callbacks: [], trace: [], ended: false, welcomed: false, fileSeeded: false, nameConfirmAsked: false,
   };
 }
 function normRow(r) {
   const iso = r.window_start;
   let when = { date: null, time: null };
   if (iso) { const p = L.eatParts(new Date(iso)); when = { date: L.isoDate(p), time: `${String(p.h).padStart(2, '0')}:${String(p.mi).padStart(2, '0')}` }; }
-  return { id: r.id, kind: r.kind === 'request' ? 'request' : 'visit', type: r.type || null, service: r.service_name, when, whenText: String(r.when_text || '').trim() || null, place: r.address_landmark, status: r.status };
+  return { id: r.id, kind: r.kind === 'request' ? 'request' : 'visit', type: r.type || null, service: r.service_name || r.job || r.service || r.item || null, when, whenText: String(r.when_text || '').trim() || null, place: r.address_landmark || r.place || null, status: r.status };
 }
 
 const nameSpeakable = (state) => state.slots.name && !state.staffNames.includes(state.slots.name.toLowerCase()) ? state.slots.name : null;
@@ -650,8 +650,8 @@ function infoAnswer(state, u, profile, kind) {
     return R.info({ kind: 'policy', line: compileAskReceipt(profile, { kind: ask }, state.lang) }, state.lang);
   }
   if (kind === 'greeting') {
-    const wb = AM.openingKnownSpeech(state, state.lang);
-    if (wb) { state.welcomed = true; return wb; }
+    const seeded = AM.rulesMouthSeed(state, state.lang);
+    if (seeded) return seeded;
     return R.info({ kind: 'greeting' }, state.lang);
   }
   if (kind === 'who_are_you') return R.info({ kind: 'who', agent: profile.agentName || 'Shy', biz: profile.businessName || '' }, state.lang);
@@ -929,6 +929,37 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     if (p.tool === 'create_handoff') { resetIntent(state); } else { state.phase = 'collect'; state.pending = null; }
   }
 
+  // C7 per-tenant name confirm ladder (DnD): yes flips THIS tenant only; never invent / never copy other tenant.
+  if (state.expecting === 'name_confirm' && state.nameConfirmAsked) {
+    if (u.yes && !u.no) {
+      const applied = AM.applyTenantConfirm(state, { yes: true });
+      state.expecting = null;
+      if (applied.ok) {
+        if (typeof handlers.confirmCallerName === 'function') {
+          try {
+            const r = handlers.confirmCallerName({ name: applied.name, source: 'name_confirm_yes' });
+            if (r && typeof r.catch === 'function') r.catch(() => {});
+          } catch { /* never blocks */ }
+        }
+        const wb = AM.welcomeBackLine(applied.name, lang);
+        const job = AM.lastJobLine(AM.lastJobRow(state.file || {}), lang);
+        state.welcomed = true;
+        if (job) state.fileSeeded = true;
+        const line = [wb, job].filter(Boolean).join(' ').trim();
+        return out(AM.speakSafeLine(line || R.info({ kind: 'greeting' }, lang), null));
+      }
+    }
+    if (u.no) {
+      state.expecting = null;
+      state.file = state.file || {};
+      state.file.nameConfirmed = false;
+      state.slots.nameConfirmed = false;
+      return out(R.ask('intent', 0, lang));
+    }
+    // unclear — re-ask once then drop
+    state.expecting = null;
+  }
+
   // 2) open offers from an info answer ("would you like ...?")
   if (state.offer && !state.intent) {
     const offer = state.offer; state.offer = null;
@@ -993,10 +1024,11 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
       return out(midThread(state) ? noReopenLine(state, lang) : R.ask('intent', 0, lang));
     }
     if (state.lastInfo === 'recall' && !u.ack) { const line = infoAnswer(state, u, profile, 'recall'); return out(AM.speakSafeLine(line, null)); }
-    // C7 audible: returner opening with bind-safe name (once) before stock intent ask
+    // C7 mouth seed: name + last job from file WITHOUT waiting on model proposal.
+    // Mute when unconfirmed/shared; confirm-ask when name on file but name_confirmed=false.
     if (!u.intents.length && !u.service && !u.ack && !midThread(state)) {
-      const wb = AM.openingKnownSpeech(state, lang);
-      if (wb) { state.welcomed = true; return out(wb); }
+      const seeded = AM.rulesMouthSeed(state, lang);
+      if (seeded) return out(AM.speakSafeLine(seeded, null));
     }
     // off-catalogue item question: say plainly it isn't on our list (never guess stock or price)
     if (u.askedItem && !u.service && !u.products.length) {

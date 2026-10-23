@@ -31,14 +31,31 @@ function bindSafeName(file = {}, slots = {}, staffNames = []) {
   return name;
 }
 
-/** First usable visit/request row (open or last_visit seed). Never invents. */
+/** D199/card rows use `job`; machine norm uses `service`; liveTurn maps service_name. */
+function rowServiceLabel(r) {
+  if (!r || typeof r !== 'object') return '';
+  return String(r.service || r.service_name || r.job || r.item || '').trim();
+}
+
+/** Normalize a file/open row so templates always see `.service`. Never invents. */
+function normalizeJobRow(r) {
+  if (!r || typeof r !== 'object') return null;
+  const service = rowServiceLabel(r);
+  if (!service) return null;
+  if (r.status === 'cancelled') return null;
+  return { ...r, service };
+}
+
+/** First usable visit/request row (open or last_visit seed). Never invents.
+ *  Accepts D199 `job`, liveTurn `service_name`, or machine `service`. */
 function lastJobRow(file = {}) {
   const rows = Array.isArray(file.openRows) ? file.openRows : [];
-  const open = rows.filter((r) => r && r.status !== 'cancelled' && r.service);
-  if (open.length) return open[0];
-  const lv = file.lastVisit;
-  if (lv && lv.service) return lv;
-  return null;
+  for (const r of rows) {
+    const n = normalizeJobRow(r);
+    if (n) return n;
+  }
+  const lv = normalizeJobRow(file.lastVisit);
+  return lv || null;
 }
 
 function welcomeBackLine(name, lang) {
@@ -47,8 +64,9 @@ function welcomeBackLine(name, lang) {
 }
 
 function lastJobLine(row, lang) {
-  if (!row || !row.service) return null;
-  return R.info({ kind: 'file', rows: [row] }, lang, 0);
+  const n = normalizeJobRow(row);
+  if (!n) return null;
+  return R.info({ kind: 'file', rows: [n] }, lang, 0);
 }
 
 /**
@@ -61,8 +79,8 @@ function openingKnownSpeech(state, lang) {
   const name = bindSafeName(state.file || {}, state.slots || {}, state.staffNames || []);
   if (!name) return null;
   const returning = state.file?.returning === true
-    || (Array.isArray(state.file?.openRows) && state.file.openRows.some((r) => r && r.service))
-    || Boolean(state.file?.lastVisit?.service)
+    || (Array.isArray(state.file?.openRows) && state.file.openRows.some((r) => rowServiceLabel(r)))
+    || Boolean(rowServiceLabel(state.file?.lastVisit))
     || Boolean(state.file?.contactName && state.file?.nameConfirmed === true);
   if (!returning) return null;
   return welcomeBackLine(name, lang);
@@ -127,16 +145,173 @@ function lookupFileSeedsRecall(mc) {
   });
 }
 
+/**
+ * Voice composeOpening card — field names locked with Voice @ tip 45c2d51f.
+ * nameConfirmed is THIS TENANT only; never copy another tenant's flag.
+ * Voice TTS uses identity+welcome only (ignores openRows/lastVisit).
+ * Last-job without Gemini is Brain machine.file/slots seed (rulesMouthSeed).
+ */
+function bindSafeOpeningCard(file = {}, slots = {}, staffNames = [], extras = {}) {
+  const sharedLine = file.sharedLine === true;
+  const name = bindSafeName(file, slots, staffNames);
+  const nameConfirmed = !sharedLine && (
+    slots.nameConfirmed === true || file.nameConfirmed === true
+  ) && Boolean(name);
+  const knownName = nameConfirmed ? name : (
+    !sharedLine && (file.contactName || file.displayName)
+      ? String(file.contactName || file.displayName).trim()
+      : ''
+  );
+  const openRows = Array.isArray(file.openRows) ? file.openRows : [];
+  const returning = file.returning === true
+    || Boolean(nameConfirmed && knownName)
+    || openRows.some((r) => rowServiceLabel(r))
+    || Boolean(rowServiceLabel(file.lastVisit));
+  const ll = String(extras.lastLanguage || file.lastLanguage || '').toLowerCase();
+  const lastLanguage = ll === 'en' || ll === 'sw' ? ll : null;
+  return {
+    knownName: knownName || '',
+    nameConfirmed: nameConfirmed === true,
+    isReturning: returning,
+    lastLanguage,
+    sharedLine,
+    openRows,
+    // Brain-only hint (Voice ignores): lastVisit for rulesMouthSeed consumers.
+    lastVisit: file.lastVisit || null,
+  };
+}
+
+/** Per-tenant confirm: name on file but this tenant's name_confirmed is false. Never invent. */
+function needsNameConfirm(file = {}, slots = {}) {
+  if (file.sharedLine === true) return false;
+  if (slots.nameConfirmed === true || file.nameConfirmed === true) return false;
+  const onFile = String(file.contactName || file.displayName || '').trim();
+  return Boolean(onFile);
+}
+
+/**
+ * Apply confirm for THIS tenant contact only (in-memory state).
+ * Does not copy flags across tenants. Does not invent a name.
+ * Caller must invoke confirmCallerName handler for durable flip.
+ */
+function applyTenantConfirm(state, { yes = false, name = null } = {}) {
+  if (!state || !yes) return { ok: false, reason: 'no_yes' };
+  if (state.file?.sharedLine === true) return { ok: false, reason: 'shared_line' };
+  const candidate = String(name || state.slots?.name || state.file?.contactName || state.file?.displayName || '').trim();
+  if (!candidate) return { ok: false, reason: 'no_name_on_file' };
+  // Never invent: candidate must already be on this tenant's file or this-call slot.
+  const onFile = String(state.file?.contactName || state.file?.displayName || '').trim().toLowerCase();
+  const onSlot = String(state.slots?.name || '').trim().toLowerCase();
+  if (candidate.toLowerCase() !== onFile && candidate.toLowerCase() !== onSlot) {
+    return { ok: false, reason: 'name_mismatch' };
+  }
+  state.slots = state.slots || {};
+  state.slots.name = candidate;
+  state.slots.nameConfirmed = true;
+  if (state.file) state.file.nameConfirmed = true;
+  return { ok: true, name: candidate, tenantOnly: true };
+}
+
+/** Criteria stub for confirm ask — Prompt owns final wording later. */
+function confirmNameAskLine(name, lang) {
+  const n = String(name || '').trim();
+  if (!n) return null;
+  const sw = String(lang || '').toLowerCase().startsWith('sw');
+  // Neutral criteria line (not owner-facing Prompt craft).
+  return sw
+    ? `Je, naongea na ${n}?`
+    : `Am I speaking with ${n}?`;
+}
+
+/**
+ * Rules mouth seed at T0 — independent of model proposal.
+ * Speaks bind-safe welcome-back and/or one last-job line from openRows/lastVisit.
+ * Mute name when unconfirmed/shared. Never invents.
+ * Marks state.welcomed / state.fileSeeded so we don't double-speak.
+ */
+function rulesMouthSeed(state, lang) {
+  if (!state) return null;
+  const parts = [];
+  const file = state.file || {};
+  const slots = state.slots || {};
+
+  // Unconfirmed returner with name on file → confirm ask once (no name greet).
+  if (!state.welcomed && needsNameConfirm(file, slots) && !state.nameConfirmAsked) {
+    const onFile = String(file.contactName || file.displayName || '').trim();
+    const ask = confirmNameAskLine(onFile, lang);
+    if (ask) {
+      state.nameConfirmAsked = true;
+      state.expecting = 'name_confirm';
+      state.welcomed = true; // avoid stock reopen looping the ask
+      return ask;
+    }
+  }
+
+  if (!state.welcomed) {
+    const wb = openingKnownSpeech(state, lang);
+    if (wb) {
+      parts.push(wb);
+      state.welcomed = true;
+    }
+  }
+
+  if (!state.fileSeeded) {
+    const row = lastJobRow(file);
+    if (row) {
+      const job = lastJobLine(row, lang);
+      if (job) {
+        parts.push(job);
+        state.fileSeeded = true;
+        state.lastInfo = 'recall';
+      }
+    }
+  }
+
+  if (!parts.length) return null;
+  return parts.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Score: mouth seed acted without a model proposal. */
+function scoreRulesMouthSeed({ spokenLine, name, lastJobService, modelTimedOut = true, nameConfirmed = true, sharedLine = false }) {
+  const line = String(spokenLine || '');
+  const namedGreet = /welcome back|karibu tena/i.test(line) && name
+    && line.toLowerCase().includes(String(name).toLowerCase());
+  if ((sharedLine || nameConfirmed === false) && namedGreet) {
+    return { ok: false, verdict: 'invented_name', reason: 'unconfirmed_or_shared_named_greet' };
+  }
+  if (!modelTimedOut) return { ok: true, verdict: 'n/a', reason: 'model_not_forced_timeout' };
+  const job = String(lastJobService || '').trim();
+  const jobTok = job ? job.toLowerCase().split(/[,(]/)[0].trim() : '';
+  const jobOk = !jobTok || line.toLowerCase().includes(jobTok);
+  const nameOk = !name || nameConfirmed !== true || sharedLine
+    || line.toLowerCase().includes(String(name).toLowerCase());
+  if (nameConfirmed === true && !sharedLine && name && !nameOk && !jobOk) {
+    return { ok: false, verdict: 'mute', reason: 'seed_missed_name_and_job' };
+  }
+  if (job && !jobOk && nameConfirmed === true) {
+    return { ok: false, verdict: 'no_last_job', reason: 'open_row_not_spoken' };
+  }
+  return { ok: true, verdict: 'seeded', reason: 'rules_mouth_without_model' };
+}
+
 module.exports = {
   bindSafeName,
+  bindSafeOpeningCard,
+  rowServiceLabel,
+  normalizeJobRow,
   lastJobRow,
   welcomeBackLine,
   lastJobLine,
   openingKnownSpeech,
   recallKnownSpeech,
+  rulesMouthSeed,
+  needsNameConfirm,
+  applyTenantConfirm,
+  confirmNameAskLine,
   speakSafeLine,
   isHollowReopen,
   scoreAudibleActing,
+  scoreRulesMouthSeed,
   lookupFileSeedsRecall,
   HOLLOW_REOPEN,
 };

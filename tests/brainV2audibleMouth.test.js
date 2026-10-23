@@ -190,7 +190,16 @@ test('B1 HD_b0a5-shaped: past booking ask with open row → acting speech (last 
   }
   const recallLine = spoken.find((l) => /Sofa cleaning/i.test(l));
   assert.ok(recallLine, `expected last-job speech, got: ${JSON.stringify(spoken)}`);
-  assert.equal(AM.isHollowReopen(recallLine), false);
+  // Acting = job label spoken. welcome_back template also contains "which service do you need"
+  // (HOLLOW_REOPEN token) when rulesMouthSeed combines welcome + last job — job token wins.
+  assert.equal(
+    AM.scoreAudibleActing({
+      proposal: { tool: 'lookup_file', args: { topic: 'last_visit' }, valid: true },
+      spokenLine: recallLine,
+      lastJobService: 'Sofa cleaning',
+    }).ok,
+    true
+  );
   // No writes from read path
   assert.equal(H.log.filter((x) => x[0] === 'appt').length, 0);
 });
@@ -244,4 +253,161 @@ test('live callerFile carries sharedLine / nameConfirmed / lastVisit into state'
   const st = live.getState();
   assert.equal(st.file.sharedLine, false);
   assert.equal(st.file.nameConfirmed, true);
+});
+
+
+// --- Prompt acceptance A1–A5: mouth seed WITHOUT model (forced timeout) ---
+test('A1 seed: confirmed+not shared → name spoken with model always timedOut', async () => {
+  const model = async () => { await new Promise((r) => setTimeout(r, 50)); return { calls: [], timedOut: true }; };
+  const { out } = await turn('Hello', {
+    contactName: 'Alvin',
+    nameConfirmed: true,
+    returning: true,
+    openRows: [ROW],
+  }, { model });
+  assert.match(out.line, /Alvin/);
+  assert.match(out.line, /Welcome back|Karibu tena/i);
+  const score = AM.scoreRulesMouthSeed({
+    spokenLine: out.line, name: 'Alvin', lastJobService: 'Sofa cleaning',
+    modelTimedOut: true, nameConfirmed: true, sharedLine: false,
+  });
+  assert.equal(score.ok, true, JSON.stringify(score));
+});
+
+test('A2 seed: openRows/job label spoken with NO model proposal (D199 job field)', async () => {
+  // D199 card shape: job, not service/service_name — rulesMouthSeed must alias.
+  const { out, st } = await turn('Hello', {
+    contactName: 'Alvin',
+    nameConfirmed: true,
+    returning: true,
+    openRows: [{ id: 'apt_carpet', job: 'Carpet cleaning', status: 'requested', window_start: '2026-10-10T07:00:00Z' }],
+  }, { model: null });
+  assert.match(out.line, /Carpet cleaning/i);
+  assert.equal(st.fileSeeded, true);
+  assert.equal(AM.lastJobRow({ openRows: [{ job: 'Carpet cleaning', status: 'requested' }] }).service, 'Carpet cleaning');
+});
+
+test('A3 seed: name_confirmed=false → no name greet (DnD-shaped)', async () => {
+  const { out } = await turn('Hello', {
+    contactName: 'Alvin',
+    nameConfirmed: false,
+    returning: true,
+    openRows: [ROW],
+  });
+  // Confirm ask may cite the on-file name; named welcome-back must not.
+  assert.doesNotMatch(out.line, /Welcome back,\s*Alvin|Karibu tena,\s*Alvin/i);
+  assert.equal(AM.bindSafeName({ contactName: 'Alvin', nameConfirmed: false, sharedLine: false }, {}, []), null);
+  const card = AM.bindSafeOpeningCard(
+    { contactName: 'Alvin', nameConfirmed: false, sharedLine: false, returning: true, openRows: [ROW] },
+    {},
+    []
+  );
+  assert.equal(card.nameConfirmed, false);
+  assert.equal(card.knownName, 'Alvin'); // on file but not confirmed for TTS name greet
+});
+
+test('A3b DnD unconfirmed → confirm ask once (B1 criteria), not invent confirm', async () => {
+  const { out, st } = await turn('Hello', {
+    contactName: 'Alvin',
+    nameConfirmed: false,
+    returning: true,
+    openRows: [ROW],
+  });
+  assert.match(out.line, /Am I speaking with Alvin|Je, naongea na Alvin/i);
+  assert.equal(st.nameConfirmAsked, true);
+  assert.equal(st.file.nameConfirmed, false); // never invent
+  assert.equal(st.expecting, 'name_confirm');
+});
+
+test('A4 seed: shared line → no household name greet', async () => {
+  const { out } = await turn('Hello', {
+    contactName: 'Grace',
+    nameConfirmed: true,
+    returning: true,
+    sharedLine: true,
+    openRows: [ROW],
+  });
+  assert.doesNotMatch(out.line, /\bGrace\b/);
+  assert.doesNotMatch(out.line, /Welcome back/i);
+  assert.equal(AM.needsNameConfirm({ contactName: 'Grace', sharedLine: true, nameConfirmed: false }, {}), false);
+});
+
+test('A5 seed: model plaintext still never TTS’d', async () => {
+  const model = async () => ({
+    calls: [],
+    text: 'Sure Alvin your carpet in Kilimani is 4500 bob',
+  });
+  const { out } = await turn('Hello', {
+    contactName: 'Alvin',
+    nameConfirmed: true,
+    returning: true,
+    openRows: [{ id: '1', job: 'Carpet cleaning', status: 'requested' }],
+  }, { model });
+  assert.doesNotMatch(out.line, /Kilimani|4500|bob/i);
+  assert.equal(AM.speakSafeLine('I can see your carpet cleaning.', 'Kilimani 4500'), 'I can see your carpet cleaning.');
+});
+
+// --- B2/B3 per-tenant confirm ---
+test('B2 confirm yes on this tenant only → later greet by name; other tenant flag unchanged', async () => {
+  const confirms = [];
+  const H = handlers();
+  H.h.confirmCallerName = async (a) => { confirms.push(a); return { ok: true }; };
+  const st = V2.createState({
+    profile: DD,
+    callerPhone: '+254709221537',
+    contactName: 'Alvin',
+    openRows: [ROW],
+    nameConfirmed: false,
+    returning: true,
+    callId: 'HD_dnd_confirm',
+  });
+  // Other tenant's flag stays in a separate fixture object — never copied.
+  const jiraniFlag = { nameConfirmed: true, tenant: 'jirani' };
+  const t1 = await V2.runTurn(st, { text: 'Hello', profile: DD, now: NOW, handlers: H.h, langLock: 'en' });
+  assert.match(t1.line, /Am I speaking with Alvin/i);
+  assert.equal(st.file.nameConfirmed, false);
+  const t2 = await V2.runTurn(st, { text: 'Yes', profile: DD, now: NOW, handlers: H.h, langLock: 'en' });
+  assert.equal(st.file.nameConfirmed, true);
+  assert.equal(st.slots.nameConfirmed, true);
+  assert.match(t2.line, /Alvin/);
+  assert.match(t2.line, /Welcome back|Karibu tena|Sofa cleaning/i);
+  assert.equal(jiraniFlag.nameConfirmed, true); // untouched
+  assert.equal(confirms.length, 1);
+  assert.equal(confirms[0].source, 'name_confirm_yes');
+});
+
+test('B3 never invent confirm / never copy Jirani flag onto DnD', () => {
+  const dnd = { contactName: 'Alvin', nameConfirmed: false, sharedLine: false, returning: true };
+  const jirani = { contactName: 'Alvin', nameConfirmed: true };
+  // Applying confirm requires explicit yes on THIS state — no cross-copy helper exists.
+  const st = { file: { ...dnd }, slots: {} };
+  const no = AM.applyTenantConfirm(st, { yes: false });
+  assert.equal(no.ok, false);
+  assert.equal(st.file.nameConfirmed, false);
+  // Invented name rejected
+  const bad = AM.applyTenantConfirm({ file: { ...dnd }, slots: {} }, { yes: true, name: 'Invented' });
+  assert.equal(bad.ok, false);
+  assert.equal(bad.reason, 'name_mismatch');
+  const card = AM.bindSafeOpeningCard(dnd, {}, []);
+  assert.equal(card.nameConfirmed, false);
+  void jirani;
+});
+
+test('opening card field names locked for Voice (knownName/nameConfirmed/isReturning/lastLanguage/sharedLine/openRows)', () => {
+  const card = AM.bindSafeOpeningCard({
+    contactName: 'Alvin',
+    nameConfirmed: true,
+    sharedLine: false,
+    returning: true,
+    openRows: [{ id: '1', job: 'Sofa cleaning', status: 'requested' }],
+    lastVisit: null,
+  }, {}, [], { lastLanguage: 'en' });
+  for (const k of ['knownName', 'nameConfirmed', 'isReturning', 'lastLanguage', 'sharedLine', 'openRows']) {
+    assert.ok(k in card, k);
+  }
+  assert.equal(card.knownName, 'Alvin');
+  assert.equal(card.nameConfirmed, true);
+  assert.equal(card.isReturning, true);
+  assert.equal(card.lastLanguage, 'en');
+  assert.equal(card.sharedLine, false);
 });

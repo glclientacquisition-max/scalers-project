@@ -4,13 +4,15 @@
 // against the C2 fact store, this state's allowed tools and C1's confirm token; tool
 // errors come back as results, never exceptions. Templates speak.
 // shadow: the rules turn stays live; the model runs beside it, off the critical path
-// (never awaited by the caller's turn), under a 900 ms hard cap, and each turn logs the
+// (never awaited by the caller's turn), under a hard cap (HARD_CAP_MS; evidence band ~1.5–2.0s), and each turn logs the
 // proposal vs the rules' intent and slots (agreement, latency, timeout, tokens, cost).
 // on: NOT for staging yet. Reachable only with BRAIN_V2_MODEL=on exactly.
 const FS = require('../../knowledge/factStore');
 const { validate, toFunctionDeclarations } = require('./catalogue');
 
-const HARD_CAP_MS = 900;
+// Evidence (2026-10-23 dry): warm tiny primary ~843ms, fat tools ~1.8s, backup warm often >2s.
+// 900 + 550/350 starve caused 100% dual-timeout on HD_0be4 / HD_c170. Cap band ~1.5–2.0s.
+const HARD_CAP_MS = 1800;
 // C7 cascade (staging): primary first; on HARD_CAP timeout or hard fail, one backup within the same overall cap.
 const MODEL_ID = 'gemini-3.6-flash';
 const MODEL_BACKUP_ID = 'gemini-3.5-flash-lite';
@@ -192,16 +194,23 @@ async function capped(model, request, capMs = HARD_CAP_MS) {
   return { latencyMs: ms, calls: Array.isArray(r.calls) ? r.calls : [], usage: r.usage || null, text: r.text ? '[model text dropped]' : '' };
 }
 
-// One overall hard cap for primary+backup (not 900+900). Primary gets the budget minus a
-// backup reserve; on timeout or hard fail, primary is already aborted by capped(), then
-// backup runs once on the remaining wall. Transport only — model plaintext still dropped.
+// One overall hard cap for primary+backup (not 2× cap). Stop the old 550/350 starve:
+// primary gets the wall minus only MIN_BACKUP so warm ~843ms primary can finish;
+// backup then runs on remaining wall. Transport only — model plaintext still dropped.
 // Never throws. Pattern spirit of geminiVoice.nextGeminiStreamAttempt, Brain-owned here.
-const BACKUP_RESERVE_MS = 350;
-const MIN_BACKUP_MS = 150;
+// BACKUP_RESERVE_MS kept exported (= MIN_BACKUP) so old harness imports don't break;
+// it is NOT subtracted as a large upfront reserve anymore.
+const MIN_BACKUP_MS = 250;
+const BACKUP_RESERVE_MS = MIN_BACKUP_MS;
+// Timer slack so primary abort + scheduling does not eat the whole backup floor.
+const CASCADE_SLACK_MS = 80;
 async function cappedCascade({ primary, backup = null, request, capMs = HARD_CAP_MS, primaryId = MODEL_ID, backupId = MODEL_BACKUP_ID } = {}) {
   const t0 = Date.now();
   const canBackup = typeof backup === 'function' && backup !== primary && primaryId !== backupId;
-  const primaryBudget = canBackup ? Math.max(capMs - BACKUP_RESERVE_MS, MIN_BACKUP_MS) : capMs;
+  // Primary gets nearly the full wall; reserve MIN_BACKUP + slack so backup can still run.
+  const primaryBudget = canBackup
+    ? Math.max(capMs - MIN_BACKUP_MS - CASCADE_SLACK_MS, MIN_BACKUP_MS)
+    : capMs;
   const first = await capped(primary, request, primaryBudget);
   const primaryFailed = !!first.timedOut || !!first.error;
   if (!primaryFailed) {
@@ -227,20 +236,39 @@ async function cappedCascade({ primary, backup = null, request, capMs = HARD_CAP
     };
   }
   const remaining = capMs - (Date.now() - t0);
-  if (remaining < MIN_BACKUP_MS) {
+  // Attempt backup whenever any meaningful wall remains (not only full MIN_BACKUP).
+  if (remaining < 80) {
     return {
       ...first,
       model: primaryId,
-      answeredBy: 'primary',
+      answeredBy: 'none',
       cascade: false,
       primaryTimedOut: !!first.timedOut,
       backupTimedOut: false,
       primaryError: first.error || null,
       backupSkipped: 'budget',
       latencyMs: Date.now() - t0,
+      timedOut: true,
     };
   }
   const second = await capped(backup, request, remaining);
+  const backupOk = !second.timedOut && !second.error && Array.isArray(second.calls);
+  // Honesty: both fail / null proposal → answeredBy=none (never claim backup success).
+  if (!backupOk || (second.timedOut && !(second.calls && second.calls.length))) {
+    return {
+      ...second,
+      model: backupId,
+      answeredBy: 'none',
+      cascade: true,
+      primaryTimedOut: !!first.timedOut,
+      backupTimedOut: !!second.timedOut,
+      primaryError: first.error || null,
+      primaryLatencyMs: first.latencyMs,
+      latencyMs: Date.now() - t0,
+      timedOut: true,
+      calls: [],
+    };
+  }
   return {
     ...second,
     model: backupId,
@@ -294,7 +322,10 @@ function createModelShadow({ model, backupModel = null, mode = 'shadow', onStage
         const ag = m.timedOut || m.error ? { agree: false, intentAgree: false, slotDiffs: [] } : agreement(rules, prop);
         turns += 1; if (ag.agree) agreeN += 1;
         const answered = m.model || modelId;
-        const answeredBy = m.answeredBy === 'backup' ? 'backup' : 'primary';
+        // Honesty: pass through none|both_timeout|primary|backup — never invent backup success.
+        const answeredBy = (m.answeredBy === 'backup' || m.answeredBy === 'primary' || m.answeredBy === 'none' || m.answeredBy === 'both_timeout')
+          ? m.answeredBy
+          : (m.timedOut || m.error ? 'none' : 'primary');
         const stage = {
           stage: 'brain_v2_model', mode, model: answered, answeredBy, turnIndex,
           allowed, rules: { intent: rules.intent, slots: redactDeep(rules.slots) },
@@ -327,4 +358,4 @@ function scoreCascadeStages(stages = []) {
   return { pass: true, reason: 'ok', n: rows.length, backupAttempts };
 }
 
-module.exports = { HARD_CAP_MS, BACKUP_RESERVE_MS, MIN_BACKUP_MS, MODEL_ID, MODEL_BACKUP_ID, PRICE, modelMode, resolveModelIds, buildTools, allowedTools, validateProposal, buildModelRequest, snapshot, rulesView, proposalView, agreement, usageOf, capped, cappedCascade, createModelShadow, scoreCascadeStages, redact };
+module.exports = { HARD_CAP_MS, BACKUP_RESERVE_MS, MIN_BACKUP_MS, CASCADE_SLACK_MS, MODEL_ID, MODEL_BACKUP_ID, PRICE, modelMode, resolveModelIds, buildTools, allowedTools, validateProposal, buildModelRequest, snapshot, rulesView, proposalView, agreement, usageOf, capped, cappedCascade, createModelShadow, scoreCascadeStages, redact };
