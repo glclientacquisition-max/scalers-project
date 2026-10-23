@@ -4,8 +4,21 @@
 // Enums are built per turn from the tenant catalogue and the caller's OWN open rows.
 
 function buildCatalogue({ profile = {}, openRows = [] } = {}) {
-  const serviceIds = (profile.servicesCatalog || []).map((s) => s.id).filter(Boolean);
-  const productIds = (profile.productCatalog || []).map((p, i) => p.id || `prd_${i}`);
+  let serviceIds = (profile.servicesCatalog || []).map((s) => s.id).filter(Boolean);
+  let productIds = (profile.productCatalog || []).map((p, i) => p.id || `prd_${i}`);
+  // R7a: when the owner catalogue has no row ids (staging DnD), use fact-store ids so
+  // validateCall can accept get_price / check_availability proposals (same ids modelShadow uses).
+  try {
+    const FS = require('../../knowledge/factStore');
+    if (FS.factStoreEnabled()) {
+      const facts = FS.factsFor(profile || {});
+      if (!serviceIds.length) serviceIds = (facts.services || []).map((s) => s.id).filter(Boolean);
+      if (!(profile.productCatalog || []).some((p) => p && p.id)) {
+        const fromFacts = (facts.products || []).map((p) => p.id).filter(Boolean);
+        if (fromFacts.length) productIds = fromFacts;
+      }
+    }
+  } catch { /* keep catalogue enums */ }
   const rowIds = openRows.map((r) => r.id);
   const when = { type: 'object', additionalProperties: false, properties: { date: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, time: { type: 'string', pattern: '^\\d{2}:\\d{2}$' }, raw: { type: 'string', maxLength: 80 } } };
   const token = { type: 'string', pattern: '^ct_[a-z0-9]+$' };
@@ -19,8 +32,8 @@ function buildCatalogue({ profile = {}, openRows = [] } = {}) {
       parameters: { type: 'object', additionalProperties: false, required: ['booking_id'], properties: { booking_id: enumOrNone(rowIds), reason: { type: 'string', maxLength: 120 }, confirm_token: token } } },
     create_order: { description: 'Save a pickup order from catalogue products.', mutating: true,
       parameters: { type: 'object', additionalProperties: false, required: ['items'], properties: { items: { type: 'array', minItems: 1, maxItems: 10, items: { type: 'object', additionalProperties: false, required: ['product_id', 'qty'], properties: { product_id: enumOrNone(productIds), qty: { type: 'integer', minimum: 1, maximum: 999 } } } }, pickup_when: when, confirm_token: token } } },
-    check_availability: { description: 'Look up whether a service/product is offered or in stock. The only source for availability speech.', mutating: false,
-      parameters: { type: 'object', additionalProperties: false, properties: { service_id: enumOrNone(serviceIds), product_id: enumOrNone(productIds), query: { type: 'string', maxLength: 80 }, date: { type: 'string' } } } },
+    check_availability: { description: 'Look up whether a service/product is offered or in stock, or whether an area is served. The only source for availability speech.', mutating: false,
+      parameters: { type: 'object', additionalProperties: false, properties: { service_id: enumOrNone(serviceIds), product_id: enumOrNone(productIds), area: { type: 'string', maxLength: 60 }, query: { type: 'string', maxLength: 80 }, date: { type: 'string' } } } },
     get_price: { description: 'Look up a catalogue price.', mutating: false,
       parameters: { type: 'object', additionalProperties: false, properties: { service_id: enumOrNone(serviceIds), product_id: enumOrNone(productIds), query: { type: 'string', maxLength: 80 } } } },
     get_hours: { description: 'Opening hours from the tenant schedule.', mutating: false,

@@ -811,6 +811,10 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   const results = [];
   const catalogue = buildCatalogue({ profile, openRows: state.file.openRows });
   const mc = await consultModel(state, u, profile, model, catalogue);
+  // R7a: validated get_price / check_availability / get_hours → seed slots (copy lookup_file→recall).
+  // Applied before explain/FAQ mouth so explain can fire; override only when rules would hollow.
+  const r7seed = AM.applyValidatedReadSeed(mc, u, profile, state);
+  if (r7seed) state.trace.push({ turn: state.turn, r7a: { tool: r7seed.tool, kind: r7seed.kind } });
   if (typeof classify === 'function' && needsClassify(u, pickIntent(u, state, profile))) {
     try {
       const ticket = normalizeTicket(await classify({ text: u.text, profile, lang: state.lang }), profile);

@@ -294,6 +294,164 @@ function scoreRulesMouthSeed({ spokenLine, name, lastJobService, modelTimedOut =
   return { ok: true, verdict: 'seeded', reason: 'rules_mouth_without_model' };
 }
 
+
+/** R7a: validated C7 read proposals → Train templates (never model prose). */
+const R7_READS = new Set(['get_price', 'check_availability', 'get_hours']);
+
+/**
+ * True when rules mouth would be repair / didn't-catch / which-one / hollow reopen.
+ * Override gate for R7a — do not override Train-true info lines.
+ */
+function rulesMouthWouldHollow(u = {}) {
+  const intents = Array.isArray(u.intents) ? u.intents : [];
+  if (u.fragment && !u.service && !u.area) return true;
+  // follow-up on a services list with no bound row → which-one / service_detail loop
+  if (u.followup && !u.service && intents.some((i) => ['services', 'explain', 'want_know'].includes(i))) return true;
+  if (intents.includes('explain') && !u.service) return true;
+  if (intents.includes('price') && !u.service && !(u.products && u.products.length)) return true;
+  if (!intents.length && !u.service && !u.area && !(u.products && u.products.length) && !u.ack && !u.yes && !u.no && !u.done) return true;
+  return false;
+}
+
+/** First validateCall/validateProposal-ok read tool (not lookup_file — that has its own seed). */
+function validatedReadProposal(mc) {
+  if (!mc || !Array.isArray(mc.calls)) return null;
+  for (let i = 0; i < mc.calls.length; i++) {
+    const c = mc.calls[i];
+    const check = mc.checks && mc.checks[i];
+    if (!check || !check.ok) continue;
+    if (!R7_READS.has(c.name)) continue;
+    return { tool: c.name, args: (c.args && typeof c.args === 'object') ? c.args : {}, index: i };
+  }
+  return null;
+}
+
+function resolveServiceById(id, profile) {
+  if (!id || !profile) return null;
+  try {
+    const FS = require('../../knowledge/factStore');
+    if (FS.factStoreEnabled()) {
+      const f = (FS.factsFor(profile).services || []).find((s) => s.id === id);
+      if (f) return { ...f.row, name: f.row.name || f.name, factId: f.id, notes: f.row.notes || '', price_range: f.row.price_range || null, pricing: f.row.pricing };
+    }
+  } catch { /* fall through */ }
+  const row = (profile.servicesCatalog || []).find((s) => s && s.id === id);
+  return row ? { ...row } : null;
+}
+
+function resolveProductById(id, profile) {
+  if (!id || !profile) return null;
+  try {
+    const FS = require('../../knowledge/factStore');
+    if (FS.factStoreEnabled()) {
+      const f = (FS.factsFor(profile).products || []).find((p) => p.id === id);
+      if (f) return { ...f.row, name: f.name, product_id: f.id, price: f.row.price, in_stock: f.inStock };
+    }
+  } catch { /* fall through */ }
+  const row = (profile.productCatalog || []).find((p, i) => (p.id || `prd_${i}`) === id);
+  return row ? { ...row, product_id: row.id || id } : null;
+}
+
+function bindAreaFromProposal(name, profile) {
+  const raw = String(name || '').trim();
+  if (!raw) return null;
+  const low = raw.toLowerCase();
+  let listed = [];
+  try { listed = require('../listedAreas').listedAreaIds(profile || {}); } catch { listed = []; }
+  const hit = listed.find((a) => a === low || a.split(/\s+/).pop() === low);
+  if (hit) return { listed: true, name: hit.replace(/\b\w/g, (c) => c.toUpperCase()) };
+  const cap = raw.replace(/\b\w/g, (c) => c.toUpperCase()).split(/[ ,]/)[0];
+  return { listed: false, name: cap };
+}
+
+/**
+ * R7a bridge: map a validated read proposal → slot/intent seed for infoAnswer/explain/coverage.
+ * Returns null when no ok read, or when rules already have Train-true info (override=false path
+ * still returns null so the caller leaves rules unchanged).
+ */
+function validatedReadSeeds(mc, { profile = {}, u = {} } = {}) {
+  const prop = validatedReadProposal(mc);
+  if (!prop) return null;
+
+  if (prop.tool === 'get_hours') {
+    if (!rulesMouthWouldHollow(u) && (u.intents || []).includes('hours')) return null; // rules already hours
+    if (!rulesMouthWouldHollow(u) && (u.intents || []).length && !(u.intents || []).includes('hours')) return null;
+    const hollow = rulesMouthWouldHollow(u) || !(u.intents || []).includes('hours');
+    if (!hollow) return null;
+    return { tool: prop.tool, kind: 'hours', day: prop.args.day || null, override: true };
+  }
+
+  if (prop.tool === 'get_price') {
+    const service = resolveServiceById(prop.args.service_id, profile);
+    const product = resolveProductById(prop.args.product_id, profile);
+    if (!service && !product) return null;
+    // Override only when rules would which-price / hollow; leave Train-true bound price alone
+    if (u.service && (u.intents || []).includes('price') && !rulesMouthWouldHollow(u)) return null;
+    if (!rulesMouthWouldHollow(u) && u.service && !((u.intents || []).includes('price'))) return null;
+    const hollow = rulesMouthWouldHollow(u) || (!u.service && !(u.products && u.products.length));
+    if (!hollow) return null;
+    return { tool: prop.tool, kind: 'price', service, product, override: true };
+  }
+
+  if (prop.tool === 'check_availability') {
+    // Area (Kericho class): seed when rules did not bind the named town
+    if (prop.args.area) {
+      const area = bindAreaFromProposal(prop.args.area, profile);
+      if (!area) return null;
+      const already = u.area && String(u.area.name || '').toLowerCase() === String(area.name).toLowerCase();
+      if (already) return null;
+      return { tool: prop.tool, kind: 'coverage', area, override: true };
+    }
+    const service = resolveServiceById(prop.args.service_id, profile);
+    const product = resolveProductById(prop.args.product_id, profile);
+    if (!service && !product) return null;
+    // Rules already Train-true for this service (bound explain/offered) → leave
+    if (u.service && !rulesMouthWouldHollow(u)) return null;
+    if (!rulesMouthWouldHollow(u) && (u.intents || []).includes('services') && !u.followup) return null; // fixture (f) list
+    const hollow = rulesMouthWouldHollow(u) || !u.service;
+    if (!hollow) return null;
+    const text = String(u.text || '');
+    const wantExplain = u.followup
+      || (u.intents || []).includes('explain')
+      || /\b(tell me (a bit |a little |more )?about|nieleze|niambie|what (exactly|does|is)|baada|after[\s-]?build|maana|mean)\b/i.test(text);
+    const wantPrice = (u.intents || []).includes('price') || /\b(how much|ngapi|price|gharama)\b/i.test(text);
+    const kind = wantPrice ? 'price' : (wantExplain ? 'explain' : 'availability');
+    return { tool: prop.tool, kind, service, product, override: true };
+  }
+  return null;
+}
+
+/** Apply R7a seed onto NLU turn `u` (mutates). Returns the seed or null. */
+function applyValidatedReadSeed(mc, u, profile, state) {
+  const seed = validatedReadSeeds(mc, { profile, u, state });
+  if (!seed || !seed.override) return null;
+  if (seed.service) u.service = seed.service;
+  if (seed.product) u.products = [seed.product];
+  if (seed.area) {
+    u.area = seed.area;
+    if (!u.place) u.place = seed.area.name;
+  }
+  const drop = (name) => {
+    const i = u.intents.indexOf(name);
+    if (i >= 0) u.intents.splice(i, 1);
+  };
+  if (seed.kind === 'explain') {
+    drop('services'); drop('want_know');
+    if (!u.intents.includes('explain')) u.intents.unshift('explain');
+  } else if (seed.kind === 'price') {
+    drop('services'); drop('want_know');
+    if (!u.intents.includes('price')) u.intents.unshift('price');
+  } else if (seed.kind === 'coverage') {
+    if (!u.intents.includes('coverage')) u.intents.unshift('coverage');
+  } else if (seed.kind === 'hours') {
+    if (!u.intents.includes('hours')) u.intents.unshift('hours');
+  } else if (seed.kind === 'availability') {
+    drop('services');
+    if (!u.intents.includes('availability')) u.intents.unshift('availability');
+  }
+  return seed;
+}
+
 module.exports = {
   bindSafeName,
   bindSafeOpeningCard,
@@ -313,5 +471,11 @@ module.exports = {
   scoreAudibleActing,
   scoreRulesMouthSeed,
   lookupFileSeedsRecall,
+  rulesMouthWouldHollow,
+  validatedReadProposal,
+  validatedReadSeeds,
+  applyValidatedReadSeed,
+  resolveServiceById,
+  bindAreaFromProposal,
   HOLLOW_REOPEN,
 };
