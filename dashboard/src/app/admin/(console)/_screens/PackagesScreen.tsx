@@ -19,7 +19,7 @@ export async function PackagesScreen() {
     }
     return (
       <div className="space-y-4">
-        <AdminPageHeader title="Plans" />
+        <AdminPageHeader title={process.env.ADMIN_V2 === "on" ? "Packages" : "Plans"} />
         <AdminPackageVersionsPanel
           catalog={editor.catalog}
           businesses={editor.businesses}
