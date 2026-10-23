@@ -53,7 +53,8 @@ const TRANSACTIONAL = ['payment_change', 'address_change', 'cancel', 'change', '
 const INFO = ['payment_how', 'policy_returns', 'policy_deposit', 'policy_warranty', 'policy_cancel', 'greeting', 'who_are_you', 'services', 'coverage', 'recall', 'availability', 'price', 'hours', 'want_know'];
 const AREA_ASK = /\b(nafika|niko|nipo|mnafika|mnakuja|mtafika|mnafikana|cover|do you cover|travel fee|delivery fee|fee to|fare|ada ya|usafiri|do you deliver|do you come)\b|\bfair\b.{0,24}\b(kuja|come|to)\b/i;
 const POLICY_KEY = { policy_returns: 'returns', policy_deposit: 'deposit', policy_warranty: 'warranty', policy_cancel: 'cancellation' };
-const FEE_ASK = /\b(travel fee|delivery fee|fee to|fare|ada ya|usafiri|transport|how much|ngapi|bei)\b|\bfair\b.{0,24}\b(kuja|come|to)\b/i;
+// R3: travel/delivery fee lexicon only — bare how much|ngapi|bei is service price, not come_cost.
+const FEE_ASK = /\b(travel fee|delivery fee|fee to|fare|ada ya(?:\s+kuja)?|usafiri|transport|come cost|gharama ya kuja)\b|\bfair\b.{0,24}\b(kuja|come|to)\b|\b(how much|ngapi|bei).{0,40}\b(to (?:come|visit|deliver|kuja)|kuja|usafiri|fare|travel|delivery)\b|\b(to (?:come|visit|deliver)|kuja|usafiri|fare|travel|delivery).{0,40}\b(how much|ngapi|bei)\b/i;
 const DELIVER_ASK = /\b(deliver|delivery|mnafika|come to|do you come)\b/i;
 
 function createState({ profile = {}, callerPhone, contactName = null, openRows = [], pendingTasks = [], callId = null } = {}) {
@@ -350,6 +351,8 @@ async function commitSafe(state, p, handlers) {
   const before = state.outcomes.length;
   const out = await commitRaw(state, p, handlers, { idempotencyKey: key });
   const { rec } = out;
+  // R1: ok without a real Desk write id is hollow (dryRun / escalate-without-row) — fail → outbox, never "committed".
+  if (rec.ok && !rec.id && !rec.duplicate) rec.ok = false;
   if (!rec.ok) {
     state.outcomes.length = before; // a failed write is not booked / saved (A4)
     let task = null;
@@ -416,6 +419,18 @@ async function commitRaw(state, p, handlers, extra = {}) {
 // Open callbacks created earlier in this call (ids may be null in dry-run).
 function openCallbacks(state) { return (state.callbacks || []).filter((c) => c.open).map((c) => c.id).filter(Boolean); }
 function isArea(place, profile) { return !!(N.matchArea(place, profile)?.listed || /^(Kitengela|Ruiru|Kasarani|Kilimani|Karen|Westlands|Lavington|Kileleshwa|Rongai|Syokimau|Thika|Juja|Embakasi|Langata|Ngong|Kahawa|Roysambu|Donholm|Umoja|Kikuyu|Parklands|South B|South C|Athi River|Kiambu|Nairobi)$/i.test(String(place || '').trim())); }
+// R4: mid-thread = lastInfo / slots / open ask — ban intent reopen / want_know "prices, services or hours?"
+function midThread(state) {
+  const s = state.slots || {};
+  return Boolean(state.lastInfo || state.expecting || state.pending || state.intent
+    || s.service || s.place || (s.items && s.items.length) || s.when?.date || s.when?.time
+    || s.row || (s.complaint && s.complaint.length) || openQ(state, state.lang));
+}
+function noReopenLine(state, lang) {
+  const q = openQ(state, lang);
+  if (q) return `${R.info({ kind: 'repair' }, lang).split(/(?<=[.!?])\s/)[0]} ${q.trim()}`;
+  return R.info({ kind: 'ack', service: state.slots.service }, lang);
+}
 function resetIntent(state) {
   const keep = { name: state.slots.name, nameConfirmed: state.slots.nameConfirmed, nameCorrectionOf: state.slots.nameCorrectionOf };
   state.slots = { service: null, when: { date: null, time: null }, place: null, items: [], row: null, new_when: { date: null, time: null }, new_place: null, kind: null, topic: null, complaint: [], ...keep };
@@ -492,8 +507,13 @@ async function confirmSafe(state, u, profile, handlers, out, results, myTurn = s
   }
   if (yes) return out(propose(state, { ...p })); // a yes that is not on the next turn: read back again, fresh token
   if (u.no || u.done) { state.record?.('rejected', p, { errorCode: u.done ? 'caller_done' : 'caller_no' }); resetIntent(state); state.outcomes.push('declined'); return out(u.done ? R.info({ kind: 'bye' }, lang) : R.info({ kind: 'decline' }, lang), { end: u.done }); }
-  // "okay wait, let me check with my wife": nothing saved; the read-back stays open for the next turn
-  if (u.intents.includes('hold') || /\b(wait|ngoja|subiri|hold on|let me (check|ask|confirm|think)|nitaangalia|niulize|nifikirie)\b/i.test(u.text)) { p.issuedTurn = state.turn; return out(`${R.info({ kind: 'hold' }, lang)} ${q()}`); }
+  // R2: "okay wait" / ngoja mid-readback — nothing saved; pending stays; issuedTurn bump; never burn unclear budget into false close
+  if (u.intents.includes('hold') || /\b(wait|ngoja|subiri|hold on|let me (check|ask|confirm|think)|nitaangalia|niulize|nifikirie)\b|\bok(?:ay)?\s*,?\s*wait\b|\bsawa\s*,?\s*ngoja\b/i.test(u.text)) {
+    p.issuedTurn = state.turn;
+    state.pendingRepeats = 0;
+    state.echoAsked = false;
+    return out(`${R.info({ kind: 'hold' }, lang)} ${q()}`);
+  }
   state.pendingRepeats = (state.pendingRepeats || 0) + 1;
   if (state.pendingRepeats <= 1 && !state.echoAsked && !u.intents.length) { state.echoAsked = true; p.issuedTurn = state.turn; return out(R.ask('yes_no', 0, lang, { q: q() })); }
   if (state.pendingRepeats <= 1) return out(propose(state, { ...p }));
@@ -596,7 +616,10 @@ function infoAnswer(state, u, profile, kind) {
   }
   if (kind === 'greeting') return R.info({ kind: 'greeting' }, state.lang);
   if (kind === 'who_are_you') return R.info({ kind: 'who', agent: profile.agentName || 'Shy', biz: profile.businessName || '' }, state.lang);
-  if (kind === 'want_know') return R.info({ kind: 'want_know' }, state.lang, n);
+  if (kind === 'want_know') {
+    if (midThread(state) && state.lastInfo && state.lastInfo !== 'want_know') return R.info({ kind: 'ack', service: state.slots.service }, state.lang);
+    return R.info({ kind: 'want_know' }, state.lang, n);
+  }
   if (kind === 'price') {
     const named = /\b(cleaning|clean|for (an?|the)? ?\w+|ya \w+)\b/i.test(u.text);
     const svc = u.service || (!named && u.text.split(/\s+/).length <= 5 && state.slots.service && (fsOn() ? (() => { const f = FS.factsFor(profile).services.find((x) => x.row.name === state.slots.service); return f ? { ...f.row, factId: f.id } : null; })() : (profile.servicesCatalog || []).find((x) => x.name === state.slots.service))); const prod = u.products[0];
@@ -905,7 +928,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
       return out(infoAnswer(state, u, profile, 'coverage'));
     }
     if (!u.intents.length && (u.when?.time || ((u.when?.date || u.place) && state.slots.service)) && (u.place || state.slots.service) && vertical(profile) === 'home' && !u.ack && !u.done) { state.intent = 'book'; mergeSlots(state, u, profile); const st0 = stepIntent(state, u, profile); if (st0?.line) return out(st0.line); }
-    if (u.name && !u.intents.length) return out(nameSpeakable(state) ? R.info({ kind: 'greet_name', name: nameSpeakable(state) }, lang) : R.ask('intent', 0, lang));
+    if (u.name && !u.intents.length) return out(nameSpeakable(state) ? R.info({ kind: 'greet_name', name: nameSpeakable(state) }, lang) : (midThread(state) ? noReopenLine(state, lang) : R.ask('intent', 0, lang)));
     if (state.lastInfo === 'recall' && !u.ack) { const line = infoAnswer(state, u, profile, 'recall'); return out(line); }
     // off-catalogue item question: say plainly it isn't on our list (never guess stock or price)
     if (u.askedItem && !u.service && !u.products.length) {
@@ -919,6 +942,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
       return out(R.info({ kind: 'ack', service: state.slots.service }, lang));
     }
     if (u.fragment && state.turn > 1) { state.repairs = (state.repairs || 0) + 1; if (state.repairs <= 2) return out(R.info({ kind: 'repair' }, lang)); }
+    if (midThread(state)) return out(noReopenLine(state, lang));
     const n = state.unknownCount++;
     if (n === 2 && !state.ladderOffered && !(state.callbacks || []).length) { state.ladderOffered = true; return out(propose(state, { tool: 'create_handoff', kind: 'ladder', reason: 'callback' })); }
     return out(R.ask('intent', n % 2, lang));
@@ -932,7 +956,9 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     resetIntent(state);
     return out(R.receipt(rec, lang), { ackOk: true });
   }
-  return out(st?.line || R.ask('intent', 1, lang));
+  if (st?.line) return out(st.line);
+  if (midThread(state)) return out(noReopenLine(state, lang));
+  return out(R.ask('intent', 1, lang));
 }
 
 function finishCall(state, { businessName, callerPhone, profile = null } = {}) {
