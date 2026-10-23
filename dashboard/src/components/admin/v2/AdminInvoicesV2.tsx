@@ -18,7 +18,7 @@ import {
   type InvoiceRow,
   type InvoiceView,
 } from "@/lib/ops/invoicesView";
-import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState } from "@/components/ops";
+import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState, UnlockCta} from "@/components/ops";
 import { ButtonLink } from "@/components/ui/Button";
 import "@/styles/ops.css";
 
@@ -231,8 +231,16 @@ export function AdminInvoicesV2({
               { label: "Business", href: businessPaneHref(it.businessId, "money") },
             ] : undefined}
             footer={it ? (
-              <div className="flex w-full items-center justify-between gap-2">
-                <span className="text-ops-label text-ink-2">Resend, credit note and void need a fresh code; they arrive with step-up.</span>
+              <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                <UnlockCta
+                  site="invoices"
+                  action="invoices:money"
+                  target={it.id}
+                  what="resend, credit or void this invoice"
+                  label="Unlock"
+                  variant="ghost"
+                  observedHint="Resend, credit note and void land with the credit-notes slice. Observe only logged the gate."
+                />
                 <ButtonLink href={`/admin/billing/invoices/${it.id}`} variant="primary" size="md">Open invoice</ButtonLink>
               </div>
             ) : undefined}

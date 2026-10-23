@@ -41,17 +41,16 @@ test("Numbers v2 is behind ADMIN_V2, Assign/Release write via OpsConfirm, Unlock
   assert.match(ui, /strength="destructive"/);
   assert.match(ui, /method: "POST"/);
   assert.match(ui, /\/api\/did-pool/);
-  assert.match(ui, /data-honest="unlock"/);
+  assert.match(ui, /data-honest="unlock"|UnlockCta/);
+  assert.match(read("dashboard/src/components/ops/UnlockCta.tsx"), /data-honest="unlock"/);
   assert.match(ui, /data-honest="hold"/);
   assert.match(ui, /Secure sign-in is next/);
   // Unlock/Hold must not POST — only Assign/Release call postPool / fetch.
-  const honest = ui.split("data-honest");
-  assert.ok(honest.length >= 3);
-  for (const chunk of honest.slice(1)) {
-    const end = chunk.indexOf("</Button>");
-    const btn = chunk.slice(0, end);
-    assert.doesNotMatch(btn, /postPool|fetch\(/);
-  }
+  assert.match(ui, /UnlockCta/);
+  assert.doesNotMatch(read("dashboard/src/components/ops/UnlockCta.tsx"), /postPool|did-pool/);
+  const holdChunk = ui.split('data-honest="hold"')[1] || "";
+  const holdBtn = holdChunk.slice(0, holdChunk.indexOf("</Button>"));
+  assert.doesNotMatch(holdBtn, /postPool|fetch\(/);
   for (const s of [ui, read("dashboard/src/lib/ops/numbersView.ts")]) assert.doesNotMatch(s, /sautikit|bachs|twilio|supabase|africastalking/i);
 });
 

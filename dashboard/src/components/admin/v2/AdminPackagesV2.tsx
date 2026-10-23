@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { PackageVersionCatalog, PackageVersionRow, VersionPackage } from "@/lib/packageVersionCatalog";
-import { EmptyState, PageHeader, SplitLayout, SplitPane, StatusPill, type OpsTone } from "@/components/ops";
-import { Button } from "@/components/ui/Button";
+import { EmptyState, PageHeader, SplitLayout, SplitPane, StatusPill, type OpsTone, UnlockCta } from "@/components/ops";
 import "@/styles/ops.css";
 
 const ksh = (n: number) => `KSh ${n.toLocaleString("en-KE")}`;
@@ -28,7 +27,6 @@ export function AdminPackagesV2({
   /** Dev fixture: open a row so the pane fills the blank-band region. */
   initialSel?: string | null;
 }) {
-  const [note, setNote] = useState(false);
   const [sel, setSel] = useState<string | null>(initialSel);
   const rows: Flat[] = useMemo(
     () =>
@@ -46,9 +44,12 @@ export function AdminPackagesV2({
         title="Packages"
         count={rows.length}
         actions={
-          <Button type="button" variant="primary" size="sm" onClick={() => setNote(true)}>
-            Unlock to edit
-          </Button>
+          <UnlockCta
+            site="packages"
+            action="packages:edit"
+            what="draft or publish packages"
+            observedHint="Draft and publish land with the Packages remake. Observe only logged the gate."
+          />
         }
       />
       <p className="pb-ops-2 text-ops-label text-ink-2">
@@ -58,13 +59,7 @@ export function AdminPackagesV2({
         {" · Catalog only (minutes and terms) · assign from the business"}
         {readOnlyHint ? <span className="ms-1">· {readOnlyHint}</span> : null}
       </p>
-      {note ? (
-        <p className="mb-ops-2 rounded-sm border border-hairline bg-canvas px-ops-3 py-ops-2 text-ops-label text-ink-2" role="status">
-          Secure sign-in is next. Drafting or publishing waits for step-up — this button does not change packages yet.{" "}
-          <button type="button" className="font-semibold text-ink underline-offset-2 hover:underline" onClick={() => setNote(false)}>Dismiss</button>
-        </p>
-      ) : null}
-      {rows.length === 0 ? (
+            {rows.length === 0 ? (
         <EmptyState title="No packages yet." />
       ) : (
         <>

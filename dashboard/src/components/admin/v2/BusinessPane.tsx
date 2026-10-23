@@ -8,7 +8,7 @@ import { statusLabel } from "@/lib/adminBusinessUi";
 import { businessTone, callLength, chargingLabel, intentLabel, numberLabel } from "@/lib/ops/businessesView";
 import { ksh } from "@/lib/ops/invoicesView";
 import { BUSINESS_PANE_SECTIONS, usedShare, type BusinessPaneData, type BusinessPaneSection } from "@/lib/ops/businessPane";
-import { OpsConfirm, SplitPane, StatusPill } from "@/components/ops";
+import { OpsConfirm, SplitPane, StatusPill, StepUpSheet } from "@/components/ops";
 import { Button } from "@/components/ui/Button";
 import { ARCHIVE_RESTORE_DAYS } from "@/lib/adminBusinessModel";
 import { postJson } from "@/lib/ops/archiveRelease";
@@ -128,7 +128,7 @@ export function BusinessPane({
           ["Billing", u?.statusLabel || "—"],
         ]} />
         {b ? <Go href={`/admin/billing/invoices?business=${b.id}`}>Invoices for this business</Go> : null}
-        <p className="text-ops-label text-ink-2">Package change, minutes and charging move here with step-up codes.</p>
+        <p className="text-ops-label text-ink-2">Package change, minutes and charging need Unlock first — use Unlock in the footer.</p>
       </>
     ) : null),
     number: b ? (
@@ -169,6 +169,7 @@ export function BusinessPane({
     )),
   };
 
+  const [unlockOpen, setUnlockOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [archivePending, setArchivePending] = useState(false);
   const [archiveError, setArchiveError] = useState("");
@@ -189,9 +190,14 @@ export function BusinessPane({
     <div className="flex flex-col gap-2">
       {archived ? <p className="text-ops-body text-ink-2" role="status">Archived. Restore within {ARCHIVE_RESTORE_DAYS} days.</p> : null}
       {archiveError && !archiving ? <p className="text-ops-body text-attention" role="alert">{archiveError}</p> : null}
-      {canArchive ? (
-        <div><Button type="button" variant="ghost" size="sm" data-action="archive" onClick={() => { setArchiveError(""); setArchiving(true); }}>Archive</Button></div>
-      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="ghost" size="sm" data-honest="unlock" data-stepup="business" onClick={() => setUnlockOpen(true)}>
+          Unlock
+        </Button>
+        {canArchive ? (
+          <Button type="button" variant="ghost" size="sm" data-action="archive" onClick={() => { setArchiveError(""); setArchiving(true); }}>Archive</Button>
+        ) : null}
+      </div>
     </div>
   ) : undefined;
 
@@ -222,6 +228,14 @@ export function BusinessPane({
         </div>
       </div>
     </SplitPane>
+    <StepUpSheet
+      open={unlockOpen && !!businessId}
+      onClose={() => setUnlockOpen(false)}
+      action="business:write"
+      target={businessId}
+      what="change package, minutes, charging or archive this business"
+      observedHint="Archive stays on the confirm sheet. Package, minutes and charging edits land with the next BusinessPane write slice."
+    />
     <OpsConfirm
       open={archiving && !!businessId}
       onClose={() => { if (!archivePending) setArchiving(false); }}
