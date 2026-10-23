@@ -1,7 +1,8 @@
 "use client";
 
 import { businessPaneHref } from "@/lib/ops/businessPane";
-import { releaseBlockReason } from "@/lib/adminBusinessModel";
+import { ARCHIVE_RESTORE_DAYS, releaseBlockReason } from "@/lib/adminBusinessModel";
+import { archiveThenRelease, releaseActions } from "@/lib/ops/archiveRelease";
 import { useRouter } from "next/navigation";
 import { startTransition, useEffect, useMemo, useState } from "react";
 import {
@@ -26,7 +27,7 @@ import "@/styles/ops.css";
 const DATE = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" });
 const day = (iso: string | null) => (iso ? DATE.format(new Date(iso)) : "—");
 
-type ConfirmKind = "assign" | "release" | null;
+type ConfirmKind = "assign" | "release" | "archive_release" | null;
 type HonestNote = "unlock" | "hold" | null;
 
 /** Numbers as a table plus pane (ADMIN_V2). Assign/Release write through OpsConfirm; Unlock/Hold stay honest until step-up enrolment. */
@@ -68,6 +69,24 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
         isActive: it.businessActive,
       })
     : null;
+  const acts = releaseActions(state, blockRelease, it?.businessId ?? null);
+
+  async function runArchiveRelease() {
+    if (!it?.businessId) return;
+    setPending(true);
+    setError("");
+    setStatus("");
+    const r = await archiveThenRelease(it.businessId, it.e164);
+    setPending(false);
+    if (!r.ok) {
+      setError(r.error);
+      if (r.step === "release") startTransition(() => router.refresh());
+      return;
+    }
+    setConfirm(null);
+    setStatus(`${it.businessName ?? "Business"} archived. ${formatE164(it.e164)} is Available.`);
+    startTransition(() => router.refresh());
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -265,21 +284,22 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
             Assign
           </Button>
         ) : null}
+        {acts.archiveRelease ? (
+          <Button type="button" variant="primary" size="sm" data-action="archive-release" onClick={() => { setError(""); setNote(null); setConfirm("archive_release"); }}>
+            Archive &amp; release
+          </Button>
+        ) : null}
         {state === "assigned" ? (
-          blockRelease ? (
-            <>
+          <>
+            {acts.justReleaseWhy ? (
               <span id={`release-why-${it.id}`} className="sr-only">
-                {blockRelease}
+                {acts.justReleaseWhy}
               </span>
-              <Button type="button" variant="ghost" size="sm" disabled title={blockRelease} aria-describedby={`release-why-${it.id}`}>
-                Release
-              </Button>
-            </>
-          ) : (
-            <Button type="button" variant="ghost" size="sm" onClick={openRelease}>
-              Release
+            ) : null}
+            <Button type="button" variant="ghost" size="sm" data-action="just-release" onClick={openRelease} disabled={!acts.justRelease} title={acts.justReleaseWhy ?? undefined} aria-describedby={acts.justReleaseWhy ? `release-why-${it.id}` : undefined}>
+              Just release
             </Button>
-          )
+          </>
         ) : null}
         <Button type="button" variant="ghost" size="sm" data-honest="hold" onClick={() => showHonest("hold")}>
           Hold
@@ -382,6 +402,22 @@ export function AdminNumbersV2({ rows: all, waiting, nowIso }: { rows: NumberRow
             ? it.businessName
               ? `${formatE164(it.e164)} returns to Available. ${it.businessName} waits for a new number.`
               : `${formatE164(it.e164)} returns to Available.`
+            : ""}
+        </p>
+      </OpsConfirm>
+      <OpsConfirm
+        open={confirm === "archive_release" && !!it}
+        onClose={() => { if (!pending) setConfirm(null); }}
+        onConfirm={() => { void runArchiveRelease(); }}
+        title="Archive the business and release this number?"
+        strength="destructive"
+        confirmLabel="Archive & release"
+        pending={pending}
+      >
+        {error ? <p className="pb-2 text-attention" role="alert">{error}</p> : null}
+        <p>
+          {it
+            ? `${it.businessName ?? "This business"} is archived: its line closes, charging stops and the owner can't sign in. You can restore it within ${ARCHIVE_RESTORE_DAYS} days. Then ${formatE164(it.e164)} returns to Available.`
             : ""}
         </p>
       </OpsConfirm>

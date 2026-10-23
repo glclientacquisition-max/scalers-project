@@ -54,3 +54,41 @@ test("Numbers v2 is behind ADMIN_V2, Assign/Release write via OpsConfirm, Unlock
   }
   for (const s of [ui, read("dashboard/src/lib/ops/numbersView.ts")]) assert.doesNotMatch(s, /sautikit|bachs|twilio|supabase|africastalking/i);
 });
+
+const loadAR = () => import(path.join(root, "dashboard/src/lib/ops/archiveRelease.ts"));
+
+test("s22: live business offers Archive & release, Just release only when not blocked", async () => {
+  const { releaseActions } = await loadAR();
+  assert.deepEqual(releaseActions("assigned", "Archive first", "b1"), { archiveRelease: true, justRelease: false, justReleaseWhy: "Archive first" });
+  assert.deepEqual(releaseActions("assigned", null, "b1"), { archiveRelease: false, justRelease: true, justReleaseWhy: null });
+  assert.equal(releaseActions("available", null, null).justRelease, false);
+  assert.equal(releaseActions("held", "x", "b1").archiveRelease, false);
+});
+
+test("s22: archive then release, in order, and says which step failed", async () => {
+  const { archiveThenRelease } = await loadAR();
+  const calls = [];
+  const ok = (url, body) => { calls.push([url, body.action]); return Promise.resolve({ ok: true }); };
+  assert.deepEqual(await archiveThenRelease("b1", "+254700000001", ok), { ok: true });
+  assert.deepEqual(calls, [["/api/admin/businesses", "archive"], ["/api/did-pool", "release"]]);
+  const calls2 = [];
+  const failA = (url) => { calls2.push(url); return Promise.resolve({ ok: false, error: "no" }); };
+  const r1 = await archiveThenRelease("b1", "+254700000001", failA);
+  assert.equal(r1.step, "archive");
+  assert.equal(calls2.length, 1);
+  const failR = (url) => Promise.resolve({ ok: url.includes("businesses") });
+  const r2 = await archiveThenRelease("b1", "+254700000001", failR);
+  assert.equal(r2.step, "release");
+  assert.match(r2.error, /archived, but the number was not released/);
+});
+
+test("s22: UI wires Archive & release, Just release, and BusinessPane Archive via OpsConfirm", () => {
+  const ui = read("dashboard/src/components/admin/v2/AdminNumbersV2.tsx");
+  assert.match(ui, /confirmLabel="Archive & release"/);
+  assert.match(ui, /Just release/);
+  assert.doesNotMatch(ui, /254709221536|Done and Dusted/);
+  const pane = read("dashboard/src/components/admin/v2/BusinessPane.tsx");
+  assert.match(pane, /confirmLabel="Archive business"/);
+  assert.match(pane, /strength="destructive"/);
+  assert.match(pane, /action: "archive"/);
+});
