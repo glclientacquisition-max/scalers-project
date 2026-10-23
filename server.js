@@ -4514,6 +4514,9 @@ mediaWss.on('connection', (ws, req) => {
           const mem = brainProfile?.callerMemory || {};
           return createBrainV2Live({
             applyTools: (parsed) => applyGeminiTools(callKey, parsed, { v2Owned: true }),
+            // C7 BRAIN_V2_MODEL=shadow: per-turn model-vs-rules stage on this turn's trace row (inert when off)
+            onModelStage: (stage) => { try { voiceTrace.noteBrainV2Model({ ...stage, turnIndex: stage.turnIndex ?? voiceTrace.currentTurnIndex() }); } catch { /* trace only */ } },
+            traceTurnIndex: () => voiceTrace.currentTurnIndex(),
             callSid: callKey,
             recordWriteReceipt: typeof db.recordWriteReceipt === 'function' ? db.recordWriteReceipt : undefined,
             confirmCallerName: typeof db.confirmCallerName === 'function' ? db.confirmCallerName : undefined,
@@ -4572,6 +4575,9 @@ mediaWss.on('connection', (ws, req) => {
             const mem = brainProfile?.callerMemory || {};
             brainV2Live = createBrainV2Live({
               applyTools: (parsed) => applyGeminiTools(callKey, parsed),
+              // C7 BRAIN_V2_MODEL=shadow: per-turn model-vs-rules stage on this turn's trace row (inert when off)
+              onModelStage: (stage) => { try { voiceTrace.noteBrainV2Model({ ...stage, turnIndex: stage.turnIndex ?? voiceTrace.currentTurnIndex() }); } catch { /* trace only */ } },
+              traceTurnIndex: () => voiceTrace.currentTurnIndex(),
               // BRAIN_V2_COMMIT_SAFETY receipts (#845) + name confirm (#844, when present); unused with the flag off
               callSid: callKey,
               recordWriteReceipt: typeof db.recordWriteReceipt === 'function' ? db.recordWriteReceipt : undefined,

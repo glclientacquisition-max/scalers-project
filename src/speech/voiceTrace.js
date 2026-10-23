@@ -228,6 +228,7 @@ function noopTrace() {
     noteCall: noop,
     noteAudioSegments: noop,
     noteBrainV2Shadow: noop,
+    noteBrainV2Model: noop,
     currentTurnIndex: noop,
     commitTurn: noop,
     finishCall: async () => null,
@@ -581,6 +582,32 @@ function createVoiceTrace(opts = {}) {
     return row;
   }
 
+  // C7 BRAIN_V2_MODEL=shadow: payload.stages[stage='brain_v2_model'] on the same turn row.
+  // The stage is built redacted (no raw phones); text fields are re-redacted here as a backstop.
+  const modelPending = new Map();
+  function attachModel(record, stage) {
+    const deep = (v) => (typeof v === 'string' ? (/\d{7}/.test(v.replace(/[\s-]/g, '')) && !/^\d{4}-\d{2}-\d{2}$/.test(v) ? redactText(v) : v) : Array.isArray(v) ? v.map(deep) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === 'thoughtSignature' ? x : deep(x)])) : v);
+    const row = deep(stage);
+    record.stages.push(row);
+    return row;
+  }
+  function noteBrainV2Model(stage = {}) {
+    if (!stage || typeof stage !== 'object') return null;
+    const idx = Number(stage.turnIndex);
+    if (open && open.turnIndex === idx) { modelPending.set(idx, stage); return null; }
+    const record = committedTurns.find((row) => row.turnIndex === idx);
+    if (!record) return null;
+    const row = attachModel(record, stage);
+    if (typeof sink.update === 'function') {
+      const update = Promise.resolve(sink.update(record)).catch((err) => {
+        console.warn('[voice-trace] model shadow update failed:', err?.message || err);
+      });
+      pendingWrites.add(update);
+      update.finally(() => pendingWrites.delete(update));
+    }
+    return row;
+  }
+
   function commitTurn(extra = {}) {
     if (!open) return null;
     const turnStartedAt = Number(extra.turnStartedAt || 0);
@@ -602,6 +629,11 @@ function createVoiceTrace(opts = {}) {
       const pendingShadow = shadowPending.get(open.turnIndex);
       shadowPending.delete(open.turnIndex);
       attachShadow(open, pendingShadow);
+    }
+    if (modelPending.has(open.turnIndex)) {
+      const pm = modelPending.get(open.turnIndex);
+      modelPending.delete(open.turnIndex);
+      attachModel(open, pm);
     }
     const record = open;
     open = null;
@@ -712,6 +744,7 @@ function createVoiceTrace(opts = {}) {
     noteCall: guard(noteCall),
     noteAudioSegments: guard(noteAudioSegments),
     noteBrainV2Shadow: guard(noteBrainV2Shadow),
+    noteBrainV2Model: guard(noteBrainV2Model),
     currentTurnIndex: guard(currentTurnIndex),
     commitTurn: guard(commitTurn),
     finishCall: async () => {
