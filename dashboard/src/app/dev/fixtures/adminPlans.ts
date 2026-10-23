@@ -133,3 +133,27 @@ export const ADMIN_PLANS_BUSINESSES: BusinessPlanRow[] = [
     minutesIncluded: 0,
   },
 ];
+
+/** Dense catalog for Packages v2 blank-band shots (many versions fill the split). */
+export const ADMIN_PACKAGES_V2_CATALOG: PackageVersionCatalog = {
+  ...ADMIN_PLANS_CATALOG,
+  packages: [
+    ...ADMIN_PLANS_CATALOG.packages,
+    ...Array.from({ length: 12 }, (_, i) =>
+      pack(`pkg-extra-${i}`, `extra_${i}`, `Extra ${i + 1}`, [
+        versionRow(`ver-extra-${i}-1`, 1, i % 5 === 0 ? "draft" : i % 7 === 0 ? "retired" : "published", {
+          monthlyPriceKes: 3000 + i * 500,
+          minutes: 120 + i * 40,
+          seats: 2 + (i % 4),
+          subscriberCount: (i * 3) % 17,
+        }),
+        versionRow(`ver-extra-${i}-2`, 2, "draft", {
+          monthlyPriceKes: 3500 + i * 500,
+          minutes: 160 + i * 40,
+          seats: 3 + (i % 4),
+          subscriberCount: 0,
+        }),
+      ]),
+    ),
+  ],
+};

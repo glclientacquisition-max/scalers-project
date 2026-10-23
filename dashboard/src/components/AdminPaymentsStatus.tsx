@@ -211,7 +211,7 @@ export function AdminPaymentsStatus({ status }: { status: BachsStatusView }) {
                 label="Plan changes"
                 title={(next) => (next ? "Turn owner plan changes on?" : "Turn owner plan changes off?")}
                 explain={(next) =>
-                  next ? "Owners can change plan when Desk ships the port." : "Owner plan change stays closed."
+                  next ? "Owners can change plan from the desk." : "Owner plan change stays closed."
                 }
                 confirmLabel={(next) => (next ? "Turn on" : "Turn off")}
                 onSave={(next, reason) => saveRuntimeFlag("desk_plan_change", next, reason)}

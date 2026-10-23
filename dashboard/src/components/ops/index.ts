@@ -8,4 +8,4 @@ export { Drawer } from "./Drawer";
 export { OpsConfirm, type ConfirmStrength } from "./OpsConfirm";
 export { SplitPane, SplitLayout, paneSections, type PaneSections, type PaneFact, type PaneChange, type PaneEvent, type PaneLink } from "./SplitPane";
 export { Headline, type HeadlineAction } from "./Headline";
-export { SkelTable, SkelPhoneRows, SkelHeadline, SkelPane, type SkelCol } from "./Skeletons";
+export { SkelTable, SkelPhoneRows, SkelHeadline, SkelPane, SkelKpi, SkelSplit, type SkelCol } from "./Skeletons";

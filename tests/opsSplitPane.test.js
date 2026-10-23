@@ -40,10 +40,12 @@ describe("split pane sections", () => {
 });
 
 describe("split pane layout", () => {
-  it("is 560px, 640px from 1440, and the list keeps 640px", () => {
-    assert.match(rule(css, ".ops-split-pane"), /width: min\(560px, calc\(100% - 640px\)\)/);
+  it("fills when pane closed; softens 640 below 1280; 640 pane from 1440", () => {
+    assert.match(rule(css, ".ops-split-pane"), /width: min\(560px, calc\(100% - 480px\)\)/);
+    assert.match(css, /@media \(min-width: 1280px\) \{\s*\.ops-split-pane \{\s*width: min\(560px, calc\(100% - 640px\)\)/);
     assert.match(css, /@media \(min-width: 1440px\) \{\s*\.ops-split-pane \{\s*width: 640px;/);
-    assert.match(rule(css, ".ops-split-list"), /min-width: 640px/);
+    assert.match(rule(css, ".ops-split-list"), /min-width: 0/);
+    assert.match(css, /\.ops-split:has\(\[data-split-pane\]\) \.ops-split-list \{\s*min-width: 640px;/);
   });
   it("is a bottom sheet below md and never a centred modal", () => {
     assert.match(pane, /if \(phone\) \{[\s\S]*<Sheet /);

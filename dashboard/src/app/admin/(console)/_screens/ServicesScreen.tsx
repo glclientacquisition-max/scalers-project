@@ -2,6 +2,7 @@
 import { AdminOpsNotices, AdminPlatformOpsForm } from "@/components/AdminPlatformOpsForm";
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AdminServicesV2 } from "@/components/admin/v2/AdminServicesV2";
 import { PlatformRunBoard } from "@/components/PlatformRunBoard";
 import { logAdminError } from "@/lib/adminErrors";
 import { readPlatformOps } from "@/lib/platformOps";
@@ -15,6 +16,10 @@ export async function ServicesScreen() {
   } catch (err) {
     logAdminError("platform", err);
     return <AdminSetupError />;
+  }
+
+  if (process.env.ADMIN_V2 === "on") {
+    return <AdminServicesV2 snapshot={snapshot} />;
   }
 
   return (

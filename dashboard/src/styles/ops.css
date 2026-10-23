@@ -138,16 +138,23 @@
 }
 
 /*
- * Split pane (slice 2b). Sits in the page flow beside the list. 560px, 640px from 1440.
- * The list never drops under 640px; between md and 1280 the pane gives way first.
+ * Split pane (slice 2b). Sits beside the list. Pane 560px (640 from 1440).
+ * When the pane is closed the list fills the row (flex-1, no forced 640).
+ * Below ~1280 soften the list min-width so Home/Invoices have no empty right band.
  */
 .ops-split-pane {
   flex: 0 0 auto;
-  width: min(560px, calc(100% - 640px));
-  min-width: 360px;
+  width: min(560px, calc(100% - 480px));
+  min-width: 320px;
   position: sticky;
   top: 0;
   max-height: calc(100dvh - 72px);
+}
+@media (min-width: 1280px) {
+  .ops-split-pane {
+    width: min(560px, calc(100% - 640px));
+    min-width: 360px;
+  }
 }
 @media (min-width: 1440px) {
   .ops-split-pane {
@@ -155,7 +162,14 @@
   }
 }
 .ops-split-list {
-  min-width: 640px;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+@media (min-width: 1280px) {
+  .ops-split:has([data-split-pane]) .ops-split-list {
+    min-width: 640px;
+  }
 }
 /* md and up the pair is one viewport tall: the list scrolls inside, the pane footer stays in view. */
 @media (min-width: 768px) {
@@ -164,11 +178,6 @@
   }
   .ops-split-pane {
     max-height: none;
-  }
-}
-@media (max-width: 767.98px) {
-  .ops-split-list {
-    min-width: 0;
   }
 }
 
