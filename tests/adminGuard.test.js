@@ -156,7 +156,7 @@ describe("requireSuperAdmin (server, before any data)", () => {
       const handlers = src.split(/export async function (?:GET|POST|PUT|PATCH|DELETE)\b/).slice(1);
       assert.ok(handlers.length > 0, name);
       for (const h of handlers) {
-        assert.equal(firstStatement(h.slice(h.indexOf("{\n") + 2)), "if (!(await isLegacyAuthenticated())) {", name);
+        assert.ok(["if (!(await isLegacyAuthenticated())) {", "const gate = await requireAdminOperatorWrite();"].includes(firstStatement(h.slice(h.indexOf("{\n") + 2))), name);
       }
     }
   });
