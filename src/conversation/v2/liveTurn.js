@@ -64,8 +64,26 @@ function callerFile(opts = {}) {
   });
   return {
     callerPhone: file.callerPhone || opts.callerPhone || null,
-    contactName: file.contactName || null,
+    contactName: file.contactName || file.displayName || null,
+    displayName: file.displayName || file.contactName || null,
     openRows,
+    sharedLine: file.sharedLine === true,
+    nameConfirmed: file.nameConfirmed === true,
+    returning: file.returning === true
+      || Boolean(file.contactName && file.nameConfirmed === true)
+      || openRows.some((r) => r && r.service_name),
+    lastVisit: file.lastVisit && (file.lastVisit.service_name || file.lastVisit.job || file.lastVisit.service)
+      ? {
+          id: file.lastVisit.id || null,
+          kind: file.lastVisit.kind === 'request' ? 'request' : 'visit',
+          type: file.lastVisit.type || null,
+          service_name: file.lastVisit.service_name || file.lastVisit.job || file.lastVisit.service || null,
+          window_start: file.lastVisit.window_start || file.lastVisit.windowStart || null,
+          when_text: file.lastVisit.when_text || file.lastVisit.whenText || (typeof file.lastVisit.when === 'string' ? file.lastVisit.when : null) || null,
+          address_landmark: file.lastVisit.address_landmark || file.lastVisit.place || null,
+          status: file.lastVisit.status || 'done',
+        }
+      : null,
   };
 }
 
@@ -107,6 +125,10 @@ function createBrainV2Live(opts = {}) {
       callerPhone: file.callerPhone,
       contactName: file.contactName,
       openRows: file.openRows,
+      sharedLine: file.sharedLine,
+      nameConfirmed: file.nameConfirmed,
+      returning: file.returning,
+      lastVisit: file.lastVisit,
       callId: opts.callSid || null,
     });
     return state;

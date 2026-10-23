@@ -7,6 +7,7 @@
 const L = require('./lexicon');
 const N = require('./nlu');
 const R = require('./receipts');
+const AM = require('./audibleMouth');
 const { buildCatalogue, validateCall } = require('./catalogue');
 const { listedAreaIds, listedAreaRows } = require('../listedAreas');
 const { compileSpokenCatalogue, joinList } = require('../spokenCatalogue');
@@ -57,14 +58,32 @@ const POLICY_KEY = { policy_returns: 'returns', policy_deposit: 'deposit', polic
 const FEE_ASK = /\b(travel fee|delivery fee|fee to|fare|ada ya(?:\s+kuja)?|usafiri|transport|come cost|gharama ya kuja)\b|\bfair\b.{0,24}\b(kuja|come|to)\b|\b(how much|ngapi|bei).{0,40}\b(to (?:come|visit|deliver|kuja)|kuja|usafiri|fare|travel|delivery)\b|\b(to (?:come|visit|deliver)|kuja|usafiri|fare|travel|delivery).{0,40}\b(how much|ngapi|bei)\b/i;
 const DELIVER_ASK = /\b(deliver|delivery|mnafika|come to|do you come)\b/i;
 
-function createState({ profile = {}, callerPhone, contactName = null, openRows = [], pendingTasks = [], callId = null } = {}) {
+function createState({ profile = {}, callerPhone, contactName = null, openRows = [], pendingTasks = [], callId = null, sharedLine = false, nameConfirmed = false, returning = false, lastVisit = null } = {}) {
+  const file = {
+    contactName,
+    displayName: contactName,
+    openRows: openRows.map(normRow),
+    pendingTasks,
+    sharedLine: sharedLine === true,
+    nameConfirmed: nameConfirmed === true,
+    returning: returning === true || nameConfirmed === true || openRows.some((r) => r && (r.service_name || r.service)),
+    lastVisit: lastVisit ? normRow(lastVisit) : null,
+  };
+  const slots = { service: null, when: { date: null, time: null }, place: null, name: null, items: [], row: null, new_when: { date: null, time: null }, new_place: null, kind: null, topic: null, complaint: [] };
+  // Bind-safe seed only: confirmed + not shared → slots carry the name for templates; never invent.
+  if (file.nameConfirmed && !file.sharedLine && contactName) {
+    const staff = (profile.staffNames || []).map((s) => String(s).toLowerCase());
+    if (!staff.includes(String(contactName).toLowerCase())) {
+      slots.name = contactName;
+      slots.nameConfirmed = true;
+    }
+  }
   return {
     v: 2, callId, turn: 0, lang: null, intent: null, phase: 'collect', expecting: null,
-    slots: { service: null, when: { date: null, time: null }, place: null, name: null, items: [], row: null, new_when: { date: null, time: null }, new_place: null, kind: null, topic: null, complaint: [] },
-    asked: {}, pending: null, tokenSeq: 0, lastLine: '', lastInfo: null, infoRepeat: {}, unknownCount: 0,
-    callerPhone, file: { contactName, openRows: openRows.map(normRow), pendingTasks },
+    slots, asked: {}, pending: null, tokenSeq: 0, lastLine: '', lastInfo: null, infoRepeat: {}, unknownCount: 0,
+    callerPhone, file,
     staffNames: (profile.staffNames || []).map((s) => String(s).toLowerCase()),
-    outcomes: [], receipts: [], callbacks: [], trace: [], ended: false,
+    outcomes: [], receipts: [], callbacks: [], trace: [], ended: false, welcomed: false,
   };
 }
 function normRow(r) {
@@ -630,7 +649,11 @@ function infoAnswer(state, u, profile, kind) {
     }[kind];
     return R.info({ kind: 'policy', line: compileAskReceipt(profile, { kind: ask }, state.lang) }, state.lang);
   }
-  if (kind === 'greeting') return R.info({ kind: 'greeting' }, state.lang);
+  if (kind === 'greeting') {
+    const wb = AM.openingKnownSpeech(state, state.lang);
+    if (wb) { state.welcomed = true; return wb; }
+    return R.info({ kind: 'greeting' }, state.lang);
+  }
   if (kind === 'who_are_you') return R.info({ kind: 'who', agent: profile.agentName || 'Shy', biz: profile.businessName || '' }, state.lang);
   if (kind === 'want_know') {
     if (midThread(state) && state.lastInfo && state.lastInfo !== 'want_know') return R.info({ kind: 'ack', service: state.slots.service }, state.lang);
@@ -665,9 +688,9 @@ function infoAnswer(state, u, profile, kind) {
     return R.info({ kind: 'stock', found: false }, state.lang, n);
   }
   if (kind === 'recall') {
-    const rows = state.file.openRows.filter((r) => r.status !== 'cancelled');
-    if (!rows.length) state.offer = n >= 1 ? 'callback' : null;
-    return R.info({ kind: 'file', rows }, state.lang, n);
+    const rows = (state.file.openRows || []).filter((r) => r.status !== 'cancelled');
+    if (!rows.length && !state.file.lastVisit) state.offer = n >= 1 ? 'callback' : null;
+    return AM.recallKnownSpeech(state, state.lang, n);
   }
   return null;
 }
@@ -921,14 +944,25 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   if (u.done && !state.intent) { state.ended = true; return out(R.info({ kind: 'bye' }, lang), { end: true }); }
 
   // 3) intent
+  // C7 audible: model plaintext never spoken (templates only).
+  if (mc && mc.calls) {
+    const dropped = (state.trace.find((x) => x.turn === state.turn && x.modelText) || {}).modelText;
+    if (dropped) state.trace.push({ turn: state.turn, audible: 'model_text_dropped' });
+  }
+  // C7: validated lookup_file seeds recall (HD_b0a5 — proposals must become audible facts).
+  const lookupSeed = AM.lookupFileSeedsRecall(mc);
+  if (lookupSeed && !u.intents.includes('recall')) u.intents.unshift('recall');
   const ni = pickIntent(u, state, profile);
   if (ni === 'cancel' && !state.intent) { const m = u.text.match(/(?:,\s*|\b(?:and|then|na|alafu|halafu)\s+|\s+(?=nataka|nahitaji|ningependa)|,(?=eka|weka))(?:book|schedule|nataka|nahitaji|ningependa|i want|i need|weka|eka)\b(.+)$/i); if (m) state.queuedBook = m[0]; }
-  if (ni && ni !== state.intent && !(state.intent === 'change' && ni === 'book')) { if (state.intent) resetIntent(state); state.intent = ni; state.stateIntentTurn = state.turn; }
+  // Recall / past-booking ask wins over a bare book intent with no service (HD_b0a5 hollow reopen).
+  const recallAsk = u.intents.includes('recall') || lookupSeed;
+  const bareBookRecall = recallAsk && ni === 'book' && !u.service && !(state.slots && state.slots.service);
+  if (ni && ni !== state.intent && !(state.intent === 'change' && ni === 'book') && !bareBookRecall) { if (state.intent) resetIntent(state); state.intent = ni; state.setIntentTurn = state.turn; }
   // model may only propose book/order when our own reading found no intent at all
   if (!state.intent && mc && !u.intents.length) { const ok = mc.calls.find((c, i) => mc.checks[i].ok && /^(create_booking|create_order)$/.test(c.name)); if (ok && (u.service || u.products.length)) state.intent = INTENT_OF_TOOL[ok.name]; }
   // info questions answered without dropping a transaction in progress
-  const infoKind = (u.intents.includes('recall') ? 'recall' : null) || u.intents.find((i) => INFO.includes(i) && i !== 'want_know') || u.intents.find((i) => i === 'want_know') || (!ni && state.lastInfo === 'price' && (u.service || u.products.length) ? 'price' : null);
-  if (infoKind && (!ni || ni === 'book' && infoKind === 'availability' && !/\bbook\b/i.test(u.text) || ni === 'book' && ['coverage', 'price', 'hours', 'payment_how'].includes(infoKind) && /\?|\b(where|how much|when|wapi|ngapi|saa ngapi)\b/i.test(u.text))) {
+  const infoKind = (recallAsk ? 'recall' : null) || u.intents.find((i) => INFO.includes(i) && i !== 'want_know') || u.intents.find((i) => i === 'want_know') || (!ni && state.lastInfo === 'price' && (u.service || u.products.length) ? 'price' : null);
+  if (infoKind && (!ni || bareBookRecall || ni === 'book' && infoKind === 'availability' && !/\bbook\b/i.test(u.text) || ni === 'book' && ['coverage', 'price', 'hours', 'payment_how', 'recall'].includes(infoKind) && (/\?|\b(where|how much|when|wapi|ngapi|saa ngapi|kumbuka|remember|past|awali|mara ya mwisho)\b/i.test(u.text) || lookupSeed))) {
     if (state.intent === 'book' && infoKind === 'availability' && !/\bbook|kubook\b/i.test(u.text) && state.stateIntentTurn === state.turn) state.intent = null;
     if (!state.intent || state.stateIntentTurn !== state.turn || ['coverage', 'price', 'hours', 'payment_how'].includes(infoKind)) {
       state.lastInfo = infoKind;
@@ -953,8 +987,17 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
       return out(infoAnswer(state, u, profile, 'coverage'));
     }
     if (!u.intents.length && (u.when?.time || ((u.when?.date || u.place) && state.slots.service)) && (u.place || state.slots.service) && vertical(profile) === 'home' && !u.ack && !u.done) { state.intent = 'book'; mergeSlots(state, u, profile); const st0 = stepIntent(state, u, profile); if (st0?.line) return out(st0.line); }
-    if (u.name && !u.intents.length) return out(nameSpeakable(state) ? R.info({ kind: 'greet_name', name: nameSpeakable(state) }, lang) : (midThread(state) ? noReopenLine(state, lang) : R.ask('intent', 0, lang)));
-    if (state.lastInfo === 'recall' && !u.ack) { const line = infoAnswer(state, u, profile, 'recall'); return out(line); }
+    if (u.name && !u.intents.length) {
+      const nm = nameSpeakable(state) || AM.bindSafeName(state.file, state.slots, state.staffNames);
+      if (nm && !state.file?.sharedLine) return out(R.info({ kind: 'greet_name', name: nm }, lang));
+      return out(midThread(state) ? noReopenLine(state, lang) : R.ask('intent', 0, lang));
+    }
+    if (state.lastInfo === 'recall' && !u.ack) { const line = infoAnswer(state, u, profile, 'recall'); return out(AM.speakSafeLine(line, null)); }
+    // C7 audible: returner opening with bind-safe name (once) before stock intent ask
+    if (!u.intents.length && !u.service && !u.ack && !midThread(state)) {
+      const wb = AM.openingKnownSpeech(state, lang);
+      if (wb) { state.welcomed = true; return out(wb); }
+    }
     // off-catalogue item question: say plainly it isn't on our list (never guess stock or price)
     if (u.askedItem && !u.service && !u.products.length) {
       const cat = vertical(profile) === 'retail' ? (profile.productCatalog || []).map((p) => p.name) : (profile.servicesCatalog || []).map((x) => R.svcName(x.name));

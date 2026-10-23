@@ -215,6 +215,7 @@ function info(r, lang, n = 0) {
       : (S ? 'Nyumba ya chumba ngapi?' : 'Which size do you need?');
     case 'ack': return r.service ? (S ? `Sawa. Ungependa kubook ${svcName(r.service, lang)}?` : `Okay. Would you like to book ${svcName(r.service, lang).toLowerCase()}?`) : (S ? 'Sawa. Kuna kingine ninaweza kukusaidia nacho?' : 'Okay. Is there anything else I can help with?');
     case 'who': return S ? `Unaongea na ${r.agent}, wa ${r.biz}. Tukusaidie na usafi gani?` : `You're speaking with ${r.agent} from ${r.biz}. What can we clean for you?`;
+    case 'welcome_back': return S ? `Karibu tena, ${r.name}. Unahitaji huduma gani leo?` : `Welcome back, ${r.name}. Which service do you need today?`;
     case 'greet_name': return S ? `${r.name}, unahitaji huduma gani leo?` : `Thanks, ${r.name}. Which service do you need today?`;
     case 'off_catalogue': return S ? `Sina ${r.item} kwenye orodha yetu. ${r.hint ? `Tunafanya ${r.hint}.` : ''}`.trim() : `${r.item} isn't on our list. ${r.hint ? `We do ${r.hint}.` : ''}`.trim();
     case 'policy': return r.line || (S ? 'Sina hiyo kwenye rekodi.' : "I don't have that on file.");
