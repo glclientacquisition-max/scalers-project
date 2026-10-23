@@ -5,16 +5,18 @@ import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { logAdminError } from "@/lib/adminErrors";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { loadBachsStatus } from "@/lib/adminPayRead";
+import { loadPaymentsV2 } from "@/lib/adminPaymentsV2Load";
 
 export const instant = false;
 
 export default async function AdminPaymentsPage() {
   await requireSuperAdmin();
   try {
-    const status = await loadBachsStatus();
     if (process.env.ADMIN_V2 === "on") {
-      return <AdminPaymentsV2 status={status} />;
+      const { rows, truncated } = await loadPaymentsV2();
+      return <AdminPaymentsV2 rows={rows} truncated={truncated} nowIso={new Date().toISOString()} />;
     }
+    const status = await loadBachsStatus();
     return (
       <div className="space-y-4">
         <AdminPageHeader title="Payments" subtitle="Payment status." />
@@ -25,7 +27,7 @@ export default async function AdminPaymentsPage() {
     logAdminError("billing-payments", err);
     return (
       <DeskLoadError backHref="/admin/billing" backLabel="Billing">
-        Payment status could not be loaded.
+        Payments could not be loaded.
       </DeskLoadError>
     );
   }

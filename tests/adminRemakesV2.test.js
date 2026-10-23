@@ -66,3 +66,10 @@ test("remakes ban vendor and engineering copy on screen", () => {
     assert.doesNotMatch(ui, />[^<]*(Supabase|Vercel|Soniox|ReasonedSwitch|SkeletonList)[^<]*</i, r.name);
   }
 });
+
+test("Packages remake is catalog write after Unlock, not note-only", () => {
+  const ui = read("dashboard/src/components/admin/v2/AdminPackagesV2.tsx");
+  assert.match(ui, /UnlockCta/);
+  assert.match(ui, /\/api\/admin\/package-versions/);
+  assert.doesNotMatch(ui, /Secure sign-in is next|Packages remake\. Observe only/);
+});

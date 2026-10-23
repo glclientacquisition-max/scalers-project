@@ -1,14 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { activityHref, type ActivityItem } from "@/lib/adminActivityModel";
 import { EmptyState, PageHeader, SplitLayout, SplitPane } from "@/components/ops";
 import "@/styles/ops.css";
 
 /**
- * Audit log (ADMIN_V2): ops table + pane for before/after. Filters via URL.
- * Read-only — writes are the audit itself.
+ * Audit log (ADMIN_V2): change-record density like Businesses.
+ * Desktop rows keyboardable (tabIndex + Enter/Space + j/k). Read-only.
  */
 export function AdminAuditV2({
   items,
@@ -42,8 +42,21 @@ export function AdminAuditV2({
     return bits.length ? bits.join(" · ") : "All";
   }, [business, actor, businesses]);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!sel || (e.target as HTMLElement)?.closest("input,textarea,select")) return;
+      if (e.key !== "j" && e.key !== "k") return;
+      const i = items.findIndex((r) => r.id === sel);
+      if (i < 0) return;
+      const next = items[Math.min(items.length - 1, Math.max(0, i + (e.key === "j" ? 1 : -1)))];
+      if (next) setSel(next.id);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [items, sel]);
+
   const list = (
-    <div className="flex min-h-0 flex-col">
+    <div className="flex min-h-0 flex-col pe-ops-4">
       <PageHeader
         title="Audit log"
         count={items.length}
@@ -82,12 +95,13 @@ export function AdminAuditV2({
       />
       <p className="pb-ops-2 text-ops-label text-ink-2">
         <span className="font-semibold text-ink">{filters}</span> · newest first · showing up to {limit}
+        {sel ? " · j/k to move" : null}
       </p>
       {items.length === 0 ? (
         <EmptyState title={business || actor ? "Nothing for this filter." : "No admin actions yet."} />
       ) : (
         <>
-          <ul className="divide-y divide-hairline bg-surface md:hidden">
+          <ul className="divide-y divide-hairline bg-surface md:hidden" data-phone-rows="">
             {items.map((r) => (
               <li key={r.id}>
                 <button type="button" onClick={() => setSel(r.id)} className="flex min-h-ops-touch w-full flex-col gap-0.5 px-ops-3 py-2 text-start">
@@ -97,7 +111,7 @@ export function AdminAuditV2({
               </li>
             ))}
           </ul>
-          <table className="hidden w-full text-ops-body md:table">
+          <table className="hidden w-full whitespace-nowrap text-ops-body md:table" data-audit-table="">
             <thead className="sticky top-0 bg-canvas text-ops-label text-ink-2">
               <tr className="h-ops-row border-b border-hairline">
                 <th className="px-ops-3 text-start font-normal">When</th>
@@ -118,8 +132,16 @@ export function AdminAuditV2({
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSel(r.id); } }}
                   className={["h-ops-row cursor-pointer", sel === r.id ? "bg-accent/10" : "hover:bg-surface-2"].join(" ")}
                 >
-                  <td className="whitespace-nowrap px-ops-3 tabular-nums text-ink-2">{r.when}</td>
-                  <td className="px-ops-3 font-semibold text-ink">{r.title}</td>
+                  <td className="whitespace-nowrap px-ops-3 tabular-nums text-ink-2">
+                    <button
+                      type="button"
+                      className="text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                      onClick={(e) => { e.stopPropagation(); setSel(r.id); }}
+                    >
+                      {r.when}
+                    </button>
+                  </td>
+                  <td className="max-w-[16rem] truncate px-ops-3 font-semibold text-ink">{r.title}</td>
                   <td className="max-w-[12rem] truncate px-ops-3 text-ink-2">{r.business || "—"}</td>
                   <td className="px-ops-3 text-ink-2">{r.actor}</td>
                   <td className="hidden max-w-[14rem] truncate px-ops-3 text-ink-2 xl:table-cell">{r.reason || "—"}</td>
