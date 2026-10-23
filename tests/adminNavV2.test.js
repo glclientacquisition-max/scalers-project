@@ -29,6 +29,7 @@ test("redirect map sends old routes to their one home", async () => {
     "/admin/billing": "/admin/billing/home",
     "/admin/packages": "/admin/billing/packages",
     "/admin/billing/catalog": "/admin/billing/packages",
+    "/admin/wallets": "/admin/billing/home",
     "/admin/platform": "/admin/settings/services",
     "/admin/voices": "/admin/settings/voices",
     "/admin/activity": "/admin/settings/audit",

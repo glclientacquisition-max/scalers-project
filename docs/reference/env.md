@@ -17,7 +17,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | --- | --- | --- |
 | `ADMIN_ACCESS_CODE` | desk | `dashboard/src/lib/admin-auth.ts` |
 | `ADMIN_ENV` | desk | `dashboard/src/app/admin/(console)/%5Fkit/page.tsx` |
-| `ADMIN_V2` | desk | `dashboard/src/app/admin/(console)/_screens/PackagesScreen.tsx`<br>`dashboard/src/app/admin/(console)/_screens/ServicesScreen.tsx`<br>`dashboard/src/app/admin/(console)/activity/page.tsx`<br>+23 more |
+| `ADMIN_V2` | desk | `dashboard/src/app/admin/(console)/_screens/PackagesScreen.tsx`<br>`dashboard/src/app/admin/(console)/_screens/ServicesScreen.tsx`<br>`dashboard/src/app/admin/(console)/activity/page.tsx`<br>+25 more |
 | `AGENT_NAME` | voice | `server.js`<br>`src/db.js`<br>`src/prompts.js`<br>+1 more |
 | `ALERT_EMAIL_FROM` | voice | `server.js`<br>`src/notifications/email.js` |
 | `BACHS_API_KEY` | desk | `dashboard/src/lib/adminPayRead.ts`<br>`dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/provider.js` |
