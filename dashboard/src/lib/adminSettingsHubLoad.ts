@@ -1,0 +1,21 @@
+import "server-only";
+
+import { getSupabaseAdmin } from "@/lib/supabase";
+import type { SettingsHubRaw } from "@/lib/ops/settingsHubView";
+
+const FULL =
+  "voicemail_hold_days, shadow_invoices, billing_notices_send, desk_plan_change_enabled, new_signup_trial_enabled, package_editor_enabled, price_change_approval_threshold_kes, updated_at";
+const HOLD = ", hold_winback_enabled, number_hold_days, reactivation_fee_kes";
+const BASE = "voicemail_hold_days, shadow_invoices, updated_at";
+
+/** Settings hub (ADMIN_V2). Read-only. Hold columns (#885) and newer switches are optional so an older schema still loads. */
+export async function loadSettingsHub(): Promise<SettingsHubRaw | null> {
+  const admin = getSupabaseAdmin();
+  const withHold = await admin.from("billing_lifecycle_settings").select(FULL + HOLD).eq("id", 1).maybeSingle();
+  if (!withHold.error) return withHold.data ? { ...(withHold.data as SettingsHubRaw), holdColumns: true } : null;
+  const full = await admin.from("billing_lifecycle_settings").select(FULL).eq("id", 1).maybeSingle();
+  if (!full.error) return full.data ? { ...(full.data as SettingsHubRaw), holdColumns: false } : null;
+  const base = await admin.from("billing_lifecycle_settings").select(BASE).eq("id", 1).maybeSingle();
+  if (base.error) throw base.error;
+  return base.data ? { ...(base.data as SettingsHubRaw), holdColumns: false } : null;
+}
