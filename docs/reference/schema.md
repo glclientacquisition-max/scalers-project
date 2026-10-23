@@ -37,7 +37,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `invoice_lines` | `amount_kes`, `description`, `id`, `invoice_id`, `kind`, `quantity`, `sort_order`, `tenant_id`, `unit_amount_kes` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_documents.sql` |
 | `invoice_pay_tokens` | `created_at`, `expires_at`, `id`, `invoice_id`, `revoked_at`, `tenant_id`, `token_hash` | `docs/supabase/invoice_pay.sql` |
 | `invoice_receipts` | `amount_kes`, `created_at`, `id`, `invoice_id`, `method`, `paid_at`, `payment_id`, `provider_ref`, `receipt_number`, `tenant_id` | `docs/supabase/invoice_documents.sql` |
-| `invoices` | `amount_paid_kes`, `billing_source`, `created_at`, `credits_applied_kes`, `currency`, `due_at`, `id`, `invoice_number`, `issued_at`, `issuer_address`, `issuer_city`, `issuer_email`, `issuer_kra_pin`, `issuer_legal_name`, `issuer_phone`, `issuer_product`, `paid_at`, `period_end`, `period_start`, `status`, `subtotal_kes`, `tax_kes`, `tenant_id`, `total_kes`, `updated_at` | `docs/supabase/billing_company.sql`<br>`docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_documents.sql`<br>`docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
+| `invoices` | `amount_paid_kes`, `billing_source`, `created_at`, `credits_applied_kes`, `currency`, `due_at`, `id`, `invoice_number`, `issued_at`, `issuer_address`, `issuer_city`, `issuer_email`, `issuer_kra_pin`, `issuer_legal_name`, `issuer_phone`, `issuer_product`, `paid_at`, `period_end`, `period_start`, `reminders_paused_at`, `status`, `subtotal_kes`, `tax_kes`, `tenant_id`, `total_kes`, `updated_at` | `docs/supabase/admin_invoice_actions.sql`<br>`docs/supabase/billing_company.sql`<br>`docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_documents.sql`<br>`docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `notify_sends` | `attempts`, `audience`, `billed_to`, `body`, `call_id`, `call_sid`, `channel`, `created_at`, `error`, `failure_reason`, `held_units`, `id`, `idempotency_key`, `kind`, `outcome`, `overage`, `provider_message_id`, `recipient`, `reserved_at`, `settled_at`, `status`, `tenant_id`, `units` | `docs/supabase/notify_send_ledger.sql`<br>`docs/supabase/notify_send_reserve_settle.sql`<br>`docs/supabase/notify_sends_status.sql`<br>`docs/supabase/sms_allowance.sql` |
 | `ops_audit_log` | `action`, `actor`, `amount_kes`, `created_at`, `detail`, `id`, `tenant_id` | `docs/supabase/wallet_security_beta.sql` |
 | `payment_attempts` | `amount_kes`, `checkout_closed_at`, `checkout_expires_at`, `checkout_session_id`, `checkout_url`, `client_reference`, `collected_total_seen_kes`, `collection_ids`, `created_at`, `currency`, `fee_amount`, `fee_currency`, `id`, `invoice_id`, `part_count`, `part_index`, `provider`, `provider_amount`, `provider_currency`, `raw`, `return_expires_at`, `return_id`, `status`, `tenant_id`, `updated_at` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_pay.sql`<br>`docs/supabase/invoice_pay_checkout_review.sql`<br>`docs/supabase/invoice_pay_checkout_total.sql`<br>`docs/supabase/invoice_pay_collections.sql` |
@@ -77,7 +77,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (226)
+## Functions (229)
 
 | Function | Defined in |
 | --- | --- |
@@ -142,17 +142,20 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `admin_draft_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_export_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_import_promoted_package_version` | `docs/supabase/package_version_editor.sql` |
+| `admin_issue_credit_note` | `docs/supabase/admin_invoice_actions.sql` |
 | `admin_list_package_versions` | `docs/supabase/package_version_editor.sql` |
 | `admin_move_subscribers_to_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_publish_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_billing_runtime_switch` | `docs/supabase/billing_payment_runtime_flags.sql` |
 | `admin_set_business_suspended` | `docs/supabase/admin_business_suspend.sql` |
+| `admin_set_invoice_dispute` | `docs/supabase/admin_invoice_actions.sql` |
 | `admin_set_new_signup_trial` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_package_editor_enabled` | `docs/supabase/billing_package_editor_flag.sql` |
 | `admin_set_price_approval_threshold` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_tenant_billing_mode` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_tenant_live_payments` | `docs/supabase/invoice_pay_live_allowlist.sql` |
 | `admin_update_package_version_draft` | `docs/supabase/package_version_editor.sql` |
+| `admin_void_invoice` | `docs/supabase/admin_invoice_actions.sql` |
 | `apply_line_rental` | `docs/supabase/line_rental_grace.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_security_beta.sql` |
 | `apply_payment` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_pay.sql` |
 | `archive_tenant_billing` | `docs/supabase/archive_tenant_billing.sql` |
@@ -203,8 +206,8 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `data_quality_for` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `default_tenant_llm_prompt` | `docs/supabase/multi_tenant_onboarding.sql`<br>`docs/supabase/voice_languages.sql` |
 | `enqueue_billing_notice` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_documents.sql` |
-| `enqueue_invoice_due_soon` | `docs/supabase/invoice_documents.sql` |
-| `enqueue_invoice_overdue` | `docs/supabase/invoice_documents.sql` |
+| `enqueue_invoice_due_soon` | `docs/supabase/admin_invoice_actions.sql`<br>`docs/supabase/invoice_documents.sql` |
+| `enqueue_invoice_overdue` | `docs/supabase/admin_invoice_actions.sql`<br>`docs/supabase/invoice_documents.sql` |
 | `expire_stale_tenant_invites` | `supabase/migrations/20261011140000_team_scale.sql` |
 | `finalize_invoice` | `docs/supabase/billing_company.sql`<br>`docs/supabase/billing_data_layer.sql`<br>`docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `grant_tenant_package_minutes` | `docs/supabase/fix_grant_package_minutes.sql` |

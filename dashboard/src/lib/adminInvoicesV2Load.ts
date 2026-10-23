@@ -24,7 +24,7 @@ export async function loadInvoicesV2(businessId?: string | null): Promise<{ rows
     let q2 = admin.from("invoices").select(colsPlain).order("created_at", { ascending: false }).limit(INVOICE_V2_LIMIT + 1);
     if (businessId) q2 = q2.eq("tenant_id", businessId);
     const retry = await q2;
-    data = retry.data;
+    data = (retry.data || null) as unknown as typeof data;
     error = retry.error;
   }
   if (error) throw error;
