@@ -11,8 +11,11 @@ const FS = require('../../knowledge/factStore');
 const { validate, toFunctionDeclarations } = require('./catalogue');
 
 const HARD_CAP_MS = 900;
-const MODEL_ID = 'gemini-3.5-flash-lite';
+// C7 cascade (staging): primary first; on HARD_CAP timeout or hard fail, one backup within the same overall cap.
+const MODEL_ID = 'gemini-3.6-flash';
+const MODEL_BACKUP_ID = 'gemini-3.5-flash-lite';
 // Gemini 3.5 Flash-Lite list price (plan A6): USD per token; KES at ~129/USD.
+// Used for rough cost estimates on either cascade leg.
 const PRICE = { inUsd: 0.30 / 1e6, cachedUsd: 0.03 / 1e6, outUsd: 2.50 / 1e6, kesPerUsd: 129 };
 const HISTORY_TURNS = 6;
 
@@ -22,7 +25,13 @@ function modelMode(env = process.env) {
   if (v === 'on') return 'on'; // explicit only; documented as not for staging
   return 'off';
 }
-void process.env.BRAIN_V2_MODEL; void process.env.BRAIN_V2_MODEL_ID;
+function resolveModelIds(env = process.env) {
+  const e = env || {};
+  const primary = String(e.BRAIN_V2_MODEL_ID || '').trim() || MODEL_ID;
+  const backup = String(e.BRAIN_V2_MODEL_BACKUP_ID || '').trim() || MODEL_BACKUP_ID;
+  return { primary, backup };
+}
+void process.env.BRAIN_V2_MODEL; void process.env.BRAIN_V2_MODEL_ID; void process.env.BRAIN_V2_MODEL_BACKUP_ID;
 
 // ---------- typed proposal tools ----------
 function buildTools(facts = {}, { openRows = [] } = {}) {
@@ -183,8 +192,70 @@ async function capped(model, request, capMs = HARD_CAP_MS) {
   return { latencyMs: ms, calls: Array.isArray(r.calls) ? r.calls : [], usage: r.usage || null, text: r.text ? '[model text dropped]' : '' };
 }
 
+// One overall hard cap for primary+backup (not 900+900). Primary gets the budget minus a
+// backup reserve; on timeout or hard fail, primary is already aborted by capped(), then
+// backup runs once on the remaining wall. Transport only — model plaintext still dropped.
+// Never throws. Pattern spirit of geminiVoice.nextGeminiStreamAttempt, Brain-owned here.
+const BACKUP_RESERVE_MS = 350;
+const MIN_BACKUP_MS = 150;
+async function cappedCascade({ primary, backup = null, request, capMs = HARD_CAP_MS, primaryId = MODEL_ID, backupId = MODEL_BACKUP_ID } = {}) {
+  const t0 = Date.now();
+  const canBackup = typeof backup === 'function' && backup !== primary && primaryId !== backupId;
+  const primaryBudget = canBackup ? Math.max(capMs - BACKUP_RESERVE_MS, MIN_BACKUP_MS) : capMs;
+  const first = await capped(primary, request, primaryBudget);
+  const primaryFailed = !!first.timedOut || !!first.error;
+  if (!primaryFailed) {
+    return {
+      ...first,
+      model: primaryId,
+      answeredBy: 'primary',
+      cascade: false,
+      primaryTimedOut: false,
+      backupTimedOut: false,
+      primaryError: null,
+    };
+  }
+  if (!canBackup) {
+    return {
+      ...first,
+      model: primaryId,
+      answeredBy: 'primary',
+      cascade: false,
+      primaryTimedOut: !!first.timedOut,
+      backupTimedOut: false,
+      primaryError: first.error || null,
+    };
+  }
+  const remaining = capMs - (Date.now() - t0);
+  if (remaining < MIN_BACKUP_MS) {
+    return {
+      ...first,
+      model: primaryId,
+      answeredBy: 'primary',
+      cascade: false,
+      primaryTimedOut: !!first.timedOut,
+      backupTimedOut: false,
+      primaryError: first.error || null,
+      backupSkipped: 'budget',
+      latencyMs: Date.now() - t0,
+    };
+  }
+  const second = await capped(backup, request, remaining);
+  return {
+    ...second,
+    model: backupId,
+    answeredBy: 'backup',
+    cascade: true,
+    primaryTimedOut: !!first.timedOut,
+    backupTimedOut: !!second.timedOut,
+    primaryError: first.error || null,
+    primaryLatencyMs: first.latencyMs,
+    latencyMs: Date.now() - t0,
+  };
+}
+
 // One runner per call: keeps the model's own history (with thoughtSignature passed back).
-function createModelShadow({ model, mode = 'shadow', onStage = () => {}, log = () => {}, now = () => new Date(), modelId = MODEL_ID } = {}) {
+function createModelShadow({ model, backupModel = null, mode = 'shadow', onStage = () => {}, log = () => {}, now = () => new Date(), modelId = MODEL_ID, backupModelId = MODEL_BACKUP_ID } = {}) {
   const history = [];
   let turns = 0; let agreeN = 0;
   function remember(text, call, result) {
@@ -208,7 +279,9 @@ function createModelShadow({ model, mode = 'shadow', onStage = () => {}, log = (
     const pending = new Promise((resolve) => setImmediate(resolve)).then(() => {
       facts = FS.factsFor(profile); tools = buildTools(facts, { openRows }); allowed = allowedTools(snap);
       request = buildModelRequest({ text, snap, facts, history: hist, allowed, tools, now: at });
-      return model ? capped(model, request) : { error: 'no_model', latencyMs: 0, calls: [] };
+      return model
+        ? cappedCascade({ primary: model, backup: backupModel, request, primaryId: modelId, backupId: backupModelId })
+        : { error: 'no_model', latencyMs: 0, calls: [], model: modelId, cascade: false, primaryTimedOut: false, backupTimedOut: false };
     });
     return function finish(after, done) {
       const rules = rulesView(snap, snapshot(after), done || {});
@@ -220,17 +293,21 @@ function createModelShadow({ model, mode = 'shadow', onStage = () => {}, log = (
         const prop = proposalView(check && check.ok ? call : null, facts);
         const ag = m.timedOut || m.error ? { agree: false, intentAgree: false, slotDiffs: [] } : agreement(rules, prop);
         turns += 1; if (ag.agree) agreeN += 1;
+        const answered = m.model || modelId;
+        const answeredBy = m.answeredBy === 'backup' ? 'backup' : 'primary';
         const stage = {
-          stage: 'brain_v2_model', mode, model: modelId, turnIndex,
+          stage: 'brain_v2_model', mode, model: answered, answeredBy, turnIndex,
           allowed, rules: { intent: rules.intent, slots: redactDeep(rules.slots) },
           proposal: call ? { tool: call.name, args: redactDeep(call.args || {}), valid: !!check?.ok, error: check && !check.ok ? check.error : null, commit: !!check?.commit, extraCalls: Math.max(0, m.calls.length - 1) } : null,
           modelIntent: prop.intent, agree: ag.agree, intentAgree: ag.intentAgree, slotDiffs: ag.slotDiffs,
           latencyMs: m.latencyMs, timedOut: !!m.timedOut, error: m.error || null, capMs: HARD_CAP_MS,
+          cascade: !!m.cascade, primaryTimedOut: !!m.primaryTimedOut, backupTimedOut: !!m.backupTimedOut,
+          primaryError: m.primaryError || null,
           tokens: m.timedOut || m.error ? usageOf(null, request) : usageOf(m.usage, request),
           thoughtSignature: !!call?.thoughtSignature,
         };
         try { onStage(stage); } catch (e) { log(`[brain_v2_model] trace failed: ${e?.message || e}`); }
-        log(`[brain_v2_model] ${mode} turn=${turnIndex} rules=${rules.intent} model=${prop.intent}${call && !check?.ok ? `(${check.error})` : ''} agree=${ag.agree} ms=${m.latencyMs}${m.timedOut ? ' timeout' : ''}${m.error ? ` error=${m.error}` : ''}`);
+        log(`[brain_v2_model] ${mode} turn=${turnIndex} rules=${rules.intent} model=${prop.intent}${call && !check?.ok ? `(${check.error})` : ''} agree=${ag.agree} ms=${m.latencyMs}${m.timedOut ? ' timeout' : ''}${m.cascade ? ' cascade' : ''}${m.error ? ` error=${m.error}` : ''} via=${answeredBy}:${answered}`);
         return stage;
       }).catch((e) => { log(`[brain_v2_model] shadow failed: ${String(e?.message || e).slice(0, 80)}`); return null; });
     };
@@ -238,4 +315,16 @@ function createModelShadow({ model, mode = 'shadow', onStage = () => {}, log = (
   return { begin, history, stats: () => ({ turns, agree: agreeN }) };
 }
 
-module.exports = { HARD_CAP_MS, MODEL_ID, PRICE, modelMode, buildTools, allowedTools, validateProposal, buildModelRequest, snapshot, rulesView, proposalView, agreement, usageOf, capped, createModelShadow, redact };
+function scoreCascadeStages(stages = []) {
+  // B2: with cascade enabled, fail if every turn timed out on primary only with zero backup attempts.
+  const rows = (Array.isArray(stages) ? stages : []).filter((s) => s && s.stage === 'brain_v2_model');
+  if (!rows.length) return { pass: true, reason: 'no_stages', n: 0, backupAttempts: 0 };
+  const backupAttempts = rows.filter((s) => s.cascade === true || s.answeredBy === 'backup').length;
+  const allPrimaryTimeoutNoBackup = rows.every((s) => s.timedOut === true && s.cascade !== true && s.answeredBy !== 'backup');
+  if (allPrimaryTimeoutNoBackup) {
+    return { pass: false, reason: 'primary_only_timeouts_no_backup', n: rows.length, backupAttempts: 0 };
+  }
+  return { pass: true, reason: 'ok', n: rows.length, backupAttempts };
+}
+
+module.exports = { HARD_CAP_MS, BACKUP_RESERVE_MS, MIN_BACKUP_MS, MODEL_ID, MODEL_BACKUP_ID, PRICE, modelMode, resolveModelIds, buildTools, allowedTools, validateProposal, buildModelRequest, snapshot, rulesView, proposalView, agreement, usageOf, capped, cappedCascade, createModelShadow, scoreCascadeStages, redact };
