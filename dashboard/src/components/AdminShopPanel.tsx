@@ -92,7 +92,7 @@ const LIFECYCLE: Record<
 function SheetNote({ error }: { error: string }) {
   if (!error) return null;
   return (
-    <p className="pb-3 text-body text-attention" role="alert">
+    <p className="pb-3 text-ops-body text-attention" role="alert">
       {error}
     </p>
   );
@@ -165,12 +165,12 @@ export function AdminShopPanel({
   return (
     <div className="space-y-8">
       {error ? (
-        <p className="px-4 text-body text-attention" role="alert">
+        <p className="px-4 text-ops-body text-attention" role="alert">
           {error}
         </p>
       ) : null}
       {status ? (
-        <p className="px-4 text-body text-ok" role="status">
+        <p className="px-4 text-ops-body text-ok" role="status">
           {status}
         </p>
       ) : null}
@@ -543,7 +543,7 @@ function RestoreBillingChoice({
       className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-hairline px-3 py-2"
     >
       <div className="min-w-0">
-        <p className="text-body font-medium text-ink">{offer.label}</p>
+        <p className="text-ops-body font-medium text-ink">{offer.label}</p>
         <p className="text-meta text-ink-2">{offer.summary}</p>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} label={offer.label} />

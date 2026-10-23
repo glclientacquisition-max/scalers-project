@@ -157,12 +157,12 @@ export function AdminCommandPalette({ fixture, defaultOpen = false, defaultQuery
 
       {open ? (
         <div className="admin-theme ops-theme fixed inset-0 z-sheet flex items-start justify-center md:pt-8">
-          <button type="button" aria-label="Close search" tabIndex={-1} onClick={close} className="absolute inset-0 bg-black/40" />
+          <button type="button" aria-label="Close search" tabIndex={-1} onClick={close} className="absolute inset-0 bg-scrim/40" />
           <div
             role="dialog"
             aria-modal="true"
             aria-label="Search"
-            className="relative flex h-dvh w-full flex-col bg-surface text-ink shadow-sheet md:h-auto md:max-h-[calc(100dvh-4rem)] md:max-w-2xl md:rounded-md md:border md:border-hairline"
+            className="relative flex h-dvh w-full flex-col bg-surface text-ink shadow-sheet md:h-auto md:max-h-[calc(100dvh-4rem)] md:max-w-2xl md:rounded-sm md:border md:border-hairline"
           >
             <div className="flex items-center gap-ops-2 border-b border-hairline px-ops-3">
               <MagnifyingGlassIcon aria-hidden="true" className="h-5 w-5 shrink-0 text-ink-2" />

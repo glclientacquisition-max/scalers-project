@@ -60,7 +60,7 @@ export function QualityBusiness({
       <section>
         <h2 className="px-4 text-title text-ink">Calls</h2>
         {calls.length === 0 ? (
-          <p className="px-4 py-6 text-body text-ink-2">No traced calls yet.</p>
+          <p className="px-4 py-6 text-ops-body text-ink-2">No traced calls yet.</p>
         ) : (
           <>
             <div className="mt-2 hidden min-w-0 md:block">
@@ -81,7 +81,7 @@ export function QualityBusiness({
                       <Td>
                         <Link
                           href={qualityCallHref(base, call.callId)}
-                          className="inline-flex min-h-11 items-center rounded-md font-medium text-ink outline-none after:absolute after:inset-0 focus-visible:ring-2 focus-visible:ring-brand"
+                          className="inline-flex min-h-ops-touch md:min-h-ops-row items-center rounded-sm font-medium text-ink outline-none after:absolute after:inset-0 focus-visible:ring-2 focus-visible:ring-brand"
                         >
                           {call.callId}
                         </Link>
@@ -123,7 +123,7 @@ export function QualityBusiness({
       <section>
         <h2 className="px-4 text-title text-ink">Repeat failures</h2>
         {detail.repeatFailures.length === 0 ? (
-          <p className="px-4 py-6 text-body text-ink-2">No repeat failures.</p>
+          <p className="px-4 py-6 text-ops-body text-ink-2">No repeat failures.</p>
         ) : (
           <ul className="mt-2 divide-y divide-hairline">
             {detail.repeatFailures.map((row) => (
@@ -136,11 +136,11 @@ export function QualityBusiness({
       <section>
         <h2 className="px-4 text-title text-ink">Couldn&apos;t answer</h2>
         {detail.couldntAnswer.length === 0 ? (
-          <p className="px-4 py-6 text-body text-ink-2">No missed questions.</p>
+          <p className="px-4 py-6 text-ops-body text-ink-2">No missed questions.</p>
         ) : (
           <ul className="mt-2 divide-y divide-hairline">
             {detail.couldntAnswer.map((question) => (
-              <li key={question} className="px-4 py-3 text-body text-ink [overflow-wrap:anywhere]">
+              <li key={question} className="px-4 py-3 text-ops-body text-ink [overflow-wrap:anywhere]">
                 {question}
               </li>
             ))}

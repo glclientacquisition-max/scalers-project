@@ -45,7 +45,7 @@ export function AdminInvoiceList({
   return (
     <div className="space-y-6">
       {businessName ? (
-        <p className="px-4 text-body text-ink-2">
+        <p className="px-4 text-ops-body text-ink-2">
           {businessName}.{" "}
           <Link href="/admin/billing/invoices" className="font-medium text-accent underline-offset-2 hover:underline">
             All invoices
@@ -64,7 +64,7 @@ export function AdminInvoiceList({
         ]}
         onSelect={(key) => setFilter(key as InvoiceFilter)}
       />
-      <label className="block px-4 text-body">
+      <label className="block px-4 text-ops-body">
         Search
         <input
           value={query}
