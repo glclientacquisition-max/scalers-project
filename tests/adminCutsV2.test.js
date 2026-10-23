@@ -33,6 +33,8 @@ test("v2 screens show no cut names and no ledger, credit or duplicate number act
     const visible = [...s.matchAll(/(?:label|title|hint):\s*"([^"]+)"|>([^<>{}\n]*[A-Za-z][^<>{}\n]*)</g)].map((m) => m[1] || m[2]);
     for (const t of visible) assert.doesNotMatch(t, CUT, `${f}: ${t}`);
     assert.doesNotMatch(s, /\/admin\/(wallets|packages|activity|platform|billing\/catalog)\b/, f);
-    assert.doesNotMatch(s, /Add number|Buy number|Release number|Assign number/, f);
+    // s21: real Assign/Release live in Numbers v2 behind the step-up gate.
+    assert.doesNotMatch(s, /Add number|Buy number/, f);
+    if (f !== "AdminNumbersV2.tsx") assert.doesNotMatch(s, /Release number|Assign number/, f);
   }
 });
