@@ -256,7 +256,7 @@ export async function resendAdminInvoice(opts: {
   }
   const row = toActionRow(inv);
   if (!canResendInvoice(row)) {
-    const e = new Error("Draft invoices have no number to resend yet.");
+    const e = new Error("Draft invoices have no number to send again yet.");
     (e as Error & { status: number }).status = 400;
     throw e;
   }

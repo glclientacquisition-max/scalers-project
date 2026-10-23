@@ -19,7 +19,7 @@ type Body = {
 
 /**
  * Invoice money actions (s29): void, full credit note, resend, dispute.
- * Void / credit / dispute need docs/supabase/admin_invoice_actions.sql —
+ * Void / credit / dispute need the admin invoice actions migration —
  * missing RPC → 501 honest, never fake success. Resend is real via ops mail.
  */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
@@ -81,8 +81,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return NextResponse.json({ error: "That action isn't available." }, { status: 400 });
   } catch (err) {
     const status = err && typeof err === "object" && "status" in err ? Number((err as { status: number }).status) : 0;
-    const message = err instanceof Error ? err.message : "That didn't save. Nothing changed.";
+    // Only our own status-tagged errors carry operator copy; raw DB/runtime errors never reach the screen.
+    const safe = status && err instanceof Error ? err.message : "That didn't save. Nothing changed.";
     if (!status || status >= 500) logAdminError("invoice-actions", err);
-    return NextResponse.json({ error: message }, { status: status && status >= 400 ? status : 500 });
+    return NextResponse.json({ error: safe }, { status: status && status >= 400 ? status : 500 });
   }
 }

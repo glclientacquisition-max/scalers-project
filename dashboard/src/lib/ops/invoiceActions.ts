@@ -97,7 +97,7 @@ export function creditBlockedWhy(r: InvoiceActionRow | null): string | null {
 
 export function resendBlockedWhy(r: InvoiceActionRow | null): string | null {
   if (!r) return "Pick an invoice.";
-  if (!canResendInvoice(r)) return "Draft invoices have no number to resend yet.";
+  if (!canResendInvoice(r)) return "Draft invoices have no number to send again yet.";
   return null;
 }
 
