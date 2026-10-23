@@ -41,3 +41,20 @@ test("Billing home is ADMIN_V2-only, read-only, and names no vendor", () => {
   assert.doesNotMatch(ui, /fetch\(|method: "POST"/);
   for (const s of [ui, read("dashboard/src/lib/ops/billingHomeView.ts")]) assert.doesNotMatch(s, /sautikit|bachs|twilio|supabase|mpesa|daraja/i);
 });
+
+test("Billing home denser: ops-tiles KPIs, catalog link, BusinessPane money", () => {
+  const ui = read("dashboard/src/components/admin/v2/AdminBillingHomeV2.tsx");
+  assert.match(ui, /ops-tiles/);
+  assert.match(ui, /data-billing-kpis/);
+  assert.match(ui, /Packages catalog/);
+  assert.match(ui, /\/admin\/billing\/packages/);
+  assert.match(ui, /\/admin\/billing\/payments/);
+  assert.match(ui, /businessPaneHref\([^,]+, "money"\)/);
+  assert.doesNotMatch(ui, /bg-brand|ribbon/i);
+});
+
+test("Packages tab copy is catalog-only (assign stays on business)", () => {
+  const ui = read("dashboard/src/components/admin/v2/AdminPackagesV2.tsx");
+  assert.match(ui, /Catalog only/);
+  assert.match(ui, /assign from the business/i);
+});
