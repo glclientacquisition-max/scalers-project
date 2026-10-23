@@ -74,6 +74,9 @@ function endDecision({ done, machine, profile, line, alreadyEnded }) {
 function createBrainV2Live(opts = {}) {
   const env = opts.env || process.env;
   const applyTools = opts.applyTools;
+  // Injectable clock (tests pin a daytime EAT instant; "tomorrow" before 06:00 EAT asks
+  // "later today or <next day>?", so wall-clock tests must not depend on when CI runs).
+  const nowFn = typeof opts.now === 'function' ? opts.now : opts.now ? () => new Date(opts.now) : () => new Date();
   let state = null;
   let endSent = false;
 
@@ -85,6 +88,7 @@ function createBrainV2Live(opts = {}) {
       callerPhone: file.callerPhone,
       contactName: file.contactName,
       openRows: file.openRows,
+      callId: opts.callSid || null,
     });
     return state;
   }
@@ -94,13 +98,13 @@ function createBrainV2Live(opts = {}) {
       return null;
     }
     const machine = ensureState(profile);
-    const handlers = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })) });
+    const handlers = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName } });
     const sentences = [];
     let done = null;
     const it = runTurnStream(machine, {
       text,
       profile: { ...(profile || {}) },
-      now: new Date(),
+      now: nowFn(),
       handlers,
       model: opts.model || null,
       classify: defaultClassify(opts),

@@ -4437,6 +4437,10 @@ mediaWss.on('connection', (ws, req) => {
             const mem = brainProfile?.callerMemory || {};
             brainV2Live = createBrainV2Live({
               applyTools: (parsed) => applyGeminiTools(callKey, parsed),
+              // BRAIN_V2_COMMIT_SAFETY receipts (#845) + name confirm (#844, when present); unused with the flag off
+              callSid: callKey,
+              recordWriteReceipt: typeof db.recordWriteReceipt === 'function' ? db.recordWriteReceipt : undefined,
+              confirmCallerName: typeof db.confirmCallerName === 'function' ? db.confirmCallerName : undefined,
               callerFile: {
                 callerPhone: brainState?.caller?.phone || mem.phone || null,
                 contactName: mem.fileOwnerName || mem.name || brainState?.caller?.name || null,
@@ -8075,6 +8079,7 @@ async function applyGeminiTools(callSid, parsed) {
           quantity: request.quantity,
           whenText: request.whenText,
           notes: request.notes || parsed.reason,
+          ...(request.idempotencyKey ? { idempotencyKey: request.idempotencyKey } : {}),
         });
         if (created) {
           if (owedConfirmFoldEnabled()) {
@@ -8126,6 +8131,7 @@ async function applyGeminiTools(callSid, parsed) {
           notes: appointment.notes || parsed.reason,
           windowStart: appointment.windowStart,
           windowEnd: appointment.windowEnd,
+          ...(appointment.idempotencyKey ? { idempotencyKey: appointment.idempotencyKey } : {}),
         });
         if (created) {
           console.log(

@@ -210,6 +210,7 @@ function validateServiceRequest(
     quantity: clean(raw.quantity, 80),
     whenText: clean(raw.whenText, 160),
     notes: clean(raw.notes, 400),
+    ...(raw.idempotencyKey ? { idempotencyKey: clean(raw.idempotencyKey, 200) } : {}), // BRAIN_V2_COMMIT_SAFETY key -> row (#691)
   };
   if (!value.item && !value.notes) {
     return { valid: false, reason: 'A request needs an item or concise notes.' };
@@ -495,6 +496,7 @@ function validateCreateAppointment(
     notes: clean(raw.notes, 400),
     windowStart: clean(raw.windowStart || raw.window_start, 64),
     windowEnd: clean(raw.windowEnd || raw.window_end, 64),
+    ...(raw.idempotencyKey ? { idempotencyKey: clean(raw.idempotencyKey, 200) } : {}), // BRAIN_V2_COMMIT_SAFETY key -> row (#691)
   };
   // Outside the listed areas on "anywhere in Kenya": the team calls back with the
   // travel price. The Business Assistant never books a time for these.

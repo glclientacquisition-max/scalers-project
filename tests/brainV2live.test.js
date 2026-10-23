@@ -6,6 +6,10 @@ const { brainV2Enabled, brainV2Mode } = require('../src/conversation/v2/flag');
 const { createLiveHandlers } = require('../src/conversation/v2/liveHandlers');
 const { createBrainV2Live } = require('../src/conversation/v2/liveTurn');
 
+// Pinned clock: a Thursday mid-morning EAT, so "tomorrow" never hits the small-hours
+// "later today or tomorrow?" question whatever time CI runs (Platform, 22 Oct).
+const DAY_EAT = '2026-10-22T10:00:00+03:00';
+
 test('BRAIN_V2 live is off unless both flags are set', () => {
   assert.equal(brainV2Enabled({ env: {} }), false);
   assert.equal(brainV2Mode({ env: {} }), 'shadow');
@@ -39,6 +43,7 @@ test('live turn speaks a services list and does not invent a booking', async () 
   const writes = [];
   const live = createBrainV2Live({
     env: { BRAIN_V2: 'on', BRAIN_V2_MODE: 'live' },
+    now: () => new Date(DAY_EAT),
     applyTools: async (parsed) => {
       writes.push(parsed);
       return { results: [] };
@@ -68,6 +73,7 @@ function phantomLive(openRows) {
   const writes = [];
   const live = createBrainV2Live({
     env: { BRAIN_V2: 'on', BRAIN_V2_MODE: 'live' },
+    now: () => new Date(DAY_EAT),
     callerFile: { callerPhone: '+254700000001', openRows },
     applyTools: async (parsed) => { writes.push(parsed); return { results: [{ action: 'update_appointment', status: 'succeeded', id: 'x' }] }; },
   });
@@ -101,15 +107,17 @@ test('phantom cancel: a dated visit still reads back its date', async () => {
   const a = await live.run({ text: 'I want to cancel my booking.', profile: PHANTOM_PROFILE, langLock: 'en' });
   assert.match(a.line, /Cancel your sofa cleaning on Friday 23 October at 10:00\. Shall I go ahead\?/);
   await live.run({ text: 'Yes.', profile: PHANTOM_PROFILE, langLock: 'en' });
-  assert.equal(writes.length, 1);
+  // the fake answers id 'x' for apt_3; with BRAIN_V2_COMMIT_SAFETY that mismatch is a failed write and opens one outbox task
+  assert.equal(writes.filter((w) => w.appointmentUpdate).length, 1);
 });
 
 // End-call contract (plan C3): { line, end: true, reason } once, goodbye in the same line,
 // never with a write proposed and not committed, never when the owner turned end_call off.
 const END_PROFILE = { ...PHANTOM_PROFILE, agentTools: { escalate: true, end_call: true } };
-function endLive() {
+function endLive(now = DAY_EAT) {
   return createBrainV2Live({
     env: { BRAIN_V2: 'on', BRAIN_V2_MODE: 'live' },
+    now: () => new Date(now),
     classify: async () => ({ kind: 'unknown', place: '' }),
     applyTools: async () => ({ results: [{ action: 'create_appointment', status: 'succeeded', id: 'apt_1' }] }),
   });
@@ -162,4 +170,13 @@ test('end-call: declining the read-back with a goodbye ends (the proposal is dro
   assert.equal(live.getState().pending, null);
   assert.match(out.line, /Goodbye/);
   assert.equal(out.end, true);
+});
+
+test('clock is injected: "tomorrow" at 02:30 EAT asks later-today-or-tomorrow; at 10:00 EAT reads back', async () => {
+  const P = { ...END_PROFILE, vertical: 'home_services', serviceAreas: { areas: [{ id: 'place:kilimani' }] } };
+  const text = 'I want sofa cleaning tomorrow at 10am in Kilimani, my name is Alvin.';
+  const night = await endLive('2026-10-22T02:30:00+03:00').run({ text, profile: P, langLock: 'en' });
+  assert.match(night.line, /later today, Thursday the 22nd, or Friday the 23rd\?/);
+  const day = await endLive(DAY_EAT).run({ text, profile: P, langLock: 'en' });
+  assert.match(day.line, /Shall I book it\?/);
 });
