@@ -155,25 +155,53 @@ function matchService(text, catalog = []) {
 // caller's size words (EN/SW rooms, 1BR, studio, bedsitter, seaters, small/large) pick the variant;
 // an unclear size or a tie is a choice to ask about, never the first row (A7).
 const VARIANT_WORD = new Set(['bedroom', 'bed', 'br', 'seater', 'small', 'medium', 'large', 'mini', 'xl', 'studio', 'bedsitter', 'kg', 'litre']);
-function famTokens(name) { return tokens(name).filter((w) => !GENERIC.has(w) && !VARIANT_WORD.has(w) && w.length >= 3 && !/^\d+$/.test(w)); }
+// Split hyphens so "post-construction" matches caller "post construction".
+function famTokens(name) {
+  return tokens(name)
+    .flatMap((w) => (w.includes('-') ? w.split('-') : [w]))
+    .filter((w) => !GENERIC.has(w) && !VARIANT_WORD.has(w) && w.length >= 3 && !/^\d+$/.test(w));
+}
+function labelsOf(s) {
+  if (Array.isArray(s.spoken_labels) && s.spoken_labels.length) return s.spoken_labels;
+  try { return FS.spokenLabelsForService(s.name, s.row || {}); } catch { return []; }
+}
 function bindService(text, facts) {
   const svcs = facts?.services || [];
   if (!svcs.length) return { service: null, choice: null };
-  const tt = new Set(tokens(text));
+  const raw = String(text || '');
+  const low = raw.toLowerCase();
+  const tt = new Set(tokens(raw).flatMap((w) => (w.includes('-') ? w.split('-') : [w])));
   const cv = FS.callerVariant(text);
-  // score = family words heard; on a tie, the rows whose distinctive words were ALL heard beat rows
-  // with unheard ones ("deep cleaning": Deep Cleaning Package over Oven Internal Deep Clean)
-  const scored = svcs.map((s) => { const ft = [...new Set(famTokens(s.family))]; let score = 0; const heard = []; for (const w of ft) if (tt.has(w)) { score += WEAK.has(w) ? 0.5 : 1; heard.push(w); } return { s, score, heard: heard.sort().join(' '), cover: ft.length ? heard.length / ft.length : 0 }; });
+  const svcOf = (f) => ({ ...f.row, name: f.row.name || f.name, factId: f.id });
+  // Train spoken_labels phrase hit (R7b-thin): "after construction" / "baada ya ujenzi" → row.
+  // Not serviceAliases.js — labels live on the fact / thin compile.
+  const phraseHits = [];
+  for (const s of svcs) {
+    for (const lab of labelsOf(s)) {
+      const l = String(lab || '').toLowerCase().trim();
+      if (l.length >= 5 && low.includes(l)) { phraseHits.push(s); break; }
+    }
+  }
+  if (phraseHits.length === 1) return { service: svcOf(phraseHits[0]), choice: null };
+  // score = family + label words heard; on a tie, full-cover rows beat partial
+  const scored = svcs.map((s) => {
+    const ft = [...new Set([
+      ...famTokens(s.family),
+      ...labelsOf(s).flatMap((lab) => famTokens(lab)),
+    ])];
+    let score = 0; const heard = [];
+    for (const w of ft) if (tt.has(w)) { score += WEAK.has(w) ? 0.5 : 1; heard.push(w); }
+    return { s, score, heard: heard.sort().join(' '), cover: ft.length ? heard.length / ft.length : 0 };
+  });
   const max = Math.max(0, ...scored.map((x) => x.score));
   const top = scored.filter((x) => x.score === max);
   const best = Math.max(0, ...top.map((x) => x.cover));
   const topC = top.filter((x) => x.cover === best);
   // two services each named by their own words ("cancel the carpet, book the sofa") is two mentions,
   // not one unclear one: keep the old first-row reading (the machine splits the intents)
-  if (max >= 0.5 && topC.length > 1 && new Set(topC.map((x) => x.heard)).size > 1) { const f = topC[0].s; return { service: { ...f.row, name: f.row.name || f.name, factId: f.id }, choice: null }; }
+  if (max >= 0.5 && topC.length > 1 && new Set(topC.map((x) => x.heard)).size > 1) { const f = topC[0].s; return { service: svcOf(f), choice: null }; }
   let C = max >= 0.5 ? topC.map((x) => x.s) : (cv ? svcs.filter((s) => s.variant && s.variant.kind === cv.kind) : []);
   if (!C.length) return { service: null, choice: null };
-  const svcOf = (f) => ({ ...f.row, name: f.row.name || f.name, factId: f.id });
   if (cv) {
     const exact = C.filter((s) => s.variant && s.variant.kind === cv.kind && s.variant.value === cv.value);
     if (exact.length === 1) return { service: svcOf(exact[0]), choice: null };

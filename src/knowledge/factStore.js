@@ -147,7 +147,36 @@ function factsSource(profile = {}) {
 function factsHash(profile = {}) { return sha(stableJson(factsSource(profile))); }
 
 function pickRow(row, keys) { const o = {}; for (const k of keys) if (row[k] !== undefined) o[k] = row[k]; return o; }
-const SVC_KEYS = ['id', 'name', 'category', 'notes', 'description', 'price_range', 'pricing', 'pricing_mode', 'duration', 'duration_min', 'site_visit_required', 'out_of_scope', 'source'];
+
+// Train spoken labels / family tags (R7b-thin): owner aliases/spoken_labels on the row,
+// plus category phrasing already spoken in the catalogue ("after building work", baada ya ujenzi).
+// No serviceAliases.js — bindService scores these tokens/phrases.
+function spokenLabelsForService(name, row = {}) {
+  const fromRow = [
+    ...(Array.isArray(row.spoken_labels) ? row.spoken_labels : []),
+    ...(Array.isArray(row.aliases) ? row.aliases : []),
+  ].map((x) => String(x || '').trim()).filter(Boolean);
+  const n = String(name || '');
+  const compiled = [];
+  if (/post[\s-]?construction/i.test(n)) {
+    compiled.push(
+      'after construction',
+      'after building',
+      'after building work',
+      'after construction cleaning',
+      'post construction',
+      'baada ya ujenzi',
+      'baada ujenzi',
+      'ukarabati',
+    );
+  }
+  if (/move[\s-]?(?:in|out)/i.test(n)) {
+    compiled.push('move-in', 'move-out', 'move in', 'move out', 'kuhamia', 'kuhama');
+  }
+  return [...new Set([...fromRow, ...compiled])];
+}
+
+const SVC_KEYS = ['id', 'name', 'category', 'notes', 'description', 'price_range', 'pricing', 'pricing_mode', 'duration', 'duration_min', 'site_visit_required', 'out_of_scope', 'source', 'aliases', 'spoken_labels'];
 const PRD_KEYS = ['id', 'name', 'sku', 'aliases', 'price', 'in_stock', 'category', 'unit', 'notes'];
 
 function compileFacts(profile = {}) {
@@ -156,7 +185,8 @@ function compileFacts(profile = {}) {
     const row = typeof r === 'string' ? { name: r } : (r || {});
     const name = cleanName(row.name);
     const variant = rowVariant(name);
-    return { id: row.id || `svc_${i}`, name, family: (variant ? variant.head : mouthName(name)).toLowerCase(), variant: variant ? { kind: variant.kind, value: variant.value } : null, price: typedPrice(row), row: pickRow({ ...row, name: row.name }, SVC_KEYS) };
+    const labels = spokenLabelsForService(name, row);
+    return { id: row.id || `svc_${i}`, name, family: (variant ? variant.head : mouthName(name)).toLowerCase(), variant: variant ? { kind: variant.kind, value: variant.value } : null, price: typedPrice(row), spoken_labels: labels, row: pickRow({ ...row, name: row.name }, SVC_KEYS) };
   }).filter((s) => s.name);
   const products = (profile.productCatalog || []).map((p, i) => {
     const row = p || {};
@@ -281,4 +311,4 @@ function areaFact(facts, name) {
   return (facts?.areas || []).find((a) => a.name.toLowerCase() === n || a.id.toLowerCase().endsWith(`:${n}`)) || null;
 }
 
-module.exports = { FACTS_VERSION, FLAG_NAME, factStoreEnabled, compileFacts, factsFor, factsHash, factsStale, normTokens, itemTokens, cleanName, callerVariant, bareSize, rowVariant, typedPrice, matchItems, findItem, itemFromFacts, matchFaq, areaFact, confirmedFaqs };
+module.exports = { FACTS_VERSION, FLAG_NAME, factStoreEnabled, compileFacts, factsFor, factsHash, factsStale, normTokens, itemTokens, cleanName, callerVariant, bareSize, rowVariant, typedPrice, matchItems, findItem, itemFromFacts, matchFaq, areaFact, confirmedFaqs, spokenLabelsForService };
