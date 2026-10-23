@@ -328,8 +328,12 @@ const toks = (t) => String(t || '').toLowerCase().replace(/\([^)]*\)/g, ' ').rep
 function findEntry(text, sc) {
   const said = new Set(toks(text));
   let best = null; let bestScore = 0;
+  // S1: category colloquialisms ("after building work") scored as extra names
+  let aliasPhrasesForName;
+  try { aliasPhrasesForName = require('../conversation/v2/serviceAliases').aliasPhrasesForName; } catch { aliasPhrasesForName = () => []; }
   for (const e of sc.entries) {
-    for (const name of [e.raw.name, e.spoken.en, e.spoken.sw]) {
+    const names = [e.raw.name, e.spoken.en, e.spoken.sw, ...aliasPhrasesForName(e.raw.name)];
+    for (const name of names) {
       const t = toks(name); if (!t.length) continue;
       const hit = t.filter((w) => said.has(w)).length;
       if (!hit) continue;

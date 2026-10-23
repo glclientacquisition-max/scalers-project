@@ -44,7 +44,10 @@ function followUp({ text, doc, lang, profile, state, topicIds = [] }) {
   let kind = 'explain';
   let r = M.catalogueTurn(v2, { text, profile, lang, command: { intent: 'explain_service', service_id: e.id, language: lang } });
   if (r?.line && r.line.split(/\s+/).length <= 3) { const pr = M.catalogueTurn(v2, { text, profile, lang, command: { intent: 'price_service', service_id: e.id, language: lang } }); if (pr?.line) { r = pr; kind = 'price'; } }
-  if (!r?.line || !T.itemNamePostCheck(r.line, doc).ok) return null;
+  if (!r?.line) return null;
+  // Bound explain/price templates are rules text for a known entry id. itemNamePostCheck is for
+  // catalogue list lines (raw SKU leak); it false-positives on "It means cleaning up…".
+  if (kind === 'catalogue' && !T.itemNamePostCheck(r.line, doc).ok) return null;
   return { kind, itemIds: [e.id], text: r.line };
 }
 function holderOf(state) { return (state.v2Topic ||= { turn: 0, lastLine: '' }); }
