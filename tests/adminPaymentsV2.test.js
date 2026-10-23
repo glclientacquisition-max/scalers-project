@@ -21,8 +21,10 @@ test("Payments v2: no ReasonedSwitch; Unlock CTA; ADMIN_V2 branch on page", () =
   const page = read("dashboard/src/app/admin/(console)/billing/payments/page.tsx");
   const dev = read("dashboard/src/app/dev/admin-payments/page.tsx");
   assert.doesNotMatch(ui, /ReasonedSwitch/);
-  assert.match(ui, /Unlock to edit/);
-  assert.match(ui, /Secure sign-in is next/);
+  assert.match(ui, /UnlockCta/);
+  assert.match(read("dashboard/src/components/ops/UnlockCta.tsx"), /Unlock to edit/);
+  assert.match(ui, /UnlockCta|StepUpSheet/);
+  assert.match(ui, /site="payments"/);
   assert.doesNotMatch(ui, /Collections stay|Desk ships|Environment list/i);
   assert.match(page, /ADMIN_V2 === "on"[\s\S]*AdminPaymentsV2/);
   assert.match(dev, /AdminShell[^>]*v2/);

@@ -5,21 +5,20 @@ import { Button } from "@/components/ui/Button";
 import { Drawer } from "./Drawer";
 
 /**
- * Platform Unlock (s23). One sheet for every sensitive Admin write.
- * Unlock proves the operator for the next write — it never changes a number, package or switch itself.
- * Code entry waits on #876 Q9 (authenticator choice); until then the sheet says so plainly.
+ * Platform Unlock (s23/s24). One sheet for every sensitive Admin write.
+ * Unlock proves the operator for the next write — it never changes domain state alone.
+ * observe: Check access logs would-require-step-up. enforce: 501 + “Authenticator not set up yet” (#876 Q9).
  */
 export function StepUpSheet({
-  open, onClose, action, target, what,
+  open, onClose, action, target, what, onObserved, observedHint,
 }: {
   open: boolean;
   onClose: () => void;
-  /** Machine action key, e.g. "numbers:archive_release". */
   action: string;
-  /** e164 or business id — never a secret. */
   target?: string | null;
-  /** Plain words: what this unlock would allow. */
   what: string;
+  onObserved?: () => void;
+  observedHint?: string;
 }) {
   const [state, setState] = useState<"idle" | "pending" | "observed" | "not_enrolled" | "error">("idle");
   const close = () => { setState("idle"); onClose(); };
@@ -34,6 +33,7 @@ export function StepUpSheet({
       if (res.status === 501) return setState("not_enrolled");
       if (!res.ok) return setState("error");
       setState("observed");
+      onObserved?.();
     } catch {
       setState("error");
     }
@@ -69,16 +69,17 @@ export function StepUpSheet({
         <label className="flex flex-col gap-1 border-t border-hairline pt-ops-3">
           <span className="text-ops-label font-semibold text-ink">Authenticator code</span>
           <input disabled inputMode="numeric" placeholder="6 digits — not set up yet" className="ops-field text-ink-2" data-field="code" aria-describedby="stepup-code-why" />
-          <span id="stepup-code-why" className="text-ops-label text-ink-2">Not set up yet — waiting on the authenticator decision.</span>
+          <span id="stepup-code-why" className="text-ops-label text-ink-2">Not set up yet — waiting on the authenticator decision (#876 Q9).</span>
         </label>
         {state === "observed" ? (
           <p className="rounded-sm border border-hairline bg-canvas px-ops-3 py-ops-2 text-ops-label text-ink-2" role="status" data-stepup-result="observed">
             Observe mode: logged that this would need a code. You can go ahead with the action as usual.
+            {observedHint ? <span className="mt-1 block">{observedHint}</span> : null}
           </p>
         ) : null}
         {state === "not_enrolled" ? (
           <p className="text-ops-label text-attention" role="alert" data-stepup-result="not_enrolled">
-            Secure sign-in is required but no authenticator is set up yet. Ask the owner to switch step-up back to observe.
+            Authenticator not set up yet. Enforce needs enrolment — ask the owner to finish authenticator setup, or switch step-up back to observe.
           </p>
         ) : null}
         {state === "error" ? (

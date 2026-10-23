@@ -1,10 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { holdSettings, type SettingsHubRaw } from "@/lib/ops/settingsHubView";
-import { PageHeader } from "@/components/ops";
-import { Button } from "@/components/ui/Button";
+import { PageHeader, UnlockCta } from "@/components/ops";
 import "@/styles/ops.css";
 
 const WHEN = new Intl.DateTimeFormat("en-KE", {
@@ -22,16 +20,18 @@ const WHEN = new Intl.DateTimeFormat("en-KE", {
  */
 export function AdminSettingsHubV2({ raw }: { raw: SettingsHubRaw | null }) {
   const rows = holdSettings(raw);
-  const [note, setNote] = useState(false);
   const here = rows.every((r) => r.state !== "absent");
   return (
     <div className="ops-theme flex w-full flex-col gap-ops-3 pe-ops-4 text-ops-body">
       <PageHeader
         title="General"
         actions={
-          <Button type="button" variant="primary" size="sm" onClick={() => setNote(true)}>
-            Unlock to edit
-          </Button>
+          <UnlockCta
+            site="settings"
+            action="settings:hold"
+            what="edit number-hold settings"
+            observedHint="Hold value edits land with the number-hold product slice. Observe only logged the gate."
+          />
         }
       />
       <article className="overflow-hidden rounded-sm border border-hairline bg-surface" data-number-hold="">
@@ -60,18 +60,9 @@ export function AdminSettingsHubV2({ raw }: { raw: SettingsHubRaw | null }) {
             </div>
           ))}
         </dl>
-        {note ? (
-          <p className="border-t border-hairline bg-canvas px-ops-3 py-ops-3 text-ops-label text-ink-2" role="status" data-unlock-note="">
-            Secure sign-in is next. Editing these three values waits for step-up — this button does not change them yet.{" "}
-            <button type="button" className="font-semibold text-ink underline-offset-2 hover:underline" onClick={() => setNote(false)}>
-              Dismiss
-            </button>
-          </p>
-        ) : (
-          <p className="border-t border-hairline px-ops-3 py-ops-3 text-ops-label text-ink-2">
-            To change these, unlock with secure sign-in. The Unlock button only opens that note until step-up lands.
-          </p>
-        )}
+        <p className="border-t border-hairline px-ops-3 py-ops-3 text-ops-label text-ink-2">
+          To change these, unlock with secure sign-in. Unlock opens the step-up sheet — it does not change values by itself.
+        </p>
       </article>
       <section aria-label="Other settings" className="flex flex-col">
         <h2 className="px-ops-3 pb-ops-1 text-ops-label font-semibold uppercase tracking-wide text-ink-2">Also in Settings</h2>
