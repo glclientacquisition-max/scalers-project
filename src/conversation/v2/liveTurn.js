@@ -9,6 +9,7 @@ const { createLiveHandlers } = require('./liveHandlers');
 const { createClassifyAsk } = require('./classifyAsk');
 const { createGeminiSend, createGeminiStreamModel } = require('./transport');
 const MS = require('./modelShadow');
+const TM = require('./turnModel');
 
 // C7 BRAIN_V2_MODEL: off (default) = nothing; shadow = the model runs beside the rules turn,
 // never awaited, logged per turn; on = the capped cascade is also handed to the machine's
@@ -16,6 +17,9 @@ const MS = require('./modelShadow');
 // on HARD_CAP timeout or hard fail, one backup (BRAIN_V2_MODEL_BACKUP_ID / gemini-3.5-flash-lite)
 // inside the same overall cap (not 900+900).
 // The key is Platform's env (GEMINI_API_KEY). Model plaintext is never TTS'd.
+// how long the reply waits after the final for the turn's fields (partial-started calls are usually done)
+const TURN_MODEL_WAIT_MS = 750;
+
 function resolveModelShadow(opts = {}, env = process.env) {
   const mode = MS.modelMode(env);
   if (mode === 'off') return null;
@@ -41,7 +45,21 @@ function resolveModelShadow(opts = {}, env = process.env) {
     modelId: ids.primary,
     backupModelId: ids.backup,
   });
-  return { mode, shadow, model, backupModel, modelId: ids.primary, backupModelId: ids.backup };
+  let turnModel = null;
+  if (mode === 'on') {
+    // One model call per turn: the extraction call, shared with Voice's unfinished hold by callSid.
+    const streams = { [ids.primary]: model, ...(backupModel ? { [ids.backup]: backupModel } : {}) };
+    const key = env.GEMINI_API_KEY;
+    if (key && typeof opts.shadowModel !== 'function') TM.prewarm({ apiKey: key, modelId: ids.primary }).catch(() => {});
+    turnModel = TM.forCall(opts.callSid || null, () => TM.createTurnModel({
+      streamFor: (id) => streams[id] || model,
+      primaryId: ids.primary,
+      backupId: ids.backup,
+      onStage: typeof opts.onModelStage === 'function' ? opts.onModelStage : () => {},
+      log: opts.log || ((m) => console.log(m)),
+    }));
+  }
+  return { mode, shadow, model, backupModel, modelId: ids.primary, backupModelId: ids.backup, turnModel };
 }
 
 function defaultClassify(opts = {}) {
@@ -162,14 +180,25 @@ function createBrainV2Live(opts = {}) {
     let done = null;
     if (modelRun === undefined) modelRun = resolveModelShadow(opts, env);
     // shadow: snapshot before the rules turn; the model call starts now and is never awaited here
-    const finishShadow = modelRun ? modelRun.shadow.begin({ text, state: machine, profile: profile || {}, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, openRows: machine.file?.openRows || [] }) : null;
+    const on = !!(modelRun && modelRun.mode === 'on' && modelRun.turnModel);
+    let turnFields = null;
+    if (on) {
+      const fileNames = (machine.file?.openRows || []).map((r) => r && r.service).filter(Boolean).slice(0, 3);
+      const note = fileNames.length ? `caller file: ${fileNames.join(', ')}` : '';
+      const tIdx = typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null;
+      const r = await modelRun.turnModel.forFinal({ text, profile: profile || {}, note, budgetMs: opts.turnModelWaitMs ?? TURN_MODEL_WAIT_MS, turnIndex: tIdx });
+      turnFields = r.fields;
+    }
+    const finishShadow = modelRun && !on ? modelRun.shadow.begin({ text, state: machine, profile: profile || {}, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, openRows: machine.file?.openRows || [] }) : null;
     const it = runTurnStream(machine, {
       text,
       profile: { ...(profile || {}) },
       now: nowFn(),
       handlers,
-      model: opts.model || (modelRun && modelRun.mode === 'on' ? async ({ request }) => MS.cappedCascade({ primary: modelRun.model, backup: modelRun.backupModel, request, primaryId: modelRun.modelId || MS.MODEL_ID, backupId: modelRun.backupModelId || MS.MODEL_BACKUP_ID }) : null),
-      classify: defaultClassify(opts),
+      // mode=on: the turn's one call already ran (turnFields); no second machine/classify call
+      model: opts.model || null,
+      classify: on ? null : defaultClassify(opts),
+      turnFields,
       langLock: langLock === 'en' || langLock === 'sw' ? langLock : null,
       shouldAbort: typeof shouldAbort === 'function' ? shouldAbort : () => false,
     });
@@ -193,7 +222,16 @@ function createBrainV2Live(opts = {}) {
     };
   }
 
-  return { run, getState: () => state, lastModelShadow: () => lastShadow };
+  /** Voice's unfinished hold: start this turn's one model call on the stable partial. */
+  function partial({ text, profile } = {}) {
+    if (modelRun === undefined) modelRun = resolveModelShadow(opts, env);
+    if (!modelRun || modelRun.mode !== 'on' || !modelRun.turnModel) return false;
+    return !!modelRun.turnModel.partial({ text, profile: profile || {} });
+  }
+  // call start: resolve the model (prewarm the warm client) before the first caller turn
+  if (opts.prewarm !== false && MS.modelMode(env) === 'on' && modelRun === undefined) modelRun = resolveModelShadow(opts, env);
+
+  return { run, partial, getState: () => state, lastModelShadow: () => lastShadow };
 }
 
 

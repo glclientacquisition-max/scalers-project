@@ -26,6 +26,7 @@ const csOn = () => CS.commitSafetyEnabled();
 const SC = require('../../knowledge/spokenCatalogue');
 const scOn = () => /^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || ''));
 const FS = require('../../knowledge/factStore');
+const TR = require('./turnResolver');
 const fsOn = () => FS.factStoreEnabled();
 // C2: the which-one question for a choice the binder could not settle (size, family or item).
 function choiceLine(profile, ch, lang) {
@@ -51,6 +52,13 @@ function spoken(profile, svc, lang) {
 function checkServiceLine(profile, svc, lang) {
   const sp = spoken(profile, svc, lang);
   return R.info({ kind: 'offered', label: sp ? sp.label : svc.name, price: sp ? sp.price : (svc.pricing?.confirmed === false ? null : svc.price_range || null) }, lang);
+}
+// Confirmed price for one service (spoken catalogue, else a confirmed price_range); null = no fact.
+function priceFact(profile, svc, lang) {
+  if (!svc || svc.pricing?.confirmed === false) return null;
+  const sp = spoken(profile, svc, lang);
+  if (sp && sp.price) return sp.price;
+  return svc.price_range || null;
 }
 const TRANSACTIONAL = ['payment_change', 'address_change', 'cancel', 'change', 'complaint', 'handoff', 'order', 'book'];
 const INFO = ['payment_how', 'policy_returns', 'policy_deposit', 'policy_warranty', 'policy_cancel', 'greeting', 'who_are_you', 'services', 'coverage', 'recall', 'availability', 'price', 'hours', 'want_know'];
@@ -786,7 +794,7 @@ function applyAckRule(state, line, { ackOk, acked, callerAck, lang }) {
 }
 function noteAck(state, line) { state.lastAckLed = isAckLed(line); if (state.lastAckLed) state.lastAckTurn = state.turn; }
 
-async function runTurnInner(state, { text, profile = {}, now = new Date(), handlers, model = null, classify = null, langLock = null, acked = false, unfinished = false, silenceBeat, holdTimedOut, utteranceComplete } = {}) {
+async function runTurnInner(state, { text, profile = {}, now = new Date(), handlers, model = null, classify = null, langLock = null, acked = false, unfinished = false, silenceBeat, holdTimedOut, utteranceComplete, turnFields = null } = {}) {
   state.turn += 1; state.now = now;
   const myTurn = state.turn; // this turn's number even if another turn starts while this one awaits
   if (csOn()) { // non-enumerable: never serialized with the state
@@ -806,6 +814,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   if (utteranceComplete === true) u.utteranceComplete = true;
   const turnOpts = { unfinished, silenceBeat, holdTimedOut, utteranceComplete };
   state.nluPrev = { kind: u.kind, service: u.service || null };
+  if (u.service) state.lastService = u.service;
   // §4 "do you do X?" (BRAIN_V2_NLU_GAPS): a resolved catalogue item is answered with its grounded
   // name + price from the catalogue (checkServiceLine), never a slot/availability claim and never a re-list.
   if (u.intents.includes('check') && u.service && u.intents.length === 1 && !state.intent && vertical(profile) === 'home') {
@@ -971,6 +980,29 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   if (state.intent && state.expecting && N.nonAnswer(text) && !u.when && !u.service && !(csOn() && state.phase === 'readback' && state.pending)) {
     const q = openQ(state, lang);
     if (q) return out(u.intents.includes('hold') ? `${R.info({ kind: 'hold' }, lang)} ${q.trim()}` : `${R.info({ kind: 'repair' }, lang).split(/(?<=[.!?])\s/)[0]} ${q.trim()}`);
+  }
+  // Turn resolver (system-owned): collect every ask, resolve each against confirmed facts, move the
+  // playbook, compose in fixed order. Runs whether or not the model answered (turnFields is evidence only).
+  if (state.phase !== 'readback' && !state.pending && !state.intent && !state.ended) {
+    const ask = TR.collectAsks({ u, text, state, profile, fields: turnFields, lastService: state.lastService || null });
+    if (ask.asks.length) {
+      const res = TR.resolve(ask, profile, {
+        labelOf: (svc) => spoken(profile, svc, lang)?.label || svc.name,
+        explainOf: (svc) => { const sp = spoken(profile, svc, lang); if (sp && sp.explain) return sp.explain; const n = String(svc.notes || '').trim(); return n ? R.info({ kind: 'explain', name: svc.name, notes: n }, lang) : null; },
+        priceOf: (svc) => priceFact(profile, svc, lang),
+        callerName: u.name || state.slots.name || state.file?.contactName || null,
+      });
+      if (TR.owns(ask, res, u)) {
+        const pb = TR.playbookStep(state.playbook, res, { ended: state.ended });
+        state.playbook = { state: pb.state, offer: pb.offer };
+        state.trace.push({ turn: state.turn, resolver: { asks: ask.asks, src: ask.src, place: ask.place && ask.place.text, service: ask.service && ask.service.name, resolutions: res.map((r) => `${r.ask}:${r.status}`), playbook: `${pb.from}->${pb.state}`, offer: pb.offer, fields: turnFields ? 'model' : 'rules' } });
+        if (pb.offer === 'callback') { state.offer = 'callback'; }
+        else if (pb.offer === 'book') { state.offer = 'book'; state.offerService = (ask.service && ask.service.name) || state.offerService; }
+        if (ask.service) state.slots.service = state.slots.service || null;
+        state.lastInfo = res.some((r) => r.ask === 'price' && r.status === 'answered') ? 'price' : 'resolver';
+        return out(TR.compose(res, pb.offer, lang, { profile }));
+      }
+    }
   }
   // C2 (BRAIN_V2_FACT_STORE): a question the owner answered in a CONFIRMED FAQ gets that answer;
   // a seed/suggested FAQ is not in the store, so it is never spoken.
