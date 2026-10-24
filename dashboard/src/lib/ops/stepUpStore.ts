@@ -107,6 +107,20 @@ export async function revokeGrant(id: string | undefined | null): Promise<void> 
     .is("revoked_at", null);
 }
 
+export type SecurityEvent = { id: string; created_at: string; actor: string; action: string };
+
+/** Last N sign-in / Unlock events for Settings › Security. Detail is never read (no codes there anyway). */
+export async function recentSecurityEvents(limit = 20): Promise<SecurityEvent[]> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("ops_audit_log")
+    .select("id, created_at, actor, action")
+    .or("action.like.admin.2fa.%,action.like.admin.step_up.%")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as SecurityEvent[];
+}
+
 /** Operator reset via the DB function (same one the break-glass runbook uses). */
 export async function resetFactor(target: string, actor: string, reason: string): Promise<void> {
   const { error } = await getSupabaseAdmin().rpc("admin_step_up_reset", {

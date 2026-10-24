@@ -124,7 +124,9 @@ describe("unlock grant for every risky action", () => {
     const host = read("dashboard/src/components/ops/StepUpHost.tsx");
     assert.match(host, /res\.status === 403/);
     assert.match(host, /step_up_required/);
-    for (const k of riskyActionKeys()) assert.ok(host.includes(`"${k}"`), `StepUpHost has no plain-language name for ${k}`);
+    assert.match(host, /STEP_UP_WHAT/);
+    const words = read("dashboard/src/lib/ops/stepUpWords.ts");
+    for (const k of riskyActionKeys()) assert.ok(words.includes(`"${k}"`), `stepUpWords has no plain-language name for ${k}`);
   });
 });
 
@@ -231,5 +233,59 @@ describe("spend and destructive actions", () => {
     }
     const buy = read("dashboard/src/app/api/admin/buy-number/route.ts");
     assert.ok(buy.indexOf('stepUpGateSession("buy-number:buy"') < buy.indexOf("buyNumberIntoPool(inventoryId)"), "gate before the purchase");
+  });
+});
+
+describe("sign-in email failure is honest", () => {
+  it("failed send: 502 with the exact message, code retired, audited as email_failed (never email_sent)", async () => {
+    const { EMAIL_FAILED_MESSAGE } = await import("../dashboard/src/lib/ops/stepUpCore.ts");
+    assert.equal(EMAIL_FAILED_MESSAGE, "We couldn't send the email code. Use your authenticator or a backup code.");
+    const route = read("dashboard/src/app/api/admin/sign-in-2fa/route.ts");
+    const fail = route.slice(route.indexOf("if (!sent.sent)"), route.indexOf('"admin.2fa.sign_in.email_sent"'));
+    assert.match(fail, /retireEmailCodes\(op\)/);
+    assert.match(fail, /"admin\.2fa\.sign_in\.email_failed", \{ to: maskEmail\(to\), why:/);
+    assert.match(fail, /EMAIL_FAILED_MESSAGE \}, \{ status: 502 \}/);
+    assert.doesNotMatch(fail, /emailCode/, "the code never goes in the audit row");
+    const ui = read("dashboard/src/components/admin/AdminSignInTwoFactor.tsx");
+    const send = ui.slice(ui.indexOf("const sendEmail"), ui.indexOf("const verify"));
+    assert.ok(send.indexOf("if (!res.ok) return setMsg") < send.indexOf("setSentTo("), "never shows 'Sent to' after a failure");
+  });
+
+  it("an unconfigured mailer reports why instead of a silent no-op", () => {
+    const store = read("dashboard/src/lib/ops/stepUpStore.ts");
+    assert.match(store, /res\.sent \? \{ sent: true \} : \{ sent: false, why: res\.skipped \}/);
+    assert.match(read("dashboard/src/lib/opsMail.ts"), /skipped: "ops_mail_unconfigured"/);
+  });
+});
+
+describe("Settings › Security tab", () => {
+  it("is a Settings tab and a phone More row (not a second desktop rail item), and the page exists", async () => {
+    const links = await import("../dashboard/src/lib/adminLinks.ts");
+    assert.ok(links.ADMIN_SETTINGS_TABS.some((t) => t.href === "/admin/settings/security" && t.label === "Security"));
+    assert.ok(links.adminPhoneMore(true).some((l) => l.href === "/admin/settings/security"));
+    assert.match(read("dashboard/src/components/AdminNav.tsx"), /ADMIN_LINKS_V2\.filter\(\(item\) => item\.rail !== false\)/);
+    assert.ok(fs.existsSync(path.join(root, "dashboard/src/app/admin/(console)/settings/security/page.tsx")));
+  });
+
+  it("has the five sections and every button calls a real route", () => {
+    const ui = read("dashboard/src/components/admin/v2/AdminSecurityV2.tsx");
+    for (const h of ["Your sign-in", "Backup codes", "Unlock", "Operators", "Recent security activity"]) assert.ok(ui.includes(`>${h}</h2>`), h);
+    for (const r of ["/api/admin/step-up/backup-codes", "/api/admin/step-up/reset", "/api/admin/step-up/session"]) {
+      assert.ok(ui.includes(r), r);
+      assert.ok(fs.existsSync(path.join(api, r.replace("/api/", ""), "route.ts")), `${r} route exists`);
+    }
+    assert.match(ui, /timeZone: "Africa\/Nairobi"/);
+    assert.match(ui, /<OpsConfirm/);
+    const page = read("dashboard/src/app/admin/(console)/settings/security/page.tsx");
+    assert.match(page, /recentSecurityEvents\(20\)/);
+  });
+
+  it("End now revokes the grant; Forget this device clears the device cookie; both audited", () => {
+    const src = read("dashboard/src/app/api/admin/step-up/session/route.ts");
+    assert.match(src, /await revokeGrant\(jar\.get\(UNLOCK_COOKIE\)/);
+    assert.match(src, /res\.cookies\.set\(UNLOCK_COOKIE, "", gone\)/);
+    assert.match(src, /res\.cookies\.set\(SIGNIN_COOKIE, "", gone\)/);
+    assert.match(src, /"admin\.step_up\.ended"/);
+    assert.match(src, /"admin\.2fa\.device_forgotten"/);
   });
 });

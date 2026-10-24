@@ -2,37 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { StepUpSheet } from "./StepUpSheet";
+import { STEP_UP_WHAT as WHAT } from "@/lib/ops/stepUpWords";
 
-/** Plain-language names for gate keys (adminRouteRegistry in stepUpCore). Unknown keys fall back to "make this change". */
-const WHAT: Record<string, string> = {
-  "buy-number:buy": "buy this number",
-  "voices:delete": "delete this voice",
-  "did-pool:release": "release this number",
-  "did-pool:assign_specific": "assign this number",
-  "did-pool:assign_next": "assign the next free number",
-  "businesses:release_did": "release this business's number",
-  "businesses:archive": "archive this business",
-  "businesses:transfer_owner": "transfer the owner",
-  "businesses:assign_next": "assign a number",
-  "invoice:void": "void this invoice",
-  "invoice:credit_note": "issue a credit note",
-  "number-hold:hold": "hold this number",
-  "number-hold:end_hold": "end the hold",
-  "number-hold:restore": "restore this number",
-  "number-hold:set_settings": "save hold settings",
-  "number-hold:bill_fee": "bill the reactivation fee",
-  "package-versions:publish": "publish this package",
-  "package-versions:move_subscribers": "move subscribers",
-  "package-versions:set_billing_mode": "change the billing mode",
-  "billing:grant_minutes": "grant minutes",
-  "billing:assign_package": "assign a package",
-  "billing:resolve_checkout_review": "resolve this checkout review",
-  "billing:set_billing_mode": "change the billing mode",
-  "wallets:set_billing_mode": "change the billing mode",
-  "platform-ops:save_settings": "save platform settings",
-  "step-up:reset": "reset another operator's authenticator",
-  "step-up:regenerate_backup_codes": "make new backup codes",
-};
 
 export const STEP_UP_EVENT = "scalers:step-up-required";
 

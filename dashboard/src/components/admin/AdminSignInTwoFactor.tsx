@@ -43,7 +43,7 @@ export function AdminSignInTwoFactor({ fieldClass }: { fieldClass: string }) {
     const { res, json } = await post({ op: "email_send" });
     setPending(false);
     if (json.lockedUntil) setLockedUntil(String(json.lockedUntil));
-    if (!res.ok) return setMsg(String(json.message || "Couldn't send the code."));
+    if (!res.ok) return setMsg(String(json.message || "We couldn't send the email code. Use your authenticator or a backup code."));
     setSentTo(String(json.sentTo || ""));
   };
 

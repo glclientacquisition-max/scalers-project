@@ -17,7 +17,7 @@ type View = "loading" | "observe" | "code" | "backup" | "setup_intro" | "setup_s
 const timeOf = (iso?: string | null) => (iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "");
 
 export function StepUpSheet({
-  open, onClose, action, target, what, onObserved, observedHint,
+  open, onClose, action, target, what, onObserved, observedHint, replace = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -26,6 +26,8 @@ export function StepUpSheet({
   what: string;
   onObserved?: () => void;
   observedHint?: string;
+  /** Settings › Security "Replace authenticator": once unlocked, go straight to setup. */
+  replace?: boolean;
 }) {
   const [view, setView] = useState<View>("loading");
   const [status, setStatus] = useState<Status | null>(null);
@@ -59,12 +61,12 @@ export function StepUpSheet({
         setStatus(s);
         if (s.mode !== "enforce") return setView("observe");
         setNeedsReenrol(!!s.needsReenrol);
-        if (s.unlockedUntil) { setUnlockedUntil(s.unlockedUntil); return setView("unlocked"); }
+        if (s.unlockedUntil) { setUnlockedUntil(s.unlockedUntil); return setView(replace ? "setup_intro" : "unlocked"); }
         setView(s.enrolled ? "code" : "setup_intro");
       })
       .catch(() => live && setView("observe"));
     return () => { live = false; };
-  }, [open]);
+  }, [open, replace]);
 
   const close = () => {
     setState("idle"); setMsg(null); setCode(""); setSetup(null); setBackupCodes(null); setCopied(false); onClose();

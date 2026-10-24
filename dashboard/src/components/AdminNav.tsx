@@ -61,6 +61,14 @@ function AdminIcon({ name: label }: { name: string }) {
   const cls = "h-5 w-5";
   // v2 renames reuse the glyph of the screen they replace.
   const name = label === "Overview" ? "Today" : label === "Settings" ? "Platform" : label;
+  if (name === "Security") {
+    return (
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
+        <path d="M10 2.5 4 5v4.5c0 3.6 2.5 6.6 6 8 3.5-1.4 6-4.4 6-8V5l-6-2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="m7.5 10 1.8 1.8 3.2-3.3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
   if (name === "Platform") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
@@ -330,7 +338,7 @@ export function AdminSideNav() {
         <span className="admin-side-label truncate text-sm font-semibold text-ink">Scalers</span>
       </div>
       <nav aria-label="Super Admin" className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
-        {ADMIN_LINKS_V2.map((item) =>
+        {ADMIN_LINKS_V2.filter((item) => item.rail !== false).map((item) =>
           item.pending ? (
             <span key={item.href} aria-disabled="true" title={item.pending} className="flex h-9 items-center gap-3 rounded-md px-2 text-sm text-ink-3">
               <AdminIcon name={item.label} />

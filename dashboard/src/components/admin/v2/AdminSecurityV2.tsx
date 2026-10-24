@@ -1,78 +1,133 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
-import { PageHeader, StepUpSheet } from "@/components/ops";
+import { OpsConfirm, PageHeader, StepUpSheet } from "@/components/ops";
+import { SECURITY_EVENT_WORDS } from "@/lib/ops/stepUpWords";
 import "@/styles/ops.css";
 
 type Op = { name: string; enrolled: boolean; needsReenrol: boolean; lockedUntil: string | null };
+type Ev = { id: string; created_at: string; actor: string; action: string };
+export type SecurityData = {
+  me: string;
+  enrolledAt: string | null;
+  needsReenrol: boolean;
+  codesLeft: number;
+  emailHint: string | null;
+  emailSource: "operator" | "alert" | null;
+  deviceUntil: string | null;
+  unlockedUntil: string | null;
+  protects: string[];
+  operators: Op[];
+  events: Ev[];
+};
+
+const EAT = (iso: string, withDate = true) =>
+  `${new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Nairobi", hour: "2-digit", minute: "2-digit", hour12: false,
+    ...(withDate ? { day: "numeric", month: "short" } : {}),
+  }).format(new Date(iso))} EAT`;
+
+const card = "border border-hairline bg-surface";
+const head = "border-b border-hairline px-ops-3 py-ops-2 text-ops-label font-semibold uppercase tracking-wide text-ink-2";
+const rowCls = "flex min-h-ops-touch items-baseline justify-between gap-ops-4 px-ops-3 py-ops-2";
+
+function Row({ k, children }: { k: string; children: ReactNode }) {
+  return (
+    <div className={rowCls}>
+      <dt className="text-ink-2">{k}</dt>
+      <dd className="text-right font-semibold">{children}</dd>
+    </div>
+  );
+}
+
+function useCountdown(until: string | null) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!until) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [until]);
+  const left = until ? Math.max(0, Date.parse(until) - now) : 0;
+  return { left, text: `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, "0")}` };
+}
 
 /**
- * Settings › Security (ADMIN_V2). Your authenticator status, new backup codes (needs Unlock),
- * and operator reset (needs Unlock + reason, never yourself). A 403 step_up_required from either
- * write also opens the Unlock sheet through StepUpHost.
+ * Settings › Security (ADMIN_V2). Five plain sections: your sign-in, backup codes, Unlock,
+ * operators, recent activity. Every button calls a real route; confirms use OpsConfirm
+ * (bottom sheet on phones, side drawer from md). A 403 step_up_required opens StepUpSheet.
  */
-export function AdminSecurityV2({ mode, me, operators, codesLeft, openSetup }: {
-  mode: "off" | "observe" | "enforce";
-  me: string | null;
-  operators: Op[];
-  codesLeft: number;
-  openSetup: boolean;
-}) {
+export function AdminSecurityV2({ mode, data, openSetup }: { mode: "off" | "observe" | "enforce"; data: SecurityData | null; openSetup: boolean }) {
   const router = useRouter();
-  const mine = operators.find((o) => o.name === me);
-  const [sheet, setSheet] = useState<null | { action: string; what: string }>(
+  const [sheet, setSheet] = useState<null | { action: string; what: string; replace?: boolean }>(
     openSetup ? { action: "enrol", what: "set up your authenticator" } : null,
   );
+  const [confirm, setConfirm] = useState<null | "codes" | "reset" | "forget">(null);
   const [codes, setCodes] = useState<string[] | null>(null);
   const [copied, setCopied] = useState(false);
   const [target, setTarget] = useState("");
-  const [reason, setReason] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tone: "ok" | "warn"; text: string } | null>(null);
+  const unlock = useCountdown(data?.unlockedUntil ?? null);
 
-  if (mode !== "enforce") {
+  if (mode !== "enforce" || !data) {
     return (
       <div className="ops-theme flex flex-col gap-ops-3 text-ops-body text-ink" data-admin-security="">
         <PageHeader title="Security" />
         <p className="border border-hairline bg-surface px-ops-3 py-ops-3 text-ink-2">
-          Authenticator sign-in and Unlock aren&apos;t switched on here yet. Nothing to set up.
+          Sign-in codes and Unlock aren&apos;t switched on here yet (ADMIN_STEP_UP_ENFORCE is off). Nothing to set up.
         </p>
       </div>
     );
   }
 
-  const others = operators.filter((o) => o.name !== me);
+  const d = data;
+  const enrolled = !!d.enrolledAt;
+  const others = d.operators.filter((o) => o.name !== d.me);
+  const unlocked = !!d.unlockedUntil && unlock.left > 0;
   const codesText = (c: string[]) => `Scalers Admin backup codes. Each works once.\n\n${c.join("\n")}\n`;
+  const needUnlock = (what: string, action: string) => {
+    setMsg({ tone: "warn", text: `Unlock first, then tap ${what} again.` });
+    setSheet({ action, what: what.toLowerCase() });
+  };
+
+  const post = async (url: string, body?: unknown) => {
+    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    return { res, json };
+  };
 
   const regenerate = async () => {
     setPending("codes"); setMsg(null);
-    const res = await fetch("/api/admin/step-up/backup-codes", { method: "POST" });
-    const json = (await res.json().catch(() => ({}))) as { backupCodes?: string[]; error?: string; message?: string };
-    setPending(null);
-    if (res.status === 403) return setMsg({ tone: "warn", text: "Unlock first, then tap New backup codes again." });
-    if (!res.ok) return setMsg({ tone: "warn", text: json.message || json.error || "Couldn't make new codes." });
-    setCodes(json.backupCodes || []);
+    const { res, json } = await post("/api/admin/step-up/backup-codes");
+    setPending(null); setConfirm(null);
+    if (res.status === 403) return needUnlock("Generate new codes", "step-up:regenerate_backup_codes");
+    if (!res.ok) return setMsg({ tone: "warn", text: String(json.message || json.error || "Couldn't make new codes.") });
+    setCodes((json.backupCodes as string[]) || []); setCopied(false);
     router.refresh();
   };
 
-  const reset = async () => {
+  const reset = async (reason: string) => {
     setPending("reset"); setMsg(null);
-    const res = await fetch("/api/admin/step-up/reset", {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ target, reason }),
-    });
-    const json = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
-    setPending(null);
-    if (res.status === 403) return setMsg({ tone: "warn", text: "Unlock first, then tap Reset again." });
-    if (!res.ok) return setMsg({ tone: "warn", text: json.message || json.error || "Couldn't reset." });
+    const { res, json } = await post("/api/admin/step-up/reset", { target, reason });
+    setPending(null); setConfirm(null);
+    if (res.status === 403) return needUnlock("Reset authenticator", "step-up:reset");
+    if (!res.ok) return setMsg({ tone: "warn", text: String(json.message || json.error || "Couldn't reset.") });
     setMsg({ tone: "ok", text: `${target}'s authenticator is reset. They'll set it up again at their next sign-in.` });
-    setTarget(""); setReason("");
+    setTarget("");
     router.refresh();
   };
 
-  const card = "border border-hairline bg-surface";
-  const head = "border-b border-hairline px-ops-3 py-ops-2 text-ops-label font-semibold uppercase tracking-wide text-ink-2";
+  const session = async (op: "end_unlock" | "forget_device") => {
+    setPending(op); setMsg(null);
+    const { res, json } = await post("/api/admin/step-up/session", { op });
+    setPending(null); setConfirm(null);
+    if (!res.ok) return setMsg({ tone: "warn", text: String(json.message || json.error || "That didn't work. Try again.") });
+    if (op === "forget_device") { window.location.href = String(json.next || "/admin/login?step=2fa"); return; }
+    setMsg({ tone: "ok", text: "Unlock ended." });
+    router.refresh();
+  };
 
   return (
     <div className="ops-theme flex flex-col gap-ops-4 text-ops-body text-ink" data-admin-security="">
@@ -84,92 +139,159 @@ export function AdminSecurityV2({ mode, me, operators, codesLeft, openSetup }: {
         </p>
       ) : null}
 
-      <section aria-label="Your authenticator" className={card} data-security-mine="">
-        <h2 className={head}>Your authenticator</h2>
+      <section aria-labelledby="sec-signin" className={card} data-security-signin="">
+        <h2 id="sec-signin" className={head}>Your sign-in</h2>
         <dl className="divide-y divide-hairline">
-          <div className="flex min-h-ops-touch items-baseline justify-between gap-ops-4 px-ops-3 py-ops-2">
-            <dt className="text-ink-2">Status</dt>
-            <dd className="font-semibold" data-security-enrolled={mine?.enrolled ? "yes" : "no"}>
-              {mine?.enrolled ? (mine.needsReenrol ? "Set up again (backup code used)" : "Set up") : "Not set up"}
-            </dd>
-          </div>
-          <div className="flex min-h-ops-touch items-baseline justify-between gap-ops-4 px-ops-3 py-ops-2">
-            <dt className="text-ink-2">Backup codes left</dt>
-            <dd className="ops-num font-semibold">{mine?.enrolled ? codesLeft : "—"}</dd>
-          </div>
+          <Row k="Authenticator">
+            <span data-security-enrolled={enrolled ? "yes" : "no"}>
+              {enrolled ? (d.needsReenrol ? "Set up again (backup code used)" : `Set up ${EAT(d.enrolledAt!)}`) : "Not set up"}
+            </span>
+          </Row>
+          <Row k="Email code goes to">
+            {d.emailHint ? (
+              <span>
+                {d.emailHint}
+                <span className="block text-ops-label font-normal text-ink-2">
+                  {d.emailSource === "operator" ? "Your own address (ADMIN_OPERATOR_EMAILS)" : "Shared ops address (ADMIN_STEP_UP_ALERT_EMAIL)"}
+                </span>
+              </span>
+            ) : <span className="text-ink-2">No address set</span>}
+          </Row>
+          <Row k="This device">
+            {d.deviceUntil ? `Trusted until ${EAT(d.deviceUntil)}` : <span className="text-ink-2">Not trusted</span>}
+          </Row>
         </dl>
         <div className="flex flex-wrap gap-ops-2 border-t border-hairline px-ops-3 py-ops-3">
-          {!mine?.enrolled || mine.needsReenrol ? (
+          {!enrolled || d.needsReenrol ? (
             <Button variant="primary" size="md" onClick={() => setSheet({ action: "enrol", what: "set up your authenticator" })} data-action="security-setup">
               Set up authenticator
             </Button>
           ) : (
-            <Button variant="tonal" size="md" pending={pending === "codes"} onClick={regenerate} data-action="security-new-codes">
-              New backup codes
+            <Button variant="tonal" size="md" onClick={() => setSheet({ action: "enrol", what: "replace your authenticator", replace: true })} data-action="security-replace">
+              Replace authenticator
             </Button>
           )}
+          {d.deviceUntil ? (
+            <Button variant="ghost" size="md" pending={pending === "forget_device"} onClick={() => setConfirm("forget")} data-action="security-forget-device">
+              Forget this device
+            </Button>
+          ) : null}
         </div>
-        <p className="px-ops-3 pb-ops-3 text-ops-label text-ink-2">New codes replace the old ones. They&apos;re shown once and never emailed.</p>
+        <p className="px-ops-3 pb-ops-3 text-ops-label text-ink-2">
+          Authenticator first; the email code is the fallback. Device trust lives in this browser only, so forgetting it signs this device out of the second step. Other devices expire on their own within 12 hours.
+        </p>
       </section>
 
-      {codes ? (
-        <section aria-label="New backup codes" className={card} data-security-codes="">
-          <h2 className={head}>Save these now. They won&apos;t be shown again.</h2>
-          <ul className="grid grid-cols-2 gap-1 p-ops-3 font-mono text-ops-label">
-            {codes.map((c) => <li key={c} className="rounded-sm border border-hairline bg-canvas px-ops-2 py-1">{c}</li>)}
-          </ul>
-          <div className="flex flex-wrap gap-ops-2 px-ops-3 pb-ops-3">
-            <Button variant="tonal" size="md" onClick={() => {
-              const url = URL.createObjectURL(new Blob([codesText(codes)], { type: "text/plain" }));
-              const a = document.createElement("a"); a.href = url; a.download = "scalers-admin-backup-codes.txt"; a.click(); URL.revokeObjectURL(url);
-            }}>Download (.txt)</Button>
-            <Button variant="tonal" size="md" onClick={() => { void navigator.clipboard.writeText(codesText(codes)).then(() => setCopied(true)).catch(() => {}); }}>{copied ? "Copied" : "Copy"}</Button>
-            <Button variant="ghost" size="md" onClick={() => setCodes(null)}>I&apos;ve saved these</Button>
+      <section aria-labelledby="sec-codes" className={card} data-security-backup="">
+        <h2 id="sec-codes" className={head}>Backup codes</h2>
+        <dl><Row k="Codes left"><span className="ops-num">{enrolled ? d.codesLeft : "—"}</span></Row></dl>
+        {enrolled ? (
+          <div className="flex flex-wrap gap-ops-2 border-t border-hairline px-ops-3 py-ops-3">
+            <Button variant="tonal" size="md" pending={pending === "codes"} onClick={() => setConfirm("codes")} data-action="security-new-codes">
+              Generate new codes
+            </Button>
           </div>
-        </section>
-      ) : null}
+        ) : null}
+        <p className="px-ops-3 pb-ops-3 text-ops-label text-ink-2">
+          {enrolled ? "Needs Unlock. Shown once, never emailed. Old codes stop working." : "You get backup codes when you set up the authenticator."}
+        </p>
+        {codes ? (
+          <div className="border-t border-hairline" data-security-codes="">
+            <p className="px-ops-3 pt-ops-3 text-ops-label font-semibold">Save these now. They won&apos;t be shown again.</p>
+            <ul className="grid grid-cols-2 gap-1 p-ops-3 font-mono text-ops-label">
+              {codes.map((c) => <li key={c} className="rounded-sm border border-hairline bg-canvas px-ops-2 py-1">{c}</li>)}
+            </ul>
+            <div className="flex flex-wrap gap-ops-2 px-ops-3 pb-ops-3">
+              <Button variant="tonal" size="md" onClick={() => {
+                const url = URL.createObjectURL(new Blob([codesText(codes)], { type: "text/plain" }));
+                const a = document.createElement("a"); a.href = url; a.download = "scalers-admin-backup-codes.txt"; a.click(); URL.revokeObjectURL(url);
+              }} data-action="security-codes-download">Download (.txt)</Button>
+              <Button variant="tonal" size="md" onClick={() => { void navigator.clipboard.writeText(codesText(codes)).then(() => setCopied(true)).catch(() => setMsg({ tone: "warn", text: "Couldn't copy. Use Download." })); }} data-action="security-codes-copy">{copied ? "Copied" : "Copy"}</Button>
+              <Button variant="ghost" size="md" onClick={() => setCodes(null)}>I&apos;ve saved these</Button>
+            </div>
+          </div>
+        ) : null}
+      </section>
 
-      <section aria-label="Operators" className={card} data-security-operators="">
-        <h2 className={head}>Operators</h2>
+      <section aria-labelledby="sec-unlock" className={card} data-security-unlock="">
+        <h2 id="sec-unlock" className={head}>Unlock</h2>
+        <dl>
+          <Row k="Now">
+            <span data-security-unlocked={unlocked ? "yes" : "no"}>
+              {unlocked ? <>Unlocked · <span className="ops-num">{unlock.text}</span> left</> : <span className="text-ink-2">Locked</span>}
+            </span>
+          </Row>
+        </dl>
+        {unlocked ? (
+          <div className="border-t border-hairline px-ops-3 py-ops-3">
+            <Button variant="tonal" size="md" pending={pending === "end_unlock"} onClick={() => session("end_unlock")} data-action="security-end-unlock">End now</Button>
+          </div>
+        ) : null}
+        <div className="border-t border-hairline px-ops-3 py-ops-3">
+          <p className="text-ops-label text-ink-2">Unlock asks for your authenticator code and lasts 10 minutes. It&apos;s needed to:</p>
+          <ul className="mt-ops-2 list-disc ps-5 text-ops-label" data-security-protects="">
+            {d.protects.map((w) => <li key={w}>{w}</li>)}
+          </ul>
+        </div>
+      </section>
+
+      <section aria-labelledby="sec-ops" className={card} data-security-operators="">
+        <h2 id="sec-ops" className={head}>Operators</h2>
         <ul className="divide-y divide-hairline">
-          {operators.map((o) => (
-            <li key={o.name} className="flex min-h-ops-touch items-baseline justify-between gap-ops-4 px-ops-3 py-ops-2">
-              <span className="font-semibold">{o.name}{o.name === me ? <span className="ms-1 font-normal text-ink-2">(you)</span> : null}</span>
-              <span className="text-ops-label text-ink-2">{o.lockedUntil ? "Locked" : o.enrolled ? "Authenticator set up" : "Not set up"}</span>
+          {d.operators.map((o) => (
+            <li key={o.name} className={rowCls}>
+              <span className="font-semibold">{o.name}{o.name === d.me ? <span className="ms-1 font-normal text-ink-2">(you)</span> : null}</span>
+              <span className="text-ops-label text-ink-2">{o.lockedUntil ? "Locked" : o.enrolled ? (o.needsReenrol ? "Must set up again" : "Authenticator set up") : "Not set up"}</span>
             </li>
           ))}
         </ul>
-      </section>
-
-      <section aria-label="Reset an operator" className={card} data-security-reset="">
-        <h2 className={head}>Reset an operator&apos;s authenticator</h2>
         {others.length === 0 ? (
-          <p className="px-ops-3 py-ops-3 text-ink-2">You&apos;re the only operator. If you lose your phone and your backup codes, use the database reset in the runbook.</p>
+          <p className="border-t border-hairline px-ops-3 py-ops-3 text-ops-label text-ink-2">You&apos;re the only operator. If you lose your phone and backup codes, use the database reset in the runbook.</p>
         ) : (
-          <div className="flex flex-col gap-ops-3 px-ops-3 py-ops-3">
+          <div className="flex flex-col gap-ops-2 border-t border-hairline px-ops-3 py-ops-3">
             <label className="flex flex-col gap-1">
-              <span className="text-ops-label font-semibold">Operator</span>
+              <span className="text-ops-label font-semibold">Reset an operator&apos;s authenticator</span>
               <select value={target} onChange={(e) => setTarget(e.target.value)} className="ops-field text-ink" data-field="reset-target">
                 <option value="">Pick an operator</option>
                 {others.map((o) => <option key={o.name} value={o.name}>{o.name}</option>)}
               </select>
             </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-ops-label font-semibold">Reason</span>
-              <input value={reason} onChange={(e) => setReason(e.target.value)} className="ops-field text-ink" placeholder="Lost phone and backup codes" data-field="reset-reason" />
-            </label>
-            <p className="text-ops-label text-ink-2">Needs Unlock. They&apos;ll set up the authenticator again at their next sign-in. You can&apos;t reset yourself here.</p>
             <div>
-              <Button variant="danger" size="md" pending={pending === "reset"} disabled={!target || reason.trim().length < 3} onClick={reset} data-action="security-reset">
-                Reset authenticator
-              </Button>
+              <Button variant="danger" size="md" disabled={!target} onClick={() => setConfirm("reset")} data-action="security-reset">Reset authenticator</Button>
             </div>
+            <p className="text-ops-label text-ink-2">Needs Unlock and a reason. You can&apos;t reset yourself.</p>
           </div>
         )}
       </section>
 
+      <section aria-labelledby="sec-activity" className={card} data-security-activity="">
+        <h2 id="sec-activity" className={head}>Recent security activity</h2>
+        {d.events.length === 0 ? (
+          <p className="px-ops-3 py-ops-3 text-ink-2">Nothing yet.</p>
+        ) : (
+          <ul className="divide-y divide-hairline">
+            {d.events.map((e) => (
+              <li key={e.id} className="flex flex-col gap-0.5 px-ops-3 py-ops-2">
+                <span>{SECURITY_EVENT_WORDS[e.action] || e.action}</span>
+                <span className="text-ops-label text-ink-2"><span className="ops-num">{EAT(e.created_at)}</span> · {e.actor}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <OpsConfirm open={confirm === "codes"} onClose={() => setConfirm(null)} onConfirm={() => void regenerate()} title="Generate new backup codes?" strength="light" confirmLabel="Generate" pending={pending === "codes"}>
+        <p>Your {d.codesLeft} current codes stop working right away. The new ones are shown once.</p>
+      </OpsConfirm>
+      <OpsConfirm open={confirm === "reset"} onClose={() => setConfirm(null)} onConfirm={(r) => void reset(r)} title={`Reset ${target}'s authenticator?`} strength="destructive" typeToConfirm={target} requireReason reasonHint="Lost phone and backup codes" confirmLabel="Reset" pending={pending === "reset"}>
+        <p>Their authenticator and backup codes stop working. They set it up again at their next sign-in.</p>
+      </OpsConfirm>
+      <OpsConfirm open={confirm === "forget"} onClose={() => setConfirm(null)} onConfirm={() => void session("forget_device")} title="Forget this device?" strength="light" confirmLabel="Forget" pending={pending === "forget_device"}>
+        <p>You&apos;ll be asked for a code right away on this device.</p>
+      </OpsConfirm>
+
       {sheet ? (
-        <StepUpSheet open onClose={() => { setSheet(null); router.refresh(); }} action={sheet.action} what={sheet.what} />
+        <StepUpSheet open replace={!!sheet.replace} onClose={() => { setSheet(null); router.refresh(); }} action={sheet.action} what={sheet.what} />
       ) : null}
     </div>
   );

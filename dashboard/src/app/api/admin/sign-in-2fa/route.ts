@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { findAdminOperator, normalizeAdminUsername } from "@/lib/adminOperators";
 import { getAdminSessionRaw, signInTwoFactorPassed } from "@/lib/auth";
 import {
-  afterFailure, afterSuccess, decryptSecret, EMAIL_CODE_TTL_MS, emailSendDecision, generateEmailCode, hashEmailCode, isLocked,
+  afterFailure, afterSuccess, EMAIL_FAILED_MESSAGE, decryptSecret, EMAIL_CODE_TTL_MS, emailSendDecision, generateEmailCode, hashEmailCode, isLocked,
   maskEmail, matchBackupCode, matchEmailCode, SIGNIN_COOKIE, SIGNIN_REMEMBER_MS, signDeviceToken, signInEmailFor,
   signInTwoFactorRequired, UNLOCK_COOKIE, UNLOCK_TTL_MS, verifyTotp,
 } from "@/lib/ops/stepUpCore";
@@ -71,8 +71,13 @@ export async function POST(req: Request) {
     const emailCode = generateEmailCode();
     await insertEmailCode(op, hashEmailCode(emailCode, op, key), now + EMAIL_CODE_TTL_MS, to);
     const sent = await sendSignInCodeEmail(to, emailCode);
-    await auditStepUp(op, "admin.2fa.sign_in.email_sent", { to: maskEmail(to), delivered: sent.sent, why: sent.why ?? null });
-    if (!sent.sent) return NextResponse.json({ error: "email_failed", message: "Couldn't send the email. Use your authenticator or try again." }, { status: 502 });
+    if (!sent.sent) {
+      // Never pretend: retire the unsent code, audit why (no code in the row), say so on screen.
+      await retireEmailCodes(op).catch(() => {});
+      await auditStepUp(op, "admin.2fa.sign_in.email_failed", { to: maskEmail(to), why: sent.why ?? "unknown" });
+      return NextResponse.json({ error: "email_failed", message: EMAIL_FAILED_MESSAGE }, { status: 502 });
+    }
+    await auditStepUp(op, "admin.2fa.sign_in.email_sent", { to: maskEmail(to), delivered: true });
     return NextResponse.json({ ok: true, sentTo: maskEmail(to), expiresInS: EMAIL_CODE_TTL_MS / 1000 });
   }
 

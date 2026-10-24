@@ -110,6 +110,7 @@ export const ADMIN_WRITE_ROUTES: AdminWriteRoute[] = [
   { file: "admin/session", prefix: null, risky: [], safe: ["sign_in"], kind: "auth" },
   { file: "admin/sign-in-2fa", prefix: null, risky: [], safe: ["totp", "backup", "email_send", "email_verify"], kind: "auth" },
   { file: "admin/step-up", prefix: null, risky: [], safe: ["unlock"], kind: "auth" },
+  { file: "admin/step-up/session", prefix: null, risky: [], safe: ["end_unlock", "forget_device"], kind: "auth", note: "Ends your own Unlock or forgets this device; only ever narrows access." },
   { file: "admin/step-up/enrol", prefix: null, risky: [], safe: ["start", "confirm"], kind: "auth", note: "Allowed unenrolled (after sign-in 2FA) or with a live unlock." },
 ];
 // route-registry:end
@@ -391,6 +392,20 @@ export function emailSendDecision(sentAt: number[], nowMs: number): { ok: true }
 }
 
 /** a***@gmail.com */
+/** Expiry (ms) of a device token without trusting it; callers verify first. */
+export function deviceTokenExpiry(token: string | undefined | null): number | null {
+  const exp = Number(String(token || "").split(".")[2]);
+  return Number.isFinite(exp) && exp > 0 ? exp : null;
+}
+
+/** Where signInEmailFor's address comes from, for the Security screen. */
+export function signInEmailSource(operator: string, env: NodeJS.ProcessEnv = process.env): "operator" | "alert" | null {
+  if (signInEmailFor(operator, { ADMIN_OPERATOR_EMAILS: env.ADMIN_OPERATOR_EMAILS } as unknown as NodeJS.ProcessEnv)) return "operator";
+  return signInEmailFor(operator, env) ? "alert" : null;
+}
+
+export const EMAIL_FAILED_MESSAGE = "We couldn't send the email code. Use your authenticator or a backup code.";
+
 export function maskEmail(email: string): string {
   const [u, d] = String(email || "").split("@");
   if (!u || !d) return "";
