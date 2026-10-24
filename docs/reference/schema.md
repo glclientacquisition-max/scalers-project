@@ -14,6 +14,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | Table | Columns | Defined in |
 | --- | --- | --- |
 | `admin_sign_in_email_code` | `code_hash`, `created_at`, `expires_at`, `id`, `operator`, `sent_to`, `used_at` | `docs/supabase/admin_sign_in_2fa.sql` |
+| `admin_step_up_area` | `area`, `required`, `updated_at`, `updated_by` | `docs/supabase/admin_step_up_area.sql` |
 | `admin_step_up_backup_code` | `code_hash`, `created_at`, `id`, `operator`, `used_at` | `docs/supabase/admin_step_up.sql` |
 | `admin_step_up_factor` | `created_at`, `enrolled_at`, `failed_count`, `last_step`, `locked_until`, `needs_reenrol`, `operator`, `pending_secret_enc`, `secret_enc`, `updated_at` | `docs/supabase/admin_step_up.sql` |
 | `admin_step_up_grant` | `action`, `created_at`, `expires_at`, `id`, `method`, `operator`, `revoked_at` | `docs/supabase/admin_step_up.sql` |

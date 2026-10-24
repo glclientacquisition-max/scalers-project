@@ -8,11 +8,11 @@ import { parseAdminOperators } from "@/lib/adminOperators";
 import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { stepUpMode } from "@/lib/ops/stepUp";
 import {
-  deviceTokenExpiry, grantValid, maskEmail, riskyActionKeys, SIGNIN_COOKIE, signInEmailFor, signInEmailSource,
+  ALWAYS_UNLOCK, deviceTokenExpiry, grantValid, riskyKeysByArea, UNLOCK_AREAS, maskEmail, riskyActionKeys, SIGNIN_COOKIE, signInEmailFor, signInEmailSource,
   UNLOCK_COOKIE, verifyDeviceToken,
 } from "@/lib/ops/stepUpCore";
-import { backupCodesLeft, factorStatuses, loadFactor, loadGrant, recentSecurityEvents, stepUpKey } from "@/lib/ops/stepUpStore";
-import { STEP_UP_WHAT } from "@/lib/ops/stepUpWords";
+import { backupCodesLeft, factorStatuses, loadAreaRows, loadFactor, loadGrant, recentSecurityEvents, stepUpKey } from "@/lib/ops/stepUpStore";
+import { STEP_UP_WHAT, UNLOCK_AREA_WORDS } from "@/lib/ops/stepUpWords";
 
 export const instant = false;
 
@@ -29,9 +29,25 @@ export default async function SecurityPage({ searchParams }: { searchParams: Pro
     const now = Date.now();
     const jar = await cookies();
     const names = parseAdminOperators().map((o) => o.username);
-    const [statuses, codesLeft, factor, grant, events] = await Promise.all([
+    const [statuses, codesLeft, factor, grant, events, areaRows] = await Promise.all([
       factorStatuses(names), backupCodesLeft(me), loadFactor(me), loadGrant(jar.get(UNLOCK_COOKIE)?.value), recentSecurityEvents(20),
+      loadAreaRows().catch((err) => { logAdminError("settings-security-areas", err); return null; }),
     ]);
+    const byArea = riskyKeysByArea();
+    const areas = areaRows === null ? null : UNLOCK_AREAS.map((a) => {
+      const row = areaRows.find((r) => r.area === a);
+      const keys = byArea[a];
+      return {
+        id: a,
+        title: UNLOCK_AREA_WORDS[a].title,
+        covers: UNLOCK_AREA_WORDS[a].covers,
+        required: row ? row.required !== false : true,
+        updatedBy: row?.updated_by ?? null,
+        updatedAt: row?.updated_at ?? null,
+        switchable: keys.filter((k) => !ALWAYS_UNLOCK[k]).map((k) => STEP_UP_WHAT[k] || k),
+        always: keys.filter((k) => ALWAYS_UNLOCK[k]).map((k) => ({ what: STEP_UP_WHAT[k] || k, why: ALWAYS_UNLOCK[k] })),
+      };
+    });
     const deviceTok = jar.get(SIGNIN_COOKIE)?.value;
     const deviceOk = verifyDeviceToken(deviceTok, me, now, stepUpKey());
     const email = signInEmailFor(me);
@@ -52,6 +68,7 @@ export default async function SecurityPage({ searchParams }: { searchParams: Pro
           protects,
           operators: names.map((n) => ({ name: n, ...statuses[n] })),
           events,
+          areas,
         }}
       />
     );

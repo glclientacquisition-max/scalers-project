@@ -21,6 +21,12 @@ export type SecurityData = {
   protects: string[];
   operators: Op[];
   events: Ev[];
+  /** null = the area table couldn't be read (everything still needs Unlock). */
+  areas: Area[] | null;
+};
+type Area = {
+  id: string; title: string; covers: string; required: boolean; updatedBy: string | null; updatedAt: string | null;
+  switchable: string[]; always: Array<{ what: string; why: string }>;
 };
 
 const EAT = (iso: string, withDate = true) =>
@@ -54,8 +60,8 @@ function useCountdown(until: string | null) {
 }
 
 /**
- * Settings › Security (ADMIN_V2). Five plain sections: your sign-in, backup codes, Unlock,
- * operators, recent activity. Every button calls a real route; confirms use OpsConfirm
+ * Settings › Security (ADMIN_V2). Six plain sections: your sign-in, backup codes, Unlock,
+ * what needs Unlock (area switches), operators, recent activity. Every button calls a real route; confirms use OpsConfirm
  * (bottom sheet on phones, side drawer from md). A 403 step_up_required opens StepUpSheet.
  */
 export function AdminSecurityV2({ mode, data, openSetup }: { mode: "off" | "observe" | "enforce"; data: SecurityData | null; openSetup: boolean }) {
@@ -64,6 +70,7 @@ export function AdminSecurityV2({ mode, data, openSetup }: { mode: "off" | "obse
     openSetup ? { action: "enrol", what: "set up your authenticator" } : null,
   );
   const [confirm, setConfirm] = useState<null | "codes" | "reset" | "forget">(null);
+  const [areaAsk, setAreaAsk] = useState<null | { id: string; title: string; required: boolean }>(null);
   const [codes, setCodes] = useState<string[] | null>(null);
   const [copied, setCopied] = useState(false);
   const [target, setTarget] = useState("");
@@ -116,6 +123,18 @@ export function AdminSecurityV2({ mode, data, openSetup }: { mode: "off" | "obse
     if (!res.ok) return setMsg({ tone: "warn", text: String(json.message || json.error || "Couldn't reset.") });
     setMsg({ tone: "ok", text: `${target}'s authenticator is reset. They'll set it up again at their next sign-in.` });
     setTarget("");
+    router.refresh();
+  };
+
+  const setArea = async (reason: string) => {
+    if (!areaAsk) return;
+    const ask = areaAsk;
+    setPending(`area-${ask.id}`); setMsg(null);
+    const { res, json } = await post("/api/admin/step-up/areas", { area: ask.id, required: ask.required, reason });
+    setPending(null); setAreaAsk(null);
+    if (res.status === 403) return needUnlock(`the ${ask.title} switch`, "step-up:set_area");
+    if (!res.ok) return setMsg({ tone: "warn", text: String(json.message || json.error || "Couldn't save that switch.") });
+    setMsg({ tone: "ok", text: `${ask.title}: ${ask.required ? "needs Unlock" : "no longer needs Unlock"}.` });
     router.refresh();
   };
 
@@ -235,6 +254,59 @@ export function AdminSecurityV2({ mode, data, openSetup }: { mode: "off" | "obse
         </div>
       </section>
 
+      <section aria-labelledby="sec-areas" className={card} data-security-areas="">
+        <h2 id="sec-areas" className={head}>What needs Unlock</h2>
+        <p className="px-ops-3 pt-ops-3 text-ops-label text-ink-2">
+          Turn an area off and its everyday changes go through without a code. Changing a switch needs Unlock and a reason, and is logged. Items with a lock always need Unlock.
+        </p>
+        {d.areas === null ? (
+          <p role="alert" className="px-ops-3 py-ops-3 text-ops-label text-attention">Couldn&apos;t read the switches, so every area needs Unlock for now.</p>
+        ) : (
+          <ul className="divide-y divide-hairline" data-security-area-list="">
+            {d.areas.map((a) => (
+              <li key={a.id} className="flex flex-col gap-ops-2 px-ops-3 py-ops-3" data-security-area={a.id}>
+                <div className="flex items-start justify-between gap-ops-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold">{a.title}</p>
+                    <p className="text-ops-label text-ink-2">{a.covers}</p>
+                  </div>
+                  {a.switchable.length ? (
+                    <button
+                      type="button" role="switch" aria-checked={a.required} aria-label={`${a.title} needs Unlock`}
+                      disabled={pending === `area-${a.id}`}
+                      onClick={() => setAreaAsk({ id: a.id, title: a.title, required: !a.required })}
+                      className={`relative inline-flex h-ops-touch min-w-[3.25rem] shrink-0 items-center rounded-full border border-hairline px-1 transition-colors disabled:opacity-60 ${a.required ? "bg-ink" : "bg-canvas"}`}
+                      data-action={`security-area-${a.id}`}
+                    >
+                      <span aria-hidden className={`block size-5 rounded-full transition-transform ${a.required ? "translate-x-5 bg-surface" : "translate-x-0 bg-ink-2"}`} />
+                    </button>
+                  ) : <span className="text-ops-label text-ink-2">Always on</span>}
+                </div>
+                {a.switchable.length ? (
+                  <p className="text-ops-label">
+                    <span className="font-semibold">{a.required ? "Needs Unlock: " : "No Unlock: "}</span>
+                    {a.switchable.join(", ")}
+                  </p>
+                ) : null}
+                {a.always.length ? (
+                  <ul className="flex flex-col gap-1 text-ops-label" data-security-area-always="">
+                    {a.always.map((x) => (
+                      <li key={x.what} className="flex gap-ops-2">
+                        <svg aria-hidden viewBox="0 0 16 16" className="mt-0.5 size-3.5 shrink-0 fill-current text-ink-2"><path d="M4 7V5a4 4 0 1 1 8 0v2h.5A1.5 1.5 0 0 1 14 8.5v5A1.5 1.5 0 0 1 12.5 15h-9A1.5 1.5 0 0 1 2 13.5v-5A1.5 1.5 0 0 1 3.5 7H4Zm1.5 0h5V5a2.5 2.5 0 0 0-5 0v2Z"/></svg>
+                        <span><span className="font-semibold">Always: {x.what}.</span> <span className="text-ink-2">{x.why}</span></span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {a.updatedBy && a.updatedAt ? (
+                  <p className="text-ops-label text-ink-2">Last changed by {a.updatedBy}, <span className="ops-num">{EAT(a.updatedAt)}</span></p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section aria-labelledby="sec-ops" className={card} data-security-operators="">
         <h2 id="sec-ops" className={head}>Operators</h2>
         <ul className="divide-y divide-hairline">
@@ -288,6 +360,10 @@ export function AdminSecurityV2({ mode, data, openSetup }: { mode: "off" | "obse
       </OpsConfirm>
       <OpsConfirm open={confirm === "forget"} onClose={() => setConfirm(null)} onConfirm={() => void session("forget_device")} title="Forget this device?" strength="light" confirmLabel="Forget" pending={pending === "forget_device"}>
         <p>You&apos;ll be asked for a code right away on this device.</p>
+      </OpsConfirm>
+
+      <OpsConfirm open={!!areaAsk} onClose={() => setAreaAsk(null)} onConfirm={(r) => void setArea(r)} title={areaAsk ? `${areaAsk.required ? "Turn on" : "Turn off"} Unlock for ${areaAsk.title}?` : ""} strength={areaAsk?.required ? "light" : "destructive"} requireReason reasonHint="Why the change" confirmLabel={areaAsk?.required ? "Turn on" : "Turn off"} pending={!!areaAsk && pending === `area-${areaAsk.id}`}>
+        <p>{areaAsk?.required ? "These changes will ask for your authenticator code again." : "These changes will go through without a code. Locked items still need Unlock."}</p>
       </OpsConfirm>
 
       {sheet ? (

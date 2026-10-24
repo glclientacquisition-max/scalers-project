@@ -37,57 +37,83 @@ export type AdminWriteRoute = {
   safe: string[];
   /** auth: sign-in / Unlock plumbing. single: one action, no `action` field in the body. */
   kind?: "auth" | "single";
+  /** Settings › Security "What needs Unlock" area. Required: CI fails a route without one. */
+  area: UnlockArea;
+  /** Per-action area when an action belongs elsewhere (e.g. businesses:release_did → numbers). */
+  actionArea?: Record<string, UnlockArea>;
   note?: string;
+};
+
+/** Areas an operator can switch on/off in Settings › Security (Alvin, 24 Oct 2026). Default ON. */
+export const UNLOCK_AREAS = ["numbers", "billing", "businesses", "voices", "operators"] as const;
+export type UnlockArea = (typeof UNLOCK_AREAS)[number];
+export type UnlockAreaSettings = Partial<Record<UnlockArea, boolean>>;
+export function isUnlockArea(v: unknown): v is UnlockArea {
+  return typeof v === "string" && (UNLOCK_AREAS as readonly string[]).includes(v);
+}
+
+/**
+ * Always need Unlock, whatever the area switch says. Number release (incl. archive-release),
+ * invoice void, authenticator reset, backup codes and the area switches themselves.
+ */
+export const ALWAYS_UNLOCK: Record<string, string> = {
+  "did-pool:release": "Releasing a number can't be undone; the number may go to someone else.",
+  "businesses:release_did": "Releasing a number can't be undone; the number may go to someone else.",
+  "businesses:archive": "Archive releases the business's number too.",
+  "invoice:void": "Voiding an invoice changes money records for good.",
+  "step-up:reset": "Resetting someone's authenticator could hand over their access.",
+  "step-up:regenerate_backup_codes": "Backup codes are a way in; making new ones needs proof it's you.",
+  "step-up:set_area": "Turning Unlock off must itself need Unlock.",
 };
 
 // route-registry:start (route paths and action ids, not screen copy)
 export const ADMIN_WRITE_ROUTES: AdminWriteRoute[] = [
-  { file: "did-pool", prefix: "did-pool", risky: ["release", "assign_specific", "assign_next"], safe: ["add"] },
+  { file: "did-pool", area: "numbers", prefix: "did-pool", risky: ["release", "assign_specific", "assign_next"], safe: ["add"] },
   {
-    file: "admin/businesses",
+    file: "admin/businesses", area: "businesses", actionArea: { release_did: "numbers", assign_next: "numbers" },
     prefix: "businesses",
     risky: ["release_did", "archive", "transfer_owner", "assign_next"],
     safe: ["suspend", "unsuspend", "restore", "update_profile", "send_owner_reset", "save_recording_retention"],
   },
   {
-    file: "admin/billing/invoices/[id]/actions",
+    file: "admin/billing/invoices/[id]/actions", area: "billing",
     prefix: "invoice",
     risky: ["void", "credit_note"],
     safe: ["dispute", "clear_dispute", "resend"],
   },
   {
-    file: "admin/number-hold",
+    file: "admin/number-hold", area: "numbers",
     prefix: "number-hold",
     risky: ["hold", "end_hold", "restore", "set_settings", "bill_fee"],
     safe: [],
   },
   {
-    file: "admin/package-versions",
+    file: "admin/package-versions", area: "billing",
     prefix: "package-versions",
     risky: ["publish", "move_subscribers", "set_billing_mode"],
     safe: ["draft", "update_draft", "archive", "discard_draft", "approve", "set_new_signup_trial", "set_price_approval_threshold"],
   },
   {
-    file: "admin/billing",
+    file: "admin/billing", area: "billing",
     prefix: "billing",
     risky: ["grant_minutes", "assign_package", "resolve_checkout_review", "set_billing_mode"],
     safe: ["unassign_package", "mint_pay_link"],
   },
   {
-    file: "admin/wallets",
+    file: "admin/wallets", area: "billing",
     prefix: "wallets",
     risky: ["set_billing_mode"],
     safe: [],
     note: "Same billing-mode switch as billing:set_billing_mode, older screen.",
   },
   {
-    file: "admin/platform-ops",
+    file: "admin/platform-ops", area: "operators",
     prefix: "platform-ops",
     risky: ["save_settings"],
     safe: ["test_send", "prepare_resend", "verify_resend", "ack"],
   },
   {
-    file: "admin/step-up/reset",
+    file: "admin/step-up/reset", area: "operators",
     prefix: "step-up",
     risky: ["reset"],
     safe: [],
@@ -95,23 +121,31 @@ export const ADMIN_WRITE_ROUTES: AdminWriteRoute[] = [
     note: "Operator reset: live unlock + reason, never self.",
   },
   {
-    file: "admin/step-up/backup-codes",
+    file: "admin/step-up/backup-codes", area: "operators",
     prefix: "step-up",
     risky: ["regenerate_backup_codes"],
     safe: [],
     kind: "single",
   },
-  { file: "admin/packages", prefix: null, risky: [], safe: ["save_rates", "save_package"], note: "Ungated by decision: legacy rate card edits; package publish is package-versions." },
-  { file: "admin/voices", prefix: "voices", risky: ["delete"], safe: ["upsert", "set_default", "set_active"], note: "Delete is destructive; edits stay ungated." },
-  { file: "admin/billing/flags", prefix: null, risky: [], safe: ["save"], kind: "single", note: "Ungated by decision." },
-  { file: "admin/billing/test-invoice", prefix: null, risky: [], safe: ["create"], kind: "single", note: "Ungated by decision: KSh 10 test invoice." },
-  { file: "admin/buy-number", prefix: "buy-number", risky: ["buy"], safe: [], kind: "single", note: "Spends money on a new DID." },
-  { file: "admin/sautikit-sync", prefix: null, risky: [], safe: ["sync"], kind: "single", note: "Ungated by decision: read-only sync." },
-  { file: "admin/session", prefix: null, risky: [], safe: ["sign_in"], kind: "auth" },
-  { file: "admin/sign-in-2fa", prefix: null, risky: [], safe: ["totp", "backup", "email_send", "email_verify"], kind: "auth" },
-  { file: "admin/step-up", prefix: null, risky: [], safe: ["unlock"], kind: "auth" },
-  { file: "admin/step-up/session", prefix: null, risky: [], safe: ["end_unlock", "forget_device"], kind: "auth", note: "Ends your own Unlock or forgets this device; only ever narrows access." },
-  { file: "admin/step-up/enrol", prefix: null, risky: [], safe: ["start", "confirm"], kind: "auth", note: "Allowed unenrolled (after sign-in 2FA) or with a live unlock." },
+  { file: "admin/packages", area: "billing", prefix: null, risky: [], safe: ["save_rates", "save_package"], note: "Ungated by decision: legacy rate card edits; package publish is package-versions." },
+  { file: "admin/voices", area: "voices", prefix: "voices", risky: ["delete"], safe: ["upsert", "set_default", "set_active"], note: "Delete is destructive; edits stay ungated." },
+  { file: "admin/billing/flags", area: "billing", prefix: null, risky: [], safe: ["save"], kind: "single", note: "Ungated by decision." },
+  { file: "admin/billing/test-invoice", area: "billing", prefix: null, risky: [], safe: ["create"], kind: "single", note: "Ungated by decision: KSh 10 test invoice." },
+  { file: "admin/buy-number", area: "numbers", prefix: "buy-number", risky: ["buy"], safe: [], kind: "single", note: "Spends money on a new DID." },
+  { file: "admin/sautikit-sync", area: "voices", prefix: null, risky: [], safe: ["sync"], kind: "single", note: "Ungated by decision: read-only sync." },
+  { file: "admin/session", area: "operators", prefix: null, risky: [], safe: ["sign_in"], kind: "auth" },
+  { file: "admin/sign-in-2fa", area: "operators", prefix: null, risky: [], safe: ["totp", "backup", "email_send", "email_verify"], kind: "auth" },
+  { file: "admin/step-up", area: "operators", prefix: null, risky: [], safe: ["unlock"], kind: "auth" },
+  { file: "admin/step-up/session", area: "operators", prefix: null, risky: [], safe: ["end_unlock", "forget_device"], kind: "auth", note: "Ends your own Unlock or forgets this device; only ever narrows access." },
+  {
+    file: "admin/step-up/areas", area: "operators",
+    prefix: "step-up",
+    risky: ["set_area"],
+    safe: [],
+    kind: "single",
+    note: "Settings › Security area switches. Always needs Unlock + reason.",
+  },
+  { file: "admin/step-up/enrol", area: "operators", prefix: null, risky: [], safe: ["start", "confirm"], kind: "auth", note: "Allowed unenrolled (after sign-in 2FA) or with a live unlock." },
 ];
 // route-registry:end
 
@@ -134,6 +168,31 @@ export function isRiskyAction(key: string): boolean {
 
 export function riskyActions(): string[] {
   return [...RISKY].sort();
+}
+
+/** Area for a `<prefix>:<action>` key, from the registry. */
+export function areaForAction(key: string): UnlockArea | null {
+  const i = key.indexOf(":");
+  const prefix = key.slice(0, i), action = key.slice(i + 1);
+  for (const r of ADMIN_WRITE_ROUTES) {
+    if (r.prefix === prefix && r.risky.includes(action)) return r.actionArea?.[action] ?? r.area;
+  }
+  return null;
+}
+
+/** Risky keys grouped by area (Settings › Security). */
+export function riskyKeysByArea(): Record<UnlockArea, string[]> {
+  const out = Object.fromEntries(UNLOCK_AREAS.map((a) => [a, [] as string[]])) as Record<UnlockArea, string[]>;
+  for (const k of riskyActionKeys()) out[areaForAction(k)!].push(k);
+  return out;
+}
+
+/** Does this key need a live Unlock under these area settings? Missing setting = ON. */
+export function requiresUnlock(key: string, settings: UnlockAreaSettings = {}): boolean {
+  if (!isRiskyAction(key)) return false;
+  if (ALWAYS_UNLOCK[key]) return true;
+  const area = areaForAction(key);
+  return !area || settings[area] !== false;
 }
 
 // ---- base32 (RFC 4648, no padding) ----
@@ -318,8 +377,10 @@ export function gateDecision(input: {
   operator: string;
   grant: Grant | null;
   nowMs: number;
+  /** Area switches from admin_step_up_area. Omitted / missing row = ON. */
+  areas?: UnlockAreaSettings;
 }): { ok: true } | { ok: false; status: 403; error: "step_up_required" } {
-  if (!input.enforced || !isRiskyAction(input.actionKey)) return { ok: true };
+  if (!input.enforced || !requiresUnlock(input.actionKey, input.areas)) return { ok: true };
   if (grantValid(input.grant, input.operator, input.nowMs)) return { ok: true };
   return { ok: false, status: 403, error: "step_up_required" };
 }

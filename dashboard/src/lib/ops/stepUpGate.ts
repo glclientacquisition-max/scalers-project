@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { gateDecision, isRiskyAction, stepUpEnforced, UNLOCK_COOKIE } from "./stepUpCore";
 import { requireStepUp } from "./stepUp";
-import { auditStepUp, loadGrant } from "./stepUpStore";
+import { auditStepUp, loadAreaSettings, loadGrant } from "./stepUpStore";
 
 /**
  * Server gate for risky Admin writes. Call right after requireAdminOperatorWrite.
@@ -15,8 +15,8 @@ export async function stepUpGate(operator: string, actionKey: string, target?: s
   requireStepUp({ action: actionKey, operator, target: target ?? null });
   if (!stepUpEnforced()) return null;
   const jar = await cookies();
-  const grant = await loadGrant(jar.get(UNLOCK_COOKIE)?.value);
-  const d = gateDecision({ enforced: true, actionKey, operator, grant, nowMs: Date.now() });
+  const [grant, areas] = await Promise.all([loadGrant(jar.get(UNLOCK_COOKIE)?.value), loadAreaSettings()]);
+  const d = gateDecision({ enforced: true, actionKey, operator, grant, nowMs: Date.now(), areas });
   if (d.ok) return null;
   await auditStepUp(operator, "admin.step_up.blocked", { intent: actionKey, target: target ?? null });
   return NextResponse.json(

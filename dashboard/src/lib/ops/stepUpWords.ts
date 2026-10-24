@@ -27,6 +27,16 @@ export const STEP_UP_WHAT: Record<string, string> = {
   "platform-ops:save_settings": "save platform settings",
   "step-up:reset": "reset another operator's authenticator",
   "step-up:regenerate_backup_codes": "make new backup codes",
+  "step-up:set_area": "change what needs Unlock",
+};
+
+/** Settings › Security "What needs Unlock" area names and one-line scope. */
+export const UNLOCK_AREA_WORDS: Record<string, { title: string; covers: string }> = {
+  numbers: { title: "Numbers", covers: "Assign, release, buy and hold phone numbers." },
+  billing: { title: "Billing & money", covers: "Invoices, credit notes, minutes, packages and billing mode." },
+  businesses: { title: "Businesses", covers: "Archive a business or transfer its owner." },
+  voices: { title: "Voices & services", covers: "Delete a voice." },
+  operators: { title: "Operators & security", covers: "Platform settings, authenticator resets, backup codes." },
 };
 
 /** Plain words for security audit events (Settings › Security, recent activity). */
@@ -47,4 +57,5 @@ export const SECURITY_EVENT_WORDS: Record<string, string> = {
   "admin.step_up.locked": "Unlock locked after too many wrong codes",
   "admin.step_up.blocked": "Change blocked until Unlock",
   "admin.step_up.ended": "Unlock ended early",
+  "admin.step_up.area_changed": "Changed what needs Unlock",
 };

@@ -47,6 +47,50 @@ describe("route registry", () => {
     for (const r of ADMIN_WRITE_ROUTES) assert.ok(fs.existsSync(path.join(api, r.file, "route.ts")), `registry lists missing route ${r.file}`);
   });
 
+  it("every route declares a What-needs-Unlock area (Settings › Security switches)", async () => {
+    const { ADMIN_WRITE_ROUTES, UNLOCK_AREAS, areaForAction, riskyActionKeys } = await load();
+    for (const r of ADMIN_WRITE_ROUTES) {
+      assert.ok(UNLOCK_AREAS.includes(r.area), `${r.file}: declare area (one of ${UNLOCK_AREAS.join(", ")})`);
+      for (const [a, area] of Object.entries(r.actionArea || {})) {
+        assert.ok(r.risky.includes(a), `${r.file}: actionArea "${a}" is not a risky action`);
+        assert.ok(UNLOCK_AREAS.includes(area), `${r.file}: actionArea "${a}" has unknown area ${area}`);
+      }
+    }
+    for (const k of riskyActionKeys()) assert.ok(areaForAction(k), `${k} has no area`);
+  });
+
+  it("area switches: missing row = ON, off skips Unlock, always-on keys ignore the switch", async () => {
+    const { requiresUnlock, gateDecision, ALWAYS_UNLOCK, riskyActionKeys, areaForAction, UNLOCK_AREAS } = await load();
+    const allOff = Object.fromEntries(UNLOCK_AREAS.map((a) => [a, false]));
+    for (const must of ["did-pool:release", "businesses:release_did", "businesses:archive", "invoice:void", "step-up:reset", "step-up:regenerate_backup_codes", "step-up:set_area"]) {
+      assert.ok(ALWAYS_UNLOCK[must], `${must} must be always-on`);
+      assert.equal(requiresUnlock(must, allOff), true, `${must} ignores the switch`);
+    }
+    for (const k of riskyActionKeys()) {
+      assert.equal(requiresUnlock(k), true, `${k}: default ON`);
+      assert.equal(requiresUnlock(k, {}), true, `${k}: missing row = ON`);
+      const off = { [areaForAction(k)]: false };
+      assert.equal(requiresUnlock(k, off), !!ALWAYS_UNLOCK[k], `${k}: area off`);
+      const base = { enforced: true, actionKey: k, operator: "alvin", grant: null, nowMs: 1 };
+      assert.equal(gateDecision({ ...base, areas: off }).ok, !ALWAYS_UNLOCK[k], `${k}: gate reads the area`);
+      assert.equal(gateDecision({ ...base, areas: { [areaForAction(k)]: true } }).ok, false);
+    }
+    assert.equal(requiresUnlock("invoice:resend", {}), false);
+    assert.equal(areaForAction("businesses:release_did"), "numbers");
+  });
+
+  it("area switch route needs Unlock + reason and writes the audit log; gate reads the setting", () => {
+    const src = read("dashboard/src/app/api/admin/step-up/areas/route.ts");
+    assert.match(src, /stepUpGate\(gate\.operator, "step-up:set_area"/);
+    assert.match(src, /validateResetReason/);
+    assert.match(src, /admin\.step_up\.area_changed/);
+    assert.ok(src.indexOf("stepUpGate(") < src.indexOf("saveAreaSetting("), "gate before write");
+    assert.match(read("dashboard/src/lib/ops/stepUpGate.ts"), /loadAreaSettings\(\)/);
+    const sql = read("docs/supabase/admin_step_up_area.sql");
+    assert.match(sql, /create table if not exists public\.admin_step_up_area/);
+    assert.match(read("docs/supabase/admin_step_up_area_down.sql"), /drop table if exists public\.admin_step_up_area/);
+  });
+
   it("every action a route handles is classified risky or safe", async () => {
     const { ADMIN_WRITE_ROUTES } = await load();
     for (const r of ADMIN_WRITE_ROUTES) {

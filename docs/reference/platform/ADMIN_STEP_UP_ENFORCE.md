@@ -67,3 +67,11 @@ Same flag: `ADMIN_STEP_UP_ENFORCE=on` turns on Unlock and sign-in 2FA together; 
 ## Gated routes registry
 
 `ADMIN_WRITE_ROUTES` in `dashboard/src/lib/ops/stepUpCore.ts` classifies every mutating admin route and action. `tests/adminStepUpRoutes.test.js` fails CI if a mutating route or action is unclassified, or a risky one skips `stepUpGate`. `StepUpHost` (console layout) opens the Unlock sheet on any 403 `step_up_required`.
+
+## What needs Unlock (area switches)
+
+Settings › Security has one switch per area: Numbers, Billing & money, Businesses, Voices & services, Operators & security.
+Table `admin_step_up_area` (`docs/supabase/admin_step_up_area.sql`, down: `admin_step_up_area_down.sql`). A missing row or read error = ON.
+Changing a switch needs a live Unlock + reason and writes `admin.step_up.area_changed` to `ops_audit_log`.
+Always on, whatever the switch: number release (incl. archive-release), invoice void, authenticator reset, new backup codes, the switches themselves (`ALWAYS_UNLOCK` in `stepUpCore.ts`).
+Every route in `ADMIN_WRITE_ROUTES` must declare an `area`; `tests/adminStepUpRoutes.test.js` fails CI otherwise.

@@ -2,7 +2,7 @@ import "server-only";
 import { recordAdminAction } from "@/lib/adminAudit";
 import { sendOpsMail } from "@/lib/opsMail";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { UNLOCK_TTL_MS, type Grant } from "./stepUpCore";
+import { isUnlockArea, UNLOCK_TTL_MS, type Grant, type UnlockArea, type UnlockAreaSettings } from "./stepUpCore";
 
 /** Data access for Admin step-up. Tables: docs/supabase/admin_step_up.sql (service_role only). */
 
@@ -243,4 +243,33 @@ export async function factorStatuses(operators: string[]): Promise<Record<string
     };
   }
   return out;
+}
+
+export type AreaRow = { area: UnlockArea; required: boolean; updated_by: string | null; updated_at: string | null };
+
+/**
+ * Area switches (docs/supabase/admin_step_up_area.sql). Fails closed: a read error or a
+ * missing row means the area needs Unlock.
+ */
+export async function loadAreaRows(): Promise<AreaRow[]> {
+  const { data, error } = await getSupabaseAdmin().from("admin_step_up_area").select("area, required, updated_by, updated_at");
+  if (error) throw error;
+  return ((data ?? []) as AreaRow[]).filter((r) => isUnlockArea(r.area));
+}
+
+export async function loadAreaSettings(): Promise<UnlockAreaSettings> {
+  try {
+    const out: UnlockAreaSettings = {};
+    for (const r of await loadAreaRows()) out[r.area] = r.required !== false;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export async function saveAreaSetting(area: UnlockArea, required: boolean, actor: string): Promise<void> {
+  const { error } = await getSupabaseAdmin()
+    .from("admin_step_up_area")
+    .upsert({ area, required, updated_by: actor, updated_at: new Date().toISOString() }, { onConflict: "area" });
+  if (error) throw error;
 }
