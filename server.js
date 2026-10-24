@@ -111,6 +111,7 @@ const { createVoiceTrace } = require('./src/speech/voiceTrace');
 const { brainV2ShadowEnabled, createBrainV2Shadow } = require('./src/conversation/v2Shadow');
 const { brainV2Enabled, brainV2Mode } = require('./src/conversation/v2/flag');
 const brainV1Draft = require('./src/conversation/v2/v1draft');
+const { planFillerCut, carryHeldSpeech } = require('./src/speech/fillerCut');
 const { createBrainV2Live } = require('./src/conversation/v2/liveTurn');
 // BRAIN_V2_OWNS_CALL (plan C3, default off): v2 is the only owner of a live-mode call.
 const v2OwnsCall = require('./src/conversation/v2/ownsCall');
@@ -2982,7 +2983,13 @@ mediaWss.on('connection', (ws, req) => {
   // BRAIN_V1_DRAFT_PHASE_A: agent lines spoken outside the brain since its last turn (greeting, opening
   // ladder, acks) are handed to the draft's history so it never asks "how can I help" again.
   let v1HeardMark = 0;
-  let v1WaitAt = 0; // Phase A: when the caller last said "wait"
+  let v1WaitAt = 0;
+  // Phase A filler cut (Voice review #927): the cut filler's generation, so held caller speech is
+  // carried to the reply; the filler's real start; a filler whose timer fired but audio is not bound yet.
+  let cutFillerGen = 0;
+  let fillerStartedAt = 0;
+  let fillerPending = false;
+  let abortPendingFiller = false; // Phase A: when the caller last said "wait"
   function v1HeardSinceLastTurn() {
     const rows = callTranscript.turns().slice(v1HeardMark);
     v1HeardMark = callTranscript.size();
@@ -3451,8 +3458,10 @@ mediaWss.on('connection', (ws, req) => {
   async function playCachedFillerPcm(pcm, { text, trace = true, kind = 'filler' } = {}) {
     if (!pcm || !pcm.length) return { ok: false, empty: true };
     if (callMeter) callMeter.cache(true);
+    if (abortPendingFiller) { abortPendingFiller = false; return { ok: false, cancelled: true }; }
     const streamId = newCachedFillerStreamId();
     bargeInActive = false;
+    fillerStartedAt = Date.now();
     speaking = true;
     speakStartedAt = Date.now();
     lastAgentText = String(text || '');
@@ -3484,14 +3493,19 @@ mediaWss.on('connection', (ws, req) => {
    * minimum audible length, then cut it so the reply starts now (same generation-bump + stream-only
    * cancel + killAudio as stopFillerForReply; no bargeInActive). VOICE REVIEW: cut point / click.
    */
-  const PHASE_A_FILLER_MIN_MS = 450;
   async function cutFillerForReply() {
-    if (!fillerStreamId) return false;
-    const played = Date.now() - (speakStartedAt || 0);
-    if (played < PHASE_A_FILLER_MIN_MS) await sleep(PHASE_A_FILLER_MIN_MS - played);
+    const plan = planFillerCut({ fillerStreamId, fillerStartedAt, fillerPending, now: Date.now() });
+    if (plan.action === 'abort_pending') {
+      abortPendingFiller = true; // speakText / playCachedFillerPcm drop the filler when it binds
+      console.log(`[ws/media][${sidLabel()}] brain_v1_draft phase_a pending filler aborted for reply`);
+      return false;
+    }
+    if (plan.action !== 'cut') return false;
+    if (plan.waitMs) await sleep(plan.waitMs);
     const cancelId = fillerStreamId;
     if (!cancelId) return false; // filler ended on its own while we waited
-    playbackGeneration += 1;
+    cutFillerGen = activePlaybackGeneration; // the reply's speakText carries held speech from this gen
+    activePlaybackGeneration = ++playbackGeneration;
     speaking = false;
     fillerStreamId = null;
     if (activeOutboundStreamId === cancelId) activeOutboundStreamId = null;
@@ -3499,7 +3513,7 @@ mediaWss.on('connection', (ws, req) => {
       try { tts.cancel(cancelId); } catch { /* ignore */ }
     }
     clearMediaPlayback(ws);
-    console.log(`[ws/media][${sidLabel()}] brain_v1_draft phase_a filler cut for reply after ${Date.now() - (speakStartedAt || 0)}ms`);
+    console.log(`[ws/media][${sidLabel()}] brain_v1_draft phase_a filler cut for reply after ${Date.now() - (fillerStartedAt || Date.now())}ms`);
     return true;
   }
 
@@ -3798,6 +3812,7 @@ mediaWss.on('connection', (ws, req) => {
     }
     activePlaybackGeneration = ++playbackGeneration;
     const gen = activePlaybackGeneration;
+    if (cutFillerGen && !opts.isFiller) { carryHeldSpeech(overlapHold, cutFillerGen, gen); cutFillerGen = 0; }
     // Hold a placeholder stream id until Soniox binds the real one.
     // speaking is true so barge still applies, but orphan PCM from the
     // cancelled stream cannot match this id.
@@ -3863,7 +3878,15 @@ mediaWss.on('connection', (ws, req) => {
         return { ok: false, cancelled: true };
       }
       activeOutboundStreamId = session.streamId;
-      if (opts.isFiller) fillerStreamId = session.streamId;
+      if (opts.isFiller && abortPendingFiller) {
+        abortPendingFiller = false;
+        session.cancel();
+        if (activeOutboundStreamId === session.streamId || activeOutboundStreamId === armId) activeOutboundStreamId = null;
+        // the reply already took over: carry speech held under this filler's gen to it
+        if (activePlaybackGeneration !== gen) carryHeldSpeech(overlapHold, gen, activePlaybackGeneration);
+        return { ok: false, cancelled: true };
+      }
+      if (opts.isFiller) { fillerStreamId = session.streamId; fillerStartedAt = Date.now(); }
       const pushed = session.pushText(prepared.text);
       if (!pushed.pushed) {
         session.cancel();
@@ -4614,7 +4637,8 @@ mediaWss.on('connection', (ws, req) => {
             if (!f) return;
             if (turnTiming && typeof turnTiming.markFiller === 'function') turnTiming.markFiller();
             console.log(`[ws/media][${callKey}] brain_v1_draft filler at=${brainV1Draft.DEADLINES.fillerMs}ms: ${f}`);
-            speakThinkingAck(f).catch(() => {});
+            fillerPending = true;
+            speakThinkingAck(f).catch(() => {}).finally(() => { fillerPending = false; abortPendingFiller = false; });
           }, brainV1Draft.DEADLINES.fillerMs);
         }
         const onV1Sentence = v1DraftOn
