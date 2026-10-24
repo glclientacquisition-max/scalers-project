@@ -23,6 +23,8 @@ Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b6
 
 **Live on staging (24 Oct 2026, ~11:2x EAT):** #925 `brain/reply-owner-p1b` (one reply owner + turn acts) merged onto `staging/v2-c0-opening-2026-10-21` and restaged with `BRAIN_V2_REPLY_OWNER=on` and `GIT_SHA` = tip (those two env changes only; `BRAIN_V2_CONV_STATE=on` unchanged). Accepted behaviour changes: names bind only from an answer to our name question; a clear caller language switch overrides the Voice lock (#677). New lines still `[PROMPT-PLACEHOLDER]`. Prod and Aris untouched.
 
+**Draft PR (24 Oct 2026, EAT):** `brain/phase-b-call-fixes` from `3373d591` fixes call HD_b4afd63a69c3 (13:08 EAT, did not book). It adds area coverage through the Kenya tree plus owner include/exclude rules (the Desk contract is proposed, Desk is unchanged), makes the fact check trust the caller's slots, removes the doubled ask on replacement, makes "Yeah, I do so" / "Ndio, sawa" at the read-back book, and starts the draft in parallel (sim p90 2031ms to 1267ms). New lines are `[PROMPT-PLACEHOLDER]`. Spec: [`rfcs/phase-b-call-fixes.md`](rfcs/phase-b-call-fixes.md). Not merged, not staged, no env change. Prod and Aris are untouched.
+
 Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Esga is on prod DID +254709221542. Staging DID is **+254709221537** (staging tenant Jirani Cleaning Services, *per team notes*).
 
 **Product is callbacks only (#658, 11 Oct).** There is no live call transfer: the assistant takes a message and alerts a teammate. [`LIVE_TRANSFER.md`](archive/LIVE_TRANSFER.md) is archived as history.

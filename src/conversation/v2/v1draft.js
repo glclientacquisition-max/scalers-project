@@ -148,8 +148,9 @@ function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL
     run.done = ladder({ streamFor, primaryId, backupId, request, signal: ac.signal, t0, clock, sleep, deadlines, onEvent: (c, meta) => { const ev = { ...c, ...meta, atMs: clock() - t0 }; run.events.push(ev); for (const l of run.listeners) l(ev); } });
     return run;
   }
-  function partial({ text, profile, state, langLock }) {
-    if (!text || v2OwnsTurn(state, text)) return false;
+  function partial({ text, profile, state, langLock, plan = false }) {
+    // Phase B (plan): there is no owner switch, so every turn may start early (RCA HD_b4afd63a69c3 #3)
+    if (!text || (!plan && v2OwnsTurn(state, text))) return false;
     if (early && early.key === norm(text)) return true;
     if (early) early.ac.abort();
     early = launch({ text, profile, state, langLock, startedOn: 'partial' });
@@ -167,11 +168,15 @@ function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL
     if (owns) { cancel(); return { path: `v2_owned:${owns}`, sentences: [] }; }
     const T = clock();
     let run = early && early.key === norm(text) ? early : null;
-    if (plan) { cancel(); run = launch({ text, profile, state, langLock, startedOn: 'final', stepNote: plan.note }); } else if (!run) { cancel(); run = launch({ text, profile, state, langLock, startedOn: 'final' }); }
+    // Phase B parallel (default): the draft already started on this text (partial or at turn start, before the
+    // plan ran); its events are buffered and gated by the plan now. Serial (knob off): launch with the step note.
+    if (plan && !(plan.parallel && run)) { cancel(); run = launch({ text, profile, state, langLock, startedOn: 'final', stepNote: plan.note }); } else if (!run) { cancel(); run = launch({ text, profile, state, langLock, startedOn: 'final' }); }
     early = null;
-    const { note, replyLang } = run;
+    const { replyLang } = run;
+    // Phase B: verify against the state AFTER this turn's plan/machine ran (the caller's new slots are backed facts)
+    const note = plan ? buildFactNote(profile, state, { callerText: text, writes: writesOf(state) }) : run.note;
     const c = CONV.conv(state);
-    const sentences = []; const verdicts = []; const proposals = []; let asks = null; let replaced = false;
+    const sentences = []; const verdicts = []; const proposals = []; let asks = null; let replaced = false; let planLine = false;
     let cbOffered = c.callback?.status && c.callback.status !== 'none';
     let handoff = false; let firstSentenceMs = null;
     const unlockedNames = state.slots?.name && !state.slots.nameConfirmed ? [state.slots.name] : [];
@@ -194,6 +199,17 @@ function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL
         row.verdict = 'replace'; row.reasons = [...(row.reasons || []), 'repeat_greeting'];
         const g = phaseALine('goAhead', replyLang); row.replacement = g; push(g);
       } else if (v.verdict === 'pass') { push(String(a.text).trim()); }
+      else if (v.verdict === 'replace' && plan) {
+        // Phase B: one coherent reply, one ask, never "I don't know" + the plan's question (RCA HD_b4afd63a69c3 #2).
+        // A replaced sentence about the booking itself, or a second unknown after the callback offer, gives way to
+        // v2's step line in full; a first real unknown is the honest line with the callback offer (its one ask).
+        if (!replaced) {
+          replaced = true;
+          const aboutBooking = v.families.some((f) => ['area', 'name', 'number', 'hours', 'status'].includes(f)) || plan.kind === 'readback' || plan.kind === 'confirmed';
+          if (aboutBooking || cbOffered || !plan.template) { row.replacement = 'plan_template'; planLine = true; }
+          else { const u = unknownLine(replyLang, { callbackOffered: false }); row.replacement = u; cbOffered = 'offered_now'; push(u, true); act.stepSaid = true; }
+        }
+      }
       else if (v.verdict === 'replace' && !replaced) { replaced = true; const u = unknownLine(replyLang, { callbackOffered: cbOffered }); row.replacement = u; if (!cbOffered) { cbOffered = 'offered_now'; } push(u, true); }
       verdicts.push(row);
     };
@@ -217,7 +233,14 @@ function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL
     run.listeners.add(consume);
     const res = await run.done;
     run.listeners.delete(consume);
-    if (plan && sentences.length && !act.stepSaid && !shouldAbort()) { const t = plan.tail(); if (t) { act.questions += 1; act.stepSaid = true; push0(t); } }
+    if (plan && planLine && !shouldAbort()) {
+      // the step line replaces the whole draft (spoken sentences cannot be unsaid: only what was not yet spoken goes)
+      const T2 = String(plan.template || '').match(/[^.!?]+[.!?]*/g) || [];
+      for (const x of T2.map((y) => y.trim()).filter(Boolean)) { if (/\?\s*$/.test(x) && act.stepSaid) continue; if (/\?\s*$/.test(x)) { act.questions += 1; act.stepSaid = true; } push0(x); }
+    } else if (plan && sentences.length && (!act.stepSaid || (plan.kind === 'confirmed' && !act.claimed)) && !replaced && !shouldAbort()) {
+      const t = plan.tail(act);
+      for (const x of (String(t || '').match(/[^.!?]+[.!?]*/g) || []).map((y) => y.trim()).filter(Boolean)) { const q = /\?\s*$/.test(x); if (q && act.questions >= 1) continue; if (q) { act.questions += 1; act.stepSaid = true; } push0(x); }
+    }
     try {
       const GH = require('../geminiProviderHealth');
       if (res.used || (handoff && (res.attempts || []).some((x) => x.firstMs != null))) GH.noteBrainModel({ ok: true, model: res.used || (res.attempts || []).find((x) => x.firstMs != null).model });
@@ -244,7 +267,12 @@ function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL
     log(`[brain_v1_draft] path=${path} used=${res.used || '-'} attempts=${res.attempts.map((a) => `${a.model}:${a.ok ? 'ok' : a.err}`).join(',')} sentences=${sentences.length} replaced=${replaced}`);
     return { path, sentences, line: sentences.map((s) => s.text).join(' '), turnFields, trace, proposals };
   }
-  return { turn, partial, cancel };
+  /** Phase B: start this turn's draft now (turn start), before the plan and machine run. */
+  function prelaunch({ text, profile, state, langLock }) {
+    if (early && early.key === norm(text)) return early.startedOn;
+    cancel(); early = launch({ text, profile, state, langLock, startedOn: 'turn_start' }); return 'turn_start';
+  }
+  return { turn, partial, cancel, prelaunch };
 }
 function langOf(state, langLock, text) {
   const l = RO.turnLang(state.lang, langLock, text) || state.lang || langLock || 'en';
