@@ -30,7 +30,7 @@ Nested rules: [`src/AGENTS.md`](src/AGENTS.md) (Voice runtime + Brain), [`dashbo
 
 ## Docs layout
 
-`docs/STATUS.md` is the only place for current state; update it in the same PR as any merge to `main`. Everything else follows Diataxis: `tutorials/`, `how-to/`, `reference/` (lane contracts in `reference/lanes/`; `schema.md` and `env.md` are generated, do not hand-edit), `explanation/`, `decisions/` (MADR ADRs, start `proposed`, Alvin accepts), `rfcs/`, `runbooks/` (one per ops alert kind), `archive/`. Every doc has `owner` + `last_reviewed` frontmatter.
+`docs/STATUS.md` is the only place for current state; update it in the same PR as any merge to `main`. CI check `status-md` (`.github/workflows/status-md.yml`) fails a PR into `main` that does not change `docs/STATUS.md`; the only escape is the `no-status-update` label, for typo-only or CI-only PRs. Everything else follows Diataxis: `tutorials/`, `how-to/`, `reference/` (lane contracts in `reference/lanes/`; `schema.md` and `env.md` are generated, do not hand-edit), `explanation/`, `decisions/` (MADR ADRs, start `proposed`, Alvin accepts), `rfcs/`, `runbooks/` (one per ops alert kind), `archive/`. Every doc has `owner` + `last_reviewed` frontmatter.
 
 ## Do not
 
@@ -38,6 +38,7 @@ Nested rules: [`src/AGENTS.md`](src/AGENTS.md) (Voice runtime + Brain), [`dashbo
 - Print, paste, or commit secrets. Docs list variable names only.
 - Force-push. Never touch prod DID `+254709221536` (Aris).
 - Set `VOICE_GEMINI_CATALOGUE` or `BRAIN_GEMINI_CATALOGUE`.
+- Merge a PR into `main` that does not update `docs/STATUS.md` (what merged, prod vs staging, flags, open drafts, decisions), unless it carries the `no-status-update` label.
 
 ## Rules of engagement
 

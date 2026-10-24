@@ -1,0 +1,52 @@
+# STATUS rule check. A pull request into main must change docs/STATUS.md
+# (AGENTS.md "Docs layout", CONTRIBUTING.md "STATUS rule").
+# Escape: the label no-status-update, for typo-only or CI-only PRs.
+#
+# Cheap by design: no checkout, no install. It reads the PR's file list from
+# the GitHub API with the job token (read-only permissions).
+# It does not deploy anything. Vercel previews skip PRs that change nothing
+# under dashboard/ (dashboard/scripts/vercel-ignore-build.sh), and this
+# workflow does not push, so Stage-PR and Railway are untouched.
+# Make the check "status-md" required on main once Alvin agrees.
+
+name: STATUS rule
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: status-md-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  status-md:
+    name: status-md
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: docs/STATUS.md changed, or no-status-update label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SKIP: ${{ contains(github.event.pull_request.labels.*.name, 'no-status-update') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$SKIP" = "true" ]; then
+            echo "::notice::Label no-status-update is set; STATUS rule skipped."
+            exit 0
+          fi
+          files="$(gh api --paginate "repos/$REPO/pulls/$PR/files?per_page=100" --jq '.[].filename')"
+          if printf '%s\n' "$files" | grep -qx 'docs/STATUS.md'; then
+            echo "docs/STATUS.md is in this PR."
+            exit 0
+          fi
+          echo "::error file=docs/STATUS.md::This PR into main does not update docs/STATUS.md. Update it in the same PR (CONTRIBUTING.md#status-rule), or add the label no-status-update for a typo-only or CI-only change."
+          exit 1
