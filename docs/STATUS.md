@@ -21,6 +21,8 @@ Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b6
 
 **Live on staging (24 Oct 2026, 10:4x EAT):** #924 `brain/conv-state-p1` (turn resolver v2 Phase 1: conversation state + rules gaps) merged onto `staging/v2-c0-opening-2026-10-21` and restaged with `BRAIN_V2_CONV_STATE=on` and `GIT_SHA` updated to the tip (those two env changes only). Callback-after-repair line is still a `[PROMPT-PLACEHOLDER]`. Prod and Aris untouched.
 
+**Live on staging (24 Oct 2026, ~11:2x EAT):** #925 `brain/reply-owner-p1b` (one reply owner + turn acts) merged onto `staging/v2-c0-opening-2026-10-21` and restaged with `BRAIN_V2_REPLY_OWNER=on` and `GIT_SHA` = tip (those two env changes only; `BRAIN_V2_CONV_STATE=on` unchanged). Accepted behaviour changes: names bind only from an answer to our name question; a clear caller language switch overrides the Voice lock (#677). New lines still `[PROMPT-PLACEHOLDER]`. Prod and Aris untouched.
+
 Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Esga is on prod DID +254709221542. Staging DID is **+254709221537** (staging tenant Jirani Cleaning Services, *per team notes*).
 
 **Product is callbacks only (#658, 11 Oct).** There is no live call transfer: the assistant takes a message and alerts a teammate. [`LIVE_TRANSFER.md`](archive/LIVE_TRANSFER.md) is archived as history.
@@ -130,7 +132,7 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-staging` means Stage-PR leaves it out of the staging pin.
 
 - ~~`brain/conv-state-p1` (#924)~~ merged to staging 24 Oct.
-- **(24 Oct, draft)** `brain/reply-owner-p1b` — fixes 1+2 from `voice-qa/2026-10-24_10f115ac-dials.md`: one reply owner (checks/corrections answered from state, mid-booking asks answered without swapping the service, open question once, per-turn language, same-ask-no-progress → callback, exact chosen area in read-back) and turn acts (answer / check_or_correct / new_ask / filler; `check_or_correct_detail` in rules + model schema; names bind only from an answer to our name question). Behind `BRAIN_V2_REPLY_OWNER` (default **OFF**). Not staged. New lines are `[PROMPT-PLACEHOLDER]`.
+- ~~`brain/reply-owner-p1b` (#925)~~ merged to staging 24 Oct.
 **Queued for the next clean Aris call** (one at a time, in this order unless Alvin says otherwise):
 
 | PR | Lane | What | State |
