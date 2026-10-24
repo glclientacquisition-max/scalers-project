@@ -28,6 +28,7 @@ export const STEP_UP_WHAT: Record<string, string> = {
   "step-up:reset": "reset another operator's authenticator",
   "step-up:regenerate_backup_codes": "make new backup codes",
   "step-up:set_area": "change what needs Unlock",
+  "step-up:set_duration": "change how long Unlock lasts",
 };
 
 /** Settings › Security "What needs Unlock" area names and one-line scope. */
@@ -58,4 +59,5 @@ export const SECURITY_EVENT_WORDS: Record<string, string> = {
   "admin.step_up.blocked": "Change blocked until Unlock",
   "admin.step_up.ended": "Unlock ended early",
   "admin.step_up.area_changed": "Changed what needs Unlock",
+  "admin.step_up.duration_changed": "Changed how long Unlock lasts",
 };

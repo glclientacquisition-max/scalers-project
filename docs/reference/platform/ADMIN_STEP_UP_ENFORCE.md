@@ -12,7 +12,7 @@ Design approved by Alvin on 24 Oct 2026. It narrows the broader spec in draft #8
 
 - **Authenticator (TOTP, RFC 6238):** SHA-1, 30 s, 6 digits, ±1 step. A step that was already accepted is refused (replay guard). Setup shows a QR code and the key to type in by hand. The secret is stored AES-256-GCM encrypted (`ADMIN_STEP_UP_KEY`).
 - **Backup codes:** 10 single-use codes, shown once at setup and stored as SHA-256 hashes. Using one is logged and emailed, and the sheet then asks the operator to set up the authenticator again, which retires the old secret.
-- **Unlock:** lasts 10 minutes. It is a row in `admin_step_up_grant` plus an httpOnly, `SameSite=Strict` cookie `scalers_admin_unlock` that holds only the grant id.
+- **Unlock:** lasts 10 minutes by default (Settings › Security › Unlock lasts: 5, 10, 15 or 30; see below). It is a row in `admin_step_up_grant` plus an httpOnly, `SameSite=Strict` cookie `scalers_admin_unlock` that holds only the grant id.
 - **Lockout:** 5 wrong codes lock Unlock for that operator for 15 minutes.
 - **Server gate:** `stepUpGate` / `stepUpGateSession` (`dashboard/src/lib/ops/stepUpGate.ts`) return `403 step_up_required` for risky writes without a live unlock. The list is in `stepUpCore.ts` `RISKY`: pool release/assign, business release/archive/transfer owner/assign, invoice void/credit note, number hold actions, package publish/move subscribers/billing mode, billing grant minutes/assign package/checkout review/billing mode, and platform settings save.
 - **Audit (`ops_audit_log`):** `admin.step_up.verified`, `.failed`, `.locked`, `.blocked`, `admin.2fa.enrolled`, `admin.2fa.backup_code_used`, `admin.2fa.reset`.
@@ -75,3 +75,15 @@ Table `admin_step_up_area` (`docs/supabase/admin_step_up_area.sql`, down: `admin
 Changing a switch needs a live Unlock + reason and writes `admin.step_up.area_changed` to `ops_audit_log`.
 Always on, whatever the switch: number release (incl. archive-release), invoice void, authenticator reset, new backup codes, the switches themselves (`ALWAYS_UNLOCK` in `stepUpCore.ts`).
 Every route in `ADMIN_WRITE_ROUTES` must declare an `area`; `tests/adminStepUpRoutes.test.js` fails CI otherwise.
+
+## Unlock lasts (24 Oct 2026)
+
+- Settings › Security › Unlock has an **Unlock lasts** picker: 5, 10 (default), 15 or 30 minutes.
+- Saved by `POST /api/admin/step-up/duration` `{ minutes, reason }`. Needs a live Unlock and a reason (always-locked: `step-up:set_duration` is in `ALWAYS_UNLOCK`, so the Operators area switch can't turn it off). Audited as `admin.step_up.duration_changed` with `{ from, to, asked }` and the reason.
+- The server clamps any value to 5–30 (`clampUnlockMinutes` in `dashboard/src/lib/ops/stepUpTime.ts`); junk is a 400. The DB also checks `unlock_minutes between 5 and 30`. A missing row or a read error means 10.
+- A change applies to the **next** Unlock. A live Unlock keeps the expiry it was given (grant `expires_at` and cookie `maxAge` are fixed at Unlock time). Unlocks made at enrolment or by a sign-in backup code use the same setting.
+- Table: `docs/supabase/admin_step_up_setting.sql` (down: `admin_step_up_setting_down.sql`). Staging `sgcdncjxauhsbunobmob` only; prod on Alvin's GO.
+
+## Unlock window tests
+
+`npm run test:unlock-window` (`tests/adminUnlockWindow.test.mjs`, also in `test:mvp`) runs the real step-up, session, areas, duration and logout route handlers and the real `stepUpGate` on an in-memory DB with fake time (`tests/fakes/stepUp`). It proves: one Unlock covers different gated actions across pages and areas; reloads keep the same server expiry; the gate closes at expiry (even with a replayed cookie); End now and sign-out revoke the grant; the duration is honoured, clamped and only applies next time; 5 wrong codes lock for 15 minutes; the countdown (`unlockTimeLeft`) hits 0:00 exactly when the gate closes. Not covered: a real phone authenticator and the browser UI, which need a live click-through on the Preview.

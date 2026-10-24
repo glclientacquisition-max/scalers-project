@@ -6,7 +6,7 @@ import { Drawer } from "./Drawer";
 
 /**
  * Platform Unlock. One sheet for every sensitive Admin write: bottom sheet on phones,
- * right drawer from md (Drawer). Unlock proves the operator for the next ~10 minutes —
+ * right drawer from md (Drawer). Unlock proves the operator for the Unlock length set in Settings › Security (default 10 minutes) —
  * it never changes domain state alone. The server gate (stepUpGate) is the real check.
  * observe: Check access logs would-require-step-up.
  * enforce (ADMIN_STEP_UP_ENFORCE=on): authenticator code, backup code, or first-time setup.
@@ -222,7 +222,7 @@ export function StepUpSheet({
         {view === "code" ? (
           <>
             {codeField("Code from your authenticator app")}
-            <p className="text-ops-label text-ink-2">Unlock lasts 10 minutes. 5 wrong codes lock Unlock for 15 minutes.</p>
+            <p className="text-ops-label text-ink-2">Unlock lasts the time set in Settings › Security (10 minutes unless changed). 5 wrong codes lock Unlock for 15 minutes.</p>
             <button type="button" className="self-start text-ops-label text-ink underline" onClick={() => { setCode(""); setMsg(null); setView("backup"); }}>
               Lost your phone? Use a backup code
             </button>

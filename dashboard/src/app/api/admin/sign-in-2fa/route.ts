@@ -4,10 +4,11 @@ import { getAdminSessionRaw, signInTwoFactorPassed } from "@/lib/auth";
 import {
   afterFailure, afterSuccess, EMAIL_FAILED_MESSAGE, decryptSecret, EMAIL_CODE_TTL_MS, emailSendDecision, generateEmailCode, hashEmailCode, isLocked,
   maskEmail, matchBackupCode, matchEmailCode, SIGNIN_COOKIE, SIGNIN_REMEMBER_MS, signDeviceToken, signInEmailFor,
-  signInTwoFactorRequired, UNLOCK_COOKIE, UNLOCK_TTL_MS, verifyTotp,
+  signInTwoFactorRequired, UNLOCK_COOKIE, verifyTotp,
 } from "@/lib/ops/stepUpCore";
+import { unlockTtlMs } from "@/lib/ops/stepUpTime";
 import {
-  auditStepUp, consumeBackupCode, createGrant, consumeEmailCode, insertEmailCode, loadBackupCodes, loadFactor, recentEmailCodes,
+  auditStepUp, consumeBackupCode, createGrant, loadUnlockMinutes, consumeEmailCode, insertEmailCode, loadBackupCodes, loadFactor, recentEmailCodes,
   retireEmailCodes, saveFactor, sendSignInCodeEmail, sendStepUpNotice, stepUpKey,
 } from "@/lib/ops/stepUpStore";
 
@@ -133,9 +134,10 @@ export async function POST(req: Request) {
     httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: Math.floor(SIGNIN_REMEMBER_MS / 1000),
   });
   if (method === "backup_code") {
-    // Same as Unlock: the backup code grants a 10-minute unlock so re-enrolment can replace the lost phone.
-    const g = await createGrant(op, "backup_code", "sign_in");
-    res.cookies.set(UNLOCK_COOKIE, g.id, { httpOnly: true, secure: true, sameSite: "strict", path: "/", maxAge: Math.floor(UNLOCK_TTL_MS / 1000) });
+    // Same as Unlock: the backup code grants an Unlock (Unlock lasts setting) so re-enrolment can replace the lost phone.
+    const ttlMs = unlockTtlMs(await loadUnlockMinutes());
+    const g = await createGrant(op, "backup_code", "sign_in", ttlMs);
+    res.cookies.set(UNLOCK_COOKIE, g.id, { httpOnly: true, secure: true, sameSite: "strict", path: "/", maxAge: Math.floor(ttlMs / 1000) });
   }
   return res;
 }

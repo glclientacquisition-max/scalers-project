@@ -265,6 +265,24 @@ describe("sign-in 2FA", () => {
   });
 });
 
+describe("Unlock lasts", () => {
+  it("SQL + down, duration route gated always-on with a reason and audit, UI select calls it", () => {
+    const sql = read("docs/supabase/admin_step_up_setting.sql");
+    assert.match(sql, /create table if not exists public\.admin_step_up_setting/);
+    assert.match(sql, /check \(unlock_minutes between 5 and 30\)/);
+    assert.match(sql, /enable row level security/);
+    assert.match(read("docs/supabase/admin_step_up_setting_down.sql"), /drop table if exists public\.admin_step_up_setting/);
+    const src = read("dashboard/src/app/api/admin/step-up/duration/route.ts");
+    assert.match(src, /stepUpGate\(gate\.operator, "step-up:set_duration"/);
+    assert.match(src, /validateResetReason/);
+    assert.match(src, /"admin\.step_up\.duration_changed"/);
+    const ui = read("dashboard/src/components/admin/v2/AdminSecurityV2.tsx");
+    assert.ok(ui.includes("/api/admin/step-up/duration"));
+    assert.match(ui, /UNLOCK_MINUTES_CHOICES/);
+    assert.doesNotMatch(ui, /lasts 10 minutes/);
+  });
+});
+
 describe("spend and destructive actions", () => {
   it("buy-number and voices delete need Unlock; the named ungated routes are classified safe on purpose", async () => {
     const { ADMIN_WRITE_ROUTES, isRiskyAction } = await import("../dashboard/src/lib/ops/stepUpCore.ts");

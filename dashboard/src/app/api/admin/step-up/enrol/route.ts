@@ -4,9 +4,10 @@ import QRCode from "qrcode";
 import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { stepUpMode } from "@/lib/ops/stepUp";
 import {
-  decryptSecret, encryptSecret, generateBackupCodes, generateTotpSecret, grantValid, hashBackupCode, otpauthUri, UNLOCK_COOKIE, UNLOCK_TTL_MS, verifyTotp,
+  decryptSecret, encryptSecret, generateBackupCodes, generateTotpSecret, grantValid, hashBackupCode, otpauthUri, UNLOCK_COOKIE, verifyTotp,
 } from "@/lib/ops/stepUpCore";
-import { auditStepUp, createGrant, loadFactor, loadGrant, replaceBackupCodes, saveFactor, stepUpIssuer, stepUpKey } from "@/lib/ops/stepUpStore";
+import { unlockTtlMs } from "@/lib/ops/stepUpTime";
+import { auditStepUp, createGrant, loadFactor, loadGrant, loadUnlockMinutes, replaceBackupCodes, saveFactor, stepUpIssuer, stepUpKey } from "@/lib/ops/stepUpStore";
 
 /**
  * Authenticator setup. start: new secret (stored encrypted as pending) + QR + manual key.
@@ -52,9 +53,10 @@ export async function POST(req: Request) {
       needs_reenrol: false, failed_count: 0, locked_until: null, last_step: step,
     });
     await auditStepUp(op, "admin.2fa.enrolled", { replaced: enrolled });
-    const g = await createGrant(op, "totp", "enrol");
+    const ttlMs = unlockTtlMs(await loadUnlockMinutes());
+    const g = await createGrant(op, "totp", "enrol", ttlMs);
     const res = NextResponse.json({ ok: true, backupCodes: codes, unlockedUntil: new Date(g.expiresAt).toISOString() });
-    res.cookies.set(UNLOCK_COOKIE, g.id, { httpOnly: true, secure: true, sameSite: "strict", path: "/", maxAge: Math.floor(UNLOCK_TTL_MS / 1000) });
+    res.cookies.set(UNLOCK_COOKIE, g.id, { httpOnly: true, secure: true, sameSite: "strict", path: "/", maxAge: Math.floor(ttlMs / 1000) });
     return res;
   }
   return NextResponse.json({ error: "Unknown step." }, { status: 400 });

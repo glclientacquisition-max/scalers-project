@@ -11,7 +11,7 @@ import {
   ALWAYS_UNLOCK, deviceTokenExpiry, grantValid, riskyKeysByArea, UNLOCK_AREAS, maskEmail, riskyActionKeys, SIGNIN_COOKIE, signInEmailFor, signInEmailSource,
   UNLOCK_COOKIE, verifyDeviceToken,
 } from "@/lib/ops/stepUpCore";
-import { backupCodesLeft, factorStatuses, loadAreaRows, loadFactor, loadGrant, recentSecurityEvents, stepUpKey } from "@/lib/ops/stepUpStore";
+import { backupCodesLeft, factorStatuses, loadAreaRows, loadFactor, loadGrant, loadUnlockSetting, recentSecurityEvents, stepUpKey } from "@/lib/ops/stepUpStore";
 import { STEP_UP_WHAT, UNLOCK_AREA_WORDS } from "@/lib/ops/stepUpWords";
 
 export const instant = false;
@@ -29,9 +29,10 @@ export default async function SecurityPage({ searchParams }: { searchParams: Pro
     const now = Date.now();
     const jar = await cookies();
     const names = parseAdminOperators().map((o) => o.username);
-    const [statuses, codesLeft, factor, grant, events, areaRows] = await Promise.all([
+    const [statuses, codesLeft, factor, grant, events, areaRows, unlockSetting] = await Promise.all([
       factorStatuses(names), backupCodesLeft(me), loadFactor(me), loadGrant(jar.get(UNLOCK_COOKIE)?.value), recentSecurityEvents(20),
       loadAreaRows().catch((err) => { logAdminError("settings-security-areas", err); return null; }),
+      loadUnlockSetting(),
     ]);
     const byArea = riskyKeysByArea();
     const areas = areaRows === null ? null : UNLOCK_AREAS.map((a) => {
@@ -69,6 +70,9 @@ export default async function SecurityPage({ searchParams }: { searchParams: Pro
           operators: names.map((n) => ({ name: n, ...statuses[n] })),
           events,
           areas,
+          unlockMinutes: unlockSetting.minutes,
+          unlockMinutesBy: unlockSetting.updatedBy,
+          unlockMinutesAt: unlockSetting.updatedAt,
         }}
       />
     );

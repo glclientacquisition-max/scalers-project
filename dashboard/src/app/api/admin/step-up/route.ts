@@ -3,17 +3,19 @@ import { NextResponse } from "next/server";
 import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { requireStepUp, stepUpMode } from "@/lib/ops/stepUp";
 import {
-  afterFailure, afterSuccess, decryptSecret, grantValid, isLocked, matchBackupCode, UNLOCK_COOKIE, UNLOCK_TTL_MS, verifyTotp,
+  afterFailure, afterSuccess, decryptSecret, grantValid, isLocked, matchBackupCode, UNLOCK_COOKIE, verifyTotp,
 } from "@/lib/ops/stepUpCore";
+import { unlockTtlMs } from "@/lib/ops/stepUpTime";
 import {
-  auditStepUp, consumeBackupCode, createGrant, loadBackupCodes, loadFactor, loadGrant, saveFactor, sendStepUpNotice, stepUpKey,
+  auditStepUp, consumeBackupCode, createGrant, loadBackupCodes, loadFactor, loadGrant, loadUnlockMinutes, saveFactor, sendStepUpNotice, stepUpKey,
 } from "@/lib/ops/stepUpStore";
 
 /**
  * StepUpSheet backend. Unlock never writes domain state.
  * observe/off: logs would-require-step-up, returns { mode, verified:false } (unchanged).
  * enforce (ADMIN_STEP_UP_ENFORCE=on): verifies an authenticator or backup code, then sets a
- * 10-minute httpOnly unlock marker backed by admin_step_up_grant.
+ * httpOnly unlock marker backed by admin_step_up_grant, lasting Settings › Security "Unlock lasts"
+ * (5–30 min, default 10), read fresh for each new Unlock.
  */
 export async function GET() {
   const gate = await requireAdminOperatorWrite();
@@ -94,15 +96,17 @@ export async function POST(req: Request) {
     ...(step != null ? { last_step: step } : {}),
     ...(method === "backup_code" ? { needs_reenrol: true } : {}),
   });
-  const grant = await createGrant(op, method, action);
-  await auditStepUp(op, "admin.step_up.verified", { intent: action, target, method, grant_id: grant.id });
+  const minutes = await loadUnlockMinutes();
+  const ttlMs = unlockTtlMs(minutes);
+  const grant = await createGrant(op, method, action, ttlMs);
+  await auditStepUp(op, "admin.step_up.verified", { intent: action, target, method, grant_id: grant.id, minutes });
   if (method === "backup_code") {
     await auditStepUp(op, "admin.2fa.backup_code_used", { intent: action });
     await sendStepUpNotice("backup_code_used", op, "Set up your authenticator again on your new phone; that retires the old one.");
   }
   const res = NextResponse.json({ mode, verified: true, method, unlockedUntil: new Date(grant.expiresAt).toISOString(), needsReenrol: method === "backup_code" || factor.needs_reenrol });
   res.cookies.set(UNLOCK_COOKIE, grant.id, {
-    httpOnly: true, secure: true, sameSite: "strict", path: "/", maxAge: Math.floor(UNLOCK_TTL_MS / 1000),
+    httpOnly: true, secure: true, sameSite: "strict", path: "/", maxAge: Math.floor(ttlMs / 1000),
   });
   return res;
 }

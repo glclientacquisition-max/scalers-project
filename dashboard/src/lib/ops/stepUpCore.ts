@@ -64,6 +64,7 @@ export const ALWAYS_UNLOCK: Record<string, string> = {
   "step-up:reset": "Resetting someone's authenticator could hand over their access.",
   "step-up:regenerate_backup_codes": "Backup codes are a way in; making new ones needs proof it's you.",
   "step-up:set_area": "Turning Unlock off must itself need Unlock.",
+  "step-up:set_duration": "A longer Unlock is a bigger window; changing it needs proof it's you.",
 };
 
 // route-registry:start (route paths and action ids, not screen copy)
@@ -144,6 +145,14 @@ export const ADMIN_WRITE_ROUTES: AdminWriteRoute[] = [
     safe: [],
     kind: "single",
     note: "Settings › Security area switches. Always needs Unlock + reason.",
+  },
+  {
+    file: "admin/step-up/duration", area: "operators",
+    prefix: "step-up",
+    risky: ["set_duration"],
+    safe: [],
+    kind: "single",
+    note: "Settings › Security \"Unlock lasts\". Always needs Unlock + reason; applies to the next Unlock.",
   },
   { file: "admin/step-up/enrol", area: "operators", prefix: null, risky: [], safe: ["start", "confirm"], kind: "auth", note: "Allowed unenrolled (after sign-in 2FA) or with a live unlock." },
 ];

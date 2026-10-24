@@ -2,7 +2,8 @@ import "server-only";
 import { recordAdminAction } from "@/lib/adminAudit";
 import { sendOpsMail } from "@/lib/opsMail";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { isUnlockArea, UNLOCK_TTL_MS, type Grant, type UnlockArea, type UnlockAreaSettings } from "./stepUpCore";
+import { clampUnlockMinutes, UNLOCK_DEFAULT_MINUTES, unlockTtlMs } from "./stepUpTime";
+import { isUnlockArea, type Grant, type UnlockArea, type UnlockAreaSettings } from "./stepUpCore";
 
 /** Data access for Admin step-up. Tables: docs/supabase/admin_step_up.sql (service_role only). */
 
@@ -73,8 +74,9 @@ export async function replaceBackupCodes(operator: string, hashes: string[]): Pr
   if (ins.error) throw ins.error;
 }
 
-export async function createGrant(operator: string, method: "totp" | "backup_code", action: string): Promise<{ id: string; expiresAt: number }> {
-  const expiresAt = Date.now() + UNLOCK_TTL_MS;
+/** ttlMs is fixed when the grant is made: a later duration change never stretches or cuts a live Unlock. */
+export async function createGrant(operator: string, method: "totp" | "backup_code", action: string, ttlMs: number = unlockTtlMs(UNLOCK_DEFAULT_MINUTES)): Promise<{ id: string; expiresAt: number }> {
+  const expiresAt = Date.now() + ttlMs;
   const { data, error } = await getSupabaseAdmin()
     .from("admin_step_up_grant")
     .insert({ operator, method, action, expires_at: new Date(expiresAt).toISOString() })
@@ -271,5 +273,35 @@ export async function saveAreaSetting(area: UnlockArea, required: boolean, actor
   const { error } = await getSupabaseAdmin()
     .from("admin_step_up_area")
     .upsert({ area, required, updated_by: actor, updated_at: new Date().toISOString() }, { onConflict: "area" });
+  if (error) throw error;
+}
+
+/**
+ * "Unlock lasts" (docs/supabase/admin_step_up_setting.sql). One row; read errors or a missing
+ * row mean the 10-minute default. Always clamped to 5–30 on the way out.
+ */
+export async function loadUnlockSetting(): Promise<{ minutes: number; updatedBy: string | null; updatedAt: string | null }> {
+  try {
+    const { data, error } = await getSupabaseAdmin()
+      .from("admin_step_up_setting")
+      .select("unlock_minutes, updated_by, updated_at")
+      .eq("id", true)
+      .maybeSingle();
+    if (error || !data) return { minutes: UNLOCK_DEFAULT_MINUTES, updatedBy: null, updatedAt: null };
+    const row = data as { unlock_minutes: number; updated_by: string | null; updated_at: string | null };
+    return { minutes: clampUnlockMinutes(row.unlock_minutes), updatedBy: row.updated_by, updatedAt: row.updated_at };
+  } catch {
+    return { minutes: UNLOCK_DEFAULT_MINUTES, updatedBy: null, updatedAt: null };
+  }
+}
+
+export async function loadUnlockMinutes(): Promise<number> {
+  return (await loadUnlockSetting()).minutes;
+}
+
+export async function saveUnlockMinutes(minutes: number, actor: string): Promise<void> {
+  const { error } = await getSupabaseAdmin()
+    .from("admin_step_up_setting")
+    .upsert({ id: true, unlock_minutes: clampUnlockMinutes(minutes), updated_by: actor, updated_at: new Date().toISOString() }, { onConflict: "id" });
   if (error) throw error;
 }

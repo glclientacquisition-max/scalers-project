@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { OpsConfirm, PageHeader, StepUpSheet } from "@/components/ops";
+import { UNLOCK_MINUTES_CHOICES, unlockTimeLeft } from "@/lib/ops/stepUpTime";
 import { SECURITY_EVENT_WORDS } from "@/lib/ops/stepUpWords";
 import "@/styles/ops.css";
 
@@ -23,6 +24,10 @@ export type SecurityData = {
   events: Ev[];
   /** null = the area table couldn't be read (everything still needs Unlock). */
   areas: Area[] | null;
+  /** Settings › Security "Unlock lasts" (5–30, default 10). Applies to the next Unlock. */
+  unlockMinutes: number;
+  unlockMinutesBy: string | null;
+  unlockMinutesAt: string | null;
 };
 type Area = {
   id: string; title: string; covers: string; required: boolean; updatedBy: string | null; updatedAt: string | null;
@@ -55,8 +60,7 @@ function useCountdown(until: string | null) {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [until]);
-  const left = until ? Math.max(0, Date.parse(until) - now) : 0;
-  return { left, text: `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, "0")}` };
+  return unlockTimeLeft(until, now);
 }
 
 /**
@@ -71,6 +75,7 @@ export function AdminSecurityV2({ mode, data, openSetup }: { mode: "off" | "obse
   );
   const [confirm, setConfirm] = useState<null | "codes" | "reset" | "forget">(null);
   const [areaAsk, setAreaAsk] = useState<null | { id: string; title: string; required: boolean }>(null);
+  const [minutesAsk, setMinutesAsk] = useState<number | null>(null);
   const [codes, setCodes] = useState<string[] | null>(null);
   const [copied, setCopied] = useState(false);
   const [target, setTarget] = useState("");
@@ -135,6 +140,18 @@ export function AdminSecurityV2({ mode, data, openSetup }: { mode: "off" | "obse
     if (res.status === 403) return needUnlock(`the ${ask.title} switch`, "step-up:set_area");
     if (!res.ok) return setMsg({ tone: "warn", text: String(json.message || json.error || "Couldn't save that switch.") });
     setMsg({ tone: "ok", text: `${ask.title}: ${ask.required ? "needs Unlock" : "no longer needs Unlock"}.` });
+    router.refresh();
+  };
+
+  const setMinutes = async (reason: string) => {
+    if (minutesAsk == null) return;
+    const want = minutesAsk;
+    setPending("minutes"); setMsg(null);
+    const { res, json } = await post("/api/admin/step-up/duration", { minutes: want, reason });
+    setPending(null); setMinutesAsk(null);
+    if (res.status === 403) return needUnlock("the Unlock length", "step-up:set_duration");
+    if (!res.ok) return setMsg({ tone: "warn", text: String(json.message || json.error || "Couldn't save the Unlock length.") });
+    setMsg({ tone: "ok", text: `Unlock now lasts ${String(json.minutes ?? want)} minutes, starting with your next Unlock.` });
     router.refresh();
   };
 
@@ -241,13 +258,31 @@ export function AdminSecurityV2({ mode, data, openSetup }: { mode: "off" | "obse
             </span>
           </Row>
         </dl>
+        <div className="flex flex-col gap-ops-2 border-t border-hairline px-ops-3 py-ops-3" data-security-unlock-length="">
+          <label className="flex flex-col gap-1">
+            <span className="text-ops-label font-semibold">Unlock lasts</span>
+            <select
+              value={String(d.unlockMinutes)}
+              disabled={pending === "minutes"}
+              onChange={(e) => { const m = Number(e.target.value); if (m !== d.unlockMinutes) setMinutesAsk(m); }}
+              className="ops-field min-h-ops-touch text-ink"
+              data-field="unlock-minutes"
+            >
+              {UNLOCK_MINUTES_CHOICES.map((m) => <option key={m} value={m}>{m} minutes{m === 10 ? " (default)" : ""}</option>)}
+            </select>
+          </label>
+          <p className="text-ops-label text-ink-2">
+            Changing it needs Unlock and a reason, and is logged. It applies from your next Unlock.
+            {d.unlockMinutesBy && d.unlockMinutesAt ? <> Last changed by {d.unlockMinutesBy}, <span className="ops-num">{EAT(d.unlockMinutesAt)}</span>.</> : null}
+          </p>
+        </div>
         {unlocked ? (
           <div className="border-t border-hairline px-ops-3 py-ops-3">
             <Button variant="tonal" size="md" pending={pending === "end_unlock"} onClick={() => session("end_unlock")} data-action="security-end-unlock">End now</Button>
           </div>
         ) : null}
         <div className="border-t border-hairline px-ops-3 py-ops-3">
-          <p className="text-ops-label text-ink-2">Unlock asks for your authenticator code and lasts 10 minutes. It&apos;s needed to:</p>
+          <p className="text-ops-label text-ink-2">Unlock asks for your authenticator code and lasts {d.unlockMinutes} minutes. It&apos;s needed to:</p>
           <ul className="mt-ops-2 list-disc ps-5 text-ops-label" data-security-protects="">
             {d.protects.map((w) => <li key={w}>{w}</li>)}
           </ul>
@@ -364,6 +399,10 @@ export function AdminSecurityV2({ mode, data, openSetup }: { mode: "off" | "obse
 
       <OpsConfirm open={!!areaAsk} onClose={() => setAreaAsk(null)} onConfirm={(r) => void setArea(r)} title={areaAsk ? `${areaAsk.required ? "Turn on" : "Turn off"} Unlock for ${areaAsk.title}?` : ""} strength={areaAsk?.required ? "light" : "destructive"} requireReason reasonHint="Why the change" confirmLabel={areaAsk?.required ? "Turn on" : "Turn off"} pending={!!areaAsk && pending === `area-${areaAsk.id}`}>
         <p>{areaAsk?.required ? "These changes will ask for your authenticator code again." : "These changes will go through without a code. Locked items still need Unlock."}</p>
+      </OpsConfirm>
+
+      <OpsConfirm open={minutesAsk != null} onClose={() => setMinutesAsk(null)} onConfirm={(r) => void setMinutes(r)} title={minutesAsk != null ? `Make Unlock last ${minutesAsk} minutes?` : ""} strength={minutesAsk != null && minutesAsk > d.unlockMinutes ? "destructive" : "light"} requireReason reasonHint="Why the change" confirmLabel="Save" pending={pending === "minutes"}>
+        <p>{minutesAsk != null && minutesAsk > d.unlockMinutes ? "A longer Unlock leaves risky changes open for longer." : "You'll be asked for a code more often."} Your current Unlock keeps its end time; the new length starts with your next Unlock.</p>
       </OpsConfirm>
 
       {sheet ? (

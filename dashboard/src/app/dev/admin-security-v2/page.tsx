@@ -40,6 +40,7 @@ export default async function DevAdminSecurityV2Page() {
           operators: [{ name: "alvin", enrolled: true, needsReenrol: false, lockedUntil: null }],
           events: [{ id: "1", created_at: new Date(now - 3600_000).toISOString(), actor: "alvin", action: "admin.step_up.area_changed" }],
           areas,
+          unlockMinutes: 10, unlockMinutesBy: null, unlockMinutesAt: null,
         }}
       />
     </AdminShell>

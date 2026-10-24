@@ -9,7 +9,7 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (57)
+## Tables (58)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
@@ -18,6 +18,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `admin_step_up_backup_code` | `code_hash`, `created_at`, `id`, `operator`, `used_at` | `docs/supabase/admin_step_up.sql` |
 | `admin_step_up_factor` | `created_at`, `enrolled_at`, `failed_count`, `last_step`, `locked_until`, `needs_reenrol`, `operator`, `pending_secret_enc`, `secret_enc`, `updated_at` | `docs/supabase/admin_step_up.sql` |
 | `admin_step_up_grant` | `action`, `created_at`, `expires_at`, `id`, `method`, `operator`, `revoked_at` | `docs/supabase/admin_step_up.sql` |
+| `admin_step_up_setting` | `id`, `unlock_minutes`, `updated_at`, `updated_by` | `docs/supabase/admin_step_up_setting.sql` |
 | `appointments` | `address_landmark`, `call_id`, `caller_name`, `caller_phone`, `contact_id`, `created_at`, `id`, `inbox_archived_at`, `metadata`, `notes`, `service_name`, `status`, `tenant_id`, `updated_at`, `when_text`, `window_end`, `window_start` | `docs/supabase/appointments.sql`<br>`docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `billing_audit_log` | `action`, `actor`, `created_at`, `detail`, `id`, `tenant_id` | `docs/supabase/billing_data_layer.sql` |
 | `billing_company` | `address`, `city`, `email`, `id`, `kra_pin`, `legal_name`, `phone`, `product`, `updated_at` | `docs/supabase/billing_company.sql` |
