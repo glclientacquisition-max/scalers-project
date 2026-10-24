@@ -27,6 +27,7 @@ const SC = require('../../knowledge/spokenCatalogue');
 const scOn = () => /^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || ''));
 const FS = require('../../knowledge/factStore');
 const TR = require('./turnResolver');
+const CONV = require('./convState');
 const fsOn = () => FS.factStoreEnabled();
 // C2: the which-one question for a choice the binder could not settle (size, family or item).
 function choiceLine(profile, ch, lang) {
@@ -814,6 +815,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   if (utteranceComplete === true) u.utteranceComplete = true;
   const turnOpts = { unfinished, silenceBeat, holdTimedOut, utteranceComplete };
   state.nluPrev = { kind: u.kind, service: u.service || null };
+  if (CONV.enabled()) CONV.pre(state, u, { text, profile });
   if (u.service) state.lastService = u.service;
   // §4 "do you do X?" (BRAIN_V2_NLU_GAPS): a resolved catalogue item is answered with its grounded
   // name + price from the catalogue (checkServiceLine), never a slot/availability claim and never a re-list.
@@ -964,7 +966,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   // "who did you escalate to?" answers from this call's own receipts only
   if (/\b(escalat\w*|umemtumia nani|who did you (send|tell|pass)|umepeleka kwa nani)\b/i.test(text) && (state.callbacks || []).length) return out(lang === 'sw' ? 'Nimeomba timu ya biashara ikupigie simu kwa namba hii.' : 'I asked the business team to call you back on this number.');
   // a bare place right after our "which place are you in?" coverage answer is the coverage follow-up
-  if (state.coverageAsk === state.turn - 1 && !u.intents.length && !state.intent && text.split(/\s+/).length <= 5) {
+  if (state.coverageAsk === state.turn - 1 && !u.intents.length && !state.intent && !u.convNo && text.split(/\s+/).length <= 5) {
     const pl = u.place || N.extractPlace(text, { prompted: true });
     if (u.area || pl) { u.place = u.place || pl; if (!u.area) u.area = { listed: false, name: L.cap(String(pl).split(/[ ,]/)[0]) }; u.intents.push('coverage'); }
   }
@@ -1257,6 +1259,10 @@ function catalogueTurn(state, { text, profile = {}, lang, command = null, now = 
 const TP = require('./topic');
 const TOPIC_KINDS = { services: 'catalogue', explain: 'explain', price: 'price', coverage: 'area' };
 async function runTurn(state, args) {
+  if (!CONV.enabled()) return runTurnTopic(state, args);
+  return CONV.post(state, await runTurnTopic(state, args));
+}
+async function runTurnTopic(state, args) {
   if (!TP.enabled()) return runTurnInner(state, args);
   const lastLine = state.lastLine || '';
   const topic = TP.liveTopic(state, state.turn + 1);
