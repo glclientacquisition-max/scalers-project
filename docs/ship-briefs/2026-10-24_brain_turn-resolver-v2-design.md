@@ -1,3 +1,8 @@
+---
+owner: brain
+last_reviewed: 2026-10-24
+---
+
 # Brain turn resolver v2: structural design (pre-implementation)
 
 - **Status:** DESIGN ONLY. No code, PR, env, dial or message is authorised by this document.
