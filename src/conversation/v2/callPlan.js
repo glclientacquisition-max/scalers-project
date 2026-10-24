@@ -121,6 +121,8 @@ async function before(state, text, profile = {}, { handlers = null } = {}) {
           if (!state.slots.place) state.slots.place = r.name;
           return own([AC.line(r, lang), reask(state, lang)].filter(Boolean).join(' '), 'area_covered_reask');
         }
+        // a fee or note the owner set is always heard (Desk preview line), then the step continues
+        if (r.fee_kes != null || r.note) { out.text = r.name; out.lead = AC.line(r, lang); out.acts.push('area_covered_terms'); return out; }
         if (short || asks) out.text = r.name;
         return out;
       }
@@ -134,7 +136,8 @@ async function before(state, text, profile = {}, { handlers = null } = {}) {
   // it is never read as the slot ("Where's your coverage?" is not a name)
   if (state.expecting && state.expecting !== 'confirm' && !state.pending && /\?\s*$|^\W*(where|what|which|how|when|why|do you|does|can you|are you|wapi|nini|je|mnafika|mnafanya)\b/i.test(t) && !matchServices(t, profile).length) {
     const cov = /\b(cover|coverage|areas?|where do you|mnafika|maeneo)\b/i.test(t);
-    const areas = cov ? require('../listedAreas').listedAreaRows(profile).map((r) => r.name) : [];
+    const lp = cov ? AC.listed(profile) : null;
+    const areas = !cov ? [] : lp ? lp.serve : require('../listedAreas').listedAreaRows(profile).map((r) => r.name);
     const ans = areas.length ? (sw(lang) ? `Tunafika ${areas.join(', ')}.` : `We cover ${areas.slice(0, -1).join(', ')}${areas.length > 1 ? ', and ' : ''}${areas[areas.length - 1]}.`) : ''; /* [PROMPT-PLACEHOLDER] */
     return own([ans, reask(state, lang)].filter(Boolean).join(' '), cov ? 'coverage_answer_reask' : 'question_reask');
   }

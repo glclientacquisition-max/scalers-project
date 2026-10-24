@@ -77,8 +77,8 @@ test('area: Kileleshwa -> covered through county:nairobi (shared Kenya tree), on
   assert.equal(AC.resolve('Niko Rongai', DD).name, 'Ongata Rongai');
   assert.equal(AC.resolve('Ruiru', DD).via, 'county:kiambu');
 });
-test('area: landmark -> its place (Sarit -> Westlands, covered)', () => {
-  const r = AC.resolve('I stay near Sarit', DD); assert.equal(r.status, 'covered'); assert.equal(r.name, 'Westlands'); assert.equal(r.landmark, 'sarit');
+test('area: landmark (Desk tree) -> its place (Sarit Centre -> Westlands, covered)', { skip: !require('../src/conversation/v2/areaPicks').available() && 'Desk tree (#930) not on this branch' }, () => {
+  const r = AC.resolve('I stay near Sarit Centre', DD); assert.equal(r.status, 'covered'); assert.equal(r.name, 'Westlands'); assert.equal(r.landmark, 'sarit centre');
 });
 test('area: owner exclude beats the county include; outside list; unknown never "I don\'t have that detail"', () => {
   const ex = AC.resolve('I am in Kibera', WITH_EXCLUDE); assert.equal(ex.status, 'excluded'); assert.equal(AC.line(ex, 'en'), "Sorry, we don't cover Kibera.");
@@ -158,4 +158,35 @@ test('EN unknown place in the flow: "Do you cover Kwa Mzee?" -> Which area is th
   await turn(h, 'I want to book window cleaning tomorrow at 2 PM.');
   const r = await turn(h, 'Do you cover Kwa Mzee?');
   assert.match(r.heard, /Which area is that near\?/); assert.ok(!UNKNOWN.test(r.heard)); assert.equal(qs(r.heard), 1, r.heard);
+});
+
+// ---- the same call on Desk's tenant_area_picks (#930); skipped when the Desk tree is not on this branch ----
+const AP = require('../src/conversation/v2/areaPicks');
+const PICKED = { ...DD, areaPicks: { version: 1, tree_version: 'ke-areas-2026-10-24.1', picks: [
+  { node: 'county:nairobi', serve: true }, { node: 'estate:nairobi:kibera', serve: false },
+  { node: 'town:kajiado:kitengela', serve: true, fee_kes: 500, note: 'Weekends only' }, { node: 'county:kiambu', serve: true },
+] } };
+const needTree = { skip: !AP.available() && 'Desk tree (#930) not on this branch' };
+test('REPLAY HD_b4afd63a69c3 on area picks: books, Kileleshwa covered via county:nairobi pick', needTree, async () => {
+  const h = harness({ script: realModel, profile: PICKED });
+  let last;
+  for (const t of ['how are you? I was booking window cleaning Tuesday morning, and.', '2:00 PM.', 'do you do Kileleshwa?', "Where's your coverage?", 'Kileleshwa.', 'you can put it under Alvin.', 'Yeah, I do so.']) {
+    last = await turn(h, t); assert.ok(!UNKNOWN.test(last.heard), `${t} => ${last.heard}`); assert.ok(qs(last.heard) <= 1, last.heard);
+  }
+  const a = h.applied.filter((x) => x.appointment).map((x) => x.appointment);
+  assert.equal(a.length, 1); assert.match(JSON.stringify(a[0]), /Kileleshwa/); assert.match(last.heard, /booked/i);
+});
+test('picks in the flow: Kitengela fee + note heard (EN, SW), then the step continues; Kibera excluded (SW)', needTree, async () => {
+  const en = harness({ script: () => [say('Okay.')], profile: PICKED, file: {} });
+  await turn(en, 'I want to book window cleaning tomorrow at 2 PM.');
+  const r = await turn(en, 'Do you come to Kitengela?');
+  assert.match(r.heard, /Yes, we cover Kitengela\. There's an extra (?:KES 500|five hundred shillings)\. Weekends only\./); // money spoken as words by spokenStyle assert.equal(qs(r.heard), 1, r.heard);
+  const sw = harness({ script: () => [say('Sawa.')], profile: PICKED, file: {} });
+  await turn(sw, 'Nataka kubook usafi wa madirisha kesho saa nane mchana.', 'sw');
+  const s = await turn(sw, 'Mnafika Kitengela?', 'sw');
+  assert.match(s.heard, /Ndio, tunafika Kitengela\. Kuna ada ya ziada ya (?:KES 500|shilingi mia tano)\./, s.heard); assert.equal(qs(s.heard), 1, s.heard);
+  const x = harness({ script: () => [say('Sawa.')], profile: PICKED, file: {} });
+  await turn(x, 'Nataka kubook usafi wa madirisha kesho saa nane mchana.', 'sw');
+  const k = await turn(x, 'Niko Kibera.', 'sw');
+  assert.match(k.heard, /Samahani, hatufiki Kibera\./); assert.equal(x.live.getState().slots.place, null);
 });
