@@ -10,7 +10,7 @@ const loadFee = () => import(path.join(root, "dashboard/src/lib/ops/numberHold.t
 test("number-hold API: operators + step-up; bill_fee is honest 501 stub; never fake success", () => {
   const route = read("dashboard/src/app/api/admin/number-hold/route.ts");
   assert.match(route, /requireAdminOperatorWrite/);
-  assert.match(route, /requireStepUp/);
+  assert.match(route, /stepUpGate/);
   assert.match(route, /admin_set_number_hold_settings|setNumberHoldSettings/);
   assert.match(route, /holdNumberForWinback|admin_hold_number_for_winback/);
   assert.match(route, /endNumberHold|admin_end_number_hold/);

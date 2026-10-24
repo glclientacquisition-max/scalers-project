@@ -18,9 +18,12 @@ test("s24: one StepUpSheet + UnlockCta; Unlock never writes domain state; enforc
   const route = read("dashboard/src/app/api/admin/step-up/route.ts");
   assert.match(route, /requireAdminOperatorWrite/);
   assert.match(route, /requireStepUp\(/);
-  assert.match(route, /status: 501/);
-  assert.match(route, /Authenticator not set up yet/);
-  assert.doesNotMatch(route, /getSupabaseAdmin|verified: true/);
+  assert.match(route, /step_up_enrolment_required/);
+  assert.match(route, /httpOnly: true/);
+  assert.doesNotMatch(route, /getSupabaseAdmin/);
+  // verified:true only after a real code check
+  const verifiedAt = route.indexOf("verified: true");
+  assert.ok(verifiedAt > route.indexOf("verifyTotp(") && verifiedAt > route.indexOf("consumeBackupCode("));
 });
 
 test("s24: Unlock opens StepUpSheet on Numbers, Settings, Payments, Packages, Services, Voices, BusinessPane, Invoices", () => {

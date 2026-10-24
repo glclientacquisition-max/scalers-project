@@ -16,11 +16,14 @@ describe("ADMIN_STEP_UP mode", () => {
     assert.equal(stepUpMode({ ADMIN_STEP_UP: "weird" }), "observe");
   });
 
-  it("accepts off, observe, enforce", async () => {
+  it("accepts off/observe; enforce only with ADMIN_STEP_UP_ENFORCE exactly on", async () => {
     const { stepUpMode } = await load();
     assert.equal(stepUpMode({ ADMIN_STEP_UP: "off" }), "off");
     assert.equal(stepUpMode({ ADMIN_STEP_UP: "OBSERVE" }), "observe");
-    assert.equal(stepUpMode({ ADMIN_STEP_UP: "enforce" }), "enforce");
+    assert.equal(stepUpMode({ ADMIN_STEP_UP: "enforce" }), "observe");
+    assert.equal(stepUpMode({ ADMIN_STEP_UP_ENFORCE: "ON" }), "observe");
+    assert.equal(stepUpMode({ ADMIN_STEP_UP_ENFORCE: "true" }), "observe");
+    assert.equal(stepUpMode({ ADMIN_STEP_UP_ENFORCE: "on" }), "enforce");
   });
 
   it("observe logs would-require-step-up without secrets and allows", async () => {
@@ -47,7 +50,7 @@ describe("ADMIN_STEP_UP mode", () => {
     assert.equal("secret" in payload, false);
   });
 
-  it("off is silent; enforce throws not implemented", async () => {
+  it("off and enforce are silent here (stepUpGate enforces)", async () => {
     const { requireStepUp } = await load();
     const lines = [];
     const orig = console.info;
@@ -55,10 +58,8 @@ describe("ADMIN_STEP_UP mode", () => {
     try {
       requireStepUp({ action: "x", operator: "a" }, { ADMIN_STEP_UP: "off" });
       assert.equal(lines.length, 0);
-      assert.throws(
-        () => requireStepUp({ action: "x", operator: "a" }, { ADMIN_STEP_UP: "enforce" }),
-        /not implemented/,
-      );
+      requireStepUp({ action: "x", operator: "a" }, { ADMIN_STEP_UP_ENFORCE: "on" });
+      assert.equal(lines.length, 0);
     } finally {
       console.info = orig;
     }
