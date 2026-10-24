@@ -208,4 +208,28 @@ describe("sign-in 2FA", () => {
     assert.match(up, /create or replace function public\.admin_step_up_reset/);
     assert.match(read("docs/supabase/admin_sign_in_2fa_down.sql"), /drop table if exists public\.admin_sign_in_email_code/);
   });
+
+  it("logout forgets this device: clears the 12 h cookie and the Unlock, and revokes the grant row", () => {
+    const src = read("dashboard/src/app/api/logout/route.ts");
+    assert.match(src, /res\.cookies\.set\(SIGNIN_COOKIE, "", \{[^}]*maxAge: 0/);
+    assert.match(src, /res\.cookies\.set\(UNLOCK_COOKIE, "", \{[^}]*maxAge: 0/);
+    assert.match(src, /await revokeGrant\(request\.cookies\.get\(UNLOCK_COOKIE\)/);
+    const store = read("dashboard/src/lib/ops/stepUpStore.ts");
+    assert.match(store, /export async function revokeGrant[\s\S]{0,300}revoked_at: new Date\(\)\.toISOString\(\)/);
+  });
+});
+
+describe("spend and destructive actions", () => {
+  it("buy-number and voices delete need Unlock; the named ungated routes are classified safe on purpose", async () => {
+    const { ADMIN_WRITE_ROUTES, isRiskyAction } = await import("../dashboard/src/lib/ops/stepUpCore.ts");
+    assert.equal(isRiskyAction("buy-number:buy"), true);
+    assert.equal(isRiskyAction("voices:delete"), true);
+    assert.equal(isRiskyAction("voices:upsert"), false);
+    for (const f of ["admin/packages", "admin/billing/flags", "admin/billing/test-invoice", "admin/sautikit-sync"]) {
+      const r = ADMIN_WRITE_ROUTES.find((x) => x.file === f);
+      assert.ok(r && r.risky.length === 0 && r.safe.length > 0 && /Ungated by decision/.test(r.note || ""), f);
+    }
+    const buy = read("dashboard/src/app/api/admin/buy-number/route.ts");
+    assert.ok(buy.indexOf('stepUpGateSession("buy-number:buy"') < buy.indexOf("buyNumberIntoPool(inventoryId)"), "gate before the purchase");
+  });
 });

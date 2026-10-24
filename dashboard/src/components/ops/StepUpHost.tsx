@@ -5,6 +5,8 @@ import { StepUpSheet } from "./StepUpSheet";
 
 /** Plain-language names for gate keys (adminRouteRegistry in stepUpCore). Unknown keys fall back to "make this change". */
 const WHAT: Record<string, string> = {
+  "buy-number:buy": "buy this number",
+  "voices:delete": "delete this voice",
   "did-pool:release": "release this number",
   "did-pool:assign_specific": "assign this number",
   "did-pool:assign_next": "assign the next free number",

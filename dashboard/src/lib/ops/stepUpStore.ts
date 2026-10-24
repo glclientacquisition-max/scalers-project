@@ -97,6 +97,16 @@ export async function loadGrant(id: string | undefined | null): Promise<(Grant &
   return { id: row.id, operator: row.operator, expiresAt: Date.parse(row.expires_at) };
 }
 
+/** Logout: mark a live Unlock grant revoked so the cookie id is dead even if replayed. */
+export async function revokeGrant(id: string | undefined | null): Promise<void> {
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return;
+  await getSupabaseAdmin()
+    .from("admin_step_up_grant")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("revoked_at", null);
+}
+
 /** Operator reset via the DB function (same one the break-glass runbook uses). */
 export async function resetFactor(target: string, actor: string, reason: string): Promise<void> {
   const { error } = await getSupabaseAdmin().rpc("admin_step_up_reset", {

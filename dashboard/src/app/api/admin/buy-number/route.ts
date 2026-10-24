@@ -3,6 +3,7 @@ import { adminActorName } from "@/lib/adminActor";
 import { recordAdminAction } from "@/lib/adminAudit";
 import { logAdminError, operatorError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
+import { stepUpGateSession } from "@/lib/ops/stepUpGate";
 import { buyNumberIntoPool } from "@/lib/didPool";
 import {
   formatMinor,
@@ -54,6 +55,8 @@ export async function POST(request: Request) {
   if (!inventoryId) {
     return NextResponse.json({ error: "Pick a number to buy." }, { status: 400 });
   }
+  const stepUp = await stepUpGateSession("buy-number:buy", inventoryId);
+  if (stepUp) return stepUp;
 
   try {
     const row = await buyNumberIntoPool(inventoryId);
