@@ -25,6 +25,11 @@ function createLiveHandlers({ applyTools, ctx = {} } = {}) {
       const row = first(execution?.results, 'create_service_request');
       return { id: row?.id || null, ok: succeeded(row) };
     },
+    addAppointmentService: async (args) => {
+      const execution = await applyTools({ appointmentAddService: args });
+      const row = first(execution?.results, 'add_appointment_service');
+      return { id: row?.id || null, ok: succeeded(row) || row?.status === 'duplicate', duplicate: row?.status === 'duplicate' };
+    },
     updateAppointment: async (args) => {
       const execution = await applyTools({ appointmentUpdate: args });
       const row = first(execution?.results, 'update_appointment');

@@ -410,7 +410,7 @@ async function commitRaw(state, p, handlers, extra = {}) {
   try {
     if (p.tool === 'create_booking') {
       action = 'create_appointment';
-      result = await handlers.createAppointment({ ...ik, serviceName: p.service, whenText: `${p.when.date} ${p.when.time}`, windowStart: L.whenToIso(p.when), landmark: p.place, notes: p.landmark || undefined, name, ...(openCallbacks(state).length ? { supersedes: openCallbacks(state) } : {}) });
+      result = await handlers.createAppointment({ ...ik, serviceName: p.service, ...(Array.isArray(p.items) && p.items.length > 1 ? { services: p.items } : {}), whenText: `${p.when.date} ${p.when.time}`, windowStart: L.whenToIso(p.when), landmark: p.place, notes: p.landmark || undefined, name, ...(openCallbacks(state).length ? { supersedes: openCallbacks(state) } : {}) });
       ok = Boolean(result && (result.id || result.dryRun === true)); state.outcomes.push('booked');
     } else if (p.tool === 'create_order') {
       action = 'create_service_request';
@@ -436,7 +436,7 @@ async function commitRaw(state, p, handlers, extra = {}) {
   } catch (e) { ok = false; }
   const sup = ok && p.tool === 'create_booking' ? openCallbacks(state) : [];
   if (sup.length || (ok && p.tool === 'create_booking')) for (const c of state.callbacks) if (c.open) { c.open = false; c.supersededBy = result?.id || null; }
-  const rec = { tool: p.tool, action, ok, id: result?.id || null, ...(sup.length ? { supersedes: sup } : {}), notify: result?.notify || null, service: p.service || null, when: p.when || null, items: p.items || null, pickup: p.pickup || null, row: p.row || null, kind: p.kind || null, place: p.place || null, readbackLine: p.readbackLine || null, replyText: p.replyText || null, idempotencyKey: extra.idempotencyKey || p.idemKey || null };
+  const rec = { tool: p.tool, action, ok, id: result?.id || null, ...(Array.isArray(p.items) && p.items.length > 1 ? { items: [...p.items] } : {}), ...(sup.length ? { supersedes: sup } : {}), notify: result?.notify || null, service: p.service || null, when: p.when || null, items: p.items || null, pickup: p.pickup || null, row: p.row || null, kind: p.kind || null, place: p.place || null, readbackLine: p.readbackLine || null, replyText: p.replyText || null, idempotencyKey: extra.idempotencyKey || p.idemKey || null };
   state.receipts.push(rec);
   if (ok && (p.tool === 'create_booking' || p.tool === 'create_order') && s.name && handlers.saveCallerInfo) {
     const prior = state.file.contactName;

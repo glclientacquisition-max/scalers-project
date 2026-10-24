@@ -359,7 +359,7 @@ test('live wiring: handlers pass tenant/call context to recordWriteReceipt and c
 
 test('the idempotency key rides through tool validation to the row args', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'conversation', 'toolExecution.js'), 'utf8');
-  assert.equal((src.match(/raw\.idempotencyKey \? \{ idempotencyKey: clean\(raw\.idempotencyKey, 200\) \}/g) || []).length, 2);
+  assert.equal((src.match(/raw\.idempotencyKey \? \{ idempotencyKey: clean\(raw\.idempotencyKey, 200\) \}/g) || []).length, 3); // create + update + add_appointment_service
   const srv = require('fs').readFileSync(require('path').join(__dirname, '..', 'server.js'), 'utf8');
   assert.match(srv, /appointment\.idempotencyKey \? \{ idempotencyKey: appointment\.idempotencyKey \}/);
   assert.match(srv, /request\.idempotencyKey \? \{ idempotencyKey: request\.idempotencyKey \}/);

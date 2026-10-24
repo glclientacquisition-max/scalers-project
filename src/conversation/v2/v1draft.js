@@ -80,11 +80,11 @@ function snapshot(state) {
   const c = state.conv || {};
   return JSON.stringify({ service: c.service?.name || state.slots?.service || null, open_offer: state.offer || c.offer?.type || null, callback: c.callback?.status || 'none', area: state.slots?.place || null, booking_in_progress: !!state.intent, expecting: state.expecting || null });
 }
-function buildRequest({ text, profile, state, note, replyLang }) {
+function buildRequest({ text, profile, state, note, replyLang, stepNote = null }) {
   const p = staticPrefix(profile, note);
   const dyn = note.facts.filter((f) => !/^(S|P|A\d|H|M|B)/.test(f.id)).map((f) => `[${f.id}] ${f.text}`).join('\n');
   const hist = (state.v1History || []).slice(-HISTORY).map((h) => ({ role: h.role === 'caller' ? 'user' : 'model', parts: [{ text: h.text }] }));
-  const user = `${dyn ? `TURN FACTS:\n${dyn}\n` : ''}STATE: ${snapshot(state)}\nreply_lang: ${replyLang}\nCALLER: ${text}`;
+  const user = `${dyn ? `TURN FACTS:\n${dyn}\n` : ''}STATE: ${snapshot(state)}\n${stepNote ? `${stepNote}\n` : ''}reply_lang: ${replyLang}\nCALLER: ${text}`;
   return { ...p, contents: [...hist, { role: 'user', parts: [{ text: user }] }] };
 }
 const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -139,10 +139,10 @@ async function ladder({ streamFor, primaryId, backupId, request, onEvent, signal
 /** Per-call drafter. streamFor(modelId) -> streamModel({request, signal, onCall}). */
 function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL_BACKUP_ID, onStage = () => {}, log = () => {}, clock = Date.now, sleep, deadlines = DEADLINES } = {}) {
   let early = null; // { key, events:[], done:Promise, ac, listeners:Set }
-  function launch({ text, profile, state, langLock, startedOn }) {
+  function launch({ text, profile, state, langLock, startedOn, stepNote = null }) {
     const replyLang = langOf(state, langLock, text);
     const note = buildFactNote(profile, state, { callerText: text, writes: writesOf(state) });
-    const request = buildRequest({ text, profile, state, note, replyLang });
+    const request = buildRequest({ text, profile, state, note, replyLang, stepNote });
     const ac = new AbortController(); const t0 = clock();
     const run = { key: norm(text), events: [], listeners: new Set(), ac, note, replyLang, t0, startedOn, request };
     run.done = ladder({ streamFor, primaryId, backupId, request, signal: ac.signal, t0, clock, sleep, deadlines, onEvent: (c, meta) => { const ev = { ...c, ...meta, atMs: clock() - t0 }; run.events.push(ev); for (const l of run.listeners) l(ev); } });
@@ -161,12 +161,13 @@ function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL
    * Draft one turn. Returns { path, line, sentences, verdicts, turnFields, trace }.
    * path: 'v1_draft' (verified sentences spoken) | 'v2_owned:<why>' | 'v2_action' | 'v2_fallback'.
    */
-  async function turn({ text, profile = {}, state, langLock = null, onSentence = null, shouldAbort = () => false, turnIndex = null, phaseA: pA = false }) {
-    const owns = v2OwnsTurn(state, text);
+  async function turn({ text, profile = {}, state, langLock = null, onSentence = null, shouldAbort = () => false, turnIndex = null, phaseA: pA = false, plan = null }) {
+    // Phase B: no owner switch. v2 already ran this turn's step; the model speaks every turn.
+    const owns = plan ? null : v2OwnsTurn(state, text);
     if (owns) { cancel(); return { path: `v2_owned:${owns}`, sentences: [] }; }
     const T = clock();
     let run = early && early.key === norm(text) ? early : null;
-    if (!run) { cancel(); run = launch({ text, profile, state, langLock, startedOn: 'final' }); }
+    if (plan) { cancel(); run = launch({ text, profile, state, langLock, startedOn: 'final', stepNote: plan.note }); } else if (!run) { cancel(); run = launch({ text, profile, state, langLock, startedOn: 'final' }); }
     early = null;
     const { note, replyLang } = run;
     const c = CONV.conv(state);
@@ -181,7 +182,7 @@ function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL
       if (ev.name === 'note_asks') { asks = ev.args || {}; return; }
       if (ev.name === 'propose_booking' || ev.name === 'propose_callback') {
         proposals.push({ name: ev.name, args: ev.args || {} });
-        if (!sentences.length) { handoff = true; run.ac.abort(); }
+        if (!sentences.length && !plan) { handoff = true; run.ac.abort(); }
         return;
       }
       if (ev.name !== 'say') return;
@@ -193,10 +194,19 @@ function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL
         row.verdict = 'replace'; row.reasons = [...(row.reasons || []), 'repeat_greeting'];
         const g = phaseALine('goAhead', replyLang); row.replacement = g; push(g);
       } else if (v.verdict === 'pass') { push(String(a.text).trim()); }
-      else if (v.verdict === 'replace' && !replaced) { replaced = true; const u = unknownLine(replyLang, { callbackOffered: cbOffered }); row.replacement = u; if (!cbOffered) { cbOffered = 'offered_now'; } push(u); }
+      else if (v.verdict === 'replace' && !replaced) { replaced = true; const u = unknownLine(replyLang, { callbackOffered: cbOffered }); row.replacement = u; if (!cbOffered) { cbOffered = 'offered_now'; } push(u, true); }
       verdicts.push(row);
     };
-    function push(s) {
+    const act = { questions: 0, stepSaid: false, gated: [] };
+    function push0(s) { if (s && pA) s = spokenStyle(s, replyLang); if (!s || sentences.some((x) => x.text === s)) return; sentences.push({ text: s, lang: replyLang }); if (typeof onSentence === 'function') { try { onSentence({ text: s, lang: replyLang }); } catch { /* speaker hook */ } } }
+    function push(s, sys = false) {
+      if (s && plan && !sys) {
+        const g = plan.check(s, act);
+        act.gated.push({ text: String(s).slice(0, 200), verdict: g.verdict, reason: g.reason || null });
+        if (g.verdict === 'drop') return;
+        if (g.verdict === 'replace') s = g.text;
+        if (/\?\s*$/.test(String(s).trim())) { act.questions += 1; act.stepSaid = true; }
+      } else if (s && plan && /\?\s*$/.test(String(s).trim())) { act.questions += 1; act.stepSaid = true; }
       if (s && pA) s = spokenStyle(s, replyLang); // Phase A: one spoken style (after the verifier passed the original)
       if (!s || sentences.some((x) => x.text === s)) return;
       if (firstSentenceMs == null) firstSentenceMs = clock() - T;
@@ -207,6 +217,7 @@ function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL
     run.listeners.add(consume);
     const res = await run.done;
     run.listeners.delete(consume);
+    if (plan && sentences.length && !act.stepSaid && !shouldAbort()) { const t = plan.tail(); if (t) { act.questions += 1; act.stepSaid = true; push0(t); } }
     try {
       const GH = require('../geminiProviderHealth');
       if (res.used || (handoff && (res.attempts || []).some((x) => x.firstMs != null))) GH.noteBrainModel({ ok: true, model: res.used || (res.attempts || []).find((x) => x.firstMs != null).model });
@@ -214,13 +225,14 @@ function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL
     } catch { /* health is best effort */ }
     let turnFields = asks ? { asks: (asks.asks || []).filter((x) => ['place', 'explain', 'price', 'possible', 'book'].includes(x)), place: asks.place || null, service_id: (asks.service_ids || [])[0] || null } : null;
     if (pA) turnFields = handoffFields({ asks, proposals, note, profile });
-    const trace = { kind: 'v1_draft', turnIndex, startedOn: run.startedOn, replyLang, attempts: res.attempts, used: res.used, broken: !!res.broken, firstSentenceMs, verdicts, proposals, asks, noteIds: note.facts.length };
+    const trace = { kind: 'v1_draft', turnIndex, startedOn: run.startedOn, replyLang, attempts: res.attempts, used: res.used, broken: !!res.broken, firstSentenceMs, verdicts, proposals, asks, noteIds: note.facts.length, ...(plan ? { phaseB: { step: plan.kind, gated: act.gated, tail: act.stepSaid } } : {}) };
     let path;
     if (sentences.length) {
       path = 'v1_draft';
       // the system's state stays the source of truth: record what was SPOKEN, never the draft
       const line = sentences.map((s) => s.text).join(' ');
-      state.turn += 1; state.lang = replyLang; state.lastLine = line; state.lastBase = line;
+      if (!plan) state.turn += 1; // Phase B: v2's machine already advanced the turn
+      state.lang = replyLang; state.lastLine = line; state.lastBase = line;
       const svcRefs = [...new Set(verdicts.filter((r) => r.verdict === 'pass').flatMap((r) => r.refs).map((id) => note.byId.get(id)).filter((f) => f && f.serviceId).map((f) => f.name))];
       if (svcRefs.length === 1) { const s = (profile.servicesCatalog || []).find((x) => x.name === svcRefs[0]); if (s) { state.lastService = s; c.service = { name: s.name, turn: state.turn }; } }
       if (cbOffered === 'offered_now') { state.offer = 'callback'; state.offerService = null; c.offer = { type: 'callback', service: null, turn: state.turn }; c.callback = { status: 'offered', reason: 'unknown_fact' }; }

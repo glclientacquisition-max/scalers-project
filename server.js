@@ -8534,6 +8534,7 @@ async function applyGeminiTools(callSid, parsed, toolOpts = {}) {
           windowStart: appointment.windowStart,
           windowEnd: appointment.windowEnd,
           ...(appointment.idempotencyKey ? { idempotencyKey: appointment.idempotencyKey } : {}),
+          ...(Array.isArray(appointment.services) && appointment.services.length ? { services: appointment.services } : {}),
         });
         if (created) {
           console.log(
@@ -8552,6 +8553,13 @@ async function applyGeminiTools(callSid, parsed, toolOpts = {}) {
           });
         }
         return created;
+      },
+      // One booking, N services: add one service to an open booking (idempotent per item).
+      // Owner/caller "service added" notify is a Notify-lane follow-up (no event kind yet), so none is sent here.
+      addAppointmentService: async (args) => {
+        const row = await db.addAppointmentService({ callSid, appointmentId: args.appointmentId, serviceName: args.serviceName, idempotencyKey: args.idempotencyKey });
+        if (row) console.log(`[${callSid}] appointment service ${row.duplicate ? 'already on' : 'added'} id=${row.id} services=${row.service_name}`);
+        return row;
       },
       updateAppointment: async (appointment) => {
         // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 1): the row and the VISIT
