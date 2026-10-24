@@ -208,7 +208,8 @@ function createBrainV2Live(opts = {}) {
     if (vd) V1.remember(machine, 'caller', text);
     // Phase B (single brain): v2's call plan decides the step and does the writes FIRST (rules, no model);
     // then the model speaks every turn, phrasing that step. No owner switch. Template = total fallback.
-    if (vd && vdMode === 'on' && CP.phaseB({ env, tenantId: profile?.id })) return runPhaseB({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine, vd });
+    const core = !!vd && CC.coreOn({ env, tenantId: profile?.id });
+    if (vd && vdMode === 'on' && (core || CP.phaseB({ env, tenantId: profile?.id }))) return runPhaseB({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine, vd, core });
     if (vd && vdMode === 'on') {
       const d = await vd.turn({ text, profile: profile || {}, state: machine, langLock: langLock === 'en' || langLock === 'sw' ? langLock : null, onSentence, shouldAbort: typeof shouldAbort === 'function' ? shouldAbort : () => false, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, phaseA: pA });
       vdPath = d.path;
@@ -237,7 +238,7 @@ function createBrainV2Live(opts = {}) {
       const fileNames = (machine.file?.openRows || []).map((r) => r && r.service).filter(Boolean).slice(0, 3);
       const note = fileNames.length ? `caller file: ${fileNames.join(', ')}` : '';
       const tIdx = typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null;
-      const r = await modelRun.turnModel.forFinal({ text, profile: profile || {}, note, budgetMs: opts.turnModelWaitMs ?? TURN_MODEL_WAIT_MS, turnIndex: tIdx });
+      const r = await modelRun.turnModel.forFinal({ text, profile: profile || {}, note, budgetMs: core ? (opts.coreUnderstandMs ?? CORE_UNDERSTAND_MS) : (opts.turnModelWaitMs ?? TURN_MODEL_WAIT_MS), turnIndex: tIdx });
       turnFields = r.fields;
       if (pA) { try { require('../geminiProviderHealth').noteBrainModel(r.fields ? { ok: true, model: 'turn_model' } : { ok: false, model: 'turn_model', err: 'no_fields' }); } catch { /* best effort */ } }
     }
@@ -277,7 +278,10 @@ function createBrainV2Live(opts = {}) {
     };
   }
 
-  async function runPhaseB({ text, profile, langLock, shouldAbort, onSentence, machine, vd }) {
+  async function runPhaseB({ text, profile, langLock, shouldAbort, onSentence, machine, vd, core = false }) {
+    // BRAIN_CALL_CORE: typed events + the reducer pre-step run first; the core is the only state writer
+    const T0 = Date.now(); const ms = {}; let evs = []; let preWrites = []; let snap0 = null; let n0 = 0;
+    if (core) { text = CC.normalize(text); machine.core = true; snap0 = CC.snapshot(machine); n0 = (machine.receipts || []).length; evs = CC.events(text, machine, profile); preWrites = CC.applyPre(machine, evs); ms.events = Date.now() - T0; }
     const abort = typeof shouldAbort === 'function' ? shouldAbort : () => false;
     const lock = langLock === 'en' || langLock === 'sw' ? langLock : null;
     const handlers = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName } });
@@ -286,7 +290,7 @@ function createBrainV2Live(opts = {}) {
     const parallel = String(env.BRAIN_V1_DRAFT_PHASE_B_PARALLEL || 'on').toLowerCase() !== 'off';
     const startedOn = parallel ? vd.prelaunch({ text, profile, state: machine, langLock: lock }) : null;
     const pre = await CP.before(machine, text, profile, { handlers });
-    let tmpl; let lang = machine.lang || lock || 'en'; let done = null;
+    let tmpl; let lang = machine.lang || lock || 'en'; let done = null; let turnFieldsOut = null;
     if (pre.owned) { tmpl = pre.line; lang = pre.lang || lang; } else {
       const parts = [];
       // understanding: v2's one turn-model call (same as today's v2 turns), rules if it is off or misses 750 ms.
@@ -294,8 +298,9 @@ function createBrainV2Live(opts = {}) {
       let turnFields = null;
       if (modelRun === undefined) modelRun = resolveModelShadow(opts, env);
       if (String(env.BRAIN_V1_DRAFT_PHASE_B_UNDERSTAND || 'model').toLowerCase() !== 'rules' && modelRun && modelRun.mode === 'on' && modelRun.turnModel) {
-        try { const r = await modelRun.turnModel.forFinal({ text: pre.text, profile, note: '', budgetMs: opts.turnModelWaitMs ?? TURN_MODEL_WAIT_MS, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null }); turnFields = r && r.fields || null; } catch { turnFields = null; }
+        try { const r = await modelRun.turnModel.forFinal({ text: pre.text, profile, note: '', budgetMs: core ? (opts.coreUnderstandMs ?? CORE_UNDERSTAND_MS) : (opts.turnModelWaitMs ?? TURN_MODEL_WAIT_MS), turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null }); turnFields = r && r.fields || null; } catch { turnFields = null; }
       }
+      turnFieldsOut = turnFields; if (core) ms.understand = Date.now() - T0;
       for await (const ev of runTurnStream(machine, { text: pre.text, profile: { ...profile }, now: nowFn(), handlers, model: null, classify: null, turnFields, langLock: lock, shouldAbort: abort })) {
         if (ev && ev.type === 'sentence') parts.push(ev.text); if (ev && ev.type === 'done') done = ev;
       }
@@ -308,14 +313,30 @@ function createBrainV2Live(opts = {}) {
     }
     tmpl = spokenStyle(tmpl, lang);
     const st = CP.step(machine, tmpl, lang);
+    let rp = null;
+    if (core) {
+      ms.reduce = Date.now() - T0;
+      const lead = machine.coreLead || null; machine.coreLead = null;
+      const evs2 = turnFieldsOut ? [...evs, ...CC.events('', null, profile, turnFieldsOut).filter((e) => !evs.some((x) => x.type === e.type && x.ask === e.ask))] : evs;
+      const ans = CC.answers(evs2, text, machine, profile, lang, { already: pre.acts || [] });
+      rp = CC.replyPlan({ st, tmpl, ans, lead, receipts: CC.receiptsSince(machine, n0), lang });
+    }
     // the plan's own line is the step: in full when its first sentence carries news (honest name check, added
     // item); a coverage answer + re-ask only adds its question (the model answers the coverage itself)
     if (pre.owned) { const full = (pre.acts || []).some((x) => /^(have_my_name|item_added|add_service|service_add|area_(excluded|outside|unknown))/.test(x)); const q = CP.split(tmpl).filter((x) => /\?\s*$/.test(x)).pop(); st.question = full || !q ? tmpl : q; } else if (pre.lead) st.question = tmpl;
     (machine.trace || (machine.trace = [])).push({ turn: machine.turn, call_plan: { items: st.items, step: st.kind, slot: st.slot || null, acts: pre.acts } });
-    const d = await vd.turn({ text, profile, state: machine, langLock: lock, onSentence, shouldAbort: abort, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, phaseA: true, plan: { kind: st.kind, parallel, startedOn, template: tmpl, note: CP.stepNote(st), check: (s, ctx) => CP.actCheck(s, st, ctx), tail: (a) => CP.tail(st, a) } });
+    const d = await vd.turn({ text, profile, state: machine, langLock: lock, onSentence, shouldAbort: abort, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, phaseA: true, plan: rp ? { kind: st.kind, core: true, parallel, startedOn, template: rp.template, note: rp.note, check: rp.check, tail: rp.tail } : { kind: st.kind, parallel, startedOn, template: tmpl, note: CP.stepNote(st), check: (s, ctx) => CP.actCheck(s, st, ctx), tail: (a) => CP.tail(st, a) } });
+    if (rp) tmpl = rp.template;
     const endCall = endDecision({ done, machine, profile, line: d.path === 'v1_draft' ? d.line : tmpl, alreadyEnded: endSent });
     if (endCall.end) endSent = true;
     const extra = { phase: machine.phase, plan: st.kind, end: endCall.end, ...(endCall.end ? { reason: endCall.reason } : {}) };
+    if (core) {
+      ms.compose = Date.now() - T0;
+      const rec = { kind: 'call_core', turn: machine.turn, events: evs, writes: [...preWrites, ...CC.diff(snap0, CC.snapshot(machine))], stagesMs: ms, plan: rp.plan, path: d.path, firstSentenceMs: d.trace ? d.trace.firstSentenceMs : null, file: CC.callerFileTool(machine) };
+      (machine.trace || (machine.trace = [])).push({ turn: machine.turn, call_core: rec });
+      try { (opts.onModelStage || (() => {}))(rec); } catch { /* trace only */ }
+      extra.core = true;
+    }
     if (d.path === 'v1_draft') { V1.remember(machine, 'agent', d.line); return { line: d.line, lang: d.sentences[0]?.lang || lang, sentences: d.sentences, path: 'v1_draft', streamed: typeof onSentence === 'function', ...extra }; }
     V1.remember(machine, 'agent', tmpl);
     return { line: tmpl, lang, sentences: CP.split(tmpl).map((x) => ({ text: x, lang })), path: `plan_fallback:${d.path}`, ...extra };
@@ -355,6 +376,8 @@ const { spoken: spokenStyle } = require('./spokenStyle');
 const TRZ = require('./turnResolver');
 const RCP = require('./receipts');
 const CP = require('./callPlan');
+const CC = require('./callCore');
+const CORE_UNDERSTAND_MS = 450; // BRAIN_CALL_CORE latency budget: understanding <= 450 ms
 /** Phase A (voice-qa 926 §2.2): a handed-off "is it possible?" with a catalogue service gets a yes before
  * v2's next question ("Yes, we do interior window cleaning. Where should we come?"). Coverage and hours
  * are still checked by v2's own place/time steps; this only answers the service half. */

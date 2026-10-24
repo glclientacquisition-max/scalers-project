@@ -88,4 +88,4 @@ function buildFactNote(profile = {}, state = {}, { callerText = '', writes = [] 
   const text = facts.map((f) => `[${f.id}] ${f.text}`).join('\n');
   return { facts, byId, text, areas };
 }
-module.exports = { buildFactNote, bookingFact, keyWords, num };
+module.exports = { buildFactNote, bookingFact, keyWords, num, hoursFact };

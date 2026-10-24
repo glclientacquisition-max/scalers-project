@@ -206,7 +206,7 @@ function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL
         if (!replaced) {
           replaced = true;
           const aboutBooking = v.families.some((f) => ['area', 'name', 'number', 'hours', 'status'].includes(f)) || plan.kind === 'readback' || plan.kind === 'confirmed';
-          if (aboutBooking || cbOffered || !plan.template) { row.replacement = 'plan_template'; planLine = true; }
+          if (plan.core || aboutBooking || cbOffered || !plan.template) { row.replacement = 'plan_template'; planLine = true; }
           else { const u = unknownLine(replyLang, { callbackOffered: false }); row.replacement = u; cbOffered = 'offered_now'; push(u, true); act.stepSaid = true; }
         }
       }
@@ -257,8 +257,9 @@ function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL
       if (!plan) state.turn += 1; // Phase B: v2's machine already advanced the turn
       state.lang = replyLang; state.lastLine = line; state.lastBase = line;
       const svcRefs = [...new Set(verdicts.filter((r) => r.verdict === 'pass').flatMap((r) => r.refs).map((id) => note.byId.get(id)).filter((f) => f && f.serviceId).map((f) => f.name))];
-      if (svcRefs.length === 1) { const s = (profile.servicesCatalog || []).find((x) => x.name === svcRefs[0]); if (s) { state.lastService = s; c.service = { name: s.name, turn: state.turn }; } }
-      if (cbOffered === 'offered_now') { state.offer = 'callback'; state.offerService = null; c.offer = { type: 'callback', service: null, turn: state.turn }; c.callback = { status: 'offered', reason: 'unknown_fact' }; }
+      // BRAIN_CALL_CORE: the core is the only state writer; the composer never writes offers or the service
+      if (svcRefs.length === 1 && !(plan && plan.core)) { const s = (profile.servicesCatalog || []).find((x) => x.name === svcRefs[0]); if (s) { state.lastService = s; c.service = { name: s.name, turn: state.turn }; } }
+      if (cbOffered === 'offered_now' && !(plan && plan.core)) { state.offer = 'callback'; state.offerService = null; c.offer = { type: 'callback', service: null, turn: state.turn }; c.callback = { status: 'offered', reason: 'unknown_fact' }; }
       c.repairCount = 0;
       (state.trace || (state.trace = [])).push({ turn: state.turn, v1_draft: { verdicts: verdicts.map((r) => r.verdict) } });
     } else path = handoff ? 'v2_action' : 'v2_fallback';

@@ -7487,6 +7487,11 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
     }
 
     await db.saveEscalation({ callSid, teammate, reason });
+    // BRAIN_CALL_CORE: owner turned off "Text me when a caller asks for a callback or a cancel" (default on)
+    if (/^callback:/.test(String(escalate.reason || '')) && require('./src/conversation/v2/ownerTextSetting').skipOwnerText({ profile: loadedProfile || {}, kind: 'callback' })) {
+      console.log(`[${callSid}] callback recorded; owner text off for this business`);
+      return { ok: true, channel: 'owner_text_off' };
+    }
 
     const lead = {
       businessName,
@@ -7922,6 +7927,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
   let notifyChannels = null;
   let teamDirectory = [];
   let tenantId = null;
+  let appointmentNotifyPolicies = {};
   try {
     const profile = await db.getTenantProfile({ callSid });
     ownerNumber = profile.whatsappNumber || ownerNumber;
@@ -7930,6 +7936,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     notifyChannels = profile.notifyChannels || null;
     teamDirectory = profile.teamDirectory || [];
     tenantId = profile.id || null;
+    appointmentNotifyPolicies = profile.businessPolicies || {};
   } catch (err) {
     console.warn(
       `[${callSid}] tenant lookup for appointment notify failed:`,
@@ -7937,6 +7944,11 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     );
   }
 
+  // BRAIN_CALL_CORE: owner turned off "Text me when a caller asks for a callback or a cancel" (default on)
+  if (kind === 'updated' && /cancel/i.test(String(appointment.status || '')) && require('./src/conversation/v2/ownerTextSetting').skipOwnerText({ profile: { id: tenantId, businessPolicies: appointmentNotifyPolicies }, kind: 'cancel' })) {
+    console.log(`[${callSid}] cancel recorded; owner text off for this business`);
+    return;
+  }
   const callRow = await db.getCall(callSid).catch(() => null);
   const ledger = {
     tenantId: tenantId || callRow?.tenant_id || null,

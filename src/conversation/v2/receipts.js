@@ -44,6 +44,7 @@ const ASK = {
   items: { en: ['Which item would you like?', 'Which item would you like from our list?'], sw: ['Ungependa kitu gani?', 'Ungependa kitu gani kwenye orodha yetu?'] },
   qty: { en: (c) => [`How many ${c.item} would you like?`, `How many ${c.item}? For example one or two.`], sw: (c) => [`${c.item} ngapi?`, `${c.item} ngapi? Kwa mfano moja au mbili.`] },
   pickup: { en: ['What day will you pick it up?', 'What day will you pick it up? For example tomorrow.'], sw: ['Utakuja kuchukua siku gani?', 'Utakuja kuchukua siku gani? Kwa mfano kesho.'] },
+  which_named: { en: ['Which booking do you mean? The service and the day is enough.', 'Which booking is it? Tell me the service and the day.'], sw: ['Ni booking ipi? Huduma na siku inatosha.', 'Ni booking ipi? Niambie huduma na siku.'] }, // [PROMPT-PLACEHOLDER] BRAIN_CALL_CORE
   which: { en: (c) => [`Which one: ${c.list}?`, `Which one, ${c.list}?`], sw: (c) => [`Ipi: ${c.list}?`, `Ni ipi, ${c.list}?`] },
   change_what: { en: (c) => [`What would you like to change on your ${c.row}?`, `Is it the day and time you want to change on your ${c.row}?`], sw: (c) => [`Ungependa kubadilisha nini kwenye ${c.row}?`, `Ni siku na saa unataka kubadilisha kwenye ${c.row}?`] },
   new_when: { en: ['What new day and time would you like?', 'What new day and time? For example Saturday at 10am.'], sw: ['Siku gani na saa ngapi mpya?', 'Siku gani na saa ngapi mpya? Kwa mfano Jumamosi saa nne.'] },
