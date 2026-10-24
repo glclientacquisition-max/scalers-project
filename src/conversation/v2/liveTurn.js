@@ -193,7 +193,7 @@ function createBrainV2Live(opts = {}) {
     return state;
   }
 
-  async function run({ text, profile, langLock, shouldAbort, onSentence } = {}) {
+  async function run({ text, profile, langLock, shouldAbort, onSentence, heardAgent = null } = {}) {
     if (!brainV2Enabled({ env, tenantId: profile?.id }) || brainV2Mode({ env }) !== 'live') {
       return null;
     }
@@ -202,9 +202,12 @@ function createBrainV2Live(opts = {}) {
     const vdMode = V1.mode({ env, tenantId: profile?.id });
     let vdFields = null; let vdPath = null;
     const vd = vdMode !== 'off' ? v1Drafter(profile) : null;
+    const pA = !!vd && V1.phaseA({ env, tenantId: profile?.id });
+    // Phase A: lines the caller heard outside the brain (greeting, opening ladder, acks) join the draft's history
+    if (pA && Array.isArray(heardAgent)) for (const l of heardAgent) if (l && String(l).trim()) V1.remember(machine, 'agent', String(l).trim());
     if (vd) V1.remember(machine, 'caller', text);
     if (vd && vdMode === 'on') {
-      const d = await vd.turn({ text, profile: profile || {}, state: machine, langLock: langLock === 'en' || langLock === 'sw' ? langLock : null, onSentence, shouldAbort: typeof shouldAbort === 'function' ? shouldAbort : () => false, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null });
+      const d = await vd.turn({ text, profile: profile || {}, state: machine, langLock: langLock === 'en' || langLock === 'sw' ? langLock : null, onSentence, shouldAbort: typeof shouldAbort === 'function' ? shouldAbort : () => false, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, phaseA: pA });
       vdPath = d.path;
       if (d.path === 'v1_draft') {
         V1.remember(machine, 'agent', d.line);
@@ -221,7 +224,11 @@ function createBrainV2Live(opts = {}) {
     let done = null;
     if (modelRun === undefined) modelRun = resolveModelShadow(opts, env);
     // shadow: snapshot before the rules turn; the model call starts now and is never awaited here
-    const on = !!(modelRun && modelRun.mode === 'on' && modelRun.turnModel) && !(vd && vdMode === 'on');
+    // Phase A (voice-qa 926 §2.1): one understanding per turn. The draft's own model result (vdFields) when it
+    // handed off with one; else v2's turn model runs as normal. No background shadow and no flash-lite
+    // classify while the draft is on.
+    const draftOn = !!(vd && vdMode === 'on');
+    const on = !!(modelRun && modelRun.mode === 'on' && modelRun.turnModel) && (!draftOn || (pA && !vdFields));
     let turnFields = null;
     if (on) {
       const fileNames = (machine.file?.openRows || []).map((r) => r && r.service).filter(Boolean).slice(0, 3);
@@ -229,8 +236,9 @@ function createBrainV2Live(opts = {}) {
       const tIdx = typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null;
       const r = await modelRun.turnModel.forFinal({ text, profile: profile || {}, note, budgetMs: opts.turnModelWaitMs ?? TURN_MODEL_WAIT_MS, turnIndex: tIdx });
       turnFields = r.fields;
+      if (pA) { try { require('../geminiProviderHealth').noteBrainModel(r.fields ? { ok: true, model: 'turn_model' } : { ok: false, model: 'turn_model', err: 'no_fields' }); } catch { /* best effort */ } }
     }
-    const finishShadow = modelRun && !on ? modelRun.shadow.begin({ text, state: machine, profile: profile || {}, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, openRows: machine.file?.openRows || [] }) : null;
+    const finishShadow = modelRun && !on && !(pA && draftOn) ? modelRun.shadow.begin({ text, state: machine, profile: profile || {}, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, openRows: machine.file?.openRows || [] }) : null;
     const it = runTurnStream(machine, {
       text,
       profile: { ...(profile || {}) },
@@ -238,18 +246,19 @@ function createBrainV2Live(opts = {}) {
       handlers,
       // mode=on: the turn's one call already ran (turnFields); no second machine/classify call
       model: opts.model || null,
-      classify: on ? null : defaultClassify(opts),
+      classify: on || (pA && draftOn && vdFields) ? null : defaultClassify(opts),
       turnFields: turnFields || vdFields,
       langLock: langLock === 'en' || langLock === 'sw' ? langLock : null,
       shouldAbort: typeof shouldAbort === 'function' ? shouldAbort : () => false,
     });
     for await (const ev of it) {
       if (!ev) continue;
-      if (ev.type === 'sentence') sentences.push({ text: ev.text, lang: ev.lang });
+      if (ev.type === 'sentence') sentences.push({ text: pA ? spokenStyle(ev.text, ev.lang) : ev.text, lang: ev.lang });
       if (ev.type === 'done') done = ev;
     }
     if (finishShadow) lastShadow = finishShadow(machine, done); // compared and logged off the critical path
-    const line = sentences.map((s) => s.text).join(' ').trim() || String(done?.line || '').trim();
+    let line = sentences.map((s) => s.text).join(' ').trim() || (pA ? spokenStyle(String(done?.line || ''), machine.lang) : String(done?.line || '')).trim();
+    if (pA && line) line = answerPossible({ text, fields: vdFields || turnFields, machine, line, sentences });
     if (vd) V1.remember(machine, 'agent', line);
     const endCall = endDecision({ done, machine, profile, line, alreadyEnded: endSent });
     if (endCall.end) endSent = true;
@@ -267,6 +276,11 @@ function createBrainV2Live(opts = {}) {
 
   /** Voice's unfinished hold: start this turn's one model call on the stable partial. */
   function partial({ text, profile, langLock } = {}) {
+    // Phase A: a turn the draft hands to v2 anyway (read-back, action flow) warms v2's one model call instead
+    if (V1.phaseA({ env, tenantId: profile?.id }) && state && V1.v2OwnsTurn(state, text)) {
+      if (modelRun === undefined) modelRun = resolveModelShadow(opts, env);
+      return !!(modelRun && modelRun.mode === 'on' && modelRun.turnModel && modelRun.turnModel.partial({ text, profile: profile || {} }));
+    }
     if (V1.mode({ env, tenantId: profile?.id }) === 'on' && state) { const d = v1Drafter(profile); if (d) return d.partial({ text, profile: profile || {}, state, langLock }); }
     if (modelRun === undefined) modelRun = resolveModelShadow(opts, env);
     if (!modelRun || modelRun.mode !== 'on' || !modelRun.turnModel) return false;
@@ -281,6 +295,24 @@ function createBrainV2Live(opts = {}) {
 
 
 const AM = require('./audibleMouth');
+const { spoken: spokenStyle } = require('./spokenStyle');
+const TRZ = require('./turnResolver');
+const RCP = require('./receipts');
+/** Phase A (voice-qa 926 §2.2): a handed-off "is it possible?" with a catalogue service gets a yes before
+ * v2's next question ("Yes, we do interior window cleaning. Where should we come?"). Coverage and hours
+ * are still checked by v2's own place/time steps; this only answers the service half. */
+function answerPossible({ text, fields, machine, line, sentences }) {
+  const asked = (fields && (fields.asks || []).includes('possible')) || TRZ.POSSIBLE.test(String(text || ''));
+  const svc = machine && machine.slots && machine.slots.service;
+  if (!asked || !svc || machine.phase === 'readback' || machine.pending) return line;
+  if (/^(yes|yeah|sure|sorry|ndio|ndiyo|sawa|samahani)\b/i.test(line) || line.toLowerCase().includes(String(svc).toLowerCase())) return line;
+  const lang = (sentences[0] && sentences[0].lang) || machine.lang || 'en';
+  const sw = /^sw/.test(lang);
+  const name = RCP.svcName(svc, lang);
+  const yes = sw ? `Ndio, tunafanya ${name}.` : `Yes, we do ${String(name).toLowerCase()}.`;
+  sentences.unshift({ text: yes, lang });
+  return `${yes} ${line}`;
+}
 
 /** Voice composeOpening card from the same bind-safe facts Brain seeds into machine.file.
  * Field names locked with Voice @ 45c2d51f — do not rename.

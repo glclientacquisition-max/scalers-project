@@ -45,8 +45,18 @@ function noteGeminiProviderOk() {
   }
 }
 
+// Brain v2 turn models (BRAIN_V1_DRAFT draft stream, v2 turn model) use their own stream clients;
+// they report here so /healthz shows the model the call actually uses.
+/** @type {{ lastOkAt: string|null, model: string|null, lastError: { message: string, at: string, model: string|null }|null }} */
+let brain = { lastOkAt: null, model: null, lastError: null };
+function noteBrainModel({ ok, model = null, err = null } = {}) {
+  if (ok) { brain = { ...brain, lastOkAt: new Date().toISOString(), model: model || brain.model }; noteGeminiProviderOk(); return; }
+  brain = { ...brain, lastError: { message: String(err || '').slice(0, 120), at: new Date().toISOString(), model } };
+}
+
 function getGeminiProviderHealth() {
   return {
+    brain: { ...brain },
     lastError,
     lastOkAt: lastOk.at,
     billingExhausted: lastError?.kind === 'billing',
@@ -58,11 +68,13 @@ function getGeminiProviderHealth() {
 function resetGeminiProviderHealth() {
   lastError = null;
   lastOk = { at: null };
+  brain = { lastOkAt: null, model: null, lastError: null };
 }
 
 module.exports = {
   noteGeminiProviderError,
   noteGeminiProviderOk,
   getGeminiProviderHealth,
+  noteBrainModel,
   resetGeminiProviderHealth,
 };

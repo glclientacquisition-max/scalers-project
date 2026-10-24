@@ -256,4 +256,4 @@ function vary(line, lang, n = 1, plain = false) {
   // No "As I said" / "Just to repeat" filler (Alvin, 14 Oct): a repeat is said plainly.
   return line;
 }
-module.exports = { serviceCategories, vary, ask, readback, reaskQ, receipt, info, svcName, rowLabel };
+module.exports = { priceTxt, serviceCategories, vary, ask, readback, reaskQ, receipt, info, svcName, rowLabel };

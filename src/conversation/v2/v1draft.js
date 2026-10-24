@@ -16,6 +16,7 @@ const RO = require('./replyOwner');
 const CONV = require('./convState');
 const { buildFactNote } = require('./v1draftFacts');
 const { verifySentence, unknownLine } = require('./v1draftVerify');
+const { spoken: spokenStyle } = require('./spokenStyle');
 
 const DND_TENANT = 'df4ad9d8-28ff-4810-b1e6-94f5495472b0'; // Done & Dusted (default scope)
 const MODES = new Set(['off', 'shadow', 'on']);
@@ -26,6 +27,21 @@ function mode({ env = process.env, tenantId } = {}) {
   if (tenantId == null || !allow.includes(String(tenantId).trim().toLowerCase())) return 'off';
   return m;
 }
+
+// BRAIN_V1_DRAFT_PHASE_A=on (only with BRAIN_V1_DRAFT=on, same tenant scope): one shared understanding
+// per turn, handoff carries the draft's slots + asks, no repeated greeting, one spoken number style.
+// voice-qa/2026-10-24_926-dials-two-systems.md §3 Phase A.
+function phaseA({ env = process.env, tenantId } = {}) {
+  return mode({ env, tenantId }) === 'on' && String(env.BRAIN_V1_DRAFT_PHASE_A || 'off').trim().toLowerCase() === 'on';
+}
+// [PROMPT-PLACEHOLDER] copy for the wait / hello-after-wait acts and the no-repeat greeting swap.
+const PHASE_A_LINES = {
+  wait: { en: 'Sure, take your time.', sw: 'Sawa, chukua muda wako.' },
+  afterWait: { en: "I'm here. What would you like to change?", sw: 'Niko hapa. Ungependa kubadilisha nini?' },
+  goAhead: { en: 'Sure, go ahead.', sw: 'Sawa, endelea.' },
+};
+const phaseALine = (key, lang) => (PHASE_A_LINES[key] || {})[/^sw/.test(String(lang || '')) ? 'sw' : 'en'] || null;
+const GREET_ASK = /\b(how (can|may) i help|what can i do for you|nikusaidie|naweza kukusaidia)\b/i;
 
 // Ladder deadlines, ms from the turn start (caller stop). Design §3.
 const DEADLINES = { r1FirstMs: 1400, r2FirstByMs: 2600, r3FirstByMs: 3000, wallMs: 6000, fillerMs: 900 };
@@ -145,7 +161,7 @@ function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL
    * Draft one turn. Returns { path, line, sentences, verdicts, turnFields, trace }.
    * path: 'v1_draft' (verified sentences spoken) | 'v2_owned:<why>' | 'v2_action' | 'v2_fallback'.
    */
-  async function turn({ text, profile = {}, state, langLock = null, onSentence = null, shouldAbort = () => false, turnIndex = null }) {
+  async function turn({ text, profile = {}, state, langLock = null, onSentence = null, shouldAbort = () => false, turnIndex = null, phaseA: pA = false }) {
     const owns = v2OwnsTurn(state, text);
     if (owns) { cancel(); return { path: `v2_owned:${owns}`, sentences: [] }; }
     const T = clock();
@@ -172,11 +188,16 @@ function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL
       const a = ev.args || {};
       const v = verifySentence({ text: a.text, refs: a.refs, kind: a.kind, lang: replyLang }, note, { profile, replyLang, unlockedNames });
       const row = { text: String(a.text || '').slice(0, 300), refs: a.refs || [], kind: a.kind || null, verdict: v.verdict, families: v.families, reasons: v.reasons, atMs: ev.atMs, model: ev.model };
-      if (v.verdict === 'pass') { push(String(a.text).trim()); }
+      if (v.verdict === 'pass' && pA && GREET_ASK.test(String(a.text)) && (state.v1History || []).some((h) => h.role === 'agent' && GREET_ASK.test(h.text))) {
+        // Phase A: the opening already asked how we can help; never a second/third time
+        row.verdict = 'replace'; row.reasons = [...(row.reasons || []), 'repeat_greeting'];
+        const g = phaseALine('goAhead', replyLang); row.replacement = g; push(g);
+      } else if (v.verdict === 'pass') { push(String(a.text).trim()); }
       else if (v.verdict === 'replace' && !replaced) { replaced = true; const u = unknownLine(replyLang, { callbackOffered: cbOffered }); row.replacement = u; if (!cbOffered) { cbOffered = 'offered_now'; } push(u); }
       verdicts.push(row);
     };
     function push(s) {
+      if (s && pA) s = spokenStyle(s, replyLang); // Phase A: one spoken style (after the verifier passed the original)
       if (!s || sentences.some((x) => x.text === s)) return;
       if (firstSentenceMs == null) firstSentenceMs = clock() - T;
       sentences.push({ text: s, lang: replyLang });
@@ -186,7 +207,13 @@ function createV1Draft({ streamFor, primaryId = MS.MODEL_ID, backupId = MS.MODEL
     run.listeners.add(consume);
     const res = await run.done;
     run.listeners.delete(consume);
-    const turnFields = asks ? { asks: (asks.asks || []).filter((x) => ['place', 'explain', 'price', 'possible', 'book'].includes(x)), place: asks.place || null, service_id: (asks.service_ids || [])[0] || null } : null;
+    try {
+      const GH = require('../geminiProviderHealth');
+      if (res.used || (handoff && (res.attempts || []).some((x) => x.firstMs != null))) GH.noteBrainModel({ ok: true, model: res.used || (res.attempts || []).find((x) => x.firstMs != null).model });
+      else { const bad = (res.attempts || []).find((x) => !x.ok && x.err !== '20' && !/abort/i.test(String(x.err))); if (bad && !handoff) GH.noteBrainModel({ ok: false, model: bad.model, err: bad.err }); }
+    } catch { /* health is best effort */ }
+    let turnFields = asks ? { asks: (asks.asks || []).filter((x) => ['place', 'explain', 'price', 'possible', 'book'].includes(x)), place: asks.place || null, service_id: (asks.service_ids || [])[0] || null } : null;
+    if (pA) turnFields = handoffFields({ asks, proposals, note, profile });
     const trace = { kind: 'v1_draft', turnIndex, startedOn: run.startedOn, replyLang, attempts: res.attempts, used: res.used, broken: !!res.broken, firstSentenceMs, verdicts, proposals, asks, noteIds: note.facts.length };
     let path;
     if (sentences.length) {
@@ -215,10 +242,32 @@ function writesOf(state) {
   return [...(state.callbacks || []).filter((c) => c && c.id).map((c) => ({ id: c.id, kind: 'callback' })), ...(state.receipts || []).filter((r) => r && r.ok !== false && r.id && /appointment|booking/.test(String(r.kind || r.tool || ''))).map((r) => ({ id: r.id, kind: 'booking' }))];
 }
 /** History the model reads: caller words and the lines actually spoken (any path). */
+/** Phase A: the draft's understanding in v2's turnFields shape (turnModel.fieldsOf). Fact ids (S#/P#)
+ * map to catalogue ids; a propose_booking adds 'book'. null when the model gave nothing usable. */
+function handoffFields({ asks, proposals = [], note, profile = {} }) {
+  const out = new Set(); let place = null; let serviceId = null;
+  const toSvc = (id) => {
+    if (!id) return null;
+    const f = note && note.byId && note.byId.get(String(id));
+    if (f && f.serviceId) return f.serviceId;
+    const row = (profile.servicesCatalog || []).find((x) => x.id === id || x.factId === id);
+    return row ? row.id : null;
+  };
+  if (asks) {
+    for (const a of asks.asks || []) if (['place', 'explain', 'price', 'possible', 'book', 'check_or_correct_detail'].includes(a)) out.add(a);
+    if (typeof asks.place === 'string' && asks.place.trim()) place = asks.place.trim().slice(0, 60);
+    for (const id of asks.service_ids || []) { serviceId = toSvc(id); if (serviceId) break; }
+  }
+  for (const p of proposals) {
+    if (p.name === 'propose_booking') { out.add('book'); if (!serviceId) serviceId = toSvc(p.args && p.args.service_id); }
+  }
+  if (!out.size && !place && !serviceId) return null;
+  return { asks: [...out], place, service_id: serviceId };
+}
 function remember(state, role, text) {
   if (!text) return;
   const h = state.v1History || (state.v1History = []);
   h.push({ role, text: String(text).slice(0, 400) });
   if (h.length > HISTORY * 2) h.splice(0, h.length - HISTORY * 2);
 }
-module.exports = { mode, createV1Draft, ladder, buildRequest, v2OwnsTurn, remember, DEADLINES, DND_TENANT, staticPrefix };
+module.exports = { mode, phaseA, phaseALine, PHASE_A_LINES, handoffFields, createV1Draft, ladder, buildRequest, v2OwnsTurn, remember, DEADLINES, DND_TENANT, staticPrefix };

@@ -2979,6 +2979,15 @@ mediaWss.on('connection', (ws, req) => {
   let ttsSpeedScale = 1;
   /** Soniox stream id for the in-flight thinking-ack (cancel this only — keep reply prefetch). */
   let fillerStreamId = null;
+  // BRAIN_V1_DRAFT_PHASE_A: agent lines spoken outside the brain since its last turn (greeting, opening
+  // ladder, acks) are handed to the draft's history so it never asks "how can I help" again.
+  let v1HeardMark = 0;
+  let v1WaitAt = 0; // Phase A: when the caller last said "wait"
+  function v1HeardSinceLastTurn() {
+    const rows = callTranscript.turns().slice(v1HeardMark);
+    v1HeardMark = callTranscript.size();
+    return rows.filter((r) => r && (r.role === 'agent' || r.speaker === 'agent' || r.who === 'agent')).map((r) => r.text || r.content || '').filter(Boolean);
+  }
   /** Only PCM from this stream id is forwarded (drops orphan filler / cancelled audio). */
   let activeOutboundStreamId = null;
   /** Resolves when TTS session is assigned and connected (or null if unavailable). */
@@ -3468,6 +3477,30 @@ mediaWss.on('connection', (ws, req) => {
       if (!speechOutageStarted) releaseQueuedCallerSpeech(gen);
     }
     return { ok: true, cached: true };
+  }
+
+  /**
+   * BRAIN_V1_DRAFT_PHASE_A: the reply is ready while a filler still plays. Let the filler reach a
+   * minimum audible length, then cut it so the reply starts now (same generation-bump + stream-only
+   * cancel + killAudio as stopFillerForReply; no bargeInActive). VOICE REVIEW: cut point / click.
+   */
+  const PHASE_A_FILLER_MIN_MS = 450;
+  async function cutFillerForReply() {
+    if (!fillerStreamId) return false;
+    const played = Date.now() - (speakStartedAt || 0);
+    if (played < PHASE_A_FILLER_MIN_MS) await sleep(PHASE_A_FILLER_MIN_MS - played);
+    const cancelId = fillerStreamId;
+    if (!cancelId) return false; // filler ended on its own while we waited
+    playbackGeneration += 1;
+    speaking = false;
+    fillerStreamId = null;
+    if (activeOutboundStreamId === cancelId) activeOutboundStreamId = null;
+    if (tts && isCancelableTtsStreamId(cancelId)) {
+      try { tts.cancel(cancelId); } catch { /* ignore */ }
+    }
+    clearMediaPlayback(ws);
+    console.log(`[ws/media][${sidLabel()}] brain_v1_draft phase_a filler cut for reply after ${Date.now() - (speakStartedAt || 0)}ms`);
+    return true;
   }
 
   async function speakThinkingAck(fillerText) {
@@ -4569,6 +4602,7 @@ mediaWss.on('connection', (ws, req) => {
         // BRAIN_V1_DRAFT=on (DnD only): verified sentences stream to TTS one by one as they pass the
         // verifier; the existing contextual filler plays at 0.9 s if nothing verified is ready yet.
         const v1DraftOn = brainV1Draft.mode({ tenantId: brainProfile?.id }) === 'on';
+        const v1PhaseA = v1DraftOn && brainV1Draft.phaseA({ tenantId: brainProfile?.id });
         let v1Chain = Promise.resolve();
         let v1Streamed = 0;
         let v1Filler = null;
@@ -4588,7 +4622,10 @@ mediaWss.on('connection', (ws, req) => {
               if (v1Filler) { clearTimeout(v1Filler); v1Filler = null; }
               if (!v1Streamed && turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') turnTiming.markFirstSpokenChunk();
               v1Streamed += 1;
-              v1Chain = v1Chain.then(() => (bargeInActive ? { ok: false, barged: true } : speakText(s.text, { tracePath: 'brain_v1_draft', skipFileGate: true }))).catch(() => ({ ok: false }));
+              const first = v1Streamed === 1;
+              v1Chain = v1Chain
+                .then(() => (v1PhaseA && first ? cutFillerForReply() : null))
+                .then(() => (bargeInActive ? { ok: false, barged: true } : speakText(s.text, { tracePath: 'brain_v1_draft', skipFileGate: true }))).catch(() => ({ ok: false }));
             }
           : undefined;
         const live = await v2OwnsCall.runOwnedTurn(
@@ -4599,12 +4636,14 @@ mediaWss.on('connection', (ws, req) => {
             langLock: callLanguage === 'en' || callLanguage === 'sw' ? callLanguage : null,
             shouldAbort: () => bargeInActive === true,
             ...(onV1Sentence ? { onSentence: onV1Sentence } : {}),
+            ...(v1PhaseA ? { heardAgent: v1HeardSinceLastTurn() } : {}),
           },
           { log: (m) => console.log(`[ws/media][${callKey}] ${m}`) }
         );
         if (v1Filler) { clearTimeout(v1Filler); v1Filler = null; }
         console.log(`[ws/media][${callKey}] brain_v2_live owned lang=${live.lang}${live.path ? ` path=${live.path}` : ''}${live.endHeld ? ` end_held=${live.endHeld}` : ''}: ${live.line}`);
         callTranscript.pushAgent(live.line);
+        v1HeardMark = callTranscript.size();
         let spoken;
         if (live.streamed && v1Streamed) {
           spoken = await v1Chain;
@@ -4612,6 +4651,7 @@ mediaWss.on('connection', (ws, req) => {
           if (turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') {
             turnTiming.markFirstSpokenChunk();
           }
+          if (v1PhaseA) await cutFillerForReply();
           spoken = await speakText(live.line, {
             tracePath: live.repaired ? 'brain_v2_repair' : 'brain_v2_live',
             skipFileGate: true,
@@ -6274,6 +6314,28 @@ mediaWss.on('connection', (ws, req) => {
         voiceTrace.noteTurnEnd({ decision: 'queue', reason: 'bare_greeting' });
         appendFinalPart(utteranceParts, evt.text);
         scheduleUtteranceFlush();
+        return;
+      }
+
+      // BRAIN_V1_DRAFT_PHASE_A (voice-qa 926 §2.4): "wait" / "no wait" gets a short ack instead of
+      // silence; a "Hello?" soon after a wait asks what to change instead of replaying the read-back.
+      if (
+        (decision.reason === 'interrupt_wait' || (decision.reason === 'hear_again' && v1WaitAt && Date.now() - v1WaitAt < 60000)) &&
+        !callEnding && !callIsOver() && !turnBusy && brainV1Draft.phaseA({ tenantId: brainProfile?.id })
+      ) {
+        const key = decision.reason === 'interrupt_wait' ? 'wait' : 'afterWait';
+        v1WaitAt = key === 'wait' ? Date.now() : 0;
+        const ackLine = brainV1Draft.phaseALine(key, callLanguage === 'sw' ? 'sw' : 'en');
+        if (callerEventClearsIdle(decision)) noteCallerSpeechForIdle(text);
+        voiceTrace.noteTurnEnd({ decision: 'phase_a_ack', reason: `${decision.reason}:${key}` });
+        console.log(`[ws/media][${sidLabel()}] brain_v1_draft phase_a ${key} ack: ${ackLine}`);
+        speakText(ackLine, { tracePath: 'brain_v1_draft_ack', skipFileGate: true })
+          .then((r) => {
+            if (r?.ok === false) return;
+            callTranscript.pushAgent(ackLine);
+            messages.push({ role: 'assistant', content: ackLine, local: true });
+          })
+          .catch((err) => console.warn(`[ws/media][${sidLabel()}] phase_a ack failed:`, err?.message || err));
         return;
       }
 
