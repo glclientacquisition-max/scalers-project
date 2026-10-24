@@ -111,8 +111,15 @@ export async function auditStepUp(actor: string, action: string, detail: Record<
   await recordAdminAction({ actor, action, reason: reason ?? null, detail });
 }
 
+/** Never let a backup code or authenticator code reach an email body (reasons are free text). */
+export function redactStepUpCodes(text: string): string {
+  return String(text || "")
+    .replace(/\b[a-z0-9]{5}-?[a-z0-9]{5}\b/gi, "[redacted]")
+    .replace(/\b\d{6}\b/g, "[redacted]");
+}
+
 /**
- * Security email. Uses the existing ops mail path (Resend). Recipient comes from
+ * Security email. Never includes backup codes or authenticator codes. Uses the existing ops mail path (Resend). Recipient comes from
  * ADMIN_STEP_UP_ALERT_EMAIL; when it or Resend is unset, the notice is skipped and logged.
  */
 export async function sendStepUpNotice(kind: "backup_code_used" | "authenticator_reset", operator: string, extra: string) {
@@ -124,7 +131,7 @@ export async function sendStepUpNotice(kind: "backup_code_used" | "authenticator
   const subject = kind === "backup_code_used"
     ? `Scalers Admin: a backup code was used for ${operator}`
     : `Scalers Admin: authenticator reset for ${operator}`;
-  const text = `${subject}.\n\n${extra}\n\nIf this wasn't you, reset the authenticator and sign out all sessions now.`;
+  const text = `${subject}.\n\n${redactStepUpCodes(extra)}\n\nIf this wasn't you, reset the authenticator and sign out all sessions now.`;
   try {
     const res = await sendOpsMail({ to, subject, text });
     if (!res.sent) console.info(JSON.stringify({ event: "step-up-notice-skipped", kind, operator, why: res.skipped }));

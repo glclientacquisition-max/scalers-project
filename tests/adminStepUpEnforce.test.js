@@ -209,4 +209,20 @@ describe("audit + UI", () => {
     assert.match(sheet, /Use a backup code/);
     assert.match(sheet, /won&apos;t be shown again/);
   });
+
+  it("backup codes: shown once with Download + Copy, never emailed", () => {
+    const sheet = read("dashboard/src/components/ops/StepUpSheet.tsx");
+    assert.match(sheet, /Download \(\.txt\)/);
+    assert.match(sheet, /navigator\.clipboard\.writeText/);
+    assert.match(sheet, /password manager or print them/);
+    assert.match(sheet, /never email backup codes/);
+    const store = read("dashboard/src/lib/ops/stepUpStore.ts");
+    assert.match(store, /redactStepUpCodes\(extra\)/);
+    for (const r of ["dashboard/src/app/api/admin/step-up/route.ts", "dashboard/src/app/api/admin/step-up/reset/route.ts", "dashboard/src/app/api/admin/step-up/enrol/route.ts"]) {
+      const src = read(r);
+      for (const m of src.matchAll(/sendStepUpNotice\(([^;]*)\);/g)) {
+        assert.doesNotMatch(m[1], /backupCode|codes|\bcode\b/i, r);
+      }
+    }
+  });
 });

@@ -34,6 +34,17 @@ export function StepUpSheet({
   const [code, setCode] = useState("");
   const [setup, setSetup] = useState<{ secret: string; qrSvg: string } | null>(null);
   const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
+  const [copied, setCopied] = useState(false);
+  const codesText = (codes: string[]) => `Scalers Admin backup codes. Each works once.\n\n${codes.join("\n")}\n`;
+  const downloadCodes = (codes: string[]) => {
+    const url = URL.createObjectURL(new Blob([codesText(codes)], { type: "text/plain" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "scalers-admin-backup-codes.txt"; a.click();
+    URL.revokeObjectURL(url);
+  };
+  const copyCodes = async (codes: string[]) => {
+    try { await navigator.clipboard.writeText(codesText(codes)); setCopied(true); } catch { setCopied(false); }
+  };
   const [unlockedUntil, setUnlockedUntil] = useState<string | null>(null);
   const [needsReenrol, setNeedsReenrol] = useState(false);
 
@@ -55,7 +66,7 @@ export function StepUpSheet({
   }, [open]);
 
   const close = () => {
-    setState("idle"); setMsg(null); setCode(""); setSetup(null); setBackupCodes(null); onClose();
+    setState("idle"); setMsg(null); setCode(""); setSetup(null); setBackupCodes(null); setCopied(false); onClose();
   };
   const post = async (url: string, body: unknown) => {
     const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -251,7 +262,11 @@ export function StepUpSheet({
             <ul className="grid grid-cols-2 gap-1 font-mono text-ops-label text-ink" data-stepup-backup-codes="">
               {backupCodes.map((c) => <li key={c} className="rounded-sm border border-hairline bg-canvas px-ops-2 py-1">{c}</li>)}
             </ul>
-            <p className="text-ops-label text-ink-2">Keep them on paper or in a password manager. Each works once if you lose your phone.</p>
+            <div className="flex flex-wrap gap-ops-2">
+              <Button variant="tonal" size="md" onClick={() => downloadCodes(backupCodes)} data-action="stepup-codes-download">Download (.txt)</Button>
+              <Button variant="tonal" size="md" onClick={() => void copyCodes(backupCodes)} data-action="stepup-codes-copy">{copied ? "Copied" : "Copy"}</Button>
+            </div>
+            <p className="text-ops-label text-ink-2">Store them in a password manager or print them. Each works once if you lose your phone. We never email backup codes.</p>
           </>
         ) : null}
 
