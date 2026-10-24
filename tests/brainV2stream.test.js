@@ -42,13 +42,27 @@ test('stream: shouldAbort stops sentences but still ends with done', async () =>
   const { turns } = await streamCall(['Hi, what services do you offer?'], { shouldAbort: () => true });
   assert.equal(turns[0].filter((e) => e.type === 'sentence').length, 0); assert.equal(turns[0].at(-1).aborted, true);
 });
-test('langLock: Swahili caller stays English when Voice locked en, and vice versa', async () => {
+test('langLock: Swahili caller stays English when Voice locked en, and vice versa — reply owner off', async () => {
+  delete process.env.BRAIN_V2_REPLY_OWNER;
   const a = await streamCall(['Habari, nataka kusafisha madirisha Ijumaa saa nne asubuhi'], { langLock: 'en' });
   for (const e of a.turns[0]) if (e.type === 'sentence') assert.equal(e.lang, 'en');
   const b = await streamCall(['Hi, I want window cleaning on Friday at 10am'], { langLock: 'sw' });
   for (const e of b.turns[0]) if (e.type === 'sentence') assert.equal(e.lang, 'sw');
   const c = await V2.runTurn(mk(), { text: 'Habari yako', profile: DD, now: NOW, handlers: V2.createDryRunHandlers(), langLock: 'en' });
   assert.equal(c.lang, 'en');
+});
+// BRAIN_V2_REPLY_OWNER (accepted 24 Oct, HD_94798 T3): a clear switch in the caller's words overrides Voice's
+// call-level lock (#677); short / greeting-only turns keep the lock.
+test('langLock with reply owner on: a clear caller switch is followed, a greeting keeps the lock', async () => {
+  process.env.BRAIN_V2_REPLY_OWNER = 'on';
+  try {
+    const a = await streamCall(['Habari, nataka kusafisha madirisha Ijumaa saa nne asubuhi'], { langLock: 'en' });
+    for (const e of a.turns[0]) if (e.type === 'sentence') assert.equal(e.lang, 'sw');
+    const b = await streamCall(['Hi, I want window cleaning on Friday at 10am'], { langLock: 'sw' });
+    for (const e of b.turns[0]) if (e.type === 'sentence') assert.equal(e.lang, 'en');
+    const c = await V2.runTurn(mk(), { text: 'Habari yako', profile: DD, now: NOW, handlers: V2.createDryRunHandlers(), langLock: 'en' });
+    assert.equal(c.lang, 'en');
+  } finally { delete process.env.BRAIN_V2_REPLY_OWNER; }
 });
 test('dry-run handlers: shapes per voice scope', async () => {
   const h = V2.createDryRunHandlers();

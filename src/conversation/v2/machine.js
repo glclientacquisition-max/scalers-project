@@ -828,6 +828,7 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     return { line, lang: lang0, source: 'receipt', toolResults: [], end: false };
   }
   // §6c "Chris." early in the call with no name yet: the caller's name, never "help regarding Chris?"
+  if (RO.enabled() && u.name && /^bare_name/.test(String(u.reason || '')) && !RO.nameBindable(state, text)) { u.name = null; u.kind = 'other'; u.reason = 'bare_word_unprompted'; } // the opening greeting asks no name
   if (RO.enabled() && u.name && RO.presence(u.name)) u.name = null; // "Nipo." / "Okay." are never names
   if (RO.enabled() && u.nameCandidate && (!RO.nameBindable(state, text) || RO.presence(u.nameCandidate))) u.nameCandidate = null; // names bind only from an answer to our name question
   if (u.nameCandidate && !u.name && !state.slots.name && !state.intent && state.turn <= 3) { u.name = u.nameCandidate; u.kind = 'give_name'; u.confidence = 0.6; u.clear = false; u.reason = 'bare_name_intro'; }

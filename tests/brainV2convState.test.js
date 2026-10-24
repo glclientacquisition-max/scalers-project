@@ -13,6 +13,7 @@ const BABE = [['I was just asking, like, I— I was.'], ['So curious to know how
 
 async function play(turns, flag = 'on') {
   process.env.BRAIN_V2_CONV_STATE = flag;
+  delete process.env.BRAIN_V2_REPLY_OWNER; // these cases pin #924 alone (no env leak from staging flags)
   const st = V2.createState({ profile: DD, callerPhone: '+254700000001', contactName: 'Alvin', openRows: [] });
   const lines = [];
   for (const [t, f] of turns) lines.push((await V2.runTurn(st, { text: t, profile: DD, now: NOW, handlers: {}, turnFields: f || null })).line);

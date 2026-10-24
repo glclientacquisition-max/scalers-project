@@ -140,8 +140,8 @@ test('§6c bare name: give_name at the opening or when pending; never a service/
   for (const t of ['Okay.', 'Karibu.', 'Kilimani.', 'Carpet.', 'Kesho.', 'Asante.']) assert.equal(u(t, { opening: true }).name, null, t);
   assert.equal(u('Chris.').nameCandidate, 'Chris');
 });
-test('§6c machine greets a bare name instead of "help regarding Chris" (EN, SW)', async () => {
-  process.env.BRAIN_V2_NLU_GAPS = '1';
+test('§6c machine greets a bare name instead of "help regarding Chris" (EN, SW) — reply owner off', async () => {
+  process.env.BRAIN_V2_NLU_GAPS = '1'; delete process.env.BRAIN_V2_REPLY_OWNER;
   try {
     for (const [lines, lang, re] of [[['Chris.'], 'en', /Thanks, Chris/], [['Hello', 'Chris.'], 'en', /Thanks, Chris/], [['Habari', 'Chris.'], 'sw', /^Chris, unahitaji/]]) {
       const st = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] });
@@ -149,6 +149,23 @@ test('§6c machine greets a bare name instead of "help regarding Chris" (EN, SW)
       assert.match(r.line, re, lines.join(' / ')); assert.doesNotMatch(r.line, /regarding/);
     }
   } finally { delete process.env.BRAIN_V2_NLU_GAPS; }
+});
+// BRAIN_V2_REPLY_OWNER (accepted 24 Oct): an unprompted bare word is never bound as the name; a name binds
+// only from an answer to our name question. Never "help regarding Chris" either way.
+test('§6c reply owner on: an unprompted "Chris." is not bound as the name; an answer to our name question is', async () => {
+  process.env.BRAIN_V2_NLU_GAPS = '1'; process.env.BRAIN_V2_REPLY_OWNER = 'on';
+  try {
+    for (const [lines, lang] of [[['Chris.'], 'en'], [['Hello', 'Chris.'], 'en'], [['Habari', 'Chris.'], 'sw']]) {
+      const st = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] });
+      let r; for (const text of lines) r = await V2.runTurn(st, { text, profile: DD, now: NOW, handlers: {}, langLock: lang });
+      assert.ok(!st.slots.name, lines.join(' / ')); assert.doesNotMatch(r.line, /Thanks, Chris|^Chris,|regarding/);
+    }
+    const st = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] });
+    await V2.runTurn(st, { text: 'I want carpet cleaning tomorrow at 11am in Juja', profile: DD, now: NOW, handlers: {}, langLock: 'en' });
+    assert.equal(st.expecting, 'name');
+    await V2.runTurn(st, { text: 'Chris.', profile: DD, now: NOW, handlers: {}, langLock: 'en' });
+    assert.equal(st.slots.name, 'Chris');
+  } finally { delete process.env.BRAIN_V2_NLU_GAPS; delete process.env.BRAIN_V2_REPLY_OWNER; }
 });
 
 // S32_sw_do_you_clean_carpet: a service check on a catalogue item answers with the grounded price,
