@@ -44,7 +44,7 @@ export default async function SecurityPage({ searchParams }: { searchParams: Pro
         required: row ? row.required !== false : true,
         updatedBy: row?.updated_by ?? null,
         updatedAt: row?.updated_at ?? null,
-        switchable: keys.filter((k) => !ALWAYS_UNLOCK[k]).map((k) => STEP_UP_WHAT[k] || k),
+        switchable: [...new Set(keys.filter((k) => !ALWAYS_UNLOCK[k]).map((k) => STEP_UP_WHAT[k] || k))],
         always: keys.filter((k) => ALWAYS_UNLOCK[k]).map((k) => ({ what: STEP_UP_WHAT[k] || k, why: ALWAYS_UNLOCK[k] })),
       };
     });
