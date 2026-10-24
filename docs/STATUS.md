@@ -25,6 +25,8 @@ Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b6
 
 **Draft PR (24 Oct 2026, EAT):** `brain/phase-b-call-fixes` from `3373d591` fixes call HD_b4afd63a69c3 (13:08 EAT, did not book). It adds area coverage through the Kenya tree plus owner include/exclude rules (the Desk contract is proposed, Desk is unchanged), makes the fact check trust the caller's slots, removes the doubled ask on replacement, makes "Yeah, I do so" / "Ndio, sawa" at the read-back book, and starts the draft in parallel (sim p90 2031ms to 1267ms). New lines are `[PROMPT-PLACEHOLDER]`. Spec: [`rfcs/phase-b-call-fixes.md`](rfcs/phase-b-call-fixes.md). Not merged, not staged, no env change. Prod and Aris are untouched.
 
+**24 Oct 2026, ~23:5x EAT:** #931 merged to `staging/v2-c0-opening-2026-10-21` after #930 (271a7b2b), restaged on Railway `scalers staging`; flags unchanged (`BRAIN_AREA_PICKS` unset = on; rollback `BRAIN_AREA_PICKS=off`). No migration applied by Brain.
+
 **Draft PR (24 Oct 2026, ~14:4x EAT):** `brain/coverage-area-picks` (from `c3fcc743`) makes Brain's coverage check read Desk's `tenant_area_picks` (#930) on Desk's tree:
 - the nearest pick wins, and the caller hears the fee and note [PROMPT-PLACEHOLDER], EN and SW;
 - Brain's own landmark list is removed;
