@@ -15,7 +15,8 @@ const { HARD_CAP_MS, MODEL_ID, MODEL_BACKUP_ID } = require('./modelShadow');
 const RETRY_WAIT_MS = 400;
 const MIN_ATTEMPT_MS = 250;
 const HISTORY_TURNS = 4;
-const ASK_ENUM = ['explain', 'price', 'possible', 'book', 'coverage', 'hours', 'services', 'other'];
+// BRAIN_V2_REPLY_OWNER adds 'check_or_correct_detail' ("what name did you put?", "carpet cleaning, right?"); off = same bytes as before
+const ASK_ENUM = ['explain', 'price', 'possible', 'book', 'coverage', 'hours', 'services', ...(process.env.BRAIN_V2_REPLY_OWNER === 'on' ? ['check_or_correct_detail'] : []), 'other'];
 
 function classify(err) {
   const s = Number(err && err.status);

@@ -130,6 +130,7 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-staging` means Stage-PR leaves it out of the staging pin.
 
 - ~~`brain/conv-state-p1` (#924)~~ merged to staging 24 Oct.
+- **(24 Oct, draft)** `brain/reply-owner-p1b` — fixes 1+2 from `voice-qa/2026-10-24_10f115ac-dials.md`: one reply owner (checks/corrections answered from state, mid-booking asks answered without swapping the service, open question once, per-turn language, same-ask-no-progress → callback, exact chosen area in read-back) and turn acts (answer / check_or_correct / new_ask / filler; `check_or_correct_detail` in rules + model schema; names bind only from an answer to our name question). Behind `BRAIN_V2_REPLY_OWNER` (default **OFF**). Not staged. New lines are `[PROMPT-PLACEHOLDER]`.
 **Queued for the next clean Aris call** (one at a time, in this order unless Alvin says otherwise):
 
 | PR | Lane | What | State |

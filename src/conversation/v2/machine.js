@@ -28,6 +28,7 @@ const scOn = () => /^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOG
 const FS = require('../../knowledge/factStore');
 const TR = require('./turnResolver');
 const CONV = require('./convState');
+const RO = require('./replyOwner');
 const fsOn = () => FS.factStoreEnabled();
 // C2: the which-one question for a choice the binder could not settle (size, family or item).
 function choiceLine(profile, ch, lang) {
@@ -804,7 +805,8 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
   }
   const prevLang = state.lang;
   // langLock (Voice #677): the call language is owned by Voice; never flip mid-turn.
-  state.lang = (langLock === 'en' || langLock === 'sw') ? langLock : (L.nextLanguage(state.lang, text) || state.lang);
+  state.lang = RO.enabled() ? RO.turnLang(state.lang, langLock, text) // BRAIN_V2_REPLY_OWNER: follow the caller's clear switch
+    : (langLock === 'en' || langLock === 'sw') ? langLock : (L.nextLanguage(state.lang, text) || state.lang);
   let areaQ = null;
   let u = N.understand(text, { profile, now, expecting: state.expecting, topic: state.lastInfo, prev: state.nluPrev || null, opening: state.turn === 1 && !state.slots.name });
   // R2 gate signals from Voice (optional): unfinished STT / silence beat after interrupt_wait
@@ -826,6 +828,8 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     return { line, lang: lang0, source: 'receipt', toolResults: [], end: false };
   }
   // §6c "Chris." early in the call with no name yet: the caller's name, never "help regarding Chris?"
+  if (RO.enabled() && u.name && RO.presence(u.name)) u.name = null; // "Nipo." / "Okay." are never names
+  if (RO.enabled() && u.nameCandidate && (!RO.nameBindable(state, text) || RO.presence(u.nameCandidate))) u.nameCandidate = null; // names bind only from an answer to our name question
   if (u.nameCandidate && !u.name && !state.slots.name && !state.intent && state.turn <= 3) { u.name = u.nameCandidate; u.kind = 'give_name'; u.confidence = 0.6; u.clear = false; u.reason = 'bare_name_intro'; }
   // C2 (BRAIN_V2_FACT_STORE): the caller's answer to our which-one question re-reads the held turn with it
   if (fsOn() && state.pick) {
@@ -852,7 +856,8 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     const pk = state.areaPick; state.areaPick = null;
     const low = String(text || '').toLowerCase();
     const hit = pk.options.find((o) => low.includes(o.county.toLowerCase())) || pk.options.find((o) => o.name.toLowerCase() !== pk.heard.toLowerCase() && low.includes(o.name.toLowerCase().split(' ')[0])) || (u.no && pk.options.length === 2 ? pk.options[1] : null) || (u.yes && !u.no ? pk.options[0] : null);
-    if (hit) { const say = hit.listed ? hit.name : hit.county; u = N.understand(pk.text.replace(new RegExp(`\\b${pk.heard}\\b`, 'i'), say), { profile, now, expecting: pk.expecting, topic: state.lastInfo }); text = u.text; }
+    if (hit) { const say = hit.listed ? hit.name : hit.county; u = N.understand(pk.text.replace(new RegExp(`\\b${pk.heard}\\b`, 'i'), say), { profile, now, expecting: pk.expecting, topic: state.lastInfo }); text = u.text;
+      if (RO.enabled() && hit.listed) { (state.ro ||= {}).listedPlace = hit.name; if (u.place) u.place = hit.name; if (u.area) u.area = { ...u.area, name: hit.name }; } } // read back the exact area the caller chose
     else { // no pick: the caller moved on; keep the one option we serve, the read-back still confirms it
       const own = pk.options.filter((o) => o.listed);
       if (own.length === 1 && !state.slots.place && !u.place) { const h = N.understand(pk.text.replace(new RegExp(`\\b${pk.heard}\\b`, 'i'), own[0].name), { profile, now, expecting: 'place' }); if (h.place || h.area) { state.slots.place = h.place || h.area.name; if (h.landmark && !state.slots.landmark) state.slots.landmark = h.landmark; } }
@@ -868,6 +873,16 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     }
   }
   resolveSmallHoursKesho(state, u, text);
+  if (RO.enabled()) { // one reply owner: checks / corrections / mid-booking asks answered from state, open question once
+    const lg = () => state.lang || 'en';
+    const owned = RO.own(state, u, { text, profile, fields: turnFields, deps: {
+      propose: (st, p) => propose(st, p),
+      label: (pf, svc) => { const sp = spoken(pf, svc, lg()); return String(sp ? sp.label : svc.name); },
+      explainLine: (pf, svc) => { const sp = spoken(pf, svc, lg()); return sp && sp.explain ? R.info({ kind: 'explain_text', text: sp.explain }, lg()) : null; },
+      offeredLine: (pf, svc) => String(checkServiceLine(pf, svc, lg()) || '').replace(/\s*[^.!?]*\?\s*$/, '').trim() || null,
+    } });
+    if (owned) return owned;
+  }
   const results = [];
   const catalogue = buildCatalogue({ profile, openRows: state.file.openRows });
   // Fail-fast: mouth on rules/Train after ~750ms if no validated proposal yet (HD_ddc993).
@@ -1259,8 +1274,9 @@ function catalogueTurn(state, { text, profile = {}, lang, command = null, now = 
 const TP = require('./topic');
 const TOPIC_KINDS = { services: 'catalogue', explain: 'explain', price: 'price', coverage: 'area' };
 async function runTurn(state, args) {
-  if (!CONV.enabled()) return runTurnTopic(state, args);
-  return CONV.post(state, await runTurnTopic(state, args));
+  const ownedPost = (res) => (RO.enabled() ? RO.post(state, res, { callbackLine: CONV.CALLBACK_AFTER_REPAIR, text: args.text, possibleRe: TR.POSSIBLE }) : res);
+  if (!CONV.enabled()) return ownedPost(await runTurnTopic(state, args));
+  return CONV.post(state, ownedPost(await runTurnTopic(state, args)));
 }
 async function runTurnTopic(state, args) {
   if (!TP.enabled()) return runTurnInner(state, args);
