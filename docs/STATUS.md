@@ -127,6 +127,7 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 
 Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-staging` means Stage-PR leaves it out of the staging pin.
 
+- **(24 Oct, draft)** `brain/conv-state-p1` — turn resolver v2 Phase 1: Brain-owned conversation state + rules gaps (coverage, non-initial no, "how much is it" carry-forward, catalogue word not a name, callback after 2 repairs, open-offer tracking). Behind `BRAIN_V2_CONV_STATE` (default **OFF**). Not staged. Callback-after-repair line is a `[PROMPT-PLACEHOLDER]` for Prompt to reword.
 **Queued for the next clean Aris call** (one at a time, in this order unless Alvin says otherwise):
 
 | PR | Lane | What | State |
