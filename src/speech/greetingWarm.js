@@ -24,6 +24,7 @@ const {
 } = require('./greetingPcmCache');
 
 const { openingV2Enabled, openingWarmLines } = require('./callOpening');
+const { sharedPcmStore, warmAllowlist } = require('./pcmPersist');
 
 const DEFAULT_SWEEP_MS = 5 * 60 * 1000;
 const LOOKAHEAD_MS = 15 * 60 * 1000;
@@ -92,6 +93,13 @@ async function renderGreetingPcm({ text, profile, tenantId, createSession }) {
     agentName: profile.agentName,
   });
   if (found.pcm) return { key: found.key, rendered: false };
+  // VOICE_PCM_PERSIST=on: restore a render that survived a restart. Warm path
+  // only (the prefetch warm is void, so no call audio awaits this).
+  const restored = await sharedPcmStore().load('greeting', found.key);
+  if (restored) {
+    putGreetingPcm(found.key, restored, { tenantId, persist: false });
+    return { key: found.key, rendered: false, restored: true };
+  }
   const session = createSession({ voiceId: profile.sonioxVoiceId || null });
   try {
     await session.ready;
@@ -198,6 +206,9 @@ function createGreetingWarmer(deps) {
       log(`[greeting-warm] tenant list failed: ${err?.message || err}`);
       return [];
     }
+    // VOICE_PCM_WARM_TENANTS: sweep only these tenants (staging: DnD).
+    const allow = warmAllowlist();
+    if (allow) ids = ids.filter((id) => allow.has(String(id)));
     return Promise.all(ids.map((id) => warmTenant(id)));
   }
 

@@ -46,6 +46,10 @@ const {
   lookupGreetingPcm,
   putGreetingPcm,
 } = require('./src/speech/greetingPcmCache');
+// Soniox spend cut (Alvin GO via Chief 2026-10-24): all flags default off.
+const { createSttSilenceGate } = require('./src/speech/sttSilenceGate');
+const { createCallLimits, limitLine } = require('./src/speech/callLimits');
+const { callMeterOn, createCallMeter, dailyMeterTotals } = require('./src/speech/callMeter');
 const { mergeIdentityLexicon } = require('./src/speech/pronunciationLexicon');
 const {
   createInitialBurstGate,
@@ -744,6 +748,8 @@ app.get('/healthz', (_req, res) => {
       defaultVoice: resolveSonioxVoice(),
       lastError: getSonioxProviderHealth(),
       outageClips: getOutageClipStatus(),
+      // VOICE_CALL_METER=on: today's (EAT) STT seconds sent / gated, TTS chars, cache hits.
+      ...(callMeterOn() ? { dailyMeter: dailyMeterTotals() } : {}),
       curatedVoices: listCuratedVoices().map((v) => ({
         id: v.id,
         description: v.description,
@@ -2808,6 +2814,13 @@ mediaWss.on('connection', (ws, req) => {
   let greetingPrerollMs = null;
   let sttAudioBytes = 0;
   const inboundBurstGate = createInitialBurstGate();
+  // VOICE_STT_SILENCE_GATE / VOICE_CALL_METER / VOICE_DEAD_AIR_HANGUP / VOICE_MAX_CALL.
+  const sttGate = createSttSilenceGate();
+  const callMeter = callMeterOn() ? createCallMeter() : null;
+  const callLimits = createCallLimits({
+    canFire: () => !speaking && !turnBusy && !callIsOver() && !callEnding,
+    onLimit: (kind) => speakCallLimitGoodbye(kind),
+  });
   let fileNameAsksCommitted = 0;
   const firstForward = {
     greetingPlayed: false,
@@ -3427,6 +3440,7 @@ mediaWss.on('connection', (ws, req) => {
 
   async function playCachedFillerPcm(pcm, { text, trace = true, kind = 'filler' } = {}) {
     if (!pcm || !pcm.length) return { ok: false, empty: true };
+    if (callMeter) callMeter.cache(true);
     const streamId = newCachedFillerStreamId();
     bargeInActive = false;
     speaking = true;
@@ -6361,6 +6375,7 @@ mediaWss.on('connection', (ws, req) => {
         if (greetingAwaitingFirstPcm) noteGreetingPcm({ cached: false });
         if (!playbackStartedAt) playbackStartedAt = Date.now();
         playbackBytes += pcm.length;
+        if (callMeter) callMeter.tts('', pcm.length);
         if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
         // Live clone-voice audio means we can record downtime clips for the next outage.
         // Fallback audio (espeak / Gemini) is not the clone voice.
@@ -6372,6 +6387,21 @@ mediaWss.on('connection', (ws, req) => {
       shouldRespeak: () =>
         !bargeInActive && !speechOutageStarted && ws.readyState === WebSocket.OPEN,
     });
+    if (callMeter) {
+      // Count TTS characters pushed on this call (VOICE_CALL_METER).
+      const rawBegin = session.beginSpeak.bind(session);
+      session.beginSpeak = async (...args) => {
+        const sp = await rawBegin(...args);
+        if (sp && typeof sp.pushText === 'function') {
+          const push = sp.pushText.bind(sp);
+          sp.pushText = (text, ...rest) => {
+            callMeter.tts(text, 0);
+            return push(text, ...rest);
+          };
+        }
+        return sp;
+      };
+    }
     tts = session;
     ttsSessionVoiceId = resolveSonioxVoice(voiceId);
     return session;
@@ -6383,6 +6413,7 @@ mediaWss.on('connection', (ws, req) => {
       ? ensureTenantPromptOnce().catch(() => null)
       : Promise.resolve(null);
 
+  callLimits.start();
   if (isSonioxConfigured()) {
     try {
       stt = createSonioxSttSession({
@@ -6552,6 +6583,39 @@ mediaWss.on('connection', (ws, req) => {
     return composed;
   }
 
+  /** VOICE_DEAD_AIR_HANGUP / VOICE_MAX_CALL: one polite line, then hang up. */
+  async function speakCallLimitGoodbye(kind) {
+    if (callIsOver() || callEnding) return;
+    const lang = callLanguage === 'sw' || callLanguage === 'en' ? callLanguage : openingLang;
+    const line = limitLine(kind, lang);
+    console.log(`[ws/media][${sidLabel()}] call_limit kind=${kind}: ${line}`);
+    callEnding = true;
+    unfinishedHold.close();
+    idleNudge.close();
+    playbackBytes = 0;
+    playbackStartedAt = 0;
+    try {
+      const spoken = await speakOpeningLine(line);
+      if (spoken?.ok) {
+        callTranscript.pushAgent(line);
+        messages.push({ role: 'assistant', content: line, local: true });
+      }
+    } catch (err) {
+      console.warn(`[ws/media][${sidLabel()}] call_limit line failed: ${err?.message || err}`);
+    }
+    // eslint-disable-next-line no-undef
+    const endCall = typeof requestEndCall === 'function' ? requestEndCall : null;
+    if (endCall && endCall(`call_limit_${kind}`, kind) === true) return;
+    const delay = farewellHangupDelayMs({ bytes: playbackBytes, startedAt: playbackStartedAt });
+    setTimeout(() => {
+      try {
+        ws.close(1000, `call_limit_${kind}`);
+      } catch {
+        /* ignore */
+      }
+    }, delay);
+  }
+
   async function speakOpeningSilence(step) {
     if (callIsOver() || callEnding) return;
     const lang = callLanguage === 'sw' || callLanguage === 'en' ? callLanguage : openingLang;
@@ -6713,7 +6777,41 @@ mediaWss.on('connection', (ws, req) => {
         agentName,
       });
       voiceTrace.noteCall({ stage: 'canned', path: 'greeting', text: greetingLine });
-      if (found.pcm && isGreetingCacheEnabled()) {
+      // VOICE_OPENING_NAME_SPLICE=on: named returning caller = cached head +
+      // live "Welcome back, <name>." + cached tail. Only when both halves are
+      // already cached; otherwise the full-line paths below run unchanged.
+      const segs = composedOpening && composedOpening.segments;
+      const spliceParts =
+        !found.pcm && segs && isGreetingCacheEnabled() && ttsSpeedScale === 1 && callOpening.openingNameSpliceOn()
+          ? [segs.head, segs.tail].map((text) =>
+              text
+                ? lookupGreetingPcm({ voiceId: tenantSonioxVoiceId, text, extraLexicon: ttsLexiconOverrides, businessName, agentName }).pcm
+                : Buffer.alloc(0)
+            )
+          : null;
+      if (callMeter) callMeter.cache(Boolean(found.pcm));
+      if (spliceParts && spliceParts.every((p) => p)) {
+        const [headPcm, tailPcm] = spliceParts;
+        noteGreetingPcm({ cached: true });
+        console.log(`[ws/media][${sidLabel()}] greeting splice head=${headPcm.length} tail=${tailPcm.length} live=${JSON.stringify(segs.live)}`);
+        if (openingOn) greetingClipMs = pcmDurationMs(headPcm, 16000) + pcmDurationMs(tailPcm, 16000);
+        if (headPcm.length) await playCachedFillerPcm(headPcm, { text: segs.head, trace: false, kind: openingOn ? 'greeting' : 'filler' });
+        let liveOk = true;
+        if (!greetingInterrupted && !speechOutageStarted) {
+          const live = await speakGreetingSentences(segs.live, {});
+          if (live?.outage || speechOutageStarted) return;
+          liveOk = Boolean(live?.ok);
+        }
+        if (liveOk && !greetingInterrupted && tailPcm.length) {
+          await playCachedFillerPcm(tailPcm, { text: segs.tail, trace: false, kind: openingOn ? 'greeting' : 'filler' });
+        }
+        voiceTrace.noteCall({ stage: 'tts', path: 'greeting', text: greetingLine, language: callLanguage });
+        if (openingOn) agentReplay.beginSpeech(greetingLine);
+        if (openingOn && !greetingInterrupted) agentReplay.commitPlayback();
+        callTranscript.pushAgent(greetingLine);
+        messages.push({ role: 'assistant', content: greetingLine, local: true });
+        if (!greetingInterrupted) markGreetingFileNameAsk(greetingLine);
+      } else if (found.pcm && isGreetingCacheEnabled()) {
         noteGreetingPcm({ cached: true });
         voiceTrace.noteCall({
           stage: 'tts',
@@ -6943,9 +7041,16 @@ mediaWss.on('connection', (ws, req) => {
         return;
       }
       // Keep feeding STT during TTS so barge-in can fire; echo is filtered in onSttEvent.
+      // VOICE_STT_SILENCE_GATE=on: silent caller frames outside TTS are held
+      // back (pre-roll kept) and a keepalive goes instead. Off: every frame.
+      const gated = sttGate.admit(buf, { ttsSpeaking: speaking });
+      if (gated.voiced) callLimits.activity();
       if (stt) {
-        sttAudioBytes += buf.length;
-        stt.sendAudio(buf);
+        for (const frame of gated.send) {
+          sttAudioBytes += frame.length;
+          stt.sendAudio(frame);
+        }
+        if (gated.keepalive && typeof stt.sendKeepalive === 'function') stt.sendKeepalive();
       }
     } catch (err) {
       console.error(
@@ -6958,6 +7063,11 @@ mediaWss.on('connection', (ws, req) => {
 
   ws.on('close', (code, reason) => {
     const ms = Date.now() - connectedAt;
+    callLimits.stop();
+    if (callMeter) {
+      const m = callMeter.finish(sttGate.stats);
+      console.log(`[ws/media][${sidLabel()}] call_meter ${JSON.stringify({ ...m, gate: sttGate.enabled ? 'on' : 'off', callMs: ms })}`);
+    }
     // VOICE_ENDED_CALL_GUARD: did this session end the call? Our end_call,
     // a clean 1000 close, or a terminal webhook while it was open. An
     // abnormal close with none of those finalizes provisionally, so a

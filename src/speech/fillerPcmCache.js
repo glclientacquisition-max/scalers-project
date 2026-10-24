@@ -51,8 +51,13 @@ function getFillerPcm(key) {
   return pcm;
 }
 
-function putFillerPcm(key, pcm) {
+function persistStore() {
+  return require('./pcmPersist').sharedPcmStore();
+}
+
+function putFillerPcm(key, pcm, opts = {}) {
   if (!key || !pcm || !pcm.length) return null;
+  if (opts.persist !== false) void persistStore().save('filler', key, pcm);
   if (cache.has(key)) cache.delete(key);
   const stored = Buffer.from(pcm);
   cache.set(key, stored);
@@ -114,6 +119,13 @@ async function warmFillerAckPcm(opts = {}) {
       extraLexicon: opts.extraLexicon,
     });
     if (found.pcm) continue;
+    // VOICE_PCM_PERSIST=on: a clip rendered before a restart is reused, not re-rendered.
+    const restored = await persistStore().load('filler', found.key);
+    if (restored) {
+      putFillerPcm(found.key, restored, { persist: false });
+      warmed += 1;
+      continue;
+    }
     try {
       const session = await tts.beginSpeak({
         language: found.prepared.language,

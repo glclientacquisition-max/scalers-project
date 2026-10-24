@@ -268,6 +268,16 @@ function createSonioxSttSession({ callSid, onEvent = () => {}, context = null, c
 
   return {
     ready,
+    /** Soniox keepalive while caller silence is gated (VOICE_STT_SILENCE_GATE). */
+    sendKeepalive() {
+      if (closed || !opened || ws.readyState !== WebSocket.OPEN) return false;
+      try {
+        ws.send(JSON.stringify({ type: 'keepalive' }));
+        return true;
+      } catch {
+        return false;
+      }
+    },
     sendAudio(buf) {
       if (closed || !buf || !buf.length) return;
       if (!opened || ws.readyState !== WebSocket.OPEN) {
