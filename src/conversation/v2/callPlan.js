@@ -2,7 +2,9 @@
 // BRAIN_V1_DRAFT_PHASE_B (off|on; needs BRAIN_V1_DRAFT=on + BRAIN_V1_DRAFT_PHASE_A=on; Done & Dusted only).
 // Design: ship-briefs/2026-10-24_brain_single-brain-phase-b-design.md (Alvin t315u/t316u).
 // ONE call plan, owned by v2, guides the caller through the call:
-//   items   - what the caller asked for (every service is an item; "add carpet" appends, never replaces)
+//   items   - what the caller asked for: ONE booking holds 1..N services (line items). "add carpet" appends an
+//             item before the read-back (one read-back, one yes, one write with services[]), or after a write
+//             runs add_service on the existing booking (idempotent per item; Alvin t320u).
 //   settled - date/time/place and the name (locked name only; name lock stays in code)
 //   step    - the ONE next thing to say/ask (ask a slot | confirm a saved name | read back | confirmed | open)
 // The model speaks every turn; it phrases the step. actCheck() gates each sentence before TTS:
@@ -11,6 +13,8 @@
 const R = require('./receipts');
 const L = require('./lexicon');
 const V1 = require('./v1draft');
+const CS = require('./commitSafety');
+const crypto = require('crypto');
 
 function phaseB({ env = process.env, tenantId } = {}) {
   return V1.phaseA({ env, tenantId }) && String(env.BRAIN_V1_DRAFT_PHASE_B || 'off').trim().toLowerCase() === 'on';
@@ -34,7 +38,7 @@ function matchServices(text, profile = {}) {
 }
 
 function plan(state) {
-  const p = state.plan || (state.plan = { items: [], nameAsk: null, extrasWritten: [], trace: [] });
+  const p = state.plan || (state.plan = { items: [], nameAsk: null, trace: [] });
   const svc = state.slots && state.slots.service;
   if (svc && !p.items.length) p.items.push({ service: svc, turn: state.turn });
   if (svc && p.items.length && p.items[0].service !== svc && !p.pinned) p.items[0] = { service: svc, turn: state.turn };
@@ -60,20 +64,54 @@ function readbackLine(state, lang) {
  * Before v2's machine runs this turn. May own the turn (returns {owned:true,line}) or rewrite the text the
  * machine reads (a confirmed saved name becomes the name answer). Never speaks.
  */
-function before(state, text, profile = {}) {
+async function before(state, text, profile = {}, { handlers = null } = {}) {
   const p = plan(state); const lang = state.lang || 'en'; const t = String(text || '');
   const out = { owned: false, text: t, acts: [] };
+  const own = (line, act) => { state.turn += 1; state.lastLine = line; state.lastBase = line; if (act) out.acts.push(act); (state.trace || (state.trace = [])).push({ turn: state.turn, call_plan: act }); return { ...out, owned: true, line, lang }; };
+  // 0) an open add-service read-back on an existing booking: one yes -> add_service per item (idempotent)
+  if (state.pending && state.pending.tool === 'add_service') {
+    const pd = state.pending;
+    if (YES.test(t) && !NO.test(t)) {
+      const added = [];
+      for (const svc of pd.services) {
+        let r = null; try { r = handlers && handlers.addAppointmentService ? await handlers.addAppointmentService({ appointmentId: pd.row.id, serviceName: svc, idempotencyKey: `${pd.row.id}#+${svc.toLowerCase()}` }) : null; } catch { r = null; }
+        const ok = !!(r && r.ok !== false && (r.id || r.duplicate));
+        state.receipts.push({ tool: 'add_service', action: 'add_appointment_service', ok, id: ok ? (r.id || pd.row.id) : null, service: svc, appointmentId: pd.row.id, duplicate: !!(r && r.duplicate) });
+        if (ok) { added.push(svc); if (!pd.row.items.includes(svc)) pd.row.items.push(svc); }
+      }
+      state.pending = null; state.phase = 'collect'; state.expecting = null;
+      if (added.length) { for (const a of added) if (!p.items.some((i) => i.service === a)) p.items.push({ service: a, turn: state.turn + 1, added: true, written: true }); state.outcomes.push('service_added'); }
+      const names = itemsSaid(added.map((x) => ({ service: x })), lang);
+      const allOk = added.length === pd.services.length;
+      return own(allOk
+        ? (sw(lang) ? `Sawa, nimeongeza ${names} kwenye booking yako. Kuna kingine?` : `Done, ${names} is added to your booking. Anything else?`) /* [PROMPT-PLACEHOLDER] */
+        : (sw(lang) ? 'Samahani, sikuweza kuongeza hiyo sasa. Timu itakupigia kuthibitisha.' : "Sorry, I couldn't add that just now. The team will call you to sort it out.") /* [PROMPT-PLACEHOLDER] */, allOk ? 'service_added' : 'service_add_failed');
+    }
+    if (NO.test(t)) { state.pending = null; state.phase = 'collect'; state.expecting = null; return own(sw(lang) ? 'Sawa, nimeacha booking kama ilivyo. Kuna kingine?' : "Okay, I'll leave the booking as it is. Anything else?" /* [PROMPT-PLACEHOLDER] */, 'service_add_declined'); }
+  }
   // 1) items: an add appends an item (in collect or at the read-back)
   const rows = matchServices(t, profile).filter((r) => !p.items.some((i) => i.service === r.name));
   if (rows.length && p.items.length && ADD.test(t) && !SWITCH.test(t)) {
     for (const r of rows) p.items.push({ service: r.name, turn: state.turn + 1, added: true });
     p.pinned = true; out.acts.push('item_added');
     if (state.phase === 'readback' && state.pending && state.pending.tool === 'create_booking') {
-      state.pending.items = p.items.map((i) => i.service);
-      const line = readbackLine(state, lang); state.pending.readbackLine = line; state.pending.issuedTurn = state.turn + 1;
-      state.turn += 1; state.lastLine = line; state.lastBase = line; state.expecting = 'confirm';
-      (state.trace || (state.trace = [])).push({ turn: state.turn, call_plan: 'item_added_readback' });
-      return { ...out, owned: true, line, lang };
+      setPendingItems(state, p);
+      const line = readbackLine(state, lang); state.pending.readbackLine = line; state.pending.issuedTurn = state.turn + 1; state.expecting = 'confirm';
+      return own(line, 'item_added_readback');
+    }
+  }
+  // 1b) add on an EXISTING booking (written earlier this call, or the caller's one open booking on file)
+  const booked = existingBooking(state);
+  const addRows = matchServices(t, profile);
+  if (booked && !state.pending && addRows.length && ADD.test(t) && !SWITCH.test(t)) {
+    const services = addRows.map((r) => r.name).filter((n) => !booked.items.includes(n));
+    if (services.length) {
+      state.pending = { tool: 'add_service', row: booked, services, token: `add_${booked.id}_${state.turn + 1}` };
+      state.phase = 'readback'; state.expecting = 'confirm';
+      const what = itemsSaid(services.map((x) => ({ service: x })), lang); const on = itemsSaid(booked.items.map((x) => ({ service: x })), lang);
+      const line = sw(lang) ? `Niongeze ${what} kwenye booking yako ya ${on}${booked.when ? `, ${L.sayDate(booked.when.date, lang)}` : ''}?` : `Shall I add ${what} to your ${on.toLowerCase()} booking${booked.when ? ` on ${L.sayDate(booked.when.date, lang)}` : ''}?`; /* [PROMPT-PLACEHOLDER] */
+      state.pending.readbackLine = line;
+      return own(line, 'add_service_readback');
     }
   }
   // 2) name: confirm a saved (unconfirmed) name instead of asking it cold; "you have my name" is a check, not a non-answer
@@ -98,8 +136,8 @@ function after(state, res, { lang } = {}) {
   if (state.pending && state.pending.tool === 'create_booking') {
     if (p.pinned && state.pending.service !== p.items[0].service) state.pending.service = p.items[0].service;
     if (p.items.length > 1) {
-      const old = state.pending.readbackLine; const nl = readbackLine(state, lang || state.lang);
-      state.pending.items = p.items.map((i) => i.service); state.pending.readbackLine = nl;
+      const old = state.pending.readbackLine; setPendingItems(state, p); const nl = readbackLine(state, lang || state.lang);
+      state.pending.readbackLine = nl;
       if (old && line.includes(old)) line = line.replace(old, nl); else if (state.phase === 'readback' && line && !line.includes(nl)) line = nl;
     }
   }
@@ -112,21 +150,20 @@ function after(state, res, { lang } = {}) {
   return line;
 }
 
-/** Extra items are written by the same backend path after the first booking's write succeeds. */
-async function commitExtras(state, handlers) {
-  const p = plan(state);
+/** The pending booking carries the item list; the idempotency key covers the items (one write for N services). */
+function setPendingItems(state, p) {
+  const pd = state.pending; if (!pd) return;
+  pd.items = p.items.map((i) => i.service);
+  const h = crypto.createHash('sha256').update(pd.items.join('|').toLowerCase()).digest('hex').slice(0, 8);
+  pd.idemKey = `${CS.idempotencyKey({ callId: state.callId, p: pd })}:items_${h}`;
+}
+/** An open booking this caller already has: written this call, else the one open row on file. */
+function existingBooking(state) {
   const rec = [...(state.receipts || [])].reverse().find((r) => r.tool === 'create_booking' && r.ok && r.id);
-  if (!rec || p.items.length < 2 || !handlers || typeof handlers.createAppointment !== 'function') return [];
-  const done = [];
-  for (const it of p.items.slice(1)) {
-    const key = `${rec.idempotencyKey || rec.id}:+${it.service}`;
-    if (p.extrasWritten.some((x) => x.key === key)) continue;
-    let r = null; try { r = await handlers.createAppointment({ idempotencyKey: key, serviceName: it.service, whenText: `${rec.when.date} ${rec.when.time}`, windowStart: L.whenToIso(rec.when), landmark: rec.place, name: state.slots.name || null, notes: `same visit as ${rec.id}` }); } catch { r = null; }
-    const row = { key, service: it.service, ok: !!(r && r.id), id: r && r.id || null };
-    p.extrasWritten.push(row); done.push(row);
-    state.receipts.push({ tool: 'create_booking', action: 'create_appointment', ok: row.ok, id: row.id, service: it.service, when: rec.when, place: rec.place, idempotencyKey: key });
-  }
-  return done;
+  if (rec) return { id: rec.id, items: rec.items ? [...rec.items] : [rec.service], when: rec.when || null };
+  const rows = (state.file && state.file.openRows || []).filter((r) => r && r.id && (r.service_name || r.service));
+  if (rows.length === 1) return { id: rows[0].id, items: String(rows[0].service_name || rows[0].service).split(' + '), when: null };
+  return null;
 }
 
 const SLOT_Q = {
@@ -135,7 +172,7 @@ const SLOT_Q = {
   date: /\b(day|date|when|which day|lini|siku|tarehe)\b/i,
   time: /\b(time|what time|o'?clock|saa|muda)\b/i,
   service: /\b(service|which|what|huduma|gani)\b/i,
-  confirm: /\b(book|confirm|go ahead|shall i|nithibitishe|niendelee|ni sawa)\b/i,
+  confirm: /\b(book|confirm|go ahead|shall i|add|nithibitishe|niendelee|ni sawa|niongeze|ongeze)\b/i,
 };
 const isQ = (s) => /\?\s*$/.test(String(s || '').trim());
 
@@ -144,8 +181,10 @@ function step(state, templateLine, lang) {
   const p = plan(state); const q = (String(templateLine || '').match(/[^.!?]*\?\s*$/) || [''])[0].trim() || null;
   const base = { items: p.items.map((i) => i.service), name: lockedName(state), when: state.slots.when || null, place: state.slots.place || null, template: templateLine, question: q, lang };
   const rec = [...(state.receipts || [])].reverse().find((r) => r.ok && r.id && r.tool === 'create_booking');
+  if (state.phase === 'readback' && state.pending && state.pending.tool === 'add_service') return { ...base, kind: 'add_service', question: state.pending.readbackLine, slot: 'confirm', items: [...state.pending.row.items, ...state.pending.services] };
+  if ((state.outcomes || []).slice(-1)[0] === 'service_added') return { ...base, kind: 'confirmed', writeIds: (state.receipts || []).filter((r) => r.tool === 'add_service' && r.ok).map((r) => r.id) };
   if (state.phase === 'readback' && state.pending) return { ...base, kind: 'readback', readback: state.pending.readbackLine || readbackLine(state, lang), slot: 'confirm' };
-  if (rec && (state.outcomes || []).slice(-1)[0] === 'booked') return { ...base, kind: 'confirmed', writeIds: [rec.id, ...p.extrasWritten.filter((x) => x.ok).map((x) => x.id)] };
+  if (rec && (state.outcomes || []).slice(-1)[0] === 'booked') return { ...base, kind: 'confirmed', writeIds: [rec.id] };
   if (state.expecting) return { ...base, kind: p.nameAsk === 'confirm' && state.expecting === 'name' ? 'confirm_name' : 'ask', slot: state.expecting };
   return { ...base, kind: 'open' };
 }
@@ -162,7 +201,7 @@ function stepNote(st) {
 function actCheck(text, st, ctx) {
   const s = String(text || '').trim();
   if (!isQ(s)) {
-    if (/\b(booked|confirmed|nimekuwekea|imethibitishwa)\b/i.test(s) && st.kind !== 'confirmed') return { verdict: 'drop', reason: 'claims_write' };
+    if (/\b(booked|confirmed|added|nimekuwekea|imethibitishwa|nimeongeza)\b/i.test(s) && st.kind !== 'confirmed') return { verdict: 'drop', reason: 'claims_write' };
     return { verdict: 'pass', text: s };
   }
   if (ctx.questions >= 1) return { verdict: 'drop', reason: 'second_question' };
@@ -181,4 +220,4 @@ function actCheck(text, st, ctx) {
 function tail(st) { if (st.kind === 'readback') return st.readback; return st.question; }
 
 const split = (line) => String(line || '').match(/[^.!?]+[.!?]*/g)?.map((x) => x.trim()).filter(Boolean) || [];
-module.exports = { split, phaseB, plan, before, after, step, stepNote, actCheck, tail, commitExtras, readbackLine, matchServices, lockedName, ADD, SWITCH, HAVE_NAME };
+module.exports = { existingBooking, setPendingItems, split, phaseB, plan, before, after, step, stepNote, actCheck, tail, readbackLine, matchServices, lockedName, ADD, SWITCH, HAVE_NAME };

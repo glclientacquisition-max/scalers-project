@@ -16,7 +16,12 @@ function harness({ scripts = [], env = ENV, file = {}, writes } = {}) {
   const streamFor = () => async ({ request, onCall }) => { counts.draft += 1; requests.push(request); const sc = typeof scripts === 'function' ? scripts(request) : scripts[di++] || []; if (sc === 'fail') throw Object.assign(new Error('boom'), { code: 'TIMEOUT' }); for (const c of sc) { await new Promise((r) => setTimeout(r, 1)); onCall(c); } return { calls: sc }; };
   const turnModel = async () => { counts.turnModel += 1; return { calls: [] }; };
   const applied = [];
-  const applyTools = async (a) => { applied.push(a); return { results: [{ action: a.appointment ? 'create_appointment' : 'x', ok: true, status: 'ok', id: `row_${applied.length}` }] }; };
+  const added = new Set();
+  const applyTools = async (a) => {
+    applied.push(a);
+    if (a.appointmentAddService) { const k = a.appointmentAddService.idempotencyKey; const dup = added.has(k); added.add(k); return { results: [{ action: 'add_appointment_service', status: dup ? 'duplicate' : 'succeeded', id: a.appointmentAddService.appointmentId }] }; }
+    return { results: [{ action: a.appointment ? 'create_appointment' : 'x', ok: true, status: 'ok', id: `row_${applied.length}` }] };
+  };
   const live = createBrainV2Live({ env, applyTools, v1DraftStreamFor: streamFor, shadowModel: turnModel, shadowBackupModel: turnModel, prewarm: false, now: () => new Date('2026-10-24T08:52:00Z'), log: () => {}, v1DraftSleep: (ms) => new Promise((r) => setTimeout(r, Math.min(ms, 5))), ...file });
   return { live, counts, requests, applied, writes };
 }
@@ -37,7 +42,7 @@ test('HD_4e388 replay: the model speaks EVERY turn (no owner switch), one questi
   assert.equal(h.counts.draft, 3); assert.equal(h.counts.turnModel, 3, 'one v2 understanding call per turn, no shadow/classify');
 });
 
-test('HD_4e388 T8: "add carpet cleaning" at the read-back APPENDS an item; read-back lists both; yes writes both', async () => {
+test('HD_4e388 T8: "add carpet cleaning" at the read-back APPENDS an item; one read-back lists both; one yes writes ONE booking with 2 services', async () => {
   const h = harness({ scripts: () => [say('Sure.')] });
   for (const t of ['I want to book window cleaning tomorrow at 2 PM.', 'Ongata Rongai.', 'Alvin.']) await turn(h, t);
   assert.equal(h.live.getState().phase, 'readback');
@@ -45,8 +50,10 @@ test('HD_4e388 T8: "add carpet cleaning" at the read-back APPENDS an item; read-
   assert.match(r.heard, /window/i); assert.match(r.heard, /carpet/i); assert.equal(qs(r.heard), 1, r.heard);
   assert.deepEqual(h.live.getState().plan.items.map((i) => i.service), ['Interior Window Cleaning', 'Carpet Cleaning (per room)']);
   const y = await turn(h, 'Yes.');
-  const svcs = h.applied.filter((a) => a.appointment).map((a) => a.appointment.serviceName);
-  assert.deepEqual(svcs, ['Interior Window Cleaning', 'Carpet Cleaning (per room)'], JSON.stringify(svcs));
+  const appts = h.applied.filter((a) => a.appointment).map((a) => a.appointment);
+  assert.equal(appts.length, 1, 'ONE booking');
+  assert.deepEqual(appts[0].services, ['Interior Window Cleaning', 'Carpet Cleaning (per room)']);
+  assert.equal(appts[0].serviceName, 'Interior Window Cleaning');
   assert.ok(y.heard.length > 0);
 });
 
@@ -142,4 +149,73 @@ test('D1 rules-only understanding: BRAIN_V1_DRAFT_PHASE_B_UNDERSTAND=rules makes
   const h = harness({ env: { ...ENV, BRAIN_V1_DRAFT_PHASE_B_UNDERSTAND: 'rules' }, scripts: () => [say('Okay.')] });
   await turn(h, 'I want to book window cleaning tomorrow at 2 PM.');
   assert.equal(h.counts.turnModel, 0); assert.equal(h.counts.draft, 1);
+});
+
+test('3 services, one booking: window + carpet + sofa -> one read-back with all three, one yes, one write', async () => {
+  const h = harness({ scripts: () => [say('Sure.')] });
+  for (const t of ['I want to book window cleaning tomorrow at 2 PM.', 'Also add carpet cleaning.', 'Ongata Rongai.', 'Alvin.']) await turn(h, t);
+  const rb = await turn(h, 'And add sofa cleaning too.');
+  assert.match(rb.heard, /window/i); assert.match(rb.heard, /carpet/i); assert.match(rb.heard, /sofa/i); assert.equal(qs(rb.heard), 1, rb.heard);
+  await turn(h, 'Yes.');
+  const appts = h.applied.filter((a) => a.appointment).map((a) => a.appointment);
+  assert.equal(appts.length, 1);
+  assert.deepEqual(appts[0].services, ['Interior Window Cleaning', 'Carpet Cleaning (per room)', 'Sofa Cleaning (per seat)']);
+});
+
+test('add_service on an EXISTING booking mid-call: one read-back, one yes, idempotent per item', async () => {
+  const h = harness({ scripts: () => [say('Sure.')] });
+  for (const t of ['I want to book window cleaning tomorrow at 2 PM.', 'Ongata Rongai.', 'Alvin.', 'Yes.']) await turn(h, t);
+  assert.equal(h.applied.filter((a) => a.appointment).length, 1);
+  const q = await turn(h, 'Can you also add carpet cleaning?');
+  assert.match(q.heard, /add/i); assert.match(q.heard, /carpet/i); assert.equal(qs(q.heard), 1, q.heard);
+  const ok = await turn(h, 'Yes.');
+  const adds = h.applied.filter((a) => a.appointmentAddService).map((a) => a.appointmentAddService);
+  assert.equal(adds.length, 1); assert.equal(adds[0].serviceName, 'Carpet Cleaning (per room)'); assert.equal(adds[0].appointmentId, 'row_1');
+  assert.match(ok.heard, /added|Done/i);
+  // asking again for the same item: already on the booking, nothing written
+  await turn(h, 'Also add carpet cleaning.');
+  assert.equal(h.applied.filter((a) => a.appointmentAddService).length, 1);
+});
+
+test('SW add_service on an existing booking: "Ongeza pia usafi wa makochi" -> Niongeze ...? -> ndio adds sofa', async () => {
+  const h = harness({ scripts: () => [say('Sawa.')] });
+  for (const t of ['Nataka kubook usafi wa madirisha kesho saa nane mchana.', 'Ongata Rongai.', 'Alvin.', 'Ndio.']) await turn(h, t, 'sw');
+  const q = await turn(h, 'Ongeza pia usafi wa makochi.', 'sw');
+  assert.match(q.heard, /Niongeze/); assert.equal(qs(q.heard), 1, q.heard);
+  const ok = await turn(h, 'Ndio.', 'sw');
+  const adds = h.applied.filter((a) => a.appointmentAddService).map((a) => a.appointmentAddService.serviceName);
+  assert.deepEqual(adds, ['Sofa Cleaning (per seat)']); assert.match(ok.heard, /nimeongeza/i);
+});
+
+test('add_service declined: nothing written', async () => {
+  const h = harness({ scripts: () => [say('Okay.')] });
+  for (const t of ['I want to book window cleaning tomorrow at 2 PM.', 'Ongata Rongai.', 'Alvin.', 'Yes.', 'Also add carpet cleaning.']) await turn(h, t);
+  await turn(h, 'No.');
+  assert.equal(h.applied.filter((a) => a.appointmentAddService).length, 0);
+});
+
+test('booking line items (db helpers): label + per-item keys, de-duplicated', () => {
+  const Module = require('module'); const orig = Module._load;
+  Module._load = function (req, ...a) { if (req === '@supabase/supabase-js') return { createClient: () => ({}) }; return orig.call(this, req, ...a); };
+  process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'http://stub'; process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'stub';
+  let db; try { db = require('../src/db'); } finally { Module._load = orig; }
+  const items = db.appointmentServiceItems(['Interior Window Cleaning', 'Carpet Cleaning (per room)', 'interior window cleaning'], null, 'k1');
+  assert.deepEqual(items.map((x) => x.name), ['Interior Window Cleaning', 'Carpet Cleaning (per room)']);
+  assert.equal(items[1].key, 'k1#carpet cleaning (per room)');
+  assert.equal(db.appointmentServiceLabel(items), 'Interior Window Cleaning + Carpet Cleaning (per room)');
+});
+
+test('tool: add_appointment_service validates, writes once, duplicate on repeat', async () => {
+  const TE = require('../src/conversation/toolExecution');
+  const keys = new Set(); const calls = [];
+  const handlers = { addAppointmentService: async (v) => { calls.push(v); const dup = keys.has(v.idempotencyKey); keys.add(v.idempotencyKey); return { id: v.appointmentId, ok: true, duplicate: dup }; } };
+  const run = (x) => TE.executeBrainTools({ parsed: { appointmentAddService: x }, capabilities: { createAppointment: true }, handlers });
+  const bad = await run({ serviceName: 'Carpet' });
+  assert.equal(bad.results[0].status, 'invalid');
+  const one = await run({ appointmentId: 'a1', serviceName: 'Carpet', idempotencyKey: 'a1#+carpet' });
+  assert.equal(one.results[0].status, 'succeeded', JSON.stringify(one.results));
+  const two = await run({ appointmentId: 'a1', serviceName: 'Carpet', idempotencyKey: 'a1#+carpet' });
+  assert.equal(two.results[0].status, 'duplicate', JSON.stringify(two.results));
+  const off = await TE.executeBrainTools({ parsed: { appointmentAddService: { appointmentId: 'a1', serviceName: 'Sofa' } }, capabilities: { messageOnly: true }, handlers });
+  assert.equal(off.results[0].status, 'disabled');
 });

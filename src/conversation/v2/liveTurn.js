@@ -281,7 +281,7 @@ function createBrainV2Live(opts = {}) {
     const abort = typeof shouldAbort === 'function' ? shouldAbort : () => false;
     const lock = langLock === 'en' || langLock === 'sw' ? langLock : null;
     const handlers = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName } });
-    const pre = CP.before(machine, text, profile);
+    const pre = await CP.before(machine, text, profile, { handlers });
     let tmpl; let lang = machine.lang || lock || 'en'; let done = null;
     if (pre.owned) { tmpl = pre.line; lang = pre.lang || lang; } else {
       const parts = [];
@@ -297,7 +297,6 @@ function createBrainV2Live(opts = {}) {
       }
       lang = machine.lang || lang;
       tmpl = (parts.join(' ').trim() || String(done?.line || '')).trim();
-      await CP.commitExtras(machine, handlers);
       tmpl = CP.after(machine, { line: tmpl }, { lang });
       machine.lastLine = tmpl; machine.lastBase = tmpl;
     }

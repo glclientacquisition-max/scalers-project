@@ -2676,6 +2676,7 @@ async function createAppointment({
   windowStart,
   idempotencyKey,
   windowEnd,
+  services,
 } = {}) {
   let resolvedTenantId = tenantId || null;
   let callRow = null;
@@ -2685,7 +2686,10 @@ async function createAppointment({
   }
   if (!resolvedTenantId) return null;
 
-  const service = String(serviceName || '').trim();
+  // One booking holds 1..N services (line items). service_name stays the display label every
+  // reader already shows (Desk, owner alert, caller SMS); metadata.services is the item list.
+  const items = appointmentServiceItems(services, serviceName, idempotencyKey);
+  const service = items.length > 1 ? appointmentServiceLabel(items) : String(serviceName || items[0]?.name || '').trim();
   if (!service) return null;
 
   const callerName = String(name || callRow?.name || '').trim() || null;
@@ -2725,10 +2729,12 @@ async function createAppointment({
       caller_name: callerName,
       caller_phone: callerPhone,
       updated_at: new Date().toISOString(),
+      ...(Array.isArray(services) && services.length ? { metadata: { services: items } } : {}),
       ...writeReceiptKeyColumn(idempotencyKey),
     })
     .select('*')
     .maybeSingle();
+  if (!error && data && Array.isArray(services) && services.length) await mirrorAppointmentServices(data, items);
 
   if (error && /appointments|relation/i.test(error.message)) {
     console.warn(
@@ -2759,6 +2765,55 @@ async function createAppointment({
     }
   }
 
+  return data || null;
+}
+
+// ---- Booking line items (Alvin t320u: one booking holds N services; "add" is a built-in operation) ----
+function appointmentServiceItems(services, serviceName, baseKey) {
+  const names = (Array.isArray(services) && services.length ? services : [serviceName])
+    .map((s) => String((s && s.name) || s || '').trim().slice(0, 200)).filter(Boolean);
+  const seen = new Set();
+  return names.filter((n) => (seen.has(n.toLowerCase()) ? false : seen.add(n.toLowerCase())))
+    .slice(0, 10)
+    .map((name, i) => ({ name, position: i, key: `${baseKey || 'create'}#${name.toLowerCase()}` }));
+}
+function appointmentServiceLabel(items) {
+  return items.map((x) => x.name).join(' + ').slice(0, 500);
+}
+/** Mirror into public.appointment_services when the migration is applied; a missing table is fine. */
+async function mirrorAppointmentServices(row, items) {
+  try {
+    const { error } = await supabase.from('appointment_services').upsert(
+      items.map((x) => ({ tenant_id: row.tenant_id, appointment_id: row.id, service_name: x.name, position: x.position, idempotency_key: x.key })),
+      { onConflict: 'appointment_id,idempotency_key', ignoreDuplicates: true }
+    );
+    if (error && !/appointment_services|relation|schema cache/i.test(error.message || '')) console.warn('[db] appointment_services mirror:', error.message);
+  } catch (err) { console.warn('[db] appointment_services mirror:', err?.message || err); }
+}
+
+/**
+ * Add one service to an existing booking. Idempotent per item: the same idempotencyKey (or the
+ * same service already on the booking) returns the row with duplicate=true and writes nothing.
+ */
+async function addAppointmentService({ callSid, tenantId, appointmentId, serviceName, idempotencyKey } = {}) {
+  let resolvedTenantId = tenantId || null;
+  if (callSid) { const callRow = await getCall(callSid); if (callRow?.tenant_id) resolvedTenantId = callRow.tenant_id; }
+  const name = String(serviceName || '').trim().slice(0, 200);
+  if (!resolvedTenantId || !appointmentId || !name) return null;
+  const { data: row, error } = await supabase.from('appointments').select('*').eq('tenant_id', resolvedTenantId).eq('id', appointmentId).maybeSingle();
+  if (error && /appointments|relation/i.test(error.message)) return null;
+  throwIfError('addAppointmentService(read)', error);
+  if (!row || !['requested', 'confirmed'].includes(String(row.status || '').toLowerCase())) return null;
+  const meta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+  const items = Array.isArray(meta.services) && meta.services.length ? meta.services : appointmentServiceItems(null, row.service_name, 'base');
+  const key = String(idempotencyKey || `${row.id}#+${name.toLowerCase()}`).slice(0, 200);
+  if (items.some((x) => x.key === key || String(x.name).toLowerCase() === name.toLowerCase())) return { ...row, duplicate: true };
+  const next = [...items, { name, position: items.length, key, added_at: new Date().toISOString(), call_sid: callSid || null }];
+  const { data, error: upErr } = await supabase.from('appointments')
+    .update({ service_name: appointmentServiceLabel(next), metadata: { ...meta, services: next }, updated_at: new Date().toISOString() })
+    .eq('tenant_id', resolvedTenantId).eq('id', row.id).select('*').maybeSingle();
+  throwIfError('addAppointmentService', upErr);
+  if (data) await mirrorAppointmentServices(data, next);
   return data || null;
 }
 
@@ -3664,6 +3719,9 @@ module.exports = {
   createServiceRequest,
   updateServiceRequest,
   createAppointment,
+  addAppointmentService,
+  appointmentServiceItems,
+  appointmentServiceLabel,
   updateAppointment,
   listOpenAppointments,
   mergeCallSummaryMeta,
