@@ -10,6 +10,7 @@ const { createClassifyAsk } = require('./classifyAsk');
 const { createGeminiSend, createGeminiStreamModel } = require('./transport');
 const MS = require('./modelShadow');
 const TM = require('./turnModel');
+const V1 = require('./v1draft');
 
 // C7 BRAIN_V2_MODEL: off (default) = nothing; shadow = the model runs beside the rules turn,
 // never awaited, logged per turn; on = the capped cascade is also handed to the machine's
@@ -152,6 +153,28 @@ function createBrainV2Live(opts = {}) {
   let endSent = false;
   let modelRun; // undefined = not resolved yet (C7)
   let lastShadow = Promise.resolve(null);
+  let drafter; // BRAIN_V1_DRAFT per-call drafter (undefined = not resolved)
+  function v1Drafter(profile) {
+    if (drafter !== undefined) return drafter;
+    drafter = null;
+    const ids = MS.resolveModelIds(env);
+    let streamFor = typeof opts.v1DraftStreamFor === 'function' ? opts.v1DraftStreamFor : null;
+    if (!streamFor) {
+      const key = env.GEMINI_API_KEY;
+      if (!key) { (opts.log || console.log)('[brain_v1_draft] no GEMINI_API_KEY; v2 answers this call'); return null; }
+      const models = {};
+      streamFor = (id) => models[id] || (models[id] = createGeminiStreamModel({ apiKey: key, model: id }));
+      TM.prewarm({ apiKey: key, modelId: ids.primary }).catch(() => {});
+    }
+    drafter = V1.createV1Draft({
+      streamFor, primaryId: ids.primary, backupId: ids.backup,
+      onStage: (st) => { try { (opts.onModelStage || (() => {}))(st); } catch { /* trace only */ } },
+      log: opts.log || ((m) => console.log(m)),
+      ...(opts.v1DraftDeadlines ? { deadlines: opts.v1DraftDeadlines } : {}),
+      ...(opts.v1DraftSleep ? { sleep: opts.v1DraftSleep } : {}),
+    });
+    return drafter;
+  }
 
   function ensureState(profile) {
     if (state) return state;
@@ -170,17 +193,35 @@ function createBrainV2Live(opts = {}) {
     return state;
   }
 
-  async function run({ text, profile, langLock, shouldAbort } = {}) {
+  async function run({ text, profile, langLock, shouldAbort, onSentence } = {}) {
     if (!brainV2Enabled({ env, tenantId: profile?.id }) || brainV2Mode({ env }) !== 'live') {
       return null;
     }
     const machine = ensureState(profile);
+    // BRAIN_V1_DRAFT: the model drafts, the KB verifies each sentence; v2 below is the total fallback.
+    const vdMode = V1.mode({ env, tenantId: profile?.id });
+    let vdFields = null; let vdPath = null;
+    const vd = vdMode !== 'off' ? v1Drafter(profile) : null;
+    if (vd) V1.remember(machine, 'caller', text);
+    if (vd && vdMode === 'on') {
+      const d = await vd.turn({ text, profile: profile || {}, state: machine, langLock: langLock === 'en' || langLock === 'sw' ? langLock : null, onSentence, shouldAbort: typeof shouldAbort === 'function' ? shouldAbort : () => false, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null });
+      vdPath = d.path;
+      if (d.path === 'v1_draft') {
+        V1.remember(machine, 'agent', d.line);
+        return { line: d.line, lang: d.sentences[0]?.lang || machine.lang || 'en', sentences: d.sentences, end: false, phase: machine.phase, path: 'v1_draft', streamed: typeof onSentence === 'function' };
+      }
+      vdFields = d.turnFields;
+    } else if (vd && vdMode === 'shadow') {
+      // shadow: draft + verify on a copy of the state, never spoken, traced only
+      let copy = null; try { copy = structuredClone(machine); } catch { copy = null; }
+      if (copy) vd.turn({ text, profile: profile || {}, state: copy, langLock, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null }).catch(() => {});
+    }
     const handlers = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName } });
     const sentences = [];
     let done = null;
     if (modelRun === undefined) modelRun = resolveModelShadow(opts, env);
     // shadow: snapshot before the rules turn; the model call starts now and is never awaited here
-    const on = !!(modelRun && modelRun.mode === 'on' && modelRun.turnModel);
+    const on = !!(modelRun && modelRun.mode === 'on' && modelRun.turnModel) && !(vd && vdMode === 'on');
     let turnFields = null;
     if (on) {
       const fileNames = (machine.file?.openRows || []).map((r) => r && r.service).filter(Boolean).slice(0, 3);
@@ -198,7 +239,7 @@ function createBrainV2Live(opts = {}) {
       // mode=on: the turn's one call already ran (turnFields); no second machine/classify call
       model: opts.model || null,
       classify: on ? null : defaultClassify(opts),
-      turnFields,
+      turnFields: turnFields || vdFields,
       langLock: langLock === 'en' || langLock === 'sw' ? langLock : null,
       shouldAbort: typeof shouldAbort === 'function' ? shouldAbort : () => false,
     });
@@ -209,6 +250,7 @@ function createBrainV2Live(opts = {}) {
     }
     if (finishShadow) lastShadow = finishShadow(machine, done); // compared and logged off the critical path
     const line = sentences.map((s) => s.text).join(' ').trim() || String(done?.line || '').trim();
+    if (vd) V1.remember(machine, 'agent', line);
     const endCall = endDecision({ done, machine, profile, line, alreadyEnded: endSent });
     if (endCall.end) endSent = true;
     return {
@@ -219,16 +261,19 @@ function createBrainV2Live(opts = {}) {
       ...(endCall.end ? { reason: endCall.reason } : {}),
       ...(endCall.held ? { endHeld: endCall.held } : {}),
       phase: done?.phase || machine.phase,
+      ...(vdPath ? { path: vdPath } : {}),
     };
   }
 
   /** Voice's unfinished hold: start this turn's one model call on the stable partial. */
-  function partial({ text, profile } = {}) {
+  function partial({ text, profile, langLock } = {}) {
+    if (V1.mode({ env, tenantId: profile?.id }) === 'on' && state) { const d = v1Drafter(profile); if (d) return d.partial({ text, profile: profile || {}, state, langLock }); }
     if (modelRun === undefined) modelRun = resolveModelShadow(opts, env);
     if (!modelRun || modelRun.mode !== 'on' || !modelRun.turnModel) return false;
     return !!modelRun.turnModel.partial({ text, profile: profile || {} });
   }
   // call start: resolve the model (prewarm the warm client) before the first caller turn
+  if (opts.prewarm !== false && V1.mode({ env, tenantId: opts.tenantId }) !== 'off' && env.GEMINI_API_KEY) TM.prewarm({ apiKey: env.GEMINI_API_KEY, modelId: MS.resolveModelIds(env).primary }).catch(() => {});
   if (opts.prewarm !== false && MS.modelMode(env) === 'on' && modelRun === undefined) modelRun = resolveModelShadow(opts, env);
 
   return { run, partial, getState: () => state, lastModelShadow: () => lastShadow };

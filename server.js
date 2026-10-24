@@ -110,6 +110,7 @@ const {
 const { createVoiceTrace } = require('./src/speech/voiceTrace');
 const { brainV2ShadowEnabled, createBrainV2Shadow } = require('./src/conversation/v2Shadow');
 const { brainV2Enabled, brainV2Mode } = require('./src/conversation/v2/flag');
+const brainV1Draft = require('./src/conversation/v2/v1draft');
 const { createBrainV2Live } = require('./src/conversation/v2/liveTurn');
 // BRAIN_V2_OWNS_CALL (plan C3, default off): v2 is the only owner of a live-mode call.
 const v2OwnsCall = require('./src/conversation/v2/ownsCall');
@@ -4565,6 +4566,31 @@ mediaWss.on('connection', (ws, req) => {
           callerPhone: brainState?.caller?.phone || brainProfile?.callerMemory?.phone || null,
           profile: brainProfile,
         });
+        // BRAIN_V1_DRAFT=on (DnD only): verified sentences stream to TTS one by one as they pass the
+        // verifier; the existing contextual filler plays at 0.9 s if nothing verified is ready yet.
+        const v1DraftOn = brainV1Draft.mode({ tenantId: brainProfile?.id }) === 'on';
+        let v1Chain = Promise.resolve();
+        let v1Streamed = 0;
+        let v1Filler = null;
+        if (v1DraftOn) {
+          v1Filler = setTimeout(() => {
+            v1Filler = null;
+            if (v1Streamed || bargeInActive) return;
+            const f = pickContextualAck(clean, fillerLanguage(callLanguage));
+            if (!f) return;
+            if (turnTiming && typeof turnTiming.markFiller === 'function') turnTiming.markFiller();
+            console.log(`[ws/media][${callKey}] brain_v1_draft filler at=${brainV1Draft.DEADLINES.fillerMs}ms: ${f}`);
+            speakThinkingAck(f).catch(() => {});
+          }, brainV1Draft.DEADLINES.fillerMs);
+        }
+        const onV1Sentence = v1DraftOn
+          ? (s) => {
+              if (v1Filler) { clearTimeout(v1Filler); v1Filler = null; }
+              if (!v1Streamed && turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') turnTiming.markFirstSpokenChunk();
+              v1Streamed += 1;
+              v1Chain = v1Chain.then(() => (bargeInActive ? { ok: false, barged: true } : speakText(s.text, { tracePath: 'brain_v1_draft', skipFileGate: true }))).catch(() => ({ ok: false }));
+            }
+          : undefined;
         const live = await v2OwnsCall.runOwnedTurn(
           brainV2Live,
           {
@@ -4572,18 +4598,25 @@ mediaWss.on('connection', (ws, req) => {
             profile: brainProfile,
             langLock: callLanguage === 'en' || callLanguage === 'sw' ? callLanguage : null,
             shouldAbort: () => bargeInActive === true,
+            ...(onV1Sentence ? { onSentence: onV1Sentence } : {}),
           },
           { log: (m) => console.log(`[ws/media][${callKey}] ${m}`) }
         );
-        console.log(`[ws/media][${callKey}] brain_v2_live owned lang=${live.lang}${live.endHeld ? ` end_held=${live.endHeld}` : ''}: ${live.line}`);
+        if (v1Filler) { clearTimeout(v1Filler); v1Filler = null; }
+        console.log(`[ws/media][${callKey}] brain_v2_live owned lang=${live.lang}${live.path ? ` path=${live.path}` : ''}${live.endHeld ? ` end_held=${live.endHeld}` : ''}: ${live.line}`);
         callTranscript.pushAgent(live.line);
-        if (turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') {
-          turnTiming.markFirstSpokenChunk();
+        let spoken;
+        if (live.streamed && v1Streamed) {
+          spoken = await v1Chain;
+        } else {
+          if (turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') {
+            turnTiming.markFirstSpokenChunk();
+          }
+          spoken = await speakText(live.line, {
+            tracePath: live.repaired ? 'brain_v2_repair' : 'brain_v2_live',
+            skipFileGate: true,
+          });
         }
-        const spoken = await speakText(live.line, {
-          tracePath: live.repaired ? 'brain_v2_repair' : 'brain_v2_live',
-          skipFileGate: true,
-        });
         if (spoken?.ok !== false) {
           spokeThisTurn = true;
           messages.push({ role: 'assistant', content: live.line, local: true });
