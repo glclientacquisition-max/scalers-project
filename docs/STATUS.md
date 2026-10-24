@@ -112,6 +112,8 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 
 ## 4. Open PRs
 
+- **24 Oct 2026 (Desk):** Service areas tree picker (`/settings/areas`): Kenya › 47 counties › towns and estates, search with loose spelling and landmarks, per-area fee and caller note, Check your areas move-over, What callers hear preview. New table `tenant_area_picks` on staging only; contract `docs/reference/platform/AREA_PICKS.md`. Draft PR, no prod.
+
 Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-staging` means Stage-PR leaves it out of the staging pin.
 
 **Queued for the next clean Aris call** (one at a time, in this order unless Alvin says otherwise):
