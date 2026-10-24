@@ -2983,13 +2983,13 @@ mediaWss.on('connection', (ws, req) => {
   // BRAIN_V1_DRAFT_PHASE_A: agent lines spoken outside the brain since its last turn (greeting, opening
   // ladder, acks) are handed to the draft's history so it never asks "how can I help" again.
   let v1HeardMark = 0;
-  let v1WaitAt = 0;
+  let v1WaitAt = 0; // Phase A: when the caller last said "wait"
   // Phase A filler cut (Voice review #927): the cut filler's generation, so held caller speech is
   // carried to the reply; the filler's real start; a filler whose timer fired but audio is not bound yet.
   let cutFillerGen = 0;
   let fillerStartedAt = 0;
   let fillerPending = false;
-  let abortPendingFiller = false; // Phase A: when the caller last said "wait"
+  let abortPendingFiller = false;
   function v1HeardSinceLastTurn() {
     const rows = callTranscript.turns().slice(v1HeardMark);
     v1HeardMark = callTranscript.size();
@@ -3942,6 +3942,8 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   function cancelSpeech(reason) {
+    // Phase A: a barge between a filler cut and the reply's speakText must not strand held speech
+    if (cutFillerGen) { carryHeldSpeech(overlapHold, cutFillerGen, activePlaybackGeneration); cutFillerGen = 0; }
     voiceTrace.noteBarge({ reason: String(reason || '') });
     // VOICE_OPENING_V2: a barge cut the agent mid-line (calls.last_line_cut).
     if (openingOn && opening && speaking && openingLineReal && lastAgentText) {
@@ -4275,6 +4277,7 @@ mediaWss.on('connection', (ws, req) => {
     }
 
     overlapHold.discardExcept(0);
+    cutFillerGen = 0;
     turnBusy = true;
     bargeInActive = false;
     const turnTiming = createVoiceTurnTiming(sidLabel());
@@ -7183,6 +7186,9 @@ mediaWss.on('connection', (ws, req) => {
   });
 
   ws.on('close', (code, reason) => {
+    cutFillerGen = 0;
+    abortPendingFiller = false;
+    fillerPending = false;
     try { require('./src/conversation/v2/turnModel').endCall(sidLabel()); } catch { /* best effort */ }
     const ms = Date.now() - connectedAt;
     callLimits.stop();

@@ -40,3 +40,16 @@ test('carry is a no-op without a cut generation', () => {
   assert.strictEqual(carryHeldSpeech(hold, 0, 4), 0);
   assert.match(hold.drain(3).text, /x/);
 });
+
+test('barge-in between cut and reply: held speech moves to the live gen, cut gen cleared', () => {
+  const hold = createOverlapHold();
+  let cutFillerGen = 7; let active = 8; // cut bumped 7 -> 8, reply not started yet
+  hold.enqueue('no wait, Saturday', 7);
+  // cancelSpeech: carry, then clear so the next speakText does not reassign a stale gen
+  if (cutFillerGen) { carryHeldSpeech(hold, cutFillerGen, active); cutFillerGen = 0; }
+  assert.strictEqual(cutFillerGen, 0);
+  assert.match(hold.drain(active).text, /Saturday/);
+  // a later reply (gen 9) carries nothing stale
+  active = 9;
+  assert.strictEqual(carryHeldSpeech(hold, cutFillerGen, active), 0);
+});
