@@ -69,7 +69,7 @@ export function AdminVoicesManager({
     });
     const json = (await res.json().catch(() => ({}))) as { error?: string };
     if (!res.ok) {
-      setError(faceError(json.error || ""));
+      setError(json.error === "step_up_required" ? "Unlock, then tap Delete again." : faceError(json.error || ""));
       return false;
     }
     startTransition(() => router.refresh());

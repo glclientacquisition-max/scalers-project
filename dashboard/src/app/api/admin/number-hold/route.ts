@@ -9,7 +9,7 @@ import {
 } from "@/lib/adminNumberHold";
 import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { clampHoldDays, reactivationFeeBillStub } from "@/lib/ops/numberHold";
-import { requireStepUp } from "@/lib/ops/stepUp";
+import { stepUpGate } from "@/lib/ops/stepUpGate";
 
 /**
  * Number hold / win-back writers (Admin s28). Calls #885 RPCs when present;
@@ -37,7 +37,8 @@ export async function POST(request: Request) {
     action === "set_settings"
       ? "settings:hold"
       : String(body.e164 || body.tenant_id || "");
-  requireStepUp({ action: `number-hold:${action}`, operator: gate.operator, target });
+  const stepUp = await stepUpGate(gate.operator, `number-hold:${action}`, target);
+  if (stepUp) return stepUp;
 
   if (action === "bill_fee") {
     // Honest stub — Invoicing owns the package-invoice line. Never ok:true.

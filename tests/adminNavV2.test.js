@@ -8,11 +8,11 @@ const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
 const load = () => import(path.join(root, "dashboard/src/lib/adminLinks.ts"));
 const page = (p) => read(`dashboard/src/app/admin/(console)/${p}/page.tsx`);
 
-test("v2 nav is the six locked entries; phone has four tabs plus More", async () => {
+test("v2 rail is the six locked entries; phone has four tabs plus More (with Security)", async () => {
   const { ADMIN_LINKS_V2, adminPhoneTabs, adminPhoneMore, ADMIN_LINKS } = await load();
-  assert.deepEqual(ADMIN_LINKS_V2.map((l) => l.label), ["Overview", "Businesses", "Billing", "Numbers", "Quality", "Settings"]);
+  assert.deepEqual(ADMIN_LINKS_V2.filter((l) => l.rail !== false).map((l) => l.label), ["Overview", "Businesses", "Billing", "Numbers", "Quality", "Settings"]);
   assert.deepEqual(adminPhoneTabs(true).map((l) => l.label), ["Overview", "Businesses", "Billing", "Numbers"]);
-  assert.deepEqual(adminPhoneMore(true).map((l) => l.label), ["Quality", "Settings"]);
+  assert.deepEqual(adminPhoneMore(true).map((l) => l.label), ["Quality", "Settings", "Security"]);
   assert.equal(ADMIN_LINKS.length, 8, "old shell nav unchanged");
   assert.deepEqual(adminPhoneTabs().map((l) => l.label), ["Today", "Businesses", "Quality", "Billing"]);
 });

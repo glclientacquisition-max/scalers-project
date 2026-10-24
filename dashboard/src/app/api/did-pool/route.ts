@@ -6,7 +6,7 @@ import { isAdminActionBlocked } from "@/lib/adminBusinessModel";
 import { adminFacingError, logAdminError, operatorError } from "@/lib/adminErrors";
 import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { isLegacyAuthenticated } from "@/lib/auth";
-import { requireStepUp } from "@/lib/ops/stepUp";
+import { stepUpGate } from "@/lib/ops/stepUpGate";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import {
   addDidToPool,
@@ -41,7 +41,8 @@ export async function POST(request: Request) {
       : action === "assign_specific"
         ? `${String(body.tenant_id || "")}:${String(body.e164 || "")}`
         : String(body.tenant_id || body.e164 || "");
-  requireStepUp({ action: `did-pool:${action}`, operator: gate.operator, target });
+  const stepUp = await stepUpGate(gate.operator, `did-pool:${action}`, target);
+  if (stepUp) return stepUp;
 
   try {
     if (action === "add") {

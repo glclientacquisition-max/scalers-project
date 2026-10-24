@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { AdminShell } from "@/components/AdminNav";
 import { AdminPhonePull } from "@/components/PhonePullSurface";
+import { StepUpHost } from "@/components/ops/StepUpHost";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { getAdminSession } from "@/lib/auth";
 import "@/styles/admin-v2.css";
@@ -25,6 +26,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <AdminPhonePull scroll="admin" />
       </Suspense>
       {children}
+      <StepUpHost />
     </AdminShell>
   );
 }
