@@ -157,6 +157,8 @@ function mergeSlots(state, u, profile) {
   if (csOn() && state.phase === 'readback' && state.pending?.tool === 'create_order' && u.quantity && !u.products.length && s.items.length === 1) s.items[0] = { ...s.items[0], qty: u.quantity };
 }
 
+// Nairobi calendar day (YYYY-MM-DD) of the call clock: rows dated on/after it are upcoming
+function upcomingFrom(state) { const n = state.now ? new Date(state.now) : new Date(); return new Date(n.getTime() + 3 * 3600e3).toISOString().slice(0, 10); }
 function resolveRow(state, u) {
   // Cancel / move / address change act on visits only. An open callback or enquiry
   // request is not a booking the caller can cancel here.
@@ -170,6 +172,14 @@ function resolveRow(state, u) {
   if (c.length === 1) return { row: c[0] };
   // a single open row is never offered as "Which one: X?" (the read-back still confirms it)
   if (!c.length && rows.length === 1) return { row: rows[0] };
+  if (state.core) {
+    // BRAIN_CALL_CORE (Alvin decision 3): a named row is still found among ALL open rows (above); a list names
+    // only UPCOMING open rows, at most 3. Past rows are never offered, closed or edited from a list.
+    const today = upcomingFrom(state);
+    const up = (c.length ? c : rows).filter((r) => r.when && r.when.date && r.when.date >= today).sort((a, b) => String(a.when.date + (a.when.time || '')).localeCompare(String(b.when.date + (b.when.time || ''))));
+    if (up.length === 1 && !c.length && !svc && !d) return { ambiguous: up };
+    return { ambiguous: up.slice(0, 3), upcomingOnly: true };
+  }
   return { ambiguous: (c.length ? c : rows) };
 }
 
@@ -312,6 +322,7 @@ function stepIntent(state, u, profile) {
       const rr = resolveRow(state, u);
       if (rr.none) { if (it === 'address_change') return addressHandoff(state); state.intent = null; return { line: R.info({ kind: 'no_rows' }, state.lang) }; }
       if (rr.row) s.row = rr.row;
+      else if (rr.upcomingOnly && !rr.ambiguous.length) return slotOr(state, 'which_named', {});
       else return slotOr(state, 'which', { list: rr.ambiguous.map((r) => R.rowLabel(r, state.lang).replace(/^/, state.lang && L.isSw(state.lang) ? '' : 'the ')).join(L.isSw(state.lang) ? ' au ' : ', or ') });
     }
     if (it === 'cancel') return { line: propose(state, { tool: 'cancel_booking', row: s.row }) };
@@ -1112,7 +1123,10 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
         state.welcomed = true;
         if (job) state.fileSeeded = true;
         const line = [wb, job].filter(Boolean).join(' ').trim();
-        return out(AM.speakSafeLine(line || R.info({ kind: 'greeting' }, lang), null));
+        // BRAIN_CALL_CORE: one name step. A yes that also carries the request ("Yes. I want window cleaning
+        // tomorrow") confirms the name AND keeps every other slot; the welcome back is a lead, not the reply.
+        if (state.core && (u.service || u.intent || u.when?.date || u.when?.time || u.place || u.products?.length)) { state.coreLead = AM.speakSafeLine(String(wb || '').split(/(?<=[.!])\s+/)[0], null); }
+        else return out(AM.speakSafeLine(line || R.info({ kind: 'greeting' }, lang), null));
       }
     }
     if (u.no) {
