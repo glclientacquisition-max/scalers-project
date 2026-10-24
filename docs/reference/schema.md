@@ -9,7 +9,7 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (56)
+## Tables (57)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
