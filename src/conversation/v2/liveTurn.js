@@ -281,6 +281,10 @@ function createBrainV2Live(opts = {}) {
     const abort = typeof shouldAbort === 'function' ? shouldAbort : () => false;
     const lock = langLock === 'en' || langLock === 'sw' ? langLock : null;
     const handlers = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName } });
+    // latency (RCA #3): the draft starts NOW, in parallel with the plan, understanding and machine; its sentences
+    // are buffered and only spoken through the plan's gate. BRAIN_V1_DRAFT_PHASE_B_PARALLEL=off restores serial.
+    const parallel = String(env.BRAIN_V1_DRAFT_PHASE_B_PARALLEL || 'on').toLowerCase() !== 'off';
+    const startedOn = parallel ? vd.prelaunch({ text, profile, state: machine, langLock: lock }) : null;
     const pre = await CP.before(machine, text, profile, { handlers });
     let tmpl; let lang = machine.lang || lock || 'en'; let done = null;
     if (pre.owned) { tmpl = pre.line; lang = pre.lang || lang; } else {
@@ -302,9 +306,11 @@ function createBrainV2Live(opts = {}) {
     }
     tmpl = spokenStyle(tmpl, lang);
     const st = CP.step(machine, tmpl, lang);
-    if (pre.owned) st.question = tmpl; // the plan's own line (honest name check / added item) is the step in full
+    // the plan's own line is the step: in full when its first sentence carries news (honest name check, added
+    // item); a coverage answer + re-ask only adds its question (the model answers the coverage itself)
+    if (pre.owned) { const full = (pre.acts || []).some((x) => /^(have_my_name|item_added|add_service|service_add|area_(excluded|outside|unknown))/.test(x)); const q = CP.split(tmpl).filter((x) => /\?\s*$/.test(x)).pop(); st.question = full || !q ? tmpl : q; }
     (machine.trace || (machine.trace = [])).push({ turn: machine.turn, call_plan: { items: st.items, step: st.kind, slot: st.slot || null, acts: pre.acts } });
-    const d = await vd.turn({ text, profile, state: machine, langLock: lock, onSentence, shouldAbort: abort, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, phaseA: true, plan: { kind: st.kind, note: CP.stepNote(st), check: (s, ctx) => CP.actCheck(s, st, ctx), tail: () => CP.tail(st) } });
+    const d = await vd.turn({ text, profile, state: machine, langLock: lock, onSentence, shouldAbort: abort, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, phaseA: true, plan: { kind: st.kind, parallel, startedOn, template: tmpl, note: CP.stepNote(st), check: (s, ctx) => CP.actCheck(s, st, ctx), tail: (a) => CP.tail(st, a) } });
     const endCall = endDecision({ done, machine, profile, line: d.path === 'v1_draft' ? d.line : tmpl, alreadyEnded: endSent });
     if (endCall.end) endSent = true;
     const extra = { phase: machine.phase, plan: st.kind, end: endCall.end, ...(endCall.end ? { reason: endCall.reason } : {}) };
@@ -315,7 +321,15 @@ function createBrainV2Live(opts = {}) {
 
   /** Voice's unfinished hold: start this turn's one model call on the stable partial. */
   function partial({ text, profile, langLock } = {}) {
-    if (CP.phaseB({ env, tenantId: profile?.id })) return false; // Phase C starts the plan+model on partials
+    if (CP.phaseB({ env, tenantId: profile?.id })) {
+      // Phase B: the draft starts on the stable partial (no owner switch, so every turn), the understanding warms too
+      if (String(env.BRAIN_V1_DRAFT_PHASE_B_PARALLEL || 'on').toLowerCase() === 'off' || !state) return false;
+      const d = v1Drafter(profile); let ok = false;
+      if (d) ok = d.partial({ text, profile: profile || {}, state, langLock, plan: true });
+      if (modelRun === undefined) modelRun = resolveModelShadow(opts, env);
+      try { if (modelRun && modelRun.mode === 'on' && modelRun.turnModel) modelRun.turnModel.partial({ text, profile: profile || {} }); } catch { /* warm only */ }
+      return ok;
+    }
     // Phase A: a turn the draft hands to v2 anyway (read-back, action flow) warms v2's one model call instead
     if (V1.phaseA({ env, tenantId: profile?.id }) && state && V1.v2OwnsTurn(state, text)) {
       if (modelRun === undefined) modelRun = resolveModelShadow(opts, env);

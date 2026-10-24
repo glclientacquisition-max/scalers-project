@@ -23,7 +23,7 @@ const RE = {
   nameSaid: /\b(?:your name is|you(?:'re| are) called|i have you (?:down )?as|jina lako ni|nimekuandika kama)\s+([A-Z][a-z]+)/i,
   hedge: /\b(usually|around|about|probably|roughly|near|nearby|close to|approximately|karibu na)\b/i,
 };
-const CAP_OK = /^(We|Our|Yes|No|And|The|For|You|Your|Done|Dusted|Shy|Sorry|Unfortunately|Okay|Currently|Right|Sure|That|This|There|What|Which|Would|Shall|Ndio|Ndiyo|Samahani|Sawa|Hapana|Tunafika|Hatufiki|Tuna|Hii|Kwa|Lakini|Great|Thanks|Thank|Also|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|English|Swahili|Paybill|Equity|Bank|Pesa)$/;
+const CAP_OK = /^(January|February|March|April|May|June|July|August|September|October|November|December|Januari|Februari|Machi|Aprili|Mei|Juni|Julai|Agosti|Septemba|Oktoba|Novemba|Desemba|Jumatatu|Jumanne|Jumatano|Alhamisi|Ijumaa|Jumamosi|Jumapili|We|Our|Yes|No|And|The|For|You|Your|Done|Dusted|Shy|Sorry|Unfortunately|Okay|Currently|Right|Sure|That|This|There|What|Which|Would|Shall|Ndio|Ndiyo|Samahani|Sawa|Hapana|Tunafika|Hatufiki|Tuna|Hii|Kwa|Lakini|Great|Thanks|Thank|Also|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|English|Swahili|Paybill|Equity|Bank|Pesa)$/;
 const STOP = new Set('kuanzia gharama ndiyo tunafanya tunatoa usafi huduma ungependa kubook mraba kwenye pamoja monday tuesday wednesday thursday friday saturday sunday today tomorrow morning afternoon evening works suits would booking currently right price prices costs priced starting starts square metre meter shillings what which please kindly great perfect alright sorry again unfortunately cover covered really actually indeed about after again also and any are because been before being both but can could did does doing done each from have having here into just like more most much only other our ours over same should some such than that their them then there these they this those through very what when where which while will with would your yours yes okay great sure thank thanks please clean cleaning cleaned service services offer offers provide will also team home house room rooms help happy glad'.split(' '));
 
 function servicesNamed(sentence, note) {
@@ -42,7 +42,11 @@ function verifySentence({ text, refs = [], kind = null, lang = null }, note, ctx
   const reasons = []; const families = [];
   if (!s) return { verdict: 'drop', families, reasons: ['empty'] };
   const cited = (Array.isArray(refs) ? refs : []).map((r) => note.byId.get(String(r).replace(/[[\]\s]/g, ''))).filter(Boolean);
+  // system-backed facts (resolved area, the booking the caller gave) count as cited: call state is the truth
+  const auto = note.facts.filter((f) => f.auto);
+  for (const f of auto) if (!cited.includes(f)) cited.push(f);
   const citedFam = (fam) => cited.filter((f) => f.family === fam);
+  const booking = auto.find((f) => f.family === 'booking') || null;
   const offer = OFFER_Q.test(s);
   const neg = NEG.test(s);
   // language follows the caller: a clear wrong-language sentence is dropped
@@ -66,14 +70,15 @@ function verifySentence({ text, refs = [], kind = null, lang = null }, note, ctx
   if ((place && place.name) || (RE.coverage.test(s) && !offer && !isQ && !servicesNamed(s, note).length)) {
     families.push('area');
     if (place && place.name) {
-      const f = citedFam('area').find((a) => a.place.toLowerCase() === String(place.name).toLowerCase() || a.place.toLowerCase().endsWith(String(place.name).toLowerCase()));
-      if (!f) reasons.push(`area_uncited:${place.name}`);
+      const f = citedFam('area').find((a) => a.place.toLowerCase() === String(place.name).toLowerCase() || (a.covered && a.county && a.county.toLowerCase() === String(place.name).toLowerCase()) || a.place.toLowerCase().endsWith(String(place.name).toLowerCase()));
+      if (!f && booking && booking.place && String(booking.place).toLowerCase().includes(String(place.name).toLowerCase())) { /* the caller's own place, read back */ }
+      else if (!f) reasons.push(`area_uncited:${place.name}`);
       else if (!s.toLowerCase().includes(f.place.toLowerCase())) reasons.push(`area_name_inexact:${f.place}`);
       else if (f.covered && neg && !offer) reasons.push('area_status_mismatch:covered_said_not');
       else if (!f.covered && !neg && !offer) reasons.push('area_status_mismatch:uncovered_said_yes');
     } else if (!citedFam('area').length) reasons.push('coverage_uncited');
-    const known = [...(note.areas || []), ...citedFam('area').map((a) => a.place)].map((a) => a.toLowerCase());
-    const caps = (s.match(/\b[A-Z][a-z]{3,}\b/g) || []).filter((w) => !CAP_OK.test(w) && !(note.facts.some((f) => (f.family === 'service' || f.family === 'business') && f.name.toLowerCase().includes(w.toLowerCase()))));
+    const known = [...(note.areas || []), ...citedFam('area').flatMap((a) => [a.place, a.county]), ...(booking && booking.place ? [booking.place] : [])].filter(Boolean).map((a) => a.toLowerCase());
+    const caps = (s.match(/\b[A-Z][a-z]{3,}\b/g) || []).filter((w) => !CAP_OK.test(w) && !(booking && booking.words.includes(w.toLowerCase())) && !(note.facts.some((f) => (f.family === 'service' || f.family === 'business') && f.name.toLowerCase().includes(w.toLowerCase()))));
     for (const w of caps) if (!known.some((a) => a.split(/\s+/).includes(w.toLowerCase()))) reasons.push(`area_unlisted:${w}`);
   }
   // 5) services: existence + description
@@ -81,7 +86,7 @@ function verifySentence({ text, refs = [], kind = null, lang = null }, note, ctx
   const citedSvc = citedFam('service'); const citedPrice = citedFam('price');
   if (named.length) {
     families.push('service');
-    const covered = named.filter((f) => citedSvc.some((c) => c.serviceId === f.serviceId) || citedPrice.some((c) => c.serviceId === f.serviceId));
+    const covered = named.filter((f) => citedSvc.some((c) => c.serviceId === f.serviceId) || citedPrice.some((c) => c.serviceId === f.serviceId) || (booking && booking.services.includes(f.name)));
     if (!covered.length) reasons.push('service_uncited');
     if (neg && RE.exists.test(s) && !offer) reasons.push('listed_service_denied');
   } else if (RE.exists.test(s) && !offer && !citedSvc.length && !citedFam('area').length && !citedFam('payment').length) {
@@ -91,6 +96,7 @@ function verifySentence({ text, refs = [], kind = null, lang = null }, note, ctx
   const svcCtx = [...new Map([...citedSvc, ...named].map((f) => [f.id, f])).values()];
   if (svcCtx.length || RE.describe.test(s)) {
     const okWords = new Set(svcCtx.flatMap((f) => `${f.desc || ''} ${f.name}`.toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/)));
+    if (booking) for (const w of [...booking.words, ...booking.services.join(' ').toLowerCase().split(/[^a-z]+/)]) okWords.add(w);
     for (const p of citedPrice) for (const w of p.text.toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/)) okWords.add(w);
     const extra = s.toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter((w) => w.length >= 5 && !STOP.has(w) && !okWords.has(w) && !okWords.has(w.replace(/s$/, '')) && !okWords.has(w.replace(/ing$/, '')) && !okWords.has(`${w.replace(/s$/, '')}s`));
     const hasDesc = svcCtx.some((f) => f.desc);
@@ -101,7 +107,8 @@ function verifySentence({ text, refs = [], kind = null, lang = null }, note, ctx
   const nums = num(s);
   const sw = /\b(elfu|mia|laki)\b/i.test(s);
   if (sw) { families.push('price'); reasons.push('spoken_number_words'); }
-  if (RE.hours.test(s) && !offer && !isQ) { families.push('hours'); if (!citedFam('hours').length) reasons.push('hours_uncited'); }
+  const bookingNumsOnly = !!booking && nums.length > 0 && nums.every((n) => booking.nums.includes(n));
+  if (RE.hours.test(s) && !offer && !isQ && !bookingNumsOnly) { families.push('hours'); if (!citedFam('hours').length) reasons.push('hours_uncited'); }
   if (RE.payment.test(s) && !offer) { families.push('payment'); if (!citedFam('payment').length) reasons.push('payment_uncited'); }
   if (RE.price.test(s) && /\b(ksh|kes|shilling|bob|bei|price|cost|charge|fee)\w*/i.test(s) && !offer) { families.push('price'); if (!citedPrice.length && !nums.length) reasons.push('price_word_without_fact'); }
   if (nums.length) {

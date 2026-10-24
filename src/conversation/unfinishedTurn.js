@@ -11,6 +11,12 @@
 const SHORT_REPLY =
   /^(?:sawa|sawa sawa|ndio|ndiyo|ndio ndio|yes|yeah|yep|okay|ok|hapana|no|la|sure|poa)$/i;
 
+// A yes-led short answer to our question is whole even when STT ends it on a soft word
+// ("Yeah, I do so.", "Ndio, sawa sawa"). A real trailing joiner still holds ("Yeah, and").
+// Call HD_b4afd63a69c3 T8: "Yeah, I do so." was held as unfinished at the read-back.
+const YES_LED = /^(?:yes|yeah|yep|yup|ya|sure|okay|ok|of course|ndio|ndiyo|eeh|sawa|kabisa|haya|naam)\b/i;
+const OPEN_TAIL = /\b(?:and|but|or|also|to|with|for|because|then|plus|na|lakini|ila|au|halafu|kwa sababu|pia)$/i;
+
 const PRICE_ASK =
   /\b(?:how much|prices?|costs?|charges?|rates?|bei|gharama|pesa ngapi|pesa gani|ngapi)\b/i;
 
@@ -61,6 +67,7 @@ function completeTurnReason(text, ctx = {}) {
   const words = wordsOf(text);
   if (!words) return '';
   if (SHORT_REPLY.test(words)) return agentQuestionPending(ctx) ? 'short_reply' : '';
+  if (YES_LED.test(words) && !OPEN_TAIL.test(words) && words.split(/\s+/).length <= 5 && agentQuestionPending(ctx)) return 'short_yes';
   const { looksLikeOfferAsk } = require('./fileRead');
   if (looksLikeOfferAsk(words)) return 'catalogue_ask';
   if (coverageAskIsResolved(words, ctx)) return 'coverage_ask';
