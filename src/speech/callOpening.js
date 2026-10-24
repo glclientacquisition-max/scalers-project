@@ -79,6 +79,11 @@ function returningSkipNoticeOn(env = process.env) {
   return /^(1|true|on|yes)$/i.test(String(env[RETURNING_SKIP_NOTICE_FLAG] || '').trim());
 }
 
+/** VOICE_OPENING_NAME_SPLICE=on: returning-named greeting = cached template + live name line. */
+function openingNameSpliceOn(env = process.env) {
+  return String(env.VOICE_OPENING_NAME_SPLICE ?? '').trim() === 'on';
+}
+
 function clean(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
@@ -270,7 +275,11 @@ function composeOpening(o = {}) {
   } else {
     parts.push(p.identity(shop, agent));
   }
-  if (returning) parts.push(p.welcomeBack(name));
+  let liveAt = -1;
+  if (returning) {
+    if (name) liveAt = parts.length;
+    parts.push(p.welcomeBack(name));
+  }
   const ownerSaysRecord = Boolean(owner) && /\b(record|rekodi)/i.test(owner);
   const variantLine = noticeOn && !ownerSaysRecord ? noticeWording(o.noticeVariant, lang) : '';
   if (noticeOn && !ownerSaysRecord && !variantLine) parts.push(p.notice);
@@ -296,6 +305,16 @@ function composeOpening(o = {}) {
     closure ? 'bulletin' : closed ? (messageMode ? 'closed_message' : 'closed_serve') : messageMode ? 'message' : 'open',
   ].join('_');
   const text = parts.filter(Boolean).join(' ');
+  // VOICE_OPENING_NAME_SPLICE: a named returning greeting is cached head +
+  // short live name line + cached tail, so the name never forces a full render.
+  const segments =
+    liveAt >= 0
+      ? {
+          head: parts.slice(0, liveAt).filter(Boolean).join(' '),
+          live: parts[liveAt],
+          tail: parts.slice(liveAt + 1).filter(Boolean).join(' '),
+        }
+      : null;
   // Where the notice ends in the line, so a barge can tell whether it was heard.
   let noticeText = '';
   if (noticeOn) noticeText = ownerSaysRecord ? owner : variantLine || p.notice;
@@ -309,6 +328,7 @@ function composeOpening(o = {}) {
     noticeVariant: variantLine ? o.noticeVariant : null,
     noticeText,
     noticeEnd: at >= 0 ? at + noticeText.length : null,
+    segments,
   };
 }
 
@@ -996,6 +1016,14 @@ function openingWarmLines(profile = {}, { isOpen = null, recordingNotice } = {})
   const lines = [first.text, back.text];
   // Every configured notice wording, so whichever a call draws is a cache hit.
   for (const v of noticeVariants()) lines.push(composeOpening({ ...base, noticeVariant: v }).text);
+  if (openingNameSpliceOn()) {
+    // Head and tail of the named returning greeting (the name is rendered live).
+    const named = { ...base, isReturning: true, nameConfirmed: true, knownName: 'Name' };
+    for (const v of [null, ...noticeVariants()]) {
+      const seg = composeOpening({ ...named, noticeVariant: v }).segments;
+      if (seg) lines.push(seg.head, seg.tail);
+    }
+  }
   for (let i = 0; i < MAX_BARE_HELLO; i += 1) lines.push(bareHelloLine({ language, invite: first.invite, count: i }));
   for (let s = 1; s <= SILENCE_LADDER_MS.length; s += 1) lines.push(silenceLine({ language, invite: first.invite, step: s }));
   return [...new Set(lines.filter(Boolean))];
@@ -1006,6 +1034,7 @@ module.exports = {
   RETURNING_SKIP_NOTICE_FLAG,
   NOTICE_HEARD_MARGIN_MS,
   returningSkipNoticeOn,
+  openingNameSpliceOn,
   noticeLine,
   isPersonalDetailsAsk,
   createNoticeTracker,
