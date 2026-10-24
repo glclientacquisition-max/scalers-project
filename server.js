@@ -4226,6 +4226,8 @@ mediaWss.on('connection', (ws, req) => {
       );
       voiceTrace.beginTurn({ callerText: clean, language: callLanguageState });
       voiceTrace.noteTurnEnd({ decision: 'hold', reason: 'unfinished' });
+      // BRAIN_V2_MODEL=on: start this turn's one model call on the stable partial (no-op otherwise)
+      try { if (brainV2Live && typeof brainV2Live.partial === 'function') brainV2Live.partial({ text: clean, profile: brainProfile }); } catch { /* model is evidence only */ }
       voiceTrace.commitTurn({ outcome: 'hold' });
       unfinishedHold.hold(clean, {
         unfinished: true,
@@ -6957,6 +6959,7 @@ mediaWss.on('connection', (ws, req) => {
   });
 
   ws.on('close', (code, reason) => {
+    try { require('./src/conversation/v2/turnModel').endCall(sidLabel()); } catch { /* best effort */ }
     const ms = Date.now() - connectedAt;
     // VOICE_ENDED_CALL_GUARD: did this session end the call? Our end_call,
     // a clean 1000 close, or a terminal webhook while it was open. An
