@@ -1,22 +1,17 @@
 'use strict';
-// One coverage answer for a place the caller names (call HD_b4afd63a69c3, voice-qa/2026-10-24_flow-and-call.md).
-// Shared Kenya area tree (data/kenyaPlaceCounties.json via kenyaPlaces.js, the same tree Desk's
-// Locations picker uses) + the owner's list: include rows (county:x covers every place in x, place:y
-// covers y) and exclude rows (beat any include). Fuzzy STT spellings come from bindSpokenPlace(fuzzy),
-// landmarks from a small seed list. Desk contract (proposed, not changed here):
-//   service_areas.areas[] = { id: 'county:nairobi' | 'place:kibera', rule?: 'include' | 'exclude', ... }
-//   rule defaults to 'include'; service_areas.exclude: string[] is read too (same ids).
+// One coverage answer for a place the caller names (call HD_b4afd63a69c3).
+// SOURCE: the owner's picks in public.tenant_area_picks (profile.areaPicks) on Desk's Kenya area tree
+// (docs/reference/platform/AREA_PICKS.md, Desk #930). Matching, nearest-pick-wins, fee/note and the caller
+// line come from ./areaPicks (the CommonJS port of Desk's areaPicks.ts; parity-tested). Landmarks and
+// aliases are Desk's (tree nodes). FALLBACK, only when the tenant has no picks (or the tree/table is
+// absent): the legacy lists (service_areas / serviceAreas / areaTerms / business_policies.coverage_areas)
+// on the place->county index (data/kenyaPlaceCounties.json). BRAIN_AREA_PICKS=off forces the fallback.
 const K = require('../kenyaPlaces');
 const INDEX = require('../data/kenyaPlaceCounties.json');
 const { coverageAreaNames } = require('../coverageAreas');
+const AP = require('./areaPicks');
 
 const cap = (s) => String(s || '').replace(/\b[a-z]/g, (c) => c.toUpperCase());
-// [seed] landmark -> place in the tree. Desk may own this later (spec §Desk contract).
-const LANDMARKS = {
-  sarit: 'westlands', 'sarit centre': 'westlands', westgate: 'westlands', yaya: 'kilimani', 'yaya centre': 'kilimani',
-  'village market': 'gigiri', jkia: 'embakasi', 'thika road mall': 'roysambu', trm: 'roysambu', 'garden city': 'roysambu',
-  'junction mall': 'kilimani', galleria: 'langata', 'the hub': 'karen', 'kenyatta university': 'kahawa',
-};
 // words that ask "where" without a place ("where's your coverage") must never become a place
 const NOT_PLACE = new Set(['coverage', 'cover', 'area', 'areas', 'where', 'place', 'town', 'eneo', 'maeneo', 'wapi']);
 const ASKED_PLACE = /\b(?:[Dd]o you (?:do|cover|come to|serve|reach|go to)|you (?:cover|come to|reach)|are you in|i'?m (?:in|at|near)|i am (?:in|at|near)|we'?re (?:in|at)|i (?:stay|live) (?:in|at|near)|near|in|at|mnafika|mnakuja|mtafika|niko|nipo|naishi|nakaa|karibu na|hadi|eneo la)\s+([A-Z][A-Za-z'-]{1,}(?:\s+[A-Z][A-Za-z'-]+){0,2})/;
@@ -45,10 +40,57 @@ function ownerRules(profile = {}) {
   return { inc, exc, say };
 }
 
+// ---- tree phrase matching (Desk rule 1: exact name/alias, then landmark, then loose spelling) ----
+const STOP = new Set(['the', 'a', 'an', 'my', 'your', 'our', 'you', 'we', 'i', 'do', 'does', 'is', 'are', 'in', 'at', 'to', 'near', 'from', 'for', 'and', 'or', 'it', 'that', 'this', 'there', 'yes', 'yeah', 'no', 'ok', 'okay', 'sawa', 'ndio', 'hapana', 'niko', 'nipo', 'naishi', 'nakaa', 'mnafika', 'mnakuja', 'mtafika', 'karibu', 'na', 'hadi', 'la', 'eneo', 'cover', 'coverage', 'area', 'areas', 'place', 'where', 'wapi', 'under', 'put', 'can', 'book', 'booking', 'please', 'tomorrow', 'today', 'kesho', 'leo', 'morning', 'evening', 'afternoon', 'cleaning', 'window', 'house', 'office', 'name', 'jina', 'stay', 'live', 'come', 'serve', 'reach', 'go', 'also', 'but', 'so', 'am', 'im', 'were', 'me', 'us', 'job', 'kazi']);
+let PHRASES = null; // normalised name/alias/landmark -> node
+function phraseIndex() {
+  if (PHRASES) return PHRASES;
+  PHRASES = { exact: new Map(), landmark: new Map() };
+  for (const n of AP.NODES) {
+    if (n.kind === 'country') continue;
+    for (const k of [n.name, ...(n.aliases || [])]) { const q = AP.normAreaText(k); if (q && !PHRASES.exact.has(q)) PHRASES.exact.set(q, n); }
+    for (const l of n.landmarks || []) { const q = AP.normAreaText(l); if (q && !PHRASES.landmark.has(q)) PHRASES.landmark.set(q, n); }
+  }
+  // a name that is both a county and a town: Desk's matchAreaText picks the county
+  for (const [q, n] of PHRASES.exact) { if (n.kind !== 'county') { const c = AP.NODES.find((x) => x.kind === 'county' && AP.normAreaText(x.name) === q); if (c) PHRASES.exact.set(q, c); } }
+  return PHRASES;
+}
+/** The tree node the caller named, or null. Exact > landmark > close spelling (≤1 for 4 letters, ≤2 for 5+). */
+function treeMatch(text) {
+  if (!AP.available()) return null;
+  const words = AP.normAreaText(text).split(' ').filter(Boolean);
+  const ix = phraseIndex(); let best = null;
+  for (let len = Math.min(3, words.length); len >= 1; len--) {
+    for (let i = 0; i + len <= words.length; i++) {
+      const g = words.slice(i, i + len);
+      if (STOP.has(g[0]) || STOP.has(g[g.length - 1])) continue;
+      const q = g.join(' ');
+      const locative = /^[a-z]{5,}ni$/.test(q) ? q.slice(0, -2) : null; // sw "Kileleshwani" = "at Kileleshwa"
+      let n = ix.exact.get(q) || (locative && ix.exact.get(locative)); let via = 'name';
+      if (!n) { n = ix.landmark.get(q); via = 'landmark'; }
+      if (!n && len <= 2 && q.replace(/ /g, '').length >= 4) {
+        const tol = q.length >= 5 ? 2 : 1; let d0 = tol + 1;
+        for (const [k, node] of ix.exact) { if (Math.abs(k.length - q.length) > tol) continue; const d = AP.editDistance(q, k); if (d < d0) { d0 = d; n = node; } }
+        if (locative && !n) for (const [k, node] of ix.exact) { if (AP.editDistance(locative, k) <= 1) { n = node; break; } }
+        via = 'fuzzy';
+      }
+      if (n) { const rank = (via === 'fuzzy' ? 0 : 10) + len; if (!best || rank > best.rank) best = { node: n, via, rank, said: q }; }
+    }
+  }
+  return best;
+}
+
+/** Owner picks (normalised), or null when this tenant has none / picks are off / the tree is missing. */
+function picksOf(profile = {}) {
+  if (String(process.env.BRAIN_AREA_PICKS || 'on').toLowerCase() === 'off' || !AP.available()) return null;
+  const raw = profile.areaPicks; if (!raw) return null;
+  const p = AP.normalizeAreaPicks(raw);
+  return p.picks.length ? p : null;
+}
+
 function landmark(text) {
-  const low = ` ${K.normalizePlaceKey(text)} `;
-  const hit = Object.keys(LANDMARKS).sort((a, b) => b.length - a.length).find((k) => low.includes(` ${k} `));
-  return hit ? { place: LANDMARKS[hit], landmark: hit } : null;
+  const m = treeMatch(text);
+  return m && m.via === 'landmark' ? { place: K.normalizePlaceKey(m.node.name), landmark: m.said } : null;
 }
 
 /**
@@ -59,8 +101,11 @@ function landmark(text) {
 function resolve(text, profile = {}) {
   const t = String(text || '');
   if (!t.trim()) return null;
+  const picks = picksOf(profile);
+  if (picks) return resolvePicks(t, picks);
   const lm = landmark(t);
-  const found = lm ? [lm.place] : K.bindSpokenPlace(t, { fuzzy: true }).filter((p) => !NOT_PLACE.has(p));
+  let found = lm ? [lm.place] : K.bindSpokenPlace(t, { fuzzy: true }).filter((p) => !NOT_PLACE.has(p));
+  if (!found.length) { const tm = treeMatch(t); if (tm) found = [K.normalizePlaceKey(tm.node.name)]; } // Desk tree names/aliases (Juja, Ongata Rongai)
   const { inc, exc, say } = ownerRules(profile);
   if (!found.length) {
     const m = t.match(ASKED_PLACE);
@@ -80,12 +125,32 @@ function resolve(text, profile = {}) {
   return { ...base, status: 'outside', via: 'tree' };
 }
 
-// [PROMPT-PLACEHOLDER] caller-facing coverage lines.
+function unknownAsked(t) {
+  const m = t.match(ASKED_PLACE); const w = m && m[1] && m[1].trim();
+  if (w && !NOT_PLACE.has(w.toLowerCase()) && /^[A-Z]/.test(w) && !/^(the|my|your|our|a|an|it|that|this|alvin)$/i.test(w)) return { status: 'unknown', name: cap(w.toLowerCase()), place: null, counties: [], via: 'asked', source: 'picks' };
+  return null;
+}
+function resolvePicks(t, picks) {
+  const m = treeMatch(t);
+  if (!m) return unknownAsked(t);
+  const n = m.node; const res = AP.resolveArea(picks, n.id);
+  const county = AP.countyOf(n.id);
+  const status = res.covered ? 'covered' : res.via ? 'excluded' : 'outside';
+  return { status, name: n.name, place: K.normalizePlaceKey(n.name), node: n.id, counties: county ? [K.normalizePlaceKey(county.name)] : [], via: res.via || 'tree', county: county && county.id !== n.id ? county.name : null, fee_kes: res.fee_kes, note: res.note, source: 'picks', ...(m.via === 'landmark' ? { landmark: m.said } : {}), lines: { en: AP.linesFor(picks, n, 'en').reply, sw: AP.linesFor(picks, n, 'sw').reply } };
+}
+/** Serving / excluded pick names for "where do you cover" (picks mode), or null (legacy). */
+function listed(profile = {}) {
+  const p = picksOf(profile); if (!p) return null;
+  return { serve: p.picks.filter((x) => x.serve).map((x) => (AP.areaNode(x.node) || {}).name).filter(Boolean), off: p.picks.filter((x) => !x.serve).map((x) => (AP.areaNode(x.node) || {}).name).filter(Boolean) };
+}
+
+// [PROMPT-PLACEHOLDER] caller-facing coverage lines. Picks mode: Desk's "what callers will hear" (fee, note).
 function line(r, lang = 'en') {
   if (!r) return null;
+  if (r.lines) return /^sw/.test(String(lang || '')) ? r.lines.sw : r.lines.en;
   const sw = /^sw/.test(String(lang || ''));
   if (r.status === 'covered') return sw ? `Ndio, tunafika ${r.name}.` : `Yes, we cover ${r.name}.`;
   if (r.status === 'excluded' || r.status === 'outside') return sw ? `Samahani, hatufiki ${r.name}.` : `Sorry, we don't cover ${r.name}.`;
   return sw ? 'Hiyo iko karibu na eneo gani?' : 'Which area is that near?';
 }
-module.exports = { resolve, line, ownerRules, LANDMARKS };
+module.exports = { resolve, line, ownerRules, picksOf, listed, treeMatch };

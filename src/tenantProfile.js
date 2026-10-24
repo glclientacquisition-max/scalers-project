@@ -63,6 +63,8 @@ function tenantProfileFromRow(row, extras = {}) {
     teamDirectory: row.team_directory || [],
     unknownAnswerFallback: row.unknown_answer_fallback || null,
     unknownAnswerSpoken: extras.unknownAnswerSpoken ?? row.unknown_answer_spoken ?? null,
+    // Desk Settings › Service areas (public.tenant_area_picks.picks); null = no row / no table -> legacy lists
+    areaPicks: extras.areaPicks ?? null,
     unknownAnswerByKind: require('./conversation/unknownAnswerByKind').parseByKind(
       row.unknown_answer_by_kind
     ),

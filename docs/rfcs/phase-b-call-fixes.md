@@ -19,14 +19,22 @@ RCA: `voice-qa/2026-10-24_flow-and-call.md`. Done when a replay of the 13:08 cal
 4. **A yes at the read-back books** ("Yeah, I do so", "Ndio, sawa", "Sawa"). "Yes but …" and "Ndio lakini …" do not book. At turn end, a short yes-led answer to our question is whole and is not held (`unfinishedTurn` short_yes).
 5. **Latency.** Under Phase B the draft starts at turn start, in parallel with CP.before, the understanding call and the machine. Its sentences are buffered and only spoken through the plan gate. They are verified against the post-plan state. The partial early start is re-allowed under B, and it also warms the understanding call. Knob: `BRAIN_V1_DRAFT_PHASE_B_PARALLEL=off` restores serial. Trade-off: the early draft request has no STEP note, so actCheck and the tail enforce the step.
 
-## Desk contract proposal (Desk to agree; Desk is not changed in this PR)
-```
-service_areas.areas[] = { id: 'county:<slug>' | 'place:<slug>', rule?: 'include' | 'exclude' }   // default include
-service_areas.exclude?: string[]   // shorthand list of place/county slugs
-```
-- Slugs come from the same Kenya tree. Desk can add the rule as a chip toggle on the existing coverage picker. Rows with no rule keep today's meaning, so no data migration is needed.
-- Brain reads both shapes. It canonicalises spellings (kibera to kibra) and speaks the owner's spelling.
-- Landmarks are a Brain seed for now. They could later become an owner list: `service_areas.landmarks[] = {name, place}`.
+## Area source: Desk's tenant_area_picks (supersedes the earlier service_areas.areas[] proposal, 24 Oct 2026)
+On the Chief's decision, Desk #930 is the single source. It provides `public.tenant_area_picks`, the tree `dashboard/src/lib/data/kenyaAreaTree.v1.json` (`ke-areas-2026-10-24.1`, 163 areas, with aliases and landmarks) and the contract `docs/reference/platform/AREA_PICKS.md`. The `service_areas.areas[]{rule}` proposal is dropped. The PR `brain/coverage-area-picks` makes these changes:
+- **Loading:** `db.loadAreaPicks` reads `tenant_area_picks.picks` in its own query and attaches it as `profile.areaPicks`. If the table is missing or the query errors, it returns null and the call still loads.
+- **Shared code:** `src/conversation/v2/areaPicks.js` is a CommonJS port of Desk's `areaPicks.ts` (`normalizeAreaPicks`, `resolveArea`, `matchAreaText`, `callerHears`). It reads Desk's tree file directly, and the Dockerfile copies `dashboard/src/lib/data` into the Voice image, so Brain keeps no tree of its own. Brain's landmark seed list is removed.
+- **Parity:** `tests/brainAreaPicks.test.js` runs Desk's TS and Brain's JS on 30 places and asserts the same status, line and node. It needs node ≥ 22.6, or `NODE_TS` set.
+- **Resolving a place:** `areaCoverage.resolve` finds the place phrase in the caller's words, using exact name or alias, then landmark, then loose spelling (≤1 edit at 4 letters, ≤2 at 5+), plus the sw locative "-ni". The nearest pick wins:
+  - a serving pick means covered, and fee and note come from the nearest serving pick that sets them;
+  - an explicit `serve:false` pick means excluded;
+  - no pick on the path means outside;
+  - no node matched gives "Which area is that near?".
+- **What the caller hears:** Desk's "what callers will hear" lines. A fee or note is always heard, followed by the open step. All lines are [PROMPT-PLACEHOLDER].
+  - EN: "Yes, we cover X. There's an extra KES N. {note}." / "Sorry, we don't cover X." / "Which area is that near?"
+  - SW: "Ndio, tunafika X. Kuna ada ya ziada ya KES N. {note}." / "Samahani, hatufiki X." / "Hiyo iko karibu na eneo gani?"
+  - TTS speaks the money as words.
+- **Fallback:** the legacy lists (`service_areas` / `serviceAreas` / `areaTerms` / `coverage_areas`) are used only when the tenant has no picks, the tree file is absent, or `BRAIN_AREA_PICKS=off`.
+- **Known gap (Desk parity):** a bare "Sarit" is not on the map, because Desk matches only the full landmark "Sarit Centre". Brain gives the same answer as the preview. The fix belongs in the Desk tree (add the short landmark or alias), not in a Brain list.
 
 ## Latency (sim, not production)
 `node evals/sim/phaseBLatency.sim.js 200` measures run() to the first sentence. It does not include STT endpointing, network or TTS. The model delays are assumed: draft ~ lognormal with median 900ms; understanding U[250,750]ms; partial lead U[0,400]ms.

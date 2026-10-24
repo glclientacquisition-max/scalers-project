@@ -302,13 +302,15 @@ function createBrainV2Live(opts = {}) {
       lang = machine.lang || lang;
       tmpl = (parts.join(' ').trim() || String(done?.line || '')).trim();
       tmpl = CP.after(machine, { line: tmpl }, { lang });
+      // an owner fee/note for the place just named is always heard first (Desk preview line), then the step
+      if (pre.lead && !tmpl.startsWith(pre.lead)) tmpl = `${pre.lead} ${tmpl}`.trim();
       machine.lastLine = tmpl; machine.lastBase = tmpl;
     }
     tmpl = spokenStyle(tmpl, lang);
     const st = CP.step(machine, tmpl, lang);
     // the plan's own line is the step: in full when its first sentence carries news (honest name check, added
     // item); a coverage answer + re-ask only adds its question (the model answers the coverage itself)
-    if (pre.owned) { const full = (pre.acts || []).some((x) => /^(have_my_name|item_added|add_service|service_add|area_(excluded|outside|unknown))/.test(x)); const q = CP.split(tmpl).filter((x) => /\?\s*$/.test(x)).pop(); st.question = full || !q ? tmpl : q; }
+    if (pre.owned) { const full = (pre.acts || []).some((x) => /^(have_my_name|item_added|add_service|service_add|area_(excluded|outside|unknown))/.test(x)); const q = CP.split(tmpl).filter((x) => /\?\s*$/.test(x)).pop(); st.question = full || !q ? tmpl : q; } else if (pre.lead) st.question = tmpl;
     (machine.trace || (machine.trace = [])).push({ turn: machine.turn, call_plan: { items: st.items, step: st.kind, slot: st.slot || null, acts: pre.acts } });
     const d = await vd.turn({ text, profile, state: machine, langLock: lock, onSentence, shouldAbort: abort, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, phaseA: true, plan: { kind: st.kind, parallel, startedOn, template: tmpl, note: CP.stepNote(st), check: (s, ctx) => CP.actCheck(s, st, ctx), tail: (a) => CP.tail(st, a) } });
     const endCall = endDecision({ done, machine, profile, line: d.path === 'v1_draft' ? d.line : tmpl, alreadyEnded: endSent });
