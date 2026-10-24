@@ -1661,7 +1661,23 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
         : await getTenantServiceAreas(row.id),
     ...(await loadProvenanceForProfile(row.id)),
     ...(await loadUnknownAnswerSpoken(row.id)),
+    ...(await loadAreaPicks(row.id)),
   });
+}
+
+/**
+ * public.tenant_area_picks.picks (Desk › Service areas, docs/reference/platform/AREA_PICKS.md). Its own query:
+ * a database without the table (or any error) still loads the call with areaPicks null -> legacy lists.
+ */
+async function loadAreaPicks(tenantId) {
+  try {
+    if (!tenantId || String(process.env.BRAIN_AREA_PICKS || 'on').toLowerCase() === 'off') return {};
+    const { data, error } = await supabase.from('tenant_area_picks').select('picks, tree_version').eq('tenant_id', tenantId).maybeSingle();
+    if (error || !data) return { areaPicks: null };
+    return { areaPicks: data.picks || null };
+  } catch {
+    return { areaPicks: null };
+  }
 }
 
 /** tenants.service_areas (Locations area terms) when the main select did not read it. Null on an old schema or error. */
