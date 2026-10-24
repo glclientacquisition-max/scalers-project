@@ -50,3 +50,20 @@ Run it in the SQL editor of the right project, staging first if testing. It clea
 1. Apply SQL on staging. Set `ADMIN_STEP_UP_KEY` and `ADMIN_STEP_UP_ALERT_EMAIL` on Vercel Preview/staging, then `ADMIN_STEP_UP_ENFORCE=on`.
 2. Alvin sets up with his phone, saves the backup codes, and test-unlocks a Release on a test business (never Done and Dusted).
 3. Prod: only on Alvin's GO. Apply SQL, set the key, then the flag. Rollback: unset `ADMIN_STEP_UP_ENFORCE`.
+
+## Sign-in 2FA (24 Oct 2026)
+
+Same flag: `ADMIN_STEP_UP_ENFORCE=on` turns on Unlock and sign-in 2FA together; off restores both.
+
+- After username + access code, `/admin/login` shows a second step. Authenticator first; "Use email code instead" (6 digits, 10 min, single use, 1 send per 60 s, 5 per hour); "Use a backup code".
+- Email goes to the operator's address in optional `ADMIN_OPERATOR_EMAILS=user:email,…`, else the first `ADMIN_STEP_UP_ALERT_EMAIL`.
+- Wrong codes share the Unlock lockout (5 wrong = 15 min).
+- Success sets `scalers_admin_2fa`: httpOnly, HMAC (ADMIN_STEP_UP_KEY) over operator + expiry, 12 hours. Unlock still asks separately before risky actions.
+- Not enrolled yet: email code, then Settings › Security opens authenticator setup.
+- With the flag on, the old shared-password cookie no longer opens Admin.
+- Audit: `admin.2fa.sign_in.verified|failed|locked|email_sent|email_rate_limited`. Codes never appear in logs or audit rows.
+- SQL: `docs/supabase/admin_sign_in_2fa.sql` (down: `admin_sign_in_2fa_down.sql`).
+
+## Gated routes registry
+
+`ADMIN_WRITE_ROUTES` in `dashboard/src/lib/ops/stepUpCore.ts` classifies every mutating admin route and action. `tests/adminStepUpRoutes.test.js` fails CI if a mutating route or action is unclassified, or a risky one skips `stepUpGate`. `StepUpHost` (console layout) opens the Unlock sheet on any 403 `step_up_required`.

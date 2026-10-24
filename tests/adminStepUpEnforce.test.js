@@ -170,7 +170,7 @@ describe("reset", () => {
     assert.equal(validateResetReason("lost phone"), "lost phone");
     const route = read("dashboard/src/app/api/admin/step-up/reset/route.ts");
     assert.match(route, /validateResetReason/);
-    assert.match(route, /grantValid\(grant, gate\.operator/);
+    assert.match(route, /stepUpGate\(gate\.operator, "step-up:reset"/);
     assert.match(route, /target === gate\.operator/);
     assert.match(route, /sendStepUpNotice\("authenticator_reset"/);
   });

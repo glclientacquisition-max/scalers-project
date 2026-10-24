@@ -21,33 +21,111 @@ export function stepUpEnforced(env: NodeJS.ProcessEnv = process.env): boolean {
 }
 
 /**
- * Risky Admin actions that need a live unlock when enforced. Keys are `<route>:<action>`.
- * Mirrors every write currently behind UnlockCta / StepUpSheet.
+ * One registry for every mutating Admin API route (Alvin, 24 Oct 2026).
+ * Every POST/PUT/PATCH/DELETE route under app/api/admin and app/api/did-pool must be listed here,
+ * and every action it handles must be classified `risky` (needs a live Unlock when
+ * ADMIN_STEP_UP_ENFORCE=on) or `safe`. tests/adminStepUpRoutes.test.js fails CI otherwise.
+ *
+ * `prefix` is the gate key prefix: the route calls stepUpGate(…, `${prefix}:${action}`).
+ * `auth` routes run before a full session (sign-in, Unlock itself) and are never gated.
  */
-const RISKY = new Set<string>([
-  "did-pool:release",
-  "did-pool:assign_specific",
-  "did-pool:assign_next",
-  "businesses:release_did",
-  "businesses:archive",
-  "businesses:transfer_owner",
-  "businesses:assign_next",
-  "invoice:void",
-  "invoice:credit_note",
-  "number-hold:hold",
-  "number-hold:end_hold",
-  "number-hold:restore",
-  "number-hold:set_settings",
-  "number-hold:bill_fee",
-  "package-versions:publish",
-  "package-versions:move_subscribers",
-  "package-versions:set_billing_mode",
-  "billing:grant_minutes",
-  "billing:assign_package",
-  "billing:resolve_checkout_review",
-  "billing:set_billing_mode",
-  "platform-ops:save_settings",
-]);
+export type AdminWriteRoute = {
+  /** Path under dashboard/src/app/api, without /route.ts. */
+  file: string;
+  prefix: string | null;
+  risky: string[];
+  safe: string[];
+  /** auth: sign-in / Unlock plumbing. single: one action, no `action` field in the body. */
+  kind?: "auth" | "single";
+  note?: string;
+};
+
+// route-registry:start (route paths and action ids, not screen copy)
+export const ADMIN_WRITE_ROUTES: AdminWriteRoute[] = [
+  { file: "did-pool", prefix: "did-pool", risky: ["release", "assign_specific", "assign_next"], safe: ["add"] },
+  {
+    file: "admin/businesses",
+    prefix: "businesses",
+    risky: ["release_did", "archive", "transfer_owner", "assign_next"],
+    safe: ["suspend", "unsuspend", "restore", "update_profile", "send_owner_reset", "save_recording_retention"],
+  },
+  {
+    file: "admin/billing/invoices/[id]/actions",
+    prefix: "invoice",
+    risky: ["void", "credit_note"],
+    safe: ["dispute", "clear_dispute", "resend"],
+  },
+  {
+    file: "admin/number-hold",
+    prefix: "number-hold",
+    risky: ["hold", "end_hold", "restore", "set_settings", "bill_fee"],
+    safe: [],
+  },
+  {
+    file: "admin/package-versions",
+    prefix: "package-versions",
+    risky: ["publish", "move_subscribers", "set_billing_mode"],
+    safe: ["draft", "update_draft", "archive", "discard_draft", "approve", "set_new_signup_trial", "set_price_approval_threshold"],
+  },
+  {
+    file: "admin/billing",
+    prefix: "billing",
+    risky: ["grant_minutes", "assign_package", "resolve_checkout_review", "set_billing_mode"],
+    safe: ["unassign_package", "mint_pay_link"],
+  },
+  {
+    file: "admin/wallets",
+    prefix: "wallets",
+    risky: ["set_billing_mode"],
+    safe: [],
+    note: "Same billing-mode switch as billing:set_billing_mode, older screen.",
+  },
+  {
+    file: "admin/platform-ops",
+    prefix: "platform-ops",
+    risky: ["save_settings"],
+    safe: ["test_send", "prepare_resend", "verify_resend", "ack"],
+  },
+  {
+    file: "admin/step-up/reset",
+    prefix: "step-up",
+    risky: ["reset"],
+    safe: [],
+    kind: "single",
+    note: "Operator reset: live unlock + reason, never self.",
+  },
+  {
+    file: "admin/step-up/backup-codes",
+    prefix: "step-up",
+    risky: ["regenerate_backup_codes"],
+    safe: [],
+    kind: "single",
+  },
+  { file: "admin/packages", prefix: null, risky: [], safe: ["save_rates", "save_package"], note: "Legacy rate card; package publish is package-versions." },
+  { file: "admin/voices", prefix: null, risky: [], safe: ["upsert", "set_default", "set_active", "delete"] },
+  { file: "admin/billing/flags", prefix: null, risky: [], safe: ["save"], kind: "single" },
+  { file: "admin/billing/test-invoice", prefix: null, risky: [], safe: ["create"], kind: "single", note: "KSh 10 test invoice." },
+  { file: "admin/buy-number", prefix: null, risky: [], safe: ["buy"], kind: "single", note: "Candidate for Unlock: spends money on a new DID." },
+  { file: "admin/sautikit-sync", prefix: null, risky: [], safe: ["sync"], kind: "single" },
+  { file: "admin/session", prefix: null, risky: [], safe: ["sign_in"], kind: "auth" },
+  { file: "admin/sign-in-2fa", prefix: null, risky: [], safe: ["totp", "backup", "email_send", "email_verify"], kind: "auth" },
+  { file: "admin/step-up", prefix: null, risky: [], safe: ["unlock"], kind: "auth" },
+  { file: "admin/step-up/enrol", prefix: null, risky: [], safe: ["start", "confirm"], kind: "auth", note: "Allowed unenrolled (after sign-in 2FA) or with a live unlock." },
+];
+// route-registry:end
+
+/** `<prefix>:<action>` keys that need a live unlock. */
+export function riskyActionKeys(): string[] {
+  const out: string[] = [];
+  for (const r of ADMIN_WRITE_ROUTES) for (const a of r.risky) out.push(`${r.prefix}:${a}`);
+  return out.sort();
+}
+
+/**
+ * Risky Admin actions that need a live unlock when enforced. Keys are `<prefix>:<action>`.
+ * Single source: ADMIN_WRITE_ROUTES above (CI checks every mutating admin route is classified there).
+ */
+const RISKY = new Set<string>(riskyActionKeys());
 
 export function isRiskyAction(key: string): boolean {
   return RISKY.has(key);
@@ -248,4 +326,91 @@ export function gateDecision(input: {
 export function validateResetReason(reason: unknown): string | null {
   const r = String(reason ?? "").trim();
   return r.length >= MIN_REASON ? r.slice(0, 500) : null;
+}
+
+// ---- sign-in 2FA (Alvin, 24 Oct 2026). Same flag as Unlock: ADMIN_STEP_UP_ENFORCE=on. ----
+export const SIGNIN_COOKIE = "scalers_admin_2fa";
+export const SIGNIN_REMEMBER_MS = 12 * 60 * 60 * 1000;
+export const EMAIL_CODE_TTL_MS = 10 * 60 * 1000;
+export const EMAIL_MIN_GAP_MS = 60 * 1000;
+export const EMAIL_MAX_PER_HOUR = 5;
+
+/** Sign-in 2FA shares the Unlock flag so one switch turns both on and off. */
+export function signInTwoFactorRequired(env: NodeJS.ProcessEnv = process.env): boolean {
+  return stepUpEnforced(env);
+}
+
+function deviceMac(operator: string, expMs: number, key: string): string {
+  return createHmac("sha256", keyFrom(key)).update(`admin-2fa-device|v1|${operator}|${expMs}`).digest("base64url");
+}
+
+/** Remember-this-device token: `v1.<operator b64url>.<expMs>.<hmac>`, bound to the operator. */
+export function signDeviceToken(operator: string, expMs: number, key: string): string {
+  return `v1.${Buffer.from(operator).toString("base64url")}.${expMs}.${deviceMac(operator, expMs, key)}`;
+}
+
+export function verifyDeviceToken(token: string | undefined | null, operator: string, nowMs: number, key: string): boolean {
+  if (!token || !operator || !key || key.length < 16) return false;
+  const [v, opB64, expRaw, mac] = String(token).split(".");
+  if (v !== "v1" || !opB64 || !expRaw || !mac) return false;
+  let op = "";
+  try { op = Buffer.from(opB64, "base64url").toString("utf8"); } catch { return false; }
+  const exp = Number(expRaw);
+  if (op !== operator || !Number.isFinite(exp) || exp <= nowMs || exp > nowMs + SIGNIN_REMEMBER_MS + 60_000) return false;
+  return eq(mac, deviceMac(op, exp, key));
+}
+
+export function generateEmailCode(): string {
+  return String(randomBytes(4).readUInt32BE(0) % 1_000_000).padStart(6, "0");
+}
+
+export function hashEmailCode(code: string, operator: string, pepper: string): string {
+  return createHash("sha256").update(`email-otp:${pepper}:${operator}:${String(code || "").replace(/\s/g, "")}`).digest("hex");
+}
+
+/** Index of a live, unused code row that matches, or -1. */
+export function matchEmailCode(
+  code: string,
+  operator: string,
+  rows: Array<{ code_hash: string; used_at: string | null; expires_at: string }>,
+  pepper: string,
+  nowMs: number,
+): number {
+  if (!/^\d{6}$/.test(String(code || "").replace(/\s/g, ""))) return -1;
+  const h = hashEmailCode(code, operator, pepper);
+  return rows.findIndex((r) => !r.used_at && Date.parse(r.expires_at) > nowMs && eq(r.code_hash, h));
+}
+
+/** Send rate limit: 1 per 60 s and 5 per rolling hour. `sentAt` = recent send times (ms). */
+export function emailSendDecision(sentAt: number[], nowMs: number): { ok: true } | { ok: false; retryAfterS: number } {
+  const hour = sentAt.filter((t) => t > nowMs - 60 * 60 * 1000).sort((a, b) => a - b);
+  const last = hour[hour.length - 1];
+  if (last != null && nowMs - last < EMAIL_MIN_GAP_MS) return { ok: false, retryAfterS: Math.ceil((EMAIL_MIN_GAP_MS - (nowMs - last)) / 1000) };
+  if (hour.length >= EMAIL_MAX_PER_HOUR) return { ok: false, retryAfterS: Math.ceil((hour[0] + 60 * 60 * 1000 - nowMs) / 1000) };
+  return { ok: true };
+}
+
+/** a***@gmail.com */
+export function maskEmail(email: string): string {
+  const [u, d] = String(email || "").split("@");
+  if (!u || !d) return "";
+  return `${u[0]}${"*".repeat(Math.max(2, Math.min(6, u.length - 1)))}@${d}`;
+}
+
+/**
+ * Where the sign-in email code goes. ADMIN_OPERATORS holds no emails, so an optional
+ * ADMIN_OPERATOR_EMAILS=user:email,… wins per operator, else ADMIN_STEP_UP_ALERT_EMAIL (first address).
+ */
+export function signInEmailFor(operator: string, env: NodeJS.ProcessEnv = process.env): string | null {
+  const ok = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+  for (const part of String(env.ADMIN_OPERATOR_EMAILS || "").split(",")) {
+    const i = part.indexOf(":");
+    if (i <= 0) continue;
+    if (part.slice(0, i).trim().toLowerCase() === operator) {
+      const e = part.slice(i + 1).trim();
+      if (ok(e)) return e;
+    }
+  }
+  const fallback = String(env.ADMIN_STEP_UP_ALERT_EMAIL || "").split(",").map((s) => s.trim()).find(ok);
+  return fallback || null;
 }

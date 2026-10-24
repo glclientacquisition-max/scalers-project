@@ -224,6 +224,7 @@ export function AdminSettingsHubV2({ raw }: { raw: SettingsHubRaw | null }) {
           {[
             ["/admin/settings/services", "Services", "Service list businesses pick from."],
             ["/admin/settings/voices", "Voices", "Assistant voices available to shops."],
+            ["/admin/settings/security", "Security", "Authenticator, backup codes, operator reset."],
             ["/admin/settings/audit", "Audit log", "Every admin change, newest first."],
           ].map(([href, label, note]) => (
             <li key={href}>

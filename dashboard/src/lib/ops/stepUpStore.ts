@@ -139,3 +139,84 @@ export async function sendStepUpNotice(kind: "backup_code_used" | "authenticator
     console.error(JSON.stringify({ event: "step-up-notice-failed", kind, operator, error: String((err as Error)?.message || err) }));
   }
 }
+
+// ---- sign-in email codes (docs/supabase/admin_sign_in_2fa.sql) ----
+export type EmailCodeRow = { id: string; code_hash: string; used_at: string | null; expires_at: string; created_at: string };
+
+export async function recentEmailCodes(operator: string, sinceMs: number): Promise<EmailCodeRow[]> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("admin_sign_in_email_code")
+    .select("id, code_hash, used_at, expires_at, created_at")
+    .eq("operator", operator)
+    .gte("created_at", new Date(sinceMs).toISOString())
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data || []) as EmailCodeRow[];
+}
+
+export async function insertEmailCode(operator: string, codeHash: string, expiresAt: number, sentTo: string): Promise<void> {
+  const { error } = await getSupabaseAdmin()
+    .from("admin_sign_in_email_code")
+    .insert({ operator, code_hash: codeHash, expires_at: new Date(expiresAt).toISOString(), sent_to: sentTo });
+  if (error) throw error;
+}
+
+/** Atomic single use. */
+export async function consumeEmailCode(id: string): Promise<boolean> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("admin_sign_in_email_code")
+    .update({ used_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("used_at", null)
+    .select("id");
+  if (error) throw error;
+  return (data || []).length === 1;
+}
+
+/** Retire every other live code once one is used. */
+export async function retireEmailCodes(operator: string): Promise<void> {
+  await getSupabaseAdmin()
+    .from("admin_sign_in_email_code")
+    .update({ used_at: new Date().toISOString() })
+    .eq("operator", operator)
+    .is("used_at", null);
+}
+
+/** The sign-in code email. The only email that ever carries a code. */
+export async function sendSignInCodeEmail(to: string, code: string): Promise<{ sent: boolean; why?: string }> {
+  try {
+    const res = await sendOpsMail({
+      to: [to],
+      subject: "Scalers Admin sign-in code",
+      text: `Your Scalers Admin sign-in code is ${code}.\n\nIt works once and expires in 10 minutes.\n\nIf you didn't try to sign in, change your access code now.`,
+    });
+    return res.sent ? { sent: true } : { sent: false, why: res.skipped };
+  } catch (err) {
+    console.error(JSON.stringify({ event: "admin-2fa-email-failed", error: String((err as Error)?.message || err).slice(0, 200) }));
+    return { sent: false, why: "send_failed" };
+  }
+}
+
+export async function backupCodesLeft(operator: string): Promise<number> {
+  return (await loadBackupCodes(operator)).filter((r) => !r.used_at).length;
+}
+
+/** Enrolment status for the Security screen. Never returns secrets. */
+export async function factorStatuses(operators: string[]): Promise<Record<string, { enrolled: boolean; needsReenrol: boolean; lockedUntil: string | null }>> {
+  const out: Record<string, { enrolled: boolean; needsReenrol: boolean; lockedUntil: string | null }> = {};
+  for (const op of operators) out[op] = { enrolled: false, needsReenrol: false, lockedUntil: null };
+  if (!operators.length) return out;
+  const { data, error } = await getSupabaseAdmin()
+    .from("admin_step_up_factor")
+    .select("operator, enrolled_at, secret_enc, needs_reenrol, locked_until")
+    .in("operator", operators);
+  if (error) throw error;
+  for (const r of (data || []) as Array<{ operator: string; enrolled_at: string | null; secret_enc: string | null; needs_reenrol: boolean; locked_until: string | null }>) {
+    out[r.operator] = {
+      enrolled: !!r.enrolled_at && !!r.secret_enc,
+      needsReenrol: !!r.needs_reenrol,
+      lockedUntil: r.locked_until && Date.parse(r.locked_until) > Date.now() ? r.locked_until : null,
+    };
+  }
+  return out;
+}

@@ -9,10 +9,11 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (55)
+## Tables (56)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
+| `admin_sign_in_email_code` | `code_hash`, `created_at`, `expires_at`, `id`, `operator`, `sent_to`, `used_at` | `docs/supabase/admin_sign_in_2fa.sql` |
 | `admin_step_up_backup_code` | `code_hash`, `created_at`, `id`, `operator`, `used_at` | `docs/supabase/admin_step_up.sql` |
 | `admin_step_up_factor` | `created_at`, `enrolled_at`, `failed_count`, `last_step`, `locked_until`, `needs_reenrol`, `operator`, `pending_secret_enc`, `secret_enc`, `updated_at` | `docs/supabase/admin_step_up.sql` |
 | `admin_step_up_grant` | `action`, `created_at`, `expires_at`, `id`, `method`, `operator`, `revoked_at` | `docs/supabase/admin_step_up.sql` |
@@ -157,7 +158,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `admin_set_price_approval_threshold` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_tenant_billing_mode` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_tenant_live_payments` | `docs/supabase/invoice_pay_live_allowlist.sql` |
-| `admin_step_up_reset` | `docs/supabase/admin_step_up.sql` |
+| `admin_step_up_reset` | `docs/supabase/admin_sign_in_2fa.sql`<br>`docs/supabase/admin_sign_in_2fa_down.sql`<br>`docs/supabase/admin_step_up.sql` |
 | `admin_update_package_version_draft` | `docs/supabase/package_version_editor.sql` |
 | `admin_void_invoice` | `docs/supabase/admin_invoice_actions.sql` |
 | `apply_line_rental` | `docs/supabase/line_rental_grace.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_security_beta.sql` |

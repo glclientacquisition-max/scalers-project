@@ -1,10 +1,10 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { findAdminOperator, normalizeAdminUsername } from "@/lib/adminOperators";
 import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { stepUpMode } from "@/lib/ops/stepUp";
-import { grantValid, UNLOCK_COOKIE, validateResetReason } from "@/lib/ops/stepUpCore";
-import { loadGrant, resetFactor, sendStepUpNotice } from "@/lib/ops/stepUpStore";
+import { validateResetReason } from "@/lib/ops/stepUpCore";
+import { stepUpGate } from "@/lib/ops/stepUpGate";
+import { resetFactor, sendStepUpNotice } from "@/lib/ops/stepUpStore";
 
 /**
  * Operator reset: another Super Admin, with their own live unlock and a reason, clears
@@ -20,11 +20,8 @@ export async function POST(req: Request) {
   const target = normalizeAdminUsername(String(body.target || ""));
   if (!target || !findAdminOperator(target)) return NextResponse.json({ error: "Pick an operator." }, { status: 400 });
   if (target === gate.operator) return NextResponse.json({ error: "Use a backup code to reset your own authenticator." }, { status: 400 });
-  const jar = await cookies();
-  const grant = await loadGrant(jar.get(UNLOCK_COOKIE)?.value);
-  if (!grantValid(grant, gate.operator, Date.now())) {
-    return NextResponse.json({ error: "step_up_required", message: "Unlock with your own code first." }, { status: 403 });
-  }
+  const stepUp = await stepUpGate(gate.operator, "step-up:reset", target);
+  if (stepUp) return stepUp;
   await resetFactor(target, gate.operator, reason);
   await sendStepUpNotice("authenticator_reset", target, `Reset by ${gate.operator}. Reason: ${reason}`);
   return NextResponse.json({ ok: true });

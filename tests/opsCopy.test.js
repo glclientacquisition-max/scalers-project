@@ -17,7 +17,10 @@ describe("ops banned words", async () => {
     for (const f of fs.readdirSync(path.join(dash, d))) {
       if (f === "copy.ts") continue;
       it(`${d}/${f}`, () => {
-        const src = fs.readFileSync(path.join(dash, d, f), "utf8").replace(/^\s*(import|export) .*$/gm, "");
+        const src = fs.readFileSync(path.join(dash, d, f), "utf8")
+          // stepUpCore's route registry holds route paths and action ids (e.g. sautikit-sync), not copy.
+          .replace(/\/\/ route-registry:start[\s\S]*?\/\/ route-registry:end/g, "")
+          .replace(/^\s*(import|export) .*$/gm, "");
         const strings = [...src.matchAll(/"([^"\n]*)"|>([^<>{}\n]+)</g)].map((m) => m[1] ?? m[2]).join("\n");
         assert.deepEqual(findBannedWords(strings), [], f);
       });

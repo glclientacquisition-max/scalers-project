@@ -58,6 +58,7 @@ export function StepUpSheet({
         if (!live) return;
         setStatus(s);
         if (s.mode !== "enforce") return setView("observe");
+        setNeedsReenrol(!!s.needsReenrol);
         if (s.unlockedUntil) { setUnlockedUntil(s.unlockedUntil); return setView("unlocked"); }
         setView(s.enrolled ? "code" : "setup_intro");
       })
