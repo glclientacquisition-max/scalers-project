@@ -238,7 +238,10 @@ export function areaSummaryParts(picks: AreaPicks): SummaryPart[] {
     const k = areaNode(p.node)?.kind;
     return k === "country" ? 0 : k === "county" ? 1 : 2;
   };
-  serving.sort((a, b) => order(a) - order(b) || (areaNode(a.node)?.name ?? "").localeCompare(areaNode(b.node)?.name ?? ""));
+  // Nairobi first (as callers and the mockup expect), then the rest by name.
+  const nairobi = (p: AreaPick) =>
+    p.node === "county:nairobi" || areaAncestors(p.node).some((a) => a.id === "county:nairobi") ? 0 : 1;
+  serving.sort((a, b) => order(a) - order(b) || nairobi(a) - nairobi(b) || (areaNode(a.node)?.name ?? "").localeCompare(areaNode(b.node)?.name ?? ""));
   const items = serving.map((p) => {
     const n = areaNode(p.node)!;
     const under = new Set(descendants(n.id).map((d) => d.id));

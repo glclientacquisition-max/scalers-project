@@ -70,3 +70,18 @@ test("normalize drops unknown nodes and clamps fee/note", async () => {
   assert.equal(p.picks[0].fee_kes, null);
   assert.ok((p.picks[0].note ?? "").length <= m.AREA_NOTE_MAX);
 });
+
+test("search: bare 'Sarit' resolves to Westlands via alias", async () => {
+  const m = await load();
+  const r = m.searchAreaTree("Sarit");
+  assert.equal(r.areas[0]?.node.id, "estate:nairobi:westlands");
+  assert.equal(m.matchAreaText("Sarit")?.name, "Westlands");
+});
+
+test("home summary lists Nairobi first, then the rest by name", async () => {
+  const m = await load();
+  let p = { version: 1 as const, tree_version: tree.version, picks: [] as never[] } as Parameters<typeof m.areaSummaryParts>[0];
+  for (const n of ["county:kiambu", "county:nairobi", "county:kajiado"]) p = m.toggleArea(p, n);
+  const parts = m.areaSummaryParts(p).filter((x) => x.strong).map((x) => x.text);
+  assert.deepEqual(parts, ["Nairobi", "Kajiado", "Kiambu"]);
+});
