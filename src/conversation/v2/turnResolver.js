@@ -12,7 +12,8 @@ const L = require('./lexicon');
 const { listedAreaRows } = require('../listedAreas');
 const { joinList } = require('../spokenCatalogue');
 
-const ASKS = ['place', 'explain', 'price', 'possible', 'book'];
+// check_or_correct_detail (BRAIN_V2_REPLY_OWNER): a check of a detail we hold; the reply owner answers it from state
+const ASKS = ['place', 'explain', 'price', 'possible', 'book', 'check_or_correct_detail'];
 const POSSIBLE = /\b(is (it|that|this) possible|possible\??|can you (come|do|make it|manage)|could you (come|do)|are you able|do you (come|go|travel) (to|out)|inawezekana|mnaweza (kuja|kufika|kufanya)|mtaweza|unaweza kuja)\b/i;
 const HOW = /\b(how (do|would|will) you (do|clean|handle) it|how (it'?s|it is) done|what (does|do) (it|that) (include|involve)|mnafanyaje|mnaifanyaje|inafanywa aje)\b/i;
 const BOOK = /\b(book|booking|schedule|appointment|niwekee|weka booking|i want you to come|want (you|someone) to come|come (to|and) (clean|do)|mkuje|mje)\b/i;
@@ -39,6 +40,7 @@ function collectAsks({ u, text, state = {}, profile = {}, fields = null, lastSer
   if (intents.has('explain') || HOW.test(t)) add('explain', 'rules');
   if (intents.has('price')) add('price', 'rules');
   if (POSSIBLE.test(t)) add('possible', 'rules');
+  if (process.env.BRAIN_V2_REPLY_OWNER === 'on') { const RO = require('./replyOwner'); if (RO.NAME_Q.test(t) || RO.RIGHT_Q.test(t)) add('check_or_correct_detail', 'rules'); }
   if (intents.has('book') || intents.has('order') || BOOK.test(t)) add('book', 'rules');
   let price_challenge = false;
   if (!asks.has('price') && state.lastInfo === 'price' && PRICE_CHALLENGE.test(t)) { add('price', 'rules'); price_challenge = true; }
@@ -82,6 +84,7 @@ function resolve(ask, profile = {}, deps = {}) {
   const area = ask.asks.includes('place') ? areaCheck(ask.place, profile, deps.callerName) : null;
   for (const a of ask.asks) {
     if (a === 'place') { out.push({ ask: 'place', ...area }); continue; }
+    if (a === 'check_or_correct_detail') { out.push({ ask: a, status: 'check', fact: {} }); continue; }
     if (a === 'explain') {
       if (!svc) { out.push({ ask: 'explain', status: 'unknown', fact: {} }); continue; }
       const ex = deps.explainOf ? deps.explainOf(svc) : null;
@@ -160,6 +163,7 @@ const RESOLVABLE = new Set(['explain', 'price', 'book', 'availability', 'check',
 function owns(ask, resolutions, u = {}) {
   const intents = u.intents || [];
   if (u.yes || u.no || u.done) return false;
+  if (ask.asks.includes('check_or_correct_detail')) return false; // the reply owner answers checks
   if (intents.some((i) => !RESOLVABLE.has(i))) return false;
   if (ask.price_challenge) return true;
   const legacyPlace = intents.includes('book') || intents.includes('coverage');
