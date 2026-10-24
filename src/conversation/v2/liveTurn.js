@@ -206,6 +206,9 @@ function createBrainV2Live(opts = {}) {
     // Phase A: lines the caller heard outside the brain (greeting, opening ladder, acks) join the draft's history
     if (pA && Array.isArray(heardAgent)) for (const l of heardAgent) if (l && String(l).trim()) V1.remember(machine, 'agent', String(l).trim());
     if (vd) V1.remember(machine, 'caller', text);
+    // Phase B (single brain): v2's call plan decides the step and does the writes FIRST (rules, no model);
+    // then the model speaks every turn, phrasing that step. No owner switch. Template = total fallback.
+    if (vd && vdMode === 'on' && CP.phaseB({ env, tenantId: profile?.id })) return runPhaseB({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine, vd });
     if (vd && vdMode === 'on') {
       const d = await vd.turn({ text, profile: profile || {}, state: machine, langLock: langLock === 'en' || langLock === 'sw' ? langLock : null, onSentence, shouldAbort: typeof shouldAbort === 'function' ? shouldAbort : () => false, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, phaseA: pA });
       vdPath = d.path;
@@ -274,8 +277,46 @@ function createBrainV2Live(opts = {}) {
     };
   }
 
+  async function runPhaseB({ text, profile, langLock, shouldAbort, onSentence, machine, vd }) {
+    const abort = typeof shouldAbort === 'function' ? shouldAbort : () => false;
+    const lock = langLock === 'en' || langLock === 'sw' ? langLock : null;
+    const handlers = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName } });
+    const pre = CP.before(machine, text, profile);
+    let tmpl; let lang = machine.lang || lock || 'en'; let done = null;
+    if (pre.owned) { tmpl = pre.line; lang = pre.lang || lang; } else {
+      const parts = [];
+      // understanding: v2's one turn-model call (same as today's v2 turns), rules if it is off or misses 750 ms.
+      // BRAIN_V1_DRAFT_PHASE_B_UNDERSTAND=rules skips it (fastest; weaker on "Alvin is my name"). Design D1.
+      let turnFields = null;
+      if (modelRun === undefined) modelRun = resolveModelShadow(opts, env);
+      if (String(env.BRAIN_V1_DRAFT_PHASE_B_UNDERSTAND || 'model').toLowerCase() !== 'rules' && modelRun && modelRun.mode === 'on' && modelRun.turnModel) {
+        try { const r = await modelRun.turnModel.forFinal({ text: pre.text, profile, note: '', budgetMs: opts.turnModelWaitMs ?? TURN_MODEL_WAIT_MS, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null }); turnFields = r && r.fields || null; } catch { turnFields = null; }
+      }
+      for await (const ev of runTurnStream(machine, { text: pre.text, profile: { ...profile }, now: nowFn(), handlers, model: null, classify: null, turnFields, langLock: lock, shouldAbort: abort })) {
+        if (ev && ev.type === 'sentence') parts.push(ev.text); if (ev && ev.type === 'done') done = ev;
+      }
+      lang = machine.lang || lang;
+      tmpl = (parts.join(' ').trim() || String(done?.line || '')).trim();
+      await CP.commitExtras(machine, handlers);
+      tmpl = CP.after(machine, { line: tmpl }, { lang });
+      machine.lastLine = tmpl; machine.lastBase = tmpl;
+    }
+    tmpl = spokenStyle(tmpl, lang);
+    const st = CP.step(machine, tmpl, lang);
+    if (pre.owned) st.question = tmpl; // the plan's own line (honest name check / added item) is the step in full
+    (machine.trace || (machine.trace = [])).push({ turn: machine.turn, call_plan: { items: st.items, step: st.kind, slot: st.slot || null, acts: pre.acts } });
+    const d = await vd.turn({ text, profile, state: machine, langLock: lock, onSentence, shouldAbort: abort, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, phaseA: true, plan: { kind: st.kind, note: CP.stepNote(st), check: (s, ctx) => CP.actCheck(s, st, ctx), tail: () => CP.tail(st) } });
+    const endCall = endDecision({ done, machine, profile, line: d.path === 'v1_draft' ? d.line : tmpl, alreadyEnded: endSent });
+    if (endCall.end) endSent = true;
+    const extra = { phase: machine.phase, plan: st.kind, end: endCall.end, ...(endCall.end ? { reason: endCall.reason } : {}) };
+    if (d.path === 'v1_draft') { V1.remember(machine, 'agent', d.line); return { line: d.line, lang: d.sentences[0]?.lang || lang, sentences: d.sentences, path: 'v1_draft', streamed: typeof onSentence === 'function', ...extra }; }
+    V1.remember(machine, 'agent', tmpl);
+    return { line: tmpl, lang, sentences: CP.split(tmpl).map((x) => ({ text: x, lang })), path: `plan_fallback:${d.path}`, ...extra };
+  }
+
   /** Voice's unfinished hold: start this turn's one model call on the stable partial. */
   function partial({ text, profile, langLock } = {}) {
+    if (CP.phaseB({ env, tenantId: profile?.id })) return false; // Phase C starts the plan+model on partials
     // Phase A: a turn the draft hands to v2 anyway (read-back, action flow) warms v2's one model call instead
     if (V1.phaseA({ env, tenantId: profile?.id }) && state && V1.v2OwnsTurn(state, text)) {
       if (modelRun === undefined) modelRun = resolveModelShadow(opts, env);
@@ -298,6 +339,7 @@ const AM = require('./audibleMouth');
 const { spoken: spokenStyle } = require('./spokenStyle');
 const TRZ = require('./turnResolver');
 const RCP = require('./receipts');
+const CP = require('./callPlan');
 /** Phase A (voice-qa 926 §2.2): a handed-off "is it possible?" with a catalogue service gets a yes before
  * v2's next question ("Yes, we do interior window cleaning. Where should we come?"). Coverage and hours
  * are still checked by v2's own place/time steps; this only answers the service half. */
