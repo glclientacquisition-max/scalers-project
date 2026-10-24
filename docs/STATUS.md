@@ -19,6 +19,8 @@ Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b6
 
 **Live on staging (24 Oct 2026, EAT):** #923 `brain/turn-resolver-v1-model-call` and #921 `voice/soniox-spend-cut` are merged onto `staging/v2-c0-opening-2026-10-21` and restaged on Railway `scalers staging` with no env change. #923 adds the turn resolver, the fixed-order composer and one model call per turn on `BRAIN_V2_MODEL=on`. #921's flags (`VOICE_STT_SILENCE_GATE`, `VOICE_MAX_CALL*`, `VOICE_DEAD_AIR_HANGUP`, `VOICE_PCM_PERSIST`, `VOICE_OPENING_NAME_SPLICE`, `VOICE_CALL_METER`) stay **OFF**. Prod and Aris are untouched.
 
+**Live on staging (24 Oct 2026, 10:4x EAT):** #924 `brain/conv-state-p1` (turn resolver v2 Phase 1: conversation state + rules gaps) merged onto `staging/v2-c0-opening-2026-10-21` and restaged with `BRAIN_V2_CONV_STATE=on` and `GIT_SHA` updated to the tip (those two env changes only). Callback-after-repair line is still a `[PROMPT-PLACEHOLDER]`. Prod and Aris untouched.
+
 Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Esga is on prod DID +254709221542. Staging DID is **+254709221537** (staging tenant Jirani Cleaning Services, *per team notes*).
 
 **Product is callbacks only (#658, 11 Oct).** There is no live call transfer: the assistant takes a message and alerts a teammate. [`LIVE_TRANSFER.md`](archive/LIVE_TRANSFER.md) is archived as history.
@@ -127,7 +129,7 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 
 Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-staging` means Stage-PR leaves it out of the staging pin.
 
-- **(24 Oct, draft)** `brain/conv-state-p1` — turn resolver v2 Phase 1: Brain-owned conversation state + rules gaps (coverage, non-initial no, "how much is it" carry-forward, catalogue word not a name, callback after 2 repairs, open-offer tracking). Behind `BRAIN_V2_CONV_STATE` (default **OFF**). Not staged. Callback-after-repair line is a `[PROMPT-PLACEHOLDER]` for Prompt to reword.
+- ~~`brain/conv-state-p1` (#924)~~ merged to staging 24 Oct.
 **Queued for the next clean Aris call** (one at a time, in this order unless Alvin says otherwise):
 
 | PR | Lane | What | State |
