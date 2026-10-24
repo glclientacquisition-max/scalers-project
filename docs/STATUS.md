@@ -128,6 +128,7 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 ---
 
 ## 4. Open PRs
+- **(24 Oct, draft)** `brain/v1-draft-kb-verify` — `BRAIN_V1_DRAFT` (off|shadow|on, default off, Done & Dusted only via `BRAIN_V1_DRAFT_TENANTS` default): v1-style single streaming model call drafts the reply as `say{text,refs}` function calls; every sentence is verified against the KB fact note before TTS (whole sentence replaced by an honest unknown + one callback if any fact is unverified; availability never from the model); v2 reply owner (#925) + conv state (#924) is the total fallback. Design `ship-briefs/2026-10-24_brain_v1-draft-kb-verify-design.md`. Not merged/restaged; env unchanged.
 
 Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-staging` means Stage-PR leaves it out of the staging pin.
 
