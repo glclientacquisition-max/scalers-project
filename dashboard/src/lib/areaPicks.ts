@@ -20,7 +20,14 @@ export type AreaNode = {
   aliases: string[];
   landmarks: string[];
 };
-export type AreaPick = { node: string; serve: boolean; fee_kes: number | null; note: string | null };
+export type AreaPick = {
+  node: string;
+  serve: boolean;
+  /** Extra travel fee in whole KES on top of the job price. null = none. */
+  fee_kes: number | null;
+  /** Short caller note, also where per-area rules live ("From 2 bedrooms up"). Spoken after the fee. */
+  note: string | null;
+};
 export type AreaPicks = { version: 1; tree_version: string; picks: AreaPick[] };
 export type TriState = "on" | "off" | "part";
 
@@ -189,7 +196,12 @@ export function toggleArea(picks: AreaPicks, id: string): AreaPicks {
   const under = new Set(descendants(id).map((d) => d.id));
   const prior = pickMap(picks).get(id);
   const rest = picks.picks.filter((p) => p.node !== id && !under.has(p.node));
-  const next: AreaPick = { node: id, serve, fee_kes: serve ? prior?.fee_kes ?? null : null, note: serve ? prior?.note ?? null : null };
+  const next: AreaPick = {
+    node: id,
+    serve,
+    fee_kes: serve ? prior?.fee_kes ?? null : null,
+    note: serve ? prior?.note ?? null : null,
+  };
   return simplifyAreaPicks({ ...picks, picks: [...rest, next] });
 }
 
@@ -442,3 +454,36 @@ export function moveOverAreas(old: string[], answers: Record<string, "county" | 
   }
   return { picks: simplifyAreaPicks(picks), rows, questions, unmatched };
 }
+
+// ---------- confirm state (Brain #942 answers only from confirmed picks) ----------
+
+/**
+ * none: no picks and no old list. old_only: old list but no picks row yet.
+ * unconfirmed: picks never confirmed. edited: picks changed after the last confirm (not by the owner's own save).
+ * confirmed: callers get the map answers.
+ */
+export type AreaConfirmState = "none" | "old_only" | "unconfirmed" | "edited" | "confirmed";
+
+export function areaConfirmState(
+  row: { confirmed_at: string | null; updated_at: string | null; pickCount: number } | null,
+  oldListCount: number,
+): AreaConfirmState {
+  if (!row) return oldListCount > 0 ? "old_only" : "none";
+  if (!row.confirmed_at) return row.pickCount > 0 || oldListCount > 0 ? "unconfirmed" : "none";
+  const c = Date.parse(row.confirmed_at);
+  const u = row.updated_at ? Date.parse(row.updated_at) : NaN;
+  // 2s slack: owner saves stamp both columns together.
+  if (Number.isFinite(c) && Number.isFinite(u) && u - c > 2000) return "edited";
+  return "confirmed";
+}
+
+export function areaNeedsConfirm(s: AreaConfirmState): boolean {
+  return s === "old_only" || s === "unconfirmed" || s === "edited";
+}
+
+/** One calm line, same on Desk home and Service areas. */
+export const AREA_CONFIRM_COPY = {
+  title: "Confirm your service areas",
+  editedTitle: "Your areas changed since you confirmed",
+  detail: "Until you confirm, callers who ask about a place hear “the team will confirm”.",
+} as const;

@@ -9,7 +9,10 @@ import { getCurrentTenant } from "@/lib/tenant";
 
 export type AreaSaveResult = { ok: true; message: string } | { ok: false; error: string };
 
-/** Save bar and "Looks right". Picks are re-normalised against the tree on the server. */
+/**
+ * Save bar, "Confirm" and "Looks right". The owner's own save on this page also confirms (Brain #942 reads only
+ * confirmed picks), so `confirm` is true from the live page. Picks are re-normalised against the tree on the server.
+ */
 export async function saveAreaPicksAction(raw: unknown, confirm = false): Promise<AreaSaveResult> {
   const denied = await memberDenied("settings.edit");
   if (denied) return { ok: false, error: denied.error };
@@ -23,5 +26,6 @@ export async function saveAreaPicksAction(raw: unknown, confirm = false): Promis
   });
   if (!res.ok) return { ok: false, error: "Could not save your areas. Try again." };
   revalidatePath("/settings/areas");
-  return { ok: true, message: confirm ? "Areas checked and saved." : "Areas saved." };
+  revalidatePath("/home");
+  return { ok: true, message: confirm ? "Saved. Callers now get these answers." : "Areas saved." };
 }
