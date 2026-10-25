@@ -19,6 +19,15 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Installable Desk: browsers must re-check the worker on every navigation (kill switch).
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache" },
+          { key: "Service-Worker-Allowed", value: "/" },
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+        ],
+      },
+      {
         // The filled pay page was a public prerender (Vercel HIT). The API is no-store.
         source: "/pay/:path*",
         headers: [

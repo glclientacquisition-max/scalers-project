@@ -17,6 +17,7 @@ import { DeskNavHost, DeskNeedsCountBridge, DeskPendingSlot, DeskScrollRestore }
 import { LiveInbox } from "@/components/LiveInbox";
 import { DeskOffline } from "@/components/ui/DeskOffline";
 import { WelcomeToast } from "@/components/WelcomeToast";
+import { InstallCard } from "@/components/InstallCard";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import { createDeskTimer } from "@/lib/deskTiming";
 import { loadCachedInboxNeedsCount } from "@/lib/inboxLoad";
@@ -121,6 +122,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
             </Suspense>
           </main>
           <DeskTabBar hideHrefs={hideHrefs} />
+          <InstallCard />
         </div>
         <Suspense fallback={null}>
           <DeskNeedsCountLive tenantId={tenant?.id} vertical={tenant?.vertical} />

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
 import { NotifyChannelPicker } from "@/components/NotifyChannelPicker";
+import { PhoneAlertsCard } from "@/components/PhoneAlertsCard";
 import {
   SettingsGroup,
   SettingsPageHeader,
@@ -158,6 +159,9 @@ function AlertsPanelInner({
           </SettingsRow>
         </SettingsGroup>
       </form>
+      <div className={`${settingsFormBodyClass} mt-6`}>
+        <PhoneAlertsCard />
+      </div>
     </section>
   );
 }

@@ -9,7 +9,7 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (58)
+## Tables (59)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
@@ -52,6 +52,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `platform_ops_notices` | `acked_at`, `detail`, `id`, `kind`, `notified_at`, `opened_at`, `resolved_at`, `status` | `docs/supabase/platform_ops_notices.sql` |
 | `platform_ops_settings` | `emails`, `id`, `kinds`, `people`, `recording_retention_days`, `sautikit_warn_minor`, `updated_at` | `docs/supabase/platform_ops_notices.sql`<br>`docs/supabase/platform_ops_people.sql`<br>`supabase/migrations/20261018230000_recording_retention_settings.sql` |
 | `platform_soniox_voices` | `created_at`, `description`, `id`, `is_active`, `is_default`, `sort_order`, `updated_at` | `docs/supabase/soniox_voice_id.sql` |
+| `push_subscriptions` | `auth`, `created_at`, `device_label`, `disabled_at`, `endpoint`, `fail_count`, `id`, `last_ok_at`, `p256dh`, `platform`, `provider`, `tenant_id`, `user_id` | `docs/supabase/push_subscriptions.sql` |
 | `rate_limit_hits` | `bucket`, `hits`, `window_start` | `supabase/migrations/20261011150000_onboarding_setup.sql` |
 | `sautikit_did_pool` | `assigned_at`, `created_at`, `e164`, `id`, `last_tenant_id`, `notes`, `quarantine_until`, `quarantined_at`, `sautikit_number_id`, `status`, `tenant_id` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/did_number_pool.sql` |
 | `service_requests` | `call_id`, `caller_name`, `caller_phone`, `contact_id`, `created_at`, `id`, `inbox_archived_at`, `item`, `metadata`, `notes`, `quantity`, `request_type`, `status`, `tenant_id`, `updated_at`, `when_text`, `window_end`, `window_start` | `docs/supabase/contacts_and_requests.sql`<br>`docs/supabase/inbox_archive_cascade.sql`<br>`docs/supabase/service_request_windows.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |

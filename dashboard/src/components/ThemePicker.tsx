@@ -17,7 +17,6 @@ import {
 } from "@/lib/deskTheme";
 
 const CHOICES = [
-  { id: "system", label: "System" },
   { id: "light", label: "Light" },
   { id: "dark", label: "Dark" },
 ] as const;
@@ -34,9 +33,9 @@ export function useThemeChoice() {
   return { choice, pick };
 }
 
-/** "Appearance · System". The one worded entry point, inside and outside the desk. */
+/** "Appearance · Light". The one worded entry point, inside and outside the desk. */
 export function appearanceLabel(choice: DeskTheme): string {
-  const name = CHOICES.find((c) => c.id === choice)?.label ?? "System";
+  const name = CHOICES.find((c) => c.id === choice)?.label ?? "Light";
   return `Appearance · ${name}`;
 }
 
@@ -89,7 +88,7 @@ export function AppearanceFooter({ tone = "ink", className }: { tone?: "ink" | "
   );
 }
 
-/** Device theme. Instant apply. Never a tenant setting. iOS segmented: System, Light, Dark, captioned On this device. */
+/** Device theme. Light by default, dark only when picked. Instant apply. Never a tenant setting. */
 export function ThemePicker() {
   const { choice, pick } = useThemeChoice();
 

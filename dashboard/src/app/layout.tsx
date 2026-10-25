@@ -1,8 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { DeskThemeProvider } from "@/components/DeskThemeProvider";
 import { NotifyHost } from "@/components/ui/DeskNotice";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { TooltipProvider } from "@/components/ui/Tooltip";
-import { DESK_THEME_COLOR_DARK, DESK_THEME_COLOR_LIGHT, DESK_THEME_STORAGE_KEY } from "@/lib/deskTheme";
+import {
+  DESK_THEME_COLOR_LIGHT,
+  DESK_THEME_INIT_SCRIPT,
+} from "@/lib/deskTheme";
 import "./globals.css";
 
 const siteUrl =
@@ -17,9 +21,10 @@ export const metadata: Metadata = {
   description:
     "It answers when you are busy, after hours, on another call, or the line is off, so you do not miss the client.",
   applicationName: "Scalers",
+  appleWebApp: { capable: true, title: "Scalers", statusBarStyle: "default" },
   icons: {
     icon: [{ url: "/brand/favicon.png", type: "image/png" }],
-    apple: [{ url: "/brand/favicon.png" }],
+    apple: [{ url: "/icons/apple-180.png", sizes: "180x180", type: "image/png" }],
   },
   openGraph: {
     title: "Scalers, your 24-hour Business Assistant",
@@ -44,11 +49,15 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Light by default. No cookie read here: the app prerenders (cacheComponents), and a
+ * cookie read in the root layout would make every route blocking. The <head> script below picks
+ * up a dark choice (localStorage, then the cookie) before first paint and re-points theme-color,
+ * so the owner never sees the wrong theme flash.
+ */
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: DESK_THEME_COLOR_LIGHT },
-    { media: "(prefers-color-scheme: dark)", color: DESK_THEME_COLOR_DARK },
-  ],
+  themeColor: DESK_THEME_COLOR_LIGHT,
+  colorScheme: "light",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -60,19 +69,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      data-theme="light"
+      style={{ colorScheme: "light only" }}
+      suppressHydrationWarning
+    >
+      <head>
+        {/* Before first paint: a saved dark pick (localStorage, then cookie) wins over the light default. */}
+        <script dangerouslySetInnerHTML={{ __html: DESK_THEME_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-dvh bg-canvas font-sans text-ink antialiased">
-        {/* Desk theme before paint: localStorage, then cookie. Explicit choice wins. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              `try{var t=localStorage.getItem(${JSON.stringify(DESK_THEME_STORAGE_KEY)});if(t!=="dark"&&t!=="light"){var c=document.cookie.match(/(?:^|; )scalers-desk-theme=(light|dark)(?:;|$)/);t=c?c[1]:"";}if(t==="dark"||t==="light"){var r=document.documentElement;r.dataset.theme=t;var s=t==="dark"?"dark only":"light only";r.style.colorScheme=s;if(document.body)document.body.style.colorScheme=s;var m=document.querySelector('meta[name="color-scheme"]');if(!m){m=document.createElement("meta");m.name="color-scheme";document.head.appendChild(m);}m.content=t;document.cookie=${JSON.stringify(DESK_THEME_STORAGE_KEY)}+"="+t+"; Path=/; Max-Age=31536000; SameSite=Lax";}var canvas=getComputedStyle(document.documentElement).getPropertyValue("--canvas").trim();if(canvas){var tm=document.querySelector('meta[name="theme-color"]:not([media])');if(!tm){tm=document.createElement("meta");tm.name="theme-color";document.head.insertBefore(tm,document.head.firstChild);}tm.content=canvas;}}catch(e){}`,
-          }}
-        />
-        <DeskThemeProvider initial="system">
+        <DeskThemeProvider initial="light">
           <TooltipProvider>{children}</TooltipProvider>
         </DeskThemeProvider>
         <NotifyHost />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
