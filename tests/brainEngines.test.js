@@ -222,7 +222,7 @@ test('liveTurn routes to brain_engines when flag on', async () => {
   assert.equal(r.path, 'brain_engines');
 });
 
-test('split race logs and uses fallback understanding when model is late (flag off)', async () => {
+test('split race logs when understanding missing after cap (flag off, no NLU inject)', async () => {
   const ML = require('../src/conversation/v2/modelLead');
   const logs = [];
   const slowStream = () => async ({ request }) => {
@@ -249,8 +249,7 @@ test('split race logs and uses fallback understanding when model is late (flag o
   const r = await live.run({ text: 'when are you free?', profile: P, langLock: 'en' });
   assert.ok(r && r.path);
   assert.ok(logs.some((l) => l.includes('understanding null after race')));
-  const st = live.getState();
-  assert.ok(st.leadFallbackU || st.u);
+  assert.equal(live.getState().leadFallbackU, undefined);
 });
 
 test('invariant fails above two sentences', () => {

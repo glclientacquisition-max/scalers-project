@@ -467,12 +467,8 @@ function createBrainV2Live(opts = {}) {
     let u = live.u || (split ? machine.leadLateU || null : null);
     if (split && machine.leadLateU) machine.leadLateU = null;
     if (!u && split) {
-      const U = require('./understanding');
-      const fb = U.fromNlu(text, profile, machine, nowFn());
       const logFn = opts.log || ((m) => console.log(m));
-      logFn(`[brain_model_lead] understanding null after race (cap=${DL.understandCapMs ?? 1100}ms); using fallback source=${fb.source || 'fallback'}`);
-      u = ML.normUnderstanding(U.toLeadShape(fb)) || U.toLeadShape(fb);
-      machine.leadFallbackU = u;
+      logFn(`[brain_model_lead] understanding null after race (cap=${DL.understandCapMs ?? 1100}ms, uDone=${live.uDone}); rules and late understanding only`);
     }
     // a unique caller-file match fills the booking to change (never a past row); the machine's read-back still confirms it
     if (lk && rowTurn && lk.match.kind === 'unique' && machine.slots && !machine.slots.row) { const row = (machine.file && machine.file.openRows || []).find((r) => r.id === lk.match.row_id); if (row) machine.slots.row = row; }
