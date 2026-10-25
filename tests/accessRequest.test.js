@@ -45,6 +45,16 @@ describe("request access sign-up", () => {
     assert.match(adminActions, /inviteUserByEmail/);
     assert.match(adminActions, /declineAccessRequestAction/);
     assert.match(adminActions, /isAdminV2Enabled/);
+    assert.match(adminActions, /saveAccessRequestNoteAction/);
+    assert.match(adminActions, /resendAccessRequestInviteAction/);
+    assert.match(adminActions, /reopenAccessRequestAction/);
+  });
+
+  it("ships access_requests v2 SQL columns", () => {
+    const v2 = read("docs/supabase/access_requests_v2.sql");
+    assert.match(v2, /note text/);
+    assert.match(v2, /decline_reason text/);
+    assert.match(read("docs/supabase/access_requests_v2.down.sql"), /drop column if exists note/);
   });
 
   it("ships access_requests SQL with RLS and no public policies", () => {
