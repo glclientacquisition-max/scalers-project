@@ -476,10 +476,18 @@ function outcome(partial) {
  *   phase: string
  * }}
  */
+// Env half of the grace-window queue: exact 'on' only. The caller (server.js) ANDs this with the
+// tenant's model-lead check and passes the result as opts.graceQueue; decideCallerEvent never reads env for it.
 function graceQueueOn(env = process.env) {
-  const v = (k) => String(env[k] || '').trim().toLowerCase();
-  if (v('VOICE_GRACE_QUEUE') === 'off') return false;
-  return v('VOICE_GRACE_QUEUE') === 'on' || v('BRAIN_MODEL_LEAD') === 'on';
+  return env.VOICE_GRACE_QUEUE === 'on';
+}
+// A grace-queued final that belongs to the turn just taken (turn busy and the reply not yet speaking, or the
+// last caller turn < mergeMs ago) is merged into that turn instead of opening a second reply after playback.
+const GRACE_MERGE_MS = 1500;
+function graceFinalDisposition({ turnBusy = false, replyStarted = false, msSinceLastCallerTurn = Infinity, mergeMs = GRACE_MERGE_MS } = {}) {
+  if (turnBusy && !replyStarted) return 'merge';
+  if (Number(msSinceLastCallerTurn) < mergeMs) return 'merge';
+  return 'queue';
 }
 function isSubstantiveFinal(text, minChars = 5) {
   const t = String(text || '').trim();
@@ -518,8 +526,9 @@ function decideCallerEvent(opts = {}) {
     // HD_319eb6f7255d (5.75 s dead air): a real caller sentence landing in the grace window right after a barge was
     // dropped and no turn owned the floor. Behind BRAIN_MODEL_LEAD (or VOICE_GRACE_QUEUE=on) a substantive final is
     // queued as the next turn instead (runs once playback stops). Short/backchannel finals are still ignored.
+    // opts.graceQueue: tenant-gated by server.js (model-lead tenant AND VOICE_GRACE_QUEUE=on).
     // [VOICE REVIEW] minimal Brain-lane change in Voice code; flag-off is unchanged.
-    if (opts.isFinal === true && graceQueueOn() && isSubstantiveFinal(text, minChars)) {
+    if (opts.isFinal === true && opts.graceQueue === true && isSubstantiveFinal(text, minChars)) {
       return outcome({ ...base, action: 'queue', reason: 'grace_queued', queue: true, runGemini: true });
     }
     return outcome({ ...base, action: 'ignore', reason: 'grace' });
@@ -988,6 +997,9 @@ function bargePhaseInputs({
 
 module.exports = {
   bargePhaseInputs,
+  graceQueueOn,
+  graceFinalDisposition,
+  GRACE_MERGE_MS,
   normalizeSpeech,
   looksLikeEcho,
   utteranceLooksIncomplete,

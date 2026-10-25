@@ -21,12 +21,12 @@ function leadOn({ env = process.env, tenantId } = {}) {
 
 // One place for every deadline (replaces v1draft r2FirstByMs 2600 on this path). Decision 2 + 3.
 const DEADLINES = { hedgeMs: 900, hardMs: 1800, repairMinLeftMs: 300, repairCapMs: 450, understandWaitMs: 1500 };
-// Split path (BRAIN_MODEL_LEAD_SPLIT, default on under BRAIN_MODEL_LEAD): understanding and reply are two parallel calls.
+// Split path (BRAIN_MODEL_LEAD_SPLIT=on exactly, default off): understanding and reply are two parallel calls.
 // Join rule: the state machine runs when the understanding arrives OR the reply's first sentence is ready OR
 // understandCapMs passes, whichever is first. A late understanding is never discarded: it still adds owed answers
 // (questions/places) before the turn ends and is carried to the next turn (machine.leadLateU).
 const SPLIT_DEADLINES = { hedgeMs: 700, hardMs: 1800, repairMinLeftMs: 300, repairCapMs: 450, understandHedgeMs: 600, understandCapMs: 1100 };
-function splitOn({ env = process.env } = {}) { return String(env.BRAIN_MODEL_LEAD_SPLIT || 'on').trim().toLowerCase() !== 'off'; }
+function splitOn({ env = process.env } = {}) { return env.BRAIN_MODEL_LEAD_SPLIT === 'on'; } // exact 'on' only; default off
 /** Lead-path models (configurable): flash-lite primary (staging TTFT ~650-800 ms), 3.6-flash hedge backup. */
 function leadModels(env = process.env) {
   return { primary: String(env.BRAIN_LEAD_MODEL_ID || '').trim() || 'gemini-3.5-flash-lite', backup: String(env.BRAIN_LEAD_BACKUP_MODEL_ID || '').trim() || 'gemini-3.6-flash' };

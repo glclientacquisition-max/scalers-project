@@ -413,6 +413,8 @@ const {
   looksLikeEcho: turnLooksLikeEcho,
   classifyFinalDuringAgentSpeech,
   agentAwaitingReply,
+  graceQueueOn,
+  graceFinalDisposition,
 } = require('./src/speech/turnTaking');
 const {
   labelFlushedCallerTurn,
@@ -2757,6 +2759,7 @@ mediaWss.on('connection', (ws, req) => {
   let playbackGeneration = 0;
   let activePlaybackGeneration = 0;
   let pendingUtterance = null;
+  let lastCallerTurnAt = 0; // grace merge: when the last caller turn started
   let pendingTurnSignals = {
     unfinished: false,
     weak: false,
@@ -4005,7 +4008,9 @@ mediaWss.on('connection', (ws, req) => {
       lastAgentAskedQuestion: lastAskedQuestion(),
       replayText: hearAgainReplayText(),
       now: Date.now(),
-      isFinal: String(source || '').startsWith('final'), // grace-window queue (BRAIN_MODEL_LEAD / VOICE_GRACE_QUEUE) acts on finals only
+      isFinal: String(source || '').startsWith('final'), // grace-window queue acts on finals only
+      // tenant-gated: the same model-lead tenant check liveTurn uses, AND VOICE_GRACE_QUEUE=on (exact)
+      graceQueue: graceQueueOn() && brainModelLead.leadOn({ tenantId: brainProfile?.id }),
     });
     // VOICE_OPENING_V2: over the greeting, barge after 600 ms of caller
     // speech or at once on a real word; anything else waits for the greeting
@@ -4281,6 +4286,7 @@ mediaWss.on('connection', (ws, req) => {
     overlapHold.discardExcept(0);
     cutFillerGen = 0;
     turnBusy = true;
+    lastCallerTurnAt = Date.now();
     bargeInActive = false;
     const turnTiming = createVoiceTurnTiming(sidLabel());
     activeTurnTiming = turnTiming;
@@ -6428,6 +6434,27 @@ mediaWss.on('connection', (ws, req) => {
         return;
       }
 
+      // Grace-queued final that belongs to the turn just taken: cut and merge into one turn (one reply),
+      // instead of queuing a second reply after playback. Late ones (>1.5 s, reply already speaking) still queue.
+      if (decision.reason === 'grace_queued') {
+        const replyStarted = speaking && !(fillerStreamId && activeOutboundStreamId === fillerStreamId);
+        const disp = graceFinalDisposition({
+          turnBusy,
+          replyStarted,
+          msSinceLastCallerTurn: lastCallerTurnAt ? Date.now() - lastCallerTurnAt : Infinity,
+        });
+        if (disp === 'merge') {
+          voiceTrace.noteTurnEnd({ decision: 'merge', reason: 'grace_queued' });
+          console.log(
+            `[ws/media][${sidLabel()}] caller_turn_merged reason=grace_queued busy=${turnBusy} reply_started=${replyStarted}: ${text.slice(0, 80)}`
+          );
+          if (speaking || turnBusy) cancelSpeech('final speech/grace_merge');
+          appendFinalPart(utteranceParts, evt.text);
+          scheduleUtteranceFlush();
+          return;
+        }
+      }
+
       if (speaking && !bargeInActive) {
         const overlap = classifyFinalDuringAgentSpeech(text, lastAgentText, {
           lastAgentAskedQuestion: lastAskedQuestion(),
@@ -6441,9 +6468,10 @@ mediaWss.on('connection', (ws, req) => {
         }
         // Hold until this playback generation ends — do not Gemini while TTS is active.
         overlapHold.enqueue(text, activePlaybackGeneration);
-        voiceTrace.noteTurnEnd({ decision: 'queue', reason: 'agent_speaking' });
+        const queueReason = decision.reason === 'grace_queued' ? 'grace_queued' : 'agent_speaking';
+        voiceTrace.noteTurnEnd({ decision: 'queue', reason: queueReason });
         console.log(
-          `[ws/media][${sidLabel()}] caller_turn_queued gen=${activePlaybackGeneration}`
+          `[ws/media][${sidLabel()}] caller_turn_queued gen=${activePlaybackGeneration}${queueReason === 'grace_queued' ? ' reason=grace_queued' : ''}`
         );
         return;
       }

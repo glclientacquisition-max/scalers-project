@@ -10,7 +10,7 @@ const ML = require('../src/conversation/v2/modelLead');
 const TT = require('../src/speech/turnTaking');
 const DD0 = require('../evals/v2/fixtures/tenants/done_and_dusted.json');
 const DD = { ...DD0, id: DD0.tenantId, businessPolicies: { ...(DD0.businessPolicies || {}), payment: (DD0.businessPolicies && DD0.businessPolicies.payment) || 'M-Pesa Paybill, bank transfer or cash' } };
-const ENV = { BRAIN_V2: '1', BRAIN_V2_MODE: 'live', BRAIN_V2_MODEL: 'on', BRAIN_V1_DRAFT: 'on', BRAIN_V1_DRAFT_PHASE_A: 'on', BRAIN_CALL_CORE: 'on', BRAIN_MODEL_LEAD: 'on', BRAIN_LEAD_MODEL_ID: 'lite', BRAIN_LEAD_BACKUP_MODEL_ID: 'flash' };
+const ENV = { BRAIN_V2: '1', BRAIN_V2_MODE: 'live', BRAIN_V2_MODEL: 'on', BRAIN_V1_DRAFT: 'on', BRAIN_V1_DRAFT_PHASE_A: 'on', BRAIN_CALL_CORE: 'on', BRAIN_MODEL_LEAD: 'on', BRAIN_MODEL_LEAD_SPLIT: 'on', BRAIN_LEAD_MODEL_ID: 'lite', BRAIN_LEAD_BACKUP_MODEL_ID: 'flash' };
 const NOW = '2026-10-25T07:24:00Z'; // 10:24 EAT (HD_319eb6f7255d)
 const sleep = (ms, signal) => new Promise((r, j) => { const t = setTimeout(r, ms); if (signal) signal.addEventListener('abort', () => { clearTimeout(t); j(Object.assign(new Error('aborted'), { code: 'TIMEOUT' })); }, { once: true }); });
 const U = (o = {}) => ({ lang: 'en', intents: [], questions: [], places: [], ...o });
@@ -160,22 +160,17 @@ test('SW all models down: template answers both places in Swahili, no unasked pr
   assert.doesNotMatch(r.heard, /shilling|bei ni/i, r.heard);
 });
 test('flag: BRAIN_MODEL_LEAD_SPLIT=off restores the #933 single call; lead models are configurable', () => {
-  assert.equal(ML.splitOn({ env: {} }), true); assert.equal(ML.splitOn({ env: { BRAIN_MODEL_LEAD_SPLIT: 'off' } }), false);
+  assert.equal(ML.splitOn({ env: {} }), false); assert.equal(ML.splitOn({ env: { BRAIN_MODEL_LEAD_SPLIT: 'on' } }), true); assert.equal(ML.splitOn({ env: { BRAIN_MODEL_LEAD_SPLIT: 'ON' } }), false); assert.equal(ML.splitOn({ env: { BRAIN_MODEL_LEAD_SPLIT: 'off' } }), false);
   assert.deepEqual(ML.leadModels({}), { primary: 'gemini-3.5-flash-lite', backup: 'gemini-3.6-flash' });
   assert.equal(ML.leadModels({ BRAIN_LEAD_MODEL_ID: 'x' }).primary, 'x');
 });
 
 // ---------------- turn-taking (HD_319eb6f7255d 5.75 s dead air) — Voice review
-test('grace window: a real caller sentence is queued (not dropped) under BRAIN_MODEL_LEAD; backchannel still ignored; flag off unchanged', () => {
-  const prev = { ...process.env };
-  try {
-    const at = { phase: 'speaking', speakStartedAt: 1000, now: 1100, isFinal: true };
-    process.env.BRAIN_MODEL_LEAD = 'on'; delete process.env.VOICE_GRACE_QUEUE;
-    const d = TT.decideCallerEvent({ ...at, text: 'Rongai or Kileleshwa?' });
-    assert.equal(d.action, 'queue'); assert.equal(d.reason, 'grace_queued'); assert.equal(d.skip, false);
-    assert.equal(TT.decideCallerEvent({ ...at, text: 'okay' }).action, 'ignore');
-    process.env.VOICE_GRACE_QUEUE = 'off'; assert.equal(TT.decideCallerEvent({ ...at, text: 'Rongai or Kileleshwa?' }).reason, 'grace');
-    delete process.env.VOICE_GRACE_QUEUE; process.env.BRAIN_MODEL_LEAD = 'off';
-    assert.equal(TT.decideCallerEvent({ ...at, text: 'Rongai or Kileleshwa?' }).reason, 'grace');
-  } finally { for (const k of ['BRAIN_MODEL_LEAD', 'VOICE_GRACE_QUEUE']) { if (prev[k] === undefined) delete process.env[k]; else process.env[k] = prev[k]; } }
+test('grace window: a real caller sentence is queued (not dropped) when opts.graceQueue; backchannel still ignored; off unchanged', () => {
+  const at = { phase: 'speaking', speakStartedAt: 1000, now: 1100, isFinal: true };
+  const d = TT.decideCallerEvent({ ...at, graceQueue: true, text: 'Rongai or Kileleshwa?' });
+  assert.equal(d.action, 'queue'); assert.equal(d.reason, 'grace_queued'); assert.equal(d.skip, false);
+  assert.equal(TT.decideCallerEvent({ ...at, graceQueue: true, text: 'okay' }).action, 'ignore');
+  assert.equal(TT.decideCallerEvent({ ...at, graceQueue: false, text: 'Rongai or Kileleshwa?' }).reason, 'grace');
+  assert.equal(TT.decideCallerEvent({ ...at, text: 'Rongai or Kileleshwa?' }).reason, 'grace');
 });
