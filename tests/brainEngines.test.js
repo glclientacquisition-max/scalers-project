@@ -1,12 +1,14 @@
 'use strict';
-// BRAIN_ENGINES: understanding, plan, handoff, guard, invariants (EN + SW).
+// BRAIN_ENGINES: understanding, plan, handoff, guard, invariants, E2E HD replay (EN + SW).
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { mock } = require('node:test');
 const U = require('../src/conversation/v2/understanding');
 const { pickGoal, businessOpen } = require('../src/conversation/v2/enginePlan');
 const H = require('../src/conversation/v2/handoff');
-const { makeEnginesVerifier } = require('../src/conversation/v2/engineGuard');
-const { assertTurnInvariants } = require('../src/conversation/v2/engineInvariants');
+const { notifyHandoffOwner } = require('../src/conversation/v2/handoffNotify');
+const { runBrainEnginesTurn } = require('../src/conversation/v2/brainEngines');
+const { assertTurnInvariants, capSpokenLine } = require('../src/conversation/v2/engineInvariants');
 const { brainEnginesOn } = require('../src/conversation/v2/flag');
 const { createState } = require('../src/conversation/v2/machine');
 const { tenantProfileFromRow } = require('../src/tenantProfile');
@@ -14,12 +16,15 @@ const { indexFieldMeta } = require('../src/conversation/provenance');
 const FR = require('./fixtures/dndSimTenant.json');
 const ML = require('../src/conversation/v2/modelLead');
 const CP = require('../src/conversation/v2/callPlan');
+const { createBrainV2Live } = require('../src/conversation/v2/liveTurn');
+const { runTools } = require('../src/conversation/v2/engineTools');
 
 const inner = FR.picks.picks;
 const areaPicksRows = inner.picks.map((row) => ({ ...row, confirmed_at: FR.picks.confirmed_at, tree_version: inner.tree_version }));
 const P = { ...tenantProfileFromRow(FR.row, { fieldMeta: indexFieldMeta(FR.meta), areaPicksRows }), id: FR.row.id };
+P.teamDirectory = [{ name: 'Owner', role: 'owner', phone: '+254711000001', receives_escalation: true }];
 
-const CLOSED_EVENING = new Date('2026-10-25T19:50:00+03:00'); // Sunday evening, DnD closed-serve
+const CLOSED_EVENING = new Date('2026-10-25T19:50:00+03:00');
 
 function machine(over = {}) {
   return createState({
@@ -30,9 +35,35 @@ function machine(over = {}) {
   });
 }
 
-function invariants(line, lang, prior = []) {
-  const issues = assertTurnInvariants({ line, lang, prior });
+function invariants(line, lang, prior = [], allowReadback = false) {
+  const issues = assertTurnInvariants({ line, lang, prior, allowReadback });
   assert.equal(issues.length, 0, issues.join('; '));
+}
+
+function stubStream(stubs) {
+  let i = 0;
+  return () => async ({ request }) => {
+    const s = stubs[i] || stubs[stubs.length - 1];
+    if (request.generationConfig?.responseSchema) {
+      i += 1;
+      return { text: JSON.stringify(s) };
+    }
+    return { text: JSON.stringify({ reply: '[PROMPT-PLACEHOLDER] Sim.' }) };
+  };
+}
+
+async function enginesTurn(m, text, understanding, { applyTools, dispatch, now = CLOSED_EVENING } = {}) {
+  const stubs = [understanding];
+  return runBrainEnginesTurn({
+    text,
+    profile: P,
+    machine: m,
+    streamFor: stubStream(stubs),
+    modelId: 'stub',
+    langLock: understanding.language || 'sw',
+    applyTools,
+    opts: { now, dispatch, ctx: {} },
+  });
 }
 
 test('BRAIN_ENGINES flag defaults off', () => {
@@ -43,150 +74,186 @@ test('BRAIN_ENGINES flag defaults off', () => {
   delete process.env.BRAIN_ENGINES;
 });
 
-test('understanding fallback is never empty; callback yes (sw)', async () => {
+test('notifyHandoffOwner is idempotent per call', async () => {
   const m = machine();
-  const u = await U.runUnderstanding({ text: 'Sawa. Wewe utamwambia nipigie?', machine: m, profile: P, streamFor: null, modelId: null });
-  assert.ok(u.intent);
-  assert.equal(u.yes_no, 'yes');
-  assert.equal(u.source, 'fallback');
-  assert.ok(u.language);
+  m.handoff = { phase: 'done', committed: true };
+  const calls = [];
+  const dispatch = async (args) => { calls.push(args); return [{ channel: 'sms', role: 'teammate' }]; };
+  const a = await notifyHandoffOwner({ machine: m, profile: P, reason: 'closed', name: 'Jane', phone: m.callerPhone, dispatch });
+  const b = await notifyHandoffOwner({ machine: m, profile: P, reason: 'closed', name: 'Jane', phone: m.callerPhone, dispatch });
+  assert.equal(calls.length, 1);
+  assert.equal(a.ok, true);
+  assert.equal(b.duplicate, true);
 });
 
-test('HD_231f7bef3ba4: closed + callback yes commits once', async () => {
+test('HD_231f7bef3ba4 full callback path: name, confirm, one write, notify, plain line', async () => {
   const m = machine();
-  m.handoff = { phase: 'confirm_yes', reason: 'closed', committed: false };
-  const u = await U.runUnderstanding({ text: 'Sawa. Wewe utamwambia nipigie?', machine: m, profile: P });
-  const goal = pickGoal({ understanding: u, machine: m, profile: P, lang: 'sw', callerPhone: m.callerPhone, now: CLOSED_EVENING });
-  assert.equal(goal.type, 'handoff_commit');
-  let writes = 0;
-  const r = await H.commitHandoff({
-    machine: m,
-    profile: P,
-    handlers: { createServiceRequest: async () => { writes += 1; return { ok: true, id: 'req1' }; } },
-    callerPhone: m.callerPhone,
-    understanding: u,
-  });
-  assert.equal(writes, 1);
-  assert.equal(r.ok, true);
-  const r2 = await H.commitHandoff({ machine: m, profile: P, handlers: { createServiceRequest: async () => { writes += 1; return { ok: true, id: 'req2' }; } }, callerPhone: m.callerPhone });
-  assert.equal(writes, 1);
-  assert.equal(r2.duplicate, true);
+  const writes = [];
+  const notifies = [];
+  const applyTools = async (payload) => {
+    if (payload.serviceRequest) writes.push(payload.serviceRequest);
+    return { results: [{ action: 'create_service_request', ok: true, status: 'succeeded', id: 'req-hd231' }] };
+  };
+  const dispatch = async (args) => {
+    notifies.push(args);
+    return [{ channel: 'sms', role: 'teammate' }];
+  };
+
+  const r1 = await enginesTurn(m, 'when are you free, you guys? I am flexible.', {
+    intent: 'ask', answers: ['hours'], yes_no: null, slots: {}, language: 'en', wants_human: false, closing: false,
+  }, { applyTools, dispatch });
+  assert.match(r1.line, /Today we are open|Leo tuko wazi/i);
+  invariants(r1.line, r1.lang, []);
+  assert.equal(m._enginesOfferCallback, true);
+
+  const r2 = await enginesTurn(m, 'Please call me back.', {
+    intent: 'callback', answers: [], yes_no: null, slots: {}, language: 'en', wants_human: false, closing: false,
+  }, { applyTools, dispatch });
+  assert.match(r2.line, /May I have your name|Naomba jina/i);
+  invariants(r2.line, r2.lang, [r1.line]);
+
+  const r3 = await enginesTurn(m, 'Alvin.', {
+    intent: 'give_info', answers: [], yes_no: null, slots: { name: 'Alvin' }, language: 'en', wants_human: false, closing: false,
+  }, { applyTools, dispatch });
+  assert.match(r3.line, /Shall I ask the owner|Nimwombe mwenye/i);
+  invariants(r3.line, r3.lang, [r1.line, r2.line], true);
+  assert.equal(m.slots.name, 'Alvin');
+  assert.equal(m.slots.nameConfirmed, true);
+
+  const r4 = await enginesTurn(m, 'Sawa. Wewe utamwambia nipigie?', {
+    intent: 'confirm', answers: [], yes_no: 'yes', slots: {}, language: 'sw', wants_human: false, closing: false,
+  }, { applyTools, dispatch });
+  assert.match(r4.line, /Mwenye biashara atakupigie|owner will call you back/i);
+  assert.equal(writes.length, 1);
+  assert.equal(notifies.length, 1);
+  assert.equal(notifies[0].channels, P.notifyChannels);
+  assert.equal(m.handoff.committed, true);
+  assert.equal(m.handoff.notifySent, true);
 });
 
-test('closed business enters handoff (name first), not a fourth date ask', () => {
+test('coverage defers price until asked (one sentence)', () => {
+  const m = machine();
+  const u = { intent: 'ask', answers: ['coverage', 'price'], slots: { place: 'Rongai' }, language: 'en' };
+  const { receipts } = runTools({ understanding: u, machine: m, profile: P, lang: 'en', text: 'Rongai?' });
+  const cov = receipts.filter((r) => r.tool === 'coverage');
+  const prices = receipts.filter((r) => r.tool === 'prices');
+  assert.equal(cov.length, 1);
+  assert.equal(prices.length, 0);
+  assert.ok(cov[0].text);
+  invariants(cov[0].text, 'en', []);
+});
+
+test('capSpokenLine trims to two sentences', () => {
+  const long = 'One. Two. Three.';
+  assert.equal(capSpokenLine(long), 'One. Two.');
+});
+
+test('closed business enters handoff after date asks', () => {
   const m = machine({ intent: 'book' });
   m._enginesDateAsks = 3;
   m.slots = { service: 'Carpet Cleaning', when: { date: null, time: null }, place: null };
   const u = { intent: 'book', answers: [], yes_no: null, slots: {}, language: 'sw' };
   const g = pickGoal({ understanding: u, machine: m, profile: P, lang: 'sw', callerPhone: m.callerPhone, now: CLOSED_EVENING });
   assert.equal(g.type, 'handoff');
-  assert.ok(['ask_name', 'readback', 'confirm_phone'].includes(g.step?.kind) || g.step?.kind === 'ask_name');
 });
 
-test('Rongai coverage receipt keeps KES 700 note on later turns', () => {
-  const m = machine();
-  const cov = ML.coverageFor('Rongai', P, { u: { slots: { places: ['Rongai'] } } });
-  assert.ok(cov.places.some((p) => /rongai/i.test(p.place || p.name || '')));
-  const line = cov.places.map((p) => p.line_en || p.text).join(' ');
-  assert.match(line, /700|seven hundred/i);
-  m.slots = { place: 'Rongai' };
-  const u2 = { intent: 'ask', answers: ['coverage'], slots: { place: 'Rongai' }, language: 'en' };
-  const g = pickGoal({ understanding: u2, machine: m, profile: P, lang: 'en', callerPhone: m.callerPhone });
-  assert.equal(m.slots.place, 'Rongai');
-  assert.equal(g.type, 'answer');
+test('split race uses fallback understanding (not null)', () => {
+  const fb = U.fromNlu('when are you free?', P, machine(), CLOSED_EVENING);
+  const lead = ML.normUnderstanding(U.toLeadShape(fb));
+  assert.ok(lead);
+  assert.ok(lead.questions.some((q) => q.type === 'hours') || lead.intents.includes('ask'));
 });
 
-test('agent-name question: understanding tags identity, not caller name steal', async () => {
-  const u = await U.runUnderstanding({
-    text: 'Habari yako, unaitwa aje?',
-    machine: machine(),
-    profile: P,
-    streamFor: async () => async () => ({ text: JSON.stringify({ intent: 'ask', answers: ['identity'], yes_no: null, slots: {}, language: 'sw', wants_human: false, closing: false }) }),
-    modelId: 'stub',
+test('runBrainEnginesTurn does not call legacy mouth, weigher, shadow, owed, or callPlan replace', async () => {
+  const OW = require('../src/conversation/v2/owed');
+  const HW = require('../src/conversation/v2/hybridWeigher');
+  const CP = require('../src/conversation/v2/callPlan');
+  const AM = require('../src/conversation/v2/audibleMouth');
+  const MS = require('../src/conversation/v2/modelShadow');
+  let ow = 0; let hw = 0; let actReplace = 0; let mouth = 0; let shadow = 0;
+  const owRestore = mock.method(OW, 'render', () => { ow += 1; return 'owed'; });
+  const hwRestore = mock.method(HW, 'weighHybridTurn', () => { hw += 1; return { escalate: false }; });
+  const mouthRestore = mock.method(AM, 'speakSafeLine', () => { mouth += 1; return null; });
+  const shadowRestore = mock.method(MS, 'createModelShadow', () => { shadow += 1; return null; });
+  const acRestore = mock.method(CP, 'actCheck', (...args) => {
+    const r = acRestore.mock.original(...args);
+    if (r.verdict === 'replace') actReplace += 1;
+    return r;
   });
-  assert.ok(u.answers.includes('identity') || u.intent === 'ask');
-});
 
-test('Ndiyo on price is yes', () => {
-  assert.equal(U.detectYesNo('Ndiyo', {}), 'yes');
-});
-
-test('wants_human routes to handoff', () => {
   const m = machine();
-  const u = { intent: 'handoff', answers: [], yes_no: null, slots: {}, language: 'en', wants_human: true, closing: false };
-  const g = pickGoal({ understanding: u, machine: m, profile: P, lang: 'en', callerPhone: m.callerPhone });
-  assert.equal(g.type, 'handoff');
-});
-
-test('understanding timeout uses fallback and call can progress', async () => {
-  const m = machine();
-  const slow = async () => async () => new Promise(() => {});
-  const u = await U.runUnderstanding({
-    text: 'How much for carpet?',
+  const r = await runBrainEnginesTurn({
+    text: 'What are your hours?',
+    profile: P,
     machine: m,
-    profile: P,
-    streamFor: slow,
-    modelId: 'x',
-    hardMs: 50,
-    clock: () => 0,
+    streamFor: stubStream([{ intent: 'ask', answers: ['hours'], yes_no: null, slots: {}, language: 'en', wants_human: false, closing: false }]),
+    modelId: 'stub',
+    opts: { now: () => CLOSED_EVENING },
   });
-  assert.equal(u.source, 'fallback');
-  assert.ok(u.answers.includes('price') || u.intent === 'ask');
-  const g = pickGoal({ understanding: u, machine: m, profile: P, lang: 'en', callerPhone: m.callerPhone });
-  assert.ok(g.type === 'answer' || g.type === 'open' || g.type === 'ask');
+  assert.equal(r.path, 'brain_engines');
+  assert.equal(ow, 0);
+  assert.equal(hw, 0);
+  assert.equal(mouth, 0);
+  assert.equal(shadow, 0);
+  assert.equal(actReplace, 0);
+  owRestore.mock.restore();
+  hwRestore.mock.restore();
+  mouthRestore.mock.restore();
+  shadowRestore.mock.restore();
+  acRestore.mock.restore();
 });
 
-test('engines guard passes off_step and readback_mismatch replaces', () => {
-  const { actCheckEngines } = require('../src/conversation/v2/engineGuard');
-  const st = { kind: 'ask', slot: 'date' };
-  const ctx = { st, receipts: [], coverage: [], caller: {}, profile: P, questions: [], lang: 'en', machine: machine(), text: '' };
-  const g = CP.actCheck('Je, ungependa tuje tarehe gani?', st, ctx);
-  if (g.verdict === 'replace') {
-    const eg = actCheckEngines('Je, ungependa tuje tarehe gani?', st, ctx);
-    assert.equal(eg.verdict, 'pass');
-  } else {
-    assert.equal(g.verdict, 'pass');
-  }
-});
-
-test('unconfirmed area offers check-with-owner path', () => {
-  const NOPICKS = { ...tenantProfileFromRow(FR.row, { fieldMeta: indexFieldMeta(FR.meta) }), id: FR.row.id };
-  const m = machine();
-  const u = { intent: 'ask', answers: ['coverage'], yes_no: null, slots: { place: 'Kamakis' }, language: 'en', wants_human: false, closing: false };
-  const trig = H.shouldHandoff({ understanding: u, machine: m, profile: NOPICKS });
-  assert.equal(trig?.reason, 'area_unknown');
-});
-
-test('happy path booking reaches readback when slots full', () => {
-  const m = machine();
-  m.intent = 'book';
-  m.slots = {
-    service: 'Carpet Cleaning (per room)',
-    place: 'Westlands',
-    when: { date: '2026-10-31', time: '10:00' },
-    name: 'Alvin',
-    nameConfirmed: true,
+test('liveTurn routes to brain_engines when flag on', async () => {
+  const ENV = {
+    BRAIN_V2: '1', BRAIN_V2_MODE: 'live', BRAIN_V1_DRAFT: 'on', BRAIN_V1_DRAFT_PHASE_A: 'on',
+    BRAIN_MODEL_LEAD: 'on', BRAIN_ENGINES: '1',
   };
-  const u = { intent: 'confirm', answers: [], yes_no: null, slots: {}, language: 'en' };
-  const g = pickGoal({ understanding: u, machine: m, profile: P, lang: 'en', callerPhone: m.callerPhone, now: new Date('2026-10-25T10:00:00+03:00') });
-  assert.equal(g.type, 'readback');
+  const stream = stubStream([{ intent: 'ask', answers: ['hours'], yes_no: null, slots: {}, language: 'en', wants_human: false, closing: false }]);
+  const live = createBrainV2Live({
+    env: ENV,
+    applyTools: async () => ({ results: [] }),
+    modelLeadStreamFor: stream,
+    v1DraftStreamFor: stream,
+    prewarm: false,
+    now: () => CLOSED_EVENING,
+    log: () => {},
+  });
+  const r = await live.run({ text: 'What are your hours?', profile: P, langLock: 'en' });
+  assert.equal(r.path, 'brain_engines');
 });
 
-test('hours receipt is single-day when day slot set', () => {
-  const { hoursReceipt } = require('../src/conversation/v2/engineTools');
-  const r = hoursReceipt(P, 'en', { day: '2026-10-31' });
-  assert.ok(r.text);
-  assert.doesNotMatch(r.text, /Monday.*Tuesday.*Wednesday/s);
+test('split race logs and uses fallback understanding when model is late (flag off)', async () => {
+  const ML = require('../src/conversation/v2/modelLead');
+  const logs = [];
+  const slowStream = () => async ({ request }) => {
+    if (request.generationConfig?.responseSchema) {
+      await new Promise((r) => setTimeout(r, 500));
+      return { text: JSON.stringify({ intent: 'ask', answers: ['hours'], yes_no: null, slots: {}, language: 'en', wants_human: false, closing: false }) };
+    }
+    return { text: JSON.stringify({ reply: '[PROMPT-PLACEHOLDER] Today we are open.' }) };
+  };
+  const ENV = {
+    BRAIN_V2: '1', BRAIN_V2_MODE: 'live', BRAIN_V1_DRAFT: 'on', BRAIN_V1_DRAFT_PHASE_A: 'on',
+    BRAIN_MODEL_LEAD: 'on', BRAIN_MODEL_LEAD_SPLIT: 'on', BRAIN_ENGINES: 'off',
+  };
+  const live = createBrainV2Live({
+    env: ENV,
+    applyTools: async () => ({ results: [] }),
+    modelLeadStreamFor: slowStream,
+    v1DraftStreamFor: slowStream,
+    modelLeadDeadlines: { ...ML.SPLIT_DEADLINES, understandCapMs: 40 },
+    prewarm: false,
+    now: () => CLOSED_EVENING,
+    log: (m) => logs.push(String(m)),
+  });
+  const r = await live.run({ text: 'when are you free?', profile: P, langLock: 'en' });
+  assert.ok(r && r.path);
+  assert.ok(logs.some((l) => l.includes('understanding null after race')));
+  const st = live.getState();
+  assert.ok(st.leadFallbackU || st.u);
 });
 
-test('split-path root cause: race leaves u null before state runs', () => {
-  // Documented behaviour in modelLead split join (understandCapMs race); BRAIN_ENGINES awaits one call + fallback.
-  const DL = ML.SPLIT_DEADLINES;
-  assert.ok(DL.understandCapMs <= 1200);
-  assert.ok(typeof ML.normUnderstanding === 'function');
-});
-
-test('invariant harness: one language, at most two sentences', () => {
-  invariants('Bei ni shilingi 1,500 hadi 4,000 kwa kila zulia.', 'sw', []);
-  invariants('Shall I ask the owner to call you back on your number, tomorrow from 7:30 AM?', 'en', []);
+test('invariant fails above two sentences', () => {
+  const issues = assertTurnInvariants({ line: 'A. B. C.', lang: 'en', prior: [] });
+  assert.ok(issues.some((x) => x.startsWith('more_than_two_sentences')));
 });

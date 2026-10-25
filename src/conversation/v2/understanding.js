@@ -168,6 +168,37 @@ async function runUnderstanding({ text, machine, profile, streamFor, modelId, ha
   return parsed;
 }
 
+/** Map engines fallback/model shape to BRAIN_MODEL_LEAD split understanding (normUnderstanding input). */
+function toLeadShape(fb) {
+  if (!fb) return null;
+  const intents = [];
+  if (fb.intent === 'book') intents.push('book');
+  if (fb.intent === 'callback' || fb.intent === 'handoff') intents.push('callback');
+  if (fb.intent === 'cancel') intents.push('cancel');
+  if (fb.intent === 'confirm') intents.push('confirm');
+  if (fb.intent === 'deny') intents.push('deny');
+  if (fb.intent === 'goodbye') intents.push('goodbye');
+  if (!intents.length) intents.push('ask');
+  const qmap = { coverage: 'coverage', price: 'price', hours: 'hours', services: 'services', payment: 'payment', identity: 'identity', booking_status: 'booking_status', policy: 'policy', other: 'other' };
+  const questions = (fb.answers || []).map((a) => ({ type: qmap[a] || 'other' }));
+  const places = fb.slots?.place ? [fb.slots.place] : [];
+  return {
+    lang: fb.language === 'sw' ? 'sw' : fb.language === 'en' ? 'en' : 'mix',
+    intents,
+    questions,
+    places,
+    slots: {
+      services: fb.slots?.service ? [fb.slots.service] : [],
+      date: fb.slots?.day || null,
+      time: fb.slots?.time || null,
+      name: fb.slots?.name || null,
+      places,
+    },
+    confirms_pending: fb.yes_no === 'yes' ? true : fb.yes_no === 'no' ? false : null,
+    source: fb.source || 'fallback',
+  };
+}
+
 module.exports = {
   SCHEMA,
   emptyUnderstanding,
@@ -177,4 +208,5 @@ module.exports = {
   understandRequest,
   runUnderstanding,
   resolvePlace,
+  toLeadShape,
 };

@@ -6,7 +6,6 @@ const RF = require('./replyFacts');
 const OF = require('./ownerFacts');
 const { hoursFact } = require('./v1draftFacts');
 const L = require('./lexicon');
-const OW = require('./owed');
 
 function sw(lang) { return L.isSw(lang); }
 
@@ -53,8 +52,7 @@ function hoursReceipt(profile, lang, { day = null, now = new Date() } = {}) {
     if (!row || row.closed) return { tool: 'hours', ok: true, text: sw(lang) ? `${L.cap(L.DOW_SW[dow])} tumefunga.` : `We're closed on ${L.cap(L.DOW_EN[dow])}.` };
     return { tool: 'hours', ok: true, text: sw(lang) ? `${L.cap(L.DOW_SW[dow])} tuko wazi ${row.open}-${row.close}.` : `On ${L.cap(L.DOW_EN[dow])} we're open ${row.open} to ${row.close}.` };
   }
-  const line = OW.render({ topic: 'hours', sub: day || '', lang }, { profile, text: '', now: new Date() });
-  return { tool: 'hours', ok: true, text: line || h.text };
+  return { tool: 'hours', ok: true, text: h.text };
 }
 
 function runTools({ understanding, machine, profile, lang, text, now = new Date() }) {
@@ -63,11 +61,17 @@ function runTools({ understanding, machine, profile, lang, text, now = new Date(
   const caller = lookupCaller(machine, profile, now);
   receipts.push({ ...caller, tool: 'lookup_caller' });
   const place = u.slots?.place || machine.slots?.place;
-  if (place || u.answers?.includes('coverage')) {
+  const wantsCoverage = !!(place || u.answers?.includes('coverage'));
+  const wantsPrice = u.answers?.includes('price');
+  if (wantsCoverage) {
     const cov = ML.coverageFor(text, profile, { u: { slots: { places: place ? [place] : [] } }, expecting: machine.expecting });
-    for (const row of cov.places) receipts.push({ tool: 'coverage', ...row });
+    for (const row of cov.places) {
+      const named = { ...row, name: row.name || row.place || place };
+      const line = AC.line(named, lang) || row.line_en || row.line_sw || row.text || null;
+      receipts.push({ tool: 'coverage', ...named, text: line });
+    }
   }
-  if (u.answers?.includes('price') || u.intent === 'ask') {
+  if (wantsPrice && !wantsCoverage) {
     const pr = priceReceipt(u.slots?.service || machine.slots?.service, profile, text, lang);
     if (pr.text) receipts.push(pr);
   }

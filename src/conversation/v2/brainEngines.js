@@ -14,6 +14,8 @@ const { runTurnStream } = require('./stream');
 const { spoken: spokenStyle } = require('./spokenStyle');
 const V1 = require('./v1draft');
 const L = require('./lexicon');
+const { createHandoffNotifier } = require('./handoffNotify');
+const { capSpokenLine, isReadbackOrBooked } = require('./engineInvariants');
 
 function on({ env = process.env, tenantId } = {}) {
   return brainEnginesOn({ env, tenantId });
@@ -67,12 +69,16 @@ async function runBrainEnginesTurn({
   const goal = pickGoal({ understanding, machine, profile, lang, callerPhone: machine.callerPhone, now: nowFn() });
   if (goal.type === 'handoff_commit') {
     const handlers = handlersIn || createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: opts.ctx || {} });
-    await commitHandoff({ machine, profile, handlers, callerPhone: machine.callerPhone, understanding });
-    const line = lang === 'sw' ? '[PROMPT-PLACEHOLDER] Sawa, nimeomba timu ikupigie.' : '[PROMPT-PLACEHOLDER] Okay, I have asked the team to call you back.';
-    return emitTurn({ line, lang, machine, understanding, goal, onSentence, path: 'brain_engines_handoff' });
+    const notify = opts.notify || createHandoffNotifier(profile, { dispatch: opts.dispatch, machine });
+    const committed = await commitHandoff({ machine, profile, handlers, callerPhone: machine.callerPhone, understanding, notify });
+    const line = lang === 'sw'
+      ? '[PROMPT-PLACEHOLDER] Sawa. Mwenye biashara atakupigie kwa nambari uliyopiga.'
+      : '[PROMPT-PLACEHOLDER] Okay. The owner will call you back on the number you called from.';
+    return emitTurn({ line, lang, machine, understanding, goal, onSentence, path: 'brain_engines_handoff_done', committed });
   }
-  if (goal.type === 'handoff' && goal.step?.line) {
-    return emitTurn({ line: spokenStyle(goal.step.line, lang), lang, machine, understanding, goal, onSentence, path: 'brain_engines_handoff' });
+  if (goal.type === 'handoff' && (goal.step?.kind === 'readback' || goal.step?.line)) {
+    const raw = goal.step.line || '';
+    return emitTurn({ line: spokenStyle(raw, lang), lang, machine, understanding, goal, onSentence, path: 'brain_engines_handoff', readback: true });
   }
   if (goal.type === 'handoff' && goal.step?.kind === 'ask_name') {
     const line = goal.step.line || (lang === 'sw' ? '[PROMPT-PLACEHOLDER] Naomba jina lako.' : '[PROMPT-PLACEHOLDER] May I have your name?');
@@ -106,7 +112,7 @@ async function runBrainEnginesTurn({
     } catch { liveReply = ''; }
   }
   if (skipReplyModel) {
-    const line = spokenStyle(receiptLine, lang);
+    const line = capSpokenLine(spokenStyle(receiptLine, lang));
     if (goal.type === 'answer' && understanding.answers?.includes('hours') && !businessOpen(profile, nowFn())) {
       machine._enginesOfferCallback = true;
     }
@@ -158,7 +164,7 @@ async function runBrainEnginesTurn({
     spoken.push({ text: t, lang, src: line.src });
     if (typeof onSentence === 'function') onSentence({ text: t, lang });
   }
-  let line = spoken.map((x) => x.text).join(' ').trim() || tmpl;
+  let line = capSpokenLine(spoken.map((x) => x.text).join(' ').trim() || tmpl, { readbackOrBooked: goal.type === 'readback' });
   if (!line.trim()) {
     line = lang === 'sw' ? '[PROMPT-PLACEHOLDER] Sawa.' : '[PROMPT-PLACEHOLDER] Okay.';
   }
@@ -180,10 +186,11 @@ function slotQuestion(slot, lang) {
   return sw ? '[PROMPT-PLACEHOLDER] Tukusaidie vipi?' : '[PROMPT-PLACEHOLDER] How can I help?';
 }
 
-function emitTurn({ line, lang, machine, understanding, goal, onSentence, path }) {
-  V1.remember(machine, 'agent', line);
-  if (typeof onSentence === 'function') onSentence({ text: line, lang });
-  return { line, lang, sentences: [{ text: line, lang, src: 'fixed' }], path, understanding, goal, lead: true, answeredBy: 'fixed' };
+function emitTurn({ line, lang, machine, understanding, goal, onSentence, path, readback = false, committed = null }) {
+  const capped = capSpokenLine(line, { readbackOrBooked: readback || isReadbackOrBooked(line) });
+  V1.remember(machine, 'agent', capped);
+  if (typeof onSentence === 'function') onSentence({ text: capped, lang });
+  return { line: capped, lang, sentences: [{ text: capped, lang, src: 'fixed' }], path, understanding, goal, lead: true, answeredBy: 'fixed', committed };
 }
 
 module.exports = { on, runBrainEnginesTurn, replyRequest };

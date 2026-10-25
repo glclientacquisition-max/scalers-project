@@ -57,7 +57,7 @@ function stepHandoff({ machine, understanding, profile, lang, callerPhone }) {
   }
   if (h.phase === 'idle') return null;
   if (h.committed) return { kind: 'done', line: null };
-  if (understanding?.yes_no === 'yes' && (h.phase === 'confirm_yes' || h.phase === 'confirm_phone')) {
+  if (understanding?.yes_no === 'yes' && h.phase === 'confirm_yes') {
     return { kind: 'commit', line: null };
   }
   if (understanding?.yes_no === 'no' && h.phase === 'confirm_yes') {
@@ -66,9 +66,7 @@ function stepHandoff({ machine, understanding, profile, lang, callerPhone }) {
   }
   if (h.phase === 'ask_name') {
     if (understanding?.slots?.name) {
-      machine.slots = machine.slots || {};
-      machine.slots.name = understanding.slots.name;
-      machine.slots.nameCandidate = understanding.slots.name;
+      bindCallerName(machine, null, understanding.slots.name);
       h.phase = 'confirm_phone';
     } else {
       return { kind: 'ask_name', line: lang === 'sw' ? '[PROMPT-PLACEHOLDER] Naomba jina lako kwanza.' : '[PROMPT-PLACEHOLDER] May I have your name first?' };
@@ -86,12 +84,24 @@ function stepHandoff({ machine, understanding, profile, lang, callerPhone }) {
   return null;
 }
 
+function bindCallerName(machine, handlers, name) {
+  if (!name) return;
+  machine.slots = machine.slots || {};
+  machine.slots.name = String(name).trim();
+  machine.slots.nameCandidate = machine.slots.name;
+  machine.slots.nameConfirmed = true;
+  if (handlers?.confirmCallerName) {
+    try { handlers.confirmCallerName({ name: machine.slots.name, source: 'handoff' }); } catch { /* best-effort */ }
+  }
+}
+
 async function commitHandoff({ machine, profile, handlers, callerPhone, understanding, notify } = {}) {
   const h = initHandoff(machine);
-  if (h.committed) return { ok: true, duplicate: true };
+  if (h.committed) return { ok: true, duplicate: true, notified: !!h.notifySent };
   const key = h.idempotencyKey || `handoff:${machine.callId || 'call'}:${h.reason || 'callback'}`;
   h.idempotencyKey = key;
   const name = CP.lockedName(machine) || machine.slots?.name || understanding?.slots?.name || '';
+  bindCallerName(machine, handlers, name);
   const when = CS.callbackWhen({ profile, now: new Date(), L });
   const pending = {
     tool: 'create_handoff',
@@ -125,10 +135,14 @@ async function commitHandoff({ machine, profile, handlers, callerPhone, understa
   machine.phase = 'collect';
   h.committed = true;
   h.phase = 'done';
-  if (typeof notify === 'function') {
-    try { await notify({ reason: h.reason, name, phone: pending.phone, profile }); } catch { /* best-effort */ }
+  let notified = !!h.notifySent;
+  if (typeof notify === 'function' && ok && !h.notifySent) {
+    try {
+      const nr = await notify({ reason: h.reason, name, phone: pending.phone, profile, machine });
+      notified = !!(nr && (nr.ok || nr.duplicate));
+    } catch { notified = false; }
   }
-  return { ok, id, duplicate: false };
+  return { ok, id, duplicate: false, notified };
 }
 
 module.exports = {
@@ -137,4 +151,5 @@ module.exports = {
   stepHandoff,
   commitHandoff,
   readbackLine,
+  bindCallerName,
 };

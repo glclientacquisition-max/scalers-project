@@ -6,10 +6,23 @@ function sentences(line) {
   return (String(line || '').match(SENT_SPLIT) || []).map((x) => x.trim()).filter(Boolean);
 }
 
-function assertTurnInvariants({ line, lang, prior = [] }) {
+function isReadbackOrBooked(line) {
+  return /\b(Ni sawa\?|Shall I ask the owner|Nimwombe mwenye|nimekuwekea|booked|miadi yako|read back)\b/i.test(String(line || ''));
+}
+
+function capSpokenLine(line, { readbackOrBooked = false } = {}) {
+  const s = String(line || '').trim();
+  if (!s || readbackOrBooked || isReadbackOrBooked(s)) return s;
+  const parts = sentences(s);
+  if (parts.length <= 2) return s;
+  return parts.slice(0, 2).join(' ');
+}
+
+function assertTurnInvariants({ line, lang, prior = [], allowReadback = false }) {
   const issues = [];
   const parts = sentences(line);
-  if (parts.length > 2 && !/\b(booking|miadi|read back|nimekuwekea)\b/i.test(line)) {
+  const exempt = allowReadback || isReadbackOrBooked(line);
+  if (parts.length > 2 && !exempt) {
     issues.push(`more_than_two_sentences:${parts.length}`);
   }
   const hasEn = /\b(the|we|you|shall|would|how)\b/i.test(line);
@@ -23,4 +36,4 @@ function assertTurnInvariants({ line, lang, prior = [] }) {
   return issues;
 }
 
-module.exports = { assertTurnInvariants, sentences };
+module.exports = { assertTurnInvariants, sentences, capSpokenLine, isReadbackOrBooked };
