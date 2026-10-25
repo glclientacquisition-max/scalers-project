@@ -5,6 +5,8 @@ last_reviewed: 2026-10-25
 
 # Scalers status and handoff (start here)
 
+> **Switching accounts or onboarding a new owner or agent? Read [`HANDOVER.md`](HANDOVER.md) first** (25 Oct 2026 snapshot: architecture, environments, lanes, rules, open work).
+
 **Last updated 23 Oct 2026.** Production pay for Aris `SCL-2026-000001` still shows "Online payment isn't available yet" and has no payment attempt, so Bachs has not been called. Checkout calls `billing_live_tenant_allowed` at `/rest/v1/rest/v1/rpc/...` and gets 404. In flight: `cursor/pay-tenant-rpc-url-9679`. `GET /api/pay/<token>` is payable. The pay page can still be a CDN prerender (`x-nextjs-prerender`). Checked against the billing apply list. Items marked *per team notes* come from lane agents and Alvin, not from the repo. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule)).
 
 New agent or new human: read this whole page before you touch code.
