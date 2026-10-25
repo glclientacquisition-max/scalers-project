@@ -138,8 +138,14 @@
   --tw-ring-offset-color: var(--surface);
 }
 
+:root,
 :root[data-theme="light"] {
   color-scheme: light only;
+}
+
+/* Paint the canvas on <html> too, so launch, overscroll and route changes never flash white or dark. */
+html {
+  background-color: var(--canvas);
 }
 
 :root[data-theme="dark"] body {
@@ -163,65 +169,9 @@
   color-scheme: inherit;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --canvas: #0b1220;
-    --surface: #121c2c;
-    --surface-2: #1a2638;
-    --surface-3: #223148;
-    --hairline: #24324a;
-    --ink: #e9eff7;
-    --ink-2: #9dafc6;
-    --ink-3: #8496b0;
-    --accent: #3d9bff;
-    --accent-hover: #63b0ff;
-    --accent-active: #2a8cf5;
-    --accent-tonal: #12294a;
-    --accent-on: #071426;
-    --brand: #2aa8ff;
-    --attention: #f4955a;
-    --attention-tonal: #2b1a12;
-    --attention-on: #071426;
-    --ok: #4ade80;
-    --ok-tonal: #122a1c;
-    --lead: #d9a62e;
-    --whatsapp-deep: #25d366;
-    --bubble-caller: #14321f;
-    --bubble-caller-ink: #7fe3a5;
-    --sms: #38bdf8;
-    --warn-deep: #fdba74;
-    --shadow-sheet: 0 12px 32px -12px rgb(0 0 0 / 0.6);
-    --shadow-menu: 0 8px 24px -8px rgb(0 0 0 / 0.55);
-    --glass: color-mix(in srgb, var(--surface) 58%, transparent);
-    --glass-highlight: rgb(255 255 255 / 0.1);
-    --scrim: #000000;
-    --tw-ring-offset-color: var(--surface);
-  }
-
-  :root:not([data-theme="light"]) .desk-theme,
-  :root:not([data-theme="light"]) .admin-theme {
-    color-scheme: dark only;
-    background: var(--canvas);
-  }
-
-  :root:not([data-theme="light"]) .desk-theme select,
-  :root:not([data-theme="light"]) .desk-theme select option,
-  :root:not([data-theme="light"]) .admin-theme select,
-  :root:not([data-theme="light"]) .admin-theme select option {
-    color-scheme: inherit;
-  }
-}
-
 :root[data-theme="dark"] ::selection {
   background: color-mix(in srgb, var(--accent) 45%, transparent);
   color: var(--ink);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) ::selection {
-    background: color-mix(in srgb, var(--accent) 45%, transparent);
-    color: var(--ink);
-  }
 }
 
 /*
@@ -281,13 +231,6 @@ html:has([data-admin-shell]:not([style*="display: none"], [style*="display: none
 :root[data-theme="dark"] body:has(.desk-theme),
 :root[data-theme="dark"] body:has([data-admin-shell]) {
   background: var(--canvas);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) body:has(.desk-theme),
-  :root:not([data-theme="light"]) body:has([data-admin-shell]) {
-    background: var(--canvas);
-  }
 }
 
 .desk-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]),
@@ -634,21 +577,9 @@ h3,
   background: transparent;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .desk-drawer-viewport {
-    background: transparent;
-  }
-}
-
 :root[data-theme="dark"] .desk-drawer-backdrop,
 :root[data-theme="light"] .desk-drawer-backdrop {
   background: var(--scrim);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .desk-drawer-backdrop {
-    background: var(--scrim);
-  }
 }
 
 .desk-drawer-backdrop[data-starting-style],
@@ -734,10 +665,4 @@ h3,
 :root[data-theme="dark"] [data-desk-main],
 :root[data-theme="dark"] [data-admin-main] {
   scrollbar-color: var(--hairline) var(--canvas);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) [data-desk-main],
-  :root:not([data-theme="light"]) [data-admin-main] {
-    scrollbar-color: var(--hairline) var(--canvas);
-  }
 }

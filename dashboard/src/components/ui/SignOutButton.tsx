@@ -7,6 +7,19 @@ import {
   focusRingVisible,
 } from "@/components/ui/deskChrome";
 import { MenuItem } from "@/components/ui/Menu";
+import { unsubscribeThisDevice } from "@/lib/pushClient";
+
+/** Sign-out removes this device's phone alerts first (bounded wait), then posts the form. */
+function signOutSubmit(event: React.FormEvent<HTMLFormElement>) {
+  const form = event.currentTarget;
+  if (form.dataset.pushCleared === "1") return;
+  event.preventDefault();
+  const done = () => {
+    form.dataset.pushCleared = "1";
+    form.submit();
+  };
+  Promise.race([unsubscribeThisDevice(), new Promise((r) => setTimeout(r, 1500))]).then(done, done);
+}
 
 const stayClass = [
   "inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-body font-medium text-ink-2",
@@ -72,7 +85,7 @@ export function SignOutButton({ layout = "inline" }: { layout?: "inline" | "menu
   const confirm = (
     <>
       <p className="text-body font-medium text-ink">Sign out?</p>
-      <form action="/api/logout" method="post">
+      <form action="/api/logout" method="post" onSubmit={signOutSubmit}>
         <Button type="submit">
           Sign out
         </Button>

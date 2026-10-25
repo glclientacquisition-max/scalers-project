@@ -1,6 +1,9 @@
 /**
  * Desk appearance is a per-browser preference.
  * Never a tenant column. Never Brain / compile state.
+ * Light is the default everywhere. Dark only when the owner picks it; the OS
+ * setting is not followed. Stored in localStorage and a cookie so the server
+ * renders the picked theme on the first byte.
  */
 
 export const DESK_THEME_STORAGE_KEY = "scalers-desk-theme";
@@ -12,25 +15,21 @@ export const DESK_THEME_COLOR_DARK = "#0b1220";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 const COOKIE_PAIR = new RegExp(`(?:^|;\\s*)${DESK_THEME_STORAGE_KEY}=(light|dark)(?:;|$)`);
 
-export type DeskTheme = "system" | "light" | "dark";
+export type DeskTheme = "light" | "dark";
 
 const listeners = new Set<() => void>();
 
 export function parseDeskTheme(raw: string | null | undefined): DeskTheme {
-  return raw === "light" || raw === "dark" ? raw : "system";
+  return raw === "dark" ? "dark" : "light";
 }
 
 export function readDeskThemeCookie(source: string | null | undefined): DeskTheme {
   const match = source?.match(COOKIE_PAIR);
-  return match ? parseDeskTheme(match[1]) : "system";
+  return match ? parseDeskTheme(match[1]) : "light";
 }
 
 function writeDeskThemeCookie(choice: DeskTheme): void {
   if (typeof document === "undefined") return;
-  if (choice === "system") {
-    document.cookie = `${DESK_THEME_STORAGE_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
-    return;
-  }
   document.cookie = `${DESK_THEME_STORAGE_KEY}=${choice}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax`;
 }
 
@@ -58,7 +57,7 @@ export function subscribeDeskTheme(onStoreChange: () => void): () => void {
 }
 
 export function readDeskTheme(): DeskTheme {
-  if (typeof window === "undefined") return "system";
+  if (typeof window === "undefined") return "light";
   try {
     const stored = window.localStorage.getItem(DESK_THEME_STORAGE_KEY);
     if (stored === "light" || stored === "dark") return stored;
@@ -68,18 +67,14 @@ export function readDeskTheme(): DeskTheme {
   try {
     return readDeskThemeCookie(document.cookie);
   } catch {
-    return "system";
+    return "light";
   }
 }
 
 export function writeDeskTheme(choice: DeskTheme): void {
   if (typeof window === "undefined") return;
   try {
-    if (choice === "system") {
-      window.localStorage.removeItem(DESK_THEME_STORAGE_KEY);
-    } else {
-      window.localStorage.setItem(DESK_THEME_STORAGE_KEY, choice);
-    }
+    window.localStorage.setItem(DESK_THEME_STORAGE_KEY, choice);
   } catch {
     // private mode: cookie + applyDeskTheme still cover this session
   }
@@ -92,7 +87,7 @@ export function writeDeskTheme(choice: DeskTheme): void {
 }
 
 /** Inline CSSOM value: `only` blocks UA scheme overrides for explicit picks. */
-export function deskColorSchemeValue(choice: Exclude<DeskTheme, "system">): string {
+export function deskColorSchemeValue(choice: DeskTheme): string {
   return choice === "dark" ? "dark only" : "light only";
 }
 
@@ -101,10 +96,6 @@ function syncColorSchemeMeta(choice: DeskTheme): void {
   const head = document.head;
   if (!head) return;
   let meta = head.querySelector('meta[name="color-scheme"]');
-  if (choice === "system") {
-    meta?.remove();
-    return;
-  }
   if (!meta) {
     meta = document.createElement("meta");
     meta.setAttribute("name", "color-scheme");
@@ -130,26 +121,20 @@ function syncThemeColorMeta(): void {
   meta.setAttribute("content", canvas);
 }
 
-if (typeof window !== "undefined") {
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-    if (readDeskTheme() === "system") syncThemeColorMeta();
-  });
-}
-
 export function applyDeskTheme(choice: DeskTheme): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  if (choice === "system") {
-    delete root.dataset.theme;
-    // Empty inline so prefers-color-scheme wins for native option lists.
-    root.style.colorScheme = "";
-    if (document.body) document.body.style.colorScheme = "";
-  } else {
-    root.dataset.theme = choice;
-    const scheme = deskColorSchemeValue(choice);
-    root.style.colorScheme = scheme;
-    if (document.body) document.body.style.colorScheme = scheme;
-  }
+  root.dataset.theme = choice;
+  const scheme = deskColorSchemeValue(choice);
+  root.style.colorScheme = scheme;
+  if (document.body) document.body.style.colorScheme = scheme;
   syncColorSchemeMeta(choice);
   syncThemeColorMeta();
 }
+
+/**
+ * Runs in <head> before first paint. The server already set data-theme from the
+ * cookie; this covers a localStorage pick whose cookie was cleared, and syncs the
+ * theme-color meta to the painted canvas. Light unless "dark" is stored.
+ */
+export const DESK_THEME_INIT_SCRIPT = `try{var k=${JSON.stringify(DESK_THEME_STORAGE_KEY)},t=null;try{t=localStorage.getItem(k)}catch(e){}if(t!=="dark"&&t!=="light"){var c=document.cookie.match(/(?:^|; )${DESK_THEME_STORAGE_KEY}=(light|dark)(?:;|$)/);t=c?c[1]:"light"}var r=document.documentElement;r.dataset.theme=t;r.style.colorScheme=t==="dark"?"dark only":"light only";var m=document.querySelector('meta[name="theme-color"]');if(m)m.content=t==="dark"?${JSON.stringify(DESK_THEME_COLOR_DARK)}:${JSON.stringify(DESK_THEME_COLOR_LIGHT)};document.cookie=k+"="+t+"; Path=/; Max-Age=31536000; SameSite=Lax"}catch(e){}`;
