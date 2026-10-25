@@ -105,7 +105,7 @@ test('every owed-answer type renders in Swahili, scoped to its sub-question (no 
   const kib = ML.coverageFor('Kibera', P).places[0];
   const SAMPLE = {
     coverage: { sub: 'Kibera', row: kib }, price: { sub: 'Sofa Cleaning' }, payment: {}, policy: { sub: 'cancellation' }, hours: {},
-    duration: { sub: '2-Bedroom Standard Clean' }, hours_fit: { date: '2026-10-31', time: '10:00' }, identity: {}, booking_status: {}, clarify: { sub: 'cancel' },
+    duration: { sub: '2-Bedroom Standard Clean' }, hours_fit: { date: '2026-10-31', time: '10:00' }, identity: {}, agent_name: {}, booking_status: {}, clarify: { sub: 'cancel' },
   };
   assert.deepEqual(Object.keys(SAMPLE).sort(), [...OW.TOPICS].sort(), 'a new owed-answer type needs a sample here (and an sw rendering)');
   const EN_WORDS = /\b(the|we|you|our|is|are|and|it|have|cover|pay|takes|open)\b/i;

@@ -353,7 +353,11 @@ function makeVerifier(ctx) {
     const policyBacked = !!OF.backingFact(s, ownerOf);
     // G8 no unasked price (decision 4)
     const priceish = !policyBacked && PRICE_WORD.test(s) && !/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|saa\s/i.test(s) && !/\b(20\d\d|october|oktoba)\b/i.test(s);
-    if (priceish && !asked.has('price')) return { verdict: 'drop', reason: 'unasked_price' };
+    if (priceish && !asked.has('price')) {
+      // keep the yes/confirm half ("Ndiyo, tunafanya deep cleaning"); only the price clause is dropped
+      const keep = yesClause(s);
+      return keep ? { verdict: 'pass', text: keep, reason: 'unasked_price_trimmed' } : { verdict: 'drop', reason: 'unasked_price' };
+    }
     if (priceish && asked.has('price') && nums(s).some((n) => !prices.has(n))) return { verdict: 'repair', reason: 'price_not_in_kb', subject: 'price', fix: priceFix(ctx) };
     // G3/G4 coverage: polarity must equal the receipt; one answer per place
     const { hits, unasked: un0 } = placesIn(s);
@@ -391,6 +395,22 @@ function priceFix(ctx) {
   const pl = RF.priceLine(svc, ctx.text || '', ctx.lang); if (pl) return pl.text;
   return sw(ctx.lang) ? 'Sina bei kamili hapa; timu inaweza kuthibitisha.' : "I don't have the exact price here; the team can confirm.";
 }
+/** The confirm clause of a sentence whose price part is unasked: "Ndiyo, tunafanya X, bei ni KSh 6,000" -> "Ndiyo, tunafanya X." */
+const YES_HEAD = /^(yes|yeah|sure|we do|ndiyo|ndio|naam|tunafanya|tunatoa)\b/i;
+function yesClause(s) {
+  const t = String(s || '').trim(); if (!YES_HEAD.test(t)) return null;
+  const m = t.match(PRICE_WORD); if (!m) return null;
+  // cut at the last clause break before the first price word, so the kept words are verbatim
+  const head = t.slice(0, m.index); const SEP = /(?:,|;|\s[–—-]\s|\.\s|\s(?:(?:and|na) (?:it costs|it is|it's|bei ni|ni)|and|na|at|for|kwa|it costs|costs|bei ni|bei|ni kati ya|from|starting)\s)/gi;
+  let cut = -1; for (let x; (x = SEP.exec(head));) cut = x.index;
+  let out = cut > 0 ? head.slice(0, cut) : '';
+  out = out.replace(/[,;\s]+$/, ''); if (!out || out.length < 3 || PRICE_WORD.test(out)) return null;
+  if (/^(yes|yeah|sure|ndiyo|ndio|naam)$/i.test(out)) return null; // a bare "yes" carries nothing on its own
+  return /[.!?]$/.test(out) ? out : `${out}.`;
+}
+const normQ = (q) => String(q || '').toLowerCase().replace(/[^a-z0-9\u00c0-\u024f ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const REPLY_WORD = /^\s*(yes|yeah|yep|no|nope|sure|ok(ay)?|ndiyo|ndio|hapana|sawa|naam|si(o)?)\b/i;
+const REASK_MIN_MS = 20000;
 function identityFix(ctx) {
   const n = CP.lockedName(ctx.machine); const c = ctx.caller.candidate;
   if (n) return sw(ctx.lang) ? `Jina lako ni ${n}.` : `You're ${n}.`;
@@ -631,4 +651,4 @@ function paymentAnswer(profile = {}, text = '', lang = 'en') {
 }
 const UNASKED_PRICE = (s) => PRICE_WORD.test(s) && !/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|saa\s/i.test(s) && !/\b(20\d\d|october|oktoba)\b/i.test(s);
 
-module.exports = { cancelKind, upcomingLine, coverageFor, addCallerPlaces, scanPlaces, owedCoverageQuestion, leadOn, splitOn, leadModels, SPLIT_DEADLINES, understandRequest, normUnderstanding, replyRequest, lookupCaller, callerFilters, ROW_INTENT, offerRowsLine, backedByCaller, pastAsOpen, paymentAnswer, UNASKED_PRICE, U_SCHEMA, R_SCHEMA, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };
+module.exports = { yesClause, normQ, REPLY_WORD, REASK_MIN_MS, cancelKind, upcomingLine, coverageFor, addCallerPlaces, scanPlaces, owedCoverageQuestion, leadOn, splitOn, leadModels, SPLIT_DEADLINES, understandRequest, normUnderstanding, replyRequest, lookupCaller, callerFilters, ROW_INTENT, offerRowsLine, backedByCaller, pastAsOpen, paymentAnswer, UNASKED_PRICE, U_SCHEMA, R_SCHEMA, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };

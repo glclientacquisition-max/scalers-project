@@ -4718,6 +4718,7 @@ mediaWss.on('connection', (ws, req) => {
               traceTurnIndex: () => voiceTrace.currentTurnIndex(),
               // BRAIN_V2_COMMIT_SAFETY receipts (#845) + name confirm (#844, when present); unused with the flag off
               callSid: callKey,
+              resumeState: openingCarry()?.brainV2State || null,
               recordWriteReceipt: typeof db.recordWriteReceipt === 'function' ? db.recordWriteReceipt : undefined,
               confirmCallerName: typeof db.confirmCallerName === 'function' ? db.confirmCallerName : undefined,
               callerFile: {
@@ -7267,6 +7268,7 @@ mediaWss.on('connection', (ws, req) => {
           ? null
           : {
               brainState: callBrainStates.get(sessionCallSid) || null,
+              brainV2State: brainV2Live && typeof brainV2Live.getState === 'function' ? brainV2Live.getState() || null : null,
               messages: messages.filter((m) => m && m.role !== 'system'),
               languageState: callLanguageState,
               firstRealTurnDone: firstRealCallerTurnDone,

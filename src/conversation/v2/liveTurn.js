@@ -178,6 +178,8 @@ function createBrainV2Live(opts = {}) {
 
   function ensureState(profile) {
     if (state) return state;
+    // stream resume (Voice openingCarry): continue the SAME v2 machine (turn index, locked name, language, asked questions)
+    if (opts.resumeState && typeof opts.resumeState === 'object' && opts.resumeState.slots) { state = opts.resumeState; state.resumed = (state.resumed || 0) + 1; return state; }
     const file = callerFile(opts);
     state = createState({
       profile: profile || {},
@@ -469,7 +471,15 @@ function createBrainV2Live(opts = {}) {
     const spoken = []; const verdicts = []; let firstMs = null; let repairs = 0; let modelSentences = 0;
     // the single reply assembler: every producer (model, owed answer, template, reducer line) is deduped by fact here
     const asm = RF.createAssembler({ profile, coverage: coverage.places, lang });
-    const emit = (s0, src) => { if (!s0 || abort()) return; const s = asm.admit(s0, { keep: src === 'fixed' }); if (!s) return; const t = spokenStyle(s, lang); spoken.push({ text: t, lang, src }); if (firstMs == null) firstMs = clock() - T0; if (typeof onSentence === 'function') { try { onSentence({ text: t, lang }); } catch { /* sink */ } } };
+    // per-turn single-emit latch: once this turn's step question is out, nothing more is spoken for the turn
+    const latch = { closed: false };
+    const prevQ = machine.lastStepQ || null; const nowMs = clock();
+    const sameQ = (a, b) => ML.normQ(a) && ML.normQ(a) === ML.normQ(b);
+    // the previous turn's question is not repeated unless the caller answered it (a reply word) or time has passed (a genuine re-ask)
+    const repeatBlocked = (q) => !!(prevQ && prevQ.turn === machine.turn - 1 && sameQ(q, prevQ.text) && nowMs - prevQ.at < ML.REASK_MIN_MS && !ML.REPLY_WORD.test(text));
+    const emit = (s0, src) => { if (!s0 || abort() || latch.closed) return;
+      if (/\?\s*$/.test(String(s0).trim()) && src !== 'template' && repeatBlocked(s0)) return; const s = asm.admit(s0, { keep: src === 'fixed' }); if (!s) return; const t = spokenStyle(s, lang); spoken.push({ text: t, lang, src }); if (firstMs == null) firstMs = clock() - T0; if (typeof onSentence === 'function') { try { onSentence({ text: t, lang }); } catch { /* sink */ } }
+      if (/\?\s*$/.test(t) && src !== 'template') { latch.closed = true; machine.lastStepQ = { text: t, turn: machine.turn, at: clock() }; } };
     const fixed = st.kind === 'readback' || st.kind === 'confirmed' || st.kind === 'add_service' || (pre.owned && (pre.acts || []).some((x) => /^(have_my_name|item_added|add_service|service_add|area_(excluded|outside|unknown))/.test(x)));
     let answeredBy = 'model';
     let held = null; let used = 0;
@@ -521,7 +531,10 @@ function createBrainV2Live(opts = {}) {
       for (const l of lines) emit(l, 'template');
       emit(base, 'template');
     } else {
-      for (const a of ML.owedAnswers(ctx, spoken.map((x) => x.text).join(' '))) emit(a.text, 'owed_answer');
+      // one reply owner: the owed answers are planned against the WHOLE model draft (spoken + held question, after
+      // the guard), dropped when it already covers them, and merged in before the step question, never after it
+      const draft = [spoken.map((x) => x.text).join(' '), held || ''].join(' '); // only what passed the guard counts as covering
+      for (const a of ML.owedAnswers(ctx, draft)) emit(a.text, 'owed_answer');
       if (fixed) { emit(st.kind === 'readback' ? st.readback : tmpl, 'fixed'); if (!modelSentences) answeredBy = 'fixed'; }
       else {
         const stepQ = st.kind === 'ask' || st.kind === 'confirm_name' ? CP.tail(st, ver.act) : null;

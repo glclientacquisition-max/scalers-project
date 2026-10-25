@@ -106,6 +106,20 @@ const RENDER = {
     return null;
   },
 };
+// [PROMPT-PLACEHOLDER] the caller asked the assistant's own name: the persona answers, never "I don't have your name"
+RENDER.agent_name = (o, c) => { const n = (c.profile && (c.profile.agentName || c.profile.spokenName)) || null; if (!n) return null; return sw(o.lang) ? `Naitwa ${n}.` : `I'm ${n}.`; };
+const AGENT_NAME = /\b(unaitwa|jina lako|wewe ni nani|ni nani (huyu|anaongea)|your name|who (am i|is this|are you)|who'?s (this|speaking)|what should i call you)\b/i;
+const CALLER_NAME = /\b(my name|jina langu|naitwa nani|do you (know|have) (me|my)|who am i\b(?! (speaking|talking)))/i;
+/** Identity questions split: the assistant's name (agent_name) vs the caller's own name (caller_name). */
+function identitySubject(q = {}, text = '') {
+  const sub = String(q.subject || '').toLowerCase();
+  if (/agent|assistant|your_name|persona/.test(sub)) return 'agent_name';
+  if (/caller|my_name|own/.test(sub)) return 'caller_name';
+  const t = String(text || '');
+  if (CALLER_NAME.test(t)) return 'caller_name';
+  if (AGENT_NAME.test(t)) return 'agent_name';
+  return 'caller_name';
+}
 const TOPICS = Object.keys(RENDER);
 
 /** Render one owed answer in its language (null when the store has nothing to say for it). */
@@ -127,7 +141,8 @@ function collect({ questions = [], coverage = [], text = '', profile = {}, machi
     else if (t === 'price') { const svc = CPm().matchServices(text, profile)[0] || svcOf(profile, machine && machine.slots && machine.slots.service); add({ topic: 'price', sub: svc ? svc.name : null }); }
     else if (t === 'payment') add({ topic: 'payment', sub: null });
     else if (t === 'hours') add({ topic: 'hours', sub: null });
-    else if (t === 'identity' || t === 'booking_status') add({ topic: t, sub: null });
+    else if (t === 'identity') add({ topic: identitySubject(q, text) === 'agent_name' ? 'agent_name' : 'identity', sub: null });
+    else if (t === 'booking_status') add({ topic: t, sub: null });
     else if (t === 'policy' || t === 'faq' || t === 'other') {
       // scoped: the ONE owner fact the sub-question names (its subject first, the caller's words as backup)
       const f = OF.match(String(q.subject || ''), of)[0] || OF.match(text, of)[0];
@@ -145,10 +160,11 @@ function answered(o, said, c = {}) {
   if (o.topic === 'coverage') return o.row ? low.includes(String(o.row.place).toLowerCase()) : /\b(cover|tunafika|hatufiki)\b/.test(low);
   if (o.topic === 'price') return /\b(ksh|kes|shillings?|bei|elfu|thousand|hundred)\b|\d{3,}/i.test(low);
   if (o.topic === 'payment') return /m-?pesa|paybill|cash|bank|crypto|malipo|tunakubali|we take|we accept/i.test(low);
+  if (o.topic === 'agent_name') { const n = (c.profile && (c.profile.agentName || c.profile.spokenName)) || ''; return (!!n && low.includes(n.toLowerCase())) || /\b(naitwa|my name is|i'?m called|jina langu ni)\b/.test(low); }
   if (o.topic === 'identity') { const n = CPm().lockedName(c.machine || {}) || (c.caller && c.caller.candidate); return !!n && low.includes(n.toLowerCase()); }
   const line = render(o, c); if (!line) return true;
   const first = String(OF.sentences(line)[0] || line).toLowerCase().slice(0, 24);
   return low.includes(first);
 }
 
-module.exports = { askedDays, sayClock, factOf, TOPICS, RENDER, render, collect, answered };
+module.exports = { identitySubject, askedDays, sayClock, factOf, TOPICS, RENDER, render, collect, answered };
