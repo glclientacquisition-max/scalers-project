@@ -17,6 +17,7 @@ COPY server.js db.js ./
 COPY src ./src
 # Desk's Kenya area tree (single source for Brain's coverage check, docs/reference/platform/AREA_PICKS.md)
 COPY dashboard/src/lib/data ./dashboard/src/lib/data
+COPY dashboard/src/lib/alertTypeDefaults.json ./dashboard/src/lib/
 COPY scripts ./scripts
 COPY docs ./docs
 
