@@ -52,8 +52,13 @@ function harness({ script = defaultModel, env = ENV, callerFile = { contactName:
   const live = createBrainV2Live({ env, applyTools, modelLeadStreamFor, ...(deadlines ? { modelLeadDeadlines: deadlines } : {}), v1DraftStreamFor: () => async () => ({ calls: [] }), shadowModel: async () => ({ calls: [] }), shadowBackupModel: async () => ({ calls: [] }), prewarm: false, now: () => new Date(NOW), log: () => {}, onModelStage: (s) => stages.push(s), callerFile });
   return { live, applied, stages, calls };
 }
+const { assertTurnSpeech } = require('./helpers/turnInvariants');
 async function turn(h, text, langLock = 'en', extra = {}) {
-  if (process.env.DBG) process.on("exit", () => {}); const said = []; const r = await h.live.run({ text, profile: DD, langLock, onSentence: (s) => said.push(s.text), ...extra }); return { ...r, heard: said.join(' ') || r.line, stage: h.stages.filter((s) => s.kind === 'model_lead').slice(-1)[0] }; }
+  if (process.env.DBG) process.on("exit", () => {}); const said = []; const r = await h.live.run({ text, profile: DD, langLock, onSentence: (s) => said.push(s.text), ...extra });
+  const out = { ...r, heard: said.join(' ') || r.line, sentences: r.sentences || [], stage: h.stages.filter((s) => s.kind === 'model_lead').slice(-1)[0] };
+  if (out.sentences.length) assertTurnSpeech(out);
+  return out;
+}
 const qs = (s) => (String(s).match(/\?/g) || []).length;
 const U = (o = {}) => ({ lang: 'en', intents: [], slots: { services: [], places: [] }, questions: [], ...o });
 /** default model: words the plan's next step, answers nothing it was not told. */

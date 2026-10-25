@@ -13,7 +13,9 @@ const ML = require('../src/conversation/v2/modelLead');
 const OW = require('../src/conversation/v2/owed');
 const FR = require('./fixtures/dndSimTenant.json');
 
-const P = { ...tenantProfileFromRow(FR.row, { fieldMeta: indexFieldMeta(FR.meta), areaPicks: FR.picks.picks, areaPicksConfirmedAt: FR.picks.confirmed_at }), id: FR.row.id };
+const inner = FR.picks.picks;
+const areaPicksRows = inner.picks.map((row) => ({ ...row, confirmed_at: FR.picks.confirmed_at, tree_version: inner.tree_version }));
+const P = { ...tenantProfileFromRow(FR.row, { fieldMeta: indexFieldMeta(FR.meta), areaPicksRows }), id: FR.row.id };
 const ENV = { BRAIN_V2: '1', BRAIN_V2_MODE: 'live', BRAIN_V2_MODEL: 'on', BRAIN_V1_DRAFT: 'on', BRAIN_V1_DRAFT_PHASE_A: 'on', BRAIN_CALL_CORE: 'on', BRAIN_MODEL_LEAD: 'on', BRAIN_MODEL_LEAD_SPLIT: 'on', BRAIN_LEAD_MODEL_ID: 'lite', BRAIN_LEAD_BACKUP_MODEL_ID: 'flash' };
 const U = (o = {}) => ({ lang: 'sw', intents: ['ask'], questions: [], slots: { places: [], services: [] }, ...o });
 const names = (t, o) => AC.placeMentions(t, o).map((m) => m.name);

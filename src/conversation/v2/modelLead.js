@@ -82,20 +82,49 @@ function scanPlaces(words) {
 }
 const norm = (x) => String(x).toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
 
-/** The owner's area note on a receipt row: a checkable owner fact (verbatim), with its language. */
-const noteFields = (r) => (r && r.status === 'covered' && r.note ? { note: r.note, note_lang: r.note_lang || null } : { note: null, note_lang: null });
-/** check_coverage receipt: one row per place (1..5). Picks resolver per place; legacy only when no picks. */
-function coverageReceipt(places = [], profile = {}) {
-  const rows = [];
-  for (const raw of places.slice(0, 5)) {
-    const p = String(raw || '').trim(); if (!p) continue;
-    const r = AC.resolve(p, profile) || AC.resolve(p.replace(/\b[a-z]/g, (c) => c.toUpperCase()), profile);
-    const name = r && r.name ? r.name : p.replace(/\b[a-z]/g, (c) => c.toUpperCase());
-    if (rows.some((x) => x.place.toLowerCase() === name.toLowerCase())) continue;
-    const covered = !r || r.status === 'unknown' ? 'unknown' : r.status === 'covered' ? 'yes' : 'no';
-    rows.push({ place: name, said: p, matched_node: r && r.node || null, covered, status: r ? r.status : 'unknown', source: r && r.source === 'picks' ? 'area_picks' : 'legacy', line_en: r ? AC.line(r, 'en') : null, line_sw: r ? AC.line(r, 'sw') : null, via: r && r.via || null, fee_kes: r && r.fee_kes != null ? r.fee_kes : null, ...noteFields(r) });
+/** Canonical place names in text (full tree name or alias), same rules as scanPlaces. */
+function placesNamedInText(text) {
+  const words = String(text || '').replace(/[?.!;:",]/g, ' ').split(/\s+/).filter(Boolean);
+  return scanPlaces(words);
+}
+
+/** Places the caller has named earlier on this call (slots, receipts, memory). */
+function callerAllowedPlaces(ctx) {
+  const out = new Set();
+  const add = (p) => { if (p) out.add(String(p).toLowerCase()); };
+  for (const r of ctx.coverage || []) if (r.from === 'caller') add(r.place);
+  for (const p of (ctx.machine && ctx.machine.callerPlaces) || []) add(p);
+  if (ctx.machine && ctx.machine.slots && ctx.machine.slots.place) {
+    const res = AC.resolve(ctx.machine.slots.place, ctx.profile || {});
+    add(res && res.name ? res.name : ctx.machine.slots.place);
   }
-  return { tool: 'check_coverage', ok: true, places: rows };
+  return out;
+}
+
+/** Remember caller-named places for later turns (guard unasked_place). */
+function rememberCallerPlaces(machine, { coverage, text, profile, u } = {}) {
+  const names = new Set(machine.callerPlaces || []);
+  for (const r of (coverage && coverage.places) || []) if (r.from === 'caller') names.add(r.place);
+  for (const p of placesNamedInText(text)) names.add(p);
+  if (u && u.slots && Array.isArray(u.slots.places)) {
+    for (const raw of u.slots.places) {
+      const hit = placeCandidates(text, { u: { slots: { places: [raw] } } })[0];
+      if (hit) {
+        const rec = coverageReceipt([hit], profile).places[0];
+        if (rec) names.add(rec.place);
+      }
+    }
+  }
+  if (machine.slots && machine.slots.place) {
+    const res = AC.resolve(machine.slots.place, profile || {});
+    names.add((res && res.name) || machine.slots.place);
+  }
+  machine.callerPlaces = [...names].slice(0, 12);
+}
+
+/** check_coverage receipt: one row per place (1..5). Delegates to areaCoverage (the only reader). */
+function coverageReceipt(places = [], profile = {}) {
+  return AC.coverageReceipt(places, profile);
 }
 
 /** Every place the CALLER named, resolved on the ONE coverage source (confirmed picks; legacy rows only with no picks).
@@ -106,7 +135,14 @@ function coverageFor(text, profile = {}, opts = {}) {
   const rec = coverageReceipt(placeCandidates(text, { ...opts, rejected }), profile);
   if (!rec.places.length) {
     const r = AC.resolve(String(text || ''), profile, { expecting: opts.expecting });
-    if (r && r.name) rec.places.push({ place: r.name, said: r.landmark || r.name, matched_node: r.node || null, covered: r.status === 'covered' ? 'yes' : r.status === 'unknown' ? 'unknown' : 'no', status: r.status, source: r.source === 'picks' ? 'area_picks' : 'legacy', via: r.via || null, line_en: AC.line(r, 'en'), line_sw: AC.line(r, 'sw'), fee_kes: r.fee_kes ?? null, ...noteFields(r) });
+    if (r && r.name) {
+      const node = r.node ? (AP.areaNode(r.node) || { id: r.node, name: r.name, aliases: [] }) : null;
+      rec.places.push({
+        place: r.name, said: r.landmark || r.name, matched_node: node, covered: AC.rowCovered(r), status: r.status,
+        source: r.source === 'picks' ? 'area_picks' : 'legacy', via: r.via || null, line_en: AC.line(r, 'en'), line_sw: AC.line(r, 'sw'),
+        fee_kes: r.fee_kes ?? null, ...(r.status === 'covered' && r.note ? { note: r.note, note_lang: r.note_lang || null } : { note: null, note_lang: null }),
+      });
+    }
   }
   for (const r of rec.places) r.from = 'caller';
   if (rejected.length) rec.rejected = rejected;
@@ -132,7 +168,7 @@ function owedCoverageQuestion(questions, coverage, text, machine = {}) {
 function coverageSentence(row, lang) {
   if (row.covered === 'unknown' && (row.line_en || row.line_sw)) return sw(lang) ? row.line_sw : row.line_en; // "which area is that near?" / "the team will confirm"
   if (row.covered !== 'unknown') return (sw(lang) ? row.line_sw : row.line_en) || (row.covered === 'yes' ? (sw(lang) ? `Ndio, tunafika ${row.place}.` : `Yes, we cover ${row.place}.`) : (sw(lang) ? `Samahani, hatufiki ${row.place}.` : `Sorry, we don't cover ${row.place}.`));
-  return sw(lang) ? `Sina uhakika kuhusu ${row.place}; timu inaweza kuthibitisha.` : `I'm not sure about ${row.place}; I can have the team confirm.`;
+  return AC.checkWithOwnerLine(row.place, lang);
 }
 function coverageAnswer(rows, lang) {
   if (!rows.length) return null;
@@ -300,7 +336,7 @@ function runHedged({ streamFor, primaryId, backupId, request, deadlines = DEADLI
 // ---------------------------------------------------------------- guard + verifier (G1-G10)
 
 const NEG = /\b(don'?t|do not|doesn'?t|not|no longer|sorry|unfortunately|outside|hatufiki|hatuji|hatuendi|hatufanyi|haifiki|siwezi)\b/i;
-const UNSURE = /\b(not sure|can'?t confirm|cannot confirm|don'?t know|sina uhakika|sijui|siwezi kuthibitisha)\b/i;
+const UNSURE = /\b(not sure|can'?t confirm|cannot confirm|don'?t know|sina uhakika|hatuna hakika|sijui|siwezi kuthibitisha)\b/i;
 const PRICE_WORD = /\b(ksh|kes|shillings?|bob|bei|gharama|elfu|thousand|hundred|mia)\b|\b\d[\d,]{2,}\b/i;
 const isQ = (s) => /\?\s*$/.test(String(s || '').trim());
 const nums = (s) => (String(s).match(/\d[\d,]*/g) || []).map((x) => x.replace(/,/g, ''));
@@ -337,9 +373,13 @@ function makeVerifier(ctx) {
   const cand = ctx.caller.candidate;
   function placesIn(s) {
     const hits = [];
-    for (const r of ctx.coverage) if (new RegExp(`\\b${r.place.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(s)) hits.push(r);
-    // the model's own words never create coverage rows: a place the caller did not name is reported, not resolved
-    const unasked = hits.length ? [] : scanPlaces(String(s).replace(/[?.!;:",]/g, ' ').split(/\s+/).filter(Boolean)).filter((p) => !known.has(p.toLowerCase()));
+    const named = placesNamedInText(s);
+    for (const name of named) {
+      const r = known.get(name.toLowerCase());
+      if (r && !hits.some((h) => h.place.toLowerCase() === r.place.toLowerCase())) hits.push(r);
+    }
+    const allowed = callerAllowedPlaces(ctx);
+    const unasked = named.filter((p) => !known.has(p.toLowerCase()) && !allowed.has(p.toLowerCase()));
     return { hits, unasked };
   }
   function check(raw) {
@@ -353,7 +393,11 @@ function makeVerifier(ctx) {
     const policyBacked = !!OF.backingFact(s, ownerOf);
     // G8 no unasked price (decision 4)
     const priceish = !policyBacked && PRICE_WORD.test(s) && !/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|saa\s/i.test(s) && !/\b(20\d\d|october|oktoba)\b/i.test(s);
-    if (priceish && !asked.has('price')) return { verdict: 'drop', reason: 'unasked_price' };
+    if (priceish && !asked.has('price')) {
+      // keep the yes/confirm half ("Ndiyo, tunafanya deep cleaning"); only the price clause is dropped
+      const keep = yesClause(s);
+      return keep ? { verdict: 'pass', text: keep, reason: 'unasked_price_trimmed' } : { verdict: 'drop', reason: 'unasked_price' };
+    }
     if (priceish && asked.has('price') && nums(s).some((n) => !prices.has(n))) return { verdict: 'repair', reason: 'price_not_in_kb', subject: 'price', fix: priceFix(ctx) };
     // G3/G4 coverage: polarity must equal the receipt; one answer per place
     const { hits, unasked: un0 } = placesIn(s);
@@ -391,6 +435,22 @@ function priceFix(ctx) {
   const pl = RF.priceLine(svc, ctx.text || '', ctx.lang); if (pl) return pl.text;
   return sw(ctx.lang) ? 'Sina bei kamili hapa; timu inaweza kuthibitisha.' : "I don't have the exact price here; the team can confirm.";
 }
+/** The confirm clause of a sentence whose price part is unasked: "Ndiyo, tunafanya X, bei ni KSh 6,000" -> "Ndiyo, tunafanya X." */
+const YES_HEAD = /^(yes|yeah|sure|we do|ndiyo|ndio|naam|tunafanya|tunatoa)\b/i;
+function yesClause(s) {
+  const t = String(s || '').trim(); if (!YES_HEAD.test(t)) return null;
+  const m = t.match(PRICE_WORD); if (!m) return null;
+  // cut at the last clause break before the first price word, so the kept words are verbatim
+  const head = t.slice(0, m.index); const SEP = /(?:,|;|\s[–—-]\s|\.\s|\s(?:(?:and|na) (?:it costs|it is|it's|bei ni|ni)|and|na|at|for|kwa|it costs|costs|bei ni|bei|ni kati ya|from|starting)\s)/gi;
+  let cut = -1; for (let x; (x = SEP.exec(head));) cut = x.index;
+  let out = cut > 0 ? head.slice(0, cut) : '';
+  out = out.replace(/[,;\s]+$/, ''); if (!out || out.length < 3 || PRICE_WORD.test(out)) return null;
+  if (/^(yes|yeah|sure|ndiyo|ndio|naam)$/i.test(out)) return null; // a bare "yes" carries nothing on its own
+  return /[.!?]$/.test(out) ? out : `${out}.`;
+}
+const normQ = (q) => String(q || '').toLowerCase().replace(/[^a-z0-9\u00c0-\u024f ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const REPLY_WORD = /^\s*(yes|yeah|yep|no|nope|sure|ok(ay)?|ndiyo|ndio|hapana|sawa|naam|si(o)?)\b/i;
+const REASK_MIN_MS = 20000;
 function identityFix(ctx) {
   const n = CP.lockedName(ctx.machine); const c = ctx.caller.candidate;
   if (n) return sw(ctx.lang) ? `Jina lako ni ${n}.` : `You're ${n}.`;
@@ -631,4 +691,4 @@ function paymentAnswer(profile = {}, text = '', lang = 'en') {
 }
 const UNASKED_PRICE = (s) => PRICE_WORD.test(s) && !/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|saa\s/i.test(s) && !/\b(20\d\d|october|oktoba)\b/i.test(s);
 
-module.exports = { cancelKind, upcomingLine, coverageFor, addCallerPlaces, scanPlaces, owedCoverageQuestion, leadOn, splitOn, leadModels, SPLIT_DEADLINES, understandRequest, normUnderstanding, replyRequest, lookupCaller, callerFilters, ROW_INTENT, offerRowsLine, backedByCaller, pastAsOpen, paymentAnswer, UNASKED_PRICE, U_SCHEMA, R_SCHEMA, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };
+module.exports = { yesClause, normQ, REPLY_WORD, REASK_MIN_MS, NEG, UNSURE, cancelKind, upcomingLine, coverageFor, addCallerPlaces, rememberCallerPlaces, callerAllowedPlaces, placesNamedInText, scanPlaces, owedCoverageQuestion, leadOn, splitOn, leadModels, SPLIT_DEADLINES, understandRequest, normUnderstanding, replyRequest, lookupCaller, callerFilters, ROW_INTENT, offerRowsLine, backedByCaller, pastAsOpen, paymentAnswer, UNASKED_PRICE, U_SCHEMA, R_SCHEMA, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };
