@@ -42,12 +42,12 @@ function parseSse(buf, onEvent) {
 function createGeminiStreamModel({ apiKey, model = 'gemini-3.5-flash-lite', fetchImpl = globalThis.fetch, baseUrl = 'https://generativelanguage.googleapis.com/v1beta' } = {}) {
   if (!apiKey) throw new Error('gemini transport: apiKey missing');
   const url = `${baseUrl}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
-  return async function streamModel({ request, signal, onCall } = {}) {
+  return async function streamModel({ request, signal, onCall, onText } = {}) {
     const calls = []; let text = ''; let usage = null;
     const onEvent = (ev) => {
       for (const p of ev?.candidates?.[0]?.content?.parts || []) {
         if (p.functionCall) { calls.push({ name: p.functionCall.name, args: p.functionCall.args || {}, thoughtSignature: p.thoughtSignature || undefined }); if (typeof onCall === 'function') { try { onCall(calls[calls.length - 1]); } catch { /* caller hook */ } } }
-        else if (typeof p.text === 'string' && !p.thought) text += p.text;
+        else if (typeof p.text === 'string' && !p.thought) { text += p.text; if (typeof onText === 'function') { try { onText(p.text); } catch { /* caller hook */ } } }
         else if (p.thoughtSignature && calls.length) calls[calls.length - 1].thoughtSignature = calls[calls.length - 1].thoughtSignature || p.thoughtSignature;
       }
       if (ev?.usageMetadata) usage = ev.usageMetadata;

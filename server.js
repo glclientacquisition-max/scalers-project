@@ -113,6 +113,7 @@ const { brainV2Enabled, brainV2Mode } = require('./src/conversation/v2/flag');
 const brainV1Draft = require('./src/conversation/v2/v1draft');
 const { planFillerCut, carryHeldSpeech } = require('./src/speech/fillerCut');
 const { createBrainV2Live } = require('./src/conversation/v2/liveTurn');
+const brainModelLead = require('./src/conversation/v2/modelLead');
 // BRAIN_V2_OWNS_CALL (plan C3, default off): v2 is the only owner of a live-mode call.
 const v2OwnsCall = require('./src/conversation/v2/ownsCall');
 const ownedV2Calls = v2OwnsCall.createOwnedCalls();
@@ -4616,6 +4617,9 @@ mediaWss.on('connection', (ws, req) => {
               callerPhone: brainState?.caller?.phone || mem.phone || null,
               contactName: mem.fileOwnerName || mem.name || brainState?.caller?.name || null,
               openRows: Array.isArray(mem.openRows) ? mem.openRows : [],
+              // BRAIN_MODEL_LEAD (decision 5): the file's confirmed-name flag (contacts.name_confirmed) and shared-line
+              // flag reach the brain, so a name confirmed on an earlier call is used and an unconfirmed one is asked.
+              ...(brainModelLead.leadOn({ tenantId: brainProfile?.id }) ? { nameConfirmed: mem.nameConfirmed === true, sharedLine: mem.sharedLine === true } : {}),
             },
           });
         };
@@ -8458,7 +8462,9 @@ async function applyGeminiTools(callSid, parsed, toolOpts = {}) {
     businessName:
       groundedProfile.businessName || process.env.BUSINESS_NAME || '',
     hoursSchedule: groundedProfile.hoursSchedule || null,
-    nameConfirmed: state.caller?.nameConfirmed === true,
+    // BRAIN_MODEL_LEAD: one name state. A v2 save whose name the v2 machine already locked (read-back yes /
+    // confirmed file name) is confirmed; v1's own flag is not a second owner of that decision.
+    nameConfirmed: state.caller?.nameConfirmed === true || (toolOpts.v2Owned === true && enforcedParsed?.v2NameLocked === true),
     heldCallerName: state.messageOnly
       ? heldMessageCallerName(state.caller)
       : String(state.caller?.name || '').trim(),
