@@ -36,14 +36,16 @@ describe("Alert type rows (Desk logic)", () => {
 
   it("parse keeps by_type and push so a save never wipes them", () => {
     const p = lib.parseNotifyChannels({ ...all, push: false, by_type: { message: { email: false } } });
+    // old key migrates to other_calls on parse
     assert.equal(p.push, false);
-    assert.deepEqual(p.by_type, { message: { email: false } });
+    assert.deepEqual(p.by_type, { other_calls: { email: false } });
   });
 
   it("reset drops all choices; copy is English", () => {
     assert.equal(lib.resetAlertChoices({ ...all, by_type: { booking: { sms: true } } }).by_type, undefined);
     const ui = readFileSync(new URL("../dashboard/src/components/AlertTypeRows.tsx", import.meta.url), "utf8");
     assert.match(ui, /aria-pressed/);
+    assert.equal(lib.ALERT_TYPE_META.find((m) => m.id === "other_calls")?.label, "Other calls");
     assert.match(ui, /min-h-11/);
     assert.match(ui, /SMS is off for the whole business\./);
     assert.match(ui, /Missed calls need at least one way to reach you\./);

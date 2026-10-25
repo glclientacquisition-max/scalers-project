@@ -44,6 +44,17 @@ function parseNotifyChannels(raw) {
   return next;
 }
 
+/** Stored row for a type; old keys (message, lead) map to other_calls. */
+function storedRow(stored, type) {
+  const own = stored[type];
+  if (own && typeof own === 'object' && !Array.isArray(own)) return own;
+  for (const [old, now] of Object.entries(ALERT_DEFAULTS.legacyKeys || {})) {
+    const row = stored[old];
+    if (now === type && row && typeof row === 'object' && !Array.isArray(row)) return row;
+  }
+  return {};
+}
+
 /** Full by_type grid: stored cells win, missing cells take the defaults. */
 function parseAlertTypes(raw) {
   const stored =
@@ -52,7 +63,7 @@ function parseAlertTypes(raw) {
       : {};
   const out = {};
   for (const type of ALERT_TYPES) {
-    const row = stored[type] && typeof stored[type] === 'object' ? stored[type] : {};
+    const row = storedRow(stored, type);
     out[type] = {};
     for (const ch of ALERT_CHANNELS) {
       out[type][ch] = typeof row[ch] === 'boolean' ? row[ch] : ALERT_DEFAULTS.defaults[type][ch];
@@ -72,20 +83,17 @@ function pushMaster(raw) {
  */
 function alertTypeFor({ kind, outcome, status, answered } = {}) {
   const o = String(outcome || '').toLowerCase();
+  const k = String(kind || '').toLowerCase();
   if (o === 'missed' || o === 'abandoned') return 'missed_call';
   if (o === 'booked' || o === 'ordered') return 'booking';
-  if (o === 'callback_needed') return 'message';
-  // Answered info calls and escalations are not one of the three owner rows.
-  if (o === 'escalated' || o === 'info_only') return null;
-  const k = String(kind || '').toLowerCase();
   if (k === 'appointment' || k === 'service_request' || k.startsWith('caller_hold') || k === 'caller_order') {
     return 'booking';
   }
-  if (k === 'lead' || k === 'caller_callback' || k === 'call_summary') {
+  if (k === 'lead' || k === 'caller_callback' || k === 'call_summary' || o) {
     const s = String(status || '').toLowerCase();
     if (answered === false || s === 'failed' || s === 'no_answer') return 'missed_call';
-    if (k === 'caller_callback') return 'message';
-    return null;
+    // Every answered non-booking call: questions, call-back requests, escalations.
+    return 'other_calls';
   }
   return null;
 }

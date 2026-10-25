@@ -1,10 +1,43 @@
 {
-  "types": ["missed_call", "booking", "message"],
-  "channels": ["push", "sms", "whatsapp", "email"],
+  "types": [
+    "missed_call",
+    "booking",
+    "other_calls"
+  ],
+  "channels": [
+    "push",
+    "sms",
+    "whatsapp",
+    "email"
+  ],
   "defaults": {
-    "missed_call": { "push": true, "sms": true, "whatsapp": true, "email": true },
-    "booking": { "push": true, "sms": false, "whatsapp": true, "email": true },
-    "message": { "push": false, "sms": false, "whatsapp": true, "email": true }
+    "missed_call": {
+      "push": true,
+      "sms": true,
+      "whatsapp": true,
+      "email": true
+    },
+    "booking": {
+      "push": true,
+      "sms": false,
+      "whatsapp": true,
+      "email": true
+    },
+    "other_calls": {
+      "push": true,
+      "sms": true,
+      "whatsapp": true,
+      "email": true
+    }
   },
-  "missedCallGuardOrder": ["whatsapp", "sms", "email", "push"]
+  "missedCallGuardOrder": [
+    "whatsapp",
+    "sms",
+    "email",
+    "push"
+  ],
+  "legacyKeys": {
+    "message": "other_calls",
+    "lead": "other_calls"
+  }
 }
