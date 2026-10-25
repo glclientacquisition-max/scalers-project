@@ -208,7 +208,10 @@ function createBrainV2Live(opts = {}) {
     if (vd) V1.remember(machine, 'caller', text);
     // Phase B (single brain): v2's call plan decides the step and does the writes FIRST (rules, no model);
     // then the model speaks every turn, phrasing that step. No owner switch. Template = total fallback.
-    if (vd && vdMode === 'on' && CP.phaseB({ env, tenantId: profile?.id })) return runPhaseB({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine, vd });
+    // BRAIN_MODEL_LEAD: one structured model call leads; code owns state and guards (off = the #932 path below)
+    if (vd && vdMode === 'on' && ML.leadOn({ env, tenantId: profile?.id })) return runModelLead({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine });
+    const core = !!vd && CC.coreOn({ env, tenantId: profile?.id });
+    if (vd && vdMode === 'on' && (core || CP.phaseB({ env, tenantId: profile?.id }))) return runPhaseB({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine, vd, core });
     if (vd && vdMode === 'on') {
       const d = await vd.turn({ text, profile: profile || {}, state: machine, langLock: langLock === 'en' || langLock === 'sw' ? langLock : null, onSentence, shouldAbort: typeof shouldAbort === 'function' ? shouldAbort : () => false, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, phaseA: pA });
       vdPath = d.path;
@@ -237,7 +240,7 @@ function createBrainV2Live(opts = {}) {
       const fileNames = (machine.file?.openRows || []).map((r) => r && r.service).filter(Boolean).slice(0, 3);
       const note = fileNames.length ? `caller file: ${fileNames.join(', ')}` : '';
       const tIdx = typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null;
-      const r = await modelRun.turnModel.forFinal({ text, profile: profile || {}, note, budgetMs: opts.turnModelWaitMs ?? TURN_MODEL_WAIT_MS, turnIndex: tIdx });
+      const r = await modelRun.turnModel.forFinal({ text, profile: profile || {}, note, budgetMs: core ? (opts.coreUnderstandMs ?? CORE_UNDERSTAND_MS) : (opts.turnModelWaitMs ?? TURN_MODEL_WAIT_MS), turnIndex: tIdx });
       turnFields = r.fields;
       if (pA) { try { require('../geminiProviderHealth').noteBrainModel(r.fields ? { ok: true, model: 'turn_model' } : { ok: false, model: 'turn_model', err: 'no_fields' }); } catch { /* best effort */ } }
     }
@@ -277,7 +280,10 @@ function createBrainV2Live(opts = {}) {
     };
   }
 
-  async function runPhaseB({ text, profile, langLock, shouldAbort, onSentence, machine, vd }) {
+  async function runPhaseB({ text, profile, langLock, shouldAbort, onSentence, machine, vd, core = false }) {
+    // BRAIN_CALL_CORE: typed events + the reducer pre-step run first; the core is the only state writer
+    const T0 = Date.now(); const ms = {}; let evs = []; let preWrites = []; let snap0 = null; let n0 = 0;
+    if (core) { text = CC.normalize(text); machine.core = true; snap0 = CC.snapshot(machine); n0 = (machine.receipts || []).length; evs = CC.events(text, machine, profile); preWrites = CC.applyPre(machine, evs); ms.events = Date.now() - T0; }
     const abort = typeof shouldAbort === 'function' ? shouldAbort : () => false;
     const lock = langLock === 'en' || langLock === 'sw' ? langLock : null;
     const handlers = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName } });
@@ -286,7 +292,7 @@ function createBrainV2Live(opts = {}) {
     const parallel = String(env.BRAIN_V1_DRAFT_PHASE_B_PARALLEL || 'on').toLowerCase() !== 'off';
     const startedOn = parallel ? vd.prelaunch({ text, profile, state: machine, langLock: lock }) : null;
     const pre = await CP.before(machine, text, profile, { handlers });
-    let tmpl; let lang = machine.lang || lock || 'en'; let done = null;
+    let tmpl; let lang = machine.lang || lock || 'en'; let done = null; let turnFieldsOut = null;
     if (pre.owned) { tmpl = pre.line; lang = pre.lang || lang; } else {
       const parts = [];
       // understanding: v2's one turn-model call (same as today's v2 turns), rules if it is off or misses 750 ms.
@@ -294,29 +300,213 @@ function createBrainV2Live(opts = {}) {
       let turnFields = null;
       if (modelRun === undefined) modelRun = resolveModelShadow(opts, env);
       if (String(env.BRAIN_V1_DRAFT_PHASE_B_UNDERSTAND || 'model').toLowerCase() !== 'rules' && modelRun && modelRun.mode === 'on' && modelRun.turnModel) {
-        try { const r = await modelRun.turnModel.forFinal({ text: pre.text, profile, note: '', budgetMs: opts.turnModelWaitMs ?? TURN_MODEL_WAIT_MS, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null }); turnFields = r && r.fields || null; } catch { turnFields = null; }
+        try { const r = await modelRun.turnModel.forFinal({ text: pre.text, profile, note: '', budgetMs: core ? (opts.coreUnderstandMs ?? CORE_UNDERSTAND_MS) : (opts.turnModelWaitMs ?? TURN_MODEL_WAIT_MS), turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null }); turnFields = r && r.fields || null; } catch { turnFields = null; }
       }
+      turnFieldsOut = turnFields; if (core) ms.understand = Date.now() - T0;
       for await (const ev of runTurnStream(machine, { text: pre.text, profile: { ...profile }, now: nowFn(), handlers, model: null, classify: null, turnFields, langLock: lock, shouldAbort: abort })) {
         if (ev && ev.type === 'sentence') parts.push(ev.text); if (ev && ev.type === 'done') done = ev;
       }
       lang = machine.lang || lang;
       tmpl = (parts.join(' ').trim() || String(done?.line || '')).trim();
       tmpl = CP.after(machine, { line: tmpl }, { lang });
+      // an owner fee/note for the place just named is always heard first (Desk preview line), then the step
+      if (pre.lead && !tmpl.startsWith(pre.lead)) tmpl = `${pre.lead} ${tmpl}`.trim();
       machine.lastLine = tmpl; machine.lastBase = tmpl;
     }
     tmpl = spokenStyle(tmpl, lang);
     const st = CP.step(machine, tmpl, lang);
+    let rp = null;
+    if (core) {
+      ms.reduce = Date.now() - T0;
+      const lead = machine.coreLead || null; machine.coreLead = null;
+      const evs2 = turnFieldsOut ? [...evs, ...CC.events('', null, profile, turnFieldsOut).filter((e) => !evs.some((x) => x.type === e.type && x.ask === e.ask))] : evs;
+      const ans = CC.answers(evs2, text, machine, profile, lang, { already: pre.acts || [] });
+      rp = CC.replyPlan({ st, tmpl, ans, lead, receipts: CC.receiptsSince(machine, n0), lang });
+    }
     // the plan's own line is the step: in full when its first sentence carries news (honest name check, added
     // item); a coverage answer + re-ask only adds its question (the model answers the coverage itself)
-    if (pre.owned) { const full = (pre.acts || []).some((x) => /^(have_my_name|item_added|add_service|service_add|area_(excluded|outside|unknown))/.test(x)); const q = CP.split(tmpl).filter((x) => /\?\s*$/.test(x)).pop(); st.question = full || !q ? tmpl : q; }
+    if (pre.owned) { const full = (pre.acts || []).some((x) => /^(have_my_name|item_added|add_service|service_add|area_(excluded|outside|unknown))/.test(x)); const q = CP.split(tmpl).filter((x) => /\?\s*$/.test(x)).pop(); st.question = full || !q ? tmpl : q; } else if (pre.lead) st.question = tmpl;
     (machine.trace || (machine.trace = [])).push({ turn: machine.turn, call_plan: { items: st.items, step: st.kind, slot: st.slot || null, acts: pre.acts } });
-    const d = await vd.turn({ text, profile, state: machine, langLock: lock, onSentence, shouldAbort: abort, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, phaseA: true, plan: { kind: st.kind, parallel, startedOn, template: tmpl, note: CP.stepNote(st), check: (s, ctx) => CP.actCheck(s, st, ctx), tail: (a) => CP.tail(st, a) } });
+    const d = await vd.turn({ text, profile, state: machine, langLock: lock, onSentence, shouldAbort: abort, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null, phaseA: true, plan: rp ? { kind: st.kind, core: true, parallel, startedOn, template: rp.template, note: rp.note, check: rp.check, tail: rp.tail } : { kind: st.kind, parallel, startedOn, template: tmpl, note: CP.stepNote(st), check: (s, ctx) => CP.actCheck(s, st, ctx), tail: (a) => CP.tail(st, a) } });
+    if (rp) tmpl = rp.template;
     const endCall = endDecision({ done, machine, profile, line: d.path === 'v1_draft' ? d.line : tmpl, alreadyEnded: endSent });
     if (endCall.end) endSent = true;
     const extra = { phase: machine.phase, plan: st.kind, end: endCall.end, ...(endCall.end ? { reason: endCall.reason } : {}) };
+    if (core) {
+      ms.compose = Date.now() - T0;
+      const rec = { kind: 'call_core', turn: machine.turn, events: evs, writes: [...preWrites, ...CC.diff(snap0, CC.snapshot(machine))], stagesMs: ms, plan: rp.plan, path: d.path, firstSentenceMs: d.trace ? d.trace.firstSentenceMs : null, file: CC.callerFileTool(machine) };
+      (machine.trace || (machine.trace = [])).push({ turn: machine.turn, call_core: rec });
+      try { (opts.onModelStage || (() => {}))(rec); } catch { /* trace only */ }
+      extra.core = true;
+    }
     if (d.path === 'v1_draft') { V1.remember(machine, 'agent', d.line); return { line: d.line, lang: d.sentences[0]?.lang || lang, sentences: d.sentences, path: 'v1_draft', streamed: typeof onSentence === 'function', ...extra }; }
     V1.remember(machine, 'agent', tmpl);
     return { line: tmpl, lang, sentences: CP.split(tmpl).map((x) => ({ text: x, lang })), path: `plan_fallback:${d.path}`, ...extra };
+  }
+
+  // ---------------------------------------------------------------- BRAIN_MODEL_LEAD turn runner
+  let leadStreams;
+  function leadStreamFor() {
+    if (leadStreams !== undefined) return leadStreams;
+    leadStreams = null;
+    if (typeof opts.modelLeadStreamFor === 'function') { leadStreams = opts.modelLeadStreamFor; return leadStreams; }
+    const key = env.GEMINI_API_KEY; if (!key) return null;
+    const models = {};
+    leadStreams = (id) => models[id] || (models[id] = createGeminiStreamModel({ apiKey: key, model: id }));
+    return leadStreams;
+  }
+  /** G5 + one name state: the booking write carries a clock the executor keeps, and the saved row must equal the read-back. */
+  function leadHandlers(machine, profile, log) {
+    const h = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName } });
+    const create = h.createAppointment; const update = h.updateAppointment;
+    h.createAppointment = async (args) => {
+      const m = String(args.whenText || '').match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})$/);
+      const when = m ? { date: m[1], time: m[2] } : null;
+      const a2 = when ? { ...args, whenText: ML.storedWhenText(when) } : args;
+      const res = await create(a2);
+      if (!res.ok) { log.push({ g5: 'write_failed' }); return res; }
+      const expected = { when, place: args.landmark || null, service: args.serviceName || null };
+      let cmp = ML.compareSaved(expected, res.saved ? { ...res.saved, serviceName: res.saved.serviceName || args.serviceName } : null);
+      log.push({ g5: 'compare', ok: cmp.ok, mismatch: cmp.mismatch || cmp.missing || [], id: res.id });
+      if (cmp.ok || !res.saved) return { ...res, verified: cmp.ok, mismatch: cmp.mismatch || cmp.missing };
+      // fix the write once (same row), then re-verify; still wrong = no booked line (honest failure path)
+      if (res.id && when) {
+        const fx = await update({ appointmentId: res.id, whenText: ML.storedWhenText(when), windowStart: L2.whenToIso(when) });
+        cmp = ML.compareSaved(expected, fx && fx.saved ? { ...res.saved, ...fx.saved } : null);
+        log.push({ g5: 'fix', ok: !!(fx && fx.ok && cmp.ok), mismatch: cmp.mismatch || cmp.missing || [] });
+        if (fx && fx.ok && cmp.ok) return { ...res, verified: true, fixed: true };
+      }
+      // the machine reads success from result.id: a row that is still wrong must not look booked
+      return { ok: false, id: null, rowId: res.id, error: 'saved_mismatch', verified: false, mismatch: cmp.mismatch };
+    };
+    const save = h.saveCallerInfo;
+    h.saveCallerInfo = async (args) => { const locked = CP.lockedName(machine); const same = locked && args && String(args.name || '').toLowerCase() === String(locked).toLowerCase(); return applyTools ? (async () => { const ex = await applyTools({ saveCallerInfo: args, name: args?.name, ...(same ? { v2NameLocked: true } : {}) }); return ex; })() : save(args); };
+    return h;
+  }
+
+  async function runModelLead({ text, profile, langLock, shouldAbort, onSentence, machine }) {
+    const clock = typeof opts.clock === 'function' ? opts.clock : () => Date.now();
+    const T0 = clock(); const ms = {}; const abort = typeof shouldAbort === 'function' ? shouldAbort : () => false;
+    const lock = langLock === 'en' || langLock === 'sw' ? langLock : null;
+    text = CC.normalize(text); machine.core = true; machine.lead = true;
+    const snap0 = CC.snapshot(machine); const n0 = (machine.receipts || []).length;
+    // 1) context pack + read-only tools in code (decision 1): caller file, coverage per place, KB
+    const caller = ML.callerReceipt(machine.file || {}, { now: nowFn(), lockedName: CP.lockedName(machine) });
+    const coverage = ML.coverageReceipt(ML.placeCandidates(text), profile);
+    const pack = ML.contextPack({ machine, text, profile, caller, coverage, langHint: lock });
+    const request = ML.buildRequest(pack, profile);
+    ms.pack = clock() - T0;
+    // 2) the one model call (hedged, streamed)
+    const ids = MS.resolveModelIds(env); const sf = leadStreamFor();
+    const live = { u: null, reply: '', closed: false, tools: null, done: false };
+    let kick = () => {}; const wake = () => { const k = kick; kick = () => {}; k(); };
+    let uRes; const uP = new Promise((r) => { uRes = r; });
+    const run = sf ? ML.runHedged({ streamFor: sf, primaryId: ids.primary, backupId: ids.backup, request, deadlines: opts.modelLeadDeadlines || ML.DEADLINES, clock, onProgress: (a, p) => {
+      if (p.understanding && !live.u) { live.u = p.understanding; ms.understanding = clock() - T0; uRes(); }
+      if (p.toolCalls) live.tools = p.toolCalls;
+      if (typeof p.reply === 'string') { live.reply = p.reply; live.closed = !!p.replyClosed; }
+      wake();
+    } }) : null;
+    if (run) run.done.then(() => { live.done = true; uRes(); wake(); }); else { live.done = true; uRes(); }
+    await Promise.race([uP, new Promise((r) => setTimeout(r, (opts.modelLeadDeadlines || ML.DEADLINES).understandWaitMs))]);
+    const u = live.u;
+    // 3) the state owner applies the turn (rules veto; the model's understanding is evidence)
+    const g5 = []; const handlers = leadHandlers(machine, profile, g5);
+    const pre = await CP.before(machine, text, profile, { handlers });
+    let tmpl; let lang = (u && (u.lang === 'sw' ? 'sw' : u.lang === 'en' ? 'en' : null)) || machine.lang || lock || 'en'; let done = null;
+    if (lock) lang = lock;
+    if (pre.owned) { tmpl = pre.line; lang = pre.lang || lang; } else {
+      const parts = [];
+      for await (const ev of runTurnStream(machine, { text: pre.text, profile: { ...profile }, now: nowFn(), handlers, model: null, classify: null, turnFields: ML.turnFieldsOf(u, profile), langLock: lock, shouldAbort: abort })) {
+        if (ev && ev.type === 'sentence') parts.push(ev.text); if (ev && ev.type === 'done') done = ev;
+      }
+      lang = lock || machine.lang || lang;
+      tmpl = (parts.join(' ').trim() || String(done?.line || '')).trim();
+      tmpl = CP.after(machine, { line: tmpl }, { lang });
+      if (pre.lead && !tmpl.startsWith(pre.lead)) tmpl = `${pre.lead} ${tmpl}`.trim();
+      machine.lastLine = tmpl; machine.lastBase = tmpl;
+    }
+    tmpl = spokenStyle(tmpl, lang);
+    const st = CP.step(machine, tmpl, lang);
+    if (pre.owned) { const q = CP.split(tmpl).filter((x) => /\?\s*$/.test(x)).pop(); st.question = q || tmpl; }
+    ms.state = clock() - T0;
+    const receipts = CC.receiptsSince(machine, n0);
+    // places the model heard that the prefetch missed: resolved locally now (no second model call)
+    if (u && u.slots && Array.isArray(u.slots.places)) { const extra = u.slots.places.filter((p) => !coverage.places.some((r) => r.place.toLowerCase() === String(p).toLowerCase() || r.said.toLowerCase() === String(p).toLowerCase())); if (extra.length) coverage.places.push(...ML.coverageReceipt(extra, profile).places.filter((r) => !coverage.places.some((x) => x.place === r.place))); }
+    const rulesEvs = CC.events(text, null, profile);
+    const questions = u ? (u.questions || []) : rulesEvs.filter((e) => e.type === 'ask').map((e) => ({ type: e.ask === 'pay' ? 'payment' : e.ask }));
+    if (!u && coverage.places.length && !questions.some((q) => q.type === 'coverage') && /\b(have|cover|come|reach|mnafika|mnakam|mnakuja)\b|\?/i.test(text)) questions.push({ type: 'coverage' });
+    // tool_calls arrive after the understanding; they are hints (the machine commits writes), guarded + traced at the end
+    const ctx = { st, receipts, coverage: coverage.places, caller, profile, questions, lang, machine, text };
+    const ver = ML.makeVerifier(ctx);
+    // 4) speak: verified sentences in order; questions held until the reply closes (owed answers go first)
+    const spoken = []; const verdicts = []; let firstMs = null; let repairs = 0; let modelSentences = 0;
+    const emit = (s, src) => { if (!s || abort()) return; const t = spokenStyle(s, lang); spoken.push({ text: t, lang, src }); if (firstMs == null) firstMs = clock() - T0; if (typeof onSentence === 'function') { try { onSentence({ text: t, lang }); } catch { /* sink */ } } };
+    const fixed = st.kind === 'readback' || st.kind === 'confirmed' || st.kind === 'add_service' || (pre.owned && (pre.acts || []).some((x) => /^(have_my_name|item_added|add_service|service_add|area_(excluded|outside|unknown))/.test(x)));
+    let answeredBy = 'model';
+    let held = null; let used = 0;
+    const handle = async (s) => {
+      const v = ver.check(s); verdicts.push({ s: s.slice(0, 160), verdict: v.verdict, reason: v.reason || null });
+      if (v.verdict === 'drop') return;
+      let out = v.text || s; let src = v.verdict === 'pass' ? 'model' : 'step';
+      if (v.verdict === 'repair') {
+        repairs += 1; out = v.fix; src = 'repair_template';
+        const left = (opts.modelLeadDeadlines || ML.DEADLINES).hardMs - (clock() - T0);
+        if (sf && left >= ML.DEADLINES.repairMinLeftMs && opts.modelLeadRepair !== false) {
+          const r = await repairSentence({ sf, id: ids.backup, bad: s, fix: v.fix, lang, capMs: Math.min(left, ML.DEADLINES.repairCapMs) });
+          if (r) { const v2 = ML.makeVerifier({ ...ctx, coverage: ctx.coverage.slice() }).check(r); if (v2.verdict === 'pass') { out = r; src = 'repair_model'; } }
+        }
+      }
+      if (fixed && (/\?\s*$/.test(out) || CC.CLAIM.test(out))) return; // the fixed line carries the step
+      if (/\?\s*$/.test(out)) { if (!held) held = out; return; }
+      if (src === 'model') modelSentences += 1;
+      emit(out, src);
+    };
+    if (run) {
+      for (;;) {
+        const all = ML.sentencesOf(live.reply, live.closed || live.done);
+        while (used < all.length) { if (abort()) break; await handle(all[used]); used += 1; }
+        if (live.closed || live.done || abort()) break;
+        await new Promise((r) => { kick = r; setTimeout(r, 50); });
+      }
+    }
+    const modelOk = !!(u && (modelSentences || held || used));
+    if (!modelOk) answeredBy = 'template';
+    const owed = ML.owedAnswers(ctx, spoken.map((x) => x.text).join(' '));
+    if (answeredBy === 'template') {
+      // all models failed: the same plan, worded by code; one answer per subject, never stacked
+      const cov = questions.some((q) => q.type === 'coverage') ? ML.coverageAnswer(coverage.places, lang) : null;
+      const ans = CC.answers(rulesEvs.filter((e) => e.ask !== 'coverage'), text, machine, profile, lang);
+      const lines = [cov, ...ans.map((a) => a.text), ...owed.filter((a) => a.subject !== 'coverage').map((a) => a.text)].filter(Boolean);
+      let base = tmpl;
+      // the template's own coverage/unknown lines are replaced by the per-place answer (G4: no contradiction stacking)
+      if (cov) base = CP.split(base).filter((x) => !coverage.places.some((r) => x.toLowerCase().includes(r.place.toLowerCase())) && !/can'?t confirm|siwezi kuthibitisha/i.test(x)).join(' ');
+      for (const l of [...new Set(lines)]) emit(l, 'template');
+      emit(base, 'template');
+    } else {
+      for (const a of owed) emit(a.text, 'owed_answer');
+      if (fixed) { emit(st.kind === 'readback' ? st.readback : tmpl, 'fixed'); if (!modelSentences) answeredBy = 'fixed'; }
+      else {
+        const stepQ = st.kind === 'ask' || st.kind === 'confirm_name' ? CP.tail(st, ver.act) : null;
+        if (held) emit(held, 'model'); else if (stepQ) emit(stepQ, 'step');
+      }
+      if (repairs) answeredBy = `${answeredBy}+repair`;
+    }
+    const line = spoken.map((x) => x.text).join(' ').trim() || tmpl;
+    V1.remember(machine, 'agent', line);
+    const endCall = endDecision({ done, machine, profile, line, alreadyEnded: endSent });
+    if (endCall.end) endSent = true;
+    ms.total = clock() - T0;
+    const runInfo = run ? await Promise.race([run.done, Promise.resolve(null)]) : null;
+    const rec = {
+      kind: 'model_lead', stage: 'brain_model_lead', turn: machine.turn, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null,
+      attempts: (run ? run.attempts : []).map((a) => ({ model: a.model, role: a.role, startMs: a.startMs, firstTokenMs: a.firstTokenMs, ms: a.ms, outcome: a.outcome || (a.end ? null : 'streaming') })),
+      understanding: u || null, toolCalls: ML.guardTools(live.tools || [], machine, caller), receipts: { caller: { name: caller.name, candidate: caller.candidate, last_past_job: caller.last_past_job, upcoming: caller.upcoming.length, upcoming_count: caller.upcoming_count }, coverage: coverage.places.map((r) => ({ place: r.place, covered: r.covered, source: r.source })), writes: receipts.map((r) => ({ tool: r.tool, ok: r.ok, id: r.id })), g5 },
+      verdicts, answeredBy, step: st.kind, writes: CC.diff(snap0, CC.snapshot(machine)), stagesMs: ms, firstSentenceMs: firstMs, why: runInfo && runInfo.why || null,
+    };
+    (machine.trace || (machine.trace = [])).push({ turn: machine.turn, model_lead: rec });
+    try { (opts.onModelStage || (() => {}))(rec); } catch { /* trace only */ }
+    return { line, lang, sentences: spoken.map((x) => ({ text: x.text, lang: x.lang })), path: answeredBy === 'template' ? 'model_lead_template' : 'model_lead', streamed: typeof onSentence === 'function', phase: machine.phase, plan: st.kind, lead: true, answeredBy, end: endCall.end, ...(endCall.end ? { reason: endCall.reason } : {}), ...(endCall.held ? { endHeld: endCall.held } : {}) };
   }
 
   /** Voice's unfinished hold: start this turn's one model call on the stable partial. */
@@ -353,6 +543,20 @@ const { spoken: spokenStyle } = require('./spokenStyle');
 const TRZ = require('./turnResolver');
 const RCP = require('./receipts');
 const CP = require('./callPlan');
+const CC = require('./callCore');
+const ML = require('./modelLead');
+const L2 = require('./lexicon');
+/** Decision 3: one bad sentence gets a quick model rewrite when >=300 ms is left (light model), else the code line. */
+async function repairSentence({ sf, id, bad, fix, lang, capMs }) {
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), capMs);
+  try {
+    const request = { systemInstruction: { parts: [{ text: 'Rewrite the receptionist sentence so it states ONLY the fact given, naturally, one short sentence, same language. Return only the sentence.' }] }, contents: [{ role: 'user', parts: [{ text: JSON.stringify({ wrong: bad, fact: fix, lang }) }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 60, thinkingConfig: { thinkingLevel: 'MINIMAL' } } };
+    let out = ''; const r = await sf(id)({ request, signal: ac.signal, onText: (d) => { out += d; } });
+    const s = String((r && r.text) || out).trim().replace(/^"|"$/g, '');
+    return s && s.length < 220 ? s : null;
+  } catch { return null; } finally { clearTimeout(t); }
+}
+const CORE_UNDERSTAND_MS = 450; // BRAIN_CALL_CORE latency budget: understanding <= 450 ms
 /** Phase A (voice-qa 926 §2.2): a handed-off "is it possible?" with a catalogue service gets a yes before
  * v2's next question ("Yes, we do interior window cleaning. Where should we come?"). Coverage and hours
  * are still checked by v2's own place/time steps; this only answers the service half. */

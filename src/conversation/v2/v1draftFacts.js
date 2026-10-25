@@ -60,8 +60,11 @@ function buildFactNote(profile = {}, state = {}, { callerText = '', writes = [] 
     const priced = s.pricing?.confirmed !== false && s.price_range;
     if (priced) facts.push({ id: `P${i + 1}`, family: 'price', serviceId: s.id, name: s.name, keys: keyWords(s.name), text: `${s.name}: ${s.price_range}`, nums: num(s.price_range) });
   });
-  const areas = (profile.serviceAreas?.areas || []).map((a) => cap(String(a.id || '').replace(/^\w+:/, ''))).filter(Boolean);
+  // picks mode (tenant_area_picks): the owner's serving picks; legacy: service_areas rows
+  const lp = AC.listed(profile);
+  const areas = lp ? lp.serve : (profile.serviceAreas?.areas || []).map((a) => cap(String(a.id || '').replace(/^\w+:/, ''))).filter(Boolean);
   areas.forEach((a, i) => facts.push({ id: `A${i + 1}`, family: 'area', place: a, covered: true, text: `${a}: covered` }));
+  if (lp) lp.off.forEach((a, i) => facts.push({ id: `AX${i + 1}`, family: 'area', place: a, covered: false, auto: true, text: `${a}: NOT covered` }));
   // places the caller named (this turn) or the booking holds, resolved on the shared Kenya area tree +
   // the owner's include/exclude rows. auto: backed by the system, valid without a model citation.
   const seenPlace = new Set(areas.map((a) => a.toLowerCase()));
@@ -70,7 +73,7 @@ function buildFactNote(profile = {}, state = {}, { callerText = '', writes = [] 
     if (!r || !r.name || r.status === 'unknown' || seenPlace.has(r.name.toLowerCase())) return;
     seenPlace.add(r.name.toLowerCase());
     const covered = r.status === 'covered';
-    facts.push({ id: `AR${i + 1}`, family: 'area', place: r.name, covered, auto: true, county: r.county || null, text: covered ? `${r.name}: covered${r.county ? ` (in ${r.county})` : ''}` : `${r.name}: NOT covered` });
+    facts.push({ id: `AR${i + 1}`, family: 'area', place: r.name, covered, auto: true, county: r.county || null, fee_kes: r.fee_kes ?? null, nums: r.fee_kes != null ? [r.fee_kes] : [], text: covered ? `${r.name}: covered${r.county ? ` (in ${r.county})` : ''}${r.fee_kes != null ? `, extra KES ${r.fee_kes}` : ''}${r.note ? `, note: ${r.note}` : ''}` : `${r.name}: NOT covered` });
   });
   // the booking in progress: what the caller gave this call is a backed fact (call state is the truth)
   const b = bookingFact(state);
@@ -85,4 +88,4 @@ function buildFactNote(profile = {}, state = {}, { callerText = '', writes = [] 
   const text = facts.map((f) => `[${f.id}] ${f.text}`).join('\n');
   return { facts, byId, text, areas };
 }
-module.exports = { buildFactNote, bookingFact, keyWords, num };
+module.exports = { buildFactNote, bookingFact, keyWords, num, hoursFact };

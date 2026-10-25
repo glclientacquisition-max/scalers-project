@@ -18,7 +18,7 @@ function createLiveHandlers({ applyTools, ctx = {} } = {}) {
     createAppointment: async (args) => {
       const execution = await applyTools({ appointment: args });
       const row = first(execution?.results, 'create_appointment');
-      return { id: row?.id || null, ok: succeeded(row) };
+      return { id: row?.id || null, ok: succeeded(row), saved: row?.value || null };
     },
     createServiceRequest: async (args) => {
       const execution = await applyTools({ serviceRequest: args });
@@ -33,7 +33,7 @@ function createLiveHandlers({ applyTools, ctx = {} } = {}) {
     updateAppointment: async (args) => {
       const execution = await applyTools({ appointmentUpdate: args });
       const row = first(execution?.results, 'update_appointment');
-      return { id: row?.id || args.appointmentId || null, ok: succeeded(row) };
+      return { id: row?.id || args.appointmentId || null, ok: succeeded(row), saved: row?.value || null };
     },
     escalate: async (args) => {
       const execution = await applyTools({ escalate: args });
