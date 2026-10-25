@@ -80,7 +80,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (226)
+## Functions (227)
 
 | Function | Defined in |
 | --- | --- |
@@ -248,7 +248,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `payments_valid` | `supabase/migrations/20261011200000_structured_data_foundation.sql`<br>`supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `pg_temp` | `docs/supabase/package_version_owner_prices.sql` |
 | `platform_soniox_voices_enforce_single_default` | `docs/supabase/soniox_voice_id.sql` |
-| `policy_rules_valid` | `supabase/migrations/20261012090000_payments_policies_v2.sql` |
+| `policy_rules_valid` | `docs/supabase/policy_topics.sql`<br>`docs/supabase/policy_topics_down.sql`<br>`supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `purge_archived_tenants` | `docs/supabase/purge_archived_tenants.sql` |
 | `purge_voice_turn_traces` | `docs/supabase/voice_turn_traces.sql` |
 | `quarantine_pool_number` | `docs/supabase/billing_data_layer.sql` |
@@ -272,6 +272,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `save_onboarding_step` | `supabase/migrations/20261011150000_onboarding_setup.sql` |
 | `save_spoken_catalogue_version` | `supabase/migrations/20261015113748_save_spoken_catalogue_version.sql` |
 | `service_areas_valid` | `supabase/migrations/20261012150000_locations_service_areas.sql`<br>`supabase/migrations/20261013090000_outside_areas.sql` |
+| `set_policy_topic` | `docs/supabase/policy_topics.sql` |
 | `set_tenant_billing_mode` | `docs/supabase/billing_mode_legal_pairs.sql`<br>`docs/supabase/wallet_security_beta.sql` |
 | `set_tenant_on_demand_usage` | `docs/supabase/on_demand_usage_audit.sql`<br>`docs/supabase/wallet_on_demand_alerts.sql` |
 | `set_tenant_soft_spend_limit` | `docs/supabase/wallet_soft_spend_limit.sql` |

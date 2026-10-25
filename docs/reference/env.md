@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-208 variables.
+209 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -28,6 +28,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BETTER_AUTH_SECRET` | desk | `dashboard/src/lib/admin-auth.ts` |
 | `BETTER_AUTH_URL` | desk | `dashboard/src/lib/admin-auth.ts` |
 | `BILLING_NOTICES_SEND` | voice | `src/billing/billingNoticeSend.js` |
+| `BRAIN_AREA_PICKS` | voice | `src/conversation/v2/areaCoverage.js`<br>`src/db.js` |
 | `BRAIN_CALL_FIXES_D199` | desk | `dashboard/src/lib/tenantFieldProvenance.ts` |
 | `BRAIN_GEMINI_CATALOGUE` | voice | `src/conversation/catalogueMouth.js` |
 | `BRAIN_V2_COMMIT_SAFETY` | voice | `src/conversation/v2/commitSafety.js` |
@@ -43,7 +44,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js`<br>`src/notifications/ownerCallSummary.js` |
 | `CALL_SUMMARY_EVENT` | voice | `src/conversation/callSummaryEvent.js` |
 | `CRON_SECRET` | desk | `dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/cron/ops-alerts/route.ts` |
-| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+50 more |
+| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+52 more |
 | `DASHBOARD_PASSWORD` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |

@@ -119,7 +119,7 @@ test("Policies save generates the spoken text from payments and rules", () => {
   if (!res.ok) return;
   assert.equal(res.policies.payment, "You can pay by M-Pesa Buy Goods Till 123456. Customers pay on delivery.");
   assert.equal(res.policies.returns, "We refund or exchange items within 7 days if unused and with the receipt or M-Pesa message.");
-  assert.equal(res.policies.delivery, "We deliver to Nairobi CBD the same day for orders before 2pm. Delivery costs KSh 200.");
+  assert.equal(res.policies.delivery, "We deliver the same day for orders before 2pm.");
   assert.match(res.policies.cancellation, /up to a day before\. After that, the deposit is kept\. We wait 15 minutes .* KSh 500 call-out fee/);
   assert.deepEqual(res.policies.provenance!.payment, { source: "owner", confirmed: true });
   const compiled = formatPoliciesForCompiler(res.policies);
