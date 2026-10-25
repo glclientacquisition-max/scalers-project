@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-214 variables.
+215 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -28,6 +28,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BETTER_AUTH_SECRET` | desk | `dashboard/src/lib/admin-auth.ts` |
 | `BETTER_AUTH_URL` | desk | `dashboard/src/lib/admin-auth.ts` |
 | `BILLING_NOTICES_SEND` | voice | `src/billing/billingNoticeSend.js` |
+| `BRAIN_AREA_PICKS` | voice | `src/conversation/v2/areaCoverage.js`<br>`src/db.js` |
 | `BRAIN_CALL_FIXES_D199` | desk | `dashboard/src/lib/tenantFieldProvenance.ts` |
 | `BRAIN_GEMINI_CATALOGUE` | voice | `src/conversation/catalogueMouth.js` |
 | `BRAIN_V2_COMMIT_SAFETY` | voice | `src/conversation/v2/commitSafety.js` |
