@@ -97,6 +97,12 @@ function matchAreaText(text) {
 }
 
 const kes = (n) => Number(n).toLocaleString('en-KE');
+/** The owner's note language. Notes are free text (Desk #944: never parsed for rules) with no Swahili variant
+ *  (unlike policy_lines.<topic>.{en,sw}), so a Swahili turn speaks it verbatim and is flagged when it is not Swahili. */
+function noteLang(note) {
+  if (!note) return null; const d = require('./lexicon').detectLang(note);
+  return d.sw > d.en ? 'sw' : 'en';
+}
 /** Desk callerHears, plus the Kiswahili line Brain speaks. [PROMPT-PLACEHOLDER] for the sw wording. */
 function callerHears(picks, place, lang = 'en') {
   const sw = /^sw/.test(String(lang || ''));
@@ -110,8 +116,10 @@ function linesFor(picks, n, lang = 'en') {
   if (!r.covered) return { status: 'not_covered', reply: sw ? `Samahani, hatufiki ${n.name}.` : `Sorry, we don't cover ${n.name}.`, node: n, res: r };
   let reply = sw ? `Ndio, tunafika ${n.name}.` : `Yes, we cover ${n.name}.`;
   if (r.fee_kes != null) reply += sw ? ` Kuna ada ya ziada ya KES ${kes(r.fee_kes)}.` : ` There's an extra KES ${kes(r.fee_kes)}.`;
+  // the owner's note, verbatim after the fee (Desk preview order); never translated, never parsed
   if (r.note) reply += ` ${r.note.replace(/[.!?]*$/, '')}.`;
-  return { status: 'covered', reply, node: n, res: r };
+  const nl = noteLang(r.note);
+  return { status: 'covered', reply, node: n, res: r, note: r.note, note_lang: nl, note_untranslated: Boolean(sw && r.note && nl !== 'sw') };
 }
 
-module.exports = { available, treeVersion: () => (TREE ? TREE.version : null), NODES, areaNode, areaAncestors, countyOf, normalizeAreaPicks, resolveArea, normAreaText, editDistance, matchAreaText, callerHears, linesFor };
+module.exports = { available, treeVersion: () => (TREE ? TREE.version : null), NODES, areaNode, areaAncestors, countyOf, normalizeAreaPicks, resolveArea, normAreaText, editDistance, matchAreaText, callerHears, linesFor, noteLang };

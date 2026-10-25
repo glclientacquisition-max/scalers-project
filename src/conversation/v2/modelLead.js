@@ -82,6 +82,8 @@ function scanPlaces(words) {
 }
 const norm = (x) => String(x).toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
 
+/** The owner's area note on a receipt row: a checkable owner fact (verbatim), with its language. */
+const noteFields = (r) => (r && r.status === 'covered' && r.note ? { note: r.note, note_lang: r.note_lang || null } : { note: null, note_lang: null });
 /** check_coverage receipt: one row per place (1..5). Picks resolver per place; legacy only when no picks. */
 function coverageReceipt(places = [], profile = {}) {
   const rows = [];
@@ -91,7 +93,7 @@ function coverageReceipt(places = [], profile = {}) {
     const name = r && r.name ? r.name : p.replace(/\b[a-z]/g, (c) => c.toUpperCase());
     if (rows.some((x) => x.place.toLowerCase() === name.toLowerCase())) continue;
     const covered = !r || r.status === 'unknown' ? 'unknown' : r.status === 'covered' ? 'yes' : 'no';
-    rows.push({ place: name, said: p, matched_node: r && r.node || null, covered, status: r ? r.status : 'unknown', source: r && r.source === 'picks' ? 'area_picks' : 'legacy', line_en: r ? AC.line(r, 'en') : null, line_sw: r ? AC.line(r, 'sw') : null, via: r && r.via || null, fee_kes: r && r.fee_kes != null ? r.fee_kes : null });
+    rows.push({ place: name, said: p, matched_node: r && r.node || null, covered, status: r ? r.status : 'unknown', source: r && r.source === 'picks' ? 'area_picks' : 'legacy', line_en: r ? AC.line(r, 'en') : null, line_sw: r ? AC.line(r, 'sw') : null, via: r && r.via || null, fee_kes: r && r.fee_kes != null ? r.fee_kes : null, ...noteFields(r) });
   }
   return { tool: 'check_coverage', ok: true, places: rows };
 }
@@ -104,7 +106,7 @@ function coverageFor(text, profile = {}, opts = {}) {
   const rec = coverageReceipt(placeCandidates(text, { ...opts, rejected }), profile);
   if (!rec.places.length) {
     const r = AC.resolve(String(text || ''), profile, { expecting: opts.expecting });
-    if (r && r.name) rec.places.push({ place: r.name, said: r.landmark || r.name, matched_node: r.node || null, covered: r.status === 'covered' ? 'yes' : r.status === 'unknown' ? 'unknown' : 'no', status: r.status, source: r.source === 'picks' ? 'area_picks' : 'legacy', via: r.via || null, line_en: AC.line(r, 'en'), line_sw: AC.line(r, 'sw'), fee_kes: r.fee_kes ?? null });
+    if (r && r.name) rec.places.push({ place: r.name, said: r.landmark || r.name, matched_node: r.node || null, covered: r.status === 'covered' ? 'yes' : r.status === 'unknown' ? 'unknown' : 'no', status: r.status, source: r.source === 'picks' ? 'area_picks' : 'legacy', via: r.via || null, line_en: AC.line(r, 'en'), line_sw: AC.line(r, 'sw'), fee_kes: r.fee_kes ?? null, ...noteFields(r) });
   }
   for (const r of rec.places) r.from = 'caller';
   if (rejected.length) rec.rejected = rejected;
@@ -212,7 +214,7 @@ function contextPack({ machine, text, profile, caller, coverage, langHint }) {
   return {
     PLAN: { step: st.kind, next: need, intent: machine.intent || null, services: CP.plan(machine).items.map((i) => i.service), date: s.when && s.when.date || null, time: s.when && s.when.time || null, place: s.place || null, name: CP.lockedName(machine) },
     CALLER: { name: caller.name, candidate: caller.candidate, last_past_job: caller.last_past_job, upcoming: caller.upcoming, upcoming_count: caller.upcoming_count },
-    RECEIPTS: { coverage: coverage.places.map((r) => ({ place: r.place, covered: r.covered, fee_kes: r.fee_kes })), this_turn: [] },
+    RECEIPTS: { coverage: coverage.places.map((r) => ({ place: r.place, covered: r.covered, fee_kes: r.fee_kes, ...(r.note ? { owner_note: r.note, owner_note_lang: r.note_lang } : {}) })), this_turn: [] },
     HISTORY: (machine.v1History || []).slice(-6, -1).map((h) => `${h.role}: ${h.text}`),
     LANG_HINT: langHint || machine.lang || null,
     CALLER_SAID: String(text || ''),

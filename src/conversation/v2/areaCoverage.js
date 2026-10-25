@@ -250,7 +250,7 @@ function resolvePicks(t, picks, opts = {}) {
   const n = m.node; const res = AP.resolveArea(picks, n.id);
   const county = AP.countyOf(n.id);
   const status = res.covered ? 'covered' : res.via ? 'excluded' : 'outside';
-  return { status, name: n.name, place: K.normalizePlaceKey(n.name), node: n.id, counties: county ? [K.normalizePlaceKey(county.name)] : [], via: res.via || 'tree', county: county && county.id !== n.id ? county.name : null, fee_kes: res.fee_kes, note: res.note, source: 'picks', ...(m.via === 'landmark' ? { landmark: m.said } : {}), lines: { en: AP.linesFor(picks, n, 'en').reply, sw: AP.linesFor(picks, n, 'sw').reply } };
+  return { status, name: n.name, place: K.normalizePlaceKey(n.name), node: n.id, counties: county ? [K.normalizePlaceKey(county.name)] : [], via: res.via || 'tree', county: county && county.id !== n.id ? county.name : null, fee_kes: res.fee_kes, note: res.note, note_lang: AP.noteLang(res.note), source: 'picks', ...(m.via === 'landmark' ? { landmark: m.said } : {}), lines: { en: AP.linesFor(picks, n, 'en').reply, sw: AP.linesFor(picks, n, 'sw').reply } };
 }
 /** Serving / excluded pick names for "where do you cover" (picks mode), or null (legacy). */
 function listed(profile = {}) {
