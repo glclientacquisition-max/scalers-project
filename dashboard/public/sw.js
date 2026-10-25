@@ -1,7 +1,7 @@
 /* Scalers Desk service worker. Hand-written, no build step. Runbook: docs/reference/platform/DESK_PWA_PUSH.md
  *
  * What it does:
- *  - Precaches only /offline and /offline/offline.css (a few KB; budget 150 KB).
+ *  - Precaches only /offline, /offline/offline.css and /icons/icon-192.png (~25 KB; budget 150 KB).
  *  - Page loads (navigations): network first; on network failure show the cached /offline page.
  *    Successful pages are NEVER written to the cache, so no signed-in content is stored.
  *  - /api, /admin, /pay and every non-navigation request: not handled here (browser default, no cache).
@@ -11,11 +11,11 @@
  * since /sw.js is served no-cache) each device deletes every scalers-* cache, unregisters, and
  * reloads its open tabs onto the network. Bump SW_VERSION on any other change.
  */
-const SW_VERSION = "2026-10-25.1";
+const SW_VERSION = "2026-10-25.3";
 const SW_KILL = false;
 const CACHE = `scalers-shell-${SW_VERSION}`;
 const OFFLINE_URL = "/offline";
-const PRECACHE = [OFFLINE_URL, "/offline/offline.css"];
+const PRECACHE = [OFFLINE_URL, "/offline/offline.css", "/icons/icon-192.png"];
 const NEVER = [/^\/api(\/|$)/, /^\/admin(\/|$)/, /^\/pay(\/|$)/];
 
 self.addEventListener("install", (event) => {

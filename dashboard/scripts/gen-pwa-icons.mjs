@@ -1,41 +1,65 @@
-// Generates the installable-app icons from public/brand/icon.svg's paths.
+// Generates the installable-app icons from the official transparent mark
+// (public/brand/icon.png, same file as "Scalers Icon - Transparent background.png").
 // Run: node scripts/gen-pwa-icons.mjs  (writes public/icons/*.png)
-// icon.svg is a blue mark on transparent with only ~6% margin, so on a #0096FF square
-// it needs a white re-colour and padding: the maskable copies keep the mark's farthest
-// corner inside the 80% safe-zone circle (radius 0.4 * size).
+//
+// any + apple: the mark on a transparent square. Launchers that draw their own plate
+//   (Samsung, Pixel themed icons) put it on theirs; others show the mark alone.
+// maskable: Android always fills the mask, so the plate is the light Desk canvas
+//   (#f4f7fb, --canvas), never blue. The mark's bounding-box corners stay inside the
+//   80% safe-zone circle (radius 0.4 * side), so circle, squircle and rounded-square
+//   masks never clip it.
 import sharp from "sharp";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
-const out = path.join(import.meta.dirname, "..", "public", "icons");
+const root = path.join(import.meta.dirname, "..", "public");
+const out = path.join(root, "icons");
 mkdirSync(out, { recursive: true });
 
-const PATHS = [
-  ["M12 14c0-3.3 2.7-6 6-6h28c2.2 0 4 1.8 4 4v6c0 2.2-1.8 4-4 4H28l-8 8H18c-3.3 0-6-2.7-6-6V14z", "#FFFFFF", 1],
-  ["M28 22l8 8-16 16-8-8 16-16z", "#FFFFFF", 0.72],
-  ["M52 50c0 3.3-2.7 6-6 6H18c-2.2 0-4-1.8-4-4v-6c0-2.2 1.8-4 4-4h18l8-8h2c3.3 0 6 2.7 6 6v10z", "#FFFFFF", 1],
-];
+export const MASKABLE_PLATE = "#f4f7fb";
 
-/** Mark bbox is x 12..52, y 8..56, centred on (32,32); farthest corner is 31.2 units out. */
-export function svgFor(scale) {
-  const t = `translate(32 32) scale(${scale}) translate(-32 -32)`;
-  const body = PATHS.map(([d, fill, op]) => `<path d="${d}" fill="${fill}" fill-opacity="${op}"/>`).join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#0096FF"/><g transform="${t}">${body}</g></svg>`;
+/** Tight bbox of the mark: alpha above 16, so the soft shadow halo does not count. */
+async function markBuffer() {
+  const src = sharp(path.join(root, "brand", "icon.png")).ensureAlpha();
+  const { data, info } = await src.clone().raw().toBuffer({ resolveWithObject: true });
+  let x0 = info.width, y0 = info.height, x1 = 0, y1 = 0;
+  for (let y = 0; y < info.height; y++) {
+    for (let x = 0; x < info.width; x++) {
+      if (data[(y * info.width + x) * 4 + 3] > 16) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+  }
+  const box = { left: x0, top: y0, width: x1 - x0 + 1, height: y1 - y0 + 1 };
+  return { buf: await src.extract(box).png().toBuffer(), box };
 }
 
-const jobs = [
-  ["icon-192.png", 192, 0.8],
-  ["icon-512.png", 512, 0.8],
-  // 0.62 * 31.2 = 19.3 units = 30% of the side: well inside the 40% safe radius.
-  ["maskable-192.png", 192, 0.62],
-  ["maskable-512.png", 512, 0.62],
-  // iOS home screen (no maskable support; iOS rounds the corners itself).
-  ["apple-180.png", 180, 0.8],
-];
-for (const [name, size, scale] of jobs) {
-  await sharp(Buffer.from(svgFor(scale)), { density: 72 * (size / 64) })
-    .resize(size, size)
+/** heightRatio: mark height as a share of the side. */
+async function render(name, size, heightRatio, background) {
+  const { buf, box } = await markBuffer();
+  const h = Math.round(size * heightRatio);
+  const w = Math.round((box.width / box.height) * h);
+  const mark = await sharp(buf).resize(w, h).png().toBuffer();
+  await sharp({
+    create: { width: size, height: size, channels: 4, background: background ?? { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .composite([{ input: mark, left: Math.round((size - w) / 2), top: Math.round((size - h) / 2) }])
     .png({ compressionLevel: 9 })
     .toFile(path.join(out, name));
-  console.log(name);
+  // Safe-zone check for maskable: half-diagonal of the mark box vs 0.4 * side.
+  const reach = Math.hypot(w / 2, h / 2) / size;
+  console.log(`${name} mark ${w}x${h} reach ${(reach * 100).toFixed(1)}% of side`);
 }
+
+// Mark is 412x676 (aspect 0.61). Half-diagonal at 0.62 height = 0.363 of the side < 0.40.
+const jobs = [
+  ["icon-192.png", 192, 0.84, null],
+  ["icon-512.png", 512, 0.84, null],
+  ["apple-180.png", 180, 0.8, null],
+  ["maskable-192.png", 192, 0.62, MASKABLE_PLATE],
+  ["maskable-512.png", 512, 0.62, MASKABLE_PLATE],
+];
+for (const [name, size, ratio, bg] of jobs) await render(name, size, ratio, bg);

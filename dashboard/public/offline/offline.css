@@ -1,10 +1,14 @@
-/* /offline only. MASTER tokens: canvas #F4F7FB, ink #0A192F, accent #005CCC, brand #0096FF. */
+/* /offline only. MASTER tokens (globals.css :root and [data-theme="dark"]), copied so the cached page needs nothing else. */
+:root{--canvas:#f4f7fb;--surface:#ffffff;--hairline:#dde4ee;--ink:#0a192f;--ink-2:#4a5b73;--accent:#005ccc;--accent-on:#ffffff;--brand:#0096ff;color-scheme:light}
+:root[data-theme="dark"]{--canvas:#0b1220;--surface:#121c2c;--hairline:#24324a;--ink:#e9eff7;--ink-2:#9dafc6;--accent:#3d9bff;--accent-on:#071426;--brand:#2aa8ff;color-scheme:dark}
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:#F4F7FB;color:#0A192F;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-main{min-height:100vh;display:flex;flex-direction:column;justify-content:center;gap:12px;padding:24px 20px;max-width:28rem;margin:0 auto}
-.mark{width:48px;height:48px;border-radius:12px;background:#0096FF;display:grid;place-items:center}
-h1{font-size:1.25rem;line-height:1.3;margin:8px 0 0;font-weight:600}
-p{margin:0;color:#3B4A63;overflow-wrap:anywhere}
-.sw{color:#3B4A63;font-size:.9375rem}
-.retry{display:inline-flex;align-items:center;text-decoration:none;margin-top:12px;min-height:48px;min-width:44px;padding:0 20px;border:0;border-radius:12px;background:#005CCC;color:#fff;font:inherit;font-weight:600;cursor:pointer;align-self:flex-start}
-.retry:focus-visible{outline:3px solid #0096FF;outline-offset:2px}
+html,body{margin:0;min-height:100%;background:var(--canvas);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.offline-shell{min-height:100dvh;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:max(24px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom));max-width:26rem;margin:0 auto}
+.mark{display:block;margin-bottom:8px}
+h1{font-size:1.375rem;line-height:1.25;margin:0;font-weight:600;letter-spacing:-0.01em}
+p{margin:0;color:var(--ink-2);overflow-wrap:anywhere;max-width:34ch}
+.sw{font-size:.875rem;padding-top:8px;border-top:1px solid var(--hairline);margin-top:4px}
+.retry{display:flex;align-items:center;justify-content:center;text-decoration:none;margin-top:16px;min-height:48px;padding:0 20px;border-radius:10px;background:var(--accent);color:var(--accent-on);font-weight:600;width:100%}
+.retry:active{transform:translateY(1px)}
+.retry:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+@media (min-width:640px){.retry{width:auto;align-self:flex-start}}

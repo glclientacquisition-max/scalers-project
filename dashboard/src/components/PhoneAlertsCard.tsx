@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { SettingsGroup } from "@/components/settingsUi";
-import { btnPrimary } from "@/components/ui/deskChrome";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { Switch } from "@/components/ui/Switch";
 import { installPlatform, pushSupport } from "@/lib/pwa";
 import {
   VAPID_PUBLIC_KEY,
@@ -32,18 +33,37 @@ export type PhoneAlertDevice = {
 };
 
 const ghostBtn =
-  "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-body font-medium text-ink-2 hover:bg-hairline hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand";
+  "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-body font-medium text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand";
 
-const STATUS: Record<PhoneAlertsState, string> = {
-  loading: "Checking this phone…",
-  unconfigured: "Phone alerts aren't ready yet. We'll turn them on soon. Texts and WhatsApp still reach you.",
-  unsupported: "This browser can't show alerts. Texts and WhatsApp still reach you.",
-  "ios-needs-install": "On iPhone, add Scalers to your Home Screen first, then open it from the icon.",
-  off: "Get a ping on this phone for missed calls and bookings.",
-  on: "On for this phone.",
-  denied: "Alerts are blocked for this site.",
+/** One line under "This phone". Short so the Kiswahili copy fits two lines at 360. */
+const HINT: Record<"off" | "on" | "error", string> = {
+  off: "Missed calls and bookings ping this phone.",
+  on: "Missed calls and bookings ping this phone.",
   error: "Couldn't turn on alerts. Try again.",
 };
+
+/** States with no switch: why, and the one next step. Texts and WhatsApp keep working. */
+const NOTE: Record<"unconfigured" | "unsupported" | "ios-needs-install" | "denied", { title: string; body: string }> = {
+  unconfigured: { title: "Not ready yet", body: "We'll switch phone alerts on soon. Texts and WhatsApp still reach you." },
+  unsupported: { title: "Not on this browser", body: "Open Scalers in Chrome or Safari to get alerts. Texts and WhatsApp still reach you." },
+  "ios-needs-install": { title: "Add to Home Screen first", body: "iPhone shows alerts only from the Scalers icon." },
+  denied: { title: "Blocked on this phone", body: "Alerts were blocked for Scalers in this browser." },
+};
+
+function Steps({ items }: { items: string[] }) {
+  return (
+    <ol className="mt-2 space-y-1.5">
+      {items.map((item, i) => (
+        <li key={item} className="flex items-start gap-2.5 text-meta leading-snug text-ink">
+          <span aria-hidden="true" className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface text-[0.75rem] font-semibold tabular-nums text-ink-2 ring-1 ring-hairline">
+            {i + 1}
+          </span>
+          <span className="min-w-0 pt-px">{item}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 /** Pure view so the dev harness can render every state. */
 export function PhoneAlertsView({
@@ -64,45 +84,66 @@ export function PhoneAlertsView({
   const live = state === "off" || state === "on" || state === "denied" || state === "error";
   return (
     <SettingsGroup title="Phone alerts">
-      <div className="space-y-3 px-4 py-3" data-phone-alerts={state}>
-        <p className="text-body text-ink" role="status" aria-live="polite">
-          {STATUS[state]}
-        </p>
-        {state === "denied" ? (
-          <p className="text-meta text-ink-2">
-            To allow them: open your browser settings, then Site settings, then Notifications, and allow
-            Scalers.
-          </p>
+      <div data-phone-alerts={state}>
+        {state === "loading" ? (
+          <div className="flex min-h-14 items-center gap-3 px-4 py-3" role="status" aria-label="Checking this phone">
+            <span className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-48 max-w-full" />
+            </span>
+            <Skeleton className="h-7 w-12 rounded-full" />
+          </div>
         ) : null}
-        {state === "ios-needs-install" ? (
-          <ol className="list-decimal space-y-1 ps-5 text-meta text-ink-2">
-            <li>Tap Share at the bottom of Safari.</li>
-            <li>Tap Add to Home Screen.</li>
-            <li>Open Scalers from the icon and come back here.</li>
-          </ol>
+
+        {state === "off" || state === "on" || state === "error" ? (
+          <div className="flex min-h-14 items-center gap-3 px-4 py-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-body font-medium text-ink">This phone</p>
+              <p
+                className={state === "error" ? "mt-0.5 text-meta text-attention" : "mt-0.5 text-meta text-ink-2"}
+                role={state === "error" ? "alert" : "status"}
+                aria-live="polite"
+              >
+                {busy ? "Asking your phone…" : HINT[state]}
+              </p>
+            </div>
+            <Switch
+              checked={state === "on"}
+              disabled={busy}
+              label="Phone alerts on this phone"
+              onCheckedChange={(next) => (next ? onTurnOn?.() : onTurnOff?.())}
+            />
+          </div>
         ) : null}
-        {state === "off" || state === "error" ? (
-          <button type="button" className={btnPrimary} onClick={onTurnOn} disabled={busy}>
-            {busy ? "Turning on…" : "Turn on phone alerts"}
-          </button>
-        ) : null}
-        {state === "on" ? (
-          <button type="button" className={ghostBtn} onClick={onTurnOff} disabled={busy}>
-            Turn off for this phone
-          </button>
+
+        {state === "unconfigured" || state === "unsupported" || state === "ios-needs-install" || state === "denied" ? (
+          <div className={state === "denied" ? "m-2 rounded-xl bg-attention-tonal px-3 py-3" : "px-4 py-3"} role="status">
+            <p className={state === "denied" ? "text-body font-medium text-attention" : "text-body font-medium text-ink"}>
+              {NOTE[state].title}
+            </p>
+            <p className="mt-0.5 text-meta leading-snug text-ink-2">{NOTE[state].body}</p>
+            {state === "denied" ? (
+              <Steps items={["Open your browser settings.", "Tap Site settings, then Notifications.", "Allow Scalers, then come back here."]} />
+            ) : null}
+            {state === "ios-needs-install" ? (
+              <Steps items={["Tap Share at the bottom of Safari.", "Tap Add to Home Screen.", "Open Scalers from the icon, then come back here."]} />
+            ) : null}
+          </div>
         ) : null}
       </div>
       {live && devices.length > 0 ? (
         <ul aria-label="Phones with alerts">
           {devices.map((d) => (
-            <li key={d.id} className="flex min-h-12 items-center gap-3 border-t border-hairline px-4 py-2">
+            <li key={d.id} className="flex min-h-14 items-center gap-3 border-t border-hairline py-1.5 ps-4 pe-2">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-body font-medium text-ink">
-                  {d.device_label || "Phone"}
-                  {d.thisDevice ? <span className="font-normal text-ink-2"> · this phone</span> : null}
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-body font-medium text-ink">
+                  <span className="min-w-0 break-words">{d.device_label || "Phone"}</span>
+                  {d.thisDevice ? (
+                    <span className="rounded-full bg-accent-tonal px-2 py-px text-[0.75rem] font-medium text-accent">This phone</span>
+                  ) : null}
                 </p>
-                <p className="text-meta text-ink-2">
-                  {d.disabled_at ? "Stopped working" : `Added ${new Date(d.created_at).toLocaleDateString("en-KE", { day: "numeric", month: "short" })}`}
+                <p className={d.disabled_at ? "text-meta text-attention" : "text-meta text-ink-2"}>
+                  {d.disabled_at ? "Stopped working. Remove it, then turn alerts on again." : `Added ${new Date(d.created_at).toLocaleDateString("en-KE", { day: "numeric", month: "short" })}`}
                 </p>
               </div>
               <button

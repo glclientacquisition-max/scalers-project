@@ -158,7 +158,7 @@ describe('src/notifications/push.js', () => {
 describe('service worker and manifest', () => {
   const sw = fs.readFileSync(path.join(DASH, 'public/sw.js'), 'utf8');
   it('precaches only /offline + CSS, never caches api/admin/pay, has kill switch + push handlers', () => {
-    assert.match(sw, /const PRECACHE = \[OFFLINE_URL, "\/offline\/offline\.css"\]/);
+    assert.match(sw, /const PRECACHE = \[OFFLINE_URL, "\/offline\/offline\.css", "\/icons\/icon-192\.png"\]/);
     assert.match(sw, /\^\\\/api/);
     assert.match(sw, /\^\\\/admin/);
     assert.match(sw, /\^\\\/pay/);
@@ -188,6 +188,44 @@ describe('service worker and manifest', () => {
     for (const n of ['icon-192', 'icon-512', 'maskable-192', 'maskable-512', 'apple-180']) {
       assert.ok(fs.existsSync(path.join(DASH, `public/icons/${n}.png`)), n);
     }
+  });
+});
+
+/** First pixel of a PNG (top-left). Any filter on row 0 leaves pixel 0 raw. */
+function pngCorner(file) {
+  const zlib = require('zlib');
+  const buf = fs.readFileSync(file);
+  assert.equal(buf.readUInt8(25), 6, `${file} is RGBA`);
+  const idat = [];
+  for (let o = 8; o < buf.length; ) {
+    const len = buf.readUInt32BE(o);
+    if (buf.toString('latin1', o + 4, o + 8) === 'IDAT') idat.push(buf.subarray(o + 8, o + 8 + len));
+    o += 12 + len;
+  }
+  const raw = zlib.inflateSync(Buffer.concat(idat));
+  return [...raw.subarray(1, 5)];
+}
+
+describe('app icon and splash (v2)', () => {
+  const icons = path.join(DASH, 'public/icons');
+  it('any and apple icons are the transparent mark', () => {
+    for (const n of ['icon-192', 'icon-512', 'apple-180']) {
+      assert.equal(pngCorner(path.join(icons, `${n}.png`))[3], 0, `${n} corner is transparent`);
+    }
+  });
+  it('maskable icons sit on the light Desk canvas, never blue', () => {
+    for (const n of ['maskable-192', 'maskable-512']) {
+      assert.deepEqual(pngCorner(path.join(icons, `${n}.png`)), [0xf4, 0xf7, 0xfb, 255], n);
+    }
+  });
+  it('manifest splash and theme colours are the light canvas', () => {
+    const src = fs.readFileSync(path.join(DASH, 'src/app/manifest.ts'), 'utf8');
+    assert.match(src, /theme_color: DESK_THEME_COLOR_LIGHT/);
+    assert.match(src, /background_color: DESK_THEME_COLOR_LIGHT/);
+    assert.doesNotMatch(src, /#0096FF/i);
+  });
+  it('no competing black apple-touch icon from the app directory', () => {
+    assert.ok(!fs.existsSync(path.join(DASH, 'src/app/apple-icon.png')));
   });
 });
 

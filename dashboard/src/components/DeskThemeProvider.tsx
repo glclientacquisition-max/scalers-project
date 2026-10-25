@@ -3,7 +3,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type { DeskTheme } from "@/lib/deskTheme";
 
-const DeskThemeInitial = createContext<DeskTheme>("system");
+const DeskThemeInitial = createContext<DeskTheme>("light");
 
 export function DeskThemeProvider({
   initial,

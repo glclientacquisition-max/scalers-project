@@ -22,12 +22,12 @@ type BeforeInstallPromptEvent = Event & {
 const SEEN_CALL_KEY = "scalers-seen-call";
 const VISIT_SESSION_KEY = "scalers-visit-counted";
 
-const notNowBtn =
-  "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-4 text-body font-medium text-ink-2 hover:bg-hairline hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand";
+const secondaryBtn =
+  "inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-hairline bg-surface px-3 text-body font-medium text-ink hover:bg-surface-2 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand";
 
 function ShareGlyph() {
   return (
-    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline-block align-[-3px]">
+    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline-block shrink-0 align-[-2px] text-accent">
       <path d="M12 3v12" />
       <path d="M8 7l4-4 4 4" />
       <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
@@ -37,14 +37,20 @@ function ShareGlyph() {
 
 function AddGlyph() {
   return (
-    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="inline-block align-[-3px]">
+    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="inline-block shrink-0 align-[-2px] text-accent">
       <rect x="4" y="4" width="16" height="16" rx="4" />
       <path d="M12 8v8M8 12h8" />
     </svg>
   );
 }
 
-/** Pure view (dev harness renders both variants). */
+const IOS_STEPS = [
+  <>Tap Share <ShareGlyph /> in Safari</>,
+  <>Tap Add to Home Screen <AddGlyph /></>,
+  <>Open Scalers from the new icon</>,
+];
+
+/** Pure view (dev harness renders both variants). Lines wrap, never truncate, so Kiswahili fits at 360. */
 export function InstallCardView({
   platform,
   onInstall,
@@ -58,36 +64,55 @@ export function InstallCardView({
     <div
       role="dialog"
       aria-labelledby="install-card-title"
+      aria-describedby="install-card-body"
       data-install-card={platform}
-      className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-md rounded-2xl border border-hairline bg-surface p-4 shadow-lg md:bottom-6"
+      className="fixed inset-x-3 bottom-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom)+0.75rem)] z-40 mx-auto max-w-md rounded-2xl border border-hairline bg-surface p-3 shadow-sheet md:bottom-6"
     >
-      <p id="install-card-title" className="text-body font-semibold text-ink">
-        <span lang="sw" className="block">Weka Scalers kwenye simu yako</span>
-        <span className="block font-normal text-ink-2">Add Scalers to your phone</span>
-      </p>
+      <div className="flex items-start gap-3">
+        {/* The real home-screen icon, so the owner knows what to look for afterwards. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icons/icon-192.png" alt="" width={44} height={44} className="h-11 w-11 shrink-0 rounded-xl border border-hairline bg-canvas p-1" />
+        <div className="min-w-0 flex-1">
+          <p id="install-card-title" className="text-body font-semibold leading-snug text-ink">
+            Add Scalers to your phone
+          </p>
+          <p lang="sw" className="text-meta leading-snug text-ink-2">
+            Weka Scalers kwenye simu yako
+          </p>
+        </div>
+      </div>
       {platform === "ios" ? (
-        <ol className="mt-3 space-y-1.5 text-meta text-ink-2">
-          <li>1. Tap Share <ShareGlyph /> in Safari</li>
-          <li>2. Tap Add to Home Screen <AddGlyph /></li>
-          <li>3. Open Scalers from the new icon</li>
+        <ol id="install-card-body" className="mt-3 space-y-2 border-t border-hairline pt-3">
+          {IOS_STEPS.map((step, i) => (
+            <li key={i} className="flex items-start gap-2.5 text-meta leading-snug text-ink">
+              <span aria-hidden="true" className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-tonal text-[0.75rem] font-semibold tabular-nums text-accent">
+                {i + 1}
+              </span>
+              <span className="min-w-0 pt-px">{step}</span>
+            </li>
+          ))}
         </ol>
       ) : (
-        <p className="mt-2 text-meta text-ink-2">Opens like an app. Uses little data.</p>
+        <p id="install-card-body" className="mt-2 text-meta leading-snug text-ink-2">
+          It opens from your home screen, like an app.
+        </p>
       )}
-      <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-        <button type="button" className={notNowBtn} onClick={onNotNow}>
-          Not now
-        </button>
-        {platform === "android" ? (
-          <button type="button" className={`${btnPrimary} min-h-11`} onClick={onInstall}>
+      {platform === "android" ? (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button type="button" className={secondaryBtn} onClick={onNotNow}>
+            Not now
+          </button>
+          <button type="button" className={`${btnPrimary} min-h-11 w-full`} onClick={onInstall}>
             Install
           </button>
-        ) : (
-          <button type="button" className={`${btnPrimary} min-h-11`} onClick={onNotNow}>
+        </div>
+      ) : (
+        <div className="mt-3">
+          <button type="button" className={secondaryBtn} onClick={onNotNow}>
             Got it
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
