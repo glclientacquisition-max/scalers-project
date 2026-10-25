@@ -391,25 +391,42 @@ function createBrainV2Live(opts = {}) {
     text = CC.normalize(text); machine.core = true; machine.lead = true;
     const snap0 = CC.snapshot(machine); const n0 = (machine.receipts || []).length;
     // 1) context pack + read-only tools in code (decision 1): caller file, coverage per place, KB
-    const caller = ML.callerReceipt(machine.file || {}, { now: nowFn(), lockedName: CP.lockedName(machine) });
+    const split = ML.splitOn({ env });
+    // lookup_caller (real receipt tool, in RAM): runs pre-model on a booking/identity turn with the rules' filters
+    const rowTurn = split && (ML.ROW_INTENT.test(text) || ['cancel', 'change', 'address_change'].includes(machine.intent) || machine.expecting === 'which' || machine.expecting === 'which_named');
+    const lk = split ? ML.lookupCaller(machine.file || {}, rowTurn ? ML.callerFilters(text, profile, machine.leadLateU || null, nowFn()) : {}, { now: nowFn(), lockedName: CP.lockedName(machine) }) : null;
+    const caller = lk || ML.callerReceipt(machine.file || {}, { now: nowFn(), lockedName: CP.lockedName(machine) });
     const coverage = ML.coverageReceipt(ML.placeCandidates(text), profile);
     const pack = ML.contextPack({ machine, text, profile, caller, coverage, langHint: lock });
-    const request = ML.buildRequest(pack, profile);
+    if (lk) pack.CALLER = { name: lk.name, candidate: lk.candidate, upcoming: lk.upcoming, past_jobs: lk.past_jobs, addresses: lk.addresses, notes: lk.notes, match: lk.match };
+    const request = split ? ML.replyRequest(pack, profile) : ML.buildRequest(pack, profile);
     ms.pack = clock() - T0;
-    // 2) the one model call (hedged, streamed)
-    const ids = MS.resolveModelIds(env); const sf = leadStreamFor();
-    const live = { u: null, reply: '', closed: false, tools: null, done: false };
+    // 2) model calls. Split: understanding (small, flash-lite) and reply (reply-first) start together; neither waits on the other.
+    const ids = split ? ML.leadModels(env) : MS.resolveModelIds(env); const sf = leadStreamFor();
+    const DL = opts.modelLeadDeadlines || (split ? ML.SPLIT_DEADLINES : ML.DEADLINES);
+    const live = { u: null, reply: '', closed: false, tools: null, done: false, uDone: false };
     let kick = () => {}; const wake = () => { const k = kick; kick = () => {}; k(); };
     let uRes; const uP = new Promise((r) => { uRes = r; });
-    const run = sf ? ML.runHedged({ streamFor: sf, primaryId: ids.primary, backupId: ids.backup, request, deadlines: opts.modelLeadDeadlines || ML.DEADLINES, clock, onProgress: (a, p) => {
-      if (p.understanding && !live.u) { live.u = p.understanding; ms.understanding = clock() - T0; uRes(); }
-      if (p.toolCalls) live.tools = p.toolCalls;
-      if (typeof p.reply === 'string') { live.reply = p.reply; live.closed = !!p.replyClosed; }
-      wake();
-    } }) : null;
-    if (run) run.done.then(() => { live.done = true; uRes(); wake(); }); else { live.done = true; uRes(); }
-    await Promise.race([uP, new Promise((r) => setTimeout(r, (opts.modelLeadDeadlines || ML.DEADLINES).understandWaitMs))]);
-    const u = live.u;
+    let s1Res; const s1P = new Promise((r) => { s1Res = r; });
+    const setU = (raw) => { const nu = split ? ML.normUnderstanding(raw) : raw; if (nu && !live.u) { live.u = nu; ms.understanding = clock() - T0; uRes(); wake(); } };
+    const urun = split && sf ? ML.runHedged({ streamFor: sf, primaryId: ids.primary, backupId: ids.backup, request: ML.understandRequest({ text, machine }), deadlines: { hedgeMs: DL.understandHedgeMs ?? 600, hardMs: DL.hardMs }, clock, winWhen: () => false, okWhen: (full) => !!ML.normUnderstanding(full), onProgress: (a, p) => { if (p.full) setU(p.full); } }) : null;
+    if (urun) urun.done.then(() => { live.uDone = true; uRes(); });
+    const run = sf ? ML.runHedged({ streamFor: sf, primaryId: ids.primary, backupId: ids.backup, request, deadlines: DL, clock,
+      ...(split ? { winWhen: (p) => typeof p.reply === 'string' && p.reply.length > 0, okWhen: (full) => !!(full && typeof full.reply === 'string') } : {}),
+      onProgress: (a, p) => {
+        if (!split && p.understanding && !live.u) { live.u = p.understanding; ms.understanding = clock() - T0; uRes(); }
+        if (p.toolCalls) live.tools = p.toolCalls;
+        if (typeof p.reply === 'string') { live.reply = p.reply; live.closed = !!p.replyClosed; if (ML.sentencesOf(live.reply, live.closed).length) s1Res(); }
+        wake();
+      } }) : null;
+    if (run) run.done.then(() => { live.done = true; s1Res(); if (!split) uRes(); wake(); }); else { live.done = true; uRes(); s1Res(); }
+    // join rule (split): understanding, or the reply's first sentence, or understandCapMs, whichever first. Never discards a late understanding.
+    if (split) await Promise.race([uP, s1P, new Promise((r) => setTimeout(r, DL.understandCapMs ?? 1100))]);
+    else await Promise.race([uP, new Promise((r) => setTimeout(r, DL.understandWaitMs))]);
+    const u = live.u || (split ? machine.leadLateU || null : null);
+    if (split && machine.leadLateU) machine.leadLateU = null;
+    // a unique caller-file match fills the booking to change (never a past row); the machine's read-back still confirms it
+    if (lk && rowTurn && lk.match.kind === 'unique' && machine.slots && !machine.slots.row) { const row = (machine.file && machine.file.openRows || []).find((r) => r.id === lk.match.row_id); if (row) machine.slots.row = row; }
     // 3) the state owner applies the turn (rules veto; the model's understanding is evidence)
     const g5 = []; const handlers = leadHandlers(machine, profile, g5);
     const pre = await CP.before(machine, text, profile, { handlers });
@@ -426,6 +443,7 @@ function createBrainV2Live(opts = {}) {
       if (pre.lead && !tmpl.startsWith(pre.lead)) tmpl = `${pre.lead} ${tmpl}`.trim();
       machine.lastLine = tmpl; machine.lastBase = tmpl;
     }
+    if (lk && machine.expecting === 'which_named' && lk.upcoming.length) { const c = lk.match.candidates.length ? lk.match.candidates : lk.upcoming; tmpl = ML.offerRowsLine(c, lang); machine.lastLine = tmpl; }
     tmpl = spokenStyle(tmpl, lang);
     const st = CP.step(machine, tmpl, lang);
     if (pre.owned) { const q = CP.split(tmpl).filter((x) => /\?\s*$/.test(x)).pop(); st.question = q || tmpl; }
@@ -435,9 +453,9 @@ function createBrainV2Live(opts = {}) {
     if (u && u.slots && Array.isArray(u.slots.places)) { const extra = u.slots.places.filter((p) => !coverage.places.some((r) => r.place.toLowerCase() === String(p).toLowerCase() || r.said.toLowerCase() === String(p).toLowerCase())); if (extra.length) coverage.places.push(...ML.coverageReceipt(extra, profile).places.filter((r) => !coverage.places.some((x) => x.place === r.place))); }
     const rulesEvs = CC.events(text, null, profile);
     const questions = u ? (u.questions || []) : rulesEvs.filter((e) => e.type === 'ask').map((e) => ({ type: e.ask === 'pay' ? 'payment' : e.ask }));
-    if (!u && coverage.places.length && !questions.some((q) => q.type === 'coverage') && /\b(have|cover|come|reach|mnafika|mnakam|mnakuja)\b|\?/i.test(text)) questions.push({ type: 'coverage' });
+    if (!u && coverage.places.length && !questions.some((q) => q.type === 'coverage') && (split ? /\b(have|cover|serve|come|reach|go|know if|mnafika|mnafikia|mnakam|mnakuja|mnaenda)\b|\?/i : /\b(have|cover|come|reach|mnafika|mnakam|mnakuja)\b|\?/i).test(text)) questions.push({ type: 'coverage' });
     // tool_calls arrive after the understanding; they are hints (the machine commits writes), guarded + traced at the end
-    const ctx = { st, receipts, coverage: coverage.places, caller, profile, questions, lang, machine, text };
+    const ctx = { st, receipts, coverage: coverage.places, caller, profile, questions, lang, machine, text, callerReadOk: !!lk };
     const ver = ML.makeVerifier(ctx);
     // 4) speak: verified sentences in order; questions held until the reply closes (owed answers go first)
     const spoken = []; const verdicts = []; let firstMs = null; let repairs = 0; let modelSentences = 0;
@@ -451,7 +469,7 @@ function createBrainV2Live(opts = {}) {
       let out = v.text || s; let src = v.verdict === 'pass' ? 'model' : 'step';
       if (v.verdict === 'repair') {
         repairs += 1; out = v.fix; src = 'repair_template';
-        const left = (opts.modelLeadDeadlines || ML.DEADLINES).hardMs - (clock() - T0);
+        const left = DL.hardMs - (clock() - T0);
         if (sf && left >= ML.DEADLINES.repairMinLeftMs && opts.modelLeadRepair !== false) {
           const r = await repairSentence({ sf, id: ids.backup, bad: s, fix: v.fix, lang, capMs: Math.min(left, ML.DEADLINES.repairCapMs) });
           if (r) { const v2 = ML.makeVerifier({ ...ctx, coverage: ctx.coverage.slice() }).check(r); if (v2.verdict === 'pass') { out = r; src = 'repair_model'; } }
@@ -470,15 +488,30 @@ function createBrainV2Live(opts = {}) {
         await new Promise((r) => { kick = r; setTimeout(r, 50); });
       }
     }
-    const modelOk = !!(u && (modelSentences || held || used));
-    if (!modelOk) answeredBy = 'template';
+    // late understanding (split): never discarded; its questions/places still get answered this turn, and it carries to the next turn
+    if (split && !u && live.u) {
+      const lu = live.u; machine.leadLateU = lu;
+      for (const q of lu.questions || []) if (!questions.some((x) => x.type === q.type)) questions.push(q);
+      const extra = (lu.slots && lu.slots.places || []).filter((p) => !coverage.places.some((r) => r.place.toLowerCase() === String(p).toLowerCase()));
+      if (extra.length) coverage.places.push(...ML.coverageReceipt(extra, profile).places);
+    }
+    // exactly one voice: any model output that passed the guard (or was repaired) owns the turn; template only when every model failed
+    const modelOk = split ? !!(modelSentences || held || repairs) : !!(u && (modelSentences || held || used));
+    if (!modelOk) answeredBy = split && used > 0 ? 'template_vetoed' : 'template'; // vetoed = the model answered but every sentence failed the guard
     const owed = ML.owedAnswers(ctx, spoken.map((x) => x.text).join(' '));
-    if (answeredBy === 'template') {
-      // all models failed: the same plan, worded by code; one answer per subject, never stacked
+    if (answeredBy === 'template' || answeredBy === 'template_vetoed') {
+      // all models failed (or every model sentence was vetoed): the same plan, worded by code; one answer per subject, never stacked
       const cov = questions.some((q) => q.type === 'coverage') ? ML.coverageAnswer(coverage.places, lang) : null;
       const ans = CC.answers(rulesEvs.filter((e) => e.ask !== 'coverage'), text, machine, profile, lang);
-      const lines = [cov, ...ans.map((a) => a.text), ...owed.filter((a) => a.subject !== 'coverage').map((a) => a.text)].filter(Boolean);
+      let lines = [cov, ...ans.map((a) => a.text), ...owed.filter((a) => a.subject !== 'coverage').map((a) => a.text)].filter(Boolean);
       let base = tmpl;
+      if (split) {
+        const priceAsked = questions.some((q) => q.type === 'price');
+        if (!priceAsked) { lines = lines.map((l) => CP.split(l).filter((x) => !ML.UNASKED_PRICE(x)).join(' ')).filter(Boolean); base = CP.split(base).filter((x) => !ML.UNASKED_PRICE(x)).join(' '); }
+        if (questions.some((q) => q.type === 'payment') && !lines.some((l) => /m-?pesa|paybill|cash|bank|malipo|tunakubali|we take/i.test(l))) lines.push(ML.paymentAnswer(profile, text, lang));
+        if (lines.length) base = CP.split(base).filter((x) => !/not getting that|sikupati|sijakuelewa/i.test(x)).join(' ');
+        if (!base.trim() && lines.length) base = CP.split(tmpl).filter((x) => /\?\s*$/.test(x) && !/not getting that/i.test(x)).pop() || '';
+      }
       // the template's own coverage/unknown lines are replaced by the per-place answer (G4: no contradiction stacking)
       if (cov) base = CP.split(base).filter((x) => !coverage.places.some((r) => x.toLowerCase().includes(r.place.toLowerCase())) && !/can'?t confirm|siwezi kuthibitisha/i.test(x)).join(' ');
       for (const l of [...new Set(lines)]) emit(l, 'template');
@@ -506,7 +539,7 @@ function createBrainV2Live(opts = {}) {
     };
     (machine.trace || (machine.trace = [])).push({ turn: machine.turn, model_lead: rec });
     try { (opts.onModelStage || (() => {}))(rec); } catch { /* trace only */ }
-    return { line, lang, sentences: spoken.map((x) => ({ text: x.text, lang: x.lang })), path: answeredBy === 'template' ? 'model_lead_template' : 'model_lead', streamed: typeof onSentence === 'function', phase: machine.phase, plan: st.kind, lead: true, answeredBy, end: endCall.end, ...(endCall.end ? { reason: endCall.reason } : {}), ...(endCall.held ? { endHeld: endCall.held } : {}) };
+    return { line, lang, sentences: spoken.map((x) => ({ text: x.text, lang: x.lang })), path: /^template/.test(answeredBy) ? 'model_lead_template' : 'model_lead', streamed: typeof onSentence === 'function', phase: machine.phase, plan: st.kind, lead: true, answeredBy, end: endCall.end, ...(endCall.end ? { reason: endCall.reason } : {}), ...(endCall.held ? { endHeld: endCall.held } : {}) };
   }
 
   /** Voice's unfinished hold: start this turn's one model call on the stable partial. */

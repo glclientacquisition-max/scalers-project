@@ -4005,6 +4005,7 @@ mediaWss.on('connection', (ws, req) => {
       lastAgentAskedQuestion: lastAskedQuestion(),
       replayText: hearAgainReplayText(),
       now: Date.now(),
+      isFinal: String(source || '').startsWith('final'), // grace-window queue (BRAIN_MODEL_LEAD / VOICE_GRACE_QUEUE) acts on finals only
     });
     // VOICE_OPENING_V2: over the greeting, barge after 600 ms of caller
     // speech or at once on a real word; anything else waits for the greeting
