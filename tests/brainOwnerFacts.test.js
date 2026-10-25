@@ -21,7 +21,8 @@ const DND = {
     payment: 'You can pay by M-Pesa paybill 247247.',
     cancellation: 'Customers can cancel up to a day before at no charge. Customers can move a booking up to 6 hours before. We wait 15 minutes if the customer is late or not in. After that, a KSh 500 call-out fee applies.',
     provenance: { payment: OWNER, cancellation: OWNER },
-    rules: { warranty: { mode: 'none' }, returns: { mode: 'custom', note: 'We redo any spot you are not happy with within 2 days.', note_sw: 'Tunarudia sehemu yoyote usiyoridhika nayo ndani ya siku 2.' }, delivery: { mode: 'custom', note: 'We bring all equipment.' } },
+    policy_lines: { warranty: { en: "We don't give a guarantee.", sw: 'Hatutoi dhamana.' } },
+    rules: { warranty: { answer: 'no', none: true }, returns: { mode: 'custom', note: 'We redo any spot you are not happy with within 2 days.', note_sw: 'Tunarudia sehemu yoyote usiyoridhika nayo ndani ya siku 2.' }, delivery: { mode: 'custom', note: 'We bring all equipment.' } },
   },
   faqs: [{ question: 'Do you bring your own detergents?', answer: 'Yes, we bring eco-friendly detergents.', source: 'owner', confirmed: true }],
   servicesCatalog: [],
@@ -151,7 +152,7 @@ test('model lead KB carries every policy + FAQ; its verifier repairs an unbacked
   assert.ok(owed.some((o) => /15 minutes/.test(o.text)), JSON.stringify(owed));
 });
 
-test('Kiswahili: none has a Swahili line; custom without note_sw falls back to "Timu itathibitisha."', () => {
+test('Kiswahili: none speaks Desk\'s policy_lines sw; custom without note_sw falls back to "Timu itathibitisha."', () => {
   const of = OF.ownerFacts(DND);
   assert.equal(OF.spoken(of.byTopic.get('warranty'), 'sw'), 'Hatutoi dhamana.');
   assert.equal(OF.spoken(of.byTopic.get('delivery'), 'sw'), 'Timu itathibitisha.');
@@ -173,4 +174,68 @@ test('B2: unconfirmed picks are never spoken (team confirms, no legacy fallback)
   assert.match(cc.find((a) => a.ask === 'coverage').text, /team will confirm/);
   const ok = { ...pending, areaPicksConfirmedAt: '2026-10-25T08:00:00Z' };
   assert.equal(AC.resolve('do you do Kileleshwa?', ok).status, 'covered');
+});
+
+// ---- Desk review of #937 (#938): own-topic facts, policy_lines wording, pickup_only ----
+// Desk-shaped saves (policyRegistry.ts): rule + policy_lines + rebuilt cancellation text key.
+const LINE = {
+  cancellation: { yes: { r: { answer: 'yes', allowed: true, notice_hours: 24, fee: 'none' }, en: 'You can cancel up to 24 hours before. There is no charge.', sw: 'Unaweza kughairi hadi saa 24 kabla. Hakuna malipo.' },
+    no: { r: { answer: 'no', allowed: false }, en: "We don't accept cancellations.", sw: 'Hatukubali kughairi.' } },
+  booking_changes: { yes: { r: { answer: 'yes', allowed: true, notice_hours: 6 }, en: 'You can move a booking up to 6 hours before.', sw: 'Unaweza kubadilisha siku hadi saa 6 kabla.' },
+    no: { r: { answer: 'no', allowed: false }, en: "We don't move bookings.", sw: 'Hatubadilishi muda wa miadi.' } },
+  no_show: { yes: { r: { answer: 'wait', charge: 'none', wait_minutes: 15 }, en: 'We wait 15 minutes, then call you.', sw: 'Tunasubiri dakika 15, kisha tunakupigia.' },
+    no: { r: { answer: 'no', allowed: false, charge: 'none' }, en: "We don't wait if the customer is late or not in.", sw: 'Hatusubiri mteja akichelewa au asipokuwepo.' } },
+};
+function deskSave(pick) {
+  const rules = {}; const policy_lines = {}; const joined = [];
+  for (const [t, a] of Object.entries(pick)) { const o = LINE[t][a]; rules[t] = o.r; policy_lines[t] = { en: o.en, sw: o.sw }; joined.push(o.en); }
+  return { businessPolicies: { rules, policy_lines, cancellation: joined.join(' '), provenance: { cancellation: OWNER } } };
+}
+test('B1 bug: Cancel=No + Move=yes -> Move answers its own line, never "We don\'t accept cancellations"', () => {
+  const of = OF.ownerFacts(deskSave({ cancellation: 'no', booking_changes: 'yes' }));
+  assert.equal(OF.spoken(of.byTopic.get('booking_changes'), 'en'), LINE.booking_changes.yes.en);
+  assert.equal(OF.spoken(of.byTopic.get('cancellation'), 'en'), "We don't accept cancellations.");
+  const hit = OF.match('can I reschedule my booking?', of);
+  assert.ok(hit.every((f) => !/accept cancellations/.test(f.text)), hit.map((f) => f.text).join(' | '));
+});
+test('B1 bug: Cancel=No + Late=yes -> Late answers its own line', () => {
+  const of = OF.ownerFacts(deskSave({ cancellation: 'no', no_show: 'yes' }));
+  assert.equal(OF.spoken(of.byTopic.get('no_show'), 'en'), LINE.no_show.yes.en);
+  assert.equal(OF.spoken(of.byTopic.get('no_show'), 'sw'), LINE.no_show.yes.sw);
+});
+test('B1 bug: every Cancel/Move/Late combination (incl. unset) -> each topic reads only its own fact, en and sw', () => {
+  const opts = [null, 'yes', 'no'];
+  for (const c of opts) for (const m of opts) for (const l of opts) {
+    const pick = {}; if (c) pick.cancellation = c; if (m) pick.booking_changes = m; if (l) pick.no_show = l;
+    if (!Object.keys(pick).length) continue;
+    const of = OF.ownerFacts(deskSave(pick));
+    for (const [t, a] of Object.entries({ cancellation: c, booking_changes: m, no_show: l })) {
+      const f = of.byTopic.get(t); const tag = `C=${c} M=${m} L=${l} ${t}`;
+      if (!a) { assert.ok(!f, `${tag}: unset topic must not borrow (${f && f.text})`); continue; }
+      assert.equal(OF.spoken(f, 'en'), LINE[t][a].en, tag);
+      assert.equal(OF.spoken(f, 'sw'), LINE[t][a].sw, tag);
+    }
+  }
+});
+test('policy_lines: en and sw spoken word for word; empty sw -> "Timu itathibitisha."; no wording copy in Brain', () => {
+  const of = OF.ownerFacts({ businessPolicies: { rules: { warranty: { answer: 'yes', none: false, months: 3 }, returns: { answer: 'custom', mode: 'custom', note: 'Ask us first.' } },
+    policy_lines: { warranty: { en: 'We give a 3 months guarantee on our work.', sw: 'Tunatoa dhamana ya miezi 3 kwa kazi yetu.' }, returns: { en: 'Ask us first.', sw: '' } } } });
+  assert.equal(OF.spoken(of.byTopic.get('warranty'), 'en'), 'We give a 3 months guarantee on our work.');
+  assert.equal(OF.spoken(of.byTopic.get('warranty'), 'sw'), 'Tunatoa dhamana ya miezi 3 kwa kazi yetu.');
+  assert.equal(OF.spoken(of.byTopic.get('returns'), 'en'), 'Ask us first.');
+  assert.equal(OF.spoken(of.byTopic.get('returns'), 'sw'), 'Timu itathibitisha.');
+  const src = fs.readFileSync(path.join(__dirname, '../src/conversation/v2/ownerFacts.js'), 'utf8');
+  assert.ok(!/NONE_LINES/.test(src) && !/Hatukubali kughairi/.test(src), 'Brain keeps no copy of Desk wording');
+  // a policy_lines line reaches the call-core answer too
+  const cc = CC.answers([{ type: 'ask', ask: 'policy' }], 'do you give a guarantee?', machine(), { ...DND, businessPolicies: of && { rules: {}, policy_lines: { warranty: { en: 'We give a 3 months guarantee on our work.', sw: 'x' } } } }, 'en');
+  assert.ok(cc.some((a) => /3 months guarantee/.test(a.text || '')), JSON.stringify(cc));
+});
+test('delivery Pickup only (mode pickup_only) is a real answer, not "no delivery info"', () => {
+  const desk = OF.ownerFacts({ businessPolicies: { rules: { delivery: { answer: 'no', mode: 'pickup_only' } }, policy_lines: { delivery: { en: 'We do not deliver. Customers collect from us.', sw: 'Hatupeleki. Wateja huchukua kwetu.' } } } });
+  assert.equal(desk.byTopic.get('delivery').mode, 'pickup_only');
+  assert.equal(OF.spoken(desk.byTopic.get('delivery'), 'en'), 'We do not deliver. Customers collect from us.');
+  assert.equal(OF.spoken(desk.byTopic.get('delivery'), 'sw'), 'Hatupeleki. Wateja huchukua kwetu.');
+  const legacy = OF.ownerFacts({ businessPolicies: { rules: { delivery: { mode: 'pickup_only' } }, delivery: '' } });
+  assert.match(OF.spoken(legacy.byTopic.get('delivery'), 'en'), /pickup only/i);
+  assert.ok(OF.match('do you deliver?', legacy).some((f) => f.topic === 'delivery'));
 });

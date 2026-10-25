@@ -17,16 +17,9 @@ const { factPolicyMap, factFaqs, policyKeyLabel } = require('../provenance');
 const SW_FALLBACK = 'Timu itathibitisha.';
 // Rule topics Desk folds into another text key on save (policyRules.ts policyTextFromRules).
 const TEXT_KEY_OF = { booking_changes: 'cancellation', no_show: 'cancellation' };
-// [PROMPT-PLACEHOLDER] "No" lines (Policies v2 mapping). Kiswahili drafts need a native-speaker review.
-const NONE_LINES = {
-  cancellation: { en: "We don't accept cancellations.", sw: 'Hatukubali kughairi.' },
-  booking_changes: { en: "We don't move bookings.", sw: 'Hatubadilishi muda wa miadi.' },
-  no_show: { en: "We don't wait if the customer is late or not in.", sw: 'Hatusubiri mteja akichelewa au asipokuwepo.' },
-  returns: { en: 'We do not take returns.', sw: 'Hatupokei bidhaa zilizorudishwa.' },
-  delivery: { en: 'We do not deliver. Customers collect from us.', sw: 'Hatupeleki. Wateja huchukua kwetu.' },
-  warranty: { en: "We don't give a guarantee.", sw: 'Hatutoi dhamana.' },
-  payment: { en: null, sw: null },
-};
+// Spoken wording lives in ONE place: Desk's registry writes business_policies.policy_lines.<topic> = { en, sw }
+// on every save (docs/reference/platform/POLICIES.md). Brain speaks it word for word and keeps no copy of
+// the wording, so the two can't drift. Only legacy rows with no policy_lines fall back to text keys.
 // words a caller uses for a topic, beyond the words in its own label/detail (generic, not per trade)
 const ALIASES = {
   payment: ['pay', 'payment', 'mpesa', 'm-pesa', 'cash', 'card', 'bank', 'paybill', 'till', 'lipa', 'malipo'],
@@ -65,6 +58,7 @@ function ruleMode(r) {
   if (!r) return null;
   const m = String(r.mode || '').toLowerCase();
   if (m === 'custom') return 'custom';
+  if (m === 'pickup_only') return 'pickup_only';
   if (m === 'none' || m === 'not_allowed' || r.allowed === false || r.none === true) return 'none';
   return null;
 }
@@ -107,24 +101,32 @@ function ownerFacts(profile = {}) {
   const ruleTopics = [...new Set([...registryTopics().map((t) => t.id), ...Object.keys(rules)])];
   const textKeys = Object.keys(split).filter((k) => k !== 'coverage_areas');
   const order = [...new Set(['payment', ...ruleTopics, ...textKeys])];
+  const lines = obj(bp.policy_lines) || {};
   const usedText = new Set();
   for (const topic of order) {
     const r = obj(rules[topic]); const mode = ruleMode(r);
+    // 1. Desk's final spoken line for this topic (every option, en + sw). Each topic reads only its own line.
+    const pl = obj(lines[topic]);
+    if (pl && (clean(pl.en) || clean(pl.sw))) {
+      add(topic, clean(pl.en) || SW_FALLBACK, clean(pl.sw) || SW_FALLBACK, 'policy_line', mode || (r ? 'rule' : 'line'));
+      continue;
+    }
     if (mode === 'custom') {
       const en = clean(r.note); const sw = clean(r.note_sw);
       if (en || sw) { add(topic, en || SW_FALLBACK, sw || SW_FALLBACK, 'rule', 'custom'); continue; }
     }
-    if (mode === 'none') {
-      const lines = NONE_LINES[topic] || {};
-      const en = lines.en || `We don't offer ${labelOf(topic).toLowerCase()}.`;
-      add(topic, r.note ? `${en} ${clean(r.note)}` : en, lines.sw || SW_FALLBACK, 'rule', 'none');
-      continue;
-    }
-    const key = split[topic] != null ? topic : null;
-    if (key && !usedText.has(key)) { usedText.add(key); add(topic, String(split[key]), null, 'text'); continue; }
-    // a folded rule topic (booking_changes, no_show) answers from its host key's fact
+    // 2. legacy rows (saved before policy_lines): a neutral line for 'none', else the topic's own text key.
+    if (mode === 'none') { add(topic, `We don't offer ${labelOf(topic).toLowerCase()}.`, SW_FALLBACK, 'rule', 'none'); continue; }
+    // a Desk-era joined text key (cancellation = Cancel + Move + Late) is not this topic's own answer when
+    // this topic has no rule but a folded topic has its own line (e.g. only Late set -> cancellation unset).
+    const joinedOnly = !r && Object.entries(TEXT_KEY_OF).some(([t, h]) => h === topic && obj(lines[t]));
+    const key = split[topic] != null && !joinedOnly ? topic : null;
+    if (key && !usedText.has(key)) { usedText.add(key); add(topic, String(split[key]), null, 'text', mode || 'text'); continue; }
+    if (mode === 'pickup_only') { add(topic, 'Pickup only. Customers collect from us.', SW_FALLBACK, 'rule', 'pickup_only'); continue; }
+    // 3. a folded topic (booking_changes, no_show) with NO rule of its own may answer from its host's legacy
+    // joined text. Never from a host rule line: Cancel=No must not answer Move or Late (Desk review of #937).
     const host = TEXT_KEY_OF[topic];
-    if (host && byTopic.has(host) && !byTopic.has(topic)) {
+    if (!r && host && byTopic.has(host) && !byTopic.has(topic) && byTopic.get(host).source === 'text' && byTopic.get(host).mode === 'text') {
       const hf = byTopic.get(host);
       hf.keys = [...new Set([...hf.keys, ...topicKeys(topic)])];
       byTopic.set(topic, hf);
