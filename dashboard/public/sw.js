@@ -11,7 +11,7 @@
  * since /sw.js is served no-cache) each device deletes every scalers-* cache, unregisters, and
  * reloads its open tabs onto the network. Bump SW_VERSION on any other change.
  */
-const SW_VERSION = "2026-10-25.3";
+const SW_VERSION = "2026-10-25.4";
 const SW_KILL = false;
 const CACHE = `scalers-shell-${SW_VERSION}`;
 const OFFLINE_URL = "/offline";
@@ -81,14 +81,18 @@ self.addEventListener("push", (event) => {
     data = { body: event.data ? event.data.text() : "" };
   }
   const title = data.title || "Scalers";
+  const asset = (v, fallback) => (typeof v === "string" && /^\/icons\/[\w.-]+\.png$/.test(v) ? v : fallback);
+  const ts = Number(data.timestamp);
   // iOS revokes subscriptions that receive a push without a visible notification: always show one.
   event.waitUntil(
     self.registration.showNotification(title, {
       body: data.body || "",
       tag: data.tag || undefined,
-      renotify: Boolean(data.tag),
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
+      // Same tag replaces quietly (renotify false) unless the sender asks otherwise.
+      renotify: Boolean(data.tag) && data.renotify === true,
+      icon: asset(data.icon, "/icons/icon-192.png"),
+      badge: asset(data.badge, "/icons/badge-96.png"),
+      timestamp: Number.isFinite(ts) && ts > 0 ? ts : Date.now(),
       data: { url: safeUrl(data.url) },
     })
   );

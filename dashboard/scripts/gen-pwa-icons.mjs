@@ -63,3 +63,17 @@ const jobs = [
   ["maskable-512.png", 512, 0.62, MASKABLE_PLATE],
 ];
 for (const [name, size, ratio, bg] of jobs) await render(name, size, ratio, bg);
+
+// badge: Android status-bar badge. Monochrome white silhouette of the mark (alpha kept),
+// transparent 96px; Android only reads the alpha channel.
+{
+  const { buf, box } = await markBuffer();
+  const size = 96, h = Math.round(size * 0.84), w = Math.round((box.width / box.height) * h);
+  const alpha = await sharp(buf).resize(w, h).extractChannel(3).toBuffer();
+  const white = await sharp({ create: { width: w, height: h, channels: 3, background: "#ffffff" } })
+    .joinChannel(alpha).png().toBuffer();
+  await sharp({ create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: white, left: Math.round((size - w) / 2), top: Math.round((size - h) / 2) }])
+    .png({ compressionLevel: 9 }).toFile(path.join(out, "badge-96.png"));
+  console.log("badge-96.png");
+}

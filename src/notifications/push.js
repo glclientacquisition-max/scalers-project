@@ -51,14 +51,21 @@ function createWebPushProvider(env = vapidEnv(), webpush = require('web-push')) 
   };
 }
 
-/** Builds the JSON payload the service worker reads. Trims body to stay under 2 KB. */
-function buildPayload({ title, body, url, tag }) {
+/** Builds the JSON payload the service worker reads. Trims body to stay under 2 KB.
+ *  Pass the output of pushFormat.formatMissedCallPush / formatBookingPush (icon, badge, timestamp, renotify). */
+function buildPayload({ title, body, url, tag, icon, badge, timestamp, renotify }) {
   const safeUrl = typeof url === 'string' && url.startsWith('/') && !url.startsWith('//') ? url : '/home';
+  const safeAsset = (v) => (typeof v === 'string' && /^\/icons\/[\w.-]+\.png$/.test(v) ? v : undefined);
+  const ts = Number(timestamp);
   const out = {
     title: String(title || 'Scalers').slice(0, 80),
     body: String(body || ''),
     url: safeUrl,
     tag: tag ? String(tag).slice(0, 64) : undefined,
+    icon: safeAsset(icon),
+    badge: safeAsset(badge),
+    timestamp: Number.isFinite(ts) && ts > 0 ? Math.round(ts) : undefined,
+    renotify: renotify === true,
   };
   let json = JSON.stringify(out);
   while (Buffer.byteLength(json) > MAX_PAYLOAD_BYTES && out.body.length > 0) {
@@ -77,7 +84,7 @@ function defaultDb() {
 }
 
 async function sendPush(
-  { tenantId, userId, title, body, url, tag } = {},
+  { tenantId, userId, title, body, url, tag, icon, badge, timestamp, renotify } = {},
   { env = vapidEnv(), db, providers } = {}
 ) {
   const result = { sent: 0, failed: 0, removed: 0, disabled: 0, skipped: null };
@@ -96,7 +103,7 @@ async function sendPush(
   if (!rows || rows.length === 0) return { ...result, skipped: 'no_devices' };
 
   const byName = providers || { webpush: createWebPushProvider(env) };
-  const payload = buildPayload({ title, body, url, tag });
+  const payload = buildPayload({ title, body, url, tag, icon, badge, timestamp, renotify });
 
   await Promise.all(
     rows.map(async (row) => {
