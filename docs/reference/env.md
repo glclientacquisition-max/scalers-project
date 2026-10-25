@@ -11,13 +11,15 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-194 variables.
+196 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
 | `ADMIN_ACCESS_CODE` | desk | `dashboard/src/lib/admin-auth.ts` |
 | `ADMIN_ENV` | desk | `dashboard/src/app/admin/(console)/%5Fkit/page.tsx` |
-| `ADMIN_V2` | desk | `dashboard/src/app/admin/(console)/_screens/AuditScreen.tsx`<br>`dashboard/src/app/admin/(console)/_screens/PackagesScreen.tsx`<br>`dashboard/src/app/admin/(console)/_screens/ServicesScreen.tsx`<br>+28 more |
+| `ADMIN_STEP_UP_ALERT_EMAIL` | desk | `dashboard/src/lib/ops/stepUpStore.ts` |
+| `ADMIN_STEP_UP_KEY` | desk | `dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/auth.ts`<br>`dashboard/src/lib/ops/stepUpStore.ts` |
+| `ADMIN_V2` | desk | `dashboard/src/app/admin/(console)/_screens/AuditScreen.tsx`<br>`dashboard/src/app/admin/(console)/_screens/PackagesScreen.tsx`<br>`dashboard/src/app/admin/(console)/_screens/ServicesScreen.tsx`<br>+29 more |
 | `AGENT_NAME` | voice | `server.js`<br>`src/db.js`<br>`src/prompts.js`<br>+1 more |
 | `ALERT_EMAIL_FROM` | voice | `server.js`<br>`src/notifications/email.js` |
 | `BACHS_API_KEY` | desk | `dashboard/src/lib/adminPayRead.ts`<br>`dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/provider.js` |
@@ -36,7 +38,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BUSINESS_NAME` | voice | `server.js`<br>`src/conversation/businessAssistantIntro.js`<br>`src/db.js`<br>+2 more |
 | `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js` |
 | `CRON_SECRET` | desk | `dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/cron/ops-alerts/route.ts` |
-| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+62 more |
+| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+63 more |
 | `DASHBOARD_PASSWORD` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
@@ -77,7 +79,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `NEXT_PUBLIC_SUPABASE_URL` | desk, scripts | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts`<br>+2 more |
 | `NEXT_PUBLIC_WALLET_RATE_KES_PER_MINUTE` | desk | `dashboard/src/lib/wallet.ts` |
 | `NEXT_RUNTIME` | desk | `dashboard/src/lib/adminQuality.ts` |
-| `NODE_ENV` | desk, scripts, voice | `dashboard/src/app/(desk)/tenantActions.ts`<br>`dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/admin-auth.ts`<br>+5 more |
+| `NODE_ENV` | desk, scripts, voice | `dashboard/src/app/(desk)/tenantActions.ts`<br>`dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/admin-auth.ts`<br>+6 more |
 | `OPS_ALERTS_DRY_RUN` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OPS_ALERTS_REARM_MARGIN` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OPS_ALERTS_SIMULATE_SMS_CREDIT` | desk | `dashboard/src/lib/opsAlerts.ts` |
@@ -160,7 +162,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `TEXTSMS_PARTNER_ID` | desk, voice | `dashboard/src/lib/callerSms.ts`<br>`src/notifications/sms.js` |
 | `TEXTSMS_SHORTCODE` | desk, voice | `dashboard/src/lib/callerSms.ts`<br>`src/notifications/sms.js` |
 | `TTS_LEXICON_OVERRIDES` | voice | `src/speech/pronunciationLexicon.js` |
-| `VERCEL_ENV` | desk | `dashboard/src/lib/opsAlerts.ts`<br>`dashboard/src/lib/platformOps.ts` |
+| `VERCEL_ENV` | desk | `dashboard/src/lib/ops/stepUpStore.ts`<br>`dashboard/src/lib/opsAlerts.ts`<br>`dashboard/src/lib/platformOps.ts` |
 | `VERCEL_TOKEN` | scripts | `scripts/stage-desk-alias.js` |
 | `VOICE_AREA_FEES` | voice | `src/conversation/areaTerms.js`<br>`src/conversation/numberWords.js` |
 | `VOICE_BARGE_EARLY_MS` | voice | `src/speech/turnTaking.js` |

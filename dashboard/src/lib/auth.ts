@@ -3,7 +3,8 @@ import { cookies, headers } from "next/headers";
 import crypto from "crypto";
 import type { User } from "@supabase/supabase-js";
 import { adminAuth } from "@/lib/admin-auth";
-import { parseAdminOperators } from "@/lib/adminOperators";
+import { normalizeAdminUsername, parseAdminOperators } from "@/lib/adminOperators";
+import { SIGNIN_COOKIE, signInTwoFactorRequired, verifyDeviceToken } from "@/lib/ops/stepUpCore";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const COOKIE = "scalers_session";
@@ -25,7 +26,8 @@ function tokenMatches(token: string | undefined): boolean {
   }
 }
 
-export const getAdminSession = cache(async () => {
+/** Better Auth session after username + access code only. Sign-in 2FA routes use this; nothing else should. */
+export const getAdminSessionRaw = cache(async () => {
   try {
     return await adminAuth.api.getSession({ headers: await headers() });
   } catch {
@@ -33,10 +35,30 @@ export const getAdminSession = cache(async () => {
   }
 });
 
+/** True when this browser passed sign-in 2FA for `username` in the last 12 hours. */
+export async function signInTwoFactorPassed(username: string): Promise<boolean> {
+  const jar = await cookies();
+  return verifyDeviceToken(jar.get(SIGNIN_COOKIE)?.value, normalizeAdminUsername(username), Date.now(), String(process.env.ADMIN_STEP_UP_KEY || ""));
+}
+
+/**
+ * Super Admin session. With ADMIN_STEP_UP_ENFORCE=on a session counts only after sign-in 2FA
+ * (signed device cookie bound to the operator, 12 h). Every page gate and admin write goes through here.
+ */
+export const getAdminSession = cache(async () => {
+  const session = await getAdminSessionRaw();
+  if (!session?.user) return session;
+  if (!signInTwoFactorRequired()) return session;
+  return (await signInTwoFactorPassed(String(session.user.name || ""))) ? session : null;
+});
+
 /** Better Auth Super Admin session, or the leftover HMAC cookie. */
 export const isAdminAuthenticated = cache(async (): Promise<boolean> => {
   const session = await getAdminSession();
   if (session?.user) return true;
+
+  // Sign-in 2FA on: the shared-password cookie has no second factor, so it no longer counts.
+  if (signInTwoFactorRequired()) return false;
 
   const jar = await cookies();
   if (tokenMatches(jar.get(COOKIE)?.value) || tokenMatches(jar.get(LEGACY_COOKIE)?.value)) {

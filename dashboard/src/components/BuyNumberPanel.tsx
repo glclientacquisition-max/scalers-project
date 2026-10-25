@@ -60,7 +60,7 @@ export function BuyNumberPanel({
         body: JSON.stringify({ inventory_id: row.inventory_id }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Could not buy.");
+      if (!res.ok) throw new Error(json.error === "step_up_required" ? "Unlock, then tap Buy again." : json.error || "Could not buy.");
       setPick(null);
       onBought(row.e164);
     } catch (err) {

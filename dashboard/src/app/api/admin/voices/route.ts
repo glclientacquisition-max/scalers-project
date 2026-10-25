@@ -3,6 +3,7 @@ import { adminActorName } from "@/lib/adminActor";
 import { recordAdminAction } from "@/lib/adminAudit";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
+import { stepUpGateSession } from "@/lib/ops/stepUpGate";
 import {
   deletePlatformSonioxVoice,
   isSonioxVoiceUuid,
@@ -33,6 +34,9 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const action = String(body.action || "upsert").trim();
   const actor = await adminActorName();
+  // Unlock gate: only delete is risky (registry in stepUpCore); other actions pass through.
+  const stepUp = await stepUpGateSession(`voices:${action}`, String(body.id || "") || null);
+  if (stepUp) return stepUp;
   const voiceBefore = async (id: string) =>
     (await listPlatformSonioxVoicesAdmin().catch(() => [])).find((v) => v.id === id) ?? null;
 

@@ -156,7 +156,10 @@ describe("requireSuperAdmin (server, before any data)", () => {
       const handlers = src.split(/export async function (?:GET|POST|PUT|PATCH|DELETE)\b/).slice(1);
       assert.ok(handlers.length > 0, name);
       for (const h of handlers) {
-        assert.ok(["if (!(await isLegacyAuthenticated())) {", "const gate = await requireAdminOperatorWrite();"].includes(firstStatement(h.slice(h.indexOf("{\n") + 2))), name);
+        // sign-in-2fa runs on the password-only session (signedInOperator) by design: it is the second factor.
+        const allowed = ["if (!(await isLegacyAuthenticated())) {", "const gate = await requireAdminOperatorWrite();"];
+        if (name === "sign-in-2fa") allowed.push("const op = await signedInOperator();");
+        assert.ok(allowed.includes(firstStatement(h.slice(h.indexOf("{\n") + 2))), name);
       }
     }
   });
