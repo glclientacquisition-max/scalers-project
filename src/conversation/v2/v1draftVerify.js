@@ -81,7 +81,8 @@ function verifySentence({ text, refs = [], kind = null, lang = null }, note, ctx
     const caps = (s.match(/\b[A-Z][a-z]{3,}\b/g) || []).filter((w) => !CAP_OK.test(w) && !(booking && booking.words.includes(w.toLowerCase())) && !(note.facts.some((f) => (f.family === 'service' || f.family === 'business') && f.name.toLowerCase().includes(w.toLowerCase()))));
     for (const w of caps) if (!known.some((a) => a.split(/\s+/).includes(w.toLowerCase()))) reasons.push(`area_unlisted:${w}`);
   }
-  // 5) services: existence + description
+  // 5) services: existence + description. Owner policy / FAQ facts (ownerFacts.js) back their own words.
+  const ownerCited = cited.filter((f) => f.family === 'policy' || f.family === 'faq' || f.family === 'payment');
   const named = servicesNamed(s, note);
   const citedSvc = citedFam('service'); const citedPrice = citedFam('price');
   if (named.length) {
@@ -89,7 +90,7 @@ function verifySentence({ text, refs = [], kind = null, lang = null }, note, ctx
     const covered = named.filter((f) => citedSvc.some((c) => c.serviceId === f.serviceId) || citedPrice.some((c) => c.serviceId === f.serviceId) || (booking && booking.services.includes(f.name)));
     if (!covered.length) reasons.push('service_uncited');
     if (neg && RE.exists.test(s) && !offer) reasons.push('listed_service_denied');
-  } else if (RE.exists.test(s) && !offer && !citedSvc.length && !citedFam('area').length && !citedFam('payment').length) {
+  } else if (RE.exists.test(s) && !offer && !citedSvc.length && !citedFam('area').length && !citedFam('payment').length && !ownerCited.length) {
     families.push('service'); reasons.push('service_claim_unlisted');
   }
   // description by default: any content word about a service that is not in its KB name/description
@@ -97,10 +98,10 @@ function verifySentence({ text, refs = [], kind = null, lang = null }, note, ctx
   if (svcCtx.length || RE.describe.test(s)) {
     const okWords = new Set(svcCtx.flatMap((f) => `${f.desc || ''} ${f.name}`.toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/)));
     if (booking) for (const w of [...booking.words, ...booking.services.join(' ').toLowerCase().split(/[^a-z]+/)]) okWords.add(w);
-    for (const p of citedPrice) for (const w of p.text.toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/)) okWords.add(w);
+    for (const p of [...citedPrice, ...ownerCited]) for (const w of `${p.text} ${p.text_sw || ''}`.toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/)) okWords.add(w);
     const extra = s.toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter((w) => w.length >= 5 && !STOP.has(w) && !okWords.has(w) && !okWords.has(w.replace(/s$/, '')) && !okWords.has(w.replace(/ing$/, '')) && !okWords.has(`${w.replace(/s$/, '')}s`));
     const hasDesc = svcCtx.some((f) => f.desc);
-    if (RE.describe.test(s) && !svcCtx.length && !offer) { families.push('description'); reasons.push('description_uncited'); }
+    if (RE.describe.test(s) && !svcCtx.length && !ownerCited.length && !offer) { families.push('description'); reasons.push('description_uncited'); }
     else if (extra.length > (hasDesc ? 2 : 0)) { families.push('description'); reasons.push(`${hasDesc ? 'description_unbacked' : 'description_none_on_file'}:${extra.slice(0, 4).join(',')}`); }
   }
   // 6) numbers / price / hours / payment: every number must come from a cited fact

@@ -119,7 +119,7 @@ test("Policies save generates the spoken text from payments and rules", () => {
   if (!res.ok) return;
   assert.equal(res.policies.payment, "You can pay by M-Pesa Buy Goods Till 123456. Customers pay on delivery.");
   assert.equal(res.policies.returns, "We refund or exchange items within 7 days if unused and with the receipt or M-Pesa message.");
-  assert.equal(res.policies.delivery, "We deliver to Nairobi CBD the same day for orders before 2pm. Delivery costs KSh 200.");
+  assert.equal(res.policies.delivery, "We deliver the same day for orders before 2pm.");
   assert.match(res.policies.cancellation, /up to a day before\. After that, the deposit is kept\. We wait 15 minutes .* KSh 500 call-out fee/);
   assert.deepEqual(res.policies.provenance!.payment, { source: "owner", confirmed: true });
   const compiled = formatPoliciesForCompiler(res.policies);
@@ -151,4 +151,15 @@ test("rule sentences", () => {
   assert.equal(rules.bookingChangesSentence({ allowed: true, notice_hours: 6, note: null }), "Customers can move a booking up to 6 hours before.");
   assert.equal(rules.warrantySentence({ months: 12, covers: ["workmanship", "parts"], note: null }), "We give a 1 year warranty on our workmanship and parts we supply.");
   assert.deepEqual(rules.topicsFor("home_services").slice(0, 3), ["cancellation", "booking_changes", "no_show"]);
+});
+
+test("merged booking line (cancel + move + late, each with a note) is kept whole, never cut at 500", () => {
+  const n = `${"Please read our notes carefully ".repeat(4).trim()} end.`;
+  const r = rules.normalizeRules({ cancellation: { notice_hours: 24, fee: "none", note: n }, booking_changes: { allowed: true, notice_hours: 6, note: n }, no_show: { wait_minutes: 15, charge: "none", note: n } });
+  const text = rules.policyTextFromRules(r).cancellation!;
+  assert.ok(text.length > 500, String(text.length));
+  assert.ok(text.endsWith("end."));
+  const saved = applyStructuredPolicies({ ...normalizeBusinessPolicies({}), rules: r });
+  assert.ok(saved.ok && saved.policies.cancellation === text);
+  assert.equal(rules.joinWholeSentences(["One two.", "Three four five."], 12), "One two.");
 });

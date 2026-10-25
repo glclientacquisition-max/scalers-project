@@ -3,6 +3,9 @@ import { formatCoverageList, parseCoverageAreas } from "./coverageAreas";
 import { cleanPayments, normalizePayments, paymentsHaveContent, paymentsSentence, validatePayments, type Payments } from "./payments";
 import { normalizeRules, policyTextFromRules, validateRules, type PolicyRules } from "./policyRules";
 
+/** Spoken policy text cap: whole merged booking lines (cancel + move + late, each with an owner note) fit. */
+export const POLICY_TEXT_MAX = 1200;
+
 export type BusinessPolicies = {
   returns: string;
   delivery: string;
@@ -122,7 +125,7 @@ export function normalizeBusinessPolicies(raw: unknown): BusinessPolicies {
     return base;
   }
   for (const field of POLICY_FIELDS) {
-    base[field.id] = String(obj[field.id] ?? "").trim().slice(0, 500);
+    base[field.id] = String(obj[field.id] ?? "").trim().slice(0, POLICY_TEXT_MAX);
   }
   base.coverage_areas = Array.isArray(obj.coverage_areas)
     ? parseCoverageAreas(obj.coverage_areas)
@@ -165,7 +168,7 @@ export function applyStructuredPolicies(input: BusinessPolicies): StructuredPoli
   const fields: Record<string, string> = {};
   const changedText: string[] = [];
   const setText = (key: "payment" | "returns" | "delivery" | "cancellation" | "warranty", value: string) => {
-    const v = value.trim().slice(0, 500);
+    const v = value.trim().slice(0, POLICY_TEXT_MAX);
     if (p[key] === v) return;
     p[key] = v;
     p.provenance![key] = { source: "owner", confirmed: true };

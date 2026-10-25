@@ -162,7 +162,7 @@ test('EN unknown place in the flow: "Do you cover Kwa Mzee?" -> Which area is th
 
 // ---- the same call on Desk's tenant_area_picks (#930); skipped when the Desk tree is not on this branch ----
 const AP = require('../src/conversation/v2/areaPicks');
-const PICKED = { ...DD, areaPicks: { version: 1, tree_version: 'ke-areas-2026-10-24.1', picks: [
+const PICKED = { ...DD, areaPicksConfirmedAt: '2026-10-25T08:00:00Z', areaPicks: { version: 1, tree_version: 'ke-areas-2026-10-24.1', picks: [
   { node: 'county:nairobi', serve: true }, { node: 'estate:nairobi:kibera', serve: false },
   { node: 'town:kajiado:kitengela', serve: true, fee_kes: 500, note: 'Weekends only' }, { node: 'county:kiambu', serve: true },
 ] } };
