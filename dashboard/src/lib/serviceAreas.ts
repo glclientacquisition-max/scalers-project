@@ -1,13 +1,13 @@
 /**
  * Areas you serve (Settings › Locations). Each area is a directory id (county:<id> or
- * place:<id>) with how you serve it, the fee, how long it takes and a minimum order.
+ * place:<id>) with how you serve it. Fees live in Service area picks only.
  *
  * Stored in tenants.service_areas. business_policies.coverage_areas is kept in step from
  * here for one release so the voice server's coverage check keeps working unchanged.
  *
  * Pure and browser-safe. Relative imports only so node tests can load it.
  */
-import { coverageAreaLabel, parseCoverageAreas, searchAreaOptions, COVERAGE_AREA_MAX, type AreaOption } from "./coverageAreas";
+import { coverageAreaLabel, parseCoverageAreas, searchAreaOptions, COVERAGE_AREA_MAX, type AreaOption } from "./coverageAreas.ts";
 
 export type AreaMode = "delivery" | "visit" | "pickup";
 export type FeeMode = "free" | "fixed" | "ask";
@@ -22,7 +22,6 @@ export type ServiceArea = {
   fee_mode: FeeMode;
   fee_ksh: number | null;
   eta: string | null;
-  min_order_ksh: number | null;
   source: "owner" | "import";
   confirmed: boolean;
 };
@@ -111,7 +110,7 @@ export function emptyServiceAreas(vertical?: string | null): ServiceAreas {
 }
 
 export function newServiceArea(id: string, vertical?: string | null): ServiceArea {
-  return { id, modes: [defaultMode(vertical)], fee_mode: "ask", fee_ksh: null, eta: null, min_order_ksh: null, source: "owner", confirmed: true };
+  return { id, modes: [defaultMode(vertical)], fee_mode: "ask", fee_ksh: null, eta: null, source: "owner", confirmed: true };
 }
 
 /** Accepts only well-formed areas with ids in the place directory. Null when nothing was ever saved. */
@@ -138,7 +137,6 @@ export function normalizeServiceAreas(raw: unknown, vertical?: string | null): S
       fee_mode: feeMode,
       fee_ksh: feeMode === "fixed" ? fee : null,
       eta: eta || null,
-      min_order_ksh: ksh(r.min_order_ksh),
       source: r.source === "import" ? "import" : "owner",
       confirmed: r.confirmed === true,
     });
@@ -214,7 +212,7 @@ function feeText(a: ServiceArea, forPrompt: boolean): string {
 export function areaSummary(a: ServiceArea): string {
   const modes = a.modes.map((m) => AREA_MODES.find((o) => o.id === m)?.label).filter(Boolean).join(", ");
   const fee = a.fee_mode === "free" ? "Free" : a.fee_mode === "fixed" && a.fee_ksh != null ? money(a.fee_ksh) : "";
-  return [modes, fee, a.eta, a.min_order_ksh ? `From ${money(a.min_order_ksh)} orders` : ""].filter(Boolean).join(" · ");
+  return [modes, fee, a.eta].filter(Boolean).join(" · ");
 }
 
 function joinNames(names: string[]): string {
@@ -263,7 +261,6 @@ export function formatServiceAreasForCompiler(v: ServiceAreas | null | undefined
   const lines = v.areas.map((a) => {
     const bits = [a.modes.map((m) => (m === "visit" ? "home visit" : m === "pickup" ? "pickup only" : "delivery")).join(" or "), feeText(a, true)];
     if (a.eta) bits.push(a.eta);
-    if (a.min_order_ksh) bits.push(`orders from ${money(a.min_order_ksh)}`);
     return `- ${shortName(a.id)}: ${bits.join(", ")}`;
   });
   const head = v.reach === "visit" ? "Areas we visit:" : v.reach === "both" ? "Areas you serve:" : "Delivery areas:";
@@ -315,7 +312,6 @@ export function validateServiceArea(a: ServiceArea): Record<string, string> {
   const e: Record<string, string> = {};
   if (!a.modes.length) e.modes = "Pick how you serve this area.";
   if (a.fee_mode === "fixed" && (a.fee_ksh == null || a.fee_ksh <= 0)) e.fee_ksh = "Add the fee in KSh, or pick Free.";
-  if (a.min_order_ksh != null && (!Number.isInteger(a.min_order_ksh) || a.min_order_ksh < 0)) e.min_order_ksh = "Use a whole amount in KSh.";
   if (a.eta && a.eta.length > ETA_MAX) e.eta = `Keep it under ${ETA_MAX} characters.`;
   return e;
 }

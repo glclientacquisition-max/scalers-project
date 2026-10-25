@@ -11,60 +11,50 @@ export type SettingsPanel =
 
 export type BusinessSettingsTab =
   | "menu"
+  | "updates"
   | "catalog"
   | "train"
   | "import"
   | "test"
-  | "calls"
   | "alerts"
-  | "assistant-say";
-
-const TRAIN_PANEL_ALIAS = new Set<string>([
-  "identity",
-  "hours",
-  "locations",
-  "policies",
-  "team",
-  "faqs",
-  "tools",
-  "pronunciation",
-]);
-
-/** `?tab=identity` is the same panel as `?tab=train&panel=identity`. */
-export function isTrainPanelAlias(raw: string | undefined | null): boolean {
-  return TRAIN_PANEL_ALIAS.has(String(raw || ""));
-}
+  | "appearance";
 
 export function parseBusinessSettingsTab(
-  raw: string | undefined | null,
-  panelRaw?: string | null
+  raw: string | undefined | null
 ): BusinessSettingsTab {
-  if (isTrainPanelAlias(raw)) return "train";
-  // The catalogue is its own tab. Old "Add prices" / "Check prices" links sent
-  // ?tab=train&panel=catalog, which fell through to Identity.
-  if ((raw === "train" || !raw) && panelRaw === "catalog") return "catalog";
   if (
     raw === "catalog" ||
     raw === "train" ||
     raw === "import" ||
     raw === "test" ||
-    raw === "calls" ||
     raw === "alerts" ||
-    raw === "assistant-say"
+    raw === "appearance"
   ) {
     return raw;
   }
-  // Updates live on Home. Appearance lives on the account menu.
-  // Old ?tab=updates, ?tab=today, and ?tab=appearance bookmarks open the hub.
+  // "today" kept as a legacy alias for bookmarked /settings?tab=today links.
+  if (raw === "updates" || raw === "today") {
+    return "updates";
+  }
+  if (raw === "menu") return "menu";
   return "menu";
 }
 
 export function parseBusinessSettingsPanel(
-  raw: string | undefined | null,
-  tabRaw?: string | null
+  raw: string | undefined | null
 ): SettingsPanel {
-  if (isTrainPanelAlias(raw)) return raw as SettingsPanel;
-  if (isTrainPanelAlias(tabRaw)) return tabRaw as SettingsPanel;
+  if (
+    raw === "identity" ||
+    raw === "hours" ||
+    raw === "locations" ||
+    raw === "policies" ||
+    raw === "team" ||
+    raw === "faqs" ||
+    raw === "tools" ||
+    raw === "pronunciation"
+  ) {
+    return raw;
+  }
   return "identity";
 }
 
@@ -80,81 +70,70 @@ export function businessSettingsHref(tab: BusinessSettingsTab, panel?: SettingsP
 export type SettingsNavTarget =
   | { tab: Exclude<BusinessSettingsTab, "train" | "menu"> }
   | { tab: "train"; panel: Exclude<SettingsPanel, "catalog"> }
-  | { href: "/settings/plan" | "/settings/billing" | "/settings/areas" };
+  | { href: "/settings/areas" };
 
 export type SettingsNavItem = {
   label: string;
-  /** One plain line for the Settings home list. */
-  description: string;
   target: SettingsNavTarget;
 };
 
 export type SettingsNavSection = {
-  id: "business" | "knowledge" | "assistant" | "people" | "billing";
+  id: "business" | "assistant" | "knowledge" | "alerts" | "device";
   title: string;
   items: SettingsNavItem[];
 };
 
 /**
- * Settings destinations. /settings with no section is the Settings home on every width
- * (phone: the whole screen; tablet and desktop: the right pane beside the rail).
- * One header each: Business, Knowledge, Assistant, People, then Plan and billing.
- * Import sits directly under Catalog. Team is People, ahead of Alerts.
- * Plan and Billing are the last section. The rail shows them to the owner and an admin.
- * Appearance is the account-menu theme cluster. It is not a settings tab.
- * URLs stay `?tab=` / `?panel=`.
+ * Settings destinations. /settings is the phone index.
+ * Business → Assistant → Knowledge → Alerts → This device.
+ * Extra shipped panels sit in the closest group. URLs stay `?tab=` / `?panel=`.
  */
 export const SETTINGS_NAV: SettingsNavSection[] = [
   {
     id: "business",
     title: "Business",
     items: [
-      { label: "Identity", description: "Name, type of business and how callers hear it", target: { tab: "train", panel: "identity" } },
-      { label: "Hours", description: "When you are open, including holidays", target: { tab: "train", panel: "hours" } },
-      { label: "Locations", description: "Where callers can find you", target: { tab: "train", panel: "locations" } },
-      { label: "Service areas", description: "Which counties, towns and estates you serve", target: { href: "/settings/areas" } },
-      { label: "Policies", description: "Payments, delivery, returns and other rules", target: { tab: "train", panel: "policies" } },
+      { label: "Identity", target: { tab: "train", panel: "identity" } },
+      { label: "Hours", target: { tab: "train", panel: "hours" } },
+      { label: "Locations", target: { tab: "train", panel: "locations" } },
+      {
+        label: "Service areas",
+        target: { href: "/settings/areas" },
+      },
+      { label: "Policies", target: { tab: "train", panel: "policies" } },
+    ],
+  },
+  {
+    id: "assistant",
+    title: "Assistant",
+    items: [
+      { label: "Voice", target: { tab: "train", panel: "tools" } },
+      { label: "Pronunciation", target: { tab: "train", panel: "pronunciation" } },
+      { label: "Updates", target: { tab: "updates" } },
+      { label: "Test", target: { tab: "test" } },
     ],
   },
   {
     id: "knowledge",
     title: "Knowledge",
     items: [
-      { label: "Catalogue", description: "What you sell and what it costs", target: { tab: "catalog" } },
-      { label: "Import", description: "Add items from a file or your website", target: { tab: "import" } },
-      { label: "FAQs", description: "Answers to the questions callers ask most", target: { tab: "train", panel: "faqs" } },
+      { label: "FAQs", target: { tab: "train", panel: "faqs" } },
+      { label: "Catalog", target: { tab: "catalog" } },
+      { label: "Import", target: { tab: "import" } },
     ],
   },
   {
-    id: "assistant",
-    title: "Business Assistant",
+    id: "alerts",
+    title: "Alerts",
     items: [
-      {
-        label: "What it will say",
-        description: "What callers hear before your team calls back",
-        target: { tab: "assistant-say" },
-      },
-      { label: "Voice", description: "How your Business Assistant sounds", target: { tab: "train", panel: "tools" } },
-      { label: "Pronunciation", description: "Names and words it should say a certain way", target: { tab: "train", panel: "pronunciation" } },
-      { label: "Test", description: "Call your line and hear it answer", target: { tab: "test" } },
-      { label: "Calls & forwarding", description: "How calls reach your Business Assistant", target: { tab: "calls" } },
+      { label: "Alerts", target: { tab: "alerts" } },
+      { label: "Team", target: { tab: "train", panel: "team" } },
     ],
   },
   {
-    id: "people",
-    title: "People",
-    items: [
-      { label: "Team", description: "Who can use the desk and what they can do", target: { tab: "train", panel: "team" } },
-      { label: "How we notify", description: "Where new calls and leads reach you", target: { tab: "alerts" } },
-    ],
-  },
-  {
-    id: "billing",
-    title: "Plan and billing",
-    items: [
-      { label: "Plan", description: "Package, minutes and seats", target: { href: "/settings/plan" } },
-      { label: "Billing", description: "Invoices and notices", target: { href: "/settings/billing" } },
-    ],
+    id: "device",
+    title: "This device",
+    items: [{ label: "Appearance", target: { tab: "appearance" } }],
   },
 ];
 
@@ -169,14 +148,20 @@ export function settingsNavItemActive(
   target: SettingsNavTarget,
   tab: BusinessSettingsTab,
   trainPanel: SettingsPanel,
-  pathname?: string | null,
+  options?: { selectHubAppearance?: boolean; activePath?: string }
 ): boolean {
   if ("href" in target) {
-    const path = pathname || "";
-    return path === target.href || path.startsWith(`${target.href}/`);
+    return options?.activePath === target.href;
   }
   if (target.tab === "train") {
     return tab === "train" && trainPanel === target.panel;
+  }
+  if (
+    target.tab === "appearance" &&
+    options?.selectHubAppearance &&
+    tab === "menu"
+  ) {
+    return true;
   }
   return tab === target.tab;
 }
@@ -187,28 +172,18 @@ export function settingsNavItems(): SettingsNavItem[] {
 
 export function settingsPanelHeading(
   tab: BusinessSettingsTab,
-  trainPanel: SettingsPanel,
-  vertical?: string | null
+  trainPanel: SettingsPanel
 ): string | null {
   if (tab === "menu") return null;
-  if (tab === "catalog") return "Catalogue";
-  if (tab === "alerts") return "How we notify";
-  if (tab === "import") {
-    const v = String(vertical || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[\s-]+/g, "_");
-    return v === "retail" || v === "shop" || v === "shops"
-      ? "Import catalogue"
-      : "Import knowledge";
-  }
+  if (tab === "catalog") return "Catalog";
+  if (tab === "updates") return "Updates";
+  if (tab === "alerts") return "Alerts";
+  if (tab === "import") return "Import";
   if (tab === "test") return "Test";
-  if (tab === "calls") return "Calls & forwarding";
-  if (tab === "assistant-say") return "What your Business Assistant will say";
+  if (tab === "appearance") return "Appearance";
   if (tab !== "train") return null;
-  const item = settingsNavItems().find((entry) => {
-    const target = entry.target;
-    return "tab" in target && target.tab === "train" && target.panel === trainPanel;
-  });
+  const item = settingsNavItems().find(
+    (entry) => entry.target.tab === "train" && entry.target.panel === trainPanel
+  );
   return item?.label ?? "Identity";
 }

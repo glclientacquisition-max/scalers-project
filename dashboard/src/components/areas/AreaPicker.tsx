@@ -7,10 +7,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { buttonClass } from "@/components/ui/Button";
 import { cx } from "@/lib/cx";
 import {
-  AREA_CONFIRM_COPY,
   AREA_NOTE_MAX,
-  areaNeedsConfirm,
-  type AreaConfirmState,
   ROOT_ID,
   areaChildren,
   areaCounties,
@@ -21,7 +18,7 @@ import {
   areaState,
   areaSummaryParts,
   areaWhere,
-  callerHears,
+  previewCallerLine,
   moveOverAreas,
   resolveArea,
   searchAreaTree,
@@ -101,7 +98,7 @@ const hit = "flex min-h-11 min-w-11 items-center justify-center rounded-lg focus
 export function AreaPicker({
   initialPicks,
   oldList,
-  confirmState,
+  confirmed,
   initialView,
   saveAction = saveAreaPicksAction,
 }: {
@@ -110,8 +107,7 @@ export function AreaPicker({
   initialPicks: AreaPicks;
   /** Old Locations / coverage list. Non-empty with confirmed=false shows Check your areas. */
   oldList: string[];
-  /** From areaConfirmState(): drives the confirm card. Brain answers areas only once confirmed. */
-  confirmState: AreaConfirmState;
+  confirmed: boolean;
   initialView: AreaView;
 }) {
   const [saved, setSaved] = useState<AreaPicks>(initialPicks);
@@ -120,7 +116,7 @@ export function AreaPicker({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<Set<string>>(() => new Set(["county:nairobi"]));
   const [sheet, setSheet] = useState<string | null>(null);
-  const [confirmNow, setConfirmNow] = useState<AreaConfirmState>(confirmState);
+  const [isConfirmed, setConfirmed] = useState(confirmed);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
 
@@ -144,15 +140,13 @@ export function AreaPicker({
       }
       setSaved(next);
       setPicks(next);
-      if (confirm) setConfirmNow("confirmed");
+      if (confirm) setConfirmed(true);
       setMsg({ ok: true, text: res.message });
       after?.();
     });
   };
 
-  const needsConfirm = areaNeedsConfirm(confirmNow);
-  // Old list never moved over: confirm on Check your areas. Picks already stored: confirm right here.
-  const needsCheck = needsConfirm && confirmNow === "old_only" && oldList.length > 0;
+  const needsCheck = oldList.length > 0 && !isConfirmed;
   const countyOrder = useMemo(
     () => [...areaCounties()].sort((a, b) => Number(areaState(saved, a.id) === "off") - Number(areaState(saved, b.id) === "off")),
     [saved],
@@ -200,24 +194,13 @@ export function AreaPicker({
           What callers will hear
         </button>
       </div>
-      {needsConfirm ? (
-        <section data-area-confirm={confirmNow} aria-labelledby="area-confirm-title" className="mx-4 mt-3 rounded-2xl border border-hairline bg-surface p-3.5">
-          <h2 id="area-confirm-title" className="font-semibold text-ink">
-            {confirmNow === "edited" ? AREA_CONFIRM_COPY.editedTitle : AREA_CONFIRM_COPY.title}
-          </h2>
-          <p className="mt-1 text-meta text-ink-2">
-            {needsCheck ? "We moved your old area list into the new map. " : null}
-            {AREA_CONFIRM_COPY.detail}
-          </p>
-          <button
-            type="button"
-            className={buttonClass({ variant: "primary", size: "lg" }) + " mt-3 w-full"}
-            disabled={pending}
-            onClick={() => (needsCheck ? setView("check") : changes > 0 ? save(picks, true) : save(saved, true))}
-          >
-            {needsCheck ? "Check and confirm" : changes > 0 ? "Save and confirm" : "Confirm these areas"}
+      {needsCheck ? (
+        <div className="mx-4 mt-1 flex items-center gap-3 rounded-2xl border border-hairline bg-accent-tonal p-3.5">
+          <p className="flex-1 text-meta text-ink">We moved your old area list into the new map.</p>
+          <button type="button" className={buttonClass({ variant: "primary", size: "md" })} onClick={() => setView("check")}>
+            Check it
           </button>
-        </section>
+        </div>
       ) : null}
       <label className="mx-4 my-3 flex h-12 items-center gap-2 rounded-xl border border-hairline bg-surface px-3.5 focus-within:border-2 focus-within:border-accent">
         <MagnifyingGlassIcon className="h-4 w-4 shrink-0 text-ink-2" aria-hidden="true" />
@@ -262,10 +245,7 @@ export function AreaPicker({
                   onOpen={setSheet}
                 />
                 {isOpen ? (
-                  <ul aria-label={`Places in ${c.name}`}>
-                    {areaState(picks, c.id) !== "off" ? (
-                      <li className="border-b border-hairline bg-surface-2/40 px-4 py-2 ps-12 text-meta text-ink-2">Untick a place to leave it out.</li>
-                    ) : null}
+                  <ul>
                     {kids.map((k) => (
                       <TreeRow key={k.id} id={k.id} picks={picks} depth={2} parentState={areaState(picks, c.id)} onToggle={(id) => setPicks(toggleArea(picks, id))} onOpen={setSheet} />
                     ))}
@@ -286,8 +266,8 @@ export function AreaPicker({
             Undo
           </button>
         ) : null}
-        <button type="button" className={buttonClass({ variant: "primary", size: "lg" })} disabled={changes === 0 || pending} onClick={() => save(picks, true)}>
-          {pending ? "Saving…" : needsConfirm && changes > 0 ? "Save and confirm" : "Save"}
+        <button type="button" className={buttonClass({ variant: "primary", size: "lg" })} disabled={changes === 0 || pending} onClick={() => save(picks, false)}>
+          {pending ? "Saving…" : "Save"}
         </button>
       </Bar>
       {sheet ? (
@@ -335,7 +315,7 @@ function TreeRow({
   const Wrap = depth === 0 ? "li" : "div";
   return (
     <Wrap className={cx(rowBase, depth === 2 && "min-h-13 bg-surface-2/40 ps-12")}>
-      <button type="button" role="checkbox" aria-checked={state === "on" ? true : state === "part" ? "mixed" : false} aria-label={depth === 2 && parentState && parentState !== "off" && res.covered ? `Serve ${n.name} (untick to leave it out)` : `Serve ${n.name}`} className={cx(hit, "-ms-2.5")} onClick={() => onToggle(id)}>
+      <button type="button" role="checkbox" aria-checked={state === "on" ? true : state === "part" ? "mixed" : false} aria-label={`Serve ${n.name}`} className={cx(hit, "-ms-2.5")} onClick={() => onToggle(id)}>
         <Box state={state} />
       </button>
       {depth === 0 ? (
@@ -426,7 +406,7 @@ function AreaSheet({
   const [note, setNote] = useState(pick?.note ?? "");
   const preview = useMemo(() => {
     const trial = setAreaDetail(picks, id, { serve, fee_kes: fee, note });
-    return callerHears(trial, n.name).reply;
+    return previewCallerLine(trial, n.name).reply;
   }, [picks, id, serve, fee, note, n.name]);
   const where = n.kind === "county" ? "County" : n.kind === "town" ? `${areaWhere(id)} County` : areaWhere(id);
   const seg = (on: boolean) =>
@@ -472,7 +452,7 @@ function AreaSheet({
           <label className="mb-1.5 mt-4 block font-semibold text-ink" htmlFor="area-note">
             Note for callers (optional)
           </label>
-          <textarea id="area-note" value={note} maxLength={AREA_NOTE_MAX} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="For example: from 2 bedrooms up" className="w-full rounded-xl border border-hairline bg-surface px-3.5 py-3 text-body text-ink outline-none focus:border-2 focus:border-accent" />
+          <textarea id="area-note" value={note} maxLength={AREA_NOTE_MAX} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="For example: weekends only" className="w-full rounded-xl border border-hairline bg-surface px-3.5 py-3 text-body text-ink outline-none focus:border-2 focus:border-accent" />
         </>
       ) : null}
       <p className="mt-4 rounded-xl border border-hairline bg-surface-2/60 p-3.5 text-body text-ink">Callers hear: “{preview}”</p>
@@ -587,7 +567,10 @@ function examplePlaces(picks: AreaPicks): string[] {
   const off = picks.picks.find((p) => !p.serve) ?? null;
   if (off) out.push(areaNode(off.node)!.name);
   else {
-    const notCovered = areaCounties().find((c) => !resolveArea(picks, c.id).covered);
+    const notCovered = areaCounties().find((c) => {
+      const r = resolveArea(picks, c.id);
+      return !r.covered && r.via;
+    });
     if (notCovered) out.push(notCovered.name);
   }
   out.push("the new mall");
@@ -595,7 +578,14 @@ function examplePlaces(picks: AreaPicks): string[] {
 }
 
 function Chat({ line, ask }: { line: CallerLine; ask: string }) {
-  const tag = line.status === "covered" ? <Tag>Covered</Tag> : line.status === "not_covered" ? <Tag tone="quiet">Not covered</Tag> : <Tag tone="warn">Not on map</Tag>;
+  const tag =
+    line.status === "covered"
+      ? <Tag>Covered</Tag>
+      : line.status === "not_covered"
+        ? <Tag tone="quiet">Not covered</Tag>
+        : line.status === "need_check"
+          ? <Tag tone="warn">Owner confirms</Tag>
+          : <Tag tone="warn">Not on map</Tag>;
   return (
     <li className="mx-4 mb-3 rounded-2xl border border-hairline bg-surface p-3.5">
       <p className="max-w-[80%] rounded-2xl rounded-bl-sm bg-surface-2 px-3 py-2.5 text-body text-ink" style={{ width: "fit-content" }}>{ask}</p>
@@ -615,9 +605,9 @@ function HearView({ picks, onBack, unsaved }: { picks: AreaPicks; onBack: () => 
       <p className="px-4 py-3 text-meta text-ink-2">Based on your saved areas.{unsaved ? " Save first to hear your latest changes." : ""}</p>
       <ul>
         {places.map((p, i) => (
-          <Chat key={p} line={callerHears(picks, p)} ask={asks[Math.min(i, 2)](p)} />
+          <Chat key={p} line={previewCallerLine(picks, p)} ask={asks[Math.min(i, 2)](p)} />
         ))}
-        {tryText.trim() ? <Chat line={callerHears(picks, tryText)} ask={`Do you come to ${tryText.trim()}?`} /> : null}
+        {tryText.trim() ? <Chat line={previewCallerLine(picks, tryText)} ask={`Do you come to ${tryText.trim()}?`} /> : null}
       </ul>
       <label className="mx-4 flex h-12 items-center gap-2 rounded-xl border border-hairline bg-surface px-3.5 focus-within:border-2 focus-within:border-accent">
         <MagnifyingGlassIcon className="h-4 w-4 shrink-0 text-ink-2" aria-hidden="true" />

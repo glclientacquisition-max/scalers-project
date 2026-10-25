@@ -90,10 +90,7 @@ import { POLICY_FIELDS } from "@/lib/businessPolicies";
 import {
   coverageIdsFrom,
   coverageOutsideFrom,
-  formatServiceAreasForCompiler,
-  normalizeServiceAreas,
   parseServiceAreasField,
-  serviceAreasFromCoverage,
   validateServiceArea,
 } from "@/lib/serviceAreas";
 
@@ -372,33 +369,25 @@ export async function saveAndCompileSettings(
     if (!structured.ok) return { error: structured.error, fields: structured.fields };
     businessPolicies = structured.policies;
   }
-  // Areas you serve (Settings › Locations). Until Locations is saved once, the old Policies
-  // coverage list is read as areas with "we confirm the fee".
+  // Service areas live on Settings › Service areas (tenant_area_picks). Locations is branches only.
   const ownsAreas = settingsFieldFromScope(scope, "serviceAreas", true, false);
-  const storedAreas =
-    tenant.service_areas && typeof tenant.service_areas === "object"
-      ? normalizeServiceAreas(tenant.service_areas, vertical)
-      : serviceAreasFromCoverage(
-          (tenant.business_policies as { coverage_areas?: unknown } | null)?.coverage_areas,
-          vertical
-        );
   const formAreas = ownsAreas ? parseServiceAreasField(formData.get("service_areas"), vertical) : null;
-  const serviceAreas = formAreas ?? storedAreas;
   if (formAreas) {
     for (const area of formAreas.areas) {
       const fields = validateServiceArea(area);
       const first = Object.values(fields)[0];
       if (first) return { error: first };
     }
-  }
-  // The voice server reads business_policies.coverage_areas: keep it in step with the areas.
-  if (serviceAreas) {
     businessPolicies = {
       ...businessPolicies,
-      coverage_areas: coverageIdsFrom(serviceAreas),
-      coverage_outside: coverageOutsideFrom(serviceAreas),
+      coverage_areas: coverageIdsFrom(formAreas),
+      coverage_outside: coverageOutsideFrom(formAreas),
     };
   }
+  const noPremises =
+    tenant.service_areas && typeof tenant.service_areas === "object"
+      ? Boolean((tenant.service_areas as { no_premises?: boolean }).no_premises)
+      : false;
   const ttsLexicon = lexiconForStorage(
     pick(
       "ttsLexicon",
@@ -424,9 +413,7 @@ export async function saveAndCompileSettings(
       String(formData.get("business_hours") || "").trim(),
       String(tenant.business_hours || "").trim()
     );
-  const locationsText = [formatLocationsForCompiler(businessLocations, { noPremises: serviceAreas?.no_premises }), formatServiceAreasForCompiler(serviceAreas)]
-    .filter(Boolean)
-    .join("\n\n");
+  const locationsText = formatLocationsForCompiler(businessLocations, { noPremises });
   const policiesText = formatPoliciesForCompiler(businessPolicies);
 
   const scopeError = settingsScopeValidationError(scope, {
@@ -519,7 +506,7 @@ export async function saveAndCompileSettings(
       Array.isArray(socialHandles?.channels) &&
       socialHandles.channels.some((row) => row && String(row.value || "").trim()),
     lineNumber: String(tenant.sautikit_virtual_number || "").trim(),
-    serviceAreas: formAreas ?? serviceAreas ?? null,
+    serviceAreas: formAreas ?? null,
   });
   const explicitPaths = cleanFieldPaths(
     saveIsConfirm ? [...ownerPathsFromForm, ...attestPathsPre] : ownerPathsFromForm
@@ -630,7 +617,7 @@ export async function saveAndCompileSettings(
     faqs,
     hasSocialHandles,
     lineNumber: String(tenant.sautikit_virtual_number || "").trim(),
-    serviceAreas: formAreas ?? serviceAreas ?? null,
+    serviceAreas: formAreas ?? null,
   });
 
   const client = workspace.client;

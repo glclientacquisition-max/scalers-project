@@ -5,7 +5,7 @@ import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { SettingsRail } from "@/components/SettingsSideNav";
 import { settingsConsoleClass } from "@/components/settingsUi";
 import { AreaPicker, type AreaView } from "@/components/areas/AreaPicker";
-import { areaConfirmState, emptyAreaPicks, moveOverAreas } from "@/lib/areaPicks";
+import { emptyAreaPicks, moveOverAreas } from "@/lib/areaPicks";
 import { loadAreaPicks, oldCoverageList } from "@/lib/areaPicks.server";
 import { memberCan } from "@/lib/requireMember";
 import { loadSettingsStatuses } from "@/lib/settingsRailStatus";
@@ -25,19 +25,16 @@ async function AreasBody({ searchParams }: { searchParams: Promise<{ view?: stri
   const row = loaded.row;
   // First visit: start from the moved-over old list; the owner confirms it on Check your areas.
   const initialPicks = row ? row.picks : oldList.length ? moveOverAreas(oldList).picks : emptyAreaPicks();
-  const confirmState = areaConfirmState(
-    row ? { confirmed_at: row.confirmed_at, updated_at: row.updated_at, pickCount: row.picks.picks.length } : null,
-    oldList.length,
-  );
+  const confirmed = Boolean(row?.confirmed_at);
   let view = parseView((await searchParams).view);
   if (view === "home" && !row && oldList.length) view = "check";
   if (view === "check" && !oldList.length) view = "home";
   return (
     <div className="w-full min-w-0" data-settings-console="" data-desk-nested="">
       <div className={settingsConsoleClass}>
-        <SettingsRail optionStatus={statuses} />
+        <SettingsRail optionStatus={statuses} activePath="/settings/areas" />
         <div className="min-w-0 flex-1 md:max-w-2xl" data-area-picker="">
-          <AreaPicker initialPicks={initialPicks} oldList={oldList} confirmState={confirmState} initialView={view} />
+          <AreaPicker initialPicks={initialPicks} oldList={oldList} confirmed={confirmed} initialView={view} />
         </div>
       </div>
     </div>
