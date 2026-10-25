@@ -259,6 +259,8 @@ describe("desk token hygiene", () => {
     "components/AdminBillingDetailPanel.tsx",
     "components/AdminBusinessesPanel.tsx",
     "components/DidPoolManager.tsx",
+    // Authenticator QR must sit on white in both themes so phones can scan it.
+    "components/ops/StepUpSheet.tsx",
   ]);
 
   it("leaves no hardcoded hex or white surfaces inside the desk scope", () => {
