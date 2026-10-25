@@ -191,6 +191,24 @@ function backingFact(s, of) {
   return of.facts.find((f) => n.every((x) => f.nums.includes(x)) && `${f.text} ${f.text_sw || ''}`.toLowerCase().split(/[^a-z]+/).filter((w) => words.has(w)).length >= 2) || null;
 }
 
+/**
+ * The ONE payment fact (methods + deposit) every path speaks and every checker reads. Built from the owner's
+ * payment line, plus the deposit line only when the payment line does not already state it (no stitching:
+ * callers hear the owner's own sentences, never "We take You can pay by ..."). null when no payment fact.
+ */
+function paymentFact(of) {
+  const pay = of.byTopic.get('payment'); const dep = of.byTopic.get('deposit');
+  if (!pay && !dep) return null;
+  const has = (f, g) => g && f && g.nums.length && g.nums.every((n) => f.nums.includes(n));
+  const parts = [pay, dep && !has(pay, dep) ? dep : null].filter(Boolean);
+  const en = parts.map((f) => f.text).join(' ');
+  const swParts = parts.map((f) => f.text_sw).filter(Boolean);
+  // owner wrote no (or partial) Swahili: name the methods in a Swahili frame, never the bare "team will confirm" ([PROMPT-PLACEHOLDER])
+  const swMethods = pay ? `Malipo ni kwa ${pay.text.replace(/^(you can pay|we accept|we take|payment is|pay)\s*(by|with|via|through)?\s*/i, '').replace(/[.!?]*$/, '')}.` : null;
+  return { id: 'M1', topic: 'payment', owner_sw: swParts.length === parts.length, en, sw: swParts.length === parts.length ? swParts.join(' ') : (pay && pay.text_sw) || swMethods || SW_FALLBACK, sentences: sentences(en), sentences_sw: sentences(swParts.join(' ')), nums: [...new Set(parts.flatMap((f) => f.nums))] };
+}
+function paymentLine(profile, lang) { const f = paymentFact(ownerFacts(profile)); if (!f) return null; return /^sw/.test(String(lang || '')) ? f.sw : f.en; }
+
 /** Compact KB rows for a model prompt: { topic: text } + FAQs. */
 function kbRows(of) {
   const policies = {};
@@ -198,4 +216,4 @@ function kbRows(of) {
   return { policies, faqs: of.faqs.map((f) => ({ q: f.question, a: f.answer })) };
 }
 
-module.exports = { backingFact, ownerFacts, spoken, match, checkPolicySentence, kbRows, sentences, registryTopics, SW_FALLBACK, TEXT_KEY_OF };
+module.exports = { paymentFact, paymentLine, backingFact, ownerFacts, spoken, match, checkPolicySentence, kbRows, sentences, registryTopics, SW_FALLBACK, TEXT_KEY_OF };

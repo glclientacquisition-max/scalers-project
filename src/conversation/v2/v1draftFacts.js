@@ -81,7 +81,8 @@ function buildFactNote(profile = {}, state = {}, { callerText = '', writes = [] 
   if (b) facts.push(b);
   const h = hoursFact(profile); if (h) facts.push(h);
   // owner policies + FAQs: the ONE shared projection (ownerFacts.js); payment keeps id M1
-  for (const f of OF.ownerFacts(profile).facts) facts.push({ ...f, text: f.family === 'faq' ? f.text : `${f.label}: ${f.text}${f.text_sw && f.text_sw !== f.text ? ` (Kiswahili: ${f.text_sw})` : ''}` });
+  const ofx = OF.ownerFacts(profile); const pfx = OF.paymentFact(ofx);
+  for (const f0 of ofx.facts) { const f = f0.family === 'payment' && pfx ? { ...f0, text: pfx.en, text_sw: pfx.sw, nums: pfx.nums } : f0; facts.push({ ...f, text: f.family === 'faq' ? f.text : `${f.label}: ${f.text}${f.text_sw && f.text_sw !== f.text ? ` (Kiswahili: ${f.text_sw})` : ''}` }); }
   if (state?.slots?.name && state.slots.nameConfirmed) facts.push({ id: 'N1', family: 'name', name: state.slots.name, text: `Caller name (confirmed): ${state.slots.name}` });
   if (profile.businessName) facts.push({ id: 'B1', family: 'business', name: profile.businessName, text: `Business: ${profile.businessName}${profile.agentName ? `; you are ${profile.agentName}` : ''}` });
   writes.forEach((w, i) => { if (w && w.id) facts.push({ id: `W${i + 1}`, family: 'write', writeId: w.id, kind: w.kind || 'callback', text: `Confirmed ${w.kind || 'callback'} (backend id ${w.id})` }); });

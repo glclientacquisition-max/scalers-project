@@ -16,6 +16,7 @@ const AC = require('./areaCoverage');
 const L = require('./lexicon');
 const { hoursFact } = require('./v1draftFacts');
 const OF = require('./ownerFacts');
+const RF = require('./replyFacts');
 
 function coreOn({ env = process.env, tenantId } = {}) {
   return V1.phaseA({ env, tenantId }) && String(env.BRAIN_CALL_CORE || 'off').trim().toLowerCase() === 'on';
@@ -41,7 +42,7 @@ function events(text, machine, profile = {}, fields = null) {
   if (/^\W*(no|nope|hapana|si mimi|sio)\b/i.test(t)) ev.push({ type: 'no' });
   const q = QUESTIONISH.test(t);
   const fa = (fields && fields.asks) || [];
-  const placeQ = q && !PAY.test(t) && !PRICE.test(t) && (() => { const r = t ? AC.resolve(t, profile) : null; return !!(r && r.status !== 'unknown'); })();
+  const placeQ = (q || RF.placeStatement(t)) && !PAY.test(t) && !PRICE.test(t) && (() => { const r = t ? AC.resolve(t, profile) : null; return !!(r && r.status !== 'unknown'); })();
   if ((q && COVER.test(t)) || placeQ || fa.includes('place')) ev.push({ type: 'ask', ask: 'coverage' });
   if (q && PAY.test(t)) ev.push({ type: 'ask', ask: 'pay' });
   if ((q && PRICE.test(t)) || fa.includes('price')) ev.push({ type: 'ask', ask: 'price' });
@@ -67,44 +68,23 @@ function applyPre(machine, evs) {
 
 /** Answers from knowledge for each caller question (areaPicks resolver for places, owner facts otherwise). */
 function answers(evs, text, machine, profile = {}, lang = 'en', { already = [] } = {}) {
-  const out = [];
+  // the ONE owed-answer structure (owed.js): each asked topic, scoped and rendered in the turn language
+  const OW = require('./owed');
   const asks = new Set(evs.filter((e) => e.type === 'ask').map((e) => e.ask));
-  if (asks.has('coverage')) {
-    const r = AC.resolve(text, profile);
-    if (r && (r.status !== 'unknown' || r.via === 'unconfirmed')) out.push({ ask: 'coverage', text: AC.line(r, lang), keys: [r.name.toLowerCase()] });
-    else if (!r && AC.picksPending(profile)) out.push({ ask: 'coverage', text: sw(lang) ? 'Timu itathibitisha maeneo tunayofika.' : 'The team will confirm the areas we cover.', keys: [] });
-    else if (!r) {
-      const areas = require('../listedAreas').listedAreaRows(profile).map((x) => x.name);
-      if (areas.length) out.push({ ask: 'coverage', text: sw(lang) ? `Tunafika ${areas.join(', ')}.` : `We cover ${areas.slice(0, -1).join(', ')}${areas.length > 1 ? ', and ' : ''}${areas[areas.length - 1]}.`, keys: [areas[0].toLowerCase()] });
-    }
-  }
-  if (asks.has('pay')) {
-    const raw = String((OF.ownerFacts(profile).byTopic.get('payment') || {}).text || '').trim();
-    const first = (raw.match(/[^.]+(?:\.\d+[^.]*)*\.?/) || [''])[0].trim().replace(/\.$/, '');
-    const what = first.replace(/^(you can pay|we accept|payment is|pay)\s*(by|with|via|through)?\s*/i, '');
-    const key = ['m-pesa', 'mpesa', 'cash', 'bank', 'card', 'airtel'].find((k) => raw.toLowerCase().includes(k));
-    if (what) out.push({ ask: 'pay', text: sw(lang) ? `Malipo ni kwa ${what}.` : `You can pay by ${what}.`, keys: [key || what.split(/\s+/)[0].toLowerCase()] });
-    else out.push({ ask: 'pay', text: sw(lang) ? 'Sina maelezo ya malipo hapa sasa hivi.' : "I don't have the payment details here right now.", keys: [] });
-  }
-  if (asks.has('price')) {
-    const rows = CP.matchServices(text, profile);
-    const svc = rows[0] || (profile.servicesCatalog || []).find((s) => s.name === (machine.slots && machine.slots.service));
-    const priced = svc && svc.pricing?.confirmed !== false && svc.price_range;
-    if (priced) out.push({ ask: 'price', text: sw(lang) ? `${svc.name} ni ${svc.price_range}.` : `${svc.name} is ${svc.price_range}.`, keys: [(String(svc.price_range).match(/\d[\d,]*/) || [''])[0]] });
-  }
-  if (asks.has('hours')) {
-    const h = hoursFact(profile);
-    if (h) out.push({ ask: 'hours', text: `${h.text}.`, keys: (h.nums || []).slice(0, 1) });
-  }
-  // owner policies + FAQs (ownerFacts.js, the shared projection): any topic the caller asks about
-  if (asks.size || QUESTIONISH.test(text) || /\b(want(?:ed)? to (?:know|ask)|tell me|what about|what if|nataka kujua|niambie)\b/i.test(text)) {
-    const of = OF.ownerFacts(profile);
-    for (const f of OF.match(text, of).slice(0, 2)) {
-      if (f.family === 'payment' && asks.has('pay')) continue;
-      const line = OF.spoken(f, lang);
-      if (!line) continue;
-      out.push({ ask: `owner:${f.topic}`, text: line, keys: [(OF.sentences(line)[0] || line).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4)[0] || ''].filter(Boolean), fact: f.id });
-    }
+  const questions = [...asks].map((a) => ({ type: a === 'pay' ? 'payment' : a }));
+  const policyScan = !!(asks.size || QUESTIONISH.test(text) || /\b(want(?:ed)? to (?:know|ask)|tell me|what about|what if|nataka kujua|niambie)\b/i.test(text));
+  const out = [];
+  for (const o of OW.collect({ questions, coverage: [], text, profile, machine, lang, policyScan })) {
+    const t = OW.render(o, { profile, text, machine }); if (!t) continue;
+    const ask = o.topic === 'payment' ? 'pay' : o.topic === 'policy' ? `owner:${(OW.factOf(profile, o.sub) || {}).topic || o.sub}` : o.topic;
+    let keys = [];
+    if (o.topic === 'coverage') { const r = AC.resolve(text, profile); keys = r && r.name ? [r.name.toLowerCase()] : (t.match(/[A-Z][a-z]+/g) || []).slice(1, 2).map((x) => x.toLowerCase()); }
+    else if (o.topic === 'payment') keys = [(t.toLowerCase().match(/m-?pesa|cash|bank|card|airtel|paybill|till/) || [''])[0]].filter(Boolean);
+    else if (o.topic === 'price') { const svc = (profile.servicesCatalog || []).find((x) => x.name === o.sub); keys = svc ? [(String(svc.price_range).match(/\d[\d,]*/) || [''])[0]] : []; }
+    else if (o.topic === 'hours') { const h = hoursFact(profile); keys = h ? (h.nums || []).slice(0, 1) : []; }
+    else keys = [(OF.sentences(t)[0] || t).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4)[0] || ''].filter(Boolean);
+    const f = o.topic === 'policy' ? OW.factOf(profile, o.sub) : null;
+    out.push({ ask, text: t, keys, ...(f ? { fact: f.id } : o.topic === 'payment' ? { fact: 'M1' } : {}) });
   }
   return out;
 }

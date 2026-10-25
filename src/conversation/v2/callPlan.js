@@ -78,8 +78,9 @@ function reask(state, lang) {
   if (state.expecting === 'name' && p.nameAsk === 'confirm' && cand) return sw(lang) ? `Niweke kwa jina ${cand}?` : `Shall I put it under ${cand}?`;
   return null;
 }
-async function before(state, text, profile = {}, { handlers = null } = {}) {
-  const p = plan(state); const lang = state.lang || 'en'; const t = String(text || '');
+async function before(state, text, profile = {}, { handlers = null, lang: turnLang = null } = {}) {
+  // every templated line here follows THIS turn's language (decided before the pre-route), never last turn's
+  const p = plan(state); const lang = turnLang || state.lang || 'en'; const t = String(text || '');
   const out = { owned: false, text: t, acts: [] };
   const own = (line, act) => { state.turn += 1; state.lastLine = line; state.lastBase = line; if (act) out.acts.push(act); (state.trace || (state.trace = [])).push({ turn: state.turn, call_plan: act }); return { ...out, owned: true, line, lang }; };
   // 0) an open add-service read-back on an existing booking: one yes -> add_service per item (idempotent)
@@ -242,6 +243,28 @@ function step(state, templateLine, lang) {
   if (state.expecting) return { ...base, kind: p.nameAsk === 'confirm' && state.expecting === 'name' ? 'confirm_name' : 'ask', slot: state.expecting };
   return { ...base, kind: 'open' };
 }
+/**
+ * The plan's owed confirmations: once a booking's slots are complete (service, day, time, place) and the plan's
+ * next step is the name or the read-back, the caller is owed coverage, price, duration (when the owner wrote one)
+ * and the day's hours fit, once per booking. Owed answers (owed.js), not a sequence step; rendered in the turn
+ * language. Returns { key, items, blocked } or null; mark(state, key) records them as said.
+ */
+function owed(state, profile = {}, st = null) {
+  const s = state && state.slots; if (!s || state.intent !== 'book') return null;
+  if (st && !(st.kind === 'ask' && st.slot === 'name') && st.kind !== 'readback') return null; // a held name being confirmed (confirm_name) is not re-opened with confirmations
+  const when = s.when || {}; if (!s.service || !when.date || !when.time || !s.place) return null;
+  const key = `${s.service}|${when.date}|${when.time}|${s.place}`;
+  if (state.confirmedFor === key) return null;
+  const r = AC.resolve(String(s.place), profile);
+  const items = [];
+  if (r) items.push({ topic: 'coverage', sub: r.name, row: { place: r.name, line_en: AC.line(r, 'en'), line_sw: AC.line(r, 'sw') } });
+  if (r && r.status !== 'covered') return { key, items, blocked: true };
+  items.push({ topic: 'price', sub: s.service }, { topic: 'duration', sub: s.service }, { topic: 'hours_fit', sub: `${when.date} ${when.time}`, date: when.date, time: when.time });
+  return { key, items, blocked: false };
+}
+/** The plan owns this turn with one line (no reducer step), traced like before()'s own(). */
+function ownLine(state, line, act, lang) { state.turn += 1; state.lastLine = line; state.lastBase = line; (state.trace || (state.trace = [])).push({ turn: state.turn, call_plan: act }); return { owned: true, line, lang, acts: [act], text: '' }; }
+function markOwed(state, o) { if (o && o.key) state.confirmedFor = o.key; }
 /** What the model is told (user turn, not the cached prefix). */
 function stepNote(st) {
   return `PLAN (system-owned; do not change it): ${JSON.stringify({ items: st.items, name: st.name, when: st.when, place: st.place, step: st.kind, slot: st.slot || null })}\n`
@@ -281,4 +304,4 @@ function tail(st, ctx = {}) {
 }
 
 const split = (line) => String(line || '').match(/[^.!?]+[.!?]*/g)?.map((x) => x.trim()).filter(Boolean) || [];
-module.exports = { isYes, YES, existingBooking, setPendingItems, split, phaseB, plan, before, after, step, stepNote, actCheck, tail, readbackLine, matchServices, lockedName, ADD, SWITCH, HAVE_NAME };
+module.exports = { ownLine, owed, markOwed, isYes, YES, existingBooking, setPendingItems, split, phaseB, plan, before, after, step, stepNote, actCheck, tail, readbackLine, matchServices, lockedName, ADD, SWITCH, HAVE_NAME };
