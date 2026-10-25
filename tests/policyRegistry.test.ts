@@ -184,3 +184,43 @@ test("Policies copy: no em dashes, no AI wording", () => {
     assert.ok(!/\bAI\b|seamless|effortless|leverage/i.test(s), s);
   }
 });
+
+test("registry topics are taxonomy.json policy_topics (the list Brain's ownerFacts.js reads)", () => {
+  const brainTax = JSON.parse(fs.readFileSync(path.join(root, "src/data/taxonomy.json"), "utf8"));
+  assert.deepEqual(reg.TAXONOMY_TOPICS, brainTax.policy_topics, "dashboard and Brain taxonomy copies agree");
+  for (const id of Object.keys(reg.TOPICS)) assert.ok(reg.taxonomyTopic(id), `${id} is in policy_topics`);
+  for (const t of reg.TAXONOMY_TOPICS) if (t.id !== "payment") assert.ok(reg.TOPICS[t.id], `${t.id} has screen config`);
+});
+
+test("every standard option has an English and a Kiswahili line; every topic has No and Write my own", () => {
+  for (const t of Object.values(reg.TOPICS)) {
+    for (const a of t.answers) {
+      assert.ok(a.line.en.trim(), `${t.id}.${a.id} en`);
+      assert.ok(a.line.sw.trim(), `${t.id}.${a.id} sw`);
+    }
+    assert.ok(t.answers.some((a) => a.id === "no"), `${t.id} has a No option`);
+    const all = reg.answersFor(t).map((a) => a.id);
+    assert.ok(all.includes("custom") && all.includes("not_set"), `${t.id} custom + not_set`);
+  }
+});
+
+test("No lines match Brain's NONE_LINES word for word (#937 ownerFacts.js)", () => {
+  const src = fs.readFileSync(path.join(root, "src/conversation/v2/ownerFacts.js"), "utf8");
+  const block = src.slice(src.indexOf("const NONE_LINES"), src.indexOf("};", src.indexOf("const NONE_LINES")));
+  for (const t of Object.values(reg.TOPICS)) {
+    const m = block.match(new RegExp(`${t.id}: \\{ en: (["'])(.*?)\\1, sw: (["'])(.*?)\\3`));
+    assert.ok(m, `${t.id} in NONE_LINES`);
+    const no = t.answers.find((a) => a.id === "no")!;
+    assert.equal(no.line.en, m[2], `${t.id} en`);
+    assert.equal(no.line.sw, m[4], `${t.id} sw`);
+  }
+});
+
+test("own words are spoken as typed, with the Kiswahili note, for every topic", () => {
+  for (const t of Object.values(reg.TOPICS)) {
+    const rule = reg.ruleFromDraft(t, { answer: "custom", note: "Ask us first.", note_sw: "Tuulize kwanza.", values: {}, checked: true });
+    const line = reg.spokenLine(t, rule as never, reg.nicheById("generic"));
+    assert.equal(line.en, "Ask us first.", t.id);
+    assert.equal(line.sw, "Tuulize kwanza.", t.id);
+  }
+});

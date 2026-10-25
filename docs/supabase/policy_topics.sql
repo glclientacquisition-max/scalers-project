@@ -30,7 +30,7 @@ create or replace function public.set_policy_topic(
   p_rule jsonb,      -- null = Not set (remove)
   p_line jsonb,      -- {"en": "...", "sw": "..."} or null
   p_text_key text,   -- returns | delivery | cancellation | warranty | null
-  p_text text
+  p_text text       -- whole sentences, <= 1200 (policyRules CANCELLATION_TEXT_MAX, #937)
 ) returns void
 language plpgsql security definer set search_path = public as $$
 declare bp jsonb;
@@ -46,7 +46,7 @@ begin
   bp := case when p_rule is null then bp #- array['rules', p_topic] else jsonb_set(bp, array['rules', p_topic], p_rule) end;
   bp := case when p_line is null then bp #- array['policy_lines', p_topic] else jsonb_set(bp, array['policy_lines', p_topic], p_line) end;
   if p_text_key is not null then
-    bp := jsonb_set(bp, array[p_text_key], to_jsonb(left(coalesce(p_text, ''), 500)));
+    bp := jsonb_set(bp, array[p_text_key], to_jsonb(left(coalesce(p_text, ''), 1200)));
     if jsonb_typeof(bp->'provenance') is distinct from 'object' then bp := jsonb_set(bp, '{provenance}', '{}'::jsonb); end if;
     bp := jsonb_set(bp, array['provenance', p_text_key], '{"source": "owner", "confirmed": true}'::jsonb);
   end if;

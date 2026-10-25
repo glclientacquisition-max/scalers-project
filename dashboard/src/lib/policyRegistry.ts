@@ -8,6 +8,21 @@
  * The contract Brain reads is in docs/reference/platform/POLICIES.md.
  */
 
+import taxonomy from "./taxonomy.json" with { type: "json" };
+import { CANCELLATION_TEXT_MAX, joinWholeSentences } from "./policyRules";
+
+/**
+ * Topic ids, names and details come from taxonomy.json policy_topics, the list Brain's
+ * ownerFacts.js also reads (src/data/taxonomy.json, same file). This registry only adds
+ * the screen wording, options and spoken lines on top. A new topic = one policy_topics entry
+ * plus one TOPICS entry.
+ */
+export type TaxonomyTopic = { id: string; label: string; detail?: string };
+export const TAXONOMY_TOPICS = (taxonomy as { policy_topics: TaxonomyTopic[] }).policy_topics;
+export function taxonomyTopic(id: string, list: TaxonomyTopic[] = TAXONOMY_TOPICS): TaxonomyTopic | null {
+  return list.find((t) => t.id === id) ?? null;
+}
+
 export type Lang = "en" | "sw";
 export type Spoken = { en: string; sw: string };
 export type Scalar = string | number | boolean;
@@ -118,7 +133,7 @@ export const TOPICS: Record<string, TopicDef> = {
         follow: [{ field: "notice_hours", label: "Notice", initial: 24, options: [hrs(0, "Any time"), hrs(6, "6 hrs"), hrs(24, "24 hrs"), hrs(48, "48 hrs")] }],
         line: { en: "You can move a booking up to {notice_hours}.", sw: "Unaweza kubadilisha siku hadi {notice_hours}." },
       },
-      { id: "no", label: "No", set: { allowed: false }, line: { en: "We don't move bookings.", sw: "Hatubadilishi siku za kazi." }, offNote: "Notice is off." },
+      { id: "no", label: "No", set: { allowed: false }, line: { en: "We don't move bookings.", sw: "Hatubadilishi muda wa miadi." }, offNote: "Notice is off." },
     ],
   },
   no_show: {
@@ -142,6 +157,7 @@ export const TOPICS: Record<string, TopicDef> = {
         follow: [{ field: "wait_minutes", label: "Wait for", initial: 15, options: [10, 15, 30].map((m) => ({ value: m, label: `${m} min`, speak: { en: `${m} minutes`, sw: `dakika ${m}` } })) }],
         line: { en: "We wait {wait_minutes}. After that, a call-out fee applies.", sw: "Tunasubiri {wait_minutes}. Baada ya hapo, kuna ada ya safari." },
       },
+      { id: "no", label: "Don't wait", set: { allowed: false, charge: "none" }, line: { en: "We don't wait if the customer is late or not in.", sw: "Hatusubiri mteja akichelewa au asipokuwepo." } },
     ],
   },
   warranty: {
@@ -196,7 +212,7 @@ export const TOPICS: Record<string, TopicDef> = {
         follow: [{ field: "days", label: "Days", initial: 7, options: [3, 7, 14].map((d) => ({ value: d, label: String(d), speak: { en: `${d} days`, sw: `siku ${d}` } })) }],
         line: { en: "We exchange items within {days}.", sw: "Tunabadilisha bidhaa ndani ya {days}." },
       },
-      { id: "no", label: "No", set: { mode: "none" }, line: { en: "We don't take returns.", sw: "Hatupokei bidhaa zilizorudishwa." } },
+      { id: "no", label: "No", set: { mode: "none" }, line: { en: "We do not take returns.", sw: "Hatupokei bidhaa zilizorudishwa." } },
     ],
   },
   delivery: {
@@ -225,7 +241,7 @@ export const TOPICS: Record<string, TopicDef> = {
         ],
         line: { en: "We deliver {speed}.", sw: "Tunaleta {speed}." },
       },
-      { id: "pickup", label: "Pickup only", set: { mode: "pickup_only" }, line: { en: "We don't deliver. You collect from us.", sw: "Hatuleti. Unachukua kwetu." } },
+      { id: "no", label: "Pickup only", set: { mode: "pickup_only" }, line: { en: "We do not deliver. Customers collect from us.", sw: "Hatupeleki. Wateja huchukua kwetu." } },
     ],
   },
 };
@@ -425,11 +441,10 @@ export function topicPatch(stored: Record<string, unknown>, topicId: string, rul
   if (topic.textKey) {
     const order = [...nicheTopics(niche, topics).map((t) => t.id), ...Object.keys(topics)];
     const seen = new Set<string>();
-    text = order
+    const parts = order
       .filter((id) => !seen.has(id) && seen.add(id) && topics[id]?.textKey === topic.textKey && rules[id])
-      .map((id) => spokenLine(topics[id], rules[id], niche).en)
-      .join(" ")
-      .slice(0, 500);
+      .map((id) => spokenLine(topics[id], rules[id], niche).en);
+    text = joinWholeSentences(parts, CANCELLATION_TEXT_MAX);
   }
   return { topic: topicId, rule, line, textKey: topic.textKey ?? null, text };
 }

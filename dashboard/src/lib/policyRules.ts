@@ -45,7 +45,7 @@ export type DeliveryRule = RuleExtras & {
 };
 export type CancellationRule = RuleExtras & { allowed?: boolean; notice_hours: number | null; fee: CancelFee; fee_ksh: number | null; note: string | null };
 export type BookingChangesRule = RuleExtras & { allowed: boolean; notice_hours: number | null; note: string | null };
-export type NoShowRule = RuleExtras & { wait_minutes: number | null; charge: NoShowCharge; fee_ksh: number | null; note: string | null };
+export type NoShowRule = RuleExtras & { allowed?: boolean; wait_minutes: number | null; charge: NoShowCharge; fee_ksh: number | null; note: string | null };
 export type WarrantyRule = RuleExtras & { none?: boolean; months: number | null; covers: WarrantyCover[]; note: string | null };
 
 export type PolicyRules = Partial<{
@@ -159,7 +159,7 @@ export function normalizeRules(raw: unknown): PolicyRules {
   else if (bc) out.booking_changes = { ...extras(bc), allowed: bc.allowed !== false, notice_hours: int(bc.notice_hours, 720), note: note(bc.note) };
   const ns = obj(r.no_show);
   if (ns && isCustom(ns)) out.no_show = { ...custom(ns), wait_minutes: null, charge: "none", fee_ksh: null };
-  else if (ns) out.no_show = { ...extras(ns), wait_minutes: int(ns.wait_minutes, 240), charge: pick(NO_SHOW_CHARGES, ns.charge, "none"), fee_ksh: int(ns.fee_ksh, MAX_KSH), note: note(ns.note) };
+  else if (ns) out.no_show = { ...extras(ns), ...(ns.allowed === false ? { allowed: false } : {}), wait_minutes: int(ns.wait_minutes, 240), charge: pick(NO_SHOW_CHARGES, ns.charge, "none"), fee_ksh: int(ns.fee_ksh, MAX_KSH), note: note(ns.note) };
   const w = obj(r.warranty);
   if (w && isCustom(w)) out.warranty = { ...custom(w), months: null, covers: [] };
   else if (w && w.none === true) out.warranty = { ...extras(w), none: true, months: null, covers: [], note: note(w.note) };
@@ -180,7 +180,7 @@ export function validateRules(rules: PolicyRules): Record<string, string> {
   const c = rules.cancellation;
   if (c && c.mode !== "custom" && c.allowed !== false && c.fee === "flat" && !(c.fee_ksh && c.fee_ksh > 0)) e["cancellation.fee_ksh"] = "Add the cancellation fee in KSh.";
   const n = rules.no_show;
-  if (n && n.mode !== "custom" && n.charge === "callout" && !(n.fee_ksh && n.fee_ksh > 0)) e["no_show.fee_ksh"] = "Add the call-out fee in KSh.";
+  if (n && n.mode !== "custom" && n.allowed !== false && n.charge === "callout" && !(n.fee_ksh && n.fee_ksh > 0)) e["no_show.fee_ksh"] = "Add the call-out fee in KSh.";
   const w = rules.warranty;
   if (w && w.mode !== "custom" && !w.none && !(w.months && w.months >= 1)) e["warranty.months"] = "Pick how long the warranty lasts.";
   return e;
@@ -237,6 +237,7 @@ export function bookingChangesSentence(b: BookingChangesRule): string {
 
 export function noShowSentence(n: NoShowRule): string {
   if (n.mode === "custom") return withNote("", n.note);
+  if (n.allowed === false) return withNote("We don't wait if the customer is late or not in.", n.note);
   let s = n.wait_minutes ? `We wait ${n.wait_minutes} minutes if the customer is late or not in.` : "If the customer is late or not in, we call them first.";
   if (n.charge === "callout") s += n.fee_ksh ? ` After that, a ${ksh(n.fee_ksh)} call-out fee applies.` : " After that, a call-out fee applies.";
   if (n.charge === "deposit_kept") s += " After that, the deposit is kept.";

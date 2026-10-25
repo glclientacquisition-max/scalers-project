@@ -64,3 +64,11 @@ Not set removes the topic from `rules` and `policy_lines` and blanks the text ke
 one UPDATE that touches only `rules.<topic>`, `policy_lines.<topic>`, one text key and its
 provenance. Until the SQL is applied, the action reads `business_policies` fresh, patches the
 same paths, and writes back only if the row didn't change in between (compare-and-set, 3 tries).
+
+## Shared with Brain (#937)
+
+- Topic ids, names and details: `taxonomy.json` `policy_topics` (dashboard `src/lib/taxonomy.json` and Brain `src/data/taxonomy.json`, kept identical; a test checks). `policyRegistry.ts` adds only screen wording, options and spoken lines.
+- "No" lines in the registry equal Brain `NONE_LINES` (ownerFacts.js) word for word; a test checks.
+- Own words: `rules.<topic>.mode = "custom"`, `note` (English), `note_sw` (Kiswahili, optional). Brain speaks them as typed; empty `note_sw` falls back to "Timu itathibitisha."
+- Legacy text keys are joined with `joinWholeSentences(..., CANCELLATION_TEXT_MAX = 1200)`; no cut sentences.
+- `policy_lines.<topic> = { en, sw }` carries the line for every option, including the Kiswahili line for standard options. Brain does not read it yet (open question).
