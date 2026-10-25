@@ -7,7 +7,7 @@ import ALERT_TYPE_FIXTURE from "./alertTypeDefaults.json" with { type: "json" };
 
 export type NotifyChannelId = "sms" | "whatsapp" | "email";
 
-export type AlertTypeId = "missed_call" | "booking" | "message";
+export type AlertTypeId = "missed_call" | "booking" | "other_calls";
 export type AlertChannelId = "push" | "sms" | "whatsapp" | "email";
 export type AlertTypeCells = Record<AlertChannelId, boolean>;
 /** Sparse: only cells that differ from ALERT_TYPE_DEFAULTS are stored. */
@@ -145,7 +145,7 @@ const MISSED_GUARD_ORDER = ALERT_TYPE_FIXTURE.missedCallGuardOrder as AlertChann
 export const ALERT_TYPE_META: { id: AlertTypeId; label: string; what: string }[] = [
   { id: "missed_call", label: "Missed calls", what: "A caller didn't get through." },
   { id: "booking", label: "Bookings", what: "Booked, moved or cancelled." },
-  { id: "message", label: "Messages from callers", what: "Left a message or wants a call back." },
+  { id: "other_calls", label: "Other calls", what: "The assistant answered: a question or a call-back request." },
 ];
 
 export const ALERT_CHANNEL_LABEL: Record<AlertChannelId, string> = {
@@ -154,6 +154,18 @@ export const ALERT_CHANNEL_LABEL: Record<AlertChannelId, string> = {
   whatsapp: "WhatsApp",
   email: "Email",
 };
+
+const LEGACY_KEYS: Record<string, string> = (ALERT_TYPE_FIXTURE as { legacyKeys?: Record<string, string> }).legacyKeys || {};
+
+/** Stored row for a type; old keys (message, lead) map to other_calls. */
+function storedRow(stored: Record<string, unknown>, type: AlertTypeId): Record<string, unknown> {
+  const isRow = (v: unknown): v is Record<string, unknown> => Boolean(v) && typeof v === "object" && !Array.isArray(v);
+  if (isRow(stored[type])) return stored[type];
+  for (const [old, now] of Object.entries(LEGACY_KEYS)) {
+    if (now === type && isRow(stored[old])) return stored[old];
+  }
+  return {};
+}
 
 /** Full grid: stored cells win, missing cells take the defaults. */
 export function parseAlertTypes(raw: unknown): Record<AlertTypeId, AlertTypeCells> {
@@ -164,8 +176,7 @@ export function parseAlertTypes(raw: unknown): Record<AlertTypeId, AlertTypeCell
       : {};
   const out = {} as Record<AlertTypeId, AlertTypeCells>;
   for (const type of ALERT_TYPES) {
-    const row =
-      stored[type] && typeof stored[type] === "object" ? (stored[type] as Record<string, unknown>) : {};
+    const row = storedRow(stored, type);
     const cells = {} as AlertTypeCells;
     for (const ch of ALERT_CHANNELS) {
       cells[ch] = typeof row[ch] === "boolean" ? (row[ch] as boolean) : ALERT_TYPE_DEFAULTS[type][ch];

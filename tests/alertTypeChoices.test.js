@@ -15,16 +15,16 @@ describe('parseAlertTypes / effectiveChannels', () => {
     const t = parseAlertTypes({ sms: true, whatsapp: true, email: true });
     assert.deepEqual(t.missed_call, { push: true, sms: true, whatsapp: true, email: true });
     assert.deepEqual(t.booking, { push: true, sms: false, whatsapp: true, email: true });
-    assert.deepEqual(t.message, { push: false, sms: false, whatsapp: true, email: true });
+    assert.deepEqual(t.other_calls, { push: true, sms: true, whatsapp: true, email: true });
     assert.deepEqual(parseAlertTypes(null), ALERT_TYPE_DEFAULTS);
   });
 
   it('partial cells: stored wins, the rest default', () => {
-    const t = parseAlertTypes({ by_type: { booking: { sms: true }, message: { email: false } } });
+    const t = parseAlertTypes({ by_type: { booking: { sms: true }, other_calls: { email: false } } });
     assert.equal(t.booking.sms, true);
     assert.equal(t.booking.whatsapp, true);
-    assert.equal(t.message.email, false);
-    assert.equal(t.message.whatsapp, true);
+    assert.equal(t.other_calls.email, false);
+    assert.equal(t.other_calls.whatsapp, true);
   });
 
   it('master off masks the column', () => {
@@ -63,14 +63,15 @@ describe('parseAlertTypes / effectiveChannels', () => {
     assert.equal(alertTypeFor({ kind: 'call_summary', outcome: 'missed' }), 'missed_call');
     assert.equal(alertTypeFor({ kind: 'call_summary', outcome: 'abandoned' }), 'missed_call');
     assert.equal(alertTypeFor({ kind: 'call_summary', outcome: 'booked' }), 'booking');
-    assert.equal(alertTypeFor({ kind: 'call_summary', outcome: 'callback_needed' }), 'message');
-    assert.equal(alertTypeFor({ kind: 'call_summary', outcome: 'escalated' }), null);
+    assert.equal(alertTypeFor({ kind: 'call_summary', outcome: 'callback_needed' }), 'other_calls');
+    assert.equal(alertTypeFor({ kind: 'call_summary', outcome: 'escalated' }), 'other_calls');
     assert.equal(alertTypeFor({ kind: 'call_summary', answered: false }), 'missed_call');
     assert.equal(alertTypeFor({ kind: 'appointment' }), 'booking');
     assert.equal(alertTypeFor({ kind: 'lead', status: 'no_answer' }), 'missed_call');
-    assert.equal(alertTypeFor({ kind: 'lead', status: 'completed' }), null);
-    assert.equal(alertTypeFor({ kind: 'call_summary', outcome: 'info_only' }), null, 'answered enquiry keeps today\'s channels');
-    assert.equal(alertTypeFor({ kind: 'caller_callback' }), 'message');
+    assert.equal(alertTypeFor({ kind: 'lead', status: 'completed' }), 'other_calls');
+    assert.equal(alertTypeFor({ kind: 'call_summary', outcome: 'info_only' }), 'other_calls');
+    assert.equal(alertTypeFor({ kind: 'call_summary' }), 'other_calls');
+    assert.equal(alertTypeFor({ kind: 'caller_callback' }), 'other_calls');
     assert.equal(alertTypeFor({ kind: 'wallet_low' }), null);
   });
 
@@ -112,9 +113,24 @@ describe('dispatchAlert honours the alert type', () => {
     assert.equal(r.channel, null);
   });
 
-  it('message never uses SMS by default', async () => {
-    await dispatchAlert({ ...base, alertType: 'message' });
-    assert.equal(smsPosts, 0);
+  it('other calls keep SMS by default (no owner loses today\'s summaries)', async () => {
+    const r = await dispatchAlert({ ...base, alertType: 'other_calls' });
+    assert.equal(r.channel, 'sms');
+  });
+
+  it('old saved message / lead choices map to other_calls', () => {
+    assert.equal(parseAlertTypes({ by_type: { message: { sms: false } } }).other_calls.sms, false);
+    assert.equal(parseAlertTypes({ by_type: { lead: { email: false } } }).other_calls.email, false);
+    assert.equal(parseAlertTypes({ by_type: { message: { sms: false }, other_calls: { sms: true } } }).other_calls.sms, true);
+  });
+
+  it('every owner summary lands in exactly one row', () => {
+    for (const outcome of ['missed', 'abandoned', 'booked', 'ordered', 'callback_needed', 'info_only', 'escalated', '']) {
+      for (const answered of [true, false]) {
+        const t = alertTypeFor({ kind: 'call_summary', outcome, answered });
+        assert.ok(['missed_call', 'booking', 'other_calls'].includes(t), `${outcome}/${answered} -> ${t}`);
+      }
+    }
   });
 
   it('missed call still sends SMS', async () => {
