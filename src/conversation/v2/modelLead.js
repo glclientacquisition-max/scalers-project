@@ -82,6 +82,46 @@ function scanPlaces(words) {
 }
 const norm = (x) => String(x).toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
 
+/** Canonical place names in text (full tree name or alias), same rules as scanPlaces. */
+function placesNamedInText(text) {
+  const words = String(text || '').replace(/[?.!;:",]/g, ' ').split(/\s+/).filter(Boolean);
+  return scanPlaces(words);
+}
+
+/** Places the caller has named earlier on this call (slots, receipts, memory). */
+function callerAllowedPlaces(ctx) {
+  const out = new Set();
+  const add = (p) => { if (p) out.add(String(p).toLowerCase()); };
+  for (const r of ctx.coverage || []) if (r.from === 'caller') add(r.place);
+  for (const p of (ctx.machine && ctx.machine.callerPlaces) || []) add(p);
+  if (ctx.machine && ctx.machine.slots && ctx.machine.slots.place) {
+    const res = AC.resolve(ctx.machine.slots.place, ctx.profile || {});
+    add(res && res.name ? res.name : ctx.machine.slots.place);
+  }
+  return out;
+}
+
+/** Remember caller-named places for later turns (guard unasked_place). */
+function rememberCallerPlaces(machine, { coverage, text, profile, u } = {}) {
+  const names = new Set(machine.callerPlaces || []);
+  for (const r of (coverage && coverage.places) || []) if (r.from === 'caller') names.add(r.place);
+  for (const p of placesNamedInText(text)) names.add(p);
+  if (u && u.slots && Array.isArray(u.slots.places)) {
+    for (const raw of u.slots.places) {
+      const hit = placeCandidates(text, { u: { slots: { places: [raw] } } })[0];
+      if (hit) {
+        const rec = coverageReceipt([hit], profile).places[0];
+        if (rec) names.add(rec.place);
+      }
+    }
+  }
+  if (machine.slots && machine.slots.place) {
+    const res = AC.resolve(machine.slots.place, profile || {});
+    names.add((res && res.name) || machine.slots.place);
+  }
+  machine.callerPlaces = [...names].slice(0, 12);
+}
+
 /** The owner's area note on a receipt row: a checkable owner fact (verbatim), with its language. */
 const noteFields = (r) => (r && r.status === 'covered' && r.note ? { note: r.note, note_lang: r.note_lang || null } : { note: null, note_lang: null });
 /** check_coverage receipt: one row per place (1..5). Picks resolver per place; legacy only when no picks. */
@@ -300,7 +340,7 @@ function runHedged({ streamFor, primaryId, backupId, request, deadlines = DEADLI
 // ---------------------------------------------------------------- guard + verifier (G1-G10)
 
 const NEG = /\b(don'?t|do not|doesn'?t|not|no longer|sorry|unfortunately|outside|hatufiki|hatuji|hatuendi|hatufanyi|haifiki|siwezi)\b/i;
-const UNSURE = /\b(not sure|can'?t confirm|cannot confirm|don'?t know|sina uhakika|sijui|siwezi kuthibitisha)\b/i;
+const UNSURE = /\b(not sure|can'?t confirm|cannot confirm|don'?t know|sina uhakika|hatuna hakika|sijui|siwezi kuthibitisha)\b/i;
 const PRICE_WORD = /\b(ksh|kes|shillings?|bob|bei|gharama|elfu|thousand|hundred|mia)\b|\b\d[\d,]{2,}\b/i;
 const isQ = (s) => /\?\s*$/.test(String(s || '').trim());
 const nums = (s) => (String(s).match(/\d[\d,]*/g) || []).map((x) => x.replace(/,/g, ''));
@@ -337,9 +377,13 @@ function makeVerifier(ctx) {
   const cand = ctx.caller.candidate;
   function placesIn(s) {
     const hits = [];
-    for (const r of ctx.coverage) if (new RegExp(`\\b${r.place.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(s)) hits.push(r);
-    // the model's own words never create coverage rows: a place the caller did not name is reported, not resolved
-    const unasked = hits.length ? [] : scanPlaces(String(s).replace(/[?.!;:",]/g, ' ').split(/\s+/).filter(Boolean)).filter((p) => !known.has(p.toLowerCase()));
+    const named = placesNamedInText(s);
+    for (const name of named) {
+      const r = known.get(name.toLowerCase());
+      if (r && !hits.some((h) => h.place.toLowerCase() === r.place.toLowerCase())) hits.push(r);
+    }
+    const allowed = callerAllowedPlaces(ctx);
+    const unasked = named.filter((p) => !known.has(p.toLowerCase()) && !allowed.has(p.toLowerCase()));
     return { hits, unasked };
   }
   function check(raw) {
@@ -651,4 +695,4 @@ function paymentAnswer(profile = {}, text = '', lang = 'en') {
 }
 const UNASKED_PRICE = (s) => PRICE_WORD.test(s) && !/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|saa\s/i.test(s) && !/\b(20\d\d|october|oktoba)\b/i.test(s);
 
-module.exports = { yesClause, normQ, REPLY_WORD, REASK_MIN_MS, cancelKind, upcomingLine, coverageFor, addCallerPlaces, scanPlaces, owedCoverageQuestion, leadOn, splitOn, leadModels, SPLIT_DEADLINES, understandRequest, normUnderstanding, replyRequest, lookupCaller, callerFilters, ROW_INTENT, offerRowsLine, backedByCaller, pastAsOpen, paymentAnswer, UNASKED_PRICE, U_SCHEMA, R_SCHEMA, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };
+module.exports = { yesClause, normQ, REPLY_WORD, REASK_MIN_MS, NEG, UNSURE, cancelKind, upcomingLine, coverageFor, addCallerPlaces, rememberCallerPlaces, callerAllowedPlaces, placesNamedInText, scanPlaces, owedCoverageQuestion, leadOn, splitOn, leadModels, SPLIT_DEADLINES, understandRequest, normUnderstanding, replyRequest, lookupCaller, callerFilters, ROW_INTENT, offerRowsLine, backedByCaller, pastAsOpen, paymentAnswer, UNASKED_PRICE, U_SCHEMA, R_SCHEMA, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };

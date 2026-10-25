@@ -8,6 +8,7 @@
 // Caller-facing wording here is [PROMPT-PLACEHOLDER].
 const OF = require('./ownerFacts');
 const AC = require('./areaCoverage');
+const AP = require('./areaPicks');
 const RF = require('./replyFacts');
 const L = require('./lexicon');
 
@@ -157,7 +158,21 @@ function collect({ questions = [], coverage = [], text = '', profile = {}, machi
 /** Whether text already spoken this turn answers the item (the model said it): then it is not owed again. */
 function answered(o, said, c = {}) {
   const low = String(said || '').toLowerCase(); if (!low) return false;
-  if (o.topic === 'coverage') return o.row ? low.includes(String(o.row.place).toLowerCase()) : /\b(cover|tunafika|hatufiki)\b/.test(low);
+  if (o.topic === 'coverage') {
+    if (!o.row) return /\b(cover|tunafika|hatufiki)\b/.test(low);
+    const place = String(o.row.place).toLowerCase();
+    const named = ML().placesNamedInText(said);
+    if (named.some((n) => n.toLowerCase() === place)) return true;
+    if (low.includes(place)) return true;
+    const node = o.row.matched_node;
+    if (node) {
+      for (const alias of [node.name, ...(node.aliases || [])]) {
+        const a = AP.normAreaText(alias);
+        if (a && low.includes(a)) return true;
+      }
+    }
+    return false;
+  }
   if (o.topic === 'price') return /\b(ksh|kes|shillings?|bei|elfu|thousand|hundred)\b|\d{3,}/i.test(low);
   if (o.topic === 'payment') return /m-?pesa|paybill|cash|bank|crypto|malipo|tunakubali|we take|we accept/i.test(low);
   if (o.topic === 'agent_name') { const n = (c.profile && (c.profile.agentName || c.profile.spokenName)) || ''; return (!!n && low.includes(n.toLowerCase())) || /\b(naitwa|my name is|i'?m called|jina langu ni)\b/.test(low); }

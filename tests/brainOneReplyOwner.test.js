@@ -35,7 +35,9 @@ function harness({ understand = () => U(), reply = () => ({ reply: 'Sure. How el
 }
 async function turn(h, text, langLock = 'en') {
   const said = []; const r = await h.live.run({ text, profile: DD, langLock, onSentence: (s) => said.push(s.text) });
-  return { ...r, heard: said.join(' ') || r.line, stage: h.stages.filter((s) => s.kind === 'model_lead').slice(-1)[0] };
+  const out = { ...r, heard: said.join(' ') || r.line, sentences: r.sentences || [], stage: h.stages.filter((s) => s.kind === 'model_lead').slice(-1)[0] };
+  assertTurnSpeech(out);
+  return out;
 }
 const count = (s, w) => (String(s).match(new RegExp(w, 'gi')) || []).length;
 const down = { understand: () => 'fail', reply: () => 'fail' };
@@ -46,6 +48,30 @@ const ROWS = [
 ];
 const ALVIN_FILE = { contactName: 'Alvin', nameConfirmed: false, callerPhone: '+254700000001', openRows: ROWS };
 const OW = require('../src/conversation/v2/owed');
+const AP = require('../src/conversation/v2/areaPicks');
+const { assertTurnSpeech } = require('./helpers/turnInvariants');
+
+const DND_PICKS = () => ({
+  ...DD,
+  areaPicksConfirmedAt: '2026-10-25T08:00:00Z',
+  areaPicks: {
+    version: 1,
+    tree_version: AP.available() ? AP.treeVersion() : 'ke-areas-2026-10-24.1',
+    picks: [
+      { node: 'town:kajiado:ongata-rongai', serve: true, fee_kes: 700 },
+      { node: 'estate:nairobi:kileleshwa', serve: true },
+    ],
+  },
+});
+const KILELESHA_ROW = { id: 'r26', kind: 'visit', service_name: 'Carpet Cleaning (per room)', window_start: '2026-10-26T11:00:00Z', address_landmark: 'Kileleshwa', status: 'scheduled' };
+
+async function turnProfile(h, text, langLock, profile) {
+  const said = [];
+  const r = await h.live.run({ text, profile, langLock, onSentence: (s) => said.push(s.text) });
+  const out = { ...r, heard: said.join(' ') || r.line, sentences: r.sentences || [], stage: h.stages.filter((s) => s.kind === 'model_lead').slice(-1)[0] };
+  assertTurnSpeech(out);
+  return out;
+}
 
 test('T1 agent-name question ("unaitwa aje?"): persona answers, no "Sina jina lako", exactly one question at the end', async () => {
   const h = harness({ understand: () => U({ lang: 'sw', intents: ['ask'], questions: [{ type: 'identity', subject: 'name' }] }), reply: () => ({ reply: 'Habari, mimi naitwa Shy kutoka Done and Dusted. Nikusaidie namna gani leo?' }) });
@@ -104,4 +130,30 @@ test('price gate end-to-end: "do you do deep cleaning?" keeps "Ndiyo, tunafanya"
   const h = harness({ understand: () => U({ lang: 'sw', intents: ['ask'], questions: [] }), reply: () => ({ reply: 'Ndiyo, tunafanya deep cleaning, bei ni KSh 6,000 hadi 12,000. Ungependa nikuwekee miadi?' }) });
   const r = await turn(h, 'Ah, nataka kujua if you guys can do Deep Cleaning.', 'sw');
   assert.match(r.heard, /Ndiyo, tunafanya deep cleaning/i, r.heard); assert.ok(!/6,000/.test(r.heard), r.heard);
+});
+
+test('HD_b0ecf17361a3 T2: Rongai alias yields one yes + KES 700, no unsure contradiction', { skip: !AP.available() && 'Desk area tree required' }, async () => {
+  const h = harness({
+    callerFile: { contactName: 'Alvin', nameConfirmed: false, callerPhone: '+254790381872', openRows: [KILELESHA_ROW] },
+    understand: () => U({ lang: 'sw', intents: ['ask'], questions: [{ type: 'coverage' }], slots: { places: ['Rongai'], services: ['Carpet Cleaning (per room)'] }, places: ['Rongai'] }),
+    reply: () => ({ reply: 'Hatuna hakika kama tunafika Rongai kwa sasa, lakini naweza kumwomba timu ithibitishe. Je, ungependa nikuwekee miadi ya kusafisha carpet Kileleshwa tarehe 26 Oktoba 2026?' }),
+  });
+  const r = await turnProfile(h, 'Nilikuwa nauliza, kama mna- kuja kwangu Rongai kunioshea carpet.', 'sw', DND_PICKS());
+  assert.ok(!/hatuna hakika/i.test(r.heard), r.heard);
+  assert.match(r.heard, /(tunafika|Ndio|ndio)/i);
+  assert.match(r.heard, /700|mia saba/i);
+  assert.equal((r.sentences || []).filter((s) => s.src === 'owed_answer').length, 0, 'coverage is merged in the guard/writer, not appended');
+});
+
+test('HD_b0ecf17361a3 T4/T5: Rongai from call memory is not dropped as unasked_place', { skip: !AP.available() && 'Desk area tree required' }, async () => {
+  const h = harness({
+    callerFile: { contactName: 'Alvin', nameConfirmed: false, callerPhone: '+254790381872', openRows: [KILELESHA_ROW] },
+    understand: (t) => (/Rongai/i.test(t) ? U({ lang: 'sw', slots: { places: ['Rongai'] }, places: ['Rongai'], questions: [] }) : U({ lang: 'sw' })),
+    reply: (p) => ({ reply: /Rongai/i.test(p.CALLER_SAID || '') ? 'Tulikuwa tunaangalia huduma ya kusafisha Rongai.' : 'Sawa.' }),
+  });
+  await turnProfile(h, 'Nilikuwa nauliza, kama mnakuja Rongai kusafisha carpet.', 'sw', DND_PICKS());
+  const r4 = await turnProfile(h, 'Tulikuwa tunaangalia Rongai.', 'sw', DND_PICKS());
+  assert.match(r4.heard, /Rongai/i, r4.heard);
+  const r5 = await turnProfile(h, 'Si mimi nadhani ni Rongai, si Kileleshwa?', 'sw', DND_PICKS());
+  assert.match(r5.heard, /Rongai/i, r5.heard);
 });

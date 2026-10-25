@@ -179,7 +179,12 @@ function createBrainV2Live(opts = {}) {
   function ensureState(profile) {
     if (state) return state;
     // stream resume (Voice openingCarry): continue the SAME v2 machine (turn index, locked name, language, asked questions)
-    if (opts.resumeState && typeof opts.resumeState === 'object' && opts.resumeState.slots) { state = opts.resumeState; state.resumed = (state.resumed || 0) + 1; return state; }
+    if (opts.resumeState && typeof opts.resumeState === 'object' && opts.resumeState.slots) {
+      state = opts.resumeState;
+      state.resumed = (state.resumed || 0) + 1;
+      state.lastStepQ = null;
+      return state;
+    }
     const file = callerFile(opts);
     state = createState({
       profile: profile || {},
@@ -458,6 +463,7 @@ function createBrainV2Live(opts = {}) {
     const receipts = CC.receiptsSince(machine, n0);
     // places the model heard that the prefetch missed: resolved locally now (no second model call)
     ML.addCallerPlaces(coverage, u, text, profile, machine); // AI-first: confirmed against the caller's own words
+    ML.rememberCallerPlaces(machine, { coverage, text, profile, u });
     const rulesEvs = CC.events(text, null, profile);
     const questions = u ? (u.questions || []) : rulesEvs.filter((e) => e.type === 'ask').map((e) => ({ type: e.ask === 'pay' ? 'payment' : e.ask }));
     // any place the caller mentioned with no answer yet is owed a coverage answer (understanding and rules alike)
@@ -465,17 +471,15 @@ function createBrainV2Live(opts = {}) {
     // the call plan's owed confirmations (slots complete, next is the name/read-back): one more kind of owed answer
     const plo = pre.owned ? null : CP.owed(machine, profile, st);
     // tool_calls arrive after the understanding; they are hints (the machine commits writes), guarded + traced at the end
-    const ctx = { st, receipts, coverage: coverage.places, caller, profile, questions, lang, machine, text, callerReadOk: !!lk, confirm: plo ? plo.items : [] };
+    const ctx = { st, receipts, coverage: coverage.places, caller, profile, questions, lang, machine, text, callerReadOk: !!lk, confirm: plo ? plo.items : [], plo, u };
     const ver = ML.makeVerifier(ctx);
     // 4) speak: verified sentences in order; questions held until the reply closes (owed answers go first)
     const spoken = []; const verdicts = []; let firstMs = null; let repairs = 0; let modelSentences = 0;
-    // the single reply assembler: every producer (model, owed answer, template, reducer line) is deduped by fact here
+    const modelBuffer = [];
     const asm = RF.createAssembler({ profile, coverage: coverage.places, lang });
-    // per-turn single-emit latch: once this turn's step question is out, nothing more is spoken for the turn
     const latch = { closed: false };
     const prevQ = machine.lastStepQ || null; const nowMs = clock();
     const sameQ = (a, b) => ML.normQ(a) && ML.normQ(a) === ML.normQ(b);
-    // the previous turn's question is not repeated unless the caller answered it (a reply word) or time has passed (a genuine re-ask)
     const repeatBlocked = (q) => !!(prevQ && prevQ.turn === machine.turn - 1 && sameQ(q, prevQ.text) && nowMs - prevQ.at < ML.REASK_MIN_MS && !ML.REPLY_WORD.test(text));
     const emit = (s0, src) => { if (!s0 || abort() || latch.closed) return;
       if (/\?\s*$/.test(String(s0).trim()) && src !== 'template' && repeatBlocked(s0)) return; const s = asm.admit(s0, { keep: src === 'fixed' }); if (!s) return; const t = spokenStyle(s, lang); spoken.push({ text: t, lang, src }); if (firstMs == null) firstMs = clock() - T0; if (typeof onSentence === 'function') { try { onSentence({ text: t, lang }); } catch { /* sink */ } }
@@ -495,10 +499,10 @@ function createBrainV2Live(opts = {}) {
           if (r) { const v2 = ML.makeVerifier({ ...ctx, coverage: ctx.coverage.slice() }).check(r); if (v2.verdict === 'pass') { out = r; src = 'repair_model'; } }
         }
       }
-      if (fixed && (/\?\s*$/.test(out) || CC.CLAIM.test(out))) return; // the fixed line carries the step
+      if (fixed && (/\?\s*$/.test(out) || CC.CLAIM.test(out))) return;
       if (/\?\s*$/.test(out)) { if (!held) held = out; return; }
-      if (src === 'model') modelSentences += 1;
-      emit(out, src);
+      if (src === 'model' || src === 'repair_model' || src === 'repair_template' || src === 'step') modelSentences += 1;
+      modelBuffer.push({ text: out, src });
     };
     if (run) {
       for (;;) {
@@ -513,35 +517,18 @@ function createBrainV2Live(opts = {}) {
       const lu = live.u; machine.leadLateU = lu;
       for (const q of lu.questions || []) if (!questions.some((x) => x.type === q.type)) questions.push(q);
       ML.addCallerPlaces(coverage, lu, text, profile, machine);
+      ML.rememberCallerPlaces(machine, { coverage, text, profile, u: lu });
     }
     // exactly one voice: any model output that passed the guard (or was repaired) owns the turn; template only when every model failed
     const modelOk = split ? !!(modelSentences || held || repairs) : !!(u && (modelSentences || held || used));
-    if (!modelOk) answeredBy = split && used > 0 ? 'template_vetoed' : 'template'; // vetoed = the model answered but every sentence failed the guard
-    if (answeredBy === 'template' || answeredBy === 'template_vetoed') {
-      // all models failed (or every model sentence was vetoed): the ONE owed-answer list (owed.js), worded by code in
-      // the turn language, then only the step's question from the reducer line (its own answer text is replaced)
-      // a cancel request is answered by the machine's own step; a clarify turn answers nothing yet (no guessed policy)
-      const list = ck === 'clarify' ? [] : OW.collect({ questions, coverage: coverage.places, text, profile, machine, lang, confirm: ctx.confirm, policyScan: !u && ck !== 'request' });
-      const lines = list.map((o) => OW.render(o, ctx)).filter(Boolean);
-      let base = tmpl;
-      if (split && !questions.some((q) => q.type === 'price')) base = CP.split(base).filter((x) => !ML.UNASKED_PRICE(x)).join(' ');
-      if (lines.length && !fixed) base = CP.split(base).filter((x) => /\?\s*$/.test(x) && !/not getting that|sikupati|sijakuelewa/i.test(x)).join(' ');
-      if (plo && plo.blocked) base = lang === 'sw' ? 'Kazi iko eneo lingine?' : 'Is the job anywhere else?'; // [PROMPT-PLACEHOLDER]
-      if (lines.some((l) => /\?\s*$/.test(l))) base = CP.split(base).filter((x) => !/\?\s*$/.test(x)).join(' ');
-      for (const l of lines) emit(l, 'template');
-      emit(base, 'template');
-    } else {
-      // one reply owner: the owed answers are planned against the WHOLE model draft (spoken + held question, after
-      // the guard), dropped when it already covers them, and merged in before the step question, never after it
-      const draft = [spoken.map((x) => x.text).join(' '), held || ''].join(' '); // only what passed the guard counts as covering
-      for (const a of ML.owedAnswers(ctx, draft)) emit(a.text, 'owed_answer');
-      if (fixed) { emit(st.kind === 'readback' ? st.readback : tmpl, 'fixed'); if (!modelSentences) answeredBy = 'fixed'; }
-      else {
-        const stepQ = st.kind === 'ask' || st.kind === 'confirm_name' ? CP.tail(st, ver.act) : null;
-        if (held) emit(held, 'model'); else if (stepQ) emit(stepQ, 'step');
-      }
-      if (repairs) answeredBy = `${answeredBy}+repair`;
-    }
+    if (!modelOk) answeredBy = split && used > 0 ? 'template_vetoed' : 'template';
+    const TW = require('./turnWriter');
+    const templateLines = (answeredBy === 'template' || answeredBy === 'template_vetoed') ? TW.templateOwedLines(ctx, ck) : [];
+    const plan = TW.writeTurn({
+      lang, ctx, st, pre, fixed, tmpl, ver, modelBuffer, held, answeredBy, templateLines, ck, split, repairs, modelSentences,
+    });
+    answeredBy = plan.answeredBy;
+    for (const line of plan.lines) emit(line.text, line.src);
     if (plo) CP.markOwed(machine, plo);
     const line = spoken.map((x) => x.text).join(' ').trim() || tmpl;
     V1.remember(machine, 'agent', line);
@@ -557,7 +544,7 @@ function createBrainV2Live(opts = {}) {
     };
     (machine.trace || (machine.trace = [])).push({ turn: machine.turn, model_lead: rec });
     try { (opts.onModelStage || (() => {}))(rec); } catch { /* trace only */ }
-    return { line, lang, sentences: spoken.map((x) => ({ text: x.text, lang: x.lang })), path: /^template/.test(answeredBy) ? 'model_lead_template' : 'model_lead', streamed: typeof onSentence === 'function', phase: machine.phase, plan: st.kind, lead: true, answeredBy, end: endCall.end, ...(endCall.end ? { reason: endCall.reason } : {}), ...(endCall.held ? { endHeld: endCall.held } : {}) };
+    return { line, lang, sentences: spoken.map((x) => ({ text: x.text, lang: x.lang, src: x.src })), path: /^template/.test(answeredBy) ? 'model_lead_template' : 'model_lead', streamed: typeof onSentence === 'function', phase: machine.phase, plan: st.kind, lead: true, answeredBy, end: endCall.end, ...(endCall.end ? { reason: endCall.reason } : {}), ...(endCall.held ? { endHeld: endCall.held } : {}) };
   }
 
   /** Voice's unfinished hold: start this turn's one model call on the stable partial. */
