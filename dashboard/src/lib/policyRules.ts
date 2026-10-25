@@ -29,9 +29,11 @@ export type CancelFee = "none" | "deposit_kept" | "flat";
 export type NoShowCharge = "none" | "callout" | "deposit_kept";
 export type WarrantyCover = "workmanship" | "parts" | "manufacturer";
 
-export type ReturnsRule = { mode: "refund_or_exchange" | "exchange" | "store_credit" | "none"; days: number | null; conditions: ReturnsCondition[]; note: string | null };
-export type DeliveryRule = {
-  mode: "deliver" | "pickup_only";
+/** Shared by every topic: "custom" means the owner's own words (note, plus optional Kiswahili note_sw) are the whole line. */
+type RuleExtras = { mode?: string; note_sw?: string | null; answer?: string };
+export type ReturnsRule = RuleExtras & { mode: "refund_or_exchange" | "exchange" | "store_credit" | "none" | "custom"; days: number | null; conditions: ReturnsCondition[]; note: string | null };
+export type DeliveryRule = RuleExtras & {
+  mode: "deliver" | "pickup_only" | "custom";
   fee_mode: DeliveryFeeMode | null;
   fee_ksh: number | null;
   free_over_ksh: number | null;
@@ -41,10 +43,10 @@ export type DeliveryRule = {
   areas: string | null;
   note: string | null;
 };
-export type CancellationRule = { notice_hours: number | null; fee: CancelFee; fee_ksh: number | null; note: string | null };
-export type BookingChangesRule = { allowed: boolean; notice_hours: number | null; note: string | null };
-export type NoShowRule = { wait_minutes: number | null; charge: NoShowCharge; fee_ksh: number | null; note: string | null };
-export type WarrantyRule = { months: number | null; covers: WarrantyCover[]; note: string | null };
+export type CancellationRule = RuleExtras & { allowed?: boolean; notice_hours: number | null; fee: CancelFee; fee_ksh: number | null; note: string | null };
+export type BookingChangesRule = RuleExtras & { allowed: boolean; notice_hours: number | null; note: string | null };
+export type NoShowRule = RuleExtras & { allowed?: boolean; wait_minutes: number | null; charge: NoShowCharge; fee_ksh: number | null; note: string | null };
+export type WarrantyRule = RuleExtras & { none?: boolean; months: number | null; covers: WarrantyCover[]; note: string | null };
 
 export type PolicyRules = Partial<{
   returns: ReturnsRule;
@@ -95,16 +97,50 @@ export function emptyRule(topic: PolicyTopic): NonNullable<PolicyRules[PolicyTop
   }
 }
 
-/** Read stored rules (or junk) into well-formed rules. Unknown topics are dropped. */
+export const RULE_NOTE_SW_MAX = RULE_NOTE_MAX;
+const ANSWER_RE = /^[a-z][a-z0-9_]{0,39}$/;
+/** mode "custom", note_sw and the Policies screen's answer id ride along on every topic. */
+function extras(src: Record<string, unknown>): RuleExtras {
+  const out: RuleExtras = {};
+  const sw = String(src.note_sw ?? "").replace(/\s+/g, " ").trim().slice(0, RULE_NOTE_SW_MAX);
+  if (sw) out.note_sw = sw;
+  if (typeof src.answer === "string" && ANSWER_RE.test(src.answer)) out.answer = src.answer;
+  return out;
+}
+const isCustom = (src: Record<string, unknown>) => src.mode === "custom";
+const custom = (src: Record<string, unknown>) => ({ ...extras(src), mode: "custom" as const, note: note(src.note) });
+
+/**
+ * Read stored rules (or junk) into well-formed rules. Topics this file does not know
+ * (added by a niche in policyRegistry.ts) keep their scalar fields, note and note_sw.
+ */
 export function normalizeRules(raw: unknown): PolicyRules {
   const r = obj(raw) || {};
   const out: PolicyRules = {};
+  const known = new Set<string>(["returns", "delivery", "cancellation", "booking_changes", "no_show", "warranty"]);
+  for (const [k, v] of Object.entries(r)) {
+    const o = obj(v);
+    if (known.has(k) || !o || !ANSWER_RE.test(k)) continue;
+    const clean: Record<string, unknown> = {};
+    for (const [f, x] of Object.entries(o)) {
+      if (!ANSWER_RE.test(f)) continue;
+      if (f === "note") clean.note = note(x);
+      else if (f === "note_sw") { const e = extras(o); if (e.note_sw) clean.note_sw = e.note_sw; }
+      else if (typeof x === "boolean" || (typeof x === "number" && Number.isFinite(x))) clean[f] = x;
+      else if (typeof x === "string") clean[f] = x.slice(0, 40);
+      else if (Array.isArray(x)) clean[f] = x.filter((y) => typeof y === "string").map((y) => String(y).slice(0, 40)).slice(0, 10);
+    }
+    (out as Record<string, unknown>)[k] = clean;
+  }
   const ret = obj(r.returns);
-  if (ret) out.returns = { mode: pick(RETURNS_MODES, ret.mode, "refund_or_exchange"), days: int(ret.days, 365), conditions: pickMany(RETURNS_CONDITIONS, ret.conditions), note: note(ret.note) };
+  if (ret && isCustom(ret)) out.returns = { ...custom(ret), days: null, conditions: [] };
+  else if (ret) out.returns = { ...extras(ret), mode: pick(RETURNS_MODES, ret.mode, "refund_or_exchange"), days: int(ret.days, 365), conditions: pickMany(RETURNS_CONDITIONS, ret.conditions), note: note(ret.note) };
   const del = obj(r.delivery);
-  if (del) {
+  if (del && isCustom(del)) out.delivery = { ...custom(del), fee_mode: null, fee_ksh: null, free_over_ksh: null, speed: null, cutoff: null, areas: null };
+  else if (del) {
     const cutoff = typeof del.cutoff === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(del.cutoff) ? del.cutoff : null;
     out.delivery = {
+      ...extras(del),
       mode: pick(DELIVERY_MODES, del.mode, "deliver"),
       fee_mode: DELIVERY_FEE_MODES.some((o) => o.id === del.fee_mode) ? (del.fee_mode as DeliveryFeeMode) : null,
       fee_ksh: int(del.fee_ksh, MAX_KSH),
@@ -116,13 +152,18 @@ export function normalizeRules(raw: unknown): PolicyRules {
     };
   }
   const can = obj(r.cancellation);
-  if (can) out.cancellation = { notice_hours: int(can.notice_hours, 720), fee: pick(CANCEL_FEES, can.fee, "none"), fee_ksh: int(can.fee_ksh, MAX_KSH), note: note(can.note) };
+  if (can && isCustom(can)) out.cancellation = { ...custom(can), notice_hours: null, fee: "none", fee_ksh: null };
+  else if (can) out.cancellation = { ...extras(can), ...(can.allowed === false ? { allowed: false } : {}), notice_hours: int(can.notice_hours, 720), fee: pick(CANCEL_FEES, can.fee, "none"), fee_ksh: int(can.fee_ksh, MAX_KSH), note: note(can.note) };
   const bc = obj(r.booking_changes);
-  if (bc) out.booking_changes = { allowed: bc.allowed !== false, notice_hours: int(bc.notice_hours, 720), note: note(bc.note) };
+  if (bc && isCustom(bc)) out.booking_changes = { ...custom(bc), allowed: true, notice_hours: null };
+  else if (bc) out.booking_changes = { ...extras(bc), allowed: bc.allowed !== false, notice_hours: int(bc.notice_hours, 720), note: note(bc.note) };
   const ns = obj(r.no_show);
-  if (ns) out.no_show = { wait_minutes: int(ns.wait_minutes, 240), charge: pick(NO_SHOW_CHARGES, ns.charge, "none"), fee_ksh: int(ns.fee_ksh, MAX_KSH), note: note(ns.note) };
+  if (ns && isCustom(ns)) out.no_show = { ...custom(ns), wait_minutes: null, charge: "none", fee_ksh: null };
+  else if (ns) out.no_show = { ...extras(ns), ...(ns.allowed === false ? { allowed: false } : {}), wait_minutes: int(ns.wait_minutes, 240), charge: pick(NO_SHOW_CHARGES, ns.charge, "none"), fee_ksh: int(ns.fee_ksh, MAX_KSH), note: note(ns.note) };
   const w = obj(r.warranty);
-  if (w) out.warranty = { months: int(w.months, 120), covers: pickMany(WARRANTY_COVERS, w.covers), note: note(w.note) };
+  if (w && isCustom(w)) out.warranty = { ...custom(w), months: null, covers: [] };
+  else if (w && w.none === true) out.warranty = { ...extras(w), none: true, months: null, covers: [], note: note(w.note) };
+  else if (w) out.warranty = { ...extras(w), months: int(w.months, 120), covers: pickMany(WARRANTY_COVERS, w.covers), note: note(w.note) };
   return out;
 }
 
@@ -130,18 +171,18 @@ export function normalizeRules(raw: unknown): PolicyRules {
 export function validateRules(rules: PolicyRules): Record<string, string> {
   const e: Record<string, string> = {};
   const r = rules.returns;
-  if (r && r.mode !== "none" && !(r.days && r.days >= 1)) e["returns.days"] = "Pick how many days customers have.";
+  if (r && r.mode !== "none" && r.mode !== "custom" && !(r.days && r.days >= 1)) e["returns.days"] = "Pick how many days customers have.";
   const d = rules.delivery;
   if (d && d.mode === "deliver") {
     if (d.fee_mode === "flat" && !(d.fee_ksh && d.fee_ksh > 0)) e["delivery.fee_ksh"] = "Add the delivery fee in KSh.";
     if (d.free_over_ksh != null && d.free_over_ksh <= 0) e["delivery.free_over_ksh"] = "Use an amount above 0.";
   }
   const c = rules.cancellation;
-  if (c && c.fee === "flat" && !(c.fee_ksh && c.fee_ksh > 0)) e["cancellation.fee_ksh"] = "Add the cancellation fee in KSh.";
+  if (c && c.mode !== "custom" && c.allowed !== false && c.fee === "flat" && !(c.fee_ksh && c.fee_ksh > 0)) e["cancellation.fee_ksh"] = "Add the cancellation fee in KSh.";
   const n = rules.no_show;
-  if (n && n.charge === "callout" && !(n.fee_ksh && n.fee_ksh > 0)) e["no_show.fee_ksh"] = "Add the call-out fee in KSh.";
+  if (n && n.mode !== "custom" && n.allowed !== false && n.charge === "callout" && !(n.fee_ksh && n.fee_ksh > 0)) e["no_show.fee_ksh"] = "Add the call-out fee in KSh.";
   const w = rules.warranty;
-  if (w && !(w.months && w.months >= 1)) e["warranty.months"] = "Pick how long the warranty lasts.";
+  if (w && w.mode !== "custom" && !w.none && !(w.months && w.months >= 1)) e["warranty.months"] = "Pick how long the warranty lasts.";
   return e;
 }
 
@@ -158,6 +199,7 @@ const withNote = (s: string, n: string | null) => [s, n ? (/[.!?]$/.test(n) ? n 
 const joinAnd = (parts: string[]) => (parts.length <= 1 ? parts.join("") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`);
 
 export function returnsSentence(r: ReturnsRule): string {
+  if (r.mode === "custom") return withNote("", r.note);
   if (r.mode === "none") return withNote("We do not take returns.", r.note);
   const what = r.mode === "exchange" ? "exchange" : r.mode === "store_credit" ? "give store credit for" : "refund or exchange";
   const conds = r.conditions.filter((c) => c !== "faulty_only").map((c) => RETURNS_CONDITIONS.find((o) => o.id === c)?.speak || c);
@@ -168,21 +210,19 @@ export function returnsSentence(r: ReturnsRule): string {
 }
 
 export function deliverySentence(d: DeliveryRule): string {
+  if (d.mode === "custom") return withNote("", d.note);
   if (d.mode === "pickup_only") return withNote("We do not deliver. Customers collect from us.", d.note);
   const parts: string[] = ["We deliver"];
-  if (d.areas) parts[0] += ` to ${d.areas}`;
+  // Areas and fees live in Service areas (tenant_area_picks); stored values here are not spoken.
   if (d.speed) parts[0] += ` ${DELIVERY_SPEEDS.find((o) => o.id === d.speed)?.speak || ""}`;
   if (d.speed === "same_day" && d.cutoff) parts[0] += ` for orders before ${time12(d.cutoff)}`;
   parts[0] += ".";
-  if (d.fee_mode === "free") parts.push("Delivery is free.");
-  else if (d.fee_mode === "flat" && d.fee_ksh) parts.push(`Delivery costs ${ksh(d.fee_ksh)}.`);
-  else if (d.fee_mode === "by_area") parts.push("The delivery fee depends on the area.");
-  else if (d.fee_mode === "rider") parts.push("The customer pays the rider.");
-  if (d.free_over_ksh && d.fee_mode !== "free") parts.push(`Free for orders over ${ksh(d.free_over_ksh)}.`);
   return withNote(parts.join(" "), d.note);
 }
 
 export function cancellationSentence(c: CancellationRule): string {
+  if (c.mode === "custom") return withNote("", c.note);
+  if (c.allowed === false) return withNote("We don't accept cancellations.", c.note);
   let s = c.notice_hours == null || c.notice_hours === 0 ? "Customers can cancel any time" : `Customers can cancel up to ${hours(c.notice_hours)}`;
   s += c.fee === "none" ? " at no charge." : c.fee === "deposit_kept" ? ". After that, the deposit is kept." : c.fee_ksh ? `. After that, there is a ${ksh(c.fee_ksh)} fee.` : ". After that, there is a fee.";
   if (c.notice_hours === 0 && c.fee !== "none") s = c.fee === "deposit_kept" ? "If a customer cancels, the deposit is kept." : `Cancelling costs ${c.fee_ksh ? ksh(c.fee_ksh) : "a fee"}.`;
@@ -190,11 +230,14 @@ export function cancellationSentence(c: CancellationRule): string {
 }
 
 export function bookingChangesSentence(b: BookingChangesRule): string {
+  if (b.mode === "custom") return withNote("", b.note);
   if (!b.allowed) return withNote("Bookings cannot be moved; cancel and book again.", b.note);
   return withNote(b.notice_hours ? `Customers can move a booking up to ${hours(b.notice_hours)}.` : "Customers can move a booking any time.", b.note);
 }
 
 export function noShowSentence(n: NoShowRule): string {
+  if (n.mode === "custom") return withNote("", n.note);
+  if (n.allowed === false) return withNote("We don't wait if the customer is late or not in.", n.note);
   let s = n.wait_minutes ? `We wait ${n.wait_minutes} minutes if the customer is late or not in.` : "If the customer is late or not in, we call them first.";
   if (n.charge === "callout") s += n.fee_ksh ? ` After that, a ${ksh(n.fee_ksh)} call-out fee applies.` : " After that, a call-out fee applies.";
   if (n.charge === "deposit_kept") s += " After that, the deposit is kept.";
@@ -202,6 +245,8 @@ export function noShowSentence(n: NoShowRule): string {
 }
 
 export function warrantySentence(w: WarrantyRule): string {
+  if (w.mode === "custom") return withNote("", w.note);
+  if (w.none) return withNote("We don't give a guarantee.", w.note);
   const covers = w.covers.map((c) => WARRANTY_COVERS.find((o) => o.id === c)?.speak || c);
   const s = `We give a ${months(w.months ?? 3)} warranty${covers.length ? ` on ${joinAnd(covers)}` : ""}.`;
   return withNote(s, w.note);
