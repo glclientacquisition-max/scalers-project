@@ -6,7 +6,7 @@ export function DeskNoWorkspace() {
     <div className={deskEmptyClass}>
       <p className="font-display text-2xl tracking-tight text-ink">No workspace</p>
       <Link href="/signup" className={`${btnGhost} mt-6`}>
-        Create one
+        Request access
       </Link>
     </div>
   );

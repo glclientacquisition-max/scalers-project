@@ -59,7 +59,7 @@ export default function LoginPage({
         <p className="mt-6 text-sm text-ink-soft">
           New business?{" "}
           <Link href="/signup" className="font-medium text-accent-deep hover:underline">
-            Create a workspace
+            Request access
           </Link>
         </p>
         <p className="mt-3">

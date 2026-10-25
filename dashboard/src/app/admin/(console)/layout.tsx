@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { AdminNav } from "@/components/AdminNav";
 import { getAdminSession, getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 // instant = false: Super Admin cookie session must run before chrome. Do not wrap the gate in Suspense.
 export const instant = false;
@@ -17,6 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const adminSession = await getAdminSession();
   const operatorName = adminSession?.user?.name || "ops";
+  const showAccessRequests = isAdminV2Enabled();
 
   return (
     <div className="min-h-screen lg:flex">
@@ -38,7 +40,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
 
         <div className="px-3 pb-3 lg:flex-1 lg:pb-0">
-          <AdminNav onDark />
+          <AdminNav onDark showAccessRequests={showAccessRequests} />
         </div>
 
         <div className="mt-auto hidden border-t border-white/10 px-5 py-5 lg:block">
