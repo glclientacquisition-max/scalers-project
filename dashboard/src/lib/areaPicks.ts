@@ -20,7 +20,20 @@ export type AreaNode = {
   aliases: string[];
   landmarks: string[];
 };
-export type AreaPick = { node: string; serve: boolean; fee_kes: number | null; note: string | null };
+/**
+ * Structured condition Brain can read. Only `min_bedrooms` today ("from 2 bedrooms up").
+ * Stored on the pick as `conditions: [{ kind: "min_bedrooms", value: 2 }]`; empty array = none.
+ */
+export type AreaConditionKind = "min_bedrooms";
+export type AreaCondition = { kind: AreaConditionKind; value: number };
+export type AreaPick = {
+  node: string;
+  serve: boolean;
+  /** Extra travel fee in whole KES on top of the job price. null = none. */
+  fee_kes: number | null;
+  note: string | null;
+  conditions: AreaCondition[];
+};
 export type AreaPicks = { version: 1; tree_version: string; picks: AreaPick[] };
 export type TriState = "on" | "off" | "part";
 
@@ -28,6 +41,7 @@ export const AREA_TREE_VERSION: string = TREE.version;
 export const AREA_NOTE_MAX = 120;
 export const AREA_FEE_MAX = 100_000;
 export const ROOT_ID = "ke";
+export const AREA_MIN_BEDROOMS_MAX = 10;
 
 const NODES = TREE.nodes as AreaNode[];
 const BY_ID = new Map(NODES.map((n) => [n.id, n]));
@@ -99,6 +113,28 @@ function cleanNote(raw: unknown): string | null {
   return t || null;
 }
 
+/** Keeps known kinds with a whole value in range; one per kind (last wins). */
+export function cleanConditions(raw: unknown): AreaCondition[] {
+  if (!Array.isArray(raw)) return [];
+  const byKind = new Map<AreaConditionKind, AreaCondition>();
+  for (const c of raw) {
+    if (!c || typeof c !== "object") continue;
+    const o = c as Record<string, unknown>;
+    if (o.kind !== "min_bedrooms") continue;
+    const v = typeof o.value === "number" ? o.value : typeof o.value === "string" ? Number(o.value) : NaN;
+    if (!Number.isFinite(v)) continue;
+    const n = Math.round(v);
+    if (n < 1 || n > AREA_MIN_BEDROOMS_MAX) continue;
+    byKind.set("min_bedrooms", { kind: "min_bedrooms", value: n });
+  }
+  return [...byKind.values()];
+}
+
+/** "From 2 bedrooms up" (Desk label and the caller line). */
+export function conditionText(c: AreaCondition): string {
+  return `from ${c.value} ${c.value === 1 ? "bedroom" : "bedrooms"} up`;
+}
+
 /** Drops unknown nodes and duplicates (last wins). Safe on any stored JSON. */
 export function normalizeAreaPicks(raw: unknown): AreaPicks {
   const src = raw && typeof raw === "object" ? (raw as { picks?: unknown }).picks : null;
@@ -115,6 +151,7 @@ export function normalizeAreaPicks(raw: unknown): AreaPicks {
         serve,
         fee_kes: serve ? cleanFee(o.fee_kes) : null,
         note: serve ? cleanNote(o.note) : null,
+        conditions: serve ? cleanConditions(o.conditions) : [],
       });
     }
   }
@@ -131,6 +168,8 @@ export type AreaResolution = {
   via: string | null;
   fee_kes: number | null;
   note: string | null;
+  /** From the nearest serving pick that sets any (stops at an exclude). */
+  conditions: AreaCondition[];
 };
 
 /** Nearest pick wins; fee and note inherit from serving ancestors. */
@@ -140,6 +179,7 @@ export function resolveArea(picks: AreaPicks, id: string): AreaResolution {
   let decided: AreaPick | null = null;
   let fee: number | null = null;
   let note: string | null = null;
+  let conditions: AreaCondition[] | null = null;
   for (const n of chain) {
     const p = m.get(n.id);
     if (!p) continue;
@@ -148,9 +188,10 @@ export function resolveArea(picks: AreaPicks, id: string): AreaResolution {
     if (p.serve === false) break;
     if (fee == null && p.fee_kes != null) fee = p.fee_kes;
     if (note == null && p.note) note = p.note;
+    if (conditions == null && p.conditions?.length) conditions = p.conditions;
   }
-  if (!decided || !decided.serve) return { covered: false, via: decided?.node ?? null, fee_kes: null, note: null };
-  return { covered: true, via: decided.node, fee_kes: fee, note };
+  if (!decided || !decided.serve) return { covered: false, via: decided?.node ?? null, fee_kes: null, note: null, conditions: [] };
+  return { covered: true, via: decided.node, fee_kes: fee, note, conditions: conditions ?? [] };
 }
 
 export function areaState(picks: AreaPicks, id: string): TriState {
@@ -170,7 +211,7 @@ export function simplifyAreaPicks(picks: AreaPicks): AreaPicks {
   for (let pass = 0; pass < 4; pass++) {
     const m = pickMap(cur);
     const keep = cur.picks.filter((p) => {
-      if (p.fee_kes != null || p.note) return true;
+      if (p.fee_kes != null || p.note || p.conditions?.length) return true;
       const parent = areaNode(p.node)?.parent;
       const inherited = parent ? resolveArea({ ...cur, picks: cur.picks.filter((x) => x.node !== p.node) }, p.node).covered : false;
       void m;
@@ -189,7 +230,13 @@ export function toggleArea(picks: AreaPicks, id: string): AreaPicks {
   const under = new Set(descendants(id).map((d) => d.id));
   const prior = pickMap(picks).get(id);
   const rest = picks.picks.filter((p) => p.node !== id && !under.has(p.node));
-  const next: AreaPick = { node: id, serve, fee_kes: serve ? prior?.fee_kes ?? null : null, note: serve ? prior?.note ?? null : null };
+  const next: AreaPick = {
+    node: id,
+    serve,
+    fee_kes: serve ? prior?.fee_kes ?? null : null,
+    note: serve ? prior?.note ?? null : null,
+    conditions: serve ? prior?.conditions ?? [] : [],
+  };
   return simplifyAreaPicks({ ...picks, picks: [...rest, next] });
 }
 
@@ -197,7 +244,7 @@ export function toggleArea(picks: AreaPicks, id: string): AreaPicks {
 export function setAreaDetail(
   picks: AreaPicks,
   id: string,
-  detail: { serve: boolean; fee_kes: unknown; note: unknown },
+  detail: { serve: boolean; fee_kes: unknown; note: unknown; conditions?: unknown },
 ): AreaPicks {
   const rest = picks.picks.filter((p) => p.node !== id);
   const next: AreaPick = {
@@ -205,6 +252,7 @@ export function setAreaDetail(
     serve: detail.serve,
     fee_kes: detail.serve ? cleanFee(detail.fee_kes) : null,
     note: detail.serve ? cleanNote(detail.note) : null,
+    conditions: detail.serve ? cleanConditions(detail.conditions) : [],
   };
   return simplifyAreaPicks({ ...picks, picks: [...rest, next] });
 }
@@ -392,6 +440,8 @@ export function callerHears(picks: AreaPicks, place: string): CallerLine {
   if (!r.covered) return { status: "not_covered", reply: `Sorry, we don't cover ${n.name}.`, node: n };
   let reply = `Yes, we cover ${n.name}.`;
   if (r.fee_kes != null) reply += ` There's an extra KES ${r.fee_kes.toLocaleString("en-KE")}.`;
+  const minBeds = r.conditions.find((c) => c.kind === "min_bedrooms");
+  if (minBeds) reply += ` In ${n.name} we take jobs ${conditionText(minBeds)}.`;
   if (r.note) reply += ` ${r.note.replace(/[.!?]*$/, "")}.`;
   return { status: "covered", reply, node: n };
 }
@@ -433,7 +483,7 @@ export function moveOverAreas(old: string[], answers: Record<string, "county" | 
       unmatched.push(raw);
       continue;
     }
-    picks = { ...picks, picks: [...picks.picks.filter((p) => p.node !== node!.id), { node: node.id, serve: true, fee_kes: null, note: null }] };
+    picks = { ...picks, picks: [...picks.picks.filter((p) => p.node !== node!.id), { node: node.id, serve: true, fee_kes: null, note: null, conditions: [] }] };
     rows.push({ node: node.id, raw, insideOf: null });
   }
   for (const r of rows) {
@@ -442,3 +492,36 @@ export function moveOverAreas(old: string[], answers: Record<string, "county" | 
   }
   return { picks: simplifyAreaPicks(picks), rows, questions, unmatched };
 }
+
+// ---------- confirm state (Brain #942 answers only from confirmed picks) ----------
+
+/**
+ * none: no picks and no old list. old_only: old list but no picks row yet.
+ * unconfirmed: picks never confirmed. edited: picks changed after the last confirm (not by the owner's own save).
+ * confirmed: callers get the map answers.
+ */
+export type AreaConfirmState = "none" | "old_only" | "unconfirmed" | "edited" | "confirmed";
+
+export function areaConfirmState(
+  row: { confirmed_at: string | null; updated_at: string | null; pickCount: number } | null,
+  oldListCount: number,
+): AreaConfirmState {
+  if (!row) return oldListCount > 0 ? "old_only" : "none";
+  if (!row.confirmed_at) return row.pickCount > 0 || oldListCount > 0 ? "unconfirmed" : "none";
+  const c = Date.parse(row.confirmed_at);
+  const u = row.updated_at ? Date.parse(row.updated_at) : NaN;
+  // 2s slack: owner saves stamp both columns together.
+  if (Number.isFinite(c) && Number.isFinite(u) && u - c > 2000) return "edited";
+  return "confirmed";
+}
+
+export function areaNeedsConfirm(s: AreaConfirmState): boolean {
+  return s === "old_only" || s === "unconfirmed" || s === "edited";
+}
+
+/** One calm line, same on Desk home and Service areas. */
+export const AREA_CONFIRM_COPY = {
+  title: "Confirm your service areas",
+  editedTitle: "Your areas changed since you confirmed",
+  detail: "Until you confirm, callers who ask about a place hear “the team will confirm”.",
+} as const;

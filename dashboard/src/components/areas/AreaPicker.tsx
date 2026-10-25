@@ -7,7 +7,11 @@ import { Sheet } from "@/components/ui/Sheet";
 import { buttonClass } from "@/components/ui/Button";
 import { cx } from "@/lib/cx";
 import {
+  AREA_CONFIRM_COPY,
   AREA_NOTE_MAX,
+  areaNeedsConfirm,
+  conditionText,
+  type AreaConfirmState,
   ROOT_ID,
   areaChildren,
   areaCounties,
@@ -24,6 +28,7 @@ import {
   searchAreaTree,
   setAreaDetail,
   toggleArea,
+  type AreaCondition,
   type AreaHit,
   type AreaPicks,
   type CallerLine,
@@ -98,7 +103,7 @@ const hit = "flex min-h-11 min-w-11 items-center justify-center rounded-lg focus
 export function AreaPicker({
   initialPicks,
   oldList,
-  confirmed,
+  confirmState,
   initialView,
   saveAction = saveAreaPicksAction,
 }: {
@@ -107,7 +112,8 @@ export function AreaPicker({
   initialPicks: AreaPicks;
   /** Old Locations / coverage list. Non-empty with confirmed=false shows Check your areas. */
   oldList: string[];
-  confirmed: boolean;
+  /** From areaConfirmState(): drives the confirm card. Brain answers areas only once confirmed. */
+  confirmState: AreaConfirmState;
   initialView: AreaView;
 }) {
   const [saved, setSaved] = useState<AreaPicks>(initialPicks);
@@ -116,7 +122,7 @@ export function AreaPicker({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<Set<string>>(() => new Set(["county:nairobi"]));
   const [sheet, setSheet] = useState<string | null>(null);
-  const [isConfirmed, setConfirmed] = useState(confirmed);
+  const [confirmNow, setConfirmNow] = useState<AreaConfirmState>(confirmState);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
 
@@ -140,13 +146,15 @@ export function AreaPicker({
       }
       setSaved(next);
       setPicks(next);
-      if (confirm) setConfirmed(true);
+      if (confirm) setConfirmNow("confirmed");
       setMsg({ ok: true, text: res.message });
       after?.();
     });
   };
 
-  const needsCheck = oldList.length > 0 && !isConfirmed;
+  const needsConfirm = areaNeedsConfirm(confirmNow);
+  // Old list never moved over: confirm on Check your areas. Picks already stored: confirm right here.
+  const needsCheck = needsConfirm && confirmNow === "old_only" && oldList.length > 0;
   const countyOrder = useMemo(
     () => [...areaCounties()].sort((a, b) => Number(areaState(saved, a.id) === "off") - Number(areaState(saved, b.id) === "off")),
     [saved],
@@ -194,13 +202,24 @@ export function AreaPicker({
           What callers will hear
         </button>
       </div>
-      {needsCheck ? (
-        <div className="mx-4 mt-1 flex items-center gap-3 rounded-2xl border border-hairline bg-accent-tonal p-3.5">
-          <p className="flex-1 text-meta text-ink">We moved your old area list into the new map.</p>
-          <button type="button" className={buttonClass({ variant: "primary", size: "md" })} onClick={() => setView("check")}>
-            Check it
+      {needsConfirm ? (
+        <section data-area-confirm={confirmNow} aria-labelledby="area-confirm-title" className="mx-4 mt-3 rounded-2xl border border-hairline bg-surface p-3.5">
+          <h2 id="area-confirm-title" className="font-semibold text-ink">
+            {confirmNow === "edited" ? AREA_CONFIRM_COPY.editedTitle : AREA_CONFIRM_COPY.title}
+          </h2>
+          <p className="mt-1 text-meta text-ink-2">
+            {needsCheck ? "We moved your old area list into the new map. " : null}
+            {AREA_CONFIRM_COPY.detail}
+          </p>
+          <button
+            type="button"
+            className={buttonClass({ variant: "primary", size: "lg" }) + " mt-3 w-full"}
+            disabled={pending}
+            onClick={() => (needsCheck ? setView("check") : changes > 0 ? save(picks, true) : save(saved, true))}
+          >
+            {needsCheck ? "Check and confirm" : changes > 0 ? "Save and confirm" : "Confirm these areas"}
           </button>
-        </div>
+        </section>
       ) : null}
       <label className="mx-4 my-3 flex h-12 items-center gap-2 rounded-xl border border-hairline bg-surface px-3.5 focus-within:border-2 focus-within:border-accent">
         <MagnifyingGlassIcon className="h-4 w-4 shrink-0 text-ink-2" aria-hidden="true" />
@@ -245,7 +264,10 @@ export function AreaPicker({
                   onOpen={setSheet}
                 />
                 {isOpen ? (
-                  <ul>
+                  <ul aria-label={`Places in ${c.name}`}>
+                    {areaState(picks, c.id) !== "off" ? (
+                      <li className="border-b border-hairline bg-surface-2/40 px-4 py-2 ps-12 text-meta text-ink-2">Untick a place to leave it out.</li>
+                    ) : null}
                     {kids.map((k) => (
                       <TreeRow key={k.id} id={k.id} picks={picks} depth={2} parentState={areaState(picks, c.id)} onToggle={(id) => setPicks(toggleArea(picks, id))} onOpen={setSheet} />
                     ))}
@@ -266,8 +288,8 @@ export function AreaPicker({
             Undo
           </button>
         ) : null}
-        <button type="button" className={buttonClass({ variant: "primary", size: "lg" })} disabled={changes === 0 || pending} onClick={() => save(picks, false)}>
-          {pending ? "Saving…" : "Save"}
+        <button type="button" className={buttonClass({ variant: "primary", size: "lg" })} disabled={changes === 0 || pending} onClick={() => save(picks, true)}>
+          {pending ? "Saving…" : needsConfirm && changes > 0 ? "Save and confirm" : "Save"}
         </button>
       </Bar>
       {sheet ? (
@@ -315,7 +337,7 @@ function TreeRow({
   const Wrap = depth === 0 ? "li" : "div";
   return (
     <Wrap className={cx(rowBase, depth === 2 && "min-h-13 bg-surface-2/40 ps-12")}>
-      <button type="button" role="checkbox" aria-checked={state === "on" ? true : state === "part" ? "mixed" : false} aria-label={`Serve ${n.name}`} className={cx(hit, "-ms-2.5")} onClick={() => onToggle(id)}>
+      <button type="button" role="checkbox" aria-checked={state === "on" ? true : state === "part" ? "mixed" : false} aria-label={depth === 2 && parentState && parentState !== "off" && res.covered ? `Serve ${n.name} (untick to leave it out)` : `Serve ${n.name}`} className={cx(hit, "-ms-2.5")} onClick={() => onToggle(id)}>
         <Box state={state} />
       </button>
       {depth === 0 ? (
@@ -329,6 +351,7 @@ function TreeRow({
           {meta ? <div className="truncate text-meta text-ink-2">{meta}</div> : null}
         </button>
       )}
+      {pick?.conditions?.[0] ? <Tag tone="quiet">{pick.conditions[0].value}+ bed</Tag> : null}
       {pick?.fee_kes != null ? <Tag>+KES {pick.fee_kes.toLocaleString("en-KE")}</Tag> : null}
       {depth === 2 && !res.covered && parentState && parentState !== "off" ? <Tag tone="quiet">Off</Tag> : null}
       {expandable ? (
@@ -396,7 +419,7 @@ function AreaSheet({
   id: string;
   picks: AreaPicks;
   onClose: () => void;
-  onDone: (d: { serve: boolean; fee_kes: string; note: string }) => void;
+  onDone: (d: { serve: boolean; fee_kes: string; note: string; conditions: AreaCondition[] }) => void;
 }) {
   const n = areaNode(id)!;
   const pick = areaPick(picks, id);
@@ -404,10 +427,12 @@ function AreaSheet({
   const [serve, setServe] = useState(res.covered);
   const [fee, setFee] = useState(pick?.fee_kes != null ? String(pick.fee_kes) : "");
   const [note, setNote] = useState(pick?.note ?? "");
+  const [minBeds, setMinBeds] = useState<number | null>(pick?.conditions?.find((c) => c.kind === "min_bedrooms")?.value ?? null);
+  const conditions: AreaCondition[] = minBeds ? [{ kind: "min_bedrooms", value: minBeds }] : [];
   const preview = useMemo(() => {
-    const trial = setAreaDetail(picks, id, { serve, fee_kes: fee, note });
+    const trial = setAreaDetail(picks, id, { serve, fee_kes: fee, note, conditions: minBeds ? [{ kind: "min_bedrooms", value: minBeds }] : [] });
     return callerHears(trial, n.name).reply;
-  }, [picks, id, serve, fee, note, n.name]);
+  }, [picks, id, serve, fee, note, minBeds, n.name]);
   const where = n.kind === "county" ? "County" : n.kind === "town" ? `${areaWhere(id)} County` : areaWhere(id);
   const seg = (on: boolean) =>
     cx("flex min-h-11 flex-1 items-center justify-center text-body", on ? "bg-accent-tonal font-semibold text-accent" : "font-medium text-ink");
@@ -422,7 +447,7 @@ function AreaSheet({
           <button type="button" className={buttonClass({ variant: "ghost", size: "lg" }) + " border border-hairline"} onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className={buttonClass({ variant: "primary", size: "lg" }) + " flex-1"} onClick={() => onDone({ serve, fee_kes: fee, note })}>
+          <button type="button" className={buttonClass({ variant: "primary", size: "lg" }) + " flex-1"} onClick={() => onDone({ serve, fee_kes: fee, note, conditions })}>
             Done
           </button>
         </div>
@@ -449,6 +474,17 @@ function AreaSheet({
             <input id="area-fee" inputMode="numeric" value={fee} onChange={(e) => setFee(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-full min-w-0 flex-1 bg-transparent text-body text-ink outline-none" />
           </div>
           <p className="mt-1 text-meta text-ink-2">Leave empty if there is none.</p>
+          <fieldset className="mt-4">
+            <legend className="mb-1.5 font-semibold text-ink">Smallest job you take here</legend>
+            <div className="flex overflow-hidden rounded-xl border border-hairline" role="radiogroup">
+              {[null, 2, 3, 4].map((v) => (
+                <button key={v ?? 0} type="button" role="radio" aria-checked={minBeds === v} className={seg(minBeds === v)} onClick={() => setMinBeds(v)}>
+                  {v ? `${v}+ bed` : "Any"}
+                </button>
+              ))}
+            </div>
+            {minBeds ? <p className="mt-1 text-meta text-ink-2">Callers hear you take jobs {conditionText({ kind: "min_bedrooms", value: minBeds })}.</p> : null}
+          </fieldset>
           <label className="mb-1.5 mt-4 block font-semibold text-ink" htmlFor="area-note">
             Note for callers (optional)
           </label>

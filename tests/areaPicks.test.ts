@@ -85,3 +85,57 @@ test("home summary lists Nairobi first, then the rest by name", async () => {
   const parts = m.areaSummaryParts(p).filter((x) => x.strong).map((x) => x.text);
   assert.deepEqual(parts, ["Nairobi", "Kajiado", "Kiambu"]);
 });
+
+// ---- coverage confirm, exclusions, conditions (Brain #942) ----
+test("one tap excludes a child place inside a covered county", async () => {
+  const m = await import("../dashboard/src/lib/areaPicks.ts");
+  let p = m.toggleArea(m.emptyAreaPicks(), "county:nairobi");
+  p = m.toggleArea(p, "estate:nairobi:kibera");
+  assert.deepEqual(m.areaPick(p, "estate:nairobi:kibera"), { node: "estate:nairobi:kibera", serve: false, fee_kes: null, note: null, conditions: [] });
+  assert.equal(m.callerHears(p, "Kibera").status, "not_covered");
+  assert.equal(m.callerHears(p, "Kilimani").status, "covered");
+});
+
+test("min_bedrooms condition is stored, inherited and spoken", async () => {
+  const m = await import("../dashboard/src/lib/areaPicks.ts");
+  let p = m.toggleArea(m.emptyAreaPicks(), "county:nairobi");
+  p = m.setAreaDetail(p, "town:kiambu:thika", { serve: true, fee_kes: "800", note: "", conditions: [{ kind: "min_bedrooms", value: 2 }] });
+  const n = m.normalizeAreaPicks(JSON.parse(JSON.stringify(p)));
+  assert.deepEqual(m.areaPick(n, "town:kiambu:thika")?.conditions, [{ kind: "min_bedrooms", value: 2 }]);
+  assert.equal(m.resolveArea(n, "town:kiambu:thika").fee_kes, 800);
+  assert.equal(m.callerHears(n, "Thika").reply, "Yes, we cover Thika. There's an extra KES 800. In Thika we take jobs from 2 bedrooms up.");
+  assert.deepEqual(m.cleanConditions([{ kind: "min_bedrooms", value: 0 }, { kind: "bogus", value: 2 }, { kind: "min_bedrooms", value: "3" }]), [{ kind: "min_bedrooms", value: 3 }]);
+  // excluding drops conditions
+  const off = m.setAreaDetail(n, "town:kiambu:thika", { serve: false, fee_kes: 800, note: "x", conditions: [{ kind: "min_bedrooms", value: 2 }] });
+  assert.equal(m.areaPick(off, "town:kiambu:thika")?.conditions?.length ?? 0, 0);
+  assert.deepEqual(m.resolveArea(off, "town:kiambu:thika").conditions, []);
+});
+
+test("confirm state: none, old_only, unconfirmed, edited, confirmed", async () => {
+  const m = await import("../dashboard/src/lib/areaPicks.ts");
+  assert.equal(m.areaConfirmState(null, 0), "none");
+  assert.equal(m.areaConfirmState(null, 3), "old_only");
+  assert.equal(m.areaConfirmState({ confirmed_at: null, updated_at: "2026-10-25T08:00:00Z", pickCount: 2 }, 0), "unconfirmed");
+  assert.equal(m.areaConfirmState({ confirmed_at: "2026-10-25T08:00:00Z", updated_at: "2026-10-25T08:00:00Z", pickCount: 2 }, 0), "confirmed");
+  assert.equal(m.areaConfirmState({ confirmed_at: "2026-10-25T08:00:00Z", updated_at: "2026-10-25T09:00:00Z", pickCount: 2 }, 0), "edited");
+  assert.equal(m.areaNeedsConfirm("edited"), true);
+  assert.equal(m.areaNeedsConfirm("confirmed"), false);
+});
+
+test("seed from old list: unconfirmed, fees carried, excludes kept, has-picks skipped", async () => {
+  const s = await import("../scripts/seed-area-picks-from-old.ts");
+  const plan = s.planSeed([
+    { id: "a", has_picks: true, service_areas: { areas: [{ id: "place:karen" }] } },
+    { id: "b", service_areas: null, coverage_areas: null },
+    { id: "c", business_name: "C", service_areas: { areas: [{ id: "county:nairobi" }, { id: "place:kitengela", fee_ksh: 500 }], exclude: ["place:kibera"] } },
+  ]);
+  assert.equal(plan.skippedHasPicks, 1);
+  assert.equal(plan.skippedNoOldList, 1);
+  assert.equal(plan.seeded.length, 1);
+  const p = plan.seeded[0].picks.picks;
+  assert.equal(p.find((x: { node: string }) => x.node === "town:kajiado:kitengela")?.fee_kes, 500);
+  assert.equal(p.find((x: { node: string }) => x.node === "estate:nairobi:kibera")?.serve, false);
+  const sql = s.seedSql(plan);
+  assert.match(sql, /on conflict \(tenant_id\) do nothing;/);
+  assert.match(sql, /::jsonb, null, null\)/);
+});
