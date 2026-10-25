@@ -28,6 +28,9 @@ begin
       and table_name = 'tenant_area_picks_v0'
   ) then
     alter table public.tenant_area_picks rename to tenant_area_picks_v0;
+    if exists (select 1 from pg_class where relname='tenant_area_picks_pkey' and relnamespace='public'::regnamespace) then
+      alter index public.tenant_area_picks_pkey rename to tenant_area_picks_v0_pkey;
+    end if;
   end if;
 end $guard$;
 
