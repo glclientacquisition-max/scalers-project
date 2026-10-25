@@ -1,0 +1,27 @@
+/* Admin v2 shell (ADMIN_V2=on). Sidebar 200px with labels, 56px icons only. Width change is instant. */
+.admin-side {
+  width: 200px;
+}
+.admin-side[data-collapsed],
+:root[data-pane-open] .admin-side {
+  width: 56px;
+}
+.admin-side[data-collapsed] .admin-side-label,
+:root[data-pane-open] .admin-side .admin-side-label {
+  display: none;
+}
+.admin-side[data-collapsed] .admin-side-chevron,
+:root[data-pane-open] .admin-side .admin-side-chevron {
+  transform: rotate(180deg);
+}
+@media (min-width: 1600px) {
+  :root[data-pane-open] .admin-side:not([data-collapsed]) {
+    width: 200px;
+  }
+  :root[data-pane-open] .admin-side:not([data-collapsed]) .admin-side-label {
+    display: revert;
+  }
+  :root[data-pane-open] .admin-side:not([data-collapsed]) .admin-side-chevron {
+    transform: none;
+  }
+}

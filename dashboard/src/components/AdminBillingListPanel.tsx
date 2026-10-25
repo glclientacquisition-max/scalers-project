@@ -75,7 +75,7 @@ function ReviewQueue({
   return (
     <div className="space-y-3">
       {warning ? (
-        <p className="px-4 text-body text-attention" role="alert">
+        <p className="px-4 text-ops-body text-attention" role="alert">
           {warning}
         </p>
       ) : null}
@@ -221,7 +221,7 @@ export function AdminBillingListPanel({
 
       {filter === "attention" ? (
         <>
-          <label className="block px-4 text-body">
+          <label className="block px-4 text-ops-body">
             <span className="sr-only">Search reviews</span>
             <input
               value={query}
@@ -241,7 +241,7 @@ export function AdminBillingListPanel({
 
       {showShopList ? (
         <>
-          <label className="block px-4 text-body">
+          <label className="block px-4 text-ops-body">
             <span className="sr-only">Search shops</span>
             <input
               value={query}

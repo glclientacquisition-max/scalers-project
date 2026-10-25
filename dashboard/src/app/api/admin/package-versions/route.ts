@@ -1,3 +1,4 @@
+import { stepUpGateSession } from "@/lib/ops/stepUpGate";
 import { NextResponse } from "next/server";
 import { recordAdminAction } from "@/lib/adminAudit";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
@@ -213,6 +214,9 @@ export async function POST(request: Request) {
   if (!parsed.ok) {
     return NextResponse.json({ error: "invalid", message: parsed.error }, { status: 400 });
   }
+
+  const stepUp = await stepUpGateSession(`package-versions:${parsed.command.action}`, null);
+  if (stepUp) return stepUp;
 
   const actor = await adminActorName();
   try {

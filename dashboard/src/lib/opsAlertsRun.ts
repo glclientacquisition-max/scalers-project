@@ -45,7 +45,9 @@ export type AlertStore = {
   releaseClaim(id: string, claimedIso: string): Promise<void>;
 };
 
-export type AlertMail = { to: string[]; subject: string; text: string; kind: string; ledgerKey: string };
+/** html is optional: wallet notices carry the @scalers/email layout, other kinds are plain text. */
+export type AlertMail = { to: string[]; subject: string; text: string; html?: string; kind: string; ledgerKey: string };
+export type ComposedMail = { subject: string; text: string; html?: string };
 
 export type AlertRunResult = {
   dryRun: boolean;
@@ -159,7 +161,7 @@ export async function runOpsAlerts(input: {
   now: Date;
   /** Unnotified notices older than this are claimed and not mailed. Unset or 0 leaves them. */
   staleMs?: number;
-  compose: (kind: AlertKind, recovered: boolean, detail: string) => { subject: string; text: string };
+  compose: (kind: AlertKind, recovered: boolean, detail: string) => ComposedMail;
   send: (mail: AlertMail) => Promise<void>;
 }): Promise<AlertRunResult> {
   const { store, signals, kinds, recipients, dryRun, compose, send } = input;

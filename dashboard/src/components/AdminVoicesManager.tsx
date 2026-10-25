@@ -15,7 +15,7 @@ import type { PlatformSonioxVoiceRow } from "@/lib/sonioxVoiceCatalog";
 function SheetNote({ error }: { error: string | null }) {
   if (!error) return null;
   return (
-    <p className="pb-3 text-body text-attention" role="alert">
+    <p className="pb-3 text-ops-body text-attention" role="alert">
       {error}
     </p>
   );
@@ -69,7 +69,7 @@ export function AdminVoicesManager({
     });
     const json = (await res.json().catch(() => ({}))) as { error?: string };
     if (!res.ok) {
-      setError(faceError(json.error || ""));
+      setError(json.error === "step_up_required" ? "Unlock, then tap Delete again." : faceError(json.error || ""));
       return false;
     }
     startTransition(() => router.refresh());
@@ -207,7 +207,7 @@ export function AdminVoicesManager({
             {editingId ? (
               <Button
                 type="button"
-                variant="danger"
+                variant="dangerSolid"
                 block
                 disabled={pending}
                 onClick={() => setDeleteId(editingId)}
@@ -247,11 +247,11 @@ export function AdminVoicesManager({
             )}
           </Field>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-body text-ink">Live</p>
+            <p className="text-ops-body text-ink">Live</p>
             <Switch label="Live" checked={live} onCheckedChange={setLive} />
           </div>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-body text-ink">Default</p>
+            <p className="text-ops-body text-ink">Default</p>
             <Switch label="Default" checked={makeDefault} onCheckedChange={setMakeDefault} />
           </div>
         </div>

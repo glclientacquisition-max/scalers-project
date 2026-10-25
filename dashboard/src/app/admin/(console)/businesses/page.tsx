@@ -1,5 +1,6 @@
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminBusinessesPanel } from "@/components/AdminBusinessesPanel";
+import { AdminBusinessesV2 } from "@/components/admin/v2/AdminBusinessesV2";
 import { getAdminOverview } from "@/lib/admin";
 import { noQualityBadges, qualityBadges } from "@/lib/adminQuality";
 import { logAdminError } from "@/lib/adminErrors";
@@ -16,6 +17,10 @@ export default async function AdminBusinessesPage() {
   } catch (err) {
     logAdminError("businesses", err);
     return <AdminSetupError />;
+  }
+
+  if (process.env.ADMIN_V2 === "on") {
+    return <AdminBusinessesV2 businesses={overview.businesses} badges={badges} />;
   }
 
   return (

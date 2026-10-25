@@ -1,4 +1,5 @@
 import crypto from "crypto";
+// Preview login: ADMIN_OPERATORS is scoped per Preview git branch in Vercel; a new branch needs it scoped (or it falls back to the unscoped Preview value).
 
 export type AdminOperator = {
   username: string;

@@ -1,6 +1,6 @@
 ---
 owner: desk
-last_reviewed: 2026-10-18
+last_reviewed: 2026-10-23
 ---
 
 # Scalers design system (MASTER)
@@ -30,6 +30,7 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 | Line | `--line` `#D5DEE9` | `line` |
 | Accent wash | `--accent-soft` `#EAF6FF` | `accent-soft` / `brand-50` |
 | Warn | `--warn` (`--attention`) `#B13A0A` (AA 4.5:1+ on canvas, surface, surface-2, tonal) | `warn` |
+| On attention fill | `--attention-on` | Label on solid attention (`dangerSolid`). Light `#FFFFFF`, dark `#071426` (same invert as `--accent-on`). `attention-on` |
 | Ok | `--ok` `#15803D` | `ok` |
 | Lead | `--lead` `#B98A1F` | `lead` |
 | WhatsApp glyph | `--whatsapp` `#25D366` | `whatsapp` |
@@ -55,7 +56,7 @@ Dark mode is the entire platform: marketing, auth, onboarding, owner desk, Super
 - **Not desk-only.** `.desk-theme` and `.admin-theme` still pin `color`, caret, and native `select` / `option`. They do not own the palette. Portals under `body` inherit the document tokens.
 - **Glass chrome.** `.glass-chrome` is the frosted shell for tab bars, rails, menus, the landing header, and auth cards. Lists, canvas, row surfaces, and `.desk-drawer` sheets stay opaque `--surface` with no backdrop blur, so a page button cannot show through a sheet. `prefers-reduced-transparency` snaps remaining glass to `--surface`. Overlay dim is `--scrim` (navy in light, black in dark), never `--ink`. Safari `theme-color` follows `--canvas`, not brand. No laser beams, dither grain, or clock dials on the desk. `color-scheme: dark only` / `light only` still pins an explicit pick on `html` and `body`.
 - **Choice is per-device.** One worded control, never icons: `Appearance · Light` (current value shown), opening the kit `SegmentedControl` Light / Dark captioned "On this device" (`ThemePicker`). Inside, it is a row in the owner and Super Admin account menu (desktop menu and phone account Sheet alike). Outside (landing, login, signup, invite accept, onboarding, Super Admin login) it is `AppearanceFooter`: a quiet footer text button that opens a `Sheet` on phones and a popover on desktop. Never in a header, never round glyph buttons. The phone account Sheet puts the heading and the switch in one inset card (`border-line bg-canvas`). Segmented options are 44px on touch and below `lg`. All write `localStorage["scalers-desk-theme"]` and a same-named cookie (`light` default) and apply instantly. Never a tenant setting. The root layout renders `data-theme="light"` (it cannot read cookies without making every prerendered route blocking); a `<head>` script applies a saved dark pick (localStorage, then cookie) and re-points `theme-color` before first paint, so there is no flash either way.
-- **Fills invert.** On bright fills (accent, warn, ok, lead) the label is `text-accent-on-fill`: white on deep blue in light, deep navy on bright fills in dark.
+- **Fills invert.** On bright fills (accent, warn/attention, ok, lead) the label is `text-accent-on-fill` (or `text-attention-on` on solid attention): white on deep fills in light, deep navy `#071426` on bright fills in dark.
 - **Inherited ink.** `.desk-theme` and `.admin-theme` set `color` and `caret-color` from `--ink`. Form controls pin `color` and autofill `-webkit-text-fill-color`. Field class strings include `text-ink`.
 
 | Token role | Light | Dark |
@@ -70,6 +71,7 @@ Dark mode is the entire platform: marketing, auth, onboarding, owner desk, Super
 | Link `--accent-deep` | `#005CCC` | `#3D9BFF` |
 | Fill `--accent-fill` | `#005CCC` | `#3D9BFF` |
 | On fill `--accent-on-fill` | `#FFFFFF` | `#071426` |
+| On attention `--attention-on` | `#FFFFFF` | `#071426` |
 
 **Shared class strings:** `dashboard/src/components/ui/deskChrome.ts`. Settings fields stay in `settingsUi.tsx` but must use the same focus ring.
 

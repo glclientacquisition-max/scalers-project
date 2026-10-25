@@ -51,22 +51,30 @@ export function InboxToolbar({
   const workView = weekView || todayView;
 
   const searchForm = (
-    <form
-      action="/calls"
-      method="get"
-      className="w-full min-w-0"
-    >
+    <form action="/calls" method="get" className="w-full min-w-0">
       <input type="hidden" name="purpose" value={current} />
-      {archived && from ? <input type="hidden" name="from" value={from} /> : null}
-      {archived && rpage ? <input type="hidden" name="rpage" value={rpage} /> : null}
-      {archived && view ? <input type="hidden" name="view" value={view} /> : null}
-      {archived && week ? <input type="hidden" name="week" value={week} /> : null}
+      {archived && from ? (
+        <input type="hidden" name="from" value={from} />
+      ) : null}
+      {archived && rpage ? (
+        <input type="hidden" name="rpage" value={rpage} />
+      ) : null}
+      {archived && view ? (
+        <input type="hidden" name="view" value={view} />
+      ) : null}
+      {archived && week ? (
+        <input type="hidden" name="week" value={week} />
+      ) : null}
       {archived && day ? <input type="hidden" name="day" value={day} /> : null}
       {workView || holdToday ? (
         <input type="hidden" name="view" value={weekView ? "week" : "today"} />
       ) : null}
-      {weekView && week ? <input type="hidden" name="week" value={week} /> : null}
-      {(todayView || holdToday) && day ? <input type="hidden" name="day" value={day} /> : null}
+      {weekView && week ? (
+        <input type="hidden" name="week" value={week} />
+      ) : null}
+      {(todayView || holdToday) && day ? (
+        <input type="hidden" name="day" value={day} />
+      ) : null}
       <label className="sr-only" htmlFor="inbox-search">
         Search inbox
       </label>
@@ -89,7 +97,13 @@ export function InboxToolbar({
           status={
             <DeskRecordLead
               align="center"
-              back={<DeskBack href={backHref || callsHref({ q: query || undefined })}>Inbox</DeskBack>}
+              back={
+                <DeskBack
+                  href={backHref || callsHref({ q: query || undefined })}
+                >
+                  Inbox
+                </DeskBack>
+              }
             >
               <h1 className={pageTitleClass}>Archived</h1>
             </DeskRecordLead>
@@ -98,31 +112,31 @@ export function InboxToolbar({
           {searchForm}
         </DeskIndexLead>
       ) : (
-        <>
-          <h1 className={deskListTitleClass}>Inbox</h1>
-          <DeskIndexLead>
-            {searchForm}
-          </DeskIndexLead>
-        </>
-      )}
-
-      {archived ? null : (
-      <InboxFilterPills
-        label="Filter by purpose"
-        active={current}
-        items={filters.map((item) => ({
-          id: item.id,
-          label: item.label,
-          count: chipCounts[item.id],
-          href: inboxPileHref(item.id, {
-            q: query,
-            active: current,
-            view,
-            week,
-            day,
-          }),
-        }))}
-      />
+        // Desktop: title, purpose pills and search share one row, so the top band is used edge to edge.
+        <div className="space-y-3 lg:flex lg:items-center lg:gap-6 lg:space-y-0">
+          <h1 className={`${deskListTitleClass} lg:shrink-0`}>Inbox</h1>
+          <div className="min-w-0 lg:order-3 lg:w-80 lg:shrink-0">
+            <DeskIndexLead>{searchForm}</DeskIndexLead>
+          </div>
+          <div className="min-w-0 lg:order-2 lg:flex-1">
+            <InboxFilterPills
+              label="Filter by purpose"
+              active={current}
+              items={filters.map((item) => ({
+                id: item.id,
+                label: item.label,
+                count: chipCounts[item.id],
+                href: inboxPileHref(item.id, {
+                  q: query,
+                  active: current,
+                  view,
+                  week,
+                  day,
+                }),
+              }))}
+            />
+          </div>
+        </div>
       )}
 
       {current === "job" ? (

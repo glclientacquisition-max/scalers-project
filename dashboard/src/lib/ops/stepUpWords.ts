@@ -1,0 +1,63 @@
+/** Plain-language names for gate keys (adminRouteRegistry in stepUpCore). Unknown keys fall back to "make this change". */
+export const STEP_UP_WHAT: Record<string, string> = {
+  "buy-number:buy": "buy this number",
+  "voices:delete": "delete this voice",
+  "did-pool:release": "release this number",
+  "did-pool:assign_specific": "assign this number",
+  "did-pool:assign_next": "assign the next free number",
+  "businesses:release_did": "release this business's number",
+  "businesses:archive": "archive this business",
+  "businesses:transfer_owner": "transfer the owner",
+  "businesses:assign_next": "assign a number",
+  "invoice:void": "void this invoice",
+  "invoice:credit_note": "issue a credit note",
+  "number-hold:hold": "hold this number",
+  "number-hold:end_hold": "end the hold",
+  "number-hold:restore": "restore this number",
+  "number-hold:set_settings": "save hold settings",
+  "number-hold:bill_fee": "bill the reactivation fee",
+  "package-versions:publish": "publish this package",
+  "package-versions:move_subscribers": "move subscribers",
+  "package-versions:set_billing_mode": "change the billing mode",
+  "billing:grant_minutes": "grant minutes",
+  "billing:assign_package": "assign a package",
+  "billing:resolve_checkout_review": "resolve this checkout review",
+  "billing:set_billing_mode": "change the billing mode",
+  "wallets:set_billing_mode": "change the billing mode",
+  "platform-ops:save_settings": "save platform settings",
+  "step-up:reset": "reset another operator's authenticator",
+  "step-up:regenerate_backup_codes": "make new backup codes",
+  "step-up:set_area": "change what needs Unlock",
+  "step-up:set_duration": "change how long Unlock lasts",
+};
+
+/** Settings › Security "What needs Unlock" area names and one-line scope. */
+export const UNLOCK_AREA_WORDS: Record<string, { title: string; covers: string }> = {
+  numbers: { title: "Numbers", covers: "Assign, release, buy and hold phone numbers." },
+  billing: { title: "Billing & money", covers: "Invoices, credit notes, minutes, packages and billing mode." },
+  businesses: { title: "Businesses", covers: "Archive a business or transfer its owner." },
+  voices: { title: "Voices & services", covers: "Delete a voice." },
+  operators: { title: "Operators & security", covers: "Platform settings, authenticator resets, backup codes." },
+};
+
+/** Plain words for security audit events (Settings › Security, recent activity). */
+export const SECURITY_EVENT_WORDS: Record<string, string> = {
+  "admin.2fa.sign_in.verified": "Signed in with a second step",
+  "admin.2fa.sign_in.failed": "Wrong sign-in code",
+  "admin.2fa.sign_in.locked": "Sign-in locked after too many wrong codes",
+  "admin.2fa.sign_in.email_sent": "Sign-in code emailed",
+  "admin.2fa.sign_in.email_failed": "Sign-in code email could not be sent",
+  "admin.2fa.sign_in.email_rate_limited": "Asked for email codes too often",
+  "admin.2fa.enrolled": "Authenticator set up",
+  "admin.2fa.reset": "Authenticator reset by an operator",
+  "admin.2fa.backup_code_used": "Backup code used",
+  "admin.2fa.backup_codes_regenerated": "New backup codes made",
+  "admin.2fa.device_forgotten": "Device forgotten",
+  "admin.step_up.verified": "Unlocked",
+  "admin.step_up.failed": "Wrong Unlock code",
+  "admin.step_up.locked": "Unlock locked after too many wrong codes",
+  "admin.step_up.blocked": "Change blocked until Unlock",
+  "admin.step_up.ended": "Unlock ended early",
+  "admin.step_up.area_changed": "Changed what needs Unlock",
+  "admin.step_up.duration_changed": "Changed how long Unlock lasts",
+};

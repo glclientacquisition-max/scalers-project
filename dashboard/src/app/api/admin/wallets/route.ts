@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminActorName } from "@/lib/adminActor";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
+import { stepUpGateSession } from "@/lib/ops/stepUpGate";
 import {
   confirmTenantBillingMode,
   listAdminWallets,
@@ -49,6 +50,8 @@ export async function POST(request: Request) {
 
   // The signed-in Super Admin, never a typed name or a value from the request body.
   const actor = await adminActorName();
+  const stepUp = await stepUpGateSession(`wallets:${action}`, businessId);
+  if (stepUp) return stepUp;
   const note = String(body.note || "").trim();
 
   try {

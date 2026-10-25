@@ -24,7 +24,7 @@ import {
   inboxTogglePin,
   inboxUnarchive,
 } from "@/lib/inboxLeadActions";
-import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
+import { announceInboxResult, writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
 import {
   inboxItemWithLocal,
   inboxOverflowActions,
@@ -122,19 +122,31 @@ export function InboxRowShell({
     setError(null);
     const view = inboxItemWithLocal(item, local);
     let res: { error?: string; ok?: boolean } = { ok: true };
+    let archivedNow: Awaited<ReturnType<typeof inboxArchive>> | null = null;
     if (id === "pin" || id === "unpin") res = await inboxTogglePin(view);
     if (id === "mark_done") res = await inboxMarkDone(item);
-    if (id === "archive") res = await inboxArchive(item);
-    if (id === "unarchive") res = await inboxUnarchive(item);
+    if (id === "archive") res = archivedNow = await inboxArchive(item);
+    let unarchivedText: string | null = null;
+    if (id === "unarchive") {
+      const one = await inboxUnarchive(item);
+      res = one;
+      unarchivedText = "text" in one ? one.text : null;
+    }
     busyRef.current = false;
     setPendingId(null);
     if (res.error) {
       setError(res.error);
       return;
     }
-    if (id === "archive" && item.callId) {
-      writeInboxArchiveUndo([{ id: item.id, callId: item.callId }]);
+    if (id === "archive" && item.callId && archivedNow?.archived !== false) {
+      // Call plus its open requests (one transaction); Undo uses the record.
+      writeInboxArchiveUndo([{ id: item.id, callId: item.callId }], undefined, undefined, {
+        undoId: archivedNow?.undoId,
+        holdIds: archivedNow?.holdIds,
+        visitIds: archivedNow?.visitIds,
+      });
     }
+    if (id === "unarchive") announceInboxResult(unarchivedText);
     if (id === "archive" || id === "unarchive") {
       patch({ hidden: true });
     }

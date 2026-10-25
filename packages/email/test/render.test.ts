@@ -38,7 +38,8 @@ for (const fx of fixtures) {
       assert.equal(e.replyTo, "support@scalers.co.ke");
     } else {
       assert.equal(e.from, "Scalers ops <platform@ops.scalers.co.ke>");
-      assert.ok(e.subject.startsWith("[Scalers ops]"));
+      // Wallet alerts lead with the environment of the wallet; other ops mail with [Scalers ops].
+      assert.ok(e.subject.startsWith(fx.kind === "ops_wallet" ? "[" : "[Scalers ops]"), e.subject);
     }
     if (e.essential) {
       assert.ok(!e.html.includes(UNSUB) && !e.headers["List-Unsubscribe"], "essential mail must not carry unsubscribe");
@@ -70,7 +71,7 @@ test("owner CTAs deep-link to real Desk routes; ops CTAs to Admin", async () => 
     const e = await renderEmail(fx.kind, fx.props as never);
     const href = e.html.match(/<a href="([^"]+)" class="btn"/)?.[1]?.replace(/&amp;/g, "&");
     assert.ok(href, `${fx.name} has no CTA`);
-    if (e.audience === "ops") assert.ok(href!.startsWith("https://admin.scalers.co.ke/admin/"), href);
+    if (e.audience === "ops") assert.ok(href!.startsWith("https://admin.scalers.co.ke/admin/") || (fx.kind === "ops_wallet" && href === "https://app.sautikit.com/wallet"), href);
     else if (fx.kind !== "invite_reminder") assert.ok(routes.includes(href!), `${fx.name}: ${href} is not a Desk route`);
   }
 });
@@ -106,4 +107,25 @@ test("line live: two options, one recommended code with ring time, airtime note,
   assert.ok(!/put (the |a )?caller through|transfer/i.test(e.text), "no live transfer claims");
   const e15 = await renderEmail("line_live", { ...(fx.props as object), ringSeconds: 15 } as never);
   assert.ok(e15.text.includes(`**004*${dial}**15#`) && e15.text.includes("about 15 seconds"));
+});
+
+test("wallet alerts: environment tag, band and the one line of facts", async () => {
+  const byName = (n: string) => fixtures.find((f) => f.name === n)!;
+  const prod = await renderEmail("ops_wallet", byName("ops-wallet-prod-low").props as never);
+  assert.ok(prod.subject.startsWith("[PRODUCTION] "), prod.subject);
+  assert.match(prod.html, /class="band-prod"[^>]*bgcolor="#b91c1c"/);
+  assert.match(prod.text, /^PRODUCTION/);
+  assert.match(prod.text, /Workspace: Production \(e0e57aa5\)\nBalance: KES 28\.27\nAlert at: KES 100\nChecked: 21 Oct 2026, 18:49 EAT/);
+  assert.match(prod.text, /2 numbers renew on 1 Nov: KES 200 due\./);
+  assert.match(prod.text, /Top up in SautiKit: https:\/\/app\.sautikit\.com\/wallet/);
+  for (const n of ["ops-wallet-staging-low"]) {
+    const st = await renderEmail("ops_wallet", byName(n).props as never);
+    assert.ok(st.subject.startsWith("[STAGING] "), st.subject);
+    assert.match(st.html, /class="band-neu"/);
+    assert.doesNotMatch(st.html, /class="band-prod"/);
+    for (const part of [st.subject, st.text, visible(st.html)]) assert.doesNotMatch(part, /PRODUCTION/);
+  }
+  const topped = await renderEmail("ops_wallet", byName("ops-wallet-prod-topped").props as never);
+  assert.equal(topped.subject, "[PRODUCTION] SautiKit wallet topped up: KES 600");
+  assert.match(topped.text, /Re-armed above: KES 550/);
 });

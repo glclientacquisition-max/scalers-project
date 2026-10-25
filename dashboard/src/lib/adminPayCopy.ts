@@ -245,7 +245,7 @@ export function livePayBlock(input: {
   liveMasterOn: boolean;
   tenantEnabled: boolean;
 }): string | null {
-  if (!input.modeLive || !input.liveMasterOn) return "Hosting switch is off";
+  if (!input.modeLive || !input.liveMasterOn) return "Live payments are off";
   if (!input.tenantEnabled) return "Not enabled";
   return null;
 }
@@ -297,4 +297,18 @@ export function shopMoneyHref(businessId: string): string {
 
 export function invoiceHref(invoiceId: string): string {
   return `/admin/billing/invoices/${invoiceId}`;
+}
+
+
+/** Operator-facing live-businesses line. No "Environment list" or hosting jargon. */
+export function liveBusinessesSummary(input: {
+  liveOpen: boolean;
+  paying: number;
+  listed: number;
+}): string {
+  if (!input.liveOpen) {
+    return input.listed ? `${input.listed} listed · live payments are off` : "Live payments are off";
+  }
+  if (input.paying === 0) return input.listed ? `${input.listed} listed · none can pay yet` : "No businesses can pay yet";
+  return `${input.paying} can pay${input.listed && input.listed !== input.paying ? ` · ${input.listed} listed` : ""}`;
 }

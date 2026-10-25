@@ -21,7 +21,7 @@ export function Unlogged({ children = "Not logged" }: { children?: ReactNode }) 
 /** Same mark on the call and on a turn, so the number is a score and not part of the title. */
 export function ScoreMark({ score }: { score: number | null }) {
   return (
-    <span className="inline-flex items-baseline gap-1 text-body text-ink">
+    <span className="inline-flex items-baseline gap-1 text-ops-body text-ink">
       <span className="text-ink-3">Score</span>
       {score == null ? <Unlogged /> : <span className="tabular-nums">{formatScore(score)}</span>}
     </span>
@@ -29,7 +29,7 @@ export function ScoreMark({ score }: { score: number | null }) {
 }
 
 const crumbClass =
-  "inline-flex min-h-11 items-center rounded-md text-ink-2 outline-none focus-visible:ring-2 focus-visible:ring-brand";
+  "inline-flex min-h-ops-touch md:min-h-ops-row items-center rounded-sm text-ink-2 outline-none focus-visible:ring-2 focus-visible:ring-brand";
 
 export function QualityCrumbs({ items }: { items: readonly { href: string; label: string }[] }) {
   return (
@@ -124,7 +124,7 @@ export function FailChips({ checks }: { checks: VoiceCheckCounts | null }) {
       {names.map((name) => (
         <span
           key={name}
-          className="inline-flex min-h-6 items-center rounded-md bg-attention-tonal px-1.5 text-caption font-medium text-attention"
+          className="inline-flex min-h-6 items-center rounded-sm bg-attention-tonal px-1.5 text-caption font-medium text-attention"
         >
           {checkLabel(name)}
         </span>
@@ -214,7 +214,7 @@ export function TurnFact({ label, children }: { label: string; children: ReactNo
   return (
     <div className="grid gap-1 md:grid-cols-[8.5rem_minmax(0,1fr)] md:items-baseline md:gap-3">
       <dt className="text-caption text-ink-3">{label}</dt>
-      <dd className="min-w-0 text-body text-ink [overflow-wrap:anywhere]">{children}</dd>
+      <dd className="min-w-0 text-ops-body text-ink [overflow-wrap:anywhere]">{children}</dd>
     </div>
   );
 }

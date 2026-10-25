@@ -7,6 +7,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendDeskCallerSms } from "@/lib/callerSms";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { outboundSendBlock } from "@/lib/tenantLine";
+import { recordCallMessageOut } from "@/lib/callMessages";
+import { smsSegments } from "@/lib/smsSegments";
+
+export { smsSegments };
 
 export type CallerLedgerKind =
   | "caller_appointment_confirmed"
@@ -24,16 +28,6 @@ function normalizeDest(value: string): string {
     .trim()
     .toLowerCase()
     .replace(/[^\d@._a-z-]/g, "");
-}
-
-export function smsSegments(body: string): number {
-  const text = String(body || "");
-  if (!text) return 0;
-  const ucs2 = /[^\x00-\x7F]/.test(text);
-  const single = ucs2 ? 70 : 160;
-  const concat = ucs2 ? 67 : 153;
-  if (text.length <= single) return 1;
-  return Math.ceil(text.length / concat);
 }
 
 export function deskCallerIdempotencyKey(opts: {
@@ -276,13 +270,20 @@ export async function sendRecordedDeskCallerSms(opts: {
   replyId?: string | null;
   /** Status version / note id: key becomes row:<tenant>:<id>:<kind>:<version>. */
   version?: string | null;
+  /** Exact ledger key (thread Retry: call_messages_retry returns it). Wins over replyId/version. */
+  key?: string | null;
+  /** Visit or hold this text is about (thread link). */
+  appointmentId?: string | null;
+  requestId?: string | null;
+  /** False when the thread row already exists (Retry). Default true. */
+  recordThread?: boolean;
 }): Promise<{ ok: boolean; reason?: string; overage?: boolean; message?: string }> {
   // Paused or closed line: nothing goes out, nothing is recorded or charged.
   const blocked = await outboundSendBlock(opts.client, opts.tenantId);
   if (blocked) return { ok: false, reason: blocked.reason, message: blocked.message };
   // Reserve -> send -> settle. A TextSMS failure releases the units and leaves
   // a `failed` row (was: units consumed, no row, no refund).
-  const key = deskSendKey(opts);
+  const key = String(opts.key || "").trim() || deskSendKey(opts);
   const reservation = await reserveNotifySend(opts.client, {
     tenantId: opts.tenantId,
     key,
@@ -315,10 +316,50 @@ export async function sendRecordedDeskCallerSms(opts: {
       ok: sent.ok,
       error: sent.ok ? null : sent.reason || "send_failed",
     });
+    // Sent or failed, the text goes on the call's thread (a failed one shows
+    // Retry). Never changes the result above.
+    if (reservation.id) await recordDeskThread(opts, key, reservation.id);
     if (!sent.ok) return sent;
     return { ok: true, overage: reservation.overage };
   }
-  return sendLegacyDeskCallerSms({ ...opts, key });
+  const legacy = await sendLegacyDeskCallerSms({ ...opts, key });
+  if (legacy.ok) await recordDeskThread(opts, key, null);
+  return legacy;
+}
+
+/**
+ * call_messages_record_out after the send settled. Skipped without a call,
+ * on Retry (row exists) and where #868 is not applied. Never throws.
+ */
+async function recordDeskThread(
+  opts: {
+    client: SupabaseClient;
+    tenantId: string;
+    callId?: string | null;
+    kind: string;
+    body: string;
+    appointmentId?: string | null;
+    requestId?: string | null;
+    recordThread?: boolean;
+  },
+  key: string,
+  notifySendId: string | null
+): Promise<void> {
+  if (opts.recordThread === false || !opts.callId) return;
+  try {
+    await recordCallMessageOut(opts.client, {
+      tenantId: opts.tenantId,
+      callId: opts.callId,
+      key,
+      source: opts.kind,
+      body: opts.body,
+      notifySendId,
+      appointmentId: opts.appointmentId || null,
+      requestId: opts.requestId || null,
+    });
+  } catch (err) {
+    console.warn("[call messages] record", err instanceof Error ? err.message : err);
+  }
 }
 
 /**
