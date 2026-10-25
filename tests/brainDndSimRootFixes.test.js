@@ -10,7 +10,9 @@ const { indexFieldMeta } = require('../src/conversation/provenance');
 const AC = require('../src/conversation/v2/areaCoverage');
 const RF = require('../src/conversation/v2/replyFacts');
 const OF = require('../src/conversation/v2/ownerFacts');
-const NLU = require('../src/conversation/v2/nlu');
+const OW = require('../src/conversation/v2/owed');
+const CP = require('../src/conversation/v2/callPlan');
+const ML = require('../src/conversation/v2/modelLead');
 const FR = require('./fixtures/dndSimTenant.json');
 
 const P = { ...tenantProfileFromRow(FR.row, { fieldMeta: indexFieldMeta(FR.meta), areaPicks: FR.picks.picks, areaPicksConfirmedAt: FR.picks.confirmed_at }), id: FR.row.id };
@@ -18,8 +20,10 @@ const NOPICKS = { ...tenantProfileFromRow(FR.row, { fieldMeta: indexFieldMeta(FR
 const ENV = { BRAIN_V2: '1', BRAIN_V2_MODE: 'live', BRAIN_V2_MODEL: 'on', BRAIN_V1_DRAFT: 'on', BRAIN_V1_DRAFT_PHASE_A: 'on', BRAIN_CALL_CORE: 'on', BRAIN_MODEL_LEAD: 'on', BRAIN_MODEL_LEAD_SPLIT: 'on', BRAIN_LEAD_MODEL_ID: 'lite', BRAIN_LEAD_BACKUP_MODEL_ID: 'flash' };
 
 // template path: every model 503s, as in the DnD sim
-async function say(text, lang = 'en', profile = P) {
-  const live = createBrainV2Live({ env: ENV, applyTools: async (a) => ({ results: [{ action: Object.keys(a)[0], ok: true, status: 'ok', id: 'x' }] }), modelLeadStreamFor: () => async () => { throw Object.assign(new Error('gemini http 503'), { code: 'http_503' }); }, v1DraftStreamFor: () => async () => ({ calls: [] }), shadowModel: async () => ({ calls: [] }), shadowBackupModel: async () => ({ calls: [] }), prewarm: false, now: () => new Date('2026-10-25T09:00:00Z'), log: () => {}, callerFile: { contactName: null, callerPhone: '+254700000009', openRows: [] } });
+async function say(text, lang = 'en', profile = P, { rows = [], u = null } = {}) {
+  // the reply model always fails (template path); the understanding call answers with `u` when given
+  const stream = () => async ({ request }) => { const p = JSON.parse(request.contents[0].parts[0].text); if (p.UNDERSTAND && u) return { text: JSON.stringify(u) }; throw Object.assign(new Error('gemini http 503'), { code: 'http_503' }); };
+  const live = createBrainV2Live({ env: ENV, applyTools: async (a) => ({ results: [{ action: Object.keys(a)[0], ok: true, status: 'ok', id: 'x' }] }), modelLeadStreamFor: stream, v1DraftStreamFor: () => async () => ({ calls: [] }), shadowModel: async () => ({ calls: [] }), shadowBackupModel: async () => ({ calls: [] }), prewarm: false, now: () => new Date('2026-10-25T09:00:00Z'), log: () => {}, callerFile: { contactName: null, callerPhone: '+254700000009', openRows: rows } });
   const said = []; const r = await live.run({ text, profile, langLock: lang, onSentence: (s) => said.push(s.text) });
   return said.join(' ') || r.line || '';
 }
@@ -81,20 +85,70 @@ test('no-picks tenant: legacy fallback never confirms an unknown place', () => {
   assert.equal(AC.resolve('Kericho', NOPICKS).status, 'outside');
 });
 
-test('booking pre-check before the name: coverage, price, duration, hours (en + sw)', async () => {
+test('call plan owes the booking confirmations before the name, once, in the turn language (en + sw)', async () => {
   const en = await say('Book a standard 2-bedroom clean Saturday 10am in Westlands');
-  assert.match(en, /Yes, we cover Westlands\..*three thousand five hundred shillings\..*On Saturday we're open 8 AM to 5 PM, so 10 AM works\. May I have your name\?$/);
-  const m = { intent: 'book', slots: { service: '2-Bedroom Standard Clean', when: { date: '2026-10-31', time: '10:00' }, place: 'Westlands' } };
-  const sw = RF.bookingPrecheck(m, P, 'sw', 'Westlands Jumamosi saa nne');
-  assert.ok(sw && sw.lines.length >= 3, JSON.stringify(sw));
-  assert.match(sw.lines.join(' '), /tunafika Westlands/);
-  assert.equal(RF.bookingPrecheck(m, P, 'sw', 'x'), null, 'once per booking');
+  assert.match(en, /Yes, we cover Westlands\..*three thousand five hundred shillings\..*It takes about 3-4 hours\..*On Saturday we're open 8 AM to 5 PM, so 10 AM works\. May I have your name\?$/);
+  const sw = await say('Nataka 2-bedroom standard clean Jumamosi saa nne asubuhi Westlands', 'sw');
+  assert.match(sw, /Ndio, tunafika Westlands\..*elfu tatu na mia tano\..*Inachukua takriban saa 3-4\..*Jumamosi tuko wazi.*Naomba jina lako\?$/);
+  const st = { intent: 'book', slots: { service: '2-Bedroom Standard Clean', when: { date: '2026-10-31', time: '10:00' }, place: 'Westlands' } };
+  const o = CP.owed(st, P, { kind: 'ask', slot: 'name' });
+  assert.deepEqual(o.items.map((x) => x.topic), ['coverage', 'price', 'duration', 'hours_fit']);
+  CP.markOwed(st, o);
+  assert.equal(CP.owed(st, P, { kind: 'ask', slot: 'name' }), null, 'once per booking');
+  assert.equal(CP.owed({ ...st, confirmedFor: null }, P, { kind: 'ask', slot: 'date' }), null, 'only before the name / read-back');
+  const kib = CP.owed({ intent: 'book', slots: { ...st.slots, place: 'Kibera' } }, P, { kind: 'ask', slot: 'name' });
+  assert.equal(kib.blocked, true);
 });
 
-test('policy question: no unasked "no open booking" line (en + sw)', async () => {
-  const en = await say('Can I cancel?');
-  assert.match(en, /cancel up to 24 hours before/); assert.doesNotMatch(en, /open booking/i);
-  const sw = await say('Naweza kughairi?', 'sw');
-  assert.match(sw, /Unaweza kughairi hadi saa 24/); assert.doesNotMatch(sw, /You can cancel|sioni/i);
-  assert.equal(NLU.cancelAskIsPolicy ? NLU.cancelAskIsPolicy('Can I cancel?') : true, true);
+test('every owed-answer type renders in Swahili, scoped to its sub-question (no extra sub-topics)', () => {
+  const ctx = { profile: P, text: 'sofa viti 5', machine: { slots: {} }, caller: { candidate: 'Wanjiru', upcoming: [{ service: 'Sofa Cleaning', date: '2026-10-26' }] } };
+  const kib = ML.coverageFor('Kibera', P).places[0];
+  const SAMPLE = {
+    coverage: { sub: 'Kibera', row: kib }, price: { sub: 'Sofa Cleaning' }, payment: {}, policy: { sub: 'cancellation' }, hours: {},
+    duration: { sub: '2-Bedroom Standard Clean' }, hours_fit: { date: '2026-10-31', time: '10:00' }, identity: {}, booking_status: {}, clarify: { sub: 'cancel' },
+  };
+  assert.deepEqual(Object.keys(SAMPLE).sort(), [...OW.TOPICS].sort(), 'a new owed-answer type needs a sample here (and an sw rendering)');
+  const EN_WORDS = /\b(the|we|you|our|is|are|and|it|have|cover|pay|takes|open)\b/i;
+  for (const t of OW.TOPICS) {
+    const sw = OW.render({ topic: t, lang: 'sw', ...SAMPLE[t] }, ctx); const en = OW.render({ topic: t, lang: 'en', ...SAMPLE[t] }, ctx);
+    assert.ok(sw && en, `${t}: en+sw render`);
+    assert.notEqual(sw, en, `${t}: sw differs from en`);
+    assert.doesNotMatch(sw.replace(/M-Pesa[^.]*|Standard Clean|Sofa Cleaning|Buy Goods|Till|Paybill|with your phone number as the account|or cash/gi, ''), EN_WORDS, `${t}: no English leak in "${sw}"`);
+  }
+  // scoped: the cancellation answer is only the cancellation fact (no reschedule / late-arrival extras)
+  const of = OF.ownerFacts(P); const cancel = OF.spoken(of.byTopic.get('cancellation'), 'en');
+  assert.equal(OW.render({ topic: 'policy', sub: 'cancellation', lang: 'en' }, ctx), cancel);
+  for (const other of of.facts.filter((f) => f.topic !== 'cancellation' && f.family !== 'faq')) assert.ok(!cancel.includes(f0(other.text)), `leaks ${other.topic}`);
+  const list = OW.collect({ questions: [{ type: 'policy', subject: 'cancellation' }], text: 'Can I cancel?', profile: P, lang: 'sw' });
+  assert.deepEqual(list.map((o) => `${o.topic}:${o.sub}:${o.lang}`), ['policy:cancellation:sw']);
+});
+const f0 = (t) => String(t || '').split(/(?<=[.!?])\s/)[0];
+
+test('Swahili not-covered reply follows the turn language through the call plan', async () => {
+  assert.equal(await say('Mnafika Kibera?', 'sw'), 'Samahani, hatufiki Kibera. Kazi iko eneo lingine?');
+  assert.equal(await say('Do you cover Kibera?', 'en'), "Sorry, we don't cover Kibera. Is the job anywhere else?");
+});
+
+const MON = [{ id: 'r1', caller_phone: '+254700000009', service_name: '2-Bedroom Standard Clean', status: 'confirmed', window_start: '2026-10-26T07:00:00Z', place: 'Westlands' }];
+test('cancel question vs request: no understanding -> clarify; a named booking -> the request (en + sw)', async () => {
+  assert.equal(await say('Can I cancel?'), 'Do you want to cancel a booking, or hear our cancellation policy?');
+  assert.equal(await say('Naweza kughairi?', 'sw'), 'Unataka kughairi booking yako, au kujua sera yetu ya kughairi?');
+  const en = await say('I want to cancel my Monday booking', 'en', P, { rows: MON });
+  assert.match(en, /^Cancel your two bedroom standard clean on Monday 26 October at 10 AM\. Shall I go ahead\?$/);
+  const sw = await say('Nataka kughairi booking yangu ya Jumatatu', 'sw', P, { rows: MON });
+  assert.match(sw, /^Nifute .*Jumatatu 26 Oktoba.*Niendelee\?$/);
+  assert.doesNotMatch(en + sw, /24 hours|saa 24|open booking|Sioni/i);
+});
+
+test('cancel question vs request: decided from the understanding (en + sw)', async () => {
+  const pol = (lang) => ({ lang, intents: ['ask'], questions: [{ type: 'policy', subject: 'cancellation' }], places: [], booking_ref: null, slots: {} });
+  const en = await say('Can I cancel?', 'en', P, { u: pol('en') });
+  assert.equal(en, 'You can cancel up to 24 hours before. After that, we keep the deposit.');
+  const sw = await say('Naweza kughairi?', 'sw', P, { u: pol('sw') });
+  assert.match(sw, /^Unaweza kughairi hadi saa 24 kabla\. Baada ya hapo, amana haitarudishwa\.$/);
+  const req = { lang: 'en', intents: ['cancel'], questions: [], places: [], booking_ref: { date: 'Monday' }, slots: {} };
+  assert.match(await say('I want to cancel my Monday booking', 'en', P, { u: req, rows: MON }), /Shall I go ahead\?$/);
+  assert.equal(ML.cancelKind(pol('en'), {}, 'Can I cancel?', P), 'policy');
+  assert.equal(ML.cancelKind(req, {}, 'cancel my Monday booking', P), 'request');
+  assert.equal(ML.cancelKind(null, {}, 'Can I cancel?', P, new Date('2026-10-25T09:00:00Z')), 'clarify');
 });

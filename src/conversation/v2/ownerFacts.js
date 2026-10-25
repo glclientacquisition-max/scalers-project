@@ -203,7 +203,9 @@ function paymentFact(of) {
   const parts = [pay, dep && !has(pay, dep) ? dep : null].filter(Boolean);
   const en = parts.map((f) => f.text).join(' ');
   const swParts = parts.map((f) => f.text_sw).filter(Boolean);
-  return { id: 'M1', topic: 'payment', en, sw: swParts.length === parts.length ? swParts.join(' ') : (swParts[0] || SW_FALLBACK), sentences: sentences(en), sentences_sw: sentences(swParts.join(' ')), nums: [...new Set(parts.flatMap((f) => f.nums))] };
+  // owner wrote no (or partial) Swahili: name the methods in a Swahili frame, never the bare "team will confirm" ([PROMPT-PLACEHOLDER])
+  const swMethods = pay ? `Malipo ni kwa ${pay.text.replace(/^(you can pay|we accept|we take|payment is|pay)\s*(by|with|via|through)?\s*/i, '').replace(/[.!?]*$/, '')}.` : null;
+  return { id: 'M1', topic: 'payment', owner_sw: swParts.length === parts.length, en, sw: swParts.length === parts.length ? swParts.join(' ') : (pay && pay.text_sw) || swMethods || SW_FALLBACK, sentences: sentences(en), sentences_sw: sentences(swParts.join(' ')), nums: [...new Set(parts.flatMap((f) => f.nums))] };
 }
 function paymentLine(profile, lang) { const f = paymentFact(ownerFacts(profile)); if (!f) return null; return /^sw/.test(String(lang || '')) ? f.sw : f.en; }
 

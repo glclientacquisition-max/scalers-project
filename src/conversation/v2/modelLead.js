@@ -153,7 +153,7 @@ function kb(profile = {}) {
   // owner policies + FAQs: the ONE shared projection (ownerFacts.js), every topic the owner filled in
   const own = OF.kbRows(OF.ownerFacts(profile));
   const pf = OF.paymentFact(OF.ownerFacts(profile));
-  const pay = pf ? (pf.sw && pf.sw !== OF.SW_FALLBACK ? { en: pf.en, sw: pf.sw } : pf.en) : null;
+  const pay = pf ? (pf.owner_sw ? { en: pf.en, sw: pf.sw } : pf.en) : null;
   const policies = { ...own.policies }; delete policies.payment; if (pf) delete policies.deposit;
   return { services, hours: h ? h.text : null, payment: pay, policies, faqs: own.faqs, business: profile.businessName || null, agent: profile.agentName || null };
 }
@@ -387,34 +387,14 @@ function identityFix(ctx) {
   return sw(ctx.lang) ? 'Sina jina lako bado. Naweza kujua jina lako?' : "I don't have your name yet. May I have it?";
 }
 
-/** G7: a question the kept reply does not answer gets the code's honest answer (placed before the step question). */
+/** G7: a question the kept reply does not answer gets the code's honest answer (placed before the step question).
+ *  The ONE owed-answer structure (owed.js): (topic, sub-question, turn language), rendered from the stores. */
 function owedAnswers(ctx, keptText) {
-  const out = []; const low = keptText.toLowerCase();
-  for (const q of ctx.questions || []) {
-    if (q.type === 'coverage') {
-      const rows = ctx.coverage.filter((r) => !low.includes(r.place.toLowerCase()));
-      const a = coverageAnswer(rows, ctx.lang); if (a) out.push({ subject: 'coverage', text: a });
-    } else if (q.type === 'identity') {
-      const n = CP.lockedName(ctx.machine) || ctx.caller.candidate;
-      if (!n || !low.includes(n.toLowerCase())) out.push({ subject: 'identity', text: identityFix(ctx) });
-    } else if (q.type === 'price') {
-      if (!PRICE_WORD.test(keptText)) out.push({ subject: 'price', text: priceFix(ctx) });
-    } else if (q.type === 'hours') {
-      const h = hoursFact(ctx.profile); if (h && !(h.nums || []).some((n) => low.includes(n))) out.push({ subject: 'hours', text: `${h.text}.` });
-    } else if (q.type === 'payment') {
-      if (!/m-?pesa|paybill|cash|bank|crypto|malipo|tunakubali|we take|we accept/i.test(keptText)) out.push({ subject: 'payment', text: paymentAnswer(ctx.profile, ctx.text || '', ctx.lang) });
-    } else if (q.type === 'policy' || q.type === 'faq' || q.type === 'other') {
-      const of = OF.ownerFacts(ctx.profile || {});
-      const f = OF.match(`${q.subject || ''} ${ctx.text || ''}`, of)[0];
-      const line = f && OF.spoken(f, ctx.lang);
-      if (line && !low.includes(String(OF.sentences(line)[0] || line).toLowerCase().slice(0, 24))) out.push({ subject: `owner:${f.topic}`, text: line });
-    } else if (q.type === 'booking_status') {
-      const up = ctx.caller.upcoming;
-      if (up.length && !up.some((u) => u.service && low.includes(String(u.service).toLowerCase().split(' ')[0]))) out.push({ subject: 'booking_status', text: upcomingLine(up, ctx.lang) });
-    }
-  }
-  // dedupe by subject, and never two coverage lines
-  const seen = new Set(); return out.filter((a) => (seen.has(a.subject) ? false : (seen.add(a.subject), true)));
+  const OW = require('./owed');
+  const list = OW.collect({ questions: ctx.questions || [], coverage: ctx.coverage || [], text: ctx.text || '', profile: ctx.profile || {}, machine: ctx.machine, lang: ctx.lang, confirm: ctx.confirm || [] });
+  const out = [];
+  for (const o of list) { if (OW.answered(o, keptText, ctx)) continue; const text = OW.render(o, ctx); if (text) out.push({ subject: o.sub ? `${o.topic}:${o.sub}` : o.topic, topic: o.topic, sub: o.sub, text }); }
+  return out;
 }
 function upcomingLine(up, lang) {
   const say = (u) => `${u.service}${u.date && /^\d{4}-/.test(u.date) ? ` ${sw(lang) ? '' : 'on '}${L.sayDate(u.date, lang)}` : ''}`;
@@ -454,6 +434,32 @@ function compareSaved(expected = {}, saved = null) {
 }
 
 /** Model understanding -> the machine's turn fields (evidence; the machine's rules still veto). */
+/**
+ * Cancel question vs cancel request, from the understanding: a request is the cancel intent with a named booking
+ * (booking_ref) or no question attached; a policy/other question with no such request is the policy question.
+ * No understanding: the rules decide only an explicit request (the cancel intent alone); any other cancel turn
+ * gets a short clarifying question ('clarify'), never a guess. null = not a cancel turn.
+ */
+function cancelKind(u, machine = {}, text = '', profile = {}, now = new Date()) {
+  const N = require('./nlu');
+  const rules = N.detectIntents(String(text || ''));
+  // the cancel TOPIC: the rules' cancel intents or the owner's own cancellation fact matching the caller's words (any language)
+  const ruleCancel = rules.includes('cancel') || rules.includes('policy_cancel') || OF.match(String(text || ''), OF.ownerFacts(profile)).some((f) => f.topic === 'cancellation');
+  if (u) {
+    const wants = (u.intents || []).includes('cancel');
+    const ref = !!(u.booking_ref && Object.values(u.booking_ref).some((v) => v && String(v).trim()));
+    const asking = (u.questions || []).some((q) => q && (q.type === 'policy' || q.type === 'other'));
+    if (wants && (ref || !asking || (machine.slots && machine.slots.row))) return 'request';
+    if (asking && (wants || ruleCancel)) return 'policy';
+    return null;
+  }
+  if (!ruleCancel) return null;
+  if (rules.includes('policy_cancel') && !rules.includes('cancel')) return null; // the rules' own policy reading stands ("cancellation policy")
+  // a named booking (a day, service or place the rules extract, or a held row) makes it a request; otherwise ask
+  const nu = N.understand(String(text || ''), { profile, now, expecting: machine.expecting || null });
+  if ((nu.when && nu.when.date) || nu.service || nu.area || (machine.slots && machine.slots.row)) return 'request';
+  return 'clarify';
+}
 function turnFieldsOf(u, profile = {}) {
   if (!u) return null;
   const asks = [];
@@ -470,6 +476,7 @@ function turnFieldsOf(u, profile = {}) {
 const U_SYSTEM = [
   'Read ONE caller turn on a Kenyan business phone line. Return ONLY JSON, nothing else.',
   'intents: what the caller wants now. questions: EVERY question, also ones with no question mark ("I wanted to know if you have Kilimani" = coverage; "tell me my name" = identity; "do you accept crypto" = payment).',
+  'cancel: intents has "cancel" ONLY when the caller asks us to cancel a booking ("cancel my Monday clean"); "can I cancel?" / "what if I cancel?" is a question {type:"policy",subject:"cancellation"}, not the intent.',
   'places: EVERY place named, each separately ("Kilimani Westlands" = ["Kilimani","Westlands"]). booking_ref: words that point at an existing booking (service/day/place, or "it"). lang: en|sw|mix.',
 ].join('\n');
 const U_SCHEMA = {
@@ -477,7 +484,7 @@ const U_SCHEMA = {
   properties: {
     lang: { type: 'string', enum: ['en', 'sw', 'mix'] },
     intents: { type: 'array', items: { type: 'string', enum: ['book', 'ask', 'confirm', 'deny', 'cancel', 'reschedule', 'booking_status', 'identity', 'callback', 'take_message', 'goodbye', 'smalltalk', 'add_service', 'give_info'] } },
-    questions: { type: 'array', items: { type: 'object', properties: { type: { type: 'string', enum: ['coverage', 'price', 'hours', 'identity', 'booking_status', 'payment', 'services', 'other'] }, subject: { type: 'string' } }, required: ['type'] } },
+    questions: { type: 'array', items: { type: 'object', properties: { type: { type: 'string', enum: ['coverage', 'price', 'hours', 'identity', 'booking_status', 'payment', 'services', 'policy', 'other'] }, subject: { type: 'string' } }, required: ['type'] } },
     places: { type: 'array', items: { type: 'string' } },
     booking_ref: { type: 'object', properties: { service: { type: 'string' }, date: { type: 'string' }, place: { type: 'string' } } },
     slots: { type: 'object', properties: { services: { type: 'array', items: { type: 'string' } }, date: { type: 'string' }, time: { type: 'string' }, name: { type: 'string' } } },
@@ -613,4 +620,4 @@ function paymentAnswer(profile = {}, text = '', lang = 'en') {
 }
 const UNASKED_PRICE = (s) => PRICE_WORD.test(s) && !/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|saa\s/i.test(s) && !/\b(20\d\d|october|oktoba)\b/i.test(s);
 
-module.exports = { coverageFor, owedCoverageQuestion, leadOn, splitOn, leadModels, SPLIT_DEADLINES, understandRequest, normUnderstanding, replyRequest, lookupCaller, callerFilters, ROW_INTENT, offerRowsLine, backedByCaller, pastAsOpen, paymentAnswer, UNASKED_PRICE, U_SCHEMA, R_SCHEMA, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };
+module.exports = { cancelKind, upcomingLine, coverageFor, owedCoverageQuestion, leadOn, splitOn, leadModels, SPLIT_DEADLINES, understandRequest, normUnderstanding, replyRequest, lookupCaller, callerFilters, ROW_INTENT, offerRowsLine, backedByCaller, pastAsOpen, paymentAnswer, UNASKED_PRICE, U_SCHEMA, R_SCHEMA, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };

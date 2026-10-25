@@ -5,7 +5,7 @@
 //                                so the same fact (a price, a place's coverage, an owner policy sentence)
 //                                is never spoken twice in a turn however many producers rendered it.
 //   priceLine                  - catalogue price, with quantity x unit price when the service is priced per unit.
-//   bookingPrecheck            - coverage + price + duration + business hours before the name, once per booking.
+//   durationOf                 - the owner's duration for a service (the call plan's owed confirmations use it).
 //   placeStatement             - "I'm in X" / "niko X" / "near X": a place mention is owed a coverage answer.
 // Niche-agnostic: units, names, durations and areas come from the tenant's catalogue/picks, never a trade list.
 // Caller-facing wording here is [PROMPT-PLACEHOLDER].
@@ -107,8 +107,7 @@ function createAssembler(ctx = {}) {
 const PLACE_STATEMENT = /\b(i'?m|i am|we'?re|we are|i live|i stay|i'?m based|located|based|staying)\s+(?:\w+\s+)?(in|at|near|around|by|off)\b|\b(niko|tuko|naishi|nakaa|nipo|tupo)\b|\bkaribu na\b|^\W*(in|near|around)\s+[A-Z]/i;
 function placeStatement(text) { return PLACE_STATEMENT.test(String(text || '')); }
 
-// ---------------------------------------------------------------- booking pre-check
-const DOW = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+// ---------------------------------------------------------------- service duration
 /** Duration the owner wrote for the service (a field when present, else the first "about N hours/minutes/days" in its notes). */
 function durationOf(svc) {
   if (!svc) return null;
@@ -117,31 +116,4 @@ function durationOf(svc) {
   const m = String(svc.notes || '').match(/\b(?:about\s+)?(\d+(?:\s*(?:-|–|to)\s*\d+)?\s*(?:hours?|hrs?|minutes?|mins?|days?))\b/i);
   return m ? m[1].replace(/–/g, '-') : null;
 }
-const hhmm = (t) => { const [h, m] = String(t).split(':').map(Number); const ap = h < 12 ? 'AM' : 'PM'; const h12 = h % 12 || 12; return m ? `${h12}:${String(m).padStart(2, '0')} ${ap}` : `${h12} ${ap}`; };
-/**
- * Once per booking (service + day + time + place all known): coverage, price (or range), duration if known,
- * and the day's opening hours with the time inside them. Returns { key, lines[] } or null.
- * The machine already refuses a time outside hours; this only states the fit.
- */
-function bookingPrecheck(machine, profile = {}, lang = 'en', text = '') {
-  const s = machine && machine.slots; if (!s || machine.intent !== 'book') return null;
-  const when = s.when || {}; if (!s.service || !when.date || !when.time || !s.place) return null;
-  const key = `${s.service}|${when.date}|${when.time}|${s.place}`;
-  if (machine.precheckFor === key) return null;
-  const svc = (profile.servicesCatalog || []).find((x) => x.name === s.service || x.id === s.service_id) || null;
-  const lines = [];
-  const r = AC.resolve(String(s.place), profile);
-  if (r) { const l = AC.line(r, lang); if (l) lines.push(l); if (r.status !== 'covered') { machine.precheckFor = key; return { key, lines, blocked: true }; } }
-  const pl = priceLine(svc, text, lang); const dur = durationOf(svc);
-  if (pl) lines.push(pl.text);
-  if (dur) lines.push(sw(lang) ? `Inachukua takriban ${dur.replace(/hours?/i, 'saa').replace(/minutes?/i, 'dakika').replace(/days?/i, 'siku')}.` : `It takes about ${dur}.`);
-  const day = (profile.hoursSchedule && profile.hoursSchedule.days || {})[DOW[new Date(`${when.date}T12:00:00Z`).getUTCDay()]];
-  if (day && day.open && day.close && when.time >= day.open && when.time < day.close) {
-    const dn = L.sayDate(when.date, lang).split(' ')[0];
-    lines.push(sw(lang) ? `${dn} tuko wazi ${day.open} hadi ${day.close}, kwa hivyo ${when.time} inafaa.` : `On ${dn} we're open ${hhmm(day.open)} to ${hhmm(day.close)}, so ${hhmm(when.time)} works.`);
-  }
-  machine.precheckFor = key;
-  return lines.length ? { key, lines } : null;
-}
-
-module.exports = { factKeys, createAssembler, priceLine, quantityFor, placeStatement, bookingPrecheck, durationOf };
+module.exports = { factKeys, createAssembler, priceLine, quantityFor, placeStatement, durationOf };

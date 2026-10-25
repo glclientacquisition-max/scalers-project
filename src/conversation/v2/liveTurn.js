@@ -3,7 +3,7 @@
 // sentences. Writes go through createLiveHandlers. Flag off = unused.
 
 const { brainV2Enabled, brainV2Mode } = require('./flag');
-const { createState } = require('./machine');
+const { createState, turnLang } = require('./machine');
 const { runTurnStream } = require('./stream');
 const { createLiveHandlers } = require('./liveHandlers');
 const { createClassifyAsk } = require('./classifyAsk');
@@ -291,7 +291,7 @@ function createBrainV2Live(opts = {}) {
     // are buffered and only spoken through the plan's gate. BRAIN_V1_DRAFT_PHASE_B_PARALLEL=off restores serial.
     const parallel = String(env.BRAIN_V1_DRAFT_PHASE_B_PARALLEL || 'on').toLowerCase() !== 'off';
     const startedOn = parallel ? vd.prelaunch({ text, profile, state: machine, langLock: lock }) : null;
-    const pre = await CP.before(machine, text, profile, { handlers });
+    const pre = await CP.before(machine, text, profile, { handlers, lang: lock || turnLang(machine, null, text) });
     let tmpl; let lang = machine.lang || lock || 'en'; let done = null; let turnFieldsOut = null;
     if (pre.owned) { tmpl = pre.line; lang = pre.lang || lang; } else {
       const parts = [];
@@ -429,12 +429,17 @@ function createBrainV2Live(opts = {}) {
     if (lk && rowTurn && lk.match.kind === 'unique' && machine.slots && !machine.slots.row) { const row = (machine.file && machine.file.openRows || []).find((r) => r.id === lk.match.row_id); if (row) machine.slots.row = row; }
     // 3) the state owner applies the turn (rules veto; the model's understanding is evidence)
     const g5 = []; const handlers = leadHandlers(machine, profile, g5);
-    const pre = await CP.before(machine, text, profile, { handlers });
+    // the turn language is decided ONCE, before the call plan's pre-route, so every templated line follows it
+    const tl = lock || turnLang(machine, null, text);
+    // cancel question vs request: decided from the understanding (intent + a named booking/action), never word patterns
+    const ck = ML.cancelKind(u, machine, text, profile, nowFn());
+    const tf = ML.turnFieldsOf(u, profile); const fields = ck && ck !== 'clarify' ? { ...(tf || {}), cancelKind: ck } : tf;
+    const pre = ck === 'clarify' ? CP.ownLine(machine, OW.render({ topic: 'clarify', sub: 'cancel', lang: tl }), 'cancel_clarify', tl) : await CP.before(machine, text, profile, { handlers, lang: tl });
     let tmpl; let lang = (u && (u.lang === 'sw' ? 'sw' : u.lang === 'en' ? 'en' : null)) || machine.lang || lock || 'en'; let done = null;
     if (lock) lang = lock;
     if (pre.owned) { tmpl = pre.line; lang = pre.lang || lang; } else {
       const parts = [];
-      for await (const ev of runTurnStream(machine, { text: pre.text, profile: { ...profile }, now: nowFn(), handlers, model: null, classify: null, turnFields: ML.turnFieldsOf(u, profile), langLock: lock, shouldAbort: abort })) {
+      for await (const ev of runTurnStream(machine, { text: pre.text, profile: { ...profile }, now: nowFn(), handlers, model: null, classify: null, turnFields: fields, langLock: lock, shouldAbort: abort })) {
         if (ev && ev.type === 'sentence') parts.push(ev.text); if (ev && ev.type === 'done') done = ev;
       }
       lang = lock || machine.lang || lang;
@@ -455,10 +460,10 @@ function createBrainV2Live(opts = {}) {
     const questions = u ? (u.questions || []) : rulesEvs.filter((e) => e.type === 'ask').map((e) => ({ type: e.ask === 'pay' ? 'payment' : e.ask }));
     // any place the caller mentioned with no answer yet is owed a coverage answer (understanding and rules alike)
     ML.owedCoverageQuestion(questions, coverage.places, text, machine);
-    // booking pre-check (service, day, time and place known): coverage, price, duration, hours, once, before the name
-    const pre2 = !pre.owned && (st.kind === 'ask' && st.slot === 'name' || st.kind === 'readback') ? RF.bookingPrecheck(machine, profile, lang, text) : null;
+    // the call plan's owed confirmations (slots complete, next is the name/read-back): one more kind of owed answer
+    const plo = pre.owned ? null : CP.owed(machine, profile, st);
     // tool_calls arrive after the understanding; they are hints (the machine commits writes), guarded + traced at the end
-    const ctx = { st, receipts, coverage: coverage.places, caller, profile, questions, lang, machine, text, callerReadOk: !!lk };
+    const ctx = { st, receipts, coverage: coverage.places, caller, profile, questions, lang, machine, text, callerReadOk: !!lk, confirm: plo ? plo.items : [] };
     const ver = ML.makeVerifier(ctx);
     // 4) speak: verified sentences in order; questions held until the reply closes (owed answers go first)
     const spoken = []; const verdicts = []; let firstMs = null; let repairs = 0; let modelSentences = 0;
@@ -503,30 +508,21 @@ function createBrainV2Live(opts = {}) {
     // exactly one voice: any model output that passed the guard (or was repaired) owns the turn; template only when every model failed
     const modelOk = split ? !!(modelSentences || held || repairs) : !!(u && (modelSentences || held || used));
     if (!modelOk) answeredBy = split && used > 0 ? 'template_vetoed' : 'template'; // vetoed = the model answered but every sentence failed the guard
-    const owed = ML.owedAnswers(ctx, spoken.map((x) => x.text).join(' '));
-    if (pre2 && pre2.lines.length) owed.unshift(...pre2.lines.map((l) => ({ subject: 'precheck', text: l })));
     if (answeredBy === 'template' || answeredBy === 'template_vetoed') {
-      // all models failed (or every model sentence was vetoed): the same plan, worded by code; one answer per subject, never stacked
-      const cov = questions.some((q) => q.type === 'coverage') ? ML.coverageAnswer(coverage.places, lang) : null;
-      const ans = CC.answers(rulesEvs.filter((e) => e.ask !== 'coverage'), text, machine, profile, lang);
-      let lines = [cov, ...ans.map((a) => a.text), ...owed.filter((a) => a.subject !== 'coverage').map((a) => a.text)].filter(Boolean);
+      // all models failed (or every model sentence was vetoed): the ONE owed-answer list (owed.js), worded by code in
+      // the turn language, then only the step's question from the reducer line (its own answer text is replaced)
+      // a cancel request is answered by the machine's own step; a clarify turn answers nothing yet (no guessed policy)
+      const list = ck === 'clarify' ? [] : OW.collect({ questions, coverage: coverage.places, text, profile, machine, lang, confirm: ctx.confirm, policyScan: !u && ck !== 'request' });
+      const lines = list.map((o) => OW.render(o, ctx)).filter(Boolean);
       let base = tmpl;
-      if (split) {
-        const priceAsked = questions.some((q) => q.type === 'price');
-        const ofP = OF.ownerFacts(profile); const ownerBacked = (x) => !!OF.backingFact(x, ofP) || (OF.paymentFact(ofP) || { sentences: [], sentences_sw: [] }).sentences.concat(OF.paymentFact(ofP)?.sentences_sw || []).includes(x.trim());
-        if (pre2) lines.unshift(...pre2.lines);
-        if (!priceAsked) { lines = lines.map((l) => l === cov ? l : CP.split(l).filter((x) => ownerBacked(x) || (pre2 && pre2.lines.some((pl) => pl.includes(x))) || !ML.UNASKED_PRICE(x)).join(' ')).filter(Boolean); base = CP.split(base).filter((x) => !ML.UNASKED_PRICE(x)).join(' '); }
-        if (questions.some((q) => q.type === 'payment') && !lines.some((l) => /m-?pesa|paybill|cash|bank|malipo|tunakubali|we take/i.test(l))) lines.push(ML.paymentAnswer(profile, text, lang));
-        if (lines.length) base = CP.split(base).filter((x) => !/not getting that|sikupati|sijakuelewa/i.test(x)).join(' ');
-        if (!base.trim() && lines.length) base = CP.split(tmpl).filter((x) => /\?\s*$/.test(x) && !/not getting that/i.test(x)).pop() || '';
-      }
-      // the template's own coverage/unknown lines are replaced by the per-place answer (G4: no contradiction stacking)
+      if (split && !questions.some((q) => q.type === 'price')) base = CP.split(base).filter((x) => !ML.UNASKED_PRICE(x)).join(' ');
+      if (lines.length && !fixed) base = CP.split(base).filter((x) => /\?\s*$/.test(x) && !/not getting that|sikupati|sijakuelewa/i.test(x)).join(' ');
+      if (plo && plo.blocked) base = lang === 'sw' ? 'Kazi iko eneo lingine?' : 'Is the job anywhere else?'; // [PROMPT-PLACEHOLDER]
       if (lines.some((l) => /\?\s*$/.test(l))) base = CP.split(base).filter((x) => !/\?\s*$/.test(x)).join(' ');
-      if (cov) base = CP.split(base).filter((x) => !coverage.places.some((r) => x.toLowerCase().includes(r.place.toLowerCase())) && !/can'?t confirm|siwezi kuthibitisha/i.test(x)).join(' ');
-      for (const l of [...new Set(lines)]) emit(l, 'template');
+      for (const l of lines) emit(l, 'template');
       emit(base, 'template');
     } else {
-      for (const a of owed) emit(a.text, 'owed_answer');
+      for (const a of ML.owedAnswers(ctx, spoken.map((x) => x.text).join(' '))) emit(a.text, 'owed_answer');
       if (fixed) { emit(st.kind === 'readback' ? st.readback : tmpl, 'fixed'); if (!modelSentences) answeredBy = 'fixed'; }
       else {
         const stepQ = st.kind === 'ask' || st.kind === 'confirm_name' ? CP.tail(st, ver.act) : null;
@@ -534,6 +530,7 @@ function createBrainV2Live(opts = {}) {
       }
       if (repairs) answeredBy = `${answeredBy}+repair`;
     }
+    if (plo) CP.markOwed(machine, plo);
     const line = spoken.map((x) => x.text).join(' ').trim() || tmpl;
     V1.remember(machine, 'agent', line);
     const endCall = endDecision({ done, machine, profile, line, alreadyEnded: endSent });
@@ -589,6 +586,7 @@ const CC = require('./callCore');
 const ML = require('./modelLead');
 const L2 = require('./lexicon');
 const RF = require('./replyFacts');
+const OW = require('./owed');
 const OF = require('./ownerFacts');
 /** Decision 3: one bad sentence gets a quick model rewrite when >=300 ms is left (light model), else the code line. */
 async function repairSentence({ sf, id, bad, fix, lang, capMs }) {

@@ -821,11 +821,12 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
     Object.defineProperty(state, 'record', { value: CS.makeRecorder(handlers, state), writable: true, configurable: true, enumerable: false });
   }
   const prevLang = state.lang;
-  // langLock (Voice #677): the call language is owned by Voice; never flip mid-turn.
-  state.lang = RO.enabled() ? RO.turnLang(state.lang, langLock, text) // BRAIN_V2_REPLY_OWNER: follow the caller's clear switch
-    : (langLock === 'en' || langLock === 'sw') ? langLock : (L.nextLanguage(state.lang, text) || state.lang);
+  state.lang = turnLang(state, langLock, text);
   let areaQ = null;
   let u = N.understand(text, { profile, now, expecting: state.expecting, topic: state.lastInfo, prev: state.nluPrev || null, opening: state.turn === 1 && !state.slots.name });
+  // cancel question vs request is the understanding's call (modelLead.cancelKind), not the rules' word patterns
+  if (turnFields && turnFields.cancelKind === 'policy') u.intents = ['policy_cancel', ...u.intents.filter((i) => i !== 'cancel' && i !== 'policy_cancel')];
+  if (turnFields && turnFields.cancelKind === 'request') u.intents = ['cancel', ...u.intents.filter((i) => i !== 'cancel' && i !== 'policy_cancel')];
   // R2 gate signals from Voice (optional): unfinished STT / silence beat after interrupt_wait
   if (unfinished === true) u.unfinished = true;
   if (silenceBeat === true) u.silenceBeat = true;
@@ -1338,4 +1339,13 @@ async function runTurnTopic(state, args) {
   if (r) r.proposals = r.line ? [TP.proposal({ kind: kind || 'turn', text: r.line, lang: state.lang, topic: kind ? { ...state.topic, now: state.turn } : null, claim: Boolean(kind) })] : [];
   return r;
 }
-module.exports = { createState, runTurn, finishCall, catalogueTurn, MOUTH_FAILFAST_MS, consultModelForMouth, weighHybridTurn: HW.weighHybridTurn };
+/**
+ * The turn language, decided ONCE per turn from the call's language, Voice's lock and the caller's words.
+ * Pure (no state write): the live runner decides it before the call plan's pre-route, the machine applies it.
+ * langLock (Voice #677): the call language is owned by Voice; never flip mid-turn.
+ */
+function turnLang(state, langLock, text) {
+  return RO.enabled() ? RO.turnLang(state.lang, langLock, text) // BRAIN_V2_REPLY_OWNER: follow the caller's clear switch
+    : (langLock === 'en' || langLock === 'sw') ? langLock : (L.nextLanguage(state.lang, text) || state.lang);
+}
+module.exports = { turnLang, createState, runTurn, finishCall, catalogueTurn, MOUTH_FAILFAST_MS, consultModelForMouth, weighHybridTurn: HW.weighHybridTurn };
