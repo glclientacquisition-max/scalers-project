@@ -103,7 +103,7 @@ function coverageReceipt(places = [], profile = {}) {
  * tree match stays the honest "which area is that near?" row. */
 function coverageFor(text, profile = {}, opts = {}) {
   const rejected = [];
-  const rec = coverageReceipt(placeCandidates(text, { ...opts, rejected }), profile);
+  const rec = coverageReceipt(placeCandidates(text, { ...opts, rejected, profile }), profile);
   if (!rec.places.length) {
     const r = AC.resolve(String(text || ''), profile, { expecting: opts.expecting });
     if (r && r.name) rec.places.push({ place: r.name, said: r.landmark || r.name, matched_node: r.node || null, covered: r.status === 'covered' ? 'yes' : r.status === 'unknown' ? 'unknown' : 'no', status: r.status, source: r.source === 'picks' ? 'area_picks' : 'legacy', via: r.via || null, line_en: AC.line(r, 'en'), line_sw: AC.line(r, 'sw'), fee_kes: r.fee_kes ?? null, ...noteFields(r) });

@@ -147,9 +147,9 @@ function confirmInCaller(place, words) {
 /**
  * The places the CALLER named this turn: [{ name, node, said, via: 'model'|'slot'|'landmark', fuzzy }] (max 5).
  * u: the model's understanding (null when the model has not answered / failed); expecting: machine.expecting.
- * rejected (out param): model places the caller never said, for the trace.
+ * rejected (out param): model places the caller never said, for the trace. profile: enables bare own-pick names.
  */
-function placeMentions(text, { u = null, expecting = null, rejected = null } = {}) {
+function placeMentions(text, { u = null, expecting = null, rejected = null, profile = null } = {}) {
   const words = AP.normAreaText(text).split(' ').filter(Boolean);
   const out = []; const seen = new Set();
   const add = (name, rest) => { const k = String(name).toLowerCase(); if (!name || seen.has(k) || out.length >= 5) return; seen.add(k); out.push({ name, ...rest }); };
@@ -160,6 +160,26 @@ function placeMentions(text, { u = null, expecting = null, rejected = null } = {
     else if (Array.isArray(rejected)) rejected.push(String(p));
   }
   if (AP.available()) for (const w of slotWindows(words, expecting)) for (const m of strictScan(words.slice(w.from, w.to), { bare: !!w.bare })) add(m.node.name, { node: m.node, said: m.said, via: m.via === 'landmark' ? 'landmark' : 'slot', fuzzy: false });
+  for (const m of ownPickBare(words, profile)) add(m.node.name, { node: m.node, said: m.said, via: 'own_pick', fuzzy: false });
+  return out;
+}
+/**
+ * Bare place names with no cue word (Alvin 2026-10-25 13:48): a whole-word EXACT match of the name or an alias of a
+ * place in THIS tenant's own CONFIRMED picks counts. Multi-letter, never a stop word. No fuzzy, no landmarks, no tree
+ * places outside the tenant's picks (those still need the model's understanding or a place slot, else "which area?").
+ */
+function ownPickBare(words, profile) {
+  if (!profile || !AP.available()) return [];
+  const p = picksOf(profile); if (!p) return [];
+  const text = ` ${words.join(' ')} `; const out = [];
+  for (const pick of p.picks) {
+    const n = AP.areaNode(pick.node); if (!n || n.kind === 'country') continue;
+    for (const k of [n.name, ...(n.aliases || [])]) {
+      const q = AP.normAreaText(k);
+      if (!q || q.replace(/ /g, '').length < 2 || q.split(' ').some((x) => PLACE_STOP.has(x)) || NOT_PLACE.has(q)) continue;
+      if (text.includes(` ${q} `)) { out.push({ node: n, said: q }); break; }
+    }
+  }
   return out;
 }
 
@@ -198,7 +218,7 @@ function resolve(text, profile = {}, opts = {}) {
   const t = String(text || '');
   if (!t.trim()) return null;
   const picks = picksOf(profile);
-  if (picks) return resolvePicks(t, picks, opts);
+  if (picks) return resolvePicks(t, picks, { ...opts, profile });
   if (picksPending(profile)) {
     const m = mentionMatch(t, opts);
     if (m) return { status: 'unknown', name: m.node.name, place: K.normalizePlaceKey(m.node.name), node: m.node.id, counties: [], via: 'unconfirmed', source: 'picks' };
