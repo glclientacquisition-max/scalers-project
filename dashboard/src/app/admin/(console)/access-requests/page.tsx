@@ -80,7 +80,7 @@ export default async function AdminAccessRequestsPage({
     <div>
       <h2 className="font-display text-2xl tracking-tight">Access requests</h2>
       <p className="mt-2 text-sm text-ink-soft">
-        Approve sends a Supabase invite. Owners set a password in onboarding.
+        Approve sends a sign-up invite. Owners set a password in onboarding.
       </p>
       <AdminAccessRequestsPanel
         rows={rows}

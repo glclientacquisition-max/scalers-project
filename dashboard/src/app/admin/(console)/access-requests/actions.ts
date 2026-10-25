@@ -70,7 +70,7 @@ async function sendInviteEmail(
 
   if (linkErr || !linkData?.properties?.action_link) {
     console.error("[access-requests] generateLink failed:", linkErr?.message || "no link");
-    return { error: "Could not resend invite for this email." };
+    return { error: "Could not send another invite to this address." };
   }
 
   if (isOwnerEmailConfigured()) {

@@ -300,10 +300,10 @@ function RequestRow({
             size="sm"
             disabled={pending}
             onClick={() =>
-              run(() => resendAccessRequestInviteAction(row.id), "Invite resent.")
+              run(() => resendAccessRequestInviteAction(row.id), "Invite sent again.")
             }
           >
-            Resend invite
+            Send invite again
           </Button>
         </div>
       ) : null}

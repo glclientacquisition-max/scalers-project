@@ -11,17 +11,18 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-202 variables.
+204 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
+| `ACCESS_REQUEST_NOTIFY_EMAIL` | desk | `dashboard/src/lib/accessRequestNotify.ts` |
 | `ADMIN_ACCESS_CODE` | desk | `dashboard/src/lib/admin-auth.ts` |
 | `ADMIN_ENV` | desk | `dashboard/src/app/admin/(console)/%5Fkit/page.tsx` |
 | `ADMIN_STEP_UP_ALERT_EMAIL` | desk | `dashboard/src/lib/ops/stepUpStore.ts` |
 | `ADMIN_STEP_UP_KEY` | desk | `dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/auth.ts`<br>`dashboard/src/lib/ops/stepUpStore.ts` |
-| `ADMIN_V2` | desk | `dashboard/src/app/admin/(console)/_screens/AuditScreen.tsx`<br>`dashboard/src/app/admin/(console)/_screens/PackagesScreen.tsx`<br>`dashboard/src/app/admin/(console)/_screens/ServicesScreen.tsx`<br>+29 more |
+| `ADMIN_V2` | desk | `dashboard/src/app/admin/(console)/_screens/AuditScreen.tsx`<br>`dashboard/src/app/admin/(console)/_screens/PackagesScreen.tsx`<br>`dashboard/src/app/admin/(console)/_screens/ServicesScreen.tsx`<br>+30 more |
 | `AGENT_NAME` | voice | `server.js`<br>`src/db.js`<br>`src/prompts.js`<br>+1 more |
-| `ALERT_EMAIL_FROM` | voice | `server.js`<br>`src/notifications/email.js` |
+| `ALERT_EMAIL_FROM` | desk, voice | `dashboard/src/lib/ownerEmail.ts`<br>`server.js`<br>`src/notifications/email.js` |
 | `BACHS_API_KEY` | desk | `dashboard/src/lib/adminPayRead.ts`<br>`dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/provider.js` |
 | `BACHS_LIVE_ALLOWED` | desk | `dashboard/src/lib/invoicePay/provider.js` |
 | `BACHS_LIVE_TENANT_ALLOWLIST` | desk | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/provider.js` |
@@ -75,7 +76,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `NEXT_PUBLIC_ADMIN_HOST` | desk | `dashboard/src/components/ServiceWorkerRegister.tsx` |
 | `NEXT_PUBLIC_APP_HOST` | desk | `dashboard/src/components/ServiceWorkerRegister.tsx` |
 | `NEXT_PUBLIC_APP_URL` | voice | `server.js` |
-| `NEXT_PUBLIC_SITE_URL` | desk | `dashboard/src/app/layout.tsx`<br>`dashboard/src/components/ServiceWorkerRegister.tsx`<br>`dashboard/src/lib/admin-auth.ts` |
+| `NEXT_PUBLIC_SITE_URL` | desk | `dashboard/src/app/admin/(console)/access-requests/actions.ts`<br>`dashboard/src/app/layout.tsx`<br>`dashboard/src/components/ServiceWorkerRegister.tsx`<br>+1 more |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | desk | `dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | desk | `dashboard/src/lib/supabase/env.ts` |
 | `NEXT_PUBLIC_SUPABASE_URL` | desk, scripts | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts`<br>+2 more |
@@ -111,7 +112,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `RAILWAY_GIT_COMMIT_SHA` | voice | `server.js` |
 | `RECORDING_RETENTION_DAYS` | desk, voice | `dashboard/src/lib/recordingRetentionPolicy.ts`<br>`src/lib/recordingRetention.js`<br>`src/lib/recordingRetentionPolicy.js` |
 | `RECORDING_RETENTION_PURGE` | voice | `src/lib/recordingRetention.js` |
-| `RESEND_API_KEY` | desk, voice | `dashboard/src/lib/opsMail.ts`<br>`src/notifications/email.js` |
+| `RESEND_API_KEY` | desk, voice | `dashboard/src/lib/opsMail.ts`<br>`dashboard/src/lib/ownerEmail.ts`<br>`src/notifications/email.js` |
 | `SAUTIKIT_ADMIN_OPS_KEY` | desk | `dashboard/src/lib/sautikit.ts` |
 | `SAUTIKIT_API_BASE` | desk, voice | `dashboard/src/lib/sautikit.ts`<br>`src/notifications/whatsapp.js`<br>`src/sautikit/lineUnavailableAudio.js`<br>+3 more |
 | `SAUTIKIT_API_KEY` | desk, scripts, voice | `dashboard/src/lib/sautikit.ts`<br>`scripts/smoke-whatsapp-did.js`<br>`server.js`<br>+5 more |
@@ -126,6 +127,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SAUTIKIT_WHATSAPP_TEMPLATE_ALLOW_LEGACY` | voice | `src/notifications/whatsappTemplates.js` |
 | `SCALERS_OPS_ALERT_EMAIL` | desk | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/setupNotify.ts` |
 | `SCALERS_OPS_ALERT_EMAILS` | desk | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/setupNotify.ts` |
+| `SIGNUP_MODE` | desk | `dashboard/src/lib/signupMode.ts` |
 | `SMOKE_TENANT_ID` | scripts | `scripts/smoke-db.js` |
 | `SMOKE_VOICE_PORT` | scripts | `scripts/smoke-recording-webhook.js` |
 | `SONIOX_API_KEY` | voice | `src/speech/sonioxStt.js`<br>`src/speech/sonioxTts.js`<br>`src/speech/sonioxVoice.js` |
