@@ -1,5 +1,6 @@
 import { ButtonLink } from "@/components/ui/Button";
 import { OverviewDataChecksCard } from "@/components/structured/OverviewDataChecksCard";
+import { areaConfirmCheck } from "@/lib/areaConfirmCheck.server";
 import { CallInsights } from "@/components/insights/CallInsights";
 import { loadCallInsights } from "@/lib/callInsightsLoad";
 import { dataChecksFor } from "@/components/structured/StructuredSettingsSlots";
@@ -107,6 +108,9 @@ async function HomeOverviewBody() {
     saveIsConfirm,
     readyItems: readyChecklist?.items,
   });
+  // Brain #942 answers coverage only from confirmed picks: nudge until the owner confirms.
+  const areaNudge = canEditSettings ? await areaConfirmCheck(tenant) : null;
+  if (areaNudge) overviewChecks.unshift(areaNudge);
 
   const readiness = assessMvpAnswerReadiness({
     businessName: tenant.business_name,
