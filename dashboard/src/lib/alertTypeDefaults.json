@@ -1,0 +1,10 @@
+{
+  "types": ["missed_call", "booking", "message"],
+  "channels": ["push", "sms", "whatsapp", "email"],
+  "defaults": {
+    "missed_call": { "push": true, "sms": true, "whatsapp": true, "email": true },
+    "booking": { "push": true, "sms": false, "whatsapp": true, "email": true },
+    "message": { "push": false, "sms": false, "whatsapp": true, "email": true }
+  },
+  "missedCallGuardOrder": ["whatsapp", "sms", "email", "push"]
+}

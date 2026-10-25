@@ -555,6 +555,7 @@ const {
   recentlyTexted,
   sendMissedTextback,
 } = require('./src/notifications/missedTextback');
+const { alertTypeFor } = require('./src/notifications/notifyChannels');
 
 /** Desk base for deep links in owner alerts. */
 function deskBaseUrl() {
@@ -7770,6 +7771,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       body,
       lead,
       channels: notifyChannels,
+      alertType: alertTypeFor({ kind: 'lead', status: call.status }),
       ledger: {
         tenantId,
         callId: call.id || null,
@@ -7873,6 +7875,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
         lead,
         channels: notifyChannels,
         subject: renderEventSubject(event),
+        alertType: 'booking',
         ledger: { ...ledger, kind: 'service_request' },
       });
   const result = sent[0] || { channel: null, reason: suppressStaff ? 'owner_summary' : 'no_inbox_recipient' };
@@ -7990,6 +7993,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
         lead,
         subject: renderEventSubject(event),
         channels: notifyChannels,
+        alertType: 'booking',
         ledger: { ...ledger, kind: 'appointment' },
       });
   const result = sent[0] || { channel: null, reason: suppressStaff ? 'owner_summary' : 'no_inbox_recipient' };

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
 import { NotifyChannelPicker } from "@/components/NotifyChannelPicker";
 import { PhoneAlertsCard } from "@/components/PhoneAlertsCard";
+import { AlertTypeRows } from "@/components/AlertTypeRows";
 import {
   SettingsGroup,
   SettingsPageHeader,
@@ -137,6 +138,8 @@ function AlertsPanelInner({
           onChange={setNotifyChannels}
           heading="Channels"
         />
+
+        <AlertTypeRows value={notifyChannels} onChange={setNotifyChannels} />
 
         <SettingsGroup title="Callers">
           <SettingsRow label="Text customers" control="switch">

@@ -19,7 +19,7 @@ const {
   buildLeadEmail,
 } = require('./email');
 const { isSmsConfigured, normalizeSmsTo, sendSms } = require('./sms');
-const { parseNotifyChannels } = require('./notifyChannels');
+const { effectiveChannels } = require('./notifyChannels');
 const {
   beginInstanceSend,
   durableSendClaim,
@@ -85,10 +85,12 @@ async function trySendWhatsApp({ to, body, lead, kind }) {
  * @param {object} [opts.lead]
  * @param {string} [opts.subject]
  */
-async function dispatchAlert({ to, email, body, lead = {}, subject, channels, ledger, kind } = {}) {
+async function dispatchAlert({ to, email, body, lead = {}, subject, channels, ledger, kind, alertType } = {}) {
   const text = body || buildLeadText(lead);
   const errors = [];
-  const prefs = parseNotifyChannels(channels);
+  // alertType (missed_call | booking | message) applies the owner's per-type
+  // choices; fallback below only walks channels allowed for that type.
+  const prefs = effectiveChannels(channels, alertType || null);
   const dests = [normalizeSmsTo(to), normalizeWhatsAppTo(to), normalizeEmail(email)].filter(
     Boolean
   );
