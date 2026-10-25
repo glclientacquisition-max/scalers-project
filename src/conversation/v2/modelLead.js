@@ -62,30 +62,19 @@ function callerReceipt(file = {}, { now = new Date(), lockedName = null } = {}) 
   };
 }
 
-/** Place phrases in a caller turn: split on "or/and/au/na/ama/," then the tree matcher per piece (local, no network).
- * Lead split (#933 dials c1 T2/T6 "Kilimani Westlands", "Ongata Rongai or Kileleshwa"): each piece is also scanned
- * word-window by word-window (longest first), so places with no conjunction between them are all found. */
-function placeCandidates(text) {
-  const parts = String(text || '').split(/\s*(?:,|\bor\b|\band\b|\bau\b|\bama\b|\bna\b|\bwala\b)\s*/i).filter((p) => p && p.trim());
-  const out = [];
-  const add = (n) => { if (n && !out.includes(n)) out.push(n); };
-  for (const p of parts) {
-    const words = p.replace(/[?.!;:"]/g, ' ').split(/\s+/).filter(Boolean);
-    const found = scanPlaces(words);
-    if (found.length) found.forEach(add); else { const m = AC.treeMatch(p); if (m && m.node) add(m.node.name); }
-  }
-  return out;
-}
-const STOP = new Set(['i', 'you', 'we', 'the', 'a', 'to', 'in', 'at', 'of', 'do', 'guys', 'have', 'go', 'there', 'about', 'what', 'maybe', 'also', 'serve', 'cover', 'come', 'is', 'it', 'my', 'me', 'for', 'if', 'want', 'wanted', 'know', 'kama', 'mnafika', 'kujua']);
+/** Place names the CALLER named (AC.placeMentions: the model's places confirmed in the caller's words, plus exact/landmark
+ * names inside an explicit place slot). Never fuzzy-invents a place from free text (rogue calls HD_7a9915837b00 / HD_ef5ee3a15a0a). */
+function placeCandidates(text, opts = {}) { return AC.placeMentions(text, opts).map((m) => m.name); }
+/** Strict place names in a MODEL sentence (exact/alias/landmark, whole words, stop-listed; never fuzzy). Guard use only. */
 function scanPlaces(words) {
   const out = []; let i = 0;
   while (i < words.length) {
     let hit = null;
     for (let n = Math.min(3, words.length - i); n >= 1 && !hit; n -= 1) {
-      const w = words.slice(i, i + n);
-      if (n === 1 && (STOP.has(w[0].toLowerCase()) || w[0].length < 4)) continue;
-      const m = AC.treeMatch(w.join(' '));
-      if (m && m.node && norm(m.said || '') === norm(w.join(' '))) hit = { name: m.node.name, n };
+      const w = words.slice(i, i + n); const q = norm(w.join(' '));
+      if (AC.PLACE_STOP.has(norm(w[0])) || AC.PLACE_STOP.has(norm(w[w.length - 1])) || (n === 1 && w[0].length < 4)) continue;
+      const m = AC.treeMatch(q, { fuzzy: false });
+      if (m && m.node && !m.fuzzy && m.said === q) hit = { name: m.node.name, n }; // whole span, never a fuzzy hit (the old m.said self-compare let fuzzy through)
     }
     if (hit) { if (!out.includes(hit.name)) out.push(hit.name); i += hit.n; } else i += 1;
   }
@@ -107,22 +96,34 @@ function coverageReceipt(places = [], profile = {}) {
   return { tool: 'check_coverage', ok: true, places: rows };
 }
 
-/** Every place the caller mentioned, resolved on the ONE coverage source (confirmed picks; legacy rows only with no picks).
- * Word-window places first, then the whole phrase (a landmark / "near X" the window scan cannot place). */
-function coverageFor(text, profile = {}) {
-  const rec = coverageReceipt(placeCandidates(text), profile);
-  const r = AC.resolve(String(text || ''), profile);
-  if (r && r.name && !rec.places.some((x) => x.place.toLowerCase() === String(r.name).toLowerCase())) {
-    if (r.via === 'asked' || r.landmark) rec.places = rec.places.filter((x) => x.covered !== 'unknown');
-    rec.places.push({ place: r.name, said: r.landmark || r.name, matched_node: r.node || null, covered: r.status === 'covered' ? 'yes' : r.status === 'unknown' ? 'unknown' : 'no', status: r.status, source: r.source === 'picks' ? 'area_picks' : 'legacy', via: r.via || null, line_en: AC.line(r, 'en'), line_sw: AC.line(r, 'sw'), fee_kes: r.fee_kes ?? null });
+/** Every place the CALLER named, resolved on the ONE coverage source (confirmed picks; legacy rows only with no picks).
+ * opts: { u (understanding, may be null), expecting }. Rows carry from:'caller'. An unknown "do you cover X?" with no
+ * tree match stays the honest "which area is that near?" row. */
+function coverageFor(text, profile = {}, opts = {}) {
+  const rejected = [];
+  const rec = coverageReceipt(placeCandidates(text, { ...opts, rejected }), profile);
+  if (!rec.places.length) {
+    const r = AC.resolve(String(text || ''), profile, { expecting: opts.expecting });
+    if (r && r.name) rec.places.push({ place: r.name, said: r.landmark || r.name, matched_node: r.node || null, covered: r.status === 'covered' ? 'yes' : r.status === 'unknown' ? 'unknown' : 'no', status: r.status, source: r.source === 'picks' ? 'area_picks' : 'legacy', via: r.via || null, line_en: AC.line(r, 'en'), line_sw: AC.line(r, 'sw'), fee_kes: r.fee_kes ?? null });
   }
+  for (const r of rec.places) r.from = 'caller';
+  if (rejected.length) rec.rejected = rejected;
   return rec;
 }
-/** Any place the caller mentioned that has no coverage answer yet is owed one (question, statement or "near X"). */
+/** Model-heard places (arriving after the prefetch) join the turn's rows only when the caller said them. */
+function addCallerPlaces(coverage, u, text, profile = {}, machine = {}) {
+  if (!u || !u.slots || !Array.isArray(u.slots.places) || !u.slots.places.length) return coverage;
+  const rec = coverageFor(text, profile, { u, expecting: machine.expecting });
+  for (const r of rec.places) if (!coverage.places.some((x) => x.place.toLowerCase() === r.place.toLowerCase())) coverage.places.push(r);
+  if (rec.rejected) coverage.rejected = [...new Set([...(coverage.rejected || []), ...rec.rejected])];
+  return coverage;
+}
+/** A place the caller named with no answer yet is owed a coverage answer. Only caller rows (never guard/model rows). */
 function owedCoverageQuestion(questions, coverage, text, machine = {}) {
-  if (!coverage.length || questions.some((q) => q.type === 'coverage')) return questions;
+  const said = coverage.filter((r) => r.from === 'caller');
+  if (!said.length || questions.some((q) => q.type === 'coverage')) return questions;
   if (['landmark', 'name'].includes(machine.expecting)) return questions;
-  questions.push({ type: 'coverage', subject: coverage.map((r) => r.place).join(', '), why: RF.placeStatement(text) ? 'place_statement' : 'place_mention' });
+  questions.push({ type: 'coverage', subject: said.map((r) => r.place).join(', '), why: RF.placeStatement(text) ? 'place_statement' : 'place_mention' });
   return questions;
 }
 /** One honest coverage sentence per place, never stacked ([PROMPT-PLACEHOLDER]). */
@@ -335,8 +336,9 @@ function makeVerifier(ctx) {
   function placesIn(s) {
     const hits = [];
     for (const r of ctx.coverage) if (new RegExp(`\\b${r.place.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(s)) hits.push(r);
-    if (!hits.length) { for (const p of placeCandidates(s)) { const r = known.get(p.toLowerCase()) || coverageReceipt([p], ctx.profile).places[0]; if (r && !hits.includes(r)) { hits.push(r); if (!known.has(r.place.toLowerCase())) { known.set(r.place.toLowerCase(), r); ctx.coverage.push(r); } } } }
-    return hits;
+    // the model's own words never create coverage rows: a place the caller did not name is reported, not resolved
+    const unasked = hits.length ? [] : scanPlaces(String(s).replace(/[?.!;:",]/g, ' ').split(/\s+/).filter(Boolean)).filter((p) => !known.has(p.toLowerCase()));
+    return { hits, unasked };
   }
   function check(raw) {
     const s = String(raw || '').trim(); if (!s) return { verdict: 'drop', reason: 'empty' };
@@ -352,7 +354,14 @@ function makeVerifier(ctx) {
     if (priceish && !asked.has('price')) return { verdict: 'drop', reason: 'unasked_price' };
     if (priceish && asked.has('price') && nums(s).some((n) => !prices.has(n))) return { verdict: 'repair', reason: 'price_not_in_kb', subject: 'price', fix: priceFix(ctx) };
     // G3/G4 coverage: polarity must equal the receipt; one answer per place
-    const hits = placesIn(s);
+    const { hits, unasked: un0 } = placesIn(s);
+    // a place the caller did not name: fine when it is the caller's own booking address (lookup_caller receipt); checked
+    // against a LOCAL receipt (never added to the turn's rows/owed answers) when the caller asked "where do you cover?";
+    // otherwise the sentence is dropped, never repaired into a new claim (HD_7a9915837b00 "hatufiki Kutus")
+    const fileText = ctx.callerReadOk ? JSON.stringify([ctx.caller.last_past_job, ...(ctx.caller.upcoming || [])]).toLowerCase() : '';
+    const unasked = un0.filter((p) => !fileText.includes(p.toLowerCase()));
+    if (unasked.length && asked.has('coverage') && !ctx.coverage.some((r) => r.from === 'caller')) { for (const p of unasked) { const r = coverageReceipt([p], ctx.profile).places[0]; if (r && !hits.includes(r)) hits.push(r); } }
+    else if (unasked.length) return { verdict: 'drop', reason: `unasked_place:${unasked[0]}`, subject: `place:${unasked[0].toLowerCase()}` };
     if (hits.length && !(ctx.st.kind === 'readback' && isQ(s))) {
       const pol = UNSURE.test(s) ? 'unknown' : NEG.test(s) ? 'no' : 'yes';
       for (const r of hits) {
@@ -620,4 +629,4 @@ function paymentAnswer(profile = {}, text = '', lang = 'en') {
 }
 const UNASKED_PRICE = (s) => PRICE_WORD.test(s) && !/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|saa\s/i.test(s) && !/\b(20\d\d|october|oktoba)\b/i.test(s);
 
-module.exports = { cancelKind, upcomingLine, coverageFor, owedCoverageQuestion, leadOn, splitOn, leadModels, SPLIT_DEADLINES, understandRequest, normUnderstanding, replyRequest, lookupCaller, callerFilters, ROW_INTENT, offerRowsLine, backedByCaller, pastAsOpen, paymentAnswer, UNASKED_PRICE, U_SCHEMA, R_SCHEMA, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };
+module.exports = { cancelKind, upcomingLine, coverageFor, addCallerPlaces, scanPlaces, owedCoverageQuestion, leadOn, splitOn, leadModels, SPLIT_DEADLINES, understandRequest, normUnderstanding, replyRequest, lookupCaller, callerFilters, ROW_INTENT, offerRowsLine, backedByCaller, pastAsOpen, paymentAnswer, UNASKED_PRICE, U_SCHEMA, R_SCHEMA, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };

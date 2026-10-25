@@ -19,6 +19,26 @@ const DOW = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const DAY_EN = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
 const DAY_SW = { mon: 'Jumatatu', tue: 'Jumanne', wed: 'Jumatano', thu: 'Alhamisi', fri: 'Ijumaa', sat: 'Jumamosi', sun: 'Jumapili' };
 const hhmm = (t) => { const [h, m] = String(t).split(':').map(Number); const ap = h < 12 ? 'AM' : 'PM'; const h12 = h % 12 || 12; return m ? `${h12}:${String(m).padStart(2, '0')} ${ap}` : `${h12} ${ap}`; };
+const WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+// spoken clock: EN "7:30 AM"; SW Swahili hours + part of day ("saa moja na nusu asubuhi")
+function sayClock(t, lang) {
+  if (!sw(lang)) return hhmm(t);
+  const h = Number(String(t).split(':')[0]);
+  const part = h < 12 ? 'asubuhi' : h < 16 ? 'mchana' : h < 19 ? 'jioni' : 'usiku';
+  return `${L.sayTime(t, 'sw')} ${part}`;
+}
+const DAY_WORDS = [[/\b(monday|mon|jumatatu)\b/i, 'mon'], [/\b(tuesday|tue|jumanne)\b/i, 'tue'], [/\b(wednesday|wed|jumatano)\b/i, 'wed'], [/\b(thursday|thu|alhamisi)\b/i, 'thu'], [/\b(friday|fri|ijumaa)\b/i, 'fri'], [/\b(saturday|sat|jumamosi)\b/i, 'sat'], [/\b(sunday|sun|jumapili)\b/i, 'sun']];
+/** The day(s) a hours question names: weekday words, today/leo, tomorrow/kesho, weekend/wikendi (EAT). */
+function askedDays(text, now) {
+  const t = String(text || ''); const out = [];
+  for (const [re, k] of DAY_WORDS) if (re.test(t)) out.push(k);
+  if (/\b(weekends?|wikendi)\b/i.test(t)) out.push('sat', 'sun');
+  const base = now instanceof Date ? now : new Date();
+  const eat = (n) => DOW[new Date(base.getTime() + 3 * 3600e3 + n * 864e5).getUTCDay()];
+  if (/\b(today|leo)\b/i.test(t)) out.push(eat(0));
+  if (/\b(tomorrow|kesho)\b/i.test(t)) out.push(eat(1));
+  return [...new Set(out)];
+}
 const svcOf = (profile, name) => (profile.servicesCatalog || []).find((x) => x.name === name || x.id === name) || null;
 const factOf = (profile, sub) => { const of = OF.ownerFacts(profile); return of.byTopic.get(sub) || of.facts.find((f) => f.id === sub || f.topic === sub) || null; };
 const dayOf = (date) => DOW[new Date(`${date}T12:00:00Z`).getUTCDay()];
@@ -40,14 +60,30 @@ const RENDER = {
   },
   payment(o, c) { return ML().paymentAnswer(c.profile, c.text || '', o.lang); },
   policy(o, c) { const f = factOf(c.profile, o.sub); return f ? OF.spoken(f, o.lang) : null; },
+  // [PROMPT-PLACEHOLDER] hours: the day asked about only; otherwise the days grouped in week order, as spoken times
   hours(o, c) {
     const d = (c.profile.hoursSchedule && c.profile.hoursSchedule.days) || {};
-    const open = Object.entries(d).filter(([, x]) => x && x.open && x.close);
-    if (!open.length) return null;
-    const spans = [...new Set(open.map(([, x]) => `${x.open}-${x.close}`))];
-    if (spans.length === 1 && open.length === 7) { const [a, b] = spans[0].split('-'); return sw(o.lang) ? `Tuko wazi kila siku, ${a} hadi ${b}.` : `We're open every day, ${hhmm(a)} to ${hhmm(b)}.`; }
-    const say = ([k, x]) => (sw(o.lang) ? `${DAY_SW[k] || k} ${x.open} hadi ${x.close}` : `${DAY_EN[k] || k} ${hhmm(x.open)} to ${hhmm(x.close)}`);
-    return sw(o.lang) ? `Saa zetu: ${open.map(say).join(', ')}.` : `Our hours: ${open.map(say).join(', ')}.`;
+    const isOpen = (k) => !!(d[k] && d[k].open && d[k].close);
+    if (!WEEK.some(isOpen)) return null;
+    const S = sw(o.lang); const span = (k) => `${sayClock(d[k].open, o.lang)} ${S ? 'hadi' : 'to'} ${sayClock(d[k].close, o.lang)}`;
+    const days = askedDays(`${o.sub || ''} ${c.text || ''}`, c.now);
+    if (days.length) {
+      return days.map((k) => (isOpen(k)
+        ? (S ? `${DAY_SW[k]} tuko wazi ${span(k)}.` : `On ${DAY_EN[k]} we're open ${span(k)}.`)
+        : (S ? `${DAY_SW[k]} tumefunga.` : `We're closed on ${DAY_EN[k]}.`))).join(' ');
+    }
+    const groups = []; // consecutive days (Mon..Sun) with the same span
+    for (const k of WEEK) {
+      const key = isOpen(k) ? `${d[k].open}-${d[k].close}` : 'closed'; const g = groups[groups.length - 1];
+      if (g && g.key === key) g.days.push(k); else groups.push({ key, days: [k] });
+    }
+    if (groups.length === 1 && groups[0].key !== 'closed') return S ? `Tuko wazi kila siku, ${span('mon')}.` : `We're open every day, ${span('mon')}.`;
+    const name = (k) => (S ? DAY_SW[k] : DAY_EN[k]);
+    const range = (g) => (g.days.length === 1 ? name(g.days[0]) : g.days.length === 2 ? `${name(g.days[0])} ${S ? 'na' : 'and'} ${name(g.days[1])}` : `${name(g.days[0])} ${S ? 'hadi' : 'to'} ${name(g.days[g.days.length - 1])}`);
+    const open = groups.filter((g) => g.key !== 'closed').map((g) => `${range(g)}, ${span(g.days[0])}`);
+    const shut = groups.filter((g) => g.key === 'closed').map(range);
+    const tail = shut.length ? (S ? ` ${shut.join(' na ')} tumefunga.` : ` Closed ${shut.join(' and ')}.`) : '';
+    return S ? `Tuko wazi ${open.join('; ')}.${tail}` : `We're open ${open.join('; ')}.${tail}`;
   },
   duration(o, c) {
     const dur = RF.durationOf(svcOf(c.profile, o.sub)); if (!dur) return null;
@@ -115,4 +151,4 @@ function answered(o, said, c = {}) {
   return low.includes(first);
 }
 
-module.exports = { factOf, TOPICS, RENDER, render, collect, answered };
+module.exports = { askedDays, sayClock, factOf, TOPICS, RENDER, render, collect, answered };

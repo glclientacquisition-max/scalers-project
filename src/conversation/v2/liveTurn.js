@@ -396,7 +396,7 @@ function createBrainV2Live(opts = {}) {
     const rowTurn = split && (ML.ROW_INTENT.test(text) || ['cancel', 'change', 'address_change'].includes(machine.intent) || machine.expecting === 'which' || machine.expecting === 'which_named');
     const lk = split ? ML.lookupCaller(machine.file || {}, rowTurn ? ML.callerFilters(text, profile, machine.leadLateU || null, nowFn()) : {}, { now: nowFn(), lockedName: CP.lockedName(machine) }) : null;
     const caller = lk || ML.callerReceipt(machine.file || {}, { now: nowFn(), lockedName: CP.lockedName(machine) });
-    const coverage = ML.coverageFor(text, profile); // the ONE coverage source (confirmed picks first)
+    const coverage = ML.coverageFor(text, profile, { expecting: machine.expecting }); // the ONE coverage source (confirmed picks first)
     const pack = ML.contextPack({ machine, text, profile, caller, coverage, langHint: lock });
     if (lk) pack.CALLER = { name: lk.name, candidate: lk.candidate, upcoming: lk.upcoming, past_jobs: lk.past_jobs, addresses: lk.addresses, notes: lk.notes, match: lk.match };
     const request = split ? ML.replyRequest(pack, profile) : ML.buildRequest(pack, profile);
@@ -455,7 +455,7 @@ function createBrainV2Live(opts = {}) {
     ms.state = clock() - T0;
     const receipts = CC.receiptsSince(machine, n0);
     // places the model heard that the prefetch missed: resolved locally now (no second model call)
-    if (u && u.slots && Array.isArray(u.slots.places)) { const extra = u.slots.places.filter((p) => !coverage.places.some((r) => r.place.toLowerCase() === String(p).toLowerCase() || r.said.toLowerCase() === String(p).toLowerCase())); if (extra.length) coverage.places.push(...ML.coverageReceipt(extra, profile).places.filter((r) => !coverage.places.some((x) => x.place === r.place))); }
+    ML.addCallerPlaces(coverage, u, text, profile, machine); // AI-first: confirmed against the caller's own words
     const rulesEvs = CC.events(text, null, profile);
     const questions = u ? (u.questions || []) : rulesEvs.filter((e) => e.type === 'ask').map((e) => ({ type: e.ask === 'pay' ? 'payment' : e.ask }));
     // any place the caller mentioned with no answer yet is owed a coverage answer (understanding and rules alike)
@@ -502,8 +502,7 @@ function createBrainV2Live(opts = {}) {
     if (split && !u && live.u) {
       const lu = live.u; machine.leadLateU = lu;
       for (const q of lu.questions || []) if (!questions.some((x) => x.type === q.type)) questions.push(q);
-      const extra = (lu.slots && lu.slots.places || []).filter((p) => !coverage.places.some((r) => r.place.toLowerCase() === String(p).toLowerCase()));
-      if (extra.length) coverage.places.push(...ML.coverageReceipt(extra, profile).places);
+      ML.addCallerPlaces(coverage, lu, text, profile, machine);
     }
     // exactly one voice: any model output that passed the guard (or was repaired) owns the turn; template only when every model failed
     const modelOk = split ? !!(modelSentences || held || repairs) : !!(u && (modelSentences || held || used));
@@ -540,7 +539,7 @@ function createBrainV2Live(opts = {}) {
     const rec = {
       kind: 'model_lead', stage: 'brain_model_lead', turn: machine.turn, turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null,
       attempts: (run ? run.attempts : []).map((a) => ({ model: a.model, role: a.role, startMs: a.startMs, firstTokenMs: a.firstTokenMs, ms: a.ms, outcome: a.outcome || (a.end ? null : 'streaming') })),
-      understanding: u || null, toolCalls: ML.guardTools(live.tools || [], machine, caller), receipts: { caller: { name: caller.name, candidate: caller.candidate, last_past_job: caller.last_past_job, upcoming: caller.upcoming.length, upcoming_count: caller.upcoming_count }, coverage: coverage.places.map((r) => ({ place: r.place, covered: r.covered, source: r.source })), writes: receipts.map((r) => ({ tool: r.tool, ok: r.ok, id: r.id })), g5 },
+      understanding: u || null, toolCalls: ML.guardTools(live.tools || [], machine, caller), receipts: { caller: { name: caller.name, candidate: caller.candidate, last_past_job: caller.last_past_job, upcoming: caller.upcoming.length, upcoming_count: caller.upcoming_count }, coverage: coverage.places.map((r) => ({ place: r.place, covered: r.covered, source: r.source, from: r.from || null })), placesRejected: coverage.rejected || [], writes: receipts.map((r) => ({ tool: r.tool, ok: r.ok, id: r.id })), g5 },
       verdicts, answeredBy, step: st.kind, writes: CC.diff(snap0, CC.snapshot(machine)), stagesMs: ms, firstSentenceMs: firstMs, why: runInfo && runInfo.why || null,
     };
     (machine.trace || (machine.trace = [])).push({ turn: machine.turn, model_lead: rec });
