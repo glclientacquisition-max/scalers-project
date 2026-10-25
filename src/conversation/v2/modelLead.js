@@ -124,12 +124,17 @@ function coverageAnswer(rows, lang) {
   return parts.join(' ');
 }
 
+const OF = require('./ownerFacts'); // B1: the one owner-fact projection
+
 /** KB slice the model may quote (prices only reach the caller when asked: G8). */
 function kb(profile = {}) {
   const services = (profile.servicesCatalog || []).slice(0, 40).map((s) => ({ id: s.id, name: s.name, price: s.pricing?.confirmed === false ? null : s.price_range || null }));
   const h = hoursFact(profile);
-  const pay = String(profile.businessPolicies?.payment || '').trim().slice(0, 200) || null;
-  return { services, hours: h ? h.text : null, payment: pay, business: profile.businessName || null, agent: profile.agentName || null };
+  // owner policies + FAQs: the ONE shared projection (ownerFacts.js), every topic the owner filled in
+  const own = OF.kbRows(OF.ownerFacts(profile));
+  const pay = own.policies.payment || null;
+  const policies = { ...own.policies }; delete policies.payment;
+  return { services, hours: h ? h.text : null, payment: pay, policies, faqs: own.faqs, business: profile.businessName || null, agent: profile.agentName || null };
 }
 
 // ---------------------------------------------------------------- the one model call
@@ -143,6 +148,7 @@ const SYSTEM = [
   'Use the caller name only if CALLER.name is set. If only CALLER.candidate is set, you may ask "Am I speaking with <candidate>?".',
   'If the caller speaks Swahili or Sheng, reply in Swahili; English in English; mixed: their dominant language. Saa nane mchana = 14:00 (Swahili hours start at 7am).',
   'If PLAN.next is a slot, end with one question that asks for it. If a fact is not in FACTS/RECEIPTS say you are not sure and offer the team to confirm.',
+  'Policy and FAQ questions (cancel, move, late, returns, delivery, guarantee, holds, any owner topic): answer from FACTS.policies / FACTS.faqs in the owner\'s words. A policy with {en, sw}: use sw for Swahili callers.',
 ].join('\n');
 const PREFIX = new Map();
 const SCHEMA = {
@@ -152,7 +158,7 @@ const SCHEMA = {
       lang: { type: 'string', enum: ['en', 'sw', 'mix'] },
       intents: { type: 'array', items: { type: 'string', enum: ['book', 'ask', 'confirm', 'deny', 'cancel', 'reschedule', 'callback', 'take_message', 'goodbye', 'smalltalk', 'add_service', 'give_info'] } },
       slots: { type: 'object', properties: { services: { type: 'array', items: { type: 'string' } }, date: { type: 'string' }, time: { type: 'string' }, places: { type: 'array', items: { type: 'string' } }, name: { type: 'string' } } },
-      questions: { type: 'array', items: { type: 'object', properties: { type: { type: 'string', enum: ['coverage', 'price', 'hours', 'identity', 'booking_status', 'payment', 'services', 'other'] }, subject: { type: 'string' } }, required: ['type'] } },
+      questions: { type: 'array', items: { type: 'object', properties: { type: { type: 'string', enum: ['coverage', 'price', 'hours', 'identity', 'booking_status', 'payment', 'services', 'policy', 'faq', 'other'] }, subject: { type: 'string' } }, required: ['type'] } },
       confirms_pending: { type: 'boolean', nullable: true },
     }, propertyOrdering: ['lang', 'intents', 'slots', 'questions', 'confirms_pending'] },
     tool_calls: { type: 'array', items: { type: 'object', properties: { name: { type: 'string', enum: TOOL_NAMES() }, args: { type: 'object', properties: { places: { type: 'array', items: { type: 'string' } }, service: { type: 'string' }, reason: { type: 'string' }, text: { type: 'string' } } } }, required: ['name'] } },
@@ -302,6 +308,7 @@ function makeVerifier(ctx) {
   const prices = new Set(); for (const s of ctx.profile.servicesCatalog || []) for (const n of nums(s.price_range || '')) prices.add(n);
   const known = new Map(ctx.coverage.map((r) => [r.place.toLowerCase(), r]));
   const act = { questions: 0, claimed: false };
+  const ownerOf = OF.ownerFacts(ctx.profile || {});
   const lockName = CP.lockedName(ctx.machine);
   const cand = ctx.caller.candidate;
   function placesIn(s) {
@@ -315,8 +322,12 @@ function makeVerifier(ctx) {
     // G2 claims need a receipt from this turn
     if ((CC.CLAIM.test(s) || CLAIM_MORE.test(s)) && !ctx.receipts.length && !(ctx.callerReadOk && backedByCaller(s, ctx.caller))) return { verdict: 'drop', reason: 'claim_without_receipt' };
     if (ctx.callerReadOk && pastAsOpen(s, ctx.caller)) return { verdict: 'drop', reason: 'past_job_as_open' };
+    // shared owner-fact check (ownerFacts.js): policy numbers come from the owner's facts; a backed policy fee is not a price
+    const pc = OF.checkPolicySentence(s, ownerOf, ctx.lang);
+    if (pc) return { verdict: 'repair', reason: pc.reason, subject: 'policy', fix: pc.fix };
+    const policyBacked = !!OF.backingFact(s, ownerOf);
     // G8 no unasked price (decision 4)
-    const priceish = PRICE_WORD.test(s) && !/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|saa\s/i.test(s) && !/\b(20\d\d|october|oktoba)\b/i.test(s);
+    const priceish = !policyBacked && PRICE_WORD.test(s) && !/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|saa\s/i.test(s) && !/\b(20\d\d|october|oktoba)\b/i.test(s);
     if (priceish && !asked.has('price')) return { verdict: 'drop', reason: 'unasked_price' };
     if (priceish && asked.has('price') && nums(s).some((n) => !prices.has(n))) return { verdict: 'repair', reason: 'price_not_in_kb', subject: 'price', fix: priceFix(ctx) };
     // G3/G4 coverage: polarity must equal the receipt; one answer per place
@@ -371,6 +382,11 @@ function owedAnswers(ctx, keptText) {
       const h = hoursFact(ctx.profile); if (h && !(h.nums || []).some((n) => low.includes(n))) out.push({ subject: 'hours', text: `${h.text}.` });
     } else if (q.type === 'payment') {
       if (!/m-?pesa|paybill|cash|bank|crypto|malipo|tunakubali|we take|we accept/i.test(keptText)) out.push({ subject: 'payment', text: paymentAnswer(ctx.profile, ctx.text || '', ctx.lang) });
+    } else if (q.type === 'policy' || q.type === 'faq' || q.type === 'other') {
+      const of = OF.ownerFacts(ctx.profile || {});
+      const f = OF.match(`${q.subject || ''} ${ctx.text || ''}`, of)[0];
+      const line = f && OF.spoken(f, ctx.lang);
+      if (line && !low.includes(String(OF.sentences(line)[0] || line).toLowerCase().slice(0, 24))) out.push({ subject: `owner:${f.topic}`, text: line });
     } else if (q.type === 'booking_status') {
       const up = ctx.caller.upcoming;
       if (up.length && !up.some((u) => u.service && low.includes(String(u.service).toLowerCase().split(' ')[0]))) out.push({ subject: 'booking_status', text: upcomingLine(up, ctx.lang) });
@@ -565,7 +581,7 @@ function pastAsOpen(s, caller) {
 }
 /** Payment question (KB answer, or honest unknown for a method the KB does not list, e.g. crypto). [PROMPT-PLACEHOLDER] */
 function paymentAnswer(profile = {}, text = '', lang = 'en') {
-  const pay = String(profile.businessPolicies?.payment || '').trim();
+  const pay = String((OF.ownerFacts(profile).byTopic.get('payment') || {}).text || '').trim().replace(/\.$/, '');
   const asked = (String(text).match(/\b(crypto\w*|bitcoin|usdt|card|visa|mastercard|cheque|check|paypal|m-?pesa|cash|bank|airtel money)\b/i) || [])[1];
   if (!pay) return sw(lang) ? 'Sina uhakika wa njia za malipo; timu inaweza kuthibitisha.' : "I'm not sure about payment options; the team can confirm.";
   const listed = asked && new RegExp(asked.replace(/s$/, ''), 'i').test(pay);

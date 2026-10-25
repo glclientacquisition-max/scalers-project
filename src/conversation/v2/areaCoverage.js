@@ -81,11 +81,24 @@ function treeMatch(text) {
 }
 
 /** Owner picks (normalised), or null when this tenant has none / picks are off / the tree is missing. */
-function picksOf(profile = {}) {
+function rawPicks(profile = {}) {
   if (String(process.env.BRAIN_AREA_PICKS || 'on').toLowerCase() === 'off' || !AP.available()) return null;
   const raw = profile.areaPicks; if (!raw) return null;
   const p = AP.normalizeAreaPicks(raw);
   return p.picks.length ? p : null;
+}
+/** B2 (audit 2026-10-25): the owner tapped "Looks right" (tenant_area_picks.confirmed_at). Fail closed. */
+function picksConfirmed(profile = {}) {
+  return Boolean(profile.areaPicksConfirmedAt || (profile.areaPicks && profile.areaPicks.confirmed_at));
+}
+/** Owner picks (normalised), or null when this tenant has none / unconfirmed / picks are off / the tree is missing. */
+function picksOf(profile = {}) {
+  const p = rawPicks(profile);
+  return p && picksConfirmed(profile) ? p : null;
+}
+/** Picks exist but the owner has not confirmed them: no area is spoken; the team confirms (no legacy fallback). */
+function picksPending(profile = {}) {
+  return Boolean(rawPicks(profile)) && !picksConfirmed(profile);
 }
 
 function landmark(text) {
@@ -103,6 +116,11 @@ function resolve(text, profile = {}) {
   if (!t.trim()) return null;
   const picks = picksOf(profile);
   if (picks) return resolvePicks(t, picks);
+  if (picksPending(profile)) {
+    const m = treeMatch(t);
+    if (m) return { status: 'unknown', name: m.node.name, place: K.normalizePlaceKey(m.node.name), node: m.node.id, counties: [], via: 'unconfirmed', source: 'picks' };
+    const u = unknownAsked(t); return u ? { ...u, via: 'unconfirmed' } : null;
+  }
   const lm = landmark(t);
   let found = lm ? [lm.place] : K.bindSpokenPlace(t, { fuzzy: true }).filter((p) => !NOT_PLACE.has(p));
   if (!found.length) { const tm = treeMatch(t); if (tm) found = [K.normalizePlaceKey(tm.node.name)]; } // Desk tree names/aliases (Juja, Ongata Rongai)
@@ -140,6 +158,7 @@ function resolvePicks(t, picks) {
 }
 /** Serving / excluded pick names for "where do you cover" (picks mode), or null (legacy). */
 function listed(profile = {}) {
+  if (picksPending(profile)) return { serve: [], off: [], pending: true };
   const p = picksOf(profile); if (!p) return null;
   return { serve: p.picks.filter((x) => x.serve).map((x) => (AP.areaNode(x.node) || {}).name).filter(Boolean), off: p.picks.filter((x) => !x.serve).map((x) => (AP.areaNode(x.node) || {}).name).filter(Boolean) };
 }
@@ -149,8 +168,9 @@ function line(r, lang = 'en') {
   if (!r) return null;
   if (r.lines) return /^sw/.test(String(lang || '')) ? r.lines.sw : r.lines.en;
   const sw = /^sw/.test(String(lang || ''));
+  if (r.via === 'unconfirmed') return sw ? `Timu itathibitisha kama tunafika ${r.name}.` : `The team will confirm whether we cover ${r.name}.`;
   if (r.status === 'covered') return sw ? `Ndio, tunafika ${r.name}.` : `Yes, we cover ${r.name}.`;
   if (r.status === 'excluded' || r.status === 'outside') return sw ? `Samahani, hatufiki ${r.name}.` : `Sorry, we don't cover ${r.name}.`;
   return sw ? 'Hiyo iko karibu na eneo gani?' : 'Which area is that near?';
 }
-module.exports = { resolve, line, ownerRules, picksOf, listed, treeMatch };
+module.exports = { resolve, line, ownerRules, picksOf, picksPending, picksConfirmed, listed, treeMatch };

@@ -321,7 +321,7 @@ function createBrainV2Live(opts = {}) {
       const lead = machine.coreLead || null; machine.coreLead = null;
       const evs2 = turnFieldsOut ? [...evs, ...CC.events('', null, profile, turnFieldsOut).filter((e) => !evs.some((x) => x.type === e.type && x.ask === e.ask))] : evs;
       const ans = CC.answers(evs2, text, machine, profile, lang, { already: pre.acts || [] });
-      rp = CC.replyPlan({ st, tmpl, ans, lead, receipts: CC.receiptsSince(machine, n0), lang });
+      rp = CC.replyPlan({ st, tmpl, ans, lead, receipts: CC.receiptsSince(machine, n0), lang, profile });
     }
     // the plan's own line is the step: in full when its first sentence carries news (honest name check, added
     // item); a coverage answer + re-ask only adds its question (the model answers the coverage itself)

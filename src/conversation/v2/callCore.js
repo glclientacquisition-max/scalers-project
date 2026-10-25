@@ -15,6 +15,7 @@ const V1 = require('./v1draft');
 const AC = require('./areaCoverage');
 const L = require('./lexicon');
 const { hoursFact } = require('./v1draftFacts');
+const OF = require('./ownerFacts');
 
 function coreOn({ env = process.env, tenantId } = {}) {
   return V1.phaseA({ env, tenantId }) && String(env.BRAIN_CALL_CORE || 'off').trim().toLowerCase() === 'on';
@@ -70,14 +71,15 @@ function answers(evs, text, machine, profile = {}, lang = 'en', { already = [] }
   const asks = new Set(evs.filter((e) => e.type === 'ask').map((e) => e.ask));
   if (asks.has('coverage')) {
     const r = AC.resolve(text, profile);
-    if (r && r.status !== 'unknown') out.push({ ask: 'coverage', text: AC.line(r, lang), keys: [r.name.toLowerCase()] });
+    if (r && (r.status !== 'unknown' || r.via === 'unconfirmed')) out.push({ ask: 'coverage', text: AC.line(r, lang), keys: [r.name.toLowerCase()] });
+    else if (!r && AC.picksPending(profile)) out.push({ ask: 'coverage', text: sw(lang) ? 'Timu itathibitisha maeneo tunayofika.' : 'The team will confirm the areas we cover.', keys: [] });
     else if (!r) {
       const areas = require('../listedAreas').listedAreaRows(profile).map((x) => x.name);
       if (areas.length) out.push({ ask: 'coverage', text: sw(lang) ? `Tunafika ${areas.join(', ')}.` : `We cover ${areas.slice(0, -1).join(', ')}${areas.length > 1 ? ', and ' : ''}${areas[areas.length - 1]}.`, keys: [areas[0].toLowerCase()] });
     }
   }
   if (asks.has('pay')) {
-    const raw = String(profile.businessPolicies?.payment || '').trim();
+    const raw = String((OF.ownerFacts(profile).byTopic.get('payment') || {}).text || '').trim();
     const first = (raw.match(/[^.]+(?:\.\d+[^.]*)*\.?/) || [''])[0].trim().replace(/\.$/, '');
     const what = first.replace(/^(you can pay|we accept|payment is|pay)\s*(by|with|via|through)?\s*/i, '');
     const key = ['m-pesa', 'mpesa', 'cash', 'bank', 'card', 'airtel'].find((k) => raw.toLowerCase().includes(k));
@@ -94,6 +96,16 @@ function answers(evs, text, machine, profile = {}, lang = 'en', { already = [] }
     const h = hoursFact(profile);
     if (h) out.push({ ask: 'hours', text: `${h.text}.`, keys: (h.nums || []).slice(0, 1) });
   }
+  // owner policies + FAQs (ownerFacts.js, the shared projection): any topic the caller asks about
+  if (asks.size || QUESTIONISH.test(text) || /\b(want(?:ed)? to (?:know|ask)|tell me|what about|what if|nataka kujua|niambie)\b/i.test(text)) {
+    const of = OF.ownerFacts(profile);
+    for (const f of OF.match(text, of).slice(0, 2)) {
+      if (f.family === 'payment' && asks.has('pay')) continue;
+      const line = OF.spoken(f, lang);
+      if (!line) continue;
+      out.push({ ask: `owner:${f.topic}`, text: line, keys: [(OF.sentences(line)[0] || line).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4)[0] || ''].filter(Boolean), fact: f.id });
+    }
+  }
   return out;
 }
 
@@ -104,7 +116,8 @@ function receiptsSince(machine, n0) { return (machine.receipts || []).slice(n0).
  * The ReplyPlan and its gates. tmpl = the reducer's template line (machine/call plan), st = CP.step().
  * Returns { template, check, tail, plan }: template = answers + lead + template line (the template composer).
  */
-function replyPlan({ st, tmpl, ans: ans0, lead, receipts, lang }) {
+function replyPlan({ st, tmpl, ans: ans0, lead, receipts, lang, profile = null }) {
+  const of = profile ? OF.ownerFacts(profile) : null;
   let ans = ans0;
   const covered = new Set();
   const hasKey = (s, a) => !a.keys.length || a.keys.some((k) => k && String(s).toLowerCase().includes(k));
@@ -119,6 +132,9 @@ function replyPlan({ st, tmpl, ans: ans0, lead, receipts, lang }) {
   function check(s, act) {
     const t = String(s || '').trim();
     if (CLAIM.test(t) && !receipts.length) return { verdict: 'drop', reason: 'claim_without_receipt' };
+    // shared owner-fact check (ownerFacts.js): a policy number must come from the owner's facts
+    const pc = of ? OF.checkPolicySentence(t, of, lang) : null;
+    if (pc) return { verdict: 'replace', text: pc.fix, reason: pc.reason };
     const g = CP.actCheck(t, st, act);
     if (g.verdict === 'drop') return g;
     let final = g.verdict === 'replace' ? g.text : t;
