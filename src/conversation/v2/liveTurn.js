@@ -2,7 +2,8 @@
 // Live BA v2 turn. BRAIN_V2=on and BRAIN_V2_MODE=live. Speaks receipt
 // sentences. Writes go through createLiveHandlers. Flag off = unused.
 
-const { brainV2Enabled, brainV2Mode } = require('./flag');
+const { brainV2Enabled, brainV2Mode, brainEnginesOn } = require('./flag');
+const BE = require('./brainEngines');
 const { createState, turnLang } = require('./machine');
 const { runTurnStream } = require('./stream');
 const { createLiveHandlers } = require('./liveHandlers');
@@ -216,7 +217,12 @@ function createBrainV2Live(opts = {}) {
     // Phase B (single brain): v2's call plan decides the step and does the writes FIRST (rules, no model);
     // then the model speaks every turn, phrasing that step. No owner switch. Template = total fallback.
     // BRAIN_MODEL_LEAD: one structured model call leads; code owns state and guards (off = the #932 path below)
-    if (vd && vdMode === 'on' && ML.leadOn({ env, tenantId: profile?.id })) return runModelLead({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine });
+    if (vd && vdMode === 'on' && ML.leadOn({ env, tenantId: profile?.id })) {
+      if (brainEnginesOn({ env, tenantId: profile?.id })) {
+        return runBrainEngines({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine });
+      }
+      return runModelLead({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine });
+    }
     const core = !!vd && CC.coreOn({ env, tenantId: profile?.id });
     if (vd && vdMode === 'on' && (core || CP.phaseB({ env, tenantId: profile?.id }))) return runPhaseB({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine, vd, core });
     if (vd && vdMode === 'on') {
@@ -389,6 +395,33 @@ function createBrainV2Live(opts = {}) {
     const save = h.saveCallerInfo;
     h.saveCallerInfo = async (args) => { const locked = CP.lockedName(machine); const same = locked && args && String(args.name || '').toLowerCase() === String(locked).toLowerCase(); return applyTools ? (async () => { const ex = await applyTools({ saveCallerInfo: args, name: args?.name, ...(same ? { v2NameLocked: true } : {}) }); return ex; })() : save(args); };
     return h;
+  }
+
+  async function runBrainEngines({ text, profile, langLock, shouldAbort, onSentence, machine }) {
+    const clock = typeof opts.clock === 'function' ? opts.clock : () => Date.now();
+    const sf = leadStreamFor();
+    const ids = MS.resolveModelIds(env);
+    const handlers = leadHandlers(machine, profile, []);
+    const abort = typeof shouldAbort === 'function' ? shouldAbort : () => false;
+    return BE.runBrainEnginesTurn({
+      text,
+      profile,
+      machine,
+      env,
+      streamFor: sf,
+      modelId: ids.primary,
+      langLock: langLock === 'en' || langLock === 'sw' ? langLock : null,
+      shouldAbort: abort,
+      onSentence,
+      applyTools,
+      handlers,
+      opts: {
+        ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName },
+        clock,
+        now: nowFn,
+        log: opts.log || (() => {}),
+      },
+    });
   }
 
   async function runModelLead({ text, profile, langLock, shouldAbort, onSentence, machine }) {

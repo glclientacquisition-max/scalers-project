@@ -23,4 +23,9 @@ function brainV2ShadowEnabled({ env = process.env, tenantId } = {}) {
   return tenantAllowed({ env, tenantId });
 }
 function brainV2Mode({ env = process.env } = {}) { return /^live$/i.test(String(env.BRAIN_V2_MODE || '')) ? 'live' : 'shadow'; }
-module.exports = { brainV2Enabled, brainV2ShadowEnabled, brainV2Mode, tenantAllowlist, tenantAllowed };
+/** BRAIN_ENGINES (off): three-engine v2 stack (understanding, response, handoff). Off = unchanged paths. */
+function brainEnginesOn({ env = process.env, tenantId } = {}) {
+  if (!ON.test(String(env.BRAIN_ENGINES || 'off'))) return false;
+  return tenantAllowed({ env, tenantId });
+}
+module.exports = { brainV2Enabled, brainV2ShadowEnabled, brainV2Mode, tenantAllowlist, tenantAllowed, brainEnginesOn };
