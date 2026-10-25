@@ -23,6 +23,8 @@ const DESK_ROOTS = [
   "/api/tenant",
   "/api/voices",
   "/api/pronunciation",
+  "/api/push",
+  "/offline",
 ];
 
 function stripHost(raw: string): string {

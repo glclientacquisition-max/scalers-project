@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DeskThemeProvider } from "@/components/DeskThemeProvider";
 import { NotifyHost } from "@/components/ui/DeskNotice";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { TooltipProvider } from "@/components/ui/Tooltip";
 import { DESK_THEME_COLOR_DARK, DESK_THEME_COLOR_LIGHT, DESK_THEME_STORAGE_KEY } from "@/lib/deskTheme";
 import "./globals.css";
@@ -17,9 +18,10 @@ export const metadata: Metadata = {
   description:
     "It answers when you are busy, after hours, on another call, or the line is off, so you do not miss the client.",
   applicationName: "Scalers",
+  appleWebApp: { capable: true, title: "Scalers", statusBarStyle: "default" },
   icons: {
     icon: [{ url: "/brand/favicon.png", type: "image/png" }],
-    apple: [{ url: "/brand/favicon.png" }],
+    apple: [{ url: "/icons/apple-180.png", sizes: "180x180", type: "image/png" }],
   },
   openGraph: {
     title: "Scalers, your 24-hour Business Assistant",
@@ -73,6 +75,7 @@ export default function RootLayout({
           <TooltipProvider>{children}</TooltipProvider>
         </DeskThemeProvider>
         <NotifyHost />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

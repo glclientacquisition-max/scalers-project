@@ -1,6 +1,6 @@
 ---
 owner: platform
-last_reviewed: 2026-10-24
+last_reviewed: 2026-10-25
 ---
 
 # Scalers status and handoff (start here)
@@ -132,6 +132,7 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 ---
 
 ## 4. Open PRs
+- **2026-10-25 Installable Desk + phone alerts (staging only, draft PR, not merged, SQL not applied, not restaged):** branch `feat/desk-pwa-push` on `staging/v2-c0-opening-2026-10-21` (SHA in the PR). Manifest + maskable icons, hand-written `sw.js` (offline page only, never caches signed-in pages; kill switch), `/api/push/subscribe`, `docs/supabase/push_subscriptions.sql` (file only), `src/notifications/push.js` (not wired into dispatch), Settings › How we notify › Phone alerts, 360px install card. Env names: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`. dispatchAlert hook = Voice/Brain lane (spec in `docs/reference/platform/DESK_PWA_PUSH.md`). Approver: Alvin GO via Chief 2026-10-25 10:13 EAT (build on staging). Merge, SQL apply and restage each need Alvin's own GO. Rollback = revert; `SW_KILL = true`; `push_subscriptions_down.sql`.
 - `brain/v1-draft-phase-a` (draft) — `BRAIN_V1_DRAFT_PHASE_A` (default off; only with `BRAIN_V1_DRAFT=on`, DnD only): one model result per turn (no shadow/classify while the draft is on; v2 turn model runs on owned turns), handoff carries draft slots/asks ("is it possible" answered), filler cut for the reply (Voice review), wait ack + hello-after-wait, greeting fed to draft history (no repeat "how can I help"), healthz `brain.lastOkAt`, one spoken style for times/prices. From voice-qa `2026-10-24_926-dials-two-systems.md`; replay of HD_4e388c38f7b5 in `tests/brainV1DraftPhaseA.test.js`. Not merged/restaged; env unchanged.
 - ~~`brain/v1-draft-kb-verify` (#926)~~ merged to staging 24 Oct. Was: `brain/v1-draft-kb-verify` — `BRAIN_V1_DRAFT` (off|shadow|on, default off, Done & Dusted only via `BRAIN_V1_DRAFT_TENANTS` default): v1-style single streaming model call drafts the reply as `say{text,refs}` function calls; every sentence is verified against the KB fact note before TTS (whole sentence replaced by an honest unknown + one callback if any fact is unverified; availability never from the model); v2 reply owner (#925) + conv state (#924) is the total fallback. Design `ship-briefs/2026-10-24_brain_v1-draft-kb-verify-design.md`. Not merged/restaged; env unchanged.
 
