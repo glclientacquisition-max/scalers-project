@@ -68,7 +68,11 @@ same paths, and writes back only if the row didn't change in between (compare-an
 ## Shared with Brain (#937)
 
 - Topic ids, names and details: `taxonomy.json` `policy_topics` (dashboard `src/lib/taxonomy.json` and Brain `src/data/taxonomy.json`, kept identical; a test checks). `policyRegistry.ts` adds only screen wording, options and spoken lines.
-- "No" lines in the registry equal Brain `NONE_LINES` (ownerFacts.js) word for word; a test checks.
-- Own words: `rules.<topic>.mode = "custom"`, `note` (English), `note_sw` (Kiswahili, optional). Brain speaks them as typed; empty `note_sw` falls back to "Timu itathibitisha."
-- Legacy text keys are joined with `joinWholeSentences(..., CANCELLATION_TEXT_MAX = 1200)`; no cut sentences.
-- `policy_lines.<topic> = { en, sw }` carries the line for every option, including the Kiswahili line for standard options. Brain does not read it yet (open question).
+- **Spoken wording lives in one place: `policy_lines.<topic> = { en, sw }`.** Desk writes it on every save, for every option (Yes, No, Write my own). Brain's `ownerFacts()` speaks it word for word and keeps no copy. A test saves each topic's No option through the Desk path and checks Brain speaks the saved en and sw exactly.
+- Each topic reads only its own line. Cancel = No never answers Move or Late.
+- Own words: `rules.<topic>.mode = "custom"`, `note` (English), `note_sw` (Kiswahili, optional). Empty `note_sw` is spoken as "Timu itathibitisha."
+- Not set: Desk removes `rules.<topic>` and `policy_lines.<topic>`; Brain has nothing to say for it.
+- Legacy rows with no `policy_lines` fall back to the text keys, joined with `joinWholeSentences(..., CANCELLATION_TEXT_MAX = 1200)`.
+- Late = No (`no_show.allowed = false`) is a valid answer.
+- Delivery "Pickup only" saves `mode: "pickup_only"`; Brain handles it.
+- Fee amounts (KSh) are not option chips. They stay in follow-up fields and on Service areas.

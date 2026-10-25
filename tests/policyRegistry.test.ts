@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import * as reg from "../dashboard/src/lib/policyRegistry.ts";
 import * as rules from "../dashboard/src/lib/policyRules.ts";
 
@@ -204,15 +205,18 @@ test("every standard option has an English and a Kiswahili line; every topic has
   }
 });
 
-test("No lines match Brain's NONE_LINES word for word (#937 ownerFacts.js)", () => {
-  const src = fs.readFileSync(path.join(root, "src/conversation/v2/ownerFacts.js"), "utf8");
-  const block = src.slice(src.indexOf("const NONE_LINES"), src.indexOf("};", src.indexOf("const NONE_LINES")));
+test("every topic's No option, saved via the Desk path, is spoken by Brain ownerFacts() as the saved policy_lines en + sw", () => {
+  const brain = createRequire(import.meta.url)(path.join(root, "src/conversation/v2/ownerFacts.js"));
   for (const t of Object.values(reg.TOPICS)) {
-    const m = block.match(new RegExp(`${t.id}: \\{ en: (["'])(.*?)\\1, sw: (["'])(.*?)\\3`));
-    assert.ok(m, `${t.id} in NONE_LINES`);
-    const no = t.answers.find((a) => a.id === "no")!;
-    assert.equal(no.line.en, m[2], `${t.id} en`);
-    assert.equal(no.line.sw, m[4], `${t.id} sw`);
+    const niche = reg.nicheById("generic");
+    const draft = { ...reg.draftFrom(t, null), answer: "no" };
+    const bp = reg.applyTopicPatch({}, reg.topicPatch({}, t.id, reg.ruleFromDraft(t, draft), niche)) as Record<string, any>;
+    const saved = bp.policy_lines?.[t.id];
+    assert.ok(saved?.en && saved?.sw, `${t.id} saved policy_lines`);
+    const fact = brain.ownerFacts({ businessPolicies: bp }).byTopic.get(t.id);
+    assert.ok(fact, `${t.id} Brain fact`);
+    assert.equal(brain.spoken(fact, "en"), saved.en, `${t.id} en`);
+    assert.equal(brain.spoken(fact, "sw"), saved.sw, `${t.id} sw`);
   }
 });
 
