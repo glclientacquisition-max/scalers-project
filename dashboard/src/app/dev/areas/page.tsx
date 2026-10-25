@@ -14,7 +14,7 @@ function fixture() {
   p = toggleArea(p, "estate:nairobi:kibera");
   p = toggleArea(p, "county:kiambu");
   p = setAreaDetail(p, "town:kajiado:kitengela", { serve: true, fee_kes: 500, note: "Weekends only" });
-  p = setAreaDetail(p, "town:kiambu:thika", { serve: true, fee_kes: 800, note: null, conditions: [{ kind: "min_bedrooms", value: 2 }] });
+  p = setAreaDetail(p, "town:kiambu:thika", { serve: true, fee_kes: 800, note: "From 2 bedrooms up" });
   p = toggleArea(p, "town:machakos:syokimau");
   return p;
 }

@@ -86,29 +86,23 @@ test("home summary lists Nairobi first, then the rest by name", async () => {
   assert.deepEqual(parts, ["Nairobi", "Kajiado", "Kiambu"]);
 });
 
-// ---- coverage confirm, exclusions, conditions (Brain #942) ----
+// ---- coverage confirm, exclusions, area note (Brain #942) ----
 test("one tap excludes a child place inside a covered county", async () => {
   const m = await import("../dashboard/src/lib/areaPicks.ts");
   let p = m.toggleArea(m.emptyAreaPicks(), "county:nairobi");
   p = m.toggleArea(p, "estate:nairobi:kibera");
-  assert.deepEqual(m.areaPick(p, "estate:nairobi:kibera"), { node: "estate:nairobi:kibera", serve: false, fee_kes: null, note: null, conditions: [] });
+  assert.deepEqual(m.areaPick(p, "estate:nairobi:kibera"), { node: "estate:nairobi:kibera", serve: false, fee_kes: null, note: null });
   assert.equal(m.callerHears(p, "Kibera").status, "not_covered");
   assert.equal(m.callerHears(p, "Kilimani").status, "covered");
 });
 
-test("min_bedrooms condition is stored, inherited and spoken", async () => {
+test("area note carries rules like Thika 2 bedrooms up and is spoken after the fee", async () => {
   const m = await import("../dashboard/src/lib/areaPicks.ts");
   let p = m.toggleArea(m.emptyAreaPicks(), "county:nairobi");
-  p = m.setAreaDetail(p, "town:kiambu:thika", { serve: true, fee_kes: "800", note: "", conditions: [{ kind: "min_bedrooms", value: 2 }] });
-  const n = m.normalizeAreaPicks(JSON.parse(JSON.stringify(p)));
-  assert.deepEqual(m.areaPick(n, "town:kiambu:thika")?.conditions, [{ kind: "min_bedrooms", value: 2 }]);
-  assert.equal(m.resolveArea(n, "town:kiambu:thika").fee_kes, 800);
-  assert.equal(m.callerHears(n, "Thika").reply, "Yes, we cover Thika. There's an extra KES 800. In Thika we take jobs from 2 bedrooms up.");
-  assert.deepEqual(m.cleanConditions([{ kind: "min_bedrooms", value: 0 }, { kind: "bogus", value: 2 }, { kind: "min_bedrooms", value: "3" }]), [{ kind: "min_bedrooms", value: 3 }]);
-  // excluding drops conditions
-  const off = m.setAreaDetail(n, "town:kiambu:thika", { serve: false, fee_kes: 800, note: "x", conditions: [{ kind: "min_bedrooms", value: 2 }] });
-  assert.equal(m.areaPick(off, "town:kiambu:thika")?.conditions?.length ?? 0, 0);
-  assert.deepEqual(m.resolveArea(off, "town:kiambu:thika").conditions, []);
+  p = m.setAreaDetail(p, "town:kiambu:thika", { serve: true, fee_kes: "800", note: "From 2 bedrooms up" });
+  const n = m.normalizeAreaPicks(JSON.parse(JSON.stringify({ ...p, picks: p.picks.map((x: object) => ({ ...x, conditions: [{ kind: "min_bedrooms", value: 2 }] })) })));
+  assert.deepEqual(m.areaPick(n, "town:kiambu:thika"), { node: "town:kiambu:thika", serve: true, fee_kes: 800, note: "From 2 bedrooms up" });
+  assert.equal(m.callerHears(n, "Thika").reply, "Yes, we cover Thika. There's an extra KES 800. From 2 bedrooms up.");
 });
 
 test("confirm state: none, old_only, unconfirmed, edited, confirmed", async () => {

@@ -10,7 +10,6 @@ import {
   AREA_CONFIRM_COPY,
   AREA_NOTE_MAX,
   areaNeedsConfirm,
-  conditionText,
   type AreaConfirmState,
   ROOT_ID,
   areaChildren,
@@ -28,7 +27,6 @@ import {
   searchAreaTree,
   setAreaDetail,
   toggleArea,
-  type AreaCondition,
   type AreaHit,
   type AreaPicks,
   type CallerLine,
@@ -351,7 +349,6 @@ function TreeRow({
           {meta ? <div className="truncate text-meta text-ink-2">{meta}</div> : null}
         </button>
       )}
-      {pick?.conditions?.[0] ? <Tag tone="quiet">{pick.conditions[0].value}+ bed</Tag> : null}
       {pick?.fee_kes != null ? <Tag>+KES {pick.fee_kes.toLocaleString("en-KE")}</Tag> : null}
       {depth === 2 && !res.covered && parentState && parentState !== "off" ? <Tag tone="quiet">Off</Tag> : null}
       {expandable ? (
@@ -419,7 +416,7 @@ function AreaSheet({
   id: string;
   picks: AreaPicks;
   onClose: () => void;
-  onDone: (d: { serve: boolean; fee_kes: string; note: string; conditions: AreaCondition[] }) => void;
+  onDone: (d: { serve: boolean; fee_kes: string; note: string }) => void;
 }) {
   const n = areaNode(id)!;
   const pick = areaPick(picks, id);
@@ -427,12 +424,10 @@ function AreaSheet({
   const [serve, setServe] = useState(res.covered);
   const [fee, setFee] = useState(pick?.fee_kes != null ? String(pick.fee_kes) : "");
   const [note, setNote] = useState(pick?.note ?? "");
-  const [minBeds, setMinBeds] = useState<number | null>(pick?.conditions?.find((c) => c.kind === "min_bedrooms")?.value ?? null);
-  const conditions: AreaCondition[] = minBeds ? [{ kind: "min_bedrooms", value: minBeds }] : [];
   const preview = useMemo(() => {
-    const trial = setAreaDetail(picks, id, { serve, fee_kes: fee, note, conditions: minBeds ? [{ kind: "min_bedrooms", value: minBeds }] : [] });
+    const trial = setAreaDetail(picks, id, { serve, fee_kes: fee, note });
     return callerHears(trial, n.name).reply;
-  }, [picks, id, serve, fee, note, minBeds, n.name]);
+  }, [picks, id, serve, fee, note, n.name]);
   const where = n.kind === "county" ? "County" : n.kind === "town" ? `${areaWhere(id)} County` : areaWhere(id);
   const seg = (on: boolean) =>
     cx("flex min-h-11 flex-1 items-center justify-center text-body", on ? "bg-accent-tonal font-semibold text-accent" : "font-medium text-ink");
@@ -447,7 +442,7 @@ function AreaSheet({
           <button type="button" className={buttonClass({ variant: "ghost", size: "lg" }) + " border border-hairline"} onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className={buttonClass({ variant: "primary", size: "lg" }) + " flex-1"} onClick={() => onDone({ serve, fee_kes: fee, note, conditions })}>
+          <button type="button" className={buttonClass({ variant: "primary", size: "lg" }) + " flex-1"} onClick={() => onDone({ serve, fee_kes: fee, note })}>
             Done
           </button>
         </div>
@@ -474,21 +469,10 @@ function AreaSheet({
             <input id="area-fee" inputMode="numeric" value={fee} onChange={(e) => setFee(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-full min-w-0 flex-1 bg-transparent text-body text-ink outline-none" />
           </div>
           <p className="mt-1 text-meta text-ink-2">Leave empty if there is none.</p>
-          <fieldset className="mt-4">
-            <legend className="mb-1.5 font-semibold text-ink">Smallest job you take here</legend>
-            <div className="flex overflow-hidden rounded-xl border border-hairline" role="radiogroup">
-              {[null, 2, 3, 4].map((v) => (
-                <button key={v ?? 0} type="button" role="radio" aria-checked={minBeds === v} className={seg(minBeds === v)} onClick={() => setMinBeds(v)}>
-                  {v ? `${v}+ bed` : "Any"}
-                </button>
-              ))}
-            </div>
-            {minBeds ? <p className="mt-1 text-meta text-ink-2">Callers hear you take jobs {conditionText({ kind: "min_bedrooms", value: minBeds })}.</p> : null}
-          </fieldset>
           <label className="mb-1.5 mt-4 block font-semibold text-ink" htmlFor="area-note">
             Note for callers (optional)
           </label>
-          <textarea id="area-note" value={note} maxLength={AREA_NOTE_MAX} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="For example: weekends only" className="w-full rounded-xl border border-hairline bg-surface px-3.5 py-3 text-body text-ink outline-none focus:border-2 focus:border-accent" />
+          <textarea id="area-note" value={note} maxLength={AREA_NOTE_MAX} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="For example: from 2 bedrooms up" className="w-full rounded-xl border border-hairline bg-surface px-3.5 py-3 text-body text-ink outline-none focus:border-2 focus:border-accent" />
         </>
       ) : null}
       <p className="mt-4 rounded-xl border border-hairline bg-surface-2/60 p-3.5 text-body text-ink">Callers hear: “{preview}”</p>

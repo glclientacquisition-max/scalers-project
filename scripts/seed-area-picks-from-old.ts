@@ -51,12 +51,12 @@ export function planSeed(rows: Row[]): SeedSummary {
       if (!node) continue;
       const i = picks.findIndex((p) => p.node === node.id);
       if (i >= 0) picks[i] = { ...picks[i], fee_kes: fee };
-      else picks.push({ node: node.id, serve: true, fee_kes: fee, note: null, conditions: [] });
+      else picks.push({ node: node.id, serve: true, fee_kes: fee, note: null });
     }
     for (const x of Array.isArray(r.service_areas?.exclude) ? r.service_areas!.exclude! : []) {
       if (typeof x !== "string") continue;
       const node = matchAreaText(rawName(x));
-      if (node) picks.push({ node: node.id, serve: false, fee_kes: null, note: null, conditions: [] });
+      if (node) picks.push({ node: node.id, serve: false, fee_kes: null, note: null });
     }
     out.seeded.push({
       tenant: r.id,
