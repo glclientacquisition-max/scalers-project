@@ -122,20 +122,9 @@ function rememberCallerPlaces(machine, { coverage, text, profile, u } = {}) {
   machine.callerPlaces = [...names].slice(0, 12);
 }
 
-/** The owner's area note on a receipt row: a checkable owner fact (verbatim), with its language. */
-const noteFields = (r) => (r && r.status === 'covered' && r.note ? { note: r.note, note_lang: r.note_lang || null } : { note: null, note_lang: null });
-/** check_coverage receipt: one row per place (1..5). Picks resolver per place; legacy only when no picks. */
+/** check_coverage receipt: one row per place (1..5). Delegates to areaCoverage (the only reader). */
 function coverageReceipt(places = [], profile = {}) {
-  const rows = [];
-  for (const raw of places.slice(0, 5)) {
-    const p = String(raw || '').trim(); if (!p) continue;
-    const r = AC.resolve(p, profile) || AC.resolve(p.replace(/\b[a-z]/g, (c) => c.toUpperCase()), profile);
-    const name = r && r.name ? r.name : p.replace(/\b[a-z]/g, (c) => c.toUpperCase());
-    if (rows.some((x) => x.place.toLowerCase() === name.toLowerCase())) continue;
-    const covered = !r || r.status === 'unknown' ? 'unknown' : r.status === 'covered' ? 'yes' : 'no';
-    rows.push({ place: name, said: p, matched_node: r && r.node || null, covered, status: r ? r.status : 'unknown', source: r && r.source === 'picks' ? 'area_picks' : 'legacy', line_en: r ? AC.line(r, 'en') : null, line_sw: r ? AC.line(r, 'sw') : null, via: r && r.via || null, fee_kes: r && r.fee_kes != null ? r.fee_kes : null, ...noteFields(r) });
-  }
-  return { tool: 'check_coverage', ok: true, places: rows };
+  return AC.coverageReceipt(places, profile);
 }
 
 /** Every place the CALLER named, resolved on the ONE coverage source (confirmed picks; legacy rows only with no picks).
@@ -146,7 +135,14 @@ function coverageFor(text, profile = {}, opts = {}) {
   const rec = coverageReceipt(placeCandidates(text, { ...opts, rejected }), profile);
   if (!rec.places.length) {
     const r = AC.resolve(String(text || ''), profile, { expecting: opts.expecting });
-    if (r && r.name) rec.places.push({ place: r.name, said: r.landmark || r.name, matched_node: r.node || null, covered: r.status === 'covered' ? 'yes' : r.status === 'unknown' ? 'unknown' : 'no', status: r.status, source: r.source === 'picks' ? 'area_picks' : 'legacy', via: r.via || null, line_en: AC.line(r, 'en'), line_sw: AC.line(r, 'sw'), fee_kes: r.fee_kes ?? null, ...noteFields(r) });
+    if (r && r.name) {
+      const node = r.node ? (AP.areaNode(r.node) || { id: r.node, name: r.name, aliases: [] }) : null;
+      rec.places.push({
+        place: r.name, said: r.landmark || r.name, matched_node: node, covered: AC.rowCovered(r), status: r.status,
+        source: r.source === 'picks' ? 'area_picks' : 'legacy', via: r.via || null, line_en: AC.line(r, 'en'), line_sw: AC.line(r, 'sw'),
+        fee_kes: r.fee_kes ?? null, ...(r.status === 'covered' && r.note ? { note: r.note, note_lang: r.note_lang || null } : { note: null, note_lang: null }),
+      });
+    }
   }
   for (const r of rec.places) r.from = 'caller';
   if (rejected.length) rec.rejected = rejected;
@@ -172,7 +168,7 @@ function owedCoverageQuestion(questions, coverage, text, machine = {}) {
 function coverageSentence(row, lang) {
   if (row.covered === 'unknown' && (row.line_en || row.line_sw)) return sw(lang) ? row.line_sw : row.line_en; // "which area is that near?" / "the team will confirm"
   if (row.covered !== 'unknown') return (sw(lang) ? row.line_sw : row.line_en) || (row.covered === 'yes' ? (sw(lang) ? `Ndio, tunafika ${row.place}.` : `Yes, we cover ${row.place}.`) : (sw(lang) ? `Samahani, hatufiki ${row.place}.` : `Sorry, we don't cover ${row.place}.`));
-  return sw(lang) ? `Sina uhakika kuhusu ${row.place}; timu inaweza kuthibitisha.` : `I'm not sure about ${row.place}; I can have the team confirm.`;
+  return AC.checkWithOwnerLine(row.place, lang);
 }
 function coverageAnswer(rows, lang) {
   if (!rows.length) return null;

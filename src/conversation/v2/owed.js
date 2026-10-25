@@ -49,11 +49,8 @@ const RENDER = {
   coverage(o, c) {
     if (o.row) return (sw(o.lang) ? o.row.line_sw : o.row.line_en) || AC.line(AC.resolve(o.row.place, c.profile), o.lang);
     const r = AC.resolve(c.text || '', c.profile);
-    if (r && (r.status !== 'unknown' || r.via === 'unconfirmed')) return AC.line(r, o.lang);
-    if (AC.picksPending(c.profile)) return sw(o.lang) ? 'Timu itathibitisha maeneo tunayofika.' : 'The team will confirm the areas we cover.';
-    const areas = require('../listedAreas').listedAreaRows(c.profile).map((x) => x.name);
-    if (!areas.length) return null;
-    return sw(o.lang) ? `Tunafika ${areas.join(', ')}.` : `We cover ${areas.slice(0, -1).join(', ')}${areas.length > 1 ? ', and ' : ''}${areas[areas.length - 1]}.`;
+    if (r) return AC.line(r, o.lang);
+    return AC.listCoverageAnswer(c.profile, o.lang);
   },
   price(o, c) {
     const pl = RF.priceLine(svcOf(c.profile, o.sub), c.text || '', o.lang); if (pl) return pl.text;
@@ -165,8 +162,9 @@ function answered(o, said, c = {}) {
     if (named.some((n) => n.toLowerCase() === place)) return true;
     if (low.includes(place)) return true;
     const node = o.row.matched_node;
-    if (node) {
-      for (const alias of [node.name, ...(node.aliases || [])]) {
+    const n = node && typeof node === 'object' ? node : (node ? AP.areaNode(node) : null);
+    if (n) {
+      for (const alias of [n.name, ...(n.aliases || [])]) {
         const a = AP.normAreaText(alias);
         if (a && low.includes(a)) return true;
       }

@@ -76,8 +76,8 @@ test('confirmed picks are the single coverage source: Kamakis, Kibera exclusion'
 test('no-picks tenant: legacy fallback never confirms an unknown place', () => {
   const r = AC.resolve('Kamakis', NOPICKS);
   assert.notEqual(r.status, 'covered');
-  assert.match(AC.line(r, 'en'), /team will confirm|Which area/i);
-  assert.match(AC.line(r, 'sw'), /Timu itathibitisha|karibu na eneo gani/i);
+  assert.match(AC.line(r, 'en'), /check with the owner|Which area/i);
+  assert.match(AC.line(r, 'sw'), /Nitaangalia na mmiliki|karibu na eneo gani/i);
   // a same-named town row ("Kiambu" the town) does not cover the whole county
   // DnD legacy lists the TOWN Kiambu, not the county: Limuru (Kiambu county, unlisted) is not covered
   assert.notEqual(AC.resolve('Limuru', NOPICKS).status, 'covered');

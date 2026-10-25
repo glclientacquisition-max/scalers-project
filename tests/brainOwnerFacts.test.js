@@ -167,11 +167,11 @@ test('B2: unconfirmed picks are never spoken (team confirms, no legacy fallback)
   const pending = { ...DND, areaPicks: PICKS, areaPicksConfirmedAt: null, serviceAreas: { areas: [{ id: 'place:kileleshwa' }] } };
   const r = AC.resolve('do you do Kileleshwa?', pending);
   assert.equal(r.status, 'unknown'); assert.equal(r.via, 'unconfirmed');
-  assert.match(AC.line(r, 'en'), /team will confirm/); assert.match(AC.line(r, 'sw'), /Timu itathibitisha/);
+  assert.match(AC.line(r, 'en'), /check with the owner/i); assert.match(AC.line(r, 'sw'), /Nitaangalia na mmiliki/i);
   assert.deepEqual(AC.listed(pending).serve, []);
   assert.ok(!F.buildFactNote(pending, {}).facts.some((f) => f.family === 'area' && f.covered));
   const cc = CC.answers([{ type: 'ask', ask: 'coverage' }], 'which areas do you cover?', machine(), pending, 'en');
-  assert.match(cc.find((a) => a.ask === 'coverage').text, /team will confirm/);
+  assert.match(cc.find((a) => a.ask === 'coverage').text, /check with the owner/i);
   const ok = { ...pending, areaPicksConfirmedAt: '2026-10-25T08:00:00Z' };
   assert.equal(AC.resolve('do you do Kileleshwa?', ok).status, 'covered');
 });

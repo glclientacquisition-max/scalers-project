@@ -249,8 +249,14 @@ function resolvePicks(t, picks, opts = {}) {
   if (!m) return unknownAsked(t);
   const n = m.node; const res = AP.resolveArea(picks, n.id);
   const county = AP.countyOf(n.id);
-  const status = res.covered ? 'covered' : res.via ? 'excluded' : 'outside';
-  return { status, name: n.name, place: K.normalizePlaceKey(n.name), node: n.id, counties: county ? [K.normalizePlaceKey(county.name)] : [], via: res.via || 'tree', county: county && county.id !== n.id ? county.name : null, fee_kes: res.fee_kes, note: res.note, note_lang: AP.noteLang(res.note), source: 'picks', ...(m.via === 'landmark' ? { landmark: m.said } : {}), lines: { en: AP.linesFor(picks, n, 'en').reply, sw: AP.linesFor(picks, n, 'sw').reply } };
+  // No pick on the tree chain: never guess no (audit 2026-10-25). Explicit exclude still excluded.
+  const status = res.covered ? 'covered' : res.via ? 'excluded' : 'unknown';
+  const via = res.covered ? (res.via || 'tree') : res.via ? res.via : 'no_pick';
+  const base = { status, name: n.name, place: K.normalizePlaceKey(n.name), node: n.id, counties: county ? [K.normalizePlaceKey(county.name)] : [], via, county: county && county.id !== n.id ? county.name : null, fee_kes: res.fee_kes, note: res.note, note_lang: AP.noteLang(res.note), source: 'picks', ...(m.via === 'landmark' ? { landmark: m.said } : {}), lines: { en: AP.linesFor(picks, n, 'en').reply, sw: AP.linesFor(picks, n, 'sw').reply } };
+  if (via === 'no_pick') {
+    base.lines = { en: checkWithOwnerLine(n.name, 'en'), sw: checkWithOwnerLine(n.name, 'sw') };
+  }
+  return base;
 }
 /** Serving / excluded pick names for "where do you cover" (picks mode), or null (legacy). */
 function listed(profile = {}) {
@@ -259,16 +265,73 @@ function listed(profile = {}) {
   return { serve: p.picks.filter((x) => x.serve).map((x) => (AP.areaNode(x.node) || {}).name).filter(Boolean), off: p.picks.filter((x) => !x.serve).map((x) => (AP.areaNode(x.node) || {}).name).filter(Boolean) };
 }
 
+// [PROMPT-PLACEHOLDER] unconfirmed tenant or no pick on a named place: never guess yes/no.
+function checkWithOwnerLine(name, lang = 'en') {
+  const sw = /^sw/.test(String(lang || ''));
+  if (name) return sw ? `Nitaangalia na mmiliki kuhusu ${name}.` : `I'll check with the owner about ${name}.`;
+  return sw ? 'Nitaangalia na mmiliki.' : "I'll check with the owner.";
+}
+
+function joinAreaNames(areas, lang = 'en') {
+  const sw = /^sw/.test(String(lang || ''));
+  if (!areas.length) return null;
+  if (areas.length === 1) return sw ? `Tunafika ${areas[0]}.` : `We cover ${areas[0]}.`;
+  const last = areas[areas.length - 1];
+  const head = areas.slice(0, -1).join(sw ? ', ' : ', ');
+  return sw ? `Tunafika ${head} na ${last}.` : `We cover ${head}, and ${last}.`;
+}
+
+/** "Where do you cover?" from confirmed picks, or legacy lists when the tenant has no picks. */
+function listCoverageAnswer(profile = {}, lang = 'en') {
+  if (picksPending(profile)) return checkWithOwnerLine(null, lang);
+  const lp = listed(profile);
+  if (lp) return lp.serve.length ? joinAreaNames(lp.serve, lang) : checkWithOwnerLine(null, lang);
+  const { inc, say } = ownerRules(profile);
+  const names = [];
+  for (const p of inc.places) names.push(say.get(p) || cap(p));
+  for (const c of inc.counties) names.push(cap(c));
+  if (!names.length) return null;
+  return joinAreaNames(names.slice(0, 12), lang);
+}
+
+function noteOnRow(r) {
+  return (r && r.status === 'covered' && r.note) ? { note: r.note, note_lang: r.note_lang || AP.noteLang(r.note) || null } : { note: null, note_lang: null };
+}
+function rowCovered(r) {
+  if (!r || r.status === 'unknown' || r.via === 'unconfirmed' || r.via === 'no_pick') return 'unknown';
+  return r.status === 'covered' ? 'yes' : 'no';
+}
+/** check_coverage receipt: one row per place (1..5). All coverage status comes from resolve(). */
+function coverageReceipt(places = [], profile = {}) {
+  const rows = [];
+  for (const raw of places.slice(0, 5)) {
+    const p = String(raw || '').trim(); if (!p) continue;
+    const r = resolve(p, profile) || resolve(p.replace(/\b[a-z]/g, (c) => c.toUpperCase()), profile);
+    const name = r && r.name ? r.name : p.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+    if (rows.some((x) => x.place.toLowerCase() === name.toLowerCase())) continue;
+    const node = r && r.node ? (AP.areaNode(r.node) || { id: r.node, name: r.name, aliases: [] }) : null;
+    rows.push({
+      place: name, said: p, matched_node: node, covered: rowCovered(r), status: r ? r.status : 'unknown',
+      source: r && r.source === 'picks' ? 'area_picks' : 'legacy', line_en: r ? line(r, 'en') : null, line_sw: r ? line(r, 'sw') : null,
+      via: r && r.via || null, fee_kes: r && r.fee_kes != null ? r.fee_kes : null, ...noteOnRow(r),
+    });
+  }
+  return { tool: 'check_coverage', ok: true, places: rows };
+}
+
 // [PROMPT-PLACEHOLDER] caller-facing coverage lines. Picks mode: Desk's "what callers will hear" (fee, note).
 function line(r, lang = 'en') {
   if (!r) return null;
+  if (r.via === 'unconfirmed' || r.via === 'no_pick') return checkWithOwnerLine(r.name, lang);
   if (r.lines) return /^sw/.test(String(lang || '')) ? r.lines.sw : r.lines.en;
   const sw = /^sw/.test(String(lang || ''));
-  if (r.via === 'unconfirmed') return sw ? `Timu itathibitisha kama tunafika ${r.name}.` : `The team will confirm whether we cover ${r.name}.`;
   if (r.status === 'covered') return sw ? `Ndio, tunafika ${r.name}.` : `Yes, we cover ${r.name}.`;
   if (r.status === 'excluded' || r.status === 'outside') return sw ? `Samahani, hatufiki ${r.name}.` : `Sorry, we don't cover ${r.name}.`;
   return sw ? 'Hiyo iko karibu na eneo gani?' : 'Which area is that near?';
 }
 /** The ONE coverage answer for a caller phrase on every path: confirmed picks first, legacy rows only with no picks. */
 function answer(text, profile = {}, lang = 'en') { const r = resolve(text, profile); return r ? { ...r, line: line(r, lang) } : null; }
-module.exports = { answer, resolve, line, ownerRules, picksOf, picksPending, picksConfirmed, listed, treeMatch, placeMentions, PLACE_STOP };
+module.exports = {
+  answer, resolve, line, ownerRules, picksOf, picksPending, picksConfirmed, listed, treeMatch, placeMentions, PLACE_STOP,
+  checkWithOwnerLine, listCoverageAnswer, coverageReceipt, rowCovered,
+};

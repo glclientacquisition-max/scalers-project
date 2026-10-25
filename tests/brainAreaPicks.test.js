@@ -33,8 +33,9 @@ test('picks: nearest pick wins, fee and note heard, EN + SW (Desk preview lines)
   assert.equal(L('Do you come to Kitengela?'), "Yes, we cover Kitengela. There's an extra KES 500. Weekends only.");
   assert.equal(L('Mnafika Kitengela?', 'sw'), 'Ndio, tunafika Kitengela. Kuna ada ya ziada ya KES 500. Weekends only.');
   assert.equal(L('Niko Ruiru', 'sw'), 'Ndio, tunafika Ruiru. Kuna ada ya ziada ya KES 300.', 'fee inherits from the county pick');
-  assert.equal(L('Mnafika Kisumu?', 'sw'), 'Samahani, hatufiki Kisumu.');
-  assert.equal(AC.resolve('Mnafika Kisumu?', P).status, 'outside');
+  assert.equal(L('Mnafika Kisumu?', 'sw'), 'Nitaangalia na mmiliki kuhusu Kisumu.');
+  assert.equal(AC.resolve('Mnafika Kisumu?', P).status, 'unknown');
+  assert.equal(AC.resolve('Mnafika Kisumu?', P).via, 'no_pick');
   assert.equal(L('Do you cover Kwa Mzee?'), 'Which area is that near?');
   assert.equal(L('Niko Kileleshwani', 'sw'), 'Ndio, tunafika Kileleshwa.');
   assert.equal(L('Kilelesha'), 'Yes, we cover Kileleshwa.');
@@ -49,7 +50,8 @@ test('fallback to legacy lists only when the tenant has no picks', { skip: !tree
   assert.equal(AC.resolve('Kileleshwa', { ...DD, areaPicks: { picks: [{ node: 'estate:nowhere:x', serve: true }] } }).source, undefined, 'unknown nodes dropped -> legacy');
   assert.equal(AC.resolve('Juja', DD).status, 'covered', 'legacy place:juja');
   assert.equal(AC.resolve('Juja', P).status, 'covered', 'picks: Juja under county:kiambu');
-  assert.equal(AC.resolve('Syokimau', P).status, 'outside', 'picks win over legacy: Syokimau not picked');
+  assert.equal(AC.resolve('Syokimau', P).via, 'no_pick', 'picks win over legacy: Syokimau not picked');
+  assert.match(AC.line(AC.resolve('Syokimau', P), 'en'), /check with the owner/i);
   process.env.BRAIN_AREA_PICKS = 'off';
   try { assert.equal(AC.resolve('Syokimau', P).status, 'covered', 'knob off -> legacy'); } finally { delete process.env.BRAIN_AREA_PICKS; }
 });
@@ -90,7 +92,10 @@ test('parity: Brain callerHears == Desk callerHears (preview = bot target)', { s
   const p = AP.normalizeAreaPicks(PICKS);
   places.forEach((x, i) => { const h = AP.callerHears(p, x); assert.deepEqual([h.status, h.reply, h.node && h.node.id], desk[i], x); });
   // and the in-call resolver says the Desk line for the bare place name
-  places.forEach((x, i) => { const r2 = AC.resolve(x, { ...DD, areaPicksConfirmedAt: '2026-10-25T08:00:00Z', areaPicks: PICKS }); if (desk[i][0] !== 'not_on_map' && r2) assert.equal(AC.line(r2, 'en'), desk[i][1], `in-call ${x}`); });
+  places.forEach((x, i) => {
+    const r2 = AC.resolve(x, { ...DD, areaPicksConfirmedAt: '2026-10-25T08:00:00Z', areaPicks: PICKS });
+    if (desk[i][0] !== 'not_on_map' && r2 && r2.via !== 'no_pick') assert.equal(AC.line(r2, 'en'), desk[i][1], `in-call ${x}`);
+  });
 });
 
 // ---- area notes (owner free text, <= 120 chars; Desk #944: rules live only in note, never parsed) ----
@@ -157,8 +162,26 @@ test('note: Desk example shape; no-note picks unchanged; unconfirmed seeded tena
   assert.equal(AC.line(AC.resolve('Thika', bare), 'sw'), 'Ndio, tunafika Thika.');
   assert.equal(AP.linesFor(AP.normalizeAreaPicks(bare.areaPicks), AP.matchAreaText('Thika'), 'sw').note_untranslated, false);
   const seeded = { ...DD, areaPicksConfirmedAt: null, areaPicks: { picks: [{ node: 'town:kiambu:thika', serve: true, fee_kes: 800, note: 'From 2 bedrooms up' }] } };
-  assert.equal(AC.line(AC.resolve('Thika', seeded), 'en'), 'The team will confirm whether we cover Thika.');
-  assert.equal(AC.line(AC.resolve('Thika', seeded), 'sw'), 'Timu itathibitisha kama tunafika Thika.');
+  assert.equal(AC.line(AC.resolve('Thika', seeded), 'en'), "I'll check with the owner about Thika.");
+  assert.equal(AC.line(AC.resolve('Thika', seeded), 'sw'), 'Nitaangalia na mmiliki kuhusu Thika.');
   const ML = require('../src/conversation/v2/modelLead');
   assert.equal(ML.coverageFor('Thika', seeded).places[0].note, null, 'unconfirmed: no note on the receipt');
+});
+
+test('unified reader: alias -> tree node; confirmed fee+note; unconfirmed/missing pick -> check with owner', { skip: !treeHere && 'needs #930 tree' }, () => {
+  const ML = require('../src/conversation/v2/modelLead');
+  const alias = AC.resolve('kibra', P);
+  assert.equal(alias.name, 'Kibera');
+  assert.equal(alias.status, 'excluded');
+  const kit = ML.coverageFor('Kitengela', P).places[0];
+  assert.equal(kit.covered, 'yes');
+  assert.equal(kit.fee_kes, 500);
+  assert.equal(kit.note, 'Weekends only');
+  const seeded = { ...DD, areaPicksConfirmedAt: null, areaPicks: PICKS };
+  const miss = ML.coverageFor('Kisumu', { ...DD, areaPicksConfirmedAt: '2026-10-25T08:00:00Z', areaPicks: PICKS }).places[0];
+  assert.equal(miss.covered, 'unknown');
+  assert.match(miss.line_en, /check with the owner/i);
+  const pend = ML.coverageFor('Kileleshwa', seeded).places[0];
+  assert.equal(pend.covered, 'unknown');
+  assert.match(pend.line_en, /check with the owner/i);
 });

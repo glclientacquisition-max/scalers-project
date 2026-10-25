@@ -137,9 +137,7 @@ async function before(state, text, profile = {}, { handlers = null, lang: turnLa
   // it is never read as the slot ("Where's your coverage?" is not a name)
   if (state.expecting && state.expecting !== 'confirm' && !state.pending && /\?\s*$|^\W*(where|what|which|how|when|why|do you|does|can you|are you|wapi|nini|je|mnafika|mnafanya)\b/i.test(t) && !matchServices(t, profile).length) {
     const cov = /\b(cover|coverage|areas?|where do you|mnafika|maeneo)\b/i.test(t);
-    const lp = cov ? AC.listed(profile) : null;
-    const areas = !cov ? [] : lp ? lp.serve : require('../listedAreas').listedAreaRows(profile).map((r) => r.name);
-    const ans = areas.length ? (sw(lang) ? `Tunafika ${areas.join(', ')}.` : `We cover ${areas.slice(0, -1).join(', ')}${areas.length > 1 ? ', and ' : ''}${areas[areas.length - 1]}.`) : ''; /* [PROMPT-PLACEHOLDER] */
+    const ans = cov ? (AC.listCoverageAnswer(profile, lang) || '') : ''; /* [PROMPT-PLACEHOLDER] */
     return own([ans, reask(state, lang)].filter(Boolean).join(' '), cov ? 'coverage_answer_reask' : 'question_reask');
   }
   // 1) items: an add appends an item (in collect or at the read-back)
