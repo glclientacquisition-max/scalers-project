@@ -26,18 +26,34 @@ Owner Desk › Settings › **Service areas** (`/settings/areas`) writes one row
   "picks": [
     { "node": "county:nairobi", "serve": true, "fee_kes": null, "note": null },
     { "node": "estate:nairobi:kibera", "serve": false, "fee_kes": null, "note": null },
-    { "node": "town:kajiado:kitengela", "serve": true, "fee_kes": 500, "note": "Weekends only" }
+    { "node": "town:kajiado:kitengela", "serve": true, "fee_kes": 500, "note": "Weekends only" },
+    { "node": "town:kiambu:thika", "serve": true, "fee_kes": 800, "note": "From 2 bedrooms up" }
   ]
 }
 ```
 
 Columns: `tenant_id` (pk), `tree_version`, `picks`, `moved_from` (old Locations / coverage list, audit), `confirmed_at` (owner tapped "Looks right"), `updated_by`, `updated_at`. Service role only.
 
+### Per-pick fields
+
+- `serve` (bool): include or exclude. An exclude under a covered county (Kibera under Nairobi) is one tap on the child row.
+- `fee_kes` (integer KES, > 0, max 100000, or null): extra travel fee on top of the job price. Edited in the area sheet.
+- `note` (string ≤ 120 or null): short caller note, spoken after the fee. Per-area rules live here
+  ("From 2 bedrooms up"); there is no structured conditions field (Alvin, 25 Oct). Unknown keys such as `conditions` are dropped on read.
+
+### Confirm
+
+- `confirmed_at` set = owner confirmed; Brain #942 answers only from confirmed picks.
+- The owner's own Save on Service areas confirms too: `confirmed_at` = `updated_at` (same stamp).
+- `updated_at` more than 2 s after `confirmed_at` = changed by someone else since confirm ("edited"). Desk shows the
+  confirm card on Service areas and an "Is this right?" row on Desk home until the owner confirms.
+- Seeding from the old list (`scripts/seed-area-picks-from-old.ts`) writes rows with `confirmed_at` null.
+
 ## Resolving a place (both sides must do this the same way)
 
 1. Match the caller's words to a node: exact name or alias, then landmark, then loose spelling (edit distance ≤ 1 for 4 letters, ≤ 2 for 5+).
 2. Walk from that node up to Kenya. The **nearest pick wins**: `serve: true` = covered, `serve: false` = not covered. No pick anywhere = not covered.
-3. Fee and note: the nearest serving pick on the path that sets them (stops at an exclude).
+3. Fee and note: each from the nearest serving pick on the path that sets it (stops at an exclude).
 4. No node matched: ask "Which area is that near?" Do not guess.
 
 Reference implementation: `dashboard/src/lib/areaPicks.ts` (`resolveArea`, `matchAreaText`, `callerHears`). Tests: `tests/areaPicks.test.ts`.
