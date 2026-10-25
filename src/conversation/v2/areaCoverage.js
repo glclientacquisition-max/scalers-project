@@ -56,7 +56,7 @@ function phraseIndex() {
   return PHRASES;
 }
 /** The tree node the caller named, or null. Exact > landmark > close spelling (≤1 for 4 letters, ≤2 for 5+). */
-function treeMatch(text) {
+function treeMatch(text, { fuzzy = true } = {}) {
   if (!AP.available()) return null;
   const words = AP.normAreaText(text).split(' ').filter(Boolean);
   const ix = phraseIndex(); let best = null;
@@ -68,16 +68,99 @@ function treeMatch(text) {
       const locative = /^[a-z]{5,}ni$/.test(q) ? q.slice(0, -2) : null; // sw "Kileleshwani" = "at Kileleshwa"
       let n = ix.exact.get(q) || (locative && ix.exact.get(locative)); let via = 'name';
       if (!n) { n = ix.landmark.get(q); via = 'landmark'; }
-      if (!n && len <= 2 && q.replace(/ /g, '').length >= 4) {
+      if (!n && fuzzy && len <= 2 && q.replace(/ /g, '').length >= 4) {
         const tol = q.length >= 5 ? 2 : 1; let d0 = tol + 1;
         for (const [k, node] of ix.exact) { if (Math.abs(k.length - q.length) > tol) continue; const d = AP.editDistance(q, k); if (d < d0) { d0 = d; n = node; } }
         if (locative && !n) for (const [k, node] of ix.exact) { if (AP.editDistance(locative, k) <= 1) { n = node; break; } }
         via = 'fuzzy';
       }
-      if (n) { const rank = (via === 'fuzzy' ? 0 : 10) + len; if (!best || rank > best.rank) best = { node: n, via, rank, said: q }; }
+      if (n) { const rank = (via === 'fuzzy' ? 0 : 10) + len; if (!best || rank > best.rank) best = { node: n, via, rank, said: q, fuzzy: via === 'fuzzy' }; }
     }
   }
   return best;
+}
+
+// ---- placeMentions: the ONE "which places did the CALLER name" (AI-first; rogue calls HD_7a9915837b00, HD_ef5ee3a15a0a) ----
+// Primary signal: the model's understanding (slots.places). Word matching only (a) confirms or rejects a place the
+// model named, against the caller's own words, or (b) finds an exact/alias/landmark name INSIDE an explicit place slot
+// ("in/at/near/kwa/niko/nipo/mnafika X", "Xni", the answer to "which area?", or a bare place answer). It never invents
+// a place from free text: fuzzy spelling is used only to confirm a model-named place. Never run on the model's own words.
+const SLOT_CUE = new Set(['in', 'have', 'at', 'near', 'around', 'to', 'from', 'kwa', 'huko', 'kule', 'niko', 'nipo', 'tuko', 'tupo', 'naishi', 'nakaa', 'tunaishi', 'mnafika', 'mnakuja', 'mtafika', 'mnafikia', 'mnaenda', 'mnafanya', 'hadi', 'mpaka', 'cover', 'covers', 'serve', 'reach', 'eneo', 'karibu']);
+const CONJ = new Set(['or', 'and', 'au', 'na', 'ama', 'wala', 'also', 'pia', 'maybe', 'labda']);
+// function/question words of either language that must never start, end or fill a place window
+const PLACE_STOP = new Set([...STOP, 'saa', 'ngapi', 'kuhusu', 'sasa', 'gani', 'nini', 'kujua', 'nataka', 'nilikuwa', 'ningependa', 'venye', 'vile', 'jinsi', 'nyinyi', 'wewe', 'mimi', 'yenu', 'yako', 'yangu', 'ya', 'wa', 'za', 'cha', 'kwa', 'huko', 'kule', 'hapa', 'pale', 'ni', 'si', 'je', 'tu', 'pia', 'labda', 'baada', 'kabla', 'asubuhi', 'jioni', 'mchana', 'usiku', 'wiki', 'siku', 'leo', 'kesho', 'jana', 'deep', 'clean', 'usafi', 'nyumba', 'ofisi', 'huduma', 'bei', 'what', 'time', 'when', 'how', 'much', 'which', 'hours', 'open', 'many', 'about', 'want', 'know', 'mna', 'mnafanyanga', 'mnafanya', 'mnafungua', 'mnafunga', 'kazi', 'salamu', 'sawa', 'asante', 'tafadhali', 'shh', 'ah', 'eh', 'um', 'uh', 'hello', 'hi', 'habari', 'jambo', 'please', 'thanks', 'thank', 'guys', 'there', 'here', 'have', 'got', 'does']);
+const BARE_MAX = 4; // "Kileleshwa." / "Kilimani Westlands?" / "Ongata Rongai or Kileleshwa" are an answer, not chatter
+function slotWindows(words, expecting) {
+  const content = words.filter((w) => !CONJ.has(w) && !PLACE_STOP.has(w));
+  if (['place', 'landmark', 'area', 'which_area'].includes(expecting)) return [{ from: 0, to: words.length, bare: true }];
+  if (content.length && content.length <= 2 && words.length <= 3) return [{ from: 0, to: words.length, bare: true }]; // a one/two-word answer: "Kilelesha." / "Kamakis"
+  // a bare place answer: every content word is part of an exact place name ("Kileleshwa.", "Ongata Rongai or Kileleshwa? Do you go there?")
+  if (content.length && content.length <= BARE_MAX && words.length <= 12) {
+    if (!AP.available()) { if (content.every((w) => K.bindSpokenPlace(w).length) || K.bindSpokenPlace(content.join(' ')).length === content.length) return [{ from: 0, to: words.length }]; } // legacy index (no tree)
+    const hit = strictScan(content).reduce((n, m) => n + m.said.split(' ').length, 0); if (hit === content.length) return [{ from: 0, to: words.length }]; }
+  const out = [];
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    if (SLOT_CUE.has(w)) {
+      let j = i + 1; let taken = 0;
+      while (j < words.length && taken < 6) { if (CONJ.has(words[j]) || SLOT_CUE.has(words[j])) { j++; continue; } if (PLACE_STOP.has(words[j])) break; j++; taken++; }
+      if (j > i + 1) out.push({ from: i + 1, to: j });
+    } else if (/^[a-z]{5,}ni$/.test(w)) out.push({ from: i, to: i + 1, locative: true }); // sw "Kileleshwani"
+  }
+  return out;
+}
+function strictScan(words, { bare = false } = {}) {
+  const out = []; let i = 0;
+  while (i < words.length) {
+    let hit = null;
+    for (let n = Math.min(3, words.length - i); n >= 1 && !hit; n--) {
+      const g = words.slice(i, i + n);
+      if (PLACE_STOP.has(g[0]) || PLACE_STOP.has(g[g.length - 1]) || CONJ.has(g[0]) || CONJ.has(g[g.length - 1])) continue;
+      const m = treeMatch(g.join(' '), { fuzzy: false });
+      if (m && m.node && m.said === g.join(' ')) hit = { m, n };
+      else if (!m && n === 1 && /^[a-z]{5,}ni$/.test(g[0])) { const m2 = treeMatch(g[0], { fuzzy: false }); if (m2 && m2.node) hit = { m: m2, n }; }
+    }
+    if (!hit && bare && !PLACE_STOP.has(words[i]) && words[i].length >= 5) { // a one-word place answer may be misheard: close spelling, same first letter
+      const m = treeMatch(words[i]); if (m && m.node && m.fuzzy && AP.normAreaText(m.node.name)[0] === words[i][0]) hit = { m, n: 1 };
+    }
+    if (hit) { out.push(hit.m); i += hit.n; } else i++;
+  }
+  return out;
+}
+/** A place the model named is real only if the caller said it (whole words, or a close spelling of a non-stop word). */
+function confirmInCaller(place, words) {
+  const q = AP.normAreaText(place); if (!q || NOT_PLACE.has(q)) return null;
+  const node = (treeMatch(q, { fuzzy: false }) || {}).node || null;
+  const cands = new Set([q, ...(node ? [AP.normAreaText(node.name), ...(node.aliases || []).map(AP.normAreaText)] : [])]);
+  const text = ` ${words.join(' ')} `;
+  for (const c of cands) if (c && text.includes(` ${c} `)) return { node, said: c, via: 'model', fuzzy: false };
+  for (const c of cands) { // STT spelling: a caller span of the same width, not a stop word, within the treeMatch tolerance
+    const k = c.split(' ').length;
+    for (let i = 0; i + k <= words.length; i++) {
+      const g = words.slice(i, i + k); if (g.some((x) => PLACE_STOP.has(x))) continue;
+      const s = g.join(' '); if (s.replace(/ /g, '').length < 4 || s[0] !== c[0]) continue;
+      if (AP.editDistance(s, c) <= (c.length >= 6 ? 2 : 1)) return { node: node || (treeMatch(s) || {}).node || null, said: s, via: 'model', fuzzy: true };
+    }
+  }
+  return null;
+}
+/**
+ * The places the CALLER named this turn: [{ name, node, said, via: 'model'|'slot'|'landmark', fuzzy }] (max 5).
+ * u: the model's understanding (null when the model has not answered / failed); expecting: machine.expecting.
+ * rejected (out param): model places the caller never said, for the trace.
+ */
+function placeMentions(text, { u = null, expecting = null, rejected = null } = {}) {
+  const words = AP.normAreaText(text).split(' ').filter(Boolean);
+  const out = []; const seen = new Set();
+  const add = (name, rest) => { const k = String(name).toLowerCase(); if (!name || seen.has(k) || out.length >= 5) return; seen.add(k); out.push({ name, ...rest }); };
+  const mp = u && u.slots && Array.isArray(u.slots.places) ? u.slots.places : [];
+  for (const p of mp) {
+    const c = confirmInCaller(String(p || ''), words);
+    if (c) add(c.node ? c.node.name : cap(String(p).trim().toLowerCase()), { node: c.node, said: c.said, via: 'model', fuzzy: c.fuzzy });
+    else if (Array.isArray(rejected)) rejected.push(String(p));
+  }
+  if (AP.available()) for (const w of slotWindows(words, expecting)) for (const m of strictScan(words.slice(w.from, w.to), { bare: !!w.bare })) add(m.node.name, { node: m.node, said: m.said, via: m.via === 'landmark' ? 'landmark' : 'slot', fuzzy: false });
+  return out;
 }
 
 /** Owner picks (normalised), or null when this tenant has none / picks are off / the tree is missing. */
@@ -111,24 +194,27 @@ function landmark(text) {
  * covered: on the owner's list directly or through its county. excluded: an owner exclude row.
  * outside: a real Kenyan place not on the list. unknown: the caller named a place we cannot place.
  */
-function resolve(text, profile = {}) {
+function resolve(text, profile = {}, opts = {}) {
   const t = String(text || '');
   if (!t.trim()) return null;
   const picks = picksOf(profile);
-  if (picks) return resolvePicks(t, picks);
+  if (picks) return resolvePicks(t, picks, opts);
   if (picksPending(profile)) {
-    const m = treeMatch(t);
+    const m = mentionMatch(t, opts);
     if (m) return { status: 'unknown', name: m.node.name, place: K.normalizePlaceKey(m.node.name), node: m.node.id, counties: [], via: 'unconfirmed', source: 'picks' };
     const u = unknownAsked(t); return u ? { ...u, via: 'unconfirmed' } : null;
   }
-  const lm = landmark(t);
-  let found = lm ? [lm.place] : K.bindSpokenPlace(t, { fuzzy: true }).filter((p) => !NOT_PLACE.has(p));
-  if (!found.length) { const tm = treeMatch(t); if (tm) found = [K.normalizePlaceKey(tm.node.name)]; } // Desk tree names/aliases (Juja, Ongata Rongai)
+  const mm = mentionMatch(t, opts);
+  const lm = mm && mm.via === 'landmark' ? { place: K.normalizePlaceKey(mm.node.name), landmark: mm.said } : null;
+  const words = AP.normAreaText(t).split(' ').filter(Boolean);
+  const slotText = slotWindows(words, opts.expecting).map((w) => words.slice(w.from, w.to).join(' ')).join(' , ');
+  let found = lm ? [lm.place] : (slotText ? K.bindSpokenPlace(slotText, { fuzzy: true }) : []).filter((p) => !NOT_PLACE.has(p) && !PLACE_STOP.has(p));
+  if (!found.length && mm) found = [K.normalizePlaceKey(mm.node.name)]; // Desk tree names/aliases (Juja, Ongata Rongai)
   const { inc, exc, say } = ownerRules(profile);
   if (!found.length) {
     const m = t.match(ASKED_PLACE);
     const w = m && m[1] && m[1].trim();
-    if (w && !NOT_PLACE.has(w.toLowerCase()) && /^[A-Z]/.test(w) && !/^(the|my|your|our|a|an|it|that|this|alvin)$/i.test(w)) return { status: 'unknown', name: cap(w.toLowerCase()), place: null, counties: [], via: 'asked' };
+    if (w && !w.toLowerCase().split(/\s+/).every((x) => PLACE_STOP.has(x)) && !NOT_PLACE.has(w.toLowerCase()) && /^[A-Z]/.test(w) && !/^(the|my|your|our|a|an|it|that|this|alvin)$/i.test(w)) return { status: 'unknown', name: cap(w.toLowerCase()), place: null, counties: [], via: 'asked' };
     return null;
   }
   // prefer an owner-listed place, then the longest name
@@ -150,11 +236,16 @@ function resolve(text, profile = {}) {
 
 function unknownAsked(t) {
   const m = t.match(ASKED_PLACE); const w = m && m[1] && m[1].trim();
-  if (w && !NOT_PLACE.has(w.toLowerCase()) && /^[A-Z]/.test(w) && !/^(the|my|your|our|a|an|it|that|this|alvin)$/i.test(w)) return { status: 'unknown', name: cap(w.toLowerCase()), place: null, counties: [], via: 'asked', source: 'picks' };
+  if (w && !w.toLowerCase().split(/\s+/).every((x) => PLACE_STOP.has(x)) && !NOT_PLACE.has(w.toLowerCase()) && /^[A-Z]/.test(w) && !/^(the|my|your|our|a|an|it|that|this|alvin)$/i.test(w)) return { status: 'unknown', name: cap(w.toLowerCase()), place: null, counties: [], via: 'asked', source: 'picks' };
   return null;
 }
-function resolvePicks(t, picks) {
-  const m = treeMatch(t);
+/** The first caller-named tree place as a treeMatch-shaped hit (placeMentions), or null. */
+function mentionMatch(t, opts = {}) {
+  const pm = placeMentions(t, opts).find((x) => x.node);
+  return pm ? { node: pm.node, via: pm.via === 'landmark' ? 'landmark' : 'name', said: pm.said } : null;
+}
+function resolvePicks(t, picks, opts = {}) {
+  const m = mentionMatch(t, opts);
   if (!m) return unknownAsked(t);
   const n = m.node; const res = AP.resolveArea(picks, n.id);
   const county = AP.countyOf(n.id);
@@ -180,4 +271,4 @@ function line(r, lang = 'en') {
 }
 /** The ONE coverage answer for a caller phrase on every path: confirmed picks first, legacy rows only with no picks. */
 function answer(text, profile = {}, lang = 'en') { const r = resolve(text, profile); return r ? { ...r, line: line(r, lang) } : null; }
-module.exports = { answer, resolve, line, ownerRules, picksOf, picksPending, picksConfirmed, listed, treeMatch };
+module.exports = { answer, resolve, line, ownerRules, picksOf, picksPending, picksConfirmed, listed, treeMatch, placeMentions, PLACE_STOP };
