@@ -3,42 +3,74 @@ import { AdminSetupError } from "@/components/AdminSetupError";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import {
   AdminAccessRequestsPanel,
-  type AccessRequestRow,
+  type AccessRequestPanelRow,
 } from "@/components/AdminAccessRequestsPanel";
 import { isAdminV2Enabled } from "@/lib/adminV2";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { logAdminError } from "@/lib/adminErrors";
+import {
+  buildAccessRequestRepeatCounts,
+  countAccessRequestsByStatus,
+  filterAccessRequestsByStatus,
+  matchesAccessRequestSearch,
+  parseAccessRequestStatusFilter,
+  type AccessRequestStatusFilter,
+} from "@/lib/accessRequestLogic";
+import { fetchAccessRequestList, loadInviteJoinStates } from "@/lib/accessRequestQueries";
 
 export const instant = false;
 
-function sortRequests(rows: AccessRequestRow[]): AccessRequestRow[] {
-  const order = { pending: 0, approved: 1, declined: 2 } as const;
-  return [...rows].sort((a, b) => {
-    const byStatus = order[a.status] - order[b.status];
-    if (byStatus !== 0) return byStatus;
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-}
-
-export default async function AdminAccessRequestsPage() {
+export default async function AdminAccessRequestsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string; q?: string }>;
+}) {
   await requireSuperAdmin();
   if (!isAdminV2Enabled()) {
     redirect("/admin");
   }
 
-  let rows: AccessRequestRow[] = [];
+  const params = await searchParams;
+  const statusFilter: AccessRequestStatusFilter =
+    params.status !== undefined && params.status !== ""
+      ? parseAccessRequestStatusFilter(params.status)
+      : "pending";
+  const searchQuery = String(params.q || "").trim();
+
+  let schemaV2 = false;
+  let rows: AccessRequestPanelRow[] = [];
+  let counts = { pending: 0, approved: 0, declined: 0 };
+
   try {
     const admin = getSupabaseAdmin();
-    const { data, error } = await admin
-      .from("access_requests")
-      .select(
-        "id, created_at, name, business, phone, email, about, status, decided_at, decided_by"
-      )
-      .order("created_at", { ascending: false })
-      .limit(200);
+    const fetched = await fetchAccessRequestList(admin);
+    schemaV2 = fetched.schemaV2;
+    const allRows = fetched.rows;
+    counts = countAccessRequestsByStatus(allRows);
+    const repeatCounts = buildAccessRequestRepeatCounts(allRows);
 
-    if (error) throw error;
-    rows = sortRequests((data || []) as AccessRequestRow[]);
+    let visible = filterAccessRequestsByStatus(allRows, statusFilter);
+    if (searchQuery) {
+      visible = visible.filter((row) => matchesAccessRequestSearch(row, searchQuery));
+    }
+    visible.sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    const inviteIds = visible
+      .filter((r) => r.status === "approved" && r.invited_user_id)
+      .map((r) => String(r.invited_user_id));
+
+    const joinStates = await loadInviteJoinStates(admin, inviteIds);
+
+    rows = visible.map((row) => ({
+      ...row,
+      repeatCount: repeatCounts[row.id] ?? 1,
+      inviteState:
+        row.status === "approved" && row.invited_user_id
+          ? joinStates[String(row.invited_user_id)] ?? "invited"
+          : null,
+    }));
   } catch (err) {
     logAdminError("access-requests", err);
     return <AdminSetupError />;
@@ -48,10 +80,15 @@ export default async function AdminAccessRequestsPage() {
     <div>
       <h2 className="font-display text-2xl tracking-tight">Access requests</h2>
       <p className="mt-2 text-sm text-ink-soft">
-        Pending first. Approve sends a Supabase invite; the owner sets a password and lands in
-        onboarding.
+        Approve sends a Supabase invite. Owners set a password in onboarding.
       </p>
-      <AdminAccessRequestsPanel rows={rows} />
+      <AdminAccessRequestsPanel
+        rows={rows}
+        counts={counts}
+        statusFilter={statusFilter}
+        searchQuery={searchQuery}
+        schemaV2={schemaV2}
+      />
     </div>
   );
 }
