@@ -46,7 +46,7 @@ export default async function OnboardingPage() {
             <OnboardingExit />
           </div>
           <p className="mt-6 text-ink-soft leading-relaxed">
-            No workspace linked to this account. Sign up again or contact support.
+            No workspace linked to this account. Request access or contact support.
           </p>
         </div>
       </main>

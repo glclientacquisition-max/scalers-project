@@ -20,8 +20,8 @@ describe("auth craft", () => {
     assert.doesNotMatch(login, /text-\[#005CCC\]/);
   });
 
-  it("drops signup phone fluff and tokenizes accents", () => {
-    assert.doesNotMatch(form, /Lead alerts go here/);
+  it("request access form tokenizes accents", () => {
+    assert.match(form, /requestAccessAction/);
     assert.match(form, /text-accent-deep/);
     assert.doesNotMatch(form, /text-\[#005CCC\]/);
     assert.match(signup, /text-accent-deep/);

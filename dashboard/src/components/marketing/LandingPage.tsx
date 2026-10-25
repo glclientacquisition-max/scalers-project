@@ -70,7 +70,7 @@ export function LandingPage() {
                 href="/signup"
                 className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-6 py-3 text-base font-medium text-brand-900 transition hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus"
               >
-                Create workspace
+                Request access
               </Link>
               <Link
                 href="/login"

@@ -12,12 +12,26 @@ const NAV = [
   { href: "/admin/voices", label: "Voices", exact: false as boolean },
 ];
 
-export function AdminNav({ onDark = false }: { onDark?: boolean }) {
+const ACCESS_REQUESTS_NAV = {
+  href: "/admin/access-requests",
+  label: "Access requests",
+  exact: false as boolean,
+};
+
+export function AdminNav({
+  onDark = false,
+  showAccessRequests = false,
+}: {
+  onDark?: boolean;
+  showAccessRequests?: boolean;
+}) {
   const pathname = usePathname();
+
+  const items = showAccessRequests ? [...NAV, ACCESS_REQUESTS_NAV] : NAV;
 
   return (
     <nav className="flex gap-1 overflow-x-auto lg:flex-col">
-      {NAV.map((item) => {
+      {items.map((item) => {
         const active = item.exact
           ? pathname === item.href
           : pathname === item.href || pathname.startsWith(`${item.href}/`);
