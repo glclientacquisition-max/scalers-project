@@ -16,6 +16,16 @@ const BARE_HOUR = /(?:^|\b(?:at|saa|around|by)\s+)(\d{1,2})(?::(\d{2}))?\b(?!\s*
 function clockPhrase(text) {
   const hit = String(text || '').match(/\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)/i);
   if (hit) return hit[0].replace(/[\s.]/g, '').toLowerCase();
+  // 24-hour clock ("2026-10-26 14:00", "Monday 09:30"): the model's canonical form. Without
+  // this the visit was saved day-only and lost its time. Same 12h form as above ("2pm").
+  // "saa 8:00" is the Swahili clock (2 o'clock, period unknown): leave it to the Swahili parser below.
+  const h24 = String(text || '').match(/(?:^|[^\d:])([01]?\d|2[0-3]):([0-5]\d)(?![\d:])/);
+  if (h24 && !/\bsaa\s*$/i.test(String(text).slice(0, h24.index + h24[0].length - h24[1].length - h24[2].length - 1))) {
+    const h = Number(h24[1]);
+    const m = Number(h24[2]);
+    const hour12 = ((h + 11) % 12) + 1;
+    return `${hour12}${m ? `:${String(m).padStart(2, '0')}` : ''}${h >= 12 ? 'pm' : 'am'}`;
+  }
   // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1a): "saa nane mchana" is 2pm.
   const sw = swahiliClockOf(text);
   if (sw.resolved == null) return '';
