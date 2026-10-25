@@ -152,3 +152,14 @@ test("rule sentences", () => {
   assert.equal(rules.warrantySentence({ months: 12, covers: ["workmanship", "parts"], note: null }), "We give a 1 year warranty on our workmanship and parts we supply.");
   assert.deepEqual(rules.topicsFor("home_services").slice(0, 3), ["cancellation", "booking_changes", "no_show"]);
 });
+
+test("merged booking line (cancel + move + late, each with a note) is kept whole, never cut at 500", () => {
+  const n = `${"Please read our notes carefully ".repeat(4).trim()} end.`;
+  const r = rules.normalizeRules({ cancellation: { notice_hours: 24, fee: "none", note: n }, booking_changes: { allowed: true, notice_hours: 6, note: n }, no_show: { wait_minutes: 15, charge: "none", note: n } });
+  const text = rules.policyTextFromRules(r).cancellation!;
+  assert.ok(text.length > 500, String(text.length));
+  assert.ok(text.endsWith("end."));
+  const saved = applyStructuredPolicies({ ...normalizeBusinessPolicies({}), rules: r });
+  assert.ok(saved.ok && saved.policies.cancellation === text);
+  assert.equal(rules.joinWholeSentences(["One two.", "Three four five."], 12), "One two.");
+});

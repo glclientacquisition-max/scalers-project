@@ -15,7 +15,7 @@ const PICKS = { version: 1, tree_version: 'ke-areas-2026-10-24.1', picks: [
   { node: 'town:kajiado:kitengela', serve: true, fee_kes: 500, note: 'Weekends only' },
   { node: 'county:kiambu', serve: true, fee_kes: 300, note: null },
 ] };
-const P = { ...DD, areaPicks: PICKS };
+const P = { ...DD, areaPicksConfirmedAt: '2026-10-25T08:00:00Z', areaPicks: PICKS };
 const DESK_TS = path.join(__dirname, '../dashboard/src/lib/areaPicks.ts');
 const treeHere = AP.available();
 
@@ -60,7 +60,7 @@ test('fail safe: no tree file -> picks ignored, legacy answers, no crash', () =>
     M._resolveFilename = function (req, ...a) { if (/kenyaAreaTree/.test(req)) throw Object.assign(new Error('missing'), { code: 'MODULE_NOT_FOUND' }); return o.call(this, req, ...a); };
     const AC = require('./src/conversation/v2/areaCoverage'); const AP = require('./src/conversation/v2/areaPicks');
     const DD = require('./evals/v2/fixtures/tenants/done_and_dusted.json');
-    const r = AC.resolve('do you do Kileleshwa?', { ...DD, areaPicks: { picks: [{ node: 'county:nairobi', serve: true }] } });
+    const r = AC.resolve('do you do Kileleshwa?', { ...DD, areaPicksConfirmedAt: '2026-10-25T08:00:00Z', areaPicks: { picks: [{ node: 'county:nairobi', serve: true }] } });
     process.stdout.write(JSON.stringify({ avail: AP.available(), status: r && r.status, line: AC.line(r, 'en') }));`], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(JSON.parse(r.stdout), { avail: false, status: 'covered', line: 'Yes, we cover Kileleshwa.' });
@@ -69,7 +69,7 @@ test('fail safe: no tree file -> picks ignored, legacy answers, no crash', () =>
 test('fail safe: the profile loader treats a missing table / error as no picks', () => {
   const src = fs.readFileSync(path.join(__dirname, '../src/db.js'), 'utf8');
   const fn = src.slice(src.indexOf('async function loadAreaPicks'), src.indexOf('async function loadAreaPicks') + 700);
-  assert.match(fn, /from\('tenant_area_picks'\)/); assert.match(fn, /if \(error \|\| !data\) return \{ areaPicks: null \}/); assert.match(fn, /catch \{\s*return \{ areaPicks: null \}/);
+  assert.match(fn, /from\('tenant_area_picks'\)/); assert.match(fn, /if \(error \|\| !data\) return \{ areaPicks: null, areaPicksConfirmedAt: null \}/); assert.match(fn, /catch \{\s*return \{ areaPicks: null \}/); assert.match(fn, /select\('picks, tree_version, confirmed_at'\)/);
   const { tenantProfileFromRow } = require('../src/tenantProfile');
   assert.equal(tenantProfileFromRow({ id: 't' }, {}).areaPicks, null);
   assert.deepEqual(tenantProfileFromRow({ id: 't' }, { areaPicks: PICKS }).areaPicks, PICKS);
@@ -90,5 +90,5 @@ test('parity: Brain callerHears == Desk callerHears (preview = bot target)', { s
   const p = AP.normalizeAreaPicks(PICKS);
   places.forEach((x, i) => { const h = AP.callerHears(p, x); assert.deepEqual([h.status, h.reply, h.node && h.node.id], desk[i], x); });
   // and the in-call resolver says the Desk line for the bare place name
-  places.forEach((x, i) => { const r2 = AC.resolve(x, { ...DD, areaPicks: PICKS }); if (desk[i][0] !== 'not_on_map' && r2) assert.equal(AC.line(r2, 'en'), desk[i][1], `in-call ${x}`); });
+  places.forEach((x, i) => { const r2 = AC.resolve(x, { ...DD, areaPicksConfirmedAt: '2026-10-25T08:00:00Z', areaPicks: PICKS }); if (desk[i][0] !== 'not_on_map' && r2) assert.equal(AC.line(r2, 'en'), desk[i][1], `in-call ${x}`); });
 });

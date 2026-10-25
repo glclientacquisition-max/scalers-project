@@ -4,6 +4,7 @@
 // and whose values match it. Design: ship-briefs/2026-10-24_brain_v1-draft-kb-verify-design.md §1-2.
 const N = require('./nlu');
 const AC = require('./areaCoverage');
+const OF = require('./ownerFacts');
 const MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
 const DAYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
 
@@ -79,8 +80,8 @@ function buildFactNote(profile = {}, state = {}, { callerText = '', writes = [] 
   const b = bookingFact(state);
   if (b) facts.push(b);
   const h = hoursFact(profile); if (h) facts.push(h);
-  const pay = String(profile.businessPolicies?.payment || '').trim();
-  if (pay) facts.push({ id: 'M1', family: 'payment', text: pay, nums: num(pay) });
+  // owner policies + FAQs: the ONE shared projection (ownerFacts.js); payment keeps id M1
+  for (const f of OF.ownerFacts(profile).facts) facts.push({ ...f, text: f.family === 'faq' ? f.text : `${f.label}: ${f.text}${f.text_sw && f.text_sw !== f.text ? ` (Kiswahili: ${f.text_sw})` : ''}` });
   if (state?.slots?.name && state.slots.nameConfirmed) facts.push({ id: 'N1', family: 'name', name: state.slots.name, text: `Caller name (confirmed): ${state.slots.name}` });
   if (profile.businessName) facts.push({ id: 'B1', family: 'business', name: profile.businessName, text: `Business: ${profile.businessName}${profile.agentName ? `; you are ${profile.agentName}` : ''}` });
   writes.forEach((w, i) => { if (w && w.id) facts.push({ id: `W${i + 1}`, family: 'write', writeId: w.id, kind: w.kind || 'callback', text: `Confirmed ${w.kind || 'callback'} (backend id ${w.id})` }); });

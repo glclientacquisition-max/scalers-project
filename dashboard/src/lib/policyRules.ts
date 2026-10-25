@@ -241,6 +241,23 @@ export function policyTextFromRules(rules: PolicyRules): Partial<Record<"returns
   if (rules.delivery) out.delivery = deliverySentence(rules.delivery);
   if (rules.warranty) out.warranty = warrantySentence(rules.warranty);
   const cancel = [rules.cancellation && cancellationSentence(rules.cancellation), rules.booking_changes && bookingChangesSentence(rules.booking_changes), rules.no_show && noShowSentence(rules.no_show)].filter(Boolean) as string[];
-  if (cancel.length) out.cancellation = cancel.join(" ").slice(0, 500);
+  // Whole sentences only, never cut mid-sentence (audit 2026-10-25): three custom notes (3 x 200) plus the
+  // generated lines fit under CANCELLATION_TEXT_MAX; Brain splits the text into sentences (ownerFacts.js).
+  if (cancel.length) out.cancellation = joinWholeSentences(cancel, CANCELLATION_TEXT_MAX);
+  return out;
+}
+
+export const CANCELLATION_TEXT_MAX = 1200;
+/** Join sentences; drop whole trailing sentences past max instead of cutting one in half. */
+export function joinWholeSentences(parts: string[], max: number): string {
+  const sentences = parts.join(" ").match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || [];
+  let out = "";
+  for (const raw of sentences) {
+    const s = raw.trim();
+    if (!s) continue;
+    const next = out ? `${out} ${s}` : s;
+    if (next.length > max) break;
+    out = next;
+  }
   return out;
 }
