@@ -15,7 +15,9 @@ const PICKS = { version: 1, tree_version: 'ke-areas-2026-10-24.1', picks: [
   { node: 'town:kajiado:kitengela', serve: true, fee_kes: 500, note: 'Weekends only' },
   { node: 'county:kiambu', serve: true, fee_kes: 300, note: null },
 ] };
-const P = { ...DD, areaPicksConfirmedAt: '2026-10-25T08:00:00Z', areaPicks: PICKS };
+const CONF = '2026-10-25T08:00:00Z';
+const P = { ...DD, areaPicksConfirmedAt: CONF, areaPicks: PICKS };
+const norm = (blob, at = CONF) => AP.normalizeAreaPicks(blob, { tenantConfirmedAt: at });
 const DESK_TS = path.join(__dirname, '../dashboard/src/lib/areaPicks.ts');
 const treeHere = AP.available();
 
@@ -71,10 +73,14 @@ test('fail safe: no tree file -> picks ignored, legacy answers, no crash', () =>
 test('fail safe: the profile loader treats a missing table / error as no picks', () => {
   const src = fs.readFileSync(path.join(__dirname, '../src/db.js'), 'utf8');
   const fn = src.slice(src.indexOf('async function loadAreaPicks'), src.indexOf('async function loadAreaPicks') + 700);
-  assert.match(fn, /from\('tenant_area_picks'\)/); assert.match(fn, /if \(error \|\| !data\) return \{ areaPicks: null, areaPicksConfirmedAt: null \}/); assert.match(fn, /catch \{\s*return \{ areaPicks: null \}/); assert.match(fn, /select\('picks, tree_version, confirmed_at'\)/);
+  assert.match(fn, /from\('tenant_area_picks'\)/);
+  assert.match(fn, /select\('node, serve, fee_kes, note, confirmed_at, tree_version'\)/);
+  assert.match(fn, /areaPicksRows: null/);
+  assert.match(fn, /return \{ areaPicksRows: data \}/);
   const { tenantProfileFromRow } = require('../src/tenantProfile');
-  assert.equal(tenantProfileFromRow({ id: 't' }, {}).areaPicks, null);
-  assert.deepEqual(tenantProfileFromRow({ id: 't' }, { areaPicks: PICKS }).areaPicks, PICKS);
+  assert.equal(tenantProfileFromRow({ id: 't' }, {}).areaPicksRows, null);
+  const rows = PICKS.picks.map((row) => ({ ...row, confirmed_at: CONF, tree_version: PICKS.tree_version }));
+  assert.deepEqual(tenantProfileFromRow({ id: 't' }, { areaPicksRows: rows }).areaPicksRows, rows);
 });
 
 // Parity with Desk's reference (dashboard/src/lib/areaPicks.ts): same callerHears for the same picks + place.
@@ -89,7 +95,7 @@ test('parity: Brain callerHears == Desk callerHears (preview = bot target)', { s
     process.stdout.write(JSON.stringify(${JSON.stringify(places)}.map((x) => { const h = m.callerHears(p, x); return [h.status, h.reply, h.node && h.node.id]; })));`], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   const desk = JSON.parse(r.stdout);
-  const p = AP.normalizeAreaPicks(PICKS);
+  const p = norm(PICKS);
   places.forEach((x, i) => { const h = AP.callerHears(p, x); assert.deepEqual([h.status, h.reply, h.node && h.node.id], desk[i], x); });
   // and the in-call resolver says the Desk line for the bare place name
   places.forEach((x, i) => {
@@ -109,13 +115,26 @@ const PICKS_NOTE = { version: 1, tree_version: 'ke-areas-2026-10-24.1', picks: [
 const PN = { ...DD, areaPicksConfirmedAt: '2026-10-25T08:00:00Z', areaPicks: PICKS_NOTE };
 
 test('note: inherited like fee_kes from the nearest serving pick; an exclude stops it', { skip: !treeHere && 'needs #930 tree' }, () => {
-  const p = AP.normalizeAreaPicks(PICKS_NOTE); const id = (q) => AP.matchAreaText(q).id;
-  assert.deepEqual(AP.resolveArea(p, id('Ruiru')), { covered: true, via: 'county:kiambu', fee_kes: 300, note: 'From 2 bedrooms up' });
-  assert.deepEqual(AP.resolveArea(p, id('Thika')), { covered: true, via: 'town:kiambu:thika', fee_kes: 800, note: 'Wikendi tu' });
-  assert.deepEqual(AP.resolveArea(p, id('Juja')), { covered: false, via: 'town:kiambu:juja', fee_kes: null, note: null });
+  const p = norm(PICKS_NOTE); const id = (q) => AP.matchAreaText(q).id;
+  assert.deepEqual(AP.resolveArea(p, id('Ruiru')), { covered: true, via: 'county:kiambu', fee_kes: 300, note: 'From 2 bedrooms up', unconfirmed: false });
+  assert.deepEqual(AP.resolveArea(p, id('Thika')), { covered: true, via: 'town:kiambu:thika', fee_kes: 800, note: 'Wikendi tu', unconfirmed: false });
+  assert.deepEqual(AP.resolveArea(p, id('Juja')), { covered: false, via: 'town:kiambu:juja', fee_kes: null, note: null, unconfirmed: false });
   assert.equal(AP.resolveArea(p, id('Kileleshwa')).note, null);
-  const long = AP.normalizeAreaPicks({ picks: [{ node: 'county:kiambu', serve: true, note: 'x'.repeat(200), conditions: [{ kind: 'min_bedrooms', value: 2 }] }] }).picks[0];
-  assert.equal(long.note.length, 120); assert.equal('conditions' in long, false, 'no conditions field is built');
+  const long = norm({ picks: [{ node: 'county:kiambu', serve: true, note: 'x'.repeat(250) }] }).picks[0];
+  assert.equal(long.note.length, 200); assert.equal('conditions' in long, false, 'no conditions field is built');
+});
+
+test('nearest ancestor: town pick wins over county; fee inherits from county when the town has none', { skip: !treeHere && 'needs #930 tree' }, () => {
+  const rows = [
+    { node: 'county:kiambu', serve: true, fee_kes: 300, note: 'From 2 bedrooms up', confirmed_at: CONF, tree_version: AP.treeVersion() },
+    { node: 'town:kiambu:thika', serve: true, fee_kes: 800, note: 'Wikendi tu', confirmed_at: CONF, tree_version: AP.treeVersion() },
+  ];
+  const prof = { ...DD, areaPicksRows: rows };
+  assert.equal(AC.resolve('Ruiru', prof).fee_kes, 300);
+  assert.equal(AC.resolve('Ruiru', prof).via, 'county:kiambu');
+  assert.equal(AC.resolve('Thika', prof).fee_kes, 800);
+  assert.equal(AC.resolve('Thika', prof).via, 'town:kiambu:thika');
+  assert.match(AC.line(AC.resolve('Thika', prof), 'en'), /Wikendi tu/);
 });
 
 test('note: owed coverage answer + pre-name check speak it after the fee, verbatim, EN + SW; no booking gate', { skip: !treeHere && 'needs #930 tree' }, () => {
@@ -124,7 +143,7 @@ test('note: owed coverage answer + pre-name check speak it after the fee, verbat
   assert.equal(L('Niko Ruiru', 'sw'), 'Ndio, tunafika Ruiru. Kuna ada ya ziada ya KES 300. From 2 bedrooms up.', 'English-only note: verbatim, not machine-translated');
   assert.equal(L('Mnafika Thika?', 'sw'), 'Ndio, tunafika Thika. Kuna ada ya ziada ya KES 800. Wikendi tu.');
   // flagged: an English-only note in a Swahili turn
-  const p = AP.normalizeAreaPicks(PICKS_NOTE); const ru = AP.matchAreaText('Ruiru'); const th = AP.matchAreaText('Thika');
+  const p = norm(PICKS_NOTE); const ru = AP.matchAreaText('Ruiru'); const th = AP.matchAreaText('Thika');
   assert.equal(AP.linesFor(p, ru, 'sw').note_untranslated, true);
   assert.equal(AP.linesFor(p, ru, 'en').note_untranslated, false);
   assert.equal(AP.linesFor(p, th, 'sw').note_untranslated, false);
@@ -150,7 +169,7 @@ test('parity with notes: Brain callerHears == Desk callerHears', { skip: !tsOk &
     const p = m.normalizeAreaPicks(${JSON.stringify(PICKS_NOTE)});
     process.stdout.write(JSON.stringify(${JSON.stringify(places)}.map((x) => { const h = m.callerHears(p, x); return [h.status, h.reply, h.node && h.node.id]; })));`], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
-  const desk = JSON.parse(r.stdout); const p = AP.normalizeAreaPicks(PICKS_NOTE);
+  const desk = JSON.parse(r.stdout); const p = norm(PICKS_NOTE);
   places.forEach((x, i) => { const h = AP.callerHears(p, x); assert.deepEqual([h.status, h.reply, h.node && h.node.id], desk[i], x); });
 });
 
@@ -160,7 +179,7 @@ test('note: Desk example shape; no-note picks unchanged; unconfirmed seeded tena
   const bare = { ...DD, areaPicksConfirmedAt: '2026-10-25T08:00:00Z', areaPicks: { picks: [{ node: 'town:kiambu:thika', serve: true, fee_kes: null, note: null }] } };
   assert.equal(AC.line(AC.resolve('Thika', bare), 'en'), 'Yes, we cover Thika.');
   assert.equal(AC.line(AC.resolve('Thika', bare), 'sw'), 'Ndio, tunafika Thika.');
-  assert.equal(AP.linesFor(AP.normalizeAreaPicks(bare.areaPicks), AP.matchAreaText('Thika'), 'sw').note_untranslated, false);
+  assert.equal(AP.linesFor(norm(bare.areaPicks), AP.matchAreaText('Thika'), 'sw').note_untranslated, false);
   const seeded = { ...DD, areaPicksConfirmedAt: null, areaPicks: { picks: [{ node: 'town:kiambu:thika', serve: true, fee_kes: 800, note: 'From 2 bedrooms up' }] } };
   assert.equal(AC.line(AC.resolve('Thika', seeded), 'en'), "I'll check with the owner about Thika.");
   assert.equal(AC.line(AC.resolve('Thika', seeded), 'sw'), 'Nitaangalia na mmiliki kuhusu Thika.');

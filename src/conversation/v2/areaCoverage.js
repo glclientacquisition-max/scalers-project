@@ -166,22 +166,27 @@ function placeMentions(text, { u = null, expecting = null, rejected = null } = {
 /** Owner picks (normalised), or null when this tenant has none / picks are off / the tree is missing. */
 function rawPicks(profile = {}) {
   if (String(process.env.BRAIN_AREA_PICKS || 'on').toLowerCase() === 'off' || !AP.available()) return null;
+  if (Array.isArray(profile.areaPicksRows) && profile.areaPicksRows.length) {
+    const p = AP.normalizeAreaPicksFromRows(profile.areaPicksRows);
+    return p.picks.length ? p : null;
+  }
   const raw = profile.areaPicks; if (!raw) return null;
-  const p = AP.normalizeAreaPicks(raw);
+  const p = AP.normalizeAreaPicks(raw, { tenantConfirmedAt: profile.areaPicksConfirmedAt });
   return p.picks.length ? p : null;
 }
-/** B2 (audit 2026-10-25): the owner tapped "Looks right" (tenant_area_picks.confirmed_at). Fail closed. */
+/** At least one pick row has confirmed_at (legacy tenant-level stamp still counts via normalizeAreaPicks). */
 function picksConfirmed(profile = {}) {
-  return Boolean(profile.areaPicksConfirmedAt || (profile.areaPicks && profile.areaPicks.confirmed_at));
-}
-/** Owner picks (normalised), or null when this tenant has none / unconfirmed / picks are off / the tree is missing. */
-function picksOf(profile = {}) {
   const p = rawPicks(profile);
-  return p && picksConfirmed(profile) ? p : null;
+  return Boolean(p && p.picks.some((x) => x.confirmed_at));
 }
-/** Picks exist but the owner has not confirmed them: no area is spoken; the team confirms (no legacy fallback). */
+/** Rows exist but none are confirmed yet: list answers fail closed; per-place resolve still uses picks mode. */
 function picksPending(profile = {}) {
-  return Boolean(rawPicks(profile)) && !picksConfirmed(profile);
+  const p = rawPicks(profile);
+  return Boolean(p && p.picks.length && !p.picks.some((x) => x.confirmed_at));
+}
+/** Normalised picks when the tenant has any area rows (per-row confirmed_at applied in resolveArea). */
+function picksOf(profile = {}) {
+  return rawPicks(profile);
 }
 
 function landmark(text) {
@@ -199,11 +204,6 @@ function resolve(text, profile = {}, opts = {}) {
   if (!t.trim()) return null;
   const picks = picksOf(profile);
   if (picks) return resolvePicks(t, picks, opts);
-  if (picksPending(profile)) {
-    const m = mentionMatch(t, opts);
-    if (m) return { status: 'unknown', name: m.node.name, place: K.normalizePlaceKey(m.node.name), node: m.node.id, counties: [], via: 'unconfirmed', source: 'picks' };
-    const u = unknownAsked(t); return u ? { ...u, via: 'unconfirmed' } : null;
-  }
   const mm = mentionMatch(t, opts);
   const lm = mm && mm.via === 'landmark' ? { place: K.normalizePlaceKey(mm.node.name), landmark: mm.said } : null;
   const words = AP.normAreaText(t).split(' ').filter(Boolean);
@@ -249,20 +249,30 @@ function resolvePicks(t, picks, opts = {}) {
   if (!m) return unknownAsked(t);
   const n = m.node; const res = AP.resolveArea(picks, n.id);
   const county = AP.countyOf(n.id);
-  // No pick on the tree chain: never guess no (audit 2026-10-25). Explicit exclude still excluded.
-  const status = res.covered ? 'covered' : res.via ? 'excluded' : 'unknown';
-  const via = res.covered ? (res.via || 'tree') : res.via ? res.via : 'no_pick';
-  const base = { status, name: n.name, place: K.normalizePlaceKey(n.name), node: n.id, counties: county ? [K.normalizePlaceKey(county.name)] : [], via, county: county && county.id !== n.id ? county.name : null, fee_kes: res.fee_kes, note: res.note, note_lang: AP.noteLang(res.note), source: 'picks', ...(m.via === 'landmark' ? { landmark: m.said } : {}), lines: { en: AP.linesFor(picks, n, 'en').reply, sw: AP.linesFor(picks, n, 'sw').reply } };
-  if (via === 'no_pick') {
+  // No pick / unconfirmed pick on the chain: never guess no (audit 2026-10-25). Explicit exclude still excluded.
+  const status = res.covered ? 'covered' : res.unconfirmed ? 'unknown' : res.via ? 'excluded' : 'unknown';
+  const via = res.covered ? (res.via || 'tree') : res.unconfirmed ? 'unconfirmed' : res.via ? res.via : 'no_pick';
+  const base = {
+    status, name: n.name, place: K.normalizePlaceKey(n.name), node: n.id,
+    counties: county ? [K.normalizePlaceKey(county.name)] : [], via,
+    county: county && county.id !== n.id ? county.name : null,
+    fee_kes: res.fee_kes, note: res.note, note_lang: AP.noteLang(res.note), source: 'picks',
+    ...(m.via === 'landmark' ? { landmark: m.said } : {}),
+  };
+  if (via === 'no_pick' || via === 'unconfirmed') {
     base.lines = { en: checkWithOwnerLine(n.name, 'en'), sw: checkWithOwnerLine(n.name, 'sw') };
+  } else {
+    base.lines = { en: AP.linesFor(picks, n, 'en').reply, sw: AP.linesFor(picks, n, 'sw').reply };
   }
   return base;
 }
 /** Serving / excluded pick names for "where do you cover" (picks mode), or null (legacy). */
 function listed(profile = {}) {
-  if (picksPending(profile)) return { serve: [], off: [], pending: true };
   const p = picksOf(profile); if (!p) return null;
-  return { serve: p.picks.filter((x) => x.serve).map((x) => (AP.areaNode(x.node) || {}).name).filter(Boolean), off: p.picks.filter((x) => !x.serve).map((x) => (AP.areaNode(x.node) || {}).name).filter(Boolean) };
+  const serve = p.picks.filter((x) => x.serve && x.confirmed_at).map((x) => (AP.areaNode(x.node) || {}).name).filter(Boolean);
+  const off = p.picks.filter((x) => !x.serve && x.confirmed_at).map((x) => (AP.areaNode(x.node) || {}).name).filter(Boolean);
+  if (!serve.length && !off.length && p.picks.length) return { serve: [], off: [], pending: true };
+  return { serve, off };
 }
 
 // [PROMPT-PLACEHOLDER] unconfirmed tenant or no pick on a named place: never guess yes/no.

@@ -10,7 +10,7 @@ let TREE = null;
 try { TREE = require(path.join(__dirname, '../../../dashboard/src/lib/data/kenyaAreaTree.v1.json')); } catch { TREE = null; }
 const NODES = TREE && Array.isArray(TREE.nodes) ? TREE.nodes : [];
 const BY_ID = new Map(NODES.map((n) => [n.id, n]));
-const AREA_FEE_MAX = 100000; const AREA_NOTE_MAX = 120;
+const AREA_FEE_MAX = 100000; const AREA_NOTE_MAX = 200;
 
 const available = () => NODES.length > 0;
 const areaNode = (id) => BY_ID.get(id) || null;
@@ -20,18 +20,43 @@ function countyOf(id) { const n = areaNode(id); if (!n) return null; if (n.kind 
 function cleanFee(raw) { const n = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() ? Number(raw.replace(/[, ]/g, '')) : NaN; if (!Number.isFinite(n) || n <= 0) return null; return Math.min(Math.round(n), AREA_FEE_MAX); }
 function cleanNote(raw) { if (typeof raw !== 'string') return null; const t = raw.replace(/\s+/g, ' ').trim().slice(0, AREA_NOTE_MAX); return t || null; }
 
-/** Same as Desk normalizeAreaPicks: unknown nodes and duplicates dropped (last wins). */
-function normalizeAreaPicks(raw) {
+/** One row per node from public.tenant_area_picks (Brain #960). */
+function normalizeAreaPicksFromRows(rows) {
+  const byNode = new Map(); let treeVersion = null;
+  for (const o of rows) {
+    if (!o || typeof o !== 'object') continue;
+    const node = typeof o.node === 'string' ? o.node : '';
+    if (!BY_ID.has(node)) continue;
+    treeVersion = o.tree_version || treeVersion;
+    const serve = o.serve !== false;
+    byNode.set(node, {
+      node, serve,
+      fee_kes: serve ? cleanFee(o.fee_kes) : null,
+      note: serve ? cleanNote(o.note) : null,
+      confirmed_at: o.confirmed_at || null,
+    });
+  }
+  return { version: 1, tree_version: treeVersion || (TREE ? TREE.version : null), picks: [...byNode.values()] };
+}
+
+/** Legacy jsonb blob or in-memory tests: unknown nodes dropped (last wins). tenantConfirmedAt backfills per-row confirmed_at. */
+function normalizeAreaPicks(raw, opts = {}) {
+  const tenantAt = opts.tenantConfirmedAt || opts.confirmed_at || (raw && raw.confirmed_at) || null;
   const src = raw && typeof raw === 'object' ? raw.picks : null; const byNode = new Map();
   if (Array.isArray(src)) for (const o of src) {
     if (!o || typeof o !== 'object') continue; const node = typeof o.node === 'string' ? o.node : '';
     if (!BY_ID.has(node)) continue; const serve = o.serve !== false;
-    byNode.set(node, { node, serve, fee_kes: serve ? cleanFee(o.fee_kes) : null, note: serve ? cleanNote(o.note) : null });
+    byNode.set(node, {
+      node, serve,
+      fee_kes: serve ? cleanFee(o.fee_kes) : null,
+      note: serve ? cleanNote(o.note) : null,
+      confirmed_at: o.confirmed_at || tenantAt || null,
+    });
   }
-  return { version: 1, tree_version: TREE ? TREE.version : null, picks: [...byNode.values()] };
+  return { version: 1, tree_version: (raw && raw.tree_version) || (TREE ? TREE.version : null), picks: [...byNode.values()] };
 }
 
-/** Nearest pick wins; fee and note inherit from serving ancestors (Desk resolveArea). */
+/** Nearest confirmed pick on the chain wins; fee/note inherit from confirmed serving ancestors. */
 function resolveArea(picks, id) {
   const m = new Map(picks.picks.map((x) => [x.node, x]));
   const chain = [areaNode(id), ...areaAncestors(id)].filter(Boolean);
@@ -39,13 +64,16 @@ function resolveArea(picks, id) {
   for (const n of chain) {
     const p = m.get(n.id); if (!p) continue;
     if (!decided) decided = p;
+    if (!p.confirmed_at) return { covered: false, via: decided.node, unconfirmed: true, fee_kes: null, note: null };
     if (decided && !decided.serve) break;
     if (p.serve === false) break;
     if (fee == null && p.fee_kes != null) fee = p.fee_kes;
     if (note == null && p.note) note = p.note;
   }
-  if (!decided || !decided.serve) return { covered: false, via: decided ? decided.node : null, fee_kes: null, note: null };
-  return { covered: true, via: decided.node, fee_kes: fee, note };
+  if (!decided) return { covered: false, via: null, unconfirmed: false, fee_kes: null, note: null };
+  if (!decided.confirmed_at) return { covered: false, via: decided.node, unconfirmed: true, fee_kes: null, note: null };
+  if (!decided.serve) return { covered: false, via: decided.node, unconfirmed: false, fee_kes: null, note: null };
+  return { covered: true, via: decided.node, fee_kes: fee, note, unconfirmed: false };
 }
 
 function normAreaText(s) { return String(s || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/['’`]/g, '').replace(/[^a-z0-9]+/g, ' ').trim(); }
@@ -113,6 +141,7 @@ function callerHears(picks, place, lang = 'en') {
 function linesFor(picks, n, lang = 'en') {
   const sw = /^sw/.test(String(lang || ''));
   const r = resolveArea(picks, n.id);
+  if (r.unconfirmed) return { status: 'unconfirmed', reply: sw ? `Nitaangalia na mmiliki kuhusu ${n.name}.` : `I'll check with the owner about ${n.name}.`, node: n, res: r };
   if (!r.covered) return { status: 'not_covered', reply: sw ? `Samahani, hatufiki ${n.name}.` : `Sorry, we don't cover ${n.name}.`, node: n, res: r };
   let reply = sw ? `Ndio, tunafika ${n.name}.` : `Yes, we cover ${n.name}.`;
   if (r.fee_kes != null) reply += sw ? ` Kuna ada ya ziada ya KES ${kes(r.fee_kes)}.` : ` There's an extra KES ${kes(r.fee_kes)}.`;
@@ -122,4 +151,7 @@ function linesFor(picks, n, lang = 'en') {
   return { status: 'covered', reply, node: n, res: r, note: r.note, note_lang: nl, note_untranslated: Boolean(sw && r.note && nl !== 'sw') };
 }
 
-module.exports = { available, treeVersion: () => (TREE ? TREE.version : null), NODES, areaNode, areaAncestors, countyOf, normalizeAreaPicks, resolveArea, normAreaText, editDistance, matchAreaText, callerHears, linesFor, noteLang };
+module.exports = {
+  available, treeVersion: () => (TREE ? TREE.version : null), NODES, areaNode, areaAncestors, countyOf,
+  normalizeAreaPicks, normalizeAreaPicksFromRows, resolveArea, normAreaText, editDistance, matchAreaText, callerHears, linesFor, noteLang,
+};
