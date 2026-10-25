@@ -21,6 +21,16 @@ function leadOn({ env = process.env, tenantId } = {}) {
 
 // One place for every deadline (replaces v1draft r2FirstByMs 2600 on this path). Decision 2 + 3.
 const DEADLINES = { hedgeMs: 900, hardMs: 1800, repairMinLeftMs: 300, repairCapMs: 450, understandWaitMs: 1500 };
+// Split path (BRAIN_MODEL_LEAD_SPLIT, default on under BRAIN_MODEL_LEAD): understanding and reply are two parallel calls.
+// Join rule: the state machine runs when the understanding arrives OR the reply's first sentence is ready OR
+// understandCapMs passes, whichever is first. A late understanding is never discarded: it still adds owed answers
+// (questions/places) before the turn ends and is carried to the next turn (machine.leadLateU).
+const SPLIT_DEADLINES = { hedgeMs: 700, hardMs: 1800, repairMinLeftMs: 300, repairCapMs: 450, understandHedgeMs: 600, understandCapMs: 1100 };
+function splitOn({ env = process.env } = {}) { return String(env.BRAIN_MODEL_LEAD_SPLIT || 'on').trim().toLowerCase() !== 'off'; }
+/** Lead-path models (configurable): flash-lite primary (staging TTFT ~650-800 ms), 3.6-flash hedge backup. */
+function leadModels(env = process.env) {
+  return { primary: String(env.BRAIN_LEAD_MODEL_ID || '').trim() || 'gemini-3.5-flash-lite', backup: String(env.BRAIN_LEAD_BACKUP_MODEL_ID || '').trim() || 'gemini-3.6-flash' };
+}
 const UPCOMING_MAX = 3; // Alvin decision 3 (2026-10-25): only upcoming open bookings, max 3
 const sw = (lang) => L.isSw(lang);
 
@@ -52,13 +62,36 @@ function callerReceipt(file = {}, { now = new Date(), lockedName = null } = {}) 
   };
 }
 
-/** Place phrases in a caller turn: split on "or/and/au/na/ama/," then the tree matcher per piece (local, no network). */
+/** Place phrases in a caller turn: split on "or/and/au/na/ama/," then the tree matcher per piece (local, no network).
+ * Lead split (#933 dials c1 T2/T6 "Kilimani Westlands", "Ongata Rongai or Kileleshwa"): each piece is also scanned
+ * word-window by word-window (longest first), so places with no conjunction between them are all found. */
 function placeCandidates(text) {
   const parts = String(text || '').split(/\s*(?:,|\bor\b|\band\b|\bau\b|\bama\b|\bna\b|\bwala\b)\s*/i).filter((p) => p && p.trim());
   const out = [];
-  for (const p of parts) { const m = AC.treeMatch(p); if (m && m.node && !out.includes(m.node.name)) out.push(m.node.name); }
+  const add = (n) => { if (n && !out.includes(n)) out.push(n); };
+  for (const p of parts) {
+    const words = p.replace(/[?.!;:"]/g, ' ').split(/\s+/).filter(Boolean);
+    const found = scanPlaces(words);
+    if (found.length) found.forEach(add); else { const m = AC.treeMatch(p); if (m && m.node) add(m.node.name); }
+  }
   return out;
 }
+const STOP = new Set(['i', 'you', 'we', 'the', 'a', 'to', 'in', 'at', 'of', 'do', 'guys', 'have', 'go', 'there', 'about', 'what', 'maybe', 'also', 'serve', 'cover', 'come', 'is', 'it', 'my', 'me', 'for', 'if', 'want', 'wanted', 'know', 'kama', 'mnafika', 'kujua']);
+function scanPlaces(words) {
+  const out = []; let i = 0;
+  while (i < words.length) {
+    let hit = null;
+    for (let n = Math.min(3, words.length - i); n >= 1 && !hit; n -= 1) {
+      const w = words.slice(i, i + n);
+      if (n === 1 && (STOP.has(w[0].toLowerCase()) || w[0].length < 4)) continue;
+      const m = AC.treeMatch(w.join(' '));
+      if (m && m.node && norm(m.said || '') === norm(w.join(' '))) hit = { name: m.node.name, n };
+    }
+    if (hit) { if (!out.includes(hit.name)) out.push(hit.name); i += hit.n; } else i += 1;
+  }
+  return out;
+}
+const norm = (x) => String(x).toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
 
 /** check_coverage receipt: one row per place (1..5). Picks resolver per place; legacy only when no picks. */
 function coverageReceipt(places = [], profile = {}) {
@@ -181,8 +214,9 @@ function partialParse(buf) {
   const ti = buf.search(/"tool_calls"\s*:/);
   const cut = [ti, ri].filter((x) => x > 0).sort((a, b) => a - b)[0];
   if (cut) { try { out.understanding = JSON.parse(`${buf.slice(0, cut).replace(/,\s*$/, '')}}`).understanding || null; } catch { /* not yet */ } }
+  if (ri >= 0 && ti > ri) { try { out.toolCalls = JSON.parse(`{${buf.slice(ti).replace(/}\s*$/, '')}}`).tool_calls || []; } catch { out.toolCalls = null; } }
   if (ti > 0 && ri > ti) { try { out.toolCalls = JSON.parse(`{${buf.slice(ti, ri).replace(/,\s*$/, '')}}`).tool_calls || []; } catch { out.toolCalls = null; } }
-  if (ri > 0) { const m = buf.slice(ri).match(/"reply"\s*:\s*"/); const r = readString(buf, ri + m[0].length); out.reply = r.text; out.replyClosed = r.closed; }
+  if (ri >= 0) { const m = buf.slice(ri).match(/"reply"\s*:\s*"/); const r = readString(buf, ri + m[0].length); out.reply = r.text; out.replyClosed = r.closed; }
   return out;
 }
 const sentencesOf = (t, closed) => { const parts = String(t || '').match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || []; const done = parts.map((x) => x.trim()).filter(Boolean); if (!closed && done.length && !/[.!?]$/.test(done[done.length - 1])) done.pop(); return done; };
@@ -195,7 +229,7 @@ const sentencesOf = (t, closed) => { const parts = String(t || '').match(/[^.!?]
  * The first attempt whose understanding parses wins; the other is aborted. Hard deadline hardMs.
  * Every attempt is traced (decision: per-attempt telemetry in voice_turn_traces).
  */
-function runHedged({ streamFor, primaryId, backupId, request, deadlines = DEADLINES, clock = () => Date.now(), onProgress = () => {} }) {
+function runHedged({ streamFor, primaryId, backupId, request, deadlines = DEADLINES, clock = () => Date.now(), onProgress = () => {}, winWhen = (p) => !!p.understanding, okWhen = (full) => !!(full && full.understanding && typeof full.reply === 'string') }) {
   const t0 = clock(); const attempts = []; let winner = null; let settled = false; let hedgeTimer = null; let hardTimer = null;
   let resolveDone; const done = new Promise((r) => { resolveDone = r; });
   const finish = (why) => { if (settled) return; settled = true; clearTimeout(hedgeTimer); clearTimeout(hardTimer); for (const a of attempts) if (a !== winner && !a.end) { a.ac.abort(); a.outcome = a.outcome || 'cancelled'; a.ms = clock() - t0 - a.startMs; a.end = true; } resolveDone({ winner, attempts, why }); };
@@ -207,15 +241,15 @@ function runHedged({ streamFor, primaryId, backupId, request, deadlines = DEADLI
       if (a.firstTokenMs == null) a.firstTokenMs = clock() - t0;
       a.buf += d;
       const p = partialParse(a.buf);
-      if (!winner && p.understanding) { winner = a; for (const b of attempts) if (b !== a && !b.end) { b.ac.abort(); b.outcome = 'lost_race'; b.end = true; b.ms = clock() - t0 - b.startMs; } clearTimeout(hedgeTimer); }
+      if (!winner && winWhen(p)) { winner = a; for (const b of attempts) if (b !== a && !b.end) { b.ac.abort(); b.outcome = 'lost_race'; b.end = true; b.ms = clock() - t0 - b.startMs; } clearTimeout(hedgeTimer); }
       if (winner === a) onProgress(a, p);
     } })).then((res) => {
       if (a.end) return;
       if (res && typeof res.text === 'string' && res.text.length > a.buf.length) { a.buf = res.text; }
       a.end = true; a.ms = clock() - t0 - a.startMs;
       let full = null; try { full = JSON.parse(a.buf); } catch { full = null; }
-      a.outcome = full && full.understanding && typeof full.reply === 'string' ? 'ok' : 'invalid_json';
-      if (a.outcome === 'ok' && (!winner || winner === a)) { winner = a; a.final = full; onProgress(a, { understanding: full.understanding, toolCalls: full.tool_calls || [], reply: full.reply, replyClosed: true }); finish('ok'); return; }
+      a.outcome = okWhen(full) ? 'ok' : 'invalid_json';
+      if (a.outcome === 'ok' && (!winner || winner === a)) { winner = a; a.final = full; onProgress(a, { understanding: full.understanding || null, full, toolCalls: full.tool_calls || [], reply: typeof full.reply === 'string' ? full.reply : null, replyClosed: true }); finish('ok'); return; }
       if (winner === a) { winner = null; }
       maybeBackup(); if (attempts.every((x) => x.end)) finish('all_failed');
     }).catch((e) => {
@@ -279,7 +313,8 @@ function makeVerifier(ctx) {
   function check(raw) {
     const s = String(raw || '').trim(); if (!s) return { verdict: 'drop', reason: 'empty' };
     // G2 claims need a receipt from this turn
-    if ((CC.CLAIM.test(s) || CLAIM_MORE.test(s)) && !ctx.receipts.length) return { verdict: 'drop', reason: 'claim_without_receipt' };
+    if ((CC.CLAIM.test(s) || CLAIM_MORE.test(s)) && !ctx.receipts.length && !(ctx.callerReadOk && backedByCaller(s, ctx.caller))) return { verdict: 'drop', reason: 'claim_without_receipt' };
+    if (ctx.callerReadOk && pastAsOpen(s, ctx.caller)) return { verdict: 'drop', reason: 'past_job_as_open' };
     // G8 no unasked price (decision 4)
     const priceish = PRICE_WORD.test(s) && !/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|saa\s/i.test(s) && !/\b(20\d\d|october|oktoba)\b/i.test(s);
     if (priceish && !asked.has('price')) return { verdict: 'drop', reason: 'unasked_price' };
@@ -334,6 +369,8 @@ function owedAnswers(ctx, keptText) {
       if (!PRICE_WORD.test(keptText)) out.push({ subject: 'price', text: priceFix(ctx) });
     } else if (q.type === 'hours') {
       const h = hoursFact(ctx.profile); if (h && !(h.nums || []).some((n) => low.includes(n))) out.push({ subject: 'hours', text: `${h.text}.` });
+    } else if (q.type === 'payment') {
+      if (!/m-?pesa|paybill|cash|bank|crypto|malipo|tunakubali|we take|we accept/i.test(keptText)) out.push({ subject: 'payment', text: paymentAnswer(ctx.profile, ctx.text || '', ctx.lang) });
     } else if (q.type === 'booking_status') {
       const up = ctx.caller.upcoming;
       if (up.length && !up.some((u) => u.service && low.includes(String(u.service).toLowerCase().split(' ')[0]))) out.push({ subject: 'booking_status', text: upcomingLine(up, ctx.lang) });
@@ -391,4 +428,150 @@ function turnFieldsOf(u, profile = {}) {
   return { asks: [...new Set(asks)], place, service_id: svc ? svc.id : null };
 }
 
-module.exports = { leadOn, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };
+// ---------------------------------------------------------------- split path: understanding (parallel) + reply-first
+
+const U_SYSTEM = [
+  'Read ONE caller turn on a Kenyan business phone line. Return ONLY JSON, nothing else.',
+  'intents: what the caller wants now. questions: EVERY question, also ones with no question mark ("I wanted to know if you have Kilimani" = coverage; "tell me my name" = identity; "do you accept crypto" = payment).',
+  'places: EVERY place named, each separately ("Kilimani Westlands" = ["Kilimani","Westlands"]). booking_ref: words that point at an existing booking (service/day/place, or "it"). lang: en|sw|mix.',
+].join('\n');
+const U_SCHEMA = {
+  type: 'object',
+  properties: {
+    lang: { type: 'string', enum: ['en', 'sw', 'mix'] },
+    intents: { type: 'array', items: { type: 'string', enum: ['book', 'ask', 'confirm', 'deny', 'cancel', 'reschedule', 'booking_status', 'identity', 'callback', 'take_message', 'goodbye', 'smalltalk', 'add_service', 'give_info'] } },
+    questions: { type: 'array', items: { type: 'object', properties: { type: { type: 'string', enum: ['coverage', 'price', 'hours', 'identity', 'booking_status', 'payment', 'services', 'other'] }, subject: { type: 'string' } }, required: ['type'] } },
+    places: { type: 'array', items: { type: 'string' } },
+    booking_ref: { type: 'object', properties: { service: { type: 'string' }, date: { type: 'string' }, place: { type: 'string' } } },
+    slots: { type: 'object', properties: { services: { type: 'array', items: { type: 'string' } }, date: { type: 'string' }, time: { type: 'string' }, name: { type: 'string' } } },
+    confirms_pending: { type: 'boolean', nullable: true },
+  },
+  required: ['intents', 'questions'],
+  propertyOrdering: ['lang', 'intents', 'questions', 'places', 'booking_ref', 'slots', 'confirms_pending'],
+};
+function understandRequest({ text, machine, lastLine }) {
+  return {
+    systemInstruction: { parts: [{ text: U_SYSTEM }] },
+    contents: [{ role: 'user', parts: [{ text: JSON.stringify({ UNDERSTAND: true, AGENT_LAST: String(lastLine || machine.lastLine || '').slice(0, 200), EXPECTING: machine.expecting || null, CALLER_SAID: String(text || '') }) }] }],
+    generationConfig: { temperature: 0, maxOutputTokens: 160, responseMimeType: 'application/json', responseSchema: U_SCHEMA, thinkingConfig: { thinkingLevel: 'MINIMAL' } },
+  };
+}
+/** Normalise either the split schema or the #933 combined {understanding:{...}} into one understanding shape. */
+function normUnderstanding(full) {
+  if (!full || typeof full !== 'object') return null;
+  const u = full.understanding && typeof full.understanding === 'object' ? full.understanding : full;
+  if (!Array.isArray(u.intents) && !Array.isArray(u.questions)) return null;
+  const slots = { ...(u.slots || {}) };
+  slots.places = [...new Set([...(Array.isArray(u.places) ? u.places : []), ...(Array.isArray(slots.places) ? slots.places : [])])];
+  slots.services = Array.isArray(slots.services) ? slots.services : [];
+  return { lang: u.lang || null, intents: u.intents || [], questions: u.questions || [], slots, booking_ref: u.booking_ref || null, confirms_pending: u.confirms_pending ?? null };
+}
+
+const R_SYSTEM = [
+  'You are the voice of a phone receptionist for one Kenyan business. The server checks every fact you say.',
+  'Return ONLY JSON {"reply":"...","tool_calls":[...]} with reply FIRST.',
+  'reply: max 2 short sentences plus at most ONE question. Answer every caller question first, using ONLY FACTS/CALLER/RECEIPTS. One answer per place. Never say a price unless the caller asked.',
+  'Never say booked, cancelled, noted, or that anyone will call/text unless RECEIPTS.writes shows it; the server says the booked line and the read-back.',
+  'CALLER is the caller file: you may describe their upcoming bookings (service, day, place) exactly as listed; past jobs only as past. Use CALLER.name only if set; with only CALLER.candidate ask "Am I speaking with <candidate>?".',
+  'Swahili/Sheng caller: reply in Swahili. Saa nane mchana = 14:00. If PLAN.next is a slot, end with one question for it. A fact not given: say you are not sure and offer the team to confirm.',
+].join('\n');
+const R_SCHEMA = {
+  type: 'object',
+  properties: { reply: { type: 'string' }, tool_calls: { type: 'array', items: { type: 'object', properties: { name: { type: 'string', enum: TOOL_NAMES() }, args: { type: 'object', properties: { places: { type: 'array', items: { type: 'string' } }, service: { type: 'string' }, date: { type: 'string' }, reason: { type: 'string' } } } }, required: ['name'] } } },
+  required: ['reply'], propertyOrdering: ['reply', 'tool_calls'],
+};
+const RPREFIX = new Map();
+/** Trimmed facts: service names (+ price only as a string the model may quote when asked), hours, payment. */
+function replyRequest(pack, profile = {}) {
+  const k = kb(profile); const facts = { business: k.business, agent: k.agent, services: k.services.map((x) => (x.price ? `${x.name} (${x.price})` : x.name)), hours: k.hours, payment: k.payment };
+  const key = `${profile.id || profile.tenantId || ''}|${JSON.stringify(facts).length}`;
+  if (!RPREFIX.has(key)) RPREFIX.set(key, { systemInstruction: { parts: [{ text: `${R_SYSTEM}\nFACTS: ${JSON.stringify(facts)}` }] }, generationConfig: { temperature: 0.3, maxOutputTokens: 160, responseMimeType: 'application/json', responseSchema: R_SCHEMA, thinkingConfig: { thinkingLevel: 'MINIMAL' } } });
+  return { ...RPREFIX.get(key), contents: [{ role: 'user', parts: [{ text: JSON.stringify(pack) }] }] };
+}
+
+// ---------------------------------------------------------------- lookup_caller (real receipt tool, in memory)
+
+const SVC_WORD = (x) => String(x || '').toLowerCase().replace(/\(.*?\)/g, '').replace(/cleaning|service|wash(ing)?/g, '').trim().split(/\s+/)[0] || '';
+/**
+ * lookup_caller({service?, date?, place?}) over the caller file already in RAM (no network, <10 ms).
+ * Receipt: { tool, ok, receipt_id, name, name_confirmed, candidate, upcoming[<=3 open, future], match:{kind unique|candidates|none, row_id, candidates[]},
+ *            past_jobs[<=2, read_only], addresses[<=3], notes[<=3], ms }. Past rows are never a match target.
+ */
+function lookupCaller(file = {}, filters = {}, { now = new Date(), lockedName = null } = {}) {
+  const t0 = Date.now();
+  const base = callerReceipt(file, { now, lockedName });
+  const rows = (file.openRows || []).filter(Boolean);
+  const t = now.getTime();
+  const startOf = (r) => { const iso = r.window_start || r.windowStart; if (iso) return Date.parse(iso); if (r.when && r.when.date) return Date.parse(`${r.when.date}T${r.when.time || '23:59'}:00+03:00`); return NaN; };
+  const svc = (r) => r.service_name || r.service || r.job || r.item || null;
+  const timeOf = (r) => { const s = startOf(r); if (!Number.isFinite(s) || !(r.window_start || r.windowStart || (r.when && r.when.time))) return null; const p = L.eatParts(new Date(s)); return `${String(p.h).padStart(2, '0')}:${String(p.mi).padStart(2, '0')}`; };
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const upcoming = base.upcoming.map((u) => ({ ...u, time: byId.has(u.id) ? timeOf(byId.get(u.id)) : null }));
+  const past = rows.filter((r) => svc(r) && Number.isFinite(startOf(r)) && startOf(r) < t).sort((a, b) => startOf(b) - startOf(a));
+  const pastJobs = [...past, ...(file.lastVisit && svc(file.lastVisit) ? [file.lastVisit] : [])]
+    .filter((r, i, a) => a.findIndex((x) => (x.id && x.id === r.id)) === i || !r.id).slice(0, 2)
+    .map((r) => ({ id: r.id || null, service: svc(r), date: Number.isFinite(startOf(r)) ? L.isoDate(L.eatParts(new Date(startOf(r)))) : null, place: r.address_landmark || r.place || null, read_only: true }));
+  const addresses = [...new Set(rows.map((r) => r.address_landmark || r.place).filter(Boolean))].slice(0, 3);
+  const notes = (Array.isArray(file.notes) ? file.notes : file.notes ? [file.notes] : []).concat(file.preferences ? [].concat(file.preferences) : []).map((x) => String(x).slice(0, 120)).slice(0, 3);
+  const f = { service: filters.service ? SVC_WORD(filters.service) : null, date: filters.date || null, place: filters.place ? String(filters.place).toLowerCase() : null };
+  let cands = upcoming;
+  if (f.service) cands = cands.filter((u) => SVC_WORD(u.service) === f.service || String(u.service || '').toLowerCase().includes(f.service));
+  if (f.date) cands = cands.filter((u) => u.date === f.date);
+  if (f.place) cands = cands.filter((u) => String(u.place || '').toLowerCase().includes(f.place));
+  const filtered = !!(f.service || f.date || f.place);
+  const kind = !upcoming.length ? 'none' : cands.length === 1 && (filtered || upcoming.length === 1) ? 'unique' : cands.length ? 'candidates' : 'none';
+  return {
+    tool: 'lookup_caller', ok: true, receipt_id: `lc_${t0.toString(36)}`,
+    name: base.name, name_confirmed: base.name_confirmed, candidate: base.candidate,
+    upcoming, upcoming_count: base.upcoming_count, last_past_job: base.last_past_job,
+    match: { kind, row_id: kind === 'unique' ? cands[0].id : null, candidates: kind === 'candidates' ? cands.slice(0, UPCOMING_MAX) : [] },
+    past_jobs: pastJobs, addresses, notes, filters: f, ms: Date.now() - t0,
+  };
+}
+const ROW_INTENT = /\b(reschedul\w*|move|change|shift|postpone|cancel\w*|ghairi|badilisha|hamisha|my booking|the booking|my appointment|booking yangu|when is my|what'?s my name|my name|jina langu|add (?:a |another )?service|ongeza)\b/i;
+/** Filters for lookup_caller from the rules (and the model's booking_ref when it is in). */
+function callerFilters(text, profile = {}, u = null, now = new Date()) {
+  const ref = (u && u.booking_ref) || {};
+  const svc = ref.service || (CP.matchServices(text || '', profile)[0] || {}).name || null;
+  const d = ref.date && /^\d{4}-\d{2}-\d{2}$/.test(ref.date) ? ref.date : (L.parseDate ? (L.parseDate(text || '', now) || {}).date || null : null);
+  const place = ref.place || null;
+  return { service: svc, date: d, place };
+}
+function offerRowsLine(cands, lang) {
+  const say = (u) => `${sw(lang) ? '' : 'the '}${String(u.service || '').replace(/\s*\(.*?\)/, '').toLowerCase()}${u.date ? ` ${sw(lang) ? 'ya' : 'on'} ${L.sayDate(u.date, lang)}` : ''}${u.place ? ` ${sw(lang) ? '' : 'in '}${u.place}` : ''}`;
+  if (cands.length === 1) return sw(lang) ? `Ni ${say(cands[0])}?` : `Is it ${say(cands[0])}?`; // [PROMPT-PLACEHOLDER]
+  return sw(lang) ? `Ni ipi: ${cands.map(say).join(', au ')}?` : `Which one: ${cands.map(say).join(', or ')}?`; // [PROMPT-PLACEHOLDER]
+}
+/** A sentence that only describes a caller-file row (service+day[/place]) is backed by the lookup_caller receipt. */
+function backedByCaller(s, caller) {
+  if (!caller || !Array.isArray(caller.upcoming)) return false;
+  const low = String(s).toLowerCase();
+  if (CC.CLAIM.test(String(s).replace(/\b(scheduled|confirmed)\b/gi, ''))) return false; // write claims still need a write receipt
+  const dayHit = (d) => { if (!d) return false; const dd = new Date(`${d}T12:00:00+03:00`); const dow = dd.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Africa/Nairobi' }).toLowerCase(); const dom = String(Number(d.slice(8, 10))); return low.includes(dow) || new RegExp(`\\b${dom}(st|nd|rd|th)?\\b`).test(low) || low.includes(String(L.sayDate(d, 'en')).toLowerCase()); };
+  const rowHit = (u) => SVC_WORD(u.service) && low.includes(SVC_WORD(u.service)) && dayHit(u.date);
+  const pastHit = (caller.past_jobs || []).some((p) => rowHit(p)) || (caller.last_past_job && rowHit(caller.last_past_job));
+  const upHit = caller.upcoming.some(rowHit);
+  if (pastHit && !upHit && !/\b(last|previous|past|was|did|had)\b/.test(low)) return false; // a past job is never spoken as open
+  return upHit || (pastHit && /\b(last|previous|past|was|did|had)\b/.test(low));
+}
+/** A sentence that names a PAST caller-file job as if it were open/upcoming (old bookings are never offered or edited). */
+function pastAsOpen(s, caller) {
+  if (!caller || !Array.isArray(caller.past_jobs)) return false;
+  const low = String(s).toLowerCase();
+  if (/\b(last|previous|past|was|did|had|ilikuwa|iliyopita)\b/.test(low)) return false;
+  const dayHit = (d) => { if (!d) return false; const dom = String(Number(d.slice(8, 10))); const mon = new Date(`${d}T12:00:00+03:00`).toLocaleDateString('en-US', { month: 'long', timeZone: 'Africa/Nairobi' }).toLowerCase(); return new RegExp(`\\b${dom}(st|nd|rd|th)?\\b`).test(low) && low.includes(mon); };
+  const up = (caller.upcoming || []).some((u) => dayHit(u.date));
+  return !up && caller.past_jobs.some((p) => dayHit(p.date) && (low.includes(SVC_WORD(p.service)) || (p.place && low.includes(String(p.place).toLowerCase()))));
+}
+/** Payment question (KB answer, or honest unknown for a method the KB does not list, e.g. crypto). [PROMPT-PLACEHOLDER] */
+function paymentAnswer(profile = {}, text = '', lang = 'en') {
+  const pay = String(profile.businessPolicies?.payment || '').trim();
+  const asked = (String(text).match(/\b(crypto\w*|bitcoin|usdt|card|visa|mastercard|cheque|check|paypal|m-?pesa|cash|bank|airtel money)\b/i) || [])[1];
+  if (!pay) return sw(lang) ? 'Sina uhakika wa njia za malipo; timu inaweza kuthibitisha.' : "I'm not sure about payment options; the team can confirm.";
+  const listed = asked && new RegExp(asked.replace(/s$/, ''), 'i').test(pay);
+  if (asked && !listed) return sw(lang) ? `Sina uhakika kama tunakubali ${asked}. Tunakubali: ${pay}.` : `I'm not sure we take ${asked}. We take ${pay}.`;
+  return sw(lang) ? `Tunakubali: ${pay}.` : `We take ${pay}.`;
+}
+const UNASKED_PRICE = (s) => PRICE_WORD.test(s) && !/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|saa\s/i.test(s) && !/\b(20\d\d|october|oktoba)\b/i.test(s);
+
+module.exports = { leadOn, splitOn, leadModels, SPLIT_DEADLINES, understandRequest, normUnderstanding, replyRequest, lookupCaller, callerFilters, ROW_INTENT, offerRowsLine, backedByCaller, pastAsOpen, paymentAnswer, UNASKED_PRICE, U_SCHEMA, R_SCHEMA, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };
