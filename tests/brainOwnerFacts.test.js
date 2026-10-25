@@ -163,17 +163,14 @@ test('Kiswahili: none speaks Desk\'s policy_lines sw; custom without note_sw fal
 // ---- B2: areas only after confirmed_at ----
 const PICKS = { version: 1, tree_version: 'ke-areas-2026-10-24.1', picks: [{ node: 'county:nairobi', serve: true }] };
 const needTree = { skip: !AP.available() && 'Desk tree (#930) not on this branch' };
-test('B2: unconfirmed picks are never spoken (team confirms, no legacy fallback); confirmed picks are', needTree, () => {
+test('B2: unconfirmed picks fall back to legacy lists; confirmed picks use the tree', needTree, () => {
   const pending = { ...DND, areaPicks: PICKS, areaPicksConfirmedAt: null, serviceAreas: { areas: [{ id: 'place:kileleshwa' }] } };
   const r = AC.resolve('do you do Kileleshwa?', pending);
-  assert.equal(r.status, 'unknown'); assert.equal(r.via, 'unconfirmed');
-  assert.match(AC.line(r, 'en'), /team will confirm/); assert.match(AC.line(r, 'sw'), /Timu itathibitisha/);
+  assert.equal(r.status, 'covered', 'legacy service_areas until confirmed_at');
   assert.deepEqual(AC.listed(pending).serve, []);
-  assert.ok(!F.buildFactNote(pending, {}).facts.some((f) => f.family === 'area' && f.covered));
-  const cc = CC.answers([{ type: 'ask', ask: 'coverage' }], 'which areas do you cover?', machine(), pending, 'en');
-  assert.match(cc.find((a) => a.ask === 'coverage').text, /team will confirm/);
   const ok = { ...pending, areaPicksConfirmedAt: '2026-10-25T08:00:00Z' };
   assert.equal(AC.resolve('do you do Kileleshwa?', ok).status, 'covered');
+  assert.equal(AC.resolve('Mnafika Kisumu?', ok).via, 'no_pick');
 });
 
 // ---- Desk review of #937 (#938): own-topic facts, policy_lines wording, pickup_only ----

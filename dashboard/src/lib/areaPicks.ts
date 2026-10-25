@@ -4,7 +4,7 @@
  * Contract (shared with Brain's KB check, see docs/reference/platform/AREA_PICKS.md):
  * - Stored in public.tenant_area_picks.picks as { version: 1, tree_version, picks: AreaPick[] }.
  * - A pick is an include (serve: true) or exclude (serve: false) on any node: country, county, town or estate.
- * - Coverage of a node = the nearest pick on it or an ancestor. No pick anywhere = not covered.
+ * - Coverage of a node = the nearest pick on it or an ancestor. No pick on the chain = check with owner.
  * - Fee and note come from the nearest serving pick that sets them.
  *
  * Pure and browser-safe. Relative imports only so node tests can load it.
@@ -25,7 +25,7 @@ export type AreaPicks = { version: 1; tree_version: string; picks: AreaPick[] };
 export type TriState = "on" | "off" | "part";
 
 export const AREA_TREE_VERSION: string = TREE.version;
-export const AREA_NOTE_MAX = 120;
+export const AREA_NOTE_MAX = 200;
 export const AREA_FEE_MAX = 100_000;
 export const ROOT_ID = "ke";
 
@@ -383,13 +383,35 @@ export function matchAreaText(text: string): AreaNode | null {
 
 // ---------- what callers hear ----------
 
-export type CallerLine = { status: "covered" | "not_covered" | "not_on_map"; reply: string; node: AreaNode | null };
+export type CallerLine = {
+  status: "covered" | "not_covered" | "need_check" | "not_on_map";
+  reply: string;
+  node: AreaNode | null;
+};
 
-export function callerHears(picks: AreaPicks, place: string): CallerLine {
+/** Named place on the tree with no pick on its chain: never guess "not covered". */
+export function checkWithOwnerLine(name: string | null, lang = "en"): string {
+  const sw = /^sw/i.test(lang);
+  if (name) return sw ? `Nitaangalia na mmiliki kuhusu ${name}.` : `I'll check with the owner about ${name}.`;
+  return sw ? "Nitaangalia na mmiliki." : "I'll check with the owner.";
+}
+
+export function callerHears(picks: AreaPicks, place: string, lang = "en"): CallerLine {
   const n = matchAreaText(place);
-  if (!n) return { status: "not_on_map", reply: "Which area is that near?", node: null };
+  if (!n) {
+    const sw = /^sw/i.test(lang);
+    return { status: "not_on_map", reply: sw ? "Hiyo iko karibu na eneo gani?" : "Which area is that near?", node: null };
+  }
   const r = resolveArea(picks, n.id);
-  if (!r.covered) return { status: "not_covered", reply: `Sorry, we don't cover ${n.name}.`, node: n };
+  if (!r.covered) {
+    if (!r.via) return { status: "need_check", reply: checkWithOwnerLine(n.name, lang), node: n };
+    const sw = /^sw/i.test(lang);
+    return {
+      status: "not_covered",
+      reply: sw ? `Samahani, hatufiki ${n.name}.` : `Sorry, we don't cover ${n.name}.`,
+      node: n,
+    };
+  }
   let reply = `Yes, we cover ${n.name}.`;
   if (r.fee_kes != null) reply += ` There's an extra KES ${r.fee_kes.toLocaleString("en-KE")}.`;
   if (r.note) reply += ` ${r.note.replace(/[.!?]*$/, "")}.`;

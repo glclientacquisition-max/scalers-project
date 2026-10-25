@@ -567,7 +567,10 @@ function examplePlaces(picks: AreaPicks): string[] {
   const off = picks.picks.find((p) => !p.serve) ?? null;
   if (off) out.push(areaNode(off.node)!.name);
   else {
-    const notCovered = areaCounties().find((c) => !resolveArea(picks, c.id).covered);
+    const notCovered = areaCounties().find((c) => {
+      const r = resolveArea(picks, c.id);
+      return !r.covered && r.via;
+    });
     if (notCovered) out.push(notCovered.name);
   }
   out.push("the new mall");
@@ -575,7 +578,14 @@ function examplePlaces(picks: AreaPicks): string[] {
 }
 
 function Chat({ line, ask }: { line: CallerLine; ask: string }) {
-  const tag = line.status === "covered" ? <Tag>Covered</Tag> : line.status === "not_covered" ? <Tag tone="quiet">Not covered</Tag> : <Tag tone="warn">Not on map</Tag>;
+  const tag =
+    line.status === "covered"
+      ? <Tag>Covered</Tag>
+      : line.status === "not_covered"
+        ? <Tag tone="quiet">Not covered</Tag>
+        : line.status === "need_check"
+          ? <Tag tone="warn">Owner confirms</Tag>
+          : <Tag tone="warn">Not on map</Tag>;
   return (
     <li className="mx-4 mb-3 rounded-2xl border border-hairline bg-surface p-3.5">
       <p className="max-w-[80%] rounded-2xl rounded-bl-sm bg-surface-2 px-3 py-2.5 text-body text-ink" style={{ width: "fit-content" }}>{ask}</p>

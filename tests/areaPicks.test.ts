@@ -25,11 +25,15 @@ test("nearest pick wins, fee and note inherit", async () => {
   assert.equal(m.areaState(p, "county:nairobi"), "part");
   assert.equal(m.areaState(p, "county:kajiado"), "part");
   assert.equal(m.areaRowMeta(p, "county:kajiado"), "Kitengela only");
-  assert.equal(m.resolveArea(p, "county:kisumu").covered, false);
+  const kisumu = m.resolveArea(p, "county:kisumu");
+  assert.equal(kisumu.covered, false);
+  assert.equal(kisumu.via, null, "no pick on chain is not an exclude");
   const k = m.resolveArea(p, "town:kajiado:kitengela");
   assert.deepEqual([k.fee_kes, k.note], [500, "Weekends only"]);
   assert.equal(m.callerHears(p, "Kitengela").reply, "Yes, we cover Kitengela. There's an extra KES 500. Weekends only.");
   assert.equal(m.callerHears(p, "Kibra").status, "not_covered");
+  assert.equal(m.callerHears(p, "Kisumu").status, "need_check");
+  assert.match(m.callerHears(p, "Kisumu").reply, /check with the owner/i);
   assert.equal(m.callerHears(p, "the new mall").status, "not_on_map");
   const s = m.areaSummaryParts(p).map((x) => x.text).join("");
   assert.equal(s, "You cover all of Nairobi except Kibera, plus Kitengela.");

@@ -36,7 +36,7 @@ Columns: `tenant_id` (pk), `tree_version`, `picks`, `moved_from` (old Locations 
 ## Resolving a place (both sides must do this the same way)
 
 1. Match the caller's words to a node: exact name or alias, then landmark, then loose spelling (edit distance ≤ 1 for 4 letters, ≤ 2 for 5+).
-2. Walk from that node up to Kenya. The **nearest pick wins**: `serve: true` = covered, `serve: false` = not covered. No pick anywhere = not covered.
+2. Walk from that node up to Kenya. The **nearest pick wins**: `serve: true` = covered, `serve: false` = not covered. **No pick on the chain** = the assistant checks with the owner (never "not covered").
 3. Fee and note: the nearest serving pick on the path that sets them (stops at an exclude).
 4. No node matched: ask "Which area is that near?" Do not guess.
 
@@ -45,7 +45,8 @@ Reference implementation: `dashboard/src/lib/areaPicks.ts` (`resolveArea`, `matc
 ## What callers hear (Desk preview = bot target)
 
 - Covered: "Yes, we cover {name}." + " There's an extra KES {fee}." when set + " {note}." when set.
-- Not covered: "Sorry, we don't cover {name}."
+- Explicit exclude (`serve: false` on the chain): "Sorry, we don't cover {name}."
+- No pick on the chain: "I'll check with the owner about {name}."
 - Not on map: "Which area is that near?"
 
 ## Not yet wired

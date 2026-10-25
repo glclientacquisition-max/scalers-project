@@ -10,7 +10,7 @@ let TREE = null;
 try { TREE = require(path.join(__dirname, '../../../dashboard/src/lib/data/kenyaAreaTree.v1.json')); } catch { TREE = null; }
 const NODES = TREE && Array.isArray(TREE.nodes) ? TREE.nodes : [];
 const BY_ID = new Map(NODES.map((n) => [n.id, n]));
-const AREA_FEE_MAX = 100000; const AREA_NOTE_MAX = 120;
+const AREA_FEE_MAX = 100000; const AREA_NOTE_MAX = 200;
 
 const available = () => NODES.length > 0;
 const areaNode = (id) => BY_ID.get(id) || null;
@@ -97,6 +97,11 @@ function matchAreaText(text) {
 }
 
 const kes = (n) => Number(n).toLocaleString('en-KE');
+function checkWithOwnerLine(name, lang = 'en') {
+  const sw = /^sw/.test(String(lang || ''));
+  if (name) return sw ? `Nitaangalia na mmiliki kuhusu ${name}.` : `I'll check with the owner about ${name}.`;
+  return sw ? 'Nitaangalia na mmiliki.' : "I'll check with the owner.";
+}
 /** Desk callerHears, plus the Kiswahili line Brain speaks. [PROMPT-PLACEHOLDER] for the sw wording. */
 function callerHears(picks, place, lang = 'en') {
   const sw = /^sw/.test(String(lang || ''));
@@ -107,11 +112,14 @@ function callerHears(picks, place, lang = 'en') {
 function linesFor(picks, n, lang = 'en') {
   const sw = /^sw/.test(String(lang || ''));
   const r = resolveArea(picks, n.id);
-  if (!r.covered) return { status: 'not_covered', reply: sw ? `Samahani, hatufiki ${n.name}.` : `Sorry, we don't cover ${n.name}.`, node: n, res: r };
+  if (!r.covered) {
+    if (!r.via) return { status: 'need_check', reply: checkWithOwnerLine(n.name, lang), node: n, res: r };
+    return { status: 'not_covered', reply: sw ? `Samahani, hatufiki ${n.name}.` : `Sorry, we don't cover ${n.name}.`, node: n, res: r };
+  }
   let reply = sw ? `Ndio, tunafika ${n.name}.` : `Yes, we cover ${n.name}.`;
   if (r.fee_kes != null) reply += sw ? ` Kuna ada ya ziada ya KES ${kes(r.fee_kes)}.` : ` There's an extra KES ${kes(r.fee_kes)}.`;
   if (r.note) reply += ` ${r.note.replace(/[.!?]*$/, '')}.`;
   return { status: 'covered', reply, node: n, res: r };
 }
 
-module.exports = { available, treeVersion: () => (TREE ? TREE.version : null), NODES, areaNode, areaAncestors, countyOf, normalizeAreaPicks, resolveArea, normAreaText, editDistance, matchAreaText, callerHears, linesFor };
+module.exports = { available, treeVersion: () => (TREE ? TREE.version : null), NODES, areaNode, areaAncestors, countyOf, normalizeAreaPicks, resolveArea, normAreaText, editDistance, matchAreaText, callerHears, linesFor, checkWithOwnerLine };

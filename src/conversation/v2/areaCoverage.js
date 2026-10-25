@@ -96,7 +96,7 @@ function picksOf(profile = {}) {
   const p = rawPicks(profile);
   return p && picksConfirmed(profile) ? p : null;
 }
-/** Picks exist but the owner has not confirmed them: no area is spoken; the team confirms (no legacy fallback). */
+/** Picks exist but the owner has not confirmed them (listed() returns pending; resolve() uses legacy fallback). */
 function picksPending(profile = {}) {
   return Boolean(rawPicks(profile)) && !picksConfirmed(profile);
 }
@@ -116,11 +116,7 @@ function resolve(text, profile = {}) {
   if (!t.trim()) return null;
   const picks = picksOf(profile);
   if (picks) return resolvePicks(t, picks);
-  if (picksPending(profile)) {
-    const m = treeMatch(t);
-    if (m) return { status: 'unknown', name: m.node.name, place: K.normalizePlaceKey(m.node.name), node: m.node.id, counties: [], via: 'unconfirmed', source: 'picks' };
-    const u = unknownAsked(t); return u ? { ...u, via: 'unconfirmed' } : null;
-  }
+  // Unconfirmed tenant_area_picks: fall back to legacy lists for this release (audit 2026-10-25).
   const lm = landmark(t);
   let found = lm ? [lm.place] : K.bindSpokenPlace(t, { fuzzy: true }).filter((p) => !NOT_PLACE.has(p));
   if (!found.length) { const tm = treeMatch(t); if (tm) found = [K.normalizePlaceKey(tm.node.name)]; } // Desk tree names/aliases (Juja, Ongata Rongai)
@@ -148,13 +144,33 @@ function unknownAsked(t) {
   if (w && !NOT_PLACE.has(w.toLowerCase()) && /^[A-Z]/.test(w) && !/^(the|my|your|our|a|an|it|that|this|alvin)$/i.test(w)) return { status: 'unknown', name: cap(w.toLowerCase()), place: null, counties: [], via: 'asked', source: 'picks' };
   return null;
 }
+function checkWithOwnerLine(name, lang = 'en') {
+  return AP.checkWithOwnerLine(name, lang);
+}
 function resolvePicks(t, picks) {
   const m = treeMatch(t);
   if (!m) return unknownAsked(t);
   const n = m.node; const res = AP.resolveArea(picks, n.id);
   const county = AP.countyOf(n.id);
-  const status = res.covered ? 'covered' : res.via ? 'excluded' : 'outside';
-  return { status, name: n.name, place: K.normalizePlaceKey(n.name), node: n.id, counties: county ? [K.normalizePlaceKey(county.name)] : [], via: res.via || 'tree', county: county && county.id !== n.id ? county.name : null, fee_kes: res.fee_kes, note: res.note, source: 'picks', ...(m.via === 'landmark' ? { landmark: m.said } : {}), lines: { en: AP.linesFor(picks, n, 'en').reply, sw: AP.linesFor(picks, n, 'sw').reply } };
+  // No pick on the tree chain: never guess no (audit 2026-10-25). Explicit exclude still excluded.
+  const status = res.covered ? 'covered' : res.via ? 'excluded' : 'unknown';
+  const via = res.covered ? (res.via || 'tree') : res.via ? res.via : 'no_pick';
+  const en = AP.linesFor(picks, n, 'en');
+  const sw = AP.linesFor(picks, n, 'sw');
+  return {
+    status,
+    name: n.name,
+    place: K.normalizePlaceKey(n.name),
+    node: n.id,
+    counties: county ? [K.normalizePlaceKey(county.name)] : [],
+    via,
+    county: county && county.id !== n.id ? county.name : null,
+    fee_kes: res.fee_kes,
+    note: res.note,
+    source: 'picks',
+    ...(m.via === 'landmark' ? { landmark: m.said } : {}),
+    lines: { en: en.reply, sw: sw.reply },
+  };
 }
 /** Serving / excluded pick names for "where do you cover" (picks mode), or null (legacy). */
 function listed(profile = {}) {
@@ -166,11 +182,11 @@ function listed(profile = {}) {
 // [PROMPT-PLACEHOLDER] caller-facing coverage lines. Picks mode: Desk's "what callers will hear" (fee, note).
 function line(r, lang = 'en') {
   if (!r) return null;
+  if (r.via === 'unconfirmed' || r.via === 'no_pick') return checkWithOwnerLine(r.name, lang);
   if (r.lines) return /^sw/.test(String(lang || '')) ? r.lines.sw : r.lines.en;
   const sw = /^sw/.test(String(lang || ''));
-  if (r.via === 'unconfirmed') return sw ? `Timu itathibitisha kama tunafika ${r.name}.` : `The team will confirm whether we cover ${r.name}.`;
   if (r.status === 'covered') return sw ? `Ndio, tunafika ${r.name}.` : `Yes, we cover ${r.name}.`;
   if (r.status === 'excluded' || r.status === 'outside') return sw ? `Samahani, hatufiki ${r.name}.` : `Sorry, we don't cover ${r.name}.`;
   return sw ? 'Hiyo iko karibu na eneo gani?' : 'Which area is that near?';
 }
-module.exports = { resolve, line, ownerRules, picksOf, picksPending, picksConfirmed, listed, treeMatch };
+module.exports = { resolve, line, ownerRules, picksOf, picksPending, picksConfirmed, listed, treeMatch, checkWithOwnerLine };
