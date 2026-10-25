@@ -23,7 +23,11 @@ export const metadata: Metadata = {
   applicationName: "Scalers",
   appleWebApp: { capable: true, title: "Scalers", statusBarStyle: "default" },
   icons: {
-    icon: [{ url: "/brand/favicon.png", type: "image/png" }],
+    icon: [
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/favicon-48.png", sizes: "48x48", type: "image/png" },
+      { url: "/icons/favicon-192.png", sizes: "192x192", type: "image/png" },
+    ],
     apple: [{ url: "/icons/apple-180.png", sizes: "180x180", type: "image/png" }],
   },
   openGraph: {

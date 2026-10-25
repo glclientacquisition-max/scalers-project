@@ -227,6 +227,15 @@ describe('app icon and splash (v2)', () => {
   it('no competing black apple-touch icon from the app directory', () => {
     assert.ok(!fs.existsSync(path.join(DASH, 'src/app/apple-icon.png')));
   });
+  it('no black-plate favicon: Windows notification header uses the site icon', () => {
+    assert.ok(!fs.existsSync(path.join(DASH, 'src/app/icon.png')));
+    const layout = fs.readFileSync(path.join(DASH, 'src/app/layout.tsx'), 'utf8');
+    assert.match(layout, /\/icons\/favicon-32\.png/);
+    for (const f of ['favicon-32.png', 'favicon-48.png', 'favicon-192.png']) {
+      const b = fs.readFileSync(path.join(DASH, 'public/icons', f));
+      assert.equal(b[25], 6, f + ' must be RGBA (transparent)');
+    }
+  });
 });
 
 describe('push_subscriptions SQL (file only)', () => {
