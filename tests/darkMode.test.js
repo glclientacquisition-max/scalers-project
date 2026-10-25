@@ -38,24 +38,20 @@ const DARK_TOKENS = [
 describe("dark palette", () => {
   const css = read("dashboard/src/app/globals.css");
 
-  it("activates on explicit choice and on system dark for the whole document", () => {
+  it("activates only on an explicit dark pick; the OS setting never turns it on", () => {
     assert.match(css, /:root\[data-theme="dark"\] \{/);
-    assert.match(css, /@media \(prefers-color-scheme: dark\)/);
-    assert.match(css, /:root:not\(\[data-theme="light"\]\) \{/);
+    assert.doesNotMatch(css, /@media \(prefers-color-scheme: dark\)/);
+    assert.doesNotMatch(css, /:root:not\(\[data-theme="light"\]\) \{/);
     assert.match(css, /color-scheme: dark/);
+    assert.match(css, /:root,\s*:root\[data-theme="light"\] \{\s*color-scheme: light only;/);
+    assert.match(css, /html \{\s*background-color: var\(--canvas\);/);
   });
 
-  it("redefines every core token on :root in both dark blocks", () => {
+  it("redefines every core token on :root in the dark block", () => {
     const explicit = css.match(/:root\[data-theme="dark"\]\s*\{[^}]+\}/s);
-    const system = css.match(
-      /@media \(prefers-color-scheme: dark\)\s*\{[\s\S]*?:root:not\(\[data-theme="light"\]\)\s*\{[^}]+\}/,
-    );
     assert.ok(explicit, "explicit dark :root block");
-    assert.ok(system, "system dark :root block");
-    for (const block of [explicit[0], system[0]]) {
-      for (const token of DARK_TOKENS) {
-        assert.ok(block.includes(token), `dark block defines ${token}`);
-      }
+    for (const token of DARK_TOKENS) {
+      assert.ok(explicit[0].includes(token), `dark block defines ${token}`);
     }
   });
 
@@ -127,43 +123,40 @@ describe("dark palette", () => {
 });
 
 describe("theme activation", () => {
-  it("sets data-theme before paint from the per-device choice", () => {
+  it("renders light by default and applies a saved dark pick in <head> before paint", () => {
     const layout = read("dashboard/src/app/layout.tsx");
     const themeLib = read("dashboard/src/lib/deskTheme.ts");
     assert.match(themeLib, /export const DESK_THEME_STORAGE_KEY = "scalers-desk-theme"/);
     assert.match(themeLib, /localStorage\.getItem\(DESK_THEME_STORAGE_KEY\)/);
     assert.match(themeLib, /localStorage\.setItem\(DESK_THEME_STORAGE_KEY, choice\)/);
-    assert.match(themeLib, /localStorage\.removeItem\(DESK_THEME_STORAGE_KEY\)/);
     assert.match(themeLib, /document\.cookie/);
-    assert.match(themeLib, /Max-Age=0/);
     assert.match(themeLib, /SameSite=Lax/);
     assert.match(themeLib, /export function subscribeDeskTheme/);
     assert.match(themeLib, /export function readDeskThemeCookie/);
-    assert.match(layout, /DESK_THEME_STORAGE_KEY/);
-    assert.match(layout, /localStorage\.getItem\(\$\{JSON\.stringify\(DESK_THEME_STORAGE_KEY\)\}\)/);
-    assert.match(layout, /document\.cookie/);
-    assert.match(layout, /var r=document\.documentElement;r\.dataset\.theme=t/);
-    assert.match(layout, /style\.colorScheme=s/);
-    assert.match(layout, /dark only/);
-    assert.match(layout, /meta\[name="color-scheme"\]/);
-    assert.match(layout, /theme-color/);
-    assert.match(layout, /--canvas/);
-    assert.match(layout, /dangerouslySetInnerHTML/);
+    assert.match(themeLib, /export const DESK_THEME_INIT_SCRIPT/);
+    assert.match(themeLib, /r\.dataset\.theme=t/);
+    assert.match(themeLib, /meta\[name="theme-color"\]/);
+    // cacheComponents: a cookies() read in the root layout would make every route blocking.
     assert.doesNotMatch(layout, /cookies\(\)/);
-    assert.match(layout, /dataset\.theme=t/);
-    assert.match(layout, /DeskThemeProvider/);
-    assert.match(layout, /DESK_THEME_COLOR_LIGHT/);
-    assert.match(layout, /DESK_THEME_COLOR_DARK/);
+    assert.match(layout, /data-theme="light"/);
+    assert.match(themeLib, /document\.cookie\.match/);
+    assert.match(layout, /<head>[\s\S]*DESK_THEME_INIT_SCRIPT[\s\S]*<\/head>/);
+    assert.match(layout, /themeColor: DESK_THEME_COLOR_LIGHT/);
+    assert.match(layout, /DeskThemeProvider initial="light"/);
+    assert.match(themeLib, /DESK_THEME_COLOR_DARK/);
     assert.doesNotMatch(layout, /themeColor:\s*"#0096FF"/);
+    assert.doesNotMatch(layout, /prefers-color-scheme/);
   });
 
-  it("hydrates This device from the saved choice, not a System default", () => {
+  it("offers Light and Dark only, hydrated from the saved choice", () => {
     const picker = read("dashboard/src/components/ThemePicker.tsx");
     const kit = read("dashboard/src/app/dev/kit/KitShowcase.tsx");
     const provider = read("dashboard/src/components/DeskThemeProvider.tsx");
     assert.match(picker, /useSyncExternalStore/);
     assert.match(picker, /subscribeDeskTheme/);
-    assert.doesNotMatch(picker, /useState<DeskTheme>\("system"\)/);
+    assert.doesNotMatch(picker, /"system"/);
+    assert.match(picker, /id: "light", label: "Light"/);
+    assert.match(picker, /id: "dark", label: "Dark"/);
     assert.match(provider, /DeskThemeProvider/);
     assert.match(kit, /useThemeChoice/);
     assert.match(kit, /pick\(/);
@@ -176,7 +169,6 @@ describe("theme activation", () => {
     const master = read("docs/reference/design-system/MASTER.md");
     assert.match(themeLib, /deskColorSchemeValue/);
     assert.match(themeLib, /root\.style\.colorScheme = scheme/);
-    assert.match(themeLib, /root\.style\.colorScheme = ""/);
     assert.match(themeLib, /document\.body\.style\.colorScheme/);
     assert.match(themeLib, /meta\[name="color-scheme"\]/);
     assert.match(themeLib, /meta\[name="theme-color"\]/);
@@ -186,17 +178,13 @@ describe("theme activation", () => {
     assert.match(themeLib, /"dark only"/);
     assert.match(themeLib, /"light only"/);
     assert.match(css, /:root\[data-theme="dark"\] \{\s*color-scheme: dark only;/);
-    assert.match(css, /:root\[data-theme="light"\] \{\s*color-scheme: light only;\s*\}/);
+    assert.match(css, /:root,\s*:root\[data-theme="light"\] \{\s*color-scheme: light only;\s*\}/);
     assert.match(css, /:root\[data-theme="dark"\] body \{\s*color-scheme: dark only;\s*\}/);
     assert.match(css, /:root\[data-theme="light"\] body \{\s*color-scheme: light only;\s*\}/);
     assert.match(css, /color-scheme: dark only;/);
     assert.match(
       css,
       /:root\[data-theme="dark"\] \.desk-theme select,\s*:root\[data-theme="dark"\] \.desk-theme select option,\s*:root\[data-theme="dark"\] \.admin-theme select,\s*:root\[data-theme="dark"\] \.admin-theme select option \{\s*color-scheme: inherit;\s*\}/,
-    );
-    assert.match(
-      css,
-      /:root:not\(\[data-theme="light"\]\) \.desk-theme select,\s*:root:not\(\[data-theme="light"\]\) \.desk-theme select option,\s*:root:not\(\[data-theme="light"\]\) \.admin-theme select,\s*:root:not\(\[data-theme="light"\]\) \.admin-theme select option \{\s*color-scheme: inherit;\s*\}/,
     );
     assert.match(css, /\.desk-theme option,\s*\.desk-theme optgroup,\s*\.admin-theme option,\s*\.admin-theme optgroup \{\s*color: var\(--ink\);\s*background-color: var\(--card\);/);
     assert.match(master, /color-scheme: dark only/);
@@ -220,7 +208,7 @@ describe("theme activation", () => {
     assert.doesNotMatch(lockup, /text-brand-900/);
   });
 
-  it("offers System, Light, Dark as an instant This device preference", () => {
+  it("offers Light and Dark as an instant This device preference", () => {
     const picker = read("dashboard/src/components/ThemePicker.tsx");
     const themeLib = read("dashboard/src/lib/deskTheme.ts");
     const ui = read("dashboard/src/components/settingsUi.tsx");
@@ -232,10 +220,11 @@ describe("theme activation", () => {
     assert.match(picker, /writeDeskTheme/);
     assert.match(picker, /applyDeskTheme/);
     assert.doesNotMatch(picker, /tenant\.|saveAndCompile|llm_system_prompt/);
-    for (const label of ['"system"', '"light"', '"dark"']) {
+    for (const label of ['"light"', '"dark"']) {
       assert.ok(picker.includes(`id: ${label}`), `choice ${label}`);
     }
-    assert.match(themeLib, /delete root\.dataset\.theme/);
+    assert.ok(!picker.includes('id: "system"'), "no System choice: light unless dark is picked");
+    assert.doesNotMatch(themeLib, /delete root\.dataset\.theme/);
     assert.match(themeLib, /root\.dataset\.theme = choice/);
     const shell = read("dashboard/src/components/BusinessSettingsShell.tsx");
     const account = read("dashboard/src/components/DeskAccountMenu.tsx");

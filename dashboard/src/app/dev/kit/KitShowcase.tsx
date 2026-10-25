@@ -72,9 +72,8 @@ export function KitShowcase() {
                 <SegmentedControl
                   label="Theme"
                   value={theme}
-                  onChange={(value) => pick(value as "system" | "light" | "dark")}
+                  onChange={(value) => pick(value as "light" | "dark")}
                   items={[
-                    { value: "system", label: "Auto" },
                     { value: "light", label: "Light", icon: <SunIcon aria-hidden="true" /> },
                     { value: "dark", label: "Dark", icon: <MoonIcon aria-hidden="true" /> },
                   ]}
