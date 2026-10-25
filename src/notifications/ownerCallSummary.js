@@ -32,7 +32,7 @@ const { callSummaryEventEnabled } = require('../conversation/callSummaryEvent');
 const { staffRecipients } = require('../conversation/teamPermissions');
 const { renderOwnerSummary, renderFallback } = require('./ownerSummaryText');
 const { buildNotifyOutcome } = require('./notifyOutcome');
-const { parseNotifyChannels } = require('./notifyChannels');
+const { effectiveChannels, alertTypeFor } = require('./notifyChannels');
 
 const KIND = 'call_summary';
 const SETTLE_MS = 30 * 1000;
@@ -116,10 +116,12 @@ async function sendOwnerSummaryToPerson({
   ledger,
   windowOpen = whatsAppWindowOpen,
   dispatch,
+  alertType = null,
 } = {}) {
   const { dispatchAlert, whatsAppSenderReady } = require('./dispatch');
   const send = dispatch || dispatchAlert;
-  const prefs = parseNotifyChannels(channels);
+  // Per-type choices first; the explicit masks below carry no alertType.
+  const prefs = effectiveChannels(channels, alertType);
   const errors = [];
   if (prefs.whatsapp && person?.phone && whatsAppSenderReady() && (await windowOpen(person.phone))) {
     try {
@@ -364,6 +366,12 @@ function createOwnerSummarySender(deps = {}) {
       rendered = renderOwnerSummary(entry.event, { businessName, callUrl });
     }
 
+    const alertType = alertTypeFor({
+      kind: KIND,
+      outcome: entry.event?.outcome || null,
+      status: entry.status || call?.status || null,
+      answered: mode === 'fallback' || !entry.event ? answeredStatus(entry.status || call?.status) : undefined,
+    });
     const inbox = staffRecipients('inbox', {
       teamDirectory: profile.teamDirectory || [],
       ownerPhone,
@@ -385,6 +393,7 @@ function createOwnerSummarySender(deps = {}) {
           subject: rendered.subject,
           lead,
           channels: profile.notifyChannels || null,
+          alertType,
           ledger: {
             tenantId,
             callId: call?.id || null,
