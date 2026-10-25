@@ -1,3 +1,4 @@
+import { stepUpGateSession } from "@/lib/ops/stepUpGate";
 import { NextResponse } from "next/server";
 import { adminActorName } from "@/lib/adminActor";
 import { recordAdminAction } from "@/lib/adminAudit";
@@ -52,6 +53,9 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const action = String(body.action || "");
+  const stepUp = await stepUpGateSession(`platform-ops:${action}`, null);
+  if (stepUp) return stepUp;
+
   const actor = await adminActorName();
 
   try {

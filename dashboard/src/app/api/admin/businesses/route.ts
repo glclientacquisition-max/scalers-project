@@ -17,7 +17,7 @@ import { requestOrigin, resetPasswordRedirectUrl } from "@/lib/authCallback";
 import { isAdminActionBlocked } from "@/lib/adminBusinessModel";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
-import { requireStepUp } from "@/lib/ops/stepUp";
+import { stepUpGate } from "@/lib/ops/stepUpGate";
 import { saveTenantRecordingRetentionOverride } from "@/lib/recordingRetentionAdmin";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -35,7 +35,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Pick a business first." }, { status: 400 });
   }
 
-  requireStepUp({ action: `businesses:${action}`, operator: gate.operator, target: businessId });
+  const stepUp = await stepUpGate(gate.operator, `businesses:${action}`, businessId);
+  if (stepUp) return stepUp;
 
   // The signed-in Super Admin, never a name from the request body.
   const actor = await adminActorName();

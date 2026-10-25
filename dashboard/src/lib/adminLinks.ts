@@ -11,6 +11,8 @@ export type AdminLink = {
   phone: "tab" | "more";
   /** No screen yet. Rendered as a quiet row with this line, never a dead link. None today. */
   pending?: string;
+  /** false: phone More sheet only (the desktop rail reaches it through Settings tabs). */
+  rail?: boolean;
 };
 
 /**
@@ -46,6 +48,7 @@ export const ADMIN_LINKS_V2: readonly AdminLink[] = [
   { href: "/admin/numbers", label: "Numbers", exact: false, phone: "tab" },
   { href: "/admin/quality", label: "Quality", exact: false, phone: "more" },
   { href: "/admin/settings", label: "Settings", exact: false, phone: "more" },
+  { href: "/admin/settings/security", label: "Security", exact: false, phone: "more", rail: false },
 ];
 
 export type AdminTab = { href: string; label: string };
@@ -64,6 +67,7 @@ export const ADMIN_SETTINGS_TABS: readonly AdminTab[] = [
   { href: "/admin/settings/services", label: "Services" },
   { href: "/admin/settings/voices", label: "Voices" },
   { href: "/admin/settings/audit", label: "Audit log" },
+  { href: "/admin/settings/security", label: "Security" },
 ];
 
 /**

@@ -1,3 +1,4 @@
+import { stepUpGateSession } from "@/lib/ops/stepUpGate";
 import { NextResponse } from "next/server";
 import { adminActorName } from "@/lib/adminActor";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
@@ -119,6 +120,9 @@ export async function POST(request: Request) {
   if (!businessId) {
     return NextResponse.json({ error: "Pick a business first." }, { status: 400 });
   }
+
+  const stepUp = await stepUpGateSession(`billing:${action}`, businessId);
+  if (stepUp) return stepUp;
 
   // The signed-in Super Admin, never a typed name or a value from the request body.
   const actor = await adminActorName();

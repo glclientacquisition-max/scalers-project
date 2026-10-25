@@ -281,16 +281,16 @@ describe("A0: operator-only writes + step-up observe (s21)", () => {
     assert.match(guard, /Sign in as an operator/);
   });
 
-  it("step-up observe is called before the write and enforce is not wired", () => {
+  it("step-up gate is called before the write; enforce needs ADMIN_STEP_UP_ENFORCE=on", () => {
     const step = read(`${DASH}/lib/ops/stepUp.ts`);
     assert.match(step, /ADMIN_STEP_UP/);
     assert.match(step, /would-require-step-up/);
-    assert.match(step, /not implemented/);
+    assert.match(step, /ADMIN_STEP_UP_ENFORCE/);
     for (const rel of writeRoutes) {
       const src = read(rel);
       const post = src.slice(src.indexOf("export async function POST"));
-      assert.match(post, /requireStepUp\(/, rel);
-      const stepAt = post.indexOf("requireStepUp(");
+      assert.match(post, /stepUpGate\(/, rel);
+      const stepAt = post.indexOf("stepUpGate(");
       const markers = ["addDidToPool", "assign_did_from_pool", "releasePoolNumber", "releaseBusinessNumber", "assign_specific_did", "suspendBusiness"];
       const writeAt = Math.min(
         ...markers.map((n) => {

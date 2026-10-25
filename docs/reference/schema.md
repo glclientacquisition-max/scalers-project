@@ -9,10 +9,16 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (57)
+## Tables (63)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
+| `admin_sign_in_email_code` | `code_hash`, `created_at`, `expires_at`, `id`, `operator`, `sent_to`, `used_at` | `docs/supabase/admin_sign_in_2fa.sql` |
+| `admin_step_up_area` | `area`, `required`, `updated_at`, `updated_by` | `docs/supabase/admin_step_up_area.sql` |
+| `admin_step_up_backup_code` | `code_hash`, `created_at`, `id`, `operator`, `used_at` | `docs/supabase/admin_step_up.sql` |
+| `admin_step_up_factor` | `created_at`, `enrolled_at`, `failed_count`, `last_step`, `locked_until`, `needs_reenrol`, `operator`, `pending_secret_enc`, `secret_enc`, `updated_at` | `docs/supabase/admin_step_up.sql` |
+| `admin_step_up_grant` | `action`, `created_at`, `expires_at`, `id`, `method`, `operator`, `revoked_at` | `docs/supabase/admin_step_up.sql` |
+| `admin_step_up_setting` | `id`, `unlock_minutes`, `updated_at`, `updated_by` | `docs/supabase/admin_step_up_setting.sql` |
 | `appointment_services` | `appointment_id`, `created_at`, `id`, `idempotency_key`, `position`, `service_name`, `status`, `tenant_id` | `supabase/migrations/20261024130000_appointment_services.sql` |
 | `appointments` | `address_landmark`, `call_id`, `caller_name`, `caller_phone`, `contact_id`, `created_at`, `id`, `inbox_archived_at`, `metadata`, `notes`, `service_name`, `status`, `tenant_id`, `updated_at`, `when_text`, `window_end`, `window_start` | `docs/supabase/appointments.sql`<br>`docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `billing_audit_log` | `action`, `actor`, `created_at`, `detail`, `id`, `tenant_id` | `docs/supabase/billing_data_layer.sql` |
@@ -82,7 +88,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (233)
+## Functions (234)
 
 | Function | Defined in |
 | --- | --- |
@@ -159,6 +165,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `admin_set_price_approval_threshold` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_tenant_billing_mode` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_tenant_live_payments` | `docs/supabase/invoice_pay_live_allowlist.sql` |
+| `admin_step_up_reset` | `docs/supabase/admin_sign_in_2fa.sql`<br>`docs/supabase/admin_sign_in_2fa_down.sql`<br>`docs/supabase/admin_step_up.sql` |
 | `admin_update_package_version_draft` | `docs/supabase/package_version_editor.sql` |
 | `admin_void_invoice` | `docs/supabase/admin_invoice_actions.sql` |
 | `apply_line_rental` | `docs/supabase/line_rental_grace.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_security_beta.sql` |

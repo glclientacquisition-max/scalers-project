@@ -8,7 +8,7 @@ import {
 } from "@/lib/adminInvoiceActions";
 import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { logAdminError } from "@/lib/adminErrors";
-import { requireStepUp, stepUpMode } from "@/lib/ops/stepUp";
+import { stepUpGate } from "@/lib/ops/stepUpGate";
 
 type Body = {
   action?: unknown;
@@ -34,15 +34,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const reason = String(body.reason || "").trim();
   const actor = await adminActorName();
 
-  const mode = stepUpMode();
-  if (mode === "observe") {
-    requireStepUp({ action: `invoice:${action || "unknown"}`, operator: gate.operator, target: id });
-  } else if (mode === "enforce") {
-    return NextResponse.json(
-      { error: "Authenticator not set up yet", mode, verified: false },
-      { status: 501 },
-    );
-  }
+  const stepUp = await stepUpGate(gate.operator, `invoice:${action || "unknown"}`, id);
+  if (stepUp) return stepUp;
 
   try {
     if (action === "void") {
