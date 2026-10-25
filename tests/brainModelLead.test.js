@@ -14,7 +14,9 @@ const { clockPhrase } = require('../src/conversation/visitTime');
 const DD0 = require('../evals/v2/fixtures/tenants/done_and_dusted.json');
 const DD = { ...DD0, id: DD0.tenantId };
 const BASE = { BRAIN_V2: '1', BRAIN_V2_MODE: 'live', BRAIN_V2_MODEL: 'on', BRAIN_V1_DRAFT: 'on', BRAIN_V1_DRAFT_PHASE_A: 'on', BRAIN_V2_MODEL_ID: 'primary', BRAIN_V2_MODEL_BACKUP_ID: 'backup', BRAIN_CALL_CORE: 'on' };
-const ENV = { ...BASE, BRAIN_MODEL_LEAD: 'on' };
+// The same case set runs twice: #933 single call (this file) and the split path (tests/brainModelLeadSplit.test.js sets BRAIN_LEAD_CASES_SPLIT=on).
+const SPLIT = process.env.BRAIN_LEAD_CASES_SPLIT === 'on';
+const ENV = { ...BASE, BRAIN_MODEL_LEAD: 'on', BRAIN_MODEL_LEAD_SPLIT: SPLIT ? 'on' : 'off', BRAIN_LEAD_MODEL_ID: 'primary', BRAIN_LEAD_BACKUP_MODEL_ID: 'backup' };
 const NOW = '2026-10-25T06:34:00Z'; // 09:34 EAT, the time of HD_d17032973ceb
 const sleep = (ms, signal) => new Promise((r, j) => { const t = setTimeout(r, ms); if (signal) signal.addEventListener('abort', () => { clearTimeout(t); j(Object.assign(new Error('aborted'), { code: 'TIMEOUT' })); }, { once: true }); });
 
@@ -24,6 +26,12 @@ function harness({ script = defaultModel, env = ENV, callerFile = { contactName:
   const modelLeadStreamFor = (id) => async ({ request, signal, onText }) => {
     const pack = JSON.parse(request.contents[0].parts[0].text);
     if (pack.wrong) { await sleep(20, signal); return { text: pack.fact }; } // repair model: says the fact
+    if (pack.UNDERSTAND) { // split path: the understanding call gets the same scripted understanding
+      await sleep(typeof ttft[id] === 'function' ? ttft[id]() : ttft[id], signal);
+      const o = script({ CALLER_SAID: pack.CALLER_SAID, PLAN: {}, CALLER: {}, RECEIPTS: { coverage: [] }, HISTORY: [], LANG_HINT: null }, id);
+      if (o === 'fail') throw Object.assign(new Error('gemini http 503'), { status: 503, code: 'http_503' });
+      return { text: JSON.stringify(o.understanding || {}) };
+    }
     calls[id] = (calls[id] || 0) + 1;
     await sleep(typeof ttft[id] === 'function' ? ttft[id]() : ttft[id], signal);
     const out = script(pack, id);
@@ -224,7 +232,7 @@ test('14 all models down -> template from state, answeredBy=template, no stacked
 test('hedge: primary silent past 900 ms -> backup fires in parallel and wins; both attempts traced', async () => {
   const h = harness({ script: c1t3Model, callerFile: ALVIN, ttft: { primary: 1500, backup: 100 } });
   const r = await turn(h, C1T3);
-  const a = r.stage.attempts; assert.equal(a.length, 2); assert.equal(a[1].role, 'backup'); assert.ok(a[1].startMs >= 880 && a[1].startMs < 1100, JSON.stringify(a));
+  const a = r.stage.attempts; assert.equal(a.length, 2); assert.equal(a[1].role, 'backup'); const hedge = SPLIT ? ML.SPLIT_DEADLINES.hedgeMs : 900; assert.ok(a[1].startMs >= hedge - 20 && a[1].startMs < hedge + 200, JSON.stringify(a));
   assert.match(r.answeredBy, /^model/); assert.ok(r.stage.firstSentenceMs < 1400, String(r.stage.firstSentenceMs));
 });
 // ---------------- Swahili / mixed
@@ -281,7 +289,7 @@ test('unit: partial JSON reader yields understanding before the reply and stream
 test('GATES over the case set: template share <5%, 0 unbacked claims, 0 contradictions', () => {
   const live = results.filter((r) => r.answeredBy);
   const tmpl = live.filter((r) => r.answeredBy === 'template' && r.name !== '14').length; // case 14 forces all-models-down
-  assert.ok(tmpl / live.length < 0.05, `template share ${tmpl}/${live.length}`);
+  assert.ok(tmpl / live.length < 0.05, `template share ${tmpl}/${live.length} ${JSON.stringify(live.filter((r) => r.answeredBy === 'template').map((r) => r.name))}`);
   assert.equal(live.filter((r) => r.unbacked).length, 0, JSON.stringify(live.filter((r) => r.unbacked)));
   assert.equal(live.filter((r) => r.contradiction).length, 0, JSON.stringify(live.filter((r) => r.contradiction)));
 });

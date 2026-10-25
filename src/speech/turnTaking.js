@@ -476,6 +476,18 @@ function outcome(partial) {
  *   phase: string
  * }}
  */
+function graceQueueOn(env = process.env) {
+  const v = (k) => String(env[k] || '').trim().toLowerCase();
+  if (v('VOICE_GRACE_QUEUE') === 'off') return false;
+  return v('VOICE_GRACE_QUEUE') === 'on' || v('BRAIN_MODEL_LEAD') === 'on';
+}
+function isSubstantiveFinal(text, minChars = 5) {
+  const t = String(text || '').trim();
+  if (t.length < Math.max(minChars, 8)) return false;
+  if (isSoftOverlap(t)) return false;
+  return t.split(/\s+/).filter(Boolean).length >= 2;
+}
+
 function decideCallerEvent(opts = {}) {
   const text = String(opts.text || '').trim();
   const phase = resolvePhase(opts);
@@ -503,6 +515,13 @@ function decideCallerEvent(opts = {}) {
   }
 
   if (phase === 'speaking' && spokenForMs < graceMs) {
+    // HD_319eb6f7255d (5.75 s dead air): a real caller sentence landing in the grace window right after a barge was
+    // dropped and no turn owned the floor. Behind BRAIN_MODEL_LEAD (or VOICE_GRACE_QUEUE=on) a substantive final is
+    // queued as the next turn instead (runs once playback stops). Short/backchannel finals are still ignored.
+    // [VOICE REVIEW] minimal Brain-lane change in Voice code; flag-off is unchanged.
+    if (opts.isFinal === true && graceQueueOn() && isSubstantiveFinal(text, minChars)) {
+      return outcome({ ...base, action: 'queue', reason: 'grace_queued', queue: true, runGemini: true });
+    }
     return outcome({ ...base, action: 'ignore', reason: 'grace' });
   }
 
