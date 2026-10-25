@@ -69,7 +69,8 @@ export function businessSettingsHref(tab: BusinessSettingsTab, panel?: SettingsP
 /** Sidebar target. Same tabs and panels. Grouped by owner job. */
 export type SettingsNavTarget =
   | { tab: Exclude<BusinessSettingsTab, "train" | "menu"> }
-  | { tab: "train"; panel: Exclude<SettingsPanel, "catalog"> };
+  | { tab: "train"; panel: Exclude<SettingsPanel, "catalog"> }
+  | { href: "/settings/areas" };
 
 export type SettingsNavItem = {
   label: string;
@@ -95,6 +96,10 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
       { label: "Identity", target: { tab: "train", panel: "identity" } },
       { label: "Hours", target: { tab: "train", panel: "hours" } },
       { label: "Locations", target: { tab: "train", panel: "locations" } },
+      {
+        label: "Service areas",
+        target: { href: "/settings/areas" },
+      },
       { label: "Policies", target: { tab: "train", panel: "policies" } },
     ],
   },
@@ -133,6 +138,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
 ];
 
 export function settingsNavHref(target: SettingsNavTarget): string {
+  if ("href" in target) return target.href;
   return target.tab === "train"
     ? businessSettingsHref("train", target.panel)
     : businessSettingsHref(target.tab);
@@ -142,8 +148,11 @@ export function settingsNavItemActive(
   target: SettingsNavTarget,
   tab: BusinessSettingsTab,
   trainPanel: SettingsPanel,
-  options?: { selectHubAppearance?: boolean }
+  options?: { selectHubAppearance?: boolean; activePath?: string }
 ): boolean {
+  if ("href" in target) {
+    return options?.activePath === target.href;
+  }
   if (target.tab === "train") {
     return tab === "train" && trainPanel === target.panel;
   }

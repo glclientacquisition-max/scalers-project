@@ -99,9 +99,11 @@ function SettingsMenu({
                   selectHubAppearance: true,
                 });
                 const key =
-                  item.target.tab === "train"
-                    ? `${item.target.tab}-${item.target.panel}`
-                    : item.target.tab;
+                  "href" in item.target
+                    ? item.target.href
+                    : item.target.tab === "train"
+                      ? `${item.target.tab}-${item.target.panel}`
+                      : item.target.tab;
                 return (
                   <li key={key}>
                     <Link
@@ -130,9 +132,11 @@ function SettingsMenu({
               {section.items.map((item, itemIndex) => {
                 const active = settingsNavItemActive(item.target, tab, trainPanel);
                 const key =
-                  item.target.tab === "train"
-                    ? `${item.target.tab}-${item.target.panel}`
-                    : item.target.tab;
+                  "href" in item.target
+                    ? item.target.href
+                    : item.target.tab === "train"
+                      ? `${item.target.tab}-${item.target.panel}`
+                      : item.target.tab;
                 return (
                   <li
                     key={key}

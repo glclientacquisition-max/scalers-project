@@ -1,4 +1,5 @@
 "use client";
+import { AutoGrowTextarea } from "@/components/ui/TextField";
 
 /**
  * Shared Business Settings UI tokens and primitives.
@@ -7,6 +8,7 @@
  */
 
 import type { ReactNode } from "react";
+import { ChoiceSheet } from "@/components/ui/ChoiceSheet";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import {
   btnPrimary,
@@ -19,66 +21,80 @@ import {
 export const settingsFieldClass = `mt-1 ${deskFieldClass}`;
 
 export const settingsDenseFieldClass =
-  `w-full min-h-11 min-w-0 rounded-lg border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent`;
+  `w-full min-h-11 min-w-0 rounded-xl border border-hairline bg-surface px-3 py-2 text-body text-ink outline-none ${deskShiftClass} placeholder:text-ink-3 hover:border-ink-3 focus:outline-none focus:border-accent focus:ring-2 focus:ring-brand/40 aria-[invalid=true]:border-attention`;
 
 export const settingsTableFieldClass =
-  `w-full min-w-0 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent`;
+  `w-full min-w-0 rounded-lg border border-hairline bg-surface px-2 py-1.5 text-body text-ink outline-none ${deskShiftClass} placeholder:text-ink-2/70 hover:border-accent/35 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent`;
 
 /** Sole-panel sections stay flush (no top rule); use when stacking blocks inside one panel. */
 export const settingsSectionClass = "space-y-3";
 
 /** Nested settings: packed inner rail + fluid panel. Fills the desk canvas from md. */
 export const settingsConsoleClass =
-  "flex w-full min-w-0 flex-col gap-6 md:flex-row md:items-start md:justify-start md:gap-4";
+  "flex w-full min-w-0 flex-col gap-6 md:flex-row md:items-start md:justify-start md:gap-3";
 
 export const settingsRailWrapClass =
-  "hidden min-w-0 shrink-0 md:block md:w-max md:max-w-[13.5rem]";
+  "hidden min-w-0 shrink-0 md:block md:w-64";
 
-export const settingsRailClass = "min-w-0 md:sticky md:top-4";
+export const settingsRailClass =
+  "min-w-0 md:sticky md:top-0 md:max-h-[calc(100dvh-3rem)] md:overflow-y-auto md:overscroll-contain md:pt-4";
 
 export const settingsPanelClass =
   "min-w-0 flex-1 pb-[var(--desk-tabbar-clearance)] md:pb-0";
+
+/** Cap train/alerts form reading width so Identity fields are not ultrawide sparse. */
+export const settingsFormBodyClass = "min-w-0 w-full max-w-2xl";
+
+/** Text controls inside SettingsRow — ops form, not full remainder. */
+export const settingsControlMaxClass = "max-w-md";
+
+/** A settings value. The row is the field: no box, current text on the right. */
+export const settingsValueFieldClass =
+  "w-full min-h-11 min-w-0 bg-transparent px-1 text-end text-body text-ink outline-none placeholder:text-ink-3 focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand";
+
+/** Selects inside SettingsRow — short values (Tone, type) stay compact. */
+export const settingsSelectMaxClass = "max-w-xs";
 
 export const settingsFormGridClass =
   "grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2";
 
 /** Sticks to the panel so Save stays docked top-right while scrolling. */
 export const settingsStickyHeaderClass =
-  "sticky top-[var(--desk-header-h,0px)] z-30 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-canvas/95 py-3 backdrop-blur-sm";
+  "sticky -top-4 z-30 -mt-4 mb-4 flex w-full max-w-2xl flex-wrap items-center justify-between gap-3 border-b border-hairline bg-canvas pb-3 pt-7 sm:-top-6 sm:-mt-6 sm:pt-9";
 
 export const settingsActionClass =
-  `inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] active:bg-accent/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`;
+  `inline-flex min-h-11 items-center justify-center rounded-lg border border-hairline px-3 text-body font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] active:bg-accent/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`;
 
 export const settingsTrashButtonClass =
-  `inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn active:bg-surface-muted active:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`;
+  `inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-2 ${deskShiftClass} hover:bg-surface hover:text-warn active:bg-surface-muted active:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`;
 
 export const settingsPrimaryButtonClass = btnPrimary;
 
 export const settingsPanelHeadingClass =
-  "font-display text-xl font-semibold tracking-tight text-ink";
+  "font-display text-title font-semibold tracking-tight text-ink";
 
 export const settingsBlockTitleClass =
-  "text-[11px] font-bold uppercase tracking-wide text-gray-500";
+  "text-meta font-medium text-ink-2";
 
-/** Non-clickable group header. Same dialect as the Profile rail. */
+/** Non-clickable group header. Same dialect as the settings rail. */
 export const settingsGroupTitleClass =
-  "pointer-events-none mb-0 select-none text-xs font-bold uppercase tracking-wide text-gray-500";
+  "pointer-events-none mb-0 select-none text-meta font-medium text-ink-2";
 
 export function settingsRadioCardClass(selected: boolean) {
   return [
     `w-full text-left rounded-xl border px-4 py-3 ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`,
     selected
       ? "border-transparent bg-accent/10 ring-2 ring-accent active:bg-accent/15"
-      : "border-line bg-surface text-ink hover:border-accent/40 hover:bg-accent/[0.04] active:bg-accent/[0.08]",
+      : "border-hairline bg-surface text-ink hover:border-accent/40 hover:bg-accent/[0.04] active:bg-accent/[0.08]",
   ].join(" ");
 }
 
 export function settingsChipClass(selected: boolean) {
   return [
-    `inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-left text-sm font-medium ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`,
+    `inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-left text-body font-medium ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`,
     selected
       ? "border-transparent bg-accent/10 text-accent-deep ring-1 ring-accent active:bg-accent/15"
-      : "border-line bg-surface text-ink hover:border-accent/40 hover:bg-accent/[0.04] active:bg-accent/[0.08]",
+      : "border-hairline bg-surface text-ink hover:border-accent/40 hover:bg-accent/[0.04] active:bg-accent/[0.08]",
   ].join(" ");
 }
 
@@ -133,17 +149,20 @@ export function ToolSwitch({
   checked,
   onChange,
   label,
+  hint,
   disabled = false,
 }: {
   checked: boolean;
   onChange: (next: boolean) => void;
   label: string;
+  /** Hover note. The switch name stays on aria-label. */
+  hint?: string;
   disabled?: boolean;
 }) {
   return (
     <label
       data-settings-toggle=""
-      title={label}
+      title={hint || label}
       className={[
         "inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-full focus-within:outline-none focus-within:ring-2 focus-within:ring-accent",
         disabled ? "cursor-not-allowed opacity-60" : "",
@@ -165,7 +184,7 @@ export function ToolSwitch({
         aria-hidden
         className={[
           `relative inline-flex h-7 w-12 shrink-0 items-center rounded-full ${deskShiftClass}`,
-          checked && !disabled ? "bg-accent-fill" : "bg-line",
+          checked && !disabled ? "bg-accent-fill" : "bg-hairline",
         ].join(" ")}
       >
         <span
@@ -193,12 +212,18 @@ export function SettingsGroup({
   return (
     <section className="min-w-0 w-full space-y-1.5">
       {title || action ? (
-        <div className="flex min-h-8 items-end justify-between gap-3 px-1">
-          {title ? <h3 className={settingsGroupTitleClass}>{title}</h3> : <span />}
+        <div
+          className={
+            action
+              ? "flex min-h-11 items-center justify-between gap-3 px-1"
+              : "flex min-h-8 items-end justify-between gap-3 px-1"
+          }
+        >
+          {title ? <h2 className={settingsGroupTitleClass}>{title}</h2> : <span />}
           {action}
         </div>
       ) : null}
-      <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
+      <div className="divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface">
         {children}
       </div>
     </section>
@@ -219,15 +244,28 @@ export function SettingsRow({
   children: ReactNode;
 }) {
   const switchRow = control === "switch";
+  if (switchRow) {
+    return (
+      <div className="flex min-h-12 w-full items-center gap-3 px-4 py-2 md:min-h-11 md:px-3 md:py-1.5">
+        <div className="min-w-0 flex-1">
+          <label htmlFor={htmlFor} className="block text-body font-medium text-ink">
+            {label}
+          </label>
+          {hint ? <p className="mt-0.5 text-meta text-ink-2">{hint}</p> : null}
+        </div>
+        <div className="shrink-0">{children}</div>
+      </div>
+    );
+  }
   return (
-    <div className="flex min-h-12 w-full items-center gap-3 px-4 py-2">
-      <div className={switchRow ? "min-w-0 flex-1" : "w-[7.5rem] shrink-0 sm:w-36"}>
-        <label htmlFor={htmlFor} className="block text-sm font-medium text-ink">
+    <div className="w-full px-4 py-1.5">
+      <div className="flex min-h-11 w-full items-center gap-3">
+        <label htmlFor={htmlFor} className="shrink-0 text-body font-medium text-ink">
           {label}
         </label>
-        {hint ? <p className="mt-0.5 text-xs text-ink-soft">{hint}</p> : null}
+        <div className="min-w-0 flex-1">{children}</div>
       </div>
-      <div className={switchRow ? "shrink-0" : "min-w-0 flex-1"}>{children}</div>
+      {hint ? <p className="pb-1 text-meta text-ink-2">{hint}</p> : null}
     </div>
   );
 }
@@ -243,7 +281,7 @@ export function SettingsStack({
 }) {
   return (
     <div className="space-y-1.5 px-4 py-3">
-      <label htmlFor={htmlFor} className="block text-sm font-medium text-ink">
+      <label htmlFor={htmlFor} className="block text-body font-medium text-ink">
         {label}
       </label>
       {children}
@@ -259,7 +297,7 @@ export function SettingsSegmented<T extends string>({
 }: {
   label: string;
   value: T;
-  options: readonly { id: T; label: string }[];
+  options: readonly { id: T; label: string; disabled?: boolean; hint?: string }[];
   onChange: (id: T) => void;
 }) {
   return (
@@ -278,10 +316,18 @@ export function SettingsSegmented<T extends string>({
                 type="button"
                 role="radio"
                 aria-checked={selected}
-                onClick={() => onChange(opt.id)}
-                className={deskRateCardClass(selected)}
+                aria-disabled={opt.disabled || undefined}
+                disabled={opt.disabled}
+                onClick={() => {
+                  if (opt.disabled) return;
+                  onChange(opt.id);
+                }}
+                className={`${deskRateCardClass(selected)}${opt.disabled ? " cursor-not-allowed opacity-50" : ""}`}
               >
                 {opt.label}
+                {opt.hint ? (
+                  <span className="ml-1 text-meta font-normal text-ink-2">{opt.hint}</span>
+                ) : null}
               </button>
             </li>
           );
@@ -302,39 +348,34 @@ export function SettingsSelect<T extends string>({
   id: string;
   value: T | "";
   onChange: (value: T) => void;
-  options: readonly { id: T; label: string }[];
+  options: readonly { id: T; label: string; detail?: string }[];
   label?: string;
   placeholder?: string;
 }) {
   return (
-    <select
+    <ChoiceSheet
       id={id}
+      title={label || placeholder || "Choose"}
+      rowLabel={label}
       value={value}
-      aria-label={label}
-      onChange={(e) => onChange(e.target.value as T)}
-      className={`${settingsDenseFieldClass} min-w-0`}
-    >
-      {placeholder || value === "" ? (
-        <option value="" disabled={value !== ""}>
-          {placeholder || "Select"}
-        </option>
-      ) : null}
-      {options.map((opt) => (
-        <option key={opt.id} value={opt.id}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+      placeholder={placeholder}
+      options={options.map((opt) => ({
+        value: opt.id,
+        label: opt.label,
+        detail: opt.detail && opt.detail !== opt.label ? opt.detail : undefined,
+      }))}
+      onChange={onChange}
+    />
   );
 }
 
 export const settingsGhostButtonClass =
-  `inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-sm font-medium text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-ink active:bg-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`;
+  `inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-body font-medium text-ink-2 ${deskShiftClass} hover:bg-surface hover:text-ink active:bg-hairline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`;
 
 export function SettingsBackLink() {
   return (
-    <DeskBack href="/settings" className="lg:hidden">
-      Profile
+    <DeskBack href="/settings">
+      Settings
     </DeskBack>
   );
 }
@@ -344,36 +385,48 @@ export function SettingsPageHeader({
   lineLive,
   lineDetail,
   action,
+  alert,
+  onRetry,
   showBack = false,
   index = false,
+  showLine = false,
   title,
 }: {
   businessName: string;
   lineLive: boolean;
   lineDetail?: string;
   action?: ReactNode;
+  alert?: string | null;
+  /** Failed save: a Try again button beside the alert (useFormSave retry). */
+  onRetry?: (() => void) | null;
   showBack?: boolean;
   index?: boolean;
+  showLine?: boolean;
   title?: string | null;
 }) {
-  const line = (
-    <p className="text-[13px] text-ink-soft [overflow-wrap:anywhere]">
+  const line = showLine ? (
+    <p className="text-meta text-ink-2 [overflow-wrap:anywhere]">
       <span className="font-medium text-ink">
         {lineLive ? "Line live" : "Number pending"}
       </span>
       {lineLive && lineDetail ? (
-        <span className="mt-0.5 block truncate font-mono text-xs font-normal">
+        <span className="mt-0.5 block truncate font-mono text-meta font-normal">
           {lineDetail}
         </span>
       ) : null}
     </p>
-  );
+  ) : null;
 
   if (index) {
     return (
       <header className="mb-4 min-w-0">
-        <h1 className="font-display text-xl font-semibold tracking-tight text-ink">Profile</h1>
-        <p className="mt-1 min-w-0 truncate text-sm font-medium text-ink">{businessName}</p>
+        <h1 className="font-display text-title font-semibold tracking-tight text-ink">Settings</h1>
+        <p
+          className="mt-1 min-w-0 break-words text-body font-medium text-ink [overflow-wrap:anywhere]"
+          title={businessName}
+        >
+          {businessName}
+        </p>
         {line}
       </header>
     );
@@ -395,6 +448,22 @@ export function SettingsPageHeader({
         )}
       </div>
       {action}
+      {alert ? (
+        <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1" data-save-error="">
+          <p className="min-w-0 flex-1 text-body text-warn" role="alert">
+            {alert}
+          </p>
+          {onRetry ? (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="min-h-11 shrink-0 rounded-xl px-2 text-body font-medium text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              Try again
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </header>
   );
 }
@@ -425,22 +494,14 @@ export function ExpandTextarea({
   className?: string;
 }) {
   return (
-    <textarea
+    <AutoGrowTextarea
       id={id}
       value={value}
       maxLength={maxLength}
       onChange={(e) => onChange(e.target.value)}
-      rows={2}
-      onFocus={(e) => {
-        e.currentTarget.rows = 4;
-      }}
-      onBlur={(e) => {
-        e.currentTarget.rows = 2;
-      }}
+      rows={3}
       placeholder={placeholder}
-      className={[settingsFieldClass, "leading-relaxed", className]
-        .filter(Boolean)
-        .join(" ")}
+      className={[settingsFieldClass, "min-h-[5.5rem]", className].filter(Boolean).join(" ")}
     />
   );
 }

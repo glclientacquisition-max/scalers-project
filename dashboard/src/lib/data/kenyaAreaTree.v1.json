@@ -1,0 +1,1478 @@
+{
+"version": "ke-areas-2026-10-24.1",
+"nodes": [
+{
+"id": "ke",
+"name": "Kenya",
+"kind": "country",
+"parent": null,
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:mombasa",
+"name": "Mombasa",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:mombasa:nyali",
+"name": "Nyali",
+"kind": "estate",
+"parent": "county:mombasa",
+"aliases": [],
+"landmarks": [
+"City Mall"
+]
+},
+{
+"id": "estate:mombasa:bamburi",
+"name": "Bamburi",
+"kind": "estate",
+"parent": "county:mombasa",
+"aliases": [],
+"landmarks": [
+"Bamburi Cement"
+]
+},
+{
+"id": "estate:mombasa:mombasa-cbd",
+"name": "Mombasa CBD",
+"kind": "estate",
+"parent": "county:mombasa",
+"aliases": [
+"mombasa town",
+"old town"
+],
+"landmarks": [
+"Fort Jesus"
+]
+},
+{
+"id": "estate:mombasa:likoni",
+"name": "Likoni",
+"kind": "estate",
+"parent": "county:mombasa",
+"aliases": [],
+"landmarks": [
+"Likoni Ferry"
+]
+},
+{
+"id": "estate:mombasa:changamwe",
+"name": "Changamwe",
+"kind": "estate",
+"parent": "county:mombasa",
+"aliases": [],
+"landmarks": [
+"Moi Airport"
+]
+},
+{
+"id": "estate:mombasa:kisauni",
+"name": "Kisauni",
+"kind": "estate",
+"parent": "county:mombasa",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:mombasa:shanzu",
+"name": "Shanzu",
+"kind": "estate",
+"parent": "county:mombasa",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:mombasa:mtwapa",
+"name": "Mtwapa",
+"kind": "town",
+"parent": "county:mombasa",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:kwale",
+"name": "Kwale",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kwale:diani",
+"name": "Diani",
+"kind": "town",
+"parent": "county:kwale",
+"aliases": [
+"ukunda"
+],
+"landmarks": []
+},
+{
+"id": "town:kwale:kwale",
+"name": "Kwale",
+"kind": "town",
+"parent": "county:kwale",
+"aliases": [
+"kwale town"
+],
+"landmarks": []
+},
+{
+"id": "county:kilifi",
+"name": "Kilifi",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kilifi:kilifi",
+"name": "Kilifi",
+"kind": "town",
+"parent": "county:kilifi",
+"aliases": [
+"kilifi town"
+],
+"landmarks": []
+},
+{
+"id": "town:kilifi:malindi",
+"name": "Malindi",
+"kind": "town",
+"parent": "county:kilifi",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kilifi:watamu",
+"name": "Watamu",
+"kind": "town",
+"parent": "county:kilifi",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:tana-river",
+"name": "Tana River",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:lamu",
+"name": "Lamu",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:taita-taveta",
+"name": "Taita Taveta",
+"kind": "county",
+"parent": "ke",
+"aliases": [
+"taita",
+"taita-taveta"
+],
+"landmarks": []
+},
+{
+"id": "county:garissa",
+"name": "Garissa",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:wajir",
+"name": "Wajir",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:mandera",
+"name": "Mandera",
+"kind": "county",
+"parent": "ke",
+"aliases": [
+"county 9"
+],
+"landmarks": []
+},
+{
+"id": "county:marsabit",
+"name": "Marsabit",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:isiolo",
+"name": "Isiolo",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:meru",
+"name": "Meru",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:meru:meru",
+"name": "Meru",
+"kind": "town",
+"parent": "county:meru",
+"aliases": [
+"meru town"
+],
+"landmarks": []
+},
+{
+"id": "town:meru:maua",
+"name": "Maua",
+"kind": "town",
+"parent": "county:meru",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:meru:nkubu",
+"name": "Nkubu",
+"kind": "town",
+"parent": "county:meru",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:tharaka-nithi",
+"name": "Tharaka Nithi",
+"kind": "county",
+"parent": "ke",
+"aliases": [
+"tharaka-nithi",
+"tharaka"
+],
+"landmarks": []
+},
+{
+"id": "county:embu",
+"name": "Embu",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:embu:embu",
+"name": "Embu",
+"kind": "town",
+"parent": "county:embu",
+"aliases": [
+"embu town"
+],
+"landmarks": []
+},
+{
+"id": "town:embu:runyenjes",
+"name": "Runyenjes",
+"kind": "town",
+"parent": "county:embu",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:kitui",
+"name": "Kitui",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kitui:kitui",
+"name": "Kitui",
+"kind": "town",
+"parent": "county:kitui",
+"aliases": [
+"kitui town"
+],
+"landmarks": []
+},
+{
+"id": "town:kitui:mwingi",
+"name": "Mwingi",
+"kind": "town",
+"parent": "county:kitui",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:machakos",
+"name": "Machakos",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:machakos:syokimau",
+"name": "Syokimau",
+"kind": "town",
+"parent": "county:machakos",
+"aliases": [],
+"landmarks": [
+"SGR Nairobi Terminus"
+]
+},
+{
+"id": "town:machakos:mlolongo",
+"name": "Mlolongo",
+"kind": "town",
+"parent": "county:machakos",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:machakos:athi-river",
+"name": "Athi River",
+"kind": "town",
+"parent": "county:machakos",
+"aliases": [
+"mavoko"
+],
+"landmarks": []
+},
+{
+"id": "town:machakos:machakos",
+"name": "Machakos",
+"kind": "town",
+"parent": "county:machakos",
+"aliases": [
+"machakos town",
+"macha"
+],
+"landmarks": []
+},
+{
+"id": "town:machakos:kangundo",
+"name": "Kangundo",
+"kind": "town",
+"parent": "county:machakos",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:machakos:tala",
+"name": "Tala",
+"kind": "town",
+"parent": "county:machakos",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:makueni",
+"name": "Makueni",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:makueni:wote",
+"name": "Wote",
+"kind": "town",
+"parent": "county:makueni",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:makueni:emali",
+"name": "Emali",
+"kind": "town",
+"parent": "county:makueni",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:makueni:sultan-hamud",
+"name": "Sultan Hamud",
+"kind": "town",
+"parent": "county:makueni",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:nyandarua",
+"name": "Nyandarua",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:nyandarua:ol-kalou",
+"name": "Ol Kalou",
+"kind": "town",
+"parent": "county:nyandarua",
+"aliases": [
+"olkalou"
+],
+"landmarks": []
+},
+{
+"id": "town:nyandarua:engineer",
+"name": "Engineer",
+"kind": "town",
+"parent": "county:nyandarua",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:nyeri",
+"name": "Nyeri",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:nyeri:nyeri",
+"name": "Nyeri",
+"kind": "town",
+"parent": "county:nyeri",
+"aliases": [
+"nyeri town"
+],
+"landmarks": []
+},
+{
+"id": "town:nyeri:karatina",
+"name": "Karatina",
+"kind": "town",
+"parent": "county:nyeri",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:nyeri:othaya",
+"name": "Othaya",
+"kind": "town",
+"parent": "county:nyeri",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:kirinyaga",
+"name": "Kirinyaga",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kirinyaga:kerugoya",
+"name": "Kerugoya",
+"kind": "town",
+"parent": "county:kirinyaga",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kirinyaga:sagana",
+"name": "Sagana",
+"kind": "town",
+"parent": "county:kirinyaga",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kirinyaga:kutus",
+"name": "Kutus",
+"kind": "town",
+"parent": "county:kirinyaga",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:muranga",
+"name": "Murang'a",
+"kind": "county",
+"parent": "ke",
+"aliases": [
+"muranga"
+],
+"landmarks": []
+},
+{
+"id": "town:muranga:muranga",
+"name": "Murang'a",
+"kind": "town",
+"parent": "county:muranga",
+"aliases": [
+"muranga town",
+"muranga"
+],
+"landmarks": []
+},
+{
+"id": "town:muranga:kenol",
+"name": "Kenol",
+"kind": "town",
+"parent": "county:muranga",
+"aliases": [
+"makuyu"
+],
+"landmarks": []
+},
+{
+"id": "town:muranga:kangema",
+"name": "Kangema",
+"kind": "town",
+"parent": "county:muranga",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:kiambu",
+"name": "Kiambu",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kiambu:kiambu",
+"name": "Kiambu",
+"kind": "town",
+"parent": "county:kiambu",
+"aliases": [
+"kiambu town"
+],
+"landmarks": []
+},
+{
+"id": "town:kiambu:thika",
+"name": "Thika",
+"kind": "town",
+"parent": "county:kiambu",
+"aliases": [],
+"landmarks": [
+"Blue Post"
+]
+},
+{
+"id": "town:kiambu:ruiru",
+"name": "Ruiru",
+"kind": "town",
+"parent": "county:kiambu",
+"aliases": [],
+"landmarks": [
+"Spur Mall"
+]
+},
+{
+"id": "town:kiambu:juja",
+"name": "Juja",
+"kind": "town",
+"parent": "county:kiambu",
+"aliases": [],
+"landmarks": [
+"JKUAT"
+]
+},
+{
+"id": "town:kiambu:kikuyu",
+"name": "Kikuyu",
+"kind": "town",
+"parent": "county:kiambu",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kiambu:limuru",
+"name": "Limuru",
+"kind": "town",
+"parent": "county:kiambu",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kiambu:githunguri",
+"name": "Githunguri",
+"kind": "town",
+"parent": "county:kiambu",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kiambu:ruaka",
+"name": "Ruaka",
+"kind": "town",
+"parent": "county:kiambu",
+"aliases": [],
+"landmarks": [
+"Two Rivers"
+]
+},
+{
+"id": "estate:kiambu:kiambu-road",
+"name": "Kiambu Road",
+"kind": "estate",
+"parent": "county:kiambu",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kiambu:banana",
+"name": "Banana",
+"kind": "town",
+"parent": "county:kiambu",
+"aliases": [
+"banana hill"
+],
+"landmarks": []
+},
+{
+"id": "town:kiambu:gatundu",
+"name": "Gatundu",
+"kind": "town",
+"parent": "county:kiambu",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kiambu:kabete",
+"name": "Kabete",
+"kind": "town",
+"parent": "county:kiambu",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:turkana",
+"name": "Turkana",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:west-pokot",
+"name": "West Pokot",
+"kind": "county",
+"parent": "ke",
+"aliases": [
+"pokot"
+],
+"landmarks": []
+},
+{
+"id": "county:samburu",
+"name": "Samburu",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:trans-nzoia",
+"name": "Trans Nzoia",
+"kind": "county",
+"parent": "ke",
+"aliases": [
+"transnzoia"
+],
+"landmarks": []
+},
+{
+"id": "town:trans-nzoia:kitale",
+"name": "Kitale",
+"kind": "town",
+"parent": "county:trans-nzoia",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:uasin-gishu",
+"name": "Uasin Gishu",
+"kind": "county",
+"parent": "ke",
+"aliases": [
+"eldoret county"
+],
+"landmarks": []
+},
+{
+"id": "town:uasin-gishu:eldoret",
+"name": "Eldoret",
+"kind": "town",
+"parent": "county:uasin-gishu",
+"aliases": [],
+"landmarks": [
+"Moi Referral"
+]
+},
+{
+"id": "town:uasin-gishu:burnt-forest",
+"name": "Burnt Forest",
+"kind": "town",
+"parent": "county:uasin-gishu",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:uasin-gishu:turbo",
+"name": "Turbo",
+"kind": "town",
+"parent": "county:uasin-gishu",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:elgeyo-marakwet",
+"name": "Elgeyo Marakwet",
+"kind": "county",
+"parent": "ke",
+"aliases": [
+"elgeyo-marakwet",
+"keiyo"
+],
+"landmarks": []
+},
+{
+"id": "county:nandi",
+"name": "Nandi",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:baringo",
+"name": "Baringo",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:laikipia",
+"name": "Laikipia",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:laikipia:nanyuki",
+"name": "Nanyuki",
+"kind": "town",
+"parent": "county:laikipia",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:laikipia:nyahururu",
+"name": "Nyahururu",
+"kind": "town",
+"parent": "county:laikipia",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:nakuru",
+"name": "Nakuru",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:nakuru:nakuru",
+"name": "Nakuru",
+"kind": "town",
+"parent": "county:nakuru",
+"aliases": [
+"nakuru town",
+"naks"
+],
+"landmarks": []
+},
+{
+"id": "town:nakuru:naivasha",
+"name": "Naivasha",
+"kind": "town",
+"parent": "county:nakuru",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:nakuru:gilgil",
+"name": "Gilgil",
+"kind": "town",
+"parent": "county:nakuru",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:nakuru:molo",
+"name": "Molo",
+"kind": "town",
+"parent": "county:nakuru",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:nakuru:njoro",
+"name": "Njoro",
+"kind": "town",
+"parent": "county:nakuru",
+"aliases": [],
+"landmarks": [
+"Egerton"
+]
+},
+{
+"id": "county:narok",
+"name": "Narok",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:narok:narok",
+"name": "Narok",
+"kind": "town",
+"parent": "county:narok",
+"aliases": [
+"narok town"
+],
+"landmarks": []
+},
+{
+"id": "county:kajiado",
+"name": "Kajiado",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kajiado:kitengela",
+"name": "Kitengela",
+"kind": "town",
+"parent": "county:kajiado",
+"aliases": [
+"ktl"
+],
+"landmarks": []
+},
+{
+"id": "town:kajiado:ongata-rongai",
+"name": "Ongata Rongai",
+"kind": "town",
+"parent": "county:kajiado",
+"aliases": [
+"rongai"
+],
+"landmarks": [
+"Maasai Mall"
+]
+},
+{
+"id": "town:kajiado:ngong",
+"name": "Ngong",
+"kind": "town",
+"parent": "county:kajiado",
+"aliases": [],
+"landmarks": [
+"Ngong Hills"
+]
+},
+{
+"id": "town:kajiado:kiserian",
+"name": "Kiserian",
+"kind": "town",
+"parent": "county:kajiado",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kajiado:kajiado",
+"name": "Kajiado",
+"kind": "town",
+"parent": "county:kajiado",
+"aliases": [
+"kajiado town"
+],
+"landmarks": []
+},
+{
+"id": "town:kajiado:isinya",
+"name": "Isinya",
+"kind": "town",
+"parent": "county:kajiado",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kajiado:namanga",
+"name": "Namanga",
+"kind": "town",
+"parent": "county:kajiado",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:kericho",
+"name": "Kericho",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kericho:kericho",
+"name": "Kericho",
+"kind": "town",
+"parent": "county:kericho",
+"aliases": [
+"kericho town"
+],
+"landmarks": []
+},
+{
+"id": "town:kericho:litein",
+"name": "Litein",
+"kind": "town",
+"parent": "county:kericho",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:bomet",
+"name": "Bomet",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:kakamega",
+"name": "Kakamega",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kakamega:kakamega",
+"name": "Kakamega",
+"kind": "town",
+"parent": "county:kakamega",
+"aliases": [
+"kakamega town"
+],
+"landmarks": []
+},
+{
+"id": "town:kakamega:mumias",
+"name": "Mumias",
+"kind": "town",
+"parent": "county:kakamega",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:vihiga",
+"name": "Vihiga",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:bungoma",
+"name": "Bungoma",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:bungoma:bungoma",
+"name": "Bungoma",
+"kind": "town",
+"parent": "county:bungoma",
+"aliases": [
+"bungoma town"
+],
+"landmarks": []
+},
+{
+"id": "town:bungoma:webuye",
+"name": "Webuye",
+"kind": "town",
+"parent": "county:bungoma",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:busia",
+"name": "Busia",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:siaya",
+"name": "Siaya",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:kisumu",
+"name": "Kisumu",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kisumu:kisumu",
+"name": "Kisumu",
+"kind": "town",
+"parent": "county:kisumu",
+"aliases": [
+"kisumu city"
+],
+"landmarks": [
+"Kisumu Port"
+]
+},
+{
+"id": "estate:kisumu:milimani-kisumu",
+"name": "Milimani Kisumu",
+"kind": "estate",
+"parent": "county:kisumu",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:kisumu:kondele",
+"name": "Kondele",
+"kind": "estate",
+"parent": "county:kisumu",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kisumu:ahero",
+"name": "Ahero",
+"kind": "town",
+"parent": "county:kisumu",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kisumu:maseno",
+"name": "Maseno",
+"kind": "town",
+"parent": "county:kisumu",
+"aliases": [],
+"landmarks": [
+"Maseno University"
+]
+},
+{
+"id": "county:homa-bay",
+"name": "Homa Bay",
+"kind": "county",
+"parent": "ke",
+"aliases": [
+"homabay"
+],
+"landmarks": []
+},
+{
+"id": "county:migori",
+"name": "Migori",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:kisii",
+"name": "Kisii",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "town:kisii:kisii",
+"name": "Kisii",
+"kind": "town",
+"parent": "county:kisii",
+"aliases": [
+"kisii town"
+],
+"landmarks": []
+},
+{
+"id": "town:kisii:ogembo",
+"name": "Ogembo",
+"kind": "town",
+"parent": "county:kisii",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:nyamira",
+"name": "Nyamira",
+"kind": "county",
+"parent": "ke",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "county:nairobi",
+"name": "Nairobi",
+"kind": "county",
+"parent": "ke",
+"aliases": [
+"nai",
+"nrb"
+],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:cbd",
+"name": "CBD",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [
+"town",
+"nairobi cbd",
+"tao"
+],
+"landmarks": [
+"Kencom",
+"Archives",
+"Hilton"
+]
+},
+{
+"id": "estate:nairobi:westlands",
+"name": "Westlands",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [
+"westie",
+"Sarit"
+],
+"landmarks": [
+"Sarit Centre",
+"Westgate"
+]
+},
+{
+"id": "estate:nairobi:kileleshwa",
+"name": "Kileleshwa",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:kilimani",
+"name": "Kilimani",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": [
+"Yaya Centre",
+"Adams Arcade"
+]
+},
+{
+"id": "estate:nairobi:lavington",
+"name": "Lavington",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": [
+"Lavington Mall"
+]
+},
+{
+"id": "estate:nairobi:karen",
+"name": "Karen",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": [
+"Karen Hub",
+"The Hub Karen"
+]
+},
+{
+"id": "estate:nairobi:langata",
+"name": "Langata",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [
+"lang'ata"
+],
+"landmarks": [
+"Galleria",
+"Carnivore"
+]
+},
+{
+"id": "estate:nairobi:south-b",
+"name": "South B",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [
+"southb"
+],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:south-c",
+"name": "South C",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [
+"southc"
+],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:kibera",
+"name": "Kibera",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [
+"kibra"
+],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:embakasi",
+"name": "Embakasi",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": [
+"JKIA"
+]
+},
+{
+"id": "estate:nairobi:donholm",
+"name": "Donholm",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:buruburu",
+"name": "Buruburu",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [
+"buru",
+"buru buru"
+],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:eastleigh",
+"name": "Eastleigh",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:kasarani",
+"name": "Kasarani",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": [
+"Kasarani Stadium"
+]
+},
+{
+"id": "estate:nairobi:roysambu",
+"name": "Roysambu",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [
+"roysa"
+],
+"landmarks": [
+"TRM",
+"Thika Road Mall"
+]
+},
+{
+"id": "estate:nairobi:kahawa",
+"name": "Kahawa",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [
+"kahawa west",
+"kahawa sukari"
+],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:ruaraka",
+"name": "Ruaraka",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:parklands",
+"name": "Parklands",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": [
+"Aga Khan Hospital"
+]
+},
+{
+"id": "estate:nairobi:upper-hill",
+"name": "Upper Hill",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [
+"upperhill"
+],
+"landmarks": [
+"KNH"
+]
+},
+{
+"id": "estate:nairobi:gigiri",
+"name": "Gigiri",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": [
+"UN Gigiri",
+"Village Market"
+]
+},
+{
+"id": "estate:nairobi:runda",
+"name": "Runda",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:muthaiga",
+"name": "Muthaiga",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:spring-valley",
+"name": "Spring Valley",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:dagoretti",
+"name": "Dagoretti",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:kawangware",
+"name": "Kawangware",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:umoja",
+"name": "Umoja",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:kayole",
+"name": "Kayole",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:utawala",
+"name": "Utawala",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:pipeline",
+"name": "Pipeline",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": []
+},
+{
+"id": "estate:nairobi:madaraka",
+"name": "Madaraka",
+"kind": "estate",
+"parent": "county:nairobi",
+"aliases": [],
+"landmarks": [
+"Strathmore"
+]
+}
+]
+}
