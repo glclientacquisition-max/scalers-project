@@ -1,3 +1,4 @@
+// alertTypeDefaults.json is a mirror of src/shared/alertTypeDefaults.json (edit there, then node scripts/sync-shared-json.js).
 import ALERT_TYPE_FIXTURE from "./alertTypeDefaults.json" with { type: "json" };
 
 /**

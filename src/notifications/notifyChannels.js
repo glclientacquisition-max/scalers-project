@@ -4,12 +4,12 @@
  * Used by voice dispatch so owner toggles are honored.
  *
  * by_type cells that are missing take the shared defaults in
- * dashboard/src/lib/alertTypeDefaults.json (Alvin GO 25 Oct 2026 12:37 EAT:
+ * src/shared/alertTypeDefaults.json (mirrored to Desk; Alvin GO 25 Oct 2026 12:37 EAT:
  * new defaults apply to existing owners too). Effective send for a type =
  * master channel on AND by_type cell on. Missed calls always keep one channel.
  */
 
-const ALERT_DEFAULTS = require('../../dashboard/src/lib/alertTypeDefaults.json');
+const ALERT_DEFAULTS = require('../shared/alertTypeDefaults.json');
 
 const DEFAULTS = Object.freeze({
   sms: true,

@@ -9,6 +9,7 @@
  *
  * Pure and browser-safe. Relative imports only so node tests can load it.
  */
+// Mirror of src/shared/kenyaAreaTree.v1.json (edit there, then node scripts/sync-shared-json.js).
 import TREE from "./data/kenyaAreaTree.v1.json" with { type: "json" };
 
 export type AreaKind = "country" | "county" | "town" | "estate";

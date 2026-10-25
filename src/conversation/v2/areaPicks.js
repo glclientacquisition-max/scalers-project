@@ -1,13 +1,13 @@
 'use strict';
 // Brain side of the Desk ↔ Brain area contract (docs/reference/platform/AREA_PICKS.md, Desk #930).
-// ONE tree: Desk's dashboard/src/lib/data/kenyaAreaTree.v1.json (copied into the Voice image by the Dockerfile).
+// ONE tree: src/shared/kenyaAreaTree.v1.json (Desk carries a byte-identical mirror; tests/sharedJsonBoundary.test.js).
 // Logic is a line-for-line CommonJS port of dashboard/src/lib/areaPicks.ts (normalizeAreaPicks, resolveArea,
 // matchAreaText, callerHears) so a caller hears what Desk's "what callers will hear" preview shows.
 // tests/brainAreaPicks.test.js runs both on the same inputs (parity). Missing tree file -> available() false.
 const path = require('path');
 
 let TREE = null;
-try { TREE = require(path.join(__dirname, '../../../dashboard/src/lib/data/kenyaAreaTree.v1.json')); } catch { TREE = null; }
+try { TREE = require(path.join(__dirname, '../../shared/kenyaAreaTree.v1.json')); } catch { TREE = null; }
 const NODES = TREE && Array.isArray(TREE.nodes) ? TREE.nodes : [];
 const BY_ID = new Map(NODES.map((n) => [n.id, n]));
 const AREA_FEE_MAX = 100000; const AREA_NOTE_MAX = 120;
