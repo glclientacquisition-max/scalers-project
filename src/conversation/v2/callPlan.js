@@ -257,7 +257,8 @@ function owed(state, profile = {}, st = null) {
   if (state.confirmedFor === key) return null;
   const r = AC.resolve(String(s.place), profile);
   const items = [];
-  if (r) items.push({ topic: 'coverage', sub: r.name, row: { place: r.name, line_en: AC.line(r, 'en'), line_sw: AC.line(r, 'sw') } });
+  // the owner's area note rides in the coverage line (after the fee); in a Swahili turn an English-only note is flagged, not translated
+  if (r) items.push({ topic: 'coverage', sub: r.name, row: { place: r.name, line_en: AC.line(r, 'en'), line_sw: AC.line(r, 'sw'), ...(r.status === 'covered' && r.note ? { note: r.note, note_lang: r.note_lang || null } : {}) } });
   if (r && r.status !== 'covered') return { key, items, blocked: true };
   items.push({ topic: 'price', sub: s.service }, { topic: 'duration', sub: s.service }, { topic: 'hours_fit', sub: `${when.date} ${when.time}`, date: when.date, time: when.time });
   return { key, items, blocked: false };
