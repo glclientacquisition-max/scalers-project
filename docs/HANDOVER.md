@@ -153,3 +153,16 @@ Call evidence: `/workspace/scalers/voice-qa/` (25 Oct: rogue-call report, root-c
 5. Verify state: `/healthz` on staging and prod, SHAs vs section 3, phone balances, DnD catalogue version.
 6. Re-read open PRs (section 7) and open issues (section 8); the next action on 25 Oct is scoring Alvin's post-#949 call for the double response, then GO decisions on #939, #953, #955.
 7. Follow the rules in section 6, especially Alvin-only GOs and agents never dial.
+
+## Status as of 25 Oct 2026, 16:30 EAT
+- Staging is running 924878f6 (deployed 14:21 EAT): #944-#949, #946 (area note), #949 (AI-first place detection), and the Dockerfile boot fix (alertTypeDefaults.json).
+- Prod Voice and Desk are on 0cbedc04 (14:04 EAT): #951 (installable Desk with push alerts, which replaced #935) and #922 (Admin 2FA). Main is at 6e2b8574 (#954 favicon). ADMIN_V2=on on prod is being set by Desk on the owner's GO.
+- Phone balances: staging about KES 49, prod about KES 18 (top up).
+- Double-reply RCA (HD_6d4e7863db76): Brain fixes 1, 2, 4 and 5 are in a draft PR on staging, and fix 3 is stacked on #939. Both are unmerged.
+- Open drafts: #939, #953, #955 (shared JSON). Any main promotion of #948 MUST carry the Dockerfile COPY line, or #955 lands first.
+- Direction (15:03 EAT): all non-voice functionality goes to prod; voice stays on staging. The prod release plan is being reworked at /workspace/scalers/ship-briefs/2026-10-25_brain_prod-release-plan.md (box). Nothing has been executed.
+- Corrections: #529 is closed. Staging branch is staging/v2-c0-opening-2026-10-21 (not cursor/staging-voice-468b).
+- Railway CLI is unauthorized on the box, so relink it before reading logs.
+
+## Key custody
+The live VAPID push keys and the prod Admin sign-in key are held in Railway and Vercel env settings. The owner keeps those accounts through any account switch, so those settings are the source of truth.
