@@ -8,6 +8,8 @@ last_reviewed: 2026-10-24
 Owner Desk › Settings › **Service areas** (`/settings/areas`) writes one row per business in
 `public.tenant_area_picks`. Brain's KB coverage check reads the same row. SQL:
 [`docs/supabase/tenant_area_picks.sql`](../../supabase/tenant_area_picks.sql) (down: `tenant_area_picks_down.sql`).
+Staging cutover from the old jsonb `picks` column:
+[`tenant_area_picks_to_rows.sql`](../../supabase/tenant_area_picks_to_rows.sql) (down: `tenant_area_picks_to_rows_down.sql`).
 
 ## Area tree
 
