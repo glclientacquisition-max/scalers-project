@@ -18,11 +18,14 @@ import {
 } from "@/lib/handoffMode";
 import { compactTextareaExpandHandlers } from "@/components/settingsUi";
 import { btnPrimary, deskFieldClass, deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
+import { emptyAreaPicks } from "@/lib/areaPicks";
+import { OnboardingAreasPanel } from "./OnboardingAreasPanel";
 
 const STEPS = [
   "Business type",
   "Services & pricing",
   "Hours & location",
+  "Service areas",
   "Tone & handoff",
 ] as const;
 
@@ -68,7 +71,8 @@ export function OnboardingWizard() {
     if (step === 0) return Boolean(vertical);
     if (step === 1) return servicesPricing.trim().length >= 12;
     if (step === 2) return hoursLocation.trim().length >= 8;
-    if (step === 3) return Boolean(tone);
+    if (step === 3) return true;
+    if (step === 4) return Boolean(tone);
     return false;
   }
 
@@ -216,6 +220,18 @@ export function OnboardingWizard() {
         ) : null}
 
         {step === 3 ? (
+          <div>
+            <h2 className="font-display text-2xl text-ink">Service areas</h2>
+            <p className="mt-2 text-sm text-ink-soft">
+              Same picker as Settings. You can skip and finish this later.
+            </p>
+            <div className="mt-4">
+              <OnboardingAreasPanel initialPicks={emptyAreaPicks()} oldList={[]} />
+            </div>
+          </div>
+        ) : null}
+
+        {step === 4 ? (
           <div className="space-y-8">
             <div>
               <h2 className="font-display text-2xl text-ink">Receptionist name & tone</h2>
