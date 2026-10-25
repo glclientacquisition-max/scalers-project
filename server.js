@@ -415,6 +415,7 @@ const {
   agentAwaitingReply,
   graceQueueOn,
   graceFinalDisposition,
+  continuationJoinOn,
 } = require('./src/speech/turnTaking');
 const {
   labelFlushedCallerTurn,
@@ -2760,6 +2761,8 @@ mediaWss.on('connection', (ws, req) => {
   let activePlaybackGeneration = 0;
   let pendingUtterance = null;
   let lastCallerTurnAt = 0; // grace merge: when the last caller turn started
+  let lastCallerTurnText = ''; // continuation join: that turn's text, re-run joined with its continuation
+  const joinOn = () => continuationJoinOn() && brainModelLead.leadOn({ tenantId: brainProfile?.id });
   let pendingTurnSignals = {
     unfinished: false,
     weak: false,
@@ -4011,6 +4014,7 @@ mediaWss.on('connection', (ws, req) => {
       isFinal: String(source || '').startsWith('final'), // grace-window queue acts on finals only
       // tenant-gated: the same model-lead tenant check liveTurn uses, AND VOICE_GRACE_QUEUE=on (exact)
       graceQueue: graceQueueOn() && brainModelLead.leadOn({ tenantId: brainProfile?.id }),
+      fragmentHold: joinOn(),
     });
     // VOICE_OPENING_V2: over the greeting, barge after 600 ms of caller
     // speech or at once on a real word; anything else waits for the greeting
@@ -4287,6 +4291,7 @@ mediaWss.on('connection', (ws, req) => {
     cutFillerGen = 0;
     turnBusy = true;
     lastCallerTurnAt = Date.now();
+    lastCallerTurnText = clean;
     bargeInActive = false;
     const turnTiming = createVoiceTurnTiming(sidLabel());
     activeTurnTiming = turnTiming;
@@ -6427,6 +6432,12 @@ mediaWss.on('connection', (ws, req) => {
           decision: decision.action,
           reason: decision.reason || '',
         });
+        if (decision.reason === 'fragment_hold') {
+          // continuation join: hold the one-word fragment; the next final (or the wait's end) decides on the joined text
+          appendFinalPart(utteranceParts, evt.text);
+          applyTurnEnd({ action: 'wait', waitMs: decision.holdMs, reason: 'fragment_hold' });
+          return;
+        }
         if (decision.queue) {
           appendFinalPart(utteranceParts, evt.text);
           if (!(speaking && !bargeInActive)) scheduleUtteranceFlush();
@@ -6464,6 +6475,17 @@ mediaWss.on('connection', (ws, req) => {
           console.log(
             `[ws/media][${sidLabel()}] drop echo final while TTS: ${text.slice(0, 80)}`
           );
+          return;
+        }
+        // Continuation join (HD_6d4e7863db76 T6/T7): a final within #939's merge window of the turn now playing is the
+        // rest of that sentence: cut the reply and re-run the SAME turn on the joined text (one reply, not a second turn).
+        if (joinOn() && graceFinalDisposition({ msSinceLastCallerTurn: lastCallerTurnAt ? Date.now() - lastCallerTurnAt : Infinity }) === 'merge') {
+          voiceTrace.noteTurnEnd({ decision: 'merge', reason: 'continuation' });
+          console.log(`[ws/media][${sidLabel()}] caller_turn_merged reason=continuation: ${text.slice(0, 80)}`);
+          cancelSpeech('final speech/continuation_join');
+          if (!utteranceParts.length && lastCallerTurnText) appendFinalPart(utteranceParts, lastCallerTurnText);
+          appendFinalPart(utteranceParts, evt.text);
+          scheduleUtteranceFlush();
           return;
         }
         // Hold until this playback generation ends — do not Gemini while TTS is active.

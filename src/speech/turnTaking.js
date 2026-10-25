@@ -443,6 +443,7 @@ function outcome(partial) {
     interrupt: partial.interrupt === true,
     runGemini,
     queue: partial.queue === true,
+    ...(partial.holdMs != null ? { holdMs: partial.holdMs } : {}),
     skip: skip && !runGemini,
     replay: partial.replay === true,
     kind: partial.kind || '',
@@ -484,6 +485,17 @@ function graceQueueOn(env = process.env) {
 // A grace-queued final that belongs to the turn just taken (turn busy and the reply not yet speaking, or the
 // last caller turn < mergeMs ago) is merged into that turn instead of opening a second reply after playback.
 const GRACE_MERGE_MS = 1500;
+// Continuation join (HD_6d4e7863db76 T6/T7): env half, exact 'on' only; server.js ANDs it with the model-lead tenant check.
+function continuationJoinOn(env = process.env) {
+  return env.VOICE_CONTINUATION_JOIN === 'on';
+}
+// A one-word filler fragment ("like.", "Ah,", "so") is held this long before it may become a turn on its own.
+const FRAGMENT_HOLD_MS = 600;
+const FILLER_FRAGMENTS = new Set(['like', 'ah', 'uh', 'um', 'umm', 'er', 'eh', 'so', 'and', 'but', 'well', 'h', 'mm', 'hmm', 'basi', 'sasa', 'yaani', 'ama', 'na', 'halafu', 'ehh']);
+function isFillerFragment(text) {
+  const w = String(text || '').toLowerCase().replace(/[^a-z\s']/g, ' ').trim().split(/\s+/).filter(Boolean);
+  return w.length === 1 && FILLER_FRAGMENTS.has(w[0]);
+}
 function graceFinalDisposition({ turnBusy = false, replyStarted = false, msSinceLastCallerTurn = Infinity, mergeMs = GRACE_MERGE_MS } = {}) {
   if (turnBusy && !replyStarted) return 'merge';
   if (Number(msSinceLastCallerTurn) < mergeMs) return 'merge';
@@ -775,6 +787,12 @@ function decideCallerEvent(opts = {}) {
     });
   }
 
+  // Continuation join: a one-word filler final while not speaking is held FRAGMENT_HOLD_MS (server.js waits, then
+  // re-decides on the joined text) instead of flushing as its own turn. opts.fragmentHold: tenant-gated by server.js.
+  if (opts.fragmentHold === true && opts.isFinal === true && phase !== 'speaking' && isFillerFragment(text)) {
+    return outcome({ ...base, action: 'skip', reason: 'fragment_hold', skip: true, queue: true, holdMs: FRAGMENT_HOLD_MS });
+  }
+
   if (kind === 'noise') {
     return outcome({ ...base, action: 'ignore', reason: 'too_short', skip: true });
   }
@@ -1000,6 +1018,9 @@ module.exports = {
   graceQueueOn,
   graceFinalDisposition,
   GRACE_MERGE_MS,
+  continuationJoinOn,
+  isFillerFragment,
+  FRAGMENT_HOLD_MS,
   normalizeSpeech,
   looksLikeEcho,
   utteranceLooksIncomplete,
