@@ -2,7 +2,7 @@
  * Owner service-area picks on the versioned Kenya area tree (Settings › Service areas).
  *
  * Contract (shared with Brain's KB check, see docs/reference/platform/AREA_PICKS.md):
- * - Stored in public.tenant_area_picks.picks as { version: 1, tree_version, picks: AreaPick[] }.
+ * - Stored in public.tenant_area_picks (one row per pick): node, serve, fee_kes, note; confirmed_at null until checked.
  * - A pick is an include (serve: true) or exclude (serve: false) on any node: country, county, town or estate.
  * - Coverage of a node = the nearest pick on it or an ancestor. No pick on the chain = check with owner.
  * - Fee and note come from the nearest serving pick that sets them.

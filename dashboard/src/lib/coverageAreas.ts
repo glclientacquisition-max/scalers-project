@@ -1,4 +1,4 @@
-import INDEX from "../../../src/conversation/data/kenyaPlaceCounties.json" with { type: "json" };
+import INDEX from "./data/kenyaPlaceCounties.json" with { type: "json" };
 import { rankCoverageAreas } from "./coverageRank.ts";
 
 export const COVERAGE_AREA_MAX = 40;

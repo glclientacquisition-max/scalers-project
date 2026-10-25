@@ -2,14 +2,23 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
+test("DDL uses per-pick columns (Brain #960 contract)", () => {
+  const ddl = readFileSync(new URL("../docs/supabase/tenant_area_picks.sql", import.meta.url), "utf8");
+  assert.match(ddl, /\bnode text not null/);
+  assert.match(ddl, /\bserve boolean not null/);
+  assert.match(ddl, /\bfee_kes integer/);
+  assert.match(ddl, /\bnote text/);
+  assert.match(ddl, /\bconfirmed_at timestamptz/);
+  assert.doesNotMatch(ddl, /\bpicks jsonb/);
+});
+
 test("backfill SQL is idempotent and names legacy sources", () => {
   const sql = readFileSync(new URL("../docs/supabase/tenant_area_picks_backfill.sql", import.meta.url), "utf8");
   assert.match(sql, /insert into public\.tenant_area_picks/i);
-  assert.match(sql, /not exists \(select 1 from public\.tenant_area_picks/i);
+  assert.match(sql, /on conflict \(tenant_id, node\) do nothing/i);
   assert.match(sql, /coverage_areas/);
   assert.match(sql, /service_areas/);
   assert.match(sql, /confirmed_at/);
-  assert.match(sql, /insert[\s\S]+null,\s*\n\s*now\(\)/i);
   const down = readFileSync(new URL("../docs/supabase/tenant_area_picks_backfill_down.sql", import.meta.url), "utf8");
   assert.match(down, /delete from public\.tenant_area_picks/i);
 });

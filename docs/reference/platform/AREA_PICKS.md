@@ -19,19 +19,21 @@ Owner Desk › Settings › **Service areas** (`/settings/areas`) writes one row
 
 ## Stored shape
 
-```json
-{
-  "version": 1,
-  "tree_version": "ke-areas-2026-10-24.1",
-  "picks": [
-    { "node": "county:nairobi", "serve": true, "fee_kes": null, "note": null },
-    { "node": "estate:nairobi:kibera", "serve": false, "fee_kes": null, "note": null },
-    { "node": "town:kajiado:kitengela", "serve": true, "fee_kes": 500, "note": "Weekends only" }
-  ]
-}
-```
+One row per pick in `public.tenant_area_picks`:
 
-Columns: `tenant_id` (pk), `tree_version`, `picks`, `moved_from` (old Locations / coverage list, audit), `confirmed_at` (owner tapped "Looks right"), `updated_by`, `updated_at`. Service role only.
+| Column | Meaning |
+| --- | --- |
+| `tenant_id` | Business (with `node`, forms the primary key) |
+| `node` | Tree id (`county:nairobi`, `town:…`, `estate:…`, or `ke`) |
+| `serve` | `true` include, `false` exclude |
+| `fee_kes` | Optional extra fee (KES) on serving picks |
+| `note` | Optional line for callers |
+| `confirmed_at` | Set when the owner taps "Looks right"; `null` = not yet checked |
+| `tree_version` | Kenya area tree version for this tenant's picks |
+| `moved_from` | Legacy Locations / coverage ids (audit; same on each row when set) |
+| `updated_by`, `updated_at` | Last Desk save |
+
+Desk loads rows into `{ version: 1, tree_version, picks: AreaPick[] }` in memory. Brain #960 reads the same columns. Service role only.
 
 ## Resolving a place (both sides must do this the same way)
 
@@ -51,4 +53,4 @@ Reference implementation: `dashboard/src/lib/areaPicks.ts` (`resolveArea`, `matc
 
 ## Not yet wired
 
-- Voice still reads `business_policies.coverage_areas` / `tenants.service_areas`. Brain switches its KB check to this table behind its own flag; until then the old fields stay the source for calls. Saving here does not rewrite them.
+- Voice coverage is Brain PR #960 (`areaCoverage.js`). Until that ships, calls still use legacy `business_policies.coverage_areas` / `tenants.service_areas`. Saving Service areas does not rewrite those columns.

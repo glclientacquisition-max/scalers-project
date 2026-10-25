@@ -3,8 +3,8 @@
 // A written county stays a county. A written estate stays that estate.
 // "Mombasa Road" does not select Mombasa county.
 
-// Legacy plain-text → id helper. Place index lives once under src/conversation/data.
-const INDEX = require("../../../src/conversation/data/kenyaPlaceCounties.json");
+// Legacy plain-text → id helper. Place index for old county:/place: ids only (area tree is canonical).
+const INDEX = require("./data/kenyaPlaceCounties.json");
 
 const COUNTY_SET = new Set(INDEX.counties);
 const MAX_AREAS = 40;

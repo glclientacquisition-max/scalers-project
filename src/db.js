@@ -1043,26 +1043,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     walletBalanceKes:
       row.wallet_balance_kes != null ? Number(row.wallet_balance_kes) : null,
     openAppointments: await listOpenAppointments(row.id),
-    ...(await loadAreaPicks(row.id)),
   };
-}
-
-/**
- * public.tenant_area_picks (Desk › Service areas). Errors or a missing table → null picks, legacy lists.
- */
-async function loadAreaPicks(tenantId) {
-  try {
-    if (!tenantId || String(process.env.BRAIN_AREA_PICKS || 'on').toLowerCase() === 'off') return {};
-    const { data, error } = await supabase
-      .from('tenant_area_picks')
-      .select('picks, tree_version, confirmed_at')
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
-    if (error || !data) return { areaPicks: null, areaPicksConfirmedAt: null };
-    return { areaPicks: data.picks || null, areaPicksConfirmedAt: data.confirmed_at || null };
-  } catch {
-    return { areaPicks: null };
-  }
 }
 
 async function listOpenAppointments(tenantId, { limit = 30 } = {}) {

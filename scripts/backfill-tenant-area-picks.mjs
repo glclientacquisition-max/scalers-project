@@ -5,8 +5,8 @@
  *
  *   node scripts/backfill-tenant-area-picks.mjs [--tenant <uuid>] [--apply]
  *
- * Needs SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY. Pick JSON uses
- * dashboard/src/lib/areaPicksMigrate.ts (fee/note merge from service_areas.areas).
+ * Needs SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY. Rows use node, serve, fee_kes, note,
+ * confirmed_at (dashboard/src/lib/areaPicksMigrate.ts).
  */
 import { createClient } from "@supabase/supabase-js";
 import { tenantAreaPicksFromLegacy } from "../dashboard/src/lib/areaPicksMigrate.ts";
@@ -39,29 +39,33 @@ for (const row of rows || []) {
   });
   if (!built.moved_from.length && !built.picks.picks.length) continue;
 
-  const { data: existing } = await db.from("tenant_area_picks").select("tenant_id").eq("tenant_id", row.id).maybeSingle();
-  if (existing) {
-    console.log(`${row.id} skip (row exists)`);
+  const { data: existing } = await db.from("tenant_area_picks").select("node").eq("tenant_id", row.id).limit(1);
+  if (existing?.length) {
+    console.log(`${row.id} skip (rows exist)`);
     continue;
   }
 
   would++;
-  const payload = {
-    tenant_id: row.id,
-    tree_version: built.tree_version,
-    picks: built.picks,
-    moved_from: built.moved_from,
-    confirmed_at: null,
-    updated_at: new Date().toISOString(),
-  };
   if (!apply) {
     console.log(`${row.id} would insert (${built.picks.picks.length} picks, moved_from ${built.moved_from.length})`);
     continue;
   }
+  const now = new Date().toISOString();
+  const payload = built.picks.picks.map((p) => ({
+    tenant_id: row.id,
+    node: p.node,
+    serve: p.serve,
+    fee_kes: p.fee_kes,
+    note: p.note,
+    confirmed_at: null,
+    tree_version: built.tree_version,
+    moved_from: built.moved_from.length ? built.moved_from : null,
+    updated_at: now,
+  }));
   const { error: insErr } = await db.from("tenant_area_picks").insert(payload);
   if (insErr) throw new Error(`${row.id}: ${insErr.message}`);
   wrote++;
-  console.log(`${row.id} inserted`);
+  console.log(`${row.id} inserted ${payload.length} rows`);
 }
 
 console.log(apply ? `Done. wrote=${wrote}` : `Dry run. would insert=${would} (pass --apply to write)`);
