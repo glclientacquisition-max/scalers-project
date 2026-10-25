@@ -12,6 +12,7 @@ import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import {
   ADMIN_LINKS,
   ADMIN_LINKS_V2,
+  type AdminLink,
   adminHidesShellBack,
   adminMainClass,
   adminMainV2Class,
@@ -31,6 +32,15 @@ type AdminChrome = {
 const AdminChromeContext = createContext<AdminChrome | null>(null);
 /** ADMIN_V2 nav set (six entries). Set by AdminShell. */
 const AdminV2Context = createContext(false);
+/** Access requests queue when ADMIN_V2 is on. */
+const AdminAccessRequestsContext = createContext(false);
+
+const ACCESS_REQUESTS_LINK: AdminLink = {
+  href: "/admin/access-requests",
+  label: "Access requests",
+  exact: false,
+  phone: "more",
+};
 
 /**
  * Harness only. Production Admin uses the live path and the real hrefs.
@@ -317,6 +327,7 @@ export function AdminRail() {
  */
 export function AdminSideNav() {
   const { pendingHref, setPendingHref } = useAdminPending();
+  const showAccessRequests = useContext(AdminAccessRequestsContext);
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => {
     setCollapsed(window.localStorage.getItem("admin-side") === "56");
@@ -360,6 +371,20 @@ export function AdminSideNav() {
             />
           ),
         )}
+        {showAccessRequests ? (
+          <AdminDestinationLink
+            key={ACCESS_REQUESTS_LINK.href}
+            href={ACCESS_REQUESTS_LINK.href}
+            label={ACCESS_REQUESTS_LINK.label}
+            exact={ACCESS_REQUESTS_LINK.exact}
+            pendingHref={pendingHref}
+            setPendingHref={setPendingHref}
+            className="flex h-9 items-center gap-3 rounded-md px-2 text-sm"
+            activeClassName="bg-accent/10 font-semibold text-accent-deep"
+            idleClassName="text-ink-2 hover:bg-surface-muted hover:text-ink"
+            labelClassName="admin-side-label truncate"
+          />
+        ) : null}
       </nav>
       <button
         type="button"
@@ -395,7 +420,11 @@ function AdminPhoneMore() {
   const { path, href: mapHref } = useAdminChrome();
   const [open, setOpen] = useState(false);
   const v2 = useContext(AdminV2Context);
-  const more = adminPhoneMore(v2);
+  const showAccessRequests = useContext(AdminAccessRequestsContext);
+  const more = [
+    ...adminPhoneMore(v2),
+    ...(showAccessRequests && v2 ? [ACCESS_REQUESTS_LINK] : []),
+  ];
   const active = more.some((item) => !item.pending && adminRouteActive(path, item.href, item.exact));
 
   return (
@@ -516,11 +545,14 @@ export function AdminShell({
   operatorName,
   children,
   v2 = false,
+  showAccessRequests = false,
 }: {
   operatorName: string;
   children: ReactNode;
   /** ADMIN_V2=on: 200/56px text sidebar, 40px top bar, full-width main with 16px margins. */
   v2?: boolean;
+  /** ADMIN_V2 access request queue at /admin/access-requests. */
+  showAccessRequests?: boolean;
 }) {
   const { path } = useAdminChrome();
   const nested = Boolean(adminParentTarget(path, v2));
@@ -534,6 +566,7 @@ export function AdminShell({
   if (v2) {
     return (
       <AdminV2Context.Provider value>
+      <AdminAccessRequestsContext.Provider value={showAccessRequests}>
       <div data-admin-shell="" data-admin-v2="" data-admin-nested={nested ? "" : undefined} className={adminShellClass}>
         <AdminSideNav />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -545,11 +578,13 @@ export function AdminShell({
           <AdminTabBar />
         </div>
       </div>
+      </AdminAccessRequestsContext.Provider>
       </AdminV2Context.Provider>
     );
   }
 
   return (
+    <AdminAccessRequestsContext.Provider value={showAccessRequests}>
     <div data-admin-shell="" data-admin-nested={nested ? "" : undefined} className={adminShellClass}>
       <AdminRail />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -561,5 +596,6 @@ export function AdminShell({
         <AdminTabBar />
       </div>
     </div>
+    </AdminAccessRequestsContext.Provider>
   );
 }
