@@ -102,13 +102,32 @@ function coverageReceipt(places = [], profile = {}) {
     const name = r && r.name ? r.name : p.replace(/\b[a-z]/g, (c) => c.toUpperCase());
     if (rows.some((x) => x.place.toLowerCase() === name.toLowerCase())) continue;
     const covered = !r || r.status === 'unknown' ? 'unknown' : r.status === 'covered' ? 'yes' : 'no';
-    rows.push({ place: name, said: p, matched_node: r && r.node || null, covered, status: r ? r.status : 'unknown', source: r && r.source === 'picks' ? 'area_picks' : 'legacy', line_en: r && r.status !== 'unknown' ? AC.line(r, 'en') : null, line_sw: r && r.status !== 'unknown' ? AC.line(r, 'sw') : null, fee_kes: r && r.fee_kes != null ? r.fee_kes : null });
+    rows.push({ place: name, said: p, matched_node: r && r.node || null, covered, status: r ? r.status : 'unknown', source: r && r.source === 'picks' ? 'area_picks' : 'legacy', line_en: r ? AC.line(r, 'en') : null, line_sw: r ? AC.line(r, 'sw') : null, via: r && r.via || null, fee_kes: r && r.fee_kes != null ? r.fee_kes : null });
   }
   return { tool: 'check_coverage', ok: true, places: rows };
 }
 
+/** Every place the caller mentioned, resolved on the ONE coverage source (confirmed picks; legacy rows only with no picks).
+ * Word-window places first, then the whole phrase (a landmark / "near X" the window scan cannot place). */
+function coverageFor(text, profile = {}) {
+  const rec = coverageReceipt(placeCandidates(text), profile);
+  const r = AC.resolve(String(text || ''), profile);
+  if (r && r.name && !rec.places.some((x) => x.place.toLowerCase() === String(r.name).toLowerCase())) {
+    if (r.via === 'asked' || r.landmark) rec.places = rec.places.filter((x) => x.covered !== 'unknown');
+    rec.places.push({ place: r.name, said: r.landmark || r.name, matched_node: r.node || null, covered: r.status === 'covered' ? 'yes' : r.status === 'unknown' ? 'unknown' : 'no', status: r.status, source: r.source === 'picks' ? 'area_picks' : 'legacy', via: r.via || null, line_en: AC.line(r, 'en'), line_sw: AC.line(r, 'sw'), fee_kes: r.fee_kes ?? null });
+  }
+  return rec;
+}
+/** Any place the caller mentioned that has no coverage answer yet is owed one (question, statement or "near X"). */
+function owedCoverageQuestion(questions, coverage, text, machine = {}) {
+  if (!coverage.length || questions.some((q) => q.type === 'coverage')) return questions;
+  if (['landmark', 'name'].includes(machine.expecting)) return questions;
+  questions.push({ type: 'coverage', subject: coverage.map((r) => r.place).join(', '), why: RF.placeStatement(text) ? 'place_statement' : 'place_mention' });
+  return questions;
+}
 /** One honest coverage sentence per place, never stacked ([PROMPT-PLACEHOLDER]). */
 function coverageSentence(row, lang) {
+  if (row.covered === 'unknown' && (row.line_en || row.line_sw)) return sw(lang) ? row.line_sw : row.line_en; // "which area is that near?" / "the team will confirm"
   if (row.covered !== 'unknown') return (sw(lang) ? row.line_sw : row.line_en) || (row.covered === 'yes' ? (sw(lang) ? `Ndio, tunafika ${row.place}.` : `Yes, we cover ${row.place}.`) : (sw(lang) ? `Samahani, hatufiki ${row.place}.` : `Sorry, we don't cover ${row.place}.`));
   return sw(lang) ? `Sina uhakika kuhusu ${row.place}; timu inaweza kuthibitisha.` : `I'm not sure about ${row.place}; I can have the team confirm.`;
 }
@@ -124,6 +143,7 @@ function coverageAnswer(rows, lang) {
   return parts.join(' ');
 }
 
+const RF = require('./replyFacts');
 const OF = require('./ownerFacts'); // B1: the one owner-fact projection
 
 /** KB slice the model may quote (prices only reach the caller when asked: G8). */
@@ -132,8 +152,9 @@ function kb(profile = {}) {
   const h = hoursFact(profile);
   // owner policies + FAQs: the ONE shared projection (ownerFacts.js), every topic the owner filled in
   const own = OF.kbRows(OF.ownerFacts(profile));
-  const pay = own.policies.payment || null;
-  const policies = { ...own.policies }; delete policies.payment;
+  const pf = OF.paymentFact(OF.ownerFacts(profile));
+  const pay = pf ? (pf.sw && pf.sw !== OF.SW_FALLBACK ? { en: pf.en, sw: pf.sw } : pf.en) : null;
+  const policies = { ...own.policies }; delete policies.payment; if (pf) delete policies.deposit;
   return { services, hours: h ? h.text : null, payment: pay, policies, faqs: own.faqs, business: profile.businessName || null, agent: profile.agentName || null };
 }
 
@@ -305,7 +326,7 @@ function guardTools(calls = [], machine, caller) {
 function makeVerifier(ctx) {
   const answered = new Map(); // subject -> polarity already spoken (G4)
   const asked = new Set((ctx.questions || []).map((q) => q.type));
-  const prices = new Set(); for (const s of ctx.profile.servicesCatalog || []) for (const n of nums(s.price_range || '')) prices.add(n);
+  const prices = new Set(); for (const s of ctx.profile.servicesCatalog || []) { for (const n of nums(s.price_range || '')) prices.add(n); const pl = RF.priceLine(s, ctx.text || '', ctx.lang); for (const n of (pl && pl.nums) || []) prices.add(n); }
   const known = new Map(ctx.coverage.map((r) => [r.place.toLowerCase(), r]));
   const act = { questions: 0, claimed: false };
   const ownerOf = OF.ownerFacts(ctx.profile || {});
@@ -356,7 +377,7 @@ function makeVerifier(ctx) {
 }
 function priceFix(ctx) {
   const svc = (ctx.profile.servicesCatalog || []).find((x) => x.name === (ctx.machine.slots && ctx.machine.slots.service)) || CP.matchServices(ctx.text || '', ctx.profile)[0];
-  if (svc && svc.price_range && svc.pricing?.confirmed !== false) return sw(ctx.lang) ? `${svc.name} ni ${svc.price_range}.` : `${svc.name} is ${svc.price_range}.`;
+  const pl = RF.priceLine(svc, ctx.text || '', ctx.lang); if (pl) return pl.text;
   return sw(ctx.lang) ? 'Sina bei kamili hapa; timu inaweza kuthibitisha.' : "I don't have the exact price here; the team can confirm.";
 }
 function identityFix(ctx) {
@@ -581,13 +602,15 @@ function pastAsOpen(s, caller) {
 }
 /** Payment question (KB answer, or honest unknown for a method the KB does not list, e.g. crypto). [PROMPT-PLACEHOLDER] */
 function paymentAnswer(profile = {}, text = '', lang = 'en') {
-  const pay = String((OF.ownerFacts(profile).byTopic.get('payment') || {}).text || '').trim().replace(/\.$/, '');
+  const pf = OF.paymentFact(OF.ownerFacts(profile));
+  const pay = pf ? (sw(lang) ? pf.sw : pf.en) : '';
   const asked = (String(text).match(/\b(crypto\w*|bitcoin|usdt|card|visa|mastercard|cheque|check|paypal|m-?pesa|cash|bank|airtel money)\b/i) || [])[1];
   if (!pay) return sw(lang) ? 'Sina uhakika wa njia za malipo; timu inaweza kuthibitisha.' : "I'm not sure about payment options; the team can confirm.";
-  const listed = asked && new RegExp(asked.replace(/s$/, ''), 'i').test(pay);
-  if (asked && !listed) return sw(lang) ? `Sina uhakika kama tunakubali ${asked}. Tunakubali: ${pay}.` : `I'm not sure we take ${asked}. We take ${pay}.`;
-  return sw(lang) ? `Tunakubali: ${pay}.` : `We take ${pay}.`;
+  const listed = asked && new RegExp(asked.replace(/s$/, ''), 'i').test(pf.en);
+  // the owner's own sentences, never stitched behind a prefix ([PROMPT-PLACEHOLDER] for the unlisted-method lead-in)
+  if (asked && !listed) return sw(lang) ? `Sina uhakika kama tunakubali ${asked}. ${pay}` : `I'm not sure we take ${asked}. ${pay}`;
+  return pay;
 }
 const UNASKED_PRICE = (s) => PRICE_WORD.test(s) && !/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|saa\s/i.test(s) && !/\b(20\d\d|october|oktoba)\b/i.test(s);
 
-module.exports = { leadOn, splitOn, leadModels, SPLIT_DEADLINES, understandRequest, normUnderstanding, replyRequest, lookupCaller, callerFilters, ROW_INTENT, offerRowsLine, backedByCaller, pastAsOpen, paymentAnswer, UNASKED_PRICE, U_SCHEMA, R_SCHEMA, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };
+module.exports = { coverageFor, owedCoverageQuestion, leadOn, splitOn, leadModels, SPLIT_DEADLINES, understandRequest, normUnderstanding, replyRequest, lookupCaller, callerFilters, ROW_INTENT, offerRowsLine, backedByCaller, pastAsOpen, paymentAnswer, UNASKED_PRICE, U_SCHEMA, R_SCHEMA, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };

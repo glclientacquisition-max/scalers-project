@@ -139,8 +139,13 @@ function resolve(text, profile = {}) {
   if (exc.places.has(place)) return { ...base, status: 'excluded', via: `place:${place}` };
   if (inc.places.has(place) || (place === 'rongai' && inc.places.has('ongata rongai'))) return { ...base, status: 'covered', via: `place:${place}` };
   const ec = counties.find((c) => exc.counties.has(c)); if (ec) return { ...base, status: 'excluded', via: `county:${ec}` };
-  const ic = counties.find((c) => inc.counties.has(c) || inc.places.has(c)); if (ic) return { ...base, status: 'covered', via: `county:${ic}`, county: cap(ic) };
-  return { ...base, status: 'outside', via: 'tree' };
+  // a county is covered only when the owner listed the COUNTY (a same-named town row, e.g. place:kiambu, is not the county)
+  const ic = counties.find((c) => inc.counties.has(c)); if (ic) return { ...base, status: 'covered', via: `county:${ic}`, county: cap(ic) };
+  // a known place in a county where the owner lists nothing at all is an honest "no" (Kericho for a Nairobi-only tenant)
+  const listedIn = (c) => inc.counties.has(c) || [...inc.places].some((p) => p === c || (INDEX.places[p] || []).includes(c));
+  if (counties.length && !counties.some(listedIn)) return { ...base, status: 'outside', via: 'tree' };
+  // otherwise the legacy fallback never confirms a place it does not know: the team confirms (never "yes", never a guessed "no")
+  return { ...base, status: 'unknown', via: 'unconfirmed', source: 'legacy' };
 }
 
 function unknownAsked(t) {
@@ -173,4 +178,6 @@ function line(r, lang = 'en') {
   if (r.status === 'excluded' || r.status === 'outside') return sw ? `Samahani, hatufiki ${r.name}.` : `Sorry, we don't cover ${r.name}.`;
   return sw ? 'Hiyo iko karibu na eneo gani?' : 'Which area is that near?';
 }
-module.exports = { resolve, line, ownerRules, picksOf, picksPending, picksConfirmed, listed, treeMatch };
+/** The ONE coverage answer for a caller phrase on every path: confirmed picks first, legacy rows only with no picks. */
+function answer(text, profile = {}, lang = 'en') { const r = resolve(text, profile); return r ? { ...r, line: line(r, lang) } : null; }
+module.exports = { answer, resolve, line, ownerRules, picksOf, picksPending, picksConfirmed, listed, treeMatch };

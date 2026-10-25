@@ -16,6 +16,7 @@ const AC = require('./areaCoverage');
 const L = require('./lexicon');
 const { hoursFact } = require('./v1draftFacts');
 const OF = require('./ownerFacts');
+const RF = require('./replyFacts');
 
 function coreOn({ env = process.env, tenantId } = {}) {
   return V1.phaseA({ env, tenantId }) && String(env.BRAIN_CALL_CORE || 'off').trim().toLowerCase() === 'on';
@@ -41,7 +42,7 @@ function events(text, machine, profile = {}, fields = null) {
   if (/^\W*(no|nope|hapana|si mimi|sio)\b/i.test(t)) ev.push({ type: 'no' });
   const q = QUESTIONISH.test(t);
   const fa = (fields && fields.asks) || [];
-  const placeQ = q && !PAY.test(t) && !PRICE.test(t) && (() => { const r = t ? AC.resolve(t, profile) : null; return !!(r && r.status !== 'unknown'); })();
+  const placeQ = (q || RF.placeStatement(t)) && !PAY.test(t) && !PRICE.test(t) && (() => { const r = t ? AC.resolve(t, profile) : null; return !!(r && r.status !== 'unknown'); })();
   if ((q && COVER.test(t)) || placeQ || fa.includes('place')) ev.push({ type: 'ask', ask: 'coverage' });
   if (q && PAY.test(t)) ev.push({ type: 'ask', ask: 'pay' });
   if ((q && PRICE.test(t)) || fa.includes('price')) ev.push({ type: 'ask', ask: 'price' });
@@ -79,18 +80,17 @@ function answers(evs, text, machine, profile = {}, lang = 'en', { already = [] }
     }
   }
   if (asks.has('pay')) {
-    const raw = String((OF.ownerFacts(profile).byTopic.get('payment') || {}).text || '').trim();
-    const first = (raw.match(/[^.]+(?:\.\d+[^.]*)*\.?/) || [''])[0].trim().replace(/\.$/, '');
-    const what = first.replace(/^(you can pay|we accept|payment is|pay)\s*(by|with|via|through)?\s*/i, '');
-    const key = ['m-pesa', 'mpesa', 'cash', 'bank', 'card', 'airtel'].find((k) => raw.toLowerCase().includes(k));
-    if (what) out.push({ ask: 'pay', text: sw(lang) ? `Malipo ni kwa ${what}.` : `You can pay by ${what}.`, keys: [key || what.split(/\s+/)[0].toLowerCase()] });
+    // the ONE payment fact (ownerFacts.paymentFact: methods + deposit), spoken in the owner's words
+    const pf = OF.paymentFact(OF.ownerFacts(profile));
+    const swNone = pf && pf.sw === OF.spoken({ family: 'policy' }, 'sw'); // owner wrote no Swahili: name the methods, never "team will confirm"
+    if (pf) out.push({ ask: 'pay', text: sw(lang) ? (swNone ? `Malipo ni kwa ${pf.en.replace(/^(you can pay|we accept|we take|payment is|pay)\s*(by|with|via|through)?\s*/i, '')}` : pf.sw) : pf.en, keys: [(pf.en.toLowerCase().match(/m-?pesa|cash|bank|card|airtel|paybill|till/) || [pf.en.split(/\s+/)[0].toLowerCase()])[0]], fact: 'M1' });
     else out.push({ ask: 'pay', text: sw(lang) ? 'Sina maelezo ya malipo hapa sasa hivi.' : "I don't have the payment details here right now.", keys: [] });
   }
   if (asks.has('price')) {
     const rows = CP.matchServices(text, profile);
     const svc = rows[0] || (profile.servicesCatalog || []).find((s) => s.name === (machine.slots && machine.slots.service));
-    const priced = svc && svc.pricing?.confirmed !== false && svc.price_range;
-    if (priced) out.push({ ask: 'price', text: sw(lang) ? `${svc.name} ni ${svc.price_range}.` : `${svc.name} is ${svc.price_range}.`, keys: [(String(svc.price_range).match(/\d[\d,]*/) || [''])[0]] });
+    const pl = RF.priceLine(svc, text, lang); // quantity x unit price from the catalogue when the caller gave a count
+    if (pl) out.push({ ask: 'price', text: pl.text, keys: [(String(svc.price_range).match(/\d[\d,]*/) || [''])[0]] });
   }
   if (asks.has('hours')) {
     const h = hoursFact(profile);
@@ -100,7 +100,7 @@ function answers(evs, text, machine, profile = {}, lang = 'en', { already = [] }
   if (asks.size || QUESTIONISH.test(text) || /\b(want(?:ed)? to (?:know|ask)|tell me|what about|what if|nataka kujua|niambie)\b/i.test(text)) {
     const of = OF.ownerFacts(profile);
     for (const f of OF.match(text, of).slice(0, 2)) {
-      if (f.family === 'payment' && asks.has('pay')) continue;
+      if (f.family === 'payment' || f.topic === 'deposit') { if (asks.has('pay')) continue; }
       const line = OF.spoken(f, lang);
       if (!line) continue;
       out.push({ ask: `owner:${f.topic}`, text: line, keys: [(OF.sentences(line)[0] || line).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4)[0] || ''].filter(Boolean), fact: f.id });

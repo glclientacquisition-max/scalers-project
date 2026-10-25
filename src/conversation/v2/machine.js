@@ -13,6 +13,7 @@ const MS = require('./modelShadow');
 const { buildCatalogue, validateCall } = require('./catalogue');
 const { listedAreaIds, listedAreaRows } = require('../listedAreas');
 const { compileSpokenCatalogue, joinList } = require('../spokenCatalogue');
+const AC = require('./areaCoverage');
 const { compileSpokenCoverage, compileSpokenPolicies } = require('../spokenFacts');
 const { compileAskReceipt } = require('./askReceipt');
 const { applyTicket, needsClassify, normalizeTicket } = require('./classifyAsk');
@@ -624,6 +625,11 @@ function infoAnswer(state, u, profile, kind) {
     return R.info({ kind: 'services', names: [...cat, ...cat].slice(start, start + 4), more: cat.length > 4 }, state.lang);
   }
   if (kind === 'coverage') {
+    // tenant_area_picks (confirmed or pending) is the single coverage source: the legacy service_areas list never answers then
+    if ((AC.picksOf(profile) || AC.picksPending(profile)) && !(u.feeAsk || FEE_ASK.test(u.text))) {
+      const r = AC.resolve(u.text || (u.area && u.area.name) || u.place || '', profile);
+      if (r) { if (r.status === 'unknown' && r.via !== 'unconfirmed') state.coverageAsk = state.turn; return AC.line(r, state.lang); }
+    }
     if (u.feeAsk || FEE_ASK.test(u.text) || (!u.area && DELIVER_ASK.test(u.text))) {
       const line = compileAskReceipt(profile, { kind: 'come_cost', place: u.area && u.area.name }, state.lang);
       if (line) return R.info({ kind: 'policy', line }, state.lang);

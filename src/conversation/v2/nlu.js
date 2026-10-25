@@ -47,6 +47,8 @@ function cancelAskIsPolicy(text) {
   if (/^\W*cancell?ation\W*$/i.test(t)) return true;
   if (/\b(cancellation policy|cancel(?:lation)? policy|reschedule policy)\b/i.test(t)) return true;
   if (/\b(what|how|handle|gani|vipi|niacha)\b/i.test(t) && /\bcancel/i.test(t)) return true;
+  // "Can I cancel?" / "Naweza kughairi?" with no booking named asks the rule, it does not start a cancellation
+  if (/\b(can i|could i|am i able to|is it possible to|do you allow|naweza|ninaweza|inawezekana)\b/i.test(t) && /\b(cancel\w*|ghairi|kughairi)\b/i.test(t) && /\?\s*$|^\W*(can|could|is|do|naweza|ninaweza|inawezekana)\b/i.test(t)) return true;
   if (/\b(kama niacha|niacha)\b/i.test(t)) return true;
   return false;
 }

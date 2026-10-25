@@ -396,7 +396,7 @@ function createBrainV2Live(opts = {}) {
     const rowTurn = split && (ML.ROW_INTENT.test(text) || ['cancel', 'change', 'address_change'].includes(machine.intent) || machine.expecting === 'which' || machine.expecting === 'which_named');
     const lk = split ? ML.lookupCaller(machine.file || {}, rowTurn ? ML.callerFilters(text, profile, machine.leadLateU || null, nowFn()) : {}, { now: nowFn(), lockedName: CP.lockedName(machine) }) : null;
     const caller = lk || ML.callerReceipt(machine.file || {}, { now: nowFn(), lockedName: CP.lockedName(machine) });
-    const coverage = ML.coverageReceipt(ML.placeCandidates(text), profile);
+    const coverage = ML.coverageFor(text, profile); // the ONE coverage source (confirmed picks first)
     const pack = ML.contextPack({ machine, text, profile, caller, coverage, langHint: lock });
     if (lk) pack.CALLER = { name: lk.name, candidate: lk.candidate, upcoming: lk.upcoming, past_jobs: lk.past_jobs, addresses: lk.addresses, notes: lk.notes, match: lk.match };
     const request = split ? ML.replyRequest(pack, profile) : ML.buildRequest(pack, profile);
@@ -453,13 +453,18 @@ function createBrainV2Live(opts = {}) {
     if (u && u.slots && Array.isArray(u.slots.places)) { const extra = u.slots.places.filter((p) => !coverage.places.some((r) => r.place.toLowerCase() === String(p).toLowerCase() || r.said.toLowerCase() === String(p).toLowerCase())); if (extra.length) coverage.places.push(...ML.coverageReceipt(extra, profile).places.filter((r) => !coverage.places.some((x) => x.place === r.place))); }
     const rulesEvs = CC.events(text, null, profile);
     const questions = u ? (u.questions || []) : rulesEvs.filter((e) => e.type === 'ask').map((e) => ({ type: e.ask === 'pay' ? 'payment' : e.ask }));
-    if (!u && coverage.places.length && !questions.some((q) => q.type === 'coverage') && (split ? /\b(have|cover|serve|come|reach|go|know if|mnafika|mnafikia|mnakam|mnakuja|mnaenda)\b|\?/i : /\b(have|cover|come|reach|mnafika|mnakam|mnakuja)\b|\?/i).test(text)) questions.push({ type: 'coverage' });
+    // any place the caller mentioned with no answer yet is owed a coverage answer (understanding and rules alike)
+    ML.owedCoverageQuestion(questions, coverage.places, text, machine);
+    // booking pre-check (service, day, time and place known): coverage, price, duration, hours, once, before the name
+    const pre2 = !pre.owned && (st.kind === 'ask' && st.slot === 'name' || st.kind === 'readback') ? RF.bookingPrecheck(machine, profile, lang, text) : null;
     // tool_calls arrive after the understanding; they are hints (the machine commits writes), guarded + traced at the end
     const ctx = { st, receipts, coverage: coverage.places, caller, profile, questions, lang, machine, text, callerReadOk: !!lk };
     const ver = ML.makeVerifier(ctx);
     // 4) speak: verified sentences in order; questions held until the reply closes (owed answers go first)
     const spoken = []; const verdicts = []; let firstMs = null; let repairs = 0; let modelSentences = 0;
-    const emit = (s, src) => { if (!s || abort()) return; const t = spokenStyle(s, lang); spoken.push({ text: t, lang, src }); if (firstMs == null) firstMs = clock() - T0; if (typeof onSentence === 'function') { try { onSentence({ text: t, lang }); } catch { /* sink */ } } };
+    // the single reply assembler: every producer (model, owed answer, template, reducer line) is deduped by fact here
+    const asm = RF.createAssembler({ profile, coverage: coverage.places, lang });
+    const emit = (s0, src) => { if (!s0 || abort()) return; const s = asm.admit(s0, { keep: src === 'fixed' }); if (!s) return; const t = spokenStyle(s, lang); spoken.push({ text: t, lang, src }); if (firstMs == null) firstMs = clock() - T0; if (typeof onSentence === 'function') { try { onSentence({ text: t, lang }); } catch { /* sink */ } } };
     const fixed = st.kind === 'readback' || st.kind === 'confirmed' || st.kind === 'add_service' || (pre.owned && (pre.acts || []).some((x) => /^(have_my_name|item_added|add_service|service_add|area_(excluded|outside|unknown))/.test(x)));
     let answeredBy = 'model';
     let held = null; let used = 0;
@@ -499,6 +504,7 @@ function createBrainV2Live(opts = {}) {
     const modelOk = split ? !!(modelSentences || held || repairs) : !!(u && (modelSentences || held || used));
     if (!modelOk) answeredBy = split && used > 0 ? 'template_vetoed' : 'template'; // vetoed = the model answered but every sentence failed the guard
     const owed = ML.owedAnswers(ctx, spoken.map((x) => x.text).join(' '));
+    if (pre2 && pre2.lines.length) owed.unshift(...pre2.lines.map((l) => ({ subject: 'precheck', text: l })));
     if (answeredBy === 'template' || answeredBy === 'template_vetoed') {
       // all models failed (or every model sentence was vetoed): the same plan, worded by code; one answer per subject, never stacked
       const cov = questions.some((q) => q.type === 'coverage') ? ML.coverageAnswer(coverage.places, lang) : null;
@@ -507,12 +513,15 @@ function createBrainV2Live(opts = {}) {
       let base = tmpl;
       if (split) {
         const priceAsked = questions.some((q) => q.type === 'price');
-        if (!priceAsked) { lines = lines.map((l) => CP.split(l).filter((x) => !ML.UNASKED_PRICE(x)).join(' ')).filter(Boolean); base = CP.split(base).filter((x) => !ML.UNASKED_PRICE(x)).join(' '); }
+        const ofP = OF.ownerFacts(profile); const ownerBacked = (x) => !!OF.backingFact(x, ofP) || (OF.paymentFact(ofP) || { sentences: [], sentences_sw: [] }).sentences.concat(OF.paymentFact(ofP)?.sentences_sw || []).includes(x.trim());
+        if (pre2) lines.unshift(...pre2.lines);
+        if (!priceAsked) { lines = lines.map((l) => l === cov ? l : CP.split(l).filter((x) => ownerBacked(x) || (pre2 && pre2.lines.some((pl) => pl.includes(x))) || !ML.UNASKED_PRICE(x)).join(' ')).filter(Boolean); base = CP.split(base).filter((x) => !ML.UNASKED_PRICE(x)).join(' '); }
         if (questions.some((q) => q.type === 'payment') && !lines.some((l) => /m-?pesa|paybill|cash|bank|malipo|tunakubali|we take/i.test(l))) lines.push(ML.paymentAnswer(profile, text, lang));
         if (lines.length) base = CP.split(base).filter((x) => !/not getting that|sikupati|sijakuelewa/i.test(x)).join(' ');
         if (!base.trim() && lines.length) base = CP.split(tmpl).filter((x) => /\?\s*$/.test(x) && !/not getting that/i.test(x)).pop() || '';
       }
       // the template's own coverage/unknown lines are replaced by the per-place answer (G4: no contradiction stacking)
+      if (lines.some((l) => /\?\s*$/.test(l))) base = CP.split(base).filter((x) => !/\?\s*$/.test(x)).join(' ');
       if (cov) base = CP.split(base).filter((x) => !coverage.places.some((r) => x.toLowerCase().includes(r.place.toLowerCase())) && !/can'?t confirm|siwezi kuthibitisha/i.test(x)).join(' ');
       for (const l of [...new Set(lines)]) emit(l, 'template');
       emit(base, 'template');
@@ -579,6 +588,8 @@ const CP = require('./callPlan');
 const CC = require('./callCore');
 const ML = require('./modelLead');
 const L2 = require('./lexicon');
+const RF = require('./replyFacts');
+const OF = require('./ownerFacts');
 /** Decision 3: one bad sentence gets a quick model rewrite when >=300 ms is left (light model), else the code line. */
 async function repairSentence({ sf, id, bad, fix, lang, capMs }) {
   const ac = new AbortController(); const t = setTimeout(() => ac.abort(), capMs);
