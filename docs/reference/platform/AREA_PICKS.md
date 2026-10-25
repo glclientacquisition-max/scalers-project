@@ -8,6 +8,8 @@ last_reviewed: 2026-10-24
 Owner Desk › Settings › **Service areas** (`/settings/areas`) writes one row per business in
 `public.tenant_area_picks`. Brain's KB coverage check reads the same row. SQL:
 [`docs/supabase/tenant_area_picks.sql`](../../supabase/tenant_area_picks.sql) (down: `tenant_area_picks_down.sql`).
+Staging cutover from the old jsonb `picks` column:
+[`tenant_area_picks_to_rows.sql`](../../supabase/tenant_area_picks_to_rows.sql) (down: `tenant_area_picks_to_rows_down.sql`).
 
 ## Area tree
 
@@ -19,41 +21,27 @@ Owner Desk › Settings › **Service areas** (`/settings/areas`) writes one row
 
 ## Stored shape
 
-```json
-{
-  "version": 1,
-  "tree_version": "ke-areas-2026-10-24.1",
-  "picks": [
-    { "node": "county:nairobi", "serve": true, "fee_kes": null, "note": null },
-    { "node": "estate:nairobi:kibera", "serve": false, "fee_kes": null, "note": null },
-    { "node": "town:kajiado:kitengela", "serve": true, "fee_kes": 500, "note": "Weekends only" },
-    { "node": "town:kiambu:thika", "serve": true, "fee_kes": 800, "note": "From 2 bedrooms up" }
-  ]
-}
-```
+One row per pick in `public.tenant_area_picks`:
 
-Columns: `tenant_id` (pk), `tree_version`, `picks`, `moved_from` (old Locations / coverage list, audit), `confirmed_at` (owner tapped "Looks right"), `updated_by`, `updated_at`. Service role only.
+| Column | Meaning |
+| --- | --- |
+| `tenant_id` | Business (with `node`, forms the primary key) |
+| `node` | Tree id (`county:nairobi`, `town:…`, `estate:…`, or `ke`) |
+| `serve` | `true` include, `false` exclude |
+| `fee_kes` | Optional extra fee (KES) on serving picks |
+| `note` | Optional line for callers |
+| `confirmed_at` | Set when the owner taps "Looks right"; `null` = not yet checked |
+| `tree_version` | Kenya area tree version for this tenant's picks |
+| `moved_from` | Legacy Locations / coverage ids (audit; same on each row when set) |
+| `updated_by`, `updated_at` | Last Desk save |
 
-### Per-pick fields
-
-- `serve` (bool): include or exclude. An exclude under a covered county (Kibera under Nairobi) is one tap on the child row.
-- `fee_kes` (integer KES, > 0, max 100000, or null): extra travel fee on top of the job price. Edited in the area sheet.
-- `note` (string ≤ 120 or null): short caller note, spoken after the fee. Per-area rules live here
-  ("From 2 bedrooms up"); there is no structured conditions field (Alvin, 25 Oct). Unknown keys such as `conditions` are dropped on read.
-
-### Confirm
-
-- `confirmed_at` set = owner confirmed; Brain #942 answers only from confirmed picks.
-- The owner's own Save on Service areas confirms too: `confirmed_at` = `updated_at` (same stamp).
-- `updated_at` more than 2 s after `confirmed_at` = changed by someone else since confirm ("edited"). Desk shows the
-  confirm card on Service areas and an "Is this right?" row on Desk home until the owner confirms.
-- Seeding from the old list (`scripts/seed-area-picks-from-old.ts`) writes rows with `confirmed_at` null.
+Desk loads rows into `{ version: 1, tree_version, picks: AreaPick[] }` in memory. Brain #960 reads the same columns. Service role only.
 
 ## Resolving a place (both sides must do this the same way)
 
 1. Match the caller's words to a node: exact name or alias, then landmark, then loose spelling (edit distance ≤ 1 for 4 letters, ≤ 2 for 5+).
-2. Walk from that node up to Kenya. The **nearest pick wins**: `serve: true` = covered, `serve: false` = not covered. No pick anywhere = not covered.
-3. Fee and note: each from the nearest serving pick on the path that sets it (stops at an exclude).
+2. Walk from that node up to Kenya. The **nearest pick wins**: `serve: true` = covered, `serve: false` = not covered. **No pick on the chain** = the assistant checks with the owner (never "not covered").
+3. Fee and note: the nearest serving pick on the path that sets them (stops at an exclude).
 4. No node matched: ask "Which area is that near?" Do not guess.
 
 Reference implementation: `dashboard/src/lib/areaPicks.ts` (`resolveArea`, `matchAreaText`, `callerHears`). Tests: `tests/areaPicks.test.ts`.
@@ -61,9 +49,10 @@ Reference implementation: `dashboard/src/lib/areaPicks.ts` (`resolveArea`, `matc
 ## What callers hear (Desk preview = bot target)
 
 - Covered: "Yes, we cover {name}." + " There's an extra KES {fee}." when set + " {note}." when set.
-- Not covered: "Sorry, we don't cover {name}."
+- Explicit exclude (`serve: false` on the chain): "Sorry, we don't cover {name}."
+- No pick on the chain: "I'll check with the owner about {name}."
 - Not on map: "Which area is that near?"
 
 ## Not yet wired
 
-- Voice still reads `business_policies.coverage_areas` / `tenants.service_areas`. Brain switches its KB check to this table behind its own flag; until then the old fields stay the source for calls. Saving here does not rewrite them.
+- Voice coverage is Brain PR #960 (`areaCoverage.js`). Until that ships, calls still use legacy `business_policies.coverage_areas` / `tenants.service_areas`. Saving Service areas does not rewrite those columns.

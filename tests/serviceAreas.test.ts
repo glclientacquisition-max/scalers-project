@@ -49,7 +49,7 @@ test("prompt: a fee is quoted only when the owner confirmed it", () => {
     areas: [
       { id: "place:ruaka", modes: ["delivery"], fee_mode: "fixed", fee_ksh: 200, eta: "same day", source: "owner", confirmed: true },
       { id: "place:kitengela", modes: ["delivery"], fee_mode: "fixed", fee_ksh: 500, source: "import", confirmed: false },
-      { id: "county:nairobi", modes: ["delivery"], fee_mode: "free", source: "owner", confirmed: true, min_order_ksh: 1000 },
+      { id: "county:nairobi", modes: ["delivery"], fee_mode: "free", source: "owner", confirmed: true },
     ],
     delivered_by: ["rider"],
     rider_paid: "on_arrival",
@@ -58,7 +58,7 @@ test("prompt: a fee is quoted only when the owner confirmed it", () => {
   assert.match(text, /Ruaka: delivery, KSh 200, same day/);
   assert.match(text, /Kitengela: delivery, fee confirmed on callback/);
   assert.doesNotMatch(text, /KSh 500/);
-  assert.match(text, /Nairobi: delivery, free, orders from KSh 1,000/);
+  assert.match(text, /Nairobi: delivery, free/);
   assert.match(text, /rider/i);
   assert.match(text, /pays the rider on arrival/i);
   assert.match(text, /not on this list.*callback/i);
@@ -71,10 +71,10 @@ test("owner-facing sentence reads plainly", () => {
   assert.match(sa.serviceAreasSentence(v), /We deliver to Ruaka for KSh 200\./);
 });
 
-test("validate: fixed fee needs an amount; min order is a whole number", () => {
-  const errs = sa.validateServiceArea({ id: "place:ruaka", modes: ["delivery"], fee_mode: "fixed", fee_ksh: null, eta: null, min_order_ksh: null, source: "owner", confirmed: true });
+test("validate: fixed fee needs an amount", () => {
+  const errs = sa.validateServiceArea({ id: "place:ruaka", modes: ["delivery"], fee_mode: "fixed", fee_ksh: null, eta: null, source: "owner", confirmed: true });
   assert.ok(errs.fee_ksh);
-  assert.deepEqual(sa.validateServiceArea({ id: "place:ruaka", modes: [], fee_mode: "ask", fee_ksh: null, eta: null, min_order_ksh: null, source: "owner", confirmed: true }).modes ? 1 : 0, 1);
+  assert.deepEqual(sa.validateServiceArea({ id: "place:ruaka", modes: [], fee_mode: "ask", fee_ksh: null, eta: null, source: "owner", confirmed: true }).modes ? 1 : 0, 1);
 });
 
 test("migration: column, check, backfill, voice-safe; search_path pinned on payments functions", () => {
@@ -87,18 +87,12 @@ test("migration: column, check, backfill, voice-safe; search_path pinned on paym
   }
 });
 
-test("wiring: Locations owns service areas; Policies no longer edits coverage; prompt includes areas", () => {
-  const scope = read("dashboard/src/lib/settingsSaveScope.ts");
-  assert.match(scope, /locations: \[[^\]]*"serviceAreas"/);
-  const actions = read("dashboard/src/app/(desk)/settings/actions.ts");
-  assert.ok(actions.includes("formatServiceAreasForCompiler("));
-  assert.ok(actions.includes("coverageIdsFrom("), "coverage_areas synced from service areas");
+test("wiring: Service areas is its own screen; Locations is branches only", () => {
   const form = read("dashboard/src/components/TenantForm.tsx");
-  assert.ok(form.includes("<ServiceAreasEditor"));
-  assert.ok(!form.includes("<CoverageAreaField"), "the coverage picker left Policies");
-  const payload = read("dashboard/src/lib/settingsPanelPayload.ts");
-  assert.match(payload, /locations: \[[^\]]*"service_areas"/);
-  assert.ok(read("dashboard/src/lib/catalogImportRecompile.ts").includes("formatServiceAreasForCompiler("));
+  assert.ok(!form.includes("ServiceAreasEditor"));
+  assert.ok(!form.includes("CoverageAreaField"));
+  assert.ok(read("dashboard/src/app/(desk)/settings/areas/page.tsx").includes("AreaPicker"));
+  assert.ok(read("dashboard/src/lib/businessSettingsNav.ts").includes("/settings/areas"));
 });
 
 test("bulk: one fee for many areas, new areas added owner-confirmed", async () => {

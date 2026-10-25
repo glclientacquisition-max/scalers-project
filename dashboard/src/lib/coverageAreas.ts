@@ -1,5 +1,5 @@
 import INDEX from "./data/kenyaPlaceCounties.json" with { type: "json" };
-import { rankCoverageAreas } from "./coverageRank";
+import { rankCoverageAreas } from "./coverageRank.ts";
 
 export const COVERAGE_AREA_MAX = 40;
 
@@ -92,7 +92,7 @@ export function coverageDisplayList(raw: unknown): string {
   return out.join(", ");
 }
 
-export { areasFromPlainText } from "./coverageSeed";
+export { areasFromPlainText } from "./coverageSeed.js";
 
 /** Type an estate. Empty query stays on counties. */
 export function searchCoverageAreas(

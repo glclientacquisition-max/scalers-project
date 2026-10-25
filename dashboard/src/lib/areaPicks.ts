@@ -2,9 +2,9 @@
  * Owner service-area picks on the versioned Kenya area tree (Settings › Service areas).
  *
  * Contract (shared with Brain's KB check, see docs/reference/platform/AREA_PICKS.md):
- * - Stored in public.tenant_area_picks.picks as { version: 1, tree_version, picks: AreaPick[] }.
+ * - Stored in public.tenant_area_picks (one row per pick): node, serve, fee_kes, note; confirmed_at null until checked.
  * - A pick is an include (serve: true) or exclude (serve: false) on any node: country, county, town or estate.
- * - Coverage of a node = the nearest pick on it or an ancestor. No pick anywhere = not covered.
+ * - Coverage of a node = the nearest pick on it or an ancestor. No pick on the chain = check with owner.
  * - Fee and note come from the nearest serving pick that sets them.
  *
  * Pure and browser-safe. Relative imports only so node tests can load it.
@@ -20,19 +20,12 @@ export type AreaNode = {
   aliases: string[];
   landmarks: string[];
 };
-export type AreaPick = {
-  node: string;
-  serve: boolean;
-  /** Extra travel fee in whole KES on top of the job price. null = none. */
-  fee_kes: number | null;
-  /** Short caller note, also where per-area rules live ("From 2 bedrooms up"). Spoken after the fee. */
-  note: string | null;
-};
+export type AreaPick = { node: string; serve: boolean; fee_kes: number | null; note: string | null };
 export type AreaPicks = { version: 1; tree_version: string; picks: AreaPick[] };
 export type TriState = "on" | "off" | "part";
 
 export const AREA_TREE_VERSION: string = TREE.version;
-export const AREA_NOTE_MAX = 120;
+export const AREA_NOTE_MAX = 200;
 export const AREA_FEE_MAX = 100_000;
 export const ROOT_ID = "ke";
 
@@ -196,12 +189,7 @@ export function toggleArea(picks: AreaPicks, id: string): AreaPicks {
   const under = new Set(descendants(id).map((d) => d.id));
   const prior = pickMap(picks).get(id);
   const rest = picks.picks.filter((p) => p.node !== id && !under.has(p.node));
-  const next: AreaPick = {
-    node: id,
-    serve,
-    fee_kes: serve ? prior?.fee_kes ?? null : null,
-    note: serve ? prior?.note ?? null : null,
-  };
+  const next: AreaPick = { node: id, serve, fee_kes: serve ? prior?.fee_kes ?? null : null, note: serve ? prior?.note ?? null : null };
   return simplifyAreaPicks({ ...picks, picks: [...rest, next] });
 }
 
@@ -395,17 +383,53 @@ export function matchAreaText(text: string): AreaNode | null {
 
 // ---------- what callers hear ----------
 
-export type CallerLine = { status: "covered" | "not_covered" | "not_on_map"; reply: string; node: AreaNode | null };
+export type CallerLine = {
+  status: "covered" | "not_covered" | "need_check" | "not_on_map";
+  reply: string;
+  node: AreaNode | null;
+};
 
-export function callerHears(picks: AreaPicks, place: string): CallerLine {
+/** Named place on the tree with no pick on its chain: never guess "not covered". */
+export function checkWithOwnerLine(name: string | null, lang = "en"): string {
+  const sw = /^sw/i.test(lang);
+  if (name) return sw ? `Nitaangalia na mmiliki kuhusu ${name}.` : `I'll check with the owner about ${name}.`;
+  return sw ? "Nitaangalia na mmiliki." : "I'll check with the owner.";
+}
+
+/** Matches Brain v2/areaPicks.js linesFor (parity-tested in brainAreaPicks.test.js). */
+export function callerHears(picks: AreaPicks, place: string, lang = "en"): CallerLine {
   const n = matchAreaText(place);
-  if (!n) return { status: "not_on_map", reply: "Which area is that near?", node: null };
+  if (!n) {
+    const sw = /^sw/i.test(lang);
+    return { status: "not_on_map", reply: sw ? "Hiyo iko karibu na eneo gani?" : "Which area is that near?", node: null };
+  }
   const r = resolveArea(picks, n.id);
-  if (!r.covered) return { status: "not_covered", reply: `Sorry, we don't cover ${n.name}.`, node: n };
-  let reply = `Yes, we cover ${n.name}.`;
-  if (r.fee_kes != null) reply += ` There's an extra KES ${r.fee_kes.toLocaleString("en-KE")}.`;
+  if (!r.covered) {
+    const sw = /^sw/i.test(lang);
+    return {
+      status: "not_covered",
+      reply: sw ? `Samahani, hatufiki ${n.name}.` : `Sorry, we don't cover ${n.name}.`,
+      node: n,
+    };
+  }
+  const sw = /^sw/i.test(lang);
+  let reply = sw ? `Ndio, tunafika ${n.name}.` : `Yes, we cover ${n.name}.`;
+  if (r.fee_kes != null) {
+    reply += sw ? ` Kuna ada ya ziada ya KES ${r.fee_kes.toLocaleString("en-KE")}.` : ` There's an extra KES ${r.fee_kes.toLocaleString("en-KE")}.`;
+  }
   if (r.note) reply += ` ${r.note.replace(/[.!?]*$/, "")}.`;
   return { status: "covered", reply, node: n };
+}
+
+/** Desk preview only: no pick on the chain shows check-with-owner (Brain areaCoverage speaks that in-call). */
+export function previewCallerLine(picks: AreaPicks, place: string, lang = "en"): CallerLine {
+  const n = matchAreaText(place);
+  if (!n) return callerHears(picks, place, lang);
+  const r = resolveArea(picks, n.id);
+  if (!r.covered && !r.via) {
+    return { status: "need_check", reply: checkWithOwnerLine(n.name, lang), node: n };
+  }
+  return callerHears(picks, place, lang);
 }
 
 // ---------- move-over from the old free-text list ----------
@@ -454,36 +478,3 @@ export function moveOverAreas(old: string[], answers: Record<string, "county" | 
   }
   return { picks: simplifyAreaPicks(picks), rows, questions, unmatched };
 }
-
-// ---------- confirm state (Brain #942 answers only from confirmed picks) ----------
-
-/**
- * none: no picks and no old list. old_only: old list but no picks row yet.
- * unconfirmed: picks never confirmed. edited: picks changed after the last confirm (not by the owner's own save).
- * confirmed: callers get the map answers.
- */
-export type AreaConfirmState = "none" | "old_only" | "unconfirmed" | "edited" | "confirmed";
-
-export function areaConfirmState(
-  row: { confirmed_at: string | null; updated_at: string | null; pickCount: number } | null,
-  oldListCount: number,
-): AreaConfirmState {
-  if (!row) return oldListCount > 0 ? "old_only" : "none";
-  if (!row.confirmed_at) return row.pickCount > 0 || oldListCount > 0 ? "unconfirmed" : "none";
-  const c = Date.parse(row.confirmed_at);
-  const u = row.updated_at ? Date.parse(row.updated_at) : NaN;
-  // 2s slack: owner saves stamp both columns together.
-  if (Number.isFinite(c) && Number.isFinite(u) && u - c > 2000) return "edited";
-  return "confirmed";
-}
-
-export function areaNeedsConfirm(s: AreaConfirmState): boolean {
-  return s === "old_only" || s === "unconfirmed" || s === "edited";
-}
-
-/** One calm line, same on Desk home and Service areas. */
-export const AREA_CONFIRM_COPY = {
-  title: "Confirm your service areas",
-  editedTitle: "Your areas changed since you confirmed",
-  detail: "Until you confirm, callers who ask about a place hear “the team will confirm”.",
-} as const;

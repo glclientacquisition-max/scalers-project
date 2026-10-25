@@ -128,8 +128,6 @@ import {
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
 import { PlacesEditor } from "@/components/structured/PlacesEditor";
-import { ServiceAreasEditor } from "@/components/structured/ServiceAreasEditor";
-import { serviceAreasForForm, suggestHomeAreas, type ServiceAreas } from "@/lib/serviceAreas";
 import { stableRowId } from "@/lib/factHash";
 import { catalogBaseline, isUnpricedRow } from "@/lib/catalogPricing";
 import { DeskSelect } from "@/components/ui/DeskSelect";
@@ -498,9 +496,6 @@ function TenantFormInner({
     const rows = normalizeBusinessLocations(tenant.business_locations).map(upgradeLegacyPlace);
     return rows.length ? rows.map((row) => markSavedRow(row)) : [emptyLocation()];
   });
-  const [serviceAreas, setServiceAreas] = useState<ServiceAreas>(() =>
-    serviceAreasForForm(tenant.service_areas, tenant.business_policies?.coverage_areas, tenant.vertical)
-  );
   const [policies, setPolicies] = useState<BusinessPolicies>(() =>
     normalizeBusinessPolicies(tenant.business_policies)
   );
@@ -614,7 +609,6 @@ function TenantFormInner({
     [locations]
   );
   const policiesJson = useMemo(() => JSON.stringify(policies), [policies]);
-  const serviceAreasJson = useMemo(() => JSON.stringify(serviceAreas), [serviceAreas]);
   const faqDupIndexes = useMemo(() => {
     const seen = new Map<string, number>();
     const dups = new Set<number>();
@@ -990,7 +984,7 @@ function TenantFormInner({
     saveAfterLocationsRef.current = false;
     const form = document.getElementById(TENANT_SETTINGS_FORM_ID);
     if (form instanceof HTMLFormElement) form.requestSubmit();
-  }, [serviceAreas, locations]);
+  }, [locations]);
 
   // A pasted list is saved straight away (the sheet says "Add and save"), not left pending.
   const saveAfterPasteRef = useRef(false);
@@ -1084,7 +1078,6 @@ function TenantFormInner({
     vertical,
     handoffMode,
     locationsJson,
-    serviceAreasJson,
     policiesJson,
     agentName,
     spokenName,
@@ -1173,7 +1166,6 @@ function TenantFormInner({
       <input type="hidden" name="vertical" value={vertical} />
       <input type="hidden" name="handoff_mode" value={handoffMode} />
       <input type="hidden" name="business_locations" value={locationsJson} />
-      <input type="hidden" name="service_areas" value={JSON.stringify(serviceAreas)} />
       <input type="hidden" name="business_policies" value={policiesJson} />
       <input type="hidden" name="agent_name" value={agentName} />
       <input type="hidden" name="spoken_name" value={spokenName} />
@@ -2170,28 +2162,11 @@ function TenantFormInner({
       <section
         className={panel === "locations" ? "space-y-3" : "hidden"}
       >
-        <ServiceAreasEditor
-          value={serviceAreas}
-          vertical={vertical}
-          homeAreas={[
-            ...locations.map((l) => l.area_id || "").filter(Boolean),
-            ...suggestHomeAreas(locations.map((l) => l.address).join(", ")),
-          ]}
-          onChange={setServiceAreas}
-          onSave={(next) => {
-            setServiceAreas(next);
-            saveAfterLocationsRef.current = true;
-          }}
-        />
         <PlacesEditor
           value={locations}
-          title={serviceAreas.no_premises ? "Your base (optional)" : locations.length > 1 ? "Branches" : "Your places"}
+          title={locations.length > 1 ? "Branches" : "Your places"}
           hint={
-            serviceAreas.no_premises
-              ? "For reference only. Callers are not sent here."
-              : locations.length > 1
-                ? "Your Business Assistant sends callers to the nearest branch."
-                : undefined
+            locations.length > 1 ? "Your Business Assistant sends callers to the nearest branch." : undefined
           }
           businessHours={formatHoursForOwner(hoursSchedule)}
           onSave={(rows) => {

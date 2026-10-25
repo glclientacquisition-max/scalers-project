@@ -2,19 +2,47 @@ import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { emptyAreaPicks, moveOverAreas, normalizeAreaPicks, type AreaPicks } from "@/lib/areaPicks";
 
-export type AreaPicksRow = { picks: AreaPicks; confirmed_at: string | null; updated_at: string | null; moved_from: string[] | null };
+export type AreaPicksRow = { picks: AreaPicks; confirmed_at: string | null; moved_from: string[] | null };
 export type AreaPicksLoad = { ok: true; row: AreaPicksRow | null } | { ok: false; error: string };
+
+type PickRow = {
+  node: string;
+  serve: boolean;
+  fee_kes: number | null;
+  note: string | null;
+  confirmed_at: string | null;
+  tree_version: string;
+  moved_from: unknown;
+};
+
+function movedFromList(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out = raw.filter((x): x is string => typeof x === "string");
+  return out.length ? out : null;
+}
 
 export async function loadAreaPicks(tenantId: string): Promise<AreaPicksLoad> {
   const res = await getSupabaseAdmin()
     .from("tenant_area_picks")
-    .select("picks, confirmed_at, updated_at, moved_from")
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
+    .select("node, serve, fee_kes, note, confirmed_at, tree_version, moved_from")
+    .eq("tenant_id", tenantId);
   if (res.error) return { ok: false, error: res.error.message };
-  if (!res.data) return { ok: true, row: null };
-  const moved = Array.isArray(res.data.moved_from) ? (res.data.moved_from as unknown[]).filter((x): x is string => typeof x === "string") : null;
-  return { ok: true, row: { picks: normalizeAreaPicks(res.data.picks), confirmed_at: res.data.confirmed_at ?? null, updated_at: res.data.updated_at ?? null, moved_from: moved } };
+  const rows = (res.data || []) as PickRow[];
+  if (!rows.length) return { ok: true, row: null };
+  const tree_version = rows[0].tree_version;
+  const confirmed_at = rows.find((r) => r.confirmed_at)?.confirmed_at ?? null;
+  const moved = movedFromList(rows.find((r) => r.moved_from != null)?.moved_from);
+  const picks: AreaPicks = normalizeAreaPicks({
+    version: 1,
+    tree_version,
+    picks: rows.map((r) => ({
+      node: r.node,
+      serve: r.serve !== false,
+      fee_kes: r.fee_kes,
+      note: r.note,
+    })),
+  });
+  return { ok: true, row: { picks, confirmed_at, moved_from: moved } };
 }
 
 /** The old Locations areas and policy coverage list, as directory ids or names. */
@@ -33,18 +61,28 @@ export async function saveAreaPicks(
   opts: { confirm?: boolean; movedFrom?: string[] | null; userId?: string | null },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const clean = normalizeAreaPicks(picks);
+  const existing = await loadAreaPicks(tenantId);
+  const confirmed_at =
+    opts.confirm ? new Date().toISOString() : existing.ok && existing.row ? existing.row.confirmed_at : null;
+  const moved_from = opts.movedFrom ?? (existing.ok && existing.row ? existing.row.moved_from : null);
   const now = new Date().toISOString();
-  const row: Record<string, unknown> = {
+  const admin = getSupabaseAdmin();
+  const del = await admin.from("tenant_area_picks").delete().eq("tenant_id", tenantId);
+  if (del.error) return { ok: false, error: del.error.message };
+  if (!clean.picks.length) return { ok: true };
+  const payload = clean.picks.map((p) => ({
     tenant_id: tenantId,
+    node: p.node,
+    serve: p.serve,
+    fee_kes: p.fee_kes,
+    note: p.note,
+    confirmed_at,
     tree_version: clean.tree_version,
-    picks: clean,
+    moved_from: moved_from?.length ? moved_from : null,
     updated_at: now,
     updated_by: opts.userId ?? null,
-  };
-  // Same stamp as updated_at, so the row reads "confirmed", not "edited since confirm".
-  if (opts.confirm) row.confirmed_at = now;
-  if (opts.movedFrom) row.moved_from = opts.movedFrom;
-  const res = await getSupabaseAdmin().from("tenant_area_picks").upsert(row, { onConflict: "tenant_id" });
+  }));
+  const res = await admin.from("tenant_area_picks").insert(payload);
   if (res.error) return { ok: false, error: res.error.message };
   return { ok: true };
 }
