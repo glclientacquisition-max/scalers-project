@@ -20,6 +20,8 @@ import {
   type StepKey,
 } from "@/lib/setupFlow";
 import { finishSetupAction, saveSetupStepAction } from "./setupActions";
+import { useFormDraft } from "@/components/useFormSave";
+import { isNavigationError } from "@/lib/formSave";
 import { BusinessStep } from "./steps/BusinessStep";
 import { CatalogueStep } from "./steps/CatalogueStep";
 import { HoursStep } from "./steps/HoursStep";
@@ -27,9 +29,6 @@ import { VoiceStep } from "./steps/VoiceStep";
 import { FaqsStep } from "./steps/FaqsStep";
 import { AlertsStep } from "./steps/AlertsStep";
 
-function isRedirect(err: unknown): boolean {
-  return Boolean(err && typeof err === "object" && "digest" in err && String((err as { digest?: unknown }).digest).startsWith("NEXT_REDIRECT"));
-}
 
 const LEADS: Record<StepKey, (business: string) => string> = {
   business: (b) => `Tell your Business Assistant what ${b} does and where callers can find you.`,
@@ -120,8 +119,10 @@ export function SetupFlow({
     headingRef.current?.focus({ preventScroll: true });
   }, [index]);
 
-  // Warn before leaving with an unsaved edit on this step.
-  const dirty = useRef(false);
+  // Shared save pattern (useFormDraft): dirty is the draft against what the server
+  // last stored, compared normalised, so typing and then undoing it is clean. It
+  // also owns the reload guard, off while finishing redirects to the line screen.
+  const { dirty, markClean } = useFormDraft(null, { id: "setup", values: draft, guardDisabled: finishing });
 
   // Unsaved typing survives reloads: kept per account + workspace on this device, and only
   // restored on top of the same server version it was typed against (another device's save wins).
@@ -130,7 +131,7 @@ export function SetupFlow({
   useEffect(() => {
     const local = readLocalDraft(window.localStorage.getItem(storageKey), initialVersion);
     if (local) {
-      dirty.current = true;
+      // Restored typing stays dirty: the baseline is still the server draft.
       setDraft(parseDraft(local, {}));
     } else {
       window.localStorage.removeItem(storageKey);
@@ -139,13 +140,22 @@ export function SetupFlow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    if (!restored.current || !dirty.current) return;
+    if (!restored.current) return;
+    if (!dirty) {
+      // Back to what the server has: nothing to keep on this device.
+      try {
+        window.localStorage.removeItem(storageKey);
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
     try {
       window.localStorage.setItem(storageKey, JSON.stringify({ base: version, draft }));
     } catch {
       /* storage full or blocked: the server draft still has every saved step */
     }
-  }, [draft, version, storageKey]);
+  }, [draft, version, storageKey, dirty]);
   const clearLocal = () => {
     try {
       window.localStorage.removeItem(storageKey);
@@ -153,13 +163,6 @@ export function SetupFlow({
       /* ignore */
     }
   };
-  useEffect(() => {
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (dirty.current && !finishing) e.preventDefault();
-    };
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [finishing]);
 
   const pushed = useRef(0);
   const goTo = useCallback((next: number) => {
@@ -184,7 +187,6 @@ export function SetupFlow({
   }
 
   function patch<K extends StepKey>(k: K, value: SetupDraft[K]) {
-    dirty.current = true;
     setDraft((d) => ({ ...d, [k]: value }));
     if (Object.keys(errors).length) setErrors({});
   }
@@ -203,18 +205,19 @@ export function SetupFlow({
       try {
         const res = await saveSetupStepAction({ tenantId, key, value: local.value, version, vertical: draft.business.vertical });
         if (res.ok) {
-          dirty.current = false;
           clearLocal();
-          setDraft((d) => ({ ...d, [key]: local.value as SetupDraft[typeof key] }));
+          const saved = { ...draft, [key]: local.value as SetupDraft[typeof key] };
+          setDraft(saved);
+          markClean(saved);
           setVersion(res.version);
           setFurthest((f) => Math.max(f, res.furthest));
           after();
           return;
         }
         if (res.conflict) {
-          dirty.current = false;
           clearLocal();
           setDraft(res.draft);
+          markClean(res.draft);
           setVersion(res.version);
           setFurthest(Math.min(res.furthest, SETUP_STEPS.length - 1));
           setMessage({ tone: "info", text: res.error });
@@ -273,12 +276,12 @@ export function SetupFlow({
           }
           return;
         }
-        dirty.current = false;
+        markClean();
         clearLocal();
         setVersion(res.version);
         await runFinish(res.version);
       } catch (err) {
-        if (isRedirect(err)) throw err;
+        if (isNavigationError(err)) throw err;
         setFinishing(false);
         setMessage({ tone: "warn", text: unreachableMessage("finish setup") });
       }

@@ -1,3 +1,4 @@
+import { withEnv } from "../env.ts";
 import { adminRoutes, type Urls } from "../config.ts";
 import type { Block, EmailSpec } from "../spec.ts";
 import type { Tone } from "../tokens.ts";
@@ -115,5 +116,79 @@ export function opsDigest(p: OpsDigestProps, ctx: Ctx): EmailSpec {
     blocks,
     cta: { label: "Open Platform", href: admin(ctx, adminRoutes.platform) },
     reason: `${REASON} Sent at 07:30 EAT, skipped when there's nothing to report.`,
+  };
+}
+
+/* 17. Phone wallet (SautiKit) low, empty, topped up --------------------- */
+/** Where the SautiKit dashboard tops up the wallet (docs: Wallet, then Top Up). */
+export const SAUTIKIT_TOPUP_URL = "https://app.sautikit.com/wallet";
+
+export type OpsWalletProps = {
+  /** Which SautiKit wallet this is about. Not where Desk runs: prod Desk also sends the staging alert. */
+  env: "production" | "staging";
+  state: "low" | "empty" | "topped_up";
+  /** e.g. "Production (e0e57aa5)". */
+  workspace: string;
+  /** Display amounts, e.g. "KES 28.27". */
+  balance: string;
+  /** Low: the threshold crossed. Empty: "KES 0". Topped up: the re-arm line passed. */
+  threshold: string;
+  /** Display time in EAT, e.g. "21 Oct 2026, 18:49 EAT". */
+  checkedAt: string;
+  /** Low or empty: one line on what is at risk, e.g. "2 numbers renew on 1 Nov: KES 200 due." */
+  risk?: string;
+  /** Topped up: the next alert line, e.g. "KES 500". */
+  nextAlert?: string;
+};
+
+export function opsWallet(p: OpsWalletProps, ctx: Ctx): EmailSpec {
+  const note = p.env === "production" ? "live calls" : "test workspace only";
+  return withEnv(opsWalletBody(p, ctx), p.env, note);
+}
+
+/** The untagged wallet mail; opsWallet adds the shared env tag (env.ts). */
+function opsWalletBody(p: OpsWalletProps, ctx: Ctx): EmailSpec {
+  const prod = p.env === "production";
+  const name = prod ? "SautiKit wallet" : "SautiKit staging wallet";
+  const rows: { label: string; value: string; tone?: Tone }[] = [
+    { label: "Workspace", value: p.workspace },
+    { label: "Balance", value: p.balance, tone: p.state === "topped_up" ? "ok" : "attention" },
+    { label: p.state === "topped_up" ? "Re-armed above" : "Alert at", value: p.threshold },
+    { label: "Checked", value: p.checkedAt },
+  ];
+  if (p.state === "topped_up") {
+    return {
+      audience: "ops",
+      essential: true,
+      subject: `${name} topped up: ${p.balance}`,
+      preheader: `${name} is back at ${p.balance}. Alerts are armed again${p.nextAlert ? ` below ${p.nextAlert}` : ""}.`,
+      pill: { tone: "ok", text: "Topped up" },
+      heading: `${prod ? "Wallet" : "Staging wallet"} back at ${p.balance}`,
+      blocks: [
+        { t: "p", text: `Alerts are armed again${p.nextAlert ? `. Next one below ${p.nextAlert}` : ""}.` },
+        { t: "table", rows },
+      ],
+      cta: { label: "Open Platform", href: admin(ctx, adminRoutes.platform) },
+      reason: REASON,
+    };
+  }
+  const empty = p.state === "empty";
+  const stake = prod
+    ? "At KES 0 incoming calls are rejected for every client."
+    : "Staging calls stop at KES 0. Production is not affected.";
+  const blocks: Block[] = [];
+  if (p.risk) blocks.push({ t: "p", text: [{ strong: p.risk }] });
+  blocks.push({ t: "p", text: empty ? (prod ? "Incoming calls are being rejected now." : "Staging calls are stopped now.") : stake });
+  blocks.push({ t: "table", rows });
+  return {
+    audience: "ops",
+    essential: true,
+    subject: empty ? `${name} is empty: ${p.balance}` : `${name} ${p.balance}, below ${p.threshold}`,
+    preheader: p.risk ? `${p.risk} ${empty ? "Calls are being rejected." : stake}` : stake,
+    pill: { tone: "attention", text: empty ? "Empty" : "Low" },
+    heading: `${prod ? "Wallet" : "Staging wallet"} at ${p.balance}`,
+    blocks,
+    cta: { label: "Top up in SautiKit", href: SAUTIKIT_TOPUP_URL },
+    reason: REASON,
   };
 }

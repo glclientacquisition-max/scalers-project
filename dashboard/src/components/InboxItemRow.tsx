@@ -31,6 +31,26 @@ import {
   type InboxPurposeFilterId,
 } from "@/lib/inboxPurpose";
 
+/** Display only. Each 0 s no-audio redial stays visible as its own child line; never folded into minutes. */
+export function InboxRedialLines({ item }: { item: InboxItem }) {
+  if (!item.redials?.length) return null;
+  return (
+    <ul className="mt-0.5 space-y-0.5" aria-label="Hang-ups from this caller">
+      {item.redials.map((r) => (
+        <li key={r.id} className={`text-meta text-ink-2 ${deskPreviewClass}`}>
+          0 s · hang-up · {redialClock(r.createdAt)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function redialClock(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-KE", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Africa/Nairobi" }).format(d);
+}
+
 export function inboxTableKind(
   purpose: InboxPurposeFilterId
 ): "hold" | "job" | "mixed" {
@@ -236,6 +256,7 @@ export function InboxTableRow({
                 {item.headline}
               </InboxRowLabel>
               <InboxNextStep line={nextStep} />
+              <InboxRedialLines item={item} />
             </InboxRowWho>
           </td>
           <td className={`${deskRowMutedClass} max-w-[10rem] px-3 py-2 align-top font-medium text-ink`}>
@@ -260,6 +281,7 @@ export function InboxTableRow({
                 {hasJob ? visit : stamp}
               </InboxRowLabel>
               <InboxNextStep line={nextStep} />
+              <InboxRedialLines item={item} />
             </InboxRowWho>
           </td>
           <td className={`${deskRowMutedClass} max-w-[10rem] px-3 py-2 align-top font-medium text-ink`}>
@@ -285,6 +307,7 @@ export function InboxTableRow({
               </InboxRowLabel>
               <p className={`mt-0.5 text-body text-ink ${deskPreviewClass}`}>{item.headline}</p>
               <InboxNextStep line={nextStep} />
+              <InboxRedialLines item={item} />
             </InboxRowWho>
           </td>
           <td className={`${deskRowMutedClass} whitespace-nowrap px-3 py-2 align-top`}>
@@ -348,6 +371,7 @@ export function InboxPhoneRow({
         {work}
       </p>
       <InboxNextStep line={nextStep} />
+      <InboxRedialLines item={item} />
     </div>
   );
 

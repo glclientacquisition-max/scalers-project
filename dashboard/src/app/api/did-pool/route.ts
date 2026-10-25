@@ -4,7 +4,9 @@ import { recordAdminAction } from "@/lib/adminAudit";
 import { releasePoolNumber } from "@/lib/adminBusinessActions";
 import { isAdminActionBlocked } from "@/lib/adminBusinessModel";
 import { adminFacingError, logAdminError, operatorError } from "@/lib/adminErrors";
+import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { isLegacyAuthenticated } from "@/lib/auth";
+import { requireStepUp } from "@/lib/ops/stepUp";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import {
   addDidToPool,
@@ -26,12 +28,20 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  const gate = await requireAdminOperatorWrite();
+  if (!gate.ok) {
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
 
   const body = await request.json();
   const action = String(body.action || "add");
+  const target =
+    action === "release"
+      ? String(body.e164 || "")
+      : action === "assign_specific"
+        ? `${String(body.tenant_id || "")}:${String(body.e164 || "")}`
+        : String(body.tenant_id || body.e164 || "");
+  requireStepUp({ action: `did-pool:${action}`, operator: gate.operator, target });
 
   try {
     if (action === "add") {

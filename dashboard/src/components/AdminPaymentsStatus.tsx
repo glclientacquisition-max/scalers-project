@@ -211,7 +211,7 @@ export function AdminPaymentsStatus({ status }: { status: BachsStatusView }) {
                 label="Plan changes"
                 title={(next) => (next ? "Turn owner plan changes on?" : "Turn owner plan changes off?")}
                 explain={(next) =>
-                  next ? "Owners can change plan when Desk ships the port." : "Owner plan change stays closed."
+                  next ? "Owners can change plan from the desk." : "Owner plan change stays closed."
                 }
                 confirmLabel={(next) => (next ? "Turn on" : "Turn off")}
                 onSave={(next, reason) => saveRuntimeFlag("desk_plan_change", next, reason)}
@@ -248,7 +248,7 @@ export function AdminPaymentsStatus({ status }: { status: BachsStatusView }) {
         <h2 className="px-4 text-caption text-ink-3">Reconcile</h2>
         {status.reconcileAvailable ? (
           status.reconcile.length === 0 ? (
-            <p className="px-4 py-3 text-body text-ink-2">No mismatches.</p>
+            <p className="px-4 py-3 text-ops-body text-ink-2">No mismatches.</p>
           ) : (
             <ul className="divide-y divide-hairline/70 border-y border-hairline/70">
               {status.reconcile.map((row) => (
@@ -257,7 +257,7 @@ export function AdminPaymentsStatus({ status }: { status: BachsStatusView }) {
             </ul>
           )
         ) : (
-          <p className="px-4 py-3 text-body text-ink-2">Not on this database.</p>
+          <p className="px-4 py-3 text-ops-body text-ink-2">Not on this database.</p>
         )}
       </section>
 
@@ -275,7 +275,7 @@ export function AdminPaymentsStatus({ status }: { status: BachsStatusView }) {
         }
       >
         {modeError ? (
-          <p className="pb-3 text-body text-attention" role="alert">
+          <p className="pb-3 text-ops-body text-attention" role="alert">
             {modeError}
           </p>
         ) : null}

@@ -44,7 +44,7 @@ function planConsequence(mode: BillingMode): string {
 function SheetNote({ error }: { error: string | null }) {
   if (!error) return null;
   return (
-    <p className="pb-3 text-body text-attention" role="alert">
+    <p className="pb-3 text-ops-body text-attention" role="alert">
       {error}
     </p>
   );
@@ -292,12 +292,12 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
   return (
     <div className="space-y-1">
       {status ? (
-        <p className="px-4 text-body text-ok" role="status">
+        <p className="px-4 text-ops-body text-ok" role="status">
           {status}
         </p>
       ) : null}
       {error && !task ? (
-        <p className="px-4 text-body text-attention" role="alert">
+        <p className="px-4 text-ops-body text-attention" role="alert">
           {error}
         </p>
       ) : null}
@@ -305,7 +305,7 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
       <div className="mx-4 mb-3 rounded-2xl border border-hairline/70 bg-surface p-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <p className="text-body font-medium text-ink">{packagePreview}</p>
+            <p className="text-ops-body font-medium text-ink">{packagePreview}</p>
             <p className="mt-0.5 text-meta text-ink-2">{usagePreview}</p>
           </div>
           <Stamp tone={stampToneForBillingStatus(row.status)}>{row.statusLabel}</Stamp>
@@ -597,7 +597,7 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
         theme="admin"
       >
         {!historyLoaded ? (
-          <p className="text-body text-ink-2">Loading…</p>
+          <p className="text-ops-body text-ink-2">Loading…</p>
         ) : history.length === 0 ? (
           <Empty className="px-0 py-8" title="No history yet." />
         ) : (
@@ -625,7 +625,7 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
           <Button
             type="button"
             block
-            variant="danger"
+            variant="dangerSolid"
             pending={busy}
             disabled={removeNote.trim().length < 3}
             onClick={() => void confirmRemove()}

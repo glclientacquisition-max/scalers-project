@@ -1,0 +1,65 @@
+const { test } = require("node:test");
+const assert = require("node:assert");
+const fs = require("node:fs");
+const path = require("node:path");
+const read = (p) => fs.readFileSync(path.join(__dirname, "..", p), "utf8");
+
+test("s24: one StepUpSheet + UnlockCta; Unlock never writes domain state; enforce never fakes success", () => {
+  const sheet = read("dashboard/src/components/ops/StepUpSheet.tsx");
+  assert.match(sheet, /\/api\/admin\/step-up/);
+  assert.doesNotMatch(sheet, /did-pool|businesses|Dialog|framer-motion/);
+  assert.match(sheet, /doesn&apos;t change anything by itself/);
+  assert.match(sheet, /Authenticator not set up yet/);
+  assert.match(sheet, /onObserved/);
+  const cta = read("dashboard/src/components/ops/UnlockCta.tsx");
+  assert.match(cta, /<StepUpSheet/);
+  assert.match(cta, /data-stepup=\{site\}/);
+  assert.doesNotMatch(cta, /did-pool|fetch\(/);
+  const route = read("dashboard/src/app/api/admin/step-up/route.ts");
+  assert.match(route, /requireAdminOperatorWrite/);
+  assert.match(route, /requireStepUp\(/);
+  assert.match(route, /status: 501/);
+  assert.match(route, /Authenticator not set up yet/);
+  assert.doesNotMatch(route, /getSupabaseAdmin|verified: true/);
+});
+
+test("s24: Unlock opens StepUpSheet on Numbers, Settings, Payments, Packages, Services, Voices, BusinessPane, Invoices", () => {
+  const sites = [
+    ["dashboard/src/components/admin/v2/AdminNumbersV2.tsx", /data-stepup=\{?["']numbers["']\}?|site="numbers"/],
+    ["dashboard/src/components/admin/v2/AdminSettingsHubV2.tsx", /site="settings"/],
+    ["dashboard/src/components/admin/v2/AdminPaymentsV2.tsx", /site="payments"/],
+    ["dashboard/src/components/admin/v2/AdminPackagesV2.tsx", /site="packages"/],
+    ["dashboard/src/components/admin/v2/AdminServicesV2.tsx", /site="services"/],
+    ["dashboard/src/components/admin/v2/AdminVoicesV2.tsx", /site="voices"/],
+    ["dashboard/src/components/admin/v2/BusinessPane.tsx", /data-stepup="business"/],
+    ["dashboard/src/components/admin/v2/AdminInvoicesV2.tsx", /site="invoices"/],
+  ];
+  for (const [file, re] of sites) {
+    const ui = read(file);
+    assert.match(ui, /UnlockCta|<StepUpSheet/, file);
+    assert.match(ui, re, file);
+    assert.doesNotMatch(ui, /setNote\(true\)/, file);
+  }
+});
+
+test("s24: Services/Voices reveal real edit paths after observe; Settings has no note-only stub", () => {
+  const svc = read("dashboard/src/components/admin/v2/AdminServicesV2.tsx");
+  assert.match(svc, /AdminPlatformOpsForm/);
+  assert.match(svc, /onUnlocked/);
+  assert.match(svc, /data-unlocked-edit="services"/);
+  const voices = read("dashboard/src/components/admin/v2/AdminVoicesV2.tsx");
+  assert.match(voices, /AdminVoicesManager/);
+  assert.match(voices, /data-unlocked-edit="voices"/);
+  const settings = read("dashboard/src/components/admin/v2/AdminSettingsHubV2.tsx");
+  assert.doesNotMatch(settings, /data-unlock-note/);
+  assert.match(settings, /UnlockCta/);
+});
+
+test("s24 item6 med: Remove uses busy remove; Audit desktop rows are keyboard reachable", () => {
+  const form = read("dashboard/src/components/AdminPlatformOpsForm.tsx");
+  assert.match(form, /busyKey: "save" \| "remove"/);
+  assert.match(form, /"remove"/);
+  const audit = read("dashboard/src/components/admin/v2/AdminAuditV2.tsx");
+  assert.match(audit, /tabIndex=\{0\}/);
+  assert.match(audit, /onKeyDown/);
+});

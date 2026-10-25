@@ -591,9 +591,12 @@ export async function saveAndCompileSettings(
   if (unknownPlan) Object.assign(patch, unknownPlan);
   const tCompile = Date.now();
   let { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
+  // Spoken When unsure pair: not migrated, or no owner UPDATE grant yet. Save the rest.
+  let spokenSkipped = false;
   if (error) {
     const peeled = withoutUnknownSpokenColumn(error.message, patch);
     if (peeled) {
+      spokenSkipped = true;
       ({ error } = await workspace.client.from("tenants").update(peeled).eq("id", tenant.id));
     }
   }
@@ -687,9 +690,19 @@ export async function saveAndCompileSettings(
 
   revalidatePath("/settings");
 
-  const spokenState = ownsUnknown ? { unknownAnswerSpoken } : {};
+  // A skipped spoken pair stays as stored, so the form shows what callers hear.
+  const storedSpoken = (tenant.unknown_answer_spoken ?? null) as typeof unknownAnswerSpoken;
+  const spokenState = ownsUnknown
+    ? { unknownAnswerSpoken: spokenSkipped ? storedSpoken : unknownAnswerSpoken }
+    : {};
+  const spokenLost =
+    spokenSkipped && JSON.stringify(unknownAnswerSpoken ?? null) !== JSON.stringify(storedSpoken ?? null);
   if (priceIssues.length) {
     return { ok: true, source, error: priceIssueSummary(priceIssues, true), fields: priceFields, ...spokenState };
+  }
+
+  if (spokenLost) {
+    return { ok: true, source, error: "Saved. The spoken When unsure lines could not be updated yet.", ...spokenState };
   }
 
   return { ok: true, source, ...spokenState };

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ButtonHTMLAttributes, ComponentProps, ReactNode } from "react";
 import { cx } from "@/lib/cx";
 
-export type ButtonVariant = "primary" | "tonal" | "ghost" | "danger";
+export type ButtonVariant = "primary" | "tonal" | "ghost" | "danger" | "dangerSolid";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const base =
@@ -13,6 +13,9 @@ const variants: Record<ButtonVariant, string> = {
   tonal: "bg-accent-tonal text-accent hover:bg-accent-tonal/80 active:bg-accent-tonal/70",
   ghost: "bg-transparent text-ink hover:bg-surface-2 active:bg-surface-2/80",
   danger: "bg-attention-tonal text-attention hover:bg-attention-tonal/80",
+  /* Confirm-sheet primary for irreversible writes: solid when ready, neutral surface (not muddy tonal) when disabled. */
+  dangerSolid:
+    "bg-attention text-attention-on hover:bg-attention/90 disabled:bg-surface-2 disabled:text-ink-2 disabled:!opacity-100 disabled:ring-1 disabled:ring-hairline",
 };
 
 /* Heights: sm 36 (44 hit via the row it sits in), md 44, lg 52. */

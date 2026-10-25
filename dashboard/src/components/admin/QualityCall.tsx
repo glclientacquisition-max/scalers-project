@@ -43,7 +43,7 @@ function TurnTimeline({ turn, turns }: { turn: VoiceTurnTrace; turns: readonly V
   return (
     <article className="border-b border-hairline py-4">
       <header className="flex flex-wrap items-center gap-2">
-        <h3 className="text-body font-medium text-ink">{turnTitle(turn, turns)}</h3>
+        <h3 className="text-ops-body font-medium text-ink">{turnTitle(turn, turns)}</h3>
         <ScoreMark score={turn.score ?? null} />
         <span className="text-caption tabular-nums text-ink-3">{formatCallWhen(turn.at)}</span>
         {turn.checks && failed.length > 0 ? <FailChips checks={turn.checks} /> : null}
@@ -127,7 +127,7 @@ function TurnTimeline({ turn, turns }: { turn: VoiceTurnTrace; turns: readonly V
         </TurnFact>
       </dl>
       <details className="mt-3">
-        <summary className="min-h-11 cursor-pointer rounded-md py-2 text-body text-ink-2 outline-none focus-visible:ring-2 focus-visible:ring-brand">
+        <summary className="min-h-ops-touch md:min-h-ops-row cursor-pointer rounded-sm py-2 text-ops-body text-ink-2 outline-none focus-visible:ring-2 focus-visible:ring-brand">
           Raw
         </summary>
         <pre className="mt-2 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-xl bg-surface-2 p-3 text-caption text-ink-2">
@@ -165,7 +165,7 @@ export function QualityCall({
         <ScoreMark score={trace.score} />
         <FailChips checks={trace.checks} />
       </div>
-      <p className="text-body text-ink [overflow-wrap:anywhere]">{diagnosisLine(trace)}</p>
+      <p className="text-ops-body text-ink [overflow-wrap:anywhere]">{diagnosisLine(trace)}</p>
       {showRecording ? (
         <section className="space-y-2">
           <h2 className="text-title text-ink">Recording</h2>

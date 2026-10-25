@@ -6,6 +6,7 @@ export function specToText(
   footer: { support: string; unsubscribeUrl?: string; alertsUrl?: string; noReply?: boolean },
 ): string {
   const out: string[] = [];
+  if (spec.band) out.push(spec.band.text, "");
   out.push(spec.pill ? `${spec.heading} [${spec.pill.text}]` : spec.heading, "");
   for (const b of spec.blocks) {
     switch (b.t) {

@@ -298,10 +298,6 @@ export function outsideFeeHint(fee: number | null): string {
   return fee != null ? `Callers outside your areas hear: delivery there is ${money(fee)}.` : "Leave blank and the team quotes it on a callback.";
 }
 
-/** Baseline for unsaved changes: a successful save makes the current form the saved one. */
-export function savedBaseline(state: { ok?: boolean } | null | undefined, draftKey: string, baseline: string): string {
-  return state?.ok ? draftKey : baseline;
-}
 
 /** Visit-only businesses always quote travel on a callback; "both" quotes it too. */
 function outsideIsVisit(v: ServiceAreas): boolean {

@@ -9,12 +9,12 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (56)
+## Tables (57)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
 | `appointment_services` | `appointment_id`, `created_at`, `id`, `idempotency_key`, `position`, `service_name`, `status`, `tenant_id` | `supabase/migrations/20261024130000_appointment_services.sql` |
-| `appointments` | `address_landmark`, `call_id`, `caller_name`, `caller_phone`, `contact_id`, `created_at`, `id`, `metadata`, `notes`, `service_name`, `status`, `tenant_id`, `updated_at`, `when_text`, `window_end`, `window_start` | `docs/supabase/appointments.sql` |
+| `appointments` | `address_landmark`, `call_id`, `caller_name`, `caller_phone`, `contact_id`, `created_at`, `id`, `inbox_archived_at`, `metadata`, `notes`, `service_name`, `status`, `tenant_id`, `updated_at`, `when_text`, `window_end`, `window_start` | `docs/supabase/appointments.sql`<br>`docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `billing_audit_log` | `action`, `actor`, `created_at`, `detail`, `id`, `tenant_id` | `docs/supabase/billing_data_layer.sql` |
 | `billing_company` | `address`, `city`, `email`, `id`, `kra_pin`, `legal_name`, `phone`, `product`, `updated_at` | `docs/supabase/billing_company.sql` |
 | `billing_features` | `key`, `label` | `docs/supabase/billing_data_layer.sql` |
@@ -35,10 +35,11 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `catalogue_price_history` | `amount_ksh`, `confirmed`, `effective_from`, `id`, `in_stock`, `item_key`, `item_name`, `kind`, `max_ksh`, `min_ksh`, `mode`, `source`, `tenant_id`, `unit` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `contacts` | `created_at`, `id`, `last_language`, `last_language_at`, `last_reason`, `metadata`, `name`, `name_confirmed`, `name_confirmed_at`, `name_confirmed_call_id`, `name_confirmed_source`, `notes`, `phone`, `tenant_id`, `updated_at` | `docs/supabase/contacts_and_requests.sql`<br>`docs/supabase/greeting_language.sql` |
 | `data_quality_snapshots` | `report`, `taken_on`, `tenant_id` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
+| `inbox_archive_undo` | `consumed_at`, `created_at`, `created_by`, `id`, `payload`, `tenant_id` | `docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `invoice_lines` | `amount_kes`, `description`, `id`, `invoice_id`, `kind`, `quantity`, `sort_order`, `tenant_id`, `unit_amount_kes` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_documents.sql` |
 | `invoice_pay_tokens` | `created_at`, `expires_at`, `id`, `invoice_id`, `revoked_at`, `tenant_id`, `token_hash` | `docs/supabase/invoice_pay.sql` |
 | `invoice_receipts` | `amount_kes`, `created_at`, `id`, `invoice_id`, `method`, `paid_at`, `payment_id`, `provider_ref`, `receipt_number`, `tenant_id` | `docs/supabase/invoice_documents.sql` |
-| `invoices` | `amount_paid_kes`, `billing_source`, `created_at`, `credits_applied_kes`, `currency`, `due_at`, `id`, `invoice_number`, `issued_at`, `issuer_address`, `issuer_city`, `issuer_email`, `issuer_kra_pin`, `issuer_legal_name`, `issuer_phone`, `issuer_product`, `paid_at`, `period_end`, `period_start`, `status`, `subtotal_kes`, `tax_kes`, `tenant_id`, `total_kes`, `updated_at` | `docs/supabase/billing_company.sql`<br>`docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_documents.sql`<br>`docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
+| `invoices` | `amount_paid_kes`, `billing_source`, `created_at`, `credits_applied_kes`, `currency`, `due_at`, `id`, `invoice_number`, `issued_at`, `issuer_address`, `issuer_city`, `issuer_email`, `issuer_kra_pin`, `issuer_legal_name`, `issuer_phone`, `issuer_product`, `paid_at`, `period_end`, `period_start`, `reminders_paused_at`, `status`, `subtotal_kes`, `tax_kes`, `tenant_id`, `total_kes`, `updated_at` | `docs/supabase/admin_invoice_actions.sql`<br>`docs/supabase/billing_company.sql`<br>`docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_documents.sql`<br>`docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `notify_sends` | `attempts`, `audience`, `billed_to`, `body`, `call_id`, `call_sid`, `channel`, `created_at`, `error`, `failure_reason`, `held_units`, `id`, `idempotency_key`, `kind`, `outcome`, `overage`, `provider_message_id`, `recipient`, `reserved_at`, `settled_at`, `status`, `tenant_id`, `units` | `docs/supabase/notify_send_ledger.sql`<br>`docs/supabase/notify_send_reserve_settle.sql`<br>`docs/supabase/notify_sends_status.sql`<br>`docs/supabase/sms_allowance.sql` |
 | `ops_audit_log` | `action`, `actor`, `amount_kes`, `created_at`, `detail`, `id`, `tenant_id` | `docs/supabase/wallet_security_beta.sql` |
 | `payment_attempts` | `amount_kes`, `checkout_closed_at`, `checkout_expires_at`, `checkout_session_id`, `checkout_url`, `client_reference`, `collected_total_seen_kes`, `collection_ids`, `created_at`, `currency`, `fee_amount`, `fee_currency`, `id`, `invoice_id`, `part_count`, `part_index`, `provider`, `provider_amount`, `provider_currency`, `raw`, `return_expires_at`, `return_id`, `status`, `tenant_id`, `updated_at` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_pay.sql`<br>`docs/supabase/invoice_pay_checkout_review.sql`<br>`docs/supabase/invoice_pay_checkout_total.sql`<br>`docs/supabase/invoice_pay_collections.sql` |
@@ -50,7 +51,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `push_subscriptions` | `auth`, `created_at`, `device_label`, `disabled_at`, `endpoint`, `fail_count`, `id`, `last_ok_at`, `p256dh`, `platform`, `provider`, `tenant_id`, `user_id` | `docs/supabase/push_subscriptions.sql` |
 | `rate_limit_hits` | `bucket`, `hits`, `window_start` | `supabase/migrations/20261011150000_onboarding_setup.sql` |
 | `sautikit_did_pool` | `assigned_at`, `created_at`, `e164`, `id`, `last_tenant_id`, `notes`, `quarantine_until`, `quarantined_at`, `sautikit_number_id`, `status`, `tenant_id` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/did_number_pool.sql` |
-| `service_requests` | `call_id`, `caller_name`, `caller_phone`, `contact_id`, `created_at`, `id`, `item`, `metadata`, `notes`, `quantity`, `request_type`, `status`, `tenant_id`, `updated_at`, `when_text`, `window_end`, `window_start` | `docs/supabase/contacts_and_requests.sql`<br>`docs/supabase/service_request_windows.sql` |
+| `service_requests` | `call_id`, `caller_name`, `caller_phone`, `contact_id`, `created_at`, `id`, `inbox_archived_at`, `item`, `metadata`, `notes`, `quantity`, `request_type`, `status`, `tenant_id`, `updated_at`, `when_text`, `window_end`, `window_start` | `docs/supabase/contacts_and_requests.sql`<br>`docs/supabase/inbox_archive_cascade.sql`<br>`docs/supabase/service_request_windows.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `subscription_events` | `actor`, `created_at`, `detail`, `from_status`, `id`, `reason`, `tenant_id`, `to_status` | `docs/supabase/billing_data_layer.sql` |
 | `tenant_area_picks` | `confirmed_at`, `moved_from`, `picks`, `tenant_id`, `tree_version`, `updated_at`, `updated_by` | `docs/supabase/tenant_area_picks.sql` |
 | `tenant_credits` | `amount_kes`, `created_at`, `id`, `idempotency_key`, `payment_id`, `reason`, `tenant_id` | `docs/supabase/billing_data_layer.sql` |
@@ -81,7 +82,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (227)
+## Functions (233)
 
 | Function | Defined in |
 | --- | --- |
@@ -93,6 +94,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `_catalogue_item_key` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `_catalogue_name_path` | `supabase/migrations/20261018200000_price_unit_preserve.sql` |
 | `_data_quality_rows` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
+| `_inbox_archive_assert_writer` | `docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `_owner_apply_allowances` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `_owner_billing_finish` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `_owner_billing_gate` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
@@ -145,17 +147,20 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `admin_draft_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_export_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_import_promoted_package_version` | `docs/supabase/package_version_editor.sql` |
+| `admin_issue_credit_note` | `docs/supabase/admin_invoice_actions.sql` |
 | `admin_list_package_versions` | `docs/supabase/package_version_editor.sql` |
 | `admin_move_subscribers_to_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_publish_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_billing_runtime_switch` | `docs/supabase/billing_payment_runtime_flags.sql` |
 | `admin_set_business_suspended` | `docs/supabase/admin_business_suspend.sql` |
+| `admin_set_invoice_dispute` | `docs/supabase/admin_invoice_actions.sql` |
 | `admin_set_new_signup_trial` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_package_editor_enabled` | `docs/supabase/billing_package_editor_flag.sql` |
 | `admin_set_price_approval_threshold` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_tenant_billing_mode` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_tenant_live_payments` | `docs/supabase/invoice_pay_live_allowlist.sql` |
 | `admin_update_package_version_draft` | `docs/supabase/package_version_editor.sql` |
+| `admin_void_invoice` | `docs/supabase/admin_invoice_actions.sql` |
 | `apply_line_rental` | `docs/supabase/line_rental_grace.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_security_beta.sql` |
 | `apply_payment` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_pay.sql` |
 | `archive_tenant_billing` | `docs/supabase/archive_tenant_billing.sql` |
@@ -208,13 +213,15 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `data_quality_for` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `default_tenant_llm_prompt` | `docs/supabase/multi_tenant_onboarding.sql`<br>`docs/supabase/voice_languages.sql` |
 | `enqueue_billing_notice` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_documents.sql` |
-| `enqueue_invoice_due_soon` | `docs/supabase/invoice_documents.sql` |
-| `enqueue_invoice_overdue` | `docs/supabase/invoice_documents.sql` |
+| `enqueue_invoice_due_soon` | `docs/supabase/admin_invoice_actions.sql`<br>`docs/supabase/invoice_documents.sql` |
+| `enqueue_invoice_overdue` | `docs/supabase/admin_invoice_actions.sql`<br>`docs/supabase/invoice_documents.sql` |
 | `expire_stale_tenant_invites` | `supabase/migrations/20261011140000_team_scale.sql` |
 | `finalize_invoice` | `docs/supabase/billing_company.sql`<br>`docs/supabase/billing_data_layer.sql`<br>`docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `grant_tenant_package_minutes` | `docs/supabase/fix_grant_package_minutes.sql` |
 | `handle_new_user_tenant` | `docs/supabase/did_number_pool.sql`<br>`docs/supabase/multi_tenant_onboarding.sql`<br>`docs/supabase/voice_languages.sql`<br>`supabase/migrations/20261011000000_team_invites.sql` |
 | `hit_rate_limit` | `supabase/migrations/20261011150000_onboarding_setup.sql` |
+| `inbox_archive_calls` | `docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
+| `inbox_undo_archive` | `docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `invite_email_has_account` | `supabase/migrations/20261011120000_invite_account_lookup.sql` |
 | `invoice_kes_parts` | `docs/supabase/invoice_pay.sql` |
 | `invoice_lines_freeze` | `docs/supabase/billing_data_layer.sql` |

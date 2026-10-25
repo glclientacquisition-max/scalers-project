@@ -67,10 +67,12 @@ describe("settings discard and remove sheets", () => {
     const alerts = read("dashboard/src/components/AlertsPanel.tsx");
     const confirm = read("dashboard/src/components/ui/ConfirmSheet.tsx");
     assert.equal((shell.match(/<SettingsLeaveGuard>/g) || []).length, 2);
-    assert.match(form, /useSettingsLeaveSource\("form", formDirty\)/);
+    // Shared save pattern: useFormDraft registers the leave source.
+    assert.match(form, /useFormDraft\(save, \{ id: "form"/);
+    assert.match(read("dashboard/src/components/useFormSave.ts"), /useSettingsLeaveSource\(id, !guardDisabled && dirty\)/);
     assert.match(form, /They leave the team when you save\./);
     assert.match(form, /requestRemove\(\s*member/);
-    assert.match(alerts, /useSettingsLeaveSource\("alerts", alertsDirty\)/);
+    assert.match(alerts, /useFormDraft\(save, \{\s*id: "alerts"/);
     assert.match(coach, /useSettingsLeaveSource\("pronunciation", unsavedReview\)/);
     assert.match(coach, /The phone stops using it\./);
     assert.match(coach, /setRemoveTarget/);

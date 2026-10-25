@@ -17,7 +17,10 @@ test("an areas save does not remount the form (sheet stays open)", async () => {
 
 test("every successful save shows the Saved toast, even if the form remounts", () => {
   const form = read("../dashboard/src/components/TenantForm.tsx");
-  const fn = form.slice(form.indexOf("async function saveSettingsSafely"), form.indexOf("async function saveSettingsSafely") + 900);
-  assert.match(fn, /if \(res\.ok\) notify\("Saved · training line"\)/);
-  assert.doesNotMatch(form, /if \(state\.ok\) notify\(/, "no second toast from the effect");
+  // Shared save pattern: the toast fires inside the wrapped action, not from an effect.
+  assert.match(form, /successMessage: "Saved · training line"/);
+  const hook = read("../dashboard/src/components/useFormSave.ts");
+  const run = hook.slice(hook.indexOf("const run = useCallback"), hook.indexOf("const [rawState"));
+  assert.match(run, /else if \(opts\.successMessage !== false\) notify\(outcome\.message\)/);
+  assert.doesNotMatch(form, /notify\(/, "no second toast from the form");
 });

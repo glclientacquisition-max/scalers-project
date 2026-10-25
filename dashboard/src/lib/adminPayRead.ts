@@ -2,7 +2,7 @@ import { eatStamp } from "@/lib/adminActivityModel";
 import { isMissingTableError, logAdminError } from "@/lib/adminErrors";
 import { loadBillingRuntimeSettings, overlayRuntimeEnv } from "@/lib/billingRuntimeSettings";
 import {
-  allowlistCount,
+  liveBusinessesSummary,
   attemptTitle,
   auditPreview,
   auditTitle,
@@ -454,11 +454,10 @@ export async function loadBachsStatus(): Promise<BachsStatusView> {
     key: process.env.BACHS_API_KEY,
     webhookSecret: process.env.BACHS_WEBHOOK_SECRET,
   });
-  const envList = allowlistCount(process.env.BACHS_LIVE_TENANT_ALLOWLIST);
   const admin = getSupabaseAdmin();
 
   const hostingOpen = flags.mode === "live" && flags.liveSwitch === "On";
-  let liveSummary = hostingOpen ? "Hosting switch is on." : "Hosting switch is off.";
+  let liveSummary = liveBusinessesSummary({ liveOpen: hostingOpen, paying: 0, listed: 0 });
   let liveRows: BachsStatusView["liveRows"] = [];
   const table = await admin.from("billing_live_tenants").select("tenant_id, enabled").order("set_at", { ascending: false });
   if (!table.error) {
@@ -470,11 +469,8 @@ export async function loadBachsStatus(): Promise<BachsStatusView> {
       const block = livePayBlock({ modeLive: flags.mode === "live", liveMasterOn: flags.liveSwitch === "On", tenantEnabled: enabled });
       return { id, name: names.get(id) || "Business", preview: block || "Can pay" };
     });
-    const envNote = envList.all ? "Environment list: all" : `Environment list: ${envList.count}`;
     const paying = liveRows.filter((row) => row.preview === "Can pay").length;
-    liveSummary = hostingOpen
-      ? `${paying} can pay. ${envNote}.`
-      : `Hosting switch is off. ${envNote}.`;
+    liveSummary = liveBusinessesSummary({ liveOpen: hostingOpen, paying, listed: liveRows.length });
   } else if (!schemaMiss(table.error)) {
     logAdminError("billing-live-tenants", table.error);
   }

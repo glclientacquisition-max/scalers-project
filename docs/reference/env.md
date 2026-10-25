@@ -11,16 +11,18 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-215 variables.
+219 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
 | `ADMIN_ACCESS_CODE` | desk | `dashboard/src/lib/admin-auth.ts` |
+| `ADMIN_ENV` | desk | `dashboard/src/app/admin/(console)/%5Fkit/page.tsx` |
+| `ADMIN_V2` | desk | `dashboard/src/app/admin/(console)/_screens/AuditScreen.tsx`<br>`dashboard/src/app/admin/(console)/_screens/PackagesScreen.tsx`<br>`dashboard/src/app/admin/(console)/_screens/ServicesScreen.tsx`<br>+28 more |
 | `AGENT_NAME` | voice | `server.js`<br>`src/db.js`<br>`src/prompts.js`<br>+1 more |
 | `ALERT_EMAIL_FROM` | voice | `server.js`<br>`src/notifications/email.js` |
 | `BACHS_API_KEY` | desk | `dashboard/src/lib/adminPayRead.ts`<br>`dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/provider.js` |
 | `BACHS_LIVE_ALLOWED` | desk | `dashboard/src/lib/invoicePay/provider.js` |
-| `BACHS_LIVE_TENANT_ALLOWLIST` | desk | `dashboard/src/lib/adminPayRead.ts`<br>`dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/provider.js` |
+| `BACHS_LIVE_TENANT_ALLOWLIST` | desk | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/provider.js` |
 | `BACHS_MODE` | desk | `dashboard/src/lib/invoicePay/provider.js` |
 | `BACHS_WEBHOOK_SECRET` | desk | `dashboard/src/lib/adminPayRead.ts` |
 | `BASE_REPO` | scripts | `scripts/stage-pull-request.js` |
@@ -44,7 +46,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js`<br>`src/notifications/ownerCallSummary.js` |
 | `CALL_SUMMARY_EVENT` | voice | `src/conversation/callSummaryEvent.js` |
 | `CRON_SECRET` | desk | `dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/cron/ops-alerts/route.ts` |
-| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+53 more |
+| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+67 more |
 | `DASHBOARD_PASSWORD` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
@@ -97,6 +99,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `OPS_EMAIL_FROM` | desk | `dashboard/src/lib/opsMail.ts` |
 | `OPS_SMS_CREDIT_CRITICAL_AT` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OPS_SMS_CREDIT_WARN_BELOW` | desk | `dashboard/src/lib/opsAlerts.ts` |
+| `OPS_STAGING_WALLET_ALERT_THRESHOLDS_KES` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OPS_WALLET_ALERT_THRESHOLDS_KES` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OWNER_ALERT_EMAIL` | voice | `server.js`<br>`src/notifications/ownerCallSummary.js` |
 | `OWNER_CALL_SUMMARY` | voice | `src/notifications/ownerCallSummary.js` |
@@ -123,6 +126,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SAUTIKIT_API_BASE` | desk, voice | `dashboard/src/lib/sautikit.ts`<br>`src/notifications/whatsapp.js`<br>`src/sautikit/callHangup.js`<br>+4 more |
 | `SAUTIKIT_API_KEY` | desk, scripts, voice | `dashboard/src/lib/sautikit.ts`<br>`scripts/smoke-whatsapp-did.js`<br>`server.js`<br>+6 more |
 | `SAUTIKIT_DID` | scripts, voice | `scripts/smoke-whatsapp-did.js`<br>`server.js`<br>`src/db.js`<br>+1 more |
+| `SAUTIKIT_STAGING_WALLET_KEY` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `SAUTIKIT_VALIDATE_WEBHOOKS` | voice | `server.js`<br>`src/sautikit/webhook.js` |
 | `SAUTIKIT_VOICE_SIGNING_SECRET` | voice | `src/sautikit/webhook.js` |
 | `SAUTIKIT_WEBHOOK_SECRET` | voice | `src/sautikit/webhook.js` |

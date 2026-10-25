@@ -57,11 +57,14 @@ export function QualityIndex({
   rows,
   releases,
   base = "/admin/quality",
+  insights,
 }: {
   range: QualityRange;
   rows: BusinessQualityRow[];
   releases: ReleaseDelta[];
   base?: string;
+  /** ADMIN_V2: show the Insights tab link. */
+  insights?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const shown = useMemo(() => {
@@ -74,6 +77,12 @@ export function QualityIndex({
     <div className="space-y-8">
       <section>
         <AdminPageHeader title="Quality" subtitle="Traced calls, worst first." />
+        {insights ? (
+          <nav aria-label="Quality views" className="flex gap-4 px-4 pb-2 text-meta">
+            <span aria-current="page" className="text-ink">Calls</span>
+            <Link href="/admin/quality/insights" className="text-ink-2 hover:text-ink">Insights</Link>
+          </nav>
+        ) : null}
         <div className="px-4 pb-2">
           <Input
             id="quality-search"
@@ -121,7 +130,7 @@ export function QualityIndex({
                         <Td>
                           <Link
                             href={href}
-                            className="inline-flex min-h-11 items-center rounded-md font-medium text-ink outline-none after:absolute after:inset-0 focus-visible:ring-2 focus-visible:ring-brand"
+                            className="inline-flex min-h-ops-touch md:min-h-ops-row items-center rounded-sm font-medium text-ink outline-none after:absolute after:inset-0 focus-visible:ring-2 focus-visible:ring-brand"
                           >
                             {row.name}
                           </Link>
@@ -235,7 +244,7 @@ export function QualityIndex({
                 return (
                   <li key={row.release.gitSha} className="space-y-1 px-4 py-3">
                     <p className="flex items-baseline gap-3">
-                      <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">{releaseName(row)}</span>
+                      <span className="min-w-0 flex-1 truncate text-ops-body font-medium text-ink">{releaseName(row)}</span>
                       {row.release.label && row.at ? (
                         <span className="shrink-0 text-caption tabular-nums text-ink-3">{formatCallWhen(row.at)}</span>
                       ) : null}

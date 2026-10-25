@@ -83,7 +83,9 @@ export default {
         attention: {
           DEFAULT: token("attention"),
           tonal: token("attention-tonal"),
+          on: token("attention-on"),
         },
+        scrim: token("scrim"),
         warn: {
           DEFAULT: token("attention"),
           soft: token("attention-tonal"),
@@ -116,6 +118,13 @@ export default {
         title: ["1.0625rem", { lineHeight: "1.5rem", fontWeight: "600" }],
         page: ["1.375rem", { lineHeight: "1.75rem", letterSpacing: "-0.01em", fontWeight: "700" }],
         display: ["1.75rem", { lineHeight: "2rem", letterSpacing: "-0.02em", fontWeight: "700" }],
+        // Ops layer (/admin only, OPS.md). Additive, ops- prefixed.
+        "ops-kpi": ["1.75rem", { lineHeight: "2rem", fontWeight: "600" }],
+        "ops-title": ["1.25rem", { lineHeight: "1.625rem", fontWeight: "600" }],
+        "ops-heading": ["0.9375rem", { lineHeight: "1.25rem", fontWeight: "600" }],
+        "ops-body": ["0.8125rem", { lineHeight: "1.125rem" }],
+        "ops-label": ["0.75rem", { lineHeight: "1rem", fontWeight: "500" }],
+        "ops-caption": ["0.6875rem", { lineHeight: "0.875rem" }],
       },
       boxShadow: {
         sheet: "var(--shadow-sheet)",
@@ -140,6 +149,15 @@ export default {
       spacing: {
         13: "3.25rem",
         18: "4.5rem",
+        "ops-1": "var(--ops-space-1)",
+        "ops-2": "var(--ops-space-2)",
+        "ops-3": "var(--ops-space-3)",
+        "ops-4": "var(--ops-space-4)",
+        "ops-5": "var(--ops-space-5)",
+        "ops-6": "var(--ops-space-6)",
+        "ops-compact": "var(--ops-row-compact)",
+        "ops-row": "var(--ops-row)",
+        "ops-touch": "var(--ops-row-touch)",
       },
       maxWidth: {
         desk: "72rem",

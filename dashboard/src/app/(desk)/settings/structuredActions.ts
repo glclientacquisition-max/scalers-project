@@ -8,7 +8,6 @@ import { memberDenied } from "@/lib/requireMember";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { recompileAfterCatalogImport } from "@/lib/catalogImportRecompile";
 import { readCatalogFresh } from "@/lib/catalogFresh";
-import { catalogPricePath, findCatalogItem, patchCatalogItem } from "@/lib/catalogPricing";
 import { planFactConfirm } from "@/lib/factConfirm";
 import { ownerConfirmPlan, readSavedFactRow } from "@/lib/ownerAttestFields";
 import {
@@ -16,11 +15,10 @@ import {
   isIntent,
   isLostReason,
   isOutcome,
-  confirmPriceFields,
-  sanitizePricing,
-  type StructuredPrice,
 } from "@/lib/structuredData";
 import { reportFactHashRestampFailure } from "@/lib/factHashRestampReport";
+import { PRICE_SAVE_FAILED, runPriceBatch, type CatalogColumns, type PriceConfirmInput } from "@/lib/priceBatch";
+import type { TenantRow } from "@/lib/supabase";
 
 export type StructuredResult = { ok: true; message: string } | { ok: false; error: string; fields?: Record<string, string> };
 
@@ -36,73 +34,65 @@ async function workspace() {
 async function restampPriceHash(
   client: SupabaseClient,
   tenantId: string,
-  kind: "product" | "service",
-  rows: Array<Record<string, unknown>>,
-  target: { id?: string | null; name: string }
+  paths: string[],
+  written: CatalogColumns
 ): Promise<void> {
-  const path = catalogPricePath(kind, rows, findCatalogItem(rows, target));
-  if (!path) return;
-  // The save may rewrite price/price_range. That text is part of the row's
-  // .name value, so re-stamp .name too or a "yes, unchanged" goes stale.
-  const namePath = path.replace(/\.price$/, ".name");
-  const column = kind === "product" ? "product_catalog" : "services_catalog";
+  if (!paths.length) return;
   try {
-    const saved = (await readSavedFactRow(client, tenantId)) ?? { [column]: rows };
+    // One read of the row as saved, one confirm_tenant_fields batch for every .price and .name path.
+    const saved = (await readSavedFactRow(client, tenantId)) ?? written;
     // before = after: nothing reads as changed, so only the explicit .price and .name paths are stamped.
-    await ownerConfirmPlan(tenantId, planFactConfirm({ scope: "catalog", before: saved, after: saved, explicitPaths: [path, namePath] }));
+    await ownerConfirmPlan(tenantId, planFactConfirm({ scope: "catalog", before: saved, after: saved, explicitPaths: paths }));
   } catch (err) {
     // Price save already committed; do not fail the owner action. Under
     // FACT_HASH_MODE=on a missed re-stamp drops the row from the grounded catalogue.
-    reportFactHashRestampFailure({ tenantId, itemPath: path, error: err });
+    for (const path of paths.filter((p) => p.endsWith(".price"))) {
+      reportFactHashRestampFailure({ tenantId, itemPath: path, error: err });
+    }
   }
 }
 
 /** Owner answers "Is this right?" for one item's typed price (yes, or a corrected price). */
-export async function confirmPriceAction(input: { kind: "product" | "service"; id?: string | null; name: string; pricing: StructuredPrice }): Promise<StructuredResult> {
+export async function confirmPriceAction(input: PriceConfirmInput): Promise<StructuredResult> {
+  return confirmPricesAction([input]);
+}
+
+/**
+ * One or many confirmed prices: one fresh catalogue read, ONE tenants update,
+ * ONE hash re-stamp and ONE prompt rebuild (runPriceBatch), however many items.
+ */
+export async function confirmPricesAction(inputs: PriceConfirmInput[]): Promise<StructuredResult> {
   const denied = await memberDenied("settings.edit");
   if (denied) return { ok: false, error: denied.error };
+  if (!Array.isArray(inputs) || !inputs.length) return { ok: false, error: "Nothing to save." };
+  if (inputs.length > 200) return { ok: false, error: "Too many prices at once. Save them in smaller groups." };
   const ws = await workspace();
-  if ("error" in ws) return { ok: false, error: ws.error ?? SAVE_FAILED };
-  const pricing = sanitizePricing({ ...input.pricing, source: "owner", confirmed: true });
-  if (!pricing) return { ok: false, error: "Pick how this is priced." };
-  if (pricing.mode !== "ask" && pricing.amount_ksh == null) return { ok: false, error: "Add the price in KSh.", fields: { amount: "Add the price in KSh." } };
-  if (pricing.mode === "range" && (pricing.max_ksh == null || pricing.max_ksh < (pricing.amount_ksh ?? 0)))
-    return { ok: false, error: "The top of the range must be higher.", fields: { max: "The top of the range must be higher." } };
-  if (pricing.mode === "from" || pricing.mode === "range") pricing.min_ksh = pricing.amount_ksh;
-  if (pricing.mode !== "range") pricing.max_ksh = null;
-  if (pricing.mode === "ask") Object.assign(pricing, { amount_ksh: null, min_ksh: null, max_ksh: null });
-
-  const column = input.kind === "product" ? "product_catalog" : "services_catalog";
-  const textKey = input.kind === "product" ? "price" : "price_range";
-  // Read the column as stored now (not the cached tenant) and patch only this item, found by id.
-  const fresh = await readCatalogFresh(ws.client, ws.tenant.id);
-  if (!fresh) return { ok: false, error: SAVE_FAILED };
-  const rows = Array.isArray(fresh[column]) ? (fresh[column] as Array<Record<string, unknown>>) : [];
-  const next = patchCatalogItem(rows, { id: input.id, name: input.name }, (row) => {
-    const decided = confirmPriceFields({
-      storedText: String(row[textKey] ?? ""),
-      storedPricing: sanitizePricing(row.pricing),
-      incoming: pricing,
-    });
-    return { ...row, pricing: decided.pricing, [textKey]: decided.text, source: "owner" };
-  });
-  if (!next) return { ok: false, error: "That item is no longer in your catalogue." };
-  const { error } = await ws.client.from("tenants").update({ [column]: next }).eq("id", ws.tenant.id);
-  bustTenantCache(ws.tenant.id);
-  if (error) return { ok: false, error: SAVE_FAILED };
-  // The owner just confirmed this price: re-stamp its .price hash against the
-  // row as saved, so the rewrite above does not leave a stale value_hash.
-  // Failures are reported inside restampPriceHash (structured log); never block the save.
-  await restampPriceHash(ws.client, ws.tenant.id, input.kind, next, { id: input.id, name: input.name });
-  requestSpokenCatalogueCompile(ws.tenant.id, { [column]: next });
-  // Same as payments: the prompt quotes prices, so rebuild it with the confirmed one.
-  await recompileAfterCatalogImport({
-    client: ws.client,
-    tenant: { ...ws.tenant, ...fresh, [column]: next },
-    ...(column === "product_catalog" ? { productCatalog: next } : {}),
-  }).catch(() => null);
-  revalidatePath("/settings");
-  return { ok: true, message: "Price saved." };
+  if ("error" in ws) return { ok: false, error: ws.error ?? PRICE_SAVE_FAILED };
+  const tenantId = ws.tenant.id;
+  const res = await runPriceBatch(
+    {
+      // Read the columns as stored now (not the cached tenant) and patch only the confirmed items.
+      readFresh: () => readCatalogFresh(ws.client, tenantId),
+      write: async (columns) => {
+        const { error } = await ws.client.from("tenants").update(columns).eq("id", tenantId);
+        bustTenantCache(tenantId);
+        if (!error) requestSpokenCatalogueCompile(tenantId, columns);
+        return { error };
+      },
+      // Failures are reported inside restampPriceHash (structured log); never block the save.
+      restamp: (paths, columns) => restampPriceHash(ws.client, tenantId, paths, columns),
+      // Same as payments: the prompt quotes prices, so rebuild it with the confirmed ones.
+      recompile: (fresh, columns) =>
+        recompileAfterCatalogImport({
+          client: ws.client,
+          tenant: { ...ws.tenant, ...fresh, ...columns } as TenantRow,
+          ...(columns.product_catalog ? { productCatalog: columns.product_catalog } : {}),
+        }).catch(() => null),
+    },
+    inputs
+  );
+  if (res.ok) revalidatePath("/settings");
+  return res;
 }
 
 export async function saveBusinessCategoryAction(category: string): Promise<StructuredResult> {

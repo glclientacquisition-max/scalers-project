@@ -27,6 +27,8 @@
   --brand: #0096ff;
   --attention: #b13a0a;
   --attention-tonal: #fdf0e8;
+  /* On attention fill (dangerSolid). Same invert rule as --accent-on. */
+  --attention-on: #ffffff;
   --ok: #15803d;
   --ok-tonal: #e8f5ee;
   --lead: #b98a1f;
@@ -119,6 +121,7 @@
   --brand: #2aa8ff;
   --attention: #f4955a;
   --attention-tonal: #2b1a12;
+  --attention-on: #071426;
   --ok: #4ade80;
   --ok-tonal: #122a1c;
   --lead: #d9a62e;
