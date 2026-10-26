@@ -66,6 +66,7 @@
     "smoke:mvp": "node scripts/smoke-mvp-retail.js",
     "smoke:one-person": "node scripts/smoke-one-person-voice.js",
     "smoke:recording-webhook": "node scripts/smoke-recording-webhook.js",
+    "posttest:knowledge": "node --test tests/trustedHours18oct.test.js",
     "test:voice-ops-cron": "node --test tests/opsAlertsCron.test.js",
     "test:access-request-logic": "node --experimental-strip-types --no-warnings --import ./tests/registerTs.mjs --test tests/accessRequestLogic.test.ts",
     "test:notify": "node --test tests/textsmsNotify.test.js tests/smsCreditBackoff.test.js tests/sendLedger.test.js tests/notifyReserveSettle.test.js tests/smsUsageAlertHook.test.js tests/messageTemplates.test.js tests/notifyEvents.test.js tests/callerSms.test.js tests/whatsappDidSmoke.test.js tests/whatsappInbound.test.js tests/whatsappTemplates.test.js",

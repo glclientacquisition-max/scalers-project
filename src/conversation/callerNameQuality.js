@@ -50,6 +50,14 @@ function isJunkCallerName(raw) {
 function sanitizeStoredCallerName(raw) {
   const name = cleanCallerName(raw);
   if (!name || isJunkCallerName(name)) return null;
+  // BRAIN_TRUSTED_HOURS (HD_af5868852bc7): a stored "excited" or "Do I need"
+  // is not a name on the review or the lead either.
+  // eslint-disable-next-line global-require
+  if (require('./trustedHours').trustedHoursEnabled()) {
+    // eslint-disable-next-line global-require
+    const gate = require('./entityExtraction');
+    if (gate.isStateWordSpan(name) || gate.isQuestionOrFunctionSpan(name)) return null;
+  }
   return name;
 }
 

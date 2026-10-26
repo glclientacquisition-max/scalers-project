@@ -1,0 +1,250 @@
+{
+  "source": "prod voice_turn_traces + calls + call_facts, read-only SELECT, 2026-10-18",
+  "callSid": "HD_49d726c3dc9b",
+  "callId": "4ef395b4-5780-4819-a0e3-72faf9fa7b98",
+  "tenant": "aris-prod-18oct",
+  "tenantId": "24ca3d5e-db5c-4cc3-b745-a87a68cf3ce0",
+  "release": "ae8508ea85732143ea992521941942cd779c0411",
+  "startedAt": "2026-10-18T10:14:34.165Z",
+  "startedAtEat": "2026-10-18 13:14 EAT (Sunday)",
+  "greeting": "Aris - The Home of Affordable Stationery, this is Lynn. We're closed now. Tukusaidie vipi.",
+  "nameConfirmed": {
+    "name": "Alvin Yegon",
+    "atTurn": 2
+  },
+  "sessions": [
+    {
+      "turnCount": 14,
+      "endedAt": "2026-10-18T10:17:20.184Z"
+    },
+    {
+      "turnCount": 0,
+      "startedAt": "2026-10-18T10:17:20.572Z",
+      "endedAt": "2026-10-18T10:17:21.524Z",
+      "note": "second call record for the same sid, no turns"
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "caller": "Ah, habari. Nilikuwa nataka kujua mko located wapi.",
+      "language": "sw",
+      "spoken": "Je, naongea na Alvin Yegon?",
+      "canned": "file_name_ask",
+      "outcome": "early_return",
+      "at": "2026-10-18T10:14:51.164Z"
+    },
+    {
+      "turn": 2,
+      "caller": "Yeah, you're speaking to Alvin Yegon.",
+      "language": "en",
+      "modelOutput": "Habari Alvin. Tuko State House Road, ground floor Hall 7 inside UON premises. Tunaweza kukusaidia aje leo?",
+      "spoken": "Habari Alvin. Tuko State House Road, ground floor Hall 7 inside UON premises. Tunaweza kukusaidia aje leo?",
+      "outcome": "ok",
+      "at": "2026-10-18T10:14:57.370Z"
+    },
+    {
+      "turn": 3,
+      "caller": "Mmh, direct.",
+      "language": "sw",
+      "spoken": "",
+      "outcome": "barge_in",
+      "at": "2026-10-18T10:15:14.061Z"
+    },
+    {
+      "turn": 4,
+      "caller": "Like direct.",
+      "language": "sw",
+      "modelOutput": "Tuko State House Road, Hall 7 ground floor ndani ya UON premises. Kuna kitu kingine ningekusaidia nacho, Alvin?",
+      "spoken": "Tuko State House Road, Hall 7 ground floor ndani ya UON premises. Kuna kitu kingine ningekusaidia nacho, Alvin?",
+      "outcome": "ok",
+      "at": "2026-10-18T10:15:15.280Z"
+    },
+    {
+      "turn": 5,
+      "caller": "Do you deliver?",
+      "language": "en",
+      "modelOutput": "Yes, we do countrywide delivery via parcel grid, including options like Pickup Mtaani, Super Metro, Easy Coach, and G4S. How can I help you place an order, Alvin?",
+      "spoken": "Yes, we do countrywide delivery via parcel grid, including options like Pickup Mtaani, Super Metro, Easy Coach, and G4S. How can I help you place an order, Alvin?",
+      "outcome": "ok",
+      "at": "2026-10-18T10:15:30.214Z"
+    },
+    {
+      "turn": 6,
+      "caller": "Uh, which items do you deal with?",
+      "language": "en",
+      "modelOutput": "We sell stationery and drawing items like T-squares, protractors, engineering sets, notebooks, calculators, pens, and files. Is there a specific item you are looking for today, Alvin?",
+      "spoken": "We sell stationery and drawing items like T-squares, protractors, engineering sets, notebooks, calculators, pens, and files. Is there a specific item you are looking for today, Alvin?",
+      "outcome": "ok",
+      "at": "2026-10-18T10:15:51.934Z"
+    },
+    {
+      "turn": 7,
+      "caller": "Not that I'm sure.",
+      "language": "en",
+      "spoken": "",
+      "outcome": "barge_in",
+      "at": "2026-10-18T10:16:18.086Z"
+    },
+    {
+      "turn": 8,
+      "caller": "But maybe I can pass by tomorrow. I'm, I'm, I'm a student in— I'm a student in UON.",
+      "language": "en",
+      "modelOutput": "Tomorrow is Monday and we will be closed. Our regular hours are Monday to Friday, 9:30 AM to 6:00 PM, but we are closed tomorrow. You can order online at arisstationaries.co.ke or pop in on Tuesday!",
+      "transforms": [
+        {
+          "before": "Our regular hours are Monday to Friday, 9:30 AM to 6:00 PM, but we are closed tomorrow.",
+          "after": "",
+          "reason": "unsaid_number",
+          "dropReasons": [
+            "unsaid_number"
+          ]
+        }
+      ],
+      "spoken": "Tomorrow is Monday and we will be closed. You can order online at aris stationaries dot co dot ke or pop in on Tuesday.",
+      "outcome": "ok",
+      "at": "2026-10-18T10:16:23.909Z"
+    },
+    {
+      "turn": 9,
+      "caller": "Uh, Tuesday at what time will you be open?",
+      "language": "en",
+      "modelOutput": "OnTuesday, we will be open from 9:30 AM to 6:00 PM. Will you be passing by then, Alvin?",
+      "transforms": [
+        {
+          "before": "OnTuesday, we will be open from 9:30 AM to 6:00 PM.",
+          "after": "I don't have that on file. I can note it for the team.",
+          "reason": "unsaid_number",
+          "dropReasons": [
+            "unsaid_number"
+          ]
+        }
+      ],
+      "spoken": "I don't have that on file. I can note it for the team. Will you be passing by then, Alvin?",
+      "outcome": "ok",
+      "at": "2026-10-18T10:16:42.976Z"
+    },
+    {
+      "turn": 10,
+      "caller": "Like at, at what time?",
+      "language": "en",
+      "modelOutput": "Weopen at 9:30 AM in the morning on Tuesday. Will that time work for you, Alvin?",
+      "transforms": [
+        {
+          "before": "Weopen at 9:30 AM in the morning on Tuesday.",
+          "after": "I don't have that on file. I can note it for the team.",
+          "reason": "unsaid_number",
+          "dropReasons": [
+            "unsaid_number"
+          ]
+        }
+      ],
+      "spoken": "I don't have that on file. I can note it for the team. Will that time work for you, Alvin?",
+      "outcome": "barge_in",
+      "at": "2026-10-18T10:16:53.656Z"
+    },
+    {
+      "turn": 11,
+      "caller": "At what time are you—",
+      "language": "en",
+      "spoken": "",
+      "outcome": "hold",
+      "at": "2026-10-18T10:16:56.459Z"
+    },
+    {
+      "turn": 12,
+      "caller": "At what time are you—",
+      "language": "en",
+      "modelOutput": "Weopenat 9:30 AM and close at 6:00 PM on Tuesday. Is there anything else I can help you with, Alvin?",
+      "transforms": [
+        {
+          "before": "Weopenat 9:30 AM and close at 6:00 PM on Tuesday.",
+          "after": "I don't have that on file. I can note it for the team.",
+          "reason": "unsaid_number",
+          "dropReasons": [
+            "unsaid_number"
+          ]
+        }
+      ],
+      "spoken": "I don't have that on file. I can note it for the team. Is there anything else I can help you with, Alvin?",
+      "outcome": "ok",
+      "at": "2026-10-18T10:16:58.105Z"
+    },
+    {
+      "turn": 13,
+      "caller": "Okay, thank you.",
+      "language": "en",
+      "modelOutput": "Karubusana,Alvin! Have a great day ahead.",
+      "transforms": [
+        {
+          "before": "Karubusana,Alvin!",
+          "after": "Karubusana, Alvin!",
+          "reason": "rewritten",
+          "dropReasons": []
+        }
+      ],
+      "spoken": "Karubusana, Alvin. Have a great day ahead.",
+      "outcome": "ok",
+      "at": "2026-10-18T10:17:08.506Z"
+    },
+    {
+      "turn": 14,
+      "caller": "Bye.",
+      "language": "en",
+      "spoken": "Thank you. Goodbye.",
+      "outcome": "early_return",
+      "at": "2026-10-18T10:17:17.136Z"
+    }
+  ],
+  "stored": {
+    "resolution": "resolved",
+    "primary_intent": "general_enquiry",
+    "resolution_note": "Answered: Do you deliver?, Uh, which items do you deal with?.",
+    "summary": {
+      "text": "Alvin Yegon asked about Bye.",
+      "reason": "Alvin Yegon asked about Bye.",
+      "language": "unknown",
+      "brain_summary": "Call completed.",
+      "primary_intent": null,
+      "products": [],
+      "actions": [],
+      "instructions": [],
+      "answered_questions": [
+        "Do you deliver?",
+        "Uh, which items do you deal with?"
+      ],
+      "unanswered_questions": [],
+      "owner_review": {
+        "at": "2026-10-18T10:17:22.345Z",
+        "done": "None.",
+        "mood": "calm",
+        "next": "Hours were answered.",
+        "want": "Alvin Yegon asked about Bye.",
+        "reason": "Alvin Yegon asked about Bye.",
+        "urgent": false,
+        "applied": {
+          "card": true,
+          "intent": false,
+          "reason": true,
+          "resolution": false
+        },
+        "confidence": 0.95,
+        "needs_human": false,
+        "needs_owner": false,
+        "primary_intent": "general_enquiry"
+      }
+    },
+    "call_facts": {
+      "intent": "general_enquiry",
+      "outcome": "info_only",
+      "language": "mixed",
+      "caller_area": "UON",
+      "secondary_intents": [
+        "directions",
+        "delivery_question",
+        "product_info"
+      ],
+      "unanswered_question": "Tuesday at what time will you be open?"
+    }
+  }
+}
