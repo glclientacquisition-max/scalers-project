@@ -1,0 +1,261 @@
+{
+  "_note": "Prod Esga Stationeries tenant row, read-only snapshot 2026-10-18 (EAT). Team phones and emails removed; other phones redacted.",
+  "tenant": {
+    "id": "c81b3480-0cc5-4224-b0e7-24c641d78db2",
+    "business_name": "Esga Stationery",
+    "agent_name": "Lucy",
+    "spoken_name": "Esga",
+    "vertical": "retail",
+    "business_type": "retail",
+    "business_category": "books_stationery",
+    "agent_tone": "warm",
+    "business_hours": "Mon-Sat: 07:00-19:00 EAT; Sun: closed. Location: Uchumi Main branch · Nakuru town   opposite Cleanshelf supermarket   from the back exit door · Uchumi branch (opposite Cleanshelf)",
+    "hours_schedule": {
+      "days": {
+        "fri": {
+          "open": "07:00",
+          "close": "19:00"
+        },
+        "mon": {
+          "open": "07:00",
+          "close": "19:00"
+        },
+        "sat": {
+          "open": "07:00",
+          "close": "19:00"
+        },
+        "sun": null,
+        "thu": {
+          "open": "07:00",
+          "close": "19:00"
+        },
+        "tue": {
+          "open": "07:00",
+          "close": "19:00"
+        },
+        "wed": {
+          "open": "07:00",
+          "close": "19:00"
+        }
+      },
+      "location": "Uchumi Main branch · Nakuru town   opposite Cleanshelf supermarket   from the back exit door · Uchumi branch (opposite Cleanshelf)",
+      "timezone": "Africa/Nairobi"
+    },
+    "after_hours_mode": "serve",
+    "services_offered": "Services:\n- Wholesale Printing Materials & Stationery - category Wholesale - price Ask - Covers bulk orders of stationery, toners, and printers. - out of scope: Quoting specific prices over the phone before confirmation; applying retail rates.\n- Retail Printing Materials & Stationery - category Retail - price Ask - Covers individual or small-quantity purchases of stationery, toners, and printers. - out of scope: Quoting specific prices over the phone before confirmation; applying wholesale discount rates to small orders.\n- General Pricing Inquiries - category Inquiries - price Ask - Identify if caller needs retail or wholesale; capture details and route to team. - out of scope: Guessing or estimating numbers on the spot.\n\nSocial & web:\nPhones / WhatsApp:\n- Phone (Manager): [phone]\n- Phone (Mister  Julius): [phone]\n- Phone (Missis Julius): [phone]",
+    "services_catalog": [
+      {
+        "id": "svc_bb6b127c24ac47a8",
+        "name": "Wholesale Printing Materials & Stationery",
+        "notes": "Covers bulk orders of stationery, toners, and printers.",
+        "source": "owner",
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "owner",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": true,
+          "amount_ksh": null,
+          "parsed_from": "Ask"
+        },
+        "category": "Wholesale",
+        "in_stock": "",
+        "price_range": "Ask",
+        "out_of_scope": "Quoting specific prices over the phone before confirmation; applying retail rates."
+      },
+      {
+        "id": "svc_c8cac52f66e04618",
+        "name": "Retail Printing Materials & Stationery",
+        "notes": "Covers individual or small-quantity purchases of stationery, toners, and printers.",
+        "source": "owner",
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "owner",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": true,
+          "amount_ksh": null,
+          "parsed_from": "Ask"
+        },
+        "category": "Retail",
+        "in_stock": "",
+        "price_range": "Ask",
+        "out_of_scope": "Quoting specific prices over the phone before confirmation; applying wholesale discount rates to small orders."
+      },
+      {
+        "id": "svc_29ac058cb5484fb6",
+        "name": "General Pricing Inquiries",
+        "notes": "Identify if caller needs retail or wholesale; capture details and route to team.",
+        "source": "owner",
+        "pricing": {
+          "mode": "ask",
+          "unit": null,
+          "source": "owner",
+          "max_ksh": null,
+          "min_ksh": null,
+          "in_stock": null,
+          "confirmed": true,
+          "amount_ksh": null,
+          "parsed_from": "Ask"
+        },
+        "category": "Inquiries",
+        "in_stock": "",
+        "price_range": "Ask",
+        "out_of_scope": "Guessing or estimating numbers on the spot."
+      }
+    ],
+    "product_catalog": [],
+    "faqs": [
+      {
+        "answer": "Yes, we handle bulk orders for stationery, toners, and printers. We will capture your quantity and details to provide a formal quote.",
+        "source": "seed",
+        "status": "suggested",
+        "question": "Do you offer wholesale stationery and printing materials?"
+      },
+      {
+        "answer": "Yes, we offer retail sales for individual or small-quantity purchases. A representative will confirm the exact price shortly via WhatsApp.",
+        "source": "seed",
+        "status": "suggested",
+        "question": "Can I buy retail or small quantities?"
+      },
+      {
+        "answer": "We cannot quote specific prices directly over the phone before confirmation. We will take your details and have our team send you a formal quote.",
+        "source": "seed",
+        "status": "suggested",
+        "question": "Can you quote specific prices over the phone?"
+      }
+    ],
+    "team_directory": [
+      {
+        "name": "Madam Esther",
+        "role": "Business owner",
+        "receives_ops": true,
+        "receives_inbox": true,
+        "receives_escalation": true
+      },
+      {
+        "name": "Esga Stationeries help desk",
+        "role": "General queries",
+        "receives_ops": true,
+        "receives_inbox": true,
+        "receives_escalation": true
+      },
+      {
+        "name": "Chris",
+        "role": "Manager",
+        "receives_ops": true,
+        "receives_inbox": true,
+        "receives_escalation": true
+      },
+      {
+        "name": "Mister Julius",
+        "role": "Business Owner",
+        "receives_ops": true,
+        "receives_inbox": true,
+        "receives_escalation": true
+      }
+    ],
+    "business_policies": {
+      "other": "Retail and wholesale orders require price confirmation by the esga team",
+      "deposit": "We can hold items for pickup when we have the caller name and pickup time.",
+      "payment": "M-Pesa and cash. Confirm other methods with the team if asked.",
+      "returns": "Returns and exchanges follow shop policy,confirm details with the team if unsure.",
+      "delivery": "Same-day Nairobi delivery for stocked items when available; countrywide shipping on request.",
+      "payments": {
+        "bank": null,
+        "card": null,
+        "note": null,
+        "pochi": null,
+        "airtel": null,
+        "source": "parsed",
+        "methods": [
+          "mpesa_send",
+          "cash"
+        ],
+        "timings": [],
+        "version": 2,
+        "confirmed": false,
+        "mpesa_send": null,
+        "mpesa_till": null,
+        "mpesa_paybill": null,
+        "deposit_percent": null
+      },
+      "warranty": ": the receptionist should not handle warranty claims directly. Instead, it should route the caller by giving them the manager's contact number.",
+      "cancellation": "When a customer asks to cancel an order, the receptionist should not confirm the cancellation directly. Instead, it should route the caller by providing the manager's contact number so they can follow up directly.",
+      "coverage_areas": [
+        "place:nakuru town"
+      ],
+      "coverage_outside": {
+        "fee_ksh": null,
+        "anywhere_kenya": true
+      }
+    },
+    "business_locations": [
+      {
+        "hours": "",
+        "label": "Uchumi Main branch",
+        "address": "Nakuru town   opposite Cleanshelf supermarket   from the back exit door",
+        "area_id": "",
+        "landmark": "Uchumi branch (opposite Cleanshelf)",
+        "directions": "We're directly opposite Cleanshelf Supermarket, right next to the Prestige matatu stage if you're at Cleanshelf, just cross over and you'll see us.\"",
+        "coverage_notes": "We do Country wide delivery ofall stationary both wholesale and retail ,where ever you are we will be able to reach you."
+      },
+      {
+        "hours": "",
+        "label": "Kirathimo Branch",
+        "address": "kirathimo builing mwaki sacco",
+        "area_id": "place:nakuru town",
+        "landmark": "Kirathimo branch (Free Area stage)",
+        "directions": "We're at Mwaki sacco stage, in a red building called Kirathimo you really can't miss it, just look for the red building once you get to Mwaki sacco. It's upstairs, where our team is ready to serve you",
+        "coverage_notes": "We do Country wide delivery ofall stationary both wholesale and retail ,where ever you are we will be able to reach you."
+      },
+      {
+        "hours": "",
+        "label": "flamco branch",
+        "address": "Flamco building",
+        "area_id": "place:nakuru town",
+        "landmark": "Flamco branch (Nakuru town, Mosque Lane)",
+        "directions": "We're in Nakuru town, on Mosque Lane. If you're coming into town, ask anyone for Mosque Lane -we're right there.\"",
+        "coverage_notes": "We do Country wide delivery ofall stationary both wholesale and retail ,where ever you are we will be able to reach you."
+      }
+    ],
+    "service_areas": {
+      "areas": [
+        {
+          "id": "place:nakuru town",
+          "eta": "Same day",
+          "modes": [
+            "delivery"
+          ],
+          "source": "owner",
+          "fee_ksh": null,
+          "fee_mode": "ask",
+          "confirmed": true,
+          "min_order_ksh": null
+        }
+      ],
+      "reach": "deliver",
+      "version": 1,
+      "rider_paid": null,
+      "no_premises": false,
+      "delivered_by": [],
+      "anywhere_kenya": true,
+      "outside_fee_ksh": null
+    },
+    "agent_tools": {
+      "end_call": false,
+      "escalate": true
+    },
+    "handoff_mode": "callback",
+    "voice_languages": [
+      "en",
+      "sw",
+      "sheng"
+    ]
+  },
+  "field_meta": []
+}

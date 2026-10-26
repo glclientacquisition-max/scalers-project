@@ -1,6 +1,6 @@
 ---
 owner: brain
-last_reviewed: 2026-10-07
+last_reviewed: 2026-10-18
 ---
 
 # Caller identity and summary (runtime contract)
@@ -99,6 +99,28 @@ Reject at observe **and** at write. A greeting in front of the stem does not mak
 3. Hangup has one writer: `deriveCallSummary`. `calls.primary_intent`, `summary.primary_intent`, and the `Intent:` line are that object's `primaryIntent`. Resolution class still comes from `deriveCallResolution` on the same state.  
 4. Transcript review, if it changes resolution/intent, rewrites that same spine (Intent line, brain_summary, column) under the same write lock as hangup so a late hangup merge cannot leave the column on one intent and the summary on another.  
 5. `first_forward.first_turn` may store raw STT for ops; `bucket=first_turn_goal` / judge only if the goal filter leaves an actionable ask.
+6. `BRAIN_CALL_FIXES_D199`: after `nameConfirmed`, a turn with no ask in it (`callerAskSpecificity` 0, e.g. `We going through?`) does not replace a goal that has one. Leave-offs (`We're leaving`, `Just leave it at that`, `never mind`, `achana nayo`, `wacha tu`) are never a goal; `isClosingCue` is unchanged. A turn that is only a team-directory name (`Chris.`, `Is Chris there?`) sets `conversation.personAsked = { name, role }` and `askedForPerson`, and is not the goal. A name given right after we asked for theirs, or the bound caller's own name, is not a person asked for.
+
+### `summary.topic` (owner text contract, `BRAIN_CALL_FIXES_D199`)
+
+**Field.** `calls.summary.topic: string | null`, plus `summary.owner_review.topic` (same value). Hangup summary (`deriveCallSummary`) also returns `topicSource: 'saved_row' | 'catalogue' | 'intent' | null`. The review writer (`writeReviewedSummary`) persists `topic`; the Voice hangup patch does not carry it yet, so a call without a completed review has no `topic` key.
+
+**What it is.** A short noun phrase for what the call was about, in words the owner can read (`carpet cleaning`, `JK copy paper and more`, `directions to the shop`). It never contains the caller's raw words.
+
+**Order of sources (first that gives a value wins):**
+
+1. **Saved row on this call.** A visit's service name (catalogue name, parenthetical dropped, sentence case). Otherwise the newest saved request item that reads: a garbled STT piece (`From began yellow`) or `Item not captured` is skipped; a list item is named by its first item (`Cartons 10 JK copy paper, pens …` → `JK copy paper and more`).
+2. **Catalogue name the caller said.** The last service or product name whose every distinctive word was in a caller turn (`Eeh, Carpet` → `carpet cleaning`; a few Swahili nouns map: `zulia`, `godoro`, `kochi`, …). Failing that, a service word in the held goal, named for the owner (`the dishwashing one` → `dishwashing`; carpet, sofa, mattress, upholstery, fumigation, plumbing, electrical). Only the word is used, never the sentence around it.
+3. **Label for the call.** From the primary intent (`hours_open` → `your opening hours`, `directions` → `directions to the shop`, `price` → `prices`, `book_visit` → `booking a visit`, `order_enquiry` → `placing an order`, `human` with a team person → `speaking to Chris`, …) or a caller cue (`my previous booking` → `a previous booking`, `what services do you offer` → `the services you offer`).
+4. **`null`.** Nothing readable. Desk shows no topic. It must not fall back to caller words, `goal.text`, or `brain_summary`.
+
+**Null semantics.** `topic: null` = the call was reviewed and nothing readable was found. Key absent = not computed (flag off, or no review yet). In both cases, Desk shows the owner reason (`owner_review.reason`) and leaves the topic out.
+
+**Owner reason built from it (flag on).**
+- Hangup `summary.reason`: `{Who} asked for {Name} ({Role}).` when a team member was asked for (plus ` They also asked about {topic}.`); otherwise `{Who} asked about {topic}.`; otherwise `{Who} needs you to return the call.` (human) or `{Who} called. No clear ask.` A saved request reads `{Who} left an enquiry about {topic}.` (`placed an order`, `left a hold`, `asked for a callback` by row type), or `…; the item was not clear.`
+- Review merge: an `asked about Y` where Y is a caller turn, a closing, or a leave-off, or a line ending in `No name.`, is rebuilt. A saved-row or catalogue topic comes first, then the reviewer's own `want`, then the intent label. `asked about Chris` becomes `asked for Chris (Manager)`. An unfinished visit (nothing saved, a slot missing) reads `{Who} wanted to book {service or topic} in {place} for {when}.`, from held slots only (no invented name, no refused time or place), and never `No name.`.
+- `mood: 'urgent'` stands only with `review.urgent === true`; otherwise `unknown`.
+- `call_facts.intent/outcome` agree with the merged review. `needs_human` gives `callback` (never `info_only`), `resolved` never gives `callback`, and `abandoned` gives `abandoned` unless a row was saved. `human_request` stays only when the merged intent is `human`.
 
 ---
 

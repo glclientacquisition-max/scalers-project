@@ -124,8 +124,40 @@ function normalizeCallFacts(raw) {
 }
 
 /** Row for public.call_facts. Products are linked to catalogue items when they match. */
-function buildCallFactsRow({ call, facts, review, callerText, catalogue, model = null } = {}) {
+/**
+ * BRAIN_CALL_FIXES_D199 (18 Oct owner review 6): call_facts agree with the
+ * merged owner review. The Wanted/Result labels read these two columns, so a
+ * call the review left needing a person is never "info only", and
+ * "Asked for a person" needs the merged intent to be human.
+ */
+function reconcileWithMerged({ intent, outcome }, merged, review) {
+  if (!merged || !require('./callFixesD199').callFixesD199Enabled()) return { intent, outcome };
+  let nextOutcome = outcome;
+  const resolution = String(merged.resolution || '');
+  if (resolution === 'abandoned' && !['sale_or_order', 'hold', 'booking'].includes(outcome)) {
+    nextOutcome = 'abandoned';
+  } else if (resolution === 'needs_human' && (!outcome || outcome === 'info_only' || outcome === 'abandoned')) {
+    nextOutcome = 'callback';
+  } else if (resolution === 'resolved' && outcome === 'callback') {
+    nextOutcome = 'info_only';
+  }
+  let nextIntent = intent;
+  const mergedIntent = canonicalIntent(merged.reviewKind || merged.primaryIntent);
+  const askedPerson =
+    merged.primaryIntent === 'human' || merged.reviewKind === 'human' || review?.primary_intent === 'human';
+  if (intent === 'human_request' && !askedPerson && mergedIntent && mergedIntent !== 'other') {
+    nextIntent = mergedIntent;
+  }
+  return { intent: nextIntent, outcome: nextOutcome };
+}
+
+function buildCallFactsRow({ call, facts, review, callerText, catalogue, model = null, merged = null } = {}) {
   const f = facts || normalizeCallFacts(null);
+  const agreed = reconcileWithMerged(
+    { intent: f.intent || canonicalIntent(review?.primary_intent), outcome: f.outcome },
+    merged,
+    review
+  );
   const lang = f.language && f.language !== 'sw' ? f.language : detectLanguage(callerText) || f.language;
   const products = f.products_mentioned.map((p) => {
     const hit = matchCatalogue(p.name, catalogue);
@@ -137,7 +169,7 @@ function buildCallFactsRow({ call, facts, review, callerText, catalogue, model =
     };
   });
   let est = f.est_value_ksh;
-  if (est == null && products.length && ['sale_or_order', 'hold', 'lost'].includes(f.outcome)) {
+  if (est == null && products.length && ['sale_or_order', 'hold', 'lost'].includes(agreed.outcome)) {
     const sum = products.reduce((n, p) => n + (p.quoted_price_ksh ?? p.listed_price_ksh ?? 0) * (p.qty || 1), 0);
     est = sum > 0 ? sum : null;
   }
@@ -146,9 +178,9 @@ function buildCallFactsRow({ call, facts, review, callerText, catalogue, model =
     tenant_id: call.tenant_id,
     created_at: call.created_at || new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    intent: f.intent || canonicalIntent(review?.primary_intent),
+    intent: agreed.intent,
     secondary_intents: f.secondary_intents,
-    outcome: f.outcome,
+    outcome: agreed.outcome,
     lost_reason: f.lost_reason,
     products_mentioned: products,
     price_objection: f.price_objection,
@@ -188,6 +220,7 @@ module.exports = {
   matchCatalogue,
   mergeWithExisting,
   normalizeCallFacts,
+  reconcileWithMerged,
   timeParts,
   taxonomy,
 };

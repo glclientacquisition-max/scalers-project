@@ -214,6 +214,17 @@ function validateServiceRequest(
   if (!value.item && !value.notes) {
     return { valid: false, reason: 'A request needs an item or concise notes.' };
   }
+  // BRAIN_CALL_FIXES_D199 (18 Oct owner review 5): quantity is a count
+  // ("Mbalimbali" is not), a list carries its counts in the item, and an
+  // enquiry item that is an STT piece ("From began yellow") is not an item.
+  if (require('./callFixesD199').callFixesD199Enabled()) {
+    const topics = require('./ownerTopic');
+    if (topics.isItemList(value.item) || !topics.countQuantity(value.quantity)) value.quantity = '';
+    if (type === 'enquiry' && topics.isGarbledItem(value.item, topics.catalogueTopicNames({ productCatalog }))) {
+      value.notes = clean([`Caller words: ${value.item}`, value.notes].filter(Boolean).join('. '), 400);
+      value.item = 'Item not captured';
+    }
+  }
 
   const identity = { agentName, businessName };
   const badName = rejectBadCallerName(value, identity);

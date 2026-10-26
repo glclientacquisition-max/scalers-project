@@ -18,7 +18,7 @@ const {
   productFieldPath,
   serviceFieldPath,
   policyMeta,
-  isPackPolicyText,
+  isSeedPolicyText,
   isPackService,
   factFaqs,
   unknownFaqTopics,
@@ -98,7 +98,7 @@ function provenanceFor(def, raw, profile) {
   const value = factValueForPath(def.fieldPath, tenantRowFromProfile(profile));
   if (def.policyKey) {
     const text = asText(raw);
-    const packSeed = isPackPolicyText(text);
+    const packSeed = isSeedPolicyText(text);
     const meta = policyMeta(policiesOf(profile), def.policyKey);
     const base = meta && Object.keys(meta).length ? meta : { source: packSeed ? 'seed' : '' };
     return classifyRecord(base, { packSeed, fieldMeta, fieldPath: def.fieldPath, value });
