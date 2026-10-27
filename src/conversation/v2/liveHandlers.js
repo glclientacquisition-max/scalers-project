@@ -14,6 +14,16 @@ function createLiveHandlers({ applyTools, ctx = {} } = {}) {
   if (typeof applyTools !== 'function') {
     throw new Error('createLiveHandlers needs applyTools');
   }
+  // BRAIN_ENGINES: receipts carry calls.id (uuid). Voice passes only the SID, so resolve it once per call
+  // (ctx.resolveCallId, set on the engines path only). Off / no resolver = today's behaviour.
+  let callIdP = null;
+  const callIdFor = async () => {
+    if (ctx.callId || typeof ctx.resolveCallId !== 'function' || !ctx.callSid) return ctx.callId || null;
+    if (!callIdP) callIdP = Promise.resolve().then(() => ctx.resolveCallId(ctx.callSid)).catch(() => null);
+    const id = await callIdP;
+    if (!id) callIdP = null; // the calls row may not exist yet on an early turn: try again next receipt
+    return id || null;
+  };
   return {
     createAppointment: async (args) => {
       const execution = await applyTools({ appointment: args });
@@ -43,7 +53,10 @@ function createLiveHandlers({ applyTools, ctx = {} } = {}) {
     // BRAIN_V2_COMMIT_SAFETY: Platform #845 receipts (never throws) and #844 name confirm (after a read-back yes).
     recordWriteReceipt: async (rec) => {
       if (typeof ctx.recordWriteReceipt !== 'function') return { ok: false, skipped: 'no_sink' };
-      try { return await ctx.recordWriteReceipt({ ...rec, tenantId: ctx.tenantId || null, callId: ctx.callId || ctx.callSid || null, callSid: ctx.callSid || null }); } catch (e) { return { ok: false, error: String(e?.message || e) }; }
+      try {
+        const callId = typeof ctx.resolveCallId === 'function' ? (await callIdFor()) : null;
+        return await ctx.recordWriteReceipt({ ...rec, tenantId: ctx.tenantId || null, callId: callId || ctx.callId || ctx.callSid || null, callSid: ctx.callSid || null });
+      } catch (e) { return { ok: false, error: String(e?.message || e) }; }
     },
     confirmCallerName: async ({ name, source = 'readback_yes' } = {}) => {
       if (typeof ctx.confirmCallerName !== 'function') return { ok: false, skipped: 'no_confirm_caller_name' };
