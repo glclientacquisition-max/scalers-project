@@ -1,4 +1,5 @@
--- Undo number_hold_winback.sql. DRAFT: NOT APPLIED. Running holds become plain quarantine rows.
+-- Undo number_hold_winback.sql (APPLIED to staging 23 Oct 2026; prod pending). Running holds become plain
+-- quarantine rows. Drop admin_number_controls_v1 (#968) first: its functions read winback_hold.
 drop function if exists public.number_on_winback_hold(text);
 drop function if exists public.admin_restore_held_number(text, uuid, text, text, boolean);
 drop function if exists public.admin_end_number_hold(text, text, text, boolean);
