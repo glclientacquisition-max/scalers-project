@@ -1,10 +1,13 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { emptyAreaPicks, moveOverAreas, normalizeAreaPicks, type AreaPicks } from "@/lib/areaPicks";
+import { areaNode, emptyAreaPicks, moveOverAreas, normalizeAreaPicks, type AreaPicks } from "@/lib/areaPicks";
+import { businessHomeCounty } from "@/lib/businessCounty";
+import { normalizeBusinessLocations } from "@/lib/businessLocations";
 import {
   applyCoverageMirrorToPolicies,
   applyCoverageMirrorToServiceAreas,
   areaPicksToCoverageAreas,
+  type CoverageMirror,
 } from "@/lib/areaPicksToCoverageAreas";
 import { writeAreaPickRows, type AreaPickRow, type PicksClient } from "@/lib/areaPicksWrite";
 import { bustTenantCache } from "@/lib/tenantCache";
@@ -66,7 +69,7 @@ export async function saveAreaPicks(
   tenantId: string,
   picks: AreaPicks,
   opts: { confirm?: boolean; movedFrom?: string[] | null; userId?: string | null },
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<MirrorResult> {
   const clean = normalizeAreaPicks(picks);
   const existing = await loadAreaPicks(tenantId);
   const confirmed_at =
@@ -89,7 +92,7 @@ export async function saveAreaPicks(
   const written = await writeAreaPickRows(getSupabaseAdmin() as unknown as PicksClient, tenantId, rows);
   if (!written.ok) return { ok: false, error: written.error };
   const priorPicks = existing.ok && existing.row ? existing.row.picks : null;
-  return mirrorCoverageFromPicks(tenantId, clean, Boolean(confirmed_at), priorPicks);
+  return mirrorCoverageFromPicks(tenantId, clean, Boolean(confirmed_at), priorPicks, moved_from?.length ? moved_from : null);
 }
 
 /**
@@ -104,44 +107,79 @@ export async function mirrorCoverageFromPicks(
   confirmed: boolean,
   /** Picks before this save; null = no row yet (then the old list the page showed, moved over). */
   priorPicks: AreaPicks | null = null,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+  /** tenant_area_picks.moved_from, the D1 anchor for a ke-only business. */
+  movedFrom: string[] | null = null,
+): Promise<MirrorResult> {
   const admin = getSupabaseAdmin();
   for (let attempt = 0; attempt < 3; attempt++) {
     const { data, error } = await admin
       .from("tenants")
-      .select("business_policies, service_areas, vertical")
+      .select("business_policies, service_areas, vertical, business_locations")
       .eq("id", tenantId)
       .maybeSingle();
     if (error || !data) return { ok: false, error: error?.message ?? "tenant not found" };
+    const row = data as {
+      business_policies?: unknown;
+      service_areas?: unknown;
+      vertical?: string | null;
+      business_locations?: unknown;
+    };
     const mirror = areaPicksToCoverageAreas(picks, {
       confirmed,
-      vertical: (data as { vertical?: string | null }).vertical ?? null,
-      priorServiceAreas: data.service_areas,
-      priorCoverage: (data.business_policies as { coverage_areas?: unknown } | null)?.coverage_areas,
-      priorPicks: priorPicks ?? moveOverAreas(oldCoverageList(data)).picks,
+      vertical: row.vertical ?? null,
+      priorServiceAreas: row.service_areas,
+      priorCoverage: (row.business_policies as { coverage_areas?: unknown } | null)?.coverage_areas,
+      priorPicks: priorPicks ?? moveOverAreas(oldCoverageList(row)).picks,
+      movedFrom,
+      homeCounty: businessHomeCounty(normalizeBusinessLocations(row.business_locations)),
     });
-    if (mirror.unmapped.length || mirror.lossy.length || mirror.overflow || mirror.dropped.length) {
+    const warning = mirrorWarning(mirror);
+    if (mirror.failClosed) {
+      // D2: nothing these picks name reaches the phone line. Keep the stale list; warn and log.
+      console.warn(`[area_picks] unmapped_all tenant=${tenantId} unmapped=${mirror.unmapped.join(",")}`);
+      return { ok: true, warning };
+    }
+    if (mirror.unmapped.length || mirror.lossy.length || mirror.overflow || mirror.dropped.length || mirror.anchorless) {
       console.warn(
-        `[area_picks] coverage mirror tenant=${tenantId} unmapped=${mirror.unmapped.length} lossy=${mirror.lossy.length} overflow=${mirror.overflow} kept=${mirror.kept.length} dropped=${mirror.dropped.length}`,
+        `[area_picks] coverage mirror tenant=${tenantId} unmapped=${mirror.unmapped.length} lossy=${mirror.lossy.length} overflow=${mirror.overflow} kept=${mirror.kept.length} dropped=${mirror.dropped.length} anchor=${mirror.anchor?.from ?? "-"}`,
       );
     }
-    const before = data.business_policies ?? null;
+    const before = row.business_policies ?? null;
+    const nextPolicies = applyCoverageMirrorToPolicies(before, mirror);
+    const nextAreas = applyCoverageMirrorToServiceAreas(row.service_areas, mirror);
+    // Same inputs, same output: skip the write when nothing changed.
+    if (JSON.stringify(nextPolicies) === JSON.stringify(before ?? {}) && JSON.stringify(nextAreas) === JSON.stringify(row.service_areas ?? null)) {
+      return { ok: true, warning };
+    }
     let q = admin
       .from("tenants")
-      .update({
-        business_policies: applyCoverageMirrorToPolicies(before, mirror),
-        service_areas: applyCoverageMirrorToServiceAreas(data.service_areas, mirror),
-      })
+      .update({ business_policies: nextPolicies, service_areas: nextAreas })
       .eq("id", tenantId);
     q = before == null ? q.is("business_policies", null) : q.eq("business_policies", JSON.stringify(before));
     const upd = await q.select("id");
     if (upd.error) return { ok: false, error: upd.error.message };
     if ((upd.data ?? []).length === 1) {
       bustTenantCache(tenantId);
-      return { ok: true };
+      return { ok: true, warning };
     }
   }
   return { ok: false, error: "changed while saving" };
+}
+
+export type MirrorResult = { ok: true; warning?: string } | { ok: false; error: string };
+
+/** Owner copy for what the phone line still can't say (D2, D3, unmapped). No dashes. */
+export function mirrorWarning(m: CoverageMirror): string | undefined {
+  const name = (id: string) => areaNode(id)?.name ?? id;
+  const list = (ids: string[]) => {
+    const names = [...new Set(ids.map(name))];
+    return names.length <= 1 ? names[0] ?? "" : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  };
+  if (m.failClosed) return "Saved. Your phone line can't use these areas yet, so callers still hear your previous list.";
+  const bits: string[] = [];
+  if (m.lossy.length) bits.push(`Callers may still hear yes for ${list(m.lossy)}.`);
+  if (m.unmapped.length) bits.push(`${list(m.unmapped)} can't reach your phone line yet.`);
+  return bits.length ? `Saved. ${bits.join(" ")}` : undefined;
 }
 
 /**

@@ -25,5 +25,6 @@ export async function saveAreaPicksAction(raw: unknown, confirm = false): Promis
   });
   if (!res.ok) return { ok: false, error: "Could not save your areas. Try again." };
   revalidatePath("/settings/areas");
-  return { ok: true, message: confirm ? "Areas checked and saved." : "Areas saved." };
+  // D2/D3: say what the phone line still can't (wrong yes for exclusions, areas it can't read yet).
+  return { ok: true, message: res.warning ?? (confirm ? "Areas checked and saved." : "Areas saved.") };
 }

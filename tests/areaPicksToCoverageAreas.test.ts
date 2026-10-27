@@ -134,14 +134,54 @@ test("fees: own or inherited fee becomes a fixed term; prod speaks it only once 
   assert.ok(unTerms.areas.every((t: { trusted: boolean; feeKsh: number | null }) => !t.trusted && t.feeKsh == null));
 });
 
-test("unmapped picks are left out and reported", async () => {
+test("unmapped picks are left out and reported; a county-named town uses its index alias", async () => {
   const m = await mapper();
   const a = await picksLib();
   let p = a.toggleArea(a.emptyAreaPicks(), "county:wajir");
   p = a.toggleArea(p, "town:kisumu:kisumu");
   const out = m.areaPicksToCoverageAreas(p);
-  assert.deepEqual(out.coverage_areas, []);
-  assert.deepEqual(out.unmapped.sort(), ["county:wajir", "town:kisumu:kisumu"]);
+  assert.deepEqual(out.coverage_areas, ["place:kisumu central"]);
+  assert.deepEqual(out.unmapped, ["county:wajir"]);
+  assert.equal(out.failClosed, false);
+});
+
+test("D2 Wajir-only business: nothing reaches the line, fail closed (no write, stale list kept, owner warned)", async () => {
+  const m = await mapper();
+  const a = await picksLib();
+  const p = a.toggleArea(a.emptyAreaPicks(), "county:wajir");
+  const out = m.areaPicksToCoverageAreas(p, { priorCoverage: ["county:nairobi"], priorPicks: a.toggleArea(a.emptyAreaPicks(), "county:nairobi") });
+  // Nairobi was removed by the owner, Wajir has no old id: nothing left, no anywhere-Kenya.
+  assert.equal(out.failClosed, true);
+  assert.equal(out.coverage_areas, null);
+  assert.deepEqual(out.unmapped, ["county:wajir"]);
+  const fresh = m.areaPicksToCoverageAreas(p);
+  assert.equal(fresh.failClosed, true, "Wajir alone, no prior list: still fail closed, never []");
+  assert.deepEqual(m.areaLineNotes(p), { yesStill: [], notOnLine: ["Wajir"], nothingReaches: true });
+});
+
+test("Done and Dusted: Kiambu town (KSh 800) mirrors to place:kiambu cbd with its fee, not the whole county", async () => {
+  const m = await mapper();
+  const a = await picksLib();
+  assert.equal(m.oldCoverageId("town:kiambu:kiambu"), "place:kiambu cbd");
+  let p = a.toggleArea(a.emptyAreaPicks(), "county:nairobi");
+  p = a.setAreaDetail(p, "town:kiambu:kiambu", { serve: true, fee_kes: 800, note: null });
+  const out = m.areaPicksToCoverageAreas(p, { confirmed: true });
+  assert.deepEqual(out.coverage_areas, ["county:nairobi", "place:kiambu cbd"]);
+  assert.ok(!out.coverage_areas!.includes("county:kiambu"));
+  assert.deepEqual(out.unmapped, []);
+  const sa = m.applyCoverageMirrorToServiceAreas({}, out);
+  const terms = prodTerms.readAreaTerms(sa, { env: { VOICE_AREA_FEES: "on" } });
+  const kiambu = terms.areas.find((t: { id: string }) => t.id === "place:kiambu cbd");
+  assert.equal(kiambu.feeKsh, 800);
+  assert.equal(prodCoverage.coveredByAreas("Kiambu CBD", out.coverage_areas), true);
+});
+
+test("other county-named towns use index aliases (nakuru town, kisii cbd, bungoma town centre); Kwale town has none", async () => {
+  const m = await mapper();
+  assert.equal(m.oldCoverageId("town:nakuru:nakuru"), "place:nakuru town");
+  assert.equal(m.oldCoverageId("town:kisii:kisii"), "place:kisii cbd");
+  assert.equal(m.oldCoverageId("town:bungoma:bungoma"), "place:bungoma town centre");
+  assert.equal(m.oldCoverageId("town:kwale:kwale"), null);
 });
 
 test("no serving pick removes coverage_areas and coverage_outside (not set, never 'serves nowhere')", async () => {
@@ -236,7 +276,8 @@ test("owner removal is the only drop: covered before this save, not covered now"
   const offNairobi = a.toggleArea(ke, "county:nairobi");
   const out2 = m.areaPicksToCoverageAreas(offNairobi, { priorCoverage: ["county:nairobi"], priorPicks: ke });
   assert.deepEqual(out2.dropped, ["county:nairobi"]);
-  assert.deepEqual(out2.coverage_areas, []);
+  assert.deepEqual(out2.coverage_areas, [], "ke-only with no anchor: [] (never null, null hides the outside line)");
+  assert.equal(out2.anchorless, true);
 });
 
 test("a prior id the old picks never covered, or the tree cannot place, is kept", async () => {
@@ -263,6 +304,54 @@ test("kept ids come first, so the 40 cap never drops a prior area", async () => 
   const out = m.areaPicksToCoverageAreas(p, { priorCoverage: ["place:juja", "county:nairobi"], priorPicks: p });
   assert.equal(out.overflow, true);
   assert.deepEqual(out.coverage_areas!.slice(0, 2), ["place:juja", "county:nairobi"]);
+});
+
+test("D1 Nairobi ke-only: no prior coverage, anchor from the ke row's moved_from", async () => {
+  const m = await mapper();
+  const a = await picksLib();
+  const picks = a.normalizeAreaPicks(BACKFILL_KE);
+  const out = m.areaPicksToCoverageAreas(picks, { movedFrom: ["county:nairobi"], homeCounty: "county:kajiado" });
+  assert.deepEqual(out.coverage_areas, ["county:nairobi"]);
+  assert.deepEqual(out.anchor, { ids: ["county:nairobi"], from: "moved_from" });
+  assert.deepEqual(out.coverage_outside, { anywhere_kenya: true, fee_ksh: null });
+  const policies = m.applyCoverageMirrorToPolicies({}, out);
+  assert.equal(prodOutside.coverageDetail("Westlands", { businessPolicies: policies }), "listed", "home area books directly");
+  assert.equal(prodOutside.coverageDetail("Kisumu", { businessPolicies: policies }), "kenya");
+});
+
+test("D1 ke-only, nothing moved over: the business county is the last-resort anchor and takes ke's fee", async () => {
+  const m = await mapper();
+  const a = await picksLib();
+  const picks = a.setAreaDetail(a.emptyAreaPicks(), "ke", { serve: true, fee_kes: 1500, note: null });
+  const out = m.areaPicksToCoverageAreas(picks, { homeCounty: "county:nairobi", confirmed: true });
+  assert.deepEqual(out.coverage_areas, ["county:nairobi"]);
+  assert.deepEqual(out.anchor, { ids: ["county:nairobi"], from: "business_county" });
+  assert.equal(out.terms[0].fee_ksh, 1500);
+  const none = m.areaPicksToCoverageAreas(picks, {});
+  assert.deepEqual(none.coverage_areas, []);
+  assert.equal(none.anchorless, true);
+});
+
+test("D1 never resurrects an excluded area as the anchor", async () => {
+  const m = await mapper();
+  const a = await picksLib();
+  let picks = a.normalizeAreaPicks(BACKFILL_KE);
+  picks = a.toggleArea(picks, "county:nairobi");
+  const out = m.areaPicksToCoverageAreas(picks, { priorCoverage: ["county:nairobi"], priorPicks: a.normalizeAreaPicks(BACKFILL_KE), movedFrom: ["county:nairobi"], homeCounty: "county:nairobi" });
+  assert.ok(!out.coverage_areas!.includes("county:nairobi"));
+  assert.equal(out.anchorless, true);
+});
+
+test("D3 banner names: excluded places callers still hear yes for", async () => {
+  const m = await mapper();
+  const a = await picksLib();
+  let p = a.toggleArea(a.emptyAreaPicks(), "county:nairobi");
+  p = a.toggleArea(p, "estate:nairobi:kibera");
+  assert.deepEqual(m.areaLineNotes(p), { yesStill: ["Kibera"], notOnLine: [], nothingReaches: false });
+  const picker = readFileSync(new URL("../dashboard/src/components/areas/AreaPicker.tsx", import.meta.url), "utf8");
+  assert.match(picker, /areaLineNotes\(saved\)/);
+  assert.match(picker, /data-area-line-note/);
+  assert.doesNotMatch(picker.slice(picker.indexOf("const lineNote")), /[\u2013\u2014]/, "no en or em dashes in UI copy");
 });
 
 // ---- upsert then prune: a failed write never leaves the tenant with fewer picks ----
@@ -397,6 +486,13 @@ test("every dashboard write to tenant_area_picks also writes the coverage mirror
   assert.doesNotMatch(afterWrite, /return \{ ok: true \}/, "saveAreaPicks returns ok without mirroring");
   assert.equal((afterWrite.match(/mirrorCoverageFromPicks\(/g) || []).length, 1);
   assert.match(server, /areaPicksToCoverageAreas\([\s\S]{0,400}priorCoverage[\s\S]{0,200}priorPicks/, "mirror gets the prior coverage and picks (lossless)");
+  // D4: a failed write returns before the mirror, so a lost insert never reaches coverage_areas.
+  assert.ok(save.indexOf("if (!written.ok) return") > 0 && save.indexOf("if (!written.ok) return") < save.indexOf("mirrorCoverageFromPicks("));
+  // D2: fail closed returns before any tenants update.
+  const mirrorFn = server.slice(server.indexOf("export async function mirrorCoverageFromPicks"));
+  assert.ok(mirrorFn.indexOf("if (mirror.failClosed)") > 0 && mirrorFn.indexOf("if (mirror.failClosed)") < mirrorFn.indexOf(".update("));
+  assert.match(mirrorFn, /unmapped_all/);
+  assert.match(mirrorFn, /movedFrom,\s*homeCounty: businessHomeCounty/);
 });
 
 test("every Desk save path reaches saveAreaPicks (settings page, onboarding step, confirm nudge)", () => {

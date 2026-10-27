@@ -1,32 +1,35 @@
 /**
  * Compat mirror: Service area picks (tenant_area_picks) -> the old coverage fields prod Voice reads.
+ * Rule v1 agreed with Brain (27 Oct, /workspace/briefs/_relay/areas-picks-to-coverage-rule-v1.md) with Chief's
+ * defaults on the open questions, plus Chief's lossless rule.
  *
  * Prod Voice (main) has no tenant_area_picks reader. It reads:
  *   - business_policies.coverage_areas: ["county:<name>" | "place:<name>"], names from
- *     kenyaPlaceCounties.json, max 40 (src/conversation/coverageAreas.js parseCoverageAreas).
+ *     kenyaPlaceCounties.json, max 40 (src/conversation/coverageAreas.js:17 parseCoverageAreas).
  *     A county id covers every place in that county; a place id covers that name only.
- *   - business_policies.coverage_outside: { anywhere_kenya: true, fee_ksh } (src/conversation/outsideAreas.js).
- *   - tenants.service_areas.areas[] terms (fee per listed id) when VOICE_AREA_FEES is on (src/conversation/areaTerms.js).
- *     A fee is spoken only when source "owner" and confirmed true.
+ *   - business_policies.coverage_outside: { anywhere_kenya: true, fee_ksh } (outsideAreas.js:24). The prompt prints
+ *     the anywhere-Kenya line only next to a coverage_areas array (businessPolicies.js:104-121).
+ *   - tenants.service_areas.areas[] terms when VOICE_AREA_FEES is on (areaTerms.js:60). Fee spoken only when
+ *     source "owner" and confirmed true.
  *
- * Every Desk write to tenant_area_picks must also write the result of this function
- * (lib/areaPicks.server.ts saveAreaPicks). tests/areaPicksToCoverageAreas.test.ts guards both.
+ * Every Desk write to tenant_area_picks goes through lib/areaPicks.server.ts saveAreaPicks, which mirrors with
+ * this function. tests/areaPicksToCoverageAreas.test.ts guards the mapping and the write path.
  *
- * Mapping rules (the old shape has no exclusions and no notes):
- *   - Serving pick on "ke" -> coverage_outside { anywhere_kenya: true, fee_ksh: its fee }.
- *   - Serving pick on a county -> "county:<name>".
- *   - Serving pick on a town or estate -> "place:<name>" (name or alias that the place index puts in that county).
- *   - Exclusions (serve false) cannot be expressed: the covering county or "anywhere in Kenya" still lists them.
- *     They are returned in `lossy` so callers and reviewers can see them.
- *   - Nodes the old index cannot name (Wajir, Mandera, Trans Nzoia, county-named towns like Kisumu town)
- *     are left out and returned in `unmapped`.
- *   - Fee: the resolved fee for that node (own pick or serving ancestor). Fee set -> fee_mode "fixed";
- *     no fee -> "ask" (team confirms). Notes are not mirrored.
- *   - No serving pick at all -> coverage_areas null (key removed): "not set", never "serves nowhere".
- *   - Lossless (Chief, 27 Oct): an id already in coverage_areas is never dropped by a save unless the owner
- *     removed it. Removed = the picks before this save covered it and the new picks do not. Kept ids come
- *     first so the 40 cap never cuts them. Ids the tree cannot place are always kept. This is what keeps a
- *     backfilled "ke"-only tenant's named home area (["county:nairobi"] + anywhere in Kenya).
+ * Rule:
+ *   1. Serving picks: "ke" -> coverage_outside {anywhere_kenya, fee}; county -> "county:<key>";
+ *      town/estate -> "place:<name|alias>" the index knows (not a county name, prefers one filed under its county).
+ *      A town named after its county (Kiambu, Kisii, Nakuru...) uses an index alias filed under that county
+ *      ("kiambu cbd", "nakuru town"), never the whole county. Fee = resolved fee (own or serving ancestor):
+ *      "fixed" when set, else "ask"; confirmed = picks confirmed. Modes/eta from the prior term. Notes not mirrored.
+ *   2. Lossless (Chief): an id already in coverage_areas stays unless the owner removed it in this save (covered by
+ *      the picks before, not now) or now explicitly excluded it. Kept ids go first so the cap never cuts them.
+ *   3. D1 anchor when only "ke" serves and step 1+2 give no ids: ke row moved_from ids, then the business county
+ *      (last resort), each only if the picks cover it; else [] (never null: null hides the outside line), `anchorless`.
+ *   4. D2 fail closed: serving picks exist but no ids and no anywhere-Kenya -> `failClosed`: the writer keeps the
+ *      stale list, warns the owner and logs unmapped_all. Never "[]" without anywhere-Kenya while picks serve.
+ *   5. D3 exclusions can't be expressed: the covering area stays listed (wrong yes), `lossy`, owner sees a banner.
+ *   6. Unmapped nodes are left out (`unmapped`). Counties, then places; dedupe; cap 40 (`overflow`).
+ *   7. No serving pick at all -> both keys removed ("not set").
  *
  * Pure and browser-safe. Relative imports only so node tests can load it.
  */
@@ -38,6 +41,8 @@ export const COVERAGE_MIRROR_MAX = 40;
 
 const COUNTIES = new Set<string>(INDEX.counties as string[]);
 const PLACES = INDEX.places as Record<string, string[]>;
+/** Index aliases for a county-named town, in order ("kiambu cbd", "nakuru town", "bungoma town centre", "kisumu central"). */
+const COUNTY_TOWN_SUFFIXES = ["town", "cbd", "town centre", "central"] as const;
 
 export type MirrorAreaTerm = {
   id: string;
@@ -63,8 +68,14 @@ export type CoverageMirror = {
   overflow: boolean;
   /** Prior coverage ids kept that no serving pick names directly (lossless rule). */
   kept: string[];
-  /** Prior coverage ids dropped because the owner removed them (covered before this save, not now). */
+  /** Prior coverage ids dropped because the owner removed or excluded them. */
   dropped: string[];
+  /** D1: ids added as the anchor for a ke-only business, and where from. */
+  anchor: { ids: string[]; from: "moved_from" | "business_county" | "none" } | null;
+  /** D1(d): ke-only with no anchor; coverage_areas is []. */
+  anchorless: boolean;
+  /** D2: serving picks map to nothing; do not write, keep the stale list, warn and log unmapped_all. */
+  failClosed: boolean;
 };
 
 /** Old county key for a tree county node ("county:muranga" -> "muranga"), or null. */
@@ -83,7 +94,15 @@ export function oldPlaceKey(nodeId: string): string | null {
   if (!n || (n.kind !== "town" && n.kind !== "estate")) return null;
   const c = countyOf(nodeId);
   const county = c ? oldCountyKey(c.id) : null;
-  const cands = [n.name, ...n.aliases].map(normAreaText).filter((k) => k && !COUNTIES.has(k) && PLACES[k]);
+  const names = [n.name, ...n.aliases].map(normAreaText);
+  const cands = names.filter((k) => k && !COUNTIES.has(k) && PLACES[k]);
+  // A town named after its county: an index alias filed under that county ("kiambu cbd"), never the county.
+  if (!cands.length && county && names.some((k) => COUNTIES.has(k))) {
+    for (const suffix of COUNTY_TOWN_SUFFIXES) {
+      const k = `${normAreaText(n.name)} ${suffix}`;
+      if (PLACES[k]?.includes(county)) return k;
+    }
+  }
   // A place id covers that name only, so a name the index files under another county is still exact.
   return cands.find((k) => county && PLACES[k].includes(county)) ?? cands[0] ?? null;
 }
@@ -142,35 +161,49 @@ export function areaPicksToCoverageAreas(
     priorCoverage?: unknown;
     /** Picks before this save (the stored row, or what the page showed). null: none. */
     priorPicks?: AreaPicks | null;
+    /** tenant_area_picks.moved_from (D1 anchor b). */
+    movedFrom?: string[] | null;
+    /** Business county from its locations, tree id "county:<slug>" (D1 anchor c). */
+    homeCounty?: string | null;
   } = {},
 ): CoverageMirror {
   const serving = picks.picks.filter((p) => p.serve);
-  const out: CoverageMirror = { coverage_areas: null, coverage_outside: null, terms: [], unmapped: [], lossy: [], overflow: false, kept: [], dropped: [] };
+  const out: CoverageMirror = {
+    coverage_areas: null, coverage_outside: null, terms: [], unmapped: [], lossy: [], overflow: false,
+    kept: [], dropped: [], anchor: null, anchorless: false, failClosed: false,
+  };
   for (const p of picks.picks) {
     if (p.serve) continue;
-    // An exclusion under any covered ancestor is still listed by the old shape.
-    const n = areaNode(p.node);
-    const parent = n?.parent ?? null;
+    // An exclusion under a covered ancestor is still listed by the old shape (D3).
+    const parent = areaNode(p.node)?.parent ?? null;
     if (parent && resolveArea(picks, parent).covered) out.lossy.push(p.node);
   }
-  // Lossless: prior ids stay unless the owner removed them in this save.
+  const prior = priorIds(opts.priorCoverage);
+  // 7. No serving pick at all: "not set". Every prior id counts as removed by the owner.
+  if (!serving.length) {
+    out.dropped = prior;
+    return out;
+  }
+
+  const nodeFor = new Map<string, string>();
+  // 2. Lossless: prior ids stay unless removed or excluded by the owner in this save.
   const keptPrior: string[] = [];
-  const priorNode = new Map<string, string>();
-  for (const id of priorIds(opts.priorCoverage)) {
+  for (const id of prior) {
     const node = nodeForOldId(id);
     if (!node) {
       keptPrior.push(id);
       continue;
     }
-    priorNode.set(id, node);
-    const now = resolveArea(picks, node).covered;
+    const now = resolveArea(picks, node);
     const before = opts.priorPicks ? resolveArea(opts.priorPicks, node).covered : true;
-    if (now || !before) keptPrior.push(id);
-    else out.dropped.push(id);
+    const excluded = !now.covered && now.via != null;
+    if (now.covered || (!before && !excluded)) {
+      keptPrior.push(id);
+      nodeFor.set(id, node);
+    } else out.dropped.push(id);
   }
-  if (!serving.length && !keptPrior.length) return out;
 
-  const defaultMode = opts.vertical === "home_services" ? "visit" : "delivery";
+  // 1. Serving picks.
   const counties: string[] = [];
   const places: string[] = [];
   for (const p of serving) {
@@ -184,27 +217,50 @@ export function areaPicksToCoverageAreas(
       continue;
     }
     (id.startsWith("county:") ? counties : places).push(id);
+    if (!nodeFor.has(id)) nodeFor.set(id, p.node);
   }
-  // Kept prior ids first (never cut by the cap), then counties (widest cover), then places.
   const fromPicks = new Set([...counties, ...places]);
   out.kept = keptPrior.filter((id) => !fromPicks.has(id));
-  const ids = [...new Set([...keptPrior, ...counties, ...places])];
+  let ids = [...new Set([...keptPrior, ...counties, ...places])];
+
+  // 3. D1: ke-only anchor.
+  if (!ids.length && out.coverage_outside) {
+    const covered = (oldId: string) => {
+      const node = nodeForOldId(oldId);
+      if (!node) return true; // ke covers every Kenyan place the tree can't name
+      if (!resolveArea(picks, node).covered) return false;
+      nodeFor.set(oldId, node);
+      return true;
+    };
+    const moved = priorIds(opts.movedFrom).filter((id) => prodParses(id) && covered(id));
+    const home = opts.homeCounty ? oldCoverageId(opts.homeCounty) : null;
+    if (moved.length) out.anchor = { ids: moved, from: "moved_from" };
+    else if (home && covered(home)) out.anchor = { ids: [home], from: "business_county" };
+    else {
+      out.anchor = { ids: [], from: "none" };
+      out.anchorless = true;
+    }
+    ids = out.anchor.ids;
+  }
+
+  // 4. D2: serving picks that reach nothing.
+  if (!ids.length && !out.coverage_outside) {
+    out.failClosed = true;
+    return out;
+  }
+
   out.overflow = ids.length > COVERAGE_MIRROR_MAX;
   const kept = ids.slice(0, COVERAGE_MIRROR_MAX);
   out.coverage_areas = kept;
-  const nodeFor = new Map<string, string>();
-  for (const p of serving) {
-    const id = p.node === ROOT_ID ? null : oldCoverageId(p.node);
-    if (id && !nodeFor.has(id)) nodeFor.set(id, p.node);
-  }
-  for (const [id, node] of priorNode) if (!nodeFor.has(id)) nodeFor.set(id, node);
+  const defaultMode = opts.vertical === "home_services" ? "visit" : "delivery";
   out.terms = kept.map((id) => {
     const node = nodeFor.get(id);
-    const prior = existingTerm(opts.priorServiceAreas, id);
-    if (!node && prior) return { ...(prior as MirrorAreaTerm), id };
-    const fee = node ? resolveArea(picks, node).fee_kes : null;
-    const priorModes = Array.isArray(prior?.modes) ? (prior!.modes as unknown[]).map(String).filter((m) => MODES.has(m)) : [];
-    const eta = typeof prior?.eta === "string" && prior.eta.trim() ? prior.eta.trim() : null;
+    const priorTerm = existingTerm(opts.priorServiceAreas, id);
+    if (!node && priorTerm) return { ...(priorTerm as MirrorAreaTerm), id };
+    // An id the tree can't place under a ke-only business takes ke's fee (same quote as anywhere else).
+    const fee = node ? resolveArea(picks, node).fee_kes : out.coverage_outside?.fee_ksh ?? null;
+    const priorModes = Array.isArray(priorTerm?.modes) ? (priorTerm!.modes as unknown[]).map(String).filter((m) => MODES.has(m)) : [];
+    const eta = typeof priorTerm?.eta === "string" && priorTerm.eta.trim() ? priorTerm.eta.trim() : null;
     return {
       id,
       modes: (priorModes.length ? priorModes : [defaultMode]) as MirrorAreaTerm["modes"],
@@ -216,6 +272,23 @@ export function areaPicksToCoverageAreas(
     };
   });
   return out;
+}
+
+/** Same acceptance as prod parseCoverageAreas for one id. */
+function prodParses(id: string): boolean {
+  const split = id.indexOf(":");
+  const kind = id.slice(0, split);
+  const name = id.slice(split + 1);
+  if (kind === "county") return COUNTIES.has(name);
+  if (kind === "place") return Boolean(PLACES[name]) && !COUNTIES.has(name);
+  return false;
+}
+
+/** Owner-facing notes for the line the phone reads (D2/D3 banner). Names, not ids. */
+export function areaLineNotes(picks: AreaPicks): { yesStill: string[]; notOnLine: string[]; nothingReaches: boolean } {
+  const m = areaPicksToCoverageAreas(picks);
+  const name = (id: string) => areaNode(id)?.name ?? id;
+  return { yesStill: m.lossy.map(name), notOnLine: m.unmapped.map(name), nothingReaches: m.failClosed };
 }
 
 /** business_policies with the mirror applied. Other keys untouched. */
