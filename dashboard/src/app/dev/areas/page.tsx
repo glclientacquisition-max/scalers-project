@@ -27,7 +27,7 @@ export default async function DevAreasPage({ searchParams }: { searchParams: Pro
   return (
     <div className="desk-theme min-h-dvh bg-canvas">
       <div className="mx-auto max-w-2xl">
-        <AreaPicker initialPicks={sp.start === "moved" ? moveOverAreas(OLD).picks : fixture()} oldList={OLD} confirmState={sp.start === "moved" ? "old_only" : sp.start === "confirmed" ? "confirmed" : sp.start === "edited" ? "edited" : "unconfirmed"} initialView={view} saveAction={devSaveAreaPicksAction} />
+        <AreaPicker initialPicks={sp.start === "moved" ? moveOverAreas(OLD).picks : fixture()} oldList={OLD} confirmed={sp.start === "confirmed"} initialView={view} saveAction={devSaveAreaPicksAction} />
       </div>
     </div>
   );
