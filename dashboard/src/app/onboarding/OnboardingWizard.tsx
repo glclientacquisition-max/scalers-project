@@ -36,6 +36,7 @@ import { parseVertical } from "@/lib/vertical";
 import { parseHandoffMode } from "@/lib/handoffMode";
 import { emptyAreaPicks } from "@/lib/areaPicks";
 import { OnboardingAreasPanel } from "./OnboardingAreasPanel";
+import { businessHomeCounty } from "@/lib/businessCounty";
 
 const STEPS = [
   "Business type",
@@ -358,7 +359,11 @@ export function OnboardingWizard() {
               Same picker as Settings. You can skip and finish this later.
             </p>
             <div className="mt-4">
-              <OnboardingAreasPanel initialPicks={emptyAreaPicks()} oldList={[]} />
+              <OnboardingAreasPanel
+                initialPicks={emptyAreaPicks()}
+                oldList={[]}
+                homeCounty={businessHomeCounty([{ landmark, address: directions }])}
+              />
             </div>
           </div>
         ) : null}

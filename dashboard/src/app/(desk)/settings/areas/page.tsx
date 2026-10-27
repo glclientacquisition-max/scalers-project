@@ -7,6 +7,8 @@ import { settingsConsoleClass } from "@/components/settingsUi";
 import { AreaPicker, type AreaView } from "@/components/areas/AreaPicker";
 import { emptyAreaPicks, moveOverAreas } from "@/lib/areaPicks";
 import { loadAreaPicks, oldCoverageList } from "@/lib/areaPicks.server";
+import { businessHomeCounty } from "@/lib/businessCounty";
+import { normalizeBusinessLocations } from "@/lib/businessLocations";
 import { memberCan } from "@/lib/requireMember";
 import { loadSettingsStatuses } from "@/lib/settingsRailStatus";
 import { getCurrentTenant } from "@/lib/tenant";
@@ -26,6 +28,9 @@ async function AreasBody({ searchParams }: { searchParams: Promise<{ view?: stri
   // First visit: start from the moved-over old list; the owner confirms it on Check your areas.
   const initialPicks = row ? row.picks : oldList.length ? moveOverAreas(oldList).picks : emptyAreaPicks();
   const confirmed = Boolean(row?.confirmed_at);
+  const homeCounty = businessHomeCounty(
+    normalizeBusinessLocations((tenant as { business_locations?: unknown }).business_locations),
+  );
   let view = parseView((await searchParams).view);
   if (view === "home" && !row && oldList.length) view = "check";
   if (view === "check" && !oldList.length) view = "home";
@@ -34,7 +39,7 @@ async function AreasBody({ searchParams }: { searchParams: Promise<{ view?: stri
       <div className={settingsConsoleClass}>
         <SettingsRail optionStatus={statuses} activePath="/settings/areas" />
         <div className="min-w-0 flex-1 md:max-w-2xl" data-area-picker="">
-          <AreaPicker initialPicks={initialPicks} oldList={oldList} confirmed={confirmed} initialView={view} />
+          <AreaPicker initialPicks={initialPicks} oldList={oldList} confirmed={confirmed} initialView={view} homeCounty={homeCounty} />
         </div>
       </div>
     </div>
