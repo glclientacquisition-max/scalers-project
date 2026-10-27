@@ -156,7 +156,7 @@ Business-owner nav stays: Calls · Business · Sign out.
 - [ ] Ops can open `/admin` and see accurate platform KPIs.
 - [ ] Ops can list every business and see who is waiting for a number.
 - [ ] Ops can add a DID, assign it to a waiting business, and release it back to Available.
-- [ ] A business can be archived with a reason, restored, and deleted for good 30 days after archive. `+254709221536` (Aris, live) is never released.
+- [ ] A business can be archived with a reason, restored, and deleted for good 30 days after archive. `+254709221536` is treated like any other number (protected line lifted 27 Oct 2026).
 - [ ] Every admin write shows in Activity: who, what, which business, before and after, when.
 - [ ] Business-owner login never sees Admin nav or `/admin` data.
 - [ ] UI copy says Business, not Tenant.
