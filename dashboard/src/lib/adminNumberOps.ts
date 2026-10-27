@@ -66,7 +66,7 @@ function businessOf(input: NumberOpInput): string | null {
   return null;
 }
 
-/** One ops_audit_log row per attempt that reached the RPC, plus refusals of the protected line. */
+/** One ops_audit_log row per change that the RPC made (or found already done). */
 export async function auditNumberOp(entry: {
   actor: string;
   input: NumberOpInput | null;

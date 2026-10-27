@@ -16,7 +16,7 @@ last_reviewed: 2026-10-09
 | Prod voice | `+254709221536`, Aris Kenya (agent Lynn) |
 | WhatsApp Cloud (`metadata.phone_number_id` `1237105982825100`) | Scalers platform sender `+254709221536` |
 
-Inbound chat routes on `phone_number_id`, never `resolveTenantId(DID)`. Pool status for `+254709221536` must never be `available`.
+Inbound chat routes on `phone_number_id`, never `resolveTenantId(DID)`. Releasing `+254709221536` in Admin (allowed since 27 Oct 2026) does not move the WhatsApp Cloud identity, which routes on `phone_number_id`.
 
 Ops:
 
