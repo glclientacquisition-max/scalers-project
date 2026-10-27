@@ -89,7 +89,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (249)
+## Functions (250)
 
 | Function | Defined in |
 | --- | --- |
@@ -213,6 +213,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_spend_allows_charge` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_spend_limit_kes` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_version_price_kes` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
+| `brain_write_receipts_fill_call_id` | `docs/supabase/brain_write_receipts_call_id_fill.sql` |
 | `bump_call_stream_seq` | `docs/supabase/greeting_language.sql` |
 | `call_setup_valid` | `supabase/migrations/20261018130000_tenant_call_setup.sql` |
 | `charge_call_to_wallet` | `docs/supabase/fix_charge_call_wallet_ambiguous.sql`<br>`docs/supabase/one_wallet_billing.sql`<br>`docs/supabase/wallet_on_demand_alerts.sql` |

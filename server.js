@@ -109,7 +109,8 @@ const {
 } = require('./src/prompts');
 const { createVoiceTrace } = require('./src/speech/voiceTrace');
 const { brainV2ShadowEnabled, createBrainV2Shadow } = require('./src/conversation/v2Shadow');
-const { brainV2Enabled, brainV2Mode } = require('./src/conversation/v2/flag');
+const { brainV2Enabled, brainV2Mode, brainEnginesOn } = require('./src/conversation/v2/flag');
+const { createEnginesFillerTurn } = require('./src/speech/enginesFillerStanddown');
 const brainV1Draft = require('./src/conversation/v2/v1draft');
 const { planFillerCut, carryHeldSpeech } = require('./src/speech/fillerCut');
 const { createBrainV2Live } = require('./src/conversation/v2/liveTurn');
@@ -4638,7 +4639,28 @@ mediaWss.on('connection', (ws, req) => {
         let v1Chain = Promise.resolve();
         let v1Streamed = 0;
         let v1Filler = null;
-        if (v1DraftOn) {
+        // BRAIN_ENGINES (#975): the Brain emits its own topic filler ({ filler: true }) at 700 ms. One filler per
+        // turn: a Brain filler stands Voice's 900 ms filler down (and the reverse); a streamed result is never
+        // re-spoken. Off = the v1Filler / onV1Sentence code below, unchanged.
+        const enginesFiller = v1DraftOn && brainModelLead.leadOn({ tenantId: brainProfile?.id }) && brainEnginesOn({ tenantId: brainProfile?.id })
+          ? createEnginesFillerTurn({
+              fillerMs: brainV1Draft.DEADLINES.fillerMs,
+              isBarged: () => bargeInActive === true,
+              pickVoiceFiller: () => pickContextualAck(clean, fillerLanguage(callLanguage)),
+              playFiller: (text) => {
+                fillerPending = true;
+                return speakThinkingAck(text).catch(() => {}).finally(() => { fillerPending = false; abortPendingFiller = false; });
+              },
+              speakLine: (text) => speakText(text, { tracePath: 'brain_v1_draft', skipFileGate: true }),
+              cutFillerForReply,
+              phaseA: v1PhaseA,
+              markFiller: () => { if (turnTiming && typeof turnTiming.markFiller === 'function') turnTiming.markFiller(); },
+              markFirstSpokenChunk: () => { if (turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') turnTiming.markFirstSpokenChunk(); },
+              log: (m) => console.log(`[ws/media][${callKey}] ${m}`),
+            })
+          : null;
+        if (enginesFiller) enginesFiller.arm();
+        if (v1DraftOn && !enginesFiller) {
           v1Filler = setTimeout(() => {
             v1Filler = null;
             if (v1Streamed || bargeInActive) return;
@@ -4650,7 +4672,9 @@ mediaWss.on('connection', (ws, req) => {
             speakThinkingAck(f).catch(() => {}).finally(() => { fillerPending = false; abortPendingFiller = false; });
           }, brainV1Draft.DEADLINES.fillerMs);
         }
-        const onV1Sentence = v1DraftOn
+        const onV1Sentence = enginesFiller
+          ? enginesFiller.onSentence
+          : v1DraftOn
           ? (s) => {
               if (v1Filler) { clearTimeout(v1Filler); v1Filler = null; }
               if (!v1Streamed && turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') turnTiming.markFirstSpokenChunk();
@@ -4674,11 +4698,15 @@ mediaWss.on('connection', (ws, req) => {
           { log: (m) => console.log(`[ws/media][${callKey}] ${m}`) }
         );
         if (v1Filler) { clearTimeout(v1Filler); v1Filler = null; }
+        if (enginesFiller) enginesFiller.cancel();
         console.log(`[ws/media][${callKey}] brain_v2_live owned lang=${live.lang}${live.path ? ` path=${live.path}` : ''}${live.endHeld ? ` end_held=${live.endHeld}` : ''}: ${live.line}`);
         callTranscript.pushAgent(live.line);
         v1HeardMark = callTranscript.size();
         let spoken;
-        if (live.streamed && v1Streamed) {
+        const enginesSpoken = enginesFiller ? await enginesFiller.finish(live) : null;
+        if (enginesSpoken) {
+          spoken = enginesSpoken.spoken;
+        } else if (live.streamed && v1Streamed) {
           spoken = await v1Chain;
         } else {
           if (turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') {

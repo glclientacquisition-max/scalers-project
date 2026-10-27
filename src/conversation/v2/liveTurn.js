@@ -2,7 +2,8 @@
 // Live BA v2 turn. BRAIN_V2=on and BRAIN_V2_MODE=live. Speaks receipt
 // sentences. Writes go through createLiveHandlers. Flag off = unused.
 
-const { brainV2Enabled, brainV2Mode } = require('./flag');
+const { brainV2Enabled, brainV2Mode, brainEnginesOn } = require('./flag');
+const BE = require('./brainEngines');
 const { createState, turnLang } = require('./machine');
 const { runTurnStream } = require('./stream');
 const { createLiveHandlers } = require('./liveHandlers');
@@ -216,7 +217,12 @@ function createBrainV2Live(opts = {}) {
     // Phase B (single brain): v2's call plan decides the step and does the writes FIRST (rules, no model);
     // then the model speaks every turn, phrasing that step. No owner switch. Template = total fallback.
     // BRAIN_MODEL_LEAD: one structured model call leads; code owns state and guards (off = the #932 path below)
-    if (vd && vdMode === 'on' && ML.leadOn({ env, tenantId: profile?.id })) return runModelLead({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine });
+    if (vd && vdMode === 'on' && ML.leadOn({ env, tenantId: profile?.id })) {
+      if (brainEnginesOn({ env, tenantId: profile?.id })) {
+        return runBrainEngines({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine });
+      }
+      return runModelLead({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine });
+    }
     const core = !!vd && CC.coreOn({ env, tenantId: profile?.id });
     if (vd && vdMode === 'on' && (core || CP.phaseB({ env, tenantId: profile?.id }))) return runPhaseB({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine, vd, core });
     if (vd && vdMode === 'on') {
@@ -363,8 +369,13 @@ function createBrainV2Live(opts = {}) {
     return leadStreams;
   }
   /** G5 + one name state: the booking write carries a clock the executor keeps, and the saved row must equal the read-back. */
+  function enginesCallIdResolver() {
+    if (typeof opts.resolveCallId === 'function') return opts.resolveCallId;
+    return async (sid) => { try { const db = require('../../db'); if (typeof db.getCall !== 'function') return null; const row = await db.getCall(sid); return (row && row.id) || null; } catch { return null; } };
+  }
   function leadHandlers(machine, profile, log) {
-    const h = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName } });
+    const engines = brainEnginesOn({ env, tenantId: profile?.id });
+    const h = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName, ...(engines ? { resolveCallId: enginesCallIdResolver() } : {}) } });
     const create = h.createAppointment; const update = h.updateAppointment;
     h.createAppointment = async (args) => {
       const m = String(args.whenText || '').match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})$/);
@@ -389,6 +400,42 @@ function createBrainV2Live(opts = {}) {
     const save = h.saveCallerInfo;
     h.saveCallerInfo = async (args) => { const locked = CP.lockedName(machine); const same = locked && args && String(args.name || '').toLowerCase() === String(locked).toLowerCase(); return applyTools ? (async () => { const ex = await applyTools({ saveCallerInfo: args, name: args?.name, ...(same ? { v2NameLocked: true } : {}) }); return ex; })() : save(args); };
     return h;
+  }
+
+  async function runBrainEngines({ text, profile, langLock, shouldAbort, onSentence, machine }) {
+    const clock = typeof opts.clock === 'function' ? opts.clock : () => Date.now();
+    const sf = leadStreamFor();
+    const ids = MS.resolveModelIds(env);
+    const handlers = leadHandlers(machine, profile, []);
+    const abort = typeof shouldAbort === 'function' ? shouldAbort : () => false;
+    const r = await BE.runBrainEnginesTurn({
+      text,
+      profile,
+      machine,
+      env,
+      streamFor: sf,
+      modelId: ids.primary,
+      langLock: langLock === 'en' || langLock === 'sw' ? langLock : null,
+      shouldAbort: abort,
+      onSentence,
+      applyTools,
+      handlers,
+      opts: {
+        ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null },
+        clock,
+        now: nowFn,
+        log: opts.log || (() => {}),
+        // the owner alert rides on the saved row (executor); an extra escalation alert only when injected
+        ...(opts.enginesNotify ? { notify: opts.enginesNotify } : {}),
+        ...(opts.dispatchEscalationAlert ? { dispatch: opts.dispatchEscalationAlert } : {}),
+        onModelStage: typeof opts.onModelStage === 'function' ? opts.onModelStage : null,
+        traceTurnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex : null,
+      },
+    });
+    // end-call contract: same gate as every v2 path (never while a read-back or write is pending)
+    const endCall = endDecision({ done: { end: r.end === true, endReason: r.reason || 'caller_done', toolResults: r.write && r.write.status !== 'committed' ? [{ ok: false }] : [] }, machine, profile, line: r.line, alreadyEnded: endSent });
+    if (endCall.end) endSent = true;
+    return { ...r, end: endCall.end, ...(endCall.end ? { reason: endCall.reason } : { reason: undefined }), ...(endCall.held ? { endHeld: endCall.held } : {}) };
   }
 
   async function runModelLead({ text, profile, langLock, shouldAbort, onSentence, machine }) {
@@ -430,8 +477,12 @@ function createBrainV2Live(opts = {}) {
     // join rule (split): understanding, or the reply's first sentence, or understandCapMs, whichever first. Never discards a late understanding.
     if (split) await Promise.race([uP, s1P, new Promise((r) => setTimeout(r, DL.understandCapMs ?? 1100))]);
     else await Promise.race([uP, new Promise((r) => setTimeout(r, DL.understandWaitMs))]);
-    const u = live.u || (split ? machine.leadLateU || null : null);
+    let u = live.u || (split ? machine.leadLateU || null : null);
     if (split && machine.leadLateU) machine.leadLateU = null;
+    if (!u && split) {
+      const logFn = opts.log || ((m) => console.log(m));
+      logFn(`[brain_model_lead] understanding null after race (cap=${DL.understandCapMs ?? 1100}ms, uDone=${live.uDone}); rules and late understanding only`);
+    }
     // a unique caller-file match fills the booking to change (never a past row); the machine's read-back still confirms it
     if (lk && rowTurn && lk.match.kind === 'unique' && machine.slots && !machine.slots.row) { const row = (machine.file && machine.file.openRows || []).find((r) => r.id === lk.match.row_id); if (row) machine.slots.row = row; }
     // 3) the state owner applies the turn (rules veto; the model's understanding is evidence)
