@@ -92,11 +92,16 @@ export type DeskLookupPreviewResult = {
   stampTone: "ok" | "attention" | "neutral";
 };
 
+/**
+ * Read only: shows what the Business Assistant would say from the business facts every member
+ * already sees on Overview. Same read gate as the other view actions (overview.view), so staff
+ * are never refused where viewers are let in (settings.view excludes staff).
+ */
 export async function previewDeskLookupAction(
   kind: string,
   query: string
 ): Promise<{ ok: true; result: DeskLookupPreviewResult } | { ok: false; error: string }> {
-  const denied = await memberDenied("settings.view");
+  const denied = await memberDenied("overview.view");
   if (denied) return { ok: false, error: denied.error };
   if (!deskLookupPreview()) {
     return { ok: false, error: "Preview is not enabled." };

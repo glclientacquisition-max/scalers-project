@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useDeskRole } from "@/components/DeskRole";
 import { Button } from "@/components/ui/Button";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { Sheet } from "@/components/ui/Sheet";
@@ -15,6 +16,7 @@ import {
   validatePlace,
   type BusinessLocation,
 } from "@/lib/businessLocations";
+import { deniedMessage } from "@/lib/permissions";
 import { AddRow, OpenRow } from "./PickList";
 
 const FIND_US_MAX = 400;
@@ -23,6 +25,8 @@ const FIND_US_MAX = 400;
  * Your places / branches. A grouped list; each place opens a bottom drawer with kit fields:
  * name, area (from the directory), street, landmark, Find us, and hours (business hours
  * unless switched off). Controlled: the Settings form saves the list with Locations.
+ * Without edit rights (view-only members) rows still open, but the drawer only shows the
+ * details: no fields, no Done, no Remove.
  */
 export function PlacesEditor({
   value,
@@ -47,6 +51,7 @@ export function PlacesEditor({
   const [areaQuery, setAreaQuery] = useState("");
   const [error, setError] = useState("");
   const [confirmRemove, setConfirmRemove] = useState<number | null>(null);
+  const role = useDeskRole();
   const rows = value.filter((l) => validatePlace(l).label === undefined);
   const results = useMemo(
     () => (areaQuery.trim() ? searchAreaOptions(areaQuery, draft.area_id ? [draft.area_id] : [], 6) : []),
@@ -63,7 +68,7 @@ export function PlacesEditor({
   }
 
   function save() {
-    if (index == null) return;
+    if (index == null || !canEdit) return;
     const next = { ...draft, hours: ownHours ? (draft.hours ?? "").trim() : "" };
     const first = Object.values(validatePlace(next))[0];
     if (first) return setError(first);
@@ -76,7 +81,7 @@ export function PlacesEditor({
 
   // Remove saves the page at once, so ask first. Cancel goes back to the drawer as it was.
   function remove() {
-    if (index == null) return;
+    if (index == null || !canEdit) return;
     setConfirmRemove(index);
     setIndex(null);
   }
@@ -104,14 +109,15 @@ export function PlacesEditor({
         {hint ? <p className="px-4 pt-3 text-meta text-ink-2">{hint}</p> : null}
         {value.map((loc, i) =>
           validatePlace(loc).label ? null : (
-            <OpenRow
-              key={`place-${i}`}
-              id={`place-row-${i}`}
-              title={loc.label || (loc.area_id ? coverageAreaLabel(loc.area_id) : "Place")}
-              value={placeSummary(loc) || undefined}
-              disabled={!canEdit}
-              onOpen={() => open(i)}
-            />
+            // Opening a place only shows it, so the row is exempt from the view-only lock.
+            <div key={`place-${i}`} data-role-exempt="">
+              <OpenRow
+                id={`place-row-${i}`}
+                title={loc.label || (loc.area_id ? coverageAreaLabel(loc.area_id) : "Place")}
+                value={placeSummary(loc) || undefined}
+                onOpen={() => open(i)}
+              />
+            </div>
           )
         )}
         {rows.length === 0 ? (
@@ -123,7 +129,32 @@ export function PlacesEditor({
       </SettingsGroup>
 
       <Sheet
-        open={index != null}
+        open={index != null && !canEdit}
+        onOpenChange={(o) => !o && setIndex(null)}
+        title={draft.label || (draft.area_id ? coverageAreaLabel(draft.area_id) : "Place")}
+        description="What callers hear when they ask where you are."
+      >
+        <div className="space-y-4" data-place-readonly="">
+          <dl className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline bg-surface">
+            {[
+              ["Area", draft.area_id ? coverageAreaLabel(draft.area_id) : ""],
+              ["Street or building", draft.address],
+              ["Landmark", draft.landmark],
+              ["Find us", draft.directions],
+              ["Hours", ownHours ? draft.hours ?? "" : businessHours ? `Same as business hours: ${businessHours}` : "Same as business hours"],
+            ].map(([label, text]) => (
+              <div key={label} className="px-3 py-2.5">
+                <dt className="text-meta text-ink-2">{label}</dt>
+                <dd className={`mt-0.5 text-body [overflow-wrap:anywhere] ${text ? "text-ink" : "text-ink-2"}`}>{text || "Not added"}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="text-meta text-ink-2">{deniedMessage(role)}</p>
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={index != null && canEdit}
         onOpenChange={(o) => !o && setIndex(null)}
         title={isNew ? "Add a place" : draft.label || "Place"}
         description="What callers hear when they ask where you are."

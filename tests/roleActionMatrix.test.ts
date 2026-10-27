@@ -51,7 +51,8 @@ const EXPECT: Record<string, Array<"admin" | "staff" | "viewer">> = {
   inboxBulkAction: ["admin", "staff"], retryCallTextAction: ["admin", "staff"],
   saveOverviewHoursAction: ["admin"], saveOverviewPaymentsAction: ["admin"], saveOverviewPricesAction: ["admin"],
   saveAreaPicksAction: ["admin"], savePolicyTopicAction: ["admin"], saveUnknownAnswerByKindAction: ["admin"],
-  previewDeskLookupAction: ["admin", "viewer"],
+  // Read only preview of what the assistant will say: every member, like the other read actions.
+  previewDeskLookupAction: ["admin", "staff", "viewer"],
 };
 
 it("every guarded action is in the expected matrix (and vice versa)", () => {
@@ -67,3 +68,13 @@ for (const role of ROLES) {
     }
   });
 }
+
+it("read actions never let viewers in while refusing staff", () => {
+  const perms = actionPerms();
+  // Known exception, owned by the pronunciation work, not changed here.
+  const SKIP = new Set(["loadPronunciationReviewQueueAction"]);
+  for (const [fn, perm] of Object.entries(perms)) {
+    if (SKIP.has(fn)) continue;
+    if (can("viewer", perm)) assert.ok(can("staff", perm), `${fn} (${perm}) lets viewers in but not staff`);
+  }
+});
