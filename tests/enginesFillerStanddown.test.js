@@ -109,6 +109,110 @@ test('only one filler per turn even if the Brain emits two', (t) => {
   assert.equal(fillers().length, 1);
 });
 
+// ---- uncuttable:true (Brain #975 contract): reply waits for the filler; barge-in and the 2000 ms cap still cut
+function uncutHarness({ barged = () => false, clock } = {}) {
+  const ev = [];
+  let finishFiller;
+  const gate = createEnginesFillerTurn({
+    fillerMs: 900,
+    isBarged: barged,
+    pickVoiceFiller: () => 'Sawa.',
+    playFiller: (text, src) => { ev.push({ kind: 'filler', src, text }); return new Promise((r) => { finishFiller = () => { ev.push({ kind: 'filler_end' }); r({ ok: true }); }; }); },
+    speakLine: async (text) => { ev.push({ kind: 'line', text }); return { ok: true }; },
+    cutFillerForReply: async () => { ev.push({ kind: 'cut' }); return true; },
+    phaseA: true,
+    log: (m) => ev.push({ kind: 'log', m }),
+    now: clock,
+  });
+  return { gate, ev, endFiller: () => finishFiller(), kinds: () => ev.filter((e) => e.kind !== 'log').map((e) => e.kind) };
+}
+const flush = async () => { for (let i = 0; i < 20; i += 1) await Promise.resolve(); };
+
+test('uncuttable: reply ready mid-filler starts right after the filler ends; filler is not cut', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const { gate, endFiller, kinds } = uncutHarness({ clock: () => Date.now() });
+  gate.arm();
+  t.mock.timers.tick(700);
+  gate.onSentence({ text: 'Let me check our hours.', filler: true, uncuttable: true });
+  t.mock.timers.tick(200);
+  gate.onSentence({ text: 'We open at 7:30 AM today.' }); // reply ready while the filler plays
+  await flush();
+  t.mock.timers.tick(500);
+  await flush();
+  assert.deepEqual(kinds(), ['filler'], 'reply waits, no cut');
+  endFiller(); // filler plays out (~700 ms)
+  await flush();
+  const r = await gate.finish({ streamed: true, line: 'We open at 7:30 AM today.' });
+  assert.deepEqual(r.spoken, { ok: true });
+  assert.deepEqual(kinds(), ['filler', 'filler_end', 'line']);
+});
+
+test('uncuttable: caller barge-in still cuts it (no wait, no line)', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  let barged = false;
+  const { gate, kinds } = uncutHarness({ barged: () => barged, clock: () => Date.now() });
+  gate.arm();
+  t.mock.timers.tick(700);
+  gate.onSentence({ text: 'Let me check our hours.', filler: true, uncuttable: true });
+  gate.onSentence({ text: 'We open at 7:30 AM today.' });
+  await flush();
+  barged = true; // server.js barge-in cuts the filler stream (existing path); the gate stops waiting
+  t.mock.timers.tick(40);
+  await flush();
+  const r = await gate.finish({ streamed: true, line: 'We open at 7:30 AM today.' });
+  assert.deepEqual(r.spoken, { ok: false, barged: true });
+  assert.deepEqual(kinds(), ['filler']);
+});
+
+test('uncuttable: a stuck filler is cut at 2000 ms playout, logged, then the reply plays', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const { gate, ev, kinds } = uncutHarness({ clock: () => Date.now() });
+  gate.arm();
+  t.mock.timers.tick(700);
+  gate.onSentence({ text: 'Let me check our hours.', filler: true, uncuttable: true });
+  t.mock.timers.tick(100);
+  gate.onSentence({ text: 'We open at 7:30 AM today.' });
+  await flush();
+  t.mock.timers.tick(1899); // 1999 ms of playout
+  await flush();
+  assert.deepEqual(kinds(), ['filler']);
+  t.mock.timers.tick(1); // 2000 ms
+  await flush();
+  assert.deepEqual(kinds(), ['filler', 'cut', 'line']);
+  assert.ok(ev.some((e) => e.kind === 'log' && /uncuttable filler cap: cut after 2000ms playout/.test(e.m)));
+  const { UNCUTTABLE_CAP_MS } = require('../src/speech/enginesFillerStanddown');
+  assert.equal(UNCUTTABLE_CAP_MS, 2000);
+});
+
+test('without uncuttable: the Phase A min-playout cut runs as before (cut, then line)', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const { gate, kinds } = uncutHarness({ clock: () => Date.now() });
+  gate.arm();
+  t.mock.timers.tick(700);
+  gate.onSentence({ text: 'Let me check our hours.', filler: true });
+  gate.onSentence({ text: 'We open at 7:30 AM today.' });
+  await flush();
+  assert.deepEqual(kinds(), ['filler', 'cut', 'line']);
+  // and Voice's own filler is never treated as uncuttable
+  const v = uncutHarness({ clock: () => Date.now() });
+  v.gate.arm();
+  t.mock.timers.tick(900);
+  v.gate.onSentence({ text: 'We open at 7:30 AM today.' });
+  await flush();
+  assert.deepEqual(v.kinds(), ['filler', 'cut', 'line']);
+});
+
+test('uncuttable filler already finished before the reply: no wait, no cut', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const { gate, endFiller, kinds } = uncutHarness({ clock: () => Date.now() });
+  gate.onSentence({ text: 'Let me check our hours.', filler: true, uncuttable: true });
+  endFiller();
+  await flush();
+  gate.onSentence({ text: 'We open at 7:30 AM today.' });
+  await flush();
+  assert.deepEqual(kinds(), ['filler', 'filler_end', 'line']);
+});
+
 // server.js wiring: the gate is used only when BRAIN_ENGINES (+ BRAIN_MODEL_LEAD path) is on; off = today's code.
 test('server.js: flag-off keeps the v1Filler / onV1Sentence / v1Chain path; gate is BRAIN_ENGINES-gated', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
@@ -117,6 +221,11 @@ test('server.js: flag-off keeps the v1Filler / onV1Sentence / v1Chain path; gate
   assert.match(src, /const onV1Sentence = enginesFiller\n\s+\? enginesFiller\.onSentence\n\s+: v1DraftOn/);
   assert.match(src, /const enginesSpoken = enginesFiller \? await enginesFiller\.finish\(live\) : null;/);
   assert.match(src, /\} else if \(live\.streamed && v1Streamed\) \{\n\s+spoken = await v1Chain;/);
+  // the filler never reaches the transcript: only live.line is pushed, and the gate has no transcript hook
+  assert.match(src, /if \(enginesFiller\) enginesFiller\.cancel\(\);\n.*\n\s+callTranscript\.pushAgent\(live\.line\);/);
+  assert.match(src, /return speakThinkingAck\(text\)\.catch/);
+  const gateSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'speech', 'enginesFillerStanddown.js'), 'utf8');
+  assert.doesNotMatch(gateSrc, /pushAgent|callTranscript|appendTranscript/);
 });
 
 test('flag: BRAIN_ENGINES off by default', () => {
@@ -165,6 +274,9 @@ test('e2e #975: slow reply -> Brain filler at 700 ms, Voice 900 ms filler stands
   const { r, fillers, lines, fin } = await runTurn({ replyDelayMs: 1200 });
   assert.equal(r.streamed, true);
   assert.equal(r.filler, 'Let me check our hours.');
+  // filler stays out of live.line / sentences (so out of the transcript)
+  assert.doesNotMatch(r.line, /Let me check our hours/);
+  assert.ok(r.sentences.every((x) => !x.filler && !/Let me check our hours/.test(x.text)));
   assert.deepEqual(fillers.map((f) => f.src), ['brain']);
   assert.equal(lines.join(' '), r.line);
   assert.equal(lines.length, r.sentences.length);

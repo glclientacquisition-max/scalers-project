@@ -4649,7 +4649,7 @@ mediaWss.on('connection', (ws, req) => {
               pickVoiceFiller: () => pickContextualAck(clean, fillerLanguage(callLanguage)),
               playFiller: (text) => {
                 fillerPending = true;
-                speakThinkingAck(text).catch(() => {}).finally(() => { fillerPending = false; abortPendingFiller = false; });
+                return speakThinkingAck(text).catch(() => {}).finally(() => { fillerPending = false; abortPendingFiller = false; });
               },
               speakLine: (text) => speakText(text, { tracePath: 'brain_v1_draft', skipFileGate: true }),
               cutFillerForReply,
