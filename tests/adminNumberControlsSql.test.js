@@ -70,7 +70,7 @@ test('every writer needs actor + reason, writes audit, and locks rows', () => {
   assert.match(body('admin_move_number'), /p_confirm is distinct from true/);
 });
 
-// v1 as applied (historical). v1.2 (20261027130500) removes this refusal; see adminNumberControlsV12Sql.test.js.
+// v1 as applied (historical). v1.2 (20261027125836) removes this refusal; see adminNumberControlsV12Sql.test.js.
 test('v1 (superseded by v1.2): protected number +254709221536 refused in any form, by last 9 digits', () => {
   assert.match(body('_admin_did_is_protected'), /= '709221536'/);
   assert.match(body('_admin_did_last9'), /right\(regexp_replace\(p_number, '\\D', '', 'g'\), 9\)/);

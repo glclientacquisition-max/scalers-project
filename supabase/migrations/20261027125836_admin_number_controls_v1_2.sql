@@ -1,6 +1,8 @@
 -- Admin number controls v1.2: +254709221536 is releasable like any other number.
 -- Alvin, 27 Oct 2026 15:54 EAT (relayed by Scalers Chief): "yes we want it release able".
 -- Run after supabase/migrations/20261027082533_admin_number_controls_v1_1.sql.
+-- STATUS: APPLIED to staging (sgcdncjxauhsbunobmob) 27 Oct 2026 15:58 EAT, version 20261027125836 (file
+--   renamed to match). PROD (fjxcdccgyhnvnnlnovcl): PENDING Alvin's yes in Platform's chat.
 --
 -- Replaces admin_restore_business_number, admin_lift_quarantine and admin_move_number with the
 -- same bodies minus every `perform public._admin_did_refuse_protected(...)` call (same

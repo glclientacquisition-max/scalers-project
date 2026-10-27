@@ -159,12 +159,12 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `admin_hold_number_for_winback` | `docs/supabase/number_hold_winback.sql` |
 | `admin_import_promoted_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_issue_credit_note` | `docs/supabase/admin_invoice_actions.sql` |
-| `admin_lift_quarantine` | `docs/supabase/admin_number_controls_v1.sql`<br>`docs/supabase/admin_number_controls_v1_2.sql`<br>`docs/supabase/admin_number_controls_v1_2_down.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql`<br>`supabase/migrations/20261027130500_admin_number_controls_v1_2.sql` |
+| `admin_lift_quarantine` | `docs/supabase/admin_number_controls_v1.sql`<br>`docs/supabase/admin_number_controls_v1_2.sql`<br>`docs/supabase/admin_number_controls_v1_2_down.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql`<br>`supabase/migrations/20261027125836_admin_number_controls_v1_2.sql` |
 | `admin_list_package_versions` | `docs/supabase/package_version_editor.sql` |
-| `admin_move_number` | `docs/supabase/admin_number_controls_v1.sql`<br>`docs/supabase/admin_number_controls_v1_1.sql`<br>`docs/supabase/admin_number_controls_v1_2.sql`<br>`docs/supabase/admin_number_controls_v1_2_down.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql`<br>`supabase/migrations/20261027082533_admin_number_controls_v1_1.sql`<br>`supabase/migrations/20261027130500_admin_number_controls_v1_2.sql` |
+| `admin_move_number` | `docs/supabase/admin_number_controls_v1.sql`<br>`docs/supabase/admin_number_controls_v1_1.sql`<br>`docs/supabase/admin_number_controls_v1_2.sql`<br>`docs/supabase/admin_number_controls_v1_2_down.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql`<br>`supabase/migrations/20261027082533_admin_number_controls_v1_1.sql`<br>`supabase/migrations/20261027125836_admin_number_controls_v1_2.sql` |
 | `admin_move_subscribers_to_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_publish_package_version` | `docs/supabase/package_version_editor.sql` |
-| `admin_restore_business_number` | `docs/supabase/admin_number_controls_v1.sql`<br>`docs/supabase/admin_number_controls_v1_2.sql`<br>`docs/supabase/admin_number_controls_v1_2_down.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql`<br>`supabase/migrations/20261027130500_admin_number_controls_v1_2.sql` |
+| `admin_restore_business_number` | `docs/supabase/admin_number_controls_v1.sql`<br>`docs/supabase/admin_number_controls_v1_2.sql`<br>`docs/supabase/admin_number_controls_v1_2_down.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql`<br>`supabase/migrations/20261027125836_admin_number_controls_v1_2.sql` |
 | `admin_restore_held_number` | `docs/supabase/number_hold_winback.sql` |
 | `admin_set_billing_runtime_switch` | `docs/supabase/billing_payment_runtime_flags.sql` |
 | `admin_set_business_suspended` | `docs/supabase/admin_business_suspend.sql` |

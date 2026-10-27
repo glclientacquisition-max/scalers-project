@@ -10,7 +10,7 @@ const { test } = require('node:test');
 
 const root = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
-const MIG = 'supabase/migrations/20261027130500_admin_number_controls_v1_2.sql';
+const MIG = 'supabase/migrations/20261027125836_admin_number_controls_v1_2.sql';
 const up = read(MIG);
 const docsCopy = read('docs/supabase/admin_number_controls_v1_2.sql');
 const down = read('docs/supabase/admin_number_controls_v1_2_down.sql');

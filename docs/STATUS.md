@@ -21,7 +21,7 @@ New agent or new human: read this whole page before you touch code.
 
 Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b66e1661`** (#647, merged 17 Oct 22:12 EAT). Prod `/healthz` reports this SHA, started 17 Oct 22:13 EAT. Staging Voice is pinned to **`aa872ade`** (branch `staging/pin-738-main-8ee9`: #738 on top of `main` @ `8ee9b161`); staging `/healthz` reports it, started 17 Oct 21:51 EAT. The old kitchen pin `1374b25d` is gone.
 
-Prod DID **+254709221536** (on Grow Tech Nurseries on prod since 27 Oct; earlier notes call it the Aris line): since 27 Oct 2026 (Alvin, 15:54 EAT, "yes we want it release able") it is an ordinary number in Admin, with Unlock, a typed reason, a confirm sheet and an audit row like any other. Admin number controls v1.2 removes the refusal (staging first; prod on Alvin's yes). Esga is on prod DID +254709221542. Staging DID is **+254709221537** (staging tenant Jirani Cleaning Services, *per team notes*).
+Prod DID **+254709221536** (on Grow Tech Nurseries on prod since 27 Oct; earlier notes call it the Aris line): since 27 Oct 2026 (Alvin, 15:54 EAT, "yes we want it release able") it is an ordinary number in Admin, with Unlock, a typed reason, a confirm sheet and an audit row like any other. Admin number controls v1.2 removes the refusal: applied on staging 27 Oct 15:58 EAT (`20261027125836`); prod pending Alvin's yes. Esga is on prod DID +254709221542. Staging DID is **+254709221537** (staging tenant Jirani Cleaning Services, *per team notes*).
 
 **Product is callbacks only (#658, 11 Oct).** There is no live call transfer: the assistant takes a message and alerts a teammate. [`LIVE_TRANSFER.md`](archive/LIVE_TRANSFER.md) is archived as history.
 

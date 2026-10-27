@@ -1,4 +1,4 @@
--- Rollback for supabase/migrations/20261027130500_admin_number_controls_v1_2.sql.
+-- Rollback for supabase/migrations/20261027125836_admin_number_controls_v1_2.sql.
 -- Restores the +254709221536 refusal exactly as v1 + v1.1 had it: re-creates
 -- _admin_did_is_protected and _admin_did_refuse_protected, and the three RPCs with their
 -- refusal calls (restore + lift as v1 20261027081642, move as v1.1 20261027082533).
