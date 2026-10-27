@@ -74,6 +74,14 @@ export function DeskLandScope({
   return <DeskLandCtx.Provider value={landed}>{children}</DeskLandCtx.Provider>;
 }
 
+/**
+ * Land class for a row that renders its own root (ListRow's <li>), so it can't be
+ * wrapped in DeskLandSurface without breaking <ul> markup.
+ */
+export function useDeskLandClass(id: string): string {
+  return useContext(DeskLandCtx).has(id) ? deskJustLandedClass : "";
+}
+
 export function DeskLandSurface({
   id,
   as: Tag = "div",
