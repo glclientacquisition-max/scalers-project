@@ -2,7 +2,7 @@
 
 import { AlertContactsList } from "@/components/AlertContactsList";
 
-import { withRoleGate } from "@/components/DeskRole";
+import { useCan, withRoleGate } from "@/components/DeskRole";
 import { CharCount as KitCharCount, FieldCard, TextAreaField, TextField } from "@/components/ui/TextField";
 import { POLICY_TEXT_MAX } from "@/lib/lengthLimits";
 import { normalizeContactPhone } from "@/lib/teamValidation";
@@ -421,6 +421,8 @@ function TenantFormInner({
   /** Shared save pattern: a save started or landed (BusinessSettingsShell keeps the mount). */
   onSaveActivity?: () => void;
 }) {
+  // View-only members still open place details; PlacesEditor shows them read-only.
+  const canEditSettings = useCan("settings.edit");
   const voiceOptions =
     curatedVoices && curatedVoices.length
       ? curatedVoices
@@ -2189,6 +2191,7 @@ function TenantFormInner({
                 : undefined
           }
           businessHours={formatHoursForOwner(hoursSchedule)}
+          canEdit={canEditSettings}
           onSave={(rows) => {
             setLocations(rows);
             const first = rows[0];

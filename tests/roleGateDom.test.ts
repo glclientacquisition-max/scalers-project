@@ -48,10 +48,23 @@ it("viewer lock: edits locked, expand/collapse stays usable", { skip: !parseHTML
 
 it("places gate edits by role; gate no longer uses a disabled fieldset", () => {
   const root = path.join(TEST_DIR, "..");
-  // The inline place toggle left TenantForm with PlacesEditor (list plus sheet); rows and Add follow canEdit.
+  // PlacesEditor (list plus sheet). Add follows canEdit; rows always open. Without edit rights the
+  // row is exempt from the view-only lock and opens a details-only drawer (no fields, Done or Remove).
   const places = fs.readFileSync(path.join(root, "dashboard/src/components/structured/PlacesEditor.tsx"), "utf8");
-  assert.match(places, /disabled=\{!canEdit\}/);
+  assert.doesNotMatch(places, /disabled=\{!canEdit\}/);
+  assert.match(places, /<div key=\{`place-\$\{i\}`\} data-role-exempt="">\s*<OpenRow/);
   assert.match(places, /canEdit && value\.length < LOCATIONS_MAX \?/);
+  assert.match(places, /open=\{index != null && !canEdit\}/);
+  assert.match(places, /open=\{index != null && canEdit\}/);
+  const ro = places.slice(places.indexOf('data-place-readonly=""'), places.indexOf("open={index != null && canEdit}"));
+  assert.ok(ro.length > 0, "read-only drawer present");
+  assert.doesNotMatch(ro, /TextField|TextAreaField|<Switch|<Button|onSave|data-place-save/, "read-only drawer has no edit controls");
+  assert.match(ro, /deniedMessage\(role\)/);
+  assert.match(places, /function save\(\) \{\s*if \(index == null \|\| !canEdit\) return;/);
+  assert.match(places, /function remove\(\) \{\s*if \(index == null \|\| !canEdit\) return;/);
+  const form = fs.readFileSync(path.join(root, "dashboard/src/components/TenantForm.tsx"), "utf8");
+  assert.match(form, /const canEditSettings = useCan\("settings\.edit"\);/);
+  assert.match(form, /<PlacesEditor[\s\S]{0,800}canEdit=\{canEditSettings\}/);
   const gate = fs.readFileSync(path.join(root, "dashboard/src/components/DeskRole.tsx"), "utf8");
   assert.doesNotMatch(gate, /<fieldset disabled/);
   assert.match(gate, /onSubmitCapture=\{\(e\) => e\.preventDefault\(\)\}/);
