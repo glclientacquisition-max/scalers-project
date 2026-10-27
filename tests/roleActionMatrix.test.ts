@@ -41,7 +41,7 @@ const EXPECT: Record<string, Array<"admin" | "staff" | "viewer">> = {
   confirmPriceAction: ["admin"], saveBusinessCategoryAction: ["admin"], correctCallFactsAction: ["admin", "staff"], addFaqFromInsightAction: ["admin"],
   previewCatalogImportAction: ["admin"], applyCatalogImportAction: ["admin"], extractKnowledgeAction: ["admin"], applyIngestAction: ["admin"],
   screenPronunciationSuggestionsAction: ["admin"], confirmPronunciationRecording: ["admin"], persistPronunciationLexicon: ["admin"], minePronunciationFromCallsAction: ["admin"], quickAddPronunciationAction: ["admin"],
-  loadPronunciationReviewQueueAction: ["admin", "viewer"], geminiScanRecentCallsAction: ["admin"], approveGeminiScanCandidateAction: ["admin"], dismissGeminiScanCandidateAction: ["admin"], queueGeminiCandidateForRecordingAction: ["admin"],
+  loadPronunciationReviewQueueAction: ["admin", "staff", "viewer"], geminiScanRecentCallsAction: ["admin"], approveGeminiScanCandidateAction: ["admin"], dismissGeminiScanCandidateAction: ["admin"], queueGeminiCandidateForRecordingAction: ["admin"],
   inviteMemberAction: ["admin"], resendInviteAction: ["admin"], revokeInviteAction: ["admin"], changeMemberRoleAction: ["admin"], removeMemberAction: ["admin"], transferOwnershipAction: [],
   saveOnDemandUsage: ["admin"],
   confirmPlanChange: ["admin"], setExtraSeatsAction: ["admin"], markBillingNoticeRead: ["admin"],
@@ -51,7 +51,8 @@ const EXPECT: Record<string, Array<"admin" | "staff" | "viewer">> = {
   inboxBulkAction: ["admin", "staff"], retryCallTextAction: ["admin", "staff"],
   saveOverviewHoursAction: ["admin"], saveOverviewPaymentsAction: ["admin"], saveOverviewPricesAction: ["admin"],
   saveAreaPicksAction: ["admin"], savePolicyTopicAction: ["admin"], saveUnknownAnswerByKindAction: ["admin"],
-  previewDeskLookupAction: ["admin", "viewer"],
+  // Read only preview of what the assistant will say: every member, like the other read actions.
+  previewDeskLookupAction: ["admin", "staff", "viewer"],
 };
 
 it("every guarded action is in the expected matrix (and vice versa)", () => {
@@ -67,3 +68,10 @@ for (const role of ROLES) {
     }
   });
 }
+
+it("read actions never let viewers in while refusing staff", () => {
+  const perms = actionPerms();
+  for (const [fn, perm] of Object.entries(perms)) {
+    if (can("viewer", perm)) assert.ok(can("staff", perm), `${fn} (${perm}) lets viewers in but not staff`);
+  }
+});
