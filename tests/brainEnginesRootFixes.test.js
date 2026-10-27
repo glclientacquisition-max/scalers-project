@@ -306,7 +306,7 @@ test('understanding first: hard cap holds, rules fallback answers, one meaningfu
   assert.ok(ms < 1500, `turn took ${ms} ms`);
   const f = r.streamed.filter((s) => s.filler);
   assert.equal(f.length, 1);
-  assert.equal(f[0].text, 'Let me check our hours.');
+  assert.equal(f[0].text, 'Checking our hours.');
   assert.doesNotMatch(f[0].text, /^(sawa|okay)/i);
   assert.equal(c.traces[0].understanding.source, 'fallback');
   assert.equal(c.traces[0].understanding.fallbackReason, 'timeout');
@@ -399,4 +399,54 @@ test('no dead air: the one filler also covers a slow reply (fast understanding),
   const r2 = await c2.say({ say: 'What time do you open today please?', u: U({ intent: 'ask', answers: ['hours'] }), reply: 'We open at 7:30 AM today.' });
   await new Promise((res) => setTimeout(res, 800));
   assert.equal(r2.streamed.some((s) => s.filler), false, 'fast turn: no filler, and none fires late');
+});
+
+// ------------------------------------------------------------------ filler contract (Voice #976 stands down on it)
+const { LINES: FILLER_LINES, fillerDelayMs, FILLER_MAX_MS } = require('../src/conversation/v2/engineFiller');
+
+test('filler contract: sent once per turn as {text, lang, filler:true, uncuttable:true}, before the real line, even on a very slow turn', async () => {
+  const c = makeCall({ now: MONDAY_10AM, understandDelayMs: 300, replyDelayMs: 300, env: { BRAIN_ENGINES_UNDERSTAND_MS: '1500', BRAIN_ENGINES_FILLER_MS: '40' } });
+  for (const step of [
+    { say: 'What time do you open today please?', u: U({ intent: 'ask', answers: ['hours'] }), reply: 'We open at 7:30 AM today.' },
+    { say: 'Na mnafika Rongai kweli?', u: U({ intent: 'ask', lang: 'sw', answers: ['coverage'], slots: { place: 'Rongai' } }), reply: 'Ndio, tunafika Ongata Rongai.' },
+  ]) {
+    const r = await c.say(step);
+    const f = r.streamed.filter((s) => s.filler);
+    assert.equal(f.length, 1, 'exactly one filler this turn');
+    assert.deepEqual(Object.keys(f[0]).sort(), ['filler', 'lang', 'text', 'uncuttable']);
+    assert.equal(f[0].filler, true);
+    assert.equal(f[0].uncuttable, true);
+    assert.ok(['en', 'sw'].includes(f[0].lang));
+    assert.equal(r.streamed[0], f[0], 'the filler comes first');
+    assert.ok(r.streamed.slice(1).every((s) => !s.filler && !s.uncuttable), 'real lines are not marked as filler');
+  }
+});
+
+test('filler lines are short (about three words, under ~1 s spoken) and never a bare ack', () => {
+  for (const [k, v] of Object.entries(FILLER_LINES)) {
+    for (const lang of ['en', 'sw']) {
+      const t = v[lang];
+      assert.ok(t.split(/\s+/).length <= 3, `${k}/${lang} too many words: ${t}`);
+      assert.ok(t.length <= 22, `${k}/${lang} too long to say in ~1 s: ${t}`);
+      assert.doesNotMatch(t, /^(sawa|okay|ok|sure)[.!]?$/i);
+    }
+  }
+});
+
+test('BRAIN_ENGINES_FILLER_MS defaults to 700 and is clamped to 850 so it always beats Voice\'s 900 ms filler', async () => {
+  assert.equal(FILLER_MAX_MS, 850);
+  assert.equal(fillerDelayMs({}), 700);
+  assert.equal(fillerDelayMs({ BRAIN_ENGINES_FILLER_MS: '' }), 700);
+  assert.equal(fillerDelayMs({ BRAIN_ENGINES_FILLER_MS: 'abc' }), 700);
+  assert.equal(fillerDelayMs({ BRAIN_ENGINES_FILLER_MS: '600' }), 600);
+  assert.equal(fillerDelayMs({ BRAIN_ENGINES_FILLER_MS: '850' }), 850);
+  assert.equal(fillerDelayMs({ BRAIN_ENGINES_FILLER_MS: '900' }), 850);
+  assert.equal(fillerDelayMs({ BRAIN_ENGINES_FILLER_MS: '5000' }), 850);
+  assert.equal(fillerDelayMs({ BRAIN_ENGINES_FILLER_MS: '0' }), 0);
+  // end to end: a misconfigured 5000 ms still fires at the clamp, before 900 ms
+  const c = makeCall({ now: MONDAY_10AM, understandDelayMs: 1200, env: { BRAIN_ENGINES_FILLER_MS: '5000' } });
+  const r = await c.say({ say: 'What time do you open today please?', u: U({ intent: 'ask', answers: ['hours'] }), reply: 'We open at 7:30 AM today.' });
+  assert.equal(r.streamed[0].filler, true);
+  // armed at the 850 clamp (not 5000): fired after 850 and before the 1200 ms understanding returned
+  assert.ok(c.traces[0].filler.atMs >= 849 && c.traces[0].filler.atMs < 1200, `filler at ${c.traces[0].filler.atMs} ms`);
 });
