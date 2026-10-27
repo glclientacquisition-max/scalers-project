@@ -24,7 +24,7 @@ export const REASON_MAX = 500;
 /** Calls can still reach the old business for this long after a move (Voice tenant cache). */
 export const MOVE_CACHE_SECONDS = 30;
 
-export const PROTECTED_COPY = "This is the protected platform line. Admin can't move, free or restore it.";
+export const PROTECTED_COPY = "This is the protected platform line. Admin can't release, assign, hold, move or restore it.";
 
 function digits(v: string): string {
   return v.replace(/\D/g, "");
@@ -40,6 +40,20 @@ export function last9(v: unknown): string | null {
 export function isProtectedNumber(v: unknown): boolean {
   return last9(v) === PROTECTED_LAST9;
 }
+
+/**
+ * Shared server refusal for every Admin number write (did-pool, number-hold, businesses,
+ * number-ops). Pass any number fields from the request body. Pure: call it before any
+ * database read or write. Returns the 403 body, or null when no protected number is named.
+ */
+export function protectedNumberRefusal(...numbers: unknown[]): { status: 403; body: { error: string; code: "protected_number" } } | null {
+  return numbers.some((n) => isProtectedNumber(n))
+    ? { status: 403, body: { error: PROTECTED_COPY, code: "protected_number" } }
+    : null;
+}
+
+/** Business-level writes (archive, release by business id): refuse when its live number is the protected line. */
+export const PROTECTED_BUSINESS_ACTIONS: ReadonlySet<string> = new Set(["archive", "release_did"]);
 
 /** "+254 7xx", "2547xx", "07xx", "7xx" → "+2547xxxxxxxx". Null when it can't be a Kenyan number. */
 export function normalizeKenyanE164(v: unknown): string | null {
