@@ -43,7 +43,11 @@ describe("attention (error) text contrast", () => {
   });
 
   it("no error text uses an undefined danger colour", () => {
-    const src = fs.readFileSync(path.join(root, "dashboard/src/components/structured/ServiceAreasEditor.tsx"), "utf8");
-    assert.doesNotMatch(src, /text-danger/);
+    // ServiceAreasEditor and CoverageAreaField were removed in #964 (43d9870b). Service areas is AreaPicker on Settings › Service areas.
+    for (const f of ["dashboard/src/components/areas/AreaPicker.tsx", "dashboard/src/components/structured/PlacesEditor.tsx"]) {
+      const src = fs.readFileSync(path.join(root, f), "utf8");
+      assert.doesNotMatch(src, /text-danger/, f);
+    }
+    assert.match(fs.readFileSync(path.join(root, "dashboard/src/components/areas/AreaPicker.tsx"), "utf8"), /!msg\.ok \? "text-attention"/);
   });
 });
