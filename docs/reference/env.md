@@ -168,8 +168,8 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SUPABASE_ANON_KEY` | desk | `dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_PUBLISHABLE_KEY` | desk | `dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_RECORDINGS_BUCKET` | voice | `src/db.js` |
-| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/supabase.ts`<br>+12 more |
-| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/invoicePay/provider.js`<br>+15 more |
+| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/supabase.ts`<br>+13 more |
+| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/invoicePay/provider.js`<br>+16 more |
 | `TENANT_DID` | voice | `server.js`<br>`src/db.js` |
 | `TENANT_ID` | scripts, voice | `scripts/bench-inbound-webhook.js`<br>`scripts/smoke-db.js`<br>`server.js`<br>+1 more |
 | `TEXTSMS_API_KEY` | desk, voice | `dashboard/src/lib/callerSms.ts`<br>`src/notifications/sms.js` |
