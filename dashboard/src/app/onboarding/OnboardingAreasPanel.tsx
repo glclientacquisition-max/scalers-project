@@ -13,7 +13,17 @@ export function OnboardingAreasPanel({
   oldList: string[];
 }) {
   return (
-    <div className="-mx-2 min-h-[min(70dvh,640px)]" data-area-picker="">
+    <div
+      className="-mx-2 min-h-[min(70dvh,640px)]"
+      data-area-picker=""
+      // The picker sits inside the onboarding form. Enter in its search box must
+      // not submit the whole wizard; picks save through the picker's own action.
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+          event.preventDefault();
+        }
+      }}
+    >
       <AreaPicker
         initialPicks={initialPicks}
         oldList={oldList}
