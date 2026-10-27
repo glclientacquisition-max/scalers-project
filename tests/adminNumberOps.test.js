@@ -1,6 +1,6 @@
 /**
  * Admin number controls v1 (27 Oct 2026): server-action validation and copy.
- * Protected line refused before step-up and RPC; empty reason refused; noop → "Already done";
+ * Every number treated the same (no protected line); empty reason refused; noop → "Already done";
  * RPC errors → plain copy with no raw SQL text. Route gated by Unlock and registered.
  */
 const { describe, it } = require("node:test");
@@ -17,49 +17,47 @@ const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
 const LONG_DASH = /[\u2013\u2014]/;
 
-describe("protected line", () => {
-  it("+254709221536 is refused in every form, before anything else", async () => {
-    const { validateNumberOp, isProtectedNumber, PROTECTED_COPY } = await load();
+describe("+254709221536 is an ordinary number (protected line lifted 27 Oct 2026, Alvin)", () => {
+  it("passes validation in every form, same as any other number", async () => {
+    const mod = await load();
+    assert.equal(mod.isProtectedNumber, undefined);
+    assert.equal(mod.PROTECTED_COPY, undefined);
+    assert.equal(mod.PROTECTED_E164, undefined);
     for (const n of ["+254709221536", "254709221536", "0709221536", "709221536", "+254 709 221 536"]) {
-      assert.equal(isProtectedNumber(n), true, n);
-      for (const body of [
-        { action: "lift_quarantine", e164: n, reason: "test" },
-        { action: "move", e164: n, from_business_id: A, to_business_id: B, reason: "test", confirm: true },
-        { action: "restore", business_id: A, e164: n, reason: "test" },
-        { action: "lift_quarantine", e164: n, reason: "" },
-      ]) {
-        const r = validateNumberOp(body);
-        assert.equal(r.ok, false, `${body.action} ${n}`);
-        assert.equal(r.status, 403);
-        assert.equal(r.code, "protected_number");
-        assert.equal(r.error, PROTECTED_COPY);
-      }
+      const lift = mod.validateNumberOp({ action: "lift_quarantine", e164: n, reason: "test" });
+      assert.equal(lift.ok, true, n);
+      assert.equal(lift.input.e164, "+254709221536");
+      const move = mod.validateNumberOp({ action: "move", e164: n, from_business_id: A, to_business_id: B, reason: "test", confirm: true });
+      assert.equal(move.ok, true, n);
+      const restore = mod.validateNumberOp({ action: "restore", business_id: A, e164: n, reason: "test" });
+      assert.equal(restore.ok, true, n);
+      const noReason = mod.validateNumberOp({ action: "lift_quarantine", e164: n, reason: "" });
+      assert.equal(noReason.code, "reason_required", "still needs a typed reason");
     }
-    assert.equal(isProtectedNumber("+254709221537"), false);
-    assert.equal(isProtectedNumber("pending:709221536"), false);
   });
 
-  it("UI disables all three controls on the protected line and says why", async () => {
+  it("UI offers the same controls on 536 as on any other assigned number", async () => {
     const { numberOpsFor } = await load();
-    const row = { e164: "+254709221536", status: "assigned", businessId: A, lastBusinessId: null, businessActive: true };
-    assert.equal(numberOpsFor(row).protectedLine, true);
+    const row = (e164) => ({ e164, status: "assigned", businessId: A, lastBusinessId: null, businessActive: true });
+    assert.deepEqual(numberOpsFor(row("+254709221536")), numberOpsFor(row("+254709221537")));
+    assert.equal(numberOpsFor(row("+254709221536")).move, true);
     const ui = read("dashboard/src/components/admin/v2/NumberControls.tsx");
-    assert.match(ui, /disabled=\{ops\.protectedLine\}/);
-    assert.match(ui, /PROTECTED_COPY/);
+    assert.doesNotMatch(ui, /protectedLine|PROTECTED_COPY|data-protected-line/);
   });
 
-  it("route refuses before the Unlock gate and before the RPC", () => {
+  it("route: validate, then Unlock gate, then RPC; no protected-line branch", () => {
     const src = read("dashboard/src/app/api/admin/number-ops/route.ts");
     const v = src.indexOf("validateNumberOp(body)");
     const g = src.indexOf("stepUpGate(");
     const rpc = src.indexOf("runNumberOp(input");
     assert.ok(v > 0 && v < g && g < rpc, "validate, then gate, then RPC");
+    assert.doesNotMatch(src, /isProtectedNumber|protected_number/);
   });
 
-  it("RPC 42501 maps to the protected copy", async () => {
-    const { mapNumberOpError, PROTECTED_COPY } = await load();
-    const e = mapNumberOpError({ code: "42501", message: "protected number: +254709221536 cannot be changed from Admin", hint: "This line is protected. Ask Alvin." });
-    assert.deepEqual([e.status, e.code, e.error], [403, "protected_number", PROTECTED_COPY]);
+  it("42501 no longer maps to protected copy", async () => {
+    const { mapNumberOpError } = await load();
+    const e = mapNumberOpError({ code: "42501", message: "permission denied for function admin_move_number" });
+    assert.notEqual(e.code, "protected_number");
   });
 });
 
