@@ -85,19 +85,28 @@ test('disagree: a different intent is logged as agree=false and changes nothing'
   assert.equal(st.agree, false);
 });
 
-test('timeout: a stand-in over 900 ms is cut off, the rules line stands and the caller waits for nothing', async () => {
+test('timeout: a stand-in slower than the hard cap is cut off, the rules line stands and the caller waits for nothing', async (t) => {
+  // Fake clock (setTimeout + Date): no wall-clock timing. The cap is MS.HARD_CAP_MS (1800 since 19f5ea96;
+  // this test used to hard-code 900 with a 1500 ms stand-in, which no longer timed out).
   const off = liveWith({});
   const offOut = await off.live.run({ text: 'I want to book sofa cleaning', profile, langLock: 'en' });
-  const slow = standIn([call('propose_booking', { service_id: 'svc_0' })], { delayMs: 1500 });
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
+  const slow = standIn([call('propose_booking', { service_id: 'svc_0' })], { delayMs: MS.HARD_CAP_MS + 600 });
   const sh = liveWith({ BRAIN_V2_MODEL: 'shadow' }, { shadowModel: slow });
-  const t0 = Date.now();
   const out = await sh.live.run({ text: 'I want to book sofa cleaning', profile, langLock: 'en' });
-  const callerMs = Date.now() - t0;
-  assert.ok(callerMs < 400, `caller turn waited ${callerMs} ms`);
+  assert.equal(Date.now(), 0, 'the caller turn finished without any time passing: it never waited on the model');
   assert.equal(out.line, offOut.line);
-  const st = await sh.live.lastModelShadow();
+  // advance the fake clock in 50 ms steps (real setImmediate between steps lets the shadow arm its cap)
+  let st = null;
+  sh.live.lastModelShadow().then((v) => { st = v; });
+  for (let ms = 0; ms <= MS.HARD_CAP_MS + 600 && !st; ms += 50) {
+    await new Promise((r) => setImmediate(r));
+    t.mock.timers.tick(50);
+  }
+  await new Promise((r) => setImmediate(r));
+  assert.ok(st, 'the shadow settled');
   assert.equal(st.timedOut, true);
-  assert.ok(st.latencyMs >= 880 && st.latencyMs < 1300, String(st.latencyMs));
+  assert.equal(st.latencyMs, MS.HARD_CAP_MS);
   assert.equal(st.agree, false);
   assert.equal(st.proposal, null);
   assert.equal(st.tokens.estimated, true);

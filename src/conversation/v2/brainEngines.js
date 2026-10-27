@@ -1,7 +1,7 @@
 'use strict';
 // BRAIN_ENGINES (default off): understanding -> plan -> tools -> (commit gate) -> response -> guard -> speakable.
 //   1. Understanding first: ONE typed model call per turn, hard cap (BRAIN_ENGINES_UNDERSTAND_MS, 1500),
-//      no backup race; a meaningful filler only if the wait passes BRAIN_ENGINES_FILLER_MS (700).
+//      no backup race; a meaningful filler only if the wait passes BRAIN_ENGINES_FILLER_MS (700, clamped to 850).
 //      The turn language is decided once here and every line of the turn obeys it.
 //   2. Plan: one goal; slot preconditions before any write; pending read-back answered first.
 //   3. Response: the model writes every line except the read-back and the write-outcome line.
@@ -23,7 +23,7 @@ const { commitWrite, enforceCommitTruth, engState } = require('./engineCommit');
 const Lines = require('./engineLines');
 const { writeReply } = require('./engineReply');
 const { speakable } = require('./engineSpeech');
-const { pickFiller } = require('./engineFiller');
+const { pickFiller, fillerDelayMs } = require('./engineFiller');
 const { buildTrace, emitTrace } = require('./engineTrace');
 
 const ACK_ONLY = /^\W*(ok(?:ay)?|sawa|haya|poa|yes|yeah|yep|no|nope|ndio|ndiyo|hapana|eeh|sure|thanks?|thank you|asante(?: sana)?|alright)\W*$/i;
@@ -78,7 +78,7 @@ async function runBrainEnginesTurn({
 
   // 1) understanding first. One turn-level filler timer covers the WHOLE wait before the first real word
   // (understanding + reply + write): it fires once at BRAIN_ENGINES_FILLER_MS only if nothing was said yet.
-  const fillerMs = Number(env.BRAIN_ENGINES_FILLER_MS || 700);
+  const fillerMs = fillerDelayMs(env);
   let spokeReal = false; let turnLang = null;
   const fireFiller = () => {
     if (spokeReal || filler || shouldAbort()) return;
@@ -88,7 +88,8 @@ async function runBrainEnginesTurn({
     const atMs = clock() - T0;
     filler = { text: line, atMs, lang: fl };
     timings.fillerMs = atMs;
-    onSentence({ text: line, lang: fl, filler: true });
+    // at most once per turn; uncuttable = our own reply never cuts it mid-phrase (caller barge-in is Voice's call)
+    onSentence({ text: line, lang: fl, filler: true, uncuttable: true });
   };
   const fillerTimer = streaming && fillerMs > 0 ? setTimeout(fireFiller, fillerMs) : null;
   if (fillerTimer && fillerTimer.unref) fillerTimer.unref();
