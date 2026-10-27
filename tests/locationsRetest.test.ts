@@ -51,7 +51,7 @@ test("change fee with differing fees: 'Fees differ', empty amount", async () => 
   const f = m.commonFee(v.areas);
   assert.equal(f.differ, true);
   assert.equal(f.fee_ksh, null);
-  assert.match(read("../dashboard/src/components/structured/ServiceAreasEditor.tsx"), /Fees differ/);
+  // "Fees differ" UI went with ServiceAreasEditor in #964 (43d9870b): AreaPicker sets a fee per area row.
 });
 
 test("search: one county per label; added areas say Added", async () => {
@@ -62,6 +62,5 @@ test("search: one county per label; added areas say Added", async () => {
   const r = c.searchAreaOptions("ruaka", ["place:ruaka"], 5);
   assert.equal(r[0].id, "place:ruaka");
   assert.equal(r[0].added, true);
-  const ed = read("../dashboard/src/components/structured/ServiceAreasEditor.tsx");
-  assert.match(ed, /Added/);
+  // The "Added" list went with ServiceAreasEditor in #964 (43d9870b); the lib flag stays.
 });

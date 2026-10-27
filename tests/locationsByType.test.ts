@@ -82,13 +82,16 @@ test("migration accepts reach and no_premises", async () => {
   assert.match(sql, /no_premises/);
 });
 
-test("UI wiring: reach choice and branch hours in Locations", async () => {
+// The reach choice UI went with ServiceAreasEditor in #964 (43d9870b): Locations is branches only and where the
+// business works is AreaPicker. reachCopy / REACH_OPTIONS stay as lib for stored service_areas and are covered above.
+test("UI wiring: branch hours in Locations", async () => {
   const fs = await import("node:fs");
-  const ed = fs.readFileSync(new URL("../dashboard/src/components/structured/ServiceAreasEditor.tsx", import.meta.url), "utf8");
-  assert.match(ed, /reachCopy\(/);
-  assert.match(ed, /REACH_OPTIONS/);
   const form = fs.readFileSync(new URL("../dashboard/src/components/TenantForm.tsx", import.meta.url), "utf8");
   const places = fs.readFileSync(new URL("../dashboard/src/components/structured/PlacesEditor.tsx", import.meta.url), "utf8");
   assert.match(places, /place-hours/);
-  assert.match(form, /noPremises|no_premises/);
+  // #964 dropped the "no premises" switch from TenantForm (open design question, see PR). The settings save keeps
+  // the stored flag so a business without premises is still described that way.
+  assert.doesNotMatch(form, /noPremises|no_premises/);
+  const actions = fs.readFileSync(new URL("../dashboard/src/app/(desk)/settings/actions.ts", import.meta.url), "utf8");
+  assert.match(actions, /formatLocationsForCompiler\(businessLocations, \{ noPremises \}\)/);
 });

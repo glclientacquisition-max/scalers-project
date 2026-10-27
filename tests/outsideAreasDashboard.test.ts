@@ -42,16 +42,18 @@ test("callers hear and the prompt", () => {
   assert.match(sa.formatServiceAreasForCompiler(sa.normalizeServiceAreas({ areas: [nairobi] })), /A place not on this list is not covered/);
 });
 
-test("editor: question under the list, hidden for walk-in, fee optional", () => {
-  const src = read("dashboard/src/components/structured/ServiceAreasEditor.tsx");
-  assert.match(src, /Do you go outside these areas\?/);
-  assert.match(src, /Yes, anywhere in Kenya/);
-  assert.match(src, /outsideFeeHint/);
-  assert.match(src, /copy\.areas/);
+// #964 design: "anywhere in Kenya" is the top row of AreaPicker (the ke node), with an optional fee on its sheet.
+test("picker: anywhere in Kenya is the first row, fee optional", async () => {
+  const src = read("dashboard/src/components/areas/AreaPicker.tsx");
+  assert.match(src, /<TreeRow id=\{ROOT_ID\}/);
+  assert.match(src, /Extra fee \(optional\)/);
+  const a = await import("../dashboard/src/lib/areaPicks.ts");
+  assert.equal(a.ROOT_ID, "ke");
 });
 
 test("save path mirrors coverage_outside", () => {
-  assert.match(read("dashboard/src/app/(desk)/settings/actions.ts"), /coverage_outside: coverageOutsideFrom\(serviceAreas\)/);
+  // Since #964 the settings form only carries service_areas when its scope owns them (formAreas).
+  assert.match(read("dashboard/src/app/(desk)/settings/actions.ts"), /coverage_outside: coverageOutsideFrom\(formAreas\)/);
 });
 
 test("migration is additive and checks the new keys", () => {
@@ -79,14 +81,12 @@ test("one outside answer survives every mode toggle, walk-in included", () => {
 test("fee hint says what callers hear, or the quote hint when blank", () => {
   assert.equal(sa.outsideFeeHint(350), "Callers outside your areas hear: delivery there is KSh 350.");
   assert.equal(sa.outsideFeeHint(null), "Leave blank and the team quotes it on a callback.");
-  const src = read("dashboard/src/components/structured/ServiceAreasEditor.tsx");
-  assert.match(src, /hint=\{outsideFeeHint\(value\.outside_fee_ksh\)\}/);
-  assert.match(src, /useEffect\(\(\) => \{\s*setOutsideFee/);
+  // The editor that showed this hint went with ServiceAreasEditor in #964 (43d9870b); the lib copy stays.
 });
 
-test("a successful save clears unsaved changes, Locations included", async () => {
+test("a successful save clears unsaved changes; areas left the form in #964", async () => {
   const src = read("dashboard/src/components/TenantForm.tsx");
-  assert.match(src, /serviceAreasJson,\n/);
+  assert.doesNotMatch(src, /serviceAreasJson/, "Service areas save on their own screen");
   // Shared save pattern: the baseline moves only when a save lands.
   assert.match(src, /useFormDraft\(save,/);
   const { nextBaseline } = await import("../dashboard/src/lib/formSave.ts");
