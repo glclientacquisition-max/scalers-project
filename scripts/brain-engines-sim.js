@@ -47,16 +47,16 @@ function streamFactory(scenario) {
     } catch { /* reply request */ }
     for (const [key, val] of Object.entries(map)) {
       if (String(caller).includes(key) || String(raw).includes(key)) {
-        if (request.generationConfig?.responseSchema) {
+        if (/Read ONE caller turn/.test(request.systemInstruction?.parts?.[0]?.text || '')) {
           return { text: JSON.stringify(val) };
         }
-        return { text: JSON.stringify({ reply: '[PROMPT-PLACEHOLDER] Sim reply for this turn.' }) };
+        return { text: JSON.stringify({ reply: '' }) };
       }
     }
-    if (request.generationConfig?.responseSchema) {
+    if (/Read ONE caller turn/.test(request.systemInstruction?.parts?.[0]?.text || '')) {
       return { text: JSON.stringify({ intent: 'unknown', answers: [], yes_no: null, slots: {}, language: 'en', wants_human: false, closing: false }) };
     }
-    return { text: JSON.stringify({ reply: '[PROMPT-PLACEHOLDER] Okay.' }) };
+    return { text: JSON.stringify({ reply: '' }) };
   };
 }
 
