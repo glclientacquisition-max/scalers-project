@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { BrandWordmark } from "@/components/brand/BrandMark";
 import { marketingHomeHref } from "@/lib/adminHost";
 import { getAuthUser } from "@/lib/auth";
+import { signupCtaLabel } from "@/lib/signupMode";
 import { Field, Input } from "@/components/ui/Field";
 import { PendingSubmit } from "./PendingSubmit";
 import { ResendDisclosure } from "./ResendDisclosure";
@@ -42,6 +43,7 @@ async function LoginGate({
   const sp = await searchParams;
   const msg = notice(sp);
   const homeHref = marketingHomeHref();
+  const signupLabel = signupCtaLabel();
 
   return (
     <main className="flex min-h-dvh justify-center px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2.5rem,env(safe-area-inset-top))] sm:items-center sm:py-16">
@@ -80,7 +82,7 @@ async function LoginGate({
         <p className="mt-8 text-meta text-ink-2">
           New to Scalers?{" "}
           <Link href="/signup" className="inline-flex min-h-11 items-center font-medium text-accent-deep underline-offset-2 hover:underline">
-            Create an account
+            {signupLabel}
           </Link>
         </p>
         <p>
