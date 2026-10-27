@@ -7,6 +7,7 @@ import { logAdminError } from "@/lib/adminErrors";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { planWritesBlockedLine } from "@/lib/adminBillingCopy";
 import { loadPackageVersionEditor } from "@/lib/packageVersionCatalog";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export async function PackagesScreen() {
   await requireSuperAdmin();
@@ -14,12 +15,12 @@ export async function PackagesScreen() {
     const editor = await loadPackageVersionEditor();
     const planWritesEnabled = editor.catalog.packageEditorEnabled;
     const readOnlyHint = planWritesBlockedLine(editor.catalog.packageEditorEnabled);
-    if (process.env.ADMIN_V2 === "on") {
+    if (isAdminV2Enabled()) {
       return <AdminPackagesV2 catalog={editor.catalog} readOnlyHint={readOnlyHint} />;
     }
     return (
       <div className="space-y-4">
-        <AdminPageHeader title={process.env.ADMIN_V2 === "on" ? "Packages" : "Plans"} />
+        <AdminPageHeader title={isAdminV2Enabled() ? "Packages" : "Plans"} />
         <AdminPackageVersionsPanel
           catalog={editor.catalog}
           businesses={editor.businesses}

@@ -11,6 +11,7 @@ import { noQualityBadges, qualityBadges } from "@/lib/adminQuality";
 import { logAdminError } from "@/lib/adminErrors";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { Stamp } from "@/components/ui/Stamp";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export const instant = false;
 
@@ -24,7 +25,7 @@ export default async function AdminBusinessPage({
   await requireSuperAdmin();
   const { id } = await params;
   // ADMIN_V2 (locked 23 Oct, t179u): one BusinessPane; this page redirects to the list with it open.
-  if (process.env.ADMIN_V2 === "on") redirect(businessPaneHref(id));
+  if (isAdminV2Enabled()) redirect(businessPaneHref(id));
   const { money } = await searchParams;
   let business;
   let badges;

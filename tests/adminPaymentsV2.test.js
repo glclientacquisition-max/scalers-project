@@ -66,7 +66,7 @@ test("Payments v2: list+pane, UnlockCta, honest disabled actions, ADMIN_V2 branc
   assert.match(ui, /PAYMENT_ACTION_WHY/);
   assert.doesNotMatch(ui, /fetch\(|"use server"/);
   assert.doesNotMatch(ui, /bg-brand|ReasonedSwitch|bachs|sautikit|twilio/i);
-  assert.match(page, /ADMIN_V2 === "on"[\s\S]*AdminPaymentsV2/);
+  assert.match(page, /isAdminV2Enabled\(\)[\s\S]*AdminPaymentsV2/);
   assert.match(page, /loadPaymentsV2/);
   assert.doesNotMatch(ld, /\.(insert|update|upsert|delete|rpc)\(/);
   assert.match(dev, /AdminShell[^>]*v2/);

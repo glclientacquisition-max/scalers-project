@@ -1,6 +1,7 @@
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { notFound } from "next/navigation";
 import { AuditScreen } from "../../_screens/AuditScreen";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export const instant = false;
 
@@ -11,6 +12,6 @@ export default async function Page({
   searchParams: Promise<{ business?: string; actor?: string }>;
 }) {
   await requireSuperAdmin();
-  if (process.env.ADMIN_V2 !== "on") notFound();
+  if (!isAdminV2Enabled()) notFound();
   return <AuditScreen searchParams={searchParams} />;
 }
