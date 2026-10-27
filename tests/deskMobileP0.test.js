@@ -20,7 +20,8 @@ describe("mobile P0", () => {
     assert.match(phone, /min-w-0 sm:flex-1 text-body tracking-tight/);
     assert.match(phone, /overflow-hidden/);
     assert.doesNotMatch(phone, /min-w-\[5\.5rem\] shrink-0/);
-    assert.match(phone, /<InboxTrailingAction item=\{item\} message=\{message\} \/>/);
+    // #811: Call and WhatsApp live in the opened item; the row's trailing action takes the item only.
+    assert.match(phone, /<InboxTrailingAction item=\{item\} \/>/);
   });
 
   it("shows the reason line on the phone row and the Needs you bar on the ticket", () => {
@@ -53,8 +54,10 @@ describe("mobile P0", () => {
     const audioAt = player.indexOf("<audio");
     const chipsAt = player.indexOf('aria-label="Playback speed"');
     assert.ok(audioAt > -1 && chipsAt > audioAt);
-    assert.match(player, /flex-col gap-2 md:flex-row/);
-    assert.match(player, /block h-12 w-full max-w-full shrink-0/);
+    // #773: stacked at every width (the speed chips never squeeze the player).
+    assert.match(player, /min-w-0 max-w-3xl flex-col gap-2/);
+    assert.doesNotMatch(player, /md:flex-row/);
+    assert.match(player, /block h-12 w-full min-w-0 max-w-full/);
     assert.doesNotMatch(player, /min-w-0 flex-1/);
     assert.match(css, /audio\[controls\]/);
     assert.match(css, /min-height: 3rem/);

@@ -33,7 +33,7 @@ describe("inbox ticket action chrome", () => {
     const splitAt = ticket.indexOf("data-ticket-split");
     const summaryAt = ticket.indexOf("data-ticket-summary");
     const threadAt = ticket.indexOf("data-ticket-thread");
-    const transcriptAt = ticket.indexOf("<CallTranscript turns={turns} mode=\"thread\" />");
+    const transcriptAt = ticket.indexOf("<CallTranscript turns={turns} mode=\"thread\"");
     const dockAt = ticket.indexOf("<InboxSmsDock");
     assert.ok(splitAt > 0 && summaryAt > splitAt && threadAt > summaryAt);
     assert.ok(transcriptAt > threadAt);
@@ -70,9 +70,10 @@ describe("inbox ticket action chrome", () => {
     assert.match(ticket, /<Menu/);
     assert.match(ticket, /<MenuItem/);
     assert.doesNotMatch(ticket, /createPortal/);
-    assert.match(ticket, /updateLeadStatus\(callId, next\)/);
+    // Archive is one transaction now (inbox_archive_calls: the call plus its open holds and visits).
+    assert.match(ticket, /leaving \? await inboxArchiveCall\(callId\) : await inboxUnarchiveCall\(callId\)/);
     assert.match(ticket, /action\.label/);
-    assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\]\)/);
+    assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\]/);
     assert.match(ticket, /router\.push\(backHref\)/);
     assert.doesNotMatch(ticket, /router\.push\("\/calls"\)/);
     assert.doesNotMatch(ticket, /Followed Up/);
@@ -80,7 +81,8 @@ describe("inbox ticket action chrome", () => {
 
   it("docks a real SMS send distinct from Confirm auto-SMS", () => {
     assert.match(dock, /sendInboxReplySms/);
-    assert.match(dock, /placeholder="SMS"/);
+    // #870: the composer names the caller (composerPlaceholder in lib/callTextThread.ts).
+    assert.match(dock, /placeholder=\{composerPlaceholder\(callerName\)\}/);
     assert.doesNotMatch(dock, /WhatsApp uses the icon above/);
     assert.match(dock, /rows=\{2\}/);
     assert.match(notes, /export async function sendInboxReplySms/);
@@ -168,7 +170,8 @@ describe("inbox ticket transcript preview", () => {
   it("renders the full thread on the ticket and keeps preview elsewhere", () => {
     const src = read("dashboard/src/components/CallTranscript.tsx");
     const ticket = read("dashboard/src/components/InboxTicketView.tsx");
-    assert.match(ticket, /<CallTranscript turns=\{turns\} mode="thread" \/>/);
+    // #870 adds the call start time so Call | Texts can interleave.
+    assert.match(ticket, /<CallTranscript turns=\{turns\} mode="thread" callStartedAt=\{lastContactAt\} \/>/);
     assert.match(src, /PREVIEW_TURNS = 3/);
     assert.match(src, /View full conversation/);
     assert.match(src, /Hide conversation/);

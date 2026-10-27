@@ -22,8 +22,9 @@ test("areas and places save straight away from their drawers", () => {
   const form = read("../dashboard/src/components/TenantForm.tsx");
   assert.match(form, /saveAfterLocationsRef/);
   assert.match(form, /onSave=\{/);
-  const ed = read("../dashboard/src/components/structured/ServiceAreasEditor.tsx");
-  assert.match(ed, /onSave\(/);
+  // Service areas save on their own screen since #964 (43d9870b): AreaPicker calls the areas action directly.
+  const picker = read("../dashboard/src/components/areas/AreaPicker.tsx");
+  assert.match(picker, /saveAction\(/);
 });
 
 test("change fee: own drawer, only existing areas, current fee prefilled", async () => {
@@ -32,8 +33,8 @@ test("change fee: own drawer, only existing areas, current fee prefilled", async
   assert.deepEqual(m.commonFee(v.areas), { fee_mode: "fixed", fee_ksh: 300, eta: "Next day", differ: false });
   v = m.applyFeeToAreas(v, ["place:ruaka"], { fee_mode: "free", fee_ksh: null, eta: null }, "retail");
   assert.equal(m.commonFee(v.areas).differ, true, "fees differ");
-  const ed = read("../dashboard/src/components/structured/ServiceAreasEditor.tsx");
-  assert.match(ed, /title="Change fee"/);
+  // The bulk "Change fee" drawer went with ServiceAreasEditor in #964 (43d9870b): the area sheet has its own fee.
+  assert.match(read("../dashboard/src/components/areas/AreaPicker.tsx"), /Extra fee \(optional\)/);
 });
 
 test("legacy place: area chip from old text, no duplicate street/landmark, summary includes street", async () => {
@@ -66,10 +67,12 @@ test("directory search: counties labelled, no doubled names", async () => {
   assert.equal(r[0].hint, "Estate or town");
 });
 
-test("no silent auto-tick: home area is a visible suggestion", () => {
-  const ed = read("../dashboard/src/components/structured/ServiceAreasEditor.tsx");
-  assert.doesNotMatch(ed, /openBulk\(homeAreas\)/);
-  assert.match(ed, /Suggested/);
+// #964 design (AreaPicker): the home county opens first and leads the list; nothing is ticked for the owner.
+test("no silent auto-tick: home county is shown first, never ticked for the owner", () => {
+  const picker = read("../dashboard/src/components/areas/AreaPicker.tsx");
+  assert.match(picker, /useState<AreaPicks>\(initialPicks\)/);
+  assert.match(picker, /countyOrder\.filter\(\(c\) => c\.id === homeCounty\)/);
+  assert.doesNotMatch(picker, /toggleArea\([^)]*homeCounty/);
 });
 
 test("callers hear: areas with the same fee are grouped", async () => {
@@ -80,9 +83,8 @@ test("callers hear: areas with the same fee are grouped", async () => {
 });
 
 test("hidden sections are explained; short phone placeholders; stronger helper text", () => {
-  const ed = read("../dashboard/src/components/structured/ServiceAreasEditor.tsx");
-  assert.match(ed, /We come to you.*shows when you pick/s);
+  // The "We come to you" section went with ServiceAreasEditor in #964 (43d9870b).
   const pl = read("../dashboard/src/components/structured/PlacesEditor.tsx");
   for (const m of pl.matchAll(/placeholder="([^"]+)"/g)) assert.ok(m[1].length <= 28, `placeholder too long for phones: ${m[1]}`);
-  assert.doesNotMatch(pl + ed, /text-ink-3/);
+  assert.doesNotMatch(pl, /text-ink-3/);
 });

@@ -230,7 +230,9 @@ describe("business settings craft", () => {
     assert.match(theme, /writeDeskTheme/);
     assert.match(themeLib, /export const DESK_THEME_STORAGE_KEY = "scalers-desk-theme"/);
     assert.match(themeLib, /localStorage\.setItem\(DESK_THEME_STORAGE_KEY, choice\)/);
-    assert.match(layout, /DESK_THEME_STORAGE_KEY/);
+    // The pre-paint script carries the key (layout renders DESK_THEME_INIT_SCRIPT, MASTER "no flash").
+    assert.match(layout, /DESK_THEME_INIT_SCRIPT/);
+    assert.match(themeLib, /DESK_THEME_INIT_SCRIPT = `[^`]*JSON\.stringify\(DESK_THEME_STORAGE_KEY\)/);
     assert.doesNotMatch(theme, /tenant\.|llm_system_prompt/);
   });
 
@@ -260,16 +262,15 @@ describe("business settings craft", () => {
     assert.doesNotMatch(form, /min-w-\[640px\]/);
   });
 
-  it("wraps location area and coverage so long values stay readable", () => {
-    assert.match(form, /htmlFor={`loc-address-\${index}`}/);
-    assert.match(form, /id={`loc-address-\${index}`}/);
-    assert.match(form, /id={`loc-coverage-\${index}`}/);
-    const addressIdx = form.indexOf("id={`loc-address-${index}`}");
-    const coverageIdx = form.indexOf("id={`loc-coverage-${index}`}");
-    assert.ok(addressIdx > 0 && coverageIdx > addressIdx);
-    assert.match(form.slice(addressIdx - 80, addressIdx + 40), /<ExpandTextarea/);
-    assert.match(form.slice(coverageIdx - 80, coverageIdx + 40), /<ExpandTextarea/);
-    assert.match(form, /min-w-0 break-words/);
+  // Locations moved into PlacesEditor (a list plus one sheet per place); coverage moved to Service areas (#964).
+  it("wraps place details so long values stay readable", () => {
+    const places = read("dashboard/src/components/structured/PlacesEditor.tsx");
+    const pick = read("dashboard/src/components/structured/PickList.tsx");
+    assert.match(form, /<PlacesEditor/);
+    assert.match(places, /id="place-street"/);
+    assert.match(places, /<TextAreaField\s+id="place-find-us"/);
+    assert.match(places, /<OpenRow[\s\S]{0,200}value=\{placeSummary\(loc\) \|\| undefined\}/);
+    assert.match(pick, /text-meta text-ink-2 \[overflow-wrap:anywhere\]/);
   });
 
   it("defines hover, focus, and active on settings primitives", () => {
@@ -299,7 +300,8 @@ describe("business settings craft", () => {
     assert.match(ui, /text-title font-semibold/);
     assert.match(form, /SettingsGroup/);
     assert.match(form, /lg:grid-cols-\[minmax\(5\.5rem,7rem\)_3\.5rem_minmax\(0,1fr\)_minmax\(0,1fr\)\]/);
-    assert.match(form, /grid-cols-\[minmax\(0,7rem\)_minmax\(0,1fr\)_2\.75rem_2\.75rem\]/);
+    // The four-column catalogue row grid is gone; phone rows are one column plus an action.
+    assert.match(form, /grid-cols-\[minmax\(0,1fr\)_2\.75rem\]/);
     // Alert contacts are a grouped list (no table columns), so nothing truncates.
     assert.match(form, /<AlertContactsList/);
     assert.doesNotMatch(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /grid-cols-\[/);
@@ -381,10 +383,12 @@ describe("business settings craft", () => {
       "Identity",
       "Hours",
       "Locations",
+      "Service areas",
       "Policies",
       "Catalogue",
       "Import",
       "FAQs",
+      "What it will say",
       "Voice",
       "Pronunciation",
       "Test",
@@ -396,7 +400,7 @@ describe("business settings craft", () => {
     ]);
     assert.deepEqual(
       got.sections.map((section) => section.title),
-      ["Business", "Knowledge", "Assistant", "People", "Plan and billing"]
+      ["Business", "Knowledge", "Business Assistant", "People", "Plan and billing"]
     );
     const billing = got.sections.find((section) => section.id === "billing");
     assert.deepEqual(billing.labels, ["Plan", "Billing"]);
@@ -429,7 +433,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(nav, /SETTINGS_HOURS_HREF|settingsWideDefaultHref/);
     assert.match(page, /parseBusinessSettingsPanel\(panelRaw, tabRaw\)/);
     for (const item of nav.match(/\{ label: "[^"]+", description: "[^"]+"/g) || []) assert.ok(item.length < 120, item);
-    assert.equal((nav.match(/description: "/g) || []).length, 15);
+    assert.equal((nav.match(/description: "/g) || []).length, 17, "one line per destination, Service areas and What it will say included");
     const activeFn = nav.slice(
       nav.indexOf("export function settingsNavItemActive"),
       nav.indexOf("export function settingsNavItems")

@@ -4,7 +4,6 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Drawer, StatusPill } from "@/components/ops";
 import {
-  PROTECTED_COPY,
   numberOpsFor,
   type NumberOp,
   type NumberOpResult,
@@ -50,7 +49,8 @@ function Fact({ k, children }: { k: string; children: ReactNode }) {
  * Number controls v1 for the Numbers pane: Make available now (lift quarantine),
  * Bring back (restore to its last business) and Move to another business.
  * Every write: typed reason, Unlock (server gate; StepUpHost opens the sheet on 403),
- * protected line refused here and on the server. Result shows as a summary, never a toast.
+ * a confirm sheet and an audit row. Every number is treated the same. Result shows as a
+ * summary, never a toast.
  */
 export function NumberControls({
   row,
@@ -105,18 +105,15 @@ export function NumberControls({
   const reasonShort = reason.trim().length < 3;
   const blockedWhy = !op || result
     ? null
-    : ops.protectedLine
-      ? PROTECTED_COPY
-      : op === "move" && !target
-        ? "Pick a business to move it to."
-        : reasonShort
-          ? "Add a reason to continue."
-          : op === "move" && typed.trim().toUpperCase() !== MOVE_WORD
-            ? `Type ${MOVE_WORD} to continue.`
-            : null;
+    : op === "move" && !target
+      ? "Pick a business to move it to."
+      : reasonShort
+        ? "Add a reason to continue."
+        : op === "move" && typed.trim().toUpperCase() !== MOVE_WORD
+          ? `Type ${MOVE_WORD} to continue.`
+          : null;
 
   async function submit(which: NumberOp, opts: { confirm?: boolean } = {}) {
-    if (ops.protectedLine) return;
     setPending(true);
     setFailure(null);
     setNeedsUnlock(false);
@@ -157,9 +154,6 @@ export function NumberControls({
         variant={variant}
         size="sm"
         data-action={`number-ops-${which}`}
-        disabled={ops.protectedLine}
-        aria-describedby={ops.protectedLine ? `numops-protected-${row.id}` : undefined}
-        title={ops.protectedLine ? PROTECTED_COPY : undefined}
         onClick={() => open(which)}
       >
         {label}
@@ -167,7 +161,7 @@ export function NumberControls({
     ) : null;
 
   const anyControl = (ops.lift && !hideLift) || (ops.restore && !hideRestore) || ops.move;
-  if (!anyControl && !ops.protectedLine) return null;
+  if (!anyControl) return null;
 
   return (
     <div className="flex w-full flex-col gap-ops-2" data-number-controls="">
@@ -176,11 +170,6 @@ export function NumberControls({
         {btn("lift_quarantine", "Make available now", "ghost", ops.lift && !hideLift)}
         {btn("move", "Move to another business", "danger", ops.move)}
       </div>
-      {ops.protectedLine ? (
-        <p id={`numops-protected-${row.id}`} className="text-ops-label text-ink-2" data-protected-line="">
-          {PROTECTED_COPY}
-        </p>
-      ) : null}
 
       <Drawer
         open={op != null}

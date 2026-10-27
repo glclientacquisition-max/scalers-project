@@ -2,6 +2,7 @@
 // Deterministic caller-turn understanding for BA v2. Produces intent hints and
 // normalised slot candidates; the state machine decides what to do with them.
 const L = require('./lexicon');
+const { listedAreaIds, listedAreaKeys } = require('../../conversation/listedAreas');
 
 const YES = /^\W*(yes|yeah|yep|yup|ok|okay|sure|correct|right|exactly|please do|go ahead|do it|ndio|ndiyo|eeh ndio|sawa|poa|fiti|kabisa|haya|yes please|iko sawa|iko poa|bila shaka|weka|book it|yap|sure thing)\b/i;
 const NO = /^\W*(no|nope|not really|hapana|la|sitaki)\b|\b(that'?s wrong|si sawa|not correct)\b/i;
@@ -171,35 +172,6 @@ function areaAmbiguity(text, profile = {}) {
     return { heard: capW(k), options: opts.slice(0, 3).map((o) => ({ ...o, county: capW(o.county) })) };
   }
   return null;
-}
-function listedAreaKeys(profile = {}) {
-  const names = new Set();
-  const counties = new Set();
-  const bags = [profile.serviceAreas, profile.areaTerms, profile.service_areas];
-  for (const bag of bags) {
-    const areas = bag && Array.isArray(bag.areas) ? bag.areas : Array.isArray(bag) ? bag : [];
-    for (const a of areas) {
-      const raw = String((a && (a.id || a.name)) || '').trim().toLowerCase();
-      if (!raw) continue;
-      if (raw.startsWith('county:')) counties.add(raw.slice(7));
-      names.add(raw.split(':').pop());
-    }
-  }
-  return { names, counties };
-}
-function listedAreaIds(profile = {}) {
-  // v2 read profile.serviceAreas only, so a tenant whose fees live on
-  // service_areas / areaTerms (Settings › Locations, #769) looked unlisted.
-  const bags = [profile.serviceAreas, profile.areaTerms, profile.service_areas];
-  const ids = [];
-  for (const bag of bags) {
-    const areas = bag && Array.isArray(bag.areas) ? bag.areas : Array.isArray(bag) ? bag : [];
-    for (const a of areas) {
-      const id = String((a && (a.id || a.name)) || '').split(':').pop();
-      if (id) ids.push(id);
-    }
-  }
-  return ids;
 }
 function matchArea(text, profile = {}) {
   // "outside Nairobi" names the base, not the caller's area: drop that phrase, keep the rest ("... I'm in Thika")

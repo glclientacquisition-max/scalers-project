@@ -19,15 +19,15 @@ const {
   buildLeadEmail,
 } = require('./email');
 const { isSmsConfigured, normalizeSmsTo, sendSms } = require('./sms');
-const { parseNotifyChannels } = require('./notifyChannels');
+const { effectiveChannels } = require('./notifyChannels');
 const {
   beginInstanceSend,
-  claimTenantSms,
   durableSendClaim,
   personKey,
   recordDispatchResult,
   releaseInstanceFlight,
   sendReserved,
+  sendTenantSmsLegacy,
 } = require('./sendLedger');
 
 function whatsAppSenderReady() {
@@ -85,10 +85,12 @@ async function trySendWhatsApp({ to, body, lead, kind }) {
  * @param {object} [opts.lead]
  * @param {string} [opts.subject]
  */
-async function dispatchAlert({ to, email, body, lead = {}, subject, channels, ledger, kind } = {}) {
+async function dispatchAlert({ to, email, body, lead = {}, subject, channels, ledger, kind, alertType } = {}) {
   const text = body || buildLeadText(lead);
   const errors = [];
-  const prefs = parseNotifyChannels(channels);
+  // alertType (missed_call | booking | message) applies the owner's per-type
+  // choices; fallback below only walks channels allowed for that type.
+  const prefs = effectiveChannels(channels, alertType || null);
   const dests = [normalizeSmsTo(to), normalizeWhatsAppTo(to), normalizeEmail(email)].filter(
     Boolean
   );
@@ -161,21 +163,31 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
           }
         }
         if (!handled) {
-          const claim = await claimTenantSms(ledger, text);
-          if (!claim.allowed) {
-            errors.push(`sms:${claim.reason || 'sms_allowance_exhausted'}`);
-            console.warn(
-              `[notify] tenant SMS skipped (${claim.reason || 'sms_allowance_exhausted'})`
-            );
-          } else {
-            if (ledger && typeof ledger === 'object') ledger.overage = Boolean(claim.overage);
-            try {
-              const sms = await trySendSms({ to, body: text });
-              if (sms) return accept(sms);
-            } catch (err) {
-              errors.push(`sms:${err?.message || err}`);
-              console.warn(`[notify] SMS send failed (${err?.message || err}); trying next channel`);
+          // Legacy path (reserve_notify_send not applied). A4 fix: units are
+          // claimed only after TextSMS accepts and the ledger row exists
+          // (was: consume_sms_units before the send, never released).
+          try {
+            const out = await sendTenantSmsLegacy({
+              ledger,
+              body: text,
+              flightKey: gate.key,
+              send: () => trySendSms({ to, body: text }),
+            });
+            if (out.sent) {
+              return out.result && typeof out.result === 'object'
+                ? { ...out.result, errors: [...errors] }
+                : out.result;
             }
+            if (out.accepted) {
+              // The SMS went out but is unrecorded: never fall through to a
+              // second channel for the same message.
+              return { channel: null, reason: out.reason, errors: [...errors] };
+            }
+            errors.push(`sms:${out.reason || 'sms_allowance_exhausted'}`);
+            console.warn(`[notify] tenant SMS skipped (${out.reason || 'sms_allowance_exhausted'})`);
+          } catch (err) {
+            errors.push(`sms:${err?.message || err}`);
+            console.warn(`[notify] SMS send failed (${err?.message || err}); nothing claimed, trying next channel`);
           }
         }
       }

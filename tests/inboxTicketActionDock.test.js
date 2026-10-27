@@ -58,7 +58,9 @@ describe("ticket action dock", () => {
 
   it("keeps Archive on More and leaves lead_status rules in the shipped helpers", () => {
     assert.match(ticket, /inboxTicketOverflowActions\(\{ archived \}\)/);
-    assert.match(ticket, /id === "unarchive" \|\| archived \? "new" : "archived"/);
+    // Archive is one transaction now (inbox_archive_calls: the call plus its open holds and visits).
+    assert.match(ticket, /const leaving = !\(id === "unarchive" \|\| archived\);/);
+    assert.match(ticket, /leaving \? await inboxArchiveCall\(callId\) : await inboxUnarchiveCall\(callId\)/);
     assert.doesNotMatch(ticket, /id === "mark_done"/);
     assert.match(verbs, /Mark done lives on the action dock/);
     assert.match(verbs, /if \(opts\.hasJob \|\| opts\.hasHold\) return false/);

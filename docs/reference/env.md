@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-204 variables.
+223 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -33,13 +33,23 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BETTER_AUTH_SECRET` | desk | `dashboard/src/lib/admin-auth.ts` |
 | `BETTER_AUTH_URL` | desk | `dashboard/src/lib/admin-auth.ts` |
 | `BILLING_NOTICES_SEND` | voice | `src/billing/billingNoticeSend.js` |
+| `BRAIN_AREA_PICKS` | voice | `src/conversation/v2/areaCoverage.js`<br>`src/db.js` |
 | `BRAIN_CALL_FIXES_D199` | desk | `dashboard/src/lib/tenantFieldProvenance.ts` |
 | `BRAIN_GEMINI_CATALOGUE` | voice | `src/conversation/catalogueMouth.js` |
+| `BRAIN_V2_COMMIT_SAFETY` | voice | `src/conversation/v2/commitSafety.js` |
+| `BRAIN_V2_FACT_STORE` | voice | `src/knowledge/factStore.js` |
+| `BRAIN_V2_MODEL` | voice | `src/conversation/v2/modelShadow.js` |
+| `BRAIN_V2_MODEL_BACKUP_ID` | voice | `src/conversation/v2/modelShadow.js` |
+| `BRAIN_V2_MODEL_ID` | voice | `src/conversation/v2/modelShadow.js` |
+| `BRAIN_V2_NLU_GAPS` | voice | `src/conversation/turnProposals.js`<br>`src/conversation/v2/nlu.js` |
+| `BRAIN_V2_OWNS_CALL` | voice | `src/conversation/v2/commitSafety.js`<br>`src/conversation/v2/ownsCall.js` |
+| `BRAIN_V2_REPLY_OWNER` | voice | `src/conversation/v2/replyOwner.js`<br>`src/conversation/v2/turnModel.js`<br>`src/conversation/v2/turnResolver.js` |
 | `BUSINESS_KNOWLEDGE` | voice | `src/db.js`<br>`src/prompts.js`<br>`src/tenantProfile.js` |
-| `BUSINESS_NAME` | voice | `server.js`<br>`src/conversation/businessAssistantIntro.js`<br>`src/db.js`<br>+2 more |
-| `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js` |
+| `BUSINESS_NAME` | voice | `server.js`<br>`src/conversation/businessAssistantIntro.js`<br>`src/db.js`<br>+3 more |
+| `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js`<br>`src/notifications/ownerCallSummary.js` |
+| `CALL_SUMMARY_EVENT` | voice | `src/conversation/callSummaryEvent.js` |
 | `CRON_SECRET` | desk | `dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/cron/ops-alerts/route.ts` |
-| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+64 more |
+| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+68 more |
 | `DASHBOARD_PASSWORD` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
@@ -50,10 +60,10 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `DESK_PLAN_CHANGE` | desk | `dashboard/src/lib/deskPlanChange.ts` |
 | `DESK_PUBLIC_URL` | voice | `server.js` |
 | `DOCS_STALE_DAYS` | scripts | `scripts/docs/check-docs.js` |
-| `FACT_HASH_MODE` | desk, scripts, voice | `dashboard/src/lib/tenantFieldProvenance.ts`<br>`scripts/replay-voice-suite.js`<br>`scripts/smoke-mvp-retail.js`<br>+1 more |
+| `FACT_HASH_MODE` | desk, scripts, voice | `dashboard/src/lib/tenantFieldProvenance.ts`<br>`scripts/ack-rule-report.js`<br>`scripts/replay-voice-suite.js`<br>+2 more |
 | `FACT_PAYMENTS_V2_HASH` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
 | `FACT_SAVE_IS_CONFIRM` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
-| `GEMINI_API_KEY` | desk, voice | `dashboard/src/app/(desk)/settings/catalogActions.ts`<br>`dashboard/src/app/(desk)/settings/pronunciationGeminiScanActions.ts`<br>`dashboard/src/lib/faqFromTranscript.ts`<br>+9 more |
+| `GEMINI_API_KEY` | desk, scripts, voice | `dashboard/src/app/(desk)/settings/catalogActions.ts`<br>`dashboard/src/app/(desk)/settings/pronunciationGeminiScanActions.ts`<br>`dashboard/src/lib/faqFromTranscript.ts`<br>+12 more |
 | `GEMINI_AUDIO_MODEL` | desk | `dashboard/src/lib/gemini.ts` |
 | `GEMINI_BACKUP_MODEL` | voice | `src/conversation/geminiVoice.js` |
 | `GEMINI_MAX_OUTPUT_TOKENS` | voice | `server.js`<br>`src/speech/replayVoice.js` |
@@ -94,10 +104,12 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `OPS_SMS_CREDIT_WARN_BELOW` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OPS_STAGING_WALLET_ALERT_THRESHOLDS_KES` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `OPS_WALLET_ALERT_THRESHOLDS_KES` | desk | `dashboard/src/lib/opsAlerts.ts` |
-| `OWNER_ALERT_EMAIL` | voice | `server.js` |
+| `OWNER_ALERT_EMAIL` | voice | `server.js`<br>`src/notifications/ownerCallSummary.js` |
+| `OWNER_CALL_SUMMARY` | voice | `src/notifications/ownerCallSummary.js` |
+| `OWNER_SUMMARY_SUPPRESS_LEGACY` | voice | `src/notifications/ownerCallSummary.js` |
 | `PATH` | scripts | `scripts/smoke-recording-webhook.js` |
 | `PLATFORM_WHATSAPP_ACK` | voice | `src/sautikit/whatsappInbound.js` |
-| `PLATFORM_WHATSAPP_PHONE_NUMBER_ID` | voice | `src/notifications/whatsapp.js`<br>`src/sautikit/whatsappInbound.js` |
+| `PLATFORM_WHATSAPP_PHONE_NUMBER_ID` | voice | `src/notifications/ownerCallSummary.js`<br>`src/notifications/whatsapp.js`<br>`src/sautikit/whatsappInbound.js` |
 | `PORT` | scripts, voice | `scripts/bench-inbound-webhook.js`<br>`scripts/tunnel.js`<br>`server.js` |
 | `POST_CALL_GEMINI_REVIEW` | voice | `src/conversation/callTranscriptReview.js` |
 | `POST_CALL_REVIEW_MODEL` | voice | `src/conversation/callTranscriptReview.js` |
@@ -114,8 +126,8 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `RECORDING_RETENTION_PURGE` | voice | `src/lib/recordingRetention.js` |
 | `RESEND_API_KEY` | desk, voice | `dashboard/src/lib/opsMail.ts`<br>`dashboard/src/lib/ownerEmail.ts`<br>`src/notifications/email.js` |
 | `SAUTIKIT_ADMIN_OPS_KEY` | desk | `dashboard/src/lib/sautikit.ts` |
-| `SAUTIKIT_API_BASE` | desk, voice | `dashboard/src/lib/sautikit.ts`<br>`src/notifications/whatsapp.js`<br>`src/sautikit/lineUnavailableAudio.js`<br>+3 more |
-| `SAUTIKIT_API_KEY` | desk, scripts, voice | `dashboard/src/lib/sautikit.ts`<br>`scripts/smoke-whatsapp-did.js`<br>`server.js`<br>+5 more |
+| `SAUTIKIT_API_BASE` | desk, voice | `dashboard/src/lib/sautikit.ts`<br>`src/notifications/whatsapp.js`<br>`src/sautikit/callHangup.js`<br>+4 more |
+| `SAUTIKIT_API_KEY` | desk, scripts, voice | `dashboard/src/lib/sautikit.ts`<br>`scripts/smoke-whatsapp-did.js`<br>`server.js`<br>+6 more |
 | `SAUTIKIT_DID` | scripts, voice | `scripts/smoke-whatsapp-did.js`<br>`server.js`<br>`src/db.js`<br>+1 more |
 | `SAUTIKIT_STAGING_WALLET_KEY` | desk | `dashboard/src/lib/opsAlerts.ts` |
 | `SAUTIKIT_VALIDATE_WEBHOOKS` | voice | `server.js`<br>`src/sautikit/webhook.js` |
@@ -123,7 +135,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SAUTIKIT_WEBHOOK_SECRET` | voice | `src/sautikit/webhook.js` |
 | `SAUTIKIT_WHATSAPP_CONNECTION_ID` | voice | `src/notifications/whatsapp.js` |
 | `SAUTIKIT_WHATSAPP_NUMBER_ID` | voice | `src/notifications/whatsapp.js` |
-| `SAUTIKIT_WHATSAPP_PHONE_NUMBER_ID` | voice | `src/notifications/whatsapp.js`<br>`src/sautikit/whatsappInbound.js` |
+| `SAUTIKIT_WHATSAPP_PHONE_NUMBER_ID` | voice | `src/notifications/ownerCallSummary.js`<br>`src/notifications/whatsapp.js`<br>`src/sautikit/whatsappInbound.js` |
 | `SAUTIKIT_WHATSAPP_TEMPLATE_ALLOW_LEGACY` | voice | `src/notifications/whatsappTemplates.js` |
 | `SCALERS_OPS_ALERT_EMAIL` | desk | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/setupNotify.ts` |
 | `SCALERS_OPS_ALERT_EMAILS` | desk | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/setupNotify.ts` |
@@ -147,6 +159,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SONIOX_VOICE` | voice | `src/speech/sonioxVoice.js` |
 | `SONIOX_VOICE_CATALOG_CACHE_MS` | voice | `src/speech/sonioxVoiceCatalog.js` |
 | `SONIOX_VOICES_API` | voice | `src/speech/sonioxVoice.js` |
+| `SPOKEN_CATALOGUE_MODEL` | scripts, voice | `scripts/backfill-spoken-catalogue.js`<br>`server.js` |
 | `STAGE_PR_HOLD` | scripts | `scripts/stage-pull-request-hold.js` |
 | `STAGE_RESULT_PATH` | scripts | `scripts/stage-desk-alias.js`<br>`scripts/stage-pull-request-note.js`<br>`scripts/stage-pull-request.js` |
 | `STAGING_DATABASE_URL` | scripts | `scripts/verify-staging-schema.js` |
@@ -157,8 +170,8 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SUPABASE_ANON_KEY` | desk | `dashboard/src/lib/supabase.ts`<br>`dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_PUBLISHABLE_KEY` | desk | `dashboard/src/lib/supabase/env.ts` |
 | `SUPABASE_RECORDINGS_BUCKET` | voice | `src/db.js` |
-| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/supabase.ts`<br>+10 more |
-| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/invoicePay/provider.js`<br>+13 more |
+| `SUPABASE_SERVICE_ROLE_KEY` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/supabase.ts`<br>+13 more |
+| `SUPABASE_URL` | desk, scripts, voice | `dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/liveTenant.js`<br>`dashboard/src/lib/invoicePay/provider.js`<br>+16 more |
 | `TENANT_DID` | voice | `server.js`<br>`src/db.js` |
 | `TENANT_ID` | scripts, voice | `scripts/bench-inbound-webhook.js`<br>`scripts/smoke-db.js`<br>`server.js`<br>+1 more |
 | `TEXTSMS_API_KEY` | desk, voice | `dashboard/src/lib/callerSms.ts`<br>`src/notifications/sms.js` |
@@ -177,6 +190,9 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_BARGE_GRACE_MS` | voice | `src/speech/turnTaking.js` |
 | `VOICE_BARGE_MIN_CHARS` | voice | `src/speech/turnTaking.js` |
 | `VOICE_CLOSED_TENANT_GUARD` | voice | `src/sautikit/closedTenantGuard.js` |
+| `VOICE_END_CALL_GRACE_MS` | voice | `src/speech/endCallHonour.js` |
+| `VOICE_END_CALL_HONOUR` | voice | `src/speech/endCallHonour.js` |
+| `VOICE_END_CALL_MAX_WAIT_MS` | voice | `src/speech/endCallHonour.js` |
 | `VOICE_FACT_REFS` | voice | `src/conversation/factSheet.js`<br>`src/conversation/numberWords.js` |
 | `VOICE_FALLBACK_BY_KIND` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
 | `VOICE_FAST_INBOUND` | scripts | `scripts/bench-inbound-webhook.js` |
@@ -188,7 +204,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_GREETING_CACHE` | voice | `src/speech/greetingPcmCache.js` |
 | `VOICE_GREETING_MODE` | voice | `src/conversation/dynamicSpeech.js` |
 | `VOICE_GREETING_TIMEOUT_MS` | voice | `src/conversation/dynamicSpeech.js` |
-| `VOICE_INTERNAL_SECRET` | desk, voice | `dashboard/src/app/(desk)/calls/escalateActions.ts`<br>`dashboard/src/lib/voicePreview.ts`<br>`server.js` |
+| `VOICE_INTERNAL_SECRET` | desk, voice | `dashboard/src/app/(desk)/calls/escalateActions.ts`<br>`dashboard/src/lib/spokenCatalogueOnSave.ts`<br>`dashboard/src/lib/voicePreview.ts`<br>+1 more |
 | `VOICE_LINE_UNAVAILABLE_CLIP_DIR` | voice | `src/sautikit/lineUnavailableAudio.js` |
 | `VOICE_LINE_UNAVAILABLE_REFRESH` | voice | `src/sautikit/lineUnavailableAudio.js` |
 | `VOICE_LINE_UNAVAILABLE_REFRESH_MS` | voice | `src/sautikit/lineUnavailableAudio.js` |
@@ -215,7 +231,10 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_TTS_RESPEAK_CONNECT_MS` | voice | `src/speech/sonioxTts.js` |
 | `VOICE_TTS_RESPEAK_MAX` | voice | `src/speech/sonioxTts.js` |
 | `VOICE_TURN_END_CAP_MS` | voice | `src/speech/turnTaking.js` |
+| `VOICE_V2_CATALOGUE` | scripts, voice | `scripts/v2-catalogue-sense.js`<br>`src/conversation/v2/machine.js`<br>`src/db.js`<br>+1 more |
+| `VOICE_V2_CATALOGUE_MODEL_NAME` | scripts | `scripts/score-intent-set.js` |
 | `WALLET_CHARGING_ENABLED` | voice | `src/db.js` |
 | `WALLET_RATE_KES_PER_MINUTE` | desk, voice | `dashboard/src/lib/wallet.ts`<br>`src/billing/liveTransferLegs.js`<br>`src/db.js` |
 | `WALLET_TRANSFER_RATE_KES_PER_MINUTE` | voice | `src/billing/liveTransferLegs.js` |
 | `WHATSAPP_INBOUND_ACK` | voice | `src/sautikit/whatsappInbound.js` |
+| `WRITE_RECEIPTS` | voice | `src/db.js` |

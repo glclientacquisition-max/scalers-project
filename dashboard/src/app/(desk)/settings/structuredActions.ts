@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { bustTenantCache } from "@/lib/tenantCache";
+import { requestSpokenCatalogueCompile } from "@/lib/spokenCatalogueOnSave";
 import { revalidatePath } from "next/cache";
 import { memberDenied } from "@/lib/requireMember";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -75,6 +76,7 @@ export async function confirmPricesAction(inputs: PriceConfirmInput[]): Promise<
       write: async (columns) => {
         const { error } = await ws.client.from("tenants").update(columns).eq("id", tenantId);
         bustTenantCache(tenantId);
+        if (!error) requestSpokenCatalogueCompile(tenantId, columns);
         return { error };
       },
       // Failures are reported inside restampPriceHash (structured log); never block the save.

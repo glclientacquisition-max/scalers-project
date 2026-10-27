@@ -1,0 +1,61 @@
+{
+ "callId": "HD_4ec204aafa93",
+ "source": "staging Railway logs 2026-10-14 (77ce8123), heard = thinking-ack + first reply sentence",
+ "turns": [
+  {
+   "caller": "Um, nilikuwa nataka ku- kujua what you guys do, mnafanyanga nini exactly?",
+   "filler": "",
+   "reply": "Je, naongea na Chris?"
+  },
+  {
+   "caller": "Yeah, unaongea na Chris?",
+   "filler": "Mm.",
+   "reply": "Chris, tunafanya usafi wa nyumba, sofa, kapeti, na magodoro Nairobi na maeneo ya karibu."
+  },
+  {
+   "caller": "Nilikuwa nataka ku- washewa godoro, hiyo—yeah.",
+   "filler": "Mm.",
+   "reply": "Saa ngapi kesho?"
+  },
+  {
+   "caller": "Um, nilikuwa nataka leo usiku.",
+   "filler": "",
+   "reply": "Sawa, nimehifadhi ombi lako."
+  },
+  {
+   "caller": "Leo usiku itaweza?",
+   "filler": "Mm.",
+   "reply": "Kwa sasa tuko kufungwa kwa huduma za leo usiku."
+  },
+  {
+   "caller": "Okay, sawa. Kisha mtakuja saa 3?",
+   "filler": "Mm.",
+   "reply": "Eneo hilo liko nje."
+  },
+  {
+   "caller": "Unauliza location ama?",
+   "filler": "Mm.",
+   "reply": "Ndiyo Chris, tuje wapi kule Naivasha?"
+  },
+  {
+   "caller": "Ah, siishi na Ivasha. Nime- nimehama saa hizi, naishi.",
+   "filler": "Mm.",
+   "reply": "Sawa Chris, kwa sasa unaishi wapi tuje kufanya usafi huo kesho saa 3 asubuhi?"
+  },
+  {
+   "caller": "Westlands hapo hivi.",
+   "filler": "Mm.",
+   "reply": "Sawa, nimehifadhi ombi la ziara Alhamisi, 9 AM."
+  },
+  {
+   "caller": "Si saa 9 asubuhi?",
+   "filler": "Mm.",
+   "reply": ""
+  },
+  {
+   "caller": "Si unaona?",
+   "filler": "Mm.",
+   "reply": "Sawa, nimehamisha ziara Alhamisi, 9 AM."
+  }
+ ]
+}

@@ -23,6 +23,9 @@ const {
   isGreetingCacheEnabled,
 } = require('./greetingPcmCache');
 
+const { openingV2Enabled, openingWarmLines } = require('./callOpening');
+const { sharedPcmStore, warmAllowlist } = require('./pcmPersist');
+
 const DEFAULT_SWEEP_MS = 5 * 60 * 1000;
 const LOOKAHEAD_MS = 15 * 60 * 1000;
 
@@ -60,6 +63,15 @@ function greetingInputs(profile = {}, { now = new Date() } = {}) {
   };
 }
 
+/** VOICE_OPENING_V2 lines a call at `at` can speak before its first real turn. */
+function openingWarmLinesAt(profile = {}, at = new Date()) {
+  const inputs = greetingInputs(profile, { now: at });
+  return openingWarmLines(
+    { ...profile, businessName: inputs.businessName, agentName: inputs.agentName, closureNotice: inputs.closureNotice },
+    { isOpen: inputs.isOpen }
+  );
+}
+
 /** Instants to render for: now, plus just past the next daypart edge if near. */
 function warmInstants(now = new Date(), lookaheadMs = LOOKAHEAD_MS) {
   const out = [now];
@@ -81,6 +93,13 @@ async function renderGreetingPcm({ text, profile, tenantId, createSession }) {
     agentName: profile.agentName,
   });
   if (found.pcm) return { key: found.key, rendered: false };
+  // VOICE_PCM_PERSIST=on: restore a render that survived a restart. Warm path
+  // only (the prefetch warm is void, so no call audio awaits this).
+  const restored = await sharedPcmStore().load('greeting', found.key);
+  if (restored) {
+    putGreetingPcm(found.key, restored, { tenantId, persist: false });
+    return { key: found.key, rendered: false, restored: true };
+  }
   const session = createSession({ voiceId: profile.sonioxVoiceId || null });
   try {
     await session.ready;
@@ -134,6 +153,12 @@ function createGreetingWarmer(deps) {
     let rendered = 0;
     const lines = new Set();
     for (const at of warmInstants(now())) {
+      if (openingV2Enabled()) {
+        // VOICE_OPENING_V2: the first greeting, the returning greeting, the
+        // bare-Hello re-invites and the silence ladder, in the shop language.
+        for (const line of openingWarmLinesAt(profile, at)) lines.add(line);
+        continue;
+      }
       lines.add(await generateDynamicGreeting(greetingInputs(profile, { now: at })));
     }
     for (const text of lines) {
@@ -181,6 +206,9 @@ function createGreetingWarmer(deps) {
       log(`[greeting-warm] tenant list failed: ${err?.message || err}`);
       return [];
     }
+    // VOICE_PCM_WARM_TENANTS: sweep only these tenants (staging: DnD).
+    const allow = warmAllowlist();
+    if (allow) ids = ids.filter((id) => allow.has(String(id)));
     return Promise.all(ids.map((id) => warmTenant(id)));
   }
 
@@ -200,6 +228,7 @@ function createGreetingWarmer(deps) {
 }
 
 module.exports = {
+  openingWarmLinesAt,
   DEFAULT_SWEEP_MS,
   LOOKAHEAD_MS,
   greetingWarmEnabled,

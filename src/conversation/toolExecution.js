@@ -210,6 +210,7 @@ function validateServiceRequest(
     quantity: clean(raw.quantity, 80),
     whenText: clean(raw.whenText, 160),
     notes: clean(raw.notes, 400),
+    ...(raw.idempotencyKey ? { idempotencyKey: clean(raw.idempotencyKey, 200) } : {}), // BRAIN_V2_COMMIT_SAFETY key -> row (#691)
   };
   if (!value.item && !value.notes) {
     return { valid: false, reason: 'A request needs an item or concise notes.' };
@@ -495,6 +496,9 @@ function validateCreateAppointment(
     notes: clean(raw.notes, 400),
     windowStart: clean(raw.windowStart || raw.window_start, 64),
     windowEnd: clean(raw.windowEnd || raw.window_end, 64),
+    ...(raw.idempotencyKey ? { idempotencyKey: clean(raw.idempotencyKey, 200) } : {}), // BRAIN_V2_COMMIT_SAFETY key -> row (#691)
+    // one booking, 1..N services (line items); serviceName stays the first/primary service
+    ...(Array.isArray(raw.services) && raw.services.length ? { services: raw.services.map((s) => clean(s, 200)).filter(Boolean).slice(0, 10) } : {}),
   };
   // Outside the listed areas on "anywhere in Kenya": the team calls back with the
   // travel price. The Business Assistant never books a time for these.
@@ -673,7 +677,7 @@ function applyHeldCallerName(parsed, held) {
  */
 function brainToolsWantWrite(parsed) {
   if (!parsed || typeof parsed !== 'object') return false;
-  if (parsed.serviceRequest || parsed.appointment || parsed.appointmentUpdate || parsed.escalate) {
+  if (parsed.serviceRequest || parsed.appointment || parsed.appointmentUpdate || parsed.appointmentAddService || parsed.escalate) {
     return true;
   }
   return Boolean(clean(parsed.name, 120) || clean(parsed.reason, 240));
@@ -692,6 +696,7 @@ function lineClosedResults(parsed, lineClosed) {
   if (parsed?.serviceRequest) refuse('create_service_request');
   if (parsed?.appointment) refuse('create_appointment');
   if (parsed?.appointmentUpdate) refuse('update_appointment');
+  if (parsed?.appointmentAddService) refuse('add_appointment_service');
   if (clean(parsed?.name, 120) || clean(parsed?.reason, 240)) {
     refuse('save_caller_info');
   }
@@ -1019,6 +1024,27 @@ async function executeBrainTools({
           fingerprint,
           reason: clean(error?.message || error, 300),
         });
+      }
+    }
+  }
+
+  // add_appointment_service: one more service on an existing open booking (idempotent per item)
+  if (parsed?.appointmentAddService) {
+    const raw = parsed.appointmentAddService || {};
+    const value = { appointmentId: clean(raw.appointmentId || raw.appointment_id, 80), serviceName: clean(raw.serviceName || raw.service_name || raw.service, 200), ...(raw.idempotencyKey ? { idempotencyKey: clean(raw.idempotencyKey, 200) } : {}) };
+    const fingerprint = stableFingerprint('add_appointment_service', value);
+    if (capabilities.messageOnly || capabilities.updateAppointment === false || capabilities.createAppointment === false) {
+      results.push({ action: 'add_appointment_service', status: 'disabled', reason: 'Booking changes are not available.' });
+    } else if (!value.appointmentId || !value.serviceName) {
+      results.push({ action: 'add_appointment_service', status: 'invalid', reason: 'Adding a service needs the booking and the service.', missingSlots: [!value.appointmentId && 'appointment', !value.serviceName && 'service'].filter(Boolean) });
+    } else if (completed.has(fingerprint)) {
+      results.push({ action: 'add_appointment_service', status: 'duplicate', fingerprint });
+    } else {
+      try {
+        const row = await handlers.addAppointmentService?.(value);
+        results.push(row ? { action: 'add_appointment_service', status: row.duplicate ? 'duplicate' : 'succeeded', fingerprint, id: row.id || value.appointmentId, value, record: row } : { action: 'add_appointment_service', status: 'failed', fingerprint, reason: 'The backend did not add the service.' });
+      } catch (error) {
+        results.push({ action: 'add_appointment_service', status: 'failed', fingerprint, reason: clean(error?.message || error, 300) });
       }
     }
   }

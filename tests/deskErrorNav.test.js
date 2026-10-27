@@ -78,8 +78,11 @@ describe("desk error navigation", () => {
     const notes = read("dashboard/src/app/(desk)/calls/noteActions.ts");
     const facing = read("dashboard/src/lib/ownerFacingError.ts");
     const crash = read("dashboard/src/components/ui/DeskCrash.tsx");
-    assert.match(notes, /Text is unavailable\./);
-    assert.doesNotMatch(notes, /SMS is not configured\./);
+    // #870 moved the SMS failure copy into lib/deskSmsError.ts (shared by notes and the text thread).
+    const smsError = read("dashboard/src/lib/deskSmsError.ts");
+    assert.match(notes, /deskSmsSendError\(sent\)/);
+    assert.match(smsError, /sms_not_configured"\) return "Texting is not set up for this business yet\."/);
+    assert.doesNotMatch(notes + smsError, /SMS is not configured\./);
     assert.match(facing, /MINIFIED_REACT/);
     assert.match(facing, /minified react error/);
     assert.doesNotMatch(crash, /error\.message/);

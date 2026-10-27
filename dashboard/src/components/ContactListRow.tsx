@@ -6,6 +6,7 @@ import { ContactNameForm } from "@/components/ContactNameForm";
 import { Avatar } from "@/components/ui/Avatar";
 import { deskPreviewClass } from "@/components/ui/deskChrome";
 import { ListRow } from "@/components/ui/ListRow";
+import { useDeskLandClass } from "@/components/ui/DeskLand";
 import { formatCallWhenRelative } from "@/lib/callsTriage";
 import { cx } from "@/lib/cx";
 import {
@@ -78,6 +79,8 @@ export function ContactPhoneRow({
     ? contactsSplitHref(row.id, listReturn)
     : contactProfileHref(row.id, listReturn);
   const selected = selectedId === row.id;
+  // ContactsEndlessList wraps the pile in DeskLandScope; this lands rows that arrive on a live refresh.
+  const landClass = useDeskLandClass(row.id);
 
   const onOpen = useCallback(() => {
     router.push(href);
@@ -95,7 +98,7 @@ export function ContactPhoneRow({
       below={unsaved ? <ContactNameForm contactId={row.id} initialName={row.name} variant="row" /> : undefined}
       when={lastCall}
       actions={<ContactListDock phone={row.phone} />}
-      className={cx(selected && "bg-accent-tonal/40 ring-1 ring-inset ring-brand/30")}
+      className={cx(landClass, selected && "bg-accent-tonal/40 ring-1 ring-inset ring-brand/30")}
     />
   );
 }

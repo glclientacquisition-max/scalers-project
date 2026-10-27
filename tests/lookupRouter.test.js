@@ -35,7 +35,7 @@ test('positives answer this turn, and chatter stays with the model', () => {
   assert.match(state.conversation.lookupTopic.areaId, /kileleshwa/);
 
   const cutoff = turn('And how much is the.', state);
-  assert.match(cutoff.speech, /deep cleaning/);
+  assert.match(cutoff.speech, /deep cleaning/i);
   assert.doesNotMatch(cutoff.speech, /two thousand five hundred/);
   assert.match(state.conversation.lookupTopic.areaId, /kileleshwa/);
 
@@ -57,6 +57,6 @@ test('positives answer this turn, and chatter stays with the model', () => {
 test('a bare price with an empty slot lists services', () => {
   const state = { conversation: {} };
   const bare = turn('How much is it?', state, undefined, 'en', { VOICE_LOOKUPS: 'price,services' });
-  assert.match(bare.speech, /deep cleaning/);
+  assert.match(bare.speech, /deep cleaning/i);
   assert.equal(state.conversation.lookupTopic.serviceId, '');
 });

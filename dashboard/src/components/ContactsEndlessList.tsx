@@ -10,6 +10,7 @@ import { DeskError } from "@/components/ui/DeskError";
 import { DeskLandScope } from "@/components/ui/DeskLand";
 import { contactsSliceOutcome } from "@/lib/deskFresh";
 import {
+  listWindowClass,
   appendUniqueById,
   listAfterPullRefresh,
 } from "@/lib/endlessList";
@@ -44,7 +45,7 @@ function ContactsGroupedList({
               {section.label}
             </h2>
           ) : null}
-          <ul className="divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface">
+          <ul className={`divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface ${listWindowClass}`}>
             {section.rows.map((row) => (
               <ContactPhoneRow
                 key={row.id}

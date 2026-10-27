@@ -19,6 +19,12 @@ function tenantRowLineState(row) {
   return reason ? { closed: true, reason, tenantId: row?.id || null } : null;
 }
 
+// tenants.greeting_language is en or sw (check constraint). Anything else is null.
+function parseGreetingLanguage(value) {
+  const v = String(value || '').trim().toLowerCase();
+  return v === 'en' || v === 'sw' ? v : null;
+}
+
 function tenantProfileFromRow(row, extras = {}) {
   const { parseAgentTools } = require('./conversation/agentTools');
   const { parseLexiconOverrides } = require('./speech/pronunciationLexicon');
@@ -35,6 +41,9 @@ function tenantProfileFromRow(row, extras = {}) {
     businessName: row.business_name,
     spokenName: row.spoken_name || null,
     greetingInvite: row.greeting_invite || null,
+    // greeting_language.sql (13c). null on an unmigrated database or empty field.
+    greetingText: row.greeting_text || null,
+    greetingLanguage: parseGreetingLanguage(row.greeting_language),
     agentName: row.agent_name || 'Receptionist',
     agentTone: row.agent_tone || null,
     llmSystemPrompt: row.llm_system_prompt || null,
@@ -54,6 +63,10 @@ function tenantProfileFromRow(row, extras = {}) {
     teamDirectory: row.team_directory || [],
     unknownAnswerFallback: row.unknown_answer_fallback || null,
     unknownAnswerSpoken: extras.unknownAnswerSpoken ?? row.unknown_answer_spoken ?? null,
+    // Desk Settings › Service areas (public.tenant_area_picks rows); null = no rows / no table -> legacy lists
+    areaPicksRows: extras.areaPicksRows ?? null,
+    areaPicks: extras.areaPicks ?? null,
+    areaPicksConfirmedAt: extras.areaPicksConfirmedAt ?? null,
     unknownAnswerByKind: require('./conversation/unknownAnswerByKind').parseByKind(
       row.unknown_answer_by_kind
     ),
@@ -71,6 +84,9 @@ function tenantProfileFromRow(row, extras = {}) {
     handoffMode: parseHandoffMode(row.handoff_mode),
     businessLocations: row.business_locations || [],
     service_areas: row.service_areas ?? null,
+    // SPOKEN_CATALOGUE_STORED_FIRST only: v2 area logic reads profile.serviceAreas,
+    // so loading it changes call behaviour; gated with the stored-first flag.
+    ...(require('./knowledge/spokenCatalogue').storedFirst() ? { serviceAreas: require('./knowledge/spokenCatalogue').catalogueProfileFromRow({ ...row, service_areas: row.service_areas !== undefined ? row.service_areas : extras.serviceAreas }).serviceAreas } : {}),
     businessPolicies: row.business_policies || {},
     billingEnforcement:
       row.billing_enforcement != null ? String(row.billing_enforcement) : null,
@@ -82,6 +98,8 @@ function tenantProfileFromRow(row, extras = {}) {
     openAppointments: Array.isArray(extras.openAppointments) ? extras.openAppointments : [],
     fieldMeta: extras.fieldMeta || null,
     holdGate: extras.holdGate || null,
+    // VOICE_V2_CATALOGUE only: stored speech-ready KB (null until Platform's column exists / backfill runs).
+    ...(/^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || '')) ? { spokenCatalogue: row.spoken_catalogue || null } : {}),
   };
 }
 

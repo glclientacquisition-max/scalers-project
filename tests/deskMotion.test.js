@@ -170,7 +170,10 @@ describe("desk motion wiring", () => {
     const list = read("dashboard/src/components/ContactListRow.tsx");
     const endless = read("dashboard/src/components/ContactsEndlessList.tsx");
     assert.match(endless, /<DeskLandScope/);
-    assert.match(list, /<DeskLandSurface/);
+    // ListRow owns the <li>, so the row takes the land class from the scope (was DeskLandSurface before #596).
+    assert.match(list, /useDeskLandClass\(row\.id\)/);
+    assert.match(list, /className=\{cx\(landClass/);
+    assert.match(read("dashboard/src/components/ui/DeskLand.tsx"), /export function useDeskLandClass/);
     assert.match(endless, /scopeKey=\{`\$\{saved\}:\$\{sort\}:\$\{q\}`\}/);
   });
 
@@ -197,7 +200,9 @@ describe("desk motion wiring", () => {
     assert.match(inbox, /deskShiftClass/);
     assert.doesNotMatch(inbox, /transition duration-150/);
     assert.match(home, /deskShiftClass/);
-    assert.match(contacts, /deskShiftClass/);
+    // Contacts chrome is kit-built since #581 (Segmented pills, ButtonLink): no hand-rolled transitions.
+    assert.match(contacts, /<InboxFilterPills/);
+    assert.doesNotMatch(contacts, /transition duration-150|transition-all/);
     const nav = read("dashboard/src/components/DeskNav.tsx");
     assert.match(nav, /deskShiftClass/);
     const tabs = read("dashboard/src/components/ui/FilterTabs.tsx");
@@ -211,7 +216,8 @@ describe("desk motion wiring", () => {
   it("replaces leftover duration-150 and transition-all with deskShiftClass", () => {
     const tenant = read("dashboard/src/components/TenantForm.tsx");
     const onboard = read("dashboard/src/app/onboarding/OnboardingWizard.tsx");
-    assert.match(tenant, /deskShiftClass/);
+    // TenantForm's last shift button moved out with Locations (#667); only the no-leftovers rule applies.
+    assert.doesNotMatch(tenant, /transition-all/);
     assert.doesNotMatch(tenant, /transition duration-150/);
     assert.match(onboard, /deskShiftClass/);
     assert.doesNotMatch(onboard, /transition-all/);
@@ -246,7 +252,7 @@ describe("desk motion wiring", () => {
     assert.match(notice, /usePrefersReducedMotion/);
     assert.match(notice, /DESK_NOTICE_MS/);
     assert.doesNotMatch(notice, /layoutId|spring|framer-motion|motion\/react/);
-    assert.match(toast, /DeskNotice open=\{!!notice\}/);
+    assert.match(toast, /DeskNotice open=\{!!notice\b/);
     assert.doesNotMatch(toast, /createPortal/);
     const gate = read("dashboard/src/components/ui/usePrefersReducedMotion.ts");
     assert.match(gate, /prefers-reduced-motion: reduce/);
