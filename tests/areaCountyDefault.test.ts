@@ -35,6 +35,36 @@ test("known borders", async () => {
   assert.deepEqual(m.nearbyCounties("county:atlantis"), []);
 });
 
+test("source-checked pairs (geoBoundaries KEN ADM1, Wikipedia, county CIDPs)", async () => {
+  const m = await adj();
+  const has = (a: string, b: string) => m.countyNeighbours(`county:${a}`).includes(`county:${b}`);
+  // In: shared land borders found on the polygons and named by sources.
+  for (const [a, b] of [
+    ["kericho", "uasin-gishu"],
+    ["kitui", "meru"],
+    ["siaya", "vihiga"],
+    ["isiolo", "kitui"],
+    ["homa-bay", "kericho"],
+    ["kisumu", "homa-bay"],
+    ["tana-river", "taita-taveta"],
+    ["tharaka-nithi", "nyeri"],
+    ["tharaka-nithi", "kirinyaga"],
+    ["embu", "muranga"],
+  ]) assert.ok(has(a, b), `${a} should border ${b}`);
+  // Out: no shared border, only a Mt Kenya summit point with no source, or across Lake Victoria.
+  for (const [a, b] of [
+    ["kakamega", "kisumu"],
+    ["mandera", "marsabit"],
+    ["siaya", "homa-bay"],
+    ["tana-river", "meru"],
+    ["isiolo", "tharaka-nithi"],
+    ["kisumu", "nyamira"],
+    ["embu", "meru"],
+    ["embu", "nyeri"],
+    ["kirinyaga", "meru"],
+  ]) assert.ok(!has(a, b), `${a} should not border ${b}`);
+});
+
 test("business county from area id, place id, text, or unknown", async () => {
   const m = await home();
   assert.equal(m.businessHomeCounty([{ area_id: "county:kiambu", address: "" }]), "county:kiambu");
