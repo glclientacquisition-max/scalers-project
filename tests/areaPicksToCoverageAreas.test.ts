@@ -178,6 +178,190 @@ test("round trip: an old coverage list moved onto picks mirrors back to the same
   assert.deepEqual([...(out.coverage_areas ?? [])].sort(), [...old].sort());
 });
 
+// ---- lossless: a save never drops an existing county or home area unless the owner removed it ----
+
+const BACKFILL_KE = { version: 1, tree_version: "ke-areas-2026-10-24.1", picks: [{ node: "ke", serve: true, fee_kes: null, note: null }] };
+
+for (const [tenant, prior, probe] of [
+  ["ALFAAL (Nairobi)", ["county:nairobi"], "Westlands"],
+  ["Esga (Nakuru town)", ["place:nakuru town"], "Nakuru town"],
+  ["Grow Tech (Nakuru county)", ["county:nakuru"], "Naivasha"],
+] as const) {
+  test(`prod backfill ${tenant}: ke-only picks, owner saves unchanged, the named area stays in coverage_areas`, async () => {
+    const m = await mapper();
+    const a = await picksLib();
+    const picks = a.normalizeAreaPicks(BACKFILL_KE);
+    const out = m.areaPicksToCoverageAreas(picks, { confirmed: true, priorCoverage: [...prior], priorPicks: picks });
+    assert.deepEqual(out.coverage_areas, [...prior]);
+    assert.deepEqual(out.coverage_outside, { anywhere_kenya: true, fee_ksh: null });
+    assert.deepEqual(out.kept, [...prior]);
+    assert.deepEqual(out.dropped, []);
+    const policies = m.applyCoverageMirrorToPolicies({ coverage_areas: [...prior], coverage_outside: { anywhere_kenya: true } }, out);
+    assert.deepEqual(prodCoverage.readCoverageAreas(policies), [...prior]);
+    assert.equal(prodOutside.coverageDetail(probe, { businessPolicies: policies }), "listed");
+  });
+}
+
+test("Nairobi: ['county:nairobi'] + backfilled ke; owner adds Kitengela with a fee and saves; county:nairobi still listed", async () => {
+  const m = await mapper();
+  const a = await picksLib();
+  const before = a.normalizeAreaPicks(BACKFILL_KE);
+  const after = a.setAreaDetail(before, "town:kajiado:kitengela", { serve: true, fee_kes: 300, note: null });
+  const out = m.areaPicksToCoverageAreas(after, { confirmed: false, priorCoverage: ["county:nairobi"], priorPicks: before });
+  assert.ok(out.coverage_areas!.includes("county:nairobi"));
+  assert.deepEqual(out.coverage_areas, ["county:nairobi", "place:kitengela"]);
+});
+
+test("no picks row yet: the old list the page showed counts as the prior picks; nothing named is lost", async () => {
+  const m = await mapper();
+  const a = await picksLib();
+  const old = ["county:nairobi", "place:juja"];
+  const shown = a.moveOverAreas(old).picks;
+  const saved = a.toggleArea(shown, "county:kajiado");
+  const out = m.areaPicksToCoverageAreas(saved, { priorCoverage: old, priorPicks: shown });
+  assert.deepEqual(out.coverage_areas, ["county:nairobi", "place:juja", "county:kajiado"]);
+});
+
+test("owner removal is the only drop: covered before this save, not covered now", async () => {
+  const m = await mapper();
+  const a = await picksLib();
+  let before = a.toggleArea(a.emptyAreaPicks(), "county:nairobi");
+  before = a.toggleArea(before, "county:kiambu");
+  const after = a.toggleArea(before, "county:nairobi");
+  const out = m.areaPicksToCoverageAreas(after, { priorCoverage: ["county:nairobi", "county:kiambu"], priorPicks: before });
+  assert.deepEqual(out.coverage_areas, ["county:kiambu"]);
+  assert.deepEqual(out.dropped, ["county:nairobi"]);
+  // Unticking Nairobi under a backfilled ke is also an owner removal.
+  const ke = a.normalizeAreaPicks(BACKFILL_KE);
+  const offNairobi = a.toggleArea(ke, "county:nairobi");
+  const out2 = m.areaPicksToCoverageAreas(offNairobi, { priorCoverage: ["county:nairobi"], priorPicks: ke });
+  assert.deepEqual(out2.dropped, ["county:nairobi"]);
+  assert.deepEqual(out2.coverage_areas, []);
+});
+
+test("a prior id the old picks never covered, or the tree cannot place, is kept", async () => {
+  const m = await mapper();
+  const a = await picksLib();
+  const index = JSON.parse(readFileSync(new URL("../dashboard/src/lib/data/kenyaPlaceCounties.json", import.meta.url), "utf8"));
+  const offTree = Object.keys(index.places).map((k) => `place:${k}`).find((id) => !index.counties.includes(id.slice(6)) && !m.nodeForOldId(id))!;
+  assert.ok(offTree, "an index place with no tree node");
+  const picks = a.toggleArea(a.emptyAreaPicks(), "county:kiambu");
+  const out = m.areaPicksToCoverageAreas(picks, { priorCoverage: ["county:nairobi", offTree], priorPicks: a.emptyAreaPicks() });
+  assert.deepEqual(out.coverage_areas, ["county:nairobi", offTree, "county:kiambu"]);
+  assert.deepEqual(out.dropped, []);
+  const prior = { areas: [{ id: offTree, modes: ["visit"], fee_mode: "fixed", fee_ksh: 500, eta: null, source: "owner", confirmed: true }] };
+  const withTerms = m.areaPicksToCoverageAreas(picks, { priorCoverage: [offTree], priorPicks: a.emptyAreaPicks(), priorServiceAreas: prior });
+  assert.equal(withTerms.terms.find((t: { id: string }) => t.id === offTree).fee_ksh, 500, "unplaceable id keeps its old terms");
+});
+
+test("kept ids come first, so the 40 cap never drops a prior area", async () => {
+  const m = await mapper();
+  const a = await picksLib();
+  let p = a.emptyAreaPicks();
+  for (const n of tree.nodes) if (n.kind === "town") p = a.setAreaDetail(p, n.id, { serve: true, fee_kes: 100, note: null });
+  p = a.toggleArea(p, "county:nairobi");
+  const out = m.areaPicksToCoverageAreas(p, { priorCoverage: ["place:juja", "county:nairobi"], priorPicks: p });
+  assert.equal(out.overflow, true);
+  assert.deepEqual(out.coverage_areas!.slice(0, 2), ["place:juja", "county:nairobi"]);
+});
+
+// ---- upsert then prune: a failed write never leaves the tenant with fewer picks ----
+
+type Row = { tenant_id: string; node: string; [k: string]: unknown };
+function fakeTable(rows: Row[], fail: { upsert?: boolean; prune?: boolean } = {}) {
+  const calls: string[] = [];
+  const client = {
+    from() {
+      return {
+        upsert(next: Row[]) {
+          calls.push("upsert");
+          if (fail.upsert) return Promise.resolve({ error: { message: "insert failed" } });
+          for (const r of next) {
+            const i = rows.findIndex((x) => x.tenant_id === r.tenant_id && x.node === r.node);
+            if (i >= 0) rows[i] = r;
+            else rows.push(r);
+          }
+          return Promise.resolve({ error: null });
+        },
+        delete() {
+          return {
+            eq(_c: string, tenant: string) {
+              const all = () => {
+                calls.push("delete-all");
+                for (let i = rows.length - 1; i >= 0; i--) if (rows[i].tenant_id === tenant) rows.splice(i, 1);
+                return { error: null };
+              };
+              // Delete-all runs only when awaited directly; .not() narrows it to a prune.
+              let used = false;
+              const lazy = {
+                then(res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) {
+                  if (used) return Promise.resolve({ error: null }).then(res, rej);
+                  used = true;
+                  return Promise.resolve(all()).then(res, rej);
+                },
+                not(_c: string, _op: string, list: string) {
+                  used = true;
+                  calls.push("prune");
+                  if (fail.prune) return Promise.resolve({ error: { message: "prune failed" } });
+                  const keep = new Set(JSON.parse(`[${list.slice(1, -1)}]`));
+                  for (let i = rows.length - 1; i >= 0; i--) if (rows[i].tenant_id === tenant && !keep.has(rows[i].node)) rows.splice(i, 1);
+                  return Promise.resolve({ error: null });
+                },
+              };
+              return lazy;
+            },
+          };
+        },
+      };
+    },
+  };
+  return { client, calls, rows };
+}
+
+const row = (tenant: string, node: string) => ({
+  tenant_id: tenant, node, serve: true, fee_kes: null, note: null, confirmed_at: null,
+  tree_version: "ke-areas-2026-10-24.1", moved_from: null, updated_at: "now", updated_by: null,
+});
+
+test("failed insert (upsert) leaves the old picks in place and never deletes", async () => {
+  const { writeAreaPickRows } = await import("../dashboard/src/lib/areaPicksWrite.ts");
+  const t = fakeTable([row("t1", "county:nairobi"), row("t1", "county:kiambu"), row("t2", "ke")], { upsert: true });
+  const res = await writeAreaPickRows(t.client as never, "t1", [row("t1", "county:kajiado")]);
+  assert.deepEqual(res, { ok: false, error: "insert failed", stage: "upsert" });
+  assert.deepEqual(t.calls, ["upsert"]);
+  assert.deepEqual(t.rows.filter((r) => r.tenant_id === "t1").map((r) => r.node), ["county:nairobi", "county:kiambu"]);
+});
+
+test("upsert then prune: new picks in, removed picks out, other tenants untouched", async () => {
+  const { writeAreaPickRows } = await import("../dashboard/src/lib/areaPicksWrite.ts");
+  const t = fakeTable([row("t1", "county:nairobi"), row("t1", "county:kiambu"), row("t2", "county:nairobi")]);
+  const res = await writeAreaPickRows(t.client as never, "t1", [row("t1", "county:kiambu"), row("t1", "estate:nairobi:kibera")]);
+  assert.deepEqual(res, { ok: true });
+  assert.deepEqual(t.calls, ["upsert", "prune"]);
+  assert.deepEqual(t.rows.filter((r) => r.tenant_id === "t1").map((r) => r.node).sort(), ["county:kiambu", "estate:nairobi:kibera"]);
+  assert.deepEqual(t.rows.filter((r) => r.tenant_id === "t2").map((r) => r.node), ["county:nairobi"]);
+});
+
+test("prune failure keeps every new pick and reports the error", async () => {
+  const { writeAreaPickRows } = await import("../dashboard/src/lib/areaPicksWrite.ts");
+  const t = fakeTable([row("t1", "county:nairobi")], { prune: true });
+  const res = await writeAreaPickRows(t.client as never, "t1", [row("t1", "county:kiambu")]);
+  assert.equal(res.ok, false);
+  assert.ok(t.rows.some((r) => r.node === "county:kiambu"));
+});
+
+test("clearing every pick deletes only that tenant's rows", async () => {
+  const { writeAreaPickRows } = await import("../dashboard/src/lib/areaPicksWrite.ts");
+  const t = fakeTable([row("t1", "county:nairobi"), row("t2", "ke")]);
+  assert.deepEqual(await writeAreaPickRows(t.client as never, "t1", []), { ok: true });
+  assert.deepEqual(t.rows.map((r) => r.tenant_id), ["t2"]);
+});
+
+test("postgrestInList quotes node ids", async () => {
+  const { postgrestInList } = await import("../dashboard/src/lib/areaPicksWrite.ts");
+  assert.equal(postgrestInList(["county:nairobi", "estate:nairobi:kibera"]), '("county:nairobi","estate:nairobi:kibera")');
+});
+
 // ---- drift guard: every tenant_area_picks write path in dashboard calls the mirror ----
 
 function walk(dir: string): string[] {
@@ -192,23 +376,27 @@ function walk(dir: string): string[] {
 
 test("every dashboard write to tenant_area_picks also writes the coverage mirror", () => {
   const root = new URL("../dashboard/src", import.meta.url).pathname;
-  const writers: string[] = [];
+  const direct: string[] = [];
+  const callers: string[] = [];
   for (const file of walk(root)) {
     const src = readFileSync(file, "utf8");
+    const rel = file.slice(root.length + 1);
     const writes = /from\(\s*["'`]tenant_area_picks["'`]\s*\)[\s\S]{0,80}?\.(insert|upsert|update|delete)\s*\(/.test(src) ||
       /rpc\(\s*["'`][a-z_]*area_pick[a-z_]*["'`]/.test(src);
-    if (!writes) continue;
-    writers.push(file.slice(root.length + 1));
-    assert.match(src, /mirrorCoverageFromPicks\(/, `${file} writes tenant_area_picks without the coverage mirror`);
+    if (writes) direct.push(rel);
+    if (/\bwriteAreaPickRows\(/.test(src) && rel !== "lib/areaPicksWrite.ts") {
+      callers.push(rel);
+      assert.match(src, /mirrorCoverageFromPicks\(/, `${rel} writes tenant_area_picks without the coverage mirror`);
+    }
   }
-  assert.deepEqual(writers, ["lib/areaPicks.server.ts"], "a new writer must call mirrorCoverageFromPicks and be listed here");
+  assert.deepEqual(direct, ["lib/areaPicksWrite.ts"], "only areaPicksWrite.ts writes the table; route new writers through it");
+  assert.deepEqual(callers, ["lib/areaPicks.server.ts"], "a new writer must call mirrorCoverageFromPicks and be listed here");
   const server = readFileSync(join(root, "lib/areaPicks.server.ts"), "utf8");
   const save = server.slice(server.indexOf("export async function saveAreaPicks"), server.indexOf("export async function mirrorCoverageFromPicks"));
-  // After the delete, every successful exit of saveAreaPicks goes through the mirror.
-  const afterDelete = save.slice(save.indexOf(".delete()"));
-  assert.doesNotMatch(afterDelete, /return \{ ok: true \}/, "saveAreaPicks returns ok without mirroring");
-  assert.equal((afterDelete.match(/mirrorCoverageFromPicks\(/g) || []).length, 2);
-  assert.match(server, /areaPicksToCoverageAreas\(/);
+  const afterWrite = save.slice(save.indexOf("writeAreaPickRows("));
+  assert.doesNotMatch(afterWrite, /return \{ ok: true \}/, "saveAreaPicks returns ok without mirroring");
+  assert.equal((afterWrite.match(/mirrorCoverageFromPicks\(/g) || []).length, 1);
+  assert.match(server, /areaPicksToCoverageAreas\([\s\S]{0,400}priorCoverage[\s\S]{0,200}priorPicks/, "mirror gets the prior coverage and picks (lossless)");
 });
 
 test("every Desk save path reaches saveAreaPicks (settings page, onboarding step, confirm nudge)", () => {

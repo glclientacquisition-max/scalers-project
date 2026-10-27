@@ -6,6 +6,7 @@ import {
   applyCoverageMirrorToServiceAreas,
   areaPicksToCoverageAreas,
 } from "@/lib/areaPicksToCoverageAreas";
+import { writeAreaPickRows, type AreaPickRow, type PicksClient } from "@/lib/areaPicksWrite";
 import { bustTenantCache } from "@/lib/tenantCache";
 
 export type AreaPicksRow = { picks: AreaPicks; confirmed_at: string | null; moved_from: string[] | null };
@@ -72,11 +73,7 @@ export async function saveAreaPicks(
     opts.confirm ? new Date().toISOString() : existing.ok && existing.row ? existing.row.confirmed_at : null;
   const moved_from = opts.movedFrom ?? (existing.ok && existing.row ? existing.row.moved_from : null);
   const now = new Date().toISOString();
-  const admin = getSupabaseAdmin();
-  const del = await admin.from("tenant_area_picks").delete().eq("tenant_id", tenantId);
-  if (del.error) return { ok: false, error: del.error.message };
-  if (!clean.picks.length) return mirrorCoverageFromPicks(tenantId, clean, Boolean(confirmed_at));
-  const payload = clean.picks.map((p) => ({
+  const rows: AreaPickRow[] = clean.picks.map((p) => ({
     tenant_id: tenantId,
     node: p.node,
     serve: p.serve,
@@ -88,9 +85,11 @@ export async function saveAreaPicks(
     updated_at: now,
     updated_by: opts.userId ?? null,
   }));
-  const res = await admin.from("tenant_area_picks").insert(payload);
-  if (res.error) return { ok: false, error: res.error.message };
-  return mirrorCoverageFromPicks(tenantId, clean, Boolean(confirmed_at));
+  // Upsert then prune (lib/areaPicksWrite.ts): a failed write leaves the old picks in place.
+  const written = await writeAreaPickRows(getSupabaseAdmin() as unknown as PicksClient, tenantId, rows);
+  if (!written.ok) return { ok: false, error: written.error };
+  const priorPicks = existing.ok && existing.row ? existing.row.picks : null;
+  return mirrorCoverageFromPicks(tenantId, clean, Boolean(confirmed_at), priorPicks);
 }
 
 /**
@@ -103,6 +102,8 @@ export async function mirrorCoverageFromPicks(
   tenantId: string,
   picks: AreaPicks,
   confirmed: boolean,
+  /** Picks before this save; null = no row yet (then the old list the page showed, moved over). */
+  priorPicks: AreaPicks | null = null,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const admin = getSupabaseAdmin();
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -116,10 +117,12 @@ export async function mirrorCoverageFromPicks(
       confirmed,
       vertical: (data as { vertical?: string | null }).vertical ?? null,
       priorServiceAreas: data.service_areas,
+      priorCoverage: (data.business_policies as { coverage_areas?: unknown } | null)?.coverage_areas,
+      priorPicks: priorPicks ?? moveOverAreas(oldCoverageList(data)).picks,
     });
-    if (mirror.unmapped.length || mirror.lossy.length || mirror.overflow) {
+    if (mirror.unmapped.length || mirror.lossy.length || mirror.overflow || mirror.dropped.length) {
       console.warn(
-        `[area_picks] coverage mirror tenant=${tenantId} unmapped=${mirror.unmapped.length} lossy=${mirror.lossy.length} overflow=${mirror.overflow}`,
+        `[area_picks] coverage mirror tenant=${tenantId} unmapped=${mirror.unmapped.length} lossy=${mirror.lossy.length} overflow=${mirror.overflow} kept=${mirror.kept.length} dropped=${mirror.dropped.length}`,
       );
     }
     const before = data.business_policies ?? null;

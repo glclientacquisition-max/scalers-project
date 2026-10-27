@@ -23,11 +23,15 @@
  *   - Fee: the resolved fee for that node (own pick or serving ancestor). Fee set -> fee_mode "fixed";
  *     no fee -> "ask" (team confirms). Notes are not mirrored.
  *   - No serving pick at all -> coverage_areas null (key removed): "not set", never "serves nowhere".
+ *   - Lossless (Chief, 27 Oct): an id already in coverage_areas is never dropped by a save unless the owner
+ *     removed it. Removed = the picks before this save covered it and the new picks do not. Kept ids come
+ *     first so the 40 cap never cuts them. Ids the tree cannot place are always kept. This is what keeps a
+ *     backfilled "ke"-only tenant's named home area (["county:nairobi"] + anywhere in Kenya).
  *
  * Pure and browser-safe. Relative imports only so node tests can load it.
  */
 import INDEX from "./data/kenyaPlaceCounties.json" with { type: "json" };
-import { areaNode, countyOf, normAreaText, resolveArea, ROOT_ID, type AreaPicks } from "./areaPicks.ts";
+import { areaNode, countyOf, moveOverAreas, normAreaText, resolveArea, ROOT_ID, type AreaPicks } from "./areaPicks.ts";
 
 /** Same cap as prod Voice parseCoverageAreas (src/conversation/coverageAreas.js MAX_AREAS). */
 export const COVERAGE_MIRROR_MAX = 40;
@@ -57,6 +61,10 @@ export type CoverageMirror = {
   lossy: string[];
   /** More than COVERAGE_MIRROR_MAX ids; the rest were dropped. */
   overflow: boolean;
+  /** Prior coverage ids kept that no serving pick names directly (lossless rule). */
+  kept: string[];
+  /** Prior coverage ids dropped because the owner removed them (covered before this save, not now). */
+  dropped: string[];
 };
 
 /** Old county key for a tree county node ("county:muranga" -> "muranga"), or null. */
@@ -88,6 +96,30 @@ export function oldCoverageId(nodeId: string): string | null {
   return place ? `place:${place}` : null;
 }
 
+/** Tree node for an old coverage id, only on an exact name or alias match (never a fuzzy guess). */
+export function nodeForOldId(oldId: string): string | null {
+  const raw = String(oldId || "").trim().toLowerCase();
+  const split = raw.indexOf(":");
+  if (split < 1) return null;
+  const name = normAreaText(raw.slice(split + 1));
+  const node = moveOverAreas([raw]).rows[0]?.node ?? null;
+  const n = node ? areaNode(node) : null;
+  if (!n || n.kind === "country") return null;
+  if (raw.startsWith("county:") && n.kind !== "county") return null;
+  const names = [n.name, ...n.aliases].map(normAreaText);
+  return names.includes(name) ? n.id : null;
+}
+
+function priorIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const x of raw) {
+    const id = String(x ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+    if (/^(county|place):./.test(id) && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
 function existingTerm(prior: unknown, id: string): { modes?: unknown; eta?: unknown } | null {
   const areas = prior && typeof prior === "object" ? (prior as { areas?: unknown }).areas : null;
   if (!Array.isArray(areas)) return null;
@@ -102,10 +134,18 @@ const MODES = new Set(["delivery", "visit", "pickup"]);
  */
 export function areaPicksToCoverageAreas(
   picks: AreaPicks,
-  opts: { confirmed?: boolean; vertical?: string | null; priorServiceAreas?: unknown } = {},
+  opts: {
+    confirmed?: boolean;
+    vertical?: string | null;
+    priorServiceAreas?: unknown;
+    /** business_policies.coverage_areas before this save. */
+    priorCoverage?: unknown;
+    /** Picks before this save (the stored row, or what the page showed). null: none. */
+    priorPicks?: AreaPicks | null;
+  } = {},
 ): CoverageMirror {
   const serving = picks.picks.filter((p) => p.serve);
-  const out: CoverageMirror = { coverage_areas: null, coverage_outside: null, terms: [], unmapped: [], lossy: [], overflow: false };
+  const out: CoverageMirror = { coverage_areas: null, coverage_outside: null, terms: [], unmapped: [], lossy: [], overflow: false, kept: [], dropped: [] };
   for (const p of picks.picks) {
     if (p.serve) continue;
     // An exclusion under any covered ancestor is still listed by the old shape.
@@ -113,7 +153,22 @@ export function areaPicksToCoverageAreas(
     const parent = n?.parent ?? null;
     if (parent && resolveArea(picks, parent).covered) out.lossy.push(p.node);
   }
-  if (!serving.length) return out;
+  // Lossless: prior ids stay unless the owner removed them in this save.
+  const keptPrior: string[] = [];
+  const priorNode = new Map<string, string>();
+  for (const id of priorIds(opts.priorCoverage)) {
+    const node = nodeForOldId(id);
+    if (!node) {
+      keptPrior.push(id);
+      continue;
+    }
+    priorNode.set(id, node);
+    const now = resolveArea(picks, node).covered;
+    const before = opts.priorPicks ? resolveArea(opts.priorPicks, node).covered : true;
+    if (now || !before) keptPrior.push(id);
+    else out.dropped.push(id);
+  }
+  if (!serving.length && !keptPrior.length) return out;
 
   const defaultMode = opts.vertical === "home_services" ? "visit" : "delivery";
   const counties: string[] = [];
@@ -130,8 +185,10 @@ export function areaPicksToCoverageAreas(
     }
     (id.startsWith("county:") ? counties : places).push(id);
   }
-  // Counties first (widest cover), then places; stable tree/pick order inside each.
-  const ids = [...new Set([...counties, ...places])];
+  // Kept prior ids first (never cut by the cap), then counties (widest cover), then places.
+  const fromPicks = new Set([...counties, ...places]);
+  out.kept = keptPrior.filter((id) => !fromPicks.has(id));
+  const ids = [...new Set([...keptPrior, ...counties, ...places])];
   out.overflow = ids.length > COVERAGE_MIRROR_MAX;
   const kept = ids.slice(0, COVERAGE_MIRROR_MAX);
   out.coverage_areas = kept;
@@ -140,9 +197,12 @@ export function areaPicksToCoverageAreas(
     const id = p.node === ROOT_ID ? null : oldCoverageId(p.node);
     if (id && !nodeFor.has(id)) nodeFor.set(id, p.node);
   }
+  for (const [id, node] of priorNode) if (!nodeFor.has(id)) nodeFor.set(id, node);
   out.terms = kept.map((id) => {
-    const fee = resolveArea(picks, nodeFor.get(id)!).fee_kes;
+    const node = nodeFor.get(id);
     const prior = existingTerm(opts.priorServiceAreas, id);
+    if (!node && prior) return { ...(prior as MirrorAreaTerm), id };
+    const fee = node ? resolveArea(picks, node).fee_kes : null;
     const priorModes = Array.isArray(prior?.modes) ? (prior!.modes as unknown[]).map(String).filter((m) => MODES.has(m)) : [];
     const eta = typeof prior?.eta === "string" && prior.eta.trim() ? prior.eta.trim() : null;
     return {
