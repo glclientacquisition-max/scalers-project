@@ -41,7 +41,7 @@ describe("businesses views", () => {
 
 describe("businesses v2 screen", () => {
   it("is behind ADMIN_V2 and keeps the old panel otherwise", () => {
-    assert.match(page, /process\.env\.ADMIN_V2 === "on"/);
+    assert.match(page, /isAdminV2Enabled\(\)/);
     assert.match(page, /AdminBusinessesPanel/);
   });
   it("uses the split pane, a table, and phone rows instead of cards", () => {

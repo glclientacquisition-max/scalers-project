@@ -35,7 +35,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <AdminShell
       operatorName={operatorName}
-      v2={process.env.ADMIN_V2 === "on"}
+      v2={isAdminV2Enabled()}
       showAccessRequests={isAdminV2Enabled()}
       accessRequestsPendingCount={accessRequestsPendingCount}
     >

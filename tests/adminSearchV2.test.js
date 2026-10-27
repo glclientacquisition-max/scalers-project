@@ -53,7 +53,7 @@ test("shortcut is Cmd/Ctrl+K, and / only outside fields", async () => {
 test("v2 search is gated, read-only and behind ADMIN_V2", () => {
   const route = read("dashboard/src/app/api/admin/search/route.ts");
   assert.match(route, /isLegacyAuthenticated/);
-  assert.match(route, /ADMIN_V2 === "on"/);
+  assert.match(route, /isAdminV2Enabled\(\)/);
   const lib = read("dashboard/src/lib/adminCommandSearch.ts");
   assert.doesNotMatch(lib, /\.(insert|update|upsert|delete|rpc)\(/);
   assert.match(lib, /archived_at/);

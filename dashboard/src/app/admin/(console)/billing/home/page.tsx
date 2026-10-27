@@ -4,13 +4,14 @@ import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { logAdminError } from "@/lib/adminErrors";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { loadInvoicesV2 } from "@/lib/adminInvoicesV2Load";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export const instant = false;
 
 /** Billing home (ADMIN_V2 only): this month's money and who owes. Read-only. */
 export default async function AdminBillingHomePage() {
   await requireSuperAdmin();
-  if (process.env.ADMIN_V2 !== "on") notFound();
+  if (!isAdminV2Enabled()) notFound();
   try {
     const { rows } = await loadInvoicesV2();
     return <AdminBillingHomeV2 rows={rows} nowIso={new Date().toISOString()} />;

@@ -6,6 +6,7 @@ import { requireSuperAdmin } from "@/lib/adminGuard";
 import { loadAdminInvoices } from "@/lib/adminPayRead";
 import { AdminInvoicesV2 } from "@/components/admin/v2/AdminInvoicesV2";
 import { loadInvoicesV2 } from "@/lib/adminInvoicesV2Load";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export const instant = false;
 
@@ -16,7 +17,7 @@ export default async function AdminInvoicesPage({
 }) {
   await requireSuperAdmin();
   const businessId = ((await searchParams).business || "").trim() || null;
-  if (process.env.ADMIN_V2 === "on") {
+  if (isAdminV2Enabled()) {
     try {
       const { rows, truncated } = await loadInvoicesV2(businessId);
       const named = businessId ? rows[0]?.businessName ?? null : null;

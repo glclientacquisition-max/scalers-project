@@ -8,7 +8,7 @@ const page = read("dashboard/src/app/admin/(console)/quality/page.tsx");
 const ui = read("dashboard/src/components/admin/v2/AdminQualityV2.tsx");
 
 test("quality v2 sits behind ADMIN_V2 and keeps the old index otherwise", () => {
-  assert.match(page, /process\.env\.ADMIN_V2 === "on"[\s\S]*<AdminQualityV2/);
+  assert.match(page, /isAdminV2Enabled\(\)[\s\S]*<AdminQualityV2/);
   assert.match(page, /<QualityIndex /);
 });
 

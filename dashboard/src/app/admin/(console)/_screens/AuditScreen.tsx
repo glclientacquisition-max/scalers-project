@@ -6,6 +6,7 @@ import { ACTIVITY_LIMIT, loadAdminActivity } from "@/lib/adminActivity";
 import { activityItem, parseActivityFilters } from "@/lib/adminActivityModel";
 import { logAdminError } from "@/lib/adminErrors";
 import { requireSuperAdmin } from "@/lib/adminGuard";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export async function AuditScreen({
   searchParams,
@@ -18,7 +19,7 @@ export async function AuditScreen({
     const { rows, businesses, actors } = await loadAdminActivity(filters);
     const names = new Map(businesses.map((b) => [b.id, b.name]));
     const items = rows.map((row) => activityItem(row, names));
-    if (process.env.ADMIN_V2 === "on") {
+    if (isAdminV2Enabled()) {
       return (
         <AdminAuditV2
           items={items}
