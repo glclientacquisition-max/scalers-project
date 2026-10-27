@@ -28,12 +28,14 @@ import {
   numberState,
   numberTone,
   statusLabel,
+  type MoveTarget,
   type NumberRow,
   type NumberView,
   type WaitingBusiness,
 } from "@/lib/ops/numbersView";
 import { Button } from "@/components/ui/Button";
 import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState, OpsConfirm, UnlockCta } from "@/components/ops";
+import { NumberControls } from "./NumberControls";
 import "@/styles/ops.css";
 
 const DATE = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" });
@@ -47,11 +49,14 @@ const DEFAULT_POLICY: HoldPolicy = { columnsPresent: false, enabled: false, defa
 export function AdminNumbersV2({
   rows: all,
   waiting,
+  moveTargets = [],
   nowIso,
   holdPolicy = DEFAULT_POLICY,
 }: {
   rows: NumberRow[];
   waiting: WaitingBusiness[];
+  /** Businesses a live number can move to (number controls v1). */
+  moveTargets?: MoveTarget[];
   nowIso: string;
   holdPolicy?: HoldPolicy;
 }) {
@@ -468,12 +473,23 @@ export function AdminNumbersV2({
             site="numbers"
             action="numbers:write"
             target={it?.e164 ?? null}
-            what="assign, release, hold or archive this number"
+            what="assign, release, hold, move or restore this number"
             label="Unlock"
             variant="ghost"
           />
         </span>
       </div>
+      <NumberControls
+        key={it.id}
+        row={it}
+        moveTargets={moveTargets}
+        hideRestore={holdActs.restore}
+        hideLift={holdActs.endHold}
+        onChanged={(message) => {
+          setStatus(message);
+          startTransition(() => router.refresh());
+        }}
+      />
     </div>
   ) : undefined;
 

@@ -16,6 +16,9 @@ export const STEP_UP_WHAT: Record<string, string> = {
   "number-hold:restore": "restore this number",
   "number-hold:set_settings": "save hold settings",
   "number-hold:bill_fee": "bill the reactivation fee",
+  "number-ops:restore": "bring this number back to its business",
+  "number-ops:lift_quarantine": "make this number available now",
+  "number-ops:move": "move this number to another business",
   "package-versions:publish": "publish this package",
   "package-versions:move_subscribers": "move subscribers",
   "package-versions:set_billing_mode": "change the billing mode",
@@ -33,7 +36,7 @@ export const STEP_UP_WHAT: Record<string, string> = {
 
 /** Settings › Security "What needs Unlock" area names and one-line scope. */
 export const UNLOCK_AREA_WORDS: Record<string, { title: string; covers: string }> = {
-  numbers: { title: "Numbers", covers: "Assign, release, buy and hold phone numbers." },
+  numbers: { title: "Numbers", covers: "Assign, release, buy, hold, move and restore phone numbers." },
   billing: { title: "Billing & money", covers: "Invoices, credit notes, minutes, packages and billing mode." },
   businesses: { title: "Businesses", covers: "Archive a business or transfer its owner." },
   voices: { title: "Voices & services", covers: "Delete a voice." },

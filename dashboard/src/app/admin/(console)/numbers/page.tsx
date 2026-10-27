@@ -17,7 +17,7 @@ export default async function AdminNumbersPage() {
   await requireSuperAdmin();
   if (isAdminV2Enabled()) {
     try {
-      const [{ rows, waiting }, settings] = await Promise.all([
+      const [{ rows, waiting, targets }, settings] = await Promise.all([
         loadNumbersV2(),
         loadSettingsHub().catch(() => null),
       ]);
@@ -25,6 +25,7 @@ export default async function AdminNumbersPage() {
         <AdminNumbersV2
           rows={rows}
           waiting={waiting}
+          moveTargets={targets}
           nowIso={new Date().toISOString()}
           holdPolicy={holdPolicyFromSettings(settings)}
         />
