@@ -85,10 +85,16 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (230)
+## Functions (239)
 
 | Function | Defined in |
 | --- | --- |
+| `_admin_did_assert_no_other_holder` | `docs/supabase/admin_number_controls_v1.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql` |
+| `_admin_did_is_protected` | `docs/supabase/admin_number_controls_v1.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql` |
+| `_admin_did_last9` | `docs/supabase/admin_number_controls_v1.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql` |
+| `_admin_did_pool_state` | `docs/supabase/admin_number_controls_v1.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql` |
+| `_admin_did_refuse_protected` | `docs/supabase/admin_number_controls_v1.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql` |
+| `_admin_did_tenant_state` | `docs/supabase/admin_number_controls_v1.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql` |
 | `_apply_package_version_move` | `docs/supabase/package_version_editor.sql` |
 | `_billing_audit` | `docs/supabase/billing_data_layer.sql` |
 | `_billing_mark_spend_blocked` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
@@ -151,9 +157,12 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `admin_export_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_import_promoted_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_issue_credit_note` | `docs/supabase/admin_invoice_actions.sql` |
+| `admin_lift_quarantine` | `docs/supabase/admin_number_controls_v1.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql` |
 | `admin_list_package_versions` | `docs/supabase/package_version_editor.sql` |
+| `admin_move_number` | `docs/supabase/admin_number_controls_v1.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql` |
 | `admin_move_subscribers_to_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_publish_package_version` | `docs/supabase/package_version_editor.sql` |
+| `admin_restore_business_number` | `docs/supabase/admin_number_controls_v1.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql` |
 | `admin_set_billing_runtime_switch` | `docs/supabase/billing_payment_runtime_flags.sql` |
 | `admin_set_business_suspended` | `docs/supabase/admin_business_suspend.sql` |
 | `admin_set_invoice_dispute` | `docs/supabase/admin_invoice_actions.sql` |
