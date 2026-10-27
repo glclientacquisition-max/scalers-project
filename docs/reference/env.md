@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-223 variables.
+237 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -35,9 +35,18 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BILLING_NOTICES_SEND` | voice | `src/billing/billingNoticeSend.js` |
 | `BRAIN_AREA_PICKS` | voice | `src/conversation/v2/areaCoverage.js`<br>`src/db.js` |
 | `BRAIN_CALL_FIXES_D199` | desk | `dashboard/src/lib/tenantFieldProvenance.ts` |
+| `BRAIN_ENGINES` | scripts | `scripts/brain-engines-sim.js` |
+| `BRAIN_ENGINES_FILLER_MS` | scripts | `scripts/brain-engines-latency.js` |
+| `BRAIN_ENGINES_REPLY_MS` | scripts | `scripts/brain-engines-latency.js` |
+| `BRAIN_ENGINES_UNDERSTAND_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_GEMINI_CATALOGUE` | voice | `src/conversation/catalogueMouth.js` |
+| `BRAIN_MODEL_LEAD` | scripts | `scripts/brain-engines-sim.js` |
+| `BRAIN_V1_DRAFT` | scripts | `scripts/brain-engines-sim.js` |
+| `BRAIN_V1_DRAFT_PHASE_A` | scripts | `scripts/brain-engines-sim.js` |
+| `BRAIN_V2` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_V2_COMMIT_SAFETY` | voice | `src/conversation/v2/commitSafety.js` |
 | `BRAIN_V2_FACT_STORE` | voice | `src/knowledge/factStore.js` |
+| `BRAIN_V2_MODE` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_V2_MODEL` | voice | `src/conversation/v2/modelShadow.js` |
 | `BRAIN_V2_MODEL_BACKUP_ID` | voice | `src/conversation/v2/modelShadow.js` |
 | `BRAIN_V2_MODEL_ID` | voice | `src/conversation/v2/modelShadow.js` |
@@ -140,6 +149,11 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `SCALERS_OPS_ALERT_EMAIL` | desk | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/setupNotify.ts` |
 | `SCALERS_OPS_ALERT_EMAILS` | desk | `dashboard/src/lib/platformOps.ts`<br>`dashboard/src/lib/setupNotify.ts` |
 | `SIGNUP_MODE` | desk | `dashboard/src/lib/signupMode.ts` |
+| `SIM_REP_MEDIAN` | scripts | `scripts/brain-engines-latency.js` |
+| `SIM_REP_P95` | scripts | `scripts/brain-engines-latency.js` |
+| `SIM_TURNS` | scripts | `scripts/brain-engines-latency.js` |
+| `SIM_UND_MEDIAN` | scripts | `scripts/brain-engines-latency.js` |
+| `SIM_UND_P95` | scripts | `scripts/brain-engines-latency.js` |
 | `SMOKE_TENANT_ID` | scripts | `scripts/smoke-db.js` |
 | `SMOKE_VOICE_PORT` | scripts | `scripts/smoke-recording-webhook.js` |
 | `SONIOX_API_KEY` | voice | `src/speech/sonioxStt.js`<br>`src/speech/sonioxTts.js`<br>`src/speech/sonioxVoice.js` |
