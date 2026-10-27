@@ -3,7 +3,8 @@ import { connection } from "next/server";
 import "@/styles/admin-v2.css";
 import { AdminShell } from "@/components/AdminNav";
 import { AdminNumbersV2 } from "@/components/admin/v2/AdminNumbersV2";
-import { ADMIN_NUMBERS, ADMIN_NUMBERS_NOW, ADMIN_NUMBERS_WAITING } from "../fixtures/adminNumbers";
+import { StepUpHost } from "@/components/ops/StepUpHost";
+import { ADMIN_NUMBERS, ADMIN_NUMBERS_MOVE_TARGETS, ADMIN_NUMBERS_NOW, ADMIN_NUMBERS_PLAIN_HOLD, ADMIN_NUMBERS_PROTECTED, ADMIN_NUMBERS_WAITING } from "../fixtures/adminNumbers";
 
 export const instant = false;
 
@@ -14,11 +15,13 @@ export default async function DevAdminNumbersV2Page() {
   return (
     <AdminShell operatorName="alvin" v2>
       <AdminNumbersV2
-        rows={ADMIN_NUMBERS}
+        rows={[ADMIN_NUMBERS_PROTECTED, ADMIN_NUMBERS_PLAIN_HOLD, ...ADMIN_NUMBERS]}
         waiting={ADMIN_NUMBERS_WAITING}
+        moveTargets={ADMIN_NUMBERS_MOVE_TARGETS}
         nowIso={ADMIN_NUMBERS_NOW}
         holdPolicy={{ columnsPresent: true, enabled: true, defaultDays: 14, reactivationFeeKes: null }}
       />
+      <StepUpHost />
     </AdminShell>
   );
 }

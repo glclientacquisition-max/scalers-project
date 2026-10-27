@@ -45,13 +45,13 @@ test("redirect map sends old routes to their one home", async () => {
 test("pages apply the map only under ADMIN_V2 and stay as-is otherwise", () => {
   for (const [p, to] of [["billing", "/admin/billing/home"], ["packages", "/admin/billing/packages"], ["platform", "/admin/settings/services"], ["voices", "/admin/settings/voices"], ["activity", "/admin/settings/audit"]]) {
     const s = page(p);
-    assert.match(s, /process\.env\.ADMIN_V2 === "on"\) redirect\(/, p);
+    assert.match(s, /isAdminV2Enabled\(\)\) redirect\(/, p);
     assert.ok(s.includes(to), `${p} → ${to}`);
   }
-  assert.match(page("businesses/[id]"), /ADMIN_V2 === "on"\) redirect\(businessPaneHref\(id\)\)/);
-  assert.match(page("billing/[tenantId]"), /ADMIN_V2 === "on"\) redirect\(businessPaneHref\(tenantId, "money"\)\)/);
+  assert.match(page("businesses/[id]"), /isAdminV2Enabled\(\)\) redirect\(businessPaneHref\(id\)\)/);
+  assert.match(page("billing/[tenantId]"), /isAdminV2Enabled\(\)\) redirect\(businessPaneHref\(tenantId, "money"\)\)/);
   for (const p of ["billing/packages", "settings/services", "settings/voices", "settings/audit", "settings"]) {
-    assert.match(page(p), /ADMIN_V2 !== "on"\) notFound\(\)/, `${p} is v2-only`);
+    assert.match(page(p), /!isAdminV2Enabled\(\)\) notFound\(\)/, `${p} is v2-only`);
   }
 });
 

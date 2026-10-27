@@ -65,6 +65,9 @@ export const ALWAYS_UNLOCK: Record<string, string> = {
   "step-up:regenerate_backup_codes": "Backup codes are a way in; making new ones needs proof it's you.",
   "step-up:set_area": "Turning Unlock off must itself need Unlock.",
   "step-up:set_duration": "A longer Unlock is a bigger window; changing it needs proof it's you.",
+  "number-ops:restore": "Bringing a number back changes which business answers its calls.",
+  "number-ops:lift_quarantine": "Freeing a number early lets another business take it.",
+  "number-ops:move": "Moving a number sends a business's calls somewhere else.",
 };
 
 // route-registry:start (route paths and action ids, not screen copy)
@@ -87,6 +90,13 @@ export const ADMIN_WRITE_ROUTES: AdminWriteRoute[] = [
     prefix: "number-hold",
     risky: ["hold", "end_hold", "restore", "set_settings", "bill_fee"],
     safe: [],
+  },
+  {
+    file: "admin/number-ops", area: "numbers",
+    prefix: "number-ops",
+    risky: ["restore", "lift_quarantine", "move"],
+    safe: [],
+    note: "Admin number controls v1 (#968 RPCs). Always needs Unlock + reason; protected line refused before the RPC.",
   },
   {
     file: "admin/package-versions", area: "billing",

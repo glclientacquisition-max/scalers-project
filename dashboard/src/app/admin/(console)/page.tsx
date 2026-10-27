@@ -22,6 +22,7 @@ import { loadOverdueForAttention, loadUsageForAttention } from "@/lib/adminAtten
 import { buildAttention, type AttentionKind } from "@/lib/ops/attentionView";
 import { loadInsightFacts } from "@/lib/adminInsightsLoad";
 import { missedDemand } from "@/lib/ops/insightsView";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export const instant = false;
 
@@ -54,7 +55,7 @@ export default async function AdminTodayPage() {
     createdAt: b.created_at,
     packageName: b.package_name,
   }));
-  if (process.env.ADMIN_V2 === "on") {
+  if (isAdminV2Enabled()) {
     const [overdue, usage, facts] = await Promise.all([loadOverdueForAttention(), loadUsageForAttention(), loadInsightFacts(7)]);
     const unavailable: AttentionKind[] = [];
     if (!overdue) unavailable.push("overdue");

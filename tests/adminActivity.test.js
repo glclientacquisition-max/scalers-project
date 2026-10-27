@@ -20,6 +20,8 @@ const SELF_AUDITING = {
   unsuspendBusiness: "dashboard/src/lib/adminBusinessActions.ts",
   updateBusinessProfile: "dashboard/src/lib/adminBusinessProfile.ts",
   sendOwnerPasswordReset: "dashboard/src/lib/adminBusinessProfile.ts",
+  // #974 number-ops: the #968 RPC audits itself; this adds the step-up companion row.
+  auditNumberOp: "dashboard/src/lib/adminNumberOps.ts",
   adminTransferOwnership: "dashboard/src/lib/adminBusinessProfile.ts",
   // These call billing RPCs that insert into ops_audit_log themselves.
   grantTenantPackageMinutes: "rpc:grant_tenant_package_minutes",

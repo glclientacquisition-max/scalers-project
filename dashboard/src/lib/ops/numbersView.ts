@@ -21,6 +21,9 @@ export type NumberRow = {
 
 export type WaitingBusiness = { id: string; name: string; since: string };
 
+/** A business a live number can move to: active, not archived or suspended, no line of its own. */
+export type MoveTarget = { id: string; name: string };
+
 export type NumberView = "available" | "assigned" | "held" | "disabled" | "all";
 export const NUMBER_VIEWS: { id: NumberView; label: string }[] = [
   { id: "available", label: "Available" },

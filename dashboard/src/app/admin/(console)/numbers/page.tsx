@@ -9,14 +9,15 @@ import { AdminNumbersV2 } from "@/components/admin/v2/AdminNumbersV2";
 import { loadNumbersV2 } from "@/lib/adminNumbersV2Load";
 import { loadSettingsHub } from "@/lib/adminSettingsHubLoad";
 import { holdPolicyFromSettings } from "@/lib/ops/numberHold";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export const instant = false;
 
 export default async function AdminNumbersPage() {
   await requireSuperAdmin();
-  if (process.env.ADMIN_V2 === "on") {
+  if (isAdminV2Enabled()) {
     try {
-      const [{ rows, waiting }, settings] = await Promise.all([
+      const [{ rows, waiting, targets }, settings] = await Promise.all([
         loadNumbersV2(),
         loadSettingsHub().catch(() => null),
       ]);
@@ -24,6 +25,7 @@ export default async function AdminNumbersPage() {
         <AdminNumbersV2
           rows={rows}
           waiting={waiting}
+          moveTargets={targets}
           nowIso={new Date().toISOString()}
           holdPolicy={holdPolicyFromSettings(settings)}
         />

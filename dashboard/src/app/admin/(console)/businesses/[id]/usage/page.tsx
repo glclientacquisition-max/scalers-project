@@ -4,6 +4,7 @@ import { AdminUsageV2 } from "@/components/admin/v2/AdminUsageV2";
 import { logAdminError } from "@/lib/adminErrors";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { loadUsageV2 } from "@/lib/adminUsageV2Load";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export const instant = false;
 
@@ -18,7 +19,7 @@ export default async function AdminBusinessUsagePage({
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
   await requireSuperAdmin();
-  if (process.env.ADMIN_V2 !== "on") notFound();
+  if (!isAdminV2Enabled()) notFound();
   const { id } = await params;
   if (!UUID.test(id)) notFound();
   const range = await searchParams;

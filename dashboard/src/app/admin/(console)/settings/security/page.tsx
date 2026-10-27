@@ -13,13 +13,14 @@ import {
 } from "@/lib/ops/stepUpCore";
 import { backupCodesLeft, factorStatuses, loadAreaRows, loadFactor, loadGrant, loadUnlockSetting, recentSecurityEvents, stepUpKey } from "@/lib/ops/stepUpStore";
 import { STEP_UP_WHAT, UNLOCK_AREA_WORDS } from "@/lib/ops/stepUpWords";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export const instant = false;
 
 /** Settings › Security: your sign-in, backup codes, Unlock, operators, recent activity. Never shows secrets. */
 export default async function SecurityPage({ searchParams }: { searchParams: Promise<{ setup?: string }> }) {
   await requireSuperAdmin();
-  if (process.env.ADMIN_V2 !== "on") notFound();
+  if (!isAdminV2Enabled()) notFound();
   const gate = await requireAdminOperatorWrite();
   const me = gate.ok ? gate.operator : null;
   const mode = stepUpMode();

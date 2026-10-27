@@ -6,13 +6,14 @@ import { logAdminError } from "@/lib/adminErrors";
 import { loadAdminBillingOverview } from "@/lib/adminBilling";
 import { loadAdminAttention } from "@/lib/adminPayRead";
 import { requireSuperAdmin } from "@/lib/adminGuard";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export const instant = false;
 
 export default async function AdminBillingPage() {
   await requireSuperAdmin();
   // ADMIN_V2: Billing opens on Billing home (this month's money and who owes).
-  if (process.env.ADMIN_V2 === "on") redirect("/admin/billing/home");
+  if (isAdminV2Enabled()) redirect("/admin/billing/home");
   let overview;
   let attention;
   try {

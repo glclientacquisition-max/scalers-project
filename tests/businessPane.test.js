@@ -31,7 +31,7 @@ describe("shared BusinessPane (t179u)", () => {
     assert.equal(bp.businessPaneRedirect("/admin/businesses/b1"), "/admin/businesses?pane=b1");
     assert.equal(bp.businessPaneRedirect("/admin/billing/b1"), "/admin/businesses?pane=b1&section=money");
     for (const p of ["app/admin/(console)/businesses/[id]/page.tsx", "app/admin/(console)/billing/[tenantId]/page.tsx"]) {
-      assert.match(read(`dashboard/src/${p}`), /ADMIN_V2 === "on"\) redirect\(businessPaneHref/);
+      assert.match(read(`dashboard/src/${p}`), /isAdminV2Enabled\(\)\) redirect\(businessPaneHref/);
     }
   });
 
