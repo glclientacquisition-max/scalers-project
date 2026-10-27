@@ -86,7 +86,7 @@ Staging is defined. See [`ENVIRONMENT_CONTRACT.md`](ENVIRONMENT_CONTRACT.md) for
 | --- | --- |
 | Supabase | `sgcdncjxauhsbunobmob` (no production data) |
 | Voice | `https://scalers-staging-staging.up.railway.app` (Railway env `staging`, branch `cursor/staging-voice-468b`) |
-| Desk | `https://scalers-staging.vercel.app` (Vercel project `scalers-staging`, same branch). Builds from any other branch are ignored. See [Vercel builds](#vercel-builds-ignored-build-step). Why the URL used to flip: [`STAGING_DESK_ALIAS.md`](../../how-to/STAGING_DESK_ALIAS.md). |
+| Desk | `https://scalers-staging.vercel.app` (Vercel project `scalers-staging`). Since 25 Oct 2026 it serves READY builds of **`staging/v2-c0-opening-2026-10-21`**, and the hostname is **moved by hand** (`assign_alias`) after each READY build. See [Desk alias on the v2 staging branch](#desk-alias-on-the-v2-staging-branch). Other branches: [Vercel builds](#vercel-builds-ignored-build-step). History: [`STAGING_DESK_ALIAS.md`](../../how-to/STAGING_DESK_ALIAS.md). |
 | Git branch | **`cursor/staging-voice-468b`**. Every open pull request is merged onto this branch for testing, including one that targets another feature branch. Open the pull request into `main` so the rebuild starts immediately. A stacked pull request joins on the next rebuild. Promote by squash-merging that tested pull request into `main`. |
 | SautiKit | Test DID `+254709221537` (Done and Dusted, agent Shy) pointing at staging voice URL |
 
@@ -115,6 +115,18 @@ Add it with `gh pr edit NUMBER --add-label hold-staging`. Remove it with `gh pr 
 The parenthetical names only the switch that fired. `cursor/staging-voice-468b` is not updated. Railway `serviceConnect` does not run. The desk alias does not run. Closing a pull request during a hold does not take it off the branch until the next run with no hold.
 
 **After the listen.** Clear the variable and remove the label. Re-run the latest Stage pull request workflow, or wait for the next pull request event against `main` or the next push to `main`. That run connects Voice to `cursor/staging-voice-468b` again with no commit SHA.
+
+### Desk alias on the v2 staging branch
+
+State on 27 Oct 2026, 11:47 EAT:
+
+- `scalers-staging.vercel.app` serves `dpl_EzkCFbJuoPoVA8qLSuqmBT7QvdKM` (`f7177320`, #973), the READY tip of `staging/v2-c0-opening-2026-10-21`. It was aliased by hand at 11:47 EAT.
+- **Branch tracking is not on yet.** The project domain still has `gitBranch: null`, so a new READY build does **not** take the hostname by itself. Scalers Chief approved setting `gitBranch` to `staging/v2-c0-opening-2026-10-21` at 11:45 EAT, within Alvin's 11:08 EAT staging plan. It isn't applied because the agent tooling can't edit an existing project domain: the Vercel connector has no domain-update call, and the box has no Vercel CLI login. To apply it, go to Vercel → `scalers-staging` → Settings → Domains → `scalers-staging.vercel.app` → Edit → Git Branch, and enter `staging/v2-c0-opening-2026-10-21`. The API equivalent is `PATCH /v9/projects/prj_koYxAaXjOZ9QYA7hVB2SUOEAmyoB/domains/scalers-staging.vercel.app` with `{"gitBranch":"staging/v2-c0-opening-2026-10-21"}`. Once it's set, only READY builds of that branch take the hostname, and an ERROR build leaves it where it is.
+- **Rollback** (once tracking is on): clear `gitBranch` (set it back to `null`), then `assign_alias` the wanted READY deploy by hand.
+- **Manual move until then:** check that the deploy is READY, that its `githubCommitRef` is `staging/v2-c0-opening-2026-10-21` and that it's the branch tip, then `assign_alias` it to `scalers-staging.vercel.app`. Never alias an ERROR build.
+- **Stage-PR conflict:** `scripts/stage-desk-alias.js` (the Stage pull request workflow) still aliases this hostname to `cursor/staging-voice-468b`. That step is idle only while the Stage-PR hold is active (the `hold-staging` label). Releasing the hold would move the URL off the v2 branch, so retarget or disable that step first.
+- **Preview-scoped env on `scalers-staging`** (added 27 Oct 11:10 EAT, plain, Preview target, every branch): `ADMIN_V2=on`, `ADMIN_ENV=staging`, `SIGNUP_MODE=request`, plus the existing `ADMIN_STEP_UP_ENFORCE=on`. These match prod's flags, except that `ADMIN_ENV=staging` turns on the Staging band. Any Production-target staging build would not get them.
+- **Staging DB:** `access_requests` (v1 + v2) already matched prod. On 27 Oct 11:24 EAT, the prod migration rows `20261025165228 access_requests` and `20261025172912 access_requests_v2` were recorded on staging. Staging also keeps an older duplicate row, `20261025171918 access_requests_v2`.
 
 ### Vercel builds (Ignored Build Step)
 

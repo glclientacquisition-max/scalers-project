@@ -15,6 +15,13 @@ New agent or new human: read this whole page before you touch code.
 
 ---
 
+## 0a. Staging Desk, 27 Oct 2026 (staging only, Alvin's 11:08 EAT staging plan via Scalers Chief)
+
+- **`scalers-staging.vercel.app` serves the v2 staging branch.** Since 11:47 EAT it has served `f7177320` (#973, `dpl_EzkCFbJu…`). Before that it served #948 `553e3a62` (25 Oct) and was then moved to #970 `fcaacc91` (11:27), #972 `a0304ec9` (11:35) and #973. `/`, `/signup`, `/login` and `/admin/login` return 200, and `/signup` shows **Request access**.
+- **Branch tracking was approved but isn't applied yet.** Scalers Chief approved it at 11:45 EAT, but the domain still has `gitBranch: null`, so aliasing is manual for now. The agent tooling can't edit an existing project domain, so this needs the Vercel dashboard or a CLI login. Steps, rollback and the Stage-PR alias conflict are in [ENVIRONMENTS.md](reference/operations/ENVIRONMENTS.md#desk-alias-on-the-v2-staging-branch).
+- **`scalers-staging` preview env:** `ADMIN_V2=on`, `ADMIN_ENV=staging` and `SIGNUP_MODE=request` were added at 11:10 EAT. `ADMIN_STEP_UP_ENFORCE=on` was already set. Prod was unchanged.
+- **Staging `access_requests`:** the objects already matched prod. Prod's migration rows `20261025165228` and `20261025172912` were recorded on staging at 11:24 EAT. No DDL was run.
+
 ## 0. Changes since 08:45 EAT, 22 Oct 2026
 
 - **Admin build on hold, plan only** (08:23 EAT, *per Scalers Chief*). See section 4b and [`ADMIN_FOUNDATION_PLAN.md`](reference/operations/ADMIN_FOUNDATION_PLAN.md).
