@@ -12,6 +12,7 @@ import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import {
   ADMIN_LINKS,
   ADMIN_LINKS_V2,
+  type AdminLink,
   adminHidesShellBack,
   adminMainClass,
   adminMainV2Class,
@@ -31,6 +32,16 @@ type AdminChrome = {
 const AdminChromeContext = createContext<AdminChrome | null>(null);
 /** ADMIN_V2 nav set (six entries). Set by AdminShell. */
 const AdminV2Context = createContext(false);
+/** Access requests queue when ADMIN_V2 is on. */
+const AdminAccessRequestsContext = createContext(false);
+const AdminAccessRequestsPendingContext = createContext(0);
+
+const ACCESS_REQUESTS_LINK: AdminLink = {
+  href: "/admin/access-requests",
+  label: "Access requests",
+  exact: false,
+  phone: "more",
+};
 
 /**
  * Harness only. Production Admin uses the live path and the real hrefs.
@@ -209,6 +220,7 @@ function AdminDestinationLink({
   activeClassName,
   idleClassName,
   labelClassName,
+  badgeCount,
   onRetap,
 }: {
   href: string;
@@ -220,6 +232,7 @@ function AdminDestinationLink({
   activeClassName: string;
   idleClassName: string;
   labelClassName: string;
+  badgeCount?: number;
   onRetap?: () => void;
 }) {
   const { path, href: mapHref } = useAdminChrome();
@@ -243,6 +256,14 @@ function AdminDestinationLink({
       <AdminLinkPending href={href} setPendingHref={setPendingHref} />
       <AdminIcon name={label} />
       <span className={labelClassName}>{label}</span>
+      {badgeCount && badgeCount > 0 ? (
+        <span
+          className="admin-side-label ms-auto inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-attention px-1.5 text-[10px] font-semibold tabular-nums text-attention-on"
+          aria-label={`${badgeCount} pending`}
+        >
+          {badgeCount > 99 ? "99+" : badgeCount}
+        </span>
+      ) : null}
     </Link>
   );
 }
@@ -317,6 +338,8 @@ export function AdminRail() {
  */
 export function AdminSideNav() {
   const { pendingHref, setPendingHref } = useAdminPending();
+  const showAccessRequests = useContext(AdminAccessRequestsContext);
+  const accessRequestsPendingCount = useContext(AdminAccessRequestsPendingContext);
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => {
     setCollapsed(window.localStorage.getItem("admin-side") === "56");
@@ -360,6 +383,21 @@ export function AdminSideNav() {
             />
           ),
         )}
+        {showAccessRequests ? (
+          <AdminDestinationLink
+            key={ACCESS_REQUESTS_LINK.href}
+            href={ACCESS_REQUESTS_LINK.href}
+            label={ACCESS_REQUESTS_LINK.label}
+            exact={ACCESS_REQUESTS_LINK.exact}
+            pendingHref={pendingHref}
+            setPendingHref={setPendingHref}
+            badgeCount={accessRequestsPendingCount}
+            className="flex h-9 w-full items-center gap-3 rounded-md px-2 text-sm"
+            activeClassName="bg-accent/10 font-semibold text-accent-deep"
+            idleClassName="text-ink-2 hover:bg-surface-muted hover:text-ink"
+            labelClassName="admin-side-label truncate"
+          />
+        ) : null}
       </nav>
       <button
         type="button"
@@ -395,7 +433,12 @@ function AdminPhoneMore() {
   const { path, href: mapHref } = useAdminChrome();
   const [open, setOpen] = useState(false);
   const v2 = useContext(AdminV2Context);
-  const more = adminPhoneMore(v2);
+  const showAccessRequests = useContext(AdminAccessRequestsContext);
+  const accessRequestsPendingCount = useContext(AdminAccessRequestsPendingContext);
+  const more = [
+    ...adminPhoneMore(v2),
+    ...(showAccessRequests && v2 ? [ACCESS_REQUESTS_LINK] : []),
+  ];
   const active = more.some((item) => !item.pending && adminRouteActive(path, item.href, item.exact));
 
   return (
@@ -450,7 +493,15 @@ function AdminPhoneMore() {
                   ].join(" ")}
                 >
                   <AdminIcon name={item.label} />
-                  {item.label}
+                  <span className="min-w-0 flex-1">{item.label}</span>
+                  {item.href === ACCESS_REQUESTS_LINK.href && accessRequestsPendingCount > 0 ? (
+                    <span
+                      className="inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-attention px-1.5 text-[10px] font-semibold tabular-nums text-attention-on"
+                      aria-label={`${accessRequestsPendingCount} pending`}
+                    >
+                      {accessRequestsPendingCount > 99 ? "99+" : accessRequestsPendingCount}
+                    </span>
+                  ) : null}
                 </Link>
               </li>
             );
@@ -516,11 +567,16 @@ export function AdminShell({
   operatorName,
   children,
   v2 = false,
+  showAccessRequests = false,
+  accessRequestsPendingCount = 0,
 }: {
   operatorName: string;
   children: ReactNode;
   /** ADMIN_V2=on: 200/56px text sidebar, 40px top bar, full-width main with 16px margins. */
   v2?: boolean;
+  /** ADMIN_V2 access request queue at /admin/access-requests. */
+  showAccessRequests?: boolean;
+  accessRequestsPendingCount?: number;
 }) {
   const { path } = useAdminChrome();
   const nested = Boolean(adminParentTarget(path, v2));
@@ -534,6 +590,8 @@ export function AdminShell({
   if (v2) {
     return (
       <AdminV2Context.Provider value>
+      <AdminAccessRequestsContext.Provider value={showAccessRequests}>
+      <AdminAccessRequestsPendingContext.Provider value={accessRequestsPendingCount}>
       <div data-admin-shell="" data-admin-v2="" data-admin-nested={nested ? "" : undefined} className={adminShellClass}>
         <AdminSideNav />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -545,11 +603,15 @@ export function AdminShell({
           <AdminTabBar />
         </div>
       </div>
+      </AdminAccessRequestsPendingContext.Provider>
+      </AdminAccessRequestsContext.Provider>
       </AdminV2Context.Provider>
     );
   }
 
   return (
+    <AdminAccessRequestsPendingContext.Provider value={accessRequestsPendingCount}>
+    <AdminAccessRequestsContext.Provider value={showAccessRequests}>
     <div data-admin-shell="" data-admin-nested={nested ? "" : undefined} className={adminShellClass}>
       <AdminRail />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -561,5 +623,7 @@ export function AdminShell({
         <AdminTabBar />
       </div>
     </div>
+    </AdminAccessRequestsContext.Provider>
+    </AdminAccessRequestsPendingContext.Provider>
   );
 }

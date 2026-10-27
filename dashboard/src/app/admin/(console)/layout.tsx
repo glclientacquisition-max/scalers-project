@@ -4,6 +4,9 @@ import { AdminPhonePull } from "@/components/PhonePullSurface";
 import { StepUpHost } from "@/components/ops/StepUpHost";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { getAdminSession } from "@/lib/auth";
+import { isAdminV2Enabled } from "@/lib/adminV2";
+import { countPendingAccessRequests } from "@/lib/accessRequestQueries";
+import { getSupabaseAdmin } from "@/lib/supabase";
 import "@/styles/admin-v2.css";
 
 // instant = false: Super Admin cookie session must run before chrome. Do not wrap the gate in Suspense.
@@ -20,8 +23,22 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const adminSession = await getAdminSession();
   const operatorName = adminSession?.user?.name || "ops";
 
+  let accessRequestsPendingCount = 0;
+  if (isAdminV2Enabled()) {
+    try {
+      accessRequestsPendingCount = await countPendingAccessRequests(getSupabaseAdmin());
+    } catch {
+      accessRequestsPendingCount = 0;
+    }
+  }
+
   return (
-    <AdminShell operatorName={operatorName} v2={process.env.ADMIN_V2 === "on"}>
+    <AdminShell
+      operatorName={operatorName}
+      v2={process.env.ADMIN_V2 === "on"}
+      showAccessRequests={isAdminV2Enabled()}
+      accessRequestsPendingCount={accessRequestsPendingCount}
+    >
       <Suspense fallback={null}>
         <AdminPhonePull scroll="admin" />
       </Suspense>

@@ -9,10 +9,11 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (63)
+## Tables (64)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
+| `access_requests` | `about`, `business`, `created_at`, `decided_at`, `decided_by`, `decline_emailed_at`, `decline_reason`, `email`, `id`, `invite_resent_at`, `invited_user_id`, `name`, `note`, `note_updated_at`, `note_updated_by`, `phone`, `reopened_at`, `status` | `docs/supabase/access_requests.sql`<br>`docs/supabase/access_requests_v2.sql` |
 | `admin_sign_in_email_code` | `code_hash`, `created_at`, `expires_at`, `id`, `operator`, `sent_to`, `used_at` | `docs/supabase/admin_sign_in_2fa.sql` |
 | `admin_step_up_area` | `area`, `required`, `updated_at`, `updated_by` | `docs/supabase/admin_step_up_area.sql` |
 | `admin_step_up_backup_code` | `code_hash`, `created_at`, `id`, `operator`, `used_at` | `docs/supabase/admin_step_up.sql` |
