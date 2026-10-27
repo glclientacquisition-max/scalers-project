@@ -369,8 +369,13 @@ function createBrainV2Live(opts = {}) {
     return leadStreams;
   }
   /** G5 + one name state: the booking write carries a clock the executor keeps, and the saved row must equal the read-back. */
+  function enginesCallIdResolver() {
+    if (typeof opts.resolveCallId === 'function') return opts.resolveCallId;
+    return async (sid) => { try { const db = require('../../db'); if (typeof db.getCall !== 'function') return null; const row = await db.getCall(sid); return (row && row.id) || null; } catch { return null; } };
+  }
   function leadHandlers(machine, profile, log) {
-    const h = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName } });
+    const engines = brainEnginesOn({ env, tenantId: profile?.id });
+    const h = createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName, ...(engines ? { resolveCallId: enginesCallIdResolver() } : {}) } });
     const create = h.createAppointment; const update = h.updateAppointment;
     h.createAppointment = async (args) => {
       const m = String(args.whenText || '').match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})$/);
@@ -403,7 +408,7 @@ function createBrainV2Live(opts = {}) {
     const ids = MS.resolveModelIds(env);
     const handlers = leadHandlers(machine, profile, []);
     const abort = typeof shouldAbort === 'function' ? shouldAbort : () => false;
-    return BE.runBrainEnginesTurn({
+    const r = await BE.runBrainEnginesTurn({
       text,
       profile,
       machine,
@@ -416,13 +421,21 @@ function createBrainV2Live(opts = {}) {
       applyTools,
       handlers,
       opts: {
-        ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null, recordWriteReceipt: opts.recordWriteReceipt, confirmCallerName: opts.confirmCallerName },
+        ctx: { tenantId: profile?.id || null, callSid: opts.callSid || null, callId: opts.callId || null, callerPhone: machine.callerPhone || null },
         clock,
         now: nowFn,
         log: opts.log || (() => {}),
-        dispatch: opts.dispatchEscalationAlert,
+        // the owner alert rides on the saved row (executor); an extra escalation alert only when injected
+        ...(opts.enginesNotify ? { notify: opts.enginesNotify } : {}),
+        ...(opts.dispatchEscalationAlert ? { dispatch: opts.dispatchEscalationAlert } : {}),
+        onModelStage: typeof opts.onModelStage === 'function' ? opts.onModelStage : null,
+        traceTurnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex : null,
       },
     });
+    // end-call contract: same gate as every v2 path (never while a read-back or write is pending)
+    const endCall = endDecision({ done: { end: r.end === true, endReason: r.reason || 'caller_done', toolResults: r.write && r.write.status !== 'committed' ? [{ ok: false }] : [] }, machine, profile, line: r.line, alreadyEnded: endSent });
+    if (endCall.end) endSent = true;
+    return { ...r, end: endCall.end, ...(endCall.end ? { reason: endCall.reason } : { reason: undefined }), ...(endCall.held ? { endHeld: endCall.held } : {}) };
   }
 
   async function runModelLead({ text, profile, langLock, shouldAbort, onSentence, machine }) {

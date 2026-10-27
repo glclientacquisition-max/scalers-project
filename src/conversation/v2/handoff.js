@@ -1,8 +1,12 @@
 'use strict';
-// ENGINE 3: one handoff path (callback / take message) per call.
+// ENGINE 3: one handoff path (callback / take message) per call, BRAIN_ENGINES.
+// The plan (enginePlan) drives it: a trigger opens the flow, slot preconditions ask for what is missing
+// (name, number), the fixed read-back states number + when in the caller's turn language, and only a yes
+// commits through engineCommit (row id + receipt, then owner alert). The clock is always injected.
 const CS = require('./commitSafety');
 const L = require('./lexicon');
 const CP = require('./callPlan');
+const { callerName } = require('./enginePreconditions');
 
 const REASONS = new Set(['closed', 'area_unknown', 'area_outside', 'service_out', 'wants_human', 'stuck', 'caller_callback']);
 
@@ -11,79 +15,54 @@ function initHandoff(state) {
   return state.handoff;
 }
 
-function shouldHandoff({ understanding, machine, profile, now = new Date() }) {
+function isOpen(profile = {}, now = new Date()) {
+  const days = profile.hoursSchedule?.days;
+  if (!days) return true;
+  const p = L.eatParts(now);
+  const today = days[['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][p.dow]];
+  const hhmm = `${String(p.h).padStart(2, '0')}:${String(p.mi).padStart(2, '0')}`;
+  return !!(today && !today.closed && today.open && today.close && hhmm >= today.open && hhmm < today.close);
+}
+
+/** Why this turn should open the handoff flow, or null. Info questions never open it. */
+function shouldHandoff({ understanding, machine, profile = {}, now = new Date() }) {
   const u = understanding || {};
+  const E = machine.eng || {};
   if (u.wants_human) return { reason: 'wants_human' };
   if (u.intent === 'callback' || u.intent === 'handoff') return { reason: 'caller_callback' };
-  const days = profile.hoursSchedule?.days;
-  if (days) {
-    const p = L.eatParts(now);
-    const key = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][p.dow];
-    const today = days[key];
-    const hhmm = `${String(p.h).padStart(2, '0')}:${String(p.mi).padStart(2, '0')}`;
-    const open = today && !today.closed && today.open && today.close && hhmm >= today.open && hhmm < today.close;
-    if (!open && profile.afterHoursMode !== 'serve') return { reason: 'closed' };
-    if (!open && profile.afterHoursMode === 'serve' && machine._enginesDateAsks >= 1) return { reason: 'closed' };
-  }
+  if (E.offered === 'callback' && u.yes_no === 'yes') return { reason: 'caller_callback' };
+  const booking = u.intent === 'book' || machine.intent === 'book';
+  if (booking && !isOpen(profile, now) && profile.afterHoursMode && profile.afterHoursMode !== 'serve') return { reason: 'closed' };
   if (machine._enginesStuck) return { reason: 'stuck' };
-  const place = u.slots?.place || machine.slots?.place;
-  if (place) {
+  const place = u.slots?.place;
+  if (booking && place) {
     const AC = require('./areaCoverage');
     const r = AC.resolve(place, profile);
-    if (r?.status === 'unknown') return { reason: 'area_unknown' };
     if (r?.status === 'outside') return { reason: 'area_outside' };
   }
   return null;
 }
 
-function readbackLine({ machine, profile, lang, callerPhone }) {
-  const name = CP.lockedName(machine) || machine.slots?.name || null;
-  const phone = CS.sayPhone(callerPhone || machine.callerPhone);
-  const when = CS.callbackWhen({ profile, now: new Date(), L });
-  const sayWhen = when.say(lang);
-  if (lang === 'sw') {
-    return `[PROMPT-PLACEHOLDER] Nimwombe mwenye biashara akupigie${name ? `, ${name}` : ''}, kwa ${phone || 'nambari yako'}, ${sayWhen}. Ni sawa?`;
-  }
-  return `[PROMPT-PLACEHOLDER] Shall I ask the owner to call you back${name ? `, ${name}` : ''} on ${phone || 'your number'}, ${sayWhen}?`;
+/** The create_handoff proposal the caller hears read back (number + when) and says yes to. */
+function handoffProposal({ machine, profile = {}, callerPhone, reason, now = new Date() }) {
+  const phone = callerPhone || machine.callerPhone || null;
+  const r = REASONS.has(reason) ? reason : 'caller_callback';
+  const p = {
+    tool: 'create_handoff',
+    kind: 'callback',
+    reason: r,
+    phone,
+    phoneSaid: CS.sayPhone(phone),
+    name: callerName(machine),
+    callbackWhen: CS.callbackWhen({ profile, now, L }),
+    issuedTurn: machine.turn,
+  };
+  p.token = `cb_${machine.turn}`;
+  p.idemKey = CS.idempotencyKey({ callId: machine.callId || 'nocall', p });
+  return p;
 }
 
-function stepHandoff({ machine, understanding, profile, lang, callerPhone }) {
-  const h = initHandoff(machine);
-  const trigger = shouldHandoff({ understanding, machine, profile });
-  if (h.phase === 'idle' && trigger) {
-    h.reason = trigger.reason;
-    h.phase = CP.lockedName(machine) ? 'confirm_phone' : 'ask_name';
-    if (!REASONS.has(h.reason)) h.reason = 'caller_callback';
-  }
-  if (h.phase === 'idle') return null;
-  if (h.committed) return { kind: 'done', line: null };
-  if (understanding?.yes_no === 'yes' && h.phase === 'confirm_yes') {
-    return { kind: 'commit', line: null };
-  }
-  if (understanding?.yes_no === 'no' && h.phase === 'confirm_yes') {
-    h.phase = 'explain';
-    return { kind: 'explain', line: lang === 'sw' ? '[PROMPT-PLACEHOLDER] Sawa. Ungependa tuachane na hilo?' : '[PROMPT-PLACEHOLDER] Okay. Should we leave it there?' };
-  }
-  if (h.phase === 'ask_name') {
-    if (understanding?.slots?.name) {
-      bindCallerName(machine, null, understanding.slots.name);
-      h.phase = 'confirm_phone';
-    } else {
-      return { kind: 'ask_name', line: lang === 'sw' ? '[PROMPT-PLACEHOLDER] Naomba jina lako kwanza.' : '[PROMPT-PLACEHOLDER] May I have your name first?' };
-    }
-  }
-  if (h.phase === 'confirm_phone') {
-    const line = readbackLine({ machine, profile, lang, callerPhone });
-    h.phase = 'confirm_yes';
-    return { kind: 'readback', line };
-  }
-  if (h.phase === 'confirm_yes' && understanding?.yes_no !== 'yes') {
-    const line = readbackLine({ machine, profile, lang, callerPhone });
-    return { kind: 'readback', line };
-  }
-  return null;
-}
-
+/** Name used on the read-back is now the caller's; after the yes it is locked (and confirmed in the file). */
 function bindCallerName(machine, handlers, name) {
   if (!name) return;
   machine.slots = machine.slots || {};
@@ -91,65 +70,14 @@ function bindCallerName(machine, handlers, name) {
   machine.slots.nameCandidate = machine.slots.name;
   machine.slots.nameConfirmed = true;
   if (handlers?.confirmCallerName) {
-    try { handlers.confirmCallerName({ name: machine.slots.name, source: 'handoff' }); } catch { /* best-effort */ }
+    try { const r = handlers.confirmCallerName({ name: machine.slots.name, source: 'readback_yes' }); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch { /* best-effort */ }
   }
 }
 
-async function commitHandoff({ machine, profile, handlers, callerPhone, understanding, notify } = {}) {
-  const h = initHandoff(machine);
-  if (h.committed) return { ok: true, duplicate: true, notified: !!h.notifySent };
-  const key = h.idempotencyKey || `handoff:${machine.callId || 'call'}:${h.reason || 'callback'}`;
-  h.idempotencyKey = key;
-  const name = CP.lockedName(machine) || machine.slots?.name || understanding?.slots?.name || '';
-  bindCallerName(machine, handlers, name);
-  const when = CS.callbackWhen({ profile, now: new Date(), L });
-  const pending = {
-    tool: 'create_handoff',
-    kind: 'callback',
-    reason: h.reason || 'callback',
-    phone: callerPhone || machine.callerPhone,
-    name,
-    callbackWhen: when,
-    token: `cb_${machine.turn}`,
-    idemKey: key,
-    issuedTurn: machine.turn,
-  };
-  machine.pending = pending;
-  machine.phase = 'readback';
-  let ok = false;
-  let id = null;
-  try {
-    if (handlers?.createServiceRequest) {
-      const r = await handlers.createServiceRequest({ type: 'callback', name, notes: `Handoff: ${h.reason}`, phone: pending.phone });
-      ok = !!(r && r.ok);
-      id = r?.id || null;
-    } else if (handlers?.escalate) {
-      const r = await handlers.escalate({ reason: h.reason, name, phone: pending.phone });
-      ok = !!(r && r.ok);
-      id = r?.id || null;
-    }
-  } catch { ok = false; }
-  machine.receipts = machine.receipts || [];
-  machine.receipts.push({ tool: 'create_handoff', ok, id, reason: h.reason, idempotencyKey: key });
-  machine.pending = null;
-  machine.phase = 'collect';
-  h.committed = true;
-  h.phase = 'done';
-  let notified = !!h.notifySent;
-  if (typeof notify === 'function' && ok && !h.notifySent) {
-    try {
-      const nr = await notify({ reason: h.reason, name, phone: pending.phone, profile, machine });
-      notified = !!(nr && (nr.ok || nr.duplicate));
-    } catch { notified = false; }
-  }
-  return { ok, id, duplicate: false, notified };
+/** Kept for callers of #966's API: the read-back line for the current handoff, clock injected. */
+function readbackLine({ machine, profile, lang, callerPhone, now = new Date(), reason = 'caller_callback' }) {
+  const R = require('./receipts');
+  return R.readback(handoffProposal({ machine, profile, callerPhone, reason, now }), lang);
 }
 
-module.exports = {
-  initHandoff,
-  shouldHandoff,
-  stepHandoff,
-  commitHandoff,
-  readbackLine,
-  bindCallerName,
-};
+module.exports = { initHandoff, shouldHandoff, handoffProposal, bindCallerName, readbackLine, isOpen, lockedName: CP.lockedName };

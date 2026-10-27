@@ -104,7 +104,7 @@ test('HD_231f7bef3ba4 full callback path: name, confirm, one write, notify, plai
   }, { applyTools, dispatch });
   assert.match(r1.line, /Today we are open|Leo tuko wazi/i);
   invariants(r1.line, r1.lang, []);
-  assert.equal(m._enginesOfferCallback, true);
+  assert.equal(m.eng.offered, 'callback');
 
   const r2 = await enginesTurn(m, 'Please call me back.', {
     intent: 'callback', answers: [], yes_no: null, slots: {}, language: 'en', wants_human: false, closing: false,
@@ -117,17 +117,19 @@ test('HD_231f7bef3ba4 full callback path: name, confirm, one write, notify, plai
   }, { applyTools, dispatch });
   assert.match(r3.line, /Shall I ask the owner|Nimwombe mwenye/i);
   invariants(r3.line, r3.lang, [r1.line, r2.line], true);
-  assert.equal(m.slots.name, 'Alvin');
-  assert.equal(m.slots.nameConfirmed, true);
+  assert.equal(m.slots.nameCandidate, 'Alvin');
+  assert.notEqual(m.slots.nameConfirmed, true, 'the name is confirmed by the read-back yes, not by hearing it');
 
   const r4 = await enginesTurn(m, 'Sawa. Wewe utamwambia nipigie?', {
     intent: 'confirm', answers: [], yes_no: 'yes', slots: {}, language: 'sw', wants_human: false, closing: false,
   }, { applyTools, dispatch });
-  assert.match(r4.line, /Mwenye biashara atakupigie|owner will call you back/i);
+  assert.match(r4.line, /nimemwomba mwenye biashara akupigie|asked the owner to call you/i);
   assert.equal(writes.length, 1);
   assert.equal(notifies.length, 1);
   assert.equal(notifies[0].channels, P.notifyChannels);
   assert.equal(m.handoff.committed, true);
+  assert.equal(m.slots.name, 'Alvin');
+  assert.equal(m.slots.nameConfirmed, true);
   assert.equal(m.handoff.notifySent, true);
 });
 
@@ -148,13 +150,14 @@ test('capSpokenLine trims to two sentences', () => {
   assert.equal(capSpokenLine(long), 'One. Two.');
 });
 
-test('closed business enters handoff after date asks', () => {
+test('closed business (message-only after hours) turns a booking into the callback flow', () => {
   const m = machine({ intent: 'book' });
-  m._enginesDateAsks = 3;
   m.slots = { service: 'Carpet Cleaning', when: { date: null, time: null }, place: null };
   const u = { intent: 'book', answers: [], yes_no: null, slots: {}, language: 'sw' };
-  const g = pickGoal({ understanding: u, machine: m, profile: P, lang: 'sw', callerPhone: m.callerPhone, now: CLOSED_EVENING });
-  assert.equal(g.type, 'handoff');
+  const g = pickGoal({ understanding: u, machine: m, profile: { ...P, afterHoursMode: 'message' }, lang: 'sw', callerPhone: m.callerPhone, now: CLOSED_EVENING });
+  assert.equal(g.type, 'ask');
+  assert.equal(g.slot, 'name');
+  assert.equal(g.why, 'callback');
 });
 
 test('split race uses fallback understanding (not null)', () => {

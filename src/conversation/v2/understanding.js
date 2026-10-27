@@ -41,12 +41,20 @@ const SYSTEM = [
   'language: en or sw for this turn. wants_human when they ask for a person. closing when they are done.',
 ].join('\n');
 
+/** Language of the caller's words (null when the turn carries no signal, e.g. "Okay."). L.isSw is for lang codes. */
+function textLang(text) {
+  const d = L.detectLang(String(text || ''));
+  if (d.greetingOnly && /\b(habari|niaje|sasa|mambo|vipi|hujambo)\b/i.test(String(text || ''))) return 'sw';
+  return d.sw > d.en ? 'sw' : d.en > d.sw ? 'en' : null;
+}
+
 function emptyUnderstanding() {
   return { intent: 'unknown', answers: [], yes_no: null, slots: {}, language: null, wants_human: false, closing: false, source: 'empty' };
 }
 
+const LEAD_FILLER = /^\W*(?:(?:uh+|um+|ah+|eh+|oh+|mm+|hmm+|er+)\W+)+/i;
 function detectYesNo(text, machine = {}) {
-  const t = String(text || '').trim();
+  const t = String(text || '').trim().replace(LEAD_FILLER, '');
   if (!t) return null;
   if (CP.isYes(t) || CALLBACK_YES.test(t)) return 'yes';
   if (/^\W*(no|nope|hapana|si mimi|sio)\b/i.test(t)) return 'no';
@@ -82,7 +90,8 @@ function fromNlu(text, profile, machine, now) {
   if (nu.when?.time) slots.time = nu.when.time;
   if (nu.name) slots.name = nu.name;
   else if (nu.nameCandidate) slots.name = nu.nameCandidate;
-  const lang = L.isSw(text) ? 'sw' : 'en';
+  else { const m = String(text || '').match(/^\W*([A-Z][a-z]{1,30})\s+(?:is (?:the|my) name|ndio jina langu|ni jina langu)\b/); if (m) slots.name = m[1]; }
+  const lang = textLang(text);
   const yes_no = detectYesNo(text, machine) || (nu.yes ? 'yes' : nu.no ? 'no' : null);
   return {
     intent,
@@ -131,18 +140,28 @@ function understandRequest({ text, machine, profile }) {
   };
 }
 
-/** One primary model call; no backup race. Waits up to hardMs; partial JSON accepted when complete object parses. */
-async function runUnderstanding({ text, machine, profile, streamFor, modelId, hardMs = 1500, clock = () => Date.now(), log = () => {} }) {
-  const now = new Date();
+/**
+ * ONE understanding call per turn, no backup race. Hard cap hardMs (abort + timer race, so a stream that
+ * ignores the signal cannot hold the turn). onSlow fires once if the wait passes slowMs (meaningful filler).
+ * Result carries _ms and _outcome for the per-turn trace. The fallback (rules) never returns empty.
+ */
+async function runUnderstanding({ text, machine, profile, streamFor, modelId, hardMs = 1500, clock = () => Date.now(), log = () => {}, now = null, slowMs = null, onSlow = null }) {
+  const at = now instanceof Date ? now : new Date();
+  const t0 = clock();
   let parsed = null;
   let outcome = 'skipped';
+  let slowTimer = null;
   if (streamFor && modelId) {
-    const t0 = clock();
     const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), hardMs);
+    let capTimer = null;
+    if (typeof onSlow === 'function' && Number.isFinite(slowMs) && slowMs > 0 && slowMs < hardMs) {
+      slowTimer = setTimeout(() => { slowTimer = null; try { onSlow({ afterMs: clock() - t0 }); } catch { /* filler is best-effort */ } }, slowMs);
+    }
     try {
       let buf = '';
-      const res = await streamFor(modelId)({ request: understandRequest({ text, machine, profile }), signal: ac.signal, onText: (d) => { buf += d; } });
+      const call = streamFor(modelId)({ request: understandRequest({ text, machine, profile }), signal: ac.signal, onText: (d) => { buf += d; } });
+      const cap = new Promise((_, rej) => { capTimer = setTimeout(() => { ac.abort(); rej(new Error('abort: understanding cap')); }, hardMs); });
+      const res = await Promise.race([call, cap]);
       if (res && res.text) buf = res.text;
       try { parsed = validate(JSON.parse(buf)); outcome = parsed ? 'ok' : 'invalid_json'; } catch { outcome = 'invalid_json'; }
       if (!parsed && buf.length > 2) {
@@ -154,17 +173,24 @@ async function runUnderstanding({ text, machine, profile, streamFor, modelId, ha
       outcome = /abort/i.test(String(e)) ? 'timeout' : 'error';
       log(`[brain_engines] understanding ${outcome}: ${e?.message || e}`);
     } finally {
-      clearTimeout(timer);
+      clearTimeout(capTimer);
+      if (slowTimer) { clearTimeout(slowTimer); slowTimer = null; }
     }
   }
   if (!parsed) {
-    parsed = fromNlu(text, profile, machine, now);
+    parsed = fromNlu(text, profile, machine, at);
     parsed.fallbackReason = outcome;
   }
   if (parsed.slots?.place) parsed.slots.place = resolvePlace(parsed.slots.place, profile);
   const yn = detectYesNo(text, machine);
   if (yn && !parsed.yes_no) parsed.yes_no = yn;
-  if (!parsed.language) parsed.language = L.isSw(text) ? 'sw' : 'en';
+  if (!parsed.slots?.name) {
+    const m = String(text || '').match(/^\W*([A-Z][a-z]{1,30})\s+(?:is (?:the|my) name|ndio jina langu|ni jina langu)\b/);
+    if (m) parsed.slots = { ...(parsed.slots || {}), name: m[1] };
+  }
+  if (!parsed.language) parsed.language = textLang(text);
+  parsed._ms = clock() - t0;
+  parsed._outcome = parsed.source === 'model' ? 'ok' : outcome;
   return parsed;
 }
 
@@ -201,6 +227,7 @@ function toLeadShape(fb) {
 
 module.exports = {
   SCHEMA,
+  textLang,
   emptyUnderstanding,
   detectYesNo,
   fromNlu,
