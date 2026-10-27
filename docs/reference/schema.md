@@ -159,7 +159,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `admin_issue_credit_note` | `docs/supabase/admin_invoice_actions.sql` |
 | `admin_lift_quarantine` | `docs/supabase/admin_number_controls_v1.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql` |
 | `admin_list_package_versions` | `docs/supabase/package_version_editor.sql` |
-| `admin_move_number` | `docs/supabase/admin_number_controls_v1.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql` |
+| `admin_move_number` | `docs/supabase/admin_number_controls_v1.sql`<br>`docs/supabase/admin_number_controls_v1_1.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql`<br>`supabase/migrations/20261027082533_admin_number_controls_v1_1.sql` |
 | `admin_move_subscribers_to_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_publish_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_restore_business_number` | `docs/supabase/admin_number_controls_v1.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql` |
