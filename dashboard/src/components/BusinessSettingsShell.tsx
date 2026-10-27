@@ -1,171 +1,36 @@
 "use client";
 
-import Link from "next/link";
+import { policiesFormKey } from "@/lib/serviceAreas";
+import { catalogContentKey } from "@/lib/catalogPricing";
+import { useCallback, useRef, useState, type ReactNode } from "react";
+import { nextFormMountKey, type FormMountKey } from "@/lib/formSave";
+
 import type { TenantRow } from "@/lib/supabase";
-import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
 import { AlertsPanel } from "@/components/AlertsPanel";
-import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
-import { CatalogImportPanel } from "@/components/CatalogImportPanel";
+import dynamic from "next/dynamic";
+import { Skeleton } from "@/components/ui/Skeleton";
+
+// Heavy panels load only when their section opens (keeps them out of the Settings home and form bundle).
+const panelLoading = () => <Skeleton className="h-64 w-full rounded-2xl" />;
+const KnowledgeIngestPanel = dynamic(() => import("@/components/KnowledgeIngestPanel").then((m) => m.KnowledgeIngestPanel), { loading: panelLoading });
+const CatalogImportPanel = dynamic(() => import("@/components/CatalogImportPanel").then((m) => m.CatalogImportPanel), { loading: panelLoading });
+const TestLinePanel = dynamic(() => import("@/components/TestLinePanel").then((m) => m.TestLinePanel), { loading: panelLoading });
+import { SettingsLeaveGuard } from "@/components/SettingsLeaveGuard";
 import { TenantForm } from "@/components/TenantForm";
-import { TestLinePanel } from "@/components/TestLinePanel";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
+import { parseVertical } from "@/lib/vertical";
 import {
-  SETTINGS_NAV,
-  settingsNavHref,
-  settingsNavItemActive,
   settingsPanelHeading,
   type BusinessSettingsTab,
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
+import { type SettingsListStatus } from "@/lib/settingsOptionStatus";
 import {
-  SettingsGroup,
   SettingsPageHeader,
   settingsConsoleClass,
-  settingsGroupTitleClass,
   settingsPanelClass,
-  settingsPanelHeadingClass,
-  settingsRailClass,
-  settingsRailWrapClass,
 } from "@/components/settingsUi";
-import { ThemePicker } from "@/components/ThemePicker";
-import { SignOutButton } from "@/components/ui/SignOutButton";
-import { deskShiftClass } from "@/components/ui/deskChrome";
-
-function SettingsChevron() {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      fill="none"
-      className="h-4 w-4 shrink-0 text-ink-soft"
-      aria-hidden
-    >
-      <path
-        d="M7.5 4.5 13 10l-5.5 5.5"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function AppearancePanel({ showHeading = true }: { showHeading?: boolean }) {
-  return (
-    <section className="min-w-0 w-full space-y-6">
-      {showHeading ? <h2 className={settingsPanelHeadingClass}>Appearance</h2> : null}
-      <SettingsGroup title="This device">
-        <div className="px-4 py-2">
-          <ThemePicker />
-        </div>
-      </SettingsGroup>
-    </section>
-  );
-}
-
-function SettingsSignOutRow() {
-  return (
-    <li className="border-t border-line">
-      <div className="flex min-h-12 items-center px-2">
-        <SignOutButton />
-      </div>
-    </li>
-  );
-}
-
-function SettingsMenu({
-  tab,
-  trainPanel,
-  variant,
-}: {
-  tab: BusinessSettingsTab;
-  trainPanel: SettingsPanel;
-  variant: "index" | "rail";
-}) {
-  const isRail = variant === "rail";
-  return (
-    <nav
-      aria-label="Business Profile sections"
-      data-settings-menu={variant}
-      className={isRail ? settingsRailClass : "min-w-0 w-full"}
-    >
-      {SETTINGS_NAV.map((section, index) => (
-        <section key={section.id} className={index === 0 ? undefined : "mt-4"}>
-          <h2 className={`${settingsGroupTitleClass} mb-1.5 px-1`}>{section.title}</h2>
-          {isRail ? (
-            <ul className="w-max max-w-full space-y-0.5">
-              {section.items.map((item) => {
-                const active = settingsNavItemActive(item.target, tab, trainPanel, {
-                  selectHubAppearance: true,
-                });
-                const key =
-                  "href" in item.target
-                    ? item.target.href
-                    : item.target.tab === "train"
-                      ? `${item.target.tab}-${item.target.panel}`
-                      : item.target.tab;
-                return (
-                  <li key={key}>
-                    <Link
-                      href={settingsNavHref(item.target)}
-                      aria-current={active ? "page" : undefined}
-                      className={[
-                        `inline-flex min-h-11 w-full items-center justify-start border-l-2 px-3 text-sm font-medium ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`,
-                        active
-                          ? "border-accent text-accent-deep"
-                          : "border-transparent text-ink hover:bg-accent/[0.04] active:bg-accent/[0.08]",
-                      ].join(" ")}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
-              {section.id === "device" ? (
-                <li className="px-1 pt-1">
-                  <SignOutButton />
-                </li>
-              ) : null}
-            </ul>
-          ) : (
-            <ul className="w-full overflow-hidden rounded-xl border border-line bg-surface">
-              {section.items.map((item, itemIndex) => {
-                const active = settingsNavItemActive(item.target, tab, trainPanel);
-                const key =
-                  "href" in item.target
-                    ? item.target.href
-                    : item.target.tab === "train"
-                      ? `${item.target.tab}-${item.target.panel}`
-                      : item.target.tab;
-                return (
-                  <li
-                    key={key}
-                    className={itemIndex === 0 ? undefined : "border-t border-line"}
-                  >
-                    <Link
-                      href={settingsNavHref(item.target)}
-                      aria-current={active ? "page" : undefined}
-                      className={[
-                        `flex min-h-12 items-center justify-between gap-3 px-4 text-sm font-medium ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent`,
-                        active
-                          ? "bg-accent/10 text-accent-deep"
-                          : "text-ink hover:bg-accent/[0.04] active:bg-accent/[0.08]",
-                      ].join(" ")}
-                    >
-                      {item.label}
-                      <SettingsChevron />
-                    </Link>
-                  </li>
-                );
-              })}
-              {section.id === "device" ? <SettingsSignOutRow /> : null}
-            </ul>
-          )}
-        </section>
-      ))}
-    </nav>
-  );
-}
+import { SettingsMenu, SettingsRail } from "@/components/SettingsSideNav";
 
 function settingsLineState(did: string | null | undefined): {
   lineLive: boolean;
@@ -181,23 +46,18 @@ function SettingsPanelBody({
   tenant,
   curatedVoices,
 }: {
-  tab: Exclude<BusinessSettingsTab, "menu" | "catalog" | "train" | "alerts">;
+  tab: "import" | "test";
   tenant: TenantRow;
   curatedVoices: CuratedSonioxVoice[];
 }) {
-  if (tab === "updates") return <DailyBulletinPanel tenant={tenant} />;
   if (tab === "import") {
-    return (
-      <div className="space-y-6">
-        <KnowledgeIngestPanel tenant={tenant} />
-        <CatalogImportPanel tenant={tenant} />
-      </div>
+    return parseVertical(tenant.vertical) === "retail" ? (
+      <CatalogImportPanel tenant={tenant} />
+    ) : (
+      <KnowledgeIngestPanel tenant={tenant} />
     );
   }
-  if (tab === "test") {
-    return <TestLinePanel tenant={tenant} curatedVoices={curatedVoices} />;
-  }
-  return <AppearancePanel showHeading={false} />;
+  return <TestLinePanel tenant={tenant} curatedVoices={curatedVoices} />;
 }
 
 /**
@@ -208,100 +68,148 @@ export function BusinessSettingsShell({
   tab,
   trainPanel,
   curatedVoices = [],
+  optionStatus = {},
   liveTransferExecutor = false,
+  membersSlot = null,
+  seatNoteSlot = null,
+  structuredSlot = null,
+  callsSlot = null,
+  assistantSaySlot = null,
+  assistantSayPage = false,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
   trainPanel: SettingsPanel;
   curatedVoices?: CuratedSonioxVoice[];
+  optionStatus?: Record<string, SettingsListStatus>;
   liveTransferExecutor?: boolean;
+  membersSlot?: ReactNode;
+  /** Team: one note when every seat is taken. */
+  seatNoteSlot?: ReactNode;
+  structuredSlot?: Partial<Record<"identity" | "catalog", ReactNode>> | null;
+  /** Calls & forwarding (server-built: reads tenants.call_setup and the calls table). */
+  callsSlot?: ReactNode;
+  assistantSaySlot?: ReactNode;
+  assistantSayPage?: boolean;
 }) {
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
   const showForm = tab === "catalog" || tab === "train";
   const isMenu = tab === "menu";
-  const heading = settingsPanelHeading(tab, trainPanel);
+  const heading = settingsPanelHeading(tab, trainPanel, tenant.vertical);
   const { lineLive, lineDetail } = settingsLineState(tenant.sautikit_virtual_number);
   const businessName = tenant.business_name?.trim() || "Business";
 
-  const tenantFormKey = [
-    tenant.id,
-    Array.isArray(tenant.services_catalog) ? tenant.services_catalog.length : 0,
-    Array.isArray(tenant.product_catalog) ? tenant.product_catalog.length : 0,
+  // Panel is part of the key: tenantForSettingsView strips catalogs/policies/etc.
+  // per panel, but TenantForm only reads those fields in useState initializers.
+  // Without remounting on panel change, Hours → Policies keeps empty openPolicyIds
+  // until a hard refresh. Length fingerprints alone miss policies/locations/lexicon.
+  const tenantFormScope = `${tenant.id}:${formPanel}`;
+  const tenantFormContent = [
+    // Catalogue content, not lengths: a price confirm changes no length, and a form that kept
+    // the old rows would post them back on Save and undo the confirm.
+    catalogContentKey(tenant.services_catalog, tenant.product_catalog),
     Array.isArray(tenant.faqs) ? tenant.faqs.length : 0,
     Array.isArray(tenant.team_directory) ? tenant.team_directory.length : 0,
+    Array.isArray(tenant.business_locations) ? tenant.business_locations.length : 0,
+    Array.isArray(tenant.tts_lexicon) ? tenant.tts_lexicon.length : 0,
+    policiesFormKey(tenant.business_policies),
     String(tenant.llm_system_prompt || "").length,
     tenant.vertical || "",
     JSON.stringify(tenant.social_handles || {}),
   ].join(":");
+  // Shared save pattern: the form's own save re-renders the page up to three times
+  // (action response, Realtime revalidation, router refresh), and one render can
+  // still carry the row from before the write. Keep the mount while it settles,
+  // so the fields keep the saved values and the Save button can say Saved.
+  const ownSaveAt = useRef(0);
+  const markOwnSave = useCallback(() => {
+    ownSaveAt.current = Date.now();
+  }, []);
+  const [formMount, setFormMount] = useState<FormMountKey>(() => ({
+    scope: tenantFormScope,
+    seen: tenantFormContent,
+    mounted: tenantFormContent,
+  }));
+  if (formMount.scope !== tenantFormScope || formMount.seen !== tenantFormContent) {
+    const next = nextFormMountKey(formMount, { scope: tenantFormScope, content: tenantFormContent }, ownSaveAt.current, Date.now());
+    if (next !== formMount) setFormMount(next);
+  }
+  const tenantFormKey = `${formMount.scope}:${formMount.mounted}`;
 
   const rail = (
-    <div className={settingsRailWrapClass}>
-      <SettingsMenu tab={tab} trainPanel={trainPanel} variant="rail" />
-    </div>
+    <SettingsRail
+      tab={tab}
+      trainPanel={trainPanel}
+      optionStatus={optionStatus}
+      assistantSayPage={assistantSayPage}
+    />
   );
 
   if (isMenu) {
+    // No section chosen: Settings home on every width, full content width (no rail).
+    // Server-rendered with no viewport script, so nothing shifts after paint.
     return (
-      <div className="w-full min-w-0" data-settings-console="">
-        <SettingsPageHeader
-          businessName={businessName}
-          lineLive={lineLive}
-          lineDetail={lineDetail}
-          index
-        />
-        <div className={settingsConsoleClass}>
-          {rail}
-          <div className={settingsPanelClass}>
-            <div className="md:hidden">
-              <SettingsMenu tab={tab} trainPanel={trainPanel} variant="index" />
-            </div>
-            <div className="hidden md:block">
-              <AppearancePanel />
-            </div>
+      <SettingsLeaveGuard>
+      <div className="w-full min-w-0" data-settings-console="" data-settings-home="" data-pull-dirty-guard="">
+        <div className="w-full min-w-0">
+          <div className={`${settingsPanelClass} mx-auto w-full md:max-w-3xl md:pt-4 xl:max-w-6xl`}>
+            <SettingsPageHeader
+              businessName={businessName}
+              lineLive={lineLive}
+              lineDetail={lineDetail}
+              index
+            />
+            <SettingsMenu
+              tab={tab}
+              trainPanel={trainPanel}
+              variant="index"
+              optionStatus={optionStatus}
+              assistantSayPage={assistantSayPage}
+            />
           </div>
         </div>
       </div>
+      </SettingsLeaveGuard>
     );
   }
 
   return (
-    <div className="w-full min-w-0" data-settings-console="" data-desk-nested="">
+    <SettingsLeaveGuard>
+    <div className="w-full min-w-0" data-settings-console="" data-desk-nested="" data-pull-dirty-guard="">
       {showForm ? (
         <TenantForm
           key={tenantFormKey}
+          onSaveActivity={markOwnSave}
           tenant={tenant}
           panel={formPanel}
           curatedVoices={curatedVoices}
           heading={heading}
-          lineNumber={lineLive ? lineDetail : "Number pending"}
           sidebar={rail}
           liveTransferExecutor={liveTransferExecutor}
+          membersSlot={formPanel === "team" ? membersSlot : null}
+          seatNoteSlot={formPanel === "team" ? seatNoteSlot : null}
+          structuredSlot={structuredSlot}
         />
       ) : (
         <div className={settingsConsoleClass}>
           {rail}
           <div className={settingsPanelClass}>
             {tab === "alerts" ? (
-              <AlertsPanel
-                tenant={tenant}
-                businessName={businessName}
-                lineLive={lineLive}
-                lineDetail={lineDetail}
-              />
+              <AlertsPanel tenant={tenant} businessName={businessName} />
             ) : (
               <>
                 <SettingsPageHeader
                   businessName={businessName}
                   lineLive={lineLive}
                   lineDetail={lineDetail}
+                  showLine={tab === "test"}
                   showBack
                   title={heading}
                 />
-                {tab === "updates" ||
-                tab === "import" ||
-                tab === "test" ||
-                tab === "appearance" ? (
+                {tab === "calls" ? callsSlot : null}
+                {tab === "assistant-say" ? assistantSaySlot : null}
+                {tab === "import" || tab === "test" ? (
                   <SettingsPanelBody
                     tab={tab}
                     tenant={tenant}
@@ -314,6 +222,7 @@ export function BusinessSettingsShell({
         </div>
       )}
     </div>
+    </SettingsLeaveGuard>
   );
 }
 

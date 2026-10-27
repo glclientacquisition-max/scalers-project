@@ -7,8 +7,8 @@ import { AREA_TREE_VERSION, emptyAreaPicks, moveOverAreas, normalizeAreaPicks, s
 type LegacyArea = {
   id?: string;
   serve?: boolean;
-  fee_ksh?: number | null;
-  fee_kes?: number | null;
+  fee_ksh?: number | string | null;
+  fee_kes?: number | string | null;
   note?: string | null;
 };
 
@@ -51,9 +51,10 @@ export function tenantAreaPicksFromLegacy(tenant: LegacyTenantAreas): {
   const sa = tenant.service_areas;
   if (sa && Array.isArray(sa.areas)) {
     for (const area of sa.areas) {
-      if (!area || typeof area.id !== "string") continue;
-      const node = moved.rows.find((r) => r.raw === area.id.replace(/^(county|place):/, ""))?.node
-        ?? moved.rows.find((r) => r.raw === area.id)?.node;
+      const id = area?.id;
+      if (!area || typeof id !== "string") continue;
+      const node = moved.rows.find((r) => r.raw === id.replace(/^(county|place):/, ""))?.node
+        ?? moved.rows.find((r) => r.raw === id)?.node;
       if (!node) continue;
       picks = setAreaDetail(picks, node, {
         serve: area.serve !== false,
@@ -71,7 +72,7 @@ export function tenantAreaPicksFromLegacy(tenant: LegacyTenantAreas): {
     const n = outsideFee == null ? null : Number(String(outsideFee).replace(/[, ]/g, ""));
     picks = setAreaDetail(picks, "ke", {
       serve: true,
-      fee_kes: Number.isFinite(n) && n > 0 ? Math.round(n) : null,
+      fee_kes: n != null && Number.isFinite(n) && n > 0 ? Math.round(n) : null,
       note: null,
     });
   }
