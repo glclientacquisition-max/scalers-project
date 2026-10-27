@@ -26,33 +26,26 @@ function priceReceipt(serviceName, profile, text, lang) {
   return { tool: 'prices', ok: true, service: svc.name, text: pl?.text || svc.price_range || null };
 }
 
+const KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const swPeriod = (hh) => { const h = Number(String(hh).slice(0, 2)); return h < 12 ? 'asubuhi' : h < 16 ? 'mchana' : h < 19 ? 'jioni' : 'usiku'; };
+const swT = (hh) => `${L.sayTime(hh, 'sw')} ${swPeriod(hh)}`;
+/** Hours receipt: TODAY's hours unless the caller named a day (Alvin: no 32 s weekly list). Clock injected. */
 function hoursReceipt(profile, lang, { day = null, now = new Date() } = {}) {
   const h = hoursFact(profile);
-  if (!h) return { tool: 'hours', ok: false, text: null };
+  if (!h && !profile.hoursSchedule?.days) return { tool: 'hours', ok: false, text: null };
+  const S = sw(lang);
   if (!day) {
     const p = L.eatParts(now);
-    const keys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-    const row = profile.hoursSchedule?.days?.[keys[p.dow]];
-    if (!row || row.closed) {
-      return { tool: 'hours', ok: true, text: sw(lang) ? '[PROMPT-PLACEHOLDER] Leo tumefunga.' : '[PROMPT-PLACEHOLDER] We are closed today.' };
-    }
-    return {
-      tool: 'hours',
-      ok: true,
-      text: sw(lang)
-        ? `[PROMPT-PLACEHOLDER] Leo tuko wazi ${row.open}-${row.close}.`
-        : `[PROMPT-PLACEHOLDER] Today we are open ${row.open} to ${row.close}.`,
-    };
+    const row = profile.hoursSchedule?.days?.[KEYS[p.dow]];
+    if (!row) return { tool: 'hours', ok: !!h, text: h ? h.text : null };
+    if (row.closed) return { tool: 'hours', ok: true, today: true, closed: true, text: S ? 'Leo tumefunga.' : 'We are closed today.' };
+    return { tool: 'hours', ok: true, today: true, open: row.open, close: row.close, text: S ? `Leo tuko wazi kuanzia ${swT(row.open)} hadi ${swT(row.close)}.` : `Today we are open from ${row.open} to ${row.close}.` };
   }
-  if (day) {
-    const d = new Date(`${day}T12:00:00+03:00`);
-    const dow = d.getUTCDay();
-    const keys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-    const row = profile.hoursSchedule?.days?.[keys[dow]];
-    if (!row || row.closed) return { tool: 'hours', ok: true, text: sw(lang) ? `${L.cap(L.DOW_SW[dow])} tumefunga.` : `We're closed on ${L.cap(L.DOW_EN[dow])}.` };
-    return { tool: 'hours', ok: true, text: sw(lang) ? `${L.cap(L.DOW_SW[dow])} tuko wazi ${row.open}-${row.close}.` : `On ${L.cap(L.DOW_EN[dow])} we're open ${row.open} to ${row.close}.` };
-  }
-  return { tool: 'hours', ok: true, text: h.text };
+  const d = new Date(`${day}T12:00:00+03:00`);
+  const dow = d.getUTCDay();
+  const row = profile.hoursSchedule?.days?.[KEYS[dow]];
+  if (!row || row.closed) return { tool: 'hours', ok: true, closed: true, text: S ? `${L.cap(L.DOW_SW[dow])} tumefunga.` : `We're closed on ${L.cap(L.DOW_EN[dow])}.` };
+  return { tool: 'hours', ok: true, open: row.open, close: row.close, text: S ? `${L.cap(L.DOW_SW[dow])} tuko wazi kuanzia ${swT(row.open)} hadi ${swT(row.close)}.` : `On ${L.cap(L.DOW_EN[dow])} we're open from ${row.open} to ${row.close}.` };
 }
 
 function runTools({ understanding, machine, profile, lang, text, now = new Date() }) {
@@ -65,7 +58,9 @@ function runTools({ understanding, machine, profile, lang, text, now = new Date(
   const wantsPrice = u.answers?.includes('price');
   if (wantsCoverage) {
     const cov = ML.coverageFor(text, profile, { u: { slots: { places: place ? [place] : [] } }, expecting: machine.expecting });
-    for (const row of cov.places) {
+    // a follow-up ("And the fee?") names no place: the call's place is still the subject
+    const rows = cov.places.length || !place ? cov.places : ML.coverageReceipt([place], profile).places;
+    for (const row of rows) {
       const named = { ...row, name: row.name || row.place || place };
       const line = AC.line(named, lang) || row.line_en || row.line_sw || row.text || null;
       receipts.push({ tool: 'coverage', ...named, text: line });
@@ -77,6 +72,11 @@ function runTools({ understanding, machine, profile, lang, text, now = new Date(
   }
   if (u.answers?.includes('hours')) {
     receipts.push(hoursReceipt(profile, lang, { day: u.slots?.day || machine.slots?.when?.date, now }));
+  }
+  if (u.answers?.includes('identity') || u.intent === 'identity') {
+    const R = require('./receipts');
+    const agent = profile.agentName || null; const biz = profile.businessName || profile.name || null;
+    if (agent && biz) receipts.push({ tool: 'identity', ok: true, text: R.info({ kind: 'who', agent, biz }, lang) });
   }
   if (u.answers?.includes('payment')) {
     const pf = OF.paymentFact(OF.ownerFacts(profile));

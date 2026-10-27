@@ -1,42 +1,54 @@
 'use strict';
-// BRAIN_ENGINES: understanding -> plan -> tools -> handoff -> guarded response.
+// BRAIN_ENGINES (default off): understanding -> plan -> tools -> (commit gate) -> response -> guard -> speakable.
+//   1. Understanding first: ONE typed model call per turn, hard cap (BRAIN_ENGINES_UNDERSTAND_MS, 1500),
+//      no backup race; a meaningful filler only if the wait passes BRAIN_ENGINES_FILLER_MS (700).
+//      The turn language is decided once here and every line of the turn obeys it.
+//   2. Plan: one goal; slot preconditions before any write; pending read-back answered first.
+//   3. Response: the model writes every line except the read-back and the write-outcome line.
+//   4. Commit truth (single check): no booked/saved/callback claim without a committed write (row id + receipt).
+//   5. Speakable: no bracketed tag ever reaches TTS; spoken dates and times.
+//   6. One trace record per turn (understanding, goal, tool, write, guard, timings) via onModelStage.
 const { brainEnginesOn } = require('./flag');
 const U = require('./understanding');
-const { pickGoal, businessOpen } = require('./enginePlan');
+const { pickGoal } = require('./enginePlan');
 const { runTools } = require('./engineTools');
-const { commitHandoff } = require('./handoff');
-const { makeEnginesVerifier } = require('./engineGuard');
+const { bindCallerName, initHandoff } = require('./handoff');
+const { makeEnginesVerifier, allowedTimes } = require('./engineGuard');
 const ML = require('./modelLead');
-const CP = require('./callPlan');
-const TW = require('./turnWriter');
-const { createLiveHandlers } = require('./liveHandlers');
-const { runTurnStream } = require('./stream');
-const { spoken: spokenStyle } = require('./spokenStyle');
 const V1 = require('./v1draft');
-const L = require('./lexicon');
+const { createLiveHandlers } = require('./liveHandlers');
 const { createHandoffNotifier } = require('./handoffNotify');
-const { capSpokenLine, isReadbackOrBooked } = require('./engineInvariants');
+const { capSpokenLine } = require('./engineInvariants');
+const { commitWrite, enforceCommitTruth, engState } = require('./engineCommit');
+const Lines = require('./engineLines');
+const { writeReply } = require('./engineReply');
+const { speakable } = require('./engineSpeech');
+const { pickFiller } = require('./engineFiller');
+const { buildTrace, emitTrace } = require('./engineTrace');
+
+const ACK_ONLY = /^\W*(ok(?:ay)?|sawa|haya|poa|yes|yeah|yep|no|nope|ndio|ndiyo|hapana|eeh|sure|thanks?|thank you|asante(?: sana)?|alright)\W*$/i;
 
 function on({ env = process.env, tenantId } = {}) {
   return brainEnginesOn({ env, tenantId });
 }
 
-function replyRequest({ goal, receipts, understanding, profile, lang, machine }) {
-  const facts = receipts.map((r) => ({ tool: r.tool, text: r.text || r.line_en || r.line_sw || null, place: r.place, covered: r.covered }));
-  const pack = {
-    GOAL: goal,
-    UNDERSTANDING: understanding,
-    RECEIPTS: facts,
-    LANG: lang,
-    PLAN: CP.step(machine, '', lang),
-    CALLER: { name: receipts.caller?.name, upcoming: receipts.caller?.upcoming?.length || 0 },
-  };
-  return ML.replyRequest(pack, profile);
+/** The turn language, decided once. A bare ack/yes/no or a name keeps the language the call is in. */
+function decideLang({ u, text, prev, langLock }) {
+  const t = String(text || '').trim();
+  const words = t.split(/\s+/).filter(Boolean).length;
+  const base = prev || langLock || null;
+  if (base && (ACK_ONLY.test(t) || (words <= 3 && !U.textLang(t)))) return base;
+  if (u && u.source === 'model' && (u.language === 'en' || u.language === 'sw')) return u.language;
+  return U.textLang(t) || base || 'en';
+}
+
+function sentencesOf(line) {
+  return ML.sentencesOf(String(line || ''), true).map((x) => String(x).trim()).filter(Boolean);
 }
 
 async function runBrainEnginesTurn({
   text,
-  profile,
+  profile = {},
   machine,
   env = process.env,
   streamFor,
@@ -51,146 +63,173 @@ async function runBrainEnginesTurn({
   const clock = typeof opts.clock === 'function' ? opts.clock : () => Date.now();
   const nowFn = typeof opts.now === 'function' ? opts.now : opts.now ? () => new Date(opts.now) : () => new Date();
   const log = opts.log || (() => {});
+  const T0 = clock();
+  const now = nowFn();
   machine.engines = true;
   machine.turn = (machine.turn || 0) + 1;
-  const understanding = await U.runUnderstanding({
-    text,
-    machine,
-    profile,
-    streamFor,
-    modelId,
-    hardMs: Number(env.BRAIN_ENGINES_UNDERSTAND_MS || 1500),
-    clock,
-    log,
-  });
-  const lang = langLock || understanding.language || machine.lang || 'en';
-  machine.lang = lang;
-  const toolOut = runTools({ understanding, machine, profile, lang, text, now: nowFn() });
-  const goal = pickGoal({ understanding, machine, profile, lang, callerPhone: machine.callerPhone, now: nowFn() });
-  if (goal.type === 'handoff_commit') {
-    const handlers = handlersIn || createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: opts.ctx || {} });
-    const notify = opts.notify || createHandoffNotifier(profile, { dispatch: opts.dispatch, machine });
-    const committed = await commitHandoff({ machine, profile, handlers, callerPhone: machine.callerPhone, understanding, notify });
-    const line = lang === 'sw'
-      ? '[PROMPT-PLACEHOLDER] Sawa. Mwenye biashara atakupigie kwa nambari uliyopiga.'
-      : '[PROMPT-PLACEHOLDER] Okay. The owner will call you back on the number you called from.';
-    return emitTurn({ line, lang, machine, understanding, goal, onSentence, path: 'brain_engines_handoff_done', committed });
-  }
-  if (goal.type === 'handoff' && (goal.step?.kind === 'readback' || goal.step?.line)) {
-    const raw = goal.step.line || '';
-    return emitTurn({ line: spokenStyle(raw, lang), lang, machine, understanding, goal, onSentence, path: 'brain_engines_handoff', readback: true });
-  }
-  if (goal.type === 'handoff' && goal.step?.kind === 'ask_name') {
-    const line = goal.step.line || (lang === 'sw' ? '[PROMPT-PLACEHOLDER] Naomba jina lako.' : '[PROMPT-PLACEHOLDER] May I have your name?');
-    return emitTurn({ line: spokenStyle(line, lang), lang, machine, understanding, goal, onSentence, path: 'brain_engines_handoff' });
-  }
+  const E = engState(machine);
+  initHandoff(machine);
   const handlers = handlersIn || createLiveHandlers({ applyTools: applyTools || (async () => ({ results: [] })), ctx: opts.ctx || {} });
-  let tmpl = '';
-  if (goal.type === 'readback' && machine.pending) {
-    tmpl = CP.readbackLine(machine, lang) || machine.pending.readbackLine || '';
-  } else if (goal.type === 'ask') {
-    const st = { kind: 'ask', slot: goal.slot, question: slotQuestion(goal.slot, lang), lang };
-    tmpl = st.question;
-  }
-  const request = replyRequest({ goal, receipts: toolOut.receipts, understanding, profile, lang, machine });
-  let liveReply = '';
-  const receiptLine = (understanding.answers?.includes('coverage')
-    ? toolOut.receipts.find((r) => r.tool === 'coverage' && r.text)?.text
-    : null) || toolOut.receipts.filter((r) => r.text).map((r) => r.text)[0] || '';
-  const skipReplyModel = goal.type === 'answer' && receiptLine;
-  if (streamFor && modelId && !skipReplyModel) {
-    try {
-      const res = await streamFor(modelId)({ request, signal: undefined, onText: (d) => { liveReply += d; } });
-      if (res?.text) {
-        try {
-          const j = JSON.parse(res.text);
-          liveReply = j.reply || liveReply;
-        } catch {
-          liveReply = res.text;
-        }
-      }
-    } catch { liveReply = ''; }
-  }
-  if (skipReplyModel) {
-    const line = capSpokenLine(spokenStyle(receiptLine, lang));
-    if (goal.type === 'answer' && understanding.answers?.includes('hours') && !businessOpen(profile, nowFn())) {
-      machine._enginesOfferCallback = true;
-    }
-    V1.remember(machine, 'agent', line);
-    if (typeof onSentence === 'function') onSentence({ text: line, lang });
-    return { line, lang, sentences: [{ text: line, lang, src: 'receipt' }], path: 'brain_engines', understanding, goal, lead: true, answeredBy: 'receipt' };
-  }
-  const st = CP.step(machine, tmpl, lang);
-  const ctx = {
-    st,
-    receipts: [],
-    coverage: toolOut.receipts.filter((r) => r.tool === 'coverage'),
-    caller: toolOut.caller,
-    profile,
-    questions: (understanding.answers || []).map((a) => ({ type: a })),
-    lang,
-    machine,
-    text,
-    u: understanding,
-    confirm: [],
+  const callerPhone = machine.callerPhone || opts.ctx?.callerPhone || null;
+  const timings = {};
+  let filler = null;
+  const prevLang = E.lang || null;
+  const streaming = typeof onSentence === 'function';
+
+  // 1) understanding first. One turn-level filler timer covers the WHOLE wait before the first real word
+  // (understanding + reply + write): it fires once at BRAIN_ENGINES_FILLER_MS only if nothing was said yet.
+  const fillerMs = Number(env.BRAIN_ENGINES_FILLER_MS || 700);
+  let spokeReal = false; let turnLang = null;
+  const fireFiller = () => {
+    if (spokeReal || filler || shouldAbort()) return;
+    const fl = turnLang || prevLang || langLock || U.textLang(text) || 'en';
+    const line = pickFiller(text, fl, { profile, machine, now });
+    if (!line) return;
+    const atMs = clock() - T0;
+    filler = { text: line, atMs, lang: fl };
+    timings.fillerMs = atMs;
+    onSentence({ text: line, lang: fl, filler: true });
   };
-  const ver = makeEnginesVerifier(ctx);
-  const modelBuffer = [];
-  for (const s of ML.sentencesOf(liveReply, true)) {
-    const v = ver.check(s);
-    if (v.verdict === 'drop') continue;
-    modelBuffer.push({ text: v.text || s, src: v.verdict === 'pass' ? 'model' : 'repair' });
-  }
-  const plan = TW.writeTurn({
-    lang,
-    ctx,
-    st,
-    pre: { owned: false },
-    fixed: goal.type === 'readback',
-    tmpl: tmpl || liveReply,
-    ver,
-    modelBuffer,
-    held: null,
-    answeredBy: 'model',
-    templateLines: [],
-    split: false,
-    repairs: 0,
-    modelSentences: modelBuffer.length,
+  const fillerTimer = streaming && fillerMs > 0 ? setTimeout(fireFiller, fillerMs) : null;
+  if (fillerTimer && fillerTimer.unref) fillerTimer.unref();
+  try {
+  const u = await U.runUnderstanding({
+    text, machine, profile, streamFor, modelId, clock, log, now,
+    hardMs: Number(env.BRAIN_ENGINES_UNDERSTAND_MS || 1500),
   });
+  timings.understandMs = u._ms;
+  const lang = decideLang({ u, text, prev: prevLang, langLock });
+  E.lang = lang; machine.lang = lang; u.language = lang; turnLang = lang;
+
+  // 2) plan: exactly one goal
+  let goal = pickGoal({ understanding: u, machine, profile, lang, callerPhone, now, text });
+  // 3) read-only tools for this turn's facts
+  const toolOut = runTools({ understanding: u, machine, profile, lang, text, now });
+  const receipts = toolOut.receipts.filter((r) => r.tool !== 'lookup_caller');
+
+  const fixed = []; const model = []; const guard = []; let write = null; let path = 'brain_engines';
+  // 4a) the write (only on a yes to the read-back the caller heard)
+  if (goal.type === 'commit') {
+    const p = goal.p;
+    const notify = opts.notify || (opts.dispatch ? createHandoffNotifier(profile, { dispatch: opts.dispatch, machine }) : null);
+    const res = await commitWrite({ p, machine, handlers, profile, notify, callerPhone, log });
+    write = { status: res.status, id: res.id || null, fallbackId: res.fallbackId || null, notified: !!res.notified, error: res.error || null, idempotencyKey: p.idemKey };
+    if (res.status === 'blocked') {
+      goal = { type: 'ask', slot: res.missing[0], why: p.tool === 'create_handoff' ? 'callback' : 'booking', answers: goal.answers };
+    } else {
+      path = 'brain_engines_commit';
+      E.pending = null;
+      E.flow = null;
+      if (res.status === 'committed') {
+        if (p.name) bindCallerName(machine, handlers, p.name);
+        if (p.tool === 'create_handoff') Object.assign(machine.handoff, { committed: true, phase: 'done', reason: p.reason, idempotencyKey: p.idemKey });
+        if (p.tool === 'create_booking') machine.intent = null;
+        fixed.push({ text: Lines.committedLine(p, lang), src: 'booked' });
+      } else {
+        if (p.tool === 'create_booking') machine.intent = null;
+        fixed.push({ text: Lines.failedLine(p, res.status, lang), src: 'write_failed' });
+      }
+    }
+  }
+  if (goal.type === 'readback') {
+    E.pending = { p: goal.p, reasks: 0, heardOk: true, issuedTurn: machine.turn };
+    try { require('./commitSafety').makeRecorder(handlers, machine)('proposed', goal.p); } catch { /* receipts never block */ }
+    fixed.push({ text: Lines.readbackLine(goal.p, lang), src: 'readback' });
+  } else if (goal.type === 'reask') {
+    fixed.push({ text: Lines.reaskLine(goal.p, lang), src: 'readback' });
+  }
+
+  // 4b) model-written lines (everything except the read-back and the outcome line)
+  const modelGoal = ['answer', 'ask', 'open', 'close', 'no_name'].includes(goal.type)
+    || ((goal.type === 'readback' || goal.type === 'reask') && (goal.answers || []).length > 0);
+  if (modelGoal) {
+    const rep = await writeReply({
+      goal, text, receipts, machine, profile, lang, caller: toolOut.caller, streamFor, modelId, clock, log,
+      hardMs: Number(env.BRAIN_ENGINES_REPLY_MS || 2500),
+    });
+    timings.replyMs = rep.ms; timings.replyOutcome = rep.outcome;
+    const ctx = {
+      st: { kind: 'answer', items: [], lang },
+      receipts: [],
+      coverage: receipts.filter((r) => r.tool === 'coverage' && r.place),
+      caller: toolOut.caller,
+      profile,
+      questions: (u.answers || []).map((a) => ({ type: a })),
+      lang, machine, text, u, confirm: [],
+    };
+    const allowed = allowedTimes({ receipts, machine, profile, extra: E.pending?.p?.callbackWhen?.at ? [E.pending.p.callbackWhen.at.time] : [] });
+    const ver = makeEnginesVerifier(ctx, { allowed, readbackTurn: goal.type === 'readback' || goal.type === 'reask' });
+    for (const s of sentencesOf(rep.text)) {
+      const v = ver.check(s);
+      guard.push({ verdict: v.verdict, reason: v.reason || null });
+      if (v.verdict === 'drop') continue;
+      model.push({ text: v.text || s, src: v.verdict === 'pass' ? 'model' : 'repair' });
+    }
+    // model unavailable or every sentence dropped: grounded receipt fact / plain ask (total fallback, traced)
+    if (!model.length && !fixed.length) {
+      let receiptText = goal.type === 'answer' ? receipts.filter((r) => r.text).map((r) => r.text).slice(0, 2).join(' ') : null;
+      // never the same fact line twice in a row: an unanswered price gets the honest unknown instead
+      if (receiptText && receiptText === machine.lastLine) receiptText = (u.answers || []).includes('price') ? (E.offered = 'callback', E.offeredTurn = machine.turn, require('./receipts').info({ kind: 'price', found: false }, lang)) : null;
+      const n = goal.type === 'open' ? (E.openFallbacks = (E.openFallbacks || 0) + 1) - 1 : (goal.n || 0);
+      const fb = Lines.noModelFallback(goal, lang, { n, machine, receiptText });
+      if (fb) model.push({ text: fb, src: receiptText ? 'receipt' : 'fallback' });
+    } else if (goal.type === 'ask' && !model.some((x) => /\?\s*$/.test(x.text))) {
+      model.push({ text: Lines.noModelFallback(goal, lang, { n: goal.n || 0, machine }), src: 'tail' });
+    }
+    if (goal.type === 'answer' && goal.offerCallback) { E.offered = 'callback'; E.offeredTurn = machine.turn; }
+  }
+
+  // 5) assemble: model part capped at two sentences, then the fixed line; one commit-truth check for all
+  const modelCapped = sentencesOf(capSpokenLine(model.map((x) => x.text).join(' ')));
+  const parts = [
+    ...modelCapped.map((t) => ({ text: t, src: (model.find((m) => m.text.includes(t)) || {}).src || 'model' })),
+    ...fixed.flatMap((f) => sentencesOf(f.text).map((t) => ({ text: t, src: f.src }))),
+  ];
+  const truth = enforceCommitTruth(parts, E.ledger);
+  const stripped = [];
+  const out = [];
+  for (const s of truth.kept) {
+    const sp = speakable(s.text, lang);
+    if (sp.stripped.length) stripped.push(...sp.stripped);
+    if (sp.text) out.push({ text: sp.text, lang, src: s.src });
+  }
+  if (!out.length) {
+    const sp = speakable(Lines.noModelFallback(goal, lang, { machine }), lang);
+    out.push({ text: sp.text, lang, src: 'fallback' });
+  }
+  if (stripped.length) log(`[brain_engines] ASSERT stripped bracketed tag(s) before TTS: ${stripped.join(' ')}`);
+
+  // 6) speak once, in order
   const spoken = [];
-  for (const line of plan.lines) {
+  for (const s of out) {
     if (shouldAbort()) break;
-    const t = spokenStyle(line.text, lang);
-    spoken.push({ text: t, lang, src: line.src });
-    if (typeof onSentence === 'function') onSentence({ text: t, lang });
+    if (timings.firstWordMs == null) timings.firstWordMs = clock() - T0;
+    if (!spokeReal) { spokeReal = true; if (fillerTimer) clearTimeout(fillerTimer); }
+    spoken.push(s);
+    if (streaming) onSentence({ text: s.text, lang });
   }
-  let line = capSpokenLine(spoken.map((x) => x.text).join(' ').trim() || tmpl, { readbackOrBooked: goal.type === 'readback' });
-  if (!line.trim()) {
-    line = lang === 'sw' ? '[PROMPT-PLACEHOLDER] Sawa.' : '[PROMPT-PLACEHOLDER] Okay.';
-  }
+  const line = spoken.map((x) => x.text).join(' ').trim();
+  machine.lastLine = line;
+  machine.phase = E.pending ? 'readback' : 'collect';
   V1.remember(machine, 'agent', line);
-  if (goal.type === 'answer' && understanding.answers?.includes('hours') && !businessOpen(profile, nowFn())) {
-    machine._enginesOfferCallback = true;
+  timings.totalMs = clock() - T0;
+  const end = goal.type === 'close' && !E.pending;
+  const answeredBy = spoken.some((x) => x.src === 'model' || x.src === 'repair') ? 'model' : (spoken[0] && spoken[0].src) || 'fallback';
+  const rec = buildTrace({
+    turn: machine.turn,
+    turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null,
+    u, lang, goal, write, guard, dropped: truth.dropped, filler, timings, stripped, path,
+  });
+  emitTrace(rec, { machine, onStage: opts.onModelStage, log });
+  return {
+    line, lang, sentences: spoken, path, understanding: u, goal, lead: true, answeredBy,
+    streamed: streaming, phase: machine.phase, end, ...(end ? { reason: 'caller_done' } : {}),
+    write, filler: filler ? filler.text : null, timings,
+  };
+  } finally {
+    spokeReal = true;
+    if (fillerTimer) clearTimeout(fillerTimer);
   }
-  (machine.trace || (machine.trace = [])).push({ turn: machine.turn, brain_engines: { understanding, goal, receipts: toolOut.receipts } });
-  return { line, lang, sentences: spoken, path: 'brain_engines', understanding, goal, lead: true, answeredBy: 'model' };
 }
 
-function slotQuestion(slot, lang) {
-  const sw = L.isSw(lang);
-  if (slot === 'name') return sw ? '[PROMPT-PLACEHOLDER] Naomba jina lako?' : '[PROMPT-PLACEHOLDER] May I have your name?';
-  if (slot === 'date') return sw ? '[PROMPT-PLACEHOLDER] Ni siku gani?' : '[PROMPT-PLACEHOLDER] Which day works for you?';
-  if (slot === 'time') return sw ? '[PROMPT-PLACEHOLDER] Saa ngapi?' : '[PROMPT-PLACEHOLDER] What time works?';
-  if (slot === 'place') return sw ? '[PROMPT-PLACEHOLDER] Mahali ni wapi?' : '[PROMPT-PLACEHOLDER] Where is the job?';
-  if (slot === 'service') return sw ? '[PROMPT-PLACEHOLDER] Huduma gani?' : '[PROMPT-PLACEHOLDER] Which service?';
-  return sw ? '[PROMPT-PLACEHOLDER] Tukusaidie vipi?' : '[PROMPT-PLACEHOLDER] How can I help?';
-}
-
-function emitTurn({ line, lang, machine, understanding, goal, onSentence, path, readback = false, committed = null }) {
-  const capped = capSpokenLine(line, { readbackOrBooked: readback || isReadbackOrBooked(line) });
-  V1.remember(machine, 'agent', capped);
-  if (typeof onSentence === 'function') onSentence({ text: capped, lang });
-  return { line: capped, lang, sentences: [{ text: capped, lang, src: 'fixed' }], path, understanding, goal, lead: true, answeredBy: 'fixed', committed };
-}
-
-module.exports = { on, runBrainEnginesTurn, replyRequest };
+module.exports = { on, runBrainEnginesTurn, decideLang };
