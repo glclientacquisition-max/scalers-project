@@ -47,7 +47,7 @@ test("minute labels", async () => {
 
 test("usage page is ADMIN_V2, read-only, no caller numbers", () => {
   const page = read("dashboard/src/app/admin/(console)/businesses/[id]/usage/page.tsx");
-  assert.match(page, /ADMIN_V2 !== "on"/);
+  assert.match(page, /!isAdminV2Enabled\(\)/);
   assert.match(page, /requireSuperAdmin/);
   const lib = read("dashboard/src/lib/adminUsageV2Load.ts");
   assert.doesNotMatch(lib, /\.(insert|update|upsert|delete|rpc)\(/);

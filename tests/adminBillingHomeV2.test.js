@@ -36,7 +36,7 @@ test("who owes: most days late first, one row per business", async () => {
 });
 
 test("Billing home is ADMIN_V2-only, read-only, and names no vendor", () => {
-  assert.match(read("dashboard/src/app/admin/(console)/billing/home/page.tsx"), /ADMIN_V2 !== "on"\) notFound\(\)/);
+  assert.match(read("dashboard/src/app/admin/(console)/billing/home/page.tsx"), /!isAdminV2Enabled\(\)\) notFound\(\)/);
   const ui = read("dashboard/src/components/admin/v2/AdminBillingHomeV2.tsx");
   assert.doesNotMatch(ui, /fetch\(|method: "POST"/);
   for (const s of [ui, read("dashboard/src/lib/ops/billingHomeView.ts")]) assert.doesNotMatch(s, /sautikit|bachs|twilio|supabase|mpesa|daraja/i);

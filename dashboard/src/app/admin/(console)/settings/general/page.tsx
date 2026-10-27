@@ -4,13 +4,14 @@ import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { logAdminError } from "@/lib/adminErrors";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { loadSettingsHub } from "@/lib/adminSettingsHubLoad";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export const instant = false;
 
 /** Settings hub (ADMIN_V2 only). Read-only. */
 export default async function SettingsGeneralPage() {
   await requireSuperAdmin();
-  if (process.env.ADMIN_V2 !== "on") notFound();
+  if (!isAdminV2Enabled()) notFound();
   try {
     return <AdminSettingsHubV2 raw={await loadSettingsHub()} />;
   } catch (err) {

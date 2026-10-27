@@ -1,6 +1,6 @@
 ---
 owner: ops-billing
-last_reviewed: 2026-10-10
+last_reviewed: 2026-10-27
 ---
 
 # Scalers — Super Admin Requirements
@@ -31,25 +31,34 @@ Requirements:
 
 ## Information architecture
 
-```
-Nav (rail, md+):  Today · Businesses · Calls · Billing · Numbers · Platform · Activity · Settings
-Nav (phone):      Today · Businesses · Calls · Billing · More (Numbers, Platform, Activity, Settings)
+ADMIN_V2 on (prod and staging). Locked 23 Oct 2026; source of truth `ADMIN_LINKS_V2` in `dashboard/src/lib/adminLinks.ts`.
 
-/admin                 Today: status line, Needs you, today's calls vs the same stretch last week. Reads only.
-/admin/businesses      All businesses + actions (assign, release when not live, archive, restore, delete after 30 days)
-/admin/quality         Calls nav item for now: call quality, worst first (traced calls only)
-/admin/quality/[business]  One business: calls, repeat failures, missed questions
-/admin/quality/call/[id]   One traced call
-/admin/billing         Billing (packages, minutes, charging). Packages and the old Ledger route sit under it.
-/admin/packages        Packages, on-demand rates, assign (reached from Billing)
-/admin/wallets         Redirects to Businesses
-/admin/numbers         Number pool (add / assign / release). Live numbers can't be released.
-/admin/platform        Health, open notices, alert people and settings. Shows notices; sends nothing on load.
-/admin/activity        Every admin write: who, what, which business, before and after, when, why
-/admin/voices          Settings nav item for now: voice catalog
+```
+Nav (sidebar, md+):  Overview · Businesses · Billing · Numbers · Quality · Settings   (+ Access requests)
+Nav (phone):         Overview · Businesses · Billing · Numbers · More (Quality, Settings, Security, Access requests)
+
+/admin                       Overview: Needs attention, worst first. Reads only.
+/admin/businesses            Businesses table + one BusinessPane (?pane=<id>&section=). /admin/businesses/[id] redirects here.
+/admin/billing               Opens Billing › Home. Tabs: Home · Invoices · Payments · Packages
+  /admin/billing/home        This month's money and who owes. /admin/wallets redirects here.
+  /admin/billing/invoices    Invoices table + pane
+  /admin/billing/payments    Payments list + pane
+  /admin/billing/packages    Packages and on-demand rates. /admin/packages and /admin/billing/catalog redirect here.
+/admin/numbers               Number pool table + pane (assign, release, hold). Live numbers can't be released.
+/admin/quality               Call quality, worst first; Insights tab at /admin/quality/insights
+/admin/settings              Opens Settings › General. Tabs: General · Services · Voices · Audit log · Security
+  /admin/settings/services   Health, open notices, who to alert. /admin/platform redirects here.
+  /admin/settings/voices     Voice catalog. /admin/voices redirects here.
+  /admin/settings/audit      Every admin write. /admin/activity redirects here.
+  /admin/settings/security   Authenticator, backup codes, Unlock (step-up), sessions
+/admin/access-requests       Signup access requests (SIGNUP_MODE=request)
 ```
 
-Nav label for ops: **Admin** (not “DID pool”). Primary billing work starts on **Packages**. There is no Ledger tab. Plan (beta or on-demand) and charges sit on the Businesses shop. `/admin/wallets` redirects there.
+ADMIN_V2 is read only through `isAdminV2Enabled()` in `dashboard/src/lib/adminV2.ts`: `on`, `true`, `1` or `yes` (any case) is on; unset or anything else is off. Prod and staging set `on`. There is no per-operator list.
+
+ADMIN_V2 off (legacy shell, retired once v2 is the only shell): rail Today · Businesses · Quality · Billing · Numbers · Platform · Activity · Voices; phone Today · Businesses · Quality · Billing · More (Numbers, Platform, Activity, Voices).
+
+Nav label for ops: **Admin** (not “DID pool”). Billing work starts on **Billing › Home**. There is no Ledger tab. Plan (beta or on-demand) and charges sit on the business pane (Money section).
 
 Customer billing story: **packages + on-demand**. The wallet ledger is visible for ops metering and adjustments. Owner **package checkout** is not shipped.
 

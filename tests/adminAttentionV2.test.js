@@ -69,7 +69,7 @@ test("order: overdue, no number, near limit, quality; worst first inside", async
 
 test("v2 Today is flag-gated, read-only and vendor-free", () => {
   const page = read("dashboard/src/app/admin/(console)/page.tsx");
-  assert.match(page, /process\.env\.ADMIN_V2 === "on"/);
+  assert.match(page, /isAdminV2Enabled\(\)/);
   const ui = read("dashboard/src/components/admin/v2/AdminAttentionV2.tsx");
   const load = read("dashboard/src/lib/adminAttentionLoad.ts");
   assert.doesNotMatch(ui, /"use server"|method:/);
