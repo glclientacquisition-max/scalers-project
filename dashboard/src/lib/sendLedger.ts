@@ -362,7 +362,59 @@ async function recordDeskThread(
   }
 }
 
-/** Legacy path until reserve_notify_send is applied. Remove after rollout. */
+/**
+ * Read-only allowance check (no units counted). Mirrors consume_sms_units:
+ * beta (enforcement off) never blocks; included first; on-demand past the cap;
+ * otherwise stop. Used before the provider call on the legacy path.
+ */
+export function deskSmsAllowance(row: {
+  billing_enforcement?: string | null;
+  on_demand_usage_enabled?: boolean | null;
+  sms_included_units?: number | null;
+  sms_used_units?: number | null;
+} | null, units: number): { allowed: boolean; reason: string; overage: boolean } {
+  if (!row) return { allowed: true, reason: "precheck_skipped", overage: false };
+  const need = Math.max(1, Number(units) || 1);
+  const included = row.sms_included_units == null ? 200 : Number(row.sms_included_units);
+  const used = Math.max(0, Number(row.sms_used_units) || 0);
+  if (String(row.billing_enforcement || "off").toLowerCase() === "off") {
+    return { allowed: true, reason: "beta", overage: false };
+  }
+  if (used + need <= included) return { allowed: true, reason: "included", overage: false };
+  if (row.on_demand_usage_enabled) return { allowed: true, reason: "on_demand", overage: true };
+  return { allowed: false, reason: "sms_allowance_exhausted", overage: false };
+}
+
+async function precheckDeskSms(
+  tenantId: string,
+  body: string
+): Promise<{ allowed: boolean; reason: string; overage: boolean }> {
+  if (!tenantId) return { allowed: true, reason: "no_tenant", overage: false };
+  const { data, error } = await getSupabaseAdmin()
+    .from("tenants")
+    .select("billing_enforcement, on_demand_usage_enabled, sms_included_units, sms_used_units")
+    .eq("id", tenantId)
+    .maybeSingle();
+  if (error) {
+    if (/sms_included_units|sms_used_units|column|schema cache/i.test(error.message || "")) {
+      return { allowed: false, reason: "rpc_missing", overage: false };
+    }
+    console.warn("[sms allowance] precheck", error.message);
+    return { allowed: true, reason: "precheck_skipped", overage: false };
+  }
+  return deskSmsAllowance(data, smsSegments(body));
+}
+
+/**
+ * Legacy path until reserve_notify_send is applied. Remove after rollout.
+ * A4 fix: units are claimed only after TextSMS accepts AND the notify_sends
+ * row exists (was: consume_sms_units before the send, no release on a failed
+ * send or a failed ledger write, and a resend charged again).
+ *   1. read-only allowance precheck   2. send   3. ledger row (one retry)
+ *   4. consume_sms_units. No row => units never claimed (compensation); the
+ *   SMS did go out, so this returns ok with reason ledger_unrecorded rather
+ *   than inviting a resend.
+ */
 async function sendLegacyDeskCallerSms(opts: {
   client: SupabaseClient;
   tenantId: string;
@@ -379,12 +431,12 @@ async function sendLegacyDeskCallerSms(opts: {
   if (prior === "table_missing") {
     return { ok: false, reason: "table_missing" };
   }
-  const claim = await claimDeskSms(opts.client, opts.tenantId, opts.body);
-  if (!claim.allowed) {
-    return { ok: false, reason: claim.reason || "sms_allowance_exhausted" };
+  const pre = await precheckDeskSms(opts.tenantId, opts.body);
+  if (!pre.allowed) {
+    return { ok: false, reason: pre.reason || "sms_allowance_exhausted" };
   }
   const sent = await sendDeskCallerSms({ to: opts.to, body: opts.body });
-  if (!sent.ok) return sent;
+  if (!sent.ok) return sent; // nothing claimed
   const row = {
     ...deskCallerLedgerRow({
       tenantId: opts.tenantId,
@@ -392,24 +444,32 @@ async function sendLegacyDeskCallerSms(opts: {
       kind: opts.kind,
       to: opts.to,
       body: opts.body,
-      overage: claim.overage,
+      overage: pre.overage,
     }),
     idempotency_key: opts.key,
   };
-  let { error } = await opts.client.from("notify_sends").insert(row);
-  if (error && /overage/i.test(error.message || "")) {
-    const rest = { ...row };
-    delete (rest as { overage?: boolean }).overage;
-    ({ error } = await opts.client.from("notify_sends").insert(rest));
+  const insert = async () => {
+    let { error } = await opts.client.from("notify_sends").insert(row);
+    if (error && /overage/i.test(error.message || "")) {
+      const rest = { ...row };
+      delete (rest as { overage?: boolean }).overage;
+      ({ error } = await opts.client.from("notify_sends").insert(rest));
+    }
+    return error;
+  };
+  let error = await insert();
+  if (error && !/notify_sends|does not exist|schema cache|relation|duplicate/i.test(error.message || "")) {
+    error = await insert();
+  }
+  if (error && /duplicate/i.test(error.message || "")) {
+    // A concurrent send already wrote (and claimed) this key: never claim twice.
+    return { ok: true, overage: pre.overage };
   }
   if (error) {
-    console.warn("[notify ledger]", error.message);
-    if (
-      /notify_sends|does not exist|schema cache|relation/i.test(error.message || "")
-    ) {
-      return { ok: false, reason: "table_missing" };
-    }
-    return { ok: false, reason: "ledger_unrecorded" };
+    console.warn("[notify ledger] SMS sent, row not written; units not claimed:", error.message);
+    return { ok: true, reason: "ledger_unrecorded", overage: false };
   }
-  return { ok: true, overage: claim.overage };
+  // Only now: count the units (service role).
+  await claimDeskSms(opts.client, opts.tenantId, opts.body);
+  return { ok: true, overage: pre.overage };
 }

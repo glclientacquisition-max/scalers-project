@@ -137,9 +137,10 @@ describe('capability gates (Overview twin)', () => {
 
 describe('Overview hold count (Aris "1 Hold" while locked)', () => {
   it('counts only open hold/order requests as holds; open enquiries are callers to return', () => {
-    const src = read('dashboard/src/lib/inboxPurpose.ts');
+    // The counts moved to dashboard/src/lib/inboxCounts.ts (one selector for Home, Inbox tabs and the badge).
+    const src = read('dashboard/src/lib/inboxCounts.ts');
     assert.match(src, /HOLD_REQUEST_TYPES = new Set\(\["hold", "order", "hold_or_pickup"\]\)/);
-    assert.match(src, /toFulfill = live\.filter\(\(item\) => openRequest\(item\) && isHoldRequestType/);
+    assert.match(src, /itemIsOpenHold\(item: CountableItem\): boolean \{\s*return !countIsArchived\(item\) && openRequest\(item\) && isHoldRequestType/);
     assert.match(src, /openRequest\(item\) && !isHoldRequestType/);
   });
 

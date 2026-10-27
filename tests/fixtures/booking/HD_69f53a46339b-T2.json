@@ -1,0 +1,14 @@
+{
+  "callSid": "HD_69f53a46339b",
+  "turn": 2,
+  "env": "staging",
+  "build": "0da5fe0b",
+  "tenant": "done_and_dusted",
+  "startedEat": "2026-10-16T01:10:00+03:00",
+  "caller": "Which service do you offer? I want Deep cleaning tomorrow, Kilimani.",
+  "heard": "We do sofas, carpets, house cleaning by size, and deep cleaning, like move-in or after building work. Which would you like?",
+  "heardSource": "speak_packet source=local_catalogue topic=catalogue",
+  "now": "2026-10-16T10:00:00+03:00",
+  "expectWithGaps": { "nluKind": "book_service", "catalogueYields": true, "v2Step": "booking", "mustNotSay": ["Which would you like?", "We do sofas"] },
+  "expectWithoutGaps": { "catalogueYields": false }
+}

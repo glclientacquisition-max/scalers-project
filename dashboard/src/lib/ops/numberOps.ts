@@ -8,10 +8,6 @@
  * database word for it, no long dashes.
  */
 
-/** The protected platform line. Never changed from Admin, in any form (+254, 254, 07). */
-export const PROTECTED_E164 = "+254709221536";
-const PROTECTED_LAST9 = PROTECTED_E164.slice(-9);
-
 export const NUMBER_OPS = ["restore", "lift_quarantine", "move"] as const;
 export type NumberOp = (typeof NUMBER_OPS)[number];
 export function isNumberOp(v: unknown): v is NumberOp {
@@ -24,8 +20,6 @@ export const REASON_MAX = 500;
 /** Calls can still reach the old business for this long after a move (Voice tenant cache). */
 export const MOVE_CACHE_SECONDS = 30;
 
-export const PROTECTED_COPY = "This is the protected platform line. Admin can't move, free or restore it.";
-
 function digits(v: string): string {
   return v.replace(/\D/g, "");
 }
@@ -35,10 +29,6 @@ export function last9(v: unknown): string | null {
   if (typeof v !== "string" || /^pending:/i.test(v.trim())) return null;
   const d = digits(v);
   return d.length >= 9 ? d.slice(-9) : null;
-}
-
-export function isProtectedNumber(v: unknown): boolean {
-  return last9(v) === PROTECTED_LAST9;
 }
 
 /** "+254 7xx", "2547xx", "07xx", "7xx" → "+2547xxxxxxxx". Null when it can't be a Kenyan number. */
@@ -63,16 +53,16 @@ export type NumberOpInput =
   | { action: "lift_quarantine"; e164: string; reason: string; confirm: boolean }
   | { action: "move"; e164: string; fromBusinessId: string; toBusinessId: string; reason: string };
 
-export type NumberOpReject = { ok: false; status: 400 | 403; code: string; error: string };
+export type NumberOpReject = { ok: false; status: 400; code: string; error: string };
 export type NumberOpValid = { ok: true; input: NumberOpInput };
 
-function reject(status: 400 | 403, code: string, error: string): NumberOpReject {
+function reject(status: 400, code: string, error: string): NumberOpReject {
   return { ok: false, status, code, error };
 }
 
 /**
- * Server-side check before step-up and before any RPC. The protected line is refused
- * here first (403), whatever the RPC would say. Empty or short reasons are refused.
+ * Server-side check before step-up and before any RPC. Every number is treated the same
+ * (no protected line since 27 Oct 2026, Alvin). Empty or short reasons are refused.
  */
 export function validateNumberOp(body: unknown): NumberOpValid | NumberOpReject {
   if (!body || typeof body !== "object") return reject(400, "bad_request", "Confirm the change.");
@@ -81,7 +71,6 @@ export function validateNumberOp(body: unknown): NumberOpValid | NumberOpReject 
   if (!isNumberOp(action)) return reject(400, "unknown_action", "Unknown action.");
 
   const rawNumber = typeof b.e164 === "string" ? b.e164.trim() : "";
-  if (rawNumber && isProtectedNumber(rawNumber)) return reject(403, "protected_number", PROTECTED_COPY);
 
   const reason = typeof b.reason === "string" ? b.reason.trim() : "";
   if (reason.length < REASON_MIN) return reject(400, "reason_required", "Add a reason (3 characters or more).");
@@ -205,7 +194,6 @@ export type NumberOpError = {
 
 /** Raised text from the RPCs (#968) → owner-friendly copy. Order matters: first match wins. */
 const ERROR_COPY: Array<[RegExp, Omit<NumberOpError, "status"> & { status?: number }]> = [
-  [/protected number/i, { code: "protected_number", error: PROTECTED_COPY, status: 403 }],
   [/previous business is still active and has no line/i, {
     code: "last_business_waiting",
     error: "The business that last had this number is still active and has no line. Give it back with Restore, or free the number anyway.",
@@ -268,7 +256,6 @@ export function mapNumberOpError(raw: unknown): NumberOpError {
   const code = typeof e.code === "string" ? e.code : "";
   const hint = typeof e.hint === "string" ? e.hint : "";
   if (MISSING_FN.test(`${message} ${code}`)) return { status: 503, code: "sql_missing", error: NUMBER_OPS_SQL_MISSING };
-  if (code === "42501") return { status: 403, code: "protected_number", error: PROTECTED_COPY };
   for (const [re, out] of ERROR_COPY) {
     if (re.test(message)) return { status: out.status ?? 400, ...out };
   }
@@ -285,11 +272,9 @@ export function numberOpsFor(row: {
   businessId: string | null;
   lastBusinessId: string | null;
   businessActive: boolean | null;
-}): { protectedLine: boolean; lift: boolean; restore: boolean; move: boolean } {
-  const protectedLine = isProtectedNumber(row.e164);
+}): { lift: boolean; restore: boolean; move: boolean } {
   const onHold = row.status === "quarantine" && !row.businessId;
   return {
-    protectedLine,
     lift: onHold,
     restore: onHold && Boolean(row.lastBusinessId),
     move: row.status === "assigned" && Boolean(row.businessId) && row.businessActive !== false,

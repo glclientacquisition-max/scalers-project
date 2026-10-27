@@ -34,11 +34,15 @@ import { homeCatalogPasses, hoursCapturePasses, shopCatalogGap, shopCatalogPasse
 import { ONBOARDING_DRAFT_KEY, parseOnboardingDraft, validateAgentName } from "@/lib/onboardingDraft";
 import { parseVertical } from "@/lib/vertical";
 import { parseHandoffMode } from "@/lib/handoffMode";
+import { emptyAreaPicks } from "@/lib/areaPicks";
+import { OnboardingAreasPanel } from "./OnboardingAreasPanel";
+import { businessHomeCounty } from "@/lib/businessCounty";
 
 const STEPS = [
   "Business type",
   "Catalogue & pricing",
   "Hours & location",
+  "Service areas",
   "Tone & handoff",
 ] as const;
 
@@ -95,7 +99,7 @@ export function OnboardingWizard() {
       if (t) setTone(t.id);
       if (draft.handoffMode) setHandoffMode(parseHandoffMode(draft.handoffMode));
       if (draft.agentName !== undefined) setAgentName(draft.agentName);
-      if (draft.step) setStep(draft.step);
+      if (draft.step) setStep(Math.min(draft.step, STEPS.length - 1));
     }
     setDraftLoaded(true);
   }, []);
@@ -157,7 +161,9 @@ export function OnboardingWizard() {
     if (step === 0) return Boolean(vertical);
     if (step === 1) return catalogSkipped || catalogReady;
     if (step === 2) return hoursSkipped || hoursReady;
-    if (step === 3) return Boolean(tone) && agentNameCheck.ok;
+    // Service areas save on their own (same picker as Settings), so the step never blocks.
+    if (step === 3) return true;
+    if (step === 4) return Boolean(tone) && agentNameCheck.ok;
     return false;
   }
 
@@ -347,6 +353,22 @@ export function OnboardingWizard() {
         ) : null}
 
         {step === 3 ? (
+          <div>
+            <h2 className="font-display text-page text-ink">Service areas</h2>
+            <p className="mt-2 text-body text-ink-2">
+              Same picker as Settings. You can skip and finish this later.
+            </p>
+            <div className="mt-4">
+              <OnboardingAreasPanel
+                initialPicks={emptyAreaPicks()}
+                oldList={[]}
+                homeCounty={businessHomeCounty([{ landmark, address: directions }])}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {step === 4 ? (
           <div className="space-y-8">
             <div>
               <h2 className="font-display text-page text-ink">Receptionist name & tone</h2>
@@ -463,7 +485,7 @@ export function OnboardingWizard() {
         {hoursGap ? (
           <p className="mt-5 text-body text-warn" role="status">{hoursGap}</p>
         ) : null}
-        {step === 3 && !agentNameCheck.ok ? (
+        {step === 4 && !agentNameCheck.ok ? (
           <p className="mt-5 text-body text-warn" role="status">{agentNameCheck.error}</p>
         ) : null}
         {save.error ? (

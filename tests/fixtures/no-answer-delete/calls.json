@@ -1,0 +1,76 @@
+{
+ "note": "Staging logs keep only what was spoken after the filter (the deleted model text is not logged). 'model' is reconstructed from the logged Gemini char counts and the staging catalogue lines ('tunasafisha nyumba, sofa, kapeti, na matress'); 'heard' and 'caller' are verbatim.",
+ "catalogue": [
+  "House Cleaning",
+  "Sofa Cleaning",
+  "Carpet Cleaning (per room)",
+  "Mattress Cleaning",
+  "Window Cleaning",
+  "Move-in / Move-out Cleaning",
+  "Office Cleaning",
+  "Deep Cleaning"
+ ],
+ "turns": [
+  {
+   "callId": "HD_b401138c8ffd",
+   "turn": 3,
+   "at": "2026-10-15T05:05:56.971Z",
+   "lang": "sw",
+   "caller": "uh, mnawashangaa nini specifically?",
+   "firstPcmMs": 1629,
+   "filler": "",
+   "model": "Tunasafisha nyumba, sofa, carpet, mattress, madirisha, na ofisi; pia tuna deep cleaning na move-in.",
+   "tail": "Ungetaka huduma gani kesho?",
+   "heard": [
+    "Tunaweza kusaidia. Unahitaji huduma gani?",
+    "Ungetaka huduma gani kesho?"
+   ]
+  },
+  {
+   "callId": "HD_b401138c8ffd",
+   "turn": 4,
+   "at": "2026-10-15T05:06:09.210Z",
+   "lang": "sw",
+   "caller": "Nyinyi mnawashangaa nini specifically?",
+   "firstPcmMs": 1499,
+   "filler": "",
+   "model": "Tunasafisha nyumba, sofa, carpet, na mattress, pia madirisha na ofisi.",
+   "tail": "Je, ni ipi kati ya hizi ungetaka tukufanyie kesho?",
+   "heard": [
+    "Tunaweza kusaidia. Unahitaji huduma gani?",
+    "Je, ni ipi kati ya hizi ungetaka tukufanyie kesho?"
+   ]
+  },
+  {
+   "callId": "HD_b401138c8ffd",
+   "turn": 5,
+   "at": "2026-10-15T05:06:24.458Z",
+   "lang": "en",
+   "caller": "What exactly? Can you tell me, like, which.",
+   "firstPcmMs": 1665,
+   "filler": "",
+   "model": "Tunasafisha nyumba, sofa, carpet, mattress, madirisha na ofisi, pia deep cleaning.",
+   "tail": "Ungependa huduma gani kesho?",
+   "heard": [
+    "What do you need done?",
+    "Ungependa huduma gani kesho?"
+   ],
+   "wrongLanguage": true
+  },
+  {
+   "callId": "HD_db0e864043c1",
+   "turn": 17,
+   "at": "2026-10-14T17:47:29.837Z",
+   "lang": "sw",
+   "caller": "you even—if you even serve outside Nairobi in places kama—kama.",
+   "firstPcmMs": 1428,
+   "filler": "",
+   "model": "Tunasafisha nyumba, sofa, carpet, na mattress, pia madirisha na ofisi kwa bei nafuu.",
+   "tail": "Kuhusu maeneo ya nje ya Nairobi, naweza kuandika ujumbe timu ikutafute?",
+   "heard": [
+    "Tunaweza kusaidia. Unahitaji huduma gani?",
+    "Kuhusu maeneo ya nje ya Nairobi, naweza kuandika ujumbe timu ikutafute?"
+   ]
+  }
+ ]
+}

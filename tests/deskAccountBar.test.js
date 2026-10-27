@@ -51,9 +51,11 @@ describe("desk account bar", () => {
     assert.match(picker, /<SegmentedControl/);
     assert.match(picker, /label="On this device"/);
     assert.match(picker, /data-theme-cluster=""/);
-    for (const label of ["System", "Light", "Dark"]) {
+    // MASTER: Light / Dark only, light by default (System left the picker).
+    for (const label of ["Light", "Dark"]) {
       assert.match(picker, new RegExp(`label: "${label}"`));
     }
+    assert.doesNotMatch(picker, /label: "System"/);
     assert.doesNotMatch(picker, /Line live|SettingsSegmented|bg-white|#[0-9a-fA-F]{6}/);
     assert.match(menu, /<ThemePicker \/>/);
     assert.match(menu, /appearanceLabel\(/);

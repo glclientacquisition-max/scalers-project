@@ -1,0 +1,18 @@
+{
+  "callId": "HD_89aa48bf657f",
+  "source": "staging 483c4838, 2026-10-15 05:26-05:28 UTC (08:26 EAT), score 88.8",
+  "t7": {
+    "caller": "Mmh, okay, I don't know.",
+    "lang": "en",
+    "chunks": ["No problem.", "Take your time, or let me know if you want to ask about another cleaning service like carpets or sofas."],
+    "heard": ["No problem.", "or let me know if you want to ask about another cleaning service like carpets or sofas."],
+    "note": "Gemini stream done chars=115 = 11 + 1 + 'Take your time, ' (16) + 87; chunk 2 text reconstructed from that count"
+  },
+  "gapGuard": [
+    { "turn": 1, "lang": "sw", "endpointToGapLogMs": 1031, "firstPcmMs": 1282, "cached": false },
+    { "turn": 2, "lang": "sw", "endpointToGapLogMs": 1060, "firstPcmMs": 962, "cached": true },
+    { "turn": 4, "lang": "en", "endpointToGapLogMs": 871, "firstPcmMs": 951, "cached": true },
+    { "turn": 7, "lang": "en", "endpointToGapLogMs": 909, "firstPcmMs": 933, "cached": true }
+  ],
+  "handlerStartAfterEndpointMs": 70
+}

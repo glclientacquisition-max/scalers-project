@@ -1048,6 +1048,12 @@ function recordRepairFailure(state) {
   return next;
 }
 
+// A4 (CALL_SUMMARY_EVENT): keep the written row id and quantity so the
+// end-of-call summary can prove a write. Off = state shape unchanged.
+function summaryEventOn() {
+  return require('./callSummaryEvent').callSummaryEventEnabled();
+}
+
 function recordActionResults(state, results = []) {
   const next = structuredClone(state || createBrainState());
   const safeResults = Array.isArray(results) ? results : [];
@@ -1088,6 +1094,8 @@ function recordActionResults(state, results = []) {
             whenText: result.value.whenText || result.value.when_text || null,
             notes: result.value.notes || null,
             name: result.value.name || null,
+            // A4: the written quantity, for the owner summary ("qty not given").
+            ...(summaryEventOn() ? { quantity: result.value.quantity || null } : {}),
             serviceName:
               result.value.serviceName ||
               result.value.service_name ||
@@ -1106,7 +1114,7 @@ function recordActionResults(state, results = []) {
       : {}),
     ...(result.soft ? { soft: true } : {}),
     ...(result.movedFiledVisit ? { movedFiledVisit: true } : {}),
-    ...(result.id && require('./callFixesD199').callFixesD199Enabled() ? { id: String(result.id) } : {}),
+    ...(result.id && (require('./callFixesD199').callFixesD199Enabled() || summaryEventOn()) ? { id: String(result.id) } : {}),
   }));
   if (!Array.isArray(next.actions.refusedHours)) next.actions.refusedHours = [];
   if (!Array.isArray(next.actions.refusedPlaces)) next.actions.refusedPlaces = [];

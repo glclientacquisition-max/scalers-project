@@ -414,18 +414,28 @@ function scoreTurns(turns = []) {
     : 100;
   const callPenalty = Math.min(30, checks.repeatedQuestion * 8);
   const score = Math.round((Math.max(0, avg - callPenalty) + Number.EPSILON) * 10) / 10;
-  // Tool-turn smoothness (report-only, VOICE_TOOL_SMOOTH_TRACE): heard gap p50/p95, dead air.
+  // Ack rule (report-only, does not change score): what the caller heard per turn.
+  const ackRule = require('./ackRule').scoreAckRule(
+    turns.map((turn) => ({
+      filler: stages(turn, 'filler').map((r) => String(r.text || '').trim()).filter(Boolean)[0] ||
+        stages(turn, 'tts').filter((r) => r.filler === true).map((r) => String(r.text || '').trim()).filter(Boolean)[0] || '',
+      text: spokenText(turn),
+    }))
+  );
+  // Tool-turn smoothness (report-only, VOICE_TOOL_SMOOTH_TRACE): heard gap p50/p95, dead air, ack stacks.
   const toolSmooth = require('./toolSmooth').scoreToolTurns(
     turns.map((turn) => {
       const seg = stage(turn, 'audio_segments');
+      const filler = stages(turn, 'filler').map((r) => String(r.text || '').trim()).filter(Boolean)[0] || '';
+      const A = require('./ackRule');
       return {
         tool: stages(turn, 'tool').length > 0,
         segments: seg ? seg.segments || [] : [],
-        stack: false,
+        stack: Boolean(filler && A.isAckLed(filler) && A.isAckLed(spokenText(turn))),
       };
     })
   );
-  return { score, checks, turns: scored, nameAsks, nameAskTurns, toolSmooth };
+  return { score, checks, turns: scored, nameAsks, nameAskTurns, ackRule, toolSmooth };
 }
 
 const CHECK_WEIGHT = {

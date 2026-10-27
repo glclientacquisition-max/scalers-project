@@ -16,52 +16,36 @@ describe("settings list rest", () => {
   const alerts = read("dashboard/src/components/NotifyChannelPicker.tsx");
   const faqs = read("dashboard/src/lib/faqs.ts");
 
-  it("keeps paste behind a closed disclosure and product paste inside it", () => {
-    const servicesHeader = form.slice(
-      form.indexOf(">Services<"),
-      form.indexOf("<details")
-    );
+  // Design since #121 / catalogue import: paste lives behind a "Paste list" button that opens
+  // CatalogImportSheet (closed by default), not an inline <details>. The rest is the same.
+  it("keeps paste behind a closed sheet for services and products", () => {
+    const servicesHeader = form.slice(form.indexOf(">Services<"), form.indexOf("<CatalogImportSheet"));
     assert.match(servicesHeader, /Add service/);
+    assert.match(servicesHeader, /Paste list/);
+    assert.match(servicesHeader, /setServicesImportOpen\(true\)/);
     assert.doesNotMatch(servicesHeader, /Add 3/);
-    assert.doesNotMatch(servicesHeader, /Paste list/);
-    const disclosure = form.slice(
-      form.indexOf("<details"),
-      form.indexOf(">Products<")
-    );
-    assert.match(disclosure, /<details/);
-    assert.doesNotMatch(disclosure, /<details[^>]*\sopen[\s>]/);
-    assert.match(disclosure, /Paste list/);
-    assert.match(disclosure, /Add 3/);
-    assert.match(disclosure, /Paste products/);
-    assert.match(disclosure, /name \| price \| notes \| out of scope/);
-    const productsHeader = form.slice(
-      form.indexOf(">Products<"),
-      form.indexOf("products.length === 0")
-    );
+    assert.doesNotMatch(form, /<details[^>]*\sopen[\s>]/);
+    assert.match(form, /open=\{servicesImportOpen\}[\s\S]{0,200}title="Paste services"/);
+    const productsHeader = form.slice(form.indexOf(">Products<"), form.indexOf('title="Paste products"'));
     assert.match(productsHeader, /Add product/);
-    assert.doesNotMatch(productsHeader, /Paste products/);
-    assert.match(form, /return rows\.length \? rows : \[emptyService\(\)\]/);
-    assert.match(form, /return rows\.length \? rows : \[\]/);
+    assert.match(productsHeader, /setProductsImportOpen\(true\)/);
+    assert.match(form, /open=\{productsImportOpen\}[\s\S]{0,200}title="Paste products"/);
+    assert.match(form, /\[servicesImportOpen, setServicesImportOpen\] = useState\(false\)/);
+    assert.match(form, /\[productsImportOpen, setProductsImportOpen\] = useState\(false\)/);
+    assert.match(form, /return rows\.length \? rows\.map\(\(row\) => markSavedRow\(row\)\) : \[emptyService\(\)\]/);
+    assert.match(form, /return rows\.length \? rows\.map\(\(row\) => markSavedRow\(row\)\) : \[\]/);
   });
 
-  it("rests a place on Label and Area and opens the rest from that row", () => {
-    const places = form.slice(form.indexOf(">Places<"), form.indexOf('panel === "policies"'));
-    assert.match(places, /Add place/);
-    assert.match(places, />Label</);
-    assert.match(places, />Area</);
-    const header = places.slice(
-      places.indexOf("grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_2.75rem_2.75rem]"),
-      places.indexOf("locations.map")
-    );
-    assert.doesNotMatch(header, />Landmark</);
-    assert.doesNotMatch(header, />Directions</);
-    assert.doesNotMatch(header, />Coverage</);
-    assert.match(places, /Landmark, directions, and coverage/);
-    assert.match(places, /Landmark, directions, and notes/);
-    assert.match(places, /vertical === "home_services" \? "Notes" : "Coverage"/);
-    assert.match(places, /settingsTrashButtonClass/);
-    assert.match(places, /h-11 w-11/);
-    assert.match(places, /\{placeOpen \?/);
+  // Places moved out of TenantForm into PlacesEditor (one row per place, details in its sheet).
+  it("rests a place on Name and Area and opens the rest from that row", () => {
+    const places = read("dashboard/src/components/structured/PlacesEditor.tsx");
+    assert.match(places, /Add a place/);
+    assert.match(places, /label="Name"/);
+    assert.match(places, /label="Area"/);
+    assert.match(places, /Landmark \(optional\)/);
+    assert.doesNotMatch(form, />Landmark<|>Directions<|>Coverage</);
+    assert.doesNotMatch(testLine, /Rings \$\{dest\.name\} during open hours\./);
+    assert.doesNotMatch(testLine, /title="Hours"|title="Offer"|title="Handoff"/);
   });
 
   it("shortens the hours save error and pairs Opens with Closes on the phone", () => {
@@ -143,7 +127,7 @@ describe("settings list rest", () => {
 
   it("blocks TenantForm submit while Pronunciation is open", () => {
     const form = read("dashboard/src/components/TenantForm.tsx");
-    assert.match(form, /panel === "pronunciation"\) event\.preventDefault/);
+    assert.match(form, /if \(panel === "pronunciation"\) \{\s*event\.preventDefault\(\);/);
     const coach = read("dashboard/src/components/PronunciationCoach.tsx");
     assert.match(coach, /startTransition\(\(\) => geminiAction\(fd\)\)/);
   });

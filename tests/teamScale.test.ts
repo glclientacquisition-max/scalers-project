@@ -2,10 +2,14 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
 import { LIMITS, PAGE_MAX, isFreshDuplicate, pageLimit, rateLimitMessage } from "../dashboard/src/lib/teamLimits.ts";
 
-const read = (p: string) => fs.readFileSync(path.join(__dirname, "..", p), "utf8");
+// Works under plain node (ESM, --experimental-strip-types) and tsx alike.
+const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+const read = (p: string) => fs.readFileSync(path.join(TEST_DIR, "..", p), "utf8");
 const actions = read("dashboard/src/app/(desk)/settings/membersActions.ts");
 const load = read("dashboard/src/lib/membersLoad.ts");
 const panel = read("dashboard/src/components/MembersPanel.tsx");

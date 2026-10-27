@@ -91,13 +91,15 @@ function dropKey(key) {
 /**
  * @param {string} key
  * @param {Buffer} pcm
- * @param {{ tenantId?: string|null }} [opts]
+ * @param {{ tenantId?: string|null, persist?: boolean }} [opts]
  */
 function putGreetingPcm(key, pcm, opts = {}) {
   if (!key || !pcm || !pcm.length) return null;
   const budget = maxCacheBytes();
   if (pcm.length > budget) return null;
   if (cache.has(key)) dropKey(key);
+  // VOICE_PCM_PERSIST=on: also keep it in Supabase Storage (fire-and-forget).
+  if (opts.persist !== false) void require('./pcmPersist').sharedPcmStore().save('greeting', key, pcm);
   const stored = Buffer.from(pcm);
   cache.set(key, stored);
   cachedBytes += stored.length;

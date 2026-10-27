@@ -21,7 +21,7 @@ const SETTINGS_SCOPE_FIELDS: Record<string, readonly string[]> = {
   ],
   catalog: ["servicesNotes", "servicesCatalog", "productCatalog"],
   hours: ["hoursSchedule"],
-  locations: ["businessLocations", "locationNotes", "serviceAreas"],
+  locations: ["businessLocations", "locationNotes", "serviceAreas", "noPremises"],
   policies: ["businessPolicies", "unknownAnswerFallback"],
   tools: ["agentTools", "sonioxVoiceId", "sonioxVoiceLabel", "afterHoursMode"],
   pronunciation: ["ttsLexicon"],

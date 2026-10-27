@@ -9,7 +9,8 @@
     "deploymentEnabled": {
       "**": false,
       "main": true,
-      "cursor/staging-voice-468b": true
+      "cursor/staging-voice-468b": true,
+      "staging/v2-c0-opening-2026-10-21": true
     }
   },
   "crons": [

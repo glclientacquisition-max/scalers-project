@@ -13,6 +13,7 @@ async function dispatchToStaff({
   subject,
   channels,
   ledger,
+  alertType,
 } = {}) {
   const people = uniqueDestinations(recipients || []);
   const sent = [];
@@ -26,6 +27,7 @@ async function dispatchToStaff({
         lead,
         subject,
         channels,
+        alertType,
         // Per-person ledger key (stable across SMS -> WhatsApp -> email).
         ledger:
           ledger && typeof ledger === 'object'

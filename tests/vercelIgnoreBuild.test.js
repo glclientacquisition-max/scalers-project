@@ -132,6 +132,11 @@ describe("vercel-ignore-build.sh on scalers-staging", () => {
     assert.equal(r.status, 1, r.out);
   });
 
+  it("always builds staging/v2-c0-opening-2026-10-21 (holds scalers-staging.vercel.app)", () => {
+    const r = run({ ...base, VERCEL_GIT_COMMIT_REF: "staging/v2-c0-opening-2026-10-21", VERCEL_GIT_PREVIOUS_SHA: shas.voice, VERCEL_GIT_COMMIT_SHA: shas.docs });
+    assert.equal(r.status, 1, r.out);
+  });
+
   it("skips a feature branch, even with a Desk change", () => {
     const r = run({ ...base, VERCEL_GIT_COMMIT_REF: "cursor/desk-thing", VERCEL_GIT_PREVIOUS_SHA: shas.root, VERCEL_GIT_COMMIT_SHA: shas.desk });
     assert.equal(r.status, 0, r.out);

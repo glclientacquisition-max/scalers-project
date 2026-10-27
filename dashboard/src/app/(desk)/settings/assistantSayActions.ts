@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { memberCan } from "@/lib/requireMember";
+import { memberDenied } from "@/lib/requireMember";
 import { voiceProfileForAssistantSay } from "@/lib/assistantSayVoice.server";
 import { requireVoice } from "@/lib/voiceRequire.server";
 import { deskLookupPreview } from "@/lib/deskFeatureFlags";
@@ -39,9 +39,8 @@ function buildByKindPayload(formData: FormData): UnknownAnswerByKind | null {
 }
 
 export async function saveUnknownAnswerByKindAction(formData: FormData) {
-  if (!(await memberCan("settings.edit"))) {
-    return { ok: false as const, error: "No permission to edit settings." };
-  }
+  const denied = await memberDenied("settings.edit");
+  if (denied) return { ok: false as const, error: denied.error };
   const tenant = await getCurrentTenant();
   if (!tenant) return { ok: false as const, error: "No workspace." };
   const workspace = await createWorkspaceDataClient();
@@ -93,15 +92,19 @@ export type DeskLookupPreviewResult = {
   stampTone: "ok" | "attention" | "neutral";
 };
 
+/**
+ * Read only: shows what the Business Assistant would say from the business facts every member
+ * already sees on Overview. Same read gate as the other view actions (overview.view), so staff
+ * are never refused where viewers are let in (settings.view excludes staff).
+ */
 export async function previewDeskLookupAction(
   kind: string,
   query: string
 ): Promise<{ ok: true; result: DeskLookupPreviewResult } | { ok: false; error: string }> {
+  const denied = await memberDenied("overview.view");
+  if (denied) return { ok: false, error: denied.error };
   if (!deskLookupPreview()) {
     return { ok: false, error: "Preview is not enabled." };
-  }
-  if (!(await memberCan("settings.view"))) {
-    return { ok: false, error: "No permission." };
   }
   const tenant = await tenantForPreview();
   if (!tenant) return { ok: false, error: "No workspace." };

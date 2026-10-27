@@ -80,7 +80,7 @@ export function businessSettingsHref(tab: BusinessSettingsTab, panel?: SettingsP
 export type SettingsNavTarget =
   | { tab: Exclude<BusinessSettingsTab, "train" | "menu"> }
   | { tab: "train"; panel: Exclude<SettingsPanel, "catalog"> }
-  | { href: "/settings/plan" | "/settings/billing" };
+  | { href: "/settings/plan" | "/settings/billing" | "/settings/areas" };
 
 export type SettingsNavItem = {
   label: string;
@@ -112,6 +112,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
       { label: "Identity", description: "Name, type of business and how callers hear it", target: { tab: "train", panel: "identity" } },
       { label: "Hours", description: "When you are open, including holidays", target: { tab: "train", panel: "hours" } },
       { label: "Locations", description: "Where callers can find you", target: { tab: "train", panel: "locations" } },
+      { label: "Service areas", description: "Which counties, towns and estates you serve", target: { href: "/settings/areas" } },
       { label: "Policies", description: "Payments, delivery, returns and other rules", target: { tab: "train", panel: "policies" } },
     ],
   },

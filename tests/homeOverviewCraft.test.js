@@ -98,7 +98,8 @@ describe("home overview craft", () => {
     const usage = read("dashboard/src/components/HomeUsageSection.tsx");
     assert.match(page, /<HomeUsageSection/);
     assert.match(usage, /aria-label="Usage"/);
-    assert.match(usage, /min left/);
+    assert.match(usage, /minutesLeftLabel\(/);
+    assert.match(read("dashboard/src/lib/minutes.ts"), /min left/);
     assert.match(page, /loadOwnerPackageMeter/);
     assert.doesNotMatch(page, /Top up/);
     assert.doesNotMatch(page, /KES \{kes\.toLocaleString/);
@@ -106,7 +107,8 @@ describe("home overview craft", () => {
 
   it("posts Updates with the Settings bulletin panel", () => {
     assert.match(page, /<DailyBulletinPanel tenant=\{tenant\} \/>/);
-    assert.match(page, />\s*Updates\s*</);
+    // The heading carries a live ping before the word when an update is live.
+    assert.match(page, /id="updates-heading"[\s\S]{0,300}\bUpdates\s*<\/h2>/);
     assert.doesNotMatch(page, /aria-label="Live updates"/);
     assert.doesNotMatch(page, />Manage</);
     const actions = read("dashboard/src/app/(desk)/settings/bulletinActions.ts");

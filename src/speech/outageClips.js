@@ -202,6 +202,14 @@ async function warmOutageClips(opts = {}) {
           continue;
         }
       }
+      const persistKey = `${id}|${lang}|${pickSpeechOutageLine(lang)}`;
+      const store = require('./pcmPersist').sharedPcmStore();
+      const restored = await store.load('outage', persistKey);
+      if (restored) {
+        cacheClip(lang, restored, 'soniox', id);
+        warmed.push(lang);
+        continue;
+      }
       try {
         const result = await synthesizeTtsPreview({
           text: pickSpeechOutageLine(lang),
@@ -211,6 +219,7 @@ async function warmOutageClips(opts = {}) {
         });
         const pcm = wavBytesTo16kPcm(result.wav);
         if (pcm?.length) {
+          void store.save('outage', persistKey, pcm);
           cacheClip(lang, pcm, 'soniox', id);
           warmed.push(lang);
           console.log(

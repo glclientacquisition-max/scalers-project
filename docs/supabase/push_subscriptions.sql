@@ -2,7 +2,7 @@
 -- Runbook: docs/reference/platform/DESK_PWA_PUSH.md. Writer: dashboard /api/push/subscribe.
 -- Reader/sender: src/notifications/push.js (service role).
 -- provider: 'webpush' now; 'fcm' / 'apns' later for a native wrapper (same table).
--- ADDITIVE. Safe to re-run. NOT APPLIED anywhere yet: staging needs Alvin's own GO.
+-- ADDITIVE. Safe to re-run. Applied on staging (sgcdncjxauhsbunobmob) 25 Oct 2026; not on prod.
 -- Rollback: docs/supabase/push_subscriptions_down.sql
 
 create extension if not exists pgcrypto;
@@ -56,6 +56,8 @@ create policy push_subscriptions_delete_own on public.push_subscriptions
 
 revoke all on public.push_subscriptions from anon;
 grant select, insert, update, delete on public.push_subscriptions to authenticated;
+-- Supabase default privileges also grant these; TRUNCATE would bypass RLS.
+revoke truncate, references, trigger on public.push_subscriptions from authenticated;
 
 comment on table public.push_subscriptions is
   'Desk phone alerts (web push). One row per device endpoint. See docs/reference/platform/DESK_PWA_PUSH.md';

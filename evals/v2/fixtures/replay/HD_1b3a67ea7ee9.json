@@ -1,0 +1,119 @@
+{
+ "id": "R_HD_1b3a67ea7ee9",
+ "sid": "HD_1b3a67ea7ee9",
+ "env": "staging",
+ "tenant": "done_and_dusted",
+ "createdAt": "2026-10-09T09:02:32.035487+00:00",
+ "callerPhone": "+254700000009",
+ "replayMode": "recorded-model",
+ "lang": "en",
+ "commitment": false,
+ "turns": [
+  {
+   "caller": "Habari yako,",
+   "model": "{\"lang\":\"sw\",\"intent\":\"smalltalk\",\"facts_used\":[],\"say\":[\"Nzuri sana. Nikusaidie vipi leo?\"]}",
+   "agent": "Nzuri sana. Nikusaidie vipi leo?",
+   "lang": "unknown",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": null,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "I was asking—",
+   "model": "{\n  \"lang\": \"en\",\n  \"intent\": \"smalltalk\",\n  \"facts_used\": [],\n  \"say\": [\n    \"Yes, I am listening. How can I help you today?\"\n  ]\n}",
+   "agent": "Yes, I am listening. How can I help you today?",
+   "lang": "sw",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": null,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "About my book.",
+   "model": "{\n  \"lang\": \"en\",\n  \"intent\": \"visit_lookup\",\n  \"facts_used\": [],\n  \"say\": [\n    \"Am I speaking with Alvin?\",\n    \"There are no bookings saved under this number right now.\"\n  ]\n}",
+   "agent": "There are no bookings saved under this number right now. Am I speaking with Alvin?",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 404,
+    "callerStopToModelFirstTokenMs": 1186
+   }
+  },
+  {
+   "caller": "About my booking.",
+   "model": "{\n  \"lang\": \"en\",\n  \"intent\": \"visit_lookup\",\n  \"facts_used\": [],\n  \"say\": [\n    \"Am I speaking with Alvin?\"\n  ]\n}",
+   "agent": "Am I speaking with Alvin?",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 407,
+    "callerStopToModelFirstTokenMs": 1017
+   }
+  },
+  {
+   "caller": "Yeah.",
+   "model": "{\n  \"lang\": \"en\",\n  \"intent\": \"visit_lookup\",\n  \"facts_used\": [\n    {\n      \"kind\": \"visit\",\n      \"id\": \"vis:1\"\n    }\n  ],\n  \"say\": [\n    \"You have a carpet cleaning visit requested for Saturday 10 October 2026 at 9 AM in Kitengela, Grace Apartments.\",\n    \"Would you like to make any changes to it?\"\n  ]\n}",
+   "agent": "Carpet Cleaning is two thousand shillings per room. Would you like to make any changes to it?",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 407,
+    "callerStopToModelFirstTokenMs": 1571
+   }
+  },
+  {
+   "caller": "ate how much.",
+   "model": "{\n  \"lang\": \"en\",\n  \"intent\": \"price\",\n  \"facts_used\": [\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:carpet-cleaning\"\n    }\n  ],\n  \"say\": [\n    \"Carpet cleaning is shilingi elfu mbili per room.\",\n    \"Which service would you like to know the price for?\"\n  ]\n}",
+   "agent": "Carpet cleaning is shilingi elfu mbili per room. Which service would you like to know the price for?",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 404,
+    "callerStopToModelFirstTokenMs": 1940
+   }
+  },
+  {
+   "caller": "Is it?",
+   "model": "{\n  \"lang\": \"en\",\n  \"intent\": \"price\",\n  \"facts_used\": [\n    {\n      \"kind\": \"service\",\n      \"id\": \"svc:carpet-cleaning\"\n    }\n  ],\n  \"say\": [\n    \"Yes, carpet cleaning is KSh 2,000 per room.\",\n    \"Would you like to book this service today?\"\n  ]\n}",
+   "agent": "Yes, carpet cleaning is two thousand shillings per room. Would you like to book this service today?",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 403,
+    "callerStopToModelFirstTokenMs": 1284
+   }
+  },
+  {
+   "caller": "Shh, already—",
+   "model": "",
+   "agent": "",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": null,
+    "callerStopToModelFirstTokenMs": null
+   }
+  },
+  {
+   "caller": "Shh, already— I've booked it.",
+   "model": "{\n  \"lang\": \"en\",\n  \"intent\": \"visit_lookup\",\n  \"facts_used\": [\n    {\n      \"kind\": \"visit\",\n      \"id\": \"vis:1\"\n    }\n  ],\n  \"say\": [\n    \"Understood, Alvin. Is there anything else I can assist you with regarding your booking?\"\n  ]\n}",
+   "agent": "Understood, Alvin. Is there anything else I can assist you with regarding your booking?",
+   "lang": "en",
+   "latency": {
+    "callerStopToFirstTtsPcmMs": 405,
+    "callerStopToModelFirstTokenMs": 2189
+   }
+  }
+ ],
+ "observed": {
+  "service_requests": [],
+  "appointments": [],
+  "resolution": "needs_human",
+  "resolution_note": "Alvin asked about Shh, already. I've booked it.",
+  "primary_intent": "human",
+  "ownerBody": null
+ },
+ "expect": {
+  "noWrites": true
+ },
+ "label": {
+  "by": "brain-lead",
+  "why": "Price question and 'about my booking'. Nothing should be written; no false 'no bookings' or booking claims."
+ },
+ "seed": {}
+}

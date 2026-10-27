@@ -32,6 +32,7 @@ function loadSpokenChunkRunner() {
         narratesInternalAction,
         isOrphanFragment,
         gateCallerFileSpeech,
+        withOwedNotice,
       } = deps;
       let {
         suppressModelSpeech,
@@ -80,6 +81,8 @@ function loadSpokenChunkRunner() {
     narratesInternalAction,
     isOrphanFragment,
     gateCallerFileSpeech,
+    // VOICE_OPENING_V2 owed recording notice: nothing owed in these turns.
+    withOwedNotice: (text) => text,
   });
 }
 

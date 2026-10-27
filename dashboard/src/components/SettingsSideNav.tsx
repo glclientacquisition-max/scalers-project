@@ -10,6 +10,7 @@ import {
   BuildingStorefrontIcon,
   ClockIcon,
   CreditCardIcon,
+  MapIcon,
   DocumentTextIcon,
   LanguageIcon,
   MapPinIcon,
@@ -68,6 +69,7 @@ const SETTINGS_ICON: Record<string, typeof ClockIcon> = {
   "train:team": UsersIcon,
   alerts: BellIcon,
   "assistant-say": DocumentTextIcon,
+  "/settings/areas": MapIcon,
   "/settings/plan": CreditCardIcon,
   "/settings/billing": ReceiptPercentIcon,
 };
@@ -80,6 +82,7 @@ function visibleSections(manageBilling: boolean, assistantSayPage: boolean): Set
     const items = section.items.filter((item) => {
       if ("tab" in item.target && item.target.tab === "assistant-say" && !assistantSayPage) return false;
       if (!("href" in item.target)) return true;
+      if (item.target.href === "/settings/areas") return true;
       return manageBilling;
     });
     return items.length > 0 ? [{ ...section, items }] : [];

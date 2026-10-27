@@ -10,6 +10,7 @@ const {
 } = require('./businessHours');
 const { looksLikeOfferAsk, looksLikeNewWork } = require('./fileRead');
 const { isMessageOnlyMode } = require('./messageOnly');
+const { speakCatalogueName, compileSpokenCatalogue } = require('./spokenCatalogue');
 
 const HOURS_ASK_RE =
   /\b(are you open|you open now|opening hours|your hours|what are your hours|what time do you (?:open|close)|when do you (?:open|close)|at what time are you opening|what time are you opening|mko wazi|mnafungua|mnafunga|saa ngapi mna(?:fungua|funga))\b/i;
@@ -152,14 +153,31 @@ function catalogueFileNames(profile = {}, limit = 4, language = 'en', opts = {})
   const rows = normalizeServices(profile.servicesCatalog);
   const names = rows.map((row) => mouthServiceName(row.name)).filter(Boolean);
   const cap = Number.isFinite(limit) && limit > 0 ? limit : names.length;
+  if (opts.families !== false && opts.speak !== false) {
+    const compiled = compileSpokenCatalogue(profile, { limit: cap });
+    if (compiled.families.some((f) => f.members.length > 1)) {
+      return {
+        names: compiled.labels(language),
+        more: compiled.more,
+        families: true,
+      };
+    }
+  }
   if (opts.families !== false && names.length > cap) {
     const families = serviceFamilies(rows, { language });
     if (families.length < names.length && families.some((f) => f.members.length > 1)) {
-      const labels = families.map((f) => f.label);
+      const labels = families.map((f) =>
+        opts.speak === false ? f.label : speakCatalogueName(f.label, language)
+      );
       return { names: labels.slice(0, cap), more: labels.length > cap, families: true };
     }
   }
-  return { names: names.slice(0, cap), more: names.length > cap, families: false };
+  const raw = names.slice(0, cap);
+  return {
+    names: opts.speak === false ? raw : raw.map((name) => speakCatalogueName(name, language)),
+    more: names.length > cap,
+    families: false,
+  };
 }
 
 /**
@@ -168,22 +186,13 @@ function catalogueFileNames(profile = {}, limit = 4, language = 'en', opts = {})
  */
 function offerCatalogueLine(text, profile = {}, language = 'en') {
   if (!looksLikeOfferAsk(text) || looksLikeNewWork(text)) return '';
+  const compiled = compileSpokenCatalogue(profile, {
+    limit: 4,
+    messageOnly: isMessageOnlyMode(profile.afterHoursMode),
+  });
+  if (compiled.families.length) return compiled.opener(language);
   const sw = String(language || '').toLowerCase() === 'sw' || String(language || '').toLowerCase() === 'sheng';
-  const { names, more } = catalogueFileNames(profile, 4, language);
-  if (!names.length) {
-    return sw ? 'Niambie unahitaji nini.' : 'Tell me what you need done.';
-  }
-  const list = joinSpoken(names, language);
-  if (isMessageOnlyMode(profile.afterHoursMode)) {
-    if (sw) return more ? `Tuna ${list}, na zingine.` : `Tuna ${list}.`;
-    return more ? `We offer ${list}, and more.` : `We offer ${list}.`;
-  }
-  if (sw) {
-    return more ? `Tuna ${list}, na zingine. Unahitaji gani?` : `Tuna ${list}. Unahitaji gani?`;
-  }
-  return more
-    ? `We offer ${list}, and more. Which one do you need?`
-    : `We offer ${list}. Which one do you need?`;
+  return sw ? 'Niambie unahitaji nini.' : 'Tell me what you need done.';
 }
 
 module.exports = {

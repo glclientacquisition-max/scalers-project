@@ -346,7 +346,8 @@ describe("import row selection", () => {
     );
     assert.doesNotMatch(actions, /else if \(!String\(tenant\.business_hours/);
     assert.match(actions, /if \(merged\.touched\.services\)/);
-    assert.match(actions, /patch\.services_catalog = merged\.services/);
+    // Imported rows keep stable ids (assignServiceIds against the stored catalogue).
+    assert.match(actions, /if \(merged\.touched\.services\) \{\s*patch\.services_catalog = assignServiceIds\(\s*merged\.services,/);
     assert.match(actions, /parseIngestIndexes\(formData\.get\("selected_services"\)\)/);
     assert.doesNotMatch(
       actions.slice(actions.indexOf("const merged = mergeIngestDraft"), actions.indexOf("if (merged.touched.services)")),

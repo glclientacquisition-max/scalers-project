@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
@@ -8,7 +9,6 @@ import { TextAreaField, TextField } from "@/components/ui/TextField";
 import { SettingsGroup, SettingsSegmented } from "@/components/settingsUi";
 import {
   CANCEL_FEES,
-  DELIVERY_FEE_MODES,
   DELIVERY_MODES,
   DELIVERY_SPEEDS,
   NOTICE_HOURS,
@@ -235,24 +235,20 @@ function ReturnsFields({ r, set, err }: { r: ReturnsRule; set: (p: Partial<Retur
   );
 }
 
-function DeliveryFields({ d, set, err }: { d: DeliveryRule; set: (p: Partial<DeliveryRule>) => void; err: Err }) {
+function DeliveryFields({ d, set }: { d: DeliveryRule; set: (p: Partial<DeliveryRule>) => void; err?: Err }) {
   return (
     <>
       <CheckList label="Delivery" options={DELIVERY_MODES} value={[d.mode]} onChange={([mode]) => set({ mode })} />
       {d.mode === "deliver" ? (
         <>
-          <TextField id="rule-delivery-areas" label="Where you deliver (optional)" maxLength={200} value={d.areas ?? ""} onChange={(e) => set({ areas: e.target.value || null })} placeholder="e.g. Nairobi CBD, Westlands and Kilimani" />
           <CheckList label="How fast" options={DELIVERY_SPEEDS} value={d.speed ? [d.speed] : []} onChange={([speed]) => set({ speed })} />
           {d.speed === "same_day" ? (
             <TextField id="rule-delivery-cutoff" label="Order before (optional)" type="time" className="max-w-48" value={d.cutoff ?? ""} onChange={(e) => set({ cutoff: e.target.value || null })} />
           ) : null}
-          <CheckList label="Delivery fee" options={DELIVERY_FEE_MODES} value={d.fee_mode ? [d.fee_mode] : []} onChange={([fee_mode]) => set({ fee_mode })} />
-          {d.fee_mode === "flat" ? (
-            <TextField id="rule-delivery-fee" label="Fee (KSh)" inputMode="numeric" className="max-w-48" error={err("delivery.fee_ksh")} value={d.fee_ksh == null ? "" : String(d.fee_ksh)} onChange={(e) => set({ fee_ksh: ksh(e.target.value) })} placeholder="e.g. 200" />
-          ) : null}
-          {d.fee_mode && d.fee_mode !== "free" ? (
-            <TextField id="rule-delivery-free-over" label="Free for orders over (KSh, optional)" inputMode="numeric" className="max-w-64" error={err("delivery.free_over_ksh")} value={d.free_over_ksh == null ? "" : String(d.free_over_ksh)} onChange={(e) => set({ free_over_ksh: ksh(e.target.value) })} placeholder="e.g. 5000" />
-          ) : null}
+          <p className="text-meta text-ink-2">
+            Areas and delivery fees are set in{" "}
+            <Link href="/settings/areas" className="font-semibold text-accent underline">Service areas</Link>.
+          </p>
         </>
       ) : null}
     </>

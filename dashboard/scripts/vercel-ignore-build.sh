@@ -8,9 +8,9 @@
 #
 # Rules, in order:
 #   scalers-staging (prj_koYx...):
-#     - build only cursor/staging-voice-468b. Stage-PR aliases
-#       scalers-staging.vercel.app to the READY deploy of that branch at the
-#       exact staging SHA, so it must always build there.
+#     - build cursor/staging-voice-468b (Stage-PR rebuild) and, since
+#       25 Oct 2026, staging/v2-c0-opening-2026-10-21, which now holds
+#       scalers-staging.vercel.app (Alvin, 25 Oct 13:05 EAT).
 #     - skip every other branch, including main (main skip matches the
 #       Ignored Build Step that Stage-PR has always set on this project).
 #   scalers-project (prod Desk, prj_GYOg...) and any unknown project:
@@ -45,6 +45,7 @@ set -u
 STAGING_PROJECT_ID="prj_koYxAaXjOZ9QYA7hVB2SUOEAmyoB"
 PRODUCTION_DESK_PROJECT_ID="prj_GYOgX3yjVowvQ1hd7D1c0AWOovpx"
 STAGING_BRANCH="cursor/staging-voice-468b"
+STAGING_V2_BRANCH="staging/v2-c0-opening-2026-10-21"
 DESK_PATHS="dashboard/ src/"
 
 project="${VERCEL_PROJECT_ID:-}"
@@ -69,7 +70,10 @@ if [ "$is_staging" = 1 ]; then
   if [ "$ref" = "$STAGING_BRANCH" ]; then
     build "scalers-staging builds $STAGING_BRANCH for the Stage-PR desk alias"
   fi
-  skip "scalers-staging builds only $STAGING_BRANCH, not ${ref:-an unnamed ref}"
+  if [ "$ref" = "$STAGING_V2_BRANCH" ]; then
+    build "scalers-staging builds $STAGING_V2_BRANCH for scalers-staging.vercel.app"
+  fi
+  skip "scalers-staging builds only $STAGING_BRANCH and $STAGING_V2_BRANCH, not ${ref:-an unnamed ref}"
 fi
 
 if [ "$env_name" = "production" ]; then

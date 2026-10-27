@@ -9,6 +9,10 @@ import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import { H } from "./fakes/stepUp/state.mjs";
 
+// Register the step-up fakes here too, so the file also runs under the plain runner
+// (--import ./tests/serverOnlyHook.mjs). Same module URL, so under --import register.mjs it is a no-op.
+await import("./fakes/stepUp/register.mjs");
+
 process.env.ADMIN_STEP_UP_ENFORCE = "on";
 process.env.ADMIN_STEP_UP_KEY = "test-step-up-key-0123456789abcdef";
 delete process.env.ADMIN_STEP_UP_ALERT_EMAIL;

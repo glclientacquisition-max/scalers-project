@@ -1,0 +1,39 @@
+{
+ "id": "R_HD_ad735da7fb01",
+ "sid": "HD_ad735da7fb01",
+ "env": "staging",
+ "tenant": "done_and_dusted",
+ "createdAt": "2026-10-07T17:09:17.232072+00:00",
+ "callerPhone": "+254700000009",
+ "replayMode": "transcript-only",
+ "lang": "sw",
+ "commitment": false,
+ "turns": [
+  {
+   "caller": "Nilikuwa nataka kujua bei ya kuosha carpet,",
+   "model": "",
+   "agent": "Naweza kusaidia?"
+  },
+  {
+   "caller": "eh, naongea na Alvin?",
+   "model": "",
+   "agent": "Je, naongea na Alvin? Good evening, Done and Dusted, this is Shy. You can speak in English or Kiswahili. We're closed now. Tukusaidie vipi."
+  }
+ ],
+ "observed": {
+  "service_requests": [],
+  "appointments": [],
+  "resolution": "needs_human",
+  "resolution_note": null,
+  "primary_intent": "human",
+  "ownerBody": null
+ },
+ "expect": {
+  "noWrites": true
+ },
+ "label": {
+  "by": "brain-lead",
+  "why": "Swahili carpet price question. Nothing written; Swahili replies; no name loop."
+ },
+ "seed": {}
+}
