@@ -1,4 +1,9 @@
--- Number hold and win-back (plan section 11). DRAFT: NOT APPLIED to staging or prod.
+-- Number hold and win-back (plan section 11).
+-- STATUS: APPLIED to staging (sgcdncjxauhsbunobmob) 23 Oct 2026 00:15 EAT, migration 20261022211546
+--   number_hold_winback. PROD (fjxcdccgyhnvnnlnovcl): PENDING, waits for Alvin's explicit yes.
+--   Settings after apply: staging was set to On, 14 days, KSh 1,000 fee on 24 Oct 2026 11:50 EAT through
+--   admin_set_number_hold_settings (audited). Alvin chose the same for prod (27 Oct 2026); the fee is set
+--   by that RPC after this file runs, not by a column default (the column default stays null = none).
 -- Apply only with Alvin's explicit go, staging first, as one transaction, after billing_data_layer.sql,
 -- billing_payment_runtime_flags.sql and package_version_editor.sql (for _package_editor_actor).
 -- Service role only. Idempotent column adds and function replace. Undo: number_hold_winback_down.sql.

@@ -8,9 +8,10 @@ const up = fs.readFileSync(path.join(root, "docs/supabase/number_hold_winback.sq
 const down = fs.readFileSync(path.join(root, "docs/supabase/number_hold_winback_down.sql"), "utf8");
 const code = up.replace(/--[^\n]*/g, "");
 
-test("draft only: marked not applied and not a CLI migration", () => {
-  assert.match(up, /DRAFT: NOT APPLIED/);
-  assert.match(down, /DRAFT: NOT APPLIED/);
+test("status header: staging applied, prod pending; not a CLI migration", () => {
+  assert.match(up, /APPLIED to staging .*20261022211546/);
+  assert.match(up, /PROD .*PENDING/);
+  assert.match(down, /prod pending/);
   const migs = fs.readdirSync(path.join(root, "supabase/migrations"));
   assert.ok(!migs.some((f) => /hold|winback/i.test(f)));
 });
