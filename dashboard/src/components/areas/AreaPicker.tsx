@@ -31,6 +31,7 @@ import {
   type TriState,
 } from "@/lib/areaPicks";
 import { nearbyCounties } from "@/lib/kenyaCountyAdjacency";
+import { areaLineNotes } from "@/lib/areaPicksToCoverageAreas";
 import { saveAreaPicksAction } from "@/app/(desk)/settings/areas/actions";
 
 export type AreaView = "home" | "check" | "hear";
@@ -193,6 +194,16 @@ export function AreaPicker({
   }
 
   const summary = areaSummaryParts(picks);
+  // What the phone line says until it reads this map (D2/D3, rule v1): saved picks only.
+  const line = areaLineNotes(saved);
+  const joinNames = (names: string[]) =>
+    names.length <= 1 ? names[0] ?? "" : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  const lineNote = line.nothingReaches
+    ? "Your phone line can't use these areas yet. Callers still hear your previous list."
+    : [
+        line.yesStill.length ? `Callers still hear yes for ${joinNames(line.yesStill)}. The phone line can't skip a place inside an area yet.` : "",
+        line.notOnLine.length ? `${joinNames(line.notOnLine)} can't reach your phone line yet.` : "",
+      ].filter(Boolean).join(" ");
   const results = query.trim() ? searchAreaTree(query) : null;
 
   return (
@@ -215,6 +226,11 @@ export function AreaPicker({
           What callers will hear
         </button>
       </div>
+      {lineNote ? (
+        <p className="mx-4 mt-1 rounded-2xl border border-hairline bg-surface p-3.5 text-meta text-attention" role="note" data-area-line-note="">
+          {lineNote}
+        </p>
+      ) : null}
       {needsCheck ? (
         <div className="mx-4 mt-1 flex items-center gap-3 rounded-2xl border border-hairline bg-accent-tonal p-3.5">
           <p className="flex-1 text-meta text-ink">We moved your old area list into the new map.</p>
