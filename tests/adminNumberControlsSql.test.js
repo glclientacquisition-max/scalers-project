@@ -5,7 +5,7 @@ const { test } = require('node:test');
 
 const root = path.join(__dirname, '..');
 const mig = 'supabase/migrations/20261027113000_admin_number_controls_v1.sql';
-const migDown = 'supabase/migrations/20261027113000_admin_number_controls_v1_down.sql';
+const migDown = 'docs/supabase/admin_number_controls_v1_down.sql';
 const code = fs.readFileSync(path.join(root, mig), 'utf8');
 const down = fs.readFileSync(path.join(root, migDown), 'utf8');
 
@@ -32,12 +32,10 @@ function body(name) {
 
 test('docs copy matches the migration (one source of SQL)', () => {
   assert.equal(fs.readFileSync(path.join(root, 'docs/supabase/admin_number_controls_v1.sql'), 'utf8'), code);
-  assert.equal(fs.readFileSync(path.join(root, 'docs/supabase/admin_number_controls_v1_down.sql'), 'utf8'), down);
 });
 
 test('migration version is unique in supabase/migrations', () => {
   const versions = fs.readdirSync(path.join(root, 'supabase/migrations'))
-    .filter((f) => !f.endsWith('_down.sql'))
     .map((f) => f.split('_')[0]);
   assert.equal(versions.filter((v) => v === '20261027113000').length, 1);
 });

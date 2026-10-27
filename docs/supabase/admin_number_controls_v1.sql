@@ -30,8 +30,7 @@
 -- same match as Voice #886 isProtectedNumber).
 --
 -- ADDITIVE. ASCII-only. Safe to re-run. Rollback:
---   supabase/migrations/20261027113000_admin_number_controls_v1_down.sql
---   (same as docs/supabase/admin_number_controls_v1_down.sql).
+--   docs/supabase/admin_number_controls_v1_down.sql (drops the functions only).
 
 do $$
 begin

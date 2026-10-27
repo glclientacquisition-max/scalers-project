@@ -1,4 +1,4 @@
--- Rollback for 20261027113000_admin_number_controls_v1.sql. Drops functions
+-- Rollback for supabase/migrations/20261027113000_admin_number_controls_v1.sql. Drops functions
 -- only; pool rows and tenants are left as they are. Audit rows stay.
 drop function if exists public.admin_move_number(text, uuid, uuid, text, text, boolean);
 drop function if exists public.admin_lift_quarantine(text, text, text, boolean);
