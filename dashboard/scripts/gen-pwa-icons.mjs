@@ -59,6 +59,11 @@ const jobs = [
   ["icon-192.png", 192, 0.84, null],
   ["icon-512.png", 512, 0.84, null],
   ["apple-180.png", 180, 0.8, null],
+  // favicon: browser tab and the Windows/Chrome notification header ("Scalers" row).
+  // Transparent, mark nearly full height so it still reads at 16px. Never a black plate.
+  ["favicon-32.png", 32, 0.94, null],
+  ["favicon-48.png", 48, 0.94, null],
+  ["favicon-192.png", 192, 0.94, null],
   ["maskable-192.png", 192, 0.62, MASKABLE_PLATE],
   ["maskable-512.png", 512, 0.62, MASKABLE_PLATE],
 ];

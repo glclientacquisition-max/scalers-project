@@ -9,10 +9,11 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (63)
+## Tables (64)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
+| `access_requests` | `about`, `business`, `created_at`, `decided_at`, `decided_by`, `decline_emailed_at`, `decline_reason`, `email`, `id`, `invite_resent_at`, `invited_user_id`, `name`, `note`, `note_updated_at`, `note_updated_by`, `phone`, `reopened_at`, `status` | `docs/supabase/access_requests.sql`<br>`docs/supabase/access_requests_v2.sql` |
 | `admin_sign_in_email_code` | `code_hash`, `created_at`, `expires_at`, `id`, `operator`, `sent_to`, `used_at` | `docs/supabase/admin_sign_in_2fa.sql` |
 | `admin_step_up_area` | `area`, `required`, `updated_at`, `updated_by` | `docs/supabase/admin_step_up_area.sql` |
 | `admin_step_up_backup_code` | `code_hash`, `created_at`, `id`, `operator`, `used_at` | `docs/supabase/admin_step_up.sql` |
@@ -59,7 +60,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `sautikit_did_pool` | `assigned_at`, `created_at`, `e164`, `id`, `last_tenant_id`, `notes`, `quarantine_until`, `quarantined_at`, `sautikit_number_id`, `status`, `tenant_id` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/did_number_pool.sql` |
 | `service_requests` | `call_id`, `caller_name`, `caller_phone`, `contact_id`, `created_at`, `id`, `inbox_archived_at`, `item`, `metadata`, `notes`, `quantity`, `request_type`, `status`, `tenant_id`, `updated_at`, `when_text`, `window_end`, `window_start` | `docs/supabase/contacts_and_requests.sql`<br>`docs/supabase/inbox_archive_cascade.sql`<br>`docs/supabase/service_request_windows.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `subscription_events` | `actor`, `created_at`, `detail`, `from_status`, `id`, `reason`, `tenant_id`, `to_status` | `docs/supabase/billing_data_layer.sql` |
-| `tenant_area_picks` | `confirmed_at`, `moved_from`, `picks`, `tenant_id`, `tree_version`, `updated_at`, `updated_by` | `docs/supabase/tenant_area_picks.sql` |
+| `tenant_area_picks` | `confirmed_at`, `fee_kes`, `moved_from`, `node`, `note`, `serve`, `tenant_id`, `tree_version`, `updated_at`, `updated_by` | `docs/supabase/tenant_area_picks.sql`<br>`docs/supabase/tenant_area_picks_to_rows.sql` |
 | `tenant_credits` | `amount_kes`, `created_at`, `id`, `idempotency_key`, `payment_id`, `reason`, `tenant_id` | `docs/supabase/billing_data_layer.sql` |
 | `tenant_field_history` | `actor`, `created_at`, `field_path`, `id`, `new_value`, `old_value`, `source`, `tenant_id` | `docs/supabase/tenant_field_provenance.sql` |
 | `tenant_field_meta` | `confidence`, `confirmed_at`, `confirmed_by`, `field_path`, `last_verified_at`, `source`, `source_ref`, `stale_after_days`, `tenant_id`, `updated_at`, `value_hash` | `docs/supabase/tenant_field_confirm_v2.sql`<br>`docs/supabase/tenant_field_provenance.sql` |
