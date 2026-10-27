@@ -8,9 +8,12 @@ import type { AreaPicks } from "@/lib/areaPicks";
 export function OnboardingAreasPanel({
   initialPicks,
   oldList,
+  homeCounty = null,
 }: {
   initialPicks: AreaPicks;
   oldList: string[];
+  /** county:<slug> from what the owner typed so far, or null for every county. */
+  homeCounty?: string | null;
 }) {
   return (
     <div
@@ -30,6 +33,7 @@ export function OnboardingAreasPanel({
         confirmed={false}
         initialView={oldList.length ? "check" : "home"}
         saveAction={saveAreaPicksAction}
+        homeCounty={homeCounty}
       />
     </div>
   );
