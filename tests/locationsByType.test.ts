@@ -89,9 +89,8 @@ test("UI wiring: branch hours in Locations", async () => {
   const form = fs.readFileSync(new URL("../dashboard/src/components/TenantForm.tsx", import.meta.url), "utf8");
   const places = fs.readFileSync(new URL("../dashboard/src/components/structured/PlacesEditor.tsx", import.meta.url), "utf8");
   assert.match(places, /place-hours/);
-  // #964 dropped the "no premises" switch from TenantForm (open design question, see PR). The settings save keeps
-  // the stored flag so a business without premises is still described that way.
-  assert.doesNotMatch(form, /noPremises|no_premises/);
+  // The "no premises" switch is back on Locations (tests/noPremisesSwitch.test.ts).
+  assert.match(form, /name="no_premises"/);
   const actions = fs.readFileSync(new URL("../dashboard/src/app/(desk)/settings/actions.ts", import.meta.url), "utf8");
   assert.match(actions, /formatLocationsForCompiler\(businessLocations, \{ noPremises \}\)/);
 });

@@ -146,19 +146,45 @@ export function normalizeServiceAreas(raw: unknown, vertical?: string | null): S
   const riderPaid = obj.rider_paid === "in_fee" || obj.rider_paid === "on_arrival" ? (obj.rider_paid as RiderPaid) : null;
   const reach = REACH_IDS.has(obj.reach as Reach) ? (obj.reach as Reach) : defaultReach(vertical);
   const anywhere = obj.anywhere_kenya === true;
-  return withReach(
+  const value = withReach(
     {
       version: 1,
       areas,
       delivered_by: [...new Set(deliveredBy)],
       rider_paid: riderPaid,
       reach,
-      no_premises: obj.no_premises === true,
+      no_premises: false,
       anywhere_kenya: anywhere,
       outside_fee_ksh: anywhere ? ksh(obj.outside_fee_ksh) : null,
     },
     reach
   );
+  // The owner sets "no premises" on Locations, apart from reach (the reach choice left with #964),
+  // so a stored true holds for any reach and every compile path reads the same answer.
+  return { ...value, no_premises: obj.no_premises === true };
+}
+
+/** tenants.service_areas.no_premises as stored. The Locations switch reads and writes this key. */
+export function storedNoPremises(stored: unknown): boolean {
+  return Boolean(stored && typeof stored === "object" && !Array.isArray(stored) && (stored as { no_premises?: unknown }).no_premises === true);
+}
+
+/**
+ * tenants.service_areas with only no_premises changed. A stored object keeps every other key as is
+ * (terms the area mirror writes, reach, anywhere_kenya). Never saved: start from what the readers
+ * already derive from the old coverage list, so the compiled areas text stays the same.
+ */
+export function serviceAreasWithNoPremises(
+  stored: unknown,
+  coverage: unknown,
+  vertical: string | null | undefined,
+  noPremises: boolean
+): Record<string, unknown> {
+  if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+    return { ...(stored as Record<string, unknown>), no_premises: noPremises };
+  }
+  const base = serviceAreasFromCoverage(coverage, vertical) ?? emptyServiceAreas(vertical);
+  return { ...base, no_premises: noPremises };
 }
 
 /**
