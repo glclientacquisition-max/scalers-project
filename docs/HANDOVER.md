@@ -1,5 +1,5 @@
 ---
-owner: chief
+owner: platform
 last_reviewed: 2026-10-25
 ---
 

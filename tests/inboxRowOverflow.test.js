@@ -19,7 +19,8 @@ describe("inbox row overflow menu", () => {
   }
 
   it("reuses the ticket Archive handler plus Pin and Mark done", () => {
-    assert.match(actions, /updateLeadStatus\(item\.callId, "archived"\)/);
+    // Archive is one transaction now (inbox_archive_calls: the call plus its open holds and visits).
+    assert.match(actions, /inboxArchiveCallsAction\(\[callId\]\)/);
     assert.match(lead, /updateLeadStatus\(callId, action\)/);
     assert.match(overflow, /inboxArchive/);
     assert.match(overflow, /inboxUnarchive/);
@@ -35,7 +36,9 @@ describe("inbox row overflow menu", () => {
     assert.doesNotMatch(overflow, /transition-all/);
     assert.match(overflow, /<Menu/);
     assert.match(overflow, /<MenuItem/);
-    assert.match(overflow, /<IconButton/);
+    // Kit Menu trigger: a plain button with the kit icon button class (Base UI needs a real button).
+    assert.match(overflow, /className=\{iconButtonClass\(\{ size: "sm" \}\)\}/);
+    assert.match(overflow, /aria-label=\{`More actions for /);
     assert.match(overflow, /onContextMenu/);
     assert.match(overflow, /pointerType !== "touch"/);
     assert.match(overflow, /ui\?\.enter\(item\.id\)/);

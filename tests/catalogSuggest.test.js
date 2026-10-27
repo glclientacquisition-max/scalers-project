@@ -6,9 +6,11 @@ const path = require("node:path");
 const ROOT = path.join(__dirname, "..");
 
 function evalTs(expr) {
+  // Same node, TypeScript stripped, @/ resolved by tests/serverOnlyHook.mjs (tsx from the repo root
+  // could not resolve dashboard's @/ alias, so every case failed before reaching an assertion).
   const out = execFileSync(
-    "npx",
-    ["tsx", "-e", expr],
+    process.execPath,
+    ["--experimental-strip-types", "--no-warnings", "--import", "./tests/serverOnlyHook.mjs", "--input-type=module", "-e", expr],
     { cwd: ROOT, encoding: "utf8", env: { ...process.env, NODE_NO_WARNINGS: "1" } }
   );
   return JSON.parse(out.trim());

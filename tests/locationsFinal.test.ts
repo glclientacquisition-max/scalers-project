@@ -13,8 +13,7 @@ test("Add areas drawer: a just-ticked area is ticked, never 'Already added'", as
   const saved = m.areaPickerRows("ruaka", [], ["place:ruaka"]);
   assert.deepEqual(saved.alreadyAdded.map((o) => o.id), ["place:ruaka"]);
   assert.ok(!saved.options.some((o) => o.id === "place:ruaka"));
-  const ed = read("../dashboard/src/components/structured/ServiceAreasEditor.tsx");
-  assert.match(ed, /areaPickerRows\(/);
+  // The drawer that used areaPickerRows went with ServiceAreasEditor in #964 (43d9870b); the lib rule stays.
 });
 
 test("a dropped connection after a save refetches instead of the page error boundary", () => {

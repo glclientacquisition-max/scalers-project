@@ -61,7 +61,8 @@ describe("desk shell speed", () => {
         return timer.line("desk-shell");
       })()`
     );
-    assert.match(line, /^desk-timing route=desk-shell auth;dur=\d+,shell;dur=\d+$/);
+    // The line now ends with the instance tag (cold start, uptime) so slow taps can be told apart.
+    assert.match(line, /^desk-timing route=desk-shell auth;dur=\d+,shell;dur=\d+ cold=[01] up=\d+$/);
   });
 
   it("paints a page skeleton on a desk tap without a route loading file", () => {
@@ -77,6 +78,11 @@ describe("desk shell speed", () => {
     for (const rel of pages) {
       const src = read(rel);
       assert.match(src, /DeskPageGate/);
+      // Settings opts out of the static shell on purpose: What it will say reads the runtime clock.
+      if (rel.endsWith("settings/page.tsx")) {
+        assert.match(src, /runtime clock; opt out of static prerender\. \*\/\nexport const instant = false;/);
+        continue;
+      }
       assert.doesNotMatch(src, /export const instant = false/);
     }
     assert.match(layout, /export const instant = false/);
@@ -520,7 +526,8 @@ describe("settings save scope", () => {
     const empty = load("dashboard/src/lib/settingsOptionStatus.ts", `mod.settingsOptionStatus({ tab: "train", panel: "hours" }, {})`);
     assert.equal(empty, "Needs setup");
     assert.match(shell, /variant="index"/);
-    assert.match(shell, /data-settings-menu=\{variant\}/);
+    // The list moved into SettingsSideNav.
+    assert.match(read("dashboard/src/components/SettingsSideNav.tsx"), /data-settings-menu=\{variant\}/);
     assert.doesNotMatch(shell, /overflow-hidden rounded-xl border border-hairline bg-surface/);
   });
 });

@@ -144,7 +144,8 @@ test("prices: no price text is 'Add prices', never an 'Is this right?' card", ()
 test("prices: Overview shows one 'Add prices' row that opens the filtered catalogue", () => {
   const slots = read("dashboard/src/components/structured/StructuredSettingsSlots.tsx");
   assert.match(slots, /UNPRICED_HREF = `\$\{businessSettingsHref\("catalog"\)\}&filter=unpriced`/);
-  assert.match(slots, /if \(unpriced\) out\.push\(\{ href: UNPRICED_HREF, label: unpricedLabelText\(unpriced\)/);
+  // Overview check rows carry a kind since the payments row; the unpriced row is a plain link.
+  assert.match(slots, /if \(unpriced\) \{\s*out\.push\(\{\s*kind: "link",\s*href: UNPRICED_HREF,\s*label: unpricedLabelText\(unpriced\)/);
   assert.match(read("dashboard/src/components/structured/unpricedCopy.ts"), /no price/);
   const form = read("dashboard/src/components/TenantForm.tsx");
   assert.match(form, /get\("filter"\) === "unpriced"/);

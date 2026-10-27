@@ -67,7 +67,7 @@ test("no caller data or question text reaches the page; v2 only; read-only", () 
   assert.match(loader, /unanswered: typeof r\.unanswered_question === "string"/);
   const ui = read("dashboard/src/components/admin/v2/AdminInsightsV2.tsx");
   assert.doesNotMatch(ui, /FactRow|unanswered_question|callerNumber/);
-  assert.match(read("dashboard/src/app/admin/(console)/quality/insights/page.tsx"), /ADMIN_V2 !== "on"\) notFound\(\)/);
+  assert.match(read("dashboard/src/app/admin/(console)/quality/insights/page.tsx"), /!isAdminV2Enabled\(\)\) notFound\(\)/);
   assert.doesNotMatch(ui, /framer-motion|rounded-(xl|2xl|3xl)/);
 });
 

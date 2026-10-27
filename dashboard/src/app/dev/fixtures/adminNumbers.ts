@@ -1,4 +1,4 @@
-import type { NumberRow, WaitingBusiness } from "@/lib/ops/numbersView";
+import type { MoveTarget, NumberRow, WaitingBusiness } from "@/lib/ops/numbersView";
 import { ADMIN_BUSINESSES } from "./adminBusinesses";
 
 /** Synthetic pool numbers: made-up lines in an unused range, no real business. */
@@ -32,3 +32,24 @@ export const ADMIN_NUMBERS_WAITING: WaitingBusiness[] = [
   { id: ADMIN_BUSINESSES[22].id, name: ADMIN_BUSINESSES[22].business_name, since: "2026-10-20T07:00:00Z" },
   { id: ADMIN_BUSINESSES[23].id, name: ADMIN_BUSINESSES[23].business_name, since: "2026-10-21T12:00:00Z" },
 ];
+
+/** Businesses with no line of their own (Move targets). Synthetic. */
+export const ADMIN_NUMBERS_MOVE_TARGETS: MoveTarget[] = ADMIN_NUMBERS_WAITING.map((w) => ({ id: w.id, name: w.name }));
+
+/** A plain quarantine (released, not a win-back hold): Make available now and Bring back. Synthetic. */
+export const ADMIN_NUMBERS_PLAIN_HOLD: NumberRow = {
+  id: "num-plain-hold",
+  e164: "+254709100990",
+  status: "quarantine",
+  businessId: null,
+  businessName: null,
+  businessActive: null,
+  assignedAt: null,
+  createdAt: "2026-05-02T09:00:00Z",
+  notes: null,
+  holdUntil: "2026-11-21T10:52:00Z",
+  heldAt: "2026-10-22T10:52:00Z",
+  lastBusinessId: ADMIN_BUSINESSES[3].id,
+  lastBusinessName: ADMIN_BUSINESSES[3].business_name,
+  winbackHold: false,
+};

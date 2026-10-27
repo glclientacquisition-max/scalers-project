@@ -1,6 +1,6 @@
 ---
 owner: desk
-last_reviewed: 2026-10-12
+last_reviewed: 2026-10-27
 ---
 
 # Super Admin
@@ -8,7 +8,11 @@ last_reviewed: 2026-10-12
 **Route:** `/admin`  
 **Job:** Ops console for platform, packages, businesses, numbers, voices, and call quality.
 
-**Chrome:** Icon rail on `md+`. Bottom tabs below `md`. Same account header as the owner desk: initials open `Appearance · <current>` (System / Light / Dark, On this device) and Sign out. The link list is `ADMIN_LINKS`: Today, Businesses, Calls, Billing, Numbers, Platform, Activity, Settings. It is not the owner desk list. Calls opens Quality (`/admin/quality`) until the Calls list exists. Activity (`/admin/activity`) lists every admin write, newest first: two filter rows (Business, Operator) open ChoiceSheets, and a row opens a Sheet with who, business, why, and before and after. The business sheet links to Activity filtered to that business. Settings opens Voices. Packages and the old Ledger sit under Billing. The phone bar shows Today, Businesses, Calls, Billing, and More. More opens a bottom sheet with Numbers, Platform, Activity, and Settings. The bar does not scroll sideways. A nested admin screen hides the phone tabs and shows one control named for the parent admin list. Quality records use the breadcrumb for that trip, so they do not also show the chevron. Hits are at least 44px. Focus ring is the brand ribbon. Filled primary is accent fill with an on-fill label.
+**Chrome (ADMIN_V2 on, prod and staging):** Text sidebar on `md+` (200px, 56px icons only when collapsed), 40px top bar with ⌘K. The nav is `ADMIN_LINKS_V2` in `lib/adminLinks.ts`, locked 23 Oct 2026: **Overview · Businesses · Billing · Numbers · Quality · Settings**. Six items, one home per job. Billing has tabs Home, Invoices, Payments, Packages (`ADMIN_BILLING_TABS`). Settings has tabs General, Services, Voices, Audit log, Security (`ADMIN_SETTINGS_TABS`); Security is a Settings tab, not a seventh rail item. Access requests (`/admin/access-requests`, with a pending count) is added under the six when ADMIN_V2 is on. Old routes redirect to their v2 home through `adminV2Redirect()` (Platform to Settings › Services, Voices to Settings › Voices, Activity to Settings › Audit log, Packages to Billing › Packages, Ledger to Billing › Home, a business page to the Businesses pane). Phone: Overview, Businesses, Billing, Numbers as bottom tabs; Quality, Settings, Security and Access requests under More. The bar does not scroll sideways. The flag is read only through `isAdminV2Enabled()` (`lib/adminV2.ts`): `on`, `true`, `1` or `yes` is on; unset or anything else is off.
+
+**Chrome (ADMIN_V2 off, legacy):** Icon rail on `md+`. Bottom tabs below `md`. Link list `ADMIN_LINKS`: Today, Businesses, Quality, Billing, Numbers, Platform, Activity, Voices. Phone tabs Today, Businesses, Quality, Billing; More holds Numbers, Platform, Activity, Voices. Retired once v2 is the only shell.
+
+Both shells: same account header as the owner desk (initials open `Appearance · <current>`, Light / Dark captioned On this device, and Sign out). It is not the owner desk list. A nested admin screen hides the phone tabs and shows one control named for the parent admin list. Quality records use the breadcrumb for that trip, so they do not also show the chevron. Hits are at least 44px. Focus ring is the brand ribbon. Filled primary is accent fill with an on-fill label. Audit log (Activity in the old shell) lists every admin write, newest first, with who, business, why, and before and after.
 
 Sign-in is `/admin/login` (username and access code). It uses the owner sign-in field density and stays off `/login`. Today (`/admin`) is a status line, one Needs you queue (including businesses whose quality is dropping), and today's calls against the same stretch last week. Plain rows, no KPI tiles, no telecom table. It reads only: the notice check and alert mail do not run on page load.
 

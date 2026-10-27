@@ -3,6 +3,7 @@ import { appEntryHref } from "@/lib/adminHost";
 import { brandAssets } from "@/components/brand/assets";
 import { HeroCall, HowStage } from "@/components/marketing/LandingStory";
 import { AppearanceFooter } from "@/components/ThemePicker";
+import { signupCtaLabel } from "@/lib/signupMode";
 
 /**
  * Marketing home: hero, how it works, then sign up.
@@ -15,7 +16,7 @@ export function LandingPage({
   signedIn?: boolean;
 }) {
   const actionHref = signedIn ? "/home" : "/signup";
-  const actionLabel = signedIn ? "Dashboard" : "Sign up";
+  const actionLabel = signedIn ? "Dashboard" : signupCtaLabel();
   return (
     <main>
       <section className="relative min-h-dvh overflow-hidden">

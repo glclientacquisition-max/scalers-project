@@ -119,7 +119,8 @@ describe("endless list slices", () => {
     assert.doesNotMatch(list, /ContactTableRow/);
     assert.doesNotMatch(list, /DeskDataTable/);
     assert.doesNotMatch(list, /md:hidden|lg:hidden/);
-    assert.match(list, /list-none overflow-hidden rounded-2xl border border-hairline bg-surface/);
+    // #596 grouped list: one card per section (Saved, A to Z), same card surface.
+    assert.match(list, /<ul className=\{`divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline bg-surface \$\{listWindowClass\}`\}>/);
     assert.match(list, /appendUniqueById/);
     assert.match(list, /listWindowClass/);
     assert.match(sentinel, /Loading/);

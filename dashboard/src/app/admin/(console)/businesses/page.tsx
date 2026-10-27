@@ -5,6 +5,7 @@ import { getAdminOverview } from "@/lib/admin";
 import { noQualityBadges, qualityBadges } from "@/lib/adminQuality";
 import { logAdminError } from "@/lib/adminErrors";
 import { requireSuperAdmin } from "@/lib/adminGuard";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export const instant = false;
 
@@ -19,7 +20,7 @@ export default async function AdminBusinessesPage() {
     return <AdminSetupError />;
   }
 
-  if (process.env.ADMIN_V2 === "on") {
+  if (isAdminV2Enabled()) {
     return <AdminBusinessesV2 businesses={overview.businesses} badges={badges} />;
   }
 

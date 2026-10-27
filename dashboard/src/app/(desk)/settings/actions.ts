@@ -91,6 +91,8 @@ import {
   coverageIdsFrom,
   coverageOutsideFrom,
   parseServiceAreasField,
+  serviceAreasWithNoPremises,
+  storedNoPremises,
   validateServiceArea,
 } from "@/lib/serviceAreas";
 
@@ -384,10 +386,18 @@ export async function saveAndCompileSettings(
       coverage_outside: coverageOutsideFrom(formAreas),
     };
   }
+  // Locations owns the "no premises" switch. Only that key of service_areas changes.
+  const storedPremisesFlag = storedNoPremises(tenant.service_areas);
+  const premisesField = formData.get("no_premises");
   const noPremises =
-    tenant.service_areas && typeof tenant.service_areas === "object"
-      ? Boolean((tenant.service_areas as { no_premises?: boolean }).no_premises)
-      : false;
+    settingsFieldFromScope(scope, "noPremises", true, false) && premisesField != null
+      ? String(premisesField) === "1"
+      : storedPremisesFlag;
+  if (formAreas) formAreas.no_premises = noPremises;
+  const premisesAreas =
+    !formAreas && noPremises !== storedPremisesFlag
+      ? serviceAreasWithNoPremises(tenant.service_areas, tenant.business_policies?.coverage_areas, vertical, noPremises)
+      : null;
   const ttsLexicon = lexiconForStorage(
     pick(
       "ttsLexicon",
@@ -477,7 +487,7 @@ export async function saveAndCompileSettings(
     soniox_voice_label: sonioxVoiceLabel,
     business_locations: businessLocations,
     business_policies: businessPoliciesForStorage(businessPolicies),
-    ...(formAreas ? { service_areas: formAreas } : {}),
+    ...(formAreas ? { service_areas: formAreas } : premisesAreas ? { service_areas: premisesAreas } : {}),
     tts_lexicon: ttsLexicon,
   };
 

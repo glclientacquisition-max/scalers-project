@@ -9,6 +9,7 @@ import { cx } from "@/lib/cx";
 import {
   AREA_NOTE_MAX,
   ROOT_ID,
+  areaAncestors,
   areaChildren,
   areaCounties,
   areaNode,
@@ -29,6 +30,8 @@ import {
   type CallerLine,
   type TriState,
 } from "@/lib/areaPicks";
+import { nearbyCounties } from "@/lib/kenyaCountyAdjacency";
+import { areaLineNotes } from "@/lib/areaPicksToCoverageAreas";
 import { saveAreaPicksAction } from "@/app/(desk)/settings/areas/actions";
 
 export type AreaView = "home" | "check" | "hear";
@@ -100,6 +103,7 @@ export function AreaPicker({
   oldList,
   confirmed,
   initialView,
+  homeCounty = null,
   saveAction = saveAreaPicksAction,
 }: {
   /** Dev harness only: a no-write stand-in. Live page uses the real action. */
@@ -109,12 +113,15 @@ export function AreaPicker({
   oldList: string[];
   confirmed: boolean;
   initialView: AreaView;
+  /** The business's own county (county:<slug>). Null shows every county. */
+  homeCounty?: string | null;
 }) {
   const [saved, setSaved] = useState<AreaPicks>(initialPicks);
   const [picks, setPicks] = useState<AreaPicks>(initialPicks);
   const [view, setViewState] = useState<AreaView>(initialView);
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState<Set<string>>(() => new Set(["county:nairobi"]));
+  const [open, setOpen] = useState<Set<string>>(() => new Set([homeCounty && areaNode(homeCounty) ? homeCounty : "county:nairobi"]));
+  const [showAll, setShowAll] = useState(false);
   const [sheet, setSheet] = useState<string | null>(null);
   const [isConfirmed, setConfirmed] = useState(confirmed);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -151,6 +158,21 @@ export function AreaPicker({
     () => [...areaCounties()].sort((a, b) => Number(areaState(saved, a.id) === "off") - Number(areaState(saved, b.id) === "off")),
     [saved],
   );
+  // Default list: the business's county and its neighbours. Anything already
+  // picked stays visible wherever it is. Unknown county: every county.
+  const near = useMemo(() => nearbyCounties(homeCounty), [homeCounty]);
+  const nearSet = near.length ? new Set(near) : null;
+  const hasPicksIn = (countyId: string) =>
+    areaState(picks, countyId) !== "off" ||
+    picks.picks.some((p) => p.node === countyId || areaAncestors(p.node).some((a) => a.id === countyId));
+  const shownCounties = !nearSet || showAll
+    ? countyOrder
+    : [
+        ...countyOrder.filter((c) => c.id === homeCounty),
+        ...countyOrder.filter((c) => c.id !== homeCounty && (nearSet.has(c.id) || hasPicksIn(c.id))),
+      ];
+  const hiddenCount = countyOrder.length - shownCounties.length;
+  const homeName = homeCounty ? areaNode(homeCounty)?.name ?? null : null;
 
   if (view === "check") {
     return (
@@ -172,6 +194,16 @@ export function AreaPicker({
   }
 
   const summary = areaSummaryParts(picks);
+  // What the phone line says until it reads this map (D2/D3, rule v1): saved picks only.
+  const line = areaLineNotes(saved);
+  const joinNames = (names: string[]) =>
+    names.length <= 1 ? names[0] ?? "" : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  const lineNote = line.nothingReaches
+    ? "Your phone line can't use these areas yet. Callers still hear your previous list."
+    : [
+        line.yesStill.length ? `Callers still hear yes for ${joinNames(line.yesStill)}. The phone line can't skip a place inside an area yet.` : "",
+        line.notOnLine.length ? `${joinNames(line.notOnLine)} can't reach your phone line yet.` : "",
+      ].filter(Boolean).join(" ");
   const results = query.trim() ? searchAreaTree(query) : null;
 
   return (
@@ -194,6 +226,11 @@ export function AreaPicker({
           What callers will hear
         </button>
       </div>
+      {lineNote ? (
+        <p className="mx-4 mt-1 rounded-2xl border border-hairline bg-surface p-3.5 text-meta text-attention" role="note" data-area-line-note="">
+          {lineNote}
+        </p>
+      ) : null}
       {needsCheck ? (
         <div className="mx-4 mt-1 flex items-center gap-3 rounded-2xl border border-hairline bg-accent-tonal p-3.5">
           <p className="flex-1 text-meta text-ink">We moved your old area list into the new map.</p>
@@ -224,7 +261,7 @@ export function AreaPicker({
       ) : (
         <ul className="border-y border-hairline bg-surface" aria-label="Areas">
           <TreeRow id={ROOT_ID} picks={picks} depth={0} onToggle={(id) => setPicks(toggleArea(picks, id))} onOpen={setSheet} />
-          {countyOrder.map((c) => {
+          {shownCounties.map((c) => {
             const kids = areaChildren(c.id);
             const isOpen = open.has(c.id);
             return (
@@ -254,6 +291,21 @@ export function AreaPicker({
               </li>
             );
           })}
+          {nearSet && (hiddenCount > 0 || showAll) ? (
+            <li className={cx(rowBase, "justify-between")} data-area-county-filter="">
+              <span className="min-w-0 flex-1 py-2 text-meta text-ink-2">
+                {showAll ? "Showing every county" : `Showing ${homeName} and nearby counties`}
+              </span>
+              <button
+                type="button"
+                aria-expanded={showAll}
+                className={buttonClass({ variant: "ghost", size: "md" })}
+                onClick={() => setShowAll(!showAll)}
+              >
+                {showAll ? "Show nearby only" : `Show all counties (${hiddenCount} more)`}
+              </button>
+            </li>
+          ) : null}
         </ul>
       )}
       <div className="h-6" />

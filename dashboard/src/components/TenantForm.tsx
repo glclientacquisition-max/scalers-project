@@ -2,7 +2,7 @@
 
 import { AlertContactsList } from "@/components/AlertContactsList";
 
-import { withRoleGate } from "@/components/DeskRole";
+import { useCan, withRoleGate } from "@/components/DeskRole";
 import { CharCount as KitCharCount, FieldCard, TextAreaField, TextField } from "@/components/ui/TextField";
 import { POLICY_TEXT_MAX } from "@/lib/lengthLimits";
 import { normalizeContactPhone } from "@/lib/teamValidation";
@@ -128,6 +128,7 @@ import {
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
 import { PlacesEditor } from "@/components/structured/PlacesEditor";
+import { storedNoPremises } from "@/lib/serviceAreas";
 import { stableRowId } from "@/lib/factHash";
 import { catalogBaseline, isUnpricedRow } from "@/lib/catalogPricing";
 import { DeskSelect } from "@/components/ui/DeskSelect";
@@ -420,6 +421,8 @@ function TenantFormInner({
   /** Shared save pattern: a save started or landed (BusinessSettingsShell keeps the mount). */
   onSaveActivity?: () => void;
 }) {
+  // View-only members still open place details; PlacesEditor shows them read-only.
+  const canEditSettings = useCan("settings.edit");
   const voiceOptions =
     curatedVoices && curatedVoices.length
       ? curatedVoices
@@ -594,6 +597,8 @@ function TenantFormInner({
       ),
     [faqs]
   );
+  // Locations › Your premises. Stored as tenants.service_areas.no_premises (same key as before #964).
+  const [noPremises, setNoPremises] = useState(() => storedNoPremises(tenant.service_areas));
   const locationsJson = useMemo(
     () =>
       JSON.stringify(
@@ -1092,6 +1097,7 @@ function TenantFormInner({
     sonioxVoiceId,
     sonioxVoiceLabel,
     ttsLexiconJson,
+    noPremises ? "1" : "0",
   ];
   // adoptsResult: a save hands back the spoken When unsure pair, synced above in render.
   const { justSaved } = useFormDraft(save, { id: "form", values: draftValues, adoptsResult: true });
@@ -1166,6 +1172,7 @@ function TenantFormInner({
       <input type="hidden" name="vertical" value={vertical} />
       <input type="hidden" name="handoff_mode" value={handoffMode} />
       <input type="hidden" name="business_locations" value={locationsJson} />
+      <input type="hidden" name="no_premises" value={noPremises ? "1" : "0"} />
       <input type="hidden" name="business_policies" value={policiesJson} />
       <input type="hidden" name="agent_name" value={agentName} />
       <input type="hidden" name="spoken_name" value={spokenName} />
@@ -2162,13 +2169,29 @@ function TenantFormInner({
       <section
         className={panel === "locations" ? "space-y-3" : "hidden"}
       >
+        <SettingsGroup title="Your premises">
+          <div data-no-premises="">
+            <SettingsRow
+              label="We come to you"
+              control="switch"
+              hint="On: no shop or office for callers to visit. Your Business Assistant never sends callers to a place."
+            >
+              <ToolSwitch checked={noPremises} label="We come to you" onChange={setNoPremises} />
+            </SettingsRow>
+          </div>
+        </SettingsGroup>
         <PlacesEditor
           value={locations}
-          title={locations.length > 1 ? "Branches" : "Your places"}
+          title={noPremises ? "Your base (optional)" : locations.length > 1 ? "Branches" : "Your places"}
           hint={
-            locations.length > 1 ? "Your Business Assistant sends callers to the nearest branch." : undefined
+            noPremises
+              ? "For reference only. Callers are not sent here."
+              : locations.length > 1
+                ? "Your Business Assistant sends callers to the nearest branch."
+                : undefined
           }
           businessHours={formatHoursForOwner(hoursSchedule)}
+          canEdit={canEditSettings}
           onSave={(rows) => {
             setLocations(rows);
             const first = rows[0];

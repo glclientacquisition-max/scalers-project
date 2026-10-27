@@ -19,7 +19,7 @@ function fixture() {
   return p;
 }
 
-export default async function DevAreasPage({ searchParams }: { searchParams: Promise<{ view?: string; start?: string }> }) {
+export default async function DevAreasPage({ searchParams }: { searchParams: Promise<{ view?: string; start?: string; county?: string }> }) {
   const sp = await searchParams;
   const v = sp.view;
   if (process.env.DASHBOARD_OPEN !== "true") notFound();
@@ -27,7 +27,14 @@ export default async function DevAreasPage({ searchParams }: { searchParams: Pro
   return (
     <div className="desk-theme min-h-dvh bg-canvas">
       <div className="mx-auto max-w-2xl">
-        <AreaPicker initialPicks={sp.start === "moved" ? moveOverAreas(OLD).picks : fixture()} oldList={OLD} confirmState={sp.start === "moved" ? "old_only" : sp.start === "confirmed" ? "confirmed" : sp.start === "edited" ? "edited" : "unconfirmed"} initialView={view} saveAction={devSaveAreaPicksAction} />
+        <AreaPicker
+          initialPicks={sp.start === "empty" ? emptyAreaPicks() : sp.start === "moved" ? moveOverAreas(OLD).picks : fixture()}
+          oldList={sp.start === "empty" ? [] : OLD}
+          confirmed={sp.start === "confirmed" || sp.start === "empty"}
+          initialView={view}
+          homeCounty={sp.county ? `county:${sp.county}` : null}
+          saveAction={devSaveAreaPicksAction}
+        />
       </div>
     </div>
   );

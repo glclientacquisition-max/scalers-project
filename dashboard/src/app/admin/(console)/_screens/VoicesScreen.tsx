@@ -6,6 +6,7 @@ import { AdminVoicesV2 } from "@/components/admin/v2/AdminVoicesV2";
 import { logAdminError } from "@/lib/adminErrors";
 import { listPlatformSonioxVoicesAdmin } from "@/lib/sonioxVoiceCatalog";
 import { requireSuperAdmin } from "@/lib/adminGuard";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export async function VoicesScreen() {
   await requireSuperAdmin();
@@ -17,7 +18,7 @@ export async function VoicesScreen() {
     return <AdminSetupError />;
   }
 
-  if (process.env.ADMIN_V2 === "on") {
+  if (isAdminV2Enabled()) {
     return <AdminVoicesV2 voices={voices} />;
   }
 

@@ -47,14 +47,14 @@ describe("coverage type-to-find", () => {
     assert.deepEqual(rows, ["county:baringo", "county:nairobi"]);
   });
 
-  it("hints estate search and does not preselect the first county", () => {
-    const field = fs.readFileSync(
-      path.join(__dirname, "../dashboard/src/components/CoverageAreaField.tsx"),
+  // ServiceAreasEditor and CoverageAreaField were removed in #964 (43d9870b). Service areas is AreaPicker on Settings › Service areas (#964 design): one search box for areas and landmarks; nothing is ticked until the owner taps a row.
+  it("Service areas search hints places and landmarks and never preselects", () => {
+    const picker = fs.readFileSync(
+      path.join(__dirname, "../dashboard/src/components/areas/AreaPicker.tsx"),
       "utf8"
     );
-    assert.match(field, /placeholder="Search estates"/);
-    assert.match(field, /Type an estate name/);
-    assert.match(field, /useState\(-1\)/);
-    assert.match(field, /activeIndex >= 0/);
+    assert.match(picker, /placeholder="Search area or landmark"/);
+    assert.match(picker, /<SearchResults results=\{results\}[^>]*onToggle=\{\(id\) => setPicks\(toggleArea\(picks, id\)\)\}/);
+    assert.doesNotMatch(picker, /results\[0\][^\n]*toggleArea/);
   });
 });

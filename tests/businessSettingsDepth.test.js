@@ -50,12 +50,14 @@ describe("business settings depth", () => {
     assert.match(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /"Wanjiku Mwangi"/);
     assert.match(form, /Add service/);
     assert.match(form, /placeholder="Shop voice"/);
-    assert.match(form, /placeholder="Opposite Naivas"/);
+    // Place fields live in PlacesEditor now.
+    assert.match(read("dashboard/src/components/structured/PlacesEditor.tsx"), /placeholder="Opposite Hilton, Kimathi St"/);
     assert.match(policies, /id: "deposit"/);
     assert.ok(policies.indexOf('id: "payment"') < policies.indexOf('id: "deposit"'));
     assert.ok(policies.indexOf('id: "deposit"') < policies.indexOf('id: "returns"'));
-    assert.match(handoff, /label: "Message teammate"/);
-    assert.match(handoff, /label: "Connect live call"/);
+    // Callbacks only (#658): one option, no live call promise.
+    assert.match(handoff, /label: "Take a message for a callback"/);
+    assert.doesNotMatch(handoff, /label: "Connect live call"/);
     assert.match(handoff, /Add a team phone\./);
     assert.match(handoff, /Rings \$\{who\} during open hours\./);
     assert.doesNotMatch(handoff, /Messages a teammate\./);
@@ -212,10 +214,9 @@ describe("business settings depth", () => {
     assert.match(team, /Add person/);
     assert.match(team, /\{liveTransferExecutor \? \(/);
     assert.doesNotMatch(team, /handoffMode === "live_transfer" \? \(/);
-    assert.match(
-      team,
-      /liveTransferExecutor \|\| handoffMode === "live_transfer"[\s\S]*liveConnectBlurb\(liveDest\?\.name\)/
-    );
+    // Callbacks only (#658): the blurb shows only with the live executor, never for a stored live_transfer alone.
+    assert.match(team, /\{liveTransferExecutor \? \([\s\S]*liveConnectBlurb\(liveDest\?\.name\)/);
+    assert.doesNotMatch(team, /liveTransferExecutor \|\| handoffMode === "live_transfer"/);
     assert.equal((team.match(/liveConnectBlurb/g) || []).length, 1);
     assert.match(team, /label="Live connect"/);
     assert.match(team, /<ToolSwitch/);

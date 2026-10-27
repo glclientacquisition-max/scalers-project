@@ -173,12 +173,16 @@ async function saveHeldReviewQueue(
   return { ok: true, saved: true, queue: pending };
 }
 
-/** Load pending Gemini / review candidates for the Fix tab. */
+/**
+ * Load pending Gemini / review candidates for the Fix tab. Read only, so it uses the shared read
+ * gate (overview.view, every member role) like previewDeskLookupAction: staff are never refused
+ * where viewers are let in. Approving, dismissing and saving stay settings.edit.
+ */
 export async function loadPronunciationReviewQueueAction(
   _prev: GeminiScanQueueState,
   formData: FormData
 ): Promise<GeminiScanQueueState> {
-  const denied = await memberDenied("settings.view");
+  const denied = await memberDenied("overview.view");
   if (denied) return denied;
   try {
     if (!(await isAuthenticated())) {

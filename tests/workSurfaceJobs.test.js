@@ -50,7 +50,7 @@ describe("work surface jobs on unified inbox", () => {
 
   it("changes Holds and Jobs columns inside Inbox", () => {
     const niche = read("dashboard/src/lib/inboxNiche.ts");
-    assert.match(toolbar, />Inbox<\/DeskBack>/);
+    assert.match(toolbar, />\s*Inbox\s*<\/DeskBack>/);
     assert.match(nav, /formatInboxNavAriaLabel/);
     assert.match(nav, /formatAttentionCount/);
     assert.match(toolbar, /purposeFilters/);

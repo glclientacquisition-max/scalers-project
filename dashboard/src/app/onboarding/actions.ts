@@ -97,7 +97,7 @@ export async function completeOnboardingAction(
     return { error: "Add opening hours, or skip.", step: 2 };
   }
   if (!tone) {
-    return { error: "Pick a tone of voice.", step: 3 };
+    return { error: "Pick a tone of voice.", step: 4 };
   }
 
   const businessLocations =
@@ -120,7 +120,7 @@ export async function completeOnboardingAction(
   });
   const agentNameCheck = validateAgentName(agentNameInput);
   if (!agentNameCheck.ok) {
-    return { error: agentNameCheck.error, step: 3 };
+    return { error: agentNameCheck.error, step: 4 };
   }
   const agentName = agentNameCheck.name;
   const servicesOffered =
@@ -154,7 +154,7 @@ export async function completeOnboardingAction(
   });
 
   if (!prompt || prompt.length < 80) {
-    return { error: "Could not build a receptionist prompt. Try again.", step: 3 };
+    return { error: "Could not build a receptionist prompt. Try again.", step: 4 };
   }
 
   // Guard: compiled prompt must not look like the signup default.
@@ -210,7 +210,7 @@ export async function completeOnboardingAction(
   if (error) {
     return {
       error: ownerFacingError(error, "Could not save business details."),
-      step: 3,
+      step: 4,
     };
   }
   if (dropped.length) {

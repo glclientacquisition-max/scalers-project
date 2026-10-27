@@ -93,13 +93,12 @@ test("leave guard: Back (Android gesture / browser) asks before dropping edits",
 
 // --- 4. Remove place / area -------------------------------------------------------
 
-test("locations: removing a place or an area asks first", () => {
+// Areas: ServiceAreasEditor's remove confirm went with it in #964 (43d9870b). In AreaPicker a removal is an
+// untick that stays a draft until Save, so it needs no confirm.
+test("locations: removing a place asks first", () => {
   const places = read("dashboard/src/components/structured/PlacesEditor.tsx");
   assert.match(places, /<ConfirmSheet[\s\S]*onConfirm=\{confirmRemoveNow\}/);
   assert.match(places, /setConfirmRemove\(index\)/);
-  const areas = read("dashboard/src/components/structured/ServiceAreasEditor.tsx");
-  assert.match(areas, /if \(editing\) setConfirmRemove\(editing\.id\)/);
-  assert.match(areas, /<ConfirmSheet[\s\S]*Remove \$\{coverageAreaLabel\(confirmRemove\)\}\?/);
 });
 
 // --- 5. Catalogue import ----------------------------------------------------------

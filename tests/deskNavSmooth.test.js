@@ -158,7 +158,9 @@ describe("desk navigation smoothness", () => {
     assert.doesNotMatch(links, /DESK_LINKS/);
     assert.doesNotMatch(admin, /DeskNavHost/);
     assert.match(admin, /scroll=\{false\}/);
-    assert.match(links, /href: "\/admin\/packages", label: "Packages"/);
+    // Locked 6-item Admin nav (#972): Packages is the Billing › Packages tab; the old route redirects there.
+    assert.match(links, /href: "\/admin\/billing\/packages", label: "Packages"/);
+    assert.match(links, /path === "\/admin\/packages"[^\n]*return "\/admin\/billing\/packages"/);
     assert.match(admin, /deskShiftClass/);
     assert.match(admin, /focusRingVisible/);
   });

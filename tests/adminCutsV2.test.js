@@ -21,8 +21,8 @@ test("Ledger and the catalog alias redirect to their v2 homes; old shell unchang
   const { adminV2Redirect, ADMIN_LINKS } = await load();
   assert.equal(adminV2Redirect("/admin/wallets"), "/admin/billing/home");
   assert.equal(adminV2Redirect("/admin/billing/catalog"), "/admin/billing/packages");
-  assert.match(page("wallets"), /ADMIN_V2 === "on"\) redirect\("\/admin\/billing\/home"\);\n\s+redirect\("\/admin\/businesses"\)/);
-  assert.match(page("billing/catalog"), /ADMIN_V2 === "on"\) redirect\("\/admin\/billing\/packages"\);\n\s+redirect\("\/admin\/packages"\)/);
+  assert.match(page("wallets"), /isAdminV2Enabled\(\)\) redirect\("\/admin\/billing\/home"\);\n\s+redirect\("\/admin\/businesses"\)/);
+  assert.match(page("billing/catalog"), /isAdminV2Enabled\(\)\) redirect\("\/admin\/billing\/packages"\);\n\s+redirect\("\/admin\/packages"\)/);
   assert.deepEqual(ADMIN_LINKS.map((l) => l.label), ["Today", "Businesses", "Quality", "Billing", "Numbers", "Platform", "Activity", "Voices"]);
 });
 

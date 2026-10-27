@@ -7,11 +7,14 @@ function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
 }
 
-/** Mirror of dashboard/src/lib/deskAttentionCount.ts. Keep in lockstep. */
+/**
+ * Mirror of dashboard/src/lib/deskAttentionCount.ts (formatNeedsBadge in inboxCounts.ts). Keep in lockstep.
+ * Owner review 18 Oct: the badge shows the real number up to 99, so it matches "Needs you 78".
+ */
 function formatAttentionCount(count) {
   const n = Math.floor(Number(count));
   if (!Number.isFinite(n) || n < 1) return null;
-  return n > 9 ? "9+" : String(n);
+  return n > 99 ? "99+" : String(n);
 }
 
 function formatAttentionCountAriaLabel(count) {
@@ -40,21 +43,23 @@ describe("desk shell chrome", () => {
   const settingsShell = read("dashboard/src/components/BusinessSettingsShell.tsx");
   const chrome = read("dashboard/src/components/ui/deskChrome.ts");
 
-  it("caps the Needs you chip at 9+", () => {
+  it("caps the Needs you chip at 99+ so it matches the Needs you tab", () => {
     assert.equal(formatAttentionCount(0), null);
     assert.equal(formatAttentionCount(-1), null);
     assert.equal(formatAttentionCount(1), "1");
     assert.equal(formatAttentionCount(9), "9");
-    assert.equal(formatAttentionCount(10), "9+");
-    assert.equal(formatAttentionCount(99), "9+");
+    assert.equal(formatAttentionCount(78), "78");
+    assert.equal(formatAttentionCount(99), "99");
+    assert.equal(formatAttentionCount(100), "99+");
     assert.equal(formatAttentionCountAriaLabel(0), null);
     assert.equal(formatAttentionCountAriaLabel(3), "3 need you");
-    assert.equal(formatAttentionCountAriaLabel(12), "9+ need you");
+    assert.equal(formatAttentionCountAriaLabel(120), "99+ need you");
     assert.equal(formatInboxNavAriaLabel(0), null);
     assert.equal(formatInboxNavAriaLabel(3), "Inbox, 3 need you");
-    assert.equal(formatInboxNavAriaLabel(12), "Inbox, 9+ need you");
+    assert.equal(formatInboxNavAriaLabel(120), "Inbox, 99+ need you");
     assert.match(helper, /export function formatAttentionCount/);
-    assert.match(helper, /n > 9 \? "9\+" : String\(n\)/);
+    assert.match(helper, /return formatNeedsBadge\(count\)/);
+    assert.match(read("dashboard/src/lib/inboxCounts.ts"), /n > 99 \? "99\+" : String\(n\)/);
     assert.match(helper, /\$\{display\} need you/);
     assert.match(helper, /Inbox, \$\{needs\}/);
     assert.doesNotMatch(helper, /items in your inbox/i);
@@ -112,11 +117,14 @@ describe("desk shell chrome", () => {
     assert.match(constitution, /deskListTitleClass/);
     assert.match(master, /deskListTitleClass/);
     assert.doesNotMatch(constitution, /have no product wordmark and no page-name/);
-    assert.match(toolbar, /<h1 className=\{deskListTitleClass\}>Inbox<\/h1>/);
+    // Desktop puts title, pills and search on one row (b0fed1e7), so the title does not shrink.
+    assert.match(toolbar, /<h1 className=\{`\$\{deskListTitleClass\} lg:shrink-0`\}>Inbox<\/h1>/);
     assert.doesNotMatch(toolbar, /pageTitleClass.*Inbox|Inbox.*pageTitleClass/);
     assert.match(toolbar, /<h1 className=\{pageTitleClass\}>Archived<\/h1>/);
     assert.match(contacts, /<PageHeader[\s\S]*title="Contacts"/);
-    assert.match(wallet, /<h1 className=\{deskListTitleClass\}>Usage<\/h1>/);
+    // Usage moved to the kit PageHeader with Plan and Billing (#782), like Contacts.
+    assert.match(wallet, /<UsageSummary/);
+    assert.match(read("dashboard/src/components/plan/UsageSummary.tsx"), /<PageHeader\s+title="Usage"/);
     assert.doesNotMatch(wallet, /<h1 className=\{deskListTitleClass\}>Wallet<\/h1>/);
     assert.doesNotMatch(home, />Overview</);
     assert.match(home, /HomeOverviewHeader/);
@@ -181,9 +189,12 @@ describe("desk shell chrome", () => {
     assert.match(read("dashboard/src/components/DeskAccountMenu.tsx"), /<SignOutButton layout="menu"/);
     assert.doesNotMatch(read("dashboard/src/components/DeskAccountBar.tsx"), />\s*Sign out\s*</);
     assert.match(settingsUi, /settingsBlockTitleClass =\s*"text-meta font-medium text-ink-2"/);
-    assert.match(settingsShell, /text-meta font-medium text-ink-2/);
-    assert.match(settingsShell, /data-settings-menu/);
-    assert.match(settingsShell, /SettingsChevron/);
+    // The Settings list moved into SettingsSideNav (SettingsMenu, SettingsRail).
+    const sideNav = read("dashboard/src/components/SettingsSideNav.tsx");
+    assert.match(settingsShell, /<SettingsMenu/);
+    assert.match(sideNav, /text-meta font-medium text-ink-2/);
+    assert.match(sideNav, /data-settings-menu/);
+    assert.match(sideNav, /SettingsChevron/);
     assert.match(settingsUi, /md:w-64/);
     assert.doesNotMatch(settingsShell, /max-w-5xl|max-w-xl/);
     assert.doesNotMatch(home, /Sign out/);

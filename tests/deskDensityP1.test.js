@@ -94,9 +94,10 @@ describe("desk density P1", () => {
   });
 
   it("titles the two import routes differently", () => {
-    assert.match(importPage, />\s*Import contacts\s*</);
-    assert.match(nav, /Import Catalog/);
-    assert.match(nav, /Import Knowledge/);
+    assert.match(importPage, /title="Import contacts"/);
+    // Sentence case and British spelling (#661).
+    assert.match(nav, /"Import catalogue"/);
+    assert.match(nav, /"Import knowledge"/);
     assert.match(shell, /settingsPanelHeading\(tab, trainPanel, tenant\.vertical\)/);
   });
 
@@ -112,7 +113,8 @@ describe("desk density P1", () => {
     assert.match(table, /px-3 py-2 align-top/);
     assert.match(table, /px-4 py-3 first:border-t-0/);
     assert.doesNotMatch(table, /px-5 py-4/);
-    assert.match(contactRow, /px-4 py-3 first:border-t-0/);
+    // Contacts rows are the kit ListRow since #596; the kit owns their padding.
+    assert.match(contactRow, /<ListRow/);
     assert.doesNotMatch(contactRow, /lg:px-3 lg:py-2|lg:px-5/);
   });
 });

@@ -304,7 +304,10 @@ describe("inbox unread since last customer event", () => {
     assert.match(load, /countInboxPurposes\(inbox\.items\)\.needs/);
     assert.match(layout, /loadCachedInboxNeedsCount/);
     assert.match(purpose, /export function itemInNeedsYouPile/);
-    assert.match(purpose, /if \(itemInNeedsYouPile\(item\)\) counts\.needs \+= 1/);
+    // One selector since the 18 Oct owner review: countInboxPurposes reads deskWorkCounts (inboxCounts.ts).
+    assert.match(purpose, /export function itemInNeedsYouPile\(item: InboxItem\): boolean \{\s*return itemNeedsYouNow\(item\);/);
+    assert.match(purpose, /const c = deskWorkCounts\(items\);\s*return \{\s*needs: c\.needs,/);
+    assert.match(read("dashboard/src/lib/inboxCounts.ts"), /if \(itemNeedsYouNow\(item, now\)\) out\.needs \+= 1;/);
     assert.doesNotMatch(load, /countInboxPurposes\(inbox\.items\)\.unread/);
     assert.doesNotMatch(load, /items\.filter\(\(item\) => item\.unread\)/);
   });
@@ -388,7 +391,7 @@ describe("inbox ticket overflow menu", () => {
     assert.match(overflow, /inboxOverflowActions\(inboxItemWithLocal\(item, local\)\)/);
     assert.match(overflow, /<Menu/);
     assert.match(overflow, /<MenuItem/);
-    assert.match(overflow, /<IconButton/);
+    assert.match(overflow, /className=\{iconButtonClass\(\{ size: "sm" \}\)\}/);
     assert.doesNotMatch(overflow, /placeInboxOverflowMenu/);
     assert.doesNotMatch(overflow, /createPortal/);
     assert.doesNotMatch(overflow, /hidden md:inline-flex/);
