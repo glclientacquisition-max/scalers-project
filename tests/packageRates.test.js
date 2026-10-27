@@ -27,7 +27,9 @@ describe("package overage math", () => {
     const login = read("dashboard/src/app/admin/login/page.tsx");
     const api = read("dashboard/src/app/api/admin/packages/route.ts");
     assert.match(read("dashboard/src/components/AdminNav.tsx"), /ADMIN_LINKS/);
-    assert.match(nav, /href: "\/admin\/packages", label: "Packages"/);
+    // Locked 6-item Admin nav (#972): Packages is the Billing › Packages tab; the old route redirects there.
+    assert.match(nav, /href: "\/admin\/billing\/packages", label: "Packages"/);
+    assert.match(nav, /path === "\/admin\/packages"[^\n]*return "\/admin\/billing\/packages"/);
     assert.match(login, /name="username"/);
     assert.match(login, /name="accessCode"/);
     assert.match(api, /isLegacyAuthenticated/);

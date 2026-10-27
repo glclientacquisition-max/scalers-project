@@ -2,10 +2,14 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
 import { can, deniedMessage, hiddenDeskHrefs, ROLES, type Action, type Role } from "../dashboard/src/lib/permissions.ts";
 
-const root = path.join(__dirname, "..");
+// Works under plain node (ESM, --experimental-strip-types) and tsx alike.
+const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+const root = path.join(TEST_DIR, "..");
 const read = (p: string) => fs.readFileSync(path.join(root, p), "utf8");
 
 /** Per-role expectation for each desk surface (mirrors scalers-roles-matrix.md). */

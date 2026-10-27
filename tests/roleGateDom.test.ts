@@ -2,8 +2,12 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { it } from "node:test";
+
+// Works under plain node (ESM, --experimental-strip-types) and tsx alike.
+const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 const req = createRequire(import.meta.url);
 let parseHTML: ((html: string) => { document: Document }) | null = null;
@@ -42,9 +46,12 @@ it("viewer lock: edits locked, expand/collapse stays usable", { skip: !parseHTML
   assert.equal(lockControls(root, "x"), 0, "idempotent");
 });
 
-it("location details toggle is marked exempt; gate no longer uses a disabled fieldset", () => {
-  const root = path.join(__dirname, "..");
-  assert.match(fs.readFileSync(path.join(root, "dashboard/src/components/TenantForm.tsx"), "utf8"), /aria-expanded=\{placeOpen\}\s*data-role-exempt=""/);
+it("places gate edits by role; gate no longer uses a disabled fieldset", () => {
+  const root = path.join(TEST_DIR, "..");
+  // The inline place toggle left TenantForm with PlacesEditor (list plus sheet); rows and Add follow canEdit.
+  const places = fs.readFileSync(path.join(root, "dashboard/src/components/structured/PlacesEditor.tsx"), "utf8");
+  assert.match(places, /disabled=\{!canEdit\}/);
+  assert.match(places, /canEdit && value\.length < LOCATIONS_MAX \?/);
   const gate = fs.readFileSync(path.join(root, "dashboard/src/components/DeskRole.tsx"), "utf8");
   assert.doesNotMatch(gate, /<fieldset disabled/);
   assert.match(gate, /onSubmitCapture=\{\(e\) => e\.preventDefault\(\)\}/);

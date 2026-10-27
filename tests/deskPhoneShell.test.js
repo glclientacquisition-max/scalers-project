@@ -64,7 +64,8 @@ describe("desk phone shell", () => {
     assert.match(nav, /export const deskShellClass/);
     assert.match(nav, /fixed inset-0 flex min-w-0 overflow-hidden/);
     assert.doesNotMatch(nav, /deskShellClass =\s*\n\s*"desk-theme flex h-dvh/);
-    assert.match(css, /html:has\(\.desk-theme\)/);
+    // Only a shown shell locks the page (a hidden cached route must not lock /onboarding).
+    assert.match(css, /html:has\(\.desk-theme:not\(\[style\*="display: none"\]/);
     assert.match(css, /overscroll-behavior: none/);
     assert.match(css, /body:has\(\.desk-theme\).*background: var\(--canvas\)/s);
     assert.match(nav, /min-h-0 min-w-0 max-w-desk flex-1 overflow-y-auto/);
@@ -99,7 +100,9 @@ describe("desk phone shell", () => {
     assert.match(hint, /createPortal/);
     assert.match(hint, /role="tooltip"/);
     assert.match(hint, /data-desk-hint=\{label\}/);
-    assert.match(hint, /bg-\[#0A192F\]/);
+    // Tokens since #661: ink fill, canvas text, no raw hex.
+    assert.match(hint, /bg-ink [^"]*text-canvas/);
+    assert.doesNotMatch(hint, /#[0-9A-Fa-f]{6}/);
     assert.match(hint, /onPointerEnter/);
     assert.match(hint, /Escape/);
     assert.match(hint, /addEventListener\("scroll", hide, true\)/);

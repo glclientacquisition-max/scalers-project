@@ -31,7 +31,10 @@ describe("inbox filters and empty states", () => {
     assert.match(toolbar, /label="Filter by purpose"/);
     assert.match(toolbar, /<Segmented/);
     assert.match(toolbar, /label="Visit sort"/);
-    assert.match(toolbar, /archived \? null/);
+    // Archived gets its own header (back to Inbox, title, search) and no purpose pills.
+    const archivedHeader = toolbar.slice(toolbar.indexOf("{archived ? ("), toolbar.indexOf(") : ("));
+    assert.match(archivedHeader, /<DeskBack/);
+    assert.doesNotMatch(archivedHeader, /InboxFilterPills/);
     const entry = read("dashboard/src/components/InboxArchivedRow.tsx");
     assert.match(entry, /InboxArchivedPhoneRow/);
     assert.match(entry, /InboxArchivedTableRow/);

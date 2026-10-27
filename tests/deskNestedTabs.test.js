@@ -103,7 +103,8 @@ describe("desk nested tab hide", () => {
     assert.match(contactFile, /data-desk-nested/);
     assert.match(contactFile, /<DeskBack href=\{backHref\}>\{backLabel\}<\/DeskBack>/);
     assert.match(contactImport, /data-desk-nested/);
-    assert.match(contactImport, /<DeskBack href="\/contacts">Contacts<\/DeskBack>/);
+    // Kit PageHeader back (icon link named Contacts) since the import page moved to PageHeader.
+    assert.match(contactImport, /back=\{\{ href: "\/contacts", label: "Contacts" \}\}/);
     const devFile = read("dashboard/src/app/dev/contacts/file/page.tsx");
     assert.match(devFile, /data-desk-nested/);
     assert.match(devFile, /<DeskBack href="\/dev\/contacts">Contacts<\/DeskBack>/);

@@ -45,6 +45,13 @@ const EXPECT: Record<string, Array<"admin" | "staff" | "viewer">> = {
   inviteMemberAction: ["admin"], resendInviteAction: ["admin"], revokeInviteAction: ["admin"], changeMemberRoleAction: ["admin"], removeMemberAction: ["admin"], transferOwnershipAction: [],
   saveOnDemandUsage: ["admin"],
   confirmPlanChange: ["admin"], setExtraSeatsAction: ["admin"], markBillingNoticeRead: ["admin"],
+  // Added since the matrix was last updated (inbox archive and bulk, call text retry, Overview quick
+  // saves, Service areas, policy topics, What it will say). Same rule as their neighbours.
+  inboxArchiveCallsAction: ["admin", "staff"], inboxUnarchiveCallsAction: ["admin", "staff"], inboxUndoArchiveAction: ["admin", "staff"],
+  inboxBulkAction: ["admin", "staff"], retryCallTextAction: ["admin", "staff"],
+  saveOverviewHoursAction: ["admin"], saveOverviewPaymentsAction: ["admin"], saveOverviewPricesAction: ["admin"],
+  saveAreaPicksAction: ["admin"], savePolicyTopicAction: ["admin"], saveUnknownAnswerByKindAction: ["admin"],
+  previewDeskLookupAction: ["admin", "viewer"],
 };
 
 it("every guarded action is in the expected matrix (and vice versa)", () => {

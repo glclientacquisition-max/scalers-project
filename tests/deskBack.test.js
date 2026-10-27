@@ -45,7 +45,7 @@ describe("DeskBack icon", () => {
     assert.match(ticket, /<DeskBack href=\{backHref\}>\{backHref === "\/home" \? "Home" : "Inbox"\}<\/DeskBack>/);
     assert.match(
       toolbar,
-      /<DeskBack href=\{backHref \|\| callsHref\(\{ q: query \|\| undefined \}\)\}>Inbox<\/DeskBack>/
+      /<DeskBack\s+href=\{backHref \|\| callsHref\(\{ q: query \|\| undefined \}\)\}\s*>\s*Inbox\s*<\/DeskBack>/
     );
     assert.doesNotMatch(ticket, /href="\/calls"/);
     assert.doesNotMatch(ticket, /router\.push\("\/calls"\)/);
@@ -62,7 +62,9 @@ describe("DeskBack icon", () => {
   });
 
   it("is the settings mobile back primitive", () => {
-    assert.match(settings, /<DeskBack href="\/settings" className="md:hidden">/);
+    // The Settings back link shows on every width since the Settings home became the hub (no md:hidden).
+    assert.match(settings, /<DeskBack href="\/settings">\s*Settings\s*<\/DeskBack>/);
+    assert.doesNotMatch(settings, /<DeskBack href="\/settings" className="md:hidden">/);
     assert.match(settings, /<DeskRecordLead/);
     assert.match(settings, />\s*Settings\s*</);
     assert.doesNotMatch(settings, />\s*Profile\s*</);
@@ -78,7 +80,8 @@ describe("DeskBack icon", () => {
     assert.match(lead, /export function DeskRecordLead/);
     assert.match(lead, /data-desk-record-lead/);
     assert.match(contact, /<DeskRecordLead/);
-    assert.match(imported, /<DeskRecordLead/);
+    // Import uses the kit PageHeader back (an icon link in the title row), so Back still has no row of its own.
+    assert.match(imported, /<PageHeader[\s\S]*back=\{\{ href: "\/contacts", label: "Contacts" \}\}/);
     assert.match(toolbar, /<DeskRecordLead/);
     assert.match(read("dashboard/src/components/AdminNav.tsx"), /<DeskBack href=\{href\(parent\.href\)\}>/);
     assert.match(constitution, /Back never owns its own row/);

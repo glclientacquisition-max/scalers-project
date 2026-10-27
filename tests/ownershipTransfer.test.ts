@@ -2,10 +2,14 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { it } from "node:test";
 import { transferConfirmMatches } from "../dashboard/src/lib/memberConfirm.ts";
 
-const read = (p: string) => fs.readFileSync(path.join(__dirname, "..", p), "utf8");
+// Works under plain node (ESM, --experimental-strip-types) and tsx alike.
+const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+const read = (p: string) => fs.readFileSync(path.join(TEST_DIR, "..", p), "utf8");
 const panel = read("dashboard/src/components/MembersPanel.tsx");
 const actions = read("dashboard/src/app/(desk)/settings/membersActions.ts");
 
