@@ -43,7 +43,7 @@ test("CSV: EAT dates, KSh with decimals, quoted commas", async () => {
 });
 
 test("v2 invoices: flag-gated, vendor-free; money actions via /actions", () => {
-  assert.match(read("dashboard/src/app/admin/(console)/billing/invoices/page.tsx"), /process\.env\.ADMIN_V2 === "on"/);
+  assert.match(read("dashboard/src/app/admin/(console)/billing/invoices/page.tsx"), /isAdminV2Enabled\(\)/);
   const ui = read("dashboard/src/components/admin/v2/AdminInvoicesV2.tsx");
   const ld = read("dashboard/src/lib/adminInvoicesV2Load.ts");
   assert.match(ui, /\/api\/admin\/billing\/invoices\//);

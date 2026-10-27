@@ -5,6 +5,7 @@ import { getBusinessQuality, getCallTrace, listBusinessQuality, listReleaseDelta
 import { logAdminError } from "@/lib/adminErrors";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { parseQualityRange } from "@/lib/adminQualityModel";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export const instant = false;
 
@@ -17,7 +18,7 @@ export default async function AdminQualityPage({
   const sp = await searchParams;
   const range = parseQualityRange(sp.range);
   try {
-    if (process.env.ADMIN_V2 === "on") {
+    if (isAdminV2Enabled()) {
       // v2: list plus a URL-driven pane (?pane=business, &call=call detail).
       const [rows, releases, call] = await Promise.all([listBusinessQuality(range), listReleaseDeltas(), sp.call ? getCallTrace(sp.call) : null]);
       const paneId = call?.businessId ?? sp.pane;
@@ -35,7 +36,7 @@ export default async function AdminQualityPage({
       );
     }
     const [rows, releases] = await Promise.all([listBusinessQuality(range), listReleaseDeltas()]);
-    return <QualityIndex range={range} rows={rows} releases={releases} insights={process.env.ADMIN_V2 === "on"} />;
+    return <QualityIndex range={range} rows={rows} releases={releases} insights={isAdminV2Enabled()} />;
   } catch (err) {
     logAdminError("quality", err);
     return <DeskLoadError>Could not load quality.</DeskLoadError>;

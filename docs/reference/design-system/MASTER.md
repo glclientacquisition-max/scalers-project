@@ -79,7 +79,7 @@ Dark mode is the entire platform: marketing, auth, onboarding, owner desk, Super
 
 ## Super Admin
 
-Ops console (`/admin`) uses `ADMIN_LINKS`: icon rail on `md+`, bottom tabs below `md`. Same canvas, ink, hairline, and focus ring as the owner desk. Owner desk keeps `DESK_LINKS`. Do not copy the ops shell onto `(desk)`, and do not import either link list into the other shell. Page note: [`pages/admin.md`](pages/admin.md).
+Ops console (`/admin`) uses `ADMIN_LINKS_V2` when ADMIN_V2 is on (the six-item nav locked 23 Oct 2026: Overview, Businesses, Billing, Numbers, Quality, Settings; text sidebar on `md+`, bottom tabs below `md`). The legacy shell uses `ADMIN_LINKS`: icon rail on `md+`, bottom tabs below `md`. Same canvas, ink, hairline, and focus ring as the owner desk. Owner desk keeps `DESK_LINKS`. Do not copy the ops shell onto `(desk)`, and do not import either link list into the other shell. Page note: [`pages/admin.md`](pages/admin.md).
 
 ---
 

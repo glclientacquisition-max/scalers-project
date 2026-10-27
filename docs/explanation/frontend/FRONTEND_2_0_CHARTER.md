@@ -167,7 +167,7 @@ One `AppShell` in `src/components/shell/`:
 - Props: `links` (icon outline, icon solid, label, href, badge), `account` slot, `children`.
 - Below `md`: fixed bottom tabs, solid icon when active, badge as a 16px dot with numeral, safe-area padding. Hidden on nested routes (existing `data-desk-nested` and `data-ticket-chat` contract stays).
 - `md+`: 72px icon rail, tooltip names, account at the foot.
-- Desk uses `DESK_LINKS`. Admin uses `ADMIN_LINKS` (Overview, Businesses, Wallets, Numbers, Packages, Voices). Admin on phone uses the same tabs with the last two under More.
+- Desk uses `DESK_LINKS`. Admin uses `ADMIN_LINKS_V2` (Overview, Businesses, Billing, Numbers, Quality, Settings; locked 23 Oct 2026, amended 27 Oct). Billing and Settings hold their sub-pages as tabs. Admin on phone shows the first four as tabs and Quality and Settings under More.
 - Light and dark for both shells. Admin loses the navy sidebar.
 
 ### 4.4 Dependencies added
