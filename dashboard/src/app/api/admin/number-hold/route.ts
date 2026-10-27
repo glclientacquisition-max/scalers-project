@@ -9,7 +9,6 @@ import {
 } from "@/lib/adminNumberHold";
 import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { clampHoldDays, reactivationFeeBillStub } from "@/lib/ops/numberHold";
-import { protectedNumberRefusal } from "@/lib/ops/numberOps";
 import { stepUpGate } from "@/lib/ops/stepUpGate";
 
 /**
@@ -29,9 +28,6 @@ export async function POST(request: Request) {
   }
 
   const action = String(body.action || "");
-  // Protected platform line: no hold, end hold or restore, before Unlock or any database call.
-  const refused = protectedNumberRefusal(body.e164);
-  if (refused) return NextResponse.json(refused.body, { status: refused.status });
   const reason = typeof body.reason === "string" ? body.reason.trim() : "";
   if (reason.length < 3 && action !== "bill_fee") {
     return NextResponse.json({ error: "Add a reason (3 characters or more)." }, { status: 400 });

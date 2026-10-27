@@ -17,19 +17,9 @@ import { requestOrigin, resetPasswordRedirectUrl } from "@/lib/authCallback";
 import { isAdminActionBlocked } from "@/lib/adminBusinessModel";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
-import { PROTECTED_BUSINESS_ACTIONS, protectedNumberRefusal } from "@/lib/ops/numberOps";
 import { stepUpGate } from "@/lib/ops/stepUpGate";
 import { saveTenantRecordingRetentionOverride } from "@/lib/recordingRetentionAdmin";
 import { getSupabaseAdmin } from "@/lib/supabase";
-
-async function businessLiveNumber(businessId: string): Promise<string | null> {
-  const { data } = await getSupabaseAdmin()
-    .from("tenants")
-    .select("sautikit_virtual_number")
-    .eq("id", businessId)
-    .maybeSingle();
-  return (data as { sautikit_virtual_number?: string | null } | null)?.sautikit_virtual_number ?? null;
-}
 
 export async function POST(request: Request) {
   const gate = await requireAdminOperatorWrite();
@@ -45,19 +35,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Pick a business first." }, { status: 400 });
   }
 
-  // Protected platform line, when the caller names it (Numbers sends e164): before Unlock or any database call.
-  const named = protectedNumberRefusal(body.e164);
-  if (named) return NextResponse.json(named.body, { status: named.status });
-
   const stepUp = await stepUpGate(gate.operator, `businesses:${action}`, businessId);
   if (stepUp) return stepUp;
-
-  // Archive or release by business id: one read of its live number before any write.
-  if (PROTECTED_BUSINESS_ACTIONS.has(action)) {
-    const held = await businessLiveNumber(businessId);
-    const refused = protectedNumberRefusal(held);
-    if (refused) return NextResponse.json(refused.body, { status: refused.status });
-  }
 
   // The signed-in Super Admin, never a name from the request body.
   const actor = await adminActorName();

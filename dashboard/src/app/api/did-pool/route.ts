@@ -6,7 +6,6 @@ import { isAdminActionBlocked } from "@/lib/adminBusinessModel";
 import { adminFacingError, logAdminError, operatorError } from "@/lib/adminErrors";
 import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { isLegacyAuthenticated } from "@/lib/auth";
-import { protectedNumberRefusal } from "@/lib/ops/numberOps";
 import { stepUpGate } from "@/lib/ops/stepUpGate";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import {
@@ -36,9 +35,6 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const action = String(body.action || "add");
-  // Protected platform line: refused for add, release and assign before Unlock or any database call.
-  const refused = protectedNumberRefusal(body?.e164);
-  if (refused) return NextResponse.json(refused.body, { status: refused.status });
   const target =
     action === "release"
       ? String(body.e164 || "")

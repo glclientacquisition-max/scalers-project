@@ -36,7 +36,6 @@ import {
 import { Button } from "@/components/ui/Button";
 import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState, OpsConfirm, UnlockCta } from "@/components/ops";
 import { NumberControls } from "./NumberControls";
-import { PROTECTED_COPY, isProtectedNumber } from "@/lib/ops/numberOps";
 import "@/styles/ops.css";
 
 const DATE = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" });
@@ -111,11 +110,6 @@ export function AdminNumbersV2({
     lastBusinessId: it?.lastBusinessId ?? null,
   });
   const fee = reactivationFeeSurface(holdPolicy.reactivationFeeKes);
-  /** Protected platform line: every write here is off, with the reason (server refuses too). */
-  const locked = it ? isProtectedNumber(it.e164) : false;
-  const lockedProps = locked && it
-    ? { disabled: true, title: PROTECTED_COPY, "aria-describedby": `numops-protected-${it.id}`, "data-protected-locked": "" }
-    : {};
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -145,7 +139,6 @@ export function AdminNumbersV2({
     r.businessName ?? (isHeld(r, now) && r.lastBusinessName ? `Was ${r.lastBusinessName}` : "—");
 
   async function postPool(body: Record<string, string>) {
-    if (isProtectedNumber(body.e164)) { setError(PROTECTED_COPY); return false; }
     setPending(true);
     setError("");
     setStatus("");
@@ -177,7 +170,6 @@ export function AdminNumbersV2({
   }
 
   async function postHold(body: Record<string, unknown>, okStatus: string) {
-    if (isProtectedNumber(body.e164)) { setError(PROTECTED_COPY); return false; }
     setPending(true);
     setError("");
     setStatus("");
@@ -205,7 +197,7 @@ export function AdminNumbersV2({
   }
 
   async function runArchiveRelease(reason: string) {
-    if (!it?.businessId || locked) return;
+    if (!it?.businessId) return;
     setPending(true);
     setError("");
     setStatus("");
@@ -228,7 +220,7 @@ export function AdminNumbersV2({
   }
 
   async function runJustRelease(reason: string) {
-    if (!it || locked) return;
+    if (!it) return;
     setPending(true);
     setError("");
     setStatus("");
@@ -251,13 +243,11 @@ export function AdminNumbersV2({
   }
 
   function openAssign() {
-    if (locked) return;
     setError("");
     setConfirm("assign");
   }
 
   function openRelease() {
-    if (locked) return;
     setError("");
     setConfirm("release");
   }
@@ -442,12 +432,12 @@ export function AdminNumbersV2({
       ) : null}
       <div className="flex flex-wrap items-center gap-2">
         {state === "available" ? (
-          <Button type="button" variant="primary" size="sm" onClick={openAssign} disabled={waiting.length === 0} title={waiting.length === 0 ? "No business is waiting for a number" : undefined} {...lockedProps}>
+          <Button type="button" variant="primary" size="sm" onClick={openAssign} disabled={waiting.length === 0} title={waiting.length === 0 ? "No business is waiting for a number" : undefined}>
             Assign
           </Button>
         ) : null}
         {acts.archiveRelease ? (
-          <Button type="button" variant="primary" size="sm" data-action="archive-release" onClick={() => { if (locked) return; setError(""); setConfirm("archive_release"); }} {...lockedProps}>
+          <Button type="button" variant="primary" size="sm" data-action="archive-release" onClick={() => { setError(""); setConfirm("archive_release"); }}>
             Archive &amp; release
           </Button>
         ) : null}
@@ -458,23 +448,23 @@ export function AdminNumbersV2({
                 {acts.justReleaseWhy}
               </span>
             ) : null}
-            <Button type="button" variant="ghost" size="sm" data-action="just-release" onClick={openRelease} disabled={!acts.justRelease} title={acts.justReleaseWhy ?? undefined} aria-describedby={acts.justReleaseWhy ? `release-why-${it.id}` : undefined} {...lockedProps}>
+            <Button type="button" variant="ghost" size="sm" data-action="just-release" onClick={openRelease} disabled={!acts.justRelease} title={acts.justReleaseWhy ?? undefined} aria-describedby={acts.justReleaseWhy ? `release-why-${it.id}` : undefined}>
               Just release
             </Button>
           </>
         ) : null}
         {holdActs.startHold ? (
-          <Button type="button" variant="primary" size="sm" data-action="start-hold" onClick={() => { if (locked) return; setError(""); setConfirm("hold"); }} {...lockedProps}>
+          <Button type="button" variant="primary" size="sm" data-action="start-hold" onClick={() => { setError(""); setConfirm("hold"); }}>
             Hold for win-back
           </Button>
         ) : null}
         {holdActs.endHold ? (
-          <Button type="button" variant="ghost" size="sm" data-action="end-hold" onClick={() => { if (locked) return; setError(""); setConfirm("end_hold"); }} {...lockedProps}>
+          <Button type="button" variant="ghost" size="sm" data-action="end-hold" onClick={() => { setError(""); setConfirm("end_hold"); }}>
             End hold early
           </Button>
         ) : null}
         {holdActs.restore ? (
-          <Button type="button" variant="primary" size="sm" data-action="restore-hold" onClick={() => { if (locked) return; setError(""); setConfirm("restore"); }} {...lockedProps}>
+          <Button type="button" variant="primary" size="sm" data-action="restore-hold" onClick={() => { setError(""); setConfirm("restore"); }}>
             Restore to {it.lastBusinessName ?? "previous business"}
           </Button>
         ) : null}
@@ -540,7 +530,7 @@ export function AdminNumbersV2({
       />
 
       <OpsConfirm
-        open={confirm === "assign" && !!it && !locked}
+        open={confirm === "assign" && !!it}
         onClose={() => { if (!pending) setConfirm(null); }}
         onConfirm={() => {
           if (!it || !assignTo) return;
@@ -578,7 +568,7 @@ export function AdminNumbersV2({
       </OpsConfirm>
 
       <OpsConfirm
-        open={confirm === "release" && !!it && !locked}
+        open={confirm === "release" && !!it}
         onClose={() => { if (!pending) setConfirm(null); }}
         onConfirm={(reason) => { void runJustRelease(reason || "Just release"); }}
         title="Release this number?"
@@ -598,7 +588,7 @@ export function AdminNumbersV2({
         {holdChoice(holdActs.chooseOnRelease)}
       </OpsConfirm>
       <OpsConfirm
-        open={confirm === "archive_release" && !!it && !locked}
+        open={confirm === "archive_release" && !!it}
         onClose={() => { if (!pending) setConfirm(null); }}
         onConfirm={(reason) => { void runArchiveRelease(reason); }}
         title="Archive the business and release this number?"
@@ -617,7 +607,7 @@ export function AdminNumbersV2({
       </OpsConfirm>
 
       <OpsConfirm
-        open={confirm === "hold" && !!it && !locked}
+        open={confirm === "hold" && !!it}
         onClose={() => { if (!pending) setConfirm(null); }}
         onConfirm={(reason) => {
           if (!it) return;
@@ -658,7 +648,7 @@ export function AdminNumbersV2({
       </OpsConfirm>
 
       <OpsConfirm
-        open={confirm === "end_hold" && !!it && !locked}
+        open={confirm === "end_hold" && !!it}
         onClose={() => { if (!pending) setConfirm(null); }}
         onConfirm={(reason) => {
           if (!it) return;
@@ -679,7 +669,7 @@ export function AdminNumbersV2({
       </OpsConfirm>
 
       <OpsConfirm
-        open={confirm === "restore" && !!it && !locked}
+        open={confirm === "restore" && !!it}
         onClose={() => { if (!pending) setConfirm(null); }}
         onConfirm={(reason) => {
           if (!it?.lastBusinessId) return;
