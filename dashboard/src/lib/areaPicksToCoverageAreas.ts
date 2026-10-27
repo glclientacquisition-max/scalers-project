@@ -25,6 +25,8 @@
  *      the picks before, not now) or now explicitly excluded it. Kept ids go first so the cap never cuts them.
  *   3. D1 anchor when only "ke" serves and step 1+2 give no ids: ke row moved_from ids, then the business county
  *      (last resort), each only if the picks cover it; else [] (never null: null hides the outside line), `anchorless`.
+ *      Home areas (anchor, or a kept id only ke covers) never take ke's fee: existing service_areas term unchanged,
+ *      else the fee of the folded moved_from row (its confirmed flag), else fee_mode "ask", null, unconfirmed.
  *   4. D2 fail closed: serving picks exist but no ids and no anywhere-Kenya -> `failClosed`: the writer keeps the
  *      stale list, warns the owner and logs unmapped_all. Never "[]" without anywhere-Kenya while picks serve.
  *   5. D3 exclusions can't be expressed: the covering area stays listed (wrong yes), `lossy`, owner sees a banner.
@@ -165,6 +167,8 @@ export function areaPicksToCoverageAreas(
     movedFrom?: string[] | null;
     /** Business county from its locations, tree id "county:<slug>" (D1 anchor c). */
     homeCounty?: string | null;
+    /** confirmed_at was set on the picks before this save (fee of a folded moved_from row). */
+    priorConfirmed?: boolean;
   } = {},
 ): CoverageMirror {
   const serving = picks.picks.filter((p) => p.serve);
@@ -253,17 +257,34 @@ export function areaPicksToCoverageAreas(
   const kept = ids.slice(0, COVERAGE_MIRROR_MAX);
   out.coverage_areas = kept;
   const defaultMode = opts.vertical === "home_services" ? "visit" : "delivery";
+  // Home areas (Brain, 27 Oct): an id that is only listed because anywhere in Kenya covers it (kept prior, or the D1
+  // anchor) keeps its own fee and never takes ke's fee_ksh: its existing term as is, else the fee its folded
+  // moved_from row had, else "ask".
+  const homeIds = new Set(
+    kept.filter((id) => {
+      const node = nodeFor.get(id);
+      return !node || resolveArea(picks, node).via === ROOT_ID;
+    }),
+  );
+  const movedIds = new Set(out.anchor?.from === "moved_from" ? out.anchor.ids : []);
   out.terms = kept.map((id) => {
     const node = nodeFor.get(id);
     const priorTerm = existingTerm(opts.priorServiceAreas, id);
-    if (!node && priorTerm) return { ...(priorTerm as MirrorAreaTerm), id };
-    // An id the tree can't place under a ke-only business takes ke's fee (same quote as anywhere else).
-    const fee = node ? resolveArea(picks, node).fee_kes : out.coverage_outside?.fee_ksh ?? null;
     const priorModes = Array.isArray(priorTerm?.modes) ? (priorTerm!.modes as unknown[]).map(String).filter((m) => MODES.has(m)) : [];
+    const modes = (priorModes.length ? priorModes : [defaultMode]) as MirrorAreaTerm["modes"];
     const eta = typeof priorTerm?.eta === "string" && priorTerm.eta.trim() ? priorTerm.eta.trim() : null;
+    if (homeIds.has(id)) {
+      if (priorTerm) return { ...(priorTerm as MirrorAreaTerm), id };
+      const folded = node && movedIds.has(id) ? opts.priorPicks?.picks.find((p) => p.node === node && p.serve) : null;
+      if (folded && folded.fee_kes != null) {
+        return { id, modes, fee_mode: "fixed", fee_ksh: folded.fee_kes, eta, source: "owner", confirmed: opts.priorConfirmed === true };
+      }
+      return { id, modes, fee_mode: "ask", fee_ksh: null, eta, source: "owner", confirmed: false };
+    }
+    const fee = node ? resolveArea(picks, node).fee_kes : null;
     return {
       id,
-      modes: (priorModes.length ? priorModes : [defaultMode]) as MirrorAreaTerm["modes"],
+      modes,
       fee_mode: fee != null ? "fixed" : "ask",
       fee_ksh: fee,
       eta,

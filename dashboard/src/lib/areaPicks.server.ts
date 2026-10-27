@@ -92,7 +92,8 @@ export async function saveAreaPicks(
   const written = await writeAreaPickRows(getSupabaseAdmin() as unknown as PicksClient, tenantId, rows);
   if (!written.ok) return { ok: false, error: written.error };
   const priorPicks = existing.ok && existing.row ? existing.row.picks : null;
-  return mirrorCoverageFromPicks(tenantId, clean, Boolean(confirmed_at), priorPicks, moved_from?.length ? moved_from : null);
+  const priorConfirmed = Boolean(existing.ok && existing.row?.confirmed_at);
+  return mirrorCoverageFromPicks(tenantId, clean, Boolean(confirmed_at), priorPicks, moved_from?.length ? moved_from : null, priorConfirmed);
 }
 
 /**
@@ -109,6 +110,8 @@ export async function mirrorCoverageFromPicks(
   priorPicks: AreaPicks | null = null,
   /** tenant_area_picks.moved_from, the D1 anchor for a ke-only business. */
   movedFrom: string[] | null = null,
+  /** The stored picks were confirmed before this save. */
+  priorConfirmed = false,
 ): Promise<MirrorResult> {
   const admin = getSupabaseAdmin();
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -132,6 +135,7 @@ export async function mirrorCoverageFromPicks(
       priorPicks: priorPicks ?? moveOverAreas(oldCoverageList(row)).picks,
       movedFrom,
       homeCounty: businessHomeCounty(normalizeBusinessLocations(row.business_locations)),
+      priorConfirmed,
     });
     const warning = mirrorWarning(mirror);
     if (mirror.failClosed) {

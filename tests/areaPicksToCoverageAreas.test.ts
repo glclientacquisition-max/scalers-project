@@ -319,17 +319,55 @@ test("D1 Nairobi ke-only: no prior coverage, anchor from the ke row's moved_from
   assert.equal(prodOutside.coverageDetail("Kisumu", { businessPolicies: policies }), "kenya");
 });
 
-test("D1 ke-only, nothing moved over: the business county is the last-resort anchor and takes ke's fee", async () => {
+test("D1 ke-only, nothing moved over: the business county is the last-resort anchor (asked fee, not ke's)", async () => {
   const m = await mapper();
   const a = await picksLib();
   const picks = a.setAreaDetail(a.emptyAreaPicks(), "ke", { serve: true, fee_kes: 1500, note: null });
   const out = m.areaPicksToCoverageAreas(picks, { homeCounty: "county:nairobi", confirmed: true });
   assert.deepEqual(out.coverage_areas, ["county:nairobi"]);
   assert.deepEqual(out.anchor, { ids: ["county:nairobi"], from: "business_county" });
-  assert.equal(out.terms[0].fee_ksh, 1500);
   const none = m.areaPicksToCoverageAreas(picks, {});
   assert.deepEqual(none.coverage_areas, []);
   assert.equal(none.anchorless, true);
+});
+
+test("home area fee (Brain): business county under ke at KSh 1500 is not quoted 1500; outside line still 1500; existing home term passes through", async () => {
+  const m = await mapper();
+  const a = await picksLib();
+  const picks = a.setAreaDetail(a.emptyAreaPicks(), "ke", { serve: true, fee_kes: 1500, note: null });
+  const env = { env: { VOICE_AREA_FEES: "on" } };
+
+  const fresh = m.areaPicksToCoverageAreas(picks, { homeCounty: "county:nairobi", confirmed: true });
+  assert.deepEqual(fresh.terms[0], { id: "county:nairobi", modes: ["delivery"], fee_mode: "ask", fee_ksh: null, eta: null, source: "owner", confirmed: false });
+  assert.deepEqual(fresh.coverage_outside, { anywhere_kenya: true, fee_ksh: 1500 });
+  const policies = m.applyCoverageMirrorToPolicies({}, fresh);
+  const sa = m.applyCoverageMirrorToServiceAreas({}, fresh);
+  const t = prodTerms.readAreaTerms(sa, env).areas.find((x: { id: string }) => x.id === "county:nairobi");
+  assert.notEqual(t?.feeKsh, 1500, "home county never quoted ke's fee");
+  assert.equal(prodOutside.readCoverageOutside(policies).feeKsh, 1500, "outside line still KSh 1500");
+
+  const homeTerm = { id: "county:nairobi", modes: ["visit"], fee_mode: "fixed", fee_ksh: 300, eta: "same day", source: "owner", confirmed: true };
+  const kept = m.areaPicksToCoverageAreas(picks, {
+    confirmed: false,
+    priorCoverage: ["county:nairobi"],
+    priorServiceAreas: { areas: [homeTerm] },
+    homeCounty: "county:mombasa",
+  });
+  assert.deepEqual(kept.coverage_areas, ["county:nairobi"]);
+  assert.deepEqual(kept.terms[0], homeTerm, "existing home term unchanged");
+  assert.deepEqual(kept.coverage_outside, { anywhere_kenya: true, fee_ksh: 1500 });
+});
+
+test("home area fee from the folded moved_from row, with its confirmed flag", async () => {
+  const m = await mapper();
+  const a = await picksLib();
+  const before = a.setAreaDetail(a.emptyAreaPicks(), "county:nairobi", { serve: true, fee_kes: 400, note: null });
+  const picks = a.setAreaDetail(a.emptyAreaPicks(), "ke", { serve: true, fee_kes: 1500, note: null });
+  const out = m.areaPicksToCoverageAreas(picks, { movedFrom: ["county:nairobi"], priorPicks: before, priorConfirmed: true });
+  assert.deepEqual(out.anchor, { ids: ["county:nairobi"], from: "moved_from" });
+  assert.equal(out.terms[0].fee_mode, "fixed");
+  assert.equal(out.terms[0].fee_ksh, 400);
+  assert.equal(out.terms[0].confirmed, true);
 });
 
 test("D1 never resurrects an excluded area as the anchor", async () => {
@@ -492,7 +530,7 @@ test("every dashboard write to tenant_area_picks also writes the coverage mirror
   const mirrorFn = server.slice(server.indexOf("export async function mirrorCoverageFromPicks"));
   assert.ok(mirrorFn.indexOf("if (mirror.failClosed)") > 0 && mirrorFn.indexOf("if (mirror.failClosed)") < mirrorFn.indexOf(".update("));
   assert.match(mirrorFn, /unmapped_all/);
-  assert.match(mirrorFn, /movedFrom,\s*homeCounty: businessHomeCounty/);
+  assert.match(mirrorFn, /movedFrom,\s*homeCounty: businessHomeCounty[^\n]*\n\s*priorConfirmed,/);
 });
 
 test("every Desk save path reaches saveAreaPicks (settings page, onboarding step, confirm nudge)", () => {
