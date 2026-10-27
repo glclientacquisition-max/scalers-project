@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase";
-import type { NumberRow, WaitingBusiness } from "@/lib/ops/numbersView";
+import type { MoveTarget, NumberRow, WaitingBusiness } from "@/lib/ops/numbersView";
 
 type Raw = {
   id: string; created_at: string; e164: string; status: string; tenant_id: string | null; assigned_at: string | null;
@@ -12,7 +12,7 @@ const HOLD = ", quarantine_until, quarantined_at, last_tenant_id";
 const WINBACK = ", winback_hold";
 
 /** Numbers v2 (ADMIN_V2). Read-only. Hold / win-back columns are optional so an older schema still loads. */
-export async function loadNumbersV2(): Promise<{ rows: NumberRow[]; waiting: WaitingBusiness[] }> {
+export async function loadNumbersV2(): Promise<{ rows: NumberRow[]; waiting: WaitingBusiness[]; targets: MoveTarget[] }> {
   const admin = getSupabaseAdmin();
   let data: unknown[] | null = null;
   const withWinback = await admin.from("sautikit_did_pool").select(BASE + HOLD + WINBACK).order("e164");
@@ -68,5 +68,23 @@ export async function loadNumbersV2(): Promise<{ rows: NumberRow[]; waiting: Wai
     name: t.business_name || "Unnamed business",
     since: t.created_at,
   }));
-  return { rows, waiting };
+  return { rows, waiting, targets: await loadMoveTargets() };
+}
+
+/**
+ * Businesses a number can move to: active, not archived, not suspended, no live line.
+ * Best effort: a failure leaves Move with an empty list (it says why) instead of breaking Numbers.
+ */
+async function loadMoveTargets(): Promise<MoveTarget[]> {
+  const q = await getSupabaseAdmin()
+    .from("tenants")
+    .select("id, business_name, sautikit_virtual_number, suspended_at")
+    .eq("is_active", true)
+    .is("archived_at", null)
+    .order("business_name", { ascending: true })
+    .limit(500);
+  if (q.error) return [];
+  return ((q.data || []) as { id: string; business_name: string | null; sautikit_virtual_number: string | null; suspended_at: string | null }[])
+    .filter((t) => !t.suspended_at && (!t.sautikit_virtual_number || /^pending:/i.test(t.sautikit_virtual_number)))
+    .map((t) => ({ id: String(t.id), name: t.business_name || "Unnamed business" }));
 }
