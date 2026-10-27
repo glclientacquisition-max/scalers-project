@@ -48,7 +48,7 @@ for (const r of remakes) {
       assert.match(ui, /UnlockCta/, r.name);
       assert.match(read("dashboard/src/components/ops/UnlockCta.tsx"), /Unlock to edit/);
     }
-    assert.match(screen, /ADMIN_V2 === "on"/, r.name);
+    assert.match(screen, /isAdminV2Enabled\(\)/, r.name);
     assert.match(screen, new RegExp(`Admin${r.name === "Audit" ? "Audit" : r.name}V2`), r.name);
     assert.match(dev, /AdminShell[^>]*v2/, r.name);
     assert.match(dev, new RegExp(r.tabs), r.name);

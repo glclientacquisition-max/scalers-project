@@ -20,7 +20,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `ADMIN_ENV` | desk | `dashboard/src/app/admin/(console)/%5Fkit/page.tsx` |
 | `ADMIN_STEP_UP_ALERT_EMAIL` | desk | `dashboard/src/lib/ops/stepUpStore.ts` |
 | `ADMIN_STEP_UP_KEY` | desk | `dashboard/src/app/api/admin/session/route.ts`<br>`dashboard/src/lib/auth.ts`<br>`dashboard/src/lib/ops/stepUpStore.ts` |
-| `ADMIN_V2` | desk | `dashboard/src/app/admin/(console)/_screens/AuditScreen.tsx`<br>`dashboard/src/app/admin/(console)/_screens/PackagesScreen.tsx`<br>`dashboard/src/app/admin/(console)/_screens/ServicesScreen.tsx`<br>+30 more |
+| `ADMIN_V2` | desk | `dashboard/src/lib/adminV2.ts` |
 | `AGENT_NAME` | voice | `server.js`<br>`src/db.js`<br>`src/prompts.js`<br>+1 more |
 | `ALERT_EMAIL_FROM` | desk, voice | `dashboard/src/lib/ownerEmail.ts`<br>`server.js`<br>`src/notifications/email.js` |
 | `BACHS_API_KEY` | desk | `dashboard/src/lib/adminPayRead.ts`<br>`dashboard/src/lib/billingRuntimeSettings.ts`<br>`dashboard/src/lib/invoicePay/provider.js` |

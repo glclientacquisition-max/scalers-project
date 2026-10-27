@@ -63,7 +63,7 @@ describe("split pane layout", () => {
 
 describe("admin v2 shell", () => {
   it("is behind ADMIN_V2=on", () => {
-    assert.match(layout, /v2=\{process\.env\.ADMIN_V2 === "on"\}/);
+    assert.match(layout, /v2=\{isAdminV2Enabled\(\)\}/);
   });
   it("sidebar is 200px with labels and collapses to 56px", () => {
     assert.match(rule(v2css, ".admin-side"), /width: 200px/);

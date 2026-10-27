@@ -35,7 +35,7 @@ test("search matches local digits and business names", async () => {
 
 test("Numbers v2 is behind ADMIN_V2; Assign/Release/Hold write via OpsConfirm + number-hold API", () => {
   const page = read("dashboard/src/app/admin/(console)/numbers/page.tsx");
-  assert.match(page, /ADMIN_V2 === "on"/);
+  assert.match(page, /isAdminV2Enabled\(\)/);
   assert.match(page, /holdPolicyFromSettings/);
   const ui = read("dashboard/src/components/admin/v2/AdminNumbersV2.tsx");
   assert.match(ui, /OpsConfirm/);

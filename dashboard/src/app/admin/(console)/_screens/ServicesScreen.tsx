@@ -7,6 +7,7 @@ import { PlatformRunBoard } from "@/components/PlatformRunBoard";
 import { logAdminError } from "@/lib/adminErrors";
 import { readPlatformOps } from "@/lib/platformOps";
 import { requireSuperAdmin } from "@/lib/adminGuard";
+import { isAdminV2Enabled } from "@/lib/adminV2";
 
 export async function ServicesScreen() {
   await requireSuperAdmin();
@@ -18,13 +19,13 @@ export async function ServicesScreen() {
     return <AdminSetupError />;
   }
 
-  if (process.env.ADMIN_V2 === "on") {
+  if (isAdminV2Enabled()) {
     return <AdminServicesV2 snapshot={snapshot} />;
   }
 
   return (
     <div className="space-y-4">
-      <AdminPageHeader title={process.env.ADMIN_V2 === "on" ? "Services" : "Platform"} subtitle="Health, open notices, and who to alert." />
+      <AdminPageHeader title={isAdminV2Enabled() ? "Services" : "Platform"} subtitle="Health, open notices, and who to alert." />
       <AdminOpsNotices notices={snapshot.notices.filter((notice) => notice.status === "open")} />
       <PlatformRunBoard />
       <AdminPlatformOpsForm settings={snapshot.settings} persisted={snapshot.persisted} />
