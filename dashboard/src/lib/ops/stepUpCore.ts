@@ -96,7 +96,7 @@ export const ADMIN_WRITE_ROUTES: AdminWriteRoute[] = [
     prefix: "number-ops",
     risky: ["restore", "lift_quarantine", "move"],
     safe: [],
-    note: "Admin number controls v1 (#968 RPCs). Always needs Unlock + reason; protected line refused before the RPC.",
+    note: "Admin number controls v1 (#968 RPCs). Always needs Unlock + reason; every number treated the same (no protected line).",
   },
   {
     file: "admin/package-versions", area: "billing",
