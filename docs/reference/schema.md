@@ -25,7 +25,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_company` | `address`, `city`, `email`, `id`, `kra_pin`, `legal_name`, `phone`, `product`, `updated_at` | `docs/supabase/billing_company.sql` |
 | `billing_features` | `key`, `label` | `docs/supabase/billing_data_layer.sql` |
 | `billing_invoice_counters` | `last_number`, `year` | `docs/supabase/billing_data_layer.sql` |
-| `billing_lifecycle_settings` | `bachs_payments_mode`, `billing_notices_send`, `desk_plan_change_enabled`, `id`, `live_payments_master`, `new_signup_trial_enabled`, `package_editor_enabled`, `price_change_approval_threshold_kes`, `shadow_invoices`, `updated_at`, `voicemail_hold_days` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/billing_payment_runtime_flags.sql`<br>`docs/supabase/package_version_editor.sql` |
+| `billing_lifecycle_settings` | `bachs_payments_mode`, `billing_notices_send`, `desk_plan_change_enabled`, `hold_winback_enabled`, `id`, `live_payments_master`, `new_signup_trial_enabled`, `number_hold_days`, `package_editor_enabled`, `price_change_approval_threshold_kes`, `reactivation_fee_kes`, `shadow_invoices`, `updated_at`, `voicemail_hold_days` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/billing_payment_runtime_flags.sql`<br>`docs/supabase/number_hold_winback.sql`<br>`docs/supabase/package_version_editor.sql` |
 | `billing_live_tenants` | `enabled`, `reason`, `set_at`, `set_by`, `tenant_id` | `docs/supabase/invoice_pay_live_allowlist.sql` |
 | `billing_notices` | `audience`, `billed_to`, `body`, `channel`, `claimed_at`, `created_at`, `delivery_status`, `fallback`, `id`, `idempotency_key`, `kind`, `last_error`, `notify_send_id`, `read_at`, `recipient`, `tenant_id`, `title` | `docs/supabase/billing_data_layer.sql` |
 | `billing_owner_action_keys` | `action`, `created_at`, `idempotency_key`, `result`, `tenant_id` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
@@ -55,7 +55,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `platform_soniox_voices` | `created_at`, `description`, `id`, `is_active`, `is_default`, `sort_order`, `updated_at` | `docs/supabase/soniox_voice_id.sql` |
 | `push_subscriptions` | `auth`, `created_at`, `device_label`, `disabled_at`, `endpoint`, `fail_count`, `id`, `last_ok_at`, `p256dh`, `platform`, `provider`, `tenant_id`, `user_id` | `docs/supabase/push_subscriptions.sql` |
 | `rate_limit_hits` | `bucket`, `hits`, `window_start` | `supabase/migrations/20261011150000_onboarding_setup.sql` |
-| `sautikit_did_pool` | `assigned_at`, `created_at`, `e164`, `id`, `last_tenant_id`, `notes`, `quarantine_until`, `quarantined_at`, `sautikit_number_id`, `status`, `tenant_id` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/did_number_pool.sql` |
+| `sautikit_did_pool` | `assigned_at`, `created_at`, `e164`, `id`, `last_tenant_id`, `notes`, `quarantine_until`, `quarantined_at`, `sautikit_number_id`, `status`, `tenant_id`, `winback_hold` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/did_number_pool.sql`<br>`docs/supabase/number_hold_winback.sql` |
 | `service_requests` | `call_id`, `caller_name`, `caller_phone`, `contact_id`, `created_at`, `id`, `inbox_archived_at`, `item`, `metadata`, `notes`, `quantity`, `request_type`, `status`, `tenant_id`, `updated_at`, `when_text`, `window_end`, `window_start` | `docs/supabase/contacts_and_requests.sql`<br>`docs/supabase/inbox_archive_cascade.sql`<br>`docs/supabase/service_request_windows.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `subscription_events` | `actor`, `created_at`, `detail`, `from_status`, `id`, `reason`, `tenant_id`, `to_status` | `docs/supabase/billing_data_layer.sql` |
 | `tenant_credits` | `amount_kes`, `created_at`, `id`, `idempotency_key`, `payment_id`, `reason`, `tenant_id` | `docs/supabase/billing_data_layer.sql` |
@@ -85,7 +85,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (239)
+## Functions (245)
 
 | Function | Defined in |
 | --- | --- |
@@ -154,7 +154,9 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `admin_archive_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_discard_package_version_draft` | `docs/supabase/package_version_editor.sql` |
 | `admin_draft_package_version` | `docs/supabase/package_version_editor.sql` |
+| `admin_end_number_hold` | `docs/supabase/number_hold_winback.sql` |
 | `admin_export_package_version` | `docs/supabase/package_version_editor.sql` |
+| `admin_hold_number_for_winback` | `docs/supabase/number_hold_winback.sql` |
 | `admin_import_promoted_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_issue_credit_note` | `docs/supabase/admin_invoice_actions.sql` |
 | `admin_lift_quarantine` | `docs/supabase/admin_number_controls_v1.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql` |
@@ -163,10 +165,12 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `admin_move_subscribers_to_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_publish_package_version` | `docs/supabase/package_version_editor.sql` |
 | `admin_restore_business_number` | `docs/supabase/admin_number_controls_v1.sql`<br>`supabase/migrations/20261027081642_admin_number_controls_v1.sql` |
+| `admin_restore_held_number` | `docs/supabase/number_hold_winback.sql` |
 | `admin_set_billing_runtime_switch` | `docs/supabase/billing_payment_runtime_flags.sql` |
 | `admin_set_business_suspended` | `docs/supabase/admin_business_suspend.sql` |
 | `admin_set_invoice_dispute` | `docs/supabase/admin_invoice_actions.sql` |
 | `admin_set_new_signup_trial` | `docs/supabase/package_version_editor.sql` |
+| `admin_set_number_hold_settings` | `docs/supabase/number_hold_winback.sql` |
 | `admin_set_package_editor_enabled` | `docs/supabase/billing_package_editor_flag.sql` |
 | `admin_set_price_approval_threshold` | `docs/supabase/package_version_editor.sql` |
 | `admin_set_tenant_billing_mode` | `docs/supabase/package_version_editor.sql` |
@@ -250,6 +254,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `member_can_write` | `supabase/migrations/20261011000000_team_invites.sql` |
 | `mint_invoice_pay_token` | `docs/supabase/invoice_pay.sql` |
 | `notify_sends_deny_mutation` | `docs/supabase/notify_send_ledger.sql`<br>`docs/supabase/notify_send_reserve_settle.sql`<br>`docs/supabase/purge_archived_tenants.sql` |
+| `number_on_winback_hold` | `docs/supabase/number_hold_winback.sql` |
 | `open_checkout_total_review` | `docs/supabase/invoice_pay_checkout_review.sql`<br>`docs/supabase/invoice_pay_checkout_review_round8.sql`<br>`docs/supabase/invoice_pay_checkout_review_round9.sql` |
 | `owner_cancel_plan_change` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `owner_change_plan` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
@@ -286,6 +291,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `resolve_checkout_total_review` | `docs/supabase/invoice_pay_amount_paid_either.sql`<br>`docs/supabase/invoice_pay_checkout_review.sql`<br>`docs/supabase/invoice_pay_checkout_review_round8.sql`<br>`docs/supabase/invoice_pay_checkout_review_round9.sql` |
 | `roll_package_periods` | `docs/supabase/package_period_rollover.sql` |
 | `sautikit_did_pool_quarantine_guard` | `docs/supabase/billing_data_layer.sql` |
+| `sautikit_did_pool_winback_guard` | `docs/supabase/number_hold_winback.sql` |
 | `save_call_setup` | `supabase/migrations/20261018130000_tenant_call_setup.sql` |
 | `save_daily_bulletin` | `supabase/migrations/20261012210000_three_features.sql` |
 | `save_onboarding_step` | `supabase/migrations/20261011150000_onboarding_setup.sql` |
