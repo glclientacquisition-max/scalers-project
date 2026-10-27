@@ -262,36 +262,48 @@ async function runTurn({ replyDelayMs, env }) {
   const step = { say: 'What time do you open today please?', u: U({ intent: 'ask', answers: ['hours'] }), reply: 'We open at 7:30 AM today.' };
   set(step);
   const { gate, ev, fillers } = harness();
+  const t0 = Date.now();
+  const tee = (x) => { if (x && x.filler) ev.push({ kind: 'brain_emit', ms: Date.now() - t0, s: x }); gate.onSentence(x); };
+  const origPlay = ev.push.bind(ev);
+  ev.push = (e) => origPlay(e.kind === 'filler' ? { ...e, ms: Date.now() - t0 } : e);
   gate.arm(); // Voice arms its 900 ms filler as the turn starts (server.js order)
-  const r = await live.run({ text: step.say, profile: PROFILE, onSentence: gate.onSentence });
+  const r = await live.run({ text: step.say, profile: PROFILE, onSentence: tee });
   gate.cancel();
   const fin = await gate.finish(r);
   await new Promise((res) => setTimeout(res, 300)); // nothing fires late
-  return { r, ev, fillers: fillers(), fin, lines: ev.filter((e) => e.kind === 'line').map((e) => e.text) };
+  return { r, ev, fillers: fillers().map(({ ms, ...f }) => f), fillerMs: fillers().map((f) => f.ms), emits: ev.filter((e) => e.kind === 'brain_emit'), fin, lines: ev.filter((e) => e.kind === 'line').map((e) => e.text) };
 }
 
 test('e2e #975: slow reply -> Brain filler at 700 ms, Voice 900 ms filler stands down, line spoken once', async () => {
-  const { r, fillers, lines, fin } = await runTurn({ replyDelayMs: 1200 });
+  const { r, fillers, lines, fin, emits } = await runTurn({ replyDelayMs: 1200 });
   assert.equal(r.streamed, true);
-  assert.equal(r.filler, 'Let me check our hours.');
+  assert.equal(r.filler, 'Checking our hours.');
+  // #975 @7df64505 contract: { text, lang, filler: true, uncuttable: true }, once per turn, <= 3 words
+  assert.equal(emits.length, 1);
+  assert.equal(emits[0].s.uncuttable, true);
+  assert.ok(emits[0].s.text.split(/\s+/).length <= 3);
   // filler stays out of live.line / sentences (so out of the transcript)
-  assert.doesNotMatch(r.line, /Let me check our hours/);
-  assert.ok(r.sentences.every((x) => !x.filler && !/Let me check our hours/.test(x.text)));
+  assert.doesNotMatch(r.line, /Checking our hours/);
+  assert.ok(r.sentences.every((x) => !x.filler && !/Checking our hours/.test(x.text)));
   assert.deepEqual(fillers.map((f) => f.src), ['brain']);
   assert.equal(lines.join(' '), r.line);
   assert.equal(lines.length, r.sentences.length);
   assert.notEqual(fin, null);
 });
 
-test('e2e #975: Brain filler disabled (BRAIN_ENGINES_FILLER_MS=0) -> Voice filler at 900 ms, exactly one', async () => {
-  const { fillers, lines, r } = await runTurn({ replyDelayMs: 1200, env: { BRAIN_ENGINES_FILLER_MS: '0' } });
+test('e2e #975: BRAIN_ENGINES_FILLER_MS=0 (Brain filler off) -> Voice 900 ms filler fires as today, exactly one', async () => {
+  const { fillers, fillerMs, emits, lines, r } = await runTurn({ replyDelayMs: 1200, env: { BRAIN_ENGINES_FILLER_MS: '0' } });
+  assert.equal(emits.length, 0);
   assert.deepEqual(fillers.map((f) => f.src), ['voice']);
+  assert.ok(fillerMs[0] >= 880 && fillerMs[0] < 1100, `voice filler at ${fillerMs[0]} ms`);
   assert.equal(lines.join(' '), r.line);
 });
 
-test('e2e #975: Brain filler later than Voice (BRAIN_ENGINES_FILLER_MS=1000) -> Voice filler only, Brain one dropped', async () => {
-  const { fillers } = await runTurn({ replyDelayMs: 1300, env: { BRAIN_ENGINES_FILLER_MS: '1000' } });
-  assert.deepEqual(fillers.map((f) => f.src), ['voice']);
+test('e2e #975: BRAIN_ENGINES_FILLER_MS=1000 is clamped to 850 by Brain -> Brain filler still first, Voice stands down', async () => {
+  const { fillers, emits } = await runTurn({ replyDelayMs: 1300, env: { BRAIN_ENGINES_FILLER_MS: '1000' } });
+  assert.deepEqual(fillers.map((f) => f.src), ['brain']);
+  assert.ok(emits[0].ms < 900, `brain filler at ${emits[0].ms} ms`);
+  // the 900+ drop case (a Brain filler after Voice's) stays covered by the unit test above
 });
 
 test('e2e #975: fast turn -> no filler at all', async () => {
