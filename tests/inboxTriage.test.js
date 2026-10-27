@@ -72,8 +72,9 @@ describe("inbox overflow persistence", () => {
     assert.doesNotMatch(ui, /unread: boolean/);
   });
 
-  it("archives Delete through the existing lead_status path", () => {
-    assert.match(actions, /updateLeadStatus\(item\.callId, "archived"\)/);
+  it("archives Delete through the archive transaction, never a delete", () => {
+    // Archive is one transaction now (inbox_archive_calls: the call plus its open holds and visits).
+    assert.match(actions, /inboxArchiveCallsAction\(\[callId\]\)/);
     assert.match(actions, /return inboxArchive\(item\)/);
     assert.doesNotMatch(select, /inboxDelete/);
     assert.doesNotMatch(overflow, /inboxDelete/);

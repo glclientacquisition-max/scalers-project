@@ -78,7 +78,9 @@ test('repeat failures to one caller text once per window', () => {
 test('server hooks text-back into the terminal webhook path', () => {
   const server = read('server.js');
   assert.match(server, /require\('\.\/src\/notifications\/missedTextback'\)/);
-  assert.match(server, /maybeSendMissedTextback\(\{ callSid, call: updated \}\)/);
+  // The terminal path moved to src/callFinalize.js; server.js injects the sender.
+  assert.match(server, /maybeSendMissedTextback: \(\.\.\.args\) => maybeSendMissedTextback\(\.\.\.args\)/);
+  assert.match(read('src/callFinalize.js'), /maybeSendMissedTextback\(\{ callSid, call \}\)/);
   assert.match(server, /textbackInProgress/);
   assert.match(server, /missedTextbackEnabled\(notifyChannels\)/);
   assert.match(server, /listRecentCallsFromNumber\(\{/);
