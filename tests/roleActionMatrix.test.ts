@@ -41,7 +41,7 @@ const EXPECT: Record<string, Array<"admin" | "staff" | "viewer">> = {
   confirmPriceAction: ["admin"], saveBusinessCategoryAction: ["admin"], correctCallFactsAction: ["admin", "staff"], addFaqFromInsightAction: ["admin"],
   previewCatalogImportAction: ["admin"], applyCatalogImportAction: ["admin"], extractKnowledgeAction: ["admin"], applyIngestAction: ["admin"],
   screenPronunciationSuggestionsAction: ["admin"], confirmPronunciationRecording: ["admin"], persistPronunciationLexicon: ["admin"], minePronunciationFromCallsAction: ["admin"], quickAddPronunciationAction: ["admin"],
-  loadPronunciationReviewQueueAction: ["admin", "viewer"], geminiScanRecentCallsAction: ["admin"], approveGeminiScanCandidateAction: ["admin"], dismissGeminiScanCandidateAction: ["admin"], queueGeminiCandidateForRecordingAction: ["admin"],
+  loadPronunciationReviewQueueAction: ["admin", "staff", "viewer"], geminiScanRecentCallsAction: ["admin"], approveGeminiScanCandidateAction: ["admin"], dismissGeminiScanCandidateAction: ["admin"], queueGeminiCandidateForRecordingAction: ["admin"],
   inviteMemberAction: ["admin"], resendInviteAction: ["admin"], revokeInviteAction: ["admin"], changeMemberRoleAction: ["admin"], removeMemberAction: ["admin"], transferOwnershipAction: [],
   saveOnDemandUsage: ["admin"],
   confirmPlanChange: ["admin"], setExtraSeatsAction: ["admin"], markBillingNoticeRead: ["admin"],
@@ -71,10 +71,7 @@ for (const role of ROLES) {
 
 it("read actions never let viewers in while refusing staff", () => {
   const perms = actionPerms();
-  // Known exception, owned by the pronunciation work, not changed here.
-  const SKIP = new Set(["loadPronunciationReviewQueueAction"]);
   for (const [fn, perm] of Object.entries(perms)) {
-    if (SKIP.has(fn)) continue;
     if (can("viewer", perm)) assert.ok(can("staff", perm), `${fn} (${perm}) lets viewers in but not staff`);
   }
 });
