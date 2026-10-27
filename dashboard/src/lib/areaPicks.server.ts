@@ -1,6 +1,12 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { emptyAreaPicks, moveOverAreas, normalizeAreaPicks, type AreaPicks } from "@/lib/areaPicks";
+import {
+  applyCoverageMirrorToPolicies,
+  applyCoverageMirrorToServiceAreas,
+  areaPicksToCoverageAreas,
+} from "@/lib/areaPicksToCoverageAreas";
+import { bustTenantCache } from "@/lib/tenantCache";
 
 export type AreaPicksRow = { picks: AreaPicks; confirmed_at: string | null; moved_from: string[] | null };
 export type AreaPicksLoad = { ok: true; row: AreaPicksRow | null } | { ok: false; error: string };
@@ -69,7 +75,7 @@ export async function saveAreaPicks(
   const admin = getSupabaseAdmin();
   const del = await admin.from("tenant_area_picks").delete().eq("tenant_id", tenantId);
   if (del.error) return { ok: false, error: del.error.message };
-  if (!clean.picks.length) return { ok: true };
+  if (!clean.picks.length) return mirrorCoverageFromPicks(tenantId, clean, Boolean(confirmed_at));
   const payload = clean.picks.map((p) => ({
     tenant_id: tenantId,
     node: p.node,
@@ -84,7 +90,67 @@ export async function saveAreaPicks(
   }));
   const res = await admin.from("tenant_area_picks").insert(payload);
   if (res.error) return { ok: false, error: res.error.message };
-  return { ok: true };
+  return mirrorCoverageFromPicks(tenantId, clean, Boolean(confirmed_at));
+}
+
+/**
+ * Compat for prod Voice (no tenant_area_picks reader): write the same picks into
+ * business_policies.coverage_areas / coverage_outside and service_areas terms
+ * (lib/areaPicksToCoverageAreas.ts). Compare-and-set on business_policies so a
+ * Policies save in between is never overwritten.
+ */
+export async function mirrorCoverageFromPicks(
+  tenantId: string,
+  picks: AreaPicks,
+  confirmed: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const admin = getSupabaseAdmin();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data, error } = await admin
+      .from("tenants")
+      .select("business_policies, service_areas, vertical")
+      .eq("id", tenantId)
+      .maybeSingle();
+    if (error || !data) return { ok: false, error: error?.message ?? "tenant not found" };
+    const mirror = areaPicksToCoverageAreas(picks, {
+      confirmed,
+      vertical: (data as { vertical?: string | null }).vertical ?? null,
+      priorServiceAreas: data.service_areas,
+    });
+    if (mirror.unmapped.length || mirror.lossy.length || mirror.overflow) {
+      console.warn(
+        `[area_picks] coverage mirror tenant=${tenantId} unmapped=${mirror.unmapped.length} lossy=${mirror.lossy.length} overflow=${mirror.overflow}`,
+      );
+    }
+    const before = data.business_policies ?? null;
+    let q = admin
+      .from("tenants")
+      .update({
+        business_policies: applyCoverageMirrorToPolicies(before, mirror),
+        service_areas: applyCoverageMirrorToServiceAreas(data.service_areas, mirror),
+      })
+      .eq("id", tenantId);
+    q = before == null ? q.is("business_policies", null) : q.eq("business_policies", JSON.stringify(before));
+    const upd = await q.select("id");
+    if (upd.error) return { ok: false, error: upd.error.message };
+    if ((upd.data ?? []).length === 1) {
+      bustTenantCache(tenantId);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: "changed while saving" };
+}
+
+/**
+ * The old list the owner still has to check: the moved_from list once a picks row exists
+ * (the mirror rewrites coverage_areas on every save), else the legacy coverage fields.
+ */
+export function pendingOldList(
+  tenant: { service_areas?: unknown; business_policies?: unknown },
+  row: AreaPicksRow | null,
+): string[] {
+  if (row) return row.moved_from ?? [];
+  return oldCoverageList(tenant);
 }
 
 export { emptyAreaPicks, moveOverAreas };

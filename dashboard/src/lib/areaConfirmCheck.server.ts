@@ -1,6 +1,6 @@
 import "server-only";
 import type { OverviewDataCheck } from "@/components/structured/OverviewDataChecksCard";
-import { loadAreaPicks, oldCoverageList } from "@/lib/areaPicks.server";
+import { loadAreaPicks, pendingOldList } from "@/lib/areaPicks.server";
 
 /**
  * Desk home "Is this right?" row while the moved-over old area list is unchecked.
@@ -9,7 +9,7 @@ import { loadAreaPicks, oldCoverageList } from "@/lib/areaPicks.server";
 export async function areaConfirmCheck(tenant: { id: string; service_areas?: unknown; business_policies?: unknown }): Promise<OverviewDataCheck | null> {
   const loaded = await loadAreaPicks(tenant.id);
   if (!loaded.ok) return null;
-  if (!oldCoverageList(tenant).length || loaded.row?.confirmed_at) return null;
+  if (!pendingOldList(tenant, loaded.row).length || loaded.row?.confirmed_at) return null;
   return {
     kind: "link",
     href: "/settings/areas?view=check",
