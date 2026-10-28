@@ -25,29 +25,65 @@ function quality(tenantId) {
 /** The live snapshot passed readiness (quality signal only). */
 const isReady = (k) => kbQuality(k) === 'ready';
 
+let EMPTY = null;
+/** The empty snapshot (no items, doc.complete false): what a call gets when its snapshot cannot be loaded. */
+function emptyDoc() {
+  if (!EMPTY) { EMPTY = require('./compile').compileKb({ items: [], categories: [], business: null }).doc; Object.freeze(EMPTY); }
+  return EMPTY;
+}
+
 /**
- * Mutates and returns the profile. extras.kb = { version, readyVersion, brainMode, doc, bytes, loadMs } | null.
- * Gate on: any business with a live snapshot gets profile.kb (readiness does not gate it; an empty snapshot is fine)
- * and the legacy catalogue fields projected from it. profile.brainMode ('full' | 'safe') is pinned for the call.
+ * Mutates and returns the profile. extras.kb = { version, readyVersion, brainMode, brainModeSource, doc, bytes, loadMs,
+ * loadError } | null. Gate on: every business gets profile.kb (readiness does not gate it) and the legacy catalogue
+ * fields projected from it. A snapshot that did not load (none published, DB error, missing row) is an EMPTY snapshot
+ * (doc.complete false: Brain B1 treats the catalogue as empty), logged, never the old brain.
+ * profile.brainMode / brainModeSource stay the tenants strings (B1's adapter reads them); the shared decision
+ * { mode, reason } is pinned on profile.brainModeDecision.
  */
 function attach(profile, kbExtras, { env = process.env, force = false } = {}) {
   if (!profile) return profile;
   const k = kbExtras || null;
-  const facts = k ? { version: k.version ?? null, readyVersion: k.readyVersion ?? null, brainMode: k.brainMode || 'full', brainModeSource: k.brainModeSource || null } : null;
+  if (profile.brainMode == null && k && k.brainMode) profile.brainMode = String(k.brainMode);
+  if (profile.brainModeSource == null && k && k.brainModeSource) profile.brainModeSource = String(k.brainModeSource);
+  const facts = k ? { version: k.version ?? null, readyVersion: k.readyVersion ?? null, brainMode: profile.brainMode || 'full', brainModeSource: profile.brainModeSource || null } : null;
   const info = { ready: isReady(facts), version: facts?.version ?? null, readyVersion: facts?.readyVersion ?? null, quality: kbQuality(facts) };
-  profile.brainMode = brainMode(facts, { safeEnv: env.BRAIN_SAFE_MODE });
-  if (!force) note(profile.id, { ...info, facts, brainMode: profile.brainMode.mode });
+  profile.brainModeDecision = brainMode({ brainMode: profile.brainMode, brainModeSource: profile.brainModeSource }, { safeEnv: env.BRAIN_SAFE_MODE });
   // gate off = kill switch (env lists, no snapshot). The readiness runner forces an attach to test a snapshot.
-  if (!k || !k.doc || (!force && !gateOn(env))) return profile;
-  const handle = R.cached(profile.id, k.version, k.doc, k.bytes);
+  if (!force && !gateOn(env)) { note(profile.id, { ...info, facts, brainMode: profile.brainModeDecision, empty: null }); return profile; }
+  if (force && (!k || !k.doc)) return profile;
+  let doc = k && k.doc;
+  let loadError = false;
+  if (!doc) {
+    doc = emptyDoc(); loadError = true;
+    console.warn(`[kb] snapshot not loaded tenant=${profile.id} version=${facts?.version ?? 'none'}${k && k.loadError ? ` error=${k.loadError}` : ''} -> empty snapshot (doc.complete false)`);
+  }
+  if (!force) note(profile.id, { ...info, facts, brainMode: profile.brainModeDecision, empty: loadError || !(doc.items && doc.items.length) });
+  const handle = R.cached(profile.id, loadError ? 'empty' : k.version, doc, loadError ? null : k.bytes);
   if (!handle) return profile;
-  profile.kb = { ...info, handle, loadMs: k.loadMs ?? null, items: k.doc.items.length };
-  const legacy = docToLegacy(k.doc);
+  profile.kb = { ...info, handle, loadMs: k ? k.loadMs ?? null : null, items: doc.items.length, loadError, complete: doc.complete === true };
+  const legacy = docToLegacy(doc);
   if (legacy) { profile.servicesCatalog = legacy.servicesCatalog; profile.productCatalog = legacy.productCatalog; profile.kbProjected = true; }
   // the old free-text services line (tenants.services_offered, now a derived copy) is not read on the KB path:
   // every caller-facing reader goes through kb/source.js (groups for the greeting, item descriptions for notes)
   profile.servicesOffered = null;
   return profile;
+}
+/**
+ * /healthz counts, pure: tenants rows { id, kb_live_version, brain_mode?, brain_mode_source? } and a Map
+ * `${tenant}:${version}` -> live snapshot item_count. Numbers only, never ids.
+ */
+function healthTally(rows, itemCounts, { safeEnv } = {}) {
+  const safe = { env: 0, owner: 0, admin: 0 };
+  let missing = 0; let empty = 0;
+  for (const t of rows || []) {
+    const m = brainMode(t, { safeEnv });
+    if (m.mode === 'safe' && safe[m.reason] != null) safe[m.reason] += 1;
+    const key = `${t.id}:${t.kb_live_version}`;
+    if (t.kb_live_version == null || !itemCounts || !itemCounts.has(key)) missing += 1;
+    else if (!Number(itemCounts.get(key))) empty += 1;
+  }
+  const n = (rows || []).length;
+  return { tenants: n, safe_mode: { total: safe.env + safe.owner + safe.admin, ...safe }, snapshot_missing: missing, snapshot_empty: empty, empty_or_missing: missing + empty };
 }
 const handle = (profile) => (profile && profile.kb && profile.kb.handle) || null;
 
@@ -67,4 +103,4 @@ function promptIndex(profile) {
   return h ? h.doc.index : null;
 }
 
-module.exports = { gateOn, decision, quality, note, attach, handle, knownNumbers, promptIndex, isReady, _REG: REG };
+module.exports = { gateOn, decision, quality, note, attach, emptyDoc, healthTally, handle, knownNumbers, promptIndex, isReady, _REG: REG };

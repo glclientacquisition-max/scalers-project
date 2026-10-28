@@ -11,6 +11,10 @@
 -- Members read the columns with their row (tenants_select_member). No column UPDATE grant for authenticated / anon;
 -- the restrictive tenants_update_admin_only policy stays. tenants.brain_target is left in place (read-free from P1)
 -- and dropped one release later by kb_v2_drop_brain_target.sql (P2).
+-- Also the owner's catalogue-complete mark: tenants.kb_catalogue_complete_at / _by, written only through
+-- public.set_kb_catalogue_complete(p_tenant, p_complete, p_actor) (same checks as set_brain_mode) with
+-- public.tenant_kb_catalogue_complete_audit. Compile stamps doc.complete / doc.complete_at into every snapshot (the
+-- mark is part of the source hash), and the caller recompiles after a set / clear. No mark = doc.complete false (sparse).
 -- Idempotent. Rollback: docs/supabase/kb_v2_brain_mode_down.sql. Staging first; prod only on Alvin's yes.
 
 alter table public.tenants add column if not exists brain_mode text not null default 'full';
@@ -82,3 +86,63 @@ begin
 end $$;
 revoke all on function public.set_brain_mode(uuid, text, uuid) from public, anon;
 grant execute on function public.set_brain_mode(uuid, text, uuid) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Catalogue-complete mark (owner: "this is everything I sell / offer"). Source of truth for doc.complete.
+alter table public.tenants add column if not exists kb_catalogue_complete_at timestamptz;
+alter table public.tenants add column if not exists kb_catalogue_complete_by uuid;
+comment on column public.tenants.kb_catalogue_complete_at is 'Owner marked the catalogue complete (null = not marked: callers hear a sparse catalogue). Write only via public.set_kb_catalogue_complete; compile copies it into kb_snapshots.doc.complete / complete_at.';
+revoke update (kb_catalogue_complete_at, kb_catalogue_complete_by) on public.tenants from authenticated, anon;
+
+create table if not exists public.tenant_kb_catalogue_complete_audit (
+  id bigserial primary key,
+  tenant_id uuid not null references public.tenants (id) on delete cascade,
+  actor uuid,
+  source text not null check (source in ('owner', 'admin')),
+  complete boolean not null,
+  was_complete boolean,
+  created_at timestamptz not null default now()
+);
+create index if not exists tenant_kb_catalogue_complete_audit_tenant_idx on public.tenant_kb_catalogue_complete_audit (tenant_id, created_at desc);
+alter table public.tenant_kb_catalogue_complete_audit enable row level security;
+revoke all on public.tenant_kb_catalogue_complete_audit from public, anon, authenticated;
+grant select on public.tenant_kb_catalogue_complete_audit to authenticated;
+grant all on public.tenant_kb_catalogue_complete_audit to service_role;
+do $$ begin
+  create policy tenant_kb_catalogue_complete_audit_select_member on public.tenant_kb_catalogue_complete_audit for select to authenticated
+    using (exists (select 1 from public.tenant_members m where m.tenant_id = tenant_kb_catalogue_complete_audit.tenant_id and m.user_id = auth.uid()));
+exception when duplicate_object then null; end $$;
+
+create or replace function public.set_kb_catalogue_complete(p_tenant uuid, p_complete boolean, p_actor uuid default null)
+returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_uid uuid := auth.uid();
+  v_service boolean := coalesce(auth.role(), '') = 'service_role';
+  v_role text;
+  v_source text;
+  v_actor uuid;
+  v_was timestamptz;
+  v_at timestamptz;
+begin
+  if p_complete is null then raise exception 'invalid_complete' using errcode = '22023'; end if;
+  if v_service then
+    v_source := 'admin'; v_actor := p_actor;
+  else
+    if v_uid is null then raise exception 'forbidden' using errcode = '42501'; end if;
+    select role into v_role from public.tenant_members where tenant_id = p_tenant and user_id = v_uid;
+    if v_role is null or v_role not in ('owner', 'admin') then raise exception 'forbidden' using errcode = '42501'; end if;
+    v_source := 'owner'; v_actor := v_uid; -- p_actor is ignored for members
+  end if;
+  select kb_catalogue_complete_at into v_was from public.tenants where id = p_tenant for update;
+  if not found then raise exception 'not_found' using errcode = 'P0002'; end if;
+  v_at := case when p_complete then coalesce(v_was, now()) else null end;
+  update public.tenants
+     set kb_catalogue_complete_at = v_at,
+         kb_catalogue_complete_by = case when p_complete then coalesce(case when v_was is null then v_actor end, kb_catalogue_complete_by) else null end
+   where id = p_tenant;
+  insert into public.tenant_kb_catalogue_complete_audit (tenant_id, actor, source, complete, was_complete)
+  values (p_tenant, v_actor, v_source, p_complete, v_was is not null);
+  return jsonb_build_object('tenant_id', p_tenant, 'complete', p_complete, 'complete_at', v_at, 'was_complete', v_was is not null, 'source', v_source, 'set_by', v_actor);
+end $$;
+revoke all on function public.set_kb_catalogue_complete(uuid, boolean, uuid) from public, anon;
+grant execute on function public.set_kb_catalogue_complete(uuid, boolean, uuid) to authenticated, service_role;

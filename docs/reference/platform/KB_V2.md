@@ -119,7 +119,7 @@ Plan: `briefs/retire-old-brain-plan-2026-10-28.md` (B1 Brain -> **P1 Platform** 
   `{ live: true, reason }` for every business, `reason` = quality only: `no_facts` (no row / load error) ->
   `no_live_version` -> `never_ready` (`kb_ready_version` null) -> `ready_stale` -> `ready`. `held_v1` is gone.
   `kbQuality(tenant)` returns the reason alone.
-- `brainMode(tenant, { safeEnv }) -> { mode: 'full' | 'safe', reason }`, reason: `env` (`safeEnv` = `'all'`, any case;
+- `brainMode` lives in **`src/knowledge/kb/brainMode.js`** (pure; Brain B1's `brainModeAdapter` loads it from that path; `kbLive.js` re-exports it). `brainMode(tenant, { safeEnv }) -> { mode: 'full' | 'safe', reason }`, reason (`no_tenant` when there is no tenant object, B1's contract): `env` (`safeEnv` = `'all'`, any case;
   wins over everything), `owner` (`brain_mode = 'safe'` set by the business: Desk Settings **"Take messages only"**),
   `admin` (`brain_mode = 'safe'` set by Super Admin, or no recorded source), `default` (full). No row / no column = full.
   Voice pins it on `profile.brainMode` in `attach` (once per call); Brain owns the safe script (greet, take name /
@@ -143,6 +143,22 @@ Plan: `briefs/retire-old-brain-plan-2026-10-28.md` (B1 Brain -> **P1 Platform** 
   `@/lib/kbLive.server`, returning `{ ok: true, mode, from, source, setAt } | { ok: false, error }`. Voice / scripts:
   `db.setBrainMode(id, mode, { actor })`, `kb-cutover --safe <id>` / `--full <id>`. Tests:
   `tests/kbBrainModeSql.test.js` (PGlite).
+- **Profile:** `db.getTenantById` selects `brain_mode, brain_mode_source` (dropped when the columns are absent), so
+  `profile.brainMode` / `profile.brainModeSource` are the tenants strings B1 reads; `kb/live.attach` pins the decision on
+  `profile.brainModeDecision`.
+- **Snapshot did not load = empty snapshot.** No live version, missing row, snapshot read error or exception at call
+  start: `attach` gives the call the empty compiled doc (`doc.complete` false, 0 items, `profile.kb.loadError` true),
+  logs `[kb] snapshot not loaded tenant=… -> empty snapshot`, and the old catalogue fields are not read. Never the old brain.
+- **Catalogue-complete mark (owner).** `tenants.kb_catalogue_complete_at` / `_by`, written only by RPC
+  `public.set_kb_catalogue_complete(p_tenant uuid, p_complete boolean, p_actor uuid default null) returns jsonb`
+  (same checks, grants and errors as `set_brain_mode`; `invalid_complete` for null; re-marking keeps the first stamp;
+  audit `public.tenant_kb_catalogue_complete_audit`). `db.listKbSource` carries `completeAt` into the compile source, so
+  `compileKb` stamps `doc.complete` (boolean) and `doc.complete_at` into every published snapshot and a set / clear
+  changes the source hash (no mark = the old hash). Desk: `setKbCatalogueCompleteAsOwner(tenantId, complete)` (session)
+  / `setKbCatalogueCompleteAsAdmin(tenantId, complete, actor)`, both then `pingKbCompile` (recompile + publish). Voice /
+  scripts: `db.setKbCatalogueComplete(id, complete, { actor })`. No mark = `doc.complete` false = sparse (B1).
+- **/healthz `kb.counts`** (cached 60 s, numbers only): `tenants`, `safe_mode { total, env, owner, admin }`,
+  `snapshot_missing`, `snapshot_empty`, `empty_or_missing` (`kb/live.healthTally`, `db.kbHealthCountsCached`).
 - **Gate / safe env:** passed in by the server like `hashMode`: Voice its env, Desk its server env (`deskKbGate()`,
   `deskSafeEnv()`). Keep both projects equal.
 - **Every business has a document:** `scripts/kb-backfill.js --apply` imports `services_catalog` **and**

@@ -1,4 +1,4 @@
-// set_brain_mode ("Take messages only"), executed for real in an in-process Postgres (PGlite):
+// set_brain_mode ("Take messages only") and set_kb_catalogue_complete (owner's catalogue-complete mark), executed for real in an in-process Postgres (PGlite):
 // docs/supabase/kb_v2_brain_mode.sql (2026-10-28.4) + its down file.
 const { describe, it, before } = require('node:test');
 const assert = require('node:assert/strict');
@@ -124,11 +124,42 @@ describe('set_brain_mode (kb_v2_brain_mode.sql .4)', () => {
     assert.ok(rows[0].proconfig.some((c) => /^search_path=public, pg_temp$/.test(c)), String(rows[0].proconfig));
   });
 
+  it('catalogue mark: owner sets / clears their own business; one audit row each; only the mark columns change', async () => {
+    const before = await row(T2);
+    const { rows } = await as(OWNER2, 'select public.set_kb_catalogue_complete($1, $2) as r', [T2, true]);
+    assert.equal(rows[0].r.complete, true); assert.equal(rows[0].r.source, 'owner'); assert.equal(rows[0].r.was_complete, false);
+    const t = await row(T2);
+    assert.ok(t.kb_catalogue_complete_at); assert.equal(t.kb_catalogue_complete_by, OWNER2);
+    for (const k of Object.keys(before).filter((k) => !k.startsWith('kb_catalogue_complete'))) assert.deepEqual(t[k], before[k], `${k} unchanged`);
+    await as(OWNER2, 'select public.set_kb_catalogue_complete($1, $2)', [T2, true]); // re-mark keeps the first stamp
+    assert.deepEqual((await row(T2)).kb_catalogue_complete_at, t.kb_catalogue_complete_at);
+    await as(OWNER2, 'select public.set_kb_catalogue_complete($1, $2)', [T2, false]);
+    const c = await row(T2);
+    assert.equal(c.kb_catalogue_complete_at, null); assert.equal(c.kb_catalogue_complete_by, null);
+    const a = (await db.query('select complete, was_complete, source, actor from public.tenant_kb_catalogue_complete_audit where tenant_id = $1 order by id', [T2])).rows;
+    assert.deepEqual(a.map((x) => [x.complete, x.was_complete, x.source, x.actor]), [[true, false, 'owner', OWNER2], [true, true, 'owner', OWNER2], [false, true, 'owner', OWNER2]]);
+  });
+
+  it('catalogue mark: non-owner member, another business, anon, null, direct UPDATE all denied; service role = admin', async () => {
+    for (const u of [STAFF, VIEWER, OWNER2]) await rejects(as(u, 'select public.set_kb_catalogue_complete($1, $2)', [T1, true]), /forbidden/);
+    await rejects(as('anon', 'select public.set_kb_catalogue_complete($1, $2)', [T1, true]), /permission denied/);
+    await rejects(as(OWNER, 'select public.set_kb_catalogue_complete($1, $2)', [T1, null]), /invalid_complete/);
+    await rejects(as(OWNER, 'update public.tenants set kb_catalogue_complete_at = now() where id = $1', [T1]), /permission denied/);
+    assert.equal((await row(T1)).kb_catalogue_complete_at, null);
+    await as('service', 'select public.set_kb_catalogue_complete($1, $2, $3)', [T1, true, SUPER]);
+    const t = await row(T1);
+    assert.ok(t.kb_catalogue_complete_at); assert.equal(t.kb_catalogue_complete_by, SUPER);
+    const { rows } = await db.query(`select prosecdef, proconfig from pg_proc where proname = 'set_kb_catalogue_complete'`);
+    assert.equal(rows[0].prosecdef, true); assert.ok(rows[0].proconfig.some((x) => x === 'search_path=public, pg_temp'));
+  });
+
   it('down file removes everything and leaves brain_target', async () => {
     await db.exec(read('docs/supabase/kb_v2_brain_mode_down.sql'));
     const { rows } = await db.query(`select column_name from information_schema.columns where table_name = 'tenants' and column_name like 'brain%' order by 1`);
     assert.deepEqual(rows.map((r) => r.column_name), ['brain_target']);
     assert.equal((await db.query(`select to_regclass('public.tenant_brain_mode_audit') as t`)).rows[0].t, null);
-    assert.equal((await db.query(`select count(*)::int n from pg_proc where proname = 'set_brain_mode'`)).rows[0].n, 0);
+    assert.equal((await db.query(`select count(*)::int n from pg_proc where proname in ('set_brain_mode', 'set_kb_catalogue_complete')`)).rows[0].n, 0);
+    const k = await db.query(`select count(*)::int n from information_schema.columns where table_name = 'tenants' and column_name like 'kb_catalogue_complete%'`);
+    assert.equal(k.rows[0].n, 0);
   });
 });

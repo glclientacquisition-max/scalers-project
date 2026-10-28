@@ -61,8 +61,12 @@ describe('kb source: mode selection (gate on = KB brain for every business; P1 r
   it('gate on + ready snapshot = kb mode', () => { assert.equal(S.catalogueSource(kbProfile()).mode, 'kb'); });
   // P1: readiness is a quality reason only and brain_target is not read, so neither falls back to the old fields.
   it('gate on + snapshot not ready = kb mode', () => { assert.equal(S.catalogueSource(kbProfile({ ready: false })).mode, 'kb'); });
+  it('gate on + load error (no doc) = kb mode on an EMPTY snapshot (never the old fields)', () => {
+    const warn = console.warn; console.warn = () => {};
+    try { const p = kbProfile({ doc: null }); const s = S.catalogueSource(p); assert.equal(s.mode, 'kb'); assert.equal(s.offered().length, 0); assert.equal(p.servicesOffered, null); } finally { console.warn = warn; }
+  });
   it('gate on + brain_target v1 (ignored) = kb mode', () => { assert.equal(S.catalogueSource(kbProfile({ brainTarget: 'v1' })).mode, 'kb'); });
-  for (const [label, o] of [['gate off', { gate: false }], ['load error (no doc)', { doc: null }]]) {
+  for (const [label, o] of [['gate off', { gate: false }]]) {
     it(`${label} = legacy mode, old fields untouched`, () => {
       const p = kbProfile(o);
       const s = S.catalogueSource(p);

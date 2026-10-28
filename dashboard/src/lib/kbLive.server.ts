@@ -17,7 +17,7 @@ export type BrainMode = "full" | "safe";
 /** env = BRAIN_SAFE_MODE=all (wins); owner = Desk toggle; admin = Super Admin; default = full. */
 export type BrainModeDecision = { mode: BrainMode; reason: "env" | "owner" | "admin" | "default" };
 /** brain_target is ignored (no v1 hold); dropped by kb_v2_drop_brain_target.sql in P2. */
-export type KbLiveFacts = { kb_live_version: number | null; kb_ready_version: number | null; brain_mode?: string | null; brain_mode_source?: string | null; brain_target?: string | null };
+export type KbLiveFacts = { kb_live_version: number | null; kb_ready_version: number | null; brain_mode?: string | null; brain_mode_source?: string | null; kb_catalogue_complete_at?: string | null; brain_target?: string | null };
 
 type Facts = Partial<KbLiveFacts> | null | undefined;
 type KbLiveModule = {
@@ -99,4 +99,46 @@ export async function setBrainModeAsAdmin(tenantId: string, mode: BrainMode, act
   if (error) return { ok: false, error: setBrainModeError(`${error.code || ""} ${error.message || ""}`) };
   const d = (data || {}) as { brain_mode?: BrainMode; from?: BrainMode | null; source?: "owner" | "admin"; set_at?: string | null };
   return { ok: true, mode: d.brain_mode || mode, from: d.from ?? null, source: d.source || "admin", setAt: d.set_at ?? null };
+}
+
+export type SetCatalogueCompleteResult =
+  | { ok: true; complete: boolean; completeAt: string | null; wasComplete: boolean; source: "owner" | "admin"; recompile: boolean }
+  | { ok: false; error: "invalid_complete" | "forbidden" | "not_found" | "rpc_missing" | "failed" };
+
+function catalogueError(message: string): Exclude<SetCatalogueCompleteResult, { ok: true }>["error"] {
+  if (/invalid_complete/.test(message)) return "invalid_complete";
+  if (/forbidden/.test(message)) return "forbidden";
+  if (/not_found/.test(message)) return "not_found";
+  if (/set_kb_catalogue_complete|PGRST202|does not exist/.test(message)) return "rpc_missing";
+  return "failed";
+}
+
+async function afterCatalogueMark(
+  tenantId: string,
+  r: { data: unknown; error: { code?: string; message?: string } | null },
+  fallbackSource: "owner" | "admin",
+): Promise<SetCatalogueCompleteResult> {
+  if (r.error) return { ok: false, error: catalogueError(`${r.error.code || ""} ${r.error.message || ""}`) };
+  const d = (r.data || {}) as { complete?: boolean; complete_at?: string | null; was_complete?: boolean; source?: "owner" | "admin" };
+  // the mark is part of the compile source: recompile + publish so the next snapshot carries doc.complete
+  const { pingKbCompile } = await import("@/lib/kb.server");
+  const ping = await pingKbCompile(tenantId, { by: "complete_mark" });
+  return { ok: true, complete: d.complete === true, completeAt: d.complete_at ?? null, wasComplete: d.was_complete === true, source: d.source || fallbackSource, recompile: ping.ok };
+}
+
+/**
+ * Desk Settings / catalogue: the owner marks "this is my whole catalogue" (complete = true) or clears it. Session
+ * client -> public.set_kb_catalogue_complete (owner / admin member check in the database, audited), then asks Voice to
+ * recompile and publish. Without the mark callers hear a sparse catalogue (doc.complete false).
+ */
+export async function setKbCatalogueCompleteAsOwner(tenantId: string, complete: boolean): Promise<SetCatalogueCompleteResult> {
+  if (typeof complete !== "boolean") return { ok: false, error: "invalid_complete" };
+  const sb = await createSupabaseServerClient();
+  return afterCatalogueMark(tenantId, await sb.rpc("set_kb_catalogue_complete", { p_tenant: tenantId, p_complete: complete }), "owner");
+}
+
+/** Super Admin (service role, after the Admin checks in the route): source 'admin', audited, then recompile. */
+export async function setKbCatalogueCompleteAsAdmin(tenantId: string, complete: boolean, actorUserId: string | null): Promise<SetCatalogueCompleteResult> {
+  if (typeof complete !== "boolean") return { ok: false, error: "invalid_complete" };
+  return afterCatalogueMark(tenantId, await getSupabaseAdmin().rpc("set_kb_catalogue_complete", { p_tenant: tenantId, p_complete: complete, p_actor: actorUserId }), "admin");
 }
