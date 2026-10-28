@@ -12,6 +12,7 @@ import {
   type CuratedSonioxVoice,
 } from "@/lib/sonioxVoiceCatalog";
 import type { TenantRow } from "@/lib/supabase";
+import { KbPendingNote } from "@/components/KbPendingNote";
 import {
   assertPreviewAudioPlayable,
   NO_VOICE_SAMPLE_COPY,
@@ -56,15 +57,20 @@ export function TestLinePanel({
 
   const greetingPreview = useMemo(() => {
     if (!businessName) return "";
+    // isKbLive: the line comes from the published snapshot (kb/source.js openerLine on the server), groups only,
+    // never items or old notes, and never mixed with the stored row.
+    const kbLine = typeof tenant.kb_offering_line === "string" ? tenant.kb_offering_line : null;
     const sample = previewBusinessAssistantIntro({
       businessName,
       spokenName: tenant.spoken_name,
       greetingInvite: tenant.greeting_invite,
       agentName,
-      servicesCatalog: Array.isArray(tenant.services_catalog)
-        ? tenant.services_catalog
-        : [],
-      servicesOffered: tenant.services_offered,
+      ...(kbLine != null
+        ? { offeringLine: kbLine, servicesCatalog: [], servicesOffered: "" }
+        : {
+            servicesCatalog: Array.isArray(tenant.services_catalog) ? tenant.services_catalog : [],
+            servicesOffered: tenant.services_offered,
+          }),
     });
     // Raw greeting. The voice line applies pronunciation and tells us what it
     // said (X-Spoken-Text), so Desk never guesses how the line reads it.
@@ -76,6 +82,7 @@ export function TestLinePanel({
     tenant.greeting_invite,
     tenant.services_catalog,
     tenant.services_offered,
+    tenant.kb_offering_line,
   ]);
 
   const voiceLabel = displaySonioxVoiceLabel(
@@ -146,6 +153,7 @@ export function TestLinePanel({
     <div className="min-w-0 w-full space-y-6">
       <SettingsGroup title="Preview">
         <div className="space-y-3 px-4 py-3">
+          <KbPendingNote pending={tenant.kb_pending === true && typeof tenant.kb_offering_line === "string"} />
           {greetingPreview ? (
             <blockquote className="border-l-2 border-accent/50 pl-4 text-body leading-relaxed text-ink">
               “{greetingPreview}”

@@ -35,7 +35,8 @@ import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
 import { DeskPageGate } from "@/components/DeskPageGate";
 import { deskAssistantSayPage } from "@/lib/deskFeatureFlags";
-import { loadAssistantSayState } from "@/lib/assistantSayVoice.server";
+import { loadAssistantSayView } from "@/lib/assistantSayVoice.server";
+import { loadKbGreetingPreview } from "@/lib/kbCaller.server";
 import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
 import { assistantSayBelowList } from "@/components/assistantSay/AssistantSayExtras";
 import { CallsForwardingPanel } from "@/components/CallsForwardingPanel";
@@ -154,8 +155,9 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   let assistantSaySlot = null;
   if (tab === "assistant-say" && assistantSayPage) {
     try {
-      const state = await loadAssistantSayState(tenant);
-      assistantSaySlot = <AssistantSayPanel state={state} belowList={assistantSayBelowList(tenant)} />;
+      // isKbLive: rows and samples read the published snapshot (what callers hear now); else the stored row.
+      const view = await loadAssistantSayView(tenant);
+      assistantSaySlot = <AssistantSayPanel state={view.state} pending={view.pending} belowList={assistantSayBelowList(tenant, view.samples)} />;
     } catch {
       assistantSaySlot = <DeskLoadError>Could not load what your Business Assistant will say.</DeskLoadError>;
     }
@@ -188,7 +190,12 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   const planStatus: Record<string, SettingsListStatus> = planRow.row ? { "/settings/plan": planRow.row } : {};
 
   // Test panel greeting preview and the catalogue view read kb_items when the KB tables exist (stored columns otherwise).
-  const kbCatalogue = settingsViewReadsCatalogue(tab, trainPanel) ? await loadKbCatalogueView(tenant.id, tenant) : null;
+  // isKbLive with a readable snapshot: the Test greeting preview uses the call's snapshot greeting; else legacy reads.
+  const readsCatalogue = settingsViewReadsCatalogue(tab, trainPanel);
+  const [kbView, kbGreeting] = readsCatalogue
+    ? await Promise.all([loadKbCatalogueView(tenant.id, tenant), loadKbGreetingPreview(tenant)])
+    : [null, null];
+  const kbCatalogue = kbView && kbGreeting ? { ...kbView, offering_line: kbGreeting.offeringLine, pending: kbGreeting.pending } : kbView;
   return (
     <BusinessSettingsShell
       tenant={tenantForSettingsView(tenant, tab, trainPanel, kbCatalogue)}

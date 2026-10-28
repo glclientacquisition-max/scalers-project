@@ -37,7 +37,11 @@ import {
   faqFactValue,
   holdsFactValue,
   stableRowId,
+  factValueForPath,
+  tenantRowFromProfile,
 } from './factHash';
+import { parseCoverageAreas } from './coverageAreas';
+import { formatPriceDisplay, legacyPriceText, normalisePrice, priceIsSpeakable } from './factPrice';
 
 export const SOURCES = new Set(['owner', 'seed', 'import', 'inferred', 'call_suggested']);
 
@@ -283,6 +287,20 @@ export function withSeedFilter(fieldMeta: any, seedFilter?: boolean): any {
   return { ...fieldMeta, seedFilter };
 }
 
+// BRAIN_CONFIRMED_COVERAGE twin (src/conversation/confirmedCoverage.js). This
+// file never reads env: the server sets it (tenantFieldProvenance.ts) and it
+// rides on fieldMeta like seedFilter. Off by default.
+function confirmedCoverageOf(fieldMeta: any): boolean {
+  return Boolean(fieldMeta && typeof fieldMeta === 'object' && fieldMeta.confirmedCoverage === true);
+}
+
+/** Carry the confirmed-coverage rule on fieldMeta, so factPolicyMap sees it. */
+export function withConfirmedCoverage(fieldMeta: any, confirmedCoverage?: boolean): any {
+  if (typeof confirmedCoverage !== 'boolean') return fieldMeta;
+  if (!fieldMeta) return confirmedCoverage ? { loaded: false, byPath: {}, confirmedCoverage: true } : null;
+  return { ...fieldMeta, confirmedCoverage };
+}
+
 export function isPackService(row: any) {
   if (!row || typeof row !== 'object') return false;
   const price = row.price_range || row.priceRange || row.price || '';
@@ -297,13 +315,14 @@ export function isPackService(row: any) {
  */
 export function indexFieldMeta(
   rows: any,
-  { hashMode, seedFilter }: { hashMode?: boolean; seedFilter?: boolean } = {}
+  { hashMode, seedFilter, confirmedCoverage }: { hashMode?: boolean; seedFilter?: boolean; confirmedCoverage?: boolean } = {}
 ) {
   if (!Array.isArray(rows)) {
     // Hash mode with no table loaded: every path is unconfirmed, so carry the
     // mode on an empty index instead of returning null (null = P0 heuristic).
     const empty = hashMode === true ? { loaded: false, hashMode: true, byPath: {} } : null;
-    return seedFilter === true ? withSeedFilter(empty, true) : empty;
+    const seeded = seedFilter === true ? withSeedFilter(empty, true) : empty;
+    return confirmedCoverage === true ? withConfirmedCoverage(seeded, true) : seeded;
   }
   const byPath: Record<string, any> = {};
   for (const row of rows) {
@@ -327,6 +346,7 @@ export function indexFieldMeta(
   const out: Record<string, any> = { loaded: true, byPath };
   if (typeof hashMode === 'boolean') out.hashMode = hashMode;
   if (seedFilter === true) out.seedFilter = true;
+  if (confirmedCoverage === true) out.confirmedCoverage = true;
   return out;
 }
 
@@ -467,26 +487,34 @@ export function policyKeyLabel(key: any) {
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : '';
 }
 
-// coverage_areas ids ("county:nairobi", "place:kitengela"). The server checks
-// each id against the place index (src/conversation/coverageAreas.js); this
-// file stays import-free, so it keeps the same shape without the index.
+// coverage_areas ids ("county:nairobi", "place:kitengela"), checked against the
+// same place index as Voice readCoverageAreas (coverageAreas.ts twin), so an id
+// the index does not know (e.g. "place:kiambu", a county) is dropped on both.
 function coverageAreaIds(obj: any): string[] | null {
   if (!Object.prototype.hasOwnProperty.call(obj, 'coverage_areas')) return null;
   if (!Array.isArray(obj.coverage_areas)) return null;
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const item of obj.coverage_areas) {
-    const id = String(item || '').trim().toLowerCase().replace(/\s+/g, ' ');
-    const split = id.indexOf(':');
-    if (split < 1) continue;
-    const kind = id.slice(0, split);
-    if (kind !== 'county' && kind !== 'place') continue;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    out.push(id);
-    if (out.length >= 40) break;
-  }
-  return out;
+  return parseCoverageAreas(obj.coverage_areas);
+}
+
+// The owner row on policies.coverage_areas (stricter than the P0 default: no
+// meta row is not an owner row).
+function coverageOwnerRow(fieldMeta: any): boolean {
+  const meta = lookupFieldMeta(fieldMeta, 'policies.coverage_areas');
+  return Boolean(meta && (meta.source === 'owner' || meta.confirmed_at || meta.confirmed_by));
+}
+
+function coverageIsFact(scoped: { businessPolicies: any; fieldMeta: any }): boolean {
+  const value = factValueForPath('policies.coverage_areas', tenantRowFromProfile(scoped));
+  return classifyRecord({}, { packSeed: false, fieldMeta: scoped.fieldMeta, fieldPath: 'policies.coverage_areas', value }).fact === true;
+}
+
+/**
+ * Twin of confirmedCoverage.js for the prompt (confirmedCoverageReading for a
+ * non-empty list, coverageOwnerRowConfirms for an empty one): both come down to
+ * an owner row on policies.coverage_areas whose record classifies as a fact.
+ */
+function coverageConfirmed(scoped: { businessPolicies: any; fieldMeta: any }): boolean {
+  return coverageOwnerRow(scoped.fieldMeta) && coverageIsFact(scoped);
 }
 
 /**
@@ -506,7 +534,11 @@ export function factPolicyMap(policies: any, fieldMeta: any = null) {
     else unknown.push(label);
   }
   const coverage = coverageAreaIds(obj);
-  if (coverage) out.coverage_areas = coverage;
+  if (coverage && confirmedCoverageOf(fieldMeta)) {
+    // BRAIN_CONFIRMED_COVERAGE: only an owner-confirmed list reaches the prompt.
+    if (coverageConfirmed({ businessPolicies: obj, fieldMeta })) out.coverage_areas = coverage;
+    else unknown.push('Areas we serve');
+  } else if (coverage) out.coverage_areas = coverage;
   for (const [key, raw] of Object.entries(obj)) {
     if (Object.prototype.hasOwnProperty.call(POLICY_TOPICS, key) || isPolicyMetaKey(key)) continue;
     if (typeof raw !== 'string' && typeof raw !== 'number') continue;
@@ -642,6 +674,7 @@ export function buildCompileSections({
   holdGate = null,
   hashMode = undefined,
   seedFilter = undefined,
+  confirmedCoverage = undefined,
 }: {
   faqs?: unknown[];
   policiesText?: string;
@@ -655,8 +688,10 @@ export function buildCompileSections({
   hashMode?: boolean;
   /** Pass from the server (BRAIN_CALL_FIXES_D199); otherwise read from fieldMeta.seedFilter. */
   seedFilter?: boolean;
+  /** Pass from the server (BRAIN_CONFIRMED_COVERAGE); otherwise read from fieldMeta.confirmedCoverage. */
+  confirmedCoverage?: boolean;
 } = {}) {
-  fieldMeta = withSeedFilter(withHashMode(fieldMeta, hashMode), seedFilter);
+  fieldMeta = withConfirmedCoverage(withSeedFilter(withHashMode(fieldMeta, hashMode), seedFilter), confirmedCoverage);
   const faqRows = asArray(faqs)
     .map((faq, index) => classifyFaq(faq, fieldMeta, faqFieldPath(index)))
     .filter((row) => row.question && row.answer);
@@ -746,17 +781,47 @@ export function buildCompileSections({
   };
 }
 
+/**
+ * Catalogue mode for one profile, the same rule as src/knowledge/kb/source.js:
+ * 'kb' when the profile carries a live KB handle (Voice attach) or Desk marked it
+ * KB live (shared isKbLive, kbLive.server; the live snapshot attached by Voice's kb/live.attach sets kb.handle, or
+ * kbFactProfile sets kbMode);
+ * otherwise 'legacy'. KB mode never reads the old free-text services line.
+ */
+export function catalogueMode(profile: any = {}): "kb" | "legacy" {
+  if (profile && typeof profile === "object" && ((profile.kb && profile.kb.handle) || profile.kbMode === true)) return "kb";
+  return "legacy";
+}
+
+function priceForSpeech(row: any): string {
+  const priced = normalisePrice(row);
+  return priceIsSpeakable(priced) ? formatPriceDisplay(priced, "en", legacyPriceText(row)) : "";
+}
+
+// Twin of src/conversation/areaTerms.js speakableAreaFacts: owner-confirmed area
+// fees and times only (terms are already read by tenantProfileFromRow).
+function speakableAreaFacts(terms: any): { name: unknown; fee_ksh: unknown; eta: unknown }[] {
+  const areas: any[] = Array.isArray(terms?.areas) ? terms.areas : [];
+  const speakable = (a: any) => a.trusted && (a.feeMode === "free" || (a.feeMode === "fixed" && a.feeKsh != null));
+  return areas
+    .filter((a) => a.trusted)
+    .map((a) => ({ name: a.name, fee_ksh: speakable(a) && a.feeMode === "fixed" ? a.feeKsh : null, eta: a.eta }));
+}
+
 export function speechFactText(profile: any = {}) {
   const fieldMeta = profile.fieldMeta || null;
   const policies = factPolicyMap(profile.businessPolicies, fieldMeta).policies;
+  // KB v2: one catalogue door. In KB mode the profile catalogue is the offered-only
+  // projection (Voice attach of the live snapshot); legacy mode reads the same fields as before.
+  const mode = catalogueMode(profile);
   const products = factProducts(profile.productCatalog, fieldMeta).map((row) => ({
     name: row.name,
-    price: row.price || row.price_range || row.priceRange || '',
+    price: priceForSpeech(row),
     notes: row.notes || '',
   }));
   const services = factServices(profile.servicesCatalog, fieldMeta).map((row) => ({
     name: row.name,
-    price_range: row.price_range || row.priceRange || '',
+    price_range: priceForSpeech(row),
     notes: row.notes || '',
   }));
   const faqs = factFaqs(profile.faqs, fieldMeta).map((row) => ({
@@ -770,10 +835,12 @@ export function speechFactText(profile: any = {}) {
     bulletin: profile.dailyBulletin || profile.daily_bulletin || '',
     team: profile.teamDirectory || profile.team_directory || '',
     social: profile.socialHandles || profile.social_handles || '',
-    notes: profile.servicesNotes || profile.servicesOffered || profile.services_offered || '',
+    notes: mode === 'kb' ? '' : profile.servicesNotes || profile.servicesOffered || profile.services_offered || '',
     policies,
     products,
     services,
     faqs,
+    // Settings > Locations: owner-confirmed area fees and times only.
+    areaFees: speakableAreaFacts(profile.areaTerms),
   });
 }

@@ -8,7 +8,18 @@
 import { mirrorLegacy, type KbCategory, type KbItem } from "./kbCore";
 import { servicesOfferedFromKb } from "./kbLegacy";
 
-export type KbCatalogueView = { services_catalog: unknown[]; product_catalog: unknown[]; services_offered: string };
+export type KbCatalogueView = {
+  services_catalog: unknown[];
+  product_catalog: unknown[];
+  services_offered: string;
+  /**
+   * Greeting offering line from the published snapshot (server: loadKbGreetingPreview, when isKbLive). Never built
+   * from kb_items here; null/absent = legacy reads.
+   */
+  offering_line?: string | null;
+  /** Saves newer than the snapshot are still compiling (KbPendingNote). */
+  pending?: boolean;
+};
 
 export function kbCatalogueView(
   items: KbItem[],
@@ -26,5 +37,6 @@ export function kbCatalogueView(
 /** The tenant row with its catalogue fields from the KB view; unchanged when there is no KB (null). */
 export function withKbCatalogue<T extends { services_catalog?: unknown; product_catalog?: unknown; services_offered?: string | null }>(tenant: T, kb: KbCatalogueView | null): T {
   if (!kb) return tenant;
-  return { ...tenant, services_catalog: kb.services_catalog, product_catalog: kb.product_catalog, services_offered: kb.services_offered };
+  const out = { ...tenant, services_catalog: kb.services_catalog, product_catalog: kb.product_catalog, services_offered: kb.services_offered };
+  return kb.offering_line == null ? out : { ...out, kb_offering_line: kb.offering_line, kb_pending: kb.pending === true };
 }

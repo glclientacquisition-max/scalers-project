@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-244 variables.
+245 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -35,6 +35,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BILLING_NOTICES_SEND` | voice | `src/billing/billingNoticeSend.js` |
 | `BRAIN_AREA_PICKS` | voice | `src/conversation/v2/areaCoverage.js`<br>`src/db.js` |
 | `BRAIN_CALL_FIXES_D199` | desk | `dashboard/src/lib/tenantFieldProvenance.ts` |
+| `BRAIN_CONFIRMED_COVERAGE` | desk | `dashboard/src/lib/tenantFieldProvenance.ts` |
 | `BRAIN_ENGINES` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_ENGINES_FILLER_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_ENGINES_REPLY_MS` | scripts | `scripts/brain-engines-latency.js` |

@@ -40,7 +40,7 @@ export default async function DevCataloguePage({ searchParams }: Props) {
                     latest={empty ? null : homeLive}
                     readiness={empty ? null : readinessTodo}
                     liveVersion={empty ? null : 2}
-                    readyVersion={null}
+                    onCalls={false}
                     vertical={retail ? "retail" : "home_services"}
                     canEdit={!viewer}
                     statesEnabled={one(p.states) === "on"}

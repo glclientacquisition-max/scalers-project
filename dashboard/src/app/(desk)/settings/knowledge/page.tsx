@@ -40,7 +40,7 @@ async function KnowledgeBody({ searchParams }: { searchParams: Promise<Search> }
             latest={state.latest}
             readiness={state.readiness}
             liveVersion={state.liveVersion}
-            readyVersion={state.readyVersion}
+            onCalls={state.onCalls}
             vertical={parseVertical(tenant.vertical)}
             canEdit={canEdit}
             statesEnabled={deskKbItemStates()}
