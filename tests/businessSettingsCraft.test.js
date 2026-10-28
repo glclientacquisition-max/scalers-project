@@ -48,7 +48,8 @@ function loadSettingsNav() {
 describe("business settings craft", () => {
   const shell = read("dashboard/src/components/BusinessSettingsShell.tsx");
   const ui = read("dashboard/src/components/settingsUi.tsx");
-  const form = read("dashboard/src/components/TenantForm.tsx");
+  // Settings form copy: TenantForm plus the Identity cards (settings remake slice 1).
+  const form = read("dashboard/src/components/TenantForm.tsx") + read("dashboard/src/components/identity/IdentitySettings.tsx");
   const test = read("dashboard/src/components/TestLinePanel.tsx");
   const save = read("dashboard/src/components/TenantSettingsSaveButton.tsx");
   const page = read("dashboard/src/app/(desk)/settings/page.tsx");
@@ -158,7 +159,9 @@ describe("business settings craft", () => {
       "pronunciation",
       "catalog",
     ]) {
-      assert.match(form, new RegExp(`panel === "${panel}"`));
+      // Identity renders its own cards from the shell (settings remake slice 1).
+      if (panel === "identity") assert.match(shell, /formPanel === "identity"/);
+      else assert.match(form, new RegExp(`panel === "${panel}"`));
     }
   });
 
@@ -535,7 +538,7 @@ describe("business settings craft", () => {
     assert.match(test, /businessSettingsHref\("train", "identity"\)/);
     assert.match(test, /to preview the greeting/);
 
-    assert.match(form, /id="business_name"[\s\S]{0,240}title=\{businessName/);
+    assert.match(form, /id="identity_business_name"[\s\S]{0,400}title=\{businessName/);
     assert.match(ui, /title=\{businessName\}/);
     assert.match(ui, /break-words text-body font-medium text-ink/);
     assert.match(side, /title=\{status\?\.title \|\| statusText\}/); // truncated status keeps its full text on hover
@@ -597,14 +600,11 @@ describe("business settings craft", () => {
     assert.match(side, /mt-6/);
     assert.match(side, /mb-2/);
     assert.doesNotMatch(side, /min-h-9/);
-    assert.match(form, /No public contacts yet/);
-    assert.match(form, /title="Public contacts"/);
+    assert.match(form, /No contacts yet/);
+    assert.match(form, /title="How customers reach you"/);
     assert.doesNotMatch(
-      form.slice(
-        form.indexOf('title="Public contacts"'),
-        form.indexOf('panel === "catalog"')
-      ),
-      /No public contacts yet[\s\S]{0,200}\+254 7/
+      form.slice(form.indexOf("function ContactsCard"), form.indexOf("/* ---------------- Page")),
+      /No contacts yet[\s\S]{0,200}\+254 7/
     );
   });
 

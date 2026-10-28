@@ -8,7 +8,7 @@ const ca = () => import("../dashboard/src/lib/coverageAreas.ts");
 
 test("save is fast: template prompt in the write, model prompt after the response", () => {
   const src = read("../dashboard/src/app/(desk)/settings/actions.ts");
-  const write = src.indexOf('.from("tenants").update(patch)');
+  const write = src.indexOf('.from("tenants").update(patch');
   const local = src.indexOf("localOnly: true");
   const afterAt = src.indexOf("after(async () => {");
   assert.ok(local > 0 && local < write, "template prompt is compiled before the write");

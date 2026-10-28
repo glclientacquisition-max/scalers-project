@@ -9,7 +9,8 @@ const { spawnSync } = require("node:child_process");
 const helperPath = path.join(__dirname, "../dashboard/src/lib/previewAudio.ts");
 const voicePreviewPath = path.join(__dirname, "../dashboard/src/lib/voicePreview.ts");
 const ttsPreviewPath = path.join(__dirname, "../src/speech/ttsPreview.js");
-const tenantFormPath = path.join(__dirname, "../dashboard/src/components/TenantForm.tsx");
+// The voice sample moved from Voice (TenantForm) to Identity › How you answer ("Hear it").
+const tenantFormPath = path.join(__dirname, "../dashboard/src/components/identity/IdentitySettings.tsx");
 const testLinePath = path.join(__dirname, "../dashboard/src/components/TestLinePanel.tsx");
 
 function wavBytes(size) {
@@ -87,11 +88,11 @@ test("voice preview packs browser-playable WAV", () => {
   assert.match(source, /pcmToBrowserWav/);
 });
 
-test("Hear sample mounts audio only after a usable preview blob", () => {
+test("Hear it mounts audio only after a usable preview blob", () => {
   const source = fs.readFileSync(tenantFormPath, "utf8");
   assert.match(source, /objectUrlFromPreviewResponse/);
   assert.match(source, /assertPreviewAudioPlayable/);
-  assert.match(source, /Hear sample/);
+  assert.match(source, /Hear it/);
   assert.match(source, /onError=/);
   assert.match(source, /voice-sample-empty/);
   assert.match(source, /type="audio\/wav"/);

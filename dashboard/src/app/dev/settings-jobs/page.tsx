@@ -17,6 +17,7 @@ import type { TenantRow } from "@/lib/supabase";
 import { parsePaymentsText } from "@/lib/payments";
 import { assistantSayStateFromTenant } from "@/lib/assistantSayVoice.server";
 import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
+import { DeskRoleProvider, ViewOnlyBanner } from "@/components/DeskRole";
 import { assistantSayBelowList } from "@/components/assistantSay/AssistantSayExtras";
 
 /**
@@ -36,6 +37,38 @@ const tenant = {
     },
   ],
 } as TenantRow;
+
+/** Identity (?tab=train&panel=identity): Automatic greeting and three public contacts. */
+const identityFilled = {
+  spoken_name: null,
+  greeting_invite: null,
+  social_handles: {
+    channels: [
+      { kind: "phone", label: "Main", value: "+254712345678" },
+      { kind: "whatsapp", label: "Orders", value: "+254722000111" },
+      { kind: "instagram", label: "Instagram", value: "@chapteronebooks" },
+    ],
+  },
+};
+
+/** ?identity=custom: the owner's own greeting (Use automatic shows). */
+const identityCustom = {
+  spoken_name: "Chapter One Books",
+  greeting_invite: "Which book are you looking for",
+};
+
+/** ?identity=sw: Kiswahili saved as the business's default greeting language. */
+const identityKiswahili = { greeting_language: "sw" as const };
+
+/** ?identity=empty: a new business with no name, greeting, tone or contacts yet. */
+const identityEmpty = {
+  business_name: "",
+  spoken_name: null,
+  greeting_invite: null,
+  agent_name: "",
+  agent_tone: null,
+  social_handles: { channels: [] },
+};
 
 const homeTenant = {
   ...tenant,
@@ -74,7 +107,19 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
   const tab = parseBusinessSettingsTab(tabRaw, panelRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
   const base = params.vertical === "home_services" ? homeTenant : tenant;
-  const t = params.policies === "messy" ? ({ ...base, business_policies: messyPolicies } as TenantRow) : base;
+  const policiesT = params.policies === "messy" ? ({ ...base, business_policies: messyPolicies } as TenantRow) : base;
+  const identityState = Array.isArray(params.identity) ? params.identity[0] : params.identity;
+  const t = (
+    identityState === "empty"
+      ? { ...policiesT, ...identityEmpty }
+      : identityState === "custom"
+        ? { ...policiesT, ...identityFilled, ...identityCustom }
+        : identityState === "sw"
+          ? { ...policiesT, ...identityFilled, ...identityKiswahili }
+          : { ...policiesT, ...identityFilled }
+  ) as TenantRow;
+  const roleRaw = Array.isArray(params.role) ? params.role[0] : params.role;
+  const role = roleRaw === "viewer" || roleRaw === "staff" ? roleRaw : null;
 
   const curatedVoices = [
     {
@@ -124,9 +169,11 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
     ) : null;
 
   return (
+    <DeskRoleProvider role={role}>
     <div className={deskShellClass}>
       <DeskRail needsCount={0} homeHref="/dev/home" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
+        <ViewOnlyBanner />
         <main data-desk-main="" className={deskMainClass}>
           <Suspense fallback={null}>
             <DeskPhonePull />
@@ -139,6 +186,7 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             callsSlot={callsSlot}
             assistantSaySlot={assistantSaySlot}
             assistantSayPage
+            businessCategory={identityState === "empty" ? null : "books_stationery"}
             optionStatus={settingsIndexStatuses(
               t,
               curatedVoices,
@@ -149,5 +197,6 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
         <DeskTabBar needsCount={0} />
       </div>
     </div>
+    </DeskRoleProvider>
   );
 }
