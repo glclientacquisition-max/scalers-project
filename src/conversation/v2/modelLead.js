@@ -186,7 +186,8 @@ function kb(profile = {}) {
   // v2 KB: the snapshot's index (names grouped by category, capped ~1,500 tokens, no prices: Hick rule 6, price only on pick)
   const kbIndex = require('../../knowledge/kb/live').promptIndex(profile);
   const services = kbIndex
-    ? kbIndex.groups.map((g) => (g.names ? { group: g.cat, names: g.names } : { group: g.cat, count: g.count }))
+    // group labels go to the model in their clean spoken form ("Capsicum (Hoho) - Green" -> "capsicum"), never raw
+    ? kbIndex.groups.map((g) => { const group = g.cat ? require('../../knowledge/kb/reader').spokenGroupName(g.cat) : g.cat; return g.names ? { group, names: g.names } : { group, count: g.count }; })
     : (profile.servicesCatalog || []).slice(0, 40).map((s) => ({ id: s.id, name: s.name, price: s.pricing?.confirmed === false ? null : s.price_range || null }));
   const h = hoursFact(profile);
   // owner policies + FAQs: the ONE shared projection (ownerFacts.js), every topic the owner filled in

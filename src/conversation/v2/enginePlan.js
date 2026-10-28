@@ -91,7 +91,7 @@ function sameProposal(a, b) {
 }
 
 function flowProposal(E, machine, profile, callerPhone, now) {
-  if (E.flow.tool === 'create_handoff') return degradedRequest(handoffProposal({ machine, profile, callerPhone, reason: E.flow.reason, now }), E.flow, machine);
+  if (E.flow.tool === 'create_handoff') return degradedRequest(handoffProposal({ machine, profile, callerPhone, reason: E.flow.reason, about: E.flow.about || null, now }), E.flow, machine);
   return bookingProposal(machine, callerPhone);
 }
 
@@ -170,7 +170,7 @@ function pickGoal({ understanding, machine, profile = {}, lang, callerPhone, now
   // 2) open a flow: handoff first (caller asked, wants a person, closed for booking, stuck), else booking
   if (!E.flow || E.flow.done) {
     const trig = shouldHandoff({ understanding: u, machine, profile, now });
-    if (trig) E.flow = { tool: 'create_handoff', reason: trig.reason };
+    if (trig) E.flow = { tool: 'create_handoff', reason: trig.reason, ...(trig.about ? { about: trig.about } : {}) };
     else if (u.intent === 'book' || machine.intent === 'book') {
       // B1 NO_HOURS_BOOKING_AS_REQUEST / EMPTY_CATALOGUE_CAPTURE: no hours (or nothing to book) = a request for the team
       const rule = D.bookingAsRequest(profile, rules);
@@ -178,8 +178,10 @@ function pickGoal({ understanding, machine, profile = {}, lang, callerPhone, now
     } else E.flow = null;
   } else if (E.flow.tool === 'create_booking') {
     const trig = shouldHandoff({ understanding: { ...u, intent: u.intent === 'book' ? 'book' : u.intent }, machine, profile, now });
-    if (trig && trig.reason !== 'closed') E.flow = { tool: 'create_handoff', reason: trig.reason };
+    if (trig && trig.reason !== 'closed') E.flow = { tool: 'create_handoff', reason: trig.reason, ...(trig.about ? { about: trig.about } : {}) };
   }
+  // the paused item travels with its callback flow (E.flow.about); the offer marker itself is spent
+  if (E.flow && E.flow.about) machine.kbWhenBack = null;
   // an offer is answered on the very next turn or not at all (a later, unrelated "yes" never triggers it)
   if (E.offered && (u.yes_no !== null || (E.offeredTurn != null && (machine.turn || 0) > E.offeredTurn + 1))) E.offered = null;
 

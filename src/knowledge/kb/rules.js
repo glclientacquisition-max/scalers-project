@@ -236,7 +236,7 @@ function overview(kb, lang = 'en') {
   const n = kb.doc.items.length;
   if (!n) return null;
   if (cats.length <= 1) return group(order(kb.doc.items), { lang }).text;
-  const names = joinList(cats.slice(0, MAX_NAMES).map((c) => (sw && c.say_sw) || c.say_en), lang);
+  const names = joinList([...new Set(cats.map((c) => (sw && c.say_sw) || c.say_en).filter(Boolean))].slice(0, MAX_NAMES), lang);
   const product = kb.doc.items.every((x) => x.kind === 'product');
   if (sw) return product ? `Tuna aina ${swCount(n)} za bidhaa, kama ${names}. Unatafuta nini?` : `Tuna huduma ${swCount(n)}, kama ${names}. Unahitaji ipi?`;
   return product ? `We have ${n} products, in groups like ${names}. What are you looking for?` : `We offer ${n} services, like ${names}. Which one do you need?`;
