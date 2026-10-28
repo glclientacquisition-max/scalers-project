@@ -2,6 +2,14 @@
  * Review tests for the M-Pesa pay path on #780 (cursor/invoice-pay-0c16).
  * These assert the money outcome that must hold before live charges.
  * They fail on the code under review. Do not flip them to test.failing.
+ *
+ * Since #806 the webhook only books money when the event names a real
+ * collection (M-Pesa receipt or Bachs charge id, not the `ch_<checkout>`
+ * placeholder); a rise with no identity opens staff review
+ * (collected_identity_missing, docs/supabase/invoice_pay_checkout_review_round8/9.sql).
+ * Bachs sends a charge id on paid collections, so these payloads carry one
+ * (`ch_paid_<checkout>`, the same default as MockPayProvider.paidEvent). The
+ * money assertions are unchanged. Runs in test:mvp.
  */
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
@@ -174,6 +182,7 @@ describe("pay-link races must not open two live M-Pesa checkouts", () => {
           type: "collection.succeeded",
           data: {
             checkout_id: checkoutId,
+            charge_id: `ch_paid_${checkoutId}`,
             status: "SUCCEEDED",
             charged_amount: "1000.00",
             charged_currency: "KES",
@@ -208,6 +217,7 @@ describe("a collected shilling must reduce the invoice", () => {
         type: "collection.succeeded",
         data: {
           checkout_id: checkout.checkoutId,
+          charge_id: `ch_paid_${checkout.checkoutId}`,
           status: "SUCCEEDED",
           charged_amount: "1000.01",
           charged_currency: "KES",
@@ -238,6 +248,7 @@ describe("a collected shilling must reduce the invoice", () => {
         type: "collection.underpaid",
         data: {
           checkout_id: checkout.checkoutId,
+          charge_id: `ch_paid_${checkout.checkoutId}`,
           charged_amount: "400.00",
           charged_currency: "KES",
         },
@@ -267,6 +278,7 @@ describe("a collected shilling must reduce the invoice", () => {
         type: "collection.succeeded",
         data: {
           checkout_id: checkout.checkoutId,
+          charge_id: `ch_paid_${checkout.checkoutId}`,
           status: "SUCCEEDED",
           amount: "7.60",
           currency: "USD",
@@ -282,6 +294,7 @@ describe("a collected shilling must reduce the invoice", () => {
         type: "collection.succeeded",
         data: {
           checkout_id: checkout.checkoutId,
+          charge_id: `ch_paid_${checkout.checkoutId}`,
           status: "SUCCEEDED",
           charged_amount: "1000.00",
           charged_currency: "KES",
@@ -392,6 +405,7 @@ describe("checkout return and overpay", () => {
         type: "checkout.completed",
         data: {
           checkout_id: checkout.checkoutId,
+          charge_id: `ch_paid_${checkout.checkoutId}`,
           payment_status: "paid",
           charged_amount: "100.00",
           charged_currency: "KES",
@@ -407,6 +421,7 @@ describe("checkout return and overpay", () => {
         type: "collection.succeeded",
         data: {
           checkout_id: checkout.checkoutId,
+          charge_id: `ch_paid_${checkout.checkoutId}`,
           status: "OVERPAID",
           charged_amount: "150.00",
           charged_currency: "KES",
