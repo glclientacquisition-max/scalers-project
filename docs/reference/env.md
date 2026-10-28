@@ -224,7 +224,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_GREETING_CACHE` | voice | `src/speech/greetingPcmCache.js` |
 | `VOICE_GREETING_MODE` | voice | `src/conversation/dynamicSpeech.js` |
 | `VOICE_GREETING_TIMEOUT_MS` | voice | `src/conversation/dynamicSpeech.js` |
-| `VOICE_INTERNAL_SECRET` | desk, voice | `dashboard/src/app/(desk)/calls/escalateActions.ts`<br>`dashboard/src/lib/kb.server.ts`<br>`dashboard/src/lib/spokenCatalogueOnSave.ts`<br>+2 more |
+| `VOICE_INTERNAL_SECRET` | desk, voice | `dashboard/src/app/(desk)/calls/escalateActions.ts`<br>`dashboard/src/lib/spokenCatalogueOnSave.ts`<br>`dashboard/src/lib/voicePreview.ts`<br>+1 more |
 | `VOICE_LINE_UNAVAILABLE_CLIP_DIR` | voice | `src/sautikit/lineUnavailableAudio.js` |
 | `VOICE_LINE_UNAVAILABLE_REFRESH` | voice | `src/sautikit/lineUnavailableAudio.js` |
 | `VOICE_LINE_UNAVAILABLE_REFRESH_MS` | voice | `src/sautikit/lineUnavailableAudio.js` |
