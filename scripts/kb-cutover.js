@@ -11,6 +11,7 @@ const flag = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : n
 (async () => {
   const db = require('../src/db');
   const { supabase } = require('../src/lib/supabaseClient');
+  const { isKbLive } = require('../src/knowledge/kb/kbLive');
   const hold = flag('--hold'); const allow = flag('--allow');
   if (hold || allow) { await db.setBrainTarget(hold || allow, hold ? 'v1' : 'v2'); console.log(JSON.stringify({ ok: true, tenant: hold || allow, brain_target: hold ? 'v1' : 'v2' })); process.exit(0); }
   const { data: rows, error } = await supabase.from('tenants').select('id, business_name, kb_live_version, kb_ready_version, brain_target').order('business_name');
@@ -18,7 +19,7 @@ const flag = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : n
   const out = [];
   for (const t of rows || []) {
     const { data: r } = await supabase.from('kb_readiness').select('snapshot_version, passed, checks, tests, checked_by, checked_at').eq('tenant_id', t.id).order('checked_at', { ascending: false }).limit(1).maybeSingle();
-    const onV2 = t.brain_target !== 'v1' && t.kb_live_version != null && t.kb_live_version === t.kb_ready_version;
+    const onV2 = isKbLive(t, { gate: true }).live; // shared predicate (gate aside: this lists readiness)
     out.push({
       id: t.id, business: t.business_name, live: t.kb_live_version, ready: t.kb_ready_version, target: t.brain_target, on_v2: onV2,
       readiness: r ? { passed: r.passed, at: r.checked_at, by: r.checked_by, failing: [...(r.checks || []).filter((c) => !c.ok).map((c) => c.id), ...(r.tests || []).filter((x) => !x.ok).map((x) => `test:${x.name}`)] } : null,

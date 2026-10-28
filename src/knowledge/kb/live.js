@@ -3,22 +3,22 @@
 // /voice/incoming prefetch, pinned on the profile object for the whole call) and answer the brain's questions.
 const R = require('./reader');
 const { docToLegacy } = require('./items');
-const ON = /^(1|true|on|yes)$/i;
+const { isKbLive, kbGateOn } = require('./kbLive');
 
-/** BRAIN_KB_GATE=on: readiness picks the brain (replaces BRAIN_V2_TENANTS / BRAIN_V1_DRAFT_TENANTS). Off/unset = kill switch: the env lists. */
-function gateOn(env = process.env) { return ON.test(String(env.BRAIN_KB_GATE || '').trim()); }
+/** BRAIN_KB_GATE=on: readiness (kb/kbLive.js isKbLive, the shared predicate) picks the brain (replaces BRAIN_V2_TENANTS / BRAIN_V1_DRAFT_TENANTS). Off/unset = kill switch: the env lists. */
+function gateOn(env = process.env) { return kbGateOn(env.BRAIN_KB_GATE); }
 
 // tenant -> { ready, version, readyVersion, brainTarget, at }: written when a profile loads, read by the brain selector.
 const REG = new Map();
 function note(tenantId, info) { if (tenantId) REG.set(String(tenantId).toLowerCase(), { ...info, at: Date.now() }); }
 /** null = gate off (callers use the env lists); true/false = the readiness decision for this business. */
 function decision({ env = process.env, tenantId } = {}) {
-  if (!gateOn(env)) return null;
-  if (tenantId == null) return false;
-  const r = REG.get(String(tenantId).toLowerCase());
-  return !!(r && r.ready);
+  const r = tenantId == null ? null : REG.get(String(tenantId).toLowerCase());
+  const d = isKbLive(r ? r.facts : null, { gate: env.BRAIN_KB_GATE });
+  return d.reason === 'gate_off' ? null : d.live;
 }
-const isReady = ({ version, readyVersion, brainTarget }) => version != null && readyVersion != null && Number(version) === Number(readyVersion) && String(brainTarget || 'v2') === 'v2';
+/** Readiness alone (gate aside): the shared predicate with the gate forced on. */
+const isReady = (k) => isKbLive(k, { gate: true }).live;
 
 /**
  * Mutates and returns the profile. extras.kb = { version, readyVersion, brainTarget, doc, bytes, loadMs } | null.
@@ -29,7 +29,8 @@ function attach(profile, kbExtras, { env = process.env, force = false } = {}) {
   if (!profile) return profile;
   const k = kbExtras || null;
   const info = { ready: !!(k && isReady(k)), version: k?.version ?? null, readyVersion: k?.readyVersion ?? null, brainTarget: k?.brainTarget || 'v2' };
-  if (!force) note(profile.id, info);
+  // the registry keeps the facts (not a precomputed answer) so decision() runs the shared predicate itself
+  if (!force) note(profile.id, { ...info, facts: k ? { version: info.version, readyVersion: info.readyVersion, brainTarget: info.brainTarget } : null });
   // the snapshot is read only by a business that passed readiness (the readiness runner forces it to test one)
   if (!k || !k.doc || (!force && (!gateOn(env) || !info.ready))) return profile;
   const handle = R.cached(profile.id, k.version, k.doc, k.bytes);
