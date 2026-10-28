@@ -114,7 +114,7 @@ describe('kb follow-up 1: the understanding engine types a catalogue ask', () =>
     assert.deepEqual(CA.catalogueAsk('do you sell pianos?'), { kind: 'item', item: 'pianos' });
     assert.deepEqual(CA.catalogueAsk('Mnauza piano?'), { kind: 'item', item: 'piano' });
     assert.deepEqual(CA.catalogueAsk('do you have any tomato seedlings please'), { kind: 'item', item: 'tomato seedlings' });
-    for (const t of ['do you have time tomorrow', 'Una nafasi kesho?', 'do you have mpesa', 'is there parking', 'do you deliver to Kitengela', 'what do you have for me tomorrow', 'do you have a branch in Westlands', 'how can you help']) assert.equal(CA.catalogueAsk(t), null, t);
+    for (const t of ['do you have time tomorrow', 'Una nafasi kesho?', 'do you have mpesa', 'is there parking', 'do you deliver to Kitengela', 'what do you have for me tomorrow', 'do you have a branch in Westlands', 'how can you help', 'do you do weekends?', 'do you work on Sundays', 'mnafanya jumamosi?']) assert.equal(CA.catalogueAsk(t), null, t);
   });
   it('model off: "what do you offer" is a services question (not the open line), KB businesses only', async () => {
     const p = profileFor(DND, DND_CATS);
