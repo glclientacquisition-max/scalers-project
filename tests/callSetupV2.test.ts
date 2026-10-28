@@ -328,7 +328,9 @@ describe("wiring and write path", () => {
     assert.match(card, /Check your call setup/);
     assert.match(card, /nudge_dismissed_at/);
     assert.match(card, /auto_seen_at/);
-    const home = readFileSync("dashboard/src/app/(desk)/home/page.tsx", "utf8");
+    const home = readFileSync("dashboard/src/app/(desk)/home/page.tsx", "utf8") +
+    // D2: usage, insights, call setup and checks stream from their own slots.
+    "\n" + readFileSync("dashboard/src/components/home/HomeOverviewSlots.tsx", "utf8");
     assert.match(home, /<RoleGate action="settings\.edit" mode="hide">[\s\S]{0,200}?<HomeCallSetupCard/);
   });
 

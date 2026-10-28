@@ -8,7 +8,9 @@ function read(rel) {
 }
 
 describe("home overview craft", () => {
-  const page = read("dashboard/src/app/(desk)/home/page.tsx");
+  const page = read("dashboard/src/app/(desk)/home/page.tsx") +
+    // D2: usage, insights, call setup and checks stream from their own slots.
+    "\n" + read("dashboard/src/components/home/HomeOverviewSlots.tsx");
   const headerFile = read("dashboard/src/components/HomeOverviewHeader.tsx");
   const triage = read("dashboard/src/lib/callsTriage.ts");
 

@@ -182,7 +182,9 @@ describe("saved picks and the Overview card", () => {
     const line = readFileSync("dashboard/src/app/onboarding/line/LineView.tsx", "utf8");
     assert.match(line, /const local = pending \? null : toLocal07\(raw\)/);
     assert.match(line, /\{local \? <CallSetupStep/);
-    const home = readFileSync("dashboard/src/app/(desk)/home/page.tsx", "utf8");
+    const home = readFileSync("dashboard/src/app/(desk)/home/page.tsx", "utf8") +
+    // D2: usage, insights, call setup and checks stream from their own slots.
+    "\n" + readFileSync("dashboard/src/components/home/HomeOverviewSlots.tsx", "utf8");
     assert.match(home, /const numberReady = toLocal07\(tenant\.sautikit_virtual_number\) !== null;/);
     assert.match(home, /<HomeCallSetupCard[\s\S]{0,120}?numberReady=\{numberReady\}/);
     const card = readFileSync("dashboard/src/components/HomeCallSetupCard.tsx", "utf8");

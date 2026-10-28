@@ -7,9 +7,9 @@ import { DeskPageCommit } from "@/components/DeskNavState";
  * and the other destinations paint before their data arrives.
  * Do not replace this with `(desk)/loading.tsx`.
  */
-export function DeskPageGate({ children }: { children: ReactNode }) {
+export function DeskPageGate({ children, fallback }: { children: ReactNode; fallback?: ReactNode }) {
   return (
-    <Suspense fallback={<DeskPageSkeleton />}>
+    <Suspense fallback={fallback ?? <DeskPageSkeleton />}>
       <DeskPageCommit>{children}</DeskPageCommit>
     </Suspense>
   );
