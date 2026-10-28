@@ -69,23 +69,27 @@ test('attach: gate on attaches the live snapshot for ready AND unready businesse
 });
 
 test('brainMode: default full; tenants.brain_mode safe; BRAIN_SAFE_MODE=all overrides every business', () => {
-  assert.deepEqual(brainMode(null), { mode: 'full', reason: 'normal' });
-  assert.deepEqual(brainMode({ kb_live_version: 2 }), { mode: 'full', reason: 'normal' }, 'no column (before .4) = full');
-  assert.deepEqual(brainMode({ brain_mode: 'full' }, { safeEnv: undefined }), { mode: 'full', reason: 'normal' });
-  assert.deepEqual(brainMode({ brain_mode: 'safe' }), { mode: 'safe', reason: 'tenant' });
-  assert.deepEqual(brainMode({ brainMode: 'SAFE' }), { mode: 'safe', reason: 'tenant' });
-  assert.deepEqual(brainMode({ brain_mode: 'weird' }), { mode: 'full', reason: 'normal' });
-  for (const v of ['all', 'ALL', ' all ']) assert.deepEqual(brainMode({ brain_mode: 'full' }, { safeEnv: v }), { mode: 'safe', reason: 'global' });
+  assert.deepEqual(brainMode(null), { mode: 'full', reason: 'default' });
+  assert.deepEqual(brainMode({ kb_live_version: 2 }), { mode: 'full', reason: 'default' }, 'no column (before .4) = full');
+  assert.deepEqual(brainMode({ brain_mode: 'full' }, { safeEnv: undefined }), { mode: 'full', reason: 'default' });
+  assert.deepEqual(brainMode({ brain_mode: 'safe' }), { mode: 'safe', reason: 'admin' }, 'no recorded source = admin');
+  assert.deepEqual(brainMode({ brain_mode: 'safe', brain_mode_source: 'owner' }), { mode: 'safe', reason: 'owner' });
+  assert.deepEqual(brainMode({ brain_mode: 'safe', brain_mode_source: 'admin' }), { mode: 'safe', reason: 'admin' });
+  assert.deepEqual(brainMode({ brain_mode: 'full', brain_mode_source: 'owner' }), { mode: 'full', reason: 'default' });
+  assert.deepEqual(brainMode({ brain_mode: 'safe', brain_mode_source: 'owner' }, { safeEnv: 'all' }), { mode: 'safe', reason: 'env' }, 'env wins');
+  assert.deepEqual(brainMode({ brainMode: 'SAFE', brainModeSource: 'owner' }), { mode: 'safe', reason: 'owner' });
+  assert.deepEqual(brainMode({ brain_mode: 'weird' }), { mode: 'full', reason: 'default' });
+  for (const v of ['all', 'ALL', ' all ']) assert.deepEqual(brainMode({ brain_mode: 'full' }, { safeEnv: v }), { mode: 'safe', reason: 'env' });
   for (const v of ['off', '', undefined, 'yes', '1', 'on']) assert.equal(brainMode({ brain_mode: 'full' }, { safeEnv: v }).mode, 'full', String(v));
   assert.equal(brainMode({ brain_mode: 'safe' }, { safeEnv: 'off' }).mode, 'safe');
   assert.equal(safeEnvState(undefined), 'off'); assert.equal(safeEnvState('off'), 'off'); assert.equal(safeEnvState('all'), 'all'); assert.equal(safeEnvState('yes'), 'invalid');
 });
 
 test('attach pins profile.brainMode for the call (env BRAIN_SAFE_MODE passed in, tenant brain_mode from the load)', () => {
-  assert.deepEqual(LIVE.attach({ id: 'M1' }, { version: 2, readyVersion: 2, brainMode: 'full', doc }, { env: ON }).brainMode, { mode: 'full', reason: 'normal' });
-  assert.deepEqual(LIVE.attach({ id: 'M2' }, { version: 2, readyVersion: 2, brainMode: 'safe', doc }, { env: ON }).brainMode, { mode: 'safe', reason: 'tenant' });
-  assert.deepEqual(LIVE.attach({ id: 'M3' }, { version: 2, readyVersion: 2, doc }, { env: { ...ON, BRAIN_SAFE_MODE: 'all' } }).brainMode, { mode: 'safe', reason: 'global' });
-  assert.deepEqual(LIVE.attach({ id: 'M4' }, null, { env: { BRAIN_SAFE_MODE: 'all' } }).brainMode, { mode: 'safe', reason: 'global' }, 'brake works with the gate off / no KB too');
+  assert.deepEqual(LIVE.attach({ id: 'M1' }, { version: 2, readyVersion: 2, brainMode: 'full', doc }, { env: ON }).brainMode, { mode: 'full', reason: 'default' });
+  assert.deepEqual(LIVE.attach({ id: 'M2' }, { version: 2, readyVersion: 2, brainMode: 'safe', brainModeSource: 'owner', doc }, { env: ON }).brainMode, { mode: 'safe', reason: 'owner' });
+  assert.deepEqual(LIVE.attach({ id: 'M3' }, { version: 2, readyVersion: 2, doc }, { env: { ...ON, BRAIN_SAFE_MODE: 'all' } }).brainMode, { mode: 'safe', reason: 'env' });
+  assert.deepEqual(LIVE.attach({ id: 'M4' }, null, { env: { BRAIN_SAFE_MODE: 'all' } }).brainMode, { mode: 'safe', reason: 'env' }, 'brake works with the gate off / no KB too');
 });
 
 test('staging tenants (fixture, 28 Oct): every one on the KB brain; quality reason unchanged', () => {
@@ -115,8 +119,8 @@ test('contract surface: pure module, facts helper, columns, Desk closure ships i
   const src = fs.readFileSync(path.join(__dirname, '../src/knowledge/kb/kbLive.js'), 'utf8');
   assert.doesNotMatch(src, /require\(/, 'no requires: safe for the Desk voice closure');
   assert.doesNotMatch(src, /process\.env/, 'gate and safe mode are passed in, never read from env');
-  assert.equal(KB_LIVE_COLUMNS, 'kb_live_version, kb_ready_version, brain_mode');
-  assert.deepEqual(kbLiveFacts({ kb_live_version: 2, kb_ready_version: null }), { liveVersion: 2, readyVersion: null, brainMode: 'full' });
+  assert.equal(KB_LIVE_COLUMNS, 'kb_live_version, kb_ready_version, brain_mode, brain_mode_source');
+  assert.deepEqual(kbLiveFacts({ kb_live_version: 2, kb_ready_version: null }), { liveVersion: 2, readyVersion: null, brainMode: 'full', brainModeSource: null });
   assert.equal(kbGateOn(true), true); assert.equal(kbGateOn('off'), false); assert.equal(kbGateOn(undefined), false);
   const { voiceClosure } = require('../dashboard/scripts/voice-modules.cjs');
   const r = voiceClosure(path.join(__dirname, '..'));
@@ -124,6 +128,7 @@ test('contract surface: pure module, facts helper, columns, Desk closure ships i
   assert.deepEqual(r.missing, []);
   const ts = fs.readFileSync(path.join(__dirname, '../dashboard/src/lib/kbLive.server.ts'), 'utf8');
   assert.match(ts, /requireVoice<KbLiveModule>\("\.\/src\/knowledge\/kb\/kbLive\.js"\)/, 'Desk calls the same module, no twin');
+  assert.match(ts, /sb\.rpc\("set_brain_mode", \{ p_tenant: tenantId, p_mode: mode \}\)/, 'owner toggle uses the session client + RPC');
   assert.match(ts, /process\.env\.BRAIN_KB_GATE/); assert.match(ts, /process\.env\.BRAIN_SAFE_MODE/);
   const sql = fs.readFileSync(path.join(__dirname, '../docs/supabase/kb_v2_brain_mode.sql'), 'utf8');
   assert.match(sql, /2026-10-28\.4/); assert.match(sql, /brain_mode in \('full', 'safe'\)/); assert.doesNotMatch(sql, /drop column/i, 'P1 SQL is additive');

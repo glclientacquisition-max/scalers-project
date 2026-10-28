@@ -33,7 +33,7 @@ const isReady = (k) => kbQuality(k) === 'ready';
 function attach(profile, kbExtras, { env = process.env, force = false } = {}) {
   if (!profile) return profile;
   const k = kbExtras || null;
-  const facts = k ? { version: k.version ?? null, readyVersion: k.readyVersion ?? null, brainMode: k.brainMode || 'full' } : null;
+  const facts = k ? { version: k.version ?? null, readyVersion: k.readyVersion ?? null, brainMode: k.brainMode || 'full', brainModeSource: k.brainModeSource || null } : null;
   const info = { ready: isReady(facts), version: facts?.version ?? null, readyVersion: facts?.readyVersion ?? null, quality: kbQuality(facts) };
   profile.brainMode = brainMode(facts, { safeEnv: env.BRAIN_SAFE_MODE });
   if (!force) note(profile.id, { ...info, facts, brainMode: profile.brainMode.mode });

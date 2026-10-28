@@ -1,5 +1,6 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireVoice } from "@/lib/voiceRequire.server";
 
 /**
@@ -12,9 +13,11 @@ import { requireVoice } from "@/lib/voiceRequire.server";
 /** "held_v1" is never returned any more (kept so older callers still type-check). */
 export type KbLiveReason = "gate_off" | "no_facts" | "no_live_version" | "never_ready" | "ready_stale" | "ready" | "held_v1";
 export type KbLiveDecision = { live: boolean; reason: KbLiveReason };
-export type BrainModeDecision = { mode: "full" | "safe"; reason: "global" | "tenant" | "normal" };
+export type BrainMode = "full" | "safe";
+/** env = BRAIN_SAFE_MODE=all (wins); owner = Desk toggle; admin = Super Admin; default = full. */
+export type BrainModeDecision = { mode: BrainMode; reason: "env" | "owner" | "admin" | "default" };
 /** brain_target is ignored (no v1 hold); dropped by kb_v2_drop_brain_target.sql in P2. */
-export type KbLiveFacts = { kb_live_version: number | null; kb_ready_version: number | null; brain_mode?: string | null; brain_target?: string | null };
+export type KbLiveFacts = { kb_live_version: number | null; kb_ready_version: number | null; brain_mode?: string | null; brain_mode_source?: string | null; brain_target?: string | null };
 
 type Facts = Partial<KbLiveFacts> | null | undefined;
 type KbLiveModule = {
@@ -60,4 +63,40 @@ export async function loadKbLive(
   if (r.error && /brain_mode/.test(r.error.message || "")) r = await sb.from("tenants").select(m.KB_LIVE_COLUMNS_PRE_BRAIN_MODE).eq("id", tenantId).maybeSingle();
   const facts = r.error || !r.data ? null : (r.data as unknown as KbLiveFacts);
   return { ...m.isKbLive(facts, opts), mode: m.brainMode(facts, { safeEnv: deskSafeEnv() }), facts };
+}
+
+export type SetBrainModeResult =
+  | { ok: true; mode: BrainMode; from: BrainMode | null; source: "owner" | "admin"; setAt: string | null }
+  | { ok: false; error: "invalid_mode" | "forbidden" | "not_found" | "rpc_missing" | "failed" };
+
+function setBrainModeError(message: string): Exclude<SetBrainModeResult, { ok: true }>["error"] {
+  if (/invalid_mode/.test(message)) return "invalid_mode";
+  if (/forbidden/.test(message)) return "forbidden";
+  if (/not_found/.test(message)) return "not_found";
+  if (/set_brain_mode|PGRST202|does not exist/.test(message)) return "rpc_missing";
+  return "failed";
+}
+
+/**
+ * Desk Settings "Take messages only" toggle: mode "safe" = on, "full" = off. Calls public.set_brain_mode with the
+ * signed-in user's session (cookie client), so the database checks the caller is an owner / admin member of
+ * tenantId and writes only brain_mode + brain_mode_set_by / _set_at / _source ('owner') and one audit row.
+ * Never uses the service role. BRAIN_SAFE_MODE=all (env) still overrides; read it back with loadKbLive(...).mode.
+ */
+export async function setBrainModeAsOwner(tenantId: string, mode: BrainMode): Promise<SetBrainModeResult> {
+  if (mode !== "full" && mode !== "safe") return { ok: false, error: "invalid_mode" };
+  const sb = await createSupabaseServerClient();
+  const { data, error } = await sb.rpc("set_brain_mode", { p_tenant: tenantId, p_mode: mode });
+  if (error) return { ok: false, error: setBrainModeError(`${error.code || ""} ${error.message || ""}`) };
+  const d = (data || {}) as { brain_mode?: BrainMode; from?: BrainMode | null; source?: "owner" | "admin"; set_at?: string | null };
+  return { ok: true, mode: d.brain_mode || mode, from: d.from ?? null, source: d.source || "owner", setAt: d.set_at ?? null };
+}
+
+/** Super Admin (service role, after the Admin sign-in / Unlock checks in the route): source 'admin', audited. */
+export async function setBrainModeAsAdmin(tenantId: string, mode: BrainMode, actorUserId: string | null): Promise<SetBrainModeResult> {
+  if (mode !== "full" && mode !== "safe") return { ok: false, error: "invalid_mode" };
+  const { data, error } = await getSupabaseAdmin().rpc("set_brain_mode", { p_tenant: tenantId, p_mode: mode, p_actor: actorUserId });
+  if (error) return { ok: false, error: setBrainModeError(`${error.code || ""} ${error.message || ""}`) };
+  const d = (data || {}) as { brain_mode?: BrainMode; from?: BrainMode | null; source?: "owner" | "admin"; set_at?: string | null };
+  return { ok: true, mode: d.brain_mode || mode, from: d.from ?? null, source: d.source || "admin", setAt: d.set_at ?? null };
 }

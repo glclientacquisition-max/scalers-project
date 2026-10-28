@@ -1676,18 +1676,18 @@ async function loadKbLive(tenantId, { force = false } = {}) {
   const t0 = Date.now();
   try {
     const { data: t, error } = await selectKbTenantFacts(tenantId);
-    if (error || !t || t.kb_live_version == null) return t ? { version: null, readyVersion: t.kb_ready_version ?? null, brainMode: t.brain_mode || 'full', doc: null } : null;
+    if (error || !t || t.kb_live_version == null) return t ? { version: null, readyVersion: t.kb_ready_version ?? null, brainMode: t.brain_mode || 'full', brainModeSource: t.brain_mode_source || null, doc: null } : null;
     const key = `${tenantId}:${t.kb_live_version}`;
     let hit = KB_DOCS.get(key);
     if (!hit) {
       const { data: snap, error: e2 } = await supabase.from('kb_snapshots').select('doc, bytes').eq('tenant_id', tenantId).eq('version', t.kb_live_version).maybeSingle();
-      if (e2 || !snap) return { version: t.kb_live_version, readyVersion: t.kb_ready_version ?? null, brainMode: t.brain_mode || 'full', doc: null };
+      if (e2 || !snap) return { version: t.kb_live_version, readyVersion: t.kb_ready_version ?? null, brainMode: t.brain_mode || 'full', brainModeSource: t.brain_mode_source || null, doc: null };
       hit = { doc: snap.doc, bytes: snap.bytes || null };
       for (const k of [...KB_DOCS.keys()]) if (k.startsWith(`${tenantId}:`)) KB_DOCS.delete(k);
       KB_DOCS.set(key, hit);
       if (KB_DOCS.size > 500) KB_DOCS.delete(KB_DOCS.keys().next().value);
     }
-    return { version: t.kb_live_version, readyVersion: t.kb_ready_version ?? null, brainMode: t.brain_mode || 'full', doc: hit.doc, bytes: hit.bytes, loadMs: Date.now() - t0 };
+    return { version: t.kb_live_version, readyVersion: t.kb_ready_version ?? null, brainMode: t.brain_mode || 'full', brainModeSource: t.brain_mode_source || null, doc: hit.doc, bytes: hit.bytes, loadMs: Date.now() - t0 };
   } catch (err) {
     console.warn('[db] loadKbLive', err?.message || err);
     return null;
@@ -1766,12 +1766,16 @@ async function listKbTenants() {
   return (data || []).map((r) => r.id);
 }
 
-/** Ops (service role; Super Admin writes through its own route): emergency safe mode for one business, or back to full. */
-async function setBrainMode(tenantId, mode) {
+/**
+ * Ops / Super Admin (service role): "Take messages only" for one business, or back to full. Goes through the one
+ * writer, public.set_brain_mode (kb_v2_brain_mode.sql): source 'admin', audited in tenant_brain_mode_audit.
+ * actor = the admin's auth user id (null for scripts).
+ */
+async function setBrainMode(tenantId, mode, { actor = null } = {}) {
   if (!['full', 'safe'].includes(mode)) throw new Error('setBrainMode: full or safe');
-  const { error } = await supabase.from('tenants').update({ brain_mode: mode }).eq('id', tenantId);
+  const { data, error } = await supabase.rpc('set_brain_mode', { p_tenant: tenantId, p_mode: mode, p_actor: actor });
   if (error) throw new Error(`setBrainMode: ${error.message}`);
-  return true;
+  return data;
 }
 
 /**
