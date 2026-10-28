@@ -74,8 +74,28 @@ and `preview` lines ("what callers hear") produced by the same call rules. Block
   price only on a pick, "more" in threes, picks by position, ranges inside the count sentence, at most 2 sentences.
 - `engineTools.catalogueReceipt` turns a price / list / pick turn into one receipt; `engineGuard` repairs a reply naming
   more than 3 catalogue items; the verifier accepts only KB numbers.
-- For a ready Business the snapshot is projected into `servicesCatalog` / `productCatalog` / `servicesOffered`, so older
-  readers read the KB and the old free-text copies are no longer read.
+- **One reader: `src/knowledge/kb/source.js` (`catalogueSource(profile)`).** Every caller-facing catalogue read goes
+  through it: liveKnowledge (SERVICES / SPOKEN CATALOGUE / SERVICE NOTES), the greeting inputs (server.js greeting calls,
+  greetingWarm), provenance fact sheet, speechGuard priced rows, v2 nlu matchers, `engineTools` named-item check, the
+  engines guard and reply pack, STT hints and the spoken-catalogue pin. Mode `kb` = this call has a ready snapshot
+  attached; mode `legacy` = everything else, and returns exactly the old profile fields (snapshot test
+  `tests/kbSource.test.js` against `tests/fixtures/kbLegacyGolden.json`, taken on staging 3a037cd9).
+- For a ready Business the snapshot is projected into `servicesCatalog` / `productCatalog` with **offered (active) items
+  only**; `servicesOffered` (the derived free text) is set to null. Paused / not-offered items live only in `doc.off`:
+  never listed, counted, priced, matched, in the prompt or the greeting; STT still hears their names. A caller who names
+  one gets the grounded receipt (`findForCaller`): not offered = a plain no; paused = the owner note in its own language
+  (an English note in a Swahili call becomes "timu itathibitisha lini itarudi") plus one offer to have the team call back
+  when it's back (capture `when_back`: a yes runs the normal callback with read-back + yes + commit gate).
+- Price binding: up to 3 priced names are spoken as item + price pairs; a bigger group may carry one true low-to-high
+  range on its count; a single price after a list of names is never built, and the guard drops a model sentence that
+  does it (`kb_price_unbound`).
+- Name lock: item names come only from the KB (the owner-approved Swahili name in a Swahili call, else the English name
+  verbatim). The reply pack carries `ITEM_NAMES` for the call language; the guard finds any other phrase that names a
+  catalogue item (same normalised name words, e.g. a made-up "usafi wa kina" for "Deep clean"), repairs it once to the
+  locked name, else drops the sentence. The pinned spoken catalogue for a KB business is built from the KB projection
+  with locked names; the stored legacy `tenants.spoken_catalogue` is never pinned next to the KB.
+- `not_included` (`excludes_en`) is spoken only when the caller asks whether X includes Y; `can_be_held` (`holdable`,
+  products) answers "can you keep one for me?" (a hold is a callback capture with read-back + yes).
 
 ## Brain selector (one kill switch)
 

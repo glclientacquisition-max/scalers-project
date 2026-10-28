@@ -1,0 +1,1105 @@
+{
+ "liveGroundTruth": "LIVE GROUND TRUTH (highest priority facts — if this conflicts with older prompt text, follow THIS):\n\nBUSINESS VERTICAL: home_services\nHANDOFF MODE: callback (notify via WhatsApp/email callback — do not claim a live transfer)\n\nLOCATIONS & DIRECTIONS:\n1. Main | Address: Argwings Kodhek Road, Kilimani, Nairobi | Landmark: Near Yaya Centre | Directions: Office only, we come to you for all jobs | Coverage: Door to door services\n\nSERVICES (what you offer — not individual products):\n1. 1-Bedroom Standard Clean | Category: Home cleaning | Price: KSh 2,500 | Notes: About 2-3 hours, 1 cleaner. Dusting, vacuuming, mopping, bathroom and kitchen surfaces. We bring supplies.\n2. 2-Bedroom Standard Clean | Category: Home cleaning | Price: KSh 3,500 | Notes: About 3-4 hours, 2 cleaners. Dusting, vacuuming, mopping, bathrooms and kitchen surfaces. We bring supplies.\n3. 3-Bedroom Standard Clean | Category: Home cleaning | Price: KSh 4,800 | Notes: About 4-5 hours, 2 cleaners. Whole house standard clean. We bring supplies.\n4. Deep Clean | Category: Home cleaning | Price: KSh 6,000-12,000 | Notes: About 5-8 hours, 2-3 cleaners. Inside cabinets, behind appliances, grout and limescale. Price depends on house size.\n5. Move-In / Move-Out Clean | Category: Home cleaning | Price: KSh 7,500-15,000 | Notes: About 6-8 hours, 3 cleaners. Empty house, top to bottom, inside cupboards and windows. Price depends on house size.\n6. Post-Construction Clean | Category: Home cleaning | Price: KSh 15,000-35,000 | Notes: 1-2 days, team of 4. Dust, paint and cement removal after building or renovation. Site visit first for big jobs.\n7. Carpet Cleaning | Category: Fabric cleaning | Price: KSh 1,500-4,000 | Notes: Shampoo, hot-water extraction, stain treatment for rugs and fitted carpets\n8. Sofa Cleaning | Category: Fabric cleaning | Price: KSh 700 | Notes: Shampoo, stain treatment, fabric sofas and chairs\n9. Mattress Cleaning | Category: Fabric cleaning | Price: KSh 1,500-2,500 | Notes: Vacuuming, stain treatment, sanitising against dust mites\n10. Window Cleaning | Category: Home cleaning | Price: KSh 150 | Notes: Inside and outside glass, frames, sills on reachable windows\n11. Office Cleaning | Category: Office cleaning | Price: KSh 8,000-25,000 | Notes: Half a day to a full day. Small and medium offices, after hours or weekends. Price depends on size.\n\nSPOKEN CATALOGUE (how to say SERVICES on the phone. File titles stay above. Do not invent names.):\nEN: We offer Standard Clean for one bedroom to three bedroom homes, Deep Clean, Move-In / Move-Out Clean, Post-Construction Clean and more. Which one do you need?\nSW: Tuna Standard Clean ya nyumba ya chumba kimoja hadi vyumba vitatu, Deep Clean, Move-In / Move-Out Clean, Post-Construction Clean na zingine. Unahitaji gani?\nSpeak size tokens as words (one bedroom / chumba kimoja), never \"1 bedroom\" or \"moja bedroom\". When a family has sizes, ask the size before quoting a price.\n\nSPOKEN LOCATIONS (how to say LOCATIONS on the phone. Addresses stay above.):\nEN: We are at Main, Argwings Kodhek Road, Kilimani, Nairobi, Near Yaya Centre.\nSW: Tupate Main, Argwings Kodhek Road, Kilimani, Nairobi, Near Yaya Centre.\n\nPRODUCT CATALOGUE (individual items — prices/stock from here / TARGETED PRODUCT MATCHES only):\n(none listed)\n\nPHONES, SOCIAL & WEB:\nPhones / WhatsApp:\n- Phone (Main): +254700000000\n\nPOLICIES:\n- Payment: You can pay by M-Pesa Buy Goods Till 5123456, M-Pesa Paybill 542542, with your phone number as the account or cash. Customers pay after the job or a 30% deposit first, then the balance. Deep, move-out and post-construction cleans need the deposit to book.\n- Returns / exchanges: Cleaning can't be returned, but we refund your deposit if we cancel or can't come.\n- Delivery: We come to your home or office. Travel is free in Nairobi; some far areas have a travel fee.\n- Deposits / holds: 30% deposit to book deep, move-out and post-construction cleans. Refunded if we cancel.\n- Cancellation: You can cancel up to 24 hours before. After that, we keep the deposit. You can move a booking up to 6 hours before. We wait 30 minutes. After that, a call-out fee applies.\n- Warranty / guarantee: Not happy with a spot? Call us within 24 hours and we come back to re-clean it free.\n- Other: (not on file — admit you do not have that detail; never invent; do not force name capture)\n- Coverage: Nairobi, Ruiru, Juja, Thika, Kikuyu, Syokimau, Kitengela, Ongata Rongai\nCOVERAGE RULE: The Coverage line is the only service area. A county on it covers every town in that county. Delivery text is timing and other instructions.\nPOLICY RULE: Answer only from lines that have real text. If the asked policy is \"(not on file)\", admit unknown. Do not invent. Do not ask for a name unless the caller wants a saved note.\n\nSPOKEN COVERAGE (how to say the Coverage list on the phone. Do not invent a place.):\nEN: We serve Kiambu, Ruiru, Juja, and Thika. We also cover other listed areas. Which place are you in?\nSW: Tunahudumia Kiambu, Ruiru, Juja, na Thika. Pia tuna maeneo mengine. Uko wapi?\n\nSPOKEN POLICIES (same owner sentences, money and clocks as words. Empty fields stay unknown.):\nEN payment: You can pay by M-Pesa Buy Goods Till 5 1 2 3 4 5 6, M-Pesa Paybill 5 4 2 5 4 2, with your phone number as the account or cash. Customers pay after the job or a 30% deposit first, then the balance. Deep, move-out and post-construction cleans need the deposit to book.\nSW payment: You can pay by M-Pesa Buy Goods Till 5 1 2 3 4 5 6, M-Pesa Paybill 5 4 2 5 4 2, with your phone number as the account or cash. Customers pay after the job or a 30% deposit first, then the balance. Deep, move-out and post-construction cleans need the deposit to book.\nEN returns: Cleaning can't be returned, but we refund your deposit if we cancel or can't come.\nSW returns: Cleaning can't be returned, but we refund your deposit if we cancel or can't come.\nEN delivery: We come to your home or office. Travel is free in Nairobi; some far areas have a travel fee.\nSW delivery: We come to your home or office. Travel is free in Nairobi; some far areas have a travel fee.\nEN deposit: 30% deposit to book deep, move-out and post-construction cleans. Refunded if we cancel.\nSW deposit: 30% deposit to book deep, move-out and post-construction cleans. Refunded if we cancel.\nEN cancellation: You can cancel up to 24 hours before. After that, we keep the deposit. You can move a booking up to 6 hours before. We wait 30 minutes. After that, a call-out fee applies.\nSW cancellation: You can cancel up to 24 hours before. After that, we keep the deposit. You can move a booking up to 6 hours before. We wait 30 minutes. After that, a call-out fee applies.\nEN warranty: Not happy with a spot? Call us within 24 hours and we come back to re-clean it free.\nSW warranty: Not happy with a spot? Call us within 24 hours and we come back to re-clean it free.\n\nSPOKEN HOURS (how to say the schedule on the phone):\nEN: We're open from 7:30 AM to 6 PM.\nSW: Tuko wazi kuanzia saa moja na nusu asubuhi hadi saa kumi na mbili jioni.\n\nSPOKEN FAQS (same owner answers, money and numbers as words):\nQ: Do you bring your own cleaning supplies?\nEN: Yes. We bring all detergents, mops, vacuums and machines. You don't need to buy anything.\nSW: Yes. We bring all detergents, mops, vacuums and machines. You don't need to buy anything.\nQ: Are your products safe for children and pets?\nEN: Yes. We use non-toxic, child and pet safe detergents. Tell us about allergies when you book.\nSW: Yes. We use non-toxic, child and pet safe detergents. Tell us about allergies when you book.\nQ: How many cleaners will come?\nEN: One cleaner for a 1 bedroom standard clean, two for 2 and 3 bedrooms, and a team of three or more for deep, move-out and post-construction cleans.\nSW: One cleaner for a 1 bedroom standard clean, two for 2 and 3 bedrooms, and a team of three or more for deep, move-out and post-construction cleans.\nQ: Do I need to be home during the cleaning?\nEN: No. You can leave a key with the caretaker or a neighbour. Someone should let us in and check the work at the end.\nSW: No. You can leave a key with the caretaker or a neighbour. Someone should let us in and check the work at the end.\n\nUNKNOWN (not confirmed by the owner. Do not state these as fact. Say you will confirm with the owner):\n- Other policy\nFor an UNKNOWN topic: admit you do not have it. Say: \"Let me confirm with the owner.\" Do not guess, and do not use a pack seed as the answer.\nA fact stated elsewhere in this brief (hours, coverage, services, prices, payment) wins over an UNKNOWN line on the same topic.\n\nCONFIRMED FAQs (owner-confirmed facts. Answer these exactly when asked. Do not treat pack seeds as fact):\nQ: Do you bring your own cleaning supplies?\nA: Yes. We bring all detergents, mops, vacuums and machines. You don't need to buy anything.\n\nQ: Are your products safe for children and pets?\nA: Yes. We use non-toxic, child and pet safe detergents. Tell us about allergies when you book.\n\nQ: How many cleaners will come?\nA: One cleaner for a 1 bedroom standard clean, two for 2 and 3 bedrooms, and a team of three or more for deep, move-out and post-construction cleans.\n\nQ: Do I need to be home during the cleaning?\nA: No. You can leave a key with the caretaker or a neighbour. Someone should let us in and check the work at the end.\n\nQ: How long does a carpet take to dry?\nA: Usually 4 to 6 hours. Keep windows open and avoid walking on it until it is dry.\n\nQ: Do you clean on Sundays and public holidays?\nA: We work Sundays from 9 am to 3 pm. On public holidays we work by booking only.\n\nQ: Are your cleaners vetted?\nA: Yes. Every cleaner has a police certificate of good conduct, is trained by us and wears a Done and Dusted uniform.\n\nQ: Do you offer regular weekly cleaning?\nA: Yes. Weekly or fortnightly standard cleans get 10% off each visit.\n\nQ: Do I pay a deposit?\nA: For deep, move-out and post-construction cleans we take a 30% deposit to book. Standard cleans are paid after the job.\n\nQ: Can you remove tough stains from sofas and carpets?\nA: We remove most food, drink and mud stains. Old ink, dye and bleach marks may not come out fully, and we tell you before we start.\n\nQ: How long does each job take?\nA: A 1 bedroom standard clean takes about 2 to 3 hours, 2 bedrooms 3 to 4 hours and 3 bedrooms 4 to 5 hours. A deep clean takes 5 to 8 hours and a move-out clean 6 to 8 hours. Carpets take about 1 hour each, sofas about 20 minutes a seat, mattresses about 45 minutes and windows about 10 minutes each.\n\nQ: Do you clean in Thika?\nA: Yes. Thika has a KSh 1,500 travel fee, and we only take Thika jobs of 2 bedrooms and up.\n\nTEAM DIRECTORY (escalation — you are the receptionist, not the expert):\n- Alvin Kiprotich Yegon (General Inquiries); phone +254700000000\n- Christopher Gachie (Owner); phone +254700000000\nESCALATION RULES:\n- Prefer matching the caller's ask to a Name or Role above. A role like \"General queries\" is the catch-all for unmatched asks.\n- Resolve from knowledge first. Escalate when the caller explicitly requests a human, policy requires one, you lack authority, a tool fails, or useful repair attempts fail. Anger alone is not sufficient.\n- Before escalating, capture the name + reason and append the escalate tool with the teammate name or role. Speak nothing about the send. Do not say you sent it, and do not describe what you sent.\n- If they ask for a role or person NOT on this list (e.g. \"sales guy\" but only CEO / General queries is listed): do NOT invent staff. Say you do not have that specialist on file, offer General queries or the owner/CEO to follow up, then escalate. In the escalate tool, set teammate to who they asked for (e.g. \"sales\") so the system can fall back and tag the notify.\n- Do not invent live transfers or claim you already WhatsApped them.\n\nUNKNOWN ANSWER POLICY (when the ask is outside SERVICES / FAQs / TEAM above):\n- Admit you do not have that fact. Do NOT invent prices, availability, guarantees, services, or policy wording.\n- Keep the spoken reply short. Offer only the next step allowed by AUTHORITY / ACTION POLICY.\n- Do not force name/reason capture. Collect them only if the caller chooses a saved request or justified handoff.\n- Missing catalogue prices and empty policy fields are unknown — admit that; never guess amounts or invent returns/refund text.\n- Match the caller language (English / Kiswahili / light Sheng).\n- Owner preferred line: \"I don't have that exact detail ,I can note it for the team or book a visit once I have the basics.\". Adapt it to the caller's language, but remove any callback time, guarantee, transfer, booking, stock, or action promise that AUTHORITY / ACTION POLICY does not support.\n\nNever invent prices, stock, availability, services, locations, policies, people, or FAQ answers outside this ground truth.\nIf PRODUCT CATALOGUE Price is unknown, say you do not have the exact price — never guess a shilling amount.\nIf a POLICIES line is \"(not on file)\", admit unknown; do not invent policy text or force name capture.\nResolve the caller's request from this truth when you can. Capture a clear next step. Only hand off when the playbook or caller requires a human.",
+ "greetingInputs": {
+  "businessName": "Done and Dusted Cleaning Services",
+  "agentName": "Shy",
+  "spokenName": "Done and Dusted",
+  "greetingInvite": "Tukusaidie vipi",
+  "vertical": "home_services",
+  "servicesCatalog": [
+   {
+    "id": "svc_dnd_std_1br",
+    "name": "1-Bedroom Standard Clean",
+    "notes": "About 2-3 hours, 1 cleaner. Dusting, vacuuming, mopping, bathroom and kitchen surfaces. We bring supplies.",
+    "price": "2500",
+    "source": "owner",
+    "pricing": {
+     "mode": "fixed",
+     "unit": "job",
+     "source": "owner",
+     "max_ksh": null,
+     "min_ksh": null,
+     "in_stock": null,
+     "confirmed": true,
+     "amount_ksh": 2500,
+     "parsed_from": "KSh 2,500"
+    },
+    "category": "Home cleaning",
+    "in_stock": "",
+    "price_max": null,
+    "price_range": "KSh 2,500",
+    "out_of_scope": "",
+    "pricing_mode": "fixed"
+   },
+   {
+    "id": "svc_dnd_std_2br",
+    "name": "2-Bedroom Standard Clean",
+    "notes": "About 3-4 hours, 2 cleaners. Dusting, vacuuming, mopping, bathrooms and kitchen surfaces. We bring supplies.",
+    "price": "3500",
+    "source": "owner",
+    "pricing": {
+     "mode": "fixed",
+     "unit": "job",
+     "source": "owner",
+     "max_ksh": null,
+     "min_ksh": null,
+     "in_stock": null,
+     "confirmed": true,
+     "amount_ksh": 3500,
+     "parsed_from": "KSh 3,500"
+    },
+    "category": "Home cleaning",
+    "in_stock": "",
+    "price_max": null,
+    "price_range": "KSh 3,500",
+    "out_of_scope": "",
+    "pricing_mode": "fixed"
+   },
+   {
+    "id": "svc_dnd_std_3br",
+    "name": "3-Bedroom Standard Clean",
+    "notes": "About 4-5 hours, 2 cleaners. Whole house standard clean. We bring supplies.",
+    "price": "4800",
+    "source": "owner",
+    "pricing": {
+     "mode": "fixed",
+     "unit": "job",
+     "source": "owner",
+     "max_ksh": null,
+     "min_ksh": null,
+     "in_stock": null,
+     "confirmed": true,
+     "amount_ksh": 4800,
+     "parsed_from": "KSh 4,800"
+    },
+    "category": "Home cleaning",
+    "in_stock": "",
+    "price_max": null,
+    "price_range": "KSh 4,800",
+    "out_of_scope": "",
+    "pricing_mode": "fixed"
+   },
+   {
+    "id": "svc_dnd_deep",
+    "name": "Deep Clean",
+    "notes": "About 5-8 hours, 2-3 cleaners. Inside cabinets, behind appliances, grout and limescale. Price depends on house size.",
+    "price": "6000",
+    "source": "owner",
+    "pricing": {
+     "mode": "range",
+     "unit": "job",
+     "source": "owner",
+     "max_ksh": 12000,
+     "min_ksh": 6000,
+     "in_stock": null,
+     "confirmed": true,
+     "amount_ksh": 6000,
+     "parsed_from": "KSh 6,000–12,000"
+    },
+    "category": "Home cleaning",
+    "in_stock": "",
+    "price_max": 12000,
+    "price_range": "KSh 6,000–12,000",
+    "out_of_scope": "",
+    "pricing_mode": "range"
+   },
+   {
+    "id": "svc_dnd_move",
+    "name": "Move-In / Move-Out Clean",
+    "notes": "About 6-8 hours, 3 cleaners. Empty house, top to bottom, inside cupboards and windows. Price depends on house size.",
+    "price": "7500",
+    "source": "owner",
+    "pricing": {
+     "mode": "range",
+     "unit": "job",
+     "source": "owner",
+     "max_ksh": 15000,
+     "min_ksh": 7500,
+     "in_stock": null,
+     "confirmed": true,
+     "amount_ksh": 7500,
+     "parsed_from": "KSh 7,500–15,000"
+    },
+    "category": "Home cleaning",
+    "in_stock": "",
+    "price_max": 15000,
+    "price_range": "KSh 7,500–15,000",
+    "out_of_scope": "",
+    "pricing_mode": "range"
+   },
+   {
+    "id": "svc_dnd_postcon",
+    "name": "Post-Construction Clean",
+    "notes": "1-2 days, team of 4. Dust, paint and cement removal after building or renovation. Site visit first for big jobs.",
+    "price": "15000",
+    "source": "owner",
+    "pricing": {
+     "mode": "range",
+     "unit": "job",
+     "source": "owner",
+     "max_ksh": 35000,
+     "min_ksh": 15000,
+     "in_stock": null,
+     "confirmed": true,
+     "amount_ksh": 15000,
+     "parsed_from": "KSh 15,000–35,000"
+    },
+    "category": "Home cleaning",
+    "in_stock": "",
+    "price_max": 35000,
+    "price_range": "KSh 15,000–35,000",
+    "out_of_scope": "",
+    "pricing_mode": "range"
+   },
+   {
+    "id": "svc_dnd_carpet",
+    "name": "Carpet Cleaning",
+    "notes": "Shampoo, hot-water extraction, stain treatment for rugs and fitted carpets",
+    "price": "1500",
+    "source": "owner",
+    "pricing": {
+     "mode": "range",
+     "unit": "carpet",
+     "source": "owner",
+     "max_ksh": 4000,
+     "min_ksh": 1500,
+     "in_stock": null,
+     "confirmed": true,
+     "amount_ksh": 1500,
+     "parsed_from": "KSh 1,500–4,000"
+    },
+    "category": "Fabric cleaning",
+    "in_stock": "",
+    "price_max": 4000,
+    "price_range": "KSh 1,500–4,000 per carpet",
+    "out_of_scope": "",
+    "pricing_mode": "range"
+   },
+   {
+    "id": "svc_dnd_sofa",
+    "name": "Sofa Cleaning",
+    "notes": "Shampoo, stain treatment, fabric sofas and chairs",
+    "price": "700",
+    "source": "owner",
+    "pricing": {
+     "mode": "fixed",
+     "unit": "seat",
+     "source": "owner",
+     "max_ksh": null,
+     "min_ksh": null,
+     "in_stock": null,
+     "confirmed": true,
+     "amount_ksh": 700,
+     "parsed_from": "KSh 700"
+    },
+    "category": "Fabric cleaning",
+    "in_stock": "",
+    "price_max": null,
+    "price_range": "KSh 700 per seat",
+    "out_of_scope": "",
+    "pricing_mode": "fixed"
+   },
+   {
+    "id": "svc_dnd_mattress",
+    "name": "Mattress Cleaning",
+    "notes": "Vacuuming, stain treatment, sanitising against dust mites",
+    "price": "1500",
+    "source": "owner",
+    "pricing": {
+     "mode": "range",
+     "unit": "mattress",
+     "source": "owner",
+     "max_ksh": 2500,
+     "min_ksh": 1500,
+     "in_stock": null,
+     "confirmed": true,
+     "amount_ksh": 1500,
+     "parsed_from": "KSh 1,500–2,500"
+    },
+    "category": "Fabric cleaning",
+    "in_stock": "",
+    "price_max": 2500,
+    "price_range": "KSh 1,500–2,500 per mattress",
+    "out_of_scope": "",
+    "pricing_mode": "range"
+   },
+   {
+    "id": "svc_dnd_windows",
+    "name": "Window Cleaning",
+    "notes": "Inside and outside glass, frames, sills on reachable windows",
+    "price": "150",
+    "source": "owner",
+    "pricing": {
+     "mode": "fixed",
+     "unit": "window",
+     "source": "owner",
+     "max_ksh": null,
+     "min_ksh": null,
+     "in_stock": null,
+     "confirmed": true,
+     "amount_ksh": 150,
+     "parsed_from": "KSh 150"
+    },
+    "category": "Home cleaning",
+    "in_stock": "",
+    "price_max": null,
+    "price_range": "KSh 150 per window",
+    "out_of_scope": "",
+    "pricing_mode": "fixed"
+   },
+   {
+    "id": "svc_dnd_office",
+    "name": "Office Cleaning",
+    "notes": "Half a day to a full day. Small and medium offices, after hours or weekends. Price depends on size.",
+    "price": "8000",
+    "source": "owner",
+    "pricing": {
+     "mode": "range",
+     "unit": "job",
+     "source": "owner",
+     "max_ksh": 25000,
+     "min_ksh": 8000,
+     "in_stock": null,
+     "confirmed": true,
+     "amount_ksh": 8000,
+     "parsed_from": "KSh 8,000–25,000"
+    },
+    "category": "Office cleaning",
+    "in_stock": "",
+    "price_max": 25000,
+    "price_range": "KSh 8,000–25,000",
+    "out_of_scope": "",
+    "pricing_mode": "range"
+   }
+  ],
+  "servicesOffered": "Services:\n- 1-Bedroom Standard Clean - category Home cleaning - price KSh 2,500 - pricing fixed - About 2-3 hours, 1 cleaner. Dusting, vacuuming, mopping, bathroom and kitchen surfaces. We bring supplies.\n- 2-Bedroom Standard Clean - category Home cleaning - price KSh 3,500 - pricing fixed - About 3-4 hours, 2 cleaners. Dusting, vacuuming, mopping, bathrooms and kitchen surfaces. We bring supplies.\n- 3-Bedroom Standard Clean - category Home cleaning - price KSh 4,800 - pricing fixed - About 4-5 hours, 2 cleaners. Whole house standard clean. We bring supplies.\n- Deep Clean - category Home cleaning - price KSh 6,000–12,000 - pricing range - About 5-8 hours, 2-3 cleaners. Inside cabinets, behind appliances, grout and limescale. Price depends on house size.\n- Move-In / Move-Out Clean - category Home cleaning - price KSh 7,500–15,000 - pricing range - About 6-8 hours, 3 cleaners. Empty house, top to bottom, inside cupboards and windows. Price depends on house size.\n- Post-Construction Clean - category Home cleaning - price KSh 15,000–35,000 - pricing range - 1-2 days, team of 4. Dust, paint and cement removal after building or renovation. Site visit first for big jobs.\n- Carpet Cleaning - category Fabric cleaning - price KSh 1,500–4,000 per carpet - pricing range - Shampoo, hot-water extraction, stain treatment for rugs and fitted carpets\n- Sofa Cleaning - category Fabric cleaning - price KSh 700 per seat - pricing fixed - Shampoo, stain treatment, fabric sofas and chairs\n- Mattress Cleaning - category Fabric cleaning - price KSh 1,500–2,500 per mattress - pricing range - Vacuuming, stain treatment, sanitising against dust mites\n- Window Cleaning - category Home cleaning - price KSh 150 per window - pricing fixed - Inside and outside glass, frames, sills on reachable windows\n- Office Cleaning - category Office cleaning - price KSh 8,000–25,000 - pricing range - Half a day to a full day. Small and medium offices, after hours or weekends. Price depends on size.",
+  "isOpen": true,
+  "afterHoursMode": "serve",
+  "closureNotice": null,
+  "callerFileName": "",
+  "mode": "instant",
+  "now": "2026-10-28T07:00:00.000Z"
+ },
+ "fallbackGreeting": "Good morning, Done and Dusted, this is Shy. You can speak in English or Kiswahili. Tukusaidie vipi.",
+ "offeringClause": "We help with 1-bedroom standard clean, 2-bedroom standard clean, and 3-bedroom standard clean.",
+ "speechFactText": "{\"businessName\":\"Done and Dusted Cleaning Services\",\"hours\":{\"days\":{\"fri\":{\"open\":\"07:30\",\"close\":\"18:00\"},\"mon\":{\"open\":\"07:30\",\"close\":\"18:00\"},\"sat\":{\"open\":\"08:00\",\"close\":\"17:00\"},\"sun\":{\"open\":\"09:00\",\"close\":\"15:00\"},\"thu\":{\"open\":\"07:30\",\"close\":\"18:00\"},\"tue\":{\"open\":\"07:30\",\"close\":\"18:00\"},\"wed\":{\"open\":\"07:30\",\"close\":\"18:00\"}},\"location\":\"Main · Kilimani, Nairobi\",\"timezone\":\"Africa/Nairobi\"},\"locations\":[{\"hours\":\"\",\"label\":\"Main\",\"address\":\"Argwings Kodhek Road, Kilimani, Nairobi\",\"area_id\":\"estate:nairobi:kilimani\",\"landmark\":\"Near Yaya Centre\",\"directions\":\"Office only, we come to you for all jobs\",\"coverage_notes\":\"Door to door services\"}],\"bulletin\":[{\"id\":\"f06cf3a4-3534-4bac-aca9-c35b380a6392\",\"text\":\"Happy customer service week\",\"active\":true,\"ends_at\":\"2026-10-10T20:59:59.999Z\",\"starts_at\":\"2026-10-10T01:05:35.834Z\",\"created_at\":\"2026-10-10T01:05:35.835Z\"},{\"id\":\"4d7f77c8-945a-4ee9-a350-85a823992722\",\"text\":\"Happy ustomer service week\",\"active\":false,\"ends_at\":\"2026-10-10T01:05:24.047Z\",\"starts_at\":\"2026-10-10T01:05:14.614Z\",\"created_at\":\"2026-10-10T01:05:14.614Z\"}],\"team\":[{\"name\":\"Alvin Kiprotich Yegon\",\"role\":\"General Inquiries\",\"email\":\"owner@example.com\",\"phone\":\"+254700000000\",\"receives_ops\":true,\"receives_inbox\":true,\"receives_escalation\":true},{\"name\":\"Christopher Gachie\",\"role\":\"Owner\",\"email\":\"owner@example.com\",\"phone\":\"+254700000000\",\"receives_ops\":true,\"receives_inbox\":true,\"receives_escalation\":true}],\"social\":{\"channels\":[{\"kind\":\"phone\",\"label\":\"Main\",\"value\":\"+254700000000\"}]},\"notes\":\"Services:\\n- 1-Bedroom Standard Clean - category Home cleaning - price KSh 2,500 - pricing fixed - About 2-3 hours, 1 cleaner. Dusting, vacuuming, mopping, bathroom and kitchen surfaces. We bring supplies.\\n- 2-Bedroom Standard Clean - category Home cleaning - price KSh 3,500 - pricing fixed - About 3-4 hours, 2 cleaners. Dusting, vacuuming, mopping, bathrooms and kitchen surfaces. We bring supplies.\\n- 3-Bedroom Standard Clean - category Home cleaning - price KSh 4,800 - pricing fixed - About 4-5 hours, 2 cleaners. Whole house standard clean. We bring supplies.\\n- Deep Clean - category Home cleaning - price KSh 6,000–12,000 - pricing range - About 5-8 hours, 2-3 cleaners. Inside cabinets, behind appliances, grout and limescale. Price depends on house size.\\n- Move-In / Move-Out Clean - category Home cleaning - price KSh 7,500–15,000 - pricing range - About 6-8 hours, 3 cleaners. Empty house, top to bottom, inside cupboards and windows. Price depends on house size.\\n- Post-Construction Clean - category Home cleaning - price KSh 15,000–35,000 - pricing range - 1-2 days, team of 4. Dust, paint and cement removal after building or renovation. Site visit first for big jobs.\\n- Carpet Cleaning - category Fabric cleaning - price KSh 1,500–4,000 per carpet - pricing range - Shampoo, hot-water extraction, stain treatment for rugs and fitted carpets\\n- Sofa Cleaning - category Fabric cleaning - price KSh 700 per seat - pricing fixed - Shampoo, stain treatment, fabric sofas and chairs\\n- Mattress Cleaning - category Fabric cleaning - price KSh 1,500–2,500 per mattress - pricing range - Vacuuming, stain treatment, sanitising against dust mites\\n- Window Cleaning - category Home cleaning - price KSh 150 per window - pricing fixed - Inside and outside glass, frames, sills on reachable windows\\n- Office Cleaning - category Office cleaning - price KSh 8,000–25,000 - pricing range - Half a day to a full day. Small and medium offices, after hours or weekends. Price depends on size.\",\"policies\":{\"payment\":\"You can pay by M-Pesa Buy Goods Till 5123456, M-Pesa Paybill 542542, with your phone number as the account or cash. Customers pay after the job or a 30% deposit first, then the balance. Deep, move-out and post-construction cleans need the deposit to book.\",\"returns\":\"Cleaning can't be returned, but we refund your deposit if we cancel or can't come.\",\"delivery\":\"We come to your home or office. Travel is free in Nairobi; some far areas have a travel fee.\",\"deposit\":\"30% deposit to book deep, move-out and post-construction cleans. Refunded if we cancel.\",\"cancellation\":\"You can cancel up to 24 hours before. After that, we keep the deposit. You can move a booking up to 6 hours before. We wait 30 minutes. After that, a call-out fee applies.\",\"warranty\":\"Not happy with a spot? Call us within 24 hours and we come back to re-clean it free.\",\"coverage_areas\":[\"county:nairobi\",\"place:ruiru\",\"place:juja\",\"place:thika\",\"place:kikuyu\",\"place:syokimau\",\"place:kitengela\",\"place:ongata rongai\"]},\"products\":[],\"services\":[{\"name\":\"1-Bedroom Standard Clean\",\"price_range\":\"KSh 2,500\",\"notes\":\"About 2-3 hours, 1 cleaner. Dusting, vacuuming, mopping, bathroom and kitchen surfaces. We bring supplies.\"},{\"name\":\"2-Bedroom Standard Clean\",\"price_range\":\"KSh 3,500\",\"notes\":\"About 3-4 hours, 2 cleaners. Dusting, vacuuming, mopping, bathrooms and kitchen surfaces. We bring supplies.\"},{\"name\":\"3-Bedroom Standard Clean\",\"price_range\":\"KSh 4,800\",\"notes\":\"About 4-5 hours, 2 cleaners. Whole house standard clean. We bring supplies.\"},{\"name\":\"Deep Clean\",\"price_range\":\"KSh 6,000-12,000\",\"notes\":\"About 5-8 hours, 2-3 cleaners. Inside cabinets, behind appliances, grout and limescale. Price depends on house size.\"},{\"name\":\"Move-In / Move-Out Clean\",\"price_range\":\"KSh 7,500-15,000\",\"notes\":\"About 6-8 hours, 3 cleaners. Empty house, top to bottom, inside cupboards and windows. Price depends on house size.\"},{\"name\":\"Post-Construction Clean\",\"price_range\":\"KSh 15,000-35,000\",\"notes\":\"1-2 days, team of 4. Dust, paint and cement removal after building or renovation. Site visit first for big jobs.\"},{\"name\":\"Carpet Cleaning\",\"price_range\":\"KSh 1,500-4,000\",\"notes\":\"Shampoo, hot-water extraction, stain treatment for rugs and fitted carpets\"},{\"name\":\"Sofa Cleaning\",\"price_range\":\"KSh 700\",\"notes\":\"Shampoo, stain treatment, fabric sofas and chairs\"},{\"name\":\"Mattress Cleaning\",\"price_range\":\"KSh 1,500-2,500\",\"notes\":\"Vacuuming, stain treatment, sanitising against dust mites\"},{\"name\":\"Window Cleaning\",\"price_range\":\"KSh 150\",\"notes\":\"Inside and outside glass, frames, sills on reachable windows\"},{\"name\":\"Office Cleaning\",\"price_range\":\"KSh 8,000-25,000\",\"notes\":\"Half a day to a full day. Small and medium offices, after hours or weekends. Price depends on size.\"}],\"faqs\":[{\"question\":\"Do you bring your own cleaning supplies?\",\"answer\":\"Yes. We bring all detergents, mops, vacuums and machines. You don't need to buy anything.\"},{\"question\":\"Are your products safe for children and pets?\",\"answer\":\"Yes. We use non-toxic, child and pet safe detergents. Tell us about allergies when you book.\"},{\"question\":\"How many cleaners will come?\",\"answer\":\"One cleaner for a 1 bedroom standard clean, two for 2 and 3 bedrooms, and a team of three or more for deep, move-out and post-construction cleans.\"},{\"question\":\"Do I need to be home during the cleaning?\",\"answer\":\"No. You can leave a key with the caretaker or a neighbour. Someone should let us in and check the work at the end.\"},{\"question\":\"How long does a carpet take to dry?\",\"answer\":\"Usually 4 to 6 hours. Keep windows open and avoid walking on it until it is dry.\"},{\"question\":\"Do you clean on Sundays and public holidays?\",\"answer\":\"We work Sundays from 9 am to 3 pm. On public holidays we work by booking only.\"},{\"question\":\"Are your cleaners vetted?\",\"answer\":\"Yes. Every cleaner has a police certificate of good conduct, is trained by us and wears a Done and Dusted uniform.\"},{\"question\":\"Do you offer regular weekly cleaning?\",\"answer\":\"Yes. Weekly or fortnightly standard cleans get 10% off each visit.\"},{\"question\":\"Do I pay a deposit?\",\"answer\":\"For deep, move-out and post-construction cleans we take a 30% deposit to book. Standard cleans are paid after the job.\"},{\"question\":\"Can you remove tough stains from sofas and carpets?\",\"answer\":\"We remove most food, drink and mud stains. Old ink, dye and bleach marks may not come out fully, and we tell you before we start.\"},{\"question\":\"How long does each job take?\",\"answer\":\"A 1 bedroom standard clean takes about 2 to 3 hours, 2 bedrooms 3 to 4 hours and 3 bedrooms 4 to 5 hours. A deep clean takes 5 to 8 hours and a move-out clean 6 to 8 hours. Carpets take about 1 hour each, sofas about 20 minutes a seat, mattresses about 45 minutes and windows about 10 minutes each.\"},{\"question\":\"Do you clean in Thika?\",\"answer\":\"Yes. Thika has a KSh 1,500 travel fee, and we only take Thika jobs of 2 bedrooms and up.\"}],\"areaFees\":[]}",
+ "guard": [
+  "Deep Clean is 6,000 shillings.",
+  "I don't have that on file. I can note it for the team.",
+  "I don't have that on file. I can note it for the team."
+ ],
+ "sttTerms": [
+  "Done and Dusted Cleaning Services",
+  "1-Bedroom Standard Clean",
+  "2-Bedroom Standard Clean",
+  "3-Bedroom Standard Clean",
+  "Move-In / Move-Out Clean",
+  "Post-Construction Clean",
+  "Alvin Kiprotich Yegon",
+  "Christopher Gachie",
+  "Mattress Cleaning",
+  "Near Yaya Centre",
+  "Carpet Cleaning",
+  "Office Cleaning",
+  "Window Cleaning",
+  "Sofa Cleaning",
+  "Deep Clean",
+  "Main",
+  "shy",
+  "Ongata Rongai",
+  "Kitengela",
+  "Syokimau",
+  "Nairobi",
+  "Kikuyu",
+  "Ruiru",
+  "Thika",
+  "Juja"
+ ],
+ "nlu": [
+  {
+   "kind": "price_service",
+   "service": "Deep Clean",
+   "products": 0,
+   "intents": [
+    "price"
+   ]
+  },
+  {
+   "kind": "list_services",
+   "service": "Carpet Cleaning",
+   "products": 0,
+   "intents": [
+    "services"
+   ]
+  },
+  {
+   "kind": "book",
+   "service": "Sofa Cleaning",
+   "products": 0,
+   "intents": [
+    "book"
+   ]
+  },
+  {
+   "kind": "list_services",
+   "service": null,
+   "products": 0,
+   "intents": [
+    "services"
+   ]
+  }
+ ],
+ "spokenCatalogue": {
+  "stale": false,
+  "degraded": false,
+  "doc": {
+   "schemaVersion": 1,
+   "tenantId": null,
+   "version": 0,
+   "sourceHash": "24d01e26cb194b878485be8f8b0f210eac7d76c3f47aa790ebbe8b5a9976092a",
+   "generatedAt": null,
+   "generator": "rules",
+   "aiError": null,
+   "status": "draft",
+   "entries": [
+    {
+     "id": "svc_dnd_std_1br",
+     "kind": "service",
+     "hash": {
+      "text": "c88c0ab8eff39753",
+      "price": "8f12ffc1cb1631bb"
+     },
+     "raw": {
+      "name": "1-Bedroom Standard Clean",
+      "price": "KSh 2,500",
+      "unit": "job"
+     },
+     "category": {
+      "id": "house",
+      "en": "house cleaning by size",
+      "sw": "usafi wa nyumba kulingana na ukubwa"
+     },
+     "spoken": {
+      "en": "one-bedroom cleaning",
+      "sw": "usafi wa nyumba ya chumba kimoja"
+     },
+     "explain": {
+      "en": "It means cleaning a one-bedroom home: dusting, mopping, the bathroom and the kitchen.",
+      "sw": "Ni usafi wa nyumba yenye chumba cha kulala kimoja: kufagia, kupiga deki, bafu na jikoni."
+     },
+     "source": {
+      "name_en": "rules",
+      "name_sw": "rules",
+      "explain_en": "rules",
+      "explain_sw": "rules"
+     },
+     "edited": false,
+     "status": "draft",
+     "priceStatus": "draft",
+     "price": {
+      "en": "2,500 shillings",
+      "sw": "shilingi 2,500",
+      "numbers": [
+       2500
+      ],
+      "review": null
+     }
+    },
+    {
+     "id": "svc_dnd_std_2br",
+     "kind": "service",
+     "hash": {
+      "text": "d07354d53b2f4d34",
+      "price": "4237eced173cf9e8"
+     },
+     "raw": {
+      "name": "2-Bedroom Standard Clean",
+      "price": "KSh 3,500",
+      "unit": "job"
+     },
+     "category": {
+      "id": "house",
+      "en": "house cleaning by size",
+      "sw": "usafi wa nyumba kulingana na ukubwa"
+     },
+     "spoken": {
+      "en": "two-bedroom cleaning",
+      "sw": "usafi wa nyumba ya vyumba viwili"
+     },
+     "explain": {
+      "en": "It means cleaning a two-bedroom home: dusting, mopping, the bathroom and the kitchen.",
+      "sw": "Ni usafi wa nyumba yenye vyumba vya kulala viwili: kufagia, kupiga deki, bafu na jikoni."
+     },
+     "source": {
+      "name_en": "rules",
+      "name_sw": "rules",
+      "explain_en": "rules",
+      "explain_sw": "rules"
+     },
+     "edited": false,
+     "status": "draft",
+     "priceStatus": "draft",
+     "price": {
+      "en": "3,500 shillings",
+      "sw": "shilingi 3,500",
+      "numbers": [
+       3500
+      ],
+      "review": null
+     }
+    },
+    {
+     "id": "svc_dnd_std_3br",
+     "kind": "service",
+     "hash": {
+      "text": "b6a6f89674ed3f7b",
+      "price": "006773fe4bf4cc35"
+     },
+     "raw": {
+      "name": "3-Bedroom Standard Clean",
+      "price": "KSh 4,800",
+      "unit": "job"
+     },
+     "category": {
+      "id": "house",
+      "en": "house cleaning by size",
+      "sw": "usafi wa nyumba kulingana na ukubwa"
+     },
+     "spoken": {
+      "en": "three-bedroom cleaning",
+      "sw": "usafi wa nyumba ya vyumba vitatu"
+     },
+     "explain": {
+      "en": "It means cleaning a three-bedroom home: dusting, mopping, the bathroom and the kitchen.",
+      "sw": "Ni usafi wa nyumba yenye vyumba vya kulala vitatu: kufagia, kupiga deki, bafu na jikoni."
+     },
+     "source": {
+      "name_en": "rules",
+      "name_sw": "rules",
+      "explain_en": "rules",
+      "explain_sw": "rules"
+     },
+     "edited": false,
+     "status": "draft",
+     "priceStatus": "draft",
+     "price": {
+      "en": "4,800 shillings",
+      "sw": "shilingi 4,800",
+      "numbers": [
+       4800
+      ],
+      "review": null
+     }
+    },
+    {
+     "id": "svc_dnd_deep",
+     "kind": "service",
+     "hash": {
+      "text": "851da0ee8ce60374",
+      "price": "50f996be7c6346b9"
+     },
+     "raw": {
+      "name": "Deep Clean",
+      "price": "KSh 6,000–12,000",
+      "unit": "job"
+     },
+     "category": {
+      "id": "deep",
+      "en": "deep cleaning, like move-in or after building work",
+      "sw": "usafi wa kina, kama wa kuhamia au baada ya ujenzi"
+     },
+     "spoken": {
+      "en": "deep cleaning",
+      "sw": "usafi wa kina"
+     },
+     "explain": {
+      "en": "It means a more thorough clean than a standard one.",
+      "sw": "Ni usafi wa kina zaidi ya usafi wa kawaida."
+     },
+     "source": {
+      "name_en": "rules",
+      "name_sw": "rules",
+      "explain_en": "rules",
+      "explain_sw": "rules"
+     },
+     "edited": false,
+     "status": "draft",
+     "priceStatus": "draft",
+     "price": {
+      "en": "6,000 shillings",
+      "sw": "shilingi 6,000",
+      "numbers": [
+       6000,
+       12000
+      ],
+      "review": null
+     }
+    },
+    {
+     "id": "svc_dnd_move",
+     "kind": "service",
+     "hash": {
+      "text": "f66de0c5131b08cb",
+      "price": "f3de909b9631906d"
+     },
+     "raw": {
+      "name": "Move-In / Move-Out Clean",
+      "price": "KSh 7,500–15,000",
+      "unit": "job"
+     },
+     "category": {
+      "id": "deep",
+      "en": "deep cleaning, like move-in or after building work",
+      "sw": "usafi wa kina, kama wa kuhamia au baada ya ujenzi"
+     },
+     "spoken": {
+      "en": "move-in and move-out cleaning",
+      "sw": "usafi wa nyumba unapohamia au kuhama"
+     },
+     "explain": {
+      "en": "It means a full clean of a home when you move in or move out.",
+      "sw": "Ni usafi kamili wa nyumba unapohamia au kuhama."
+     },
+     "source": {
+      "name_en": "rules",
+      "name_sw": "rules",
+      "explain_en": "rules",
+      "explain_sw": "rules"
+     },
+     "edited": false,
+     "status": "draft",
+     "priceStatus": "draft",
+     "price": {
+      "en": "7,500 shillings",
+      "sw": "shilingi 7,500",
+      "numbers": [
+       7500,
+       15000
+      ],
+      "review": null
+     }
+    },
+    {
+     "id": "svc_dnd_postcon",
+     "kind": "service",
+     "hash": {
+      "text": "abcaf375ba8267d9",
+      "price": "81d0931a7983b7c3"
+     },
+     "raw": {
+      "name": "Post-Construction Clean",
+      "price": "KSh 15,000–35,000",
+      "unit": "job"
+     },
+     "category": {
+      "id": "deep",
+      "en": "deep cleaning, like move-in or after building work",
+      "sw": "usafi wa kina, kama wa kuhamia au baada ya ujenzi"
+     },
+     "spoken": {
+      "en": "post-construction cleaning",
+      "sw": "usafi baada ya ujenzi"
+     },
+     "explain": {
+      "en": "It means cleaning up after building or renovation work: dust and debris.",
+      "sw": "Ni usafi baada ya ujenzi au ukarabati, kuondoa vumbi na uchafu."
+     },
+     "source": {
+      "name_en": "rules",
+      "name_sw": "rules",
+      "explain_en": "rules",
+      "explain_sw": "rules"
+     },
+     "edited": false,
+     "status": "draft",
+     "priceStatus": "draft",
+     "price": {
+      "en": "15,000 shillings",
+      "sw": "shilingi 15,000",
+      "numbers": [
+       15000,
+       35000
+      ],
+      "review": null
+     }
+    },
+    {
+     "id": "svc_dnd_carpet",
+     "kind": "service",
+     "hash": {
+      "text": "03f120a2f912a0d3",
+      "price": "4f564a2e35f517a9"
+     },
+     "raw": {
+      "name": "Carpet Cleaning",
+      "price": "KSh 1,500–4,000 per carpet",
+      "unit": "carpet"
+     },
+     "category": {
+      "id": "items",
+      "en": "mattresses, sofas, carpets, windows",
+      "sw": "usafi wa magodoro, sofa, mazulia, madirisha"
+     },
+     "spoken": {
+      "en": "carpet cleaning",
+      "sw": "usafi wa zulia"
+     },
+     "explain": {
+      "en": "Carpet cleaning covers shampoo, hot-water extraction and stain treatment for rugs and fitted carpets.",
+      "sw": "Ni usafi wa zulia."
+     },
+     "source": {
+      "name_en": "rules",
+      "name_sw": "rules",
+      "explain_en": "rules",
+      "explain_sw": "rules"
+     },
+     "edited": false,
+     "status": "draft",
+     "priceStatus": "draft",
+     "price": {
+      "en": "1,500 shillings",
+      "sw": "shilingi 1,500",
+      "numbers": [
+       1500,
+       4000
+      ],
+      "review": null
+     }
+    },
+    {
+     "id": "svc_dnd_sofa",
+     "kind": "service",
+     "hash": {
+      "text": "382f6cadb15c267d",
+      "price": "51aa9bf86625adfe"
+     },
+     "raw": {
+      "name": "Sofa Cleaning",
+      "price": "KSh 700 per seat",
+      "unit": "seat"
+     },
+     "category": {
+      "id": "items",
+      "en": "mattresses, sofas, carpets, windows",
+      "sw": "usafi wa magodoro, sofa, mazulia, madirisha"
+     },
+     "spoken": {
+      "en": "sofa cleaning",
+      "sw": "usafi wa sofa"
+     },
+     "explain": {
+      "en": "Sofa cleaning covers shampoo, stain treatment and fabric sofas and chairs.",
+      "sw": "Ni usafi wa sofa."
+     },
+     "source": {
+      "name_en": "rules",
+      "name_sw": "rules",
+      "explain_en": "rules",
+      "explain_sw": "rules"
+     },
+     "edited": false,
+     "status": "draft",
+     "priceStatus": "draft",
+     "price": {
+      "en": "700 shillings per seat",
+      "sw": "shilingi 700 kwa kiti",
+      "numbers": [
+       700
+      ],
+      "review": null
+     }
+    },
+    {
+     "id": "svc_dnd_mattress",
+     "kind": "service",
+     "hash": {
+      "text": "7d8202cc2e078910",
+      "price": "40b350541bc9f2e2"
+     },
+     "raw": {
+      "name": "Mattress Cleaning",
+      "price": "KSh 1,500–2,500 per mattress",
+      "unit": "mattress"
+     },
+     "category": {
+      "id": "items",
+      "en": "mattresses, sofas, carpets, windows",
+      "sw": "usafi wa magodoro, sofa, mazulia, madirisha"
+     },
+     "spoken": {
+      "en": "mattress cleaning",
+      "sw": "usafi wa godoro"
+     },
+     "explain": {
+      "en": "Mattress cleaning covers vacuuming, stain treatment and sanitising against dust mites.",
+      "sw": "Ni usafi wa godoro."
+     },
+     "source": {
+      "name_en": "rules",
+      "name_sw": "rules",
+      "explain_en": "rules",
+      "explain_sw": "rules"
+     },
+     "edited": false,
+     "status": "draft",
+     "priceStatus": "draft",
+     "price": {
+      "en": "1,500 shillings",
+      "sw": "shilingi 1,500",
+      "numbers": [
+       1500,
+       2500
+      ],
+      "review": null
+     }
+    },
+    {
+     "id": "svc_dnd_windows",
+     "kind": "service",
+     "hash": {
+      "text": "d43a2cbcfa2b6189",
+      "price": "4860ebf22de234b0"
+     },
+     "raw": {
+      "name": "Window Cleaning",
+      "price": "KSh 150 per window",
+      "unit": "window"
+     },
+     "category": {
+      "id": "items",
+      "en": "mattresses, sofas, carpets, windows",
+      "sw": "usafi wa magodoro, sofa, mazulia, madirisha"
+     },
+     "spoken": {
+      "en": "window cleaning",
+      "sw": "usafi wa madirisha"
+     },
+     "explain": {
+      "en": "Window cleaning covers inside and outside glass, frames and sills on reachable windows.",
+      "sw": "Ni usafi wa madirisha."
+     },
+     "source": {
+      "name_en": "rules",
+      "name_sw": "rules",
+      "explain_en": "rules",
+      "explain_sw": "rules"
+     },
+     "edited": false,
+     "status": "draft",
+     "priceStatus": "draft",
+     "price": {
+      "en": "150 shillings per window",
+      "sw": "shilingi 150 kwa dirisha",
+      "numbers": [
+       150
+      ],
+      "review": null
+     }
+    },
+    {
+     "id": "svc_dnd_office",
+     "kind": "service",
+     "hash": {
+      "text": "814e4b6046d5eb20",
+      "price": "944126d7f85923a5"
+     },
+     "raw": {
+      "name": "Office Cleaning",
+      "price": "KSh 8,000–25,000",
+      "unit": "job"
+     },
+     "category": {
+      "id": "office",
+      "en": "offices",
+      "sw": "usafi wa maofisi"
+     },
+     "spoken": {
+      "en": "office cleaning",
+      "sw": "usafi wa ofisi"
+     },
+     "explain": {
+      "en": "Office cleaning covers half a day to a full day. small and medium offices and after hours or weekends. price depends on size..",
+      "sw": "Ni usafi wa ofisi."
+     },
+     "source": {
+      "name_en": "rules",
+      "name_sw": "rules",
+      "explain_en": "rules",
+      "explain_sw": "rules"
+     },
+     "edited": false,
+     "status": "draft",
+     "priceStatus": "draft",
+     "price": {
+      "en": "8,000 shillings",
+      "sw": "shilingi 8,000",
+      "numbers": [
+       8000,
+       25000
+      ],
+      "review": null
+     }
+    }
+   ],
+   "categories": [
+    {
+     "id": "items",
+     "entryIds": [
+      "svc_dnd_carpet",
+      "svc_dnd_sofa",
+      "svc_dnd_mattress",
+      "svc_dnd_windows"
+     ],
+     "en": "mattresses, sofas, carpets, windows",
+     "sw": "usafi wa magodoro, sofa, mazulia, madirisha"
+    },
+    {
+     "id": "house",
+     "entryIds": [
+      "svc_dnd_std_1br",
+      "svc_dnd_std_2br",
+      "svc_dnd_std_3br"
+     ],
+     "en": "house cleaning by size",
+     "sw": "usafi wa nyumba kulingana na ukubwa"
+    },
+    {
+     "id": "deep",
+     "entryIds": [
+      "svc_dnd_deep",
+      "svc_dnd_move",
+      "svc_dnd_postcon"
+     ],
+     "en": "deep cleaning, like move-in or after building work",
+     "sw": "usafi wa kina, kama wa kuhamia au baada ya ujenzi"
+    },
+    {
+     "id": "office",
+     "entryIds": [
+      "svc_dnd_office"
+     ],
+     "en": "offices",
+     "sw": "usafi wa maofisi"
+    }
+   ],
+   "coverage": {
+    "places": [],
+    "ambiguityGroups": [],
+    "gazetteerVersion": "7b8c98b356a2"
+   },
+   "issues": []
+  }
+ },
+ "tools": [
+  [
+   {
+    "tool": "lookup_caller",
+    "ok": true,
+    "name": null,
+    "name_confirmed": false,
+    "candidate": null,
+    "upcoming": [],
+    "upcoming_count": 0,
+    "last_past_job": null,
+    "match": {
+     "kind": "none",
+     "row_id": null,
+     "candidates": []
+    },
+    "past_jobs": [],
+    "addresses": [],
+    "notes": [],
+    "filters": {
+     "service": null,
+     "date": null,
+     "place": null
+    }
+   },
+   {
+    "tool": "prices",
+    "ok": true,
+    "service": "Deep Clean",
+    "text": "Deep Clean is KSh 6,000–12,000."
+   }
+  ],
+  [
+   {
+    "tool": "lookup_caller",
+    "ok": true,
+    "name": null,
+    "name_confirmed": false,
+    "candidate": null,
+    "upcoming": [],
+    "upcoming_count": 0,
+    "last_past_job": null,
+    "match": {
+     "kind": "none",
+     "row_id": null,
+     "candidates": []
+    },
+    "past_jobs": [],
+    "addresses": [],
+    "notes": [],
+    "filters": {
+     "service": null,
+     "date": null,
+     "place": null
+    }
+   }
+  ],
+  [
+   {
+    "tool": "lookup_caller",
+    "ok": true,
+    "name": null,
+    "name_confirmed": false,
+    "candidate": null,
+    "upcoming": [],
+    "upcoming_count": 0,
+    "last_past_job": null,
+    "match": {
+     "kind": "none",
+     "row_id": null,
+     "candidates": []
+    },
+    "past_jobs": [],
+    "addresses": [],
+    "notes": [],
+    "filters": {
+     "service": null,
+     "date": null,
+     "place": null
+    }
+   }
+  ]
+ ],
+ "replyPack": {
+  "TASK": "Answer every question the caller asked, using ONLY RECEIPTS (exact facts, no invented prices or times). For hours, give only TODAY's hours unless the caller asked about another day. Max 2 short sentences.",
+  "LANG": "Swahili (reply ONLY in Swahili)",
+  "CALLER_SAID": "how much is a deep clean",
+  "GOAL": {
+   "type": "answer",
+   "slot": null,
+   "topics": [
+    "price"
+   ]
+  },
+  "RECEIPTS": [
+   {
+    "tool": "prices",
+    "text": "Deep Clean is KSh 6,000–12,000.",
+    "place": null,
+    "covered": null
+   }
+  ],
+  "CALLER": {
+   "name": null,
+   "candidate": null
+  },
+  "AGENT_LAST": ""
+ },
+ "replyRequest": {
+  "systemInstruction": {
+   "parts": [
+    {
+     "text": "You are the voice of a phone receptionist for one Kenyan business. The server checks every fact you say.\nReturn ONLY JSON {\"reply\":\"...\",\"tool_calls\":[...]} with reply FIRST.\nreply: max 2 short sentences plus at most ONE question. Answer every caller question first, using ONLY FACTS/CALLER/RECEIPTS. One answer per place. Never say a price unless the caller asked.\nNever say booked, cancelled, noted, or that anyone will call/text unless RECEIPTS.writes shows it; the server says the booked line and the read-back.\nCALLER is the caller file: you may describe their upcoming bookings (service, day, place) exactly as listed; past jobs only as past. Use CALLER.name only if set; with only CALLER.candidate ask \"Am I speaking with <candidate>?\".\nSwahili/Sheng caller: reply in Swahili. Saa nane mchana = 14:00. If PLAN.next is a slot, end with one question for it. A fact not given: say you are not sure and offer the team to confirm.\nFACTS: {\"business\":\"Done and Dusted Cleaning Services\",\"agent\":\"Shy\",\"services\":[\"1-Bedroom Standard Clean (KSh 2,500)\",\"2-Bedroom Standard Clean (KSh 3,500)\",\"3-Bedroom Standard Clean (KSh 4,800)\",\"Deep Clean (KSh 6,000–12,000)\",\"Move-In / Move-Out Clean (KSh 7,500–15,000)\",\"Post-Construction Clean (KSh 15,000–35,000)\",\"Carpet Cleaning (KSh 1,500–4,000 per carpet)\",\"Sofa Cleaning (KSh 700 per seat)\",\"Mattress Cleaning (KSh 1,500–2,500 per mattress)\",\"Window Cleaning (KSh 150 per window)\",\"Office Cleaning (KSh 8,000–25,000)\"],\"hours\":\"fri 07:30-18:00, mon 07:30-18:00, sat 08:00-17:00, sun 09:00-15:00, thu 07:30-18:00, tue 07:30-18:00, wed 07:30-18:00\",\"payment\":{\"en\":\"You can pay by M-Pesa Buy Goods Till 5123456, M-Pesa Paybill 542542, with your phone number as the account or cash. Customers pay after the job or a 30% deposit first, then the balance. Deep, move-out and post-construction cleans need the deposit to book.\",\"sw\":\"Unaweza kulipa kwa M-Pesa Buy Goods Till 5123456, M-Pesa Paybill 542542 ukitumia nambari yako ya simu kama akaunti, au pesa taslimu. Wateja hulipa amana ya asilimia 30 kwanza, kisha salio, au baada ya kazi. Usafi wa kina, wa kuhama na wa baada ya ujenzi unahitaji amana ili kuweka miadi.\"}}"
+    }
+   ]
+  },
+  "generationConfig": {
+   "temperature": 0.3,
+   "maxOutputTokens": 160,
+   "responseMimeType": "application/json",
+   "responseSchema": {
+    "type": "object",
+    "properties": {
+     "reply": {
+      "type": "string"
+     },
+     "tool_calls": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string",
+         "enum": [
+          "lookup_caller",
+          "check_coverage",
+          "kb_lookup",
+          "create_booking",
+          "add_service",
+          "reschedule_booking",
+          "cancel_booking",
+          "request_callback",
+          "take_message",
+          "save_caller_info",
+          "end_call"
+         ]
+        },
+        "args": {
+         "type": "object",
+         "properties": {
+          "places": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "service": {
+           "type": "string"
+          },
+          "date": {
+           "type": "string"
+          },
+          "reason": {
+           "type": "string"
+          }
+         }
+        }
+       },
+       "required": [
+        "name"
+       ]
+      }
+     }
+    },
+    "required": [
+     "reply"
+    ],
+    "propertyOrdering": [
+     "reply",
+     "tool_calls"
+    ]
+   },
+   "thinkingConfig": {
+    "thinkingLevel": "MINIMAL"
+   }
+  },
+  "contents": [
+   {
+    "role": "user",
+    "parts": [
+     {
+      "text": "{\"TASK\":\"Answer every question the caller asked, using ONLY RECEIPTS (exact facts, no invented prices or times). For hours, give only TODAY's hours unless the caller asked about another day. Max 2 short sentences.\",\"LANG\":\"Swahili (reply ONLY in Swahili)\",\"CALLER_SAID\":\"how much is a deep clean\",\"GOAL\":{\"type\":\"answer\",\"slot\":null,\"topics\":[\"price\"]},\"RECEIPTS\":[{\"tool\":\"prices\",\"text\":\"Deep Clean is KSh 6,000–12,000.\",\"place\":null,\"covered\":null}],\"CALLER\":{\"name\":null,\"candidate\":null},\"AGENT_LAST\":\"\"}"
+     }
+    ]
+   }
+  ]
+ },
+ "verifier": [
+  {
+   "verdict": "pass",
+   "text": "Usafi wa kina ni shilingi elfu sita."
+  },
+  {
+   "verdict": "pass",
+   "text": "Deep Clean ni shilingi elfu sita."
+  },
+  {
+   "verdict": "pass",
+   "text": "We have Deep Clean and Post-Construction Clean, 6,000 shillings."
+  }
+ ]
+}

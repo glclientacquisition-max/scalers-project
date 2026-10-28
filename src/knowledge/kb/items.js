@@ -163,7 +163,9 @@ function docToLegacy(doc) {
     price_mode: x.price.mode, price_amount: x.price.amount, price_min: x.price.min, price_max: x.price.max, in_stock: x.in_stock,
     aliases: x.aliases, status: x.state || 'active', source: 'owner', needs_visit: x.needs_visit, holdable: x.holdable, excludes_en: x.excludes || null,
   }));
-  for (const x of Array.isArray(doc.off) ? doc.off : []) if (x.state === 'paused') rows.push({ id: x.id, kind: x.kind, name_en: x.name, category_id: x.cat, price_mode: 'none', status: 'paused', source: 'owner', aliases: [] });
+  // doc.off (paused / not_offered) never enters the projection: the old readers list, count, match and hint every
+  // row they get, so an off row there is offered to callers (root cause 1). Off items are answered only through
+  // kb/source.js findForCaller when a caller names one.
   return toLegacy(rows, []);
 }
 module.exports.docToLegacy = docToLegacy;

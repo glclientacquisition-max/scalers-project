@@ -52,8 +52,8 @@ function greetingInputs(profile = {}, { now = new Date() } = {}) {
     spokenName: profile.spokenName || '',
     greetingInvite: profile.greetingInvite || '',
     vertical: profile.vertical || '',
-    servicesCatalog: profile.servicesCatalog,
-    servicesOffered: profile.servicesOffered,
+    // KB v2: through the one catalogue door (groups only on the KB; legacy: the same two fields as before)
+    ...require('../knowledge/kb/source').catalogueSource(profile).greetingFields(),
     isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
     afterHoursMode,
     closureNotice: bulletinClosureNotice(profile.dailyBulletin, now),
