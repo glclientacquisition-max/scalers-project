@@ -53,6 +53,9 @@ function tenantProfileFromRow(row, extras = {}) {
     notifyChannels: parseNotifyChannels(row.notify_channels),
     did: row.sautikit_virtual_number || null,
     hoursSchedule: row.hours_schedule || null,
+    // B1 safe mode: tenants.brain_mode ('full' | 'safe'), added by Platform P1. undefined on today's select = 'full'.
+    brainMode: row.brain_mode == null ? null : String(row.brain_mode),
+    brainModeSource: row.brain_mode_source == null ? null : String(row.brain_mode_source),
     businessHours: row.business_hours || null,
     afterHoursMode,
     servicesCatalog: row.services_catalog || [],

@@ -196,3 +196,31 @@ compile, on Voice boot (`KB_BOOT_READINESS`, every 12 h) and on demand (Super Ad
 ## Phase 8
 
 `kb_v2_phase8_drop_legacy.sql` drops the old copies. Not applied; needs Alvin's GO after every Business has run on v2.
+
+## B1 degradation and safe mode (retire the old brain, staging first)
+Plan: `briefs/retire-old-brain-plan-2026-10-28.md` §2c / §2d. Additive: nothing is deleted, default behaviour for a
+business with a full catalogue, hours and confirmed area picks is unchanged.
+
+### Named rules (`src/conversation/v2/degrade.js`, the `RULES` table is the only toggle)
+Alvin approved every default on 28 Oct; they are final. Flip one by editing `RULES` (tests pass `opts.degradeRules`).
+| Rule | Default | What callers hear |
+|---|---|---|
+| `SPARSE_UNKNOWN_ITEM` | on, `minItems: 5` | An item the catalogue does not carry: "I'll have the team confirm X" + the callback capture (name, number, read-back, yes). #1004's `not_in_catalogue` ("we don't offer X") is rewritten, until the catalogue has >= 5 offered items AND the owner marked it complete (`profile.kbCatalogueComplete` / `doc.complete`; not written by Desk yet). |
+| `EMPTY_CATALOGUE_CAPTURE` | on | Empty snapshot (0 offered items) is valid: no list, price or item yes/no; any catalogue question opens the capture with the caller's ask as the reason. A booking becomes a request. |
+| `NO_HOURS_BOOKING_AS_REQUEST` | on | No `hours_schedule`: "when are you open" = the team confirms + callback offer; a booking becomes a callback request carrying the service + preferred time ("please confirm the time"). No slot is offered as available, no appointment row. |
+| `UNCONFIRMED_AREAS_NO_VERDICT` | on | Coverage is a firm yes/no only from confirmed area picks. Legacy lists, no areas, unconfirmed picks: "I'll check with the owner about X", no fee, and never an `area_outside` handoff. |
+| `NO_POLICY_TEAM_CONFIRM` | on | Payment asked with no policy on file: the team confirms + callback offer. |
+
+### Safe mode (`src/conversation/v2/safeMode.js`, `brainModeAdapter.js`)
+`brainMode(tenant, { safeEnv }) -> { mode: 'full' | 'safe', reason }`, reason `'owner' | 'admin' | 'env'` (safe) or
+`'default'` (full). Sources: `tenants.brain_mode` + `tenants.brain_mode_source` (Platform P1; the owner's Desk
+Settings "Take messages only", or Super Admin) and `BRAIN_SAFE_MODE=all`. Manual only, never automatic. Decided on the
+call's first engines turn and pinned. Until P1 ships `src/knowledge/kb/brainMode.js` the adapter's local stand-in
+(same signature) is used; when that module exists it is picked up automatically.
+Script: greet (call opening) -> name -> number (asked only when caller ID is withheld) -> reason -> read all three back
+-> yes (one correction loop) -> save the callback request (commit gate: confirmed only after a row id) -> owner alert
+-> close. No catalogue, prices, areas, hours or bookings.
+
+### Trace
+Every `brain_engines` turn record carries `brain_stage` (`full` | `degraded` | `safe`), `brain_mode`,
+`brain_mode_reason` and `degraded` (the rule names that fired). Safe turns use path `brain_engines_safe`.

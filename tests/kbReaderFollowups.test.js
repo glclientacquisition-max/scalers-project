@@ -56,9 +56,13 @@ const GT = [
   prod({ id: 'b1', name_en: 'Williams banana', category_id: 'fruits_tc_bananas', sort: 11 }),
 ];
 let seq = 0;
-function profileFor(items, categories, { kb = true } = {}) {
+// complete = the owner's catalogue-complete mark (doc.complete). B1 SPARSE_UNKNOWN_ITEM: "we don't offer X" only on a
+// complete catalogue with >= 5 offered items (DND has 6); otherwise "I'll have the team confirm X".
+function profileFor(items, categories, { kb = true, complete = false } = {}) {
   const p = tenantProfileFromRow({ id: `kbfu-${++seq}`, business_name: 'Followup Test Co', vertical: 'home_services', services_offered: 'Legacy text' }, { areaPicksRows: [] });
-  if (kb) L.attach(p, { version: 4, readyVersion: 4, brainTarget: 'v2', doc: C.compileKb({ items, categories, business: 'kbfu', now: NOW }).doc, bytes: null, loadMs: 1 }, { env: { BRAIN_KB_GATE: 'on' } });
+  const doc = C.compileKb({ items, categories, business: 'kbfu', now: NOW }).doc;
+  if (complete) doc.complete = true;
+  if (kb) L.attach(p, { version: 4, readyVersion: 4, brainTarget: 'v2', doc, bytes: null, loadMs: 1 }, { env: { BRAIN_KB_GATE: 'on' } });
   return p;
 }
 const RAW = /[()[\]]|\s-\s|\//;
@@ -199,14 +203,20 @@ describe('kb follow-up 1: the turn end to end (no model = receipt line; stand-in
     ['Mnauza piano?', 'sw', /^Samahani, hatuna piano; tuna home cleaning/],
   ]) {
     it(`model off, ${lang}: "${text}" is answered from the catalogue, never "How can I help you today?"`, async () => {
-      const r = await run(profileFor(DND, DND_CATS), text, { langLock: lang === 'sw' ? 'sw' : null });
+      const r = await run(profileFor(DND, DND_CATS, { complete: true }), text, { langLock: lang === 'sw' ? 'sw' : null });
       assert.equal(r.goal.type, 'answer');
       assert.match(r.line, re);
       assert.ok(!/how can i help|tukusaidie vipi/i.test(r.line), r.line);
     });
   }
+  it('sparse catalogue (no complete mark): the same ask is "I\'ll have the team confirm pianos", never "we don\'t offer"', async () => {
+    const r = await run(profileFor(DND, DND_CATS, { complete: false }), 'do you sell pianos');
+    assert.match(r.line, /I'll have the team confirm pianos/);
+    assert.ok(!/don't offer/i.test(r.line), r.line);
+    assert.ok(!/how can i help/i.test(r.line), r.line);
+  });
   it('stand-in model: the reply engine gets the typed miss facts and writes the reply (guard passes it)', async () => {
-    const p = profileFor(DND, DND_CATS);
+    const p = profileFor(DND, DND_CATS, { complete: true });
     let pack = null;
     const streamFor = () => async ({ request }) => {
       const sys = JSON.stringify(request.systemInstruction || '');

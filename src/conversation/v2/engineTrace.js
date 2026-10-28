@@ -11,11 +11,18 @@ function slotPresence(slots = {}) {
   return out;
 }
 
-function buildTrace({ turn, turnIndex, u, lang, goal, write, guard, dropped, filler, timings, stripped, path }) {
+function buildTrace({ turn, turnIndex, u, lang, goal, write, guard, dropped, filler, timings, stripped, path, mode = null, degraded = [] }) {
   const p = goal && goal.p;
+  const safe = !!(mode && mode.mode === 'safe');
   return {
     kind: 'brain_engines',
     stage: 'brain_engines',
+    // B1: which brain answered this turn. brain_stage: 'full' | 'degraded' (a named rule fired) | 'safe';
+    // brain_mode_reason: 'owner' | 'admin' | 'env' in safe mode ('default' when full); degraded: the rule names
+    brain_stage: safe ? 'safe' : (degraded && degraded.length ? 'degraded' : 'full'),
+    brain_mode: safe ? 'safe' : 'full',
+    brain_mode_reason: (mode && mode.reason) || 'default',
+    degraded: degraded && degraded.length ? [...degraded] : [],
     turn,
     turnIndex: turnIndex ?? null,
     path,
