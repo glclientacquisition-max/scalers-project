@@ -1,18 +1,16 @@
 'use strict';
-// isKbLive: the ONE rule for "this business's calls are answered from the v2 KB" (shared contract, Voice + Desk).
-// Pure: no env, no DB, no requires. The caller passes the readiness facts and the gate value, like hashMode.
+// Shared contract (Voice + Desk), pure: no env, no DB, no requires. The server passes the facts and env values in.
 //
-// Facts (all on public.tenants; owners/members read their own row under tenants_select_member, service role reads all):
-//   kb_live_version   kb_snapshots.version callers hear (moved by kb_publish_snapshot)
-//   kb_ready_version  the snapshot version that passed readiness (moved by kb_record_readiness on a pass)
-//   brain_target      'v2' (default) = readiness decides; 'v1' = per-business hold on the old brain
-// Camel keys are accepted too ({ version, readyVersion, brainTarget }, the shape Voice's loadKbLive returns).
+// Retire the old brain, step P1 (28 Oct, briefs/retire-old-brain-plan-2026-10-28.md): with BRAIN_KB_GATE on, the KB
+// brain answers EVERY business. Readiness no longer picks a brain; isKbLive's `reason` is a quality signal only
+// (Desk Fix card, Super Admin). brain_target 'v1' (held_v1) is gone. BRAIN_KB_GATE off stays the kill switch until
+// P2 removes the switch (after Brain B2 deletes the old turn). The one per-call choice left is brainMode.
 //
-// Gate: BRAIN_KB_GATE from the server that owns the decision (Voice: its env; Desk: its server env, never the client).
-//   Off/unset = the kill switch: no business is on the KB, Voice falls back to the env lists.
-//
-// Rule (unchanged from kb/live.js isReady + decision): live = gate on AND brain_target != 'v1'
-//   AND kb_live_version is set AND kb_ready_version === kb_live_version.
+// Facts (public.tenants; owners/members read their own row, service role all):
+//   kb_live_version   kb_snapshots.version callers hear (kb_publish_snapshot)
+//   kb_ready_version  the snapshot version that passed readiness (kb_record_readiness on a pass)
+//   brain_mode        'full' (default) | 'safe'  (kb_v2_brain_mode.sql 2026-10-28.4; Super Admin / service role write)
+// Camel keys are accepted too ({ version, readyVersion, brainMode }, Voice's loadKbLive shape).
 const ON = /^(1|true|on|yes)$/i;
 
 /** Gate value as the server passes it: boolean, or the raw env string ('1' | 'true' | 'on' | 'yes', any case). */
@@ -21,43 +19,67 @@ function kbGateOn(gate) {
   return ON.test(String(gate == null ? '' : gate).trim());
 }
 
-// same coercion as the pre-contract kb/live.js isReady (Number(), exact brain_target match), so no decision moves
 const num = (v) => (v == null ? null : Number(v));
+const pick = (o, snake, camel) => (o[snake] !== undefined ? o[snake] : o[camel]);
 
 /** Readiness facts from a tenants row (snake) or Voice's loadKbLive result (camel). null when there are none. */
 function kbLiveFacts(tenant) {
   if (!tenant || typeof tenant !== 'object') return null;
-  const pick = (snake, camel) => (tenant[snake] !== undefined ? tenant[snake] : tenant[camel]);
+  const mode = String(pick(tenant, 'brain_mode', 'brainMode') || 'full').trim().toLowerCase();
   return {
-    liveVersion: num(pick('kb_live_version', 'version')),
-    readyVersion: num(pick('kb_ready_version', 'readyVersion')),
-    brainTarget: String(pick('brain_target', 'brainTarget') || 'v2'),
+    liveVersion: num(pick(tenant, 'kb_live_version', 'version')),
+    readyVersion: num(pick(tenant, 'kb_ready_version', 'readyVersion')),
+    brainMode: mode === 'safe' ? 'safe' : 'full',
   };
+}
+
+/** Readiness / quality reason only (never a brain switch). */
+function kbQuality(tenant) {
+  const f = kbLiveFacts(tenant);
+  if (!f) return 'no_facts';
+  if (f.liveVersion == null || !Number.isFinite(f.liveVersion)) return 'no_live_version';
+  if (f.readyVersion == null) return 'never_ready';
+  if (!(f.readyVersion === f.liveVersion)) return 'ready_stale';
+  return 'ready';
 }
 
 /**
  * isKbLive(tenant, { gate }) -> { live: boolean, reason }
- * reason (first that applies): 'gate_off' | 'no_facts' | 'held_v1' | 'no_live_version' | 'never_ready' | 'ready_stale' | 'ready'
- *   gate_off         BRAIN_KB_GATE off: kill switch (Voice uses the env lists for every business)
- *   no_facts         no tenant row / readiness facts (Voice: profile not loaded or the KB load failed)
- *   held_v1          brain_target = 'v1' (Super Admin "Hold on old brain" / kb-cutover --hold)
- *   no_live_version  nothing published yet (kb_live_version null)
- *   never_ready      the live version has no readiness pass (kb_ready_version null)
- *   ready_stale      a newer live version has not passed readiness yet (kb_ready_version != kb_live_version)
- *   ready            on the KB
+ *   gate off:  { live: false, reason: 'gate_off' }  (kill switch until P2; Voice uses the env lists)
+ *   gate on:   { live: true,  reason: <quality> }   for every business, ready or not:
+ *     'no_facts' (no row / KB load failed: the brain degrades safely), 'no_live_version' (nothing published; the
+ *     backfill publishes one for every business), 'never_ready' (setup gaps), 'ready_stale', 'ready'.
  */
 function isKbLive(tenant, { gate } = {}) {
   if (!kbGateOn(gate)) return { live: false, reason: 'gate_off' };
-  const f = kbLiveFacts(tenant);
-  if (!f) return { live: false, reason: 'no_facts' };
-  if (f.brainTarget !== 'v2') return { live: false, reason: 'held_v1' };
-  if (f.liveVersion == null) return { live: false, reason: 'no_live_version' };
-  if (f.readyVersion == null) return { live: false, reason: 'never_ready' };
-  if (!(f.readyVersion === f.liveVersion)) return { live: false, reason: 'ready_stale' };
-  return { live: true, reason: 'ready' };
+  return { live: true, reason: kbQuality(tenant) };
 }
 
-/** Columns to select from public.tenants to call isKbLive. */
-const KB_LIVE_COLUMNS = 'kb_live_version, kb_ready_version, brain_target';
+/** BRAIN_SAFE_MODE as the server passes it: 'all' = every business safe; unset / off / anything else = normal. */
+function safeEnvAll(safeEnv) { return String(safeEnv == null ? '' : safeEnv).trim().toLowerCase() === 'all'; }
+/** For /healthz: how this server reads BRAIN_SAFE_MODE ('off' | 'all' | 'invalid' = a value that is ignored). */
+function safeEnvState(safeEnv) {
+  const v = String(safeEnv == null ? '' : safeEnv).trim().toLowerCase();
+  if (v === 'all') return 'all';
+  return v === '' || /^(0|off|false|no|none)$/.test(v) ? 'off' : 'invalid';
+}
 
-module.exports = { isKbLive, kbGateOn, kbLiveFacts, KB_LIVE_COLUMNS };
+/**
+ * brainMode(tenant, { safeEnv }) -> { mode: 'full' | 'safe', reason }
+ *   'global'  BRAIN_SAFE_MODE=all (emergency brake: every business on the safe script)
+ *   'tenant'  tenants.brain_mode = 'safe' (Super Admin, one business)
+ *   'normal'  the full KB brain
+ * No row or no column (before .4) = full. Brain owns what safe does (greet, name, number, reason, read back, alert).
+ */
+function brainMode(tenant, { safeEnv } = {}) {
+  if (safeEnvAll(safeEnv)) return { mode: 'safe', reason: 'global' };
+  const f = kbLiveFacts(tenant);
+  if (f && f.brainMode === 'safe') return { mode: 'safe', reason: 'tenant' };
+  return { mode: 'full', reason: 'normal' };
+}
+
+/** Columns to select from public.tenants for isKbLive + brainMode (brain_mode needs kb_v2_brain_mode.sql). */
+const KB_LIVE_COLUMNS = 'kb_live_version, kb_ready_version, brain_mode';
+const KB_LIVE_COLUMNS_PRE_BRAIN_MODE = 'kb_live_version, kb_ready_version';
+
+module.exports = { isKbLive, kbQuality, brainMode, kbGateOn, kbLiveFacts, safeEnvAll, safeEnvState, KB_LIVE_COLUMNS, KB_LIVE_COLUMNS_PRE_BRAIN_MODE };

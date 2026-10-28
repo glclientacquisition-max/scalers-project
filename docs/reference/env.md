@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-245 variables.
+246 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -41,8 +41,9 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BRAIN_ENGINES_REPLY_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_ENGINES_UNDERSTAND_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_GEMINI_CATALOGUE` | voice | `src/conversation/catalogueMouth.js` |
-| `BRAIN_KB_GATE` | desk, voice | `dashboard/src/lib/kbLive.server.ts`<br>`src/db.js` |
+| `BRAIN_KB_GATE` | desk, scripts, voice | `dashboard/src/lib/kbLive.server.ts`<br>`scripts/kb-cutover.js`<br>`src/db.js` |
 | `BRAIN_MODEL_LEAD` | scripts | `scripts/brain-engines-sim.js` |
+| `BRAIN_SAFE_MODE` | desk, scripts, voice | `dashboard/src/lib/kbLive.server.ts`<br>`scripts/kb-cutover.js`<br>`server.js` |
 | `BRAIN_V1_DRAFT` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_V1_DRAFT_PHASE_A` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_V2` | scripts | `scripts/brain-engines-sim.js` |

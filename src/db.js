@@ -1675,23 +1675,32 @@ async function loadKbLive(tenantId, { force = false } = {}) {
   if (!tenantId || (!force && !/^(1|true|on|yes)$/i.test(String(process.env.BRAIN_KB_GATE || '').trim()))) return null;
   const t0 = Date.now();
   try {
-    const { data: t, error } = await supabase.from('tenants').select('kb_live_version, kb_ready_version, brain_target').eq('id', tenantId).maybeSingle();
-    if (error || !t || t.kb_live_version == null) return t ? { version: null, readyVersion: t.kb_ready_version ?? null, brainTarget: t.brain_target || 'v2', doc: null } : null;
+    const { data: t, error } = await selectKbTenantFacts(tenantId);
+    if (error || !t || t.kb_live_version == null) return t ? { version: null, readyVersion: t.kb_ready_version ?? null, brainMode: t.brain_mode || 'full', doc: null } : null;
     const key = `${tenantId}:${t.kb_live_version}`;
     let hit = KB_DOCS.get(key);
     if (!hit) {
       const { data: snap, error: e2 } = await supabase.from('kb_snapshots').select('doc, bytes').eq('tenant_id', tenantId).eq('version', t.kb_live_version).maybeSingle();
-      if (e2 || !snap) return { version: t.kb_live_version, readyVersion: t.kb_ready_version ?? null, brainTarget: t.brain_target || 'v2', doc: null };
+      if (e2 || !snap) return { version: t.kb_live_version, readyVersion: t.kb_ready_version ?? null, brainMode: t.brain_mode || 'full', doc: null };
       hit = { doc: snap.doc, bytes: snap.bytes || null };
       for (const k of [...KB_DOCS.keys()]) if (k.startsWith(`${tenantId}:`)) KB_DOCS.delete(k);
       KB_DOCS.set(key, hit);
       if (KB_DOCS.size > 500) KB_DOCS.delete(KB_DOCS.keys().next().value);
     }
-    return { version: t.kb_live_version, readyVersion: t.kb_ready_version ?? null, brainTarget: t.brain_target || 'v2', doc: hit.doc, bytes: hit.bytes, loadMs: Date.now() - t0 };
+    return { version: t.kb_live_version, readyVersion: t.kb_ready_version ?? null, brainMode: t.brain_mode || 'full', doc: hit.doc, bytes: hit.bytes, loadMs: Date.now() - t0 };
   } catch (err) {
     console.warn('[db] loadKbLive', err?.message || err);
     return null;
   }
+}
+
+/** tenants KB facts (kbLive KB_LIVE_COLUMNS). Before kb_v2_brain_mode.sql (.4) there is no brain_mode column: read without it (= full). */
+async function selectKbTenantFacts(tenantId, extra = '') {
+  const K = require('./knowledge/kb/kbLive');
+  const sel = (cols) => supabase.from('tenants').select(extra ? `${cols}, ${extra}` : cols).eq('id', tenantId).maybeSingle();
+  const r = await sel(K.KB_LIVE_COLUMNS);
+  if (r.error && /brain_mode/.test(r.error.message || '')) return sel(K.KB_LIVE_COLUMNS_PRE_BRAIN_MODE);
+  return r;
 }
 
 /** kb_items + variants + categories of one business (compile input, Desk editor). */
@@ -1728,7 +1737,7 @@ async function publishKbSnapshot(tenantId, { doc, sourceHash, issues = [], statu
 /** Latest snapshot row (any status) + the tenant pointers. */
 async function getKbState(tenantId) {
   const [{ data: t, error: e1 }, { data: last, error: e2 }] = await Promise.all([
-    supabase.from('tenants').select('id, business_name, kb_live_version, kb_ready_version, brain_target, hours_schedule, notify_channels, whatsapp_notification_number, alert_email').eq('id', tenantId).maybeSingle(),
+    selectKbTenantFacts(tenantId, 'id, business_name, hours_schedule, notify_channels, whatsapp_notification_number, alert_email'),
     supabase.from('kb_snapshots').select('version, status, source_hash, issues, item_count, bytes, compiled_at').eq('tenant_id', tenantId).order('version', { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (e1) throw new Error(`getKbState: ${e1.message}`);
@@ -1757,11 +1766,11 @@ async function listKbTenants() {
   return (data || []).map((r) => r.id);
 }
 
-/** Ops: hold a business on the old brain (v1) or let readiness move it (v2). */
-async function setBrainTarget(tenantId, target) {
-  if (!['v1', 'v2'].includes(target)) throw new Error('setBrainTarget: v1 or v2');
-  const { error } = await supabase.from('tenants').update({ brain_target: target }).eq('id', tenantId);
-  if (error) throw new Error(`setBrainTarget: ${error.message}`);
+/** Ops (service role; Super Admin writes through its own route): emergency safe mode for one business, or back to full. */
+async function setBrainMode(tenantId, mode) {
+  if (!['full', 'safe'].includes(mode)) throw new Error('setBrainMode: full or safe');
+  const { error } = await supabase.from('tenants').update({ brain_mode: mode }).eq('id', tenantId);
+  if (error) throw new Error(`setBrainMode: ${error.message}`);
   return true;
 }
 
@@ -3788,7 +3797,7 @@ module.exports = {
   getKbState,
   searchKbItems,
   recordKbReadiness,
-  setBrainTarget,
+  setBrainMode,
   normalizeCallerLanguage,
   saveCallerLanguage,
   confirmCallerName,
