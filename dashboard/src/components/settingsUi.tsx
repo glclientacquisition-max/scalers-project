@@ -391,6 +391,7 @@ export function SettingsPageHeader({
   index = false,
   showLine = false,
   title,
+  wide = false,
 }: {
   businessName: string;
   lineLive: boolean;
@@ -403,6 +404,8 @@ export function SettingsPageHeader({
   index?: boolean;
   showLine?: boolean;
   title?: string | null;
+  /** Panels laid out to the MASTER desk width (Identity) keep the header rule as wide. */
+  wide?: boolean;
 }) {
   const line = showLine ? (
     <p className="text-meta text-ink-2 [overflow-wrap:anywhere]">
@@ -433,7 +436,7 @@ export function SettingsPageHeader({
   }
 
   return (
-    <header className={settingsStickyHeaderClass}>
+    <header className={wide ? settingsStickyHeaderClass.replace("max-w-2xl", "max-w-desk") : settingsStickyHeaderClass}>
       <div className="min-w-0 flex-1">
         {showBack ? (
           <DeskRecordLead align="center" back={<SettingsBackLink />}>

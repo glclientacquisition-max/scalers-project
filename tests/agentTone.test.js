@@ -10,7 +10,8 @@ function read(rel) {
 describe('agent tone offer', () => {
   const onboarding = read('dashboard/src/lib/onboarding.ts');
   const compiler = read('dashboard/src/lib/promptCompiler.ts');
-  const form = read('dashboard/src/components/TenantForm.tsx');
+  // Tone moved to Identity › How you answer (settings remake slice 1).
+  const form = read('dashboard/src/components/TenantForm.tsx') + read('dashboard/src/components/identity/IdentitySettings.tsx');
   const wizard = read('dashboard/src/app/onboarding/OnboardingWizard.tsx');
 
   it('offers only Professional and Warm manner', () => {

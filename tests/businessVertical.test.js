@@ -13,7 +13,9 @@ function read(rel) {
 
 describe('business type offer', () => {
   const verticalTs = read('dashboard/src/lib/vertical.ts');
-  const form = read('dashboard/src/components/TenantForm.tsx');
+  // Identity › Your business asks one "What you do" question over pack + category.
+  const form = read('dashboard/src/components/identity/IdentitySettings.tsx');
+  const identityCategory = read('dashboard/src/lib/identityCategory.ts');
   const wizard = read('dashboard/src/app/onboarding/OnboardingWizard.tsx');
   const compiler = read('dashboard/src/lib/promptCompiler.ts');
   const niche = read('dashboard/src/lib/inboxNiche.ts');
@@ -30,8 +32,9 @@ describe('business type offer', () => {
     assert.match(wizard, /DEFAULT_VERTICAL/);
     assert.match(wizard, /VERTICAL_OPTIONS/);
     assert.match(wizard, /opt\.blurb/);
-    assert.match(form, /verticalSettingsOptions/);
-    assert.match(form, /detail: opt\.blurb/);
+    assert.match(form, /identityCategoryChoices\(storedVertical\)/);
+    assert.match(identityCategory, /VERTICAL_LABELS\[vertical\]/);
+    assert.match(identityCategory, /current === "hospitality"/); // legacy pack keeps its row
   });
 
   it('maps shop onto retail and keeps hospitality as a stored id', () => {
