@@ -102,6 +102,13 @@ const SCOPE_SCALARS: Record<string, string[]> = {
   "identity-business": ["identity.business_name", "identity.vertical"],
   "identity-answer": ["identity.spoken_name", "assistant.agent_name", "assistant.tone"],
   "identity-contacts": ["identity.social_handles"],
+  // Settings › Policies cards: the rules/payments card owns every policy path; When unsure owns none.
+  "policies-rules": [
+    ...POLICY_TEXT_KEYS.map((key) => `policies.${key}`),
+    "payments.methods",
+    "policies.coverage_areas",
+  ],
+  "policies-unknown": [],
 };
 
 const KNOWN_SCOPES = new Set([
@@ -113,6 +120,8 @@ const KNOWN_SCOPES = new Set([
   "hours",
   "locations",
   "policies",
+  "policies-rules",
+  "policies-unknown",
   "tools",
   "pronunciation",
   "team",
@@ -137,8 +146,8 @@ export function scopeFactPaths(scope: string, row: Row): string[] {
   const all = !KNOWN_SCOPES.has(s);
   const out: string[] = [];
   for (const [key, paths] of Object.entries(SCOPE_SCALARS)) {
-    // The identity-* card scopes are slices of "identity": the whole form takes them once.
-    if ((all && !key.startsWith("identity-")) || key === s) out.push(...paths);
+    // The identity-* and policies-* card scopes are slices: the whole form takes them once.
+    if ((all && !key.startsWith("identity-") && !key.startsWith("policies-")) || key === s) out.push(...paths);
   }
   if (all || s === "catalog") {
     out.push(...catalogPaths(row, "service"), ...catalogPaths(row, "product"));
