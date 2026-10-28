@@ -80,7 +80,7 @@ export function businessSettingsHref(tab: BusinessSettingsTab, panel?: SettingsP
 export type SettingsNavTarget =
   | { tab: Exclude<BusinessSettingsTab, "train" | "menu"> }
   | { tab: "train"; panel: Exclude<SettingsPanel, "catalog"> }
-  | { href: "/settings/plan" | "/settings/billing" | "/settings/areas" };
+  | { href: "/settings/plan" | "/settings/billing" | "/settings/areas" | "/settings/knowledge" };
 
 export type SettingsNavItem = {
   label: string;
@@ -120,7 +120,8 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     id: "knowledge",
     title: "Knowledge",
     items: [
-      { label: "Catalogue", description: "What you sell and what it costs", target: { tab: "catalog" } },
+      // v2 Knowledge Base editor; before the v2 tables exist it sends the owner to the old tab: "catalog" screen.
+      { label: "Catalogue", description: "What you sell and what it costs", target: { href: "/settings/knowledge" } },
       { label: "Import", description: "Add items from a file or your website", target: { tab: "import" } },
       { label: "FAQs", description: "Answers to the questions callers ask most", target: { tab: "train", panel: "faqs" } },
     ],
