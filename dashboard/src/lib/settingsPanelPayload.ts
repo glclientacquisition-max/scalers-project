@@ -10,13 +10,13 @@ import type { TenantRow } from "@/lib/supabase";
  */
 const KEEP: Record<string, readonly (keyof TenantRow)[]> = {
   menu: ["social_handles", "business_locations", "business_policies"],
-  identity: ["social_handles", "business_locations", "business_policies"],
+  // Identity › How you answer: Hear it reads the stored lexicon. Save scope omits ttsLexicon.
+  identity: ["social_handles", "business_locations", "business_policies", "tts_lexicon"],
   catalog: ["services_catalog", "product_catalog", "services_offered"],
   hours: [],
   locations: ["business_locations", "service_areas", "business_policies"],
   policies: ["business_policies"],
-  // Voice Hear sample reads the stored lexicon. Save scope still omits ttsLexicon.
-  tools: ["tts_lexicon"],
+  tools: [],
   pronunciation: ["tts_lexicon", "daily_bulletin"],
   team: ["team_directory"],
   faqs: ["faqs"],

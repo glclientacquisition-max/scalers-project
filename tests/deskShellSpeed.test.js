@@ -101,13 +101,15 @@ describe("desk shell speed", () => {
   });
 
   it("loads the voice catalog only for Voice and Test", () => {
-    assert.match(settings, /tab === "test" \|\| \(tab === "train" && trainPanel === "tools"\)/);
+    // The voice picker moved to Identity (How you answer): Identity loads the catalog too.
+    assert.match(settings, /tab === "test" \|\| \(tab === "train" && \(trainPanel === "tools" \|\| trainPanel === "identity"\)\)/);
     assert.match(settings, /tenantForSettingsView/);
   });
 
   it("keeps a stored offer blob when the active panel does not own the catalog", () => {
     const actions = read("dashboard/src/app/(desk)/settings/actions.ts");
-    const form = read("dashboard/src/components/TenantForm.tsx");
+    // Settings form copy: TenantForm plus the Identity cards (settings remake slice 1).
+  const form = read("dashboard/src/components/TenantForm.tsx") + read("dashboard/src/components/identity/IdentitySettings.tsx");
     assert.match(form, /name="settings_scope"/);
     assert.match(actions, /pick\(\s*"servicesCatalog"/);
     assert.match(actions, /pick\(\s*"hoursSchedule"/);
@@ -251,7 +253,7 @@ describe("settings save scope", () => {
     assert.equal(name, "From form");
   });
 
-  it("keeps the stored lexicon on Voice and strips it from Hours", () => {
+  it("keeps the stored lexicon on Identity (Hear it) and strips it from Hours", () => {
     const lexicon = [{ match: "aisha", say: "Eye-sha", label: "Aisha" }];
     const voice = load(
       "dashboard/src/lib/settingsPanelPayload.ts",
@@ -259,7 +261,7 @@ describe("settings save scope", () => {
         id: "t1",
         business_name: "Westlands Books",
         tts_lexicon: ${JSON.stringify(lexicon)}
-      }, "train", "tools")`
+      }, "train", "identity")`
     );
     assert.equal(voice.tts_lexicon[0].say, "Eye-sha");
     const hours = load(
@@ -388,16 +390,23 @@ describe("settings save scope", () => {
     assert.equal(ok, null);
   });
 
-  it("fails a Voice save only for voice fields", () => {
-    const err = load(
+  it("checks the voice on Identity (How you answer), never on a Voice save", () => {
+    // The voice picker moved to Identity: Voice (tools) no longer owns or checks it.
+    const voiceSave = load(
       "dashboard/src/lib/settingsSaveScope.ts",
       `mod.settingsScopeValidationError("tools", ${JSON.stringify(invalidEverywhere)})`
+    );
+    assert.equal(voiceSave, null);
+    const answer = { ...invalidEverywhere, agentName: "Aisha", hasTone: true };
+    const err = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsScopeValidationError("identity-answer", ${JSON.stringify(answer)})`
     );
     assert.equal(err, "Pick a voice from the list.");
     const label = load(
       "dashboard/src/lib/settingsSaveScope.ts",
-      `mod.settingsScopeValidationError("tools", ${JSON.stringify({
-        ...invalidEverywhere,
+      `mod.settingsScopeValidationError("identity-answer", ${JSON.stringify({
+        ...answer,
         submittedVoiceId: "",
         resolvedVoiceId: null,
       })})`
@@ -405,8 +414,8 @@ describe("settings save scope", () => {
     assert.equal(label, "Voice label should be under 40 characters.");
     const ok = load(
       "dashboard/src/lib/settingsSaveScope.ts",
-      `mod.settingsScopeValidationError("tools", ${JSON.stringify({
-        ...invalidEverywhere,
+      `mod.settingsScopeValidationError("identity-answer", ${JSON.stringify({
+        ...answer,
         submittedVoiceId: "",
         voiceLabel: "Shop voice",
       })})`
@@ -459,7 +468,8 @@ describe("settings save scope", () => {
   });
 
   it("keeps panel copy on the job and off invented FAQ answers", () => {
-    const form = read("dashboard/src/components/TenantForm.tsx");
+    // Settings form copy: TenantForm plus the Identity cards (settings remake slice 1).
+  const form = read("dashboard/src/components/TenantForm.tsx") + read("dashboard/src/components/identity/IdentitySettings.tsx");
     const save = read("dashboard/src/components/TenantSettingsSaveButton.tsx");
     const catalog = read("dashboard/src/app/(desk)/settings/catalogActions.ts");
     const ingest = read("dashboard/src/app/(desk)/settings/ingestActions.ts");
@@ -469,7 +479,7 @@ describe("settings save scope", () => {
     assert.doesNotMatch(form, /Voice option \d/);
     assert.doesNotMatch(form, /FAQ_STARTERS/);
     assert.doesNotMatch(form, /free parking behind the building/);
-    assert.match(form, /displaySonioxVoiceLabel\("", voice\.id, voiceOptions\)/);
+    assert.match(form, /displaySonioxVoiceLabel\("", voice\.id, voices\)/);
     assert.doesNotMatch(catalog, /Open Train to review/);
     assert.doesNotMatch(ingest, /Open Train to review/);
     assert.doesNotMatch(catalog, /Catalogue saved for the next call/);
@@ -491,22 +501,22 @@ describe("settings save scope", () => {
     assert.equal(voice, "Shop voice");
     const identityBiz = load(
       "dashboard/src/lib/settingsOptionStatus.ts",
-      `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { business_name: "Done and Dusted", agent_name: "Shy", soniox_voice_label: "Shy" }, [])`
+      `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { business_name: "Done and Dusted", spoken_name: "Done and Dusted", agent_name: "Shy", soniox_voice_label: "Shy" }, [])`
     );
-    assert.equal(identityBiz, "");
+    assert.equal(identityBiz, "Done and Dusted", "Identity shows the business name");
     const identityTone = load(
       "dashboard/src/lib/settingsOptionStatus.ts",
-      `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { agent_name: "Shy", agent_tone: "warm", soniox_voice_label: "Shy" }, [])`
+      `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { business_name: "Done and Dusted", spoken_name: "Done and Dusted", agent_name: "Shy", agent_tone: "warm", soniox_voice_label: "Shy" }, [])`
     );
-    assert.equal(identityTone, "Warm");
+    assert.equal(identityTone, "Done and Dusted", "never the tone");
     const identityCollision = load(
       "dashboard/src/lib/settingsOptionStatus.ts",
-      `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { agent_name: "Shy", soniox_voice_label: "Shy" }, [])`
+      `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { business_name: "Done and Dusted", spoken_name: "Done and Dusted", agent_name: "Shy", soniox_voice_label: "Shy" }, [])`
     );
-    assert.equal(identityCollision, "");
+    assert.equal(identityCollision, "Done and Dusted");
     const voiceKeepsLabel = load(
       "dashboard/src/lib/settingsOptionStatus.ts",
-      `mod.settingsOptionStatus({ tab: "train", panel: "tools" }, { agent_name: "Shy", soniox_voice_label: "Shy" }, [])`
+      `mod.settingsOptionStatus({ tab: "train", panel: "tools" }, { business_name: "Done and Dusted", spoken_name: "Done and Dusted", agent_name: "Shy", soniox_voice_label: "Shy" }, [])`
     );
     assert.equal(voiceKeepsLabel, "Shy");
     const line = load(

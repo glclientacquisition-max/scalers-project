@@ -8,7 +8,8 @@ function read(rel) {
 }
 
 describe("settings list rest", () => {
-  const form = read("dashboard/src/components/TenantForm.tsx");
+  // Settings form copy: TenantForm plus the Identity cards (settings remake slice 1).
+  const form = read("dashboard/src/components/TenantForm.tsx") + read("dashboard/src/components/identity/IdentitySettings.tsx");
   const scope = read("dashboard/src/lib/settingsSaveScope.ts");
   const handoff = read("dashboard/src/lib/handoffMode.ts");
   const wizard = read("dashboard/src/app/onboarding/OnboardingWizard.tsx");
@@ -97,7 +98,7 @@ describe("settings list rest", () => {
     assert.match(form, /label="Tone"/);
     assert.match(form, /Assistant name/);
     assert.match(form, /Business name/);
-    assert.match(form, /Business type/);
+    assert.match(form, /What you do/); // one category question (was Business type + category)
     assert.doesNotMatch(form, /hint=\{TONE_OPTIONS/);
     assert.doesNotMatch(form, /Calm and short\./);
     assert.doesNotMatch(form, /Helpful, like a good receptionist\./);
@@ -126,7 +127,8 @@ describe("settings list rest", () => {
   });
 
   it("blocks TenantForm submit while Pronunciation is open", () => {
-    const form = read("dashboard/src/components/TenantForm.tsx");
+    // Settings form copy: TenantForm plus the Identity cards (settings remake slice 1).
+  const form = read("dashboard/src/components/TenantForm.tsx") + read("dashboard/src/components/identity/IdentitySettings.tsx");
     assert.match(form, /if \(panel === "pronunciation"\) \{\s*event\.preventDefault\(\);/);
     const coach = read("dashboard/src/components/PronunciationCoach.tsx");
     assert.match(coach, /startTransition\(\(\) => geminiAction\(fd\)\)/);

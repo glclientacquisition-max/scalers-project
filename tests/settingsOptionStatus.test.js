@@ -71,15 +71,15 @@ describe("settings row status", () => {
     );
     assert.equal(
       load(
-        `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { business_name: "Chapter One", agent_tone: "warm", agent_name: "Aisha" })`
+        `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { business_name: "Chapter One", spoken_name: "Chapter One Books", agent_tone: "warm", agent_name: "Aisha" })`
       ),
-      "Warm"
+      "Chapter One"
     );
     assert.equal(
       load(
-        `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { business_name: "Chapter One", agent_name: "Aisha" })`
+        `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { business_name: "", greeting_invite: "Karibu", agent_name: "Aisha" })`
       ),
-      "Aisha"
+      "Needs setup"
     );
   });
 
