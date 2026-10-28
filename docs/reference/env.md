@@ -40,7 +40,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BRAIN_ENGINES_REPLY_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_ENGINES_UNDERSTAND_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_GEMINI_CATALOGUE` | voice | `src/conversation/catalogueMouth.js` |
-| `BRAIN_KB_GATE` | voice | `src/db.js` |
+| `BRAIN_KB_GATE` | desk, voice | `dashboard/src/lib/kbLive.server.ts`<br>`src/db.js` |
 | `BRAIN_MODEL_LEAD` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_V1_DRAFT` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_V1_DRAFT_PHASE_A` | scripts | `scripts/brain-engines-sim.js` |
@@ -59,7 +59,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js`<br>`src/notifications/ownerCallSummary.js` |
 | `CALL_SUMMARY_EVENT` | voice | `src/conversation/callSummaryEvent.js` |
 | `CRON_SECRET` | desk | `dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/cron/ops-alerts/route.ts` |
-| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+70 more |
+| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+71 more |
 | `DASHBOARD_PASSWORD` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
