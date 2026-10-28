@@ -59,9 +59,12 @@ test('gap guard ON: no filler + >900 ms first audio -> neutral Mm., not ack-led,
   assert.equal(A.scoreAckRule(A.replayHeard(db.turns, { gapGuard: true })).stacks, 0);
 });
 
-test('server.js: gap guard is behind the flag and only when the rule withheld a filler', () => {
+// B2: the gap-guard clip was played only by the old Gemini turn (deleted with it). The clip warm is still behind the
+// flag (Voice V1 decides whether the engines path plays it or the warm goes).
+test('server.js (B2): the old turn\'s gap-guard play is gone; the warm stays behind the flag', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  assert.match(src, /else if \(ackTracker && ruleFiller === null && tts && ackRule\.gapGuardEnabled\(\)\)/);
+  assert.doesNotMatch(src, /else if \(ackTracker && ruleFiller === null && tts && ackRule\.gapGuardEnabled\(\)\)/);
+  assert.match(src, /const gapWarm = ackRule\.gapGuardEnabled\(\)/);
 });
 
 const fx923 = require('./fixtures/no-answer-delete/HD_923e63f8a72b.json');
@@ -136,9 +139,7 @@ test('HD_89aa48bf657f gap guard: sent at 700 ms after end of turn (was 871-1060)
   }
 });
 
-test('server.js: gap guard is cached-only, once per turn, never over reply audio', () => {
+test('server.js (B2): no old-turn gap-guard timer left to speak over reply audio', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  assert.match(src, /if \(!turnBusy \|\| speaking \|\| bargeInActive \|\| firstSpokenChunk \|\| fillerStarted\) return;/);
-  assert.match(src, /gap-guard miss \(not cached\)/);
-  assert.match(src, /ackRule\.gapGuardDelay\(turnTiming\.turnStartedAt, Date\.now\(\)\)/);
+  assert.doesNotMatch(src, /gap-guard miss \(not cached\)|ackRule\.gapGuardDelay\(/);
 });

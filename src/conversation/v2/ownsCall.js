@@ -1,25 +1,18 @@
 'use strict';
-// BRAIN_V2_OWNS_CALL (default off): plan row C3, "v2 owns the call"
-// (briefs/v2-greeting-and-path-plan.md). It only acts with BRAIN_V2=on and
-// BRAIN_V2_MODE=live. In that mode v2 is the only owner of a caller turn:
+// v2 owns the call: plan row C3 (briefs/v2-greeting-and-path-plan.md). Since B2 this is
+// always on (BRAIN_V2_OWNS_CALL / BRAIN_V2 / BRAIN_V2_MODE no longer read): v2 is the only
+// owner of every caller turn:
 //   - a v2 error, an exception or an empty line speaks the v2 repair template
 //     (EN/SW). It never falls through to a v1 local or Gemini turn;
 //   - v2 writes go straight to the tool executor. There is no ensureRequired*
 //     and no guardToolPlan, and the v1 caller-file speech gate does not edit
-//     v2 lines. BRAIN_V2_COMMIT_SAFETY (C1) is the guard, and this flag turns
-//     it on too (commitSafety.commitSafetyEnabled);
+//     v2 lines. Commit safety (C1, always on) is the guard;
 //   - once v2 has ended the call, no turn opens again, not even on a media
 //     reconnect for the same call;
 //   - machine.finishCall runs once per call at hangup. A reconnect, a double
 //     hangup or a second terminal webhook gets the cached result back.
-// Off: nothing here is called; server.js keeps the #849 behaviour.
 const R = require('./receipts');
 const { finishCall } = require('./machine');
-
-const ON = /^(1|true|on|yes)$/i;
-function ownsCallEnabled(env = null) {
-  return ON.test(String((env ? env.BRAIN_V2_OWNS_CALL : process.env.BRAIN_V2_OWNS_CALL) || ''));
-}
 
 function repairLine(lang) {
   return R.info({ kind: 'repair' }, lang === 'sw' ? 'sw' : 'en');
@@ -38,7 +31,13 @@ async function runOwnedTurn(live, input = {}, { log = () => {} } = {}) {
     return { line: repairLine(lang()), lang: lang(), end: false, owned: true, repaired: r ? 'empty_line' : 'no_result' };
   } catch (err) {
     log(`brain_v2_owned repair reason=throw err=${String(err && err.message ? err.message : err).slice(0, 160)}`);
-    return { line: repairLine(lang()), lang: lang(), end: false, owned: true, repaired: 'throw' };
+    // B2 follow-up: the caller is saved for the owner (callback commit path, once per call) before the repair line.
+    let brainError = null;
+    if (live && typeof live.recordError === 'function') {
+      try { brainError = await live.recordError(err, { profile: input.profile || null, lastCaller: input.text || null }); } catch { brainError = null; }
+      if (brainError) log(`brain_v2_owned brain_error saved=${brainError.ok ? 'yes' : 'no'}${brainError.id ? ` id=${brainError.id}` : ''}${brainError.error ? ` code=${brainError.error}` : ''}`);
+    }
+    return { line: repairLine(lang()), lang: lang(), end: false, owned: true, repaired: 'throw', ...(brainError ? { brainError } : {}) };
   }
 }
 
@@ -116,13 +115,13 @@ function summaryPatch(fin) {
 //   finished: v2 owned the call and finishCall ran (fin carries summaryReceipts);
 //   pending:  v2 owns a live call whose finish waits out the reconnect window,
 //             so the summary waits for that one finish;
-//   none:     v2 does not own this call (flag off or no owned turn): v1 receipts.
-function a4V2Source(owned, callSid, { ownsCallOn = ownsCallEnabled() } = {}) {
-  if (!ownsCallOn || !owned || !callSid) return { state: 'none', fin: null };
+//   none:     no owned turn ran on this call (e.g. no caller turn): the summary uses its own receipts.
+function a4V2Source(owned, callSid) {
+  if (!owned || !callSid) return { state: 'none', fin: null };
   const fin = owned.finished(callSid);
   if (fin) return { state: 'finished', fin };
   if (owned.getLive(callSid)) return { state: 'pending', fin: null };
   return { state: 'none', fin: null };
 }
 
-module.exports = { ownsCallEnabled, repairLine, runOwnedTurn, createOwnedCalls, summaryPatch, a4V2Source };
+module.exports = { repairLine, runOwnedTurn, createOwnedCalls, summaryPatch, a4V2Source };

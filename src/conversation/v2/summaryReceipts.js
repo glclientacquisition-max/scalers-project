@@ -91,6 +91,19 @@ function receiptsFromV2(state, profile = {}) {
     r.slots.name = slot(name);
     out.push(r);
   }
+  // B2 follow-up: a brain error on the call is an owner callback with whatever was known (saved row id when the
+  // save worked). Never confirmed: the caller read back nothing.
+  const be = state.eng && state.eng.brainError;
+  if (be) {
+    const s0 = state.slots || {};
+    const when0 = s0.when && (s0.when.date || s0.when.time) ? whenText(s0.when) : null;
+    const r = { receiptId: `v2_${++n}`, type: 'callback', status: 'unconfirmed', brainError: { kind: be.kind || 'turn', saved: Boolean(be.ok) }, slots: { reason: slot(be.ok ? 'Live line could not complete. Team to follow up.' : 'Live line could not complete. Follow-up NOT saved.'), name: slot(name) } };
+    if (be.ok && be.id) r.writtenRowId = String(be.id);
+    if (s0.service) r.slots.service = slot(s0.service);
+    if (when0) r.slots.when = slot(when0);
+    if (s0.place) r.slots.place = slot(s0.place);
+    out.push(r);
+  }
   // Interest that never committed: an unanswered read-back or held slots.
   const p = state.pending;
   const s = state.slots || {};

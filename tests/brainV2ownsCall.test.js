@@ -22,14 +22,11 @@ function withEnv(vars, fn) {
 }
 const LIVE_ON = { BRAIN_V2: 'on', BRAIN_V2_MODE: 'live', BRAIN_V2_OWNS_CALL: 'on', BRAIN_V2_COMMIT_SAFETY: null, GEMINI_API_KEY: null };
 
-test('flag: off by default; on only for 1/true/on/yes; it turns commit safety on with it', withEnv({ BRAIN_V2_OWNS_CALL: null, BRAIN_V2_COMMIT_SAFETY: null }, () => {
-  assert.equal(O.ownsCallEnabled(), false);
-  assert.equal(CS.commitSafetyEnabled(), false);
-  for (const v of ['1', 'true', 'on', 'yes']) assert.equal(O.ownsCallEnabled({ BRAIN_V2_OWNS_CALL: v }), true);
-  assert.equal(O.ownsCallEnabled({ BRAIN_V2_OWNS_CALL: 'off' }), false);
-  assert.equal(CS.commitSafetyEnabled({ BRAIN_V2_OWNS_CALL: 'on' }), true);
-  process.env.BRAIN_V2_OWNS_CALL = 'on';
+test('B2: v2 always owns the call (no BRAIN_V2_OWNS_CALL switch) and commit safety is always on', withEnv({ BRAIN_V2_OWNS_CALL: null, BRAIN_V2_COMMIT_SAFETY: null }, () => {
+  assert.equal(O.ownsCallEnabled, undefined);
   assert.equal(CS.commitSafetyEnabled(), true);
+  assert.equal(CS.commitSafetyEnabled({ BRAIN_V2_OWNS_CALL: 'off', BRAIN_V2_COMMIT_SAFETY: 'off' }), true);
+  assert.doesNotMatch(SERVER, /ownsCallEnabled|env.BRAIN_V2_OWNS_CALL/);
 }));
 
 for (const [lang, line] of [['en', "Sorry, I didn't catch that. Could you say it again?"], ['sw', 'Samahani, sijakusikia vizuri. Unaweza kurudia?']]) {
@@ -73,23 +70,26 @@ test('server wiring: owned v2 writes pass v2Owned to applyGeminiTools, which han
   assert.match(SERVER, /const enforcedParsed =\n\s+toolOpts\.v2Owned === true\n\s+\? parsed\n\s+: guardToolPlan\(\n\s+ensureRequiredEscalate\(\n\s+ensureRequiredCreateRequest\(parsed, state, capabilities\)/);
   // the v1 old-path request de-dupe (type + item, quantity ignored) is skipped for v2 writes
   assert.match(SERVER, /if \(owedConfirmFoldEnabled\(\) && toolOpts\.v2Owned !== true\) \{\n\s+const dup = findDuplicateServiceRequest/);
-  // v1's own applyGeminiTools callers are unchanged (no third argument)
-  assert.match(SERVER, /applyGeminiTools\(callKey, rescue\.parsed\)/);
+  // B2: the old turn's rescue call (applyGeminiTools(callKey, rescue.parsed)) is gone with the old turn;
+  // /ws/relay (Voice V1) still calls it with no third argument
+  assert.doesNotMatch(SERVER, /applyGeminiTools\(callKey, rescue\.parsed\)/);
   assert.match(SERVER, /return await applyGeminiTools\(callSid, parsed\);/);
 });
 
-test('server wiring: the owned v2 turn returns before any v1 path, and skips the v1 file gate', () => {
-  const i = SERVER.indexOf('if (v2Owns) {');
-  const j = SERVER.indexOf('const lookupPlan = planLookupTurn(');
-  assert.ok(i > 0 && j > i, 'owned block sits before the v1 lookup / local / Gemini paths');
-  const block = SERVER.slice(i, SERVER.indexOf('\n      if (v2Live) {', i));
+test('server wiring (B2): the owned v2 turn is the only turn: always returns, skips the v1 file gate, no old-brain path', () => {
+  const i = SERVER.indexOf('const live = await v2OwnsCall.runOwnedTurn(');
+  assert.ok(i > 0, 'the owned turn is wired');
+  const block = SERVER.slice(i, SERVER.indexOf('    } catch (err) {', i));
   assert.match(block, /skipFileGate: true/);
-  assert.match(block, /v2OwnsCall\.runOwnedTurn\(/);
   assert.ok(!/using v1/.test(block), 'no v1 fallthrough in the owned block');
-  assert.ok(block.trimEnd().endsWith('return;\n      }') || /\n        return;\n      }$/.test(block.trimEnd()), 'the owned block always returns');
+  assert.match(block, /no v1 fallback/);
+  assert.ok(/\n      return;\n$/.test(block), 'the owned block always returns');
   assert.match(block, /ownedV2Calls\.markEnded\(callKey/);
-  // Flag off: the #849 block (v1 fallthrough) is still there.
-  assert.match(SERVER, /brain_v2_live failed, using v1/);
+  // the old turn and its routing are deleted (no lookup plan, no #849 fallthrough, no Gemini streaming turn)
+  for (const gone of ['const lookupPlan = planLookupTurn(', 'brain_v2_live failed, using v1', 'async function runGeminiTurnStreaming(', 'if (v2Owns) {', 'if (v2Live) {']) assert.ok(!SERVER.includes(gone), gone);
+  // the catch path speaks the v2 repair template, never an old-brain recovery
+  const c = SERVER.slice(SERVER.indexOf('    } catch (err) {', i), SERVER.indexOf('    } finally {', i));
+  assert.match(c, /v2OwnsCall\.repairLine\(/);
 });
 
 test('server wiring: no turn re-opens after v2 ended (runCallerTurn guard), finishCall at hangup', () => {

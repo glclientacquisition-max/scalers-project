@@ -29,11 +29,9 @@ async function talk(lines, opts = {}) {
   return { st, out, log };
 }
 
-test('flag is off by default and respects the tenant allowlist', () => {
-  assert.equal(V2.brainV2Enabled({ env: {} }), false);
-  assert.equal(V2.brainV2Enabled({ env: { BRAIN_V2: 'on' } }), true);
-  assert.equal(V2.brainV2Enabled({ env: { BRAIN_V2: 'on', BRAIN_V2_TENANTS: 'a,b' }, tenantId: 'c' }), false);
-  assert.equal(V2.brainV2Mode({ env: {} }), 'shadow');
+test('B2: v2 has no on/off, mode or tenant-allowlist switch (BRAIN_V2 / BRAIN_V2_MODE / BRAIN_V2_TENANTS gone)', () => {
+  for (const k of ['brainV2Enabled', 'brainV2Mode', 'brainV2ShadowEnabled', 'tenantAllowlist', 'tenantAllowed', 'brainEnginesOn']) assert.equal(V2[k], undefined, k);
+  assert.equal(typeof V2.createBrainV2Live, 'function');
 });
 
 test('Swahili clock: saa 4 = 10:00, saa nane mchana = 14:00, keshokutwa = +2d', () => {
@@ -208,7 +206,8 @@ test('ack rule: only a write receipt may open with an ack; never after an ack; a
   const b = await talk(['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Ruiru', 'Wanjiru', 'Ndio.', 'Hapana, ni hayo tu.']);
   assert.equal(b.out[4].line, 'Karibu tena. Kwaheri.', 'goodbye is not paired with an ack-led receipt');
   for (let i = 1; i < a.out.length; i++) assert.ok(!(ACKRX.test(a.out[i].line) && ACKRX.test(a.out[i - 1].line)));
-  const st = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] }); const h = V2.createDryRunHandlers(); let r;
+  // commit safety is always on (B2): a write is only spoken as saved with a row id, so the dry run returns one here
+  const st = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] }); const h = V2.createDryRunHandlers(); h.createAppointment = async (a) => ({ id: 'appt-dry-1', intended: a }); let r;
   for (const text of ['Habari, nataka kubook carpet cleaning kesho saa tatu asubuhi.', 'Ruiru', 'Wanjiru']) await V2.runTurn(st, { text, profile: DD, now: NOW, handlers: h });
   r = await V2.runTurn(st, { text: 'Ndio.', profile: DD, now: NOW, handlers: h, acked: true });
   assert.match(r.line, /^Nimeweka Carpet Cleaning/);

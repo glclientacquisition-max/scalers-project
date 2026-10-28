@@ -7,9 +7,9 @@
 // optional fake Gemini). A local HTTP server stands in for the SautiKit REST
 // API (SAUTIKIT_API_BASE) and records POST /v1/calls/{sid}/hangup.
 //
-// Signals covered: v1 brain END (caller says "Goodbye.") and the v1 end_call
-// marker (###ENDCALL### from the model). The v2 { end: true } shape is covered
-// by unit tests (tests/endCallHonour.test.js); v2 is not on main.
+// B2: every media turn is the v2 engines, so the only end signal is v2's { end: true } (source=v2_end). The v1
+// brain END farewell timer and the ###ENDCALL### marker were the old Gemini turn's and are deleted with it. The fake
+// Gemini answers the engines' reply call (tests/helpers/endCallSim.js); the understanding call fails (rules).
 //
 // Run: node --test tests/endCallHonourE2e.test.js   (Node 22, like CI)
 'use strict';
@@ -29,6 +29,8 @@ const END_SIM = path.join(__dirname, 'helpers', 'endCallSim.js');
 const LINE_MS = 1500;
 const GREETING_TIMEOUT_MS = 20000;
 const GEMINI_SCRIPT = [
+  { match: 'Goodbye', delayMs: 30, text: 'Thank you. Goodbye.' },
+  { match: 'Bye', delayMs: 30, text: 'Thank you. Goodbye.' },
   { match: 'call me back', delayMs: 30, text: 'Sure, the team will call you back. Goodbye! ###ENDCALL###' },
   { match: 'clean sofas', delayMs: 1500, text: 'Yes, we clean sofas. Would you like to book a visit?' },
   { delayMs: 30, text: 'Okay.' },
@@ -196,20 +198,25 @@ describe('VOICE_END_CALL_HONOUR=on (e2e server.js)', { concurrency: true }, () =
     if (rest) rest.server.close();
   });
 
-  it('brain END ("Goodbye."): one hangup after the farewell has played; a second "Bye." does not hang up twice', async () => {
+  it('v2 end ("Goodbye."): one hangup after the farewell has played; a second "Bye." does not hang up twice', async () => {
     const callSid = 'HD_sim_end_on_brain';
     const r = await endCall(srv, rest, callSid, 'Goodbye.', { thenSay: 'Bye.' });
-    assertHungUpAfterAudio(r, callSid, 'Thank you. Goodbye.');
-    assert.ok(r.logs.some((l) => l.includes('end_call scheduled source=brain_end')));
+    assertHungUpAfterAudio(r, callSid, 'Goodbye.');
+    assert.ok(r.logs.some((l) => l.includes('end_call scheduled source=v2_end')));
     assert.equal(r.logs.filter((l) => l.includes('end_call hangup source=')).length, 1, 'one hangup');
-    assert.equal(r.speaks.length, 1, 'nothing spoken after the farewell');
+    // v2 streams the farewell one sentence per line ("Thank you." then "Goodbye."); the second "Bye." adds nothing.
+    assert.equal(r.speaks.map((x) => x.text).join(' '), 'Thank you. Goodbye.', 'nothing spoken after the farewell');
   });
 
-  it('v1 end_call marker (###ENDCALL###): one hangup after the last line has played', async () => {
+  // B2: the v1 ###ENDCALL### marker is gone. A model goodbye on a callback ask never hangs up before the callback is
+  // saved, and the unbacked "the team will call you back" is dropped by the commit gate.
+  it('B2: a model goodbye with ###ENDCALL### on a callback ask does not hang up; no unbacked promise', async () => {
     const callSid = 'HD_sim_end_on_marker';
-    const r = await endCall(srv, rest, callSid, 'Please have them call me back.');
-    assertHungUpAfterAudio(r, callSid, 'Goodbye!');
-    assert.ok(r.logs.some((l) => l.includes('end-call signal source=v1_end_call')));
+    const r = await endCall(srv, rest, callSid, 'Please have them call me back.', { listenMs: 3000 });
+    assert.ok(r.speaks.length >= 1, r.logs.join('\n'));
+    assert.equal(r.hangups.length, 0, 'no hangup');
+    assert.ok(!r.logs.some((l) => l.includes('source=v1_end_call')));
+    assert.ok(!r.speaks.some((x) => /team will call you back/i.test(x.text)), 'commit gate: no promise without a saved callback');
   });
 
   it('HD_2ccfbf6e1fa4 shape: the reply lands after the caller hung up: no outage clip, no owner alert', async () => {
@@ -238,22 +245,15 @@ describe('VOICE_END_CALL_HONOUR unset (documents current behaviour)', { concurre
     if (rest) rest.server.close();
   });
 
-  it('brain END: media close on the old byte timer, no REST hangup', async () => {
+  // B2: with the honour flag unset, v2's end is not honoured: the goodbye is spoken, the call stays open on v2
+  // (the old byte-timer close and the 800 ms marker close were the deleted old turn's).
+  it('v2 end with honour unset: goodbye spoken, no hangup, the call stays open on v2', async () => {
     const callSid = 'HD_sim_end_off_brain';
-    const r = await endCall(srv, rest, callSid, 'Goodbye.');
-    assert.ok(r.closed && r.closed.reason === 'end_call');
-    assert.ok(r.logs.some((l) => /brain-end hangup in \d+ms/.test(l)));
+    const r = await endCall(srv, rest, callSid, 'Goodbye.', { listenMs: 3000 });
+    assert.ok(r.speaks.some((x) => /Goodbye/.test(x.text)), r.logs.join('\n'));
+    assert.ok(r.logs.some((l) => l.includes('end not honoured (VOICE_END_CALL_HONOUR off)')));
     assert.equal(r.hangups.length, 0);
-    assert.ok(!r.logs.some((l) => l.includes('end_call scheduled')));
-  });
-
-  it('v1 end_call marker: KNOWN GAP, fixed 800 ms close cuts the last line, no REST hangup', async () => {
-    const callSid = 'HD_sim_end_off_marker';
-    const r = await endCall(srv, rest, callSid, 'Please have them call me back.');
-    const bye = r.speaks.find((s) => s.text.includes('Goodbye!'));
-    assert.ok(bye && r.closed && r.closed.reason === 'end_call');
-    assert.ok(r.closed.t - bye.t < LINE_MS, `closed ${r.closed.t - bye.t} ms after a ${LINE_MS} ms line started`);
-    assert.equal(r.hangups.length, 0);
+    assert.ok(!r.logs.some((l) => /brain-end hangup in \d+ms/.test(l)));
   });
 
   it('HD_2ccfbf6e1fa4 shape: KNOWN BUG, a reply after caller hangup is read as a speech outage', async () => {

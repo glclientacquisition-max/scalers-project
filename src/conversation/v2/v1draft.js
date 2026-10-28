@@ -1,5 +1,7 @@
 'use strict';
-// BRAIN_V1_DRAFT (off | shadow | on; default off; Done & Dusted only).
+// v1draft: the model-drafts / KB-verifies library the engines are built on (brainEngines.js, modelLead.js).
+// B2: BRAIN_V1_DRAFT / BRAIN_V1_DRAFT_TENANTS / BRAIN_V1_DRAFT_PHASE_A no longer gate anything (mode() / phaseA()
+// and the Done & Dusted default list are gone); every call runs the engines. History below is the original design.
 // Design: ship-briefs/2026-10-24_brain_v1-draft-kb-verify-design.md (Alvin GO 10:57, answers 11:19-11:20 EAT).
 // v1's model drafts the reply; every sentence is verified against the KB fact note before TTS
 // (v1draftVerify.js); v2 (reply owner #925 + conv state #924) answers only when every model failed.
@@ -18,25 +20,8 @@ const { buildFactNote } = require('./v1draftFacts');
 const { verifySentence, unknownLine } = require('./v1draftVerify');
 const { spoken: spokenStyle } = require('./spokenStyle');
 
-const DND_TENANT = 'df4ad9d8-28ff-4810-b1e6-94f5495472b0'; // Done & Dusted (default scope)
-const MODES = new Set(['off', 'shadow', 'on']);
-function mode({ env = process.env, tenantId } = {}) {
-  const m = String(env.BRAIN_V1_DRAFT || 'off').trim().toLowerCase();
-  if (!MODES.has(m) || m === 'off') return 'off';
-  // BRAIN_KB_GATE=on: readiness decides (see flag.js); the env list is the kill-switch path
-  const gate = require('../../knowledge/kb/live').decision({ env, tenantId });
-  if (gate !== null) return gate ? m : 'off';
-  const allow = String(env.BRAIN_V1_DRAFT_TENANTS || DND_TENANT).split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
-  if (tenantId == null || !allow.includes(String(tenantId).trim().toLowerCase())) return 'off';
-  return m;
-}
-
-// BRAIN_V1_DRAFT_PHASE_A=on (only with BRAIN_V1_DRAFT=on, same tenant scope): one shared understanding
-// per turn, handoff carries the draft's slots + asks, no repeated greeting, one spoken number style.
-// voice-qa/2026-10-24_926-dials-two-systems.md §3 Phase A.
-function phaseA({ env = process.env, tenantId } = {}) {
-  return mode({ env, tenantId }) === 'on' && String(env.BRAIN_V1_DRAFT_PHASE_A || 'off').trim().toLowerCase() === 'on';
-}
+// Phase A (always on since B2): one shared understanding per turn, handoff carries the draft's slots + asks,
+// no repeated greeting, one spoken number style. voice-qa/2026-10-24_926-dials-two-systems.md §3 Phase A.
 // [PROMPT-PLACEHOLDER] copy for the wait / hello-after-wait acts and the no-repeat greeting swap.
 const PHASE_A_LINES = {
   wait: { en: 'Sure, take your time.', sw: 'Sawa, chukua muda wako.' },
@@ -314,4 +299,4 @@ function remember(state, role, text) {
   h.push({ role, text: String(text).slice(0, 400) });
   if (h.length > HISTORY * 2) h.splice(0, h.length - HISTORY * 2);
 }
-module.exports = { mode, phaseA, phaseALine, PHASE_A_LINES, handoffFields, createV1Draft, ladder, buildRequest, v2OwnsTurn, remember, DEADLINES, DND_TENANT, staticPrefix };
+module.exports = { phaseALine, PHASE_A_LINES, handoffFields, createV1Draft, ladder, buildRequest, v2OwnsTurn, remember, DEADLINES, staticPrefix };

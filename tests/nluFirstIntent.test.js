@@ -80,10 +80,8 @@ test('VOICE_INTENT_IN_MAIN_TURN: folded command parsed from ###TOOL###, never sp
   assert.match(G.foldInstruction(doc), /catalogue_intent/); assert.match(G.foldInstruction(doc), new RegExp(id));
 });
 
-test('server wiring: fold is shadow-only (logged, not applied) and gated by the sub-flag', () => {
+// B2: the intent fold was a log-only shadow inside the old Gemini turn; it is deleted with that turn.
+test('server wiring (B2): the old turn\'s intent-fold shadow is gone', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'server.js'), 'utf8');
-  assert.match(src, /intentGate\.intentInMainTurnEnabled\(\)/);
-  assert.match(src, /intent_fold \$\{JSON\.stringify\(\{ folded, nlu/);
-  const i = src.indexOf('function logFoldedIntent'); const body = src.slice(i, i + 900);
-  assert.doesNotMatch(body, /speakText|commit\(|applyGeminiTools/);
+  assert.doesNotMatch(src, /intentGate\.intentInMainTurnEnabled\(\)|function logFoldedIntent|intent_fold/);
 });

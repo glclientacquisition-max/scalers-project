@@ -87,24 +87,6 @@ test('identity subject split: agent name vs caller name', () => {
   assert.equal(OW.render({ topic: 'agent_name', lang: 'sw' }, { profile: DD }), 'Naitwa Shy.');
   assert.equal(OW.render({ topic: 'agent_name', lang: 'en' }, { profile: DD }), "I'm Shy.");
 });
-test('owed answers already covered by the model draft are dropped (price), never appended after the reply', async () => {
-  const h = harness({ understand: () => U({ intents: ['ask'], questions: [{ type: 'price' }] }), reply: () => ({ reply: 'Deep cleaning ni KSh 3,000 hadi 6,000. Ungependa nikuwekee miadi?' }) });
-  const r = await turn(h, 'Deep cleaning ni bei gani?', 'sw');
-  assert.equal(count(r.heard, '3,000|elfu tatu'), 1, r.heard);
-  assert.match(r.heard, /\?\s*$/, 'step question is last');
-});
-test('latch + fragment: "like." then "Do you guys do it?" asks the booking question once', async () => {
-  const h = harness({ understand: () => U({ intents: ['ask'], questions: [] }), reply: () => ({ reply: 'Ndiyo, tunatoa huduma ya usafi wa kina. Ungependa nikuwekee miadi?' }) });
-  const a = await turn(h, 'like.', 'sw'); const b = await turn(h, 'Do you guys do it?', 'sw');
-  assert.equal(count(`${a.heard} ${b.heard}`, 'Ungependa nikuwekee miadi'), 1, `${a.heard} || ${b.heard}`);
-});
-test('latch: the caller answering the question lets it be asked again later; a genuine re-ask is allowed', async () => {
-  const h = harness({ reply: () => ({ reply: 'Deep Clean costs between 3,000 and 6,000 shillings. Would you like me to book it for you?' }), understand: () => U({ intents: ['ask'], questions: [{ type: 'price' }] }) });
-  const a = await turn(h, 'How much is deep cleaning? How much?'); const b = await turn(h, 'How much is deep cleaning?');
-  assert.match(a.heard, /3,000/); assert.match(b.heard, /3,000/, 'the repeated price answer is legit (D3)');
-  const c = await turn(h, 'Yes, how much is deep cleaning again?');
-  assert.match(c.heard, /book it for you\?/, 'a reply word re-opens the question');
-});
 test('reconnect: resumed stream continues the v2 machine at T11 as Alvin, no re-greet, language kept', async () => {
   const h = harness({ callerFile: ALVIN_FILE, understand: (t) => U({ lang: /Sawa|Habari|naitwa/.test(t) ? 'sw' : 'en' }), reply: (p) => ({ reply: /Sawa/.test(p.CALLER_SAID || '') ? 'Sawa Alvin. Nikusaidie na nini kingine?' : 'Sure. How else can I help?' }) });
   await turn(h, 'Habari, naitwa Alvin.', 'sw');
@@ -132,28 +114,4 @@ test('price gate end-to-end: "do you do deep cleaning?" keeps "Ndiyo, tunafanya"
   assert.match(r.heard, /Ndiyo, tunafanya deep cleaning/i, r.heard); assert.ok(!/6,000/.test(r.heard), r.heard);
 });
 
-test('HD_b0ecf17361a3 T2: Rongai alias yields one yes + KES 700, no unsure contradiction', { skip: !AP.available() && 'Desk area tree required' }, async () => {
-  const h = harness({
-    callerFile: { contactName: 'Alvin', nameConfirmed: false, callerPhone: '+254790381872', openRows: [KILELESHA_ROW] },
-    understand: () => U({ lang: 'sw', intents: ['ask'], questions: [{ type: 'coverage' }], slots: { places: ['Rongai'], services: ['Carpet Cleaning (per room)'] }, places: ['Rongai'] }),
-    reply: () => ({ reply: 'Hatuna hakika kama tunafika Rongai kwa sasa, lakini naweza kumwomba timu ithibitishe. Je, ungependa nikuwekee miadi ya kusafisha carpet Kileleshwa tarehe 26 Oktoba 2026?' }),
-  });
-  const r = await turnProfile(h, 'Nilikuwa nauliza, kama mna- kuja kwangu Rongai kunioshea carpet.', 'sw', DND_PICKS());
-  assert.ok(!/hatuna hakika/i.test(r.heard), r.heard);
-  assert.match(r.heard, /(tunafika|Ndio|ndio)/i);
-  assert.match(r.heard, /700|mia saba/i);
-  assert.equal((r.sentences || []).filter((s) => s.src === 'owed_answer').length, 0, 'coverage is merged in the guard/writer, not appended');
-});
 
-test('HD_b0ecf17361a3 T4/T5: Rongai from call memory is not dropped as unasked_place', { skip: !AP.available() && 'Desk area tree required' }, async () => {
-  const h = harness({
-    callerFile: { contactName: 'Alvin', nameConfirmed: false, callerPhone: '+254790381872', openRows: [KILELESHA_ROW] },
-    understand: (t) => (/Rongai/i.test(t) ? U({ lang: 'sw', slots: { places: ['Rongai'] }, places: ['Rongai'], questions: [] }) : U({ lang: 'sw' })),
-    reply: (p) => ({ reply: /Rongai/i.test(p.CALLER_SAID || '') ? 'Tulikuwa tunaangalia huduma ya kusafisha Rongai.' : 'Sawa.' }),
-  });
-  await turnProfile(h, 'Nilikuwa nauliza, kama mnakuja Rongai kusafisha carpet.', 'sw', DND_PICKS());
-  const r4 = await turnProfile(h, 'Tulikuwa tunaangalia Rongai.', 'sw', DND_PICKS());
-  assert.match(r4.heard, /Rongai/i, r4.heard);
-  const r5 = await turnProfile(h, 'Si mimi nadhani ni Rongai, si Kileleshwa?', 'sw', DND_PICKS());
-  assert.match(r5.heard, /Rongai/i, r5.heard);
-});

@@ -51,9 +51,9 @@ const phases = (rs) => rs.map((r) => r.phase);
 const BOOK_EN = 'Book sofa cleaning Friday at 10am in Kitengela, I am Alvin.';
 const BOOK_SW = 'Nataka sofa cleaning Ijumaa saa nne asubuhi Kitengela, naitwa Alvin.';
 
-test('flag is off by default; explicit whole-answer yes classifier', () => {
-  assert.equal(CS.commitSafetyEnabled({}), false);
-  assert.equal(CS.commitSafetyEnabled({ BRAIN_V2_COMMIT_SAFETY: '1' }), true);
+test('B2: commit safety is always on (no BRAIN_V2_COMMIT_SAFETY / OWNS_CALL switch); explicit whole-answer yes classifier', () => {
+  assert.equal(CS.commitSafetyEnabled({}), true);
+  assert.equal(CS.commitSafetyEnabled({ BRAIN_V2_COMMIT_SAFETY: 'off', BRAIN_V2_OWNS_CALL: 'off' }), true);
   for (const y of ['Yes', 'Yes please', 'Yes, that is correct', 'yes book it', 'Ndio', 'Ndiyo, weka', 'Sawa', 'Okay.']) assert.equal(CS.explicitYes(y), true, y);
   for (const n of ['Okay wait', 'Okay wait, let me check with my wife', 'Yes but make it 11', 'Is it at 10?', 'Ndio, lakini Jumamosi', 'Sawa, ni hayo tu. Baadaye basi.', 'Sawa ngoja kidogo', 'Hmm', 'Yes, and also a carpet', 'Eeh...']) assert.equal(CS.explicitYes(n), false, n);
 });
@@ -142,7 +142,7 @@ for (const [lang, book, yes] of [['en', BOOK_EN, 'Yes'], ['sw', BOOK_SW, 'Ndio']
     assert.equal(r.receipts[2].outboxTaskId, 'task_1'); // #845 keeps it only when it is a uuid
     const fin = V2.finishCall(r.st, { businessName: 'Done and Dusted', callerPhone: '+254700000001' });
     assert.equal(fin.outcome, 'write_failed');
-    assert.doesNotMatch(fin.ownerText, /Visit booked/); assert.match(fin.ownerText, /could not save this request\. Nothing was booked/);
+    assert.doesNotMatch(fin.ownerText, /Visit booked/); assert.match(fin.ownerText, /could not save this request\. Please call the caller back\./); assert.doesNotMatch(fin.ownerText, /Nothing was booked/); // Ops #1011: an earlier booking on the call may be real
     assert.equal(r.out[1].toolResults[0].status, 'failed');
     const r2 = await talk([book, yes], { fail: true, outboxFail: true });
     assert.equal(r2.out[1].line, lang === 'en' ? "Sorry, I couldn't save that just now. Please call us again a little later." : 'Samahani, sikuweza kuhifadhi hilo sasa hivi. Tafadhali piga simu tena baadaye kidogo.');
@@ -334,12 +334,14 @@ test('decline and "no thanks, bye" at the read-back: rejected receipt, no write,
   }
 }));
 
-test('flag off: Phase 1 behaviour unchanged (callback line, no receipts, no key)', withFlag(async () => {
+// B2 rewrite of "flag off: Phase 1 behaviour unchanged": there is no flag-off any more. With the env switch cleared,
+// the C1 behaviour still holds: callback read-back with number + when, receipts written, idempotency key on the row.
+test('B2: env switch cleared still gives C1 (callback read-back, receipts, idempotency key)', withFlag(async () => {
   const r = await talk(['Can someone call me back?', 'Yes']);
-  assert.equal(r.out[0].line, 'Shall I ask the team to call you back on this number?');
-  assert.equal(r.receipts.length, 0);
+  assert.match(r.out[0].line, /call you back on 0700 000 001/);
+  assert.ok(r.receipts.length > 0);
   const b = await talk([BOOK_EN, 'Yes']);
-  assert.equal(b.log.find((x) => x[0] === 'appt')[1].idempotencyKey, undefined);
+  assert.ok(b.log.find((x) => x[0] === 'appt')[1].idempotencyKey);
 }, ''));
 
 test('live wiring: handlers pass tenant/call context to recordWriteReceipt and confirmCallerName', async () => {

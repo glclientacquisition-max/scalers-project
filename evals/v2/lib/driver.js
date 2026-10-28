@@ -112,9 +112,10 @@ function withEnv(flags, fn) {
  * Run one call. `model(ctx)` returns raw model text (stand-in or replayed).
  * `caller(ctx)` returns the next caller line or null to hang up.
  */
-const V2_ON = () => /^(1|true|on|yes)$/i.test(String(process.env.BRAIN_V2 || ''));
+// B2: v2 is the only brain, so any root that has it runs it (BRAIN_V2 is no longer read). An older root without
+// src/conversation/v2 (a historical comparison) still runs the old-brain simulation below.
 async function runCall(opts) {
-  if (V2_ON() && require('fs').existsSync(path.join(opts.root, 'src/conversation/v2/index.js'))) return require('./driverV2').runCallV2(opts, createFakeDb);
+  if (require('fs').existsSync(path.join(opts.root, 'src/conversation/v2/index.js'))) return require('./driverV2').runCallV2(opts, createFakeDb);
   return runCallV1(opts);
 }
 async function runCallV1({ root, profile, seed, callerPhone = '+254700000001', model, caller, maxTurns = 14, now, agentName = 'Shy', businessName }) {

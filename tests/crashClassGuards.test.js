@@ -200,7 +200,8 @@ describe('server.js wiring', () => {
     assert.doesNotMatch(src, /void handleSpeechProviderOutage\(/);
     assert.doesNotMatch(src, /void voiceTrace\.finishCall\(\)/);
     assert.doesNotMatch(src, /void speakText\(replay/);
-    assert.match(src, /maybeSendWhatsAppNotification\(sidLabel\(\)\)\.catch\(/);
+    // B2: the mid-turn notify after the old LLM recovery save is deleted with that recovery; no bare notify is left
+    assert.doesNotMatch(src, /maybeSendWhatsAppNotification\(sidLabel\(\)\);/);
     assert.match(src, /maybeSendWhatsAppNotification\(callSid, \{ midCall: true \}\)\.catch\(/);
     assert.match(src, /buildSttContext\(sttTenantSnapshot\)\)\s*\.catch\(\(\) => null\)/);
   });

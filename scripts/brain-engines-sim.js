@@ -1,12 +1,7 @@
 #!/usr/bin/env node
 'use strict';
-// Simulated end-to-end BRAIN_ENGINES scenarios (no telephony). Model outputs are recorded stubs.
-process.env.BRAIN_V2 = '1';
-process.env.BRAIN_V2_MODE = 'live';
-process.env.BRAIN_V1_DRAFT = 'on';
-process.env.BRAIN_V1_DRAFT_PHASE_A = 'on';
-process.env.BRAIN_MODEL_LEAD = 'on';
-process.env.BRAIN_ENGINES = '1';
+// Simulated end-to-end engines scenarios (no telephony). Model outputs are recorded stubs.
+// B2: the engines are the only caller turn, so no BRAIN_V2 / V1_DRAFT / MODEL_LEAD / ENGINES env is set here.
 
 const { createBrainV2Live } = require('../src/conversation/v2/liveTurn');
 const { tenantProfileFromRow } = require('../src/tenantProfile');
@@ -67,7 +62,7 @@ async function runScenario(name, turns, { now = '2026-10-25T19:50:00+03:00', lan
   const notifies = [];
   const stream = streamFactory(name);
   const live = createBrainV2Live({
-    env: { ...process.env, BRAIN_ENGINES: '1', BRAIN_MODEL_LEAD: 'on', BRAIN_V1_DRAFT: 'on', BRAIN_V1_DRAFT_PHASE_A: 'on', BRAIN_V2: '1', BRAIN_V2_MODE: 'live' },
+    env: { ...process.env },
     applyTools: async (payload) => {
       if (payload.serviceRequest) writes.push(payload.serviceRequest);
       return { results: [{ action: 'create_service_request', ok: true, status: 'succeeded', id: `sim-${name}` }] };

@@ -184,14 +184,12 @@ describe('2. A successful escalate closes the handoff', () => {
 });
 
 describe('3. Tool turns get the adaptive filler', () => {
-  it('useFiller no longer excludes ESCALATE / CREATE_REQUEST turns', () => {
-    const start = SERVER.indexOf('const useFiller =');
-    const block = SERVER.slice(start, SERVER.indexOf(';', start));
-    assert.ok(start > 0);
-    assert.doesNotMatch(block, /needsImmediateProgress/);
-    assert.match(block, /shouldSpeakThinkingAck\(clean\)/);
-    // The action-progress line itself stays withheld.
-    assert.match(SERVER, /withheld: \$\{progressLine\}/);
+  // B2: the old Gemini turn's filler gate (useFiller) and action-progress line are deleted with it; on v2 the engines
+  // filler (createEnginesFillerTurn) covers tool turns too.
+  it('B2: the old turn\'s useFiller gate is gone; the engines filler is built for every turn', () => {
+    assert.ok(SERVER.indexOf('const useFiller =') < 0);
+    assert.doesNotMatch(SERVER, /withheld: \$\{progressLine\}/);
+    assert.match(SERVER, /const enginesFiller = createEnginesFillerTurn\(\{/);
   });
 });
 
@@ -235,14 +233,12 @@ describe('5. A booking confirmed during a barge-in is still told', () => {
     assert.equal(queueToolOutcome(null, 'x'), '');
   });
 
-  it('server keeps the barged confirmation and speaks it on the next turn', () => {
-    assert.equal((SERVER.match(/const bargedActionConfirmation = heldTools\.toolHoldCancelled/g) || []).length, 2);
-    const discards = SERVER.match(
-      /queueToolOutcome\(callBrainStates\.get\(callKey\), result\?\.actionConfirmation \|\| result\?\.bargedActionConfirmation\)/g
-    );
-    assert.equal((discards || []).length, 4);
+  // B2: the old Gemini media turn's copy is deleted; /ws/relay's runGeminiTurn keeps its one (Voice V1), and the media
+  // turn still speaks an owed outcome first, before the v2 turn.
+  it('server keeps the barged confirmation (relay) and the media turn speaks an owed outcome before the v2 turn', () => {
+    assert.equal((SERVER.match(/const bargedActionConfirmation = heldTools\.toolHoldCancelled/g) || []).length, 1);
     const owed = SERVER.indexOf('const owedOutcome = takeToolOutcome(brainState);');
-    assert.ok(owed > 0 && owed < SERVER.indexOf('resolveLocalReply({'));
+    assert.ok(owed > 0 && owed < SERVER.indexOf('const live = await v2OwnsCall.runOwnedTurn('));
   });
 });
 
@@ -279,8 +275,8 @@ describe('6. A Gemini coverage answer ends on a next step', () => {
     );
   });
 
-  it('server speaks it at the end of a model turn', () => {
-    assert.match(SERVER, /coverageNextStepFor\(\s*spokenChunks\.join/);
+  it('B2: the old model turn that appended it is gone (coverageNextStepFor stays as library code for B3)', () => {
+    assert.doesNotMatch(SERVER, /coverageNextStepFor\(\s*spokenChunks\.join/);
   });
 });
 

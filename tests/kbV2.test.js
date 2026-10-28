@@ -130,8 +130,8 @@ describe('kb v2: gate (BRAIN_KB_GATE) replaces the env allowlists; off is the ki
     assert.equal(L.decision({ tenantId: p.id }), true);
     assert.ok(p.kb && p.kb.handle);
     assert.equal(p.kbProjected, true);
-    const flag = require('../src/conversation/v2/flag');
-    assert.equal(flag.tenantAllowed({ tenantId: p.id, env: { ...process.env, BRAIN_V2_TENANTS: '' } }), true);
+    // B2: no tenant allowlist exists any more (the v2/flag module is deleted)
+    assert.throws(() => require('../src/conversation/v2/flag'), /Cannot find module/);
   });
   it('not ready: still the KB brain (P1), snapshot attached, quality never_ready', () => {
     const { p } = profileFor('growtech', { ready: false });

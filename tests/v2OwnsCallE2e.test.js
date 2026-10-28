@@ -122,7 +122,9 @@ async function session(srv, callSid) {
       say(child, callSid, text);
       const spoke = await waitFor(events, (e) => e.ev === 'speak' && mine(e), waitMs, from);
       await sleep(settleMs);
-      return spoke ? spoke.text : null;
+      if (!spoke) return null;
+      // B2: the engines stream one line per sentence; the turn is every line spoken for it.
+      return events.slice(from).filter((e) => e.ev === 'speak' && mine(e)).map((e) => e.text).join(' ');
     },
     async close(code = 1000) {
       if (ws.readyState === WebSocket.OPEN) ws.close(code);
@@ -158,7 +160,7 @@ describe('BRAIN_V2_OWNS_CALL=on: v2 is the only owner of the call', () => {
     assert.deepEqual(v1Calls(evs).map((e) => e.fn), [], 'no v1 guard, lookup, local reply, model turn or file gate ran');
     assert.ok(!evs.some((e) => e.ev === 'net_blocked' && /googleapis|generativelanguage/.test(e.host)), 'no Gemini call');
     assert.ok(s.mine().some((e) => e.ev === 'log' && /brain_v2_owned repair reason=throw/.test(e.line)));
-    assert.equal(s.mine().filter((e) => e.ev === 'speak').length, 1, 'one line, not repair + v1');
+    assert.equal(s.mine().filter((e) => e.ev === 'speak').map((e) => e.text).join(' '), REPAIR_EN, 'one line, not repair + v1');
     // The call carries on in v2 on the next turn.
     const next = await s.turn('What are your hours?');
     assert.ok(next && next !== REPAIR_EN && !/EDITED/.test(next), next);
@@ -211,7 +213,9 @@ describe('BRAIN_V2_OWNS_CALL=on: v2 is the only owner of the call', () => {
   });
 });
 
-describe('BRAIN_V2_OWNS_CALL unset: #849 behaviour (v1 fallthrough on a v2 throw)', () => {
+// B2: the v1 turn is deleted, so BRAIN_V2_OWNS_CALL is no longer read. Unset, a v2 throw still speaks the v2 repair
+// line (no v1 fallthrough) and the v1 caller-file gate never sits on a v2 line.
+describe('BRAIN_V2_OWNS_CALL unset (B2: ignored, v2 always owns the call)', () => {
   let srv;
   let rest;
   before(async () => {
@@ -223,16 +227,14 @@ describe('BRAIN_V2_OWNS_CALL unset: #849 behaviour (v1 fallthrough on a v2 throw
     if (rest) rest.server.close();
   });
 
-  it('a v2 throw falls through to the v1 path (logged), and no brain_v2 summary patch is written', async () => {
+  it('a v2 throw speaks the v2 repair line (no v1 fallthrough); the next line is v2 and never gate-edited', async () => {
     const s = await session(srv, 'HD_sim_c3_off');
-    await s.turn('SIMTHROW what are your hours', { waitMs: 4000 });
-    assert.ok(s.mine().some((e) => e.ev === 'log' && /brain_v2_live failed, using v1/.test(e.line)));
-    assert.ok(v1Calls(s.since()).length > 0, 'v1 ran');
-    // Off, the v1 caller-file gate still sits on v2 lines (the sim gate rewrites what it sees).
+    const first = await s.turn('SIMTHROW what are your hours', { waitMs: 4000 });
+    assert.equal(first, REPAIR_EN, s.dump());
+    assert.ok(!s.mine().some((e) => e.ev === 'log' && /using v1/.test(e.line)), 'no v1 fallthrough');
+    assert.deepEqual(v1Calls(s.since()).map((e) => e.fn), [], 'v1 never ran');
     const heard = await s.turn('What are your hours?');
-    assert.equal(heard, 'EDITED BY V1 GATE');
+    assert.ok(heard && heard !== REPAIR_EN && !/EDITED BY V1 GATE/.test(heard), heard);
     await s.close();
-    await sleep(500);
-    assert.equal(dbCalls(srv.events, 'mergeCallSummaryMeta').filter((e) => e.args.patch && e.args.patch.brain_v2).length, 0);
   });
 });

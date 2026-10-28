@@ -38,36 +38,8 @@ async function replay(phaseA) {
   return { out, counts };
 }
 
-test('phaseA flag: default off, needs draft on, DnD only', () => {
-  assert.strictEqual(V1.phaseA({ env: { BRAIN_V1_DRAFT: 'on' }, tenantId: V1.DND_TENANT }), false);
-  assert.strictEqual(V1.phaseA({ env: { BRAIN_V1_DRAFT: 'shadow', BRAIN_V1_DRAFT_PHASE_A: 'on' }, tenantId: V1.DND_TENANT }), false);
-  assert.strictEqual(V1.phaseA({ env: { BRAIN_V1_DRAFT: 'on', BRAIN_V1_DRAFT_PHASE_A: 'on' }, tenantId: 'other' }), false);
-  assert.strictEqual(V1.phaseA({ env: { BRAIN_V1_DRAFT: 'on', BRAIN_V1_DRAFT_PHASE_A: 'on' }, tenantId: V1.DND_TENANT }), true);
-});
 
-test('HD_4e388c38f7b5 replay, phase A off: unchanged (third "how can I help", 14:00, no model on owned turns)', async () => {
-  const { out, counts } = await replay(false);
-  assert.match(out[0].line, /How can I help/);
-  assert.strictEqual(out[1].line, 'Where should we come?');
-  assert.match(out[5].line, /14:00/);
-  assert.strictEqual(counts.turnModel, 0);
-});
 
-test('HD_4e388c38f7b5 replay, phase A on', async () => {
-  const { out, counts } = await replay(true);
-  // T1: greeting already asked; no third "how can I help"
-  assert.doesNotMatch(out[0].line, /how can I help/i);
-  assert.strictEqual(out[0].line, V1.phaseALine('goAhead', 'en'));
-  // T2: handoff carries the asks: "is it possible" answered before the place question
-  assert.strictEqual(out[1].path, 'v2_action');
-  assert.match(out[1].line, /^Yes, we do interior window cleaning\. Where should we come\?$/);
-  // T6 read-back: one spoken time style
-  assert.match(out[5].line, /at 2 PM/);
-  assert.doesNotMatch(out[5].line, /14:00/);
-  // one understanding per turn: T2 uses the draft's result; T3-T6 (owned) one v2 turn-model call each; no shadow, no extra
-  assert.strictEqual(counts.draft, 2);
-  assert.strictEqual(counts.turnModel, 4);
-});
 
 test('handoffFields maps fact ids to catalogue ids and keeps possible', () => {
   const note = { byId: new Map([['S9', { serviceId: 'svc-win' }]]) };
@@ -87,10 +59,3 @@ test('wait / hello-after-wait lines exist in en and sw', () => {
   for (const k of ['wait', 'afterWait', 'goAhead']) for (const l of ['en', 'sw']) assert.ok(V1.phaseALine(k, l));
 });
 
-test('healthz: a draft model success is noted', async () => {
-  GH.resetGeminiProviderHealth();
-  await replay(true);
-  const h = GH.getGeminiProviderHealth();
-  assert.ok(h.brain.lastOkAt, 'brain.lastOkAt set');
-  assert.ok(h.lastOkAt, 'provider lastOkAt set');
-});

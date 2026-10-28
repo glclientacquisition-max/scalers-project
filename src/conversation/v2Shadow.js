@@ -19,14 +19,8 @@ const V2_TO_V1_TOOL = {
 };
 const AGREEMENT_TOOLS = new Set(['create_appointment', 'create_service_request', 'update_appointment', 'escalate']);
 
-function brainV2ShadowEnabled({ env = process.env, tenantId } = {}) {
-  if (!ON.test(String(env.BRAIN_V2_SHADOW || ''))) return false;
-  // Defence in depth: a mis-set BRAIN_V2_MODE=live must never make shadow speak
-  // or write; this hook stays log-only regardless. Optional tenant allowlist.
-  const allow = String(env.BRAIN_V2_TENANTS || '').split(',').map((s) => s.trim()).filter(Boolean);
-  if (allow.length && !allow.includes(String(tenantId || ''))) return false;
-  return true;
-}
+// B2: server.js no longer runs the shadow (brainV2ShadowEnabled and its BRAIN_V2_SHADOW / BRAIN_V2_TENANTS reads are
+// gone). diffAgainstLive stays only for voiceTrace's lazy require; B3 deletes this module with that hook.
 
 function shadowTimeoutMs(env = process.env) {
   const n = Number(env.BRAIN_V2_SHADOW_TIMEOUT_MS);
@@ -248,7 +242,6 @@ function createBrainV2Shadow(opts = {}) {
 
 module.exports = {
   callerFileForState,
-  brainV2ShadowEnabled,
   createBrainV2Shadow,
   diffAgainstLive,
   textSimilarity,

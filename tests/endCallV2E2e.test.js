@@ -146,7 +146,11 @@ describe('v2 live + VOICE_END_CALL_HONOUR=on: "No thanks, that\'s all. Bye."', (
     assert.ok(live, `v2 live answered. Logs:\n${r.logs.join('\n')}`);
     const bye = r.speaks.find((s) => /goodbye|kwaheri/i.test(s.text));
     assert.ok(bye, `the goodbye reached the speak sink. Speaks: ${JSON.stringify(r.speaks.map((s) => s.text))}`);
-    assert.equal(r.speaks.length, 1, 'nothing spoken after the goodbye (the second "Bye." is not answered)');
+    // B2: the engines stream the farewell one sentence per line; the goodbye is the last line, and the second "Bye."
+    // is not answered (one owned turn only).
+    assert.equal(r.speaks[r.speaks.length - 1], bye, `nothing spoken after the goodbye: ${JSON.stringify(r.speaks.map((s) => s.text))}`);
+    assert.ok(r.speaks.length <= 2, `one farewell turn: ${JSON.stringify(r.speaks.map((s) => s.text))}`);
+    assert.equal(r.logs.filter((l) => l.includes('brain_v2_live owned')).length, 1, 'the second "Bye." is not answered');
     assert.ok(r.logs.some((l) => l.includes('end-call signal source=v2_end')), 'v2 end signal read');
     assert.equal(r.logs.filter((l) => l.includes('end_call hangup source=')).length, 1, 'one hangup');
     assert.ok(r.closed && r.closed.code === 1000 && r.closed.reason === 'end_call', 'media closed 1000 end_call');

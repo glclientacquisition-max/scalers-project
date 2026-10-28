@@ -1254,9 +1254,18 @@ async function runTurnInner(state, { text, profile = {}, now = new Date(), handl
 
 function finishCall(state, { businessName, callerPhone, profile = null } = {}) {
   const order = ['owner_only_change', 'complaint', 'booked', 'order_saved', 'moved', 'cancelled', 'handoff_callback', 'write_failed'];
-  let outcome = order.find((o) => state.outcomes.includes(o));
+  // B2: the engines (the only turn since B2) keep their writes in state.eng.ledger, not state.outcomes; fold them in.
+  // A not-saved owner_request fallback is not a handoff: the call's outcome stays write_failed.
+  const engLedger = Array.isArray(state.eng?.ledger) ? state.eng.ledger : [];
+  const engOutcomes = engLedger.map((l) => (l.ok ? ({ create_booking: 'booked', create_handoff: 'handoff_callback' }[l.tool] || null) : 'write_failed')).filter(Boolean);
+  const outcomes = [...(state.outcomes || []), ...engOutcomes];
+  let outcome = order.find((o) => outcomes.includes(o));
+  // B2 follow-up: a brain error on the call is the owner's first concern. Saved follow-up = brain_error; the save
+  // itself failed = write_failed (never booked-only, so the owner alert still says the caller needs a call back).
+  const brainError = state.eng?.brainError || null;
+  if (brainError) outcome = brainError.ok ? 'brain_error' : 'write_failed';
   const s = state.slots;
-  if (!outcome) outcome = state.intent && (s.service || s.items.length || s.when.date) ? 'abandoned_with_capture' : state.lastInfo ? 'answered' : 'no_action';
+  if (!outcome) outcome = state.intent && (s.service || s.items.length || s.when.date) ? 'abandoned_with_capture' : (state.lastInfo || state.eng?.answered) ? 'answered' : 'no_action';
   const last = state.receipts[state.receipts.length - 1];
   const captured = { service: s.service || last?.service, when: (s.when.date || last?.when?.date) ? `${s.when.date || last.when.date} ${s.when.time || last?.when?.time || ''}` : null, place: s.place, items: (s.items.length ? s.items : last?.items || []).map((x) => `${x.qty || '?'} x ${x.name}`).join(', ') || null, booking: last?.row ? `${last.row.service} ${last.row.when.date}` : null };
   const intent = { booked: 'book', order_saved: 'order', moved: 'change', cancelled: 'cancel', owner_only_change: last?.kind === 'payment' ? 'payment_change' : 'address_change', complaint: 'complaint', handoff_callback: 'handoff', write_failed: INTENT_OF_TOOL[last?.tool] || 'none' }[outcome] || state.intent || state.lastInfo || 'none';

@@ -21,7 +21,7 @@ test('stream: only sentence/tool/done events; done.line equals joined sentences'
   assert.ok(sent.length >= 1); assert.equal(sent.map((s) => s.text).join(' '), ev.at(-1).line);
   for (const s of sent) { assert.ok(['en', 'sw'].includes(s.lang)); assert.ok(s.source); }
 });
-test('stream: write emits tool start before end, then the receipt sentence; dry-run writes nothing', async () => {
+test('stream: write emits tool start before end, then the receipt sentence; dry-run writes nothing and is never spoken as booked (commit safety always on, B2)', async () => {
   const { turns, handlers } = await streamCall(BOOK);
   const all = turns.flat(); const i0 = all.findIndex((e) => e.type === 'tool' && e.phase === 'start' && e.name === 'createAppointment');
   const i1 = all.findIndex((e) => e.type === 'tool' && e.phase === 'end' && e.name === 'createAppointment');
@@ -30,8 +30,10 @@ test('stream: write emits tool start before end, then the receipt sentence; dry-
   const last = turns.at(-1); const k = last.findIndex((e) => e.type === 'tool' && e.phase === 'end' && e.name === 'createAppointment');
   assert.ok(last.slice(k).some((e) => e.type === 'sentence'), 'receipt sentence after tool end');
   assert.ok(handlers.log.some((l) => l.name === 'createAppointment' && l.args.serviceName));
-  const done = last.at(-1); assert.equal(done.toolResults.at(-1).status, 'succeeded', 'shadow receipt mirrors a successful write');
-  assert.doesNotMatch(done.line, /couldn't save/);
+  // B2: commit safety is always on, so a write with no Desk row id (the dry run) is hollow: honest failure, no booked line
+  const done = last.at(-1);
+  assert.match(done.line, /couldn't save/);
+  assert.doesNotMatch(done.line, /is booked|nimeweka/i);
 });
 test('stream: model prose is never spoken', async () => {
   const model = async () => ({ calls: [], text: 'I have booked you for Friday, done!' });

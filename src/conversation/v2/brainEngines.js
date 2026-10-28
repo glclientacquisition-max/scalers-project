@@ -1,5 +1,6 @@
 'use strict';
-// BRAIN_ENGINES (default off): understanding -> plan -> tools -> (commit gate) -> response -> guard -> speakable.
+// The engines: the only caller-turn brain since B2 (BRAIN_ENGINES no longer read).
+// understanding -> plan -> tools -> (commit gate) -> response -> guard -> speakable.
 //   1. Understanding first: ONE typed model call per turn, hard cap (BRAIN_ENGINES_UNDERSTAND_MS, 1500),
 //      no backup race; a meaningful filler only if the wait passes BRAIN_ENGINES_FILLER_MS (700, clamped to 850).
 //      The turn language is decided once here and every line of the turn obeys it.
@@ -8,7 +9,6 @@
 //   4. Commit truth (single check): no booked/saved/callback claim without a committed write (row id + receipt).
 //   5. Speakable: no bracketed tag ever reaches TTS; spoken dates and times.
 //   6. One trace record per turn (understanding, goal, tool, write, guard, timings) via onModelStage.
-const { brainEnginesOn } = require('./flag');
 const U = require('./understanding');
 const { pickGoal } = require('./enginePlan');
 const { runTools } = require('./engineTools');
@@ -31,10 +31,6 @@ const { callMode } = require('./brainModeAdapter');
 const { openTeamConfirm } = require('./enginePlan');
 
 const ACK_ONLY = /^\W*(ok(?:ay)?|sawa|haya|poa|yes|yeah|yep|no|nope|ndio|ndiyo|hapana|eeh|sure|thanks?|thank you|asante(?: sana)?|alright)\W*$/i;
-
-function on({ env = process.env, tenantId } = {}) {
-  return brainEnginesOn({ env, tenantId });
-}
 
 /** The turn language, decided once. A bare ack/yes/no or a name keeps the language the call is in. */
 function decideLang({ u, text, prev, langLock }) {
@@ -137,6 +133,8 @@ async function runBrainEnginesTurn({
   }
   if (goal.degraded && !degraded.includes(goal.degraded)) degraded.push(goal.degraded);
   if (goal.teamConfirm) { E.offered = 'callback'; E.offeredTurn = machine.turn; }
+  // B2: the engines are the only turn, so the once-per-call finish (machine.finishCall -> A4) reads this
+  if (goal.type === 'answer') E.answered = true;
   if (safe) goal.safe = true;
 
   const fixed = []; const model = []; const guard = []; let write = null; let path = safe ? 'brain_engines_safe' : 'brain_engines';
@@ -283,4 +281,4 @@ async function runBrainEnginesTurn({
   }
 }
 
-module.exports = { on, runBrainEnginesTurn, decideLang };
+module.exports = { runBrainEnginesTurn, decideLang };

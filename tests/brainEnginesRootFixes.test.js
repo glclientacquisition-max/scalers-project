@@ -367,11 +367,11 @@ test('response engine: slot question is the model\'s own wording; a reply with n
   assert.match(r2.line, /^Great choice\. What day would you like\?$/);
 });
 
-test('flag off: liveTurn never enters the engines path', async () => {
-  const c = makeCall({ now: MONDAY_10AM, env: { BRAIN_ENGINES: 'off' } });
+test('B2: BRAIN_ENGINES=off (or any old brain flag off) no longer leaves the engines path', async () => {
+  const c = makeCall({ now: MONDAY_10AM, env: { BRAIN_ENGINES: 'off', BRAIN_V2: '0', BRAIN_V1_DRAFT: 'off', BRAIN_MODEL_LEAD: 'off', BRAIN_V2_MODE: 'shadow' } });
   const r = await c.say({ say: 'What time do you open today please?', u: U({ intent: 'ask', answers: ['hours'] }), reply: 'Today we are open from 7:30 to 18:00.' });
-  assert.notEqual(r.path, 'brain_engines');
-  assert.equal(c.traces.some((t) => t.kind === 'brain_engines'), false);
+  assert.match(String(r.path || ''), /^brain_engines/);
+  assert.equal(c.traces.some((t) => t.kind === 'brain_engines'), true);
 });
 
 test('no model: a follow-up price question never repeats the same fact line; the honest unknown offers a callback, and the offer expires', async () => {
