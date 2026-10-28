@@ -109,6 +109,30 @@ Plan: `briefs/retire-old-brain-plan-2026-10-28.md` (B1 Brain -> **P1 Platform** 
   turn: unsetting any brain env var on today's code routes calls to the old brain, so no env var is removed before B2.
 - Safe mode ("Take messages only"): `BRAIN_SAFE_MODE=all` (every business, emergency brake) or `tenants.brain_mode = 'safe'` (one business: the owner from Desk Settings or Super Admin, via `set_brain_mode`).
 
+### P2 (last step): no switch left, env removal list
+
+Merge only after Brain B2 (old turn deleted, flags collapsed) and B3 are deployed. P2 removes `BRAIN_KB_GATE` from
+Platform code (`kb/live.decision` is always true for a business, `attach` / `db.loadKbLive` / the boot readiness sweep
+no longer check it, Desk `deskKbGate()` is a constant until D1), adds `/healthz` `brain: 'v2-engines'` and
+`kb: { version, safeMode, counts, … }`, and drops `tenants.brain_target` with
+`kb_v2_drop_brain_target.sql` (2026-10-28.5, rollback restores it as `v2`) one release after its last reader went.
+
+Env removal list (Railway Voice staging then prod, and the Desk Vercel project), **only after B2 is live on that
+environment** (on older code, unsetting any of these routes calls to the old brain). Snapshot the env first.
+
+| Variable | Where | Read by after B2 |
+|---|---|---|
+| `BRAIN_KB_GATE` | Voice, Desk | nothing (P2) |
+| `BRAIN_V2`, `BRAIN_V2_MODE`, `BRAIN_V2_OWNS_CALL` | Voice | nothing (B2 constants) |
+| `BRAIN_V2_SHADOW`, `BRAIN_V2_SHADOW_*` | Voice | nothing (B2/B3) |
+| `BRAIN_V1_DRAFT`, `BRAIN_V1_DRAFT_PHASE_A`, `BRAIN_V1_DRAFT_PHASE_B` | Voice | nothing (B2 constants) |
+| `BRAIN_V2_TENANTS`, `BRAIN_V1_DRAFT_TENANTS` | Voice | nothing (B2) |
+| `BRAIN_MODEL_LEAD`, `BRAIN_ENGINES`, `BRAIN_CALL_CORE` | Voice | nothing (B2 constants) |
+
+Keep: `BRAIN_SAFE_MODE` (brake), `BRAIN_V2_MODEL_ID`, `BRAIN_V2_MODEL_BACKUP_ID`, `KB_*`, and every `VOICE_*` /
+`FACT_HASH_MODE` setting. Any other `BRAIN_*` stays until Brain names it. Rollback: re-add from the snapshot, revert the
+P2 merge, `BRAIN_SAFE_MODE=all` as the brake.
+
 ### Shared contract: `isKbLive` and `brainMode` (Voice + Desk, one module)
 
 `src/knowledge/kb/kbLive.js`, pure (no env, no DB, no requires). Voice's selector (`kb/live.js` `decision`, `quality`,

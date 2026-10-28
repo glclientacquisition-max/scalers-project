@@ -138,8 +138,8 @@ describe('kb v2: gate (BRAIN_KB_GATE) replaces the env allowlists; off is the ki
     assert.equal(L.decision({ tenantId: p.id }), true);
     assert.ok(p.kb && p.kb.handle);
   });
-  it('gate off: decision null (env lists decide as before)', () => {
-    assert.equal(L.decision({ env: { BRAIN_KB_GATE: 'off' }, tenantId: 'x' }), null);
+  it('P2: no gate: decision true even with BRAIN_KB_GATE off', () => {
+    assert.equal(L.decision({ env: { BRAIN_KB_GATE: 'off' }, tenantId: 'x' }), true);
   });
 });
 

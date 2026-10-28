@@ -750,7 +750,8 @@ app.get('/healthz', (_req, res) => {
     // v2 KB: readiness gate on/off and the in-process snapshot cache (no business data)
     // safeMode = how BRAIN_SAFE_MODE reads here ('off' | 'all' | 'invalid'); gate on = the KB brain for every business
     // counts (cached 60 s, numbers only, no tenant ids): safe_mode { total, env, owner, admin }, snapshot_missing / _empty
-    kb: { gate: require('./src/knowledge/kb/live').gateOn(), safeMode: require('./src/knowledge/kb/kbLive').safeEnvState(process.env.BRAIN_SAFE_MODE), counts: db.kbHealthCountsCached(), compileOnSave: kbCompileOnSave(), cache: require('./src/knowledge/kb/reader').cacheStats() },
+    brain: 'v2-engines',
+    kb: { version: { schema: require('./src/knowledge/kb/compile').SCHEMA, compiler: require('./src/knowledge/kb/compile').COMPILER }, safeMode: require('./src/knowledge/kb/kbLive').safeEnvState(process.env.BRAIN_SAFE_MODE), counts: db.kbHealthCountsCached(), compileOnSave: kbCompileOnSave(), cache: require('./src/knowledge/kb/reader').cacheStats() },
     soniox: {
       stt: isSonioxConfigured(),
       tts: isSonioxTtsConfigured(),
@@ -945,10 +946,10 @@ function scheduleKbCompileOnSave(tenantId) {
   } catch (e) { console.warn(`[kb] compile on save tenant=${tenantId} failed: ${e && e.message}`); }
   return { scheduled: true };
 }
-// Boot sweep (BRAIN_KB_GATE=on, KB_BOOT_READINESS not off): re-check readiness for every business with a live snapshot,
+// Boot sweep (KB_BOOT_READINESS not off): re-check readiness for every business with a live snapshot,
 // 20 s after start, then every 12 h. Text mode through the live brain; never writes calls, bookings or messages.
 function startKbReadinessSweep() {
-  if (!require('./src/knowledge/kb/live').gateOn() || /^(0|off|false|no)$/i.test(String(process.env.KB_BOOT_READINESS || ''))) return;
+  if (/^(0|off|false|no)$/i.test(String(process.env.KB_BOOT_READINESS || ''))) return;
   const run = () => require('./src/knowledge/kb/publish').sweepReadiness(db, { by: 'boot', log: (m) => console.log(m) }).catch((e) => console.warn(`[kb] readiness sweep failed: ${e && e.message}`));
   const t = setTimeout(run, 20000); if (t.unref) t.unref();
   const i = setInterval(run, 12 * 3600 * 1000); if (i.unref) i.unref();

@@ -1678,7 +1678,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
 // tenants read; a new version (an owner save that compiled) loads once on whichever replica takes the next call.
 const KB_DOCS = new Map(); // `${tenantId}:${version}` -> { doc, bytes }
 async function loadKbLive(tenantId, { force = false } = {}) {
-  if (!tenantId || (!force && !/^(1|true|on|yes)$/i.test(String(process.env.BRAIN_KB_GATE || '').trim()))) return null;
+  if (!tenantId) return null; void force; // P2: no gate; every business loads its live snapshot
   const t0 = Date.now();
   try {
     const { data: t, error } = await selectKbTenantFacts(tenantId);

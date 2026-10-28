@@ -3,19 +3,18 @@
 // /voice/incoming prefetch, pinned on the profile object for the whole call) and answer the brain's questions.
 const R = require('./reader');
 const { docToLegacy } = require('./items');
-const { isKbLive, kbQuality, brainMode, kbGateOn } = require('./kbLive');
+const { isKbLive, kbQuality, brainMode } = require('./kbLive');
 
-/** BRAIN_KB_GATE=on: the KB brain answers every business (readiness is a quality signal, kb/kbLive.js). Off/unset = kill switch: the env lists (removed in P2). */
-function gateOn(env = process.env) { return kbGateOn(env.BRAIN_KB_GATE); }
+/** P2: the KB brain answers every business; the gate env is gone. Always true (kept for old callers). */
+// eslint-disable-next-line no-unused-vars
+function gateOn(_env) { return true; }
 
 // tenant -> { version, readyVersion, quality, brainMode, facts, at }: written when a profile loads.
 const REG = new Map();
 function note(tenantId, info) { if (tenantId) REG.set(String(tenantId).toLowerCase(), { ...info, at: Date.now() }); }
-/** null = gate off (callers use the env lists); gate on: true for every business (false only with no business id). */
-function decision({ env = process.env, tenantId } = {}) {
-  const d = isKbLive(null, { gate: env.BRAIN_KB_GATE });
-  if (d.reason === 'gate_off') return null;
-  return tenantId != null && String(tenantId).trim() !== '';
+/** True for every business (false only with no business id). P2: never null, no env lists. */
+function decision({ tenantId } = {}) {
+  return isKbLive(null).live && tenantId != null && String(tenantId).trim() !== '';
 }
 /** Readiness / quality reason for a business seen on this replica (never a brain switch). */
 function quality(tenantId) {
@@ -34,7 +33,7 @@ function emptyDoc() {
 
 /**
  * Mutates and returns the profile. extras.kb = { version, readyVersion, brainMode, brainModeSource, doc, bytes, loadMs,
- * loadError } | null. Gate on: every business gets profile.kb (readiness does not gate it) and the legacy catalogue
+ * loadError } | null. Every business gets profile.kb (readiness does not gate it) and the legacy catalogue
  * fields projected from it. A snapshot that did not load (none published, DB error, missing row) is an EMPTY snapshot
  * (doc.complete false: Brain B1 treats the catalogue as empty), logged, never the old brain.
  * profile.brainMode / brainModeSource stay the tenants strings (B1's adapter reads them); the shared decision
@@ -48,8 +47,7 @@ function attach(profile, kbExtras, { env = process.env, force = false } = {}) {
   const facts = k ? { version: k.version ?? null, readyVersion: k.readyVersion ?? null, brainMode: profile.brainMode || 'full', brainModeSource: profile.brainModeSource || null } : null;
   const info = { ready: isReady(facts), version: facts?.version ?? null, readyVersion: facts?.readyVersion ?? null, quality: kbQuality(facts) };
   profile.brainModeDecision = brainMode({ brainMode: profile.brainMode, brainModeSource: profile.brainModeSource }, { safeEnv: env.BRAIN_SAFE_MODE });
-  // gate off = kill switch (env lists, no snapshot). The readiness runner forces an attach to test a snapshot.
-  if (!force && !gateOn(env)) { note(profile.id, { ...info, facts, brainMode: profile.brainModeDecision, empty: null }); return profile; }
+  // P2: no gate. The readiness runner forces an attach to test a snapshot.
   if (force && (!k || !k.doc)) return profile;
   let doc = k && k.doc;
   let loadError = false;

@@ -58,6 +58,7 @@ function kbProfile({ ready = true, gate = true, brainTarget = 'v2', doc = compil
 const sentences = (t) => String(t || '').split(/(?<=[.?!])\s+/).filter(Boolean);
 
 describe('kb source: mode selection (gate on = KB brain for every business; P1 retire the old brain)', () => {
+  it('P2: BRAIN_KB_GATE off no longer matters = kb mode', () => { assert.equal(S.catalogueSource(kbProfile({ gate: false })).mode, 'kb'); });
   it('gate on + ready snapshot = kb mode', () => { assert.equal(S.catalogueSource(kbProfile()).mode, 'kb'); });
   // P1: readiness is a quality reason only and brain_target is not read, so neither falls back to the old fields.
   it('gate on + snapshot not ready = kb mode', () => { assert.equal(S.catalogueSource(kbProfile({ ready: false })).mode, 'kb'); });
@@ -66,7 +67,7 @@ describe('kb source: mode selection (gate on = KB brain for every business; P1 r
     try { const p = kbProfile({ doc: null }); const s = S.catalogueSource(p); assert.equal(s.mode, 'kb'); assert.equal(s.offered().length, 0); assert.equal(p.servicesOffered, null); } finally { console.warn = warn; }
   });
   it('gate on + brain_target v1 (ignored) = kb mode', () => { assert.equal(S.catalogueSource(kbProfile({ brainTarget: 'v1' })).mode, 'kb'); });
-  for (const [label, o] of [['gate off', { gate: false }]]) {
+  for (const [label, o] of []) {
     it(`${label} = legacy mode, old fields untouched`, () => {
       const p = kbProfile(o);
       const s = S.catalogueSource(p);
@@ -319,7 +320,7 @@ describe('kb source: root cause 6 (name lock)', () => {
     assert.ok(pk.ITEM_NAMES.names.includes('Usafi wa godoro'));
     assert.ok(pk.ITEM_NAMES.names.includes('Deep clean'));
     assert.ok(!pk.ITEM_NAMES.names.some((n) => OFF_NAMES.test(n)));
-    const leg = kbProfile({ gate: false });
+    const leg = kbProfile({ doc: null });
     assert.equal(ER.replyPack({ goal: { type: 'answer' }, text: 'x', receipts: [], machine: m, lang: 'sw', caller: {}, profile: leg }).ITEM_NAMES, undefined);
   });
 });
@@ -342,8 +343,8 @@ describe('kb source: root cause 4 (no second frozen catalogue next to the KB)', 
     const pin = SC.pinSpokenCatalogue(p);
     assert.equal(pin.doc.kb, true);
   });
-  it('legacy mode still pins the stored doc exactly as before', () => {
-    const p = kbProfile({ gate: false });
+  it('legacy mode (no attach at all) still pins the stored doc exactly as before', () => {
+    const p = tenantProfileFromRow({ id: 'kbsrc-legacy', business_name: 'Sparkle Test Cleaners', vertical: 'home_services' }, { areaPicksRows: [] });
     const stored = { schemaVersion: 99, version: 7, sourceHash: 'x', entries: [], categories: [] };
     p.spokenCatalogue = stored;
     assert.equal(SC.resolveSpokenCatalogueMeta(p, { env: { SPOKEN_CATALOGUE_STORED_FIRST: 'on' } }).doc, stored);
