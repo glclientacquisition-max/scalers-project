@@ -57,9 +57,12 @@ function kbProfile({ ready = true, gate = true, brainTarget = 'v2', doc = compil
 }
 const sentences = (t) => String(t || '').split(/(?<=[.?!])\s+/).filter(Boolean);
 
-describe('kb source: mode selection (safe default: only KB-ready businesses change)', () => {
+describe('kb source: mode selection (gate on = KB brain for every business; P1 retire the old brain)', () => {
   it('gate on + ready snapshot = kb mode', () => { assert.equal(S.catalogueSource(kbProfile()).mode, 'kb'); });
-  for (const [label, o] of [['gate off', { gate: false }], ['snapshot not ready', { ready: false }], ['brain_target v1', { brainTarget: 'v1' }], ['load error (no doc)', { doc: null }]]) {
+  // P1: readiness is a quality reason only and brain_target is not read, so neither falls back to the old fields.
+  it('gate on + snapshot not ready = kb mode', () => { assert.equal(S.catalogueSource(kbProfile({ ready: false })).mode, 'kb'); });
+  it('gate on + brain_target v1 (ignored) = kb mode', () => { assert.equal(S.catalogueSource(kbProfile({ brainTarget: 'v1' })).mode, 'kb'); });
+  for (const [label, o] of [['gate off', { gate: false }], ['load error (no doc)', { doc: null }]]) {
     it(`${label} = legacy mode, old fields untouched`, () => {
       const p = kbProfile(o);
       const s = S.catalogueSource(p);
