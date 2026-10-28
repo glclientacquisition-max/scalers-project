@@ -46,7 +46,11 @@ export type KbWriteResult = { ok: true; upserted: number; hidden: number } | { o
  */
 export async function writeKbItems(tenantId: string, items: KbItem[] | KbLegacyItem[], opts: { replaceKind?: KbKind } = {}): Promise<KbWriteResult> {
   const sb = getSupabaseAdmin();
-  const clean = (items as Record<string, unknown>[]).map(({ category_name: _c, ...rest }) => rest);
+  const clean = (items as Record<string, unknown>[]).map((it) => {
+    const rest = { ...it };
+    delete rest.category_name;
+    return rest;
+  });
   const { data, error } = opts.replaceKind
     ? await sb.rpc("kb_import_items", { p_tenant: tenantId, p_kind: opts.replaceKind, p_items: clean, p_replace: true })
     : await sb.rpc("kb_upsert_items", { p_tenant: tenantId, p_items: clean });
