@@ -42,7 +42,9 @@ export function unpricedCount(tenant: { product_catalog?: unknown; services_cata
   );
 }
 
-export const UNPRICED_HREF = `${businessSettingsHref("catalog")}&filter=unpriced`;
+// The Catalogue page (KB v2) shows a "Show all" way out of this filter; before the v2 tables exist it
+// forwards to the old tab with the same filter.
+export const UNPRICED_HREF = "/settings/knowledge?filter=unpriced";
 
 export { unpricedLabelText as unpricedLabel } from "./unpricedCopy";
 

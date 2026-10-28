@@ -63,6 +63,27 @@ export async function loadKbState(tenantId: string): Promise<KbState> {
   };
 }
 
+/**
+ * True once the v2 tables exist (staging now, prod after the batch). Probes the same tables and column
+ * loadKbState reads, so /settings and /settings/knowledge can never redirect into each other.
+ */
+export async function kbTablesReady(tenantId: string): Promise<boolean> {
+  try {
+    const sb = getSupabaseAdmin();
+    const head = { head: true, count: "exact" as const };
+    const rs = await Promise.all([
+      sb.from("kb_items").select("id", head).eq("tenant_id", tenantId).limit(1),
+      sb.from("kb_categories").select("id", head).eq("tenant_id", tenantId).limit(1),
+      sb.from("kb_snapshots").select("version", head).eq("tenant_id", tenantId).limit(1),
+      sb.from("kb_readiness").select("snapshot_version", head).eq("tenant_id", tenantId).limit(1),
+      sb.from("tenants").select("kb_live_version, kb_ready_version, brain_target").eq("id", tenantId).maybeSingle(),
+    ]);
+    return rs.every((r) => !r.error);
+  } catch {
+    return false;
+  }
+}
+
 /** Ask Voice to compile kb_items into a new snapshot and re-check readiness. Fire and forget (3 s cap). */
 export async function pingKbCompile(tenantId: string, body: Record<string, unknown> = {}, path = "/internal/kb/compile"): Promise<{ ok: boolean; status?: number; json?: unknown }> {
   const secret = String(process.env.VOICE_INTERNAL_SECRET || "").trim();

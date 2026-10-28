@@ -1,4 +1,5 @@
 import type { TenantRow } from "@/lib/supabase";
+import { withKbCatalogue, type KbCatalogueView } from "@/lib/kbRead";
 
 /**
  * Fields the active Settings view reads. The prompt and the catalogs stay off
@@ -37,11 +38,22 @@ export function settingsViewKey(tab: string, panel: string): string {
   return tab;
 }
 
+/** True when this view shows catalogue fields (load the KB view for it). */
+export function settingsViewReadsCatalogue(tab: string, panel: string): boolean {
+  return (KEEP[settingsViewKey(tab, panel)] || []).some((k) => k === "services_offered" || k === "services_catalog" || k === "product_catalog");
+}
+
+/**
+ * `kb`: the catalogue read from kb_items (loadKbCatalogueView). When present it replaces the stored
+ * services_catalog / product_catalog / services_offered; null (no KB tables, prod today) keeps the stored columns.
+ */
 export function tenantForSettingsView(
-  tenant: TenantRow,
+  stored: TenantRow,
   tab: string,
-  panel: string
+  panel: string,
+  kb: KbCatalogueView | null = null
 ): TenantRow {
+  const tenant = withKbCatalogue(stored, kb) as TenantRow;
   const keep = new Set(KEEP[settingsViewKey(tab, panel)] || []);
   return {
     ...tenant,

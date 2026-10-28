@@ -29,7 +29,9 @@ test("route: ?tab=train&panel=catalog opens the Catalogue, not Identity", () => 
 test("route: Overview links use the Catalogue tab and both pages pass the panel", () => {
   const slots = read("dashboard/src/components/structured/StructuredSettingsSlots.tsx");
   assert.doesNotMatch(slots, /businessSettingsHref\("train", "catalog"\)/);
-  assert.match(slots, /UNPRICED_HREF = `\$\{businessSettingsHref\("catalog"\)\}&filter=unpriced`/);
+  // KB v2: the Catalogue page owns the filter (with Show all); before the v2 tables it forwards to ?tab=catalog&filter=unpriced.
+  assert.match(slots, /UNPRICED_HREF = "\/settings\/knowledge\?filter=unpriced"/);
+  assert.match(read("dashboard/src/app/(desk)/settings/knowledge/page.tsx"), /\/settings\?tab=catalog\$\{needPrice \? "&filter=unpriced" : ""\}/);
   for (const page of ["dashboard/src/app/(desk)/settings/page.tsx", "dashboard/src/app/dev/settings-jobs/page.tsx"]) {
     assert.match(read(page), /parseBusinessSettingsTab\(tabRaw, panelRaw\)/);
   }

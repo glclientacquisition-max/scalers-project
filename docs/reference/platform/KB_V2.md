@@ -104,12 +104,25 @@ compile, on Voice boot (`KB_BOOT_READINESS`, every 12 h) and on demand (Super Ad
 
 ## Desk and Admin
 
-- Desk Settings > Catalogue opens `/settings/knowledge` (falls back to the old Catalogue tab when the tables are missing):
-  ready card with fix links, what callers hear (English / Swahili), Swahili names to approve, issues, items by group with
-  the popular switch, item sheet (price incl. site visit, callers hear: offered / paused / not offered, not included,
-  hold), and Paste a list (`previewKbPasteAction` parses one item per line with an optional price for a preview;
-  `importKbPasteAction` re-parses on the server and writes one `kb_upsert_items` batch, up to 500, names already in the
-  catalogue update that item). Server actions write `kb_items`, mirror the old columns, and ping `/internal/kb/compile`.
+- Desk Settings > Catalogue opens `/settings/knowledge` (falls back to the old Catalogue tab when the tables are missing,
+  keeping `?filter=unpriced`). `components/catalogue/CatalogueScreen.tsx`, view rules in `lib/catalogueView.ts`:
+  a one-line status card ("6 services · 2 need a price", Fix walks the items without a price, readiness checks behind
+  "See checks"); "What you sell" as plain rows with the price in words, search from 10 items, Services / Products only
+  when both exist (never for home services), and a "Showing N that need a price · Show all" banner for the Overview
+  "Add prices" link (`/settings/knowledge?filter=unpriced`). Item sheet: name and price up front (one KSh box; nothing
+  is preselected for an unpriced item, so "Needs a price" stays honest), "Price changes?" for from / range / per unit /
+  Custom quote / after a site visit / free (the no-number choices save as soon as they are picked), and More for
+  offered / paused (note) / not offered, not included (services), in stock and hold (products), group, per, other
+  names, short note, popular pick. Remove is separate (hide, with a confirm that points to Paused). Paste a list
+  (`previewKbPasteAction` preview with new / update / needs a price / skipped, then `importKbPasteAction`, one
+  `kb_upsert_items` batch up to 500) replaces Import for the catalogue: `?tab=catalog` and the retail `?tab=import`
+  redirect to `/settings/knowledge` (`?paste=1`) once the tables exist. Viewers read the page without edit controls.
+  What callers hear, Kiswahili names to approve and issues sit beside the list from `xl`. Dev fixture: `/dev/catalogue`.
+  Paste a list also offers "Replace my list instead" (`importKbPasteAction` mode `replace`, rpc `kb_import_items`): a confirm
+  names and counts the items of that kind the paste does not match (paused and not offered included), and refuses lines
+  that match an item of the other kind. Desk reads of the catalogue text (Settings Test greeting preview and catalogue
+  payload, FAQ compile input) come from kb_items via `lib/kbRead.server.ts` (`mirrorLegacy` + `servicesOfferedFromKb`),
+  falling back to the stored `services_offered` / catalogue columns when the KB tables are absent.
 - Super Admin Businesses > Calls & quality: brain state, readiness pills, Check again (safe), Hold on old brain / Allow new
   brain (`business-kb:set_brain_target`, Unlock + reason, audited).
 
