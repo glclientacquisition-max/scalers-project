@@ -12,6 +12,7 @@ import { OpsConfirm, SplitPane, StatusPill, StepUpSheet } from "@/components/ops
 import { Button } from "@/components/ui/Button";
 import { ARCHIVE_RESTORE_DAYS } from "@/lib/adminBusinessModel";
 import { postJson } from "@/lib/ops/archiveRelease";
+import { BusinessKbBlock } from "@/components/admin/v2/BusinessKbBlock";
 
 const DATE = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" });
 const day = (iso: string | null | undefined) => (iso ? DATE.format(new Date(iso)) : "—");
@@ -153,6 +154,7 @@ export function BusinessPane({
           </ol>
         ) : <p className="text-ops-body text-ink-2">No calls yet.</p>)}
         {b ? <Go href={`/admin/quality?pane=${b.id}`}>All calls and quality</Go> : null}
+        {businessId && !fixture ? <BusinessKbBlock businessId={businessId} /> : null}
       </>
     ),
     history: wait("history", (

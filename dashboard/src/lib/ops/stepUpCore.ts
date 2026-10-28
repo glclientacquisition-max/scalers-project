@@ -80,6 +80,13 @@ export const ADMIN_WRITE_ROUTES: AdminWriteRoute[] = [
     safe: ["suspend", "unsuspend", "restore", "update_profile", "send_owner_reset", "save_recording_retention"],
   },
   {
+    file: "admin/businesses/[id]/kb", area: "businesses",
+    prefix: "business-kb",
+    risky: ["set_brain_target"],
+    safe: ["check"],
+    note: "v2 Knowledge Base: hold a Business on the old brain or let readiness move it. Check again is read-only.",
+  },
+  {
     file: "admin/billing/invoices/[id]/actions", area: "billing",
     prefix: "invoice",
     risky: ["void", "credit_note"],
