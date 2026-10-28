@@ -189,7 +189,9 @@ describe("package usage meter", () => {
 
   it("keeps stop-and-rate lines off the owner Usage page", () => {
     const page = read("dashboard/src/app/(desk)/wallet/page.tsx");
-    const home = read("dashboard/src/app/(desk)/home/page.tsx");
+    const home = read("dashboard/src/app/(desk)/home/page.tsx") +
+    // D2: usage, insights, call setup and checks stream from their own slots.
+    "\n" + read("dashboard/src/components/home/HomeOverviewSlots.tsx");
     const copy = read("dashboard/src/lib/usageCap.ts");
     assert.doesNotMatch(page, /usageCapNotice/);
     assert.doesNotMatch(page, /Inbox only/);

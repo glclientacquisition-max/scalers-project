@@ -88,7 +88,7 @@ describe("inbox ticket action chrome", () => {
     assert.match(notes, /export async function sendInboxReplySms/);
     assert.match(notes, /caller_inbox_reply/);
     assert.match(notes, /sendRecordedDeskCallerSms/);
-    assert.match(dock, /name="reply_id"/);
+    assert.match(dock, /fd\.set\("reply_id", id\)/);
     assert.match(ticket, /mode="thread"/);
     assert.doesNotMatch(notes, /caller_appointment_confirmed/);
     assert.match(dock, /label="Send"/);

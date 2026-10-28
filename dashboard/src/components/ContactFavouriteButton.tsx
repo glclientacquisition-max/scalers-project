@@ -1,11 +1,12 @@
 "use client";
 
 import { withRoleGate } from "@/components/DeskRole";
-import { useState, useTransition } from "react";
+import { useOptimistic, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateContactFavourite } from "@/app/(desk)/contacts/actions";
 import { Button } from "@/components/ui/Button";
-import { pendingSpinnerInkClass } from "@/components/ui/deskChrome";
+import { notify } from "@/components/ui/DeskNotice";
+import { OPTIMISTIC_OFFLINE_ERROR } from "@/lib/optimisticAction";
 
 function ContactFavouriteButtonInner({
   contactId,
@@ -15,15 +16,26 @@ function ContactFavouriteButtonInner({
   favourite: boolean;
 }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  // The star flips on tap. If the save fails the transition ends without new
+  // props, React drops the optimistic value and the star flips back.
+  const [shown, show] = useOptimistic(favourite, (_current, next: boolean) => next);
+  const [, startTransition] = useTransition();
 
   function toggle() {
-    setError(null);
+    const next = !shown;
     startTransition(async () => {
-      const res = await updateContactFavourite(contactId, !favourite);
+      show(next);
+      let res: { ok?: boolean; error?: string };
+      try {
+        res = await updateContactFavourite(contactId, next);
+      } catch {
+        res = { error: OPTIMISTIC_OFFLINE_ERROR };
+      }
       if (!res.ok) {
-        setError(res.error || "Could not save.");
+        notify(res.error || "Could not save.", {
+          tone: "error",
+          action: { label: "Try again", run: toggle },
+        });
         return;
       }
       router.refresh();
@@ -34,22 +46,14 @@ function ContactFavouriteButtonInner({
     <div data-contact-favourite="">
       <Button
         type="button"
-        disabled={pending}
         onClick={toggle}
-        aria-pressed={favourite}
-        variant={favourite ? "tonal" : "ghost"}
+        aria-pressed={shown}
+        variant={shown ? "tonal" : "ghost"}
         size="md"
-        leading={
-          pending ? (
-            <span aria-hidden="true" className={pendingSpinnerInkClass} />
-          ) : (
-            <span aria-hidden="true">★</span>
-          )
-        }
+        leading={<span aria-hidden="true">★</span>}
       >
-        {favourite ? "Favourited" : "Add to Favourites"}
+        {shown ? "Favourited" : "Add to Favourites"}
       </Button>
-      {error ? <p className="mt-2 text-body text-warn">{error}</p> : null}
     </div>
   );
 }

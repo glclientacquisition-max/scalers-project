@@ -36,8 +36,9 @@ describe("ticket action dock", () => {
     assert.match(ping, /<Sheet/);
     assert.doesNotMatch(dock, /[\u2014\u2013]/);
     assert.doesNotMatch(ping, /[\u2014\u2013]/);
-    assert.match(dock, /pending=\{pending\}/);
-    assert.doesNotMatch(dock, /useTransition/);
+    // Optimistic (D1): Done reads Done on tap and rolls back through useOptimistic.
+    assert.match(dock, /useOptimistic\(done/);
+    assert.match(dock, /label: "Try again"/);
     assert.match(ping, /pending=\{pending\}/);
     assert.match(ping, /Pinging/);
     assert.doesNotMatch(ping, /useTransition/);

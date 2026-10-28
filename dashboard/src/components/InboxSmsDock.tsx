@@ -14,7 +14,9 @@ import { deskShiftClass } from "@/components/ui/deskChrome";
 import type { InboxSmsFacts } from "@/lib/polishInboxSms";
 import { emptyInboxSmsFacts } from "@/lib/polishInboxSms";
 import { smsSegments } from "@/lib/smsSegments";
-import { composerPlaceholder, smsMeterLine } from "@/lib/callTextThread";
+import { composerPlaceholder, composerLabel, smsMeterLine } from "@/lib/callTextThread";
+import { addPendingText } from "@/lib/pendingTexts";
+import { deliverPendingText } from "@/lib/pendingTextSend";
 
 const polishInitial: PolishCallerNoteState = {};
 const sendInitial: SendCallerNoteState = {};
@@ -34,7 +36,7 @@ function InboxSmsDockInner({
   smsAllowance?: { included: number | null; used: number | null } | null;
   /** For the placeholder: "Text Chris". */
   callerName?: string | null;
-  /** After a send was tried, sent or failed (call view switches to Texts). */
+  /** Send was tapped (call view switches to Texts, where the Sending bubble shows). */
   onSent?: () => void;
 }) {
   const [note, setNote] = useState("");
@@ -60,24 +62,41 @@ function InboxSmsDockInner({
     el.style.height = `${el.scrollHeight}px`;
   }, [note]);
 
-  const onSentRef = useRef(onSent);
-  useEffect(() => {
-    onSentRef.current = onSent;
-  }, [onSent]);
-
-  useEffect(() => {
-    if (sendState.attempted) onSentRef.current?.();
-  }, [sendState]);
-
-  useEffect(() => {
-    if (sendState.ok) {
+  // With a Texts thread (onSent set) the text shows there at once as a
+  // Sending bubble and flips to Sent or Not sent. Without one, the old
+  // status line under the composer stays.
+  const threaded = Boolean(onSent);
+  function send() {
+    const body = note.trim();
+    if (!callerPhone || !body || sendPending) return;
+    const id = replyId;
+    const fd = new FormData();
+    fd.set("call_id", callId);
+    fd.set("caller_phone", callerPhone);
+    fd.set("reply_id", id);
+    fd.set("note", note);
+    if (threaded) {
+      addPendingText({ id, callId, callerPhone, body, at: Date.now() });
       setNote("");
       setReplyId(crypto.randomUUID());
-      if (areaRef.current) {
-        areaRef.current.style.height = "";
-      }
+      if (areaRef.current) areaRef.current.style.height = "";
+      onSent?.();
+      void deliverPendingText(id, fd);
+      return;
     }
-  }, [sendState.ok, sendState.token]);
+    startTransition(() => {
+      sendAction(fd);
+    });
+  }
+
+  useEffect(() => {
+    if (threaded || !sendState.ok) return;
+    setNote("");
+    setReplyId(crypto.randomUUID());
+    if (areaRef.current) {
+      areaRef.current.style.height = "";
+    }
+  }, [threaded, sendState.ok, sendState.token]);
 
   const canSend = Boolean(callerPhone) && note.trim().length > 0;
   const meter = smsAllowance
@@ -108,12 +127,15 @@ function InboxSmsDockInner({
 
   return (
     <div className="shrink-0 border-t border-hairline bg-surface px-4 py-3">
-      <form action={sendAction} className="flex items-end gap-2">
-        <input type="hidden" name="call_id" value={callId} />
-        <input type="hidden" name="caller_phone" value={callerPhone || ""} />
-        <input type="hidden" name="reply_id" value={replyId} />
+      <form
+        className="flex items-end gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          send();
+        }}
+      >
         <label className="sr-only" htmlFor="inbox-sms">
-          SMS
+          {composerLabel(callerName)}
         </label>
         <textarea
           ref={areaRef}
@@ -122,6 +144,7 @@ function InboxSmsDockInner({
           value={note}
           rows={2}
           placeholder={composerPlaceholder(callerName)}
+          aria-describedby={meter && callerPhone ? "inbox-sms-meter" : undefined}
           onChange={(event) => {
             setNote(event.target.value);
             const el = event.currentTarget;
@@ -154,7 +177,7 @@ function InboxSmsDockInner({
           label="Send"
           size="sm"
           tone="accent"
-          pending={sendPending}
+          pending={sendPending && !threaded}
           disabled={sendPending || !canSend}
         >
           <PaperAirplaneIcon aria-hidden="true" />
@@ -165,18 +188,18 @@ function InboxSmsDockInner({
           {polishState.error}
         </p>
       ) : null}
-      {sendState.error ? (
+      {sendState.error && !threaded ? (
         <p className="mt-1 text-caption text-attention" role="alert">
           {sendState.error}
         </p>
       ) : null}
-      {sendState.ok ? (
+      {sendState.ok && !threaded ? (
         <p className="mt-1 text-caption text-ok" role="status">
           Sent
         </p>
       ) : null}
       {meter && callerPhone ? (
-        <p data-sms-meter="" className="mt-1 text-right text-caption tabular-nums text-ink-2">
+        <p id="inbox-sms-meter" data-sms-meter="" className="mt-1 text-right text-caption tabular-nums text-ink-2">
           {meter}
         </p>
       ) : null}
