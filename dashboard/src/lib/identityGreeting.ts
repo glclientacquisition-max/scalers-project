@@ -22,7 +22,26 @@ const DEFAULT_INVITE: Record<GreetingLanguage, string> = {
   sw: "Nikusaidie vipi?",
 };
 
-const SW_QUESTION_END = /\b(vipi|nini|gani|wapi|lini|nani|je)$/i;
+// Same lists as src/speech/callOpening.js (shopLanguage, SW_QUESTION_END).
+const SW_QUESTION_END = /\b(vipi|nini|gani|ngapi|wapi|lini|aje|nani|je)$/i;
+const SW_OWNER_WORDS =
+  /\b(\w*saidie|\w*hudumie|vipi|nini|gani|ngapi|wapi|lini|aje|karibu|tafadhali|asante|naitwa|hapa ni|tuko|mko|uko|sema|niambie|tuambie)\b/i;
+
+/** The owner's language pick. Automatic is the default and is what calls use today. */
+export type GreetingLanguagePick = "auto" | GreetingLanguage;
+
+/**
+ * Automatic greeting language, as the voice line picks it with no typed language:
+ * Kiswahili when the owner's own question is in Kiswahili, else English.
+ */
+export function autoGreetingLanguage(greetingInvite: unknown): GreetingLanguage {
+  const text = String(greetingInvite ?? "").replace(/\s+/g, " ").trim();
+  return text && SW_OWNER_WORDS.test(text) ? "sw" : "en";
+}
+
+export function resolveGreetingLanguage(pick: GreetingLanguagePick, greetingInvite: unknown): GreetingLanguage {
+  return pick === "auto" ? autoGreetingLanguage(greetingInvite) : pick;
+}
 
 export function parseGreetingLanguage(raw: unknown): GreetingLanguage {
   return String(raw || "").trim().toLowerCase() === "sw" ? "sw" : "en";
@@ -96,10 +115,15 @@ export function buildGreetingSentence(input: GreetingInput): GreetingSentence {
   return { text: `${opening} ${invite}`, name, usesSpokenName, agent, invite, usesDefaultInvite };
 }
 
-/** The owner has not set the greeting: no spoken name and no question of their own. */
-export function greetingMissing(tenant: {
-  spoken_name?: string | null;
-  greeting_invite?: string | null;
-}): boolean {
-  return !clean(tenant.spoken_name, SPOKEN_NAME_MAX) && !clean(tenant.greeting_invite, GREETING_INVITE_MAX);
+/**
+ * Automatic greeting: no name of its own and no question of its own, so the
+ * voice line builds it from the business name, the assistant name and the
+ * stock question. It follows a business rename until the owner customizes it.
+ * Stored as empty spoken_name and greeting_invite (no new column).
+ */
+export function greetingIsAutomatic(fields: { spokenName?: string | null; greetingInvite?: string | null }): boolean {
+  const spoken = clean(fields.spokenName, SPOKEN_NAME_MAX);
+  const usesSpoken = Boolean(spoken) && !/^the business$/i.test(spoken);
+  const invite = clean(fields.greetingInvite, GREETING_INVITE_MAX).replace(/[.!?\u2026]+$/g, "").trim();
+  return !usesSpoken && (!invite || /^how can i help$/i.test(invite));
 }

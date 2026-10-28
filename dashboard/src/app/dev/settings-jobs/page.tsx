@@ -38,10 +38,10 @@ const tenant = {
   ],
 } as TenantRow;
 
-/** Identity (?tab=train&panel=identity): a filled greeting and three public contacts. */
+/** Identity (?tab=train&panel=identity): Automatic greeting and three public contacts. */
 const identityFilled = {
-  spoken_name: "Chapter One Books",
-  greeting_invite: "Which book are you looking for",
+  spoken_name: null,
+  greeting_invite: null,
   social_handles: {
     channels: [
       { kind: "phone", label: "Main", value: "+254712345678" },
@@ -49,6 +49,12 @@ const identityFilled = {
       { kind: "instagram", label: "Instagram", value: "@chapteronebooks" },
     ],
   },
+};
+
+/** ?identity=custom: the owner's own greeting (Use automatic shows). */
+const identityCustom = {
+  spoken_name: "Chapter One Books",
+  greeting_invite: "Which book are you looking for",
 };
 
 /** ?identity=empty: a new business with no name, greeting, tone or contacts yet. */
@@ -101,7 +107,11 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
   const policiesT = params.policies === "messy" ? ({ ...base, business_policies: messyPolicies } as TenantRow) : base;
   const identityState = Array.isArray(params.identity) ? params.identity[0] : params.identity;
   const t = (
-    identityState === "empty" ? { ...policiesT, ...identityEmpty } : { ...policiesT, ...identityFilled }
+    identityState === "empty"
+      ? { ...policiesT, ...identityEmpty }
+      : identityState === "custom"
+        ? { ...policiesT, ...identityFilled, ...identityCustom }
+        : { ...policiesT, ...identityFilled }
   ) as TenantRow;
   const roleRaw = Array.isArray(params.role) ? params.role[0] : params.role;
   const role = roleRaw === "viewer" || roleRaw === "staff" ? roleRaw : null;

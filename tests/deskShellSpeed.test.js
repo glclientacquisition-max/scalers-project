@@ -503,17 +503,17 @@ describe("settings save scope", () => {
       "dashboard/src/lib/settingsOptionStatus.ts",
       `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { business_name: "Done and Dusted", spoken_name: "Done and Dusted", agent_name: "Shy", soniox_voice_label: "Shy" }, [])`
     );
-    assert.equal(identityBiz, "");
+    assert.equal(identityBiz, "Done and Dusted", "Identity shows the business name");
     const identityTone = load(
       "dashboard/src/lib/settingsOptionStatus.ts",
       `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { business_name: "Done and Dusted", spoken_name: "Done and Dusted", agent_name: "Shy", agent_tone: "warm", soniox_voice_label: "Shy" }, [])`
     );
-    assert.equal(identityTone, "Warm");
+    assert.equal(identityTone, "Done and Dusted", "never the tone");
     const identityCollision = load(
       "dashboard/src/lib/settingsOptionStatus.ts",
       `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { business_name: "Done and Dusted", spoken_name: "Done and Dusted", agent_name: "Shy", soniox_voice_label: "Shy" }, [])`
     );
-    assert.equal(identityCollision, "");
+    assert.equal(identityCollision, "Done and Dusted");
     const voiceKeepsLabel = load(
       "dashboard/src/lib/settingsOptionStatus.ts",
       `mod.settingsOptionStatus({ tab: "train", panel: "tools" }, { business_name: "Done and Dusted", spoken_name: "Done and Dusted", agent_name: "Shy", soniox_voice_label: "Shy" }, [])`

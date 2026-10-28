@@ -125,13 +125,53 @@ test("greeting sentence: one line built from spoken name and short invite", asyn
   assert.equal(buildGreetingSentence({ businessName: "X", spokenName: "a".repeat(60) }).name.length, 40, "spoken name clips at 40");
 });
 
-test("side nav: Identity says Needs setup when the business name or greeting is missing", async () => {
+test("side nav: Identity shows the business name, or Needs setup without one", async () => {
   const { settingsOptionStatus, NEEDS_SETUP } = await status();
   const identity = { tab: "train", panel: "identity" } as const;
   assert.equal(settingsOptionStatus(identity, { business_name: "", spoken_name: "X", agent_tone: "warm" }), NEEDS_SETUP);
-  assert.equal(settingsOptionStatus(identity, { business_name: "Chapter One", agent_tone: "warm" }), NEEDS_SETUP);
-  assert.equal(settingsOptionStatus(identity, { business_name: "Chapter One", spoken_name: "Chapter One Books", agent_tone: "warm" }), "Warm");
-  assert.equal(settingsOptionStatus(identity, { business_name: "Chapter One", greeting_invite: "Karibu", agent_name: "Aisha" }), "Aisha");
+  assert.equal(settingsOptionStatus(identity, { business_name: "  ", agent_tone: "warm" }), NEEDS_SETUP);
+  assert.equal(settingsOptionStatus(identity, { business_name: "Chapter One", agent_tone: "warm" }), "Chapter One", "Automatic greeting is not missing");
+  assert.equal(settingsOptionStatus(identity, { business_name: "Chapter One", agent_tone: "professional", agent_name: "Aisha" }), "Chapter One", "never the tone");
+  assert.equal(settingsOptionStatus(identity, { business_name: "Westlands Family Bookshop and Stationers" }), "Westlands Family", "long names fit the rail");
+});
+
+test("automatic greeting: empty fields, built from the business and assistant names, follows a rename", async () => {
+  const { greetingIsAutomatic, buildGreetingSentence } = await greet();
+  assert.equal(greetingIsAutomatic({ spokenName: "", greetingInvite: "" }), true);
+  assert.equal(greetingIsAutomatic({ spokenName: null, greetingInvite: "How can I help?" }), true, "the stock question is Automatic");
+  assert.equal(greetingIsAutomatic({ spokenName: "The business", greetingInvite: "" }), true, "voice ignores the default name");
+  assert.equal(greetingIsAutomatic({ spokenName: "Chapter One Books", greetingInvite: "" }), false);
+  assert.equal(greetingIsAutomatic({ spokenName: "", greetingInvite: "Which book" }), false);
+  const auto = (businessName: string) => buildGreetingSentence({ businessName, agentName: "Aisha" }).text;
+  assert.equal(auto("Chapter One Books"), "Chapter One Books, this is Aisha. How can I help?");
+  assert.equal(auto("Chapter One Westlands"), "Chapter One Westlands, this is Aisha. How can I help?", "a rename flows through");
+});
+
+test("automatic greeting matches the voice line's opening (src/speech/callOpening.js)", async () => {
+  const { buildGreetingSentence } = await greet();
+  const { composeOpening } = await import("../src/speech/callOpening.js");
+  const cases = [
+    { businessName: "Chapter One Books", agentName: "Aisha" },
+    { businessName: "Chapter One Books", agentName: "Receptionist" },
+    { businessName: "Chapter One", spokenName: "Chapter One Books", agentName: "Aisha", greetingInvite: "Which book are you looking for" },
+    { businessName: "Done and Dusted", agentName: "Amani", greetingInvite: "Tukusaidie vipi", language: "sw" as const },
+    { businessName: "Done and Dusted", agentName: "Amani", language: "sw" as const },
+  ];
+  for (const c of cases) {
+    const voice = composeOpening({ ...c, isOpen: true, recordingNotice: false, isReturning: false, noticeVariant: null });
+    assert.equal(buildGreetingSentence(c).text, voice.text, JSON.stringify(c));
+  }
+});
+
+test("greeting language: Automatic follows the owner's question, else English", async () => {
+  const { autoGreetingLanguage, resolveGreetingLanguage } = await greet();
+  assert.equal(autoGreetingLanguage(""), "en");
+  assert.equal(autoGreetingLanguage("Which book are you looking for"), "en");
+  assert.equal(autoGreetingLanguage("Tukusaidie vipi"), "sw");
+  assert.equal(autoGreetingLanguage("Karibu, niambie"), "sw");
+  assert.equal(resolveGreetingLanguage("auto", "Tukusaidie vipi"), "sw");
+  assert.equal(resolveGreetingLanguage("en", "Tukusaidie vipi"), "en");
+  assert.equal(resolveGreetingLanguage("sw", ""), "sw");
 });
 
 test("category: one question writes vertical and category the same way as before", async () => {
@@ -180,6 +220,13 @@ test("render: three cards, each its own form and scope; no spreadsheet; voice mo
   assert.doesNotMatch(page, /greeting_text|greeting_language"/, "never posts greeting_text or greeting_language");
   assert.match(page, /withRoleGate\("settings\.edit"/);
   assert.match(page, /\/api\/pronunciation\/preview/, "Hear it uses the existing preview");
+  assert.match(page, />\s*Automatic\s*</, "Automatic tag");
+  assert.match(page, /"Change greeting"/, "one door to the greeting fields");
+  assert.match(page, /Use automatic/, "a way back");
+  assert.match(page, /rowLabel="Greeting language"/, "language is a one-line row");
+  assert.doesNotMatch(page, /Not saved yet/);
+  assert.match(page, /max-w-desk/, "MASTER desk width, not max-w-2xl");
+  assert.match(page, /xl:grid-cols-2/);
   const copy = page.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "");
   assert.doesNotMatch(copy, /[\u2013\u2014]/, "no en or em dashes");
   assert.doesNotMatch(copy, /"[^"\n]*\b[Tt]enant\b[^"\n]*"|>[^<>{}\n]*\b[Tt]enant\b[^<>{}\n]*</, "no tenant in copy");

@@ -13,12 +13,10 @@ import {
   SettingsGroup,
   SettingsPageHeader,
   SettingsRow,
-  SettingsSegmented,
   SettingsSelect,
   TrashIcon,
   settingsConsoleClass,
   settingsDenseFieldClass,
-  settingsFormBodyClass,
   settingsGhostButtonClass,
   settingsPanelClass,
   settingsValueFieldClass,
@@ -40,9 +38,13 @@ import {
   GREETING_INVITE_MAX,
   GREETING_LANGUAGES,
   SPOKEN_NAME_MAX,
+  autoGreetingLanguage,
   buildGreetingSentence,
   greetingInviteLine,
+  greetingIsAutomatic,
+  resolveGreetingLanguage,
   type GreetingLanguage,
+  type GreetingLanguagePick,
 } from "@/lib/identityGreeting";
 import {
   SOCIAL_KINDS,
@@ -164,11 +166,16 @@ function useCardSave(
 
 function BusinessCard({
   tenant,
+  businessName,
+  setBusinessName,
   businessCategory,
   canEdit,
   onSaveActivity,
 }: {
   tenant: TenantRow;
+  /** Lifted to the page: How you answer reads the draft so Automatic follows a rename. */
+  businessName: string;
+  setBusinessName: (next: string) => void;
   businessCategory: string | null;
   canEdit: boolean;
   onSaveActivity?: () => void;
@@ -176,7 +183,6 @@ function BusinessCard({
   const formId = "identity-business-form";
   const [storedVertical, setStoredVertical] = useState(() => parseVertical(tenant.vertical));
   const storedCategory = useRef(businessCategory);
-  const [businessName, setBusinessName] = useState(tenant.business_name || "");
   const [choice, setChoice] = useState(() => currentCategoryChoice(storedVertical, businessCategory));
   const options = useMemo(() => identityCategoryChoices(storedVertical), [storedVertical]);
   const writes = categoryWrites(choice || `${storedVertical}:`, {
@@ -259,36 +265,52 @@ function initialVoiceId(tenant: TenantRow, voices: CuratedSonioxVoice[]): string
   return marked?.id || voices[0]?.id || getDefaultSonioxVoiceIdSync() || "";
 }
 
+const LANGUAGE_PICKS: readonly { value: GreetingLanguagePick; label: string; detail?: string }[] = [
+  { value: "auto", label: "Automatic", detail: "Kiswahili when your question is in Kiswahili, else English" },
+  ...GREETING_LANGUAGES.map((l) => ({ value: l.id as GreetingLanguagePick, label: l.label })),
+];
+
+function languageLabel(pick: GreetingLanguagePick, resolved: GreetingLanguage): string {
+  const name = GREETING_LANGUAGES.find((l) => l.id === resolved)?.label || "English";
+  return pick === "auto" ? `Automatic · ${name}` : name;
+}
+
 function AnswerCard({
   tenant,
+  businessName,
   voices,
   canEdit,
   onSaveActivity,
 }: {
   tenant: TenantRow;
+  /** The business name as typed in Your business, so Automatic follows a rename at once. */
+  businessName: string;
   voices: CuratedSonioxVoice[];
   canEdit: boolean;
   onSaveActivity?: () => void;
 }) {
   const formId = "identity-answer-form";
   const [agentName, setAgentName] = useState(tenant.agent_name || "");
+  // Warm is the default tone, so a first save never stops on a choice.
   const [tone, setTone] = useState<OnboardingTone | "">(
-    () => canonicalizeAgentTone(String(tenant.agent_tone || "")) || ""
+    () => canonicalizeAgentTone(String(tenant.agent_tone || "")) || "warm"
   );
   const [spokenName, setSpokenName] = useState(tenant.spoken_name || "");
   const [greetingInvite, setGreetingInvite] = useState(tenant.greeting_invite || "");
   const [storedVoiceId, setStoredVoiceId] = useState(() => initialVoiceId(tenant, voices));
   const [voiceId, setVoiceId] = useState(storedVoiceId);
-  // Not stored by this save (no Desk writer for greeting_language yet): it sets the
-  // sentence and the Hear it language.
-  const [language, setLanguage] = useState<GreetingLanguage>("en");
+  // Not stored by this save (no Desk writer for greeting_language yet): calls use
+  // Automatic; a pick here only changes the sentence and Hear it.
+  const [languagePick, setLanguagePick] = useState<GreetingLanguagePick>("auto");
+  const automatic = greetingIsAutomatic({ spokenName, greetingInvite });
   const [editingGreeting, setEditingGreeting] = useState(false);
   const storedLabel = String(tenant.soniox_voice_label || "").trim();
   // A label names the old voice; a new voice drops it.
   const voiceLabel = voiceId === storedVoiceId ? storedLabel : "";
+  const language = resolveGreetingLanguage(languagePick, greetingInvite);
 
   const sentence = buildGreetingSentence({
-    businessName: tenant.business_name,
+    businessName,
     spokenName,
     agentName,
     greetingInvite,
@@ -352,6 +374,12 @@ function AnswerCard({
     }
   }
 
+  function switchToAutomatic() {
+    setSpokenName("");
+    setGreetingInvite("");
+    setEditingGreeting(false);
+  }
+
   const voiceOptions = voices.map((voice) => ({
     id: voice.id,
     label: displaySonioxVoiceLabel("", voice.id, voices),
@@ -378,10 +406,20 @@ function AnswerCard({
         </>
       }
     >
-      <div className="space-y-3 px-4 py-3" data-greeting="">
-        <p className="text-meta font-medium text-ink-2" id="identity-greeting-label">
-          Callers hear
-        </p>
+      <div className="space-y-3 px-4 py-3" data-greeting="" data-greeting-mode={automatic ? "automatic" : "custom"}>
+        <div className="flex min-h-6 items-center gap-2">
+          <p className="text-meta font-medium text-ink-2" id="identity-greeting-label">
+            Callers hear
+          </p>
+          {automatic ? (
+            <span
+              data-greeting-automatic=""
+              className="rounded-md bg-accent-soft px-1.5 py-0.5 text-meta font-medium text-accent-deep"
+            >
+              Automatic
+            </span>
+          ) : null}
+        </div>
         <p
           aria-labelledby="identity-greeting-label"
           data-greeting-sentence=""
@@ -390,22 +428,10 @@ function AnswerCard({
           {sentence.text ? (
             sentence.text
           ) : (
-            <span className="text-ink-2">No greeting yet. Add the name callers hear.</span>
+            <span className="text-ink-2">Add your business name and callers hear it here.</span>
           )}
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          {canEdit ? (
-            <button
-              type="button"
-              aria-expanded={editingGreeting}
-              aria-controls="identity-greeting-fields"
-              onClick={() => setEditingGreeting((open) => !open)}
-              className={settingsGhostButtonClass}
-            >
-              <PencilSquareIcon aria-hidden="true" className="mr-1.5 size-4" />
-              {editingGreeting ? "Done" : "Edit greeting"}
-            </button>
-          ) : null}
           <span data-role-exempt="">
             <Button
               variant="tonal"
@@ -417,6 +443,22 @@ function AnswerCard({
               Hear it
             </Button>
           </span>
+          {canEdit ? (
+            <button
+              type="button"
+              aria-expanded={editingGreeting}
+              aria-controls="identity-greeting-fields"
+              onClick={() => setEditingGreeting((open) => !open)}
+              className={settingsGhostButtonClass}
+            >
+              {editingGreeting ? "Done" : "Change greeting"}
+            </button>
+          ) : null}
+          {canEdit && !automatic ? (
+            <button type="button" onClick={switchToAutomatic} data-use-automatic="" className={settingsGhostButtonClass}>
+              Use automatic
+            </button>
+          ) : null}
         </div>
         {sampleUrl ? (
           <audio
@@ -445,7 +487,7 @@ function AnswerCard({
               id="spoken_name"
               value={spokenName}
               onChange={(e) => setSpokenName(e.target.value)}
-              placeholder={String(tenant.business_name || "").trim() || "Your business name"}
+              placeholder={businessName.trim() || "Your business name"}
               maxLength={SPOKEN_NAME_MAX}
               autoFocus
               className={settingsValueFieldClass}
@@ -477,7 +519,7 @@ function AnswerCard({
         id="agent_tone"
         label="Tone"
         value={tone}
-        placeholder="Choose"
+        placeholder="Warm"
         onChange={(next) => {
           if (canEdit) setTone(next);
         }}
@@ -499,17 +541,23 @@ function AnswerCard({
         </SettingsRow>
       )}
       {/* Preview only (nothing saved), so viewers can switch it too. */}
-      <div className="space-y-1.5 px-4 py-3" data-role-exempt="">
-        <p className="text-body font-medium text-ink" id="identity-language-label">
-          Greeting language
-        </p>
-        <SettingsSegmented
-          label="Greeting language"
-          value={language}
-          options={GREETING_LANGUAGES}
-          onChange={setLanguage}
+      <div data-role-exempt="" data-greeting-language={languagePick}>
+        <ChoiceSheet
+          id="identity_language"
+          title="Greeting language"
+          rowLabel="Greeting language"
+          value={languagePick}
+          options={LANGUAGE_PICKS.map((opt) => ({
+            ...opt,
+            label: opt.value === "auto" ? languageLabel("auto", autoGreetingLanguage(greetingInvite)) : opt.label,
+          }))}
+          onChange={setLanguagePick}
         />
-        <p className="text-meta text-ink-2">Used for Hear it. Not saved yet.</p>
+        {languagePick !== "auto" ? (
+          <p className="px-4 pb-2 text-meta text-ink-2" data-language-note="">
+            Only Hear it uses this for now. Calls stay on Automatic.
+          </p>
+        ) : null}
       </div>
     </IdentityCard>
   );
@@ -687,6 +735,7 @@ function IdentitySettingsInner({
   onSaveActivity?: () => void;
 }) {
   const canEdit = useCan("settings.edit");
+  const [businessName, setBusinessName] = useState(tenant.business_name || "");
   const voices = curatedVoices && curatedVoices.length ? curatedVoices : listCuratedSonioxVoicesSync();
   return (
     <div className={settingsConsoleClass}>
@@ -696,17 +745,36 @@ function IdentitySettingsInner({
           businessName={tenant.business_name?.trim() || "Business"}
           lineLive={false}
           showBack
+          wide
           title={heading ?? "Identity"}
         />
-        <div className={`${settingsFormBodyClass} space-y-6`} data-identity-page="">
-          <BusinessCard
-            tenant={tenant}
-            businessCategory={businessCategory ?? null}
-            canEdit={canEdit}
-            onSaveActivity={onSaveActivity}
-          />
-          <AnswerCard tenant={tenant} voices={voices} canEdit={canEdit} onSaveActivity={onSaveActivity} />
-          <ContactsCard tenant={tenant} canEdit={canEdit} onSaveActivity={onSaveActivity} />
+        {/* Wide desktop: two columns up to the MASTER desk width, so no empty right side. */}
+        <div
+          className="grid w-full min-w-0 max-w-desk grid-cols-1 items-start gap-6 xl:grid-cols-2"
+          data-identity-page=""
+        >
+          <div className="min-w-0 xl:col-start-1 xl:row-start-1">
+            <BusinessCard
+              tenant={tenant}
+              businessName={businessName}
+              setBusinessName={setBusinessName}
+              businessCategory={businessCategory ?? null}
+              canEdit={canEdit}
+              onSaveActivity={onSaveActivity}
+            />
+          </div>
+          <div className="min-w-0 xl:col-start-2 xl:row-span-2 xl:row-start-1">
+            <AnswerCard
+              tenant={tenant}
+              businessName={businessName}
+              voices={voices}
+              canEdit={canEdit}
+              onSaveActivity={onSaveActivity}
+            />
+          </div>
+          <div className="min-w-0 xl:col-start-1 xl:row-start-2">
+            <ContactsCard tenant={tenant} canEdit={canEdit} onSaveActivity={onSaveActivity} />
+          </div>
         </div>
       </div>
     </div>
