@@ -63,7 +63,7 @@ const COPY = {
     // B2 (#1010) failure outcomes: always "call back", never an enquiry.
     failure: {
       brain_error: 'The line had a problem during this call. A callback request was saved. Please call the caller back.',
-      write_failed: 'The assistant could not save this request. Nothing was booked. Please call the caller back.',
+      write_failed: 'The assistant could not save this request. Please call the caller back.',
     },
   },
   sw: {
@@ -112,7 +112,7 @@ const COPY = {
     fallbackAnswered: (who) => `Simu kutoka ${who}, hakuna maelezo yaliyopatikana`,
     failure: {
       brain_error: 'Laini ilikuwa na hitilafu wakati wa simu hii. Ombi la kupigiwa limehifadhiwa. Tafadhali mpigie mpigaji.',
-      write_failed: 'Msaidizi hakuweza kuhifadhi ombi hili. Hakuna kilichowekwa. Tafadhali mpigie mpigaji.',
+      write_failed: 'Msaidizi hakuweza kuhifadhi ombi hili. Tafadhali mpigie mpigaji.',
     },
   },
 };

@@ -696,7 +696,7 @@ describe('owner call summary: brain_error / write_failed (#1010)', () => {
     };
   }
 
-  it('EN: both render as "Call back needed", never "Enquiry"; write_failed says nothing was saved', () => {
+  it('EN: both render as "Call back needed", never "Enquiry"; write_failed says the request was not saved', () => {
     const be = renderOwnerSummary(failureEvent('brain_error'), { businessName: 'Aris Kenya' });
     assert.match(be.label, /^Call back needed/);
     assert.match(be.subject, /^Call back needed/);
@@ -706,7 +706,7 @@ describe('owner call summary: brain_error / write_failed (#1010)', () => {
     const wf = renderOwnerSummary(failureEvent('write_failed'), {});
     assert.match(wf.label, /^Call back needed/);
     assert.match(wf.text, /^Call back needed: request NOT saved$/m);
-    assert.match(wf.text, /could not save this request\. Nothing was booked\./);
+    assert.match(wf.text, /could not save this request\. Please call the caller back\./);
     assert.doesNotMatch(wf.text, /Enquiry|asked questions/);
     for (const t of [be.text, wf.text]) assert.match(t, /^[\x20-\x7e\n]+$/, 'GSM-7 safe');
   });
