@@ -23,6 +23,9 @@ const MODES = new Set(['off', 'shadow', 'on']);
 function mode({ env = process.env, tenantId } = {}) {
   const m = String(env.BRAIN_V1_DRAFT || 'off').trim().toLowerCase();
   if (!MODES.has(m) || m === 'off') return 'off';
+  // BRAIN_KB_GATE=on: readiness decides (see flag.js); the env list is the kill-switch path
+  const gate = require('../../knowledge/kb/live').decision({ env, tenantId });
+  if (gate !== null) return gate ? m : 'off';
   const allow = String(env.BRAIN_V1_DRAFT_TENANTS || DND_TENANT).split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
   if (tenantId == null || !allow.includes(String(tenantId).trim().toLowerCase())) return 'off';
   return m;

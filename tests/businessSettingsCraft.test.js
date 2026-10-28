@@ -125,7 +125,7 @@ describe("business settings craft", () => {
     assert.match(nav, /panel: "team"/);
     assert.doesNotMatch(nav, /tab: "updates"/);
     assert.match(nav, /tab: "test"/);
-    assert.match(nav, /tab: "catalog"/);
+    assert.match(nav, /href: "\/settings\/knowledge"/);
     assert.match(nav, /tab: "import"/);
     assert.match(nav, /tab: "alerts"/);
     assert.doesNotMatch(nav, /return "Appearance"/);

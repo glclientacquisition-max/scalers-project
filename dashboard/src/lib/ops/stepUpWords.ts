@@ -19,6 +19,7 @@ export const STEP_UP_WHAT: Record<string, string> = {
   "number-ops:restore": "bring this number back to its business",
   "number-ops:lift_quarantine": "make this number available now",
   "number-ops:move": "move this number to another business",
+  "business-kb:set_brain_target": "switch which brain answers this business",
   "package-versions:publish": "publish this package",
   "package-versions:move_subscribers": "move subscribers",
   "package-versions:set_billing_mode": "change the billing mode",

@@ -1652,7 +1652,8 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     };
   }
 
-  return tenantProfileFromRow(row, {
+  const kbLoad = loadKbLive(row.id); // v2 KB snapshot, in parallel with the rest of the profile
+  const profile = tenantProfileFromRow(row, {
     openAppointments: await listOpenAppointments(row.id),
     serviceAreas:
       row.service_areas !== undefined ||
@@ -1663,6 +1664,105 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     ...(await loadUnknownAnswerSpoken(row.id)),
     ...(await loadAreaPicks(row.id)),
   });
+  return require('./knowledge/kb/live').attach(profile, await kbLoad);
+}
+
+// ---------------------------------------------------------------- v2 Knowledge Base (docs/supabase/kb_v2.sql)
+// The live snapshot per business, cached in process by (tenant, version): a warm call start costs one small
+// tenants read; a new version (an owner save that compiled) loads once on whichever replica takes the next call.
+const KB_DOCS = new Map(); // `${tenantId}:${version}` -> { doc, bytes }
+async function loadKbLive(tenantId, { force = false } = {}) {
+  if (!tenantId || (!force && !/^(1|true|on|yes)$/i.test(String(process.env.BRAIN_KB_GATE || '').trim()))) return null;
+  const t0 = Date.now();
+  try {
+    const { data: t, error } = await supabase.from('tenants').select('kb_live_version, kb_ready_version, brain_target').eq('id', tenantId).maybeSingle();
+    if (error || !t || t.kb_live_version == null) return t ? { version: null, readyVersion: t.kb_ready_version ?? null, brainTarget: t.brain_target || 'v2', doc: null } : null;
+    const key = `${tenantId}:${t.kb_live_version}`;
+    let hit = KB_DOCS.get(key);
+    if (!hit) {
+      const { data: snap, error: e2 } = await supabase.from('kb_snapshots').select('doc, bytes').eq('tenant_id', tenantId).eq('version', t.kb_live_version).maybeSingle();
+      if (e2 || !snap) return { version: t.kb_live_version, readyVersion: t.kb_ready_version ?? null, brainTarget: t.brain_target || 'v2', doc: null };
+      hit = { doc: snap.doc, bytes: snap.bytes || null };
+      for (const k of [...KB_DOCS.keys()]) if (k.startsWith(`${tenantId}:`)) KB_DOCS.delete(k);
+      KB_DOCS.set(key, hit);
+      if (KB_DOCS.size > 500) KB_DOCS.delete(KB_DOCS.keys().next().value);
+    }
+    return { version: t.kb_live_version, readyVersion: t.kb_ready_version ?? null, brainTarget: t.brain_target || 'v2', doc: hit.doc, bytes: hit.bytes, loadMs: Date.now() - t0 };
+  } catch (err) {
+    console.warn('[db] loadKbLive', err?.message || err);
+    return null;
+  }
+}
+
+/** kb_items + variants + categories of one business (compile input, Desk editor). */
+async function listKbSource(tenantId) {
+  const [items, variants, categories] = await Promise.all([
+    supabase.from('kb_items').select('*').eq('tenant_id', tenantId).order('sort', { ascending: true }),
+    supabase.from('kb_item_variants').select('*').eq('tenant_id', tenantId).order('sort', { ascending: true }),
+    supabase.from('kb_categories').select('*').eq('tenant_id', tenantId).order('sort', { ascending: true }),
+  ]);
+  for (const r of [items, variants, categories]) if (r.error) throw new Error(`listKbSource: ${r.error.message}`);
+  return { items: items.data || [], variants: variants.data || [], categories: categories.data || [] };
+}
+
+/** One batch write (rpc kb_upsert_items). Category rows are upserted first so items can point at them. */
+async function upsertKbItems(tenantId, { items = [], variants = [], categories = [], hideMissing = false, scope = null } = {}) {
+  if (categories.length) {
+    const rows = categories.map((c, i) => ({ tenant_id: tenantId, id: c.id, name_en: c.name_en, ...(c.name_sw !== undefined ? { name_sw: c.name_sw } : {}), ...(c.name_sw_state ? { name_sw_state: c.name_sw_state } : {}), sort: c.sort ?? i }));
+    const { error } = await supabase.from('kb_categories').upsert(rows, { onConflict: 'tenant_id,id' });
+    if (error) throw new Error(`upsertKbItems categories: ${error.message}`);
+  }
+  const clean = items.map(({ category_name, ...rest }) => rest);
+  const { data, error } = await supabase.rpc('kb_upsert_items', { p_tenant: tenantId, p_items: clean, p_variants: variants, p_hide_missing: hideMissing, p_scope: scope });
+  if (error) throw new Error(`upsertKbItems: ${error.message}`);
+  return data;
+}
+
+/** rpc kb_publish_snapshot: live moves the pointer in the same transaction; failed never does. -> version */
+async function publishKbSnapshot(tenantId, { doc, sourceHash, issues = [], status, compiler = 'rules' }) {
+  const { data, error } = await supabase.rpc('kb_publish_snapshot', { p_tenant: tenantId, p_doc: doc, p_source_hash: sourceHash, p_issues: issues, p_status: status, p_compiler: compiler });
+  if (error) throw new Error(`publishKbSnapshot: ${error.message}`);
+  return data;
+}
+
+/** Latest snapshot row (any status) + the tenant pointers. */
+async function getKbState(tenantId) {
+  const [{ data: t, error: e1 }, { data: last, error: e2 }] = await Promise.all([
+    supabase.from('tenants').select('id, business_name, kb_live_version, kb_ready_version, brain_target, hours_schedule, notify_channels, whatsapp_notification_number, alert_email').eq('id', tenantId).maybeSingle(),
+    supabase.from('kb_snapshots').select('version, status, source_hash, issues, item_count, bytes, compiled_at').eq('tenant_id', tenantId).order('version', { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  if (e1) throw new Error(`getKbState: ${e1.message}`);
+  if (e2) throw new Error(`getKbState snapshot: ${e2.message}`);
+  return { tenant: t, latest: last || null };
+}
+
+/** Tier 2 lookup (rpc kb_search_items) for businesses above 10,000 items. */
+async function searchKbItems(tenantId, query, limit = 5) {
+  const { data, error } = await supabase.rpc('kb_search_items', { p_tenant: tenantId, p_query: String(query || ''), p_limit: limit });
+  if (error) throw new Error(`searchKbItems: ${error.message}`);
+  return data || [];
+}
+
+/** rpc kb_record_readiness: a pass for the live version moves tenants.kb_ready_version. */
+async function recordKbReadiness(tenantId, { version, passed, checks, tests, by = 'script', callSid = null }) {
+  const { data, error } = await supabase.rpc('kb_record_readiness', { p_tenant: tenantId, p_version: version, p_passed: passed, p_checks: checks, p_tests: tests, p_by: by, p_call_sid: callSid });
+  if (error) throw new Error(`recordKbReadiness: ${error.message}`);
+  return data;
+}
+
+/** Businesses with a live v2 KB snapshot. */
+async function listKbTenants() {
+  const { data, error } = await supabase.from('tenants').select('id').not('kb_live_version', 'is', null);
+  if (error) throw new Error(`listKbTenants: ${error.message}`);
+  return (data || []).map((r) => r.id);
+}
+
+/** Ops: hold a business on the old brain (v1) or let readiness move it (v2). */
+async function setBrainTarget(tenantId, target) {
+  if (!['v1', 'v2'].includes(target)) throw new Error('setBrainTarget: v1 or v2');
+  const { error } = await supabase.from('tenants').update({ brain_target: target }).eq('id', tenantId);
+  if (error) throw new Error(`setBrainTarget: ${error.message}`);
+  return true;
 }
 
 /**
@@ -3680,6 +3780,15 @@ async function getTenantCatalogue(tenantId) {
 }
 
 module.exports = {
+  loadKbLive,
+  listKbTenants,
+  listKbSource,
+  upsertKbItems,
+  publishKbSnapshot,
+  getKbState,
+  searchKbItems,
+  recordKbReadiness,
+  setBrainTarget,
   normalizeCallerLanguage,
   saveCallerLanguage,
   confirmCallerName,

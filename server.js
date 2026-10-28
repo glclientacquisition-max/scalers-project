@@ -747,6 +747,8 @@ app.get('/healthz', (_req, res) => {
     gitSha: resolveVoiceGitSha(),
     gitBranch: resolveVoiceGitBranch(),
     startedAt: PROCESS_STARTED_AT,
+    // v2 KB: readiness gate on/off and the in-process snapshot cache (no business data)
+    kb: { gate: require('./src/knowledge/kb/live').gateOn(), compileOnSave: kbCompileOnSave(), cache: require('./src/knowledge/kb/reader').cacheStats() },
     soniox: {
       stt: isSonioxConfigured(),
       tts: isSonioxTtsConfigured(),
@@ -912,12 +914,68 @@ app.post('/internal/desk/spoken-catalogue', (req, res) => {
   if (!secret || String(req.headers['x-voice-internal-secret'] || '').trim() !== secret) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
+  // v2 KB compat writer (KB_COMPILE_ON_SAVE=on): a save of today's catalogue fields syncs kb_items, compiles, re-checks readiness
+  if (kbCompileOnSave()) scheduleKbFromLegacy(String(req.body?.tenantId || '').trim());
   const onSave = require('./src/knowledge/spokenCatalogueOnSave');
   if (!onSave.enabled()) return res.status(200).json({ ok: true, skipped: 'flag_off' });
   const tenantId = String(req.body?.tenantId || '').trim();
+  // phase 8 (staging): a Business on the v2 KB no longer writes the old spoken catalogue copy
+  if (require('./src/knowledge/kb/live').decision({ tenantId }) === true) return res.status(200).json({ ok: true, skipped: 'kb_v2' });
   const { supabase } = require('./src/lib/supabaseClient');
   const r = onSave.scheduleSpokenCatalogueCompile(tenantId, { db: supabase, generate: spokenCatalogueGenerate() });
   return res.status(202).json({ ok: true, scheduled: r.scheduled, coalesced: Boolean(r.coalesced) });
+});
+
+// ---------------------------------------------------------------- v2 Knowledge Base (docs/reference/platform/KB_V2.md)
+function kbCompileOnSave() { return /^(1|true|on|yes)$/i.test(String(process.env.KB_COMPILE_ON_SAVE || '').trim()); }
+function kbSecretOk(req) {
+  const secret = String(process.env.VOICE_INTERNAL_SECRET || '').trim();
+  return !!secret && String(req.headers['x-voice-internal-secret'] || '').trim() === secret;
+}
+const KB_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function kbSwGenerate() { return /^(1|true|on|yes)$/i.test(String(process.env.KB_SW_SUGGEST || '').trim()) ? spokenCatalogueGenerate() : null; }
+function scheduleKbFromLegacy(tenantId) {
+  if (!KB_UUID.test(tenantId)) return { scheduled: false };
+  const pub = require('./src/knowledge/kb/publish');
+  // read today's catalogue columns first, then sync + compile in the background (never on the Desk save path)
+  setImmediate(async () => {
+    try {
+      const { supabase } = require('./src/lib/supabaseClient');
+      const { data } = await supabase.from('tenants').select('services_catalog, product_catalog').eq('id', tenantId).maybeSingle();
+      pub.scheduleKbCompile(db, tenantId, { legacyRow: data || null, generate: kbSwGenerate(), by: 'compile' });
+    } catch (e) { console.warn(`[kb] legacy sync tenant=${tenantId} failed: ${e && e.message}`); }
+  });
+  return { scheduled: true };
+}
+// Boot sweep (BRAIN_KB_GATE=on, KB_BOOT_READINESS not off): re-check readiness for every business with a live snapshot,
+// 20 s after start, then every 12 h. Text mode through the live brain; never writes calls, bookings or messages.
+function startKbReadinessSweep() {
+  if (!require('./src/knowledge/kb/live').gateOn() || /^(0|off|false|no)$/i.test(String(process.env.KB_BOOT_READINESS || ''))) return;
+  const run = () => require('./src/knowledge/kb/publish').sweepReadiness(db, { by: 'boot', log: (m) => console.log(m) }).catch((e) => console.warn(`[kb] readiness sweep failed: ${e && e.message}`));
+  const t = setTimeout(run, 20000); if (t.unref) t.unref();
+  const i = setInterval(run, 12 * 3600 * 1000); if (i.unref) i.unref();
+}
+startKbReadinessSweep();
+
+// Desk KB editor / Super Admin: compile now (kb_items are the source) and re-check readiness. Answers at once.
+app.post('/internal/kb/compile', (req, res) => {
+  if (!kbSecretOk(req)) return res.status(401).json({ error: 'Unauthorized' });
+  const tenantId = String(req.body?.tenantId || '').trim();
+  if (!KB_UUID.test(tenantId)) return res.status(400).json({ error: 'tenantId' });
+  const r = require('./src/knowledge/kb/publish').scheduleKbCompile(db, tenantId, { generate: kbSwGenerate(), force: req.body?.force === true, by: String(req.body?.by || 'compile').slice(0, 20) });
+  return res.status(202).json({ ok: true, ...r });
+});
+// Readiness on demand (Super Admin "Check again"): waits for the result, read-only except the kb_readiness row.
+app.post('/internal/kb/readiness', async (req, res) => {
+  if (!kbSecretOk(req)) return res.status(401).json({ error: 'Unauthorized' });
+  const tenantId = String(req.body?.tenantId || '').trim();
+  if (!KB_UUID.test(tenantId)) return res.status(400).json({ error: 'tenantId' });
+  try {
+    const r = await require('./src/knowledge/kb/publish').checkReadiness(db, tenantId, { by: String(req.body?.by || 'admin').slice(0, 20) });
+    return res.status(200).json({ ok: true, passed: r.passed, version: r.version, failing: r.failing, checks: r.checks, tests: r.tests });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: String(e && e.message || e).slice(0, 200) });
+  }
 });
 
 let spokenCatalogueGen;
@@ -1702,7 +1760,7 @@ function prefetchCallOpening({ callSid, tenantId, toNumber, fromNumber }) {
         const willWarm =
           isGreetingCacheEnabled() && !isDefaultShopName(profile.businessName || '');
         console.log(
-          `[voice/incoming][${callSid}] opening_prefetch ready load_ms=${loadMs} total_ms=${Date.now() - t0} greeting_pcm=${willWarm ? 'warming' : 'skipped'}`
+          `[voice/incoming][${callSid}] opening_prefetch ready load_ms=${loadMs} total_ms=${Date.now() - t0} greeting_pcm=${willWarm ? 'warming' : 'skipped'}${profile.kb ? ` kb_v=${profile.kb.version} kb_items=${profile.kb.items} kb_load_ms=${profile.kb.loadMs}` : ''}`
         );
         return profile;
       },
