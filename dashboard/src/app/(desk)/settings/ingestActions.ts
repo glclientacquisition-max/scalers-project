@@ -3,6 +3,7 @@
 import { formatServiceAreasForCompiler, normalizeServiceAreas, serviceAreasFromCoverage } from "@/lib/serviceAreas";
 import { bustTenantCache } from "@/lib/tenantCache";
 import { memberDenied } from "@/lib/requireMember";
+import { importCatalogueToKb } from "@/lib/kbWrite.server";
 
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
@@ -423,13 +424,11 @@ export async function applyIngestAction(
     unknown_answer_spoken: unknownAnswerSpoken,
     llm_system_prompt: prompt,
   };
-  if (merged.touched.services) {
-    patch.services_catalog = assignServiceIds(
-      merged.services,
-      normalizeServicesCatalog(tenant.services_catalog)
-    );
-    patch.services_offered = servicesOffered;
-  }
+  // Imported services go into kb_items (add-only, after the update below): an item the owner already has keeps its
+  // state and price; nothing is hidden. The KB mirror then rewrites services_catalog + services_offered.
+  const importedServices = merged.touched.services
+    ? assignServiceIds(merged.services, normalizeServicesCatalog(tenant.services_catalog))
+    : null;
   if (merged.touched.faqs) {
     patch.faqs = merged.faqs;
   }
@@ -476,6 +475,13 @@ export async function applyIngestAction(
 
   if (error) {
     return ownerSaveFailed("ingest", error.message);
+  }
+  if (importedServices) {
+    await importCatalogueToKb(tenant.id, { services_catalog: importedServices }, {
+      legacyServicesOffered: servicesOffered,
+      legacyColumns: { services_catalog: importedServices },
+      by: "import",
+    });
   }
 
   revalidatePath("/settings");

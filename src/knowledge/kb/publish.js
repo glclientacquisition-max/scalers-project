@@ -7,15 +7,31 @@ const live = require('./live');
 const { runReadiness } = require('./readiness');
 const { suggestSwahili } = require('./swSuggest');
 
-/** Compat writer: today's services_catalog / product_catalog -> kb_items (ids kept; kb-only fields kept). */
+const nameKey = (s) => String(s || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+
+/**
+ * Import today's services_catalog / product_catalog into kb_items, ADD-ONLY (Alvin, 28 Oct: kb_items is the source of truth).
+ * Only rows new to the KB (id and name not already there) are inserted. An existing item is never changed, so the owner's
+ * paused / not_offered / holdable / excludes stay as set, and nothing absent from the old columns is hidden.
+ * Used by the one-time backfill (scripts/kb-backfill.js); saves of the old columns no longer sync (server.js).
+ */
 async function syncFromLegacy(db, tenantId, row) {
   const { items, categories } = fromLegacy(row);
-  const strip = (it) => { const o = { ...it }; if (!o.aliases || !o.aliases.length) delete o.aliases; return o; };
-  const svc = items.filter((x) => x.kind === 'service').map(strip);
-  const prd = items.filter((x) => x.kind === 'product').map(strip);
-  const a = await db.upsertKbItems(tenantId, { items: svc, categories, hideMissing: true, scope: 'services_catalog' });
-  const b = await db.upsertKbItems(tenantId, { items: prd, hideMissing: true, scope: 'product_catalog' });
-  return { services: svc.length, products: prd.length, upserted: (a?.upserted || 0) + (b?.upserted || 0), hidden: (a?.hidden || 0) + (b?.hidden || 0) };
+  const src = await db.listKbSource(tenantId);
+  const ids = new Set((src.items || []).map((x) => x.id));
+  const names = new Set((src.items || []).map((x) => `${x.kind}:${nameKey(x.name_en)}`));
+  const haveCats = new Set((src.categories || []).map((c) => c.id));
+  const fresh = [];
+  for (const it of items) {
+    const nk = `${it.kind}:${nameKey(it.name_en)}`;
+    if (ids.has(it.id) || names.has(nk)) continue;
+    ids.add(it.id); names.add(nk);
+    const o = { ...it }; if (!o.aliases || !o.aliases.length) delete o.aliases;
+    fresh.push(o);
+  }
+  const cats = categories.filter((c) => !haveCats.has(c.id) && fresh.some((i) => i.category_id === c.id));
+  const r = fresh.length || cats.length ? await db.upsertKbItems(tenantId, { items: fresh, categories: cats }) : null;
+  return { services: fresh.filter((x) => x.kind === 'service').length, products: fresh.filter((x) => x.kind === 'product').length, kept: items.length - fresh.length, upserted: r?.upserted || 0, hidden: 0 };
 }
 
 /**

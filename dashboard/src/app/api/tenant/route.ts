@@ -4,6 +4,7 @@ import { isAuthenticated, isLegacyAuthenticated } from "@/lib/auth";
 import { canonicalizeAgentTone } from "@/lib/onboarding";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { memberDenied } from "@/lib/requireMember";
+import { addKbItemsFromText } from "@/lib/kbWrite.server";
 
 export async function POST(request: Request) {
   if (!(await isAuthenticated())) {
@@ -29,9 +30,9 @@ export async function POST(request: Request) {
   if (typeof body.whatsapp_notification_number === "string") {
     patch.whatsapp_notification_number = body.whatsapp_notification_number.trim();
   }
-  if (typeof body.services_offered === "string") {
-    patch.services_offered = body.services_offered.trim();
-  }
+  // The old free-text services field is no longer stored as typed: its lines are added to the Catalogue
+  // (kb_items, add-only; existing items keep the owner's state), and the KB mirror derives the services text.
+  const servicesText = typeof body.services_offered === "string" ? body.services_offered.trim() : "";
   if (typeof body.business_hours === "string") {
     patch.business_hours = body.business_hours.trim();
   }
@@ -46,15 +47,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { data, error } = await workspace.client
-    .from("tenants")
-    .update(patch)
-    .eq("id", id)
-    .select(
-      "id, business_name, whatsapp_notification_number, services_offered, business_hours, agent_tone"
-    )
-    .single();
+  const cols = "id, business_name, whatsapp_notification_number, services_offered, business_hours, agent_tone";
+  let { error } = Object.keys(patch).length
+    ? await workspace.client.from("tenants").update(patch).eq("id", id)
+    : { error: null };
   bustTenantCache(id);
+  if (!error && servicesText) {
+    await addKbItemsFromText(id, servicesText, tenant.vertical === "retail" ? "product" : "service", "api");
+  }
+  const read = error ? { data: null, error } : await workspace.client.from("tenants").select(cols).eq("id", id).single();
+  const data = read.data;
+  error = read.error;
 
   if (error) {
     const hint =

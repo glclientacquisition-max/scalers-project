@@ -30,6 +30,7 @@ import {
   type StepKey,
 } from "@/lib/setupFlow";
 import { compileReceptionistPrompt } from "@/lib/promptCompiler";
+import { importCatalogueToKb } from "@/lib/kbWrite.server";
 import { compilePromptLocally, tenantNeedsOnboarding, type OnboardingAnswers } from "@/lib/onboarding";
 import { formatLocationsForCompiler } from "@/lib/businessLocations";
 import { formatProductsForCompiler, normalizeProductCatalog } from "@/lib/productCatalog";
@@ -212,8 +213,8 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
 
   const tPrep = Date.now();
   const fromFaqs = policiesFromFaqs(faqs.map((f) => ({ question: String(f.question || ""), answer: String(f.answer || "") })), vertical);
+  // services_offered is no longer written here: kb_items is the source; the KB mirror derives that text (below).
   const patch: Record<string, unknown> = {
-    services_offered: servicesOffered,
     services_catalog: servicesCatalog,
     product_catalog: productCatalog,
     business_hours: businessHours,
@@ -266,6 +267,9 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
     return { ok: false, conflict: true, error: "Setup was changed in another tab. Review this step, then finish again." };
   }
 
+  // The Catalogue starts filled: the setup rows go into kb_items (add-only), then the mirror + compile ping.
+  const kb = await importCatalogueToKb(row.id, { services_catalog: servicesCatalog, product_catalog: productCatalog }, { legacyServicesOffered: servicesOffered, by: "setup" });
+  if (!kb.ok && kb.skipped === "error") console.error(`[setup] finish kb import tenant=${row.id} failed`);
   const tWrite = Date.now();
   requestSpokenCatalogueCompile(row.id, patch);
   // Number assignment stays inline (one DB call) so the next screen can show it.

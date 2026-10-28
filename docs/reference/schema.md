@@ -94,7 +94,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (240)
+## Functions (241)
 
 | Function | Defined in |
 | --- | --- |
@@ -245,6 +245,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `invoices_freeze` | `docs/supabase/billing_data_layer.sql` |
 | `is_e164` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `issue_invoice_receipt` | `docs/supabase/invoice_documents.sql` |
+| `kb_import_items` | `docs/supabase/kb_v2_paste_replace.sql` |
 | `kb_items_search_fill` | `docs/supabase/kb_v2.sql` |
 | `kb_publish_snapshot` | `docs/supabase/kb_v2.sql` |
 | `kb_record_readiness` | `docs/supabase/kb_v2.sql` |
