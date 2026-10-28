@@ -7,8 +7,15 @@
  */
 import { mirrorLegacy, type KbCategory, type KbItem } from "./kbCore";
 import { servicesOfferedFromKb } from "./kbLegacy";
+import { isKbCallerBusiness, kbOpenerLine } from "./kbCaller";
 
-export type KbCatalogueView = { services_catalog: unknown[]; product_catalog: unknown[]; services_offered: string };
+export type KbCatalogueView = {
+  services_catalog: unknown[];
+  product_catalog: unknown[];
+  services_offered: string;
+  /** Greeting offering line as the call builds it (kbCaller.ts); null when there are no offered items (legacy reads). */
+  offering_line: string | null;
+};
 
 export function kbCatalogueView(
   items: KbItem[],
@@ -20,11 +27,13 @@ export function kbCatalogueView(
     services_catalog: m.services_catalog,
     product_catalog: m.product_catalog,
     services_offered: servicesOfferedFromKb(items, categories, stored.services_offered),
+    offering_line: isKbCallerBusiness(items) ? kbOpenerLine(items, categories) : null,
   };
 }
 
 /** The tenant row with its catalogue fields from the KB view; unchanged when there is no KB (null). */
 export function withKbCatalogue<T extends { services_catalog?: unknown; product_catalog?: unknown; services_offered?: string | null }>(tenant: T, kb: KbCatalogueView | null): T {
   if (!kb) return tenant;
-  return { ...tenant, services_catalog: kb.services_catalog, product_catalog: kb.product_catalog, services_offered: kb.services_offered };
+  const out = { ...tenant, services_catalog: kb.services_catalog, product_catalog: kb.product_catalog, services_offered: kb.services_offered };
+  return kb.offering_line == null ? out : { ...out, kb_offering_line: kb.offering_line };
 }

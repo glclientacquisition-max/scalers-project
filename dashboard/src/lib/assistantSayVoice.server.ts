@@ -2,6 +2,7 @@ import type { TenantRow } from "@/lib/supabase";
 import type { AssistantSayState, ReadyChecklistItem } from "@/lib/assistantSayTypes";
 import { loadCompileProvenance } from "@/lib/tenantFieldProvenance";
 import { requireVoice } from "@/lib/voiceRequire.server";
+import { loadKbCallerRow } from "@/lib/kbCaller.server";
 
 function voiceProfileFromTenant(
   tenant: TenantRow,
@@ -28,9 +29,13 @@ export function assistantSayStateFromTenant(tenant: TenantRow): AssistantSayStat
   return evaluateAssistantSay(voiceProfileFromTenant(tenant));
 }
 
+/**
+ * KB business: the row is projected like the call reads it (offered items only, no old services text), so this
+ * page never shows a paused item or stale notes. No KB (prod today): the stored row.
+ */
 export async function voiceProfileForAssistantSay(tenant: TenantRow) {
-  const provenance = await loadCompileProvenance(tenant.id);
-  return voiceProfileFromTenant(tenant, {
+  const [provenance, row] = await Promise.all([loadCompileProvenance(tenant.id), loadKbCallerRow(tenant)]);
+  return voiceProfileFromTenant(row, {
     fieldMeta: provenance.fieldMeta,
     holdGate: provenance.holdGate,
   });
@@ -46,7 +51,10 @@ export async function loadReadyChecklist(tenant: TenantRow) {
 
 export type LookupPreviewSamples = { price: string; hours: string; delivery: string; pay: string };
 
-/** Preview sample questions from this tenant's own catalogue and areas (same as the readiness probes). */
+/**
+ * Preview sample questions from this tenant's own catalogue and areas (same as the readiness probes).
+ * Pass the row from loadKbCallerRow so a KB business never samples a paused item.
+ */
 export function lookupPreviewSamples(tenant: TenantRow): LookupPreviewSamples {
   const { previewSampleQuestions } = requireVoice("./src/knowledge/assistantSayReadiness.js") as {
     previewSampleQuestions: (profile: unknown) => LookupPreviewSamples;

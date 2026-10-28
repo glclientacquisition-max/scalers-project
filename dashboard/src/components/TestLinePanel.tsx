@@ -56,15 +56,19 @@ export function TestLinePanel({
 
   const greetingPreview = useMemo(() => {
     if (!businessName) return "";
+    // KB business: the call greets with groups only (kb/source.js greetingFields), never items or old notes.
+    const kbLine = typeof tenant.kb_offering_line === "string" ? tenant.kb_offering_line : null;
     const sample = previewBusinessAssistantIntro({
       businessName,
       spokenName: tenant.spoken_name,
       greetingInvite: tenant.greeting_invite,
       agentName,
-      servicesCatalog: Array.isArray(tenant.services_catalog)
-        ? tenant.services_catalog
-        : [],
-      servicesOffered: tenant.services_offered,
+      ...(kbLine != null
+        ? { offeringLine: kbLine, servicesCatalog: [], servicesOffered: "" }
+        : {
+            servicesCatalog: Array.isArray(tenant.services_catalog) ? tenant.services_catalog : [],
+            servicesOffered: tenant.services_offered,
+          }),
     });
     // Raw greeting. The voice line applies pronunciation and tells us what it
     // said (X-Spoken-Text), so Desk never guesses how the line reads it.
@@ -76,6 +80,7 @@ export function TestLinePanel({
     tenant.greeting_invite,
     tenant.services_catalog,
     tenant.services_offered,
+    tenant.kb_offering_line,
   ]);
 
   const voiceLabel = displaySonioxVoiceLabel(

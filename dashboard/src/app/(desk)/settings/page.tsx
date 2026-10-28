@@ -36,6 +36,7 @@ import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
 import { DeskPageGate } from "@/components/DeskPageGate";
 import { deskAssistantSayPage } from "@/lib/deskFeatureFlags";
 import { loadAssistantSayState } from "@/lib/assistantSayVoice.server";
+import { loadKbCallerRow } from "@/lib/kbCaller.server";
 import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
 import { assistantSayBelowList } from "@/components/assistantSay/AssistantSayExtras";
 import { CallsForwardingPanel } from "@/components/CallsForwardingPanel";
@@ -154,8 +155,10 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   let assistantSaySlot = null;
   if (tab === "assistant-say" && assistantSayPage) {
     try {
-      const state = await loadAssistantSayState(tenant);
-      assistantSaySlot = <AssistantSayPanel state={state} belowList={assistantSayBelowList(tenant)} />;
+      // KB business: offered items only and no old services text, the same reads as the call.
+      const sayTenant = await loadKbCallerRow(tenant);
+      const state = await loadAssistantSayState(sayTenant);
+      assistantSaySlot = <AssistantSayPanel state={state} belowList={assistantSayBelowList(sayTenant)} />;
     } catch {
       assistantSaySlot = <DeskLoadError>Could not load what your Business Assistant will say.</DeskLoadError>;
     }

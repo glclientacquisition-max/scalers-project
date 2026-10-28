@@ -38,6 +38,8 @@ import {
   holdsFactValue,
   stableRowId,
 } from './factHash';
+import { parseCoverageAreas } from './coverageAreas';
+import { formatPriceDisplay, legacyPriceText, normalisePrice, priceIsSpeakable } from './factPrice';
 
 export const SOURCES = new Set(['owner', 'seed', 'import', 'inferred', 'call_suggested']);
 
@@ -467,26 +469,13 @@ export function policyKeyLabel(key: any) {
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : '';
 }
 
-// coverage_areas ids ("county:nairobi", "place:kitengela"). The server checks
-// each id against the place index (src/conversation/coverageAreas.js); this
-// file stays import-free, so it keeps the same shape without the index.
+// coverage_areas ids ("county:nairobi", "place:kitengela"), checked against the
+// same place index as Voice readCoverageAreas (coverageAreas.ts twin), so an id
+// the index does not know (e.g. "place:kiambu", a county) is dropped on both.
 function coverageAreaIds(obj: any): string[] | null {
   if (!Object.prototype.hasOwnProperty.call(obj, 'coverage_areas')) return null;
   if (!Array.isArray(obj.coverage_areas)) return null;
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const item of obj.coverage_areas) {
-    const id = String(item || '').trim().toLowerCase().replace(/\s+/g, ' ');
-    const split = id.indexOf(':');
-    if (split < 1) continue;
-    const kind = id.slice(0, split);
-    if (kind !== 'county' && kind !== 'place') continue;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    out.push(id);
-    if (out.length >= 40) break;
-  }
-  return out;
+  return parseCoverageAreas(obj.coverage_areas);
 }
 
 /**
@@ -746,17 +735,46 @@ export function buildCompileSections({
   };
 }
 
+/**
+ * Catalogue mode for one profile, the same rule as src/knowledge/kb/source.js:
+ * 'kb' when the profile carries a live KB handle (Voice attach) or Desk marked it
+ * as a KB business (kbCaller.ts sets kbMode after projecting offered items only);
+ * otherwise 'legacy'. KB mode never reads the old free-text services line.
+ */
+export function catalogueMode(profile: any = {}): "kb" | "legacy" {
+  if (profile && typeof profile === "object" && ((profile.kb && profile.kb.handle) || profile.kbMode === true)) return "kb";
+  return "legacy";
+}
+
+function priceForSpeech(row: any): string {
+  const priced = normalisePrice(row);
+  return priceIsSpeakable(priced) ? formatPriceDisplay(priced, "en", legacyPriceText(row)) : "";
+}
+
+// Twin of src/conversation/areaTerms.js speakableAreaFacts: owner-confirmed area
+// fees and times only (terms are already read by tenantProfileFromRow).
+function speakableAreaFacts(terms: any): { name: unknown; fee_ksh: unknown; eta: unknown }[] {
+  const areas: any[] = Array.isArray(terms?.areas) ? terms.areas : [];
+  const speakable = (a: any) => a.trusted && (a.feeMode === "free" || (a.feeMode === "fixed" && a.feeKsh != null));
+  return areas
+    .filter((a) => a.trusted)
+    .map((a) => ({ name: a.name, fee_ksh: speakable(a) && a.feeMode === "fixed" ? a.feeKsh : null, eta: a.eta }));
+}
+
 export function speechFactText(profile: any = {}) {
   const fieldMeta = profile.fieldMeta || null;
   const policies = factPolicyMap(profile.businessPolicies, fieldMeta).policies;
+  // KB v2: one catalogue door. In KB mode the profile catalogue is the offered-only
+  // projection (Voice attach or kbCaller.ts); legacy mode reads the same fields as before.
+  const mode = catalogueMode(profile);
   const products = factProducts(profile.productCatalog, fieldMeta).map((row) => ({
     name: row.name,
-    price: row.price || row.price_range || row.priceRange || '',
+    price: priceForSpeech(row),
     notes: row.notes || '',
   }));
   const services = factServices(profile.servicesCatalog, fieldMeta).map((row) => ({
     name: row.name,
-    price_range: row.price_range || row.priceRange || '',
+    price_range: priceForSpeech(row),
     notes: row.notes || '',
   }));
   const faqs = factFaqs(profile.faqs, fieldMeta).map((row) => ({
@@ -770,10 +788,12 @@ export function speechFactText(profile: any = {}) {
     bulletin: profile.dailyBulletin || profile.daily_bulletin || '',
     team: profile.teamDirectory || profile.team_directory || '',
     social: profile.socialHandles || profile.social_handles || '',
-    notes: profile.servicesNotes || profile.servicesOffered || profile.services_offered || '',
+    notes: mode === 'kb' ? '' : profile.servicesNotes || profile.servicesOffered || profile.services_offered || '',
     policies,
     products,
     services,
     faqs,
+    // Settings > Locations: owner-confirmed area fees and times only.
+    areaFees: speakableAreaFacts(profile.areaTerms),
   });
 }

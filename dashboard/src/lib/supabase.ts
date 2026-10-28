@@ -172,6 +172,11 @@ export type TenantRow = {
   notify_channels?: { sms?: boolean; whatsapp?: boolean; email?: boolean } | null;
   llm_system_prompt: string | null;
   services_offered?: string | null;
+  /**
+   * Desk only, never a column: set by withKbCatalogue for a KB business (offered kb_items). The greeting offering
+   * line the call uses (groups, never items; "" for one group). Absent: legacy reads (services_offered).
+   */
+  kb_offering_line?: string | null;
   services_catalog?: ServiceCatalogEntry[] | null;
   /** Retail/product rows — separate from services_catalog. */
   product_catalog?: Array<{
