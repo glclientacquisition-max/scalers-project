@@ -805,7 +805,7 @@ export function InboxTicketView({
         </div>
       ) : canHoldDone && hold ? (
         <div className="shrink-0 border-t border-hairline bg-surface px-4 py-3 sm:px-6">
-          <RequestStatusToggle id={hold.id} status={hold.status} banner />
+          <RequestStatusToggle id={hold.id} status={hold.status} banner requestType={hold.request_type} />
         </div>
       ) : null}
 

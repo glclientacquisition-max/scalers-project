@@ -87,7 +87,7 @@ export async function decideSwNameAction(id: string, decision: "approve" | "edit
   }
   if (decision === "edit") {
     const sw = String(text || "").trim().slice(0, 120);
-    if (!sw) return { ok: false, error: "Type the Swahili name." };
+    if (!sw) return { ok: false, error: "Type the Kiswahili name." };
     return writeItems(t.id, [{ ...prev, name_sw: sw, name_sw_state: "edited" }]);
   }
   return writeItems(t.id, [{ ...prev, name_sw: null, name_sw_state: "rejected" }]);

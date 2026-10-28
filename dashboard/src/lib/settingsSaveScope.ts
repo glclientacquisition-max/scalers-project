@@ -1,4 +1,4 @@
-import { parseGreetingLanguageField, type StoredGreetingLanguage } from "./identityGreeting.ts";
+import { parseGreetingLanguageField, parseGreetingTextClear, type StoredGreetingLanguage } from "./identityGreeting.ts";
 
 /**
  * Which form fields a Settings panel is allowed to overwrite.
@@ -21,6 +21,7 @@ const IDENTITY_ANSWER = [
   "sonioxVoiceId",
   "sonioxVoiceLabel",
   "greetingLanguage",
+  "greetingTextClear",
 ] as const;
 const IDENTITY_CONTACTS = ["socialHandles"] as const;
 
@@ -167,6 +168,18 @@ export function greetingLanguagePatch(
   if (posted === null || posted === undefined) return {};
   const value = parseGreetingLanguageField(posted);
   return value === undefined ? {} : { greeting_language: value };
+}
+
+/**
+ * tenants.greeting_text for this save: Desk only ever clears it (Go back to
+ * automatic), and only from a scope that owns the greeting (identity,
+ * identity-answer) when the form posted greeting_text_clear=1. Every other
+ * save leaves the owner's full greeting as stored. Never sent to Brain compile.
+ */
+export function greetingTextClearPatch(scope: string, posted: unknown): { greeting_text?: null } {
+  const owned = SETTINGS_SCOPE_FIELDS[scope];
+  if (!owned || !owned.includes("greetingTextClear")) return {};
+  return parseGreetingTextClear(posted) ? { greeting_text: null } : {};
 }
 
 /**

@@ -68,6 +68,40 @@ export function priceInWords(it: Pick<KbItem, "price_mode" | "price_amount" | "p
   }
 }
 
+/**
+ * The price on a list row. Same words as priceInWords, with the unit the item editor promises:
+ * a service with no unit is priced per job ("Empty means per job"), a product is priced each.
+ */
+export function rowPriceInWords(it: Pick<KbItem, "price_mode" | "price_amount" | "price_min" | "price_max" | "unit" | "kind">): string {
+  const unit = String(it.unit || "").trim() || (it.kind === "product" ? "" : "job");
+  return priceInWords({ ...it, unit });
+}
+
+/** "3 results" under the search box, so an owner knows the list is filtered. */
+export function searchCountLine(n: number): string {
+  return n === 1 ? "1 result" : `${n} results`;
+}
+
+export type StatusChoice = { value: "active" | "paused" | "not_offered"; label: string };
+const STATUS_CHOICES: StatusChoice[] = [
+  { value: "active", label: "Offered" },
+  { value: "paused", label: "Paused" },
+  { value: "not_offered", label: "Not offered" },
+];
+
+/**
+ * The item Status choices. States flag on (DESK_KB_ITEM_STATES): all three. Off: none, unless the
+ * item is already paused or not offered; then that state and Offered, so it is never hidden and
+ * the owner can put it back.
+ */
+export function statusChoices(statesEnabled: boolean, storedStatus: string): StatusChoice[] {
+  if (statesEnabled) return STATUS_CHOICES;
+  if (storedStatus === "paused" || storedStatus === "not_offered") {
+    return STATUS_CHOICES.filter((c) => c.value === "active" || c.value === storedStatus);
+  }
+  return [];
+}
+
 export type ItemState = "offered" | "paused" | "not_offered";
 export const STATE_LABEL: Record<ItemState, string> = { offered: "Offered", paused: "Paused", not_offered: "Not offered" };
 

@@ -69,6 +69,7 @@ export async function HomeUsageSlot({ tenant, isBeta }: { tenant: HomeTenant; is
       lowNotice={lowNotice}
       lowNoticeNote={lowNoticeNote}
       showLink={Boolean(lowNotice || (minuteStatus && !isBeta))}
+      isBeta={isBeta}
     />
   );
 }

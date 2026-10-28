@@ -20,6 +20,16 @@ export function deskAssistantSayPage(): boolean {
   return envFlagOn(process.env.DESK_ASSISTANT_SAY_PAGE);
 }
 
+/**
+ * Catalogue item states Paused and Not offered (the Status control on an item).
+ * Off by default: until the KB writers and the Brain KB reader are live, an old
+ * services save can force items back to active and calls would not honour the state.
+ * Server side only; the knowledge page passes it down as statesEnabled.
+ */
+export function deskKbItemStates(): boolean {
+  return envFlagOn(process.env.DESK_KB_ITEM_STATES);
+}
+
 export function voiceFallbackByKind(): boolean {
   return envFlagOn(process.env.VOICE_FALLBACK_BY_KIND);
 }

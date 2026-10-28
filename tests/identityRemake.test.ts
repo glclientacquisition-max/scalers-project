@@ -233,6 +233,7 @@ test("render: three cards, each its own form and scope; no spreadsheet; voice mo
   assert.doesNotMatch(page, /Not saved yet/);
   assert.match(page, /max-w-desk/, "MASTER desk width, not max-w-2xl");
   assert.match(page, /xl:grid-cols-2/);
+  assert.match(page, /xl:grid-rows-\[auto_1fr\]/, "row 1 never stretches: no dead gap under Your business");
   const copy = page.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "");
   assert.doesNotMatch(copy, /[\u2013\u2014]/, "no en or em dashes");
   assert.doesNotMatch(copy, /"[^"\n]*\b[Tt]enant\b[^"\n]*"|>[^<>{}\n]*\b[Tt]enant\b[^<>{}\n]*</, "no tenant in copy");

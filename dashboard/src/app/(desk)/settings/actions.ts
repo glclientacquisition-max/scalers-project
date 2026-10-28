@@ -69,6 +69,7 @@ import { cleanFieldPaths } from "@/lib/fieldPathRegistry";
 import { factSaveIsConfirm } from "@/lib/deskFeatureFlags";
 import {
   greetingLanguagePatch,
+  greetingTextClearPatch,
   saveMatchedNoRows,
   settingsFieldFromScope,
   settingsScopeValidationError,
@@ -496,6 +497,8 @@ export async function saveAndCompileSettings(
     tts_lexicon: ttsLexicon,
     // How you answer owns the business's default greeting language; no other save writes it.
     ...greetingLanguagePatch(scope, formData.get("greeting_language")),
+    // Go back to automatic clears the owner's full greeting (column grant, owner RLS). Not a compile input.
+    ...greetingTextClearPatch(scope, formData.get("greeting_text_clear")),
   };
 
   // FACT_HASH_MODE: confirm only what changed (plus "Looks right" paths). Both

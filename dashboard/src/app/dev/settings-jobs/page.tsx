@@ -57,6 +57,12 @@ const identityCustom = {
   greeting_invite: "Which book are you looking for",
 };
 
+/** ?identity=owntext: the owner's full greeting is saved (greeting_text), so Voice says it word for word. */
+const identityOwnText = {
+  business_name: "Done and Dusted",
+  greeting_text: "Karibu Done and Dusted, home cleaning made easy. How can we help you today?",
+};
+
 /** ?identity=sw: Kiswahili saved as the business's default greeting language. */
 const identityKiswahili = { greeting_language: "sw" as const };
 
@@ -114,6 +120,8 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
       ? { ...policiesT, ...identityEmpty }
       : identityState === "custom"
         ? { ...policiesT, ...identityFilled, ...identityCustom }
+        : identityState === "owntext"
+          ? { ...policiesT, ...identityFilled, ...identityOwnText }
         : identityState === "sw"
           ? { ...policiesT, ...identityFilled, ...identityKiswahili }
           : { ...policiesT, ...identityFilled }

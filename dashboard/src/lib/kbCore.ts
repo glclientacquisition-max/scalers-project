@@ -266,8 +266,8 @@ export const ISSUE_LINE: Record<string, string> = {
   one_item_categories: "Every item sits in its own group; group them so callers can narrow down",
   no_speakable_items: "Nothing to say yet: add at least one item",
   doc_too_large: "The catalogue is too large to compile",
-  sw_name_waiting: "has a Swahili name waiting for you",
-  no_sw_name: "has no Swahili name yet",
+  sw_name_waiting: "has a Kiswahili name waiting for you",
+  no_sw_name: "has no Kiswahili name yet",
 };
 
 // ---------------------------------------------------------------- paste a list (Desk bulk import)

@@ -6,11 +6,11 @@ import { useMemo, useState } from "react";
 import { CheckIcon } from "@heroicons/react/20/solid";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { SettingsGroup } from "@/components/settingsUi";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClass } from "@/components/ui/Button";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import type { ReadyChecklistItem } from "@/lib/assistantSayTypes";
 import type { OverviewDataCheck } from "@/components/structured/OverviewDataChecksCard";
-import { confirmCheckForReadyItem } from "@/lib/overviewDataChecks";
+import { confirmCheckForReadyItem, readyItemConfirmLink } from "@/lib/overviewDataChecks";
 import {
   OverviewCheckSheetHost,
   openSheetFromCheck,
@@ -60,6 +60,9 @@ export function HomeGetReadyCallsCard({
         <ul className="divide-y divide-hairline">
           {items.map((item) => {
             const confirmCheck = confirmCheckForReadyItem(item, checks);
+            // No sheet for this fact: a named button opens the exact spot instead of "Open Policies and save".
+            const confirmLink = !confirmCheck && canEdit ? readyItemConfirmLink(item) : null;
+            const reason = confirmLink ? confirmLink.reason : item.reason;
             return (
               <li
                 key={item.id}
@@ -93,8 +96,8 @@ export function HomeGetReadyCallsCard({
                         >
                           {item.label}
                         </Link>
-                        {item.reason ? (
-                          <p className="mt-0.5 line-clamp-2 text-meta text-ink-3">{item.reason}</p>
+                        {reason ? (
+                          <p className="mt-0.5 line-clamp-2 text-meta text-ink-3">{reason}</p>
                         ) : null}
                       </>
                     )}
@@ -110,6 +113,14 @@ export function HomeGetReadyCallsCard({
                   >
                     Confirm
                   </Button>
+                ) : confirmLink ? (
+                  <Link
+                    href={confirmLink.href}
+                    data-ready-confirm={item.id}
+                    className={buttonClass({ variant: "tonal", size: "sm", className: "shrink-0 self-start sm:self-center" })}
+                  >
+                    {confirmLink.label}
+                  </Link>
                 ) : null}
               </li>
             );

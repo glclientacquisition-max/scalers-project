@@ -76,7 +76,8 @@ describe("bookings + holds honesty desk copy", () => {
     assert.doesNotMatch(niche, /Fulfill hold/);
     assert.match(home, /copy\.holdCtaOne/);
     assert.match(home, /copy\.holdCtaMany/);
-    assert.match(holdActions, /wide \? "Hold Done" : "Done"/);
+    // Hold Done only for a real hold; a callback or enquiry banner says Mark done (holdDoneLabel).
+    assert.match(holdActions, /wide \? holdDoneLabel\(\{ request_type: requestType \}, vertical\) : "Done"/);
     assert.match(jobActions, /"Confirm"/);
     assert.doesNotMatch(jobActions, /Confirm booking/);
   });

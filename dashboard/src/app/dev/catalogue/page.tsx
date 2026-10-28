@@ -8,7 +8,7 @@ import { homeCategories, homeItems, homeLive, readinessTodo, shopCategories, sho
 
 /**
  * Settings > Catalogue (KB v2) with fixture data. DASHBOARD_OPEN=true only.
- * ?vertical=retail, ?cat=empty, ?role=viewer, ?filter=unpriced, ?paste=1
+ * ?vertical=retail, ?cat=empty, ?role=viewer, ?filter=unpriced, ?paste=1, ?states=on (Paused / Not offered control)
  */
 export const instant = false;
 
@@ -31,7 +31,7 @@ export default async function DevCataloguePage({ searchParams }: Props) {
           <main data-desk-main="" className={deskMainClass}>
             <div className="w-full min-w-0" data-settings-console="" data-desk-nested="">
               <div className={settingsConsoleClass}>
-                <SettingsRail activePath="/settings/knowledge" />
+                <SettingsRail activePath="/settings/knowledge" assistantSayPage />
                 <div className="min-w-0 flex-1 md:max-w-2xl xl:max-w-desk" data-kb-screen="">
                   <DevCatalogue
                     items={items}
@@ -43,6 +43,7 @@ export default async function DevCataloguePage({ searchParams }: Props) {
                     readyVersion={null}
                     vertical={retail ? "retail" : "home_services"}
                     canEdit={!viewer}
+                    statesEnabled={one(p.states) === "on"}
                     initialNeedPrice={one(p.filter) === "unpriced"}
                     initialPaste={one(p.paste) === "1"}
                   />

@@ -27,11 +27,13 @@ import {
   pasteRowLine,
   pasteSummary,
   pasteSummaryLine,
-  priceInWords,
   replaceConfirmLine,
   replaceKindClashes,
   replaceRemovals,
+  rowPriceInWords,
   rowTags,
+  searchCountLine,
+  statusChoices,
   savedLine,
   savesInstantly,
   sheetErrors,
@@ -67,6 +69,12 @@ export type CatalogueScreenProps = {
   initialNeedPrice?: boolean;
   /** ?paste=1 (old Import links) opens Paste a list. */
   initialPaste?: boolean;
+  /**
+   * Paused and Not offered (the item Status control). Server flag DESK_KB_ITEM_STATES, off by default
+   * until the KB writers and the Brain KB reader are live. Off: an item already in one of those states
+   * still shows it, with the way back to Offered.
+   */
+  statesEnabled?: boolean;
   actions: CatalogueActions;
 };
 
@@ -76,6 +84,7 @@ const SHOW_STEP = 150;
 
 export function CatalogueScreen(props: CatalogueScreenProps) {
   const { items, categories, live, latest, readiness, liveVersion, readyVersion, vertical, canEdit, actions } = props;
+  const statesEnabled = !!props.statesEnabled;
   const router = useRouter();
   const homeServices = vertical === "home_services";
   const [pending, start] = useTransition();
@@ -203,7 +212,8 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
               <Button variant="tonal" size="sm" onClick={() => setPasting(true)}>
                 Paste a list
               </Button>
-              <Button variant="primary" size="sm" leading={<PlusIcon aria-hidden="true" className="size-4" />} onClick={() => setEditing({ draft: newDraft(defaultKind, categories), fixing: false })}>
+              {/* One filled button per screen: Fix while prices are missing, else Add. */}
+              <Button variant={counts.needPrice ? "tonal" : "primary"} size="sm" leading={<PlusIcon aria-hidden="true" className="size-4" />} onClick={() => setEditing({ draft: newDraft(defaultKind, categories), fixing: false })} data-add="">
                 Add
               </Button>
             </div>
@@ -231,6 +241,11 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
                 <Input type="search" aria-label="Search your catalogue" placeholder="Search" value={query} onChange={(e) => { setQuery(e.target.value); setShown(SHOW_STEP); }} className="pl-9" />
               </div>
             ) : null}
+            {query.trim() ? (
+              <p className="px-4 pt-2 text-meta text-ink-2" role="status" aria-live="polite" data-search-count={list.length}>
+                {searchCountLine(list.length)}
+              </p>
+            ) : null}
             {needPrice ? (
               <div className="mx-4 mt-3 flex min-h-11 items-center justify-between gap-2 rounded-xl bg-surface-2 px-3" role="status" data-need-price-banner="">
                 <p className="text-meta text-ink">{`Showing ${list.length} that ${list.length === 1 ? "needs" : "need"} a price`}</p>
@@ -256,7 +271,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
                         ) : null}
                       </span>
                       <span className={cx("shrink-0 text-right text-body tabular-nums", unpriced ? "font-semibold text-attention" : "text-ink")} data-price-words="">
-                        {it.status === "not_offered" ? "" : priceInWords(it)}
+                        {it.status === "not_offered" ? "" : rowPriceInWords(it)}
                       </span>
                     </>
                   );
@@ -348,13 +363,13 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
                 {swEdit?.id === it.id ? (
                   <>
                     <Input aria-label={`Kiswahili name for ${it.name_en}`} value={swEdit.text} onChange={(e) => setSwEdit({ id: it.id, text: e.target.value })} className="max-w-56" />
-                    <Button size="sm" variant="primary" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "edit", swEdit.text), "Saved")}>
+                    <Button size="sm" variant="tonal" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "edit", swEdit.text), "Saved")}>
                       Save
                     </Button>
                   </>
                 ) : (
                   <>
-                    <Button size="sm" variant="primary" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "approve"), "Approved")}>
+                    <Button size="sm" variant="tonal" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "approve"), "Approved")}>
                       Approve
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setSwEdit({ id: it.id, text: it.name_sw_suggested || "" })}>
@@ -409,6 +424,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
           fixing={editing.fixing}
           left={counts.needPrice}
           retail={!homeServices}
+          statesEnabled={statesEnabled}
           categories={categories}
           actions={actions}
           onClose={() => setEditing(null)}
@@ -424,12 +440,6 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
   );
 }
 
-const STATE_ITEMS = [
-  { value: "active", label: "Offered" },
-  { value: "paused", label: "Paused" },
-  { value: "not_offered", label: "Not offered" },
-];
-
 const NOTHING_LINE: Partial<Record<PriceChoice, string>> = {
   quote: "Callers hear that you give a custom quote, and you get their details to call back.",
   site_visit: "Callers hear that you price it after a site visit, and you get their details to book one.",
@@ -441,6 +451,7 @@ function ItemSheet({
   fixing,
   left,
   retail,
+  statesEnabled,
   categories,
   actions,
   onClose,
@@ -451,6 +462,7 @@ function ItemSheet({
   fixing: boolean;
   left: number;
   retail: boolean;
+  statesEnabled: boolean;
   categories: KbCategory[];
   actions: CatalogueActions;
   onClose: () => void;
@@ -468,6 +480,7 @@ function ItemSheet({
   const [confirmRemove, setConfirmRemove] = useState(false);
   const set = (patch: Partial<KbDraft>) => setD((x) => ({ ...x, ...patch }));
   const isNew = !d.id;
+  const statuses = statusChoices(statesEnabled, draft.status);
 
   const save = (next: KbDraft = d) => {
     const errs = sheetErrors(next);
@@ -510,10 +523,11 @@ function ItemSheet({
       onOpenChange={(o) => (o ? null : onClose())}
       title={title}
       description={fixing ? `${left} without a price` : undefined}
+      height="compact"
       footer={
         confirmRemove ? (
           <>
-            <Button variant="ghost" onClick={() => setConfirmRemove(false)}>
+            <Button variant="ghost" onClick={() => setConfirmRemove(false)} className="me-auto">
               Keep
             </Button>
             <Button variant="dangerSolid" onClick={remove} pending={pending}>
@@ -527,7 +541,8 @@ function ItemSheet({
                 Skip
               </Button>
             ) : !isNew ? (
-              <Button variant="danger" onClick={() => setConfirmRemove(true)}>
+              // Remove sits at the start of the footer, away from Save.
+              <Button variant="danger" onClick={() => setConfirmRemove(true)} className="me-auto" data-remove-start="">
                 Remove
               </Button>
             ) : null}
@@ -542,7 +557,9 @@ function ItemSheet({
         {error ? <p className="rounded-xl bg-attention-tonal p-3 text-body text-attention" role="alert">{error}</p> : null}
         {confirmRemove ? (
           <p className="rounded-xl bg-surface-2 p-3 text-body text-ink" data-remove-confirm="">
-            {`Remove ${d.name_en || "this item"}? Callers stop hearing it. To stop for a while, keep it and mark it Paused under More.`}
+            {statuses.some((s) => s.value === "paused")
+              ? `Remove ${d.name_en || "this item"}? Callers stop hearing it. To stop for a while, keep it and set Status to Paused under More.`
+              : `Remove ${d.name_en || "this item"}? Callers stop hearing it.`}
           </p>
         ) : null}
         {isNew && retail ? (
@@ -655,13 +672,14 @@ function ItemSheet({
           </button>
           {moreOpen ? (
             <div id="item-more" className="space-y-4 pt-2" data-more-open="">
-              <div className="space-y-2">
-                <p className="text-meta font-medium text-ink">Callers hear</p>
+              {statuses.length ? (
+              <div className="space-y-2" data-item-status="">
+                <p className="text-meta font-medium text-ink">Status</p>
                 <SegmentedControl
-                  label="Callers hear"
+                  label="Status"
                   value={d.status}
                   onChange={(v) => set({ status: v === "paused" ? "paused" : v === "not_offered" ? "not_offered" : "active" })}
-                  items={STATE_ITEMS}
+                  items={statuses}
                 />
                 {d.status === "paused" ? (
                   <Field id="item-note" label="Note for callers" hint="Optional. For example: back next week.">
@@ -671,6 +689,7 @@ function ItemSheet({
                   <p className="text-meta text-ink-2">Callers who ask hear that you don&apos;t offer it.</p>
                 ) : null}
               </div>
+              ) : null}
               {d.kind !== "product" && d.status !== "not_offered" ? (
                 <Field id="item-excludes" label="Not included" hint="Optional. For example: outside windows.">
                   {(p) => <Input {...p} value={d.excludes_en} maxLength={500} onChange={(e) => set({ excludes_en: e.target.value })} />}

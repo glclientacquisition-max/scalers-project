@@ -105,7 +105,8 @@ describe("business settings craft", () => {
     assert.match(nav, /label: "Hours"/);
     assert.match(nav, /label: "Locations"/);
     assert.match(nav, /label: "Policies"/);
-    assert.match(nav, /label: "Voice"/);
+    assert.match(nav, /label: "On calls"/);
+    assert.doesNotMatch(nav, /label: "Voice"/, "one setting called Voice (the speaking voice in Identity)");
     assert.match(nav, /label: "Pronunciation"/);
     assert.doesNotMatch(nav, /label: "Updates"/);
     assert.match(nav, /label: "Test"/);
@@ -392,7 +393,7 @@ describe("business settings craft", () => {
       "Import",
       "FAQs",
       "What it will say",
-      "Voice",
+      "On calls",
       "Pronunciation",
       "Test",
       "Calls & forwarding",

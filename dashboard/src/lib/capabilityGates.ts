@@ -202,7 +202,7 @@ export function capabilityGates(
     gate(
       {
         id: "callbacks",
-        title: "Callbacks",
+        title: "Call backs",
         question: "Can I talk to the owner?",
         callerHearsLive: `"I've taken your details. The owner will call you back."`,
         callerHearsLocked: `"I've taken your message and passed it to the team."`,

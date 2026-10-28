@@ -31,3 +31,20 @@ export function confirmCheckForReadyItem(
   if (item.complete || !reasonNeedsOverviewConfirm(item.reason)) return null;
   return confirmCheckForItem(item.id, checks);
 }
+
+/** Policies, scrolled to the payment details. */
+export const PAYMENTS_SECTION_HREF = "/settings?tab=train&panel=policies#payments";
+
+/**
+ * A Get ready row whose fix is a named button instead of "Open Policies and save":
+ * payment details that are saved but not confirmed open the exact spot to confirm them.
+ */
+export function readyItemConfirmLink(
+  item: ReadyChecklistItem
+): { href: string; label: string; reason: string } | null {
+  if (item.complete || !reasonNeedsOverviewConfirm(item.reason)) return null;
+  if (item.id === "payment") {
+    return { href: PAYMENTS_SECTION_HREF, label: "Confirm payment details", reason: "Saved but not confirmed." };
+  }
+  return null;
+}

@@ -7,6 +7,7 @@ import { SettingsRail } from "@/components/SettingsSideNav";
 import { settingsConsoleClass } from "@/components/settingsUi";
 import { KnowledgeCatalogue } from "@/components/catalogue/KnowledgeCatalogue";
 import { loadKbState } from "@/lib/kb.server";
+import { deskAssistantSayPage, deskKbItemStates } from "@/lib/deskFeatureFlags";
 import { memberCan } from "@/lib/requireMember";
 import { loadSettingsStatuses } from "@/lib/settingsRailStatus";
 import { getCurrentTenant } from "@/lib/tenant";
@@ -30,7 +31,7 @@ async function KnowledgeBody({ searchParams }: { searchParams: Promise<Search> }
   return (
     <div className="w-full min-w-0" data-settings-console="" data-desk-nested="">
       <div className={settingsConsoleClass}>
-        <SettingsRail optionStatus={statuses} activePath="/settings/knowledge" />
+        <SettingsRail optionStatus={statuses} activePath="/settings/knowledge" assistantSayPage={deskAssistantSayPage()} />
         <div className="min-w-0 flex-1 md:max-w-2xl xl:max-w-desk" data-kb-screen="">
           <KnowledgeCatalogue
             items={state.items}
@@ -42,6 +43,7 @@ async function KnowledgeBody({ searchParams }: { searchParams: Promise<Search> }
             readyVersion={state.readyVersion}
             vertical={parseVertical(tenant.vertical)}
             canEdit={canEdit}
+            statesEnabled={deskKbItemStates()}
             initialNeedPrice={needPrice}
             initialPaste={first(search.paste) === "1"}
           />

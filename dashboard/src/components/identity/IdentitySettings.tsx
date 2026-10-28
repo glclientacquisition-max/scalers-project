@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { PencilSquareIcon, PlusIcon, SpeakerWaveIcon } from "@heroicons/react/20/solid";
 import { useCan, withRoleGate } from "@/components/DeskRole";
 import { useFormDraft, useFormSave } from "@/components/useFormSave";
@@ -41,8 +41,8 @@ import {
   autoGreetingLanguage,
   buildGreetingSentence,
   greetingInviteLine,
-  greetingIsAutomatic,
   greetingLanguageForStorage,
+  greetingMode,
   greetingLanguagePickFromStored,
   resolveGreetingLanguage,
   type GreetingLanguage,
@@ -268,7 +268,7 @@ function initialVoiceId(tenant: TenantRow, voices: CuratedSonioxVoice[]): string
 }
 
 const LANGUAGE_PICKS: readonly { value: GreetingLanguagePick; label: string; detail?: string }[] = [
-  { value: "auto", label: "Automatic", detail: "Kiswahili when your question is in Kiswahili, else English" },
+  { value: "auto", label: "Automatic", detail: "Kiswahili when your greeting words are in Kiswahili, else English" },
   ...GREETING_LANGUAGES.map((l) => ({ value: l.id as GreetingLanguagePick, label: l.label })),
 ];
 
@@ -306,9 +306,17 @@ function AnswerCard({
   const [languagePick, setLanguagePick] = useState<GreetingLanguagePick>(() =>
     greetingLanguagePickFromStored(tenant.greeting_language)
   );
-  const greetingText = tenant.greeting_text || "";
-  const automatic = greetingIsAutomatic({ spokenName, greetingInvite });
+  // tenants.greeting_text: the owner's full greeting, said word for word. Desk never types one;
+  // Go back to automatic clears it with this card's save (greeting_text_clear). Not a compile input.
+  const [storedOwnText, setStoredOwnText] = useState(() => (tenant.greeting_text || "").trim());
+  const [ownText, setOwnText] = useState(storedOwnText);
+  const greetingText = ownText;
+  const clearOwnText = Boolean(storedOwnText) && !ownText;
+  const mode = greetingMode({ greetingText: ownText, spokenName, greetingInvite });
+  const automatic = mode === "automatic";
   const [editingGreeting, setEditingGreeting] = useState(false);
+  // Change greeting opens on these values; Cancel and Escape put them back.
+  const openedWith = useRef<{ spokenName: string; greetingInvite: string } | null>(null);
   const storedLabel = String(tenant.soniox_voice_label || "").trim();
   // A label names the old voice; a new voice drops it.
   const voiceLabel = voiceId === storedVoiceId ? storedLabel : "";
@@ -327,14 +335,17 @@ function AnswerCard({
     formId,
     async (prev, data) => {
       const res = await saveAndCompileSettings(prev, data);
-      if (res.ok && !res.error) setStoredVoiceId(String(data.get("soniox_voice_id") || ""));
+      if (res.ok && !res.error) {
+        setStoredVoiceId(String(data.get("soniox_voice_id") || ""));
+        if (String(data.get("greeting_text_clear") || "") === "1") setStoredOwnText("");
+      }
       return res;
     },
     onSaveActivity
   );
   const { dirty, justSaved } = useFormDraft(save, {
     id: formId,
-    values: [agentName, tone, spokenName, greetingInvite, voiceId, languagePick],
+    values: [agentName, tone, spokenName, greetingInvite, voiceId, languagePick, ownText],
   });
 
   const [sampleUrl, setSampleUrl] = useState<string | null>(null);
@@ -380,10 +391,48 @@ function AnswerCard({
     }
   }
 
+  // Go back to automatic, then Keep my greeting: everything returns as it was.
+  const beforeAutomatic = useRef<{ spokenName: string; greetingInvite: string } | null>(null);
   function switchToAutomatic() {
+    if (mode === "own") beforeAutomatic.current = { spokenName, greetingInvite };
     setSpokenName("");
     setGreetingInvite("");
+    setOwnText("");
     setEditingGreeting(false);
+    openedWith.current = null;
+  }
+
+  function keepOwnGreeting() {
+    const was = beforeAutomatic.current;
+    if (was) {
+      setSpokenName(was.spokenName);
+      setGreetingInvite(was.greetingInvite);
+    }
+    beforeAutomatic.current = null;
+    setOwnText(storedOwnText);
+  }
+
+  function openGreetingEdit() {
+    openedWith.current = { spokenName, greetingInvite };
+    setEditingGreeting(true);
+  }
+
+  /** Cancel and Escape: the name and question go back to how they were when Change greeting opened. */
+  function cancelGreetingEdit() {
+    const was = openedWith.current;
+    if (was) {
+      setSpokenName(was.spokenName);
+      setGreetingInvite(was.greetingInvite);
+    }
+    openedWith.current = null;
+    setEditingGreeting(false);
+  }
+
+  function onGreetingKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Escape" || !editingGreeting) return;
+    event.preventDefault();
+    event.stopPropagation();
+    cancelGreetingEdit();
   }
 
   const voiceOptions = voices.map((voice) => ({
@@ -414,10 +463,11 @@ function AnswerCard({
             name="greeting_language"
             value={greetingLanguageForStorage(languagePick) ?? "auto"}
           />
+          {clearOwnText ? <input type="hidden" name="greeting_text_clear" value="1" /> : null}
         </>
       }
     >
-      <div className="space-y-3 px-4 py-3" data-greeting="" data-greeting-mode={automatic ? "automatic" : "custom"}>
+      <div className="space-y-3 px-4 py-3" data-greeting="" data-greeting-mode={mode} onKeyDown={onGreetingKeyDown}>
         <div className="flex min-h-6 items-center gap-2">
           <p className="text-meta font-medium text-ink-2" id="identity-greeting-label">
             Callers hear
@@ -428,6 +478,13 @@ function AnswerCard({
               className="rounded-md bg-accent-soft px-1.5 py-0.5 text-meta font-medium text-accent-deep"
             >
               Automatic
+            </span>
+          ) : mode === "own" ? (
+            <span
+              data-greeting-own=""
+              className="rounded-md bg-surface-2 px-1.5 py-0.5 text-meta font-medium text-ink"
+            >
+              Your own greeting
             </span>
           ) : null}
         </div>
@@ -448,7 +505,18 @@ function AnswerCard({
             </p>
           ) : null}
         </div>
-        {sentence.text && sentence.notice ? (
+        {mode === "own" ? (
+          <p className="text-meta text-ink-2" data-greeting-own-help="">
+            Callers hear these words exactly. Go back to automatic to build it from your business name.
+          </p>
+        ) : clearOwnText ? (
+          <div className="flex flex-wrap items-center gap-x-3" data-greeting-clear-pending="">
+            <p className="min-w-0 flex-1 text-meta text-ink-2">Save to switch. Until then callers hear your own greeting.</p>
+            <button type="button" onClick={keepOwnGreeting} data-keep-own="" className={settingsGhostButtonClass}>
+              Keep my greeting
+            </button>
+          </div>
+        ) : sentence.text && sentence.notice ? (
           <p className="text-meta text-ink-2" data-greeting-notice-help="">
             Calls also get a short recording notice.
           </p>
@@ -465,18 +533,27 @@ function AnswerCard({
               Hear it
             </Button>
           </span>
-          {canEdit ? (
+          {canEdit && mode !== "own" ? (
             <button
               type="button"
               aria-expanded={editingGreeting}
               aria-controls="identity-greeting-fields"
-              onClick={() => setEditingGreeting((open) => !open)}
+              onClick={() => (editingGreeting ? setEditingGreeting(false) : openGreetingEdit())}
               className={settingsGhostButtonClass}
             >
               {editingGreeting ? "Done" : "Change greeting"}
             </button>
           ) : null}
-          {canEdit && !automatic ? (
+          {canEdit && editingGreeting ? (
+            <button type="button" onClick={cancelGreetingEdit} data-greeting-cancel="" className={settingsGhostButtonClass}>
+              Cancel
+            </button>
+          ) : null}
+          {canEdit && mode === "own" ? (
+            <button type="button" onClick={switchToAutomatic} data-go-automatic="" className={settingsGhostButtonClass}>
+              Go back to automatic
+            </button>
+          ) : canEdit && !automatic && !editingGreeting ? (
             <button type="button" onClick={switchToAutomatic} data-use-automatic="" className={settingsGhostButtonClass}>
               Use automatic
             </button>
@@ -502,8 +579,8 @@ function AnswerCard({
           </p>
         ) : null}
       </div>
-      {editingGreeting && canEdit ? (
-        <div id="identity-greeting-fields" data-greeting-fields="">
+      {editingGreeting && canEdit && mode !== "own" ? (
+        <div id="identity-greeting-fields" data-greeting-fields="" onKeyDown={onGreetingKeyDown}>
           <SettingsRow label="Name callers hear" htmlFor="spoken_name">
             <input
               id="spoken_name"
@@ -772,9 +849,12 @@ function IdentitySettingsInner({
           wide
           title={heading ?? "Identity"}
         />
-        {/* Wide desktop: two columns up to the MASTER desk width, so no empty right side. */}
+        {/* Wide desktop: two columns up to the MASTER desk width, so no empty right side.
+            Rows are auto then 1fr: How you answer spans both, and its extra height lands in
+            row 2, so Your business never stretches and leaves a dead gap above the contacts.
+            DOM order stays business, answer, contacts (phone reading and focus order). */}
         <div
-          className="grid w-full min-w-0 max-w-desk grid-cols-1 items-start gap-6 xl:grid-cols-2"
+          className="grid w-full min-w-0 max-w-desk grid-cols-1 items-start gap-6 xl:grid-cols-2 xl:grid-rows-[auto_1fr]"
           data-identity-page=""
         >
           <div className="min-w-0 xl:col-start-1 xl:row-start-1">
