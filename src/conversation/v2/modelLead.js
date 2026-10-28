@@ -187,7 +187,11 @@ const OF = require('./ownerFacts'); // B1: the one owner-fact projection
 
 /** KB slice the model may quote (prices only reach the caller when asked: G8). */
 function kb(profile = {}) {
-  const services = (profile.servicesCatalog || []).slice(0, 40).map((s) => ({ id: s.id, name: s.name, price: s.pricing?.confirmed === false ? null : s.price_range || null }));
+  // v2 KB: the snapshot's index (names grouped by category, capped ~1,500 tokens, no prices: Hick rule 6, price only on pick)
+  const kbIndex = require('../../knowledge/kb/live').promptIndex(profile);
+  const services = kbIndex
+    ? kbIndex.groups.map((g) => (g.names ? { group: g.cat, names: g.names } : { group: g.cat, count: g.count }))
+    : (profile.servicesCatalog || []).slice(0, 40).map((s) => ({ id: s.id, name: s.name, price: s.pricing?.confirmed === false ? null : s.price_range || null }));
   const h = hoursFact(profile);
   // owner policies + FAQs: the ONE shared projection (ownerFacts.js), every topic the owner filled in
   const own = OF.kbRows(OF.ownerFacts(profile));
@@ -366,6 +370,7 @@ function makeVerifier(ctx) {
   const answered = new Map(); // subject -> polarity already spoken (G4)
   const asked = new Set((ctx.questions || []).map((q) => q.type));
   const prices = new Set(); for (const s of ctx.profile.servicesCatalog || []) { for (const n of nums(s.price_range || '')) prices.add(n); const pl = RF.priceLine(s, ctx.text || '', ctx.lang); for (const n of (pl && pl.nums) || []) prices.add(n); }
+  for (const n of require('../../knowledge/kb/live').knownNumbers(ctx.profile)) prices.add(n); // v2 KB: products, variants, group spans + counts
   const known = new Map(ctx.coverage.map((r) => [r.place.toLowerCase(), r]));
   const act = { questions: 0, claimed: false };
   const ownerOf = OF.ownerFacts(ctx.profile || {});
@@ -431,6 +436,8 @@ function makeVerifier(ctx) {
   return { check, act, answered };
 }
 function priceFix(ctx) {
+  const kbh = require('../../knowledge/kb/live').handle(ctx.profile);
+  if (kbh) { const a = require('../../knowledge/kb/rules').answer(kbh, [ctx.machine && ctx.machine.slots && ctx.machine.slots.service, ctx.text].filter(Boolean).join(' '), { asksPrice: true, lang: ctx.lang }); if (a.text && a.kind === 'item') return a.text; }
   const svc = (ctx.profile.servicesCatalog || []).find((x) => x.name === (ctx.machine.slots && ctx.machine.slots.service)) || CP.matchServices(ctx.text || '', ctx.profile)[0];
   const pl = RF.priceLine(svc, ctx.text || '', ctx.lang); if (pl) return pl.text;
   return sw(ctx.lang) ? 'Sina bei kamili hapa; timu inaweza kuthibitisha.' : "I don't have the exact price here; the team can confirm.";
@@ -598,7 +605,7 @@ const R_SCHEMA = {
 const RPREFIX = new Map();
 /** Trimmed facts: service names (+ price only as a string the model may quote when asked), hours, payment. */
 function replyRequest(pack, profile = {}) {
-  const k = kb(profile); const facts = { business: k.business, agent: k.agent, services: k.services.map((x) => (x.price ? `${x.name} (${x.price})` : x.name)), hours: k.hours, payment: k.payment };
+  const k = kb(profile); const facts = { business: k.business, agent: k.agent, services: k.services.map((x) => (x.group !== undefined ? x : x.price ? `${x.name} (${x.price})` : x.name)), hours: k.hours, payment: k.payment };
   const key = `${profile.id || profile.tenantId || ''}|${JSON.stringify(facts).length}`;
   if (!RPREFIX.has(key)) RPREFIX.set(key, { systemInstruction: { parts: [{ text: `${R_SYSTEM}\nFACTS: ${JSON.stringify(facts)}` }] }, generationConfig: { temperature: 0.3, maxOutputTokens: 160, responseMimeType: 'application/json', responseSchema: R_SCHEMA, thinkingConfig: { thinkingLevel: 'MINIMAL' } } });
   return { ...RPREFIX.get(key), contents: [{ role: 'user', parts: [{ text: JSON.stringify(pack) }] }] };

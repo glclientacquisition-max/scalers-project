@@ -41,12 +41,18 @@ function makeEnginesVerifier(ctx, { allowed = null, readbackTurn = false } = {})
   const base = ML.makeVerifier(ctx);
   const origCheck = base.check.bind(base);
   const times = allowed || allowedTimes({ receipts: ctx.receiptsForTimes || [], machine: ctx.machine, profile: ctx.profile });
+  const kbh = require('../../knowledge/kb/live').handle(ctx.profile);
+  const kbNames = kbh ? [...new Set(kbh.doc.items.map((x) => String(x.say_en || '').toLowerCase()).filter((x) => x.length >= 4))] : null;
+  let listed = 0;
   base.check = (raw) => {
     const s = String(raw || '').trim();
     if (!s) return { verdict: 'drop', reason: 'empty' };
     if (READBACK_LIKE.test(s)) return { verdict: 'drop', reason: readbackTurn ? 'readback_mismatch_model' : 'model_readback' };
     const bad = timesIn(s).filter((t) => !times.has(t));
     if (bad.length) return { verdict: 'drop', reason: `time_not_in_receipts:${bad[0]}` };
+    // v2 KB, Hick rule 2: at most 3 catalogue names in one turn; a longer model list is swapped for the rules-made receipt
+    if (kbNames && namesIn(s, kbNames) + listed > MAX_LIST) return ctx.kbReceipt ? { verdict: 'repair', text: ctx.kbReceipt, reason: 'kb_list_over_3' } : { verdict: 'drop', reason: 'kb_list_over_3' };
+    if (kbNames) listed += namesIn(s, kbNames);
     const v = origCheck(s);
     if (v.verdict === 'replace') {
       // engines: never swap a template in; a real fact fix of the same sentence is the one allowed repair
@@ -57,6 +63,9 @@ function makeEnginesVerifier(ctx, { allowed = null, readbackTurn = false } = {})
   };
   return base;
 }
+
+const MAX_LIST = 3;
+function namesIn(s, names) { const low = String(s || '').toLowerCase(); let n = 0; for (const x of names) if (low.includes(x)) n += 1; return n; }
 
 /** Engines never use callPlan replace verdicts. */
 function actCheckEngines(text, st, ctx) {
