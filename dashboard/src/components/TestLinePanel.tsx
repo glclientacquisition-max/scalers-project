@@ -12,6 +12,7 @@ import {
   type CuratedSonioxVoice,
 } from "@/lib/sonioxVoiceCatalog";
 import type { TenantRow } from "@/lib/supabase";
+import { KbPendingNote } from "@/components/KbPendingNote";
 import {
   assertPreviewAudioPlayable,
   NO_VOICE_SAMPLE_COPY,
@@ -56,7 +57,8 @@ export function TestLinePanel({
 
   const greetingPreview = useMemo(() => {
     if (!businessName) return "";
-    // KB live: the call greets with groups only (kb/source.js greetingFields), never items or old notes.
+    // isKbLive: the line comes from the published snapshot (kb/source.js openerLine on the server), groups only,
+    // never items or old notes, and never mixed with the stored row.
     const kbLine = typeof tenant.kb_offering_line === "string" ? tenant.kb_offering_line : null;
     const sample = previewBusinessAssistantIntro({
       businessName,
@@ -151,6 +153,7 @@ export function TestLinePanel({
     <div className="min-w-0 w-full space-y-6">
       <SettingsGroup title="Preview">
         <div className="space-y-3 px-4 py-3">
+          <KbPendingNote pending={tenant.kb_pending === true && typeof tenant.kb_offering_line === "string"} />
           {greetingPreview ? (
             <blockquote className="border-l-2 border-accent/50 pl-4 text-body leading-relaxed text-ink">
               “{greetingPreview}”

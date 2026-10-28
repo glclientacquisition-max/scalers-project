@@ -173,10 +173,12 @@ export type TenantRow = {
   llm_system_prompt: string | null;
   services_offered?: string | null;
   /**
-   * Desk only, never a column: set by withKbCatalogue when the KB is live (kbCaller.ts isKbLive). The greeting offering
-   * line the call uses (groups, never items; "" for one group). Absent: legacy reads (services_offered).
+   * Desk only, never a column: set by withKbCatalogue when isKbLive and the live snapshot was read. The greeting
+   * offering line that snapshot gives (groups, never items; "" for one group). Absent: legacy reads (services_offered).
    */
   kb_offering_line?: string | null;
+  /** Desk only, never a column: saves newer than the live snapshot are still compiling (KbPendingNote). */
+  kb_pending?: boolean;
   services_catalog?: ServiceCatalogEntry[] | null;
   /** Retail/product rows — separate from services_catalog. */
   product_catalog?: Array<{

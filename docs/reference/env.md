@@ -41,7 +41,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BRAIN_ENGINES_REPLY_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_ENGINES_UNDERSTAND_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_GEMINI_CATALOGUE` | voice | `src/conversation/catalogueMouth.js` |
-| `BRAIN_KB_GATE` | desk, voice | `dashboard/src/lib/kbCaller.server.ts`<br>`dashboard/src/lib/kbLive.server.ts`<br>`src/db.js` |
+| `BRAIN_KB_GATE` | desk, voice | `dashboard/src/lib/kbLive.server.ts`<br>`src/db.js` |
 | `BRAIN_MODEL_LEAD` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_V1_DRAFT` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_V1_DRAFT_PHASE_A` | scripts | `scripts/brain-engines-sim.js` |

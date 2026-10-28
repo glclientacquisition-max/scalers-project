@@ -2,6 +2,7 @@ import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getVoicePublicBase } from "@/lib/voicePublicBase.js";
 import type { KbCategory, KbItem, KbReadiness, KbSnapshotRow } from "@/lib/kbCore";
+import { isKbLive, type KbLiveReason } from "@/lib/kbLive.server";
 
 export type KbState = {
   ok: true;
@@ -13,6 +14,9 @@ export type KbState = {
   liveVersion: number | null;
   readyVersion: number | null;
   brainTarget: "v1" | "v2";
+  /** The shared isKbLive (kbLive.server) on the row read above; the client gets only the boolean. */
+  onCalls: boolean;
+  onCallsReason: KbLiveReason;
 } | { ok: false; reason: "no_tables" | "error" };
 
 const ITEM_COLS =
@@ -50,6 +54,7 @@ export async function loadKbState(tenantId: string): Promise<KbState> {
     price_max: n(r.price_max),
     aliases: Array.isArray(r.aliases) ? (r.aliases as string[]) : [],
   }));
+  const decision = isKbLive({ kb_live_version: liveV, kb_ready_version: n(tenant.data?.kb_ready_version), brain_target: tenant.data?.brain_target ?? null });
   return {
     ok: true,
     items: items2,
@@ -60,6 +65,8 @@ export async function loadKbState(tenantId: string): Promise<KbState> {
     liveVersion: liveV,
     readyVersion: n(tenant.data?.kb_ready_version),
     brainTarget: tenant.data?.brain_target === "v1" ? "v1" : "v2",
+    onCalls: decision.live,
+    onCallsReason: decision.reason,
   };
 }
 

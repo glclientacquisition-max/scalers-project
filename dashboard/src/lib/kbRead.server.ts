@@ -12,7 +12,6 @@ import { loadKbItems } from "@/lib/kbWrite.server";
 export async function loadKbCatalogueView(
   tenantId: string,
   stored: { services_catalog?: unknown; product_catalog?: unknown; services_offered?: string | null },
-  opts: { kbLive?: boolean } = {},
 ): Promise<KbCatalogueView | null> {
   try {
     const [items, cats] = await Promise.all([
@@ -20,7 +19,7 @@ export async function loadKbCatalogueView(
       getSupabaseAdmin().from("kb_categories").select("id, name_en, name_sw, name_sw_state, sort").eq("tenant_id", tenantId),
     ]);
     if (!items || cats.error) return null;
-    return kbCatalogueView(items, (cats.data || []) as KbCategory[], stored, opts);
+    return kbCatalogueView(items, (cats.data || []) as KbCategory[], stored);
   } catch {
     return null;
   }

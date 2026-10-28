@@ -1,14 +1,15 @@
 // Desk twin parity: dashboard/src/lib/provenance.ts speechFactText (and factPrice.ts, kbCaller.ts) against Voice
 // src/conversation/provenance.js on shared fixtures, legacy and KB v2 mode (Brain #1000: the fact sheet reads
-// through src/knowledge/kb/source.js; notes are empty when the KB is live). One predicate, isKbLive =
-// BRAIN_KB_GATE on AND readiness passed for the live snapshot; BRAIN_CONFIRMED_COVERAGE passed in, default off.
+// through src/knowledge/kb/source.js; notes are empty when the KB is live). The decision is ONLY the shared
+// isKbLive (src/knowledge/kb/kbLive.js via dashboard/src/lib/kbLive.server.ts); when live the preview is the
+// published snapshot attached with Voice's own kb/live.attach, never kb_items. BRAIN_CONFIRMED_COVERAGE passed in.
 // Run: node --experimental-strip-types --no-warnings --import ./tests/registerTs.mjs --test tests/provenanceMirror.test.ts
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { catalogueMode, factPolicyMap as deskPolicyMap, indexFieldMeta as deskIndex, speechFactText as deskFacts, withConfirmedCoverage } from "../dashboard/src/lib/provenance.ts";
 import * as DP from "../dashboard/src/lib/factPrice.ts";
-import { isKbLive, kbCallerRow, kbFactProfile, kbOpenerLine, offeredKbItems } from "../dashboard/src/lib/kbCaller.ts";
+import { KB_PENDING_LINE, kbChangesPending, kbFactProfile, kbSnapshotAttachArgs } from "../dashboard/src/lib/kbCaller.ts";
 import { mirrorLegacy } from "../dashboard/src/lib/kbCore.ts";
 import { kbCatalogueView, withKbCatalogue } from "../dashboard/src/lib/kbRead.ts";
 import type { KbCategory, KbItem } from "../dashboard/src/lib/kbCore.ts";
@@ -23,6 +24,7 @@ const VP = require("../src/conversation/factPrice");
 const C = require("../src/knowledge/kb/compile");
 const L = require("../src/knowledge/kb/live");
 const S = require("../src/knowledge/kb/source");
+const { isKbLive } = require("../src/knowledge/kb/kbLive");
 const { tenantProfileFromRow } = require("../src/tenantProfile");
 const FR = require("./fixtures/dndSimTenant.json");
 const GOLD = require("./fixtures/kbLegacyGolden.json");
@@ -99,55 +101,88 @@ const voiceAttached = ({ gate, ready }: { gate: boolean; ready: boolean }) => {
   L.attach(p, { version: 3, readyVersion: ready ? 3 : 2, brainTarget: "v2", doc: compiled.doc, bytes: null, loadMs: 1 }, { env: { BRAIN_KB_GATE: gate ? "on" : "off" } });
   return p;
 };
-const deskProfileFor = ({ gate, ready }: { gate: boolean; ready: boolean }) => {
-  const live = isKbLive({ gate, liveVersion: 3, brainTarget: "v2", readinessPassed: ready, snapshot: true });
-  return { live, profile: kbFactProfile(tenantProfileFromRow(kbCallerRow({ ...STORED }, ITEMS, CATS, live), { areaPicksRows: [] }), live) };
+// The Desk path (kbCaller.server.ts): shared isKbLive on the tenant facts; live -> the snapshot for kb_live_version,
+// attached with Voice's live.attach (kbSnapshotAttachArgs). Not live, or no readable snapshot -> the stored row.
+const SNAP = { version: 3, brainTarget: "v2", doc: compiled.doc, bytes: null, compiledAt: "2026-10-28T07:00:00Z" };
+const deskProfileFor = ({ gate, ready }: { gate: boolean; ready: boolean }, snapshot: typeof SNAP | null = SNAP) => {
+  const d = isKbLive({ kb_live_version: 3, kb_ready_version: ready ? 3 : 2, brain_target: "v2" }, { gate: gate ? "on" : "off" });
+  const profile = tenantProfileFromRow({ ...STORED }, { areaPicksRows: [] });
+  if (d.live && snapshot) L.attach(profile, ...kbSnapshotAttachArgs(snapshot));
+  return { live: d.live, reason: d.reason, profile };
 };
 
 for (const c of [
-  { gate: false, ready: false, want: "legacy" },
-  { gate: false, ready: true, want: "legacy" },
-  { gate: true, ready: false, want: "legacy" },
-  { gate: true, ready: true, want: "kb" },
+  { gate: false, ready: false, want: "legacy", reason: "gate_off" },
+  { gate: false, ready: true, want: "legacy", reason: "gate_off" },
+  { gate: true, ready: false, want: "legacy", reason: "ready_stale" },
+  { gate: true, ready: true, want: "kb", reason: "ready" },
 ] as const) {
-  test(`gate ${c.gate ? "on" : "off"}, readiness ${c.ready ? "passed" : "not passed"}: ${c.want}, same fact sheet as Voice`, () => {
+  test(`gate ${c.gate ? "on" : "off"}, readiness ${c.ready ? "passed" : "not passed"}: ${c.want} (${c.reason}), same fact sheet as Voice`, () => {
     const vp = voiceAttached(c);
     assert.equal(S.catalogueSource(vp).mode, c.want);
-    const { live, profile } = deskProfileFor(c);
+    const { live, reason, profile } = deskProfileFor(c);
     assert.equal(live, c.want === "kb");
+    assert.equal(reason, c.reason);
     assert.equal(catalogueMode(profile), c.want);
-    const voice = JSON.parse(PV.speechFactText(vp));
+    assert.equal(S.catalogueSource(profile).mode, c.want);
+    assert.equal(deskFacts(profile), PV.speechFactText(vp), "Desk preview is byte for byte what Voice reads");
     const desk = JSON.parse(deskFacts(profile));
-    assert.deepEqual(desk.services, voice.services);
-    assert.deepEqual(desk.products, voice.products);
-    assert.equal(desk.notes, voice.notes);
     if (c.want === "legacy") {
-      assert.equal(deskFacts(profile), PV.speechFactText(vp), "legacy is byte for byte");
       assert.match(desk.notes, /legacy text/);
       assert.match(JSON.stringify(desk.services), /Sofa cleaning/, "legacy keeps the stored rows");
     } else {
       assert.equal(desk.notes, "");
       assert.ok(!OFF_NAMES.test(JSON.stringify(desk)), "off item in the KB fact sheet");
-      // Voice code on the Desk-projected row (the What it will say page path) reads the same.
-      const onRow = JSON.parse(PV.speechFactText(tenantProfileFromRow(kbCallerRow({ ...STORED }, ITEMS, CATS, true), { areaPicksRows: [] })));
-      assert.deepEqual(onRow.services, voice.services);
-      assert.equal(onRow.notes, "");
+      assert.equal(S.catalogueSource(profile).openerLine("en"), S.catalogueSource(vp).openerLine("en"));
     }
   });
 }
 
-test("isKbLive: gate, live version, v2 target, passed readiness and a snapshot are all required; default off", () => {
-  const ok = { gate: true, liveVersion: 3, brainTarget: "v2", readinessPassed: true, snapshot: true };
-  assert.equal(isKbLive(ok), true);
-  assert.equal(isKbLive({ ...ok, brainTarget: null }), true, "brain_target defaults to v2");
-  assert.equal(isKbLive(null), false);
-  assert.equal(isKbLive({}), false);
-  assert.equal(isKbLive({ ...ok, gate: undefined }), false);
-  assert.equal(isKbLive({ ...ok, gate: false }), false);
-  assert.equal(isKbLive({ ...ok, liveVersion: null }), false);
-  assert.equal(isKbLive({ ...ok, brainTarget: "v1" }), false);
-  assert.equal(isKbLive({ ...ok, readinessPassed: false }), false);
-  assert.equal(isKbLive({ ...ok, snapshot: false }), false);
+test("snapshot preview is the snapshot only: kb_items edited after it never leak in, never mixed", () => {
+  // Owner saved after the snapshot: a paused item came back and a new one was added. Callers still hear the snapshot.
+  const newer = [...ITEMS.map((i) => (i.id === "sofa" ? { ...i, status: "active" as const } : i)), it_({ id: "win", name_en: "Window cleaning", sort: 11 })];
+  const stored = { ...ROW, ...mirrorLegacy(newer, CATS, { services_catalog: [], product_catalog: [] }) };
+  const p = tenantProfileFromRow(stored, { areaPicksRows: [] });
+  L.attach(p, ...kbSnapshotAttachArgs(SNAP));
+  const facts = deskFacts(p);
+  assert.equal(facts, PV.speechFactText(voiceKbProfile()), "same as a call on the published snapshot");
+  assert.ok(!/Window cleaning|Sofa cleaning/.test(facts), "newer kb_items are not in the preview");
+  assert.ok(!/legacy text/.test(facts));
+  assert.equal(kbChangesPending("2026-10-28T07:05:00Z", SNAP.compiledAt), true, "kb_items newer: not on calls yet");
+});
+
+test("snapshot unreadable while live: the preview falls back to the stored row (legacy), the decision stays live", () => {
+  const { live, reason, profile } = deskProfileFor({ gate: true, ready: true }, null);
+  assert.equal(live, true);
+  assert.equal(reason, "ready");
+  assert.equal(catalogueMode(profile), "legacy");
+  assert.equal(deskFacts(profile), PV.speechFactText(tenantProfileFromRow({ ...STORED }, { areaPicksRows: [] })));
+});
+
+test("isKbLive is the shared rule: every reason", () => {
+  const f = { kb_live_version: 3, kb_ready_version: 3, brain_target: "v2" };
+  const on = { gate: "on" };
+  assert.deepEqual(isKbLive(f, on), { live: true, reason: "ready" });
+  assert.equal(isKbLive(f, {}).reason, "gate_off", "default off");
+  assert.equal(isKbLive(null, on).reason, "no_facts");
+  assert.equal(isKbLive({ ...f, brain_target: "v1" }, on).reason, "held_v1");
+  assert.equal(isKbLive({ ...f, kb_live_version: null }, on).reason, "no_live_version");
+  assert.equal(isKbLive({ ...f, kb_ready_version: null }, on).reason, "never_ready");
+  assert.equal(isKbLive({ ...f, kb_ready_version: 2 }, on).reason, "ready_stale");
+});
+
+test("not live yet: kb_items newer than the snapshot shows the calm state (plain, no dashes, no publish)", () => {
+  assert.equal(kbChangesPending("2026-10-28T07:00:01Z", "2026-10-28T07:00:00Z"), true);
+  assert.equal(kbChangesPending("2026-10-28T07:00:00Z", "2026-10-28T07:00:00Z"), false, "same moment: on calls");
+  assert.equal(kbChangesPending("2026-10-28T06:59:00Z", "2026-10-28T07:00:00Z"), false);
+  assert.equal(kbChangesPending(null, "2026-10-28T07:00:00Z"), false, "no items");
+  assert.equal(kbChangesPending("2026-10-28T07:00:01Z", null), false);
+  assert.equal(KB_PENDING_LINE, "Your latest changes reach calls in a moment. This is what callers hear now.");
+  assert.ok(!/[-\u2013\u2014]|publish/i.test(KB_PENDING_LINE));
+  // greeting preview inputs carry the flag only alongside a snapshot line
+  const t = withKbCatalogue({ id: "x" } as { id: string; kb_offering_line?: string | null; kb_pending?: boolean }, { ...kbCatalogueView(ITEMS, CATS, {}), offering_line: "We help with a and b.", pending: true });
+  assert.equal(t.kb_offering_line, "We help with a and b.");
+  assert.equal(t.kb_pending, true);
 });
 
 test("KB: stale stored notes never reach the Desk fact sheet", () => {
@@ -156,25 +191,19 @@ test("KB: stale stored notes never reach the Desk fact sheet", () => {
   assert.equal(JSON.parse(deskFacts(kbFactProfile(stale, true))).notes, "");
 });
 
-test("KB: greeting offering line matches source.js openerLine (groups, never items)", () => {
-  assert.equal(kbOpenerLine(ITEMS, CATS), S.catalogueSource(voiceKbProfile()).openerLine("en"));
-  assert.equal(kbOpenerLine(ITEMS, CATS), "We help with home cleaning, fabric cleaning and office cleaning.");
-  const one = ITEMS.filter((i) => i.category_id === "home");
-  assert.equal(kbOpenerLine(one, CATS), "", "one group: no names");
-  const view = kbCatalogueView(ITEMS, CATS, { services_offered: STALE }, { kbLive: true });
-  assert.equal(view.offering_line, kbOpenerLine(ITEMS, CATS));
-  const t = withKbCatalogue({ id: "x", services_offered: STALE } as { id: string; services_offered: string; kb_offering_line?: string | null }, view);
-  assert.equal(t.kb_offering_line, view.offering_line);
+test("KB: greeting offering line comes from the snapshot through source.js (groups, never items)", () => {
+  const p = tenantProfileFromRow({ ...STORED }, { areaPicksRows: [] });
+  L.attach(p, ...kbSnapshotAttachArgs(SNAP));
+  assert.equal(S.catalogueSource(p).openerLine("en"), S.catalogueSource(voiceKbProfile()).openerLine("en"));
+  assert.equal(S.catalogueSource(p).openerLine("en"), "We help with home cleaning, fabric cleaning and office cleaning.");
 });
 
-test("not live: rows and views stay legacy", () => {
-  const row = { ...ROW, services_catalog: [], product_catalog: [] };
-  assert.equal(kbCallerRow(row, ITEMS, CATS, false), row);
-  assert.equal(kbCallerRow(row, null, CATS, true), row);
-  assert.equal(kbCatalogueView(ITEMS, CATS, {}).offering_line, null, "kbLive defaults off");
-  assert.equal(withKbCatalogue({ id: "x" } as { id: string; kb_offering_line?: string | null }, kbCatalogueView(ITEMS, CATS, {})).kb_offering_line, undefined);
+test("not live: views stay legacy (no offering line, no pending)", () => {
+  assert.equal(kbCatalogueView(ITEMS, CATS, {}).offering_line, undefined, "never built from kb_items");
+  const t = withKbCatalogue({ id: "x" } as { id: string; kb_offering_line?: string | null; kb_pending?: boolean }, kbCatalogueView(ITEMS, CATS, {}));
+  assert.equal(t.kb_offering_line, undefined);
+  assert.equal(t.kb_pending, undefined);
   assert.equal(JSON.parse(deskFacts(kbFactProfile(tenantProfileFromRow({ ...ROW }, { areaPicksRows: [] }), false))).notes.length > 0, true);
-  assert.deepEqual(offeredKbItems(ITEMS).map((i) => i.id), ["dc", "pc", "mould", "uph", "mat", "off", "bags", "mop"]);
 });
 
 test("BRAIN_CONFIRMED_COVERAGE: off by default, on mirrors Voice (owner-confirmed list only)", () => {
@@ -236,13 +265,19 @@ test("factPrice twin: same parse and display as Voice", () => {
   }
 });
 
-test("pure Desk twins never read env; the server reads BRAIN_KB_GATE and BRAIN_CONFIRMED_COVERAGE and passes them in", async () => {
+test("pure Desk twins never read env; one predicate (shared isKbLive), gate and BRAIN_CONFIRMED_COVERAGE passed in", async () => {
   const fs = await import("node:fs");
   const read = (p: string) => fs.readFileSync(new URL(`../dashboard/src/${p}`, import.meta.url), "utf8");
   for (const f of ["lib/provenance.ts", "lib/kbCaller.ts", "lib/factPrice.ts", "lib/kbRead.ts"]) assert.ok(!/process\.env\.[A-Z_]/.test(read(f)), f);
   const server = read("lib/kbCaller.server.ts");
-  assert.match(server, /process\.env\.BRAIN_KB_GATE/);
-  assert.match(server, /from\("kb_readiness"\)\.select\("id"\)\.eq\("tenant_id", tenantId\)\.eq\("snapshot_version", live\)\.eq\("passed", true\)/);
-  assert.match(server, /createWorkspaceDataClient/, "readiness is read with the member's session");
+  assert.ok(!/process\.env/.test(server), "the gate is read once, in kbLive.server");
+  assert.match(server, /import \{ loadKbLive, type KbLiveReason \} from "@\/lib\/kbLive\.server"/);
+  assert.ok(!/kb_readiness|kb_ready_version|brain_target ===|brainTarget ===/.test(server), "no hand-built predicate");
+  assert.match(server, /if \(!d\.live \|\| version == null\) return/, "snapshot read only after the shared decision");
+  assert.match(server, /console\.warn\("\[kbPreview\] live snapshot/, "unreadable snapshot is logged, preview falls back");
+  assert.match(read("lib/kbLive.server.ts"), /process\.env\.BRAIN_KB_GATE/);
+  for (const f of ["lib/kb.server.ts", "app/api/admin/businesses/[id]/kb/route.ts"]) assert.match(read(f), /isKbLive\(/, `${f} uses the shared rule`);
+  assert.ok(!/readyVersion === liveVersion/.test(read("components/catalogue/CatalogueScreen.tsx")), "CatalogueScreen takes onCalls from the server");
+  assert.ok(!/live === ready/.test(read("app/api/admin/businesses/[id]/kb/route.ts")));
   assert.match(read("lib/tenantFieldProvenance.ts"), /indexFieldMeta\(rows, \{ hashMode: factHashModeFromEnv\(\), seedFilter, confirmedCoverage \}\)/);
 });

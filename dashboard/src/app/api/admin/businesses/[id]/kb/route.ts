@@ -6,6 +6,7 @@ import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { pingKbCompile } from "@/lib/kb.server";
 import { stepUpGate } from "@/lib/ops/stepUpGate";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { isKbLive, type KbLiveReason } from "@/lib/kbLive.server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -13,7 +14,9 @@ export type BusinessKbView = {
   liveVersion: number | null;
   readyVersion: number | null;
   brainTarget: "v1" | "v2";
+  /** The shared isKbLive (kbLive.server, this server's BRAIN_KB_GATE): the same answer Voice gives. */
   onNewBrain: boolean;
+  onNewBrainReason: KbLiveReason;
   items: number | null;
   readiness: { passed: boolean; version: number | null; checkedAt: string; by: string | null; checks: { id: string; ok: boolean; fix?: string | null }[]; tests: { name: string; ok: boolean; heard?: string | null; why?: string | null }[] } | null;
 };
@@ -33,13 +36,15 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const live = t.data?.kb_live_version ?? null;
   const ready = t.data?.kb_ready_version ?? null;
   const target = t.data?.brain_target === "v1" ? "v1" : "v2";
+  const decision = isKbLive(t.data);
   type Raw = { snapshot_version: number | null; passed: boolean; checks: NonNullable<BusinessKbView["readiness"]>["checks"] | null; tests: NonNullable<BusinessKbView["readiness"]>["tests"] | null; checked_by: string | null; checked_at: string };
   const rr = r.data as Raw | null;
   const view: BusinessKbView = {
     liveVersion: live,
     readyVersion: ready,
     brainTarget: target,
-    onNewBrain: target === "v2" && live != null && live === ready,
+    onNewBrain: decision.live,
+    onNewBrainReason: decision.reason,
     items: (s.data as { item_count?: number } | null)?.item_count ?? null,
     readiness: rr ? { passed: rr.passed, version: rr.snapshot_version, checkedAt: rr.checked_at, by: rr.checked_by, checks: rr.checks || [], tests: rr.tests || [] } : null,
   };

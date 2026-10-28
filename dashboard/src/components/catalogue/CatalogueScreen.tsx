@@ -61,7 +61,11 @@ export type CatalogueScreenProps = {
   latest: KbSnapshotRow | null;
   readiness: KbReadiness;
   liveVersion: number | null;
-  readyVersion: number | null;
+  /**
+   * On calls: the shared isKbLive decided on the server (kbLive.server), passed down as a boolean. Never rebuilt
+   * here from versions or readiness.
+   */
+  onCalls: boolean;
   /** home_services never sees a Products concept. */
   vertical: string;
   canEdit: boolean;
@@ -83,7 +87,7 @@ const heading = "text-body font-semibold text-ink";
 const SHOW_STEP = 150;
 
 export function CatalogueScreen(props: CatalogueScreenProps) {
-  const { items, categories, live, latest, readiness, liveVersion, readyVersion, vertical, canEdit, actions } = props;
+  const { items, categories, live, latest, readiness, liveVersion, onCalls, vertical, canEdit, actions } = props;
   const statesEnabled = !!props.statesEnabled;
   const router = useRouter();
   const homeServices = vertical === "home_services";
@@ -102,7 +106,6 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
   const list = useMemo(() => filterItems(items, categories, { query, kind, needPrice }), [items, categories, query, kind, needPrice]);
   const catName = useMemo(() => new Map(categories.map((c) => [c.id, c.name_en])), [categories]);
   const both = counts.services > 0 && counts.products > 0 && !homeServices;
-  const onCalls = !!readiness?.passed && readyVersion != null && readyVersion === liveVersion;
   const todo = (readiness?.checks || []).filter((c) => !c.ok);
   const failed = latest && latest.status === "failed" && latest.version !== liveVersion;
   const waiting = items.filter((i) => i.name_sw_state === "suggested" && i.name_sw_suggested);
@@ -146,7 +149,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
               {statusLine(counts)}
             </p>
             <p className="text-meta text-ink-2">
-              {onCalls ? "On calls. Changes reach calls within a minute." : readiness ? `Not on calls yet. ${todo.length} ${todo.length === 1 ? "check" : "checks"} to do.` : "Not on calls yet."}
+              {onCalls ? "On calls. Changes reach calls within a minute." : todo.length ? `Not on calls yet. ${todo.length} ${todo.length === 1 ? "check" : "checks"} to do.` : "Not on calls yet."}
             </p>
           </div>
           {canEdit && counts.needPrice ? (

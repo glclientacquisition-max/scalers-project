@@ -7,28 +7,30 @@
  */
 import { mirrorLegacy, type KbCategory, type KbItem } from "./kbCore";
 import { servicesOfferedFromKb } from "./kbLegacy";
-import { kbOpenerLine } from "./kbCaller";
 
 export type KbCatalogueView = {
   services_catalog: unknown[];
   product_catalog: unknown[];
   services_offered: string;
-  /** Greeting offering line as the call builds it when the KB is live (kbCaller.ts isKbLive); null = legacy reads. */
-  offering_line: string | null;
+  /**
+   * Greeting offering line from the published snapshot (server: loadKbGreetingPreview, when isKbLive). Never built
+   * from kb_items here; null/absent = legacy reads.
+   */
+  offering_line?: string | null;
+  /** Saves newer than the snapshot are still compiling (KbPendingNote). */
+  pending?: boolean;
 };
 
 export function kbCatalogueView(
   items: KbItem[],
   categories: KbCategory[],
   stored: { services_catalog?: unknown; product_catalog?: unknown; services_offered?: string | null },
-  opts: { kbLive?: boolean } = {},
 ): KbCatalogueView {
   const m = mirrorLegacy(items, categories, { services_catalog: stored.services_catalog ?? [], product_catalog: stored.product_catalog ?? [] });
   return {
     services_catalog: m.services_catalog,
     product_catalog: m.product_catalog,
     services_offered: servicesOfferedFromKb(items, categories, stored.services_offered),
-    offering_line: opts.kbLive === true ? kbOpenerLine(items, categories) : null,
   };
 }
 
@@ -36,5 +38,5 @@ export function kbCatalogueView(
 export function withKbCatalogue<T extends { services_catalog?: unknown; product_catalog?: unknown; services_offered?: string | null }>(tenant: T, kb: KbCatalogueView | null): T {
   if (!kb) return tenant;
   const out = { ...tenant, services_catalog: kb.services_catalog, product_catalog: kb.product_catalog, services_offered: kb.services_offered };
-  return kb.offering_line == null ? out : { ...out, kb_offering_line: kb.offering_line };
+  return kb.offering_line == null ? out : { ...out, kb_offering_line: kb.offering_line, kb_pending: kb.pending === true };
 }

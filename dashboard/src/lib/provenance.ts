@@ -784,7 +784,8 @@ export function buildCompileSections({
 /**
  * Catalogue mode for one profile, the same rule as src/knowledge/kb/source.js:
  * 'kb' when the profile carries a live KB handle (Voice attach) or Desk marked it
- * KB live (kbCaller.ts isKbLive; kbFactProfile sets kbMode on the offered-only projection);
+ * KB live (shared isKbLive, kbLive.server; the live snapshot attached by Voice's kb/live.attach sets kb.handle, or
+ * kbFactProfile sets kbMode);
  * otherwise 'legacy'. KB mode never reads the old free-text services line.
  */
 export function catalogueMode(profile: any = {}): "kb" | "legacy" {
@@ -811,7 +812,7 @@ export function speechFactText(profile: any = {}) {
   const fieldMeta = profile.fieldMeta || null;
   const policies = factPolicyMap(profile.businessPolicies, fieldMeta).policies;
   // KB v2: one catalogue door. In KB mode the profile catalogue is the offered-only
-  // projection (Voice attach or kbCaller.ts); legacy mode reads the same fields as before.
+  // projection (Voice attach of the live snapshot); legacy mode reads the same fields as before.
   const mode = catalogueMode(profile);
   const products = factProducts(profile.productCatalog, fieldMeta).map((row) => ({
     name: row.name,
