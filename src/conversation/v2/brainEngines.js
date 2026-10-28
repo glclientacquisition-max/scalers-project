@@ -107,6 +107,11 @@ async function runBrainEnginesTurn({
   // 3) read-only tools for this turn's facts
   const toolOut = runTools({ understanding: u, machine, profile, lang, text, now });
   const receipts = toolOut.receipts.filter((r) => r.tool !== 'lookup_caller');
+  // v2 KB: lookup timing + what kind of catalogue answer this turn carried (trace only)
+  const kbr = receipts.find((r) => r.kb);
+  if (kbr) { timings.kbLookupMs = kbr.ms; timings.kbKind = kbr.kind; timings.kbVersion = kbr.kbVersion ?? null; }
+  // a catalogue question the understanding missed ("what tomato seedlings do you have") is answered, not met with an open line
+  if (kbr && kbr.text && goal.type === 'open') goal = { type: 'answer', topics: ['services'], answers: ['services'], offerCallback: false };
 
   const fixed = []; const model = []; const guard = []; let write = null; let path = 'brain_engines';
   // 4a) the write (only on a yes to the read-back the caller heard)
@@ -157,6 +162,7 @@ async function runBrainEnginesTurn({
       profile,
       questions: (u.answers || []).map((a) => ({ type: a })),
       lang, machine, text, u, confirm: [],
+      kbReceipt: (receipts.find((r) => r.kb && r.text) || {}).text || null,
     };
     const allowed = allowedTimes({ receipts, machine, profile, extra: E.pending?.p?.callbackWhen?.at ? [E.pending.p.callbackWhen.at.time] : [] });
     const ver = makeEnginesVerifier(ctx, { allowed, readbackTurn: goal.type === 'readback' || goal.type === 'reask' });
@@ -173,7 +179,10 @@ async function runBrainEnginesTurn({
       if (receiptText && receiptText === machine.lastLine) receiptText = (u.answers || []).includes('price') ? (E.offered = 'callback', E.offeredTurn = machine.turn, require('./receipts').info({ kind: 'price', found: false }, lang)) : null;
       const n = goal.type === 'open' ? (E.openFallbacks = (E.openFallbacks || 0) + 1) - 1 : (goal.n || 0);
       const fb = Lines.noModelFallback(goal, lang, { n, machine, receiptText });
-      if (fb) model.push({ text: fb, src: receiptText ? 'receipt' : 'fallback' });
+      // v2 KB: an ask turn that also carried a catalogue question answers it first (model unavailable only)
+      const kbFirst = goal.type === 'ask' && kbr && kbr.text && (goal.answers || []).length ? kbr.text : null;
+      if (kbFirst) model.push({ text: /\?\s*$/.test(kbFirst) ? kbFirst : `${kbFirst} ${fb || ''}`.trim(), src: 'receipt' });
+      else if (fb) model.push({ text: fb, src: receiptText ? 'receipt' : 'fallback' });
     } else if (goal.type === 'ask' && !model.some((x) => /\?\s*$/.test(x.text))) {
       model.push({ text: Lines.noModelFallback(goal, lang, { n: goal.n || 0, machine }), src: 'tail' });
     }

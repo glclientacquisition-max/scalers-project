@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-237 variables.
+243 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -40,6 +40,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BRAIN_ENGINES_REPLY_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_ENGINES_UNDERSTAND_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_GEMINI_CATALOGUE` | voice | `src/conversation/catalogueMouth.js` |
+| `BRAIN_KB_GATE` | voice | `src/db.js` |
 | `BRAIN_MODEL_LEAD` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_V1_DRAFT` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_V1_DRAFT_PHASE_A` | scripts | `scripts/brain-engines-sim.js` |
@@ -92,6 +93,11 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `GITHUB_STEP_SUMMARY` | scripts | `scripts/stage-pull-request-hold.js` |
 | `HEAD_REF` | scripts | `scripts/stage-pull-request.js` |
 | `HEAD_REPO` | scripts | `scripts/stage-pull-request.js` |
+| `KB_BOOT_READINESS` | voice | `server.js` |
+| `KB_CACHE_MAX_MB` | voice | `src/knowledge/kb/reader.js` |
+| `KB_COMPILE_ON_SAVE` | voice | `server.js` |
+| `KB_SHADOW` | voice | `src/conversation/v2/engineTools.js` |
+| `KB_SW_SUGGEST` | voice | `server.js` |
 | `NEXT_PUBLIC_ADMIN_HOST` | desk | `dashboard/src/components/ServiceWorkerRegister.tsx` |
 | `NEXT_PUBLIC_APP_HOST` | desk | `dashboard/src/components/ServiceWorkerRegister.tsx` |
 | `NEXT_PUBLIC_APP_URL` | voice | `server.js` |
@@ -218,7 +224,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_GREETING_CACHE` | voice | `src/speech/greetingPcmCache.js` |
 | `VOICE_GREETING_MODE` | voice | `src/conversation/dynamicSpeech.js` |
 | `VOICE_GREETING_TIMEOUT_MS` | voice | `src/conversation/dynamicSpeech.js` |
-| `VOICE_INTERNAL_SECRET` | desk, voice | `dashboard/src/app/(desk)/calls/escalateActions.ts`<br>`dashboard/src/lib/spokenCatalogueOnSave.ts`<br>`dashboard/src/lib/voicePreview.ts`<br>+1 more |
+| `VOICE_INTERNAL_SECRET` | desk, voice | `dashboard/src/app/(desk)/calls/escalateActions.ts`<br>`dashboard/src/lib/kb.server.ts`<br>`dashboard/src/lib/spokenCatalogueOnSave.ts`<br>+2 more |
 | `VOICE_LINE_UNAVAILABLE_CLIP_DIR` | voice | `src/sautikit/lineUnavailableAudio.js` |
 | `VOICE_LINE_UNAVAILABLE_REFRESH` | voice | `src/sautikit/lineUnavailableAudio.js` |
 | `VOICE_LINE_UNAVAILABLE_REFRESH_MS` | voice | `src/sautikit/lineUnavailableAudio.js` |
