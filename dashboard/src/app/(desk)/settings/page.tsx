@@ -23,6 +23,8 @@ import { listCuratedSonioxVoices, type CuratedSonioxVoice } from "@/lib/sonioxVo
 import { settingsIndexStatuses, type SettingsListStatus } from "@/lib/settingsOptionStatus";
 import { tenantForSettingsView } from "@/lib/settingsPanelPayload";
 import { getCurrentTenant } from "@/lib/tenant";
+import { kbTablesReady } from "@/lib/kb.server";
+import { parseVertical } from "@/lib/vertical";
 import { loadPlanRowStatus } from "@/lib/ownerPlanLoad";
 import { loadSeatCount } from "@/lib/billingStateLoad";
 import { planEntry } from "@/lib/planEntry";
@@ -76,6 +78,14 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   const planRowPromise = loadPlanRowStatus(tenant.id);
   const tab = parseBusinessSettingsTab(tabRaw, panelRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
+  // KB v2 businesses edit the catalogue on /settings/knowledge. The old Catalogue tab (and the retail
+  // Import tab, now "Paste a list" there) would write the retired catalogue columns, so send owners across.
+  if (tab === "catalog" || (tab === "import" && parseVertical(tenant.vertical) === "retail")) {
+    if (await kbTablesReady(tenant.id)) {
+      const unpriced = (Array.isArray(params.filter) ? params.filter[0] : params.filter) === "unpriced";
+      redirect(tab === "import" ? "/settings/knowledge?paste=1" : `/settings/knowledge${unpriced ? "?filter=unpriced" : ""}`);
+    }
+  }
   const assistantSayPage = deskAssistantSayPage();
   if (tab === "assistant-say" && !assistantSayPage) redirect("/settings");
   // The voice picker lives on Identity (How you answer); Voice links there.

@@ -1,0 +1,819 @@
+"use client";
+
+import Link from "next/link";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { ChevronDownIcon, MagnifyingGlassIcon, PlusIcon } from "@heroicons/react/20/solid";
+import { Button } from "@/components/ui/Button";
+import { Field, Input, Textarea } from "@/components/ui/Field";
+import { Segmented, SegmentedControl } from "@/components/ui/Segmented";
+import { Sheet } from "@/components/ui/Sheet";
+import { Switch } from "@/components/ui/Switch";
+import { Empty } from "@/components/ui/Empty";
+import { notify } from "@/components/ui/DeskNotice";
+import { deskShiftClass } from "@/lib/deskMotion";
+import { cx } from "@/lib/cx";
+import { CHECK_FIX, CHECK_LABEL, ISSUE_LINE, type KbCategory, type KbDraft, type KbItem, type KbKind, type KbPasteRow, type KbReadiness, type KbSnapshotRow } from "@/lib/kbCore";
+import {
+  PRICE_CHOICES,
+  SEARCH_FROM,
+  catalogueCounts,
+  editDraft,
+  filterItems,
+  isUnpriced,
+  itemState,
+  newDraft,
+  nextUnpriced,
+  pasteRowLine,
+  pasteSummary,
+  pasteSummaryLine,
+  priceInWords,
+  rowTags,
+  savedLine,
+  savesInstantly,
+  sheetErrors,
+  statusLine,
+  withAmount,
+  withChoice,
+  type PriceChoice,
+} from "@/lib/catalogueView";
+import type { KbActionResult } from "@/app/(desk)/settings/knowledge/actions";
+
+/** The KB v2 server actions this screen calls. Injected so the dev fixture can render without a database. */
+export type CatalogueActions = {
+  saveItem: (d: KbDraft) => Promise<KbActionResult>;
+  hideItem: (id: string) => Promise<KbActionResult>;
+  decideSwName: (id: string, decision: "approve" | "edit" | "reject", text?: string) => Promise<KbActionResult>;
+  compile: () => Promise<KbActionResult>;
+  previewPaste: (text: string) => Promise<{ ok: true; rows: KbPasteRow[] } | { ok: false; error: string }>;
+  importPaste: (rows: KbPasteRow[], kind: KbKind, group: string) => Promise<KbActionResult>;
+};
+
+export type CatalogueScreenProps = {
+  items: KbItem[];
+  categories: KbCategory[];
+  live: KbSnapshotRow | null;
+  latest: KbSnapshotRow | null;
+  readiness: KbReadiness;
+  liveVersion: number | null;
+  readyVersion: number | null;
+  /** home_services never sees a Products concept. */
+  vertical: string;
+  canEdit: boolean;
+  /** ?filter=unpriced from Overview "Add prices". Always shown with a way out. */
+  initialNeedPrice?: boolean;
+  /** ?paste=1 (old Import links) opens Paste a list. */
+  initialPaste?: boolean;
+  actions: CatalogueActions;
+};
+
+const card = "overflow-hidden rounded-2xl border border-hairline bg-surface";
+const heading = "text-body font-semibold text-ink";
+const SHOW_STEP = 150;
+
+export function CatalogueScreen(props: CatalogueScreenProps) {
+  const { items, categories, live, latest, readiness, liveVersion, readyVersion, vertical, canEdit, actions } = props;
+  const router = useRouter();
+  const homeServices = vertical === "home_services";
+  const [pending, start] = useTransition();
+  const [query, setQuery] = useState("");
+  const [kind, setKind] = useState<"all" | KbKind>("all");
+  const [needPrice, setNeedPrice] = useState(!!props.initialNeedPrice);
+  const [shown, setShown] = useState(SHOW_STEP);
+  const [editing, setEditing] = useState<{ draft: KbDraft; fixing: boolean } | null>(null);
+  const [pasting, setPasting] = useState(!!props.initialPaste && canEdit);
+  const [checksOpen, setChecksOpen] = useState(false);
+  const [lang, setLang] = useState<"en" | "sw">("en");
+  const [swEdit, setSwEdit] = useState<{ id: string; text: string } | null>(null);
+
+  const counts = useMemo(() => catalogueCounts(items), [items]);
+  const list = useMemo(() => filterItems(items, categories, { query, kind, needPrice }), [items, categories, query, kind, needPrice]);
+  const catName = useMemo(() => new Map(categories.map((c) => [c.id, c.name_en])), [categories]);
+  const both = counts.services > 0 && counts.products > 0 && !homeServices;
+  const onCalls = !!readiness?.passed && readyVersion != null && readyVersion === liveVersion;
+  const todo = (readiness?.checks || []).filter((c) => !c.ok);
+  const failed = latest && latest.status === "failed" && latest.version !== liveVersion;
+  const waiting = items.filter((i) => i.name_sw_state === "suggested" && i.name_sw_suggested);
+  // "No price" is the status card's job (one count, one Fix), so it is not listed twice.
+  const issues = (latest?.issues || []).filter((i) => i.severity !== "info" && i.code !== "no_price");
+  const hasAside = !!live?.doc?.preview?.length || (waiting.length > 0 && canEdit) || issues.length > 0;
+  const nameOf = (id?: string) => items.find((i) => i.id === id)?.name_en;
+  const defaultKind: KbKind = homeServices || kind === "service" ? "service" : kind === "product" || vertical === "retail" || (counts.products > 0 && !counts.services) ? "product" : "service";
+
+  const run = (fn: () => Promise<KbActionResult>, done?: string) =>
+    start(async () => {
+      const r = await fn();
+      if (!r.ok) notify(r.error, { tone: "error" });
+      else {
+        if (done) notify(done);
+        router.refresh();
+      }
+    });
+
+  const openFix = (afterId?: string | null, justSaved = false) => {
+    const next = nextUnpriced(items, afterId);
+    if (!next || next.id === afterId) {
+      setEditing(null);
+      if (justSaved) notify("Every item has a price now.");
+      return;
+    }
+    setEditing({ draft: editDraft(next, categories), fixing: true });
+  };
+
+  return (
+    <div className="space-y-4 px-4 py-4 md:px-0" data-catalogue="">
+      <h1 className="text-title font-semibold text-ink">Catalogue</h1>
+      <div className={cx("grid min-w-0 grid-cols-1 items-start gap-4", hasAside ? "xl:grid-cols-[minmax(0,1fr)_22rem]" : "max-w-2xl")}>
+      <div className="min-w-0 space-y-4">
+
+      {/* Card A: one line of status, one Fix. */}
+      <section className={card} data-catalogue-status="" data-on-calls={onCalls ? "yes" : "no"}>
+        <div className="flex min-h-16 items-center gap-3 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <p className={heading} data-status-line="">
+              {statusLine(counts)}
+            </p>
+            <p className="text-meta text-ink-2">
+              {onCalls ? "On calls. Changes reach calls within a minute." : readiness ? `Not on calls yet. ${todo.length} ${todo.length === 1 ? "check" : "checks"} to do.` : "Not on calls yet."}
+            </p>
+          </div>
+          {canEdit && counts.needPrice ? (
+            <Button size="sm" variant="primary" onClick={() => openFix(null)} data-fix="">
+              Fix
+            </Button>
+          ) : null}
+        </div>
+        {readiness && !onCalls ? (
+          <div className="border-t border-hairline">
+            <button
+              type="button"
+              aria-expanded={checksOpen}
+              aria-controls="catalogue-checks"
+              onClick={() => setChecksOpen((v) => !v)}
+              className={cx("flex min-h-11 w-full items-center justify-between px-4 text-meta font-medium text-accent", deskShiftClass)}
+            >
+              {checksOpen ? "Hide checks" : "See checks"}
+              <ChevronDownIcon aria-hidden="true" className={cx("size-4", checksOpen && "rotate-180")} />
+            </button>
+            {checksOpen ? (
+              <div id="catalogue-checks" className="space-y-2 px-4 pb-3">
+                <ul className="space-y-2">
+                  {readiness.checks.map((c) => (
+                    <li key={c.id} className="flex items-start gap-2 text-meta">
+                      <span className={c.ok ? "w-12 shrink-0 text-ink-2" : "w-12 shrink-0 font-semibold text-attention"}>{c.ok ? "Done" : "To do"}</span>
+                      <span className="min-w-0 flex-1 text-ink">{CHECK_LABEL[c.id] || c.id}</span>
+                      {!c.ok && c.id === "catalogue" && canEdit ? (
+                        <button type="button" className="text-meta font-semibold text-accent" onClick={() => openFix(null)}>
+                          Fix
+                        </button>
+                      ) : !c.ok && CHECK_FIX[c.id] && CHECK_FIX[c.id] !== "/settings/knowledge" ? (
+                        <Link href={CHECK_FIX[c.id]} className="text-meta font-semibold text-accent">
+                          Fix
+                        </Link>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+                {canEdit ? (
+                  <Button variant="tonal" size="sm" pending={pending} onClick={() => run(actions.compile, "Checking now. This takes a few seconds.")}>
+                    Check again
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+
+      {failed ? (
+        <p className="rounded-xl bg-attention-tonal p-3 text-body text-attention" role="status">
+          Your last change could not be used, so calls still use the earlier catalogue. Fix the items below, then save again.
+        </p>
+      ) : null}
+
+      {/* Card B: what you sell. */}
+      <section className={card} data-catalogue-list="">
+        <div className="flex min-h-14 flex-wrap items-center justify-between gap-2 px-4 py-2">
+          <h2 className={heading}>What you sell</h2>
+          {canEdit && counts.total ? (
+            <div className="flex gap-2">
+              <Button variant="tonal" size="sm" onClick={() => setPasting(true)}>
+                Paste a list
+              </Button>
+              <Button variant="primary" size="sm" leading={<PlusIcon aria-hidden="true" className="size-4" />} onClick={() => setEditing({ draft: newDraft(defaultKind, categories), fixing: false })}>
+                Add
+              </Button>
+            </div>
+          ) : null}
+        </div>
+
+        {counts.total ? (
+          <>
+            {both ? (
+              <div className="px-4">
+                <Segmented
+                  label="Show"
+                  items={[
+                    { key: "all", label: "All", count: counts.total, active: kind === "all" },
+                    { key: "service", label: "Services", count: counts.services, active: kind === "service" },
+                    { key: "product", label: "Products", count: counts.products, active: kind === "product" },
+                  ]}
+                  onSelect={(k) => setKind(k === "service" || k === "product" ? k : "all")}
+                />
+              </div>
+            ) : null}
+            {counts.total >= SEARCH_FROM ? (
+              <div className="relative px-4 pt-3" data-catalogue-search="">
+                <MagnifyingGlassIcon aria-hidden="true" className="pointer-events-none absolute left-7 top-1/2 mt-1.5 size-4 -translate-y-1/2 text-ink-3" />
+                <Input type="search" aria-label="Search your catalogue" placeholder="Search" value={query} onChange={(e) => { setQuery(e.target.value); setShown(SHOW_STEP); }} className="pl-9" />
+              </div>
+            ) : null}
+            {needPrice ? (
+              <div className="mx-4 mt-3 flex min-h-11 items-center justify-between gap-2 rounded-xl bg-surface-2 px-3" role="status" data-need-price-banner="">
+                <p className="text-meta text-ink">{`Showing ${list.length} that ${list.length === 1 ? "needs" : "need"} a price`}</p>
+                <button type="button" onClick={() => setNeedPrice(false)} className="min-h-11 text-meta font-semibold text-accent">
+                  Show all
+                </button>
+              </div>
+            ) : null}
+
+            {list.length ? (
+              <ul className="mt-2 divide-y divide-hairline border-t border-hairline" data-catalogue-rows="">
+                {list.slice(0, shown).map((it) => {
+                  const unpriced = it.status !== "not_offered" && isUnpriced(it);
+                  const tags = rowTags(it);
+                  const group = it.category_id ? catName.get(it.category_id) : null;
+                  const muted = itemState(it) !== "offered";
+                  const body = (
+                    <>
+                      <span className="min-w-0 flex-1">
+                        <span className={cx("block truncate text-body font-medium", muted ? "text-ink-2" : "text-ink")}>{it.name_en}</span>
+                        {group || tags.length ? (
+                          <span className="block truncate text-meta text-ink-2">{[...tags, group].filter(Boolean).join(" · ")}</span>
+                        ) : null}
+                      </span>
+                      <span className={cx("shrink-0 text-right text-body tabular-nums", unpriced ? "font-semibold text-attention" : "text-ink")} data-price-words="">
+                        {it.status === "not_offered" ? "" : priceInWords(it)}
+                      </span>
+                    </>
+                  );
+                  return (
+                    <li key={it.id} data-item-row={it.id} data-item-state={itemState(it)}>
+                      {canEdit ? (
+                        <button type="button" onClick={() => setEditing({ draft: editDraft(it, categories), fixing: false })} className={cx("flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left hover:bg-surface-2", deskShiftClass)}>
+                          {body}
+                        </button>
+                      ) : (
+                        <div className="flex min-h-14 items-center gap-3 px-4 py-2">{body}</div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="px-4 py-6 text-body text-ink-2">{query ? `Nothing matches "${query}".` : "Nothing here."}</p>
+            )}
+            {list.length > shown ? (
+              <div className="border-t border-hairline px-4 py-2">
+                <Button variant="ghost" size="sm" onClick={() => setShown((n) => n + SHOW_STEP)}>
+                  {`Show ${Math.min(SHOW_STEP, list.length - shown)} more`}
+                </Button>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <Empty
+            title={homeServices ? "Add the services you offer" : "Add what you sell"}
+            line="Callers hear your prices when they ask."
+            action={
+              canEdit ? (
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button variant="tonal" onClick={() => setPasting(true)}>
+                    Paste a list
+                  </Button>
+                  <Button variant="primary" onClick={() => setEditing({ draft: newDraft(defaultKind, categories), fixing: false })}>
+                    {homeServices ? "Add a service" : "Add an item"}
+                  </Button>
+                </div>
+              ) : undefined
+            }
+          />
+        )}
+      </section>
+
+      </div>
+      {hasAside ? (
+      <aside className="min-w-0 space-y-4" data-catalogue-aside="">
+      {live?.doc?.preview?.length ? (
+        <section className={card} data-kb-preview="">
+          <div className="flex min-h-14 items-center justify-between gap-2 px-4 py-2">
+            <h2 className={heading}>What callers hear</h2>
+            <SegmentedControl
+              label="Language"
+              value={lang}
+              onChange={(v) => setLang(v === "sw" ? "sw" : "en")}
+              items={[
+                { value: "en", label: "English" },
+                { value: "sw", label: "Kiswahili" },
+              ]}
+            />
+          </div>
+          <ul className="space-y-3 px-4 pb-4">
+            {live.doc.preview.map((p) => (
+              <li key={p.asked}>
+                <p className="text-meta text-ink-2">Caller: {p.asked}</p>
+                <p className="text-body text-ink">{(lang === "sw" ? p.sw : p.en) || "Nothing to say yet."}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {waiting.length && canEdit ? (
+        <section className={card} data-kb-swahili="">
+          <div className="px-4 pt-3">
+            <h2 className={heading}>Kiswahili names to check</h2>
+            <p className="text-meta text-ink-2">Callers only hear a Kiswahili name after you approve it.</p>
+          </div>
+          <ul className="mt-2 divide-y divide-hairline border-t border-hairline">
+            {waiting.slice(0, 30).map((it) => (
+              <li key={it.id} className="flex flex-wrap items-center gap-2 px-4 py-2">
+                <span className="min-w-0 flex-1 text-body text-ink">
+                  {it.name_en}
+                  <span className="block text-meta text-ink-2">Suggested: {it.name_sw_suggested}</span>
+                </span>
+                {swEdit?.id === it.id ? (
+                  <>
+                    <Input aria-label={`Kiswahili name for ${it.name_en}`} value={swEdit.text} onChange={(e) => setSwEdit({ id: it.id, text: e.target.value })} className="max-w-56" />
+                    <Button size="sm" variant="primary" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "edit", swEdit.text), "Saved")}>
+                      Save
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button size="sm" variant="primary" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "approve"), "Approved")}>
+                      Approve
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setSwEdit({ id: it.id, text: it.name_sw_suggested || "" })}>
+                      Edit
+                    </Button>
+                    <Button size="sm" variant="ghost" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "reject"))}>
+                      Reject
+                    </Button>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {issues.length ? (
+        <section className={card} data-kb-issues="">
+          <h2 className={cx(heading, "px-4 pt-3")}>Worth fixing</h2>
+          <ul className="space-y-1 px-4 pb-3 pt-1 text-meta">
+            {issues.slice(0, 10).map((i, n) => (
+              <li key={`${i.code}-${i.item_id || n}`} className="text-ink">
+                {i.item_id ? <span className="font-semibold">{nameOf(i.item_id) || "An item"} </span> : null}
+                {ISSUE_LINE[i.code] || i.detail || i.code}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      </aside>
+      ) : null}
+      </div>
+
+      {pasting ? (
+        <PasteSheet
+          homeServices={homeServices}
+          defaultKind={defaultKind}
+          actions={actions}
+          onClose={() => setPasting(false)}
+          onSaved={() => {
+            setPasting(false);
+            router.refresh();
+          }}
+        />
+      ) : null}
+      {editing ? (
+        <ItemSheet
+          key={editing.draft.id || "new"}
+          draft={editing.draft}
+          fixing={editing.fixing}
+          left={counts.needPrice}
+          retail={!homeServices}
+          categories={categories}
+          actions={actions}
+          onClose={() => setEditing(null)}
+          onSkip={() => openFix(editing.draft.id)}
+          onSaved={(id) => {
+            router.refresh();
+            if (editing.fixing) openFix(id, true);
+            else setEditing(null);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+const STATE_ITEMS = [
+  { value: "active", label: "Offered" },
+  { value: "paused", label: "Paused" },
+  { value: "not_offered", label: "Not offered" },
+];
+
+const NOTHING_LINE: Partial<Record<PriceChoice, string>> = {
+  quote: "Callers hear that you give a custom quote, and you get their details to call back.",
+  site_visit: "Callers hear that you price it after a site visit, and you get their details to book one.",
+  free: "Callers hear that it is free.",
+};
+
+function ItemSheet({
+  draft,
+  fixing,
+  left,
+  retail,
+  categories,
+  actions,
+  onClose,
+  onSkip,
+  onSaved,
+}: {
+  draft: KbDraft;
+  fixing: boolean;
+  left: number;
+  retail: boolean;
+  categories: KbCategory[];
+  actions: CatalogueActions;
+  onClose: () => void;
+  onSkip: () => void;
+  onSaved: (id: string | undefined) => void;
+}) {
+  const [d, setD] = useState<KbDraft>(draft);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const extraChoice = d.price_mode !== "none" && d.price_mode !== "fixed";
+  const [choicesOpen, setChoicesOpen] = useState(false);
+  const showChoices = choicesOpen || extraChoice;
+  // More opens by itself only when the item is paused or not offered, so that state is never hidden.
+  const [moreOpen, setMoreOpen] = useState(d.status !== "active");
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const set = (patch: Partial<KbDraft>) => setD((x) => ({ ...x, ...patch }));
+  const isNew = !d.id;
+
+  const save = (next: KbDraft = d) => {
+    const errs = sheetErrors(next);
+    if (errs.length) return setError(errs.join(" "));
+    setError(null);
+    start(async () => {
+      const r = await actions.saveItem(next);
+      if (!r.ok) setError(r.error);
+      else {
+        notify(savedLine(next));
+        onSaved(next.id);
+      }
+    });
+  };
+
+  const choose = (mode: PriceChoice) => {
+    const next = withChoice(d, mode);
+    setD(next);
+    // One rule: a price that needs no number saves the moment it is picked (existing items).
+    if (savesInstantly(mode) && !isNew) save(next);
+  };
+
+  const remove = () =>
+    start(async () => {
+      if (!d.id) return onClose();
+      const r = await actions.hideItem(d.id);
+      if (!r.ok) setError(r.error);
+      else {
+        notify(`Removed ${d.name_en}.`);
+        onSaved(undefined);
+      }
+    });
+
+  const needsAmount = d.price_mode === "none" || d.price_mode === "fixed" || d.price_mode === "from" || d.price_mode === "per_unit";
+  const title = fixing ? "Add a price" : isNew ? (d.kind === "product" ? "Add a product" : "Add a service") : "Edit item";
+
+  return (
+    <Sheet
+      open
+      onOpenChange={(o) => (o ? null : onClose())}
+      title={title}
+      description={fixing ? `${left} without a price` : undefined}
+      footer={
+        confirmRemove ? (
+          <>
+            <Button variant="ghost" onClick={() => setConfirmRemove(false)}>
+              Keep
+            </Button>
+            <Button variant="dangerSolid" onClick={remove} pending={pending}>
+              Remove
+            </Button>
+          </>
+        ) : (
+          <>
+            {fixing ? (
+              <Button variant="ghost" onClick={onSkip}>
+                Skip
+              </Button>
+            ) : !isNew ? (
+              <Button variant="danger" onClick={() => setConfirmRemove(true)}>
+                Remove
+              </Button>
+            ) : null}
+            <Button variant="primary" onClick={() => save()} pending={pending}>
+              Save
+            </Button>
+          </>
+        )
+      }
+    >
+      <div className="space-y-4" data-item-sheet="" data-price-mode={d.price_mode}>
+        {error ? <p className="rounded-xl bg-attention-tonal p-3 text-body text-attention" role="alert">{error}</p> : null}
+        {confirmRemove ? (
+          <p className="rounded-xl bg-surface-2 p-3 text-body text-ink" data-remove-confirm="">
+            {`Remove ${d.name_en || "this item"}? Callers stop hearing it. To stop for a while, keep it and mark it Paused under More.`}
+          </p>
+        ) : null}
+        {isNew && retail ? (
+          <SegmentedControl
+            label="Type"
+            value={d.kind === "product" ? "product" : "service"}
+            onChange={(v) => set({ kind: v === "product" ? "product" : "service", in_stock: v === "product" ? true : null })}
+            items={[
+              { value: "product", label: "Product" },
+              { value: "service", label: "Service" },
+            ]}
+          />
+        ) : null}
+        <Field id="item-name" label="Name">
+          {(p) => <Input {...p} value={d.name_en} maxLength={120} onChange={(e) => set({ name_en: e.target.value })} />}
+        </Field>
+
+        <fieldset className="space-y-2" data-price-section="">
+          <legend className="mb-1.5 text-meta font-medium text-ink">Price</legend>
+          {d.price_mode === "range" ? (
+            <div className="grid grid-cols-2 gap-2">
+              <Field id="item-min" label="Lowest (KSh)">
+                {(p) => <Input {...p} inputMode="decimal" value={d.price_min} onChange={(e) => set({ price_min: e.target.value })} />}
+              </Field>
+              <Field id="item-max" label="Highest (KSh)">
+                {(p) => <Input {...p} inputMode="decimal" value={d.price_max} onChange={(e) => set({ price_max: e.target.value })} />}
+              </Field>
+            </div>
+          ) : needsAmount ? (
+            <div className={d.price_mode === "per_unit" ? "grid grid-cols-2 gap-2" : ""}>
+              <div className="relative">
+                <span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-body text-ink-2">
+                  {d.price_mode === "from" ? "From KSh" : "KSh"}
+                </span>
+                <Input
+                  aria-label="Price in KSh"
+                  inputMode="decimal"
+                  value={d.price_amount}
+                  onChange={(e) => setD((x) => withAmount(x, e.target.value))}
+                  className={d.price_mode === "from" ? "pl-20" : "pl-12"}
+                  data-amount=""
+                />
+              </div>
+              {d.price_mode === "per_unit" ? (
+                <div className="relative">
+                  <span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-body text-ink-2">per</span>
+                  <Input aria-label="Per" placeholder="sqm, hour, seat" value={d.unit} onChange={(e) => set({ unit: e.target.value })} className="pl-11" />
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-body text-ink" data-price-says="">
+              {NOTHING_LINE[d.price_mode as PriceChoice]}
+            </p>
+          )}
+          {d.price_mode === "none" ? <p className="text-meta font-medium text-attention">Needs a price</p> : null}
+
+          {extraChoice ? null : (
+            <button
+              type="button"
+              aria-expanded={choicesOpen}
+              aria-controls="item-price-choices"
+              onClick={() => setChoicesOpen((v) => !v)}
+              className="inline-flex min-h-11 items-center gap-1 text-meta font-semibold text-accent"
+            >
+              Price changes?
+              <ChevronDownIcon aria-hidden="true" className={cx("size-4", choicesOpen && "rotate-180")} />
+            </button>
+          )}
+          {showChoices ? (
+            <div id="item-price-choices" role="radiogroup" aria-label="Price type" className="flex flex-wrap gap-2" data-price-choices="">
+              {PRICE_CHOICES.map((c) => {
+                const on = d.price_mode === c.key;
+                return (
+                  <button
+                    key={c.key}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => choose(c.key)}
+                    className={cx(
+                      "min-h-11 rounded-xl border px-3 text-meta font-medium",
+                      deskShiftClass,
+                      on ? "border-accent bg-accent-tonal text-accent" : "border-hairline bg-surface text-ink hover:border-ink-3",
+                    )}
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+          {showChoices && !isNew ? <p className="text-meta text-ink-2">Custom quote, site visit and Free save as soon as you pick them.</p> : null}
+        </fieldset>
+
+        <div className="border-t border-hairline pt-2">
+          <button
+            type="button"
+            aria-expanded={moreOpen}
+            aria-controls="item-more"
+            onClick={() => setMoreOpen((v) => !v)}
+            className="flex min-h-11 w-full items-center justify-between text-body font-medium text-ink"
+            data-more=""
+          >
+            <span>
+              More
+              {d.status !== "active" ? <span className="ml-2 text-meta text-ink-2">{d.status === "paused" ? "Paused" : "Not offered"}</span> : null}
+            </span>
+            <ChevronDownIcon aria-hidden="true" className={cx("size-5 text-ink-2", moreOpen && "rotate-180")} />
+          </button>
+          {moreOpen ? (
+            <div id="item-more" className="space-y-4 pt-2" data-more-open="">
+              <div className="space-y-2">
+                <p className="text-meta font-medium text-ink">Callers hear</p>
+                <SegmentedControl
+                  label="Callers hear"
+                  value={d.status}
+                  onChange={(v) => set({ status: v === "paused" ? "paused" : v === "not_offered" ? "not_offered" : "active" })}
+                  items={STATE_ITEMS}
+                />
+                {d.status === "paused" ? (
+                  <Field id="item-note" label="Note for callers" hint="Optional. For example: back next week.">
+                    {(p) => <Input {...p} value={d.status_note} maxLength={120} onChange={(e) => set({ status_note: e.target.value })} />}
+                  </Field>
+                ) : d.status === "not_offered" ? (
+                  <p className="text-meta text-ink-2">Callers who ask hear that you don&apos;t offer it.</p>
+                ) : null}
+              </div>
+              {d.kind !== "product" && d.status !== "not_offered" ? (
+                <Field id="item-excludes" label="Not included" hint="Optional. For example: outside windows.">
+                  {(p) => <Input {...p} value={d.excludes_en} maxLength={500} onChange={(e) => set({ excludes_en: e.target.value })} />}
+                </Field>
+              ) : null}
+              {d.kind === "product" ? (
+                <>
+                  <div className="flex min-h-11 items-center justify-between gap-3">
+                    <span className="text-body text-ink">In stock</span>
+                    <Switch label="In stock" checked={d.in_stock !== false} onCheckedChange={(v) => set({ in_stock: v ? true : false })} />
+                  </div>
+                  <div className="flex min-h-11 items-center justify-between gap-3" id="holdable">
+                    <span className="text-body text-ink">Callers can ask you to hold it</span>
+                    <Switch label="Callers can ask you to hold it" checked={d.holdable} onCheckedChange={(v) => set({ holdable: v })} />
+                  </div>
+                </>
+              ) : null}
+              <Field id="item-group" label="Group">
+                {(p) => (
+                  <>
+                    <Input {...p} list="item-group-list" value={d.category} onChange={(e) => set({ category: e.target.value })} />
+                    <datalist id="item-group-list">
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.name_en} />
+                      ))}
+                    </datalist>
+                  </>
+                )}
+              </Field>
+              {d.price_mode !== "per_unit" ? (
+                <Field id="item-unit" label="Per" hint={d.kind === "product" ? "Empty means each." : "Empty means per job."}>
+                  {(p) => <Input {...p} value={d.unit} onChange={(e) => set({ unit: e.target.value })} />}
+                </Field>
+              ) : null}
+              <Field id="item-alias" label="Other names callers use" hint="Separate with commas.">
+                {(p) => <Input {...p} value={d.aliases} onChange={(e) => set({ aliases: e.target.value })} />}
+              </Field>
+              <Field id="item-desc" label="Short note">
+                {(p) => <Input {...p} value={d.description_en} maxLength={300} onChange={(e) => set({ description_en: e.target.value })} />}
+              </Field>
+              <div className="flex min-h-11 items-center justify-between gap-3">
+                <span className="text-body text-ink">Popular pick</span>
+                <Switch label="Popular pick" checked={d.popular} onCheckedChange={(v) => set({ popular: v })} />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
+/** Paste a list: preview first, then one batch of up to 500. Replaces the Import tab for the catalogue. */
+function PasteSheet({
+  homeServices,
+  defaultKind,
+  actions,
+  onClose,
+  onSaved,
+}: {
+  homeServices: boolean;
+  defaultKind: KbKind;
+  actions: CatalogueActions;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [text, setText] = useState("");
+  const [kind, setKind] = useState<KbKind>(homeServices ? "service" : defaultKind);
+  const [group, setGroup] = useState("");
+  const [rows, setRows] = useState<KbPasteRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const summary = rows ? pasteSummary(rows) : null;
+  const preview = () =>
+    start(async () => {
+      setError(null);
+      const r = await actions.previewPaste(text);
+      if (!r.ok) setError(r.error);
+      else setRows(r.rows);
+    });
+  const add = () =>
+    start(async () => {
+      if (!summary) return;
+      const r = await actions.importPaste(summary.ready, kind, group);
+      if (!r.ok) setError(r.error);
+      else {
+        notify(`Added ${summary.ready.length}. Calls use them within a minute.`);
+        onSaved();
+      }
+    });
+  return (
+    <Sheet
+      open
+      onOpenChange={(o) => (o ? null : onClose())}
+      title="Paste a list"
+      size="lg"
+      description={summary ? pasteSummaryLine(summary) : undefined}
+      footer={
+        rows && summary ? (
+          <>
+            <Button variant="ghost" onClick={() => setRows(null)}>
+              Back
+            </Button>
+            <Button variant="primary" onClick={add} pending={pending} disabled={!summary.ready.length}>
+              {`Add ${summary.ready.length}`}
+            </Button>
+          </>
+        ) : (
+          <Button variant="primary" onClick={preview} pending={pending} disabled={!text.trim()}>
+            Preview
+          </Button>
+        )
+      }
+    >
+      <div className="space-y-3" data-paste-sheet="" data-paste-step={rows ? "preview" : "text"}>
+        {error ? <p className="rounded-xl bg-attention-tonal p-3 text-body text-attention" role="alert">{error}</p> : null}
+        {!rows ? (
+          <>
+            {!homeServices ? (
+              <SegmentedControl
+                label="These are"
+                value={kind === "product" ? "product" : "service"}
+                onChange={(v) => setKind(v === "product" ? "product" : "service")}
+                items={[
+                  { value: "product", label: "Products" },
+                  { value: "service", label: "Services" },
+                ]}
+              />
+            ) : null}
+            <Field id="paste-text" label="One item per line" hint="Price at the end is optional. For example: Deep clean, 6,000 to 12,000. Up to 500 lines.">
+              {(p) => <Textarea {...p} rows={10} value={text} onChange={(e) => setText(e.target.value)} />}
+            </Field>
+            <Field id="paste-group" label="Group" hint="Optional. New items join this group.">
+              {(p) => <Input {...p} value={group} maxLength={120} onChange={(e) => setGroup(e.target.value)} />}
+            </Field>
+          </>
+        ) : (
+          <ul className="divide-y divide-hairline rounded-xl border border-hairline" data-paste-preview="">
+            {rows.map((r) => (
+              <li key={r.line} className="flex min-h-12 items-center gap-3 px-3 py-2" data-paste-row={r.error ? "skip" : r.match_id ? "update" : "new"}>
+                <span className={cx("min-w-0 flex-1 truncate text-body", r.error ? "text-ink-2" : "text-ink")}>{r.name_en || r.raw}</span>
+                <span className={cx("shrink-0 text-right text-meta", r.error || r.price_mode === "none" ? "font-semibold text-attention" : "text-ink-2")}>{pasteRowLine(r)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Sheet>
+  );
+}
