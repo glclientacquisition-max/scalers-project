@@ -12,6 +12,7 @@ const OUTCOME = {
   answered: 'Question answered. No action needed.',
   abandoned_with_capture: 'Call ended before anything was confirmed. Details captured below.',
   no_action: 'No request made.',
+  brain_error: 'The line had a problem during this call. A callback request was saved. Please call the caller back.',
   write_failed: 'The assistant could not save this request. Nothing was booked. Please call the caller back.',
 };
 const INTENT = { book: 'Book a visit', order: 'Order', cancel: 'Cancel a booking', change: 'Change a booking', address_change: 'Address change', payment_change: 'Payment change', complaint: 'Complaint', handoff: 'Callback', price: 'Price question', availability: 'Availability question', hours: 'Hours question', recall: 'Asked about their file', none: 'General' };

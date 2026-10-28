@@ -1335,6 +1335,8 @@ async function emitHangupCallSummary({ callSid, call, brainState, spokenTurns, d
     const answeredQs = Array.isArray(derived?.answeredQuestions) ? derived.answeredQuestions.length : 0;
     const built = callSummaryEvent.buildCallSummaryEvent({
       path: v2Fin ? 'v2' : 'v1',
+      // B2 follow-up: BA v2's typed failure outcome (brain_error / write_failed) reaches the event.
+      ...(v2Fin && (v2Fin.outcome === 'brain_error' || v2Fin.outcome === 'write_failed') ? { failure: v2Fin.outcome } : {}),
       callLanguage: (v2Fin && v2Fin.lang) || brainState?.language?.current,
       callId: call?.id || callSid,
       tenantId: call?.tenant_id || profile?.id || null,
@@ -4149,6 +4151,11 @@ mediaWss.on('connection', (ws, req) => {
           // C7 BRAIN_V2_MODEL=shadow: per-turn model-vs-rules stage on this turn's trace row (inert when off)
           onModelStage: (stage) => { try { voiceTrace.noteBrainV2Model({ ...stage, turnIndex: stage.turnIndex ?? voiceTrace.currentTurnIndex() }); } catch { /* trace only */ } },
           traceTurnIndex: () => voiceTrace.currentTurnIndex(),
+          // B2 follow-up: the brain-error follow-up save is logged and traced (saved / failed), never spoken as booked.
+          onBrainError: (rec) => {
+            console.log(`[ws/media][${callKey}] brain_error kind=${rec.kind} saved=${rec.ok ? 'yes' : 'no'}${rec.id ? ` id=${rec.id}` : ''}${rec.error ? ` code=${rec.error}` : ''}`);
+            try { voiceTrace.noteTool({ name: 'brain_error_follow_up', status: rec.ok ? 'saved' : 'failed', args: `kind=${rec.kind}${rec.error ? ` code=${rec.error}` : ''}` }); } catch { /* trace only */ }
+          },
           callSid: callKey,
           recordWriteReceipt: typeof db.recordWriteReceipt === 'function' ? db.recordWriteReceipt : undefined,
           confirmCallerName: typeof db.confirmCallerName === 'function' ? db.confirmCallerName : undefined,
@@ -4246,7 +4253,11 @@ mediaWss.on('connection', (ws, req) => {
           /* ignore */
         }
       } else if (!bargeInActive && !spokeThisTurn) {
-        // B2: no old-brain recovery turn. The v2 repair template (EN/SW) is the only fallback line.
+        // B2: no old-brain recovery turn. The v2 repair template (EN/SW) is the only fallback line. The caller is
+        // saved for the owner first (callback commit path, once per call; a no-op if the brain already saved it).
+        if (brainV2Live && typeof brainV2Live.recordError === 'function') {
+          await brainV2Live.recordError(Object.assign(err instanceof Error ? err : new Error(String(err)), { brainErrorKind: 'voice' }), { profile: brainProfile, lastCaller: clean || null }).catch(() => null);
+        }
         const recovery = v2OwnsCall.repairLine(callLanguage === 'sw' ? 'sw' : 'en');
         callTranscript.pushAgent(recovery);
         await speakText(recovery, { tracePath: 'brain_v2_repair', skipFileGate: true });

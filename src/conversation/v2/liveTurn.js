@@ -9,6 +9,8 @@ const { createGeminiStreamModel } = require('./transport');
 const MS = require('./modelShadow');
 const TM = require('./turnModel');
 const V1 = require('./v1draft');
+const R = require('./receipts');
+const { recordBrainError } = require('./brainErrorRecord');
 
 // C7 BRAIN_V2_MODEL: off (default) = nothing; shadow = the model runs beside the rules turn,
 // never awaited, logged per turn; on = the capped cascade is also handed to the machine's
@@ -168,7 +170,37 @@ function createBrainV2Live(opts = {}) {
     // lines the caller heard outside the brain (greeting, opening ladder, acks) join the turn history
     if (Array.isArray(heardAgent)) for (const l of heardAgent) if (l && String(l).trim()) V1.remember(machine, 'agent', String(l).trim());
     V1.remember(machine, 'caller', text);
-    return runBrainEngines({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine });
+    try {
+      return await runBrainEngines({ text, profile: profile || {}, langLock, shouldAbort, onSentence, machine });
+    } catch (err) {
+      // B2 follow-up: a model, tool or turn error never loses the caller. Save the owner follow-up through the
+      // callback commit path (once per call), then speak the v2 repair line. Never a booked line.
+      const rec = await recordError(err, { profile, lastCaller: text });
+      const lang = langLock === 'en' || langLock === 'sw' ? langLock : (machine.lang === 'sw' ? 'sw' : 'en');
+      return { line: R.info({ kind: 'repair' }, lang), lang, end: false, path: 'brain_engines_error', repaired: 'throw', brainError: rec };
+    }
+  }
+
+  /** Save this call's brain-error follow-up (idempotent per call). Never throws. */
+  async function recordError(err, { profile = null, kind = null, lastCaller = null } = {}) {
+    try {
+      const machine = ensureState(profile || {});
+      const log = typeof opts.log === 'function' ? opts.log : () => {};
+      log(`[brain_engines] turn error: ${String((err && err.message) || err).slice(0, 160)}`);
+      return await recordBrainError({
+        machine,
+        handlers: leadHandlers(machine, profile || {}, []),
+        err,
+        kind,
+        callSid: opts.callSid || null,
+        lastCaller,
+        log,
+        onRecord: typeof opts.onBrainError === 'function' ? opts.onBrainError : null,
+        notify: opts.enginesNotify || null,
+      });
+    } catch (e) {
+      return { ok: false, id: null, kind: kind || 'turn', error: String((e && e.message) || e).slice(0, 60), once: false };
+    }
   }
 
   // ---------------------------------------------------------------- BRAIN_MODEL_LEAD turn runner
@@ -261,7 +293,7 @@ function createBrainV2Live(opts = {}) {
   if (opts.prewarm !== false && env.GEMINI_API_KEY) TM.prewarm({ apiKey: env.GEMINI_API_KEY, modelId: MS.resolveModelIds(env).primary }).catch(() => {});
   if (opts.prewarm !== false && MS.modelMode(env) === 'on' && modelRun === undefined) modelRun = resolveModelShadow(opts, env);
 
-  return { run, partial, getState: () => state, lastModelShadow: () => Promise.resolve(null) };
+  return { run, partial, recordError, getState: () => state, lastModelShadow: () => Promise.resolve(null) };
 }
 
 
