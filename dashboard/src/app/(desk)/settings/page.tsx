@@ -60,18 +60,22 @@ export default function SettingsPage(props: SettingsPageProps) {
 }
 
 async function SettingsBody({ searchParams }: SettingsPageProps) {
-  if (!(await memberCan("settings.view"))) return <DeskNoAccess what="Settings" />;
+  // Params first (no fetch), then role and row together, not one after another.
   const params = (await searchParams) || {};
   const tabRaw = Array.isArray(params.tab) ? params.tab[0] : params.tab;
   const panelRaw = Array.isArray(params.panel) ? params.panel[0] : params.panel;
   if (tabRaw === "appearance") redirect("/settings");
+  const [canView, loaded] = await Promise.all([
+    memberCan("settings.view"),
+    getCurrentTenant().then(
+      (row) => ({ ok: true as const, row }),
+      () => ({ ok: false as const, row: null })
+    ),
+  ]);
+  if (!canView) return <DeskNoAccess what="Settings" />;
 
-  let tenant;
-  try {
-    tenant = await getCurrentTenant();
-  } catch {
-    return <DeskLoadError>Could not load Settings.</DeskLoadError>;
-  }
+  if (!loaded.ok) return <DeskLoadError>Could not load Settings.</DeskLoadError>;
+  let tenant = loaded.row;
 
   if (!tenant) {
     return <DeskNoWorkspace />;

@@ -21,7 +21,8 @@ export function nearLimit(length: number, max?: number): boolean {
 
 export function CharCount({ id, length, max }: { id?: string; length: number; max?: number }) {
   if (!nearLimit(length, max)) return null;
-  const over = length >= (max as number);
+  // Reaching the limit exactly is fine (maxLength stops more typing); only past it is an error.
+  const over = length > (max as number);
   return (
     <p id={id} aria-live="polite" className={cx("text-meta tabular-nums", over ? "text-attention" : "text-ink-2")}>
       {(max as number) - length} left
@@ -69,6 +70,17 @@ export const AutoGrowTextarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttr
   },
 );
 
+/**
+ * Fixed-format values (a till, a paybill, a percentage) are not prose: a full 7-digit till
+ * is correct, not "0 left". The count shows only for free text unless asked for.
+ */
+export function showsCount(
+  props: { showCount?: boolean; inputMode?: string; type?: string },
+): boolean {
+  if (typeof props.showCount === "boolean") return props.showCount;
+  return !(props.inputMode === "numeric" || props.inputMode === "decimal" || props.inputMode === "tel" || props.type === "tel" || props.type === "number" || props.type === "time");
+}
+
 type Common = {
   id: string;
   label: ReactNode;
@@ -77,6 +89,8 @@ type Common = {
   hint?: ReactNode;
   error?: string | null;
   className?: string;
+  /** Near-limit count under the field. Default: on for free text, off for numbers and phones. */
+  showCount?: boolean;
 };
 
 function describe(id: string, hint: unknown, error: unknown, count: boolean) {
@@ -126,9 +140,11 @@ export function TextField({
   value,
   maxLength,
   required,
+  showCount,
   ...rest
 }: Common & Omit<InputHTMLAttributes<HTMLInputElement>, "id" | "className">) {
   const length = String(value ?? "").length;
+  const countMax = showsCount({ showCount, inputMode: rest.inputMode, type: rest.type }) ? maxLength : undefined;
   return (
     <div className={cx("min-w-0", className)}>
       <Label id={id} label={label} hideLabel={hideLabel} required={required} />
@@ -138,11 +154,11 @@ export function TextField({
         maxLength={maxLength}
         required={required}
         aria-invalid={error ? true : undefined}
-        aria-describedby={describe(id, hint, error, nearLimit(length, maxLength))}
+        aria-describedby={describe(id, hint, error, nearLimit(length, countMax))}
         className={controlClass}
         {...rest}
       />
-      <Foot id={id} hint={hint} error={error} length={length} max={maxLength} />
+      <Foot id={id} hint={hint} error={error} length={length} max={countMax} />
     </div>
   );
 }
@@ -159,8 +175,10 @@ export function TextAreaField({
   maxLength,
   required,
   rows = 3,
+  showCount: _showCount,
   ...rest
 }: Common & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "id" | "className">) {
+  void _showCount;
   const length = String(value ?? "").length;
   return (
     <div className={cx("min-w-0", className)}>

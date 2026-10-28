@@ -123,10 +123,10 @@ export function dataChecksFor(
     ).trim();
     out.push({
       kind: "payments",
-      href: businessSettingsHref("train", "policies"),
+      href: `${businessSettingsHref("train", "policies")}#payments`,
       label: "Check how customers pay",
       detail: opts?.saveIsConfirm
-        ? "Imported from your payment notes. Press Save on Policies to use it."
+        ? "Imported from your payment notes. Confirm it on Policies."
         : "We read it from your payment notes.",
       payments: pay,
       legacyText: legacy,

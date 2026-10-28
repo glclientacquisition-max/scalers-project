@@ -41,6 +41,10 @@ const SETTINGS_SCOPE_FIELDS: Record<string, readonly string[]> = {
   hours: ["hoursSchedule"],
   locations: ["businessLocations", "locationNotes", "serviceAreas", "noPremises"],
   policies: ["businessPolicies", "unknownAnswerFallback"],
+  // Policies remake: each card saves its own keys of business_policies (merged on the
+  // server onto the stored value), and When unsure saves on its own. Neither wipes the other.
+  "policies-rules": ["businessPolicies"],
+  "policies-unknown": ["unknownAnswerFallback"],
   tools: ["agentTools", "afterHoursMode"],
   pronunciation: ["ttsLexicon"],
   team: ["teamDirectory", "handoffMode"],
@@ -89,6 +93,10 @@ export function settingsScopeIncludes(scope: string, field: string): boolean {
 /** The Identity card scopes, in page order. */
 export const IDENTITY_CARD_SCOPES = ["identity-business", "identity-answer", "identity-contacts"] as const;
 export type IdentityCardScope = (typeof IDENTITY_CARD_SCOPES)[number];
+
+/** The Policies card scopes. */
+export const POLICIES_CARD_SCOPES = ["policies-rules", "policies-unknown"] as const;
+export type PoliciesCardScope = (typeof POLICIES_CARD_SCOPES)[number];
 
 /** Fields a scope may overwrite (null: unknown scope, the whole form). */
 export function settingsScopeFields(scope: string): readonly string[] | null {

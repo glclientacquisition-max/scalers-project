@@ -16,7 +16,7 @@ const KEEP: Record<string, readonly (keyof TenantRow)[]> = {
   catalog: ["services_catalog", "product_catalog", "services_offered"],
   hours: [],
   locations: ["business_locations", "service_areas", "business_policies"],
-  policies: ["business_policies"],
+  policies: ["business_policies", "tts_lexicon"],
   tools: [],
   pronunciation: ["tts_lexicon", "daily_bulletin"],
   team: ["team_directory"],

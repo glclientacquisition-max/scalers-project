@@ -16,8 +16,16 @@ const KnowledgeIngestPanel = dynamic(() => import("@/components/KnowledgeIngestP
 const CatalogImportPanel = dynamic(() => import("@/components/CatalogImportPanel").then((m) => m.CatalogImportPanel), { loading: panelLoading });
 const TestLinePanel = dynamic(() => import("@/components/TestLinePanel").then((m) => m.TestLinePanel), { loading: panelLoading });
 import { SettingsLeaveGuard } from "@/components/SettingsLeaveGuard";
-import { TenantForm } from "@/components/TenantForm";
-import { IdentitySettings } from "@/components/identity/IdentitySettings";
+import { savePoliciesCardAction, savePoliciesUnknownAction } from "@/app/(desk)/settings/policiesCardActions";
+import { PoliciesSkeleton } from "@/components/policies/PoliciesSkeleton";
+
+// Each panel is its own chunk, so opening Policies does not download the whole settings form.
+const formLoading = () => <Skeleton className="h-96 w-full rounded-2xl" />;
+const TenantForm = dynamic(() => import("@/components/TenantForm").then((m) => m.TenantForm), { loading: formLoading });
+const IdentitySettings = dynamic(() => import("@/components/identity/IdentitySettings").then((m) => m.IdentitySettings), { loading: formLoading });
+const PoliciesSettings = dynamic(() => import("@/components/policies/PoliciesSettings").then((m) => m.PoliciesSettings), {
+  loading: () => <PoliciesSkeleton />,
+});
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import { parseVertical } from "@/lib/vertical";
 import {
@@ -192,6 +200,18 @@ export function BusinessSettingsShell({
           heading={heading}
           sidebar={rail}
           businessCategory={businessCategory}
+        />
+      ) : showForm && formPanel === "policies" ? (
+        // Policies: cards that each save on their own, beside what callers hear.
+        <PoliciesSettings
+          key={`${tenant.id}:policies`}
+          onSaveActivity={markOwnSave}
+          tenant={tenant}
+          curatedVoices={curatedVoices}
+          heading={heading}
+          sidebar={rail}
+          saveCard={savePoliciesCardAction}
+          saveUnknown={savePoliciesUnknownAction}
         />
       ) : showForm ? (
         <TenantForm

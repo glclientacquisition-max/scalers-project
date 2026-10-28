@@ -18,7 +18,9 @@ import { parseHoursSchedule, type HoursSchedule } from "@/lib/hoursSchedule";
 function policiesFormData(tenantId: string, policiesJson: string, ownerPaths: string[]): FormData {
   const formData = new FormData();
   formData.set("id", tenantId);
-  formData.set("settings_scope", "policies");
+  // policies-rules owns business_policies only. "policies" also owns When unsure, and this
+  // form posts no unsure line, so a Home payments save used to clear the owner's line.
+  formData.set("settings_scope", "policies-rules");
   formData.set("business_policies", policiesJson);
   formData.set("owner_field_paths", JSON.stringify(ownerPaths));
   return formData;
