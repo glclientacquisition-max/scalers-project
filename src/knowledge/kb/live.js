@@ -3,36 +3,42 @@
 // /voice/incoming prefetch, pinned on the profile object for the whole call) and answer the brain's questions.
 const R = require('./reader');
 const { docToLegacy } = require('./items');
-const { isKbLive, kbGateOn } = require('./kbLive');
+const { isKbLive, kbQuality, brainMode, kbGateOn } = require('./kbLive');
 
-/** BRAIN_KB_GATE=on: readiness (kb/kbLive.js isKbLive, the shared predicate) picks the brain (replaces BRAIN_V2_TENANTS / BRAIN_V1_DRAFT_TENANTS). Off/unset = kill switch: the env lists. */
+/** BRAIN_KB_GATE=on: the KB brain answers every business (readiness is a quality signal, kb/kbLive.js). Off/unset = kill switch: the env lists (removed in P2). */
 function gateOn(env = process.env) { return kbGateOn(env.BRAIN_KB_GATE); }
 
-// tenant -> { ready, version, readyVersion, brainTarget, at }: written when a profile loads, read by the brain selector.
+// tenant -> { version, readyVersion, quality, brainMode, facts, at }: written when a profile loads.
 const REG = new Map();
 function note(tenantId, info) { if (tenantId) REG.set(String(tenantId).toLowerCase(), { ...info, at: Date.now() }); }
-/** null = gate off (callers use the env lists); true/false = the readiness decision for this business. */
+/** null = gate off (callers use the env lists); gate on: true for every business (false only with no business id). */
 function decision({ env = process.env, tenantId } = {}) {
-  const r = tenantId == null ? null : REG.get(String(tenantId).toLowerCase());
-  const d = isKbLive(r ? r.facts : null, { gate: env.BRAIN_KB_GATE });
-  return d.reason === 'gate_off' ? null : d.live;
+  const d = isKbLive(null, { gate: env.BRAIN_KB_GATE });
+  if (d.reason === 'gate_off') return null;
+  return tenantId != null && String(tenantId).trim() !== '';
 }
-/** Readiness alone (gate aside): the shared predicate with the gate forced on. */
-const isReady = (k) => isKbLive(k, { gate: true }).live;
+/** Readiness / quality reason for a business seen on this replica (never a brain switch). */
+function quality(tenantId) {
+  const r = tenantId == null ? null : REG.get(String(tenantId).toLowerCase());
+  return kbQuality(r ? r.facts : null);
+}
+/** The live snapshot passed readiness (quality signal only). */
+const isReady = (k) => kbQuality(k) === 'ready';
 
 /**
- * Mutates and returns the profile. extras.kb = { version, readyVersion, brainTarget, doc, bytes, loadMs } | null.
- * Gate on + live snapshot: profile.kb is set and the legacy catalogue fields are projected from the snapshot
- * (the KB is the one source; services_catalog / product_catalog are no longer read on this path).
+ * Mutates and returns the profile. extras.kb = { version, readyVersion, brainMode, doc, bytes, loadMs } | null.
+ * Gate on: any business with a live snapshot gets profile.kb (readiness does not gate it; an empty snapshot is fine)
+ * and the legacy catalogue fields projected from it. profile.brainMode ('full' | 'safe') is pinned for the call.
  */
 function attach(profile, kbExtras, { env = process.env, force = false } = {}) {
   if (!profile) return profile;
   const k = kbExtras || null;
-  const info = { ready: !!(k && isReady(k)), version: k?.version ?? null, readyVersion: k?.readyVersion ?? null, brainTarget: k?.brainTarget || 'v2' };
-  // the registry keeps the facts (not a precomputed answer) so decision() runs the shared predicate itself
-  if (!force) note(profile.id, { ...info, facts: k ? { version: info.version, readyVersion: info.readyVersion, brainTarget: info.brainTarget } : null });
-  // the snapshot is read only by a business that passed readiness (the readiness runner forces it to test one)
-  if (!k || !k.doc || (!force && (!gateOn(env) || !info.ready))) return profile;
+  const facts = k ? { version: k.version ?? null, readyVersion: k.readyVersion ?? null, brainMode: k.brainMode || 'full' } : null;
+  const info = { ready: isReady(facts), version: facts?.version ?? null, readyVersion: facts?.readyVersion ?? null, quality: kbQuality(facts) };
+  profile.brainMode = brainMode(facts, { safeEnv: env.BRAIN_SAFE_MODE });
+  if (!force) note(profile.id, { ...info, facts, brainMode: profile.brainMode.mode });
+  // gate off = kill switch (env lists, no snapshot). The readiness runner forces an attach to test a snapshot.
+  if (!k || !k.doc || (!force && !gateOn(env))) return profile;
   const handle = R.cached(profile.id, k.version, k.doc, k.bytes);
   if (!handle) return profile;
   profile.kb = { ...info, handle, loadMs: k.loadMs ?? null, items: k.doc.items.length };
@@ -61,4 +67,4 @@ function promptIndex(profile) {
   return h ? h.doc.index : null;
 }
 
-module.exports = { gateOn, decision, note, attach, handle, knownNumbers, promptIndex, isReady, _REG: REG };
+module.exports = { gateOn, decision, quality, note, attach, handle, knownNumbers, promptIndex, isReady, _REG: REG };

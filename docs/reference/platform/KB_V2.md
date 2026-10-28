@@ -97,38 +97,43 @@ and `preview` lines ("what callers hear") produced by the same call rules. Block
 - `not_included` (`excludes_en`) is spoken only when the caller asks whether X includes Y; `can_be_held` (`holdable`,
   products) answers "can you keep one for me?" (a hold is a callback capture with read-back + yes).
 
-## Brain selector (one kill switch)
+## Brain selector (retire the old brain: P1)
 
-`BRAIN_KB_GATE=on`: readiness decides who gets the v2 brain (`flag.tenantAllowed`, `v1draft.mode`), replacing
-`BRAIN_V2_TENANTS` / `BRAIN_V1_DRAFT_TENANTS`. A Business is on the new path when `kb_live_version = kb_ready_version`
-and `brain_target = 'v2'`. Unset or `off`: the env lists decide exactly as before (the old brain path stays recoverable).
+Plan: `briefs/retire-old-brain-plan-2026-10-28.md` (B1 Brain -> **P1 Platform** -> test calls -> B2 -> V1 -> D1 -> B3 -> P2).
 
-### Shared contract: `isKbLive` (Voice + Desk, one predicate)
+- `BRAIN_KB_GATE=on`: the KB brain answers **every** business (`flag.tenantAllowed`, `v1draft.mode` get `true` from
+  `kb/live.decision` for any business id). Readiness no longer picks a brain: an unready business (no area picks, no
+  hours, empty catalogue) still runs the KB brain, which degrades safely (Brain B1). `brain_target` is not read (no v1
+  hold). `attach` puts the live snapshot on the profile for every business with one (an empty snapshot is allowed).
+- Unset or `off`: kill switch until P2 (the env lists decide). P2 removes the switch **after** Brain B2 deletes the old
+  turn: unsetting any brain env var on today's code routes calls to the old brain, so no env var is removed before B2.
+- Emergency brake: `BRAIN_SAFE_MODE=all` (every business) or `tenants.brain_mode = 'safe'` (one business, Super Admin).
 
-The one rule for "this Business's calls are answered from the KB". Voice's selector (`kb/live.js` `decision`, `isReady`,
-`attach`) and `scripts/kb-cutover.js` call it; Desk calls the same file through the voice closure. Nobody re-derives it
-(not from "has an offered kb_item", not from `kb_readiness.passed`).
+### Shared contract: `isKbLive` and `brainMode` (Voice + Desk, one module)
 
-- **Function:** `isKbLive(tenant, { gate }) -> { live: boolean, reason }` in `src/knowledge/kb/kbLive.js` (pure: no env,
-  no DB, no requires). Also `kbGateOn(gate)`, `kbLiveFacts(tenant)`, `KB_LIVE_COLUMNS`.
-  Desk server: `import { isKbLive, loadKbLive, deskKbGate } from "@/lib/kbLive.server"` (`requireVoice` of the same
-  module; listed in `dashboard/scripts/voice-modules.cjs`). Server-only; pass the boolean result to client components.
-- **Facts (no new SQL):** `public.tenants` columns `kb_live_version int`, `kb_ready_version int`, `brain_target text`
-  (`'v1' | 'v2'`, default `'v2'`), from `kb_v2.sql` 2026-10-28.1. Owners/members read their own row (`tenants_select_member`,
-  column SELECT for `authenticated`; no UPDATE on these three), service role reads all. `kb_publish_snapshot` moves
-  `kb_live_version`; `kb_record_readiness` moves `kb_ready_version` on a pass for the live version; Super Admin
-  "Hold on old brain" / `kb-cutover --hold` sets `brain_target`. Snake (`tenants` row) or camel (`{ version, readyVersion,
-  brainTarget }`, Voice's `loadKbLive`) keys.
-- **Gate:** passed in by the server, like `hashMode`: the raw `BRAIN_KB_GATE` value (or a boolean). Voice passes its env;
-  Desk passes `process.env.BRAIN_KB_GATE` of the Desk server (`deskKbGate()`), so the Desk project must carry the same value
-  as Voice. Missing = off. Never read on the client.
-- **Rule / reasons** (first that applies): `gate_off` (kill switch; Voice selector returns `null` = env lists) ->
-  `no_facts` (no row, profile not loaded, KB load error) -> `held_v1` -> `no_live_version` -> `never_ready`
-  (`kb_ready_version` null) -> `ready_stale` (`kb_ready_version != kb_live_version`) -> `ready` (`live: true`).
-- **Not in the predicate:** a live snapshot whose doc fails to load on the call is still `ready` here; that call reads the
-  legacy fields (`kb/source.js` mode `legacy`). The readiness runner's `force` attach is a test path, not a decision.
-- Tests: `tests/kbLive.test.js` (gate off / on + ready / on + not ready / per-business hold; old vs new selector over every
-  facts x gate combination and every staging tenant).
+`src/knowledge/kb/kbLive.js`, pure (no env, no DB, no requires). Voice's selector (`kb/live.js` `decision`, `quality`,
+`attach`) and `scripts/kb-cutover.js` call it; Desk calls the same file through the voice closure
+(`import { isKbLive, brainMode, loadKbLive, deskKbGate, deskSafeEnv } from "@/lib/kbLive.server"`, server-only).
+
+- `isKbLive(tenant, { gate }) -> { live, reason }`: gate off -> `{ live: false, reason: 'gate_off' }`; gate on ->
+  `{ live: true, reason }` for every business, `reason` = quality only: `no_facts` (no row / load error) ->
+  `no_live_version` -> `never_ready` (`kb_ready_version` null) -> `ready_stale` -> `ready`. `held_v1` is gone.
+  `kbQuality(tenant)` returns the reason alone.
+- `brainMode(tenant, { safeEnv }) -> { mode: 'full' | 'safe', reason }`: `global` (`safeEnv` = `'all'`, any case),
+  `tenant` (`brain_mode = 'safe'`), else `normal`. No row / no column = full. Voice pins it on `profile.brainMode` in
+  `attach` (once per call); Brain owns the safe script. `safeEnvState(v)` (`off` | `all` | `invalid`) feeds `/healthz`
+  `kb.safeMode`.
+- **Facts:** `public.tenants` `kb_live_version`, `kb_ready_version`, `brain_mode` (`KB_LIVE_COLUMNS`). Before
+  `kb_v2_brain_mode.sql` (.4) there is no `brain_mode`: Voice (`db.selectKbTenantFacts`) and Desk read without it (= full).
+  Owners/members read their own row; only Super Admin (service role) writes `brain_mode` (no column UPDATE grant for
+  `authenticated`; `tenants_update_admin_only` stays restrictive). `db.setBrainMode(id, 'full'|'safe')`,
+  `kb-cutover --safe <id>` / `--full <id>`.
+- **Gate / safe env:** passed in by the server like `hashMode`: Voice its env, Desk its server env (`deskKbGate()`,
+  `deskSafeEnv()`). Keep both projects equal.
+- **Every business has a document:** `scripts/kb-backfill.js --apply` imports `services_catalog` **and**
+  `product_catalog` into kb_items and publishes; `scripts/kb-ensure-live.js --apply` then publishes an empty live snapshot
+  for any business still without one (never over a blocked compile with items: those are listed).
+- Tests: `tests/kbLive.test.js`.
 
 ## Readiness (src/knowledge/kb/readiness.js, publish.js)
 
@@ -141,7 +146,8 @@ compile, on Voice boot (`KB_BOOT_READINESS`, every 12 h) and on demand (Super Ad
 
 | Var | Default | Effect |
 | --- | --- | --- |
-| `BRAIN_KB_GATE` | off | Readiness selects the brain (kill switch). Voice **and** the Desk server (passed to `isKbLive`); keep both projects equal. |
+| `BRAIN_KB_GATE` | off | On: the KB brain for every business (readiness = quality only). Off = kill switch until P2. Voice **and** the Desk server; keep both equal. |
+| `BRAIN_SAFE_MODE` | off | `all` = every business on the safe script (emergency brake). Voice and the Desk server. |
 | `KB_COMPILE_ON_SAVE` | off | A Desk settings save recompiles the KB and re-checks readiness (the old columns are not synced back). |
 | `KB_SW_SUGGEST` | off | AI suggests Swahili names (owner approves). |
 | `KB_TEXT_TESTS` | none | JSON `{ "<tenant uuid>": ["utterance", ...] }`. |
