@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ClockIcon, ExclamationCircleIcon } from "@heroicons/react/24/outline";
 import { retryCallTextAction } from "@/app/(desk)/calls/textThreadActions";
@@ -12,6 +12,26 @@ import {
   type TextBubble,
 } from "@/lib/callTextThread";
 import { pendingSpinnerInkClass } from "@/components/ui/deskChrome";
+import {
+  addPendingText,
+  dropPendingTexts,
+  mergePendingTexts,
+  pendingTextsFor,
+  subscribePendingTexts,
+  type PendingText,
+} from "@/lib/pendingTexts";
+import { deliverPendingText } from "@/lib/pendingTextSend";
+
+const NO_PENDING: PendingText[] = [];
+
+/** Local texts for this call (Sending / Sent / Not sent) until the server has them. */
+function usePendingTexts(callId: string): PendingText[] {
+  return useSyncExternalStore(
+    subscribePendingTexts,
+    () => pendingTextsFor(callId),
+    () => NO_PENDING
+  );
+}
 
 /** One tick (sent) or two (delivered). Inline glyph like JumpGlyph; no new icon set. */
 function Ticks({ n }: { n: 1 | 2 }) {
@@ -45,7 +65,18 @@ function stampClass(b: TextBubble): string {
   return "text-ink-2";
 }
 
-function Bubble({ b, callId, canAct }: { b: TextBubble; callId: string; canAct: boolean }) {
+function Bubble({
+  b,
+  callId,
+  canAct,
+  local = null,
+}: {
+  b: TextBubble;
+  callId: string;
+  canAct: boolean;
+  /** Set for a text the server has not recorded yet (Retry resends it). */
+  local?: PendingText | null;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +86,18 @@ function Bubble({ b, callId, canAct }: { b: TextBubble; callId: string; canAct: 
 
   function retry() {
     setError(null);
+    if (local) {
+      // Never left the phone: send the same words again under the same reply
+      // id, so a send that did land is not doubled.
+      const fd = new FormData();
+      fd.set("call_id", local.callId);
+      fd.set("caller_phone", local.callerPhone);
+      fd.set("reply_id", local.id);
+      fd.set("note", local.body);
+      addPendingText({ id: local.id, callId: local.callId, callerPhone: local.callerPhone, body: local.body, at: Date.now() });
+      void deliverPendingText(local.id, fd);
+      return;
+    }
     start(async () => {
       const res = await retryCallTextAction(callId, b.id);
       if (res.error) setError(res.error);
@@ -87,7 +130,8 @@ function Bubble({ b, callId, canAct }: { b: TextBubble; callId: string; canAct: 
           {b.failed ? <ExclamationCircleIcon className="h-3.5 w-3.5" aria-hidden="true" /> : null}
           {b.failed ? (
             <span>
-              Not delivered.{b.reason ? ` ${b.reason}` : ""}
+              {local ? "Not sent." : "Not delivered."}
+              {b.reason ? ` ${b.reason}` : ""}
             </span>
           ) : (
             <span>
@@ -131,7 +175,14 @@ export function CallTextThread({
   /** Member may send (inbox.act): shows Retry. */
   canAct: boolean;
 }) {
-  const bubbles = textThreadBubbles(messages);
+  const pending = usePendingTexts(callId);
+  const { bubbles, matched } = mergePendingTexts(messages, textThreadBubbles(messages), pending);
+  const matchedKey = matched.join(",");
+  useEffect(() => {
+    // The server row is in: drop the local copy.
+    if (matchedKey) dropPendingTexts(matchedKey.split(","));
+  }, [matchedKey]);
+  const localById = new Map(pending.map((p) => [`local:${p.id}`, p]));
   if (!bubbles.length) {
     return (
       <p data-text-empty="" className="px-3 py-10 text-center text-body text-ink-2">
@@ -142,7 +193,7 @@ export function CallTextThread({
   return (
     <div data-text-thread="" className="flex flex-col">
       {bubbles.map((b) => (
-        <Bubble key={b.id} b={b} callId={callId} canAct={canAct} />
+        <Bubble key={b.id} b={b} callId={callId} canAct={canAct} local={localById.get(b.id) ?? null} />
       ))}
     </div>
   );

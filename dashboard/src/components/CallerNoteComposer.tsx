@@ -9,6 +9,7 @@ import {
   type SendCallerNoteState,
 } from "@/app/(desk)/calls/noteActions";
 import { btnGhost, btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
+import { composerLabel } from "@/lib/callTextThread";
 
 const polishInitial: PolishCallerNoteState = {};
 const sendInitial: SendCallerNoteState = {};
@@ -112,7 +113,11 @@ function CallerNoteComposerInner({
         <input type="hidden" name="service" value={service || ""} />
         <input type="hidden" name="when" value={when || ""} />
         <input type="hidden" name="landmark" value={landmark || ""} />
+        <label className="sr-only" htmlFor={`caller-note-${callId}`}>
+          {composerLabel(callerName)}
+        </label>
         <textarea
+          id={`caller-note-${callId}`}
           name="note"
           value={note}
           onChange={(e) => setNote(e.target.value)}
@@ -124,7 +129,7 @@ function CallerNoteComposerInner({
           <button
             type="submit"
             disabled={polishPending || !note.trim()}
-            className={`inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-body font-medium text-ink-2 ${deskShiftClass} hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50`}
+            className={`inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-body font-medium text-ink-2 ${deskShiftClass} hover:bg-surface-muted hover:text-ink active:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50`}
           >
             Polish
           </button>
