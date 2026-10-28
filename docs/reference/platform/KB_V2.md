@@ -107,27 +107,42 @@ Plan: `briefs/retire-old-brain-plan-2026-10-28.md` (B1 Brain -> **P1 Platform** 
   hold). `attach` puts the live snapshot on the profile for every business with one (an empty snapshot is allowed).
 - Unset or `off`: kill switch until P2 (the env lists decide). P2 removes the switch **after** Brain B2 deletes the old
   turn: unsetting any brain env var on today's code routes calls to the old brain, so no env var is removed before B2.
-- Emergency brake: `BRAIN_SAFE_MODE=all` (every business) or `tenants.brain_mode = 'safe'` (one business, Super Admin).
+- Safe mode ("Take messages only"): `BRAIN_SAFE_MODE=all` (every business, emergency brake) or `tenants.brain_mode = 'safe'` (one business: the owner from Desk Settings or Super Admin, via `set_brain_mode`).
 
 ### Shared contract: `isKbLive` and `brainMode` (Voice + Desk, one module)
 
 `src/knowledge/kb/kbLive.js`, pure (no env, no DB, no requires). Voice's selector (`kb/live.js` `decision`, `quality`,
 `attach`) and `scripts/kb-cutover.js` call it; Desk calls the same file through the voice closure
-(`import { isKbLive, brainMode, loadKbLive, deskKbGate, deskSafeEnv } from "@/lib/kbLive.server"`, server-only).
+(`import { isKbLive, brainMode, loadKbLive, setBrainModeAsOwner, setBrainModeAsAdmin, deskKbGate, deskSafeEnv } from "@/lib/kbLive.server"`, server-only).
 
 - `isKbLive(tenant, { gate }) -> { live, reason }`: gate off -> `{ live: false, reason: 'gate_off' }`; gate on ->
   `{ live: true, reason }` for every business, `reason` = quality only: `no_facts` (no row / load error) ->
   `no_live_version` -> `never_ready` (`kb_ready_version` null) -> `ready_stale` -> `ready`. `held_v1` is gone.
   `kbQuality(tenant)` returns the reason alone.
-- `brainMode(tenant, { safeEnv }) -> { mode: 'full' | 'safe', reason }`: `global` (`safeEnv` = `'all'`, any case),
-  `tenant` (`brain_mode = 'safe'`), else `normal`. No row / no column = full. Voice pins it on `profile.brainMode` in
-  `attach` (once per call); Brain owns the safe script. `safeEnvState(v)` (`off` | `all` | `invalid`) feeds `/healthz`
-  `kb.safeMode`.
-- **Facts:** `public.tenants` `kb_live_version`, `kb_ready_version`, `brain_mode` (`KB_LIVE_COLUMNS`). Before
-  `kb_v2_brain_mode.sql` (.4) there is no `brain_mode`: Voice (`db.selectKbTenantFacts`) and Desk read without it (= full).
-  Owners/members read their own row; only Super Admin (service role) writes `brain_mode` (no column UPDATE grant for
-  `authenticated`; `tenants_update_admin_only` stays restrictive). `db.setBrainMode(id, 'full'|'safe')`,
-  `kb-cutover --safe <id>` / `--full <id>`.
+- `brainMode(tenant, { safeEnv }) -> { mode: 'full' | 'safe', reason }`, reason: `env` (`safeEnv` = `'all'`, any case;
+  wins over everything), `owner` (`brain_mode = 'safe'` set by the business: Desk Settings **"Take messages only"**),
+  `admin` (`brain_mode = 'safe'` set by Super Admin, or no recorded source), `default` (full). No row / no column = full.
+  Voice pins it on `profile.brainMode` in `attach` (once per call); Brain owns the safe script (greet, take name /
+  number / reason, read back, alert / hand over). `safeEnvState(v)` (`off` | `all` | `invalid`) feeds `/healthz`
+  `kb.safeMode`. The global env is admin / env only; owners only ever change their own business.
+- **Facts:** `public.tenants` `kb_live_version`, `kb_ready_version`, `brain_mode`, `brain_mode_source`
+  (`KB_LIVE_COLUMNS`), plus `brain_mode_set_by` / `brain_mode_set_at` for Desk / Admin display. Before
+  `kb_v2_brain_mode.sql` (.4) there are no brain_mode columns: Voice (`db.selectKbTenantFacts`) and Desk read without
+  them (= full). Members read them with their row.
+- **One writer: RPC `public.set_brain_mode(p_tenant uuid, p_mode text, p_actor uuid default null) returns jsonb`**
+  (SECURITY DEFINER, `search_path = public, pg_temp`; execute granted to `authenticated` and `service_role`, revoked
+  from `public` / `anon`). Signed-in caller must be an `owner` or `admin` member of `p_tenant` (source `owner`,
+  `set_by = auth.uid()`, `p_actor` ignored); the service role (Super Admin) may set any business (source `admin`,
+  `set_by = p_actor`). Errors: `invalid_mode` (22023, anything but `full` / `safe`), `forbidden` (42501: staff, viewer,
+  another business, no session), `not_found`. Writes only the four brain_mode columns and appends one row to
+  `public.tenant_brain_mode_audit` (tenant_id, actor, source, from_mode, to_mode, created_at; members read, no
+  writes). No column UPDATE grant for `authenticated` / `anon`; the restrictive `tenants_update_admin_only` policy
+  stays. Returns `{ tenant_id, brain_mode, from, source, set_by, set_at }`.
+  Desk: `setBrainModeAsOwner(tenantId, mode)` (session client: the Settings toggle) and
+  `setBrainModeAsAdmin(tenantId, mode, actorUserId)` (service role, after Admin sign-in / Unlock) in
+  `@/lib/kbLive.server`, returning `{ ok: true, mode, from, source, setAt } | { ok: false, error }`. Voice / scripts:
+  `db.setBrainMode(id, mode, { actor })`, `kb-cutover --safe <id>` / `--full <id>`. Tests:
+  `tests/kbBrainModeSql.test.js` (PGlite).
 - **Gate / safe env:** passed in by the server like `hashMode`: Voice its env, Desk its server env (`deskKbGate()`,
   `deskSafeEnv()`). Keep both projects equal.
 - **Every business has a document:** `scripts/kb-backfill.js --apply` imports `services_catalog` **and**

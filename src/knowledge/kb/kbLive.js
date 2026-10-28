@@ -9,8 +9,9 @@
 // Facts (public.tenants; owners/members read their own row, service role all):
 //   kb_live_version   kb_snapshots.version callers hear (kb_publish_snapshot)
 //   kb_ready_version  the snapshot version that passed readiness (kb_record_readiness on a pass)
-//   brain_mode        'full' (default) | 'safe'  (kb_v2_brain_mode.sql 2026-10-28.4; Super Admin / service role write)
-// Camel keys are accepted too ({ version, readyVersion, brainMode }, Voice's loadKbLive shape).
+//   brain_mode        'full' (default) | 'safe' = "Take messages only" (kb_v2_brain_mode.sql 2026-10-28.4)
+//   brain_mode_source 'owner' (Desk Settings toggle) | 'admin' (Super Admin) | null; written only by set_brain_mode
+// Camel keys are accepted too ({ version, readyVersion, brainMode, brainModeSource }, Voice's loadKbLive shape).
 const ON = /^(1|true|on|yes)$/i;
 
 /** Gate value as the server passes it: boolean, or the raw env string ('1' | 'true' | 'on' | 'yes', any case). */
@@ -26,10 +27,12 @@ const pick = (o, snake, camel) => (o[snake] !== undefined ? o[snake] : o[camel])
 function kbLiveFacts(tenant) {
   if (!tenant || typeof tenant !== 'object') return null;
   const mode = String(pick(tenant, 'brain_mode', 'brainMode') || 'full').trim().toLowerCase();
+  const src = String(pick(tenant, 'brain_mode_source', 'brainModeSource') || '').trim().toLowerCase();
   return {
     liveVersion: num(pick(tenant, 'kb_live_version', 'version')),
     readyVersion: num(pick(tenant, 'kb_ready_version', 'readyVersion')),
     brainMode: mode === 'safe' ? 'safe' : 'full',
+    brainModeSource: src === 'owner' ? 'owner' : src === 'admin' ? 'admin' : null,
   };
 }
 
@@ -65,21 +68,23 @@ function safeEnvState(safeEnv) {
 }
 
 /**
- * brainMode(tenant, { safeEnv }) -> { mode: 'full' | 'safe', reason }
- *   'global'  BRAIN_SAFE_MODE=all (emergency brake: every business on the safe script)
- *   'tenant'  tenants.brain_mode = 'safe' (Super Admin, one business)
- *   'normal'  the full KB brain
- * No row or no column (before .4) = full. Brain owns what safe does (greet, name, number, reason, read back, alert).
+ * brainMode(tenant, { safeEnv }) -> { mode: 'full' | 'safe', reason: 'env' | 'owner' | 'admin' | 'default' }
+ *   'env'     BRAIN_SAFE_MODE=all wins (emergency brake, every business; env only, admin-owned)
+ *   'owner'   tenants.brain_mode = 'safe' set by the business ("Take messages only" in Desk Settings)
+ *   'admin'   tenants.brain_mode = 'safe' set by Super Admin (or with no recorded source)
+ *   'default' the full KB brain (brain_mode 'full', no row, or no column before .4)
+ * Brain owns what safe does (greet, take name / number / reason, read back, alert / hand over).
  */
 function brainMode(tenant, { safeEnv } = {}) {
-  if (safeEnvAll(safeEnv)) return { mode: 'safe', reason: 'global' };
+  if (safeEnvAll(safeEnv)) return { mode: 'safe', reason: 'env' };
   const f = kbLiveFacts(tenant);
-  if (f && f.brainMode === 'safe') return { mode: 'safe', reason: 'tenant' };
-  return { mode: 'full', reason: 'normal' };
+  if (f && f.brainMode === 'safe') return { mode: 'safe', reason: f.brainModeSource === 'owner' ? 'owner' : 'admin' };
+  return { mode: 'full', reason: 'default' };
 }
 
-/** Columns to select from public.tenants for isKbLive + brainMode (brain_mode needs kb_v2_brain_mode.sql). */
-const KB_LIVE_COLUMNS = 'kb_live_version, kb_ready_version, brain_mode';
+/** Columns to select from public.tenants for isKbLive + brainMode (brain_mode / brain_mode_source need kb_v2_brain_mode.sql). */
+const BRAIN_MODES = Object.freeze(['full', 'safe']);
+const KB_LIVE_COLUMNS = 'kb_live_version, kb_ready_version, brain_mode, brain_mode_source';
 const KB_LIVE_COLUMNS_PRE_BRAIN_MODE = 'kb_live_version, kb_ready_version';
 
-module.exports = { isKbLive, kbQuality, brainMode, kbGateOn, kbLiveFacts, safeEnvAll, safeEnvState, KB_LIVE_COLUMNS, KB_LIVE_COLUMNS_PRE_BRAIN_MODE };
+module.exports = { isKbLive, kbQuality, brainMode, kbGateOn, kbLiveFacts, safeEnvAll, safeEnvState, KB_LIVE_COLUMNS, KB_LIVE_COLUMNS_PRE_BRAIN_MODE, BRAIN_MODES };
