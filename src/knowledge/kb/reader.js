@@ -17,6 +17,22 @@ function lev1(a, b) { // edit distance <= 1
 }
 const near = (q, k) => q === k || (q.length >= 5 && k.length >= 5 && lev1(q, k));
 
+/**
+ * The spoken form of a group (category) name. kb_categories has no spoken/display column (name_en, name_sw,
+ * name_sw_state only), so the owner's label is cleaned the same way every time it is spoken: bracketed asides
+ * and a spaced dash suffix go ("Capsicum (Hoho) - Green" -> "capsicum"), a slash or & becomes a word
+ * ("Kales / Collards" -> "kales or collards"), and words are lower-cased mid-sentence except acronyms.
+ * Pure (Desk bundles this file); applied on read, so snapshots compiled before this fix speak clean names too.
+ */
+function spokenGroupName(name, { lower = true } = {}) {
+  const raw = String(name || '').trim();
+  if (!raw) return null;
+  let s = raw.replace(/\s*[([{][^)\]}]*[)\]}]/g, ' ').replace(/\s+[-\u2013\u2014]\s+.*$/, '');
+  s = s.replace(/\s*\/\s*/g, ' or ').replace(/\s*&\s*/g, ' and ').replace(/[()[\]{}]/g, ' ').replace(/\s+/g, ' ').replace(/^[\s,;:.-]+|[\s,;:.-]+$/g, '').trim();
+  if (!s) s = raw.replace(/[()[\]{}]/g, ' ').replace(/\s+/g, ' ').trim();
+  return lower ? s.split(' ').map((w) => (/^[A-Z0-9]{2,}$/.test(w) ? w : w.toLowerCase())).join(' ') : s;
+}
+
 function openKb(doc) {
   if (!doc || !Array.isArray(doc.items)) return null;
   const t0 = process.hrtime.bigint();
@@ -64,7 +80,8 @@ function openKb(doc) {
     return top.map(([ix, sc]) => ({ item: doc.items[ix], score: sc }));
   }
   const buildMs = Number(process.hrtime.bigint() - t0) / 1e6;
-  const cats = doc.categories || [];
+  // groups are spoken by their clean spoken name (approved Swahili name only, cleaned the same way)
+  const cats = (doc.categories || []).map((c) => (c && c.name ? { ...c, say_en: spokenGroupName(c.name), say_sw: c.say_sw ? spokenGroupName(c.say_sw, { lower: false }) : null } : c));
 
   /**
    * find(text) -> { q, named: item|null, items: [{item, score}], category: cat|null, ms }
@@ -139,4 +156,4 @@ function cached(tenantId, version, doc, bytes = null) {
 function cacheStats() { return { entries: CACHE.size, bytes: cacheBytes }; }
 function clearCache() { CACHE.clear(); cacheBytes = 0; }
 
-module.exports = { openKb, cached, cacheStats, clearCache, TIER1_MAX_ITEMS, GENERIC };
+module.exports = { openKb, cached, cacheStats, clearCache, TIER1_MAX_ITEMS, GENERIC, spokenGroupName };
