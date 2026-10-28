@@ -10,6 +10,7 @@ import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import { DESK_TENANT_COOKIE } from "@/lib/deskTenantCookie";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizePhone } from "@/lib/setupFlow";
+import { kbCatalogueComplete } from "@/lib/kbLegacy";
 
 const TENANT_SELECT_NO_GREETING_IDENTITY =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, notify_channels, llm_system_prompt, services_offered, services_catalog, product_catalog, social_handles, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, service_areas, tts_lexicon, soniox_voice_id, soniox_voice_label, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, soft_spend_limit_enabled, soft_spend_limit_kes, on_demand_usage_enabled, sms_included_units, sms_used_units, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
@@ -149,7 +150,7 @@ export async function ownerTenantId(
 }
 
 const SHELL_SELECT =
-  "id, business_name, vertical, services_offered, business_hours, agent_tone";
+  "id, business_name, vertical, business_hours, agent_tone";
 /** Adds the setup flag (migration 20261011150000). Falls back to SHELL_SELECT before it is applied. */
 const SHELL_SELECT_SETUP = `${SHELL_SELECT}, setup_completed_at`;
 /** Adds archived_at (admin_business_archive.sql): an archived business blocks owner sign-in. */
@@ -159,7 +160,8 @@ export type DeskShellTenant = {
   id: string;
   business_name: string;
   vertical: string | null;
-  services_offered: string | null;
+  /** Active (offered) kb_items; read only on a database without the setup flag (the legacy completion check). */
+  kb_active_items?: number | null;
   business_hours: string | null;
   agent_tone: string | null;
   llm_system_prompt: string | null;
@@ -172,12 +174,12 @@ export type DeskShellTenant = {
 };
 
 function shellProfileComplete(row: {
-  services_offered?: string | null;
+  kb_active_items?: number | null;
   business_hours?: string | null;
   agent_tone?: string | null;
 }): boolean {
   return (
-    Boolean(String(row.services_offered || "").trim()) &&
+    kbCatalogueComplete(row.kb_active_items) &&
     Boolean(String(row.business_hours || "").trim()) &&
     Boolean(String(row.agent_tone || "").trim())
   );
@@ -224,7 +226,7 @@ export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null
       .maybeSingle());
   }
 
-  if (error && /vertical|services_offered|business_hours|agent_tone|column/i.test(error.message)) {
+  if (error && /vertical|business_hours|agent_tone|column/i.test(error.message)) {
     ({ data, error } = await supabase
       .from("tenants")
       .select("id, business_name")
@@ -246,7 +248,6 @@ export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null
     id: row.id,
     business_name: row.business_name || "",
     vertical: row.vertical ?? null,
-    services_offered: row.services_offered ?? null,
     business_hours: row.business_hours ?? null,
     agent_tone: row.agent_tone ?? null,
     llm_system_prompt: null,
@@ -257,6 +258,9 @@ export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null
     shell.setup_completed_at = row.setup_completed_at ?? null;
     return shell;
   }
+  // Legacy completion check (no setup flag): the catalogue half counts active kb_items, not services_offered.
+  const kb = await getSupabaseAdmin().from("kb_items").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "active");
+  shell.kb_active_items = kb.error ? null : kb.count ?? 0;
   if (shellProfileComplete(shell)) return shell;
 
   const prompt = await supabase

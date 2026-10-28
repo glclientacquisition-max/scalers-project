@@ -204,7 +204,8 @@ export function mirrorLegacy(
   for (const it of [...items].sort((a, b) => a.sort - b.sort)) {
     if (it.status === "hidden" || it.status === "not_offered") continue;
     const paused = it.status === "paused";
-    const key = it.legacy_ref || it.id;
+    // legacy_ref names the old column (services_catalog / product_catalog), not the row: the kb id IS the old row id.
+    const key = it.id;
     const prev = old.get(key) || {};
     const price = displayPrice(it) || "";
     const mode = it.price_mode === "per_unit" ? "fixed" : it.price_mode === "site_visit" ? "quote" : it.price_mode;

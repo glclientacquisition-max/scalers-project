@@ -28,6 +28,7 @@ import {
 } from "@/lib/outcomeGates";
 import { upsertTenantFieldMeta } from "@/lib/deskProvenance";
 import { memberDenied } from "@/lib/requireMember";
+import { importCatalogueToKb } from "@/lib/kbWrite.server";
 import { updateWithColumnPeel } from "@/lib/peelMissingColumns";
 import { validateAgentName } from "@/lib/onboardingDraft";
 
@@ -177,8 +178,8 @@ export async function completeOnboardingAction(
     return { error: "Not signed in." };
   }
 
+  // services_offered is no longer written here: kb_items is the source; the KB mirror derives that text (below).
   const patch: Record<string, unknown> = {
-    services_offered: servicesOffered,
     services_catalog: vertical === "home_services" ? services : [],
     product_catalog: vertical === "home_services" ? [] : products,
     business_hours: hoursLocation,
@@ -216,6 +217,12 @@ export async function completeOnboardingAction(
   if (dropped.length) {
     console.warn("[onboarding] saved without missing columns:", dropped.join(", "));
   }
+  // The Catalogue starts filled: these rows go into kb_items (add-only), then the mirror + compile ping.
+  await importCatalogueToKb(
+    tenant.id,
+    { services_catalog: patch.services_catalog, product_catalog: patch.product_catalog },
+    { legacyServicesOffered: servicesOffered, by: "onboarding" },
+  );
   requestSpokenCatalogueCompile(tenant.id, patch);
 
   await recordCaptureMeta({

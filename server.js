@@ -914,8 +914,10 @@ app.post('/internal/desk/spoken-catalogue', (req, res) => {
   if (!secret || String(req.headers['x-voice-internal-secret'] || '').trim() !== secret) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  // v2 KB compat writer (KB_COMPILE_ON_SAVE=on): a save of today's catalogue fields syncs kb_items, compiles, re-checks readiness
-  if (kbCompileOnSave()) scheduleKbFromLegacy(String(req.body?.tenantId || '').trim());
+  // v2 KB (KB_COMPILE_ON_SAVE=on): a settings save re-compiles the KB and re-checks readiness. kb_items is the source of
+  // truth: the old catalogue columns are NOT synced back into it (that undid paused / not offered states). Desk writes
+  // kb_items itself (add-only for onboarding / imports) before it pings.
+  if (kbCompileOnSave()) scheduleKbCompileOnSave(String(req.body?.tenantId || '').trim());
   const onSave = require('./src/knowledge/spokenCatalogueOnSave');
   if (!onSave.enabled()) return res.status(200).json({ ok: true, skipped: 'flag_off' });
   const tenantId = String(req.body?.tenantId || '').trim();
@@ -934,17 +936,11 @@ function kbSecretOk(req) {
 }
 const KB_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function kbSwGenerate() { return /^(1|true|on|yes)$/i.test(String(process.env.KB_SW_SUGGEST || '').trim()) ? spokenCatalogueGenerate() : null; }
-function scheduleKbFromLegacy(tenantId) {
+function scheduleKbCompileOnSave(tenantId) {
   if (!KB_UUID.test(tenantId)) return { scheduled: false };
-  const pub = require('./src/knowledge/kb/publish');
-  // read today's catalogue columns first, then sync + compile in the background (never on the Desk save path)
-  setImmediate(async () => {
-    try {
-      const { supabase } = require('./src/lib/supabaseClient');
-      const { data } = await supabase.from('tenants').select('services_catalog, product_catalog').eq('id', tenantId).maybeSingle();
-      pub.scheduleKbCompile(db, tenantId, { legacyRow: data || null, generate: kbSwGenerate(), by: 'compile' });
-    } catch (e) { console.warn(`[kb] legacy sync tenant=${tenantId} failed: ${e && e.message}`); }
-  });
+  try {
+    require('./src/knowledge/kb/publish').scheduleKbCompile(db, tenantId, { generate: kbSwGenerate(), by: 'compile' });
+  } catch (e) { console.warn(`[kb] compile on save tenant=${tenantId} failed: ${e && e.message}`); }
   return { scheduled: true };
 }
 // Boot sweep (BRAIN_KB_GATE=on, KB_BOOT_READINESS not off): re-check readiness for every business with a live snapshot,
