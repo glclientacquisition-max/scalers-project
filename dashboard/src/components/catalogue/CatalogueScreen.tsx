@@ -28,6 +28,9 @@ import {
   pasteSummary,
   pasteSummaryLine,
   priceInWords,
+  replaceConfirmLine,
+  replaceKindClashes,
+  replaceRemovals,
   rowTags,
   savedLine,
   savesInstantly,
@@ -46,7 +49,7 @@ export type CatalogueActions = {
   decideSwName: (id: string, decision: "approve" | "edit" | "reject", text?: string) => Promise<KbActionResult>;
   compile: () => Promise<KbActionResult>;
   previewPaste: (text: string) => Promise<{ ok: true; rows: KbPasteRow[] } | { ok: false; error: string }>;
-  importPaste: (rows: KbPasteRow[], kind: KbKind, group: string) => Promise<KbActionResult>;
+  importPaste: (rows: KbPasteRow[], kind: KbKind, group: string, mode?: "append" | "replace") => Promise<KbActionResult>;
 };
 
 export type CatalogueScreenProps = {
@@ -388,6 +391,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
 
       {pasting ? (
         <PasteSheet
+          existing={items}
           homeServices={homeServices}
           defaultKind={defaultKind}
           actions={actions}
@@ -721,12 +725,14 @@ function ItemSheet({
 
 /** Paste a list: preview first, then one batch of up to 500. Replaces the Import tab for the catalogue. */
 function PasteSheet({
+  existing,
   homeServices,
   defaultKind,
   actions,
   onClose,
   onSaved,
 }: {
+  existing: KbItem[];
   homeServices: boolean;
   defaultKind: KbKind;
   actions: CatalogueActions;
@@ -739,21 +745,31 @@ function PasteSheet({
   const [rows, setRows] = useState<KbPasteRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  // Replace my list: off by default; one tap shows the confirm with the count and names that go.
+  const [replacing, setReplacing] = useState(false);
   const summary = rows ? pasteSummary(rows) : null;
+  const removed = rows ? replaceRemovals(rows, existing, kind) : [];
+  const clashes = rows ? replaceKindClashes(rows, existing, kind) : [];
+  const confirm = replaceConfirmLine(removed, kind);
   const preview = () =>
     start(async () => {
       setError(null);
+      setReplacing(false);
       const r = await actions.previewPaste(text);
       if (!r.ok) setError(r.error);
       else setRows(r.rows);
     });
-  const add = () =>
+  const add = (mode: "append" | "replace") =>
     start(async () => {
       if (!summary) return;
-      const r = await actions.importPaste(summary.ready, kind, group);
+      const r = await actions.importPaste(summary.ready, kind, group, mode);
       if (!r.ok) setError(r.error);
       else {
-        notify(`Added ${summary.ready.length}. Calls use them within a minute.`);
+        notify(
+          mode === "replace"
+            ? `Your list is now these ${summary.ready.length}${removed.length ? `. Removed ${removed.length}` : ""}. Calls use it within a minute.`
+            : `Added ${summary.ready.length}. Calls use them within a minute.`,
+        );
         onSaved();
       }
     });
@@ -761,19 +777,30 @@ function PasteSheet({
     <Sheet
       open
       onOpenChange={(o) => (o ? null : onClose())}
-      title="Paste a list"
+      title={replacing ? "Replace my list" : "Paste a list"}
       size="lg"
       description={summary ? pasteSummaryLine(summary) : undefined}
       footer={
         rows && summary ? (
-          <>
-            <Button variant="ghost" onClick={() => setRows(null)}>
-              Back
-            </Button>
-            <Button variant="primary" onClick={add} pending={pending} disabled={!summary.ready.length}>
-              {`Add ${summary.ready.length}`}
-            </Button>
-          </>
+          replacing ? (
+            <>
+              <Button variant="ghost" onClick={() => setReplacing(false)}>
+                Keep my list
+              </Button>
+              <Button variant="dangerSolid" onClick={() => add("replace")} pending={pending} disabled={!summary.ready.length || clashes.length > 0} data-replace-confirm-button="">
+                {removed.length ? `Replace and remove ${removed.length}` : "Replace my list"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={() => setRows(null)}>
+                Back
+              </Button>
+              <Button variant="primary" onClick={() => add("append")} pending={pending} disabled={!summary.ready.length}>
+                {`Add ${summary.ready.length}`}
+              </Button>
+            </>
+          )
         ) : (
           <Button variant="primary" onClick={preview} pending={pending} disabled={!text.trim()}>
             Preview
@@ -804,6 +831,25 @@ function PasteSheet({
             </Field>
           </>
         ) : (
+          <>
+          {replacing ? (
+            <div className="space-y-1 rounded-xl bg-attention-tonal p-3" role="alert" data-replace-confirm="" data-remove-count={removed.length}>
+              <p className="text-body font-semibold text-attention">{confirm.title}</p>
+              {confirm.names ? <p className="text-body text-ink">{confirm.names}</p> : null}
+              <p className="text-meta text-ink">
+                {`Your ${kind === "product" ? "products" : "services"} become the ${summary?.ready.length ?? 0} below. Removed items include paused and not offered ones, and callers stop hearing them.`}
+              </p>
+              {clashes.length ? (
+                <p className="text-meta font-semibold text-attention">
+                  {`${clashes.map((c) => c.name_en).slice(0, 3).join(", ")} ${clashes.length === 1 ? "is" : "are"} already a ${kind === "product" ? "service" : "product"}. Remove ${clashes.length === 1 ? "that line" : "those lines"} or use Add instead.`}
+                </p>
+              ) : null}
+            </div>
+          ) : existing.some((e) => e.kind === kind && e.status !== "hidden") ? (
+            <button type="button" onClick={() => setReplacing(true)} className="min-h-11 text-meta font-semibold text-accent" data-replace-start="">
+              Replace my list instead
+            </button>
+          ) : null}
           <ul className="divide-y divide-hairline rounded-xl border border-hairline" data-paste-preview="">
             {rows.map((r) => (
               <li key={r.line} className="flex min-h-12 items-center gap-3 px-3 py-2" data-paste-row={r.error ? "skip" : r.match_id ? "update" : "new"}>
@@ -812,6 +858,7 @@ function PasteSheet({
               </li>
             ))}
           </ul>
+          </>
         )}
       </div>
     </Sheet>

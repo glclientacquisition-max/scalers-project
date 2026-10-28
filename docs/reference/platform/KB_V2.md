@@ -118,6 +118,11 @@ compile, on Voice boot (`KB_BOOT_READINESS`, every 12 h) and on demand (Super Ad
   `kb_upsert_items` batch up to 500) replaces Import for the catalogue: `?tab=catalog` and the retail `?tab=import`
   redirect to `/settings/knowledge` (`?paste=1`) once the tables exist. Viewers read the page without edit controls.
   What callers hear, Kiswahili names to approve and issues sit beside the list from `xl`. Dev fixture: `/dev/catalogue`.
+  Paste a list also offers "Replace my list instead" (`importKbPasteAction` mode `replace`, rpc `kb_import_items`): a confirm
+  names and counts the items of that kind the paste does not match (paused and not offered included), and refuses lines
+  that match an item of the other kind. Desk reads of the catalogue text (Settings Test greeting preview and catalogue
+  payload, FAQ compile input) come from kb_items via `lib/kbRead.server.ts` (`mirrorLegacy` + `servicesOfferedFromKb`),
+  falling back to the stored `services_offered` / catalogue columns when the KB tables are absent.
 - Super Admin Businesses > Calls & quality: brain state, readiness pills, Check again (safe), Hold on old brain / Allow new
   brain (`business-kb:set_brain_target`, Unlock + reason, audited).
 

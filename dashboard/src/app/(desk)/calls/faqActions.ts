@@ -1,5 +1,6 @@
 "use server";
 
+import { loadKbCatalogueView } from "@/lib/kbRead.server";
 import { loadTranscriptTurns } from "@/lib/transcriptLoad";
 import { bustTenantCache } from "@/lib/tenantCache";
 import { memberDenied } from "@/lib/requireMember";
@@ -212,10 +213,12 @@ export async function applyFaqSuggestionsAction(
     };
   }
 
-  const services = normalizeServicesCatalog(tenant.services_catalog).filter((s) => s.name);
-  const servicesOffered =
-    formatServicesForCompiler(services, "") ||
-    String(tenant.services_offered || "").trim();
+  // Catalogue text for the prompt: from kb_items when the KB tables exist; stored columns otherwise (prod today).
+  const kbCatalogue = await loadKbCatalogueView(tenant.id, tenant);
+  const services = normalizeServicesCatalog(kbCatalogue ? kbCatalogue.services_catalog : tenant.services_catalog).filter((s) => s.name);
+  const servicesOffered = kbCatalogue
+    ? kbCatalogue.services_offered.trim()
+    : formatServicesForCompiler(services, "") || String(tenant.services_offered || "").trim();
   const team = normalizeTeam(tenant.team_directory);
   const agentName = String(tenant.agent_name || "Receptionist").trim() || "Receptionist";
   const unknownAnswerFallback = String(tenant.unknown_answer_fallback || "").trim();

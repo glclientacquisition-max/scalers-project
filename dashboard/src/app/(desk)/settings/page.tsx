@@ -21,7 +21,8 @@ import {
 } from "@/lib/businessSettingsNav";
 import { listCuratedSonioxVoices, type CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import { settingsIndexStatuses, type SettingsListStatus } from "@/lib/settingsOptionStatus";
-import { tenantForSettingsView } from "@/lib/settingsPanelPayload";
+import { settingsViewReadsCatalogue, tenantForSettingsView } from "@/lib/settingsPanelPayload";
+import { loadKbCatalogueView } from "@/lib/kbRead.server";
 import { getCurrentTenant } from "@/lib/tenant";
 import { kbTablesReady } from "@/lib/kb.server";
 import { parseVertical } from "@/lib/vertical";
@@ -182,9 +183,11 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   const planRow = await planRowPromise;
   const planStatus: Record<string, SettingsListStatus> = planRow.row ? { "/settings/plan": planRow.row } : {};
 
+  // Test panel greeting preview and the catalogue view read kb_items when the KB tables exist (stored columns otherwise).
+  const kbCatalogue = settingsViewReadsCatalogue(tab, trainPanel) ? await loadKbCatalogueView(tenant.id, tenant) : null;
   return (
     <BusinessSettingsShell
-      tenant={tenantForSettingsView(tenant, tab, trainPanel)}
+      tenant={tenantForSettingsView(tenant, tab, trainPanel, kbCatalogue)}
       tab={tab}
       trainPanel={trainPanel}
       curatedVoices={curatedVoices}

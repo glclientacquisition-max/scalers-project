@@ -221,3 +221,30 @@ export function pasteRowLine(r: KbPasteRow): string {
   const price = priceInWords(r);
   return r.match_id ? `${price} · updates the item you have` : price;
 }
+
+/**
+ * Replace my list (importKbPasteAction mode "replace", rpc kb_import_items): the paste becomes the whole list for
+ * that kind. Items of that kind that the paste does not match are removed (hidden, restorable by Platform), including
+ * paused and not offered ones. This is the list the confirm names and counts.
+ */
+export function replaceRemovals(rows: KbPasteRow[], existing: KbItem[], kind: KbKind): KbItem[] {
+  const kept = new Set(rows.filter((r) => !r.error && r.match_id).map((r) => r.match_id as string));
+  return existing.filter((e) => e.kind === kind && e.status !== "hidden" && !kept.has(e.id));
+}
+
+/** A pasted line that matches an item of the other kind would be written with that kind, which Replace refuses. */
+export function replaceKindClashes(rows: KbPasteRow[], existing: KbItem[], kind: KbKind): KbPasteRow[] {
+  const byId = new Map(existing.map((e) => [e.id, e]));
+  return rows.filter((r) => !r.error && r.match_id && byId.get(r.match_id) && byId.get(r.match_id)!.kind !== kind);
+}
+
+/** "Remove 9 services?" plus up to 5 names. */
+export function replaceConfirmLine(removed: KbItem[], kind: KbKind): { title: string; names: string } {
+  const noun = kind === "product" ? (removed.length === 1 ? "product" : "products") : removed.length === 1 ? "service" : "services";
+  const title = removed.length
+    ? `Replace your list and remove ${removed.length} ${noun}?`
+    : `Replace your list? Nothing is removed.`;
+  const shown = removed.slice(0, 5).map((r) => r.name_en);
+  const more = removed.length > shown.length ? ` and ${removed.length - shown.length} more` : "";
+  return { title, names: shown.length ? `${shown.join(", ")}${more}` : "" };
+}

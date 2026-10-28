@@ -25,7 +25,12 @@ import {
   statusLine,
   withAmount,
   withChoice,
+  replaceConfirmLine,
+  replaceKindClashes,
+  replaceRemovals,
 } from "../dashboard/src/lib/catalogueView.ts";
+import { kbCatalogueView, withKbCatalogue } from "../dashboard/src/lib/kbRead.ts";
+import { tenantForSettingsView, settingsViewReadsCatalogue } from "../dashboard/src/lib/settingsPanelPayload.ts";
 
 const item = (o: Partial<KbItem> & { id: string; name_en: string }): KbItem => ({
   kind: "service", name_sw: null, name_sw_state: "none", name_sw_suggested: null, aliases: [], category_id: null, description_en: null,
@@ -184,4 +189,55 @@ test("Catalogue copy: no em or en dashes, no tenant or shop", () => {
       assert.doesNotMatch(s, /\btenant\b|\bshop\b/i, `${f}: ${s}`);
     }
   }
+});
+
+test("Replace my list: counts and names what goes (paused and not offered too), keeps matched items, other kind untouched", () => {
+  const existing = [
+    item({ id: "svc_deep", name_en: "Deep clean", price_mode: "fixed", price_amount: 6000 }),
+    item({ id: "svc_carpet", name_en: "Carpet cleaning", price_mode: "quote" }),
+    item({ id: "svc_after", name_en: "After builders", status: "paused" }),
+    item({ id: "svc_pest", name_en: "Pest control", status: "not_offered" }),
+    item({ id: "svc_old", name_en: "Old gone", status: "hidden" }),
+    item({ id: "prd_mop", name_en: "Mop", kind: "product" }),
+  ];
+  const rows = parsePasteList("Deep clean, 7,000\nBalcony wash, 1,500\nMop, 300", existing);
+  const removed = replaceRemovals(rows, existing, "service");
+  assert.deepEqual(removed.map((r) => r.id), ["svc_carpet", "svc_after", "svc_pest"]);
+  const c = replaceConfirmLine(removed, "service");
+  assert.equal(c.title, "Replace your list and remove 3 services?");
+  assert.equal(c.names, "Carpet cleaning, After builders, Pest control");
+  assert.equal(replaceConfirmLine([], "service").title, "Replace your list? Nothing is removed.");
+  const many = Array.from({ length: 8 }, (_, i) => item({ id: `s${i}`, name_en: `S${i}` }));
+  assert.equal(replaceConfirmLine(many, "service").names, "S0, S1, S2, S3, S4 and 3 more");
+  // "Mop" matches a product: Replace for services would write it as a product, which the RPC refuses.
+  assert.deepEqual(replaceKindClashes(rows, existing, "service").map((r) => r.name_en), ["Mop"]);
+  assert.deepEqual(replaceKindClashes(rows, existing, "product").map((r) => r.name_en), ["Deep clean"]);
+  const src = fs.readFileSync(path.join(import.meta.dirname, "../dashboard/src/components/catalogue/CatalogueScreen.tsx"), "utf8");
+  assert.match(src, /add\("replace"\)/);
+  assert.match(src, /data-replace-confirm/);
+});
+
+test("services_offered reads come from kb_items when the KB exists, stored text otherwise", () => {
+  const items = [
+    item({ id: "svc_deep", name_en: "Deep clean", price_mode: "range", price_min: 6000, price_max: 12000, unit: "job" }),
+    item({ id: "svc_pest", name_en: "Pest control", status: "not_offered" }),
+  ];
+  const stored = { services_catalog: [{ id: "svc_old", name: "Stale row" }], product_catalog: [], services_offered: "Stale row\n\nAdditional notes:\nWe bring our own supplies" };
+  const kb = kbCatalogueView(items, [], stored);
+  assert.match(kb.services_offered, /Deep clean/);
+  assert.doesNotMatch(kb.services_offered, /Pest control|Stale row/);
+  assert.match(kb.services_offered, /We bring our own supplies/);
+  assert.deepEqual((kb.services_catalog as { name: string }[]).map((r) => r.name), ["Deep clean"]);
+  const t = { id: "t", services_offered: "stored", services_catalog: [], product_catalog: [] };
+  assert.equal(withKbCatalogue(t, null).services_offered, "stored");
+  assert.equal(withKbCatalogue(t, kb).services_offered, kb.services_offered);
+  // Settings payload: Test and Catalogue views take the KB view; other views still strip it.
+  assert.ok(settingsViewReadsCatalogue("test", "identity"));
+  assert.ok(!settingsViewReadsCatalogue("train", "hours"));
+  const row = { ...t, faqs: [], team_directory: [], tts_lexicon: [], daily_bulletin: [], social_handles: {}, business_locations: [], business_policies: {} } as never;
+  assert.equal(tenantForSettingsView(row, "test", "identity", kb).services_offered, kb.services_offered);
+  assert.equal(tenantForSettingsView(row, "test", "identity", null).services_offered, "stored");
+  assert.equal(tenantForSettingsView(row, "train", "hours", kb).services_offered, "");
+  const faq = fs.readFileSync(path.join(import.meta.dirname, "../dashboard/src/app/(desk)/calls/faqActions.ts"), "utf8");
+  assert.match(faq, /loadKbCatalogueView\(tenant\.id, tenant\)/);
 });
