@@ -4,6 +4,8 @@ const N = require('./nlu');
 const L = require('./lexicon');
 const AC = require('./areaCoverage');
 const CP = require('./callPlan');
+const CA = require('./catalogueAsk');
+const { isKb } = require('../../knowledge/kb/source');
 
 const YES_PAT = /^\W*(yes|yeah|yep|yup|sure|correct|right|ok(?:ay)?|of course|go ahead|please do|that'?s (me|right)|ndio|ndiyo|ndiye|sawa|eeh|naam|ni mimi|ni sahihi|kabisa|haya|poa|endelea)\b/i;
 const CALLBACK_YES = /\b(nipigie|kunipigia|mtanipigia|mnanipigia|unipigie|utamwambia|watakupigia|call me back|call you back)\b/i;
@@ -39,6 +41,20 @@ const SYSTEM = [
   'A line like "Sawa. Wewe utamwambia nipigie?" is yes to a callback offer (yes_no=yes).',
   'slots.place: every place named, resolved to the business area tree when possible.',
   'language: en or sw for this turn. wants_human when they ask for a person. closing when they are done.',
+].join('\n');
+
+// KB v2 businesses only (legacy request byte-for-byte unchanged): the typed catalogue ask. asked_item is the thing
+// the caller asked whether we offer / sell / have, in their words, even when this business may not have it; the
+// catalogue tool (engineTools) decides offered, paused / not offered, or not in the catalogue at all.
+const SCHEMA_KB = {
+  ...SCHEMA,
+  properties: { ...SCHEMA.properties, asked_item: { type: 'string', nullable: true } },
+  propertyOrdering: ['intent', 'answers', 'asked_item', 'yes_no', 'slots', 'language', 'wants_human', 'closing'],
+};
+const SYSTEM_KB = [
+  SYSTEM,
+  'answers includes services when they ask what the business offers / sells / has, or whether it offers one thing.',
+  'asked_item: the one product or service they asked whether we offer, sell or have, in their own words ("do you sell pianos" -> "pianos", "mna miche ya nyanya?" -> "miche ya nyanya"), even if the business may not have it; null for a general "what do you offer".',
 ].join('\n');
 
 /** Language of the caller's words (null when the turn carries no signal, e.g. "Okay."). L.isSw is for lang codes. */
@@ -128,15 +144,17 @@ function validate(raw) {
     language: lang,
     wants_human: raw.wants_human === true,
     closing: raw.closing === true,
+    ...(raw.asked_item ? { asked_item: String(raw.asked_item).slice(0, 80) } : {}),
     source: 'model',
   };
 }
 
 function understandRequest({ text, machine, profile }) {
+  const kb = isKb(profile);
   return {
-    systemInstruction: { parts: [{ text: SYSTEM }] },
+    systemInstruction: { parts: [{ text: kb ? SYSTEM_KB : SYSTEM }] },
     contents: [{ role: 'user', parts: [{ text: JSON.stringify({ CALLER_SAID: String(text || ''), EXPECTING: machine.expecting || null, AGENT_LAST: String(machine.lastLine || '').slice(0, 200), BUSINESS: profile?.businessName || null }) }] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json', responseSchema: SCHEMA, thinkingConfig: { thinkingLevel: 'MINIMAL' } },
+    generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json', responseSchema: kb ? SCHEMA_KB : SCHEMA, thinkingConfig: { thinkingLevel: 'MINIMAL' } },
   };
 }
 
@@ -189,8 +207,26 @@ async function runUnderstanding({ text, machine, profile, streamFor, modelId, ha
     if (m) parsed.slots = { ...(parsed.slots || {}), name: m[1] };
   }
   if (!parsed.language) parsed.language = textLang(text);
+  typeCatalogueAsk(parsed, text, profile);
   parsed._ms = clock() - t0;
   parsed._outcome = parsed.source === 'model' ? 'ok' : outcome;
+  return parsed;
+}
+
+const ASKING = new Set(['ask', 'unknown', 'smalltalk']);
+/**
+ * KB v2 businesses only: u.catalogue = { kind: 'overview' } | { kind: 'item', item } | null, from the model's typed
+ * asked_item, else the rules reading of the same words (model off / slow / silent). A catalogue ask is a services
+ * question, so it is always answered from the catalogue receipt (never met with the open "How can I help?").
+ */
+function typeCatalogueAsk(parsed, text, profile) {
+  if (!isKb(profile) || !ASKING.has(parsed.intent)) return parsed;
+  const typed = parsed.source === 'model' ? CA.fromModel(parsed.asked_item, parsed.answers) : null;
+  const rules = CA.catalogueAsk(text);
+  const c = (typed && typed.kind === 'item' ? typed : null) || rules || typed || null;
+  if (!c) return parsed;
+  parsed.catalogue = c;
+  if (!(parsed.answers || []).includes('services')) parsed.answers = [...(parsed.answers || []), 'services'];
   return parsed;
 }
 
@@ -227,6 +263,8 @@ function toLeadShape(fb) {
 
 module.exports = {
   SCHEMA,
+  SCHEMA_KB,
+  typeCatalogueAsk,
   textLang,
   emptyUnderstanding,
   detectYesNo,

@@ -192,8 +192,9 @@ async function runBrainEnginesTurn({
     if (kbCap) {
       E.offered = 'callback'; E.offeredTurn = machine.turn;
       // a paused item is never a booking slot: a yes is a callback for when it's back (traced, read back like any callback)
-      if (kbCap.capture === 'when_back') machine.kbWhenBack = kbCap.service || null;
-      else if (kbCap.service && machine.slots && !machine.slots.service) machine.slots.service = kbCap.service;
+      // turn-stamped, so only a yes to THIS offer names the item in the owner request and alert
+      machine.kbWhenBack = kbCap.capture === 'when_back' && kbCap.service ? { item: kbCap.service, turn: machine.turn } : null;
+      if (kbCap.capture === 'when_back') { /* never a booking slot */ } else if (kbCap.service && machine.slots && !machine.slots.service) machine.slots.service = kbCap.service;
     }
   }
 

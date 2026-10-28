@@ -30,7 +30,11 @@ function shouldHandoff({ understanding, machine, profile = {}, now = new Date() 
   const E = machine.eng || {};
   if (u.wants_human) return { reason: 'wants_human' };
   if (u.intent === 'callback' || u.intent === 'handoff') return { reason: 'caller_callback' };
-  if (E.offered === 'callback' && u.yes_no === 'yes') return { reason: 'caller_callback' };
+  if (E.offered === 'callback' && u.yes_no === 'yes') {
+    // KB v2: a yes to "shall the team call you when it's back?" carries the paused item into the request + alert
+    const about = whenBackAbout(machine, E);
+    return about ? { reason: 'caller_callback', about } : { reason: 'caller_callback' };
+  }
   const booking = u.intent === 'book' || machine.intent === 'book';
   if (booking && !isOpen(profile, now) && profile.afterHoursMode && profile.afterHoursMode !== 'serve') return { reason: 'closed' };
   if (machine._enginesStuck) return { reason: 'stuck' };
@@ -43,8 +47,18 @@ function shouldHandoff({ understanding, machine, profile = {}, now = new Date() 
   return null;
 }
 
+/** The paused item offered on the same turn as this callback offer, or null (a stale offer never names an item). */
+function whenBackAbout(machine, E) {
+  const wb = machine.kbWhenBack;
+  if (!wb) return null;
+  const item = typeof wb === 'string' ? wb : wb.item;
+  if (!item) return null;
+  if (typeof wb === 'object' && wb.turn != null && E.offeredTurn != null && wb.turn !== E.offeredTurn) return null;
+  return { kind: 'when_back', item: String(item).trim() };
+}
+
 /** The create_handoff proposal the caller hears read back (number + when) and says yes to. */
-function handoffProposal({ machine, profile = {}, callerPhone, reason, now = new Date() }) {
+function handoffProposal({ machine, profile = {}, callerPhone, reason, about = null, now = new Date() }) {
   const phone = callerPhone || machine.callerPhone || null;
   const r = REASONS.has(reason) ? reason : 'caller_callback';
   const p = {
@@ -57,6 +71,13 @@ function handoffProposal({ machine, profile = {}, callerPhone, reason, now = new
     callbackWhen: CS.callbackWhen({ profile, now, L }),
     issuedTurn: machine.turn,
   };
+  if (about && about.kind === 'when_back' && about.item) {
+    // the read-back says the item ("..., about the sofa cleaning"), the owner request and alert say why
+    p.topic = about.item;
+    p.about = { kind: 'when_back', item: about.item };
+    p.notes = `Callback when ${about.item} is back: the caller asked to be called when this paused item is available again.`;
+    p.alertReason = `Call back when ${about.item} is back (paused item)`;
+  }
   p.token = `cb_${machine.turn}`;
   p.idemKey = CS.idempotencyKey({ callId: machine.callId || 'nocall', p });
   return p;
@@ -80,4 +101,4 @@ function readbackLine({ machine, profile, lang, callerPhone, now = new Date(), r
   return R.readback(handoffProposal({ machine, profile, callerPhone, reason, now }), lang);
 }
 
-module.exports = { initHandoff, shouldHandoff, handoffProposal, bindCallerName, readbackLine, isOpen, lockedName: CP.lockedName };
+module.exports = { initHandoff, shouldHandoff, whenBackAbout, handoffProposal, bindCallerName, readbackLine, isOpen, lockedName: CP.lockedName };
