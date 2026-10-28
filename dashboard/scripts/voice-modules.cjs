@@ -14,6 +14,7 @@ const VOICE_ENTRIES = [
   'src/knowledge/assistantSayReadiness.js',
   'src/knowledge/lookup.js',
   'src/knowledge/lookupOwnerReason.js',
+  'src/knowledge/kb/kbLive.js', // shared isKbLive contract (lib/kbLive.server.ts)
 ];
 
 function resolveRel(from, spec) {
