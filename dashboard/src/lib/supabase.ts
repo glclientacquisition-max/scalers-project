@@ -209,6 +209,10 @@ export type TenantRow = {
   spoken_name?: string | null;
   /** Line after the shop and agent name. Empty uses How can I help? */
   greeting_invite?: string | null;
+  /** The business's default greeting language: 'en' | 'sw', null is Automatic. Read on Identity only. */
+  greeting_language?: "en" | "sw" | null;
+  /** The owner's full greeting, said word for word by Voice. Desk reads it on Identity only. */
+  greeting_text?: string | null;
   agent_tone?: string | null;
   team_directory?: TeamDirectoryEntry[] | null;
   faqs?: FaqEntry[] | null;

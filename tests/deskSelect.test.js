@@ -76,8 +76,10 @@ describe("Residual owner DeskSelect swaps", () => {
     const form = read("dashboard/src/components/TenantForm.tsx");
     assert.match(form, /from "@\/components\/ui\/DeskSelect"/);
     assert.match(form, /STOCK_OPTIONS/);
-    assert.match(form, /social-kind-m-/);
-    assert.match(form, /social-kind-/);
+    // Public contacts moved to Identity › How customers reach you: plain rows, DeskSelect for the social kind.
+    const identity = read("dashboard/src/components/identity/IdentitySettings.tsx");
+    assert.match(identity, /from "@\/components\/ui\/DeskSelect"/);
+    assert.match(identity, /contact-kind-/);
     assert.match(form, /prod-stock-m-/);
     assert.match(form, /prod-stock-/);
     // Policies "Add a rule" is a bottom-drawer picker now (PolicyRulesEditor), not a DeskSelect.

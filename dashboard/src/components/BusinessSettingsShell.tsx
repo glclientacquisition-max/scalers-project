@@ -17,6 +17,7 @@ const CatalogImportPanel = dynamic(() => import("@/components/CatalogImportPanel
 const TestLinePanel = dynamic(() => import("@/components/TestLinePanel").then((m) => m.TestLinePanel), { loading: panelLoading });
 import { SettingsLeaveGuard } from "@/components/SettingsLeaveGuard";
 import { TenantForm } from "@/components/TenantForm";
+import { IdentitySettings } from "@/components/identity/IdentitySettings";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import { parseVertical } from "@/lib/vertical";
 import {
@@ -76,6 +77,7 @@ export function BusinessSettingsShell({
   callsSlot = null,
   assistantSaySlot = null,
   assistantSayPage = false,
+  businessCategory = null,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
@@ -91,6 +93,8 @@ export function BusinessSettingsShell({
   callsSlot?: ReactNode;
   assistantSaySlot?: ReactNode;
   assistantSayPage?: boolean;
+  /** Identity: tenants.business_category for the one "What you do" question. */
+  businessCategory?: string | null;
 }) {
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
@@ -177,7 +181,18 @@ export function BusinessSettingsShell({
   return (
     <SettingsLeaveGuard>
     <div className="w-full min-w-0" data-settings-console="" data-desk-nested="" data-pull-dirty-guard="">
-      {showForm ? (
+      {showForm && formPanel === "identity" ? (
+        // Identity: three cards that each save on their own (no shared form or Save).
+        <IdentitySettings
+          key={`${tenant.id}:identity`}
+          onSaveActivity={markOwnSave}
+          tenant={tenant}
+          curatedVoices={curatedVoices}
+          heading={heading}
+          sidebar={rail}
+          businessCategory={businessCategory}
+        />
+      ) : showForm ? (
         <TenantForm
           key={tenantFormKey}
           onSaveActivity={markOwnSave}

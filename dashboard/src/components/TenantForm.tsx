@@ -8,11 +8,11 @@ import { POLICY_TEXT_MAX } from "@/lib/lengthLimits";
 import { normalizeContactPhone } from "@/lib/teamValidation";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import {
   canonicalizeAgentTone,
-  TONE_LABELS,
-  TONE_OPTIONS,
   type OnboardingTone,
 } from "@/lib/onboarding";
 import {
@@ -70,11 +70,7 @@ import {
 import { CatalogImportSheet } from "@/components/settings/catalog/CatalogImportSheet";
 import { CatalogSectionShell } from "@/components/settings/catalog/CatalogSectionShell";
 import {
-  emptySocialChannel,
   normalizeSocialHandles,
-  SOCIAL_CHANNEL_KINDS,
-  SOCIAL_CHANNELS_MAX,
-  type SocialChannel,
   type SocialHandles,
 } from "@/lib/socialHandles";
 import { catalogPriceFieldKey } from "@/lib/catalogValidation";
@@ -93,7 +89,6 @@ import { SERVICES_PASTE_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
 import { useMountedPoolPick } from "@/lib/useMountedPoolPick";
 import {
   parseVertical,
-  verticalSettingsOptions,
   type BusinessVertical,
 } from "@/lib/vertical";
 import {
@@ -106,7 +101,6 @@ import {
   displaySonioxVoiceLabel,
   getDefaultSonioxVoiceIdSync,
   listCuratedSonioxVoicesSync,
-  resolveLiveCallVoiceId,
   type CuratedSonioxVoice,
 } from "@/lib/sonioxVoiceCatalog";
 import {
@@ -147,7 +141,6 @@ import {
   SettingsPageHeader,
   SettingsRow,
   SettingsSegmented,
-  SettingsSelect,
   SettingsStack,
   ToolSwitch,
   TrashIcon,
@@ -155,7 +148,6 @@ import {
   settingsConsoleClass,
   settingsFormBodyClass,
   settingsDenseFieldClass,
-  settingsValueFieldClass,
   settingsGhostButtonClass,
   settingsPanelClass,
   settingsTableFieldClass,
@@ -177,12 +169,6 @@ import {
   lexiconForStorage,
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
-import {
-  assertPreviewAudioPlayable,
-  NO_VOICE_SAMPLE_COPY,
-  objectUrlFromPreviewResponse,
-  previewErrorCopy,
-} from "@/lib/previewAudio";
 import {
   EMPTY_TEAM_NOTIFY_FLAGS,
   normalizeTeamDirectory,
@@ -427,7 +413,7 @@ function TenantFormInner({
     curatedVoices && curatedVoices.length
       ? curatedVoices
       : listCuratedSonioxVoicesSync();
-  const [businessName, setBusinessName] = useState(tenant.business_name || "");
+  const [businessName] = useState(tenant.business_name || "");
   const [servicesNotes, setServicesNotes] = useState(() =>
     extractServicesNotes(tenant.services_offered || "")
   );
@@ -441,7 +427,7 @@ function TenantFormInner({
   });
   const [servicePriceDrafts, setServicePriceDrafts] = useState<CatalogPriceDraftMap>({});
   const [productPriceDrafts, setProductPriceDrafts] = useState<CatalogPriceDraftMap>({});
-  const [socialHandles, setSocialHandles] = useState<SocialHandles>(() => {
+  const [socialHandles] = useState<SocialHandles>(() => {
     const next = normalizeSocialHandles(tenant.social_handles);
     return { channels: next.channels.map((row) => markSavedRow(row)) };
   });
@@ -471,10 +457,10 @@ function TenantFormInner({
   const [spokenSw, setSpokenSw] = useState(storedSpoken?.sw ?? "");
   const [spokenSource, setSpokenSource] = useState(storedSpoken?.source ?? "");
   const [spokenTouched, setSpokenTouched] = useState(false);
-  const [agentName, setAgentName] = useState(tenant.agent_name || "");
-  const [spokenName, setSpokenName] = useState(tenant.spoken_name || "");
-  const [greetingInvite, setGreetingInvite] = useState(tenant.greeting_invite || "");
-  const [tone, setTone] = useState<OnboardingTone | "">(initialTone(tenant));
+  const [agentName] = useState(tenant.agent_name || "");
+  const [spokenName] = useState(tenant.spoken_name || "");
+  const [greetingInvite] = useState(tenant.greeting_invite || "");
+  const [tone] = useState<OnboardingTone | "">(initialTone(tenant));
   const [hoursSchedule, setHoursSchedule] = useState<HoursSchedule>(() =>
     scheduleForForm(tenant.hours_schedule, tenant.business_hours || "")
   );
@@ -486,7 +472,7 @@ function TenantFormInner({
   const [afterHoursMode, setAfterHoursMode] = useState<AfterHoursMode>(() =>
     parseAfterHoursMode(tenant.after_hours_mode)
   );
-  const [vertical, setVertical] = useState<BusinessVertical>(() =>
+  const [vertical] = useState<BusinessVertical>(() =>
     parseVertical(tenant.vertical)
   );
   const servicesPasteExample = useMountedPoolPick(
@@ -529,15 +515,12 @@ function TenantFormInner({
   const [agentTools, setAgentTools] = useState<AgentTools>(() =>
     parseAgentTools(tenant.agent_tools)
   );
-  const [sonioxVoiceId, setSonioxVoiceId] = useState(() =>
+  const [sonioxVoiceId] = useState(() =>
     initialSonioxVoiceId(tenant, voiceOptions)
   );
-  const [sonioxVoiceLabel, setSonioxVoiceLabel] = useState(
+  const [sonioxVoiceLabel] = useState(
     () => String(tenant.soniox_voice_label || "").trim()
   );
-  const [voiceSampleLoading, setVoiceSampleLoading] = useState(false);
-  const [voiceSampleError, setVoiceSampleError] = useState<string | null>(null);
-  const [voiceSampleUrl, setVoiceSampleUrl] = useState<string | null>(null);
   const [team, setTeam] = useState<TeamDirectoryEntry[]>(() => {
     const rows = normalizeTeam(
       tenant.team_directory,
@@ -737,49 +720,6 @@ function TenantFormInner({
     if (state.networkError) router.refresh();
   }, [state, router]);
 
-  useEffect(() => {
-    return () => {
-      if (voiceSampleUrl) URL.revokeObjectURL(voiceSampleUrl);
-    };
-  }, [voiceSampleUrl]);
-
-  async function generateVoiceSample() {
-    const sample =
-      agentName && businessName
-        ? `Hello, you've reached ${businessName}, this is ${agentName} speaking. How can I help?`
-        : "Hello, how can I help you today?";
-    const liveVoiceId = resolveLiveCallVoiceId(sonioxVoiceId, voiceOptions);
-    setVoiceSampleLoading(true);
-    setVoiceSampleError(null);
-    if (voiceSampleUrl) {
-      URL.revokeObjectURL(voiceSampleUrl);
-      setVoiceSampleUrl(null);
-    }
-    try {
-      const res = await fetch("/api/pronunciation/preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: sample,
-          lexicon: lexiconForStorage(ttsLexicon),
-          voiceId: liveVoiceId,
-        }),
-      });
-      const preview = await objectUrlFromPreviewResponse(res);
-      try {
-        await assertPreviewAudioPlayable(preview.url);
-      } catch (probeErr) {
-        URL.revokeObjectURL(preview.url);
-        throw probeErr;
-      }
-      setVoiceSampleUrl(preview.url);
-    } catch (err) {
-      setVoiceSampleError(previewErrorCopy(err));
-    } finally {
-      setVoiceSampleLoading(false);
-    }
-  }
-
   function updateTeam(
     index: number,
     key: keyof TeamDirectoryEntry,
@@ -938,39 +878,6 @@ function TenantFormInner({
     setProducts((prev) =>
       prev.map((row, i) => (i === index ? carrySavedRow({ ...row, holdable, source: "owner" }, row) : row))
     );
-  }
-
-  function updateSocialChannel(
-    index: number,
-    key: keyof SocialChannel,
-    value: string
-  ) {
-    setSocialHandles((prev) => ({
-      channels: prev.channels.map((row, i) =>
-        i === index ? carrySavedRow({ ...row, [key]: value }, row) : row
-      ),
-    }));
-  }
-
-  function addSocialChannel(kind = "phone") {
-    setSocialHandles((prev) => {
-      if (prev.channels.length >= SOCIAL_CHANNELS_MAX) return prev;
-      const label =
-        kind === "phone" || kind === "whatsapp"
-          ? prev.channels.some((c) => c.kind === "phone" || c.kind === "whatsapp")
-            ? "Sales"
-            : "Main"
-          : SOCIAL_CHANNEL_KINDS.find((k) => k.id === kind)?.label || "Other";
-      return {
-        channels: [...prev.channels, emptySocialChannel(kind, label)],
-      };
-    });
-  }
-
-  function removeSocialChannel(index: number) {
-    setSocialHandles((prev) => ({
-      channels: prev.channels.filter((_, i) => i !== index),
-    }));
   }
 
   const bulkPreview = useMemo(
@@ -1190,305 +1097,6 @@ function TenantFormInner({
       <input type="hidden" name="soniox_voice_id" value={sonioxVoiceId} />
       <input type="hidden" name="soniox_voice_label" value={sonioxVoiceLabel} />
       <input type="hidden" name="tts_lexicon" value={ttsLexiconJson} />
-
-      <section className={panel === "identity" ? "space-y-3" : "hidden"}>
-        {panel === "identity" ? structuredSlot?.identity : null}
-        <SettingsGroup title="Business Assistant">
-          <SettingsRow label="Business Assistant name" htmlFor="agent_name">
-            <input
-              id="agent_name"
-              value={agentName}
-              onChange={(e) => setAgentName(e.target.value)}
-              placeholder="Aisha"
-              maxLength={40}
-              className={settingsValueFieldClass}
-            />
-          </SettingsRow>
-          <SettingsSelect
-            id="agent_tone"
-            label="Tone"
-            value={tone}
-            placeholder="Tone"
-            onChange={(id) => setTone(id)}
-            options={TONE_OPTIONS.map((opt) => ({
-              id: opt.id,
-              label: TONE_LABELS[opt.id],
-              detail: opt.blurb,
-            }))}
-          />
-        </SettingsGroup>
-
-        <SettingsGroup title="Business">
-          <SettingsRow label="Business name" htmlFor="business_name">
-            <input
-              id="business_name"
-              value={businessName}
-              onChange={(e) => setBusinessName(e.target.value)}
-              placeholder="Westlands Books"
-              title={businessName || undefined}
-              className={settingsValueFieldClass}
-            />
-          </SettingsRow>
-          <SettingsRow
-            label="Spoken name"
-            htmlFor="spoken_name"
-            hint="What callers hear"
-          >
-            <input
-              id="spoken_name"
-              value={spokenName}
-              onChange={(e) => setSpokenName(e.target.value)}
-              placeholder={businessName.trim() || "Your business name"}
-              maxLength={40}
-              title={spokenName || undefined}
-              className={settingsValueFieldClass}
-            />
-          </SettingsRow>
-          <SettingsRow
-            label="Short invite"
-            htmlFor="greeting_invite"
-            hint="The line after the name"
-          >
-            <input
-              id="greeting_invite"
-              value={greetingInvite}
-              onChange={(e) => setGreetingInvite(e.target.value)}
-              placeholder="How can I help?"
-              maxLength={80}
-              className={settingsValueFieldClass}
-            />
-          </SettingsRow>
-          <SettingsSelect
-            id="business_vertical"
-            label="Business type"
-            value={vertical}
-            onChange={setVertical}
-            options={verticalSettingsOptions(vertical).map((opt) => ({
-              id: opt.id,
-              label: opt.label,
-              detail: opt.blurb,
-            }))}
-          />
-        </SettingsGroup>
-
-        <SettingsGroup
-          title="Public contacts"
-          action={
-            socialHandles.channels.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => addSocialChannel("phone")}
-                  className={settingsGhostButtonClass}
-                >
-                  Add phone
-                </button>
-                <button
-                  type="button"
-                  onClick={() => addSocialChannel("whatsapp")}
-                  className={settingsGhostButtonClass}
-                >
-                  Add WhatsApp
-                </button>
-                <button
-                  type="button"
-                  onClick={() => addSocialChannel("instagram")}
-                  className={settingsGhostButtonClass}
-                >
-                  Add social
-                </button>
-              </div>
-            ) : undefined
-          }
-        >
-          {socialHandles.channels.length === 0 ? (
-            <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <p className="text-body text-ink-2">No public contacts yet</p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => addSocialChannel("phone")}
-                  className={settingsGhostButtonClass}
-                >
-                  Add phone
-                </button>
-                <button
-                  type="button"
-                  onClick={() => addSocialChannel("whatsapp")}
-                  className={settingsGhostButtonClass}
-                >
-                  Add WhatsApp
-                </button>
-                <button
-                  type="button"
-                  onClick={() => addSocialChannel("instagram")}
-                  className={settingsGhostButtonClass}
-                >
-                  Add social
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="min-w-0">
-            <div className="divide-y divide-hairline lg:hidden">
-              {socialHandles.channels.map((channel, index) => (
-                <div
-                  key={`social-m-${index}`}
-                  className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_2.75rem] items-center gap-2 px-3 py-2"
-                >
-                  <div className="min-w-0">
-                    <label className="sr-only" htmlFor={`social-kind-m-${index}`}>
-                      Type
-                    </label>
-                    <DeskSelect
-                      id={`social-kind-m-${index}`}
-                      aria-label="Type"
-                      value={channel.kind}
-                      className={denseFieldClass}
-                      options={SOCIAL_CHANNEL_KINDS.map((k) => ({
-                        value: k.id,
-                        label: k.label,
-                      }))}
-                      onChange={(next) => updateSocialChannel(index, "kind", next)}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label className="sr-only" htmlFor={`social-label-m-${index}`}>
-                      Label
-                    </label>
-                    <input
-                      id={`social-label-m-${index}`}
-                      value={channel.label}
-                      onChange={(e) => updateSocialChannel(index, "label", e.target.value)}
-                      placeholder="Main"
-                      className={denseFieldClass}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      requestRemove(
-                        channel,
-                        "Remove this contact?",
-                        "It leaves the public contacts when you save.",
-                        () => removeSocialChannel(index)
-                      )
-                    }
-                    className={settingsTrashButtonClass}
-                    aria-label={`Remove contact ${index + 1}`}
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                  <div className="col-span-3 min-w-0">
-                    <label className="sr-only" htmlFor={`social-value-m-${index}`}>
-                      Handle / URL
-                    </label>
-                    <input
-                      id={`social-value-m-${index}`}
-                      value={channel.value}
-                      onChange={(e) => updateSocialChannel(index, "value", e.target.value)}
-                      placeholder={
-                        SOCIAL_CHANNEL_KINDS.find((k) => k.id === channel.kind)
-                          ?.placeholder || ""
-                      }
-                      className={denseFieldClass}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="hidden lg:block">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[520px] text-body">
-                  <thead>
-                    <tr className="border-b border-hairline bg-surface-canvas text-left text-meta font-medium text-ink-2">
-                      <th className="px-3 py-2 font-medium w-36">Type</th>
-                      <th className="px-3 py-2 font-medium w-28">Label</th>
-                      <th className="px-3 py-2 font-medium">Handle / URL</th>
-                      <th className="px-3 py-2 font-medium w-12">
-                        <span className="sr-only">Action</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-hairline bg-surface">
-                    {socialHandles.channels.map((channel, index) => (
-                      <tr key={`social-ch-${index}`} className="align-middle">
-                        <td className="px-3 py-1.5">
-                          <label className="sr-only" htmlFor={`social-kind-${index}`}>
-                            Type
-                          </label>
-                          <DeskSelect
-                            id={`social-kind-${index}`}
-                            aria-label="Type"
-                            value={channel.kind}
-                            className={denseFieldClass}
-                            options={SOCIAL_CHANNEL_KINDS.map((k) => ({
-                              value: k.id,
-                              label: k.label,
-                            }))}
-                            onChange={(next) =>
-                              updateSocialChannel(index, "kind", next)
-                            }
-                          />
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <label className="sr-only" htmlFor={`social-label-${index}`}>
-                            Label
-                          </label>
-                          <input
-                            id={`social-label-${index}`}
-                            value={channel.label}
-                            onChange={(e) =>
-                              updateSocialChannel(index, "label", e.target.value)
-                            }
-                            placeholder="Main"
-                            className={denseFieldClass}
-                          />
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <label className="sr-only" htmlFor={`social-value-${index}`}>
-                            Handle / URL
-                          </label>
-                          <input
-                            id={`social-value-${index}`}
-                            value={channel.value}
-                            onChange={(e) =>
-                              updateSocialChannel(index, "value", e.target.value)
-                            }
-                            placeholder={
-                              SOCIAL_CHANNEL_KINDS.find((k) => k.id === channel.kind)
-                                ?.placeholder || ""
-                            }
-                            className={denseFieldClass}
-                          />
-                        </td>
-                        <td className="px-2 py-1.5">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              requestRemove(
-                                channel,
-                                "Remove this contact?",
-                                "It leaves the public contacts when you save.",
-                                () => removeSocialChannel(index)
-                              )
-                            }
-                            className={settingsTrashButtonClass}
-                            aria-label={`Remove contact ${index + 1}`}
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            </div>
-          )}
-        </SettingsGroup>
-      </section>
 
       <section className={panel === "catalog" ? "space-y-4" : "hidden"}>
         {panel === "catalog" ? structuredSlot?.catalog : null}
@@ -2409,70 +2017,18 @@ function TenantFormInner({
 
             <section className={panel === "tools" ? "space-y-6" : "hidden"}>
         <SettingsGroup title="Voice">
-          {voiceOptions.length > 0 ? (
-            <SettingsSelect
-              id="soniox_voice_id"
-              label="Voice"
-              value={sonioxVoiceId}
-              onChange={setSonioxVoiceId}
-              options={voiceOptions.map((voice) => ({
-                id: voice.id,
-                label: displaySonioxVoiceLabel("", voice.id, voiceOptions),
-              }))}
-            />
-          ) : (
-            <p className="px-4 py-3 text-body text-ink-2">No voices loaded.</p>
-          )}
-          <SettingsRow label="Voice label" htmlFor="soniox_voice_label">
-            <input
-              id="soniox_voice_label"
-              type="text"
-              maxLength={40}
-              value={sonioxVoiceLabel}
-              onChange={(e) => setSonioxVoiceLabel(e.target.value)}
-              placeholder="Shop voice"
-              className={settingsValueFieldClass}
-            />
-          </SettingsRow>
-          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2">
-            <p className="text-body text-ink-2">
-              {sonioxVoiceLabel.trim() || sonioxVoiceId
-                ? displaySonioxVoiceLabel(
-                    sonioxVoiceLabel,
-                    sonioxVoiceId,
-                    voiceOptions
-                  )
-                : "No voice selected"}
-            </p>
-            <button
-              type="button"
-              onClick={() => void generateVoiceSample()}
-              disabled={voiceSampleLoading}
-              className={settingsGhostButtonClass}
-            >
-              {voiceSampleLoading ? "Generating…" : "Hear sample"}
-            </button>
-          </div>
-          {voiceSampleUrl ? (
-            <div className="px-4 py-2">
-              <audio
-                controls
-                preload="metadata"
-                className="max-w-full"
-                onError={() => {
-                  URL.revokeObjectURL(voiceSampleUrl);
-                  setVoiceSampleUrl(null);
-                  setVoiceSampleError(NO_VOICE_SAMPLE_COPY);
-                }}
-              >
-                <source src={voiceSampleUrl} type="audio/wav" />
-              </audio>
-            </div>
-          ) : voiceSampleError ? (
-            <p className="px-4 py-2 text-meta text-warn" role="alert" data-testid="voice-sample-empty">
-              {voiceSampleError}
-            </p>
-          ) : null}
+          {/* The voice is picked on Identity › How you answer, next to the greeting it says. */}
+          <Link
+            href={businessSettingsHref("train", "identity")}
+            data-voice-moved=""
+            className="flex min-h-11 w-full items-center gap-3 px-4 text-start hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+          >
+            <span className="shrink-0 text-body font-medium text-ink">Voice</span>
+            <span className="min-w-0 flex-1 truncate text-end text-body text-ink-2">
+              {displaySonioxVoiceLabel(sonioxVoiceLabel, sonioxVoiceId, voiceOptions)}
+            </span>
+            <span className="shrink-0 text-body font-medium text-accent">Change in Identity</span>
+          </Link>
           <div className="space-y-1.5 px-4 py-3">
             <p className="text-body font-medium text-ink">On a call</p>
             <SettingsSegmented

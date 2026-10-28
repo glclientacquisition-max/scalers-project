@@ -9,7 +9,8 @@ function read(rel) {
 }
 
 describe("business settings depth", () => {
-  const form = read("dashboard/src/components/TenantForm.tsx");
+  // Settings form copy: TenantForm plus the Identity cards (settings remake slice 1).
+  const form = read("dashboard/src/components/TenantForm.tsx") + read("dashboard/src/components/identity/IdentitySettings.tsx");
   const policies = read("dashboard/src/lib/businessPolicies.ts");
   const handoff = read("dashboard/src/lib/handoffMode.ts");
   const ingest = read("dashboard/src/components/KnowledgeIngestPanel.tsx");
@@ -20,13 +21,15 @@ describe("business settings depth", () => {
   const compileActions = read("dashboard/src/app/(desk)/settings/actions.ts");
   const nav = read("dashboard/src/lib/businessSettingsNav.ts");
 
-  it("orders Assistant before Business and uses example placeholders", () => {
-    const assistantName = form.indexOf("Assistant name");
-    const businessBlock = form.indexOf('title="Business"');
-    const contacts = form.indexOf('title="Public contacts"');
-    assert.ok(assistantName > 0);
-    assert.ok(assistantName < businessBlock);
-    assert.ok(businessBlock < contacts);
+  it("orders Identity as business, then how you answer, then contacts, with example placeholders", () => {
+    const page = form.slice(form.indexOf("function IdentitySettingsInner"));
+    const business = page.indexOf("<BusinessCard");
+    const answer = page.indexOf("<AnswerCard");
+    const contacts = page.indexOf("<ContactsCard");
+    assert.ok(business > 0);
+    assert.ok(business < answer);
+    assert.ok(answer < contacts);
+    assert.match(form, /Assistant name/);
     assert.doesNotMatch(form, />Alerts</);
     assert.match(form, /placeholder="Aisha"/);
     assert.match(form, /placeholder="Westlands Books"/);
@@ -49,7 +52,8 @@ describe("business settings depth", () => {
     assert.match(read("dashboard/src/components/UnknownAnswerField.tsx"), /What to say/);
     assert.match(require("node:fs").readFileSync(require("path").join(__dirname, "..", "dashboard/src/components/AlertContactsList.tsx"), "utf8"), /"Wanjiku Mwangi"/);
     assert.match(form, /Add service/);
-    assert.match(form, /placeholder="Shop voice"/);
+    // The voice label field left with the voice picker (Identity shows the voice by name).
+    assert.doesNotMatch(form, /placeholder="Shop voice"/);
     // Place fields live in PlacesEditor now.
     assert.match(read("dashboard/src/components/structured/PlacesEditor.tsx"), /placeholder="Opposite Hilton, Kimathi St"/);
     assert.match(policies, /id: "deposit"/);
@@ -199,9 +203,12 @@ describe("business settings depth", () => {
     );
     assert.match(voice, /title="Voice"/);
     assert.match(voice, /title="Tools"/);
-    assert.match(voice, /Hear sample/);
-    assert.match(voice, /id="soniox_voice_id"/); // SettingsSelect wires its own label
-    assert.match(voice, /htmlFor="soniox_voice_label"/);
+    // The voice is picked on Identity › How you answer; Voice links there.
+    assert.match(voice, /data-voice-moved=""/);
+    assert.match(voice, /Change in Identity/);
+    assert.doesNotMatch(voice, /id="soniox_voice_id"/);
+    assert.match(form, /id="soniox_voice_id"/); // Identity: SettingsSelect wires its own label
+    assert.match(form, /Hear it/);
     assert.doesNotMatch(voice, /Handoff/);
     assert.doesNotMatch(voice, /HANDOFF_OPTIONS/);
     assert.doesNotMatch(voice, /Change in Team/);

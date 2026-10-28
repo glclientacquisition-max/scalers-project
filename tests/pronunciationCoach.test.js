@@ -223,7 +223,12 @@ describe("pronunciation coach chrome", () => {
       "utf8"
     );
     assert.match(form, /voiceId=\{tenant\.soniox_voice_id/);
-    assert.match(form, /lexicon: lexiconForStorage\(ttsLexicon\)/);
-    assert.match(form, /Hear sample/);
+    // The voice sample moved to Identity › How you answer: it reads the stored lexicon.
+    const identity = fs.readFileSync(
+      path.join(__dirname, "..", "dashboard/src/components/identity/IdentitySettings.tsx"),
+      "utf8"
+    );
+    assert.match(identity, /lexicon: lexiconForStorage\(parseTtsLexicon\(tenant\.tts_lexicon\)\)/);
+    assert.match(identity, /Hear it/);
   });
 });
