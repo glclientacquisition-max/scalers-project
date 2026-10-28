@@ -12,6 +12,7 @@ const {
   ownerCallSummaryEnabled,
   legacyOwnerSendsSuppressed,
   sendOwnerSummaryToPerson,
+  withStickyFailure,
 } = require('../src/notifications/ownerCallSummary');
 const { renderOwnerSummary, renderFallback } = require('../src/notifications/ownerSummaryText');
 const { resetInstanceFlights } = require('../src/notifications/sendLedger');
@@ -663,6 +664,122 @@ describe('SMS metering: claim after accept, compensate on ledger failure', () =>
       assert.equal([...db.rows.values()][0].status, 'sent');
     } finally {
       restore();
+    }
+  });
+});
+
+// B2 follow-up (#1010): BA v2 adds outcomes brain_error (brain failed mid-call,
+// callback row saved) and write_failed (the save itself failed).
+describe('owner call summary: brain_error / write_failed (#1010)', () => {
+  function failureEvent(outcome, extra = {}) {
+    return {
+      event: 'call.summary.ready', schemaVersion: 1, path: 'v2', callLanguage: 'en', callId: CALL.id, tenantId: 'ten_aris',
+      outcome, urgent: false,
+      caller: { name: 'Alvin Yegon', phone: '+254790381872' },
+      receipts: [{
+        receiptId: 'r1', type: 'callback', status: 'unconfirmed',
+        ...(outcome === 'brain_error' ? { writtenRowId: 'sr_77' } : {}),
+        brainError: { kind: 'model', saved: outcome === 'brain_error' },
+        slots: { reason: { value: 'deep clean on Friday', status: 'given' }, name: { value: 'Alvin Yegon', status: 'given' } },
+      }],
+      emittedAt: '2026-10-28T10:00:00Z',
+      ...extra,
+    };
+  }
+  function bookedEvent() {
+    return {
+      event: 'call.summary.ready', schemaVersion: 1, path: 'v2', callLanguage: 'en', callId: CALL.id, tenantId: 'ten_aris',
+      outcome: 'booked', urgent: false,
+      caller: { name: 'Alvin Yegon', phone: '+254790381872' },
+      receipts: [{ receiptId: 'r1', type: 'booking', status: 'confirmed', writtenRowId: 'a1', slots: { service: { value: 'Deep clean', status: 'given' }, when: { value: 'Friday 10am', status: 'given' }, place: { value: 'Kilimani', status: 'given' } } }],
+      emittedAt: '2026-10-28T09:59:00Z',
+    };
+  }
+
+  it('EN: both render as "Call back needed", never "Enquiry"; write_failed says nothing was saved', () => {
+    const be = renderOwnerSummary(failureEvent('brain_error'), { businessName: 'Aris Kenya' });
+    assert.match(be.label, /^Call back needed/);
+    assert.match(be.subject, /^Call back needed/);
+    assert.match(be.text, /^Call back needed: the line had a problem - Aris Kenya$/m);
+    assert.match(be.text, /A callback request was saved\. Please call the caller back\./);
+    assert.doesNotMatch(be.text, /Enquiry|asked questions/);
+    const wf = renderOwnerSummary(failureEvent('write_failed'), {});
+    assert.match(wf.label, /^Call back needed/);
+    assert.match(wf.text, /^Call back needed: request NOT saved$/m);
+    assert.match(wf.text, /could not save this request\. Nothing was booked\./);
+    assert.doesNotMatch(wf.text, /Enquiry|asked questions/);
+    for (const t of [be.text, wf.text]) assert.match(t, /^[\x20-\x7e\n]+$/, 'GSM-7 safe');
+  });
+
+  it('SW: Swahili labels from the brain-side summary, never "Ulizo"', () => {
+    for (const o of ['brain_error', 'write_failed']) {
+      const r = renderOwnerSummary(failureEvent(o, { callLanguage: 'sw' }), {});
+      assert.match(r.label, /^Mpigie tena/);
+      assert.equal(r.language, 'sw');
+      assert.doesNotMatch(r.text, /Ulizo|aliuliza maswali/);
+      assert.match(r.text, /Tafadhali mpigie mpigaji\./);
+    }
+  });
+
+  it('no receipts: still "Call back needed", no "asked questions" line', () => {
+    for (const o of ['brain_error', 'write_failed']) {
+      const r = renderOwnerSummary(failureEvent(o, { receipts: [] }), {});
+      assert.match(r.label, /^Call back needed/);
+      assert.doesNotMatch(r.text, /asked questions|Enquiry/);
+    }
+  });
+
+  it('precedence: a brain error stays over an earlier or later booked copy; escalated / missed still outrank', () => {
+    assert.equal(withStickyFailure(bookedEvent(), failureEvent('brain_error')).outcome, 'brain_error');
+    assert.equal(withStickyFailure(failureEvent('brain_error'), bookedEvent()).outcome, 'brain_error');
+    assert.equal(withStickyFailure(failureEvent('write_failed'), { ...bookedEvent(), outcome: 'info_only' }).outcome, 'write_failed');
+    assert.equal(withStickyFailure(failureEvent('write_failed'), failureEvent('brain_error')).outcome, 'brain_error');
+    assert.equal(withStickyFailure(failureEvent('brain_error'), { ...bookedEvent(), outcome: 'escalated', urgent: true }).outcome, 'escalated');
+    assert.equal(withStickyFailure(null, bookedEvent()).outcome, 'booked');
+  });
+
+  it('sender: confirmed booking emitted first, then brain_error before the settle: one message, "Call back needed"', async () => {
+    setEnv();
+    try {
+      const c = clock();
+      const db = callDb();
+      const out = [];
+      const s = makeSender(db, c, { sendToPerson: async (o) => { out.push(o); return { channel: 'sms', to: o.person.phone }; } });
+      s.onEvent(bookedEvent());
+      await s.noteCallEnded({ callSid: CALL.call_sid, status: 'complete' });
+      s.onEvent(failureEvent('brain_error'), { replaces: true });
+      await c.advance(31 * 1000);
+      assert.equal(out.length, 1, 'one summary per call');
+      assert.match(out[0].body, /^Call back needed: the line had a problem - Aris Kenya/);
+      assert.equal(out[0].lead.reason, 'Call back needed: the line had a problem');
+      assert.equal(out[0].alertType, 'other_calls', 'same owner alert type as callback_needed');
+      const marker = db.calls.merged.find((p) => p.owner_summary_sent_at);
+      assert.equal(marker.owner_summary_outcome, 'brain_error');
+      // A later re-emit (even booked-only) is Desk copy only: no second send.
+      assert.equal(s.onEvent(bookedEvent(), { replaces: true }).action, 'desk_only');
+      await c.advance(10 * 60 * 1000);
+      assert.equal(out.length, 1);
+    } finally {
+      restoreEnv();
+    }
+  });
+
+  it('sender: write_failed then a booked-only re-emit before the settle keeps write_failed', async () => {
+    setEnv();
+    try {
+      const c = clock();
+      const db = callDb();
+      const out = [];
+      const s = makeSender(db, c, { sendToPerson: async (o) => { out.push(o.body); return { channel: 'sms', to: o.person.phone }; } });
+      await s.noteCallEnded({ callSid: CALL.call_sid, status: 'complete' });
+      s.onEvent(failureEvent('write_failed'));
+      s.onEvent(bookedEvent(), { replaces: true });
+      await c.advance(31 * 1000);
+      assert.equal(out.length, 1);
+      assert.match(out[0], /^Call back needed: request NOT saved/);
+      assert.doesNotMatch(out[0], /^Booking - /m);
+    } finally {
+      restoreEnv();
     }
   });
 });

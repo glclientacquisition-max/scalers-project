@@ -12,6 +12,8 @@
 // - Stock only when in_stock / out_of_stock, else "stock to confirm".
 // - Price as a range from unitPrice (single price when min = max).
 // - The top-level `event` discriminator is ignored. catalogueId may be null.
+// - brain_error / write_failed (B2, #1010): "Call back needed" label plus a
+//   plain line saying whether the callback row was saved. Never "Enquiry".
 
 const COPY = {
   en: {
@@ -23,6 +25,8 @@ const COPY = {
       abandoned: 'Call ended early',
       missed: 'Missed call',
       escalated: 'URGENT',
+      brain_error: 'Call back needed: the line had a problem',
+      write_failed: 'Call back needed: request NOT saved',
     },
     caller: 'Caller',
     notGiven: 'not given',
@@ -56,6 +60,11 @@ const COPY = {
     open: 'Open call',
     fallbackMissed: (who) => `Missed call from ${who}`,
     fallbackAnswered: (who) => `Call from ${who}, no details captured`,
+    // B2 (#1010) failure outcomes: always "call back", never an enquiry.
+    failure: {
+      brain_error: 'The line had a problem during this call. A callback request was saved. Please call the caller back.',
+      write_failed: 'The assistant could not save this request. Nothing was booked. Please call the caller back.',
+    },
   },
   sw: {
     labels: {
@@ -66,6 +75,8 @@ const COPY = {
       abandoned: 'Simu ilikatika mapema',
       missed: 'Simu haikupokelewa',
       escalated: 'DHARURA',
+      brain_error: 'Mpigie tena: laini ilikuwa na hitilafu',
+      write_failed: 'Mpigie tena: ombi HALIKUHIFADHIWA',
     },
     caller: 'Mpigaji',
     notGiven: 'haijatolewa',
@@ -99,6 +110,10 @@ const COPY = {
     open: 'Fungua simu',
     fallbackMissed: (who) => `Simu ambayo haikupokelewa kutoka ${who}`,
     fallbackAnswered: (who) => `Simu kutoka ${who}, hakuna maelezo yaliyopatikana`,
+    failure: {
+      brain_error: 'Laini ilikuwa na hitilafu wakati wa simu hii. Ombi la kupigiwa limehifadhiwa. Tafadhali mpigie mpigaji.',
+      write_failed: 'Msaidizi hakuweza kuhifadhi ombi hili. Hakuna kilichowekwa. Tafadhali mpigie mpigaji.',
+    },
   },
 };
 
@@ -230,6 +245,8 @@ function renderOwnerSummary(event, { businessName, callUrl } = {}) {
   }
   const biz = ascii(businessName);
   const lines = [`${label}${biz ? ` - ${biz}` : ''}`, `${c.caller}: ${callerLine(event, c)}`];
+  const failureNote = c.failure[outcome] || null;
+  if (failureNote) lines.push(failureNote);
   const receipts = Array.isArray(event?.receipts) ? event.receipts : [];
   // Urgent first, then confirmed, then the rest, so the headline is the action.
   const order = { escalation: 0, booking: 1, order: 1, callback: 2, complaint: 2, quote: 3 };
@@ -246,7 +263,7 @@ function renderOwnerSummary(event, { businessName, callUrl } = {}) {
   if (!receipts.length) {
     if (outcome === 'abandoned') lines.push(c.abandoned);
     else if (outcome === 'missed') lines.push(c.noDetails);
-    else lines.push(c.infoOnly);
+    else if (!failureNote) lines.push(c.infoOnly);
   }
   if (callUrl) lines.push(`${c.open}: ${callUrl}`);
   const text = lines.map(ascii).filter(Boolean).join('\n').slice(0, 1600);
