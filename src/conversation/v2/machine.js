@@ -1260,6 +1260,10 @@ function finishCall(state, { businessName, callerPhone, profile = null } = {}) {
   const engOutcomes = engLedger.map((l) => (l.ok ? ({ create_booking: 'booked', create_handoff: 'handoff_callback' }[l.tool] || null) : 'write_failed')).filter(Boolean);
   const outcomes = [...(state.outcomes || []), ...engOutcomes];
   let outcome = order.find((o) => outcomes.includes(o));
+  // B2 follow-up: a brain error on the call is the owner's first concern. Saved follow-up = brain_error; the save
+  // itself failed = write_failed (never booked-only, so the owner alert still says the caller needs a call back).
+  const brainError = state.eng?.brainError || null;
+  if (brainError) outcome = brainError.ok ? 'brain_error' : 'write_failed';
   const s = state.slots;
   if (!outcome) outcome = state.intent && (s.service || s.items.length || s.when.date) ? 'abandoned_with_capture' : (state.lastInfo || state.eng?.answered) ? 'answered' : 'no_action';
   const last = state.receipts[state.receipts.length - 1];

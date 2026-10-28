@@ -8,7 +8,10 @@
 
 const EVENT_NAME = 'call.summary.ready';
 const SCHEMA_VERSION = 1;
-const OUTCOMES = ['booked', 'ordered', 'callback_needed', 'info_only', 'abandoned', 'missed', 'escalated'];
+// B2 follow-up: brain_error (the brain errored; the caller's follow-up was saved) and write_failed (a write or
+// that follow-up could not be saved) are typed outcomes from BA v2's finish, so Ops' owner alert fires on them.
+const OUTCOMES = ['booked', 'ordered', 'callback_needed', 'info_only', 'abandoned', 'missed', 'escalated', 'brain_error', 'write_failed'];
+const FAILURE_OUTCOMES = new Set(['brain_error', 'write_failed']);
 const RECEIPT_TYPES = ['booking', 'order', 'callback', 'quote', 'complaint', 'escalation'];
 const RECEIPT_STATUS = ['confirmed', 'unconfirmed'];
 const SLOT_STATUS = ['given', 'not_given'];
@@ -300,10 +303,11 @@ function callerPhoneFrom(call, brainState) {
 
 // ---- builder ---------------------------------------------------------------
 
-function deriveOutcome({ answered, receipts, infoAnswered }) {
+function deriveOutcome({ answered, receipts, infoAnswered, failure }) {
   if (answered === false) return 'missed';
   const has = (type, status) => receipts.some((r) => r.type === type && (!status || r.status === status));
   if (has('escalation')) return 'escalated';
+  if (FAILURE_OUTCOMES.has(failure)) return failure;
   if (has('booking', 'confirmed')) return 'booked';
   if (has('order', 'confirmed')) return 'ordered';
   if (has('callback') || has('complaint') || has('quote', 'confirmed')) return 'callback_needed';
@@ -321,7 +325,7 @@ function buildCallSummaryEvent(input = {}) {
     receiptId: clean(r.receiptId || `r_${i + 1}`, 40),
   }));
   if (input.answered === false) receipts.length = 0; // a missed call has no receipts
-  const outcome = deriveOutcome({ answered: input.answered, receipts, infoAnswered: Boolean(input.infoAnswered) });
+  const outcome = deriveOutcome({ answered: input.answered, receipts, infoAnswered: Boolean(input.infoAnswered), failure: input.failure });
   const escalation = receipts.find((r) => r.type === 'escalation');
   const phone = toE164(input.caller?.phone);
   const name = clean(input.caller?.name || '', 80);

@@ -31,7 +31,13 @@ async function runOwnedTurn(live, input = {}, { log = () => {} } = {}) {
     return { line: repairLine(lang()), lang: lang(), end: false, owned: true, repaired: r ? 'empty_line' : 'no_result' };
   } catch (err) {
     log(`brain_v2_owned repair reason=throw err=${String(err && err.message ? err.message : err).slice(0, 160)}`);
-    return { line: repairLine(lang()), lang: lang(), end: false, owned: true, repaired: 'throw' };
+    // B2 follow-up: the caller is saved for the owner (callback commit path, once per call) before the repair line.
+    let brainError = null;
+    if (live && typeof live.recordError === 'function') {
+      try { brainError = await live.recordError(err, { profile: input.profile || null, lastCaller: input.text || null }); } catch { brainError = null; }
+      if (brainError) log(`brain_v2_owned brain_error saved=${brainError.ok ? 'yes' : 'no'}${brainError.id ? ` id=${brainError.id}` : ''}${brainError.error ? ` code=${brainError.error}` : ''}`);
+    }
+    return { line: repairLine(lang()), lang: lang(), end: false, owned: true, repaired: 'throw', ...(brainError ? { brainError } : {}) };
   }
 }
 
