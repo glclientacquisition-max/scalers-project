@@ -125,36 +125,13 @@ function voiceStatus(
   return fitsStatus(voiceFull(tenant, voices));
 }
 
-/** Same ids as onboarding TONE_LABELS. Older chips fold into Warm. */
-function toneLabel(raw: string): string {
-  const tone = String(raw || "")
-    .trim()
-    .toLowerCase();
-  if (tone === "professional") return "Professional";
-  if (
-    tone === "warm" ||
-    tone === "friendly" ||
-    tone === "empathetic" ||
-    tone === "localized"
-  ) {
-    return "Warm";
-  }
-  return "";
-}
-
-/** Tone, or the assistant name when it is not already the voice. */
-function identityStatus(
-  tenant: SettingsStatusTenant,
-  voices: SettingsStatusVoice[]
-): string {
-  const tone = toneLabel(String(tenant.agent_tone || ""));
-  if (tone) return tone;
-
-  const name = String(tenant.agent_name || "").trim();
-  if (!name || /^receptionist$/i.test(name)) return "";
-  const voice = voiceFull(tenant, voices);
-  if (voice && name.toLowerCase() === voice.toLowerCase()) return "";
-  return fitsStatus(name);
+/**
+ * The business name, or Needs setup while it is missing. The greeting is
+ * Automatic by default, so an empty greeting is not missing.
+ */
+function identityStatus(tenant: SettingsStatusTenant): string {
+  const name = String(tenant.business_name || "").trim();
+  return name ? fitsStatus(name) : NEEDS_SETUP;
 }
 
 /** Shown where the Business Assistant cannot answer well until the owner fills it in. */
@@ -193,7 +170,7 @@ export function settingsOptionStatus(
     case "locations":
       return countLabel(placeCount(tenant.business_locations), "place", "places");
     case "identity":
-      return identityStatus(tenant, voices);
+      return identityStatus(tenant);
     case "pronunciation":
       return countLabel(
         Array.isArray(tenant.tts_lexicon) ? tenant.tts_lexicon.length : 0,
