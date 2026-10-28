@@ -1,5 +1,6 @@
 import { defaultTenantLlmPrompt } from "@/lib/prompts";
 import { buildCompileSections } from "@/lib/provenance";
+import { kbCatalogueComplete } from "@/lib/kbLegacy";
 
 export type OnboardingTone = "professional" | "warm";
 
@@ -54,7 +55,8 @@ export type FaqItem = {
 export function tenantNeedsOnboarding(tenant: {
   business_name: string;
   llm_system_prompt: string | null | undefined;
-  services_offered?: string | null;
+  /** Active (offered) kb_items. The catalogue half of the check (28 Oct: kb_items, not services_offered). */
+  kb_active_items?: number | null;
   business_hours?: string | null;
   agent_tone?: string | null;
   /** Single source of truth once migrated: set by the setup finish action (and backfilled). */
@@ -63,7 +65,7 @@ export function tenantNeedsOnboarding(tenant: {
   if (tenant.setup_completed_at !== undefined) return !tenant.setup_completed_at;
   // Structured profile from onboarding/settings means setup is done.
   const hasProfile =
-    Boolean(String(tenant.services_offered || "").trim()) &&
+    kbCatalogueComplete(tenant.kb_active_items) &&
     Boolean(String(tenant.business_hours || "").trim()) &&
     Boolean(String(tenant.agent_tone || "").trim());
   if (hasProfile) return false;

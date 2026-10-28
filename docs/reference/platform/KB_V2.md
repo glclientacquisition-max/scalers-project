@@ -19,7 +19,7 @@ versioned snapshot; the call reads the snapshot in-process. Design and decisions
 | `kb_readiness` | Every readiness run (checks + scripted tests, one real call sid at the first switch). |
 | `tenants.kb_live_version`, `kb_ready_version`, `brain_target` | Live pointer; version that passed readiness; ops hold (`v1`) or let readiness decide (`v2`, default). |
 
-RPCs (service role only, `search_path = ''`): `kb_upsert_items`, `kb_publish_snapshot`, `kb_search_items` (tier 2), `kb_record_readiness`.
+RPCs (service role only, `search_path = ''`): `kb_upsert_items`, `kb_publish_snapshot`, `kb_search_items` (tier 2), `kb_record_readiness`, `kb_import_items` (2026-10-28.3).
 
 ### Item states (docs/supabase/kb_v2_item_states.sql, version 2026-10-28.2, after .1)
 
@@ -34,6 +34,28 @@ RPCs (service role only, `search_path = ''`): `kb_upsert_items`, `kb_publish_sna
 - Legacy mirror: not offered leaves `services_catalog` / `product_catalog`; paused reads as out of stock; site visit is
   the old Quote plus `site_visit_required`; `excludes_en` -> `out_of_scope`; `holdable` kept.
 - `kb_search_items` returns `status` too (paused / not offered included, hidden never).
+
+### Paste a list Replace (docs/supabase/kb_v2_paste_replace.sql, version 2026-10-28.3, after .2)
+
+- `kb_import_items(p_tenant, p_kind, p_items, p_replace default false)`: upserts the pasted rows (all of `p_kind`);
+  with `p_replace` the kind's other rows become `hidden` (soft-removed, restorable) in the same transaction. A stale row
+  (`row_version` conflict, errcode 40001) or an empty Replace rolls everything back. Append stays the default.
+
+### Writers (28 Oct: kb_items is the source of truth)
+
+- Owner edits: Catalogue item sheet and Paste a list (`settings/knowledge/actions.ts`, every action calls
+  `memberDenied("settings.edit")` first) write through `lib/kbWrite.server.ts` `writeKbItems`.
+- Writers that start from catalogue rows are ADD-ONLY (`lib/kbLegacy.ts` `planLegacyImport` / `planTextImport`): setup
+  finish and the previous onboarding wizard, `/api/tenant` (`services_offered` text -> one item per line), the
+  website/FAQ import (services), and the old Catalogue tab. New rows are inserted; an existing item (same id or name)
+  keeps its state (paused, not offered, hold, not included, status note) and nothing is hidden. The old tab may also
+  change an existing item's name / price / unit / group / notes / stock, never its state.
+- The old `services_catalog` / `product_catalog` -> `kb_items` sync on save is retired: `/internal/desk/spoken-catalogue`
+  only recompiles (`KB_COMPILE_ON_SAVE`). `publish.syncFromLegacy` is add-only and used by the backfill only.
+- Compat copy: `mirrorKbToLegacy` is the only writer of `services_catalog`, `product_catalog` and `services_offered` for a
+  Business with KB tables: derived from `kb_items` (active items; the owner's "Additional notes" kept), read-only for the
+  readers not yet on the KB. Before the KB SQL exists the writers store the derived text as before.
+- Setup completion (databases without `setup_completed_at`): the catalogue half is at least one `active` kb item.
 
 ## Compile (src/knowledge/kb/compile.js)
 
@@ -73,7 +95,7 @@ compile, on Voice boot (`KB_BOOT_READINESS`, every 12 h) and on demand (Super Ad
 | Var | Default | Effect |
 | --- | --- | --- |
 | `BRAIN_KB_GATE` | off | Readiness selects the brain (kill switch). |
-| `KB_COMPILE_ON_SAVE` | off | Old Desk saves sync legacy columns into `kb_items` and recompile. |
+| `KB_COMPILE_ON_SAVE` | off | A Desk settings save recompiles the KB and re-checks readiness (the old columns are not synced back). |
 | `KB_SW_SUGGEST` | off | AI suggests Swahili names (owner approves). |
 | `KB_TEXT_TESTS` | none | JSON `{ "<tenant uuid>": ["utterance", ...] }`. |
 | `KB_BOOT_READINESS` | on (with the gate) | Boot + 12 h readiness sweep. |
@@ -101,7 +123,7 @@ compile, on Voice boot (`KB_BOOT_READINESS`, every 12 h) and on demand (Super Ad
 
 ## Scripts
 
-- `node scripts/kb-backfill.js [--apply] [--tenant <uuid>]`: legacy columns -> kb_items (ids kept), compile, readiness. Idempotent.
+- `node scripts/kb-backfill.js [--apply] [--tenant <uuid>]`: legacy columns -> kb_items (ids kept, add-only: an item already there is left as the owner set it), compile, readiness. Idempotent.
 - `node scripts/kb-cutover.js [--hold <uuid> | --allow <uuid>]`: readiness table for every Business; optional ops hold.
 
 ## Phase 8

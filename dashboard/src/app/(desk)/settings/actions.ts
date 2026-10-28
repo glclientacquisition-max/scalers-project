@@ -2,6 +2,7 @@
 
 import { bustTenantCache } from "@/lib/tenantCache";
 import { requestSpokenCatalogueCompile } from "@/lib/spokenCatalogueOnSave";
+import { importCatalogueToKb } from "@/lib/kbWrite.server";
 import { PRODUCT_ID_PREFIX, parseBaseline, settleCatalogPrices } from "@/lib/catalogPricing";
 import { readCatalogFresh } from "@/lib/catalogFresh";
 import { normalizePhone } from "@/lib/setupFlow";
@@ -469,9 +470,10 @@ export async function saveAndCompileSettings(
 
   const patch: Record<string, unknown> = {
     business_name: businessName,
-    services_offered: servicesOffered,
-    services_catalog: servicesCatalog,
-    product_catalog: productCatalog,
+    // kb_items is the source of truth (28 Oct). services_offered is never written from this form (the KB mirror
+    // derives it), and the old catalogue columns are written only by a save that owns them (no stale copy back).
+    ...(ownsServices ? { services_catalog: servicesCatalog } : {}),
+    ...(ownsProducts ? { product_catalog: productCatalog } : {}),
     social_handles: socialHandles,
     business_hours: businessHours,
     hours_schedule: scheduleForSave,
@@ -614,6 +616,16 @@ export async function saveAndCompileSettings(
   }
   if (saveMatchedNoRows(count)) {
     return { error: deniedMessage(null, "settings.edit") };
+  }
+  if (ownsServices || ownsProducts) {
+    // Old catalogue tab (#997 sends it to the Catalogue once the KB tables exist): new rows are added to kb_items,
+    // price/name edits reach existing items, but never their state (paused / not offered / held / not included) and
+    // nothing is hidden. The mirror then rewrites the old columns + services_offered from the KB.
+    await importCatalogueToKb(
+      tenant.id,
+      { ...(ownsServices ? { services_catalog: servicesCatalog } : {}), ...(ownsProducts ? { product_catalog: productCatalog } : {}) },
+      { legacyServicesOffered: servicesOffered, by: "settings", notes: servicesNotes, contentEdits: true },
+    );
   }
   requestSpokenCatalogueCompile(tenant.id, patch);
 
