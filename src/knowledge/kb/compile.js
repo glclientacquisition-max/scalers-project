@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const S = require('./spoken');
 const { tokens } = require('./keys');
 const { displayPrice, fmtNum } = require('./items');
+const { spokenGroupName } = require('./reader');
 
 const SCHEMA = 2;
 const COMPILER = 'kb-rules-2026-10-28.2';
@@ -128,7 +129,7 @@ function compileKb(src = {}) {
     const span = nums.length ? S.sayRange(Math.min(...nums), Math.max(...nums), units.length === 1 ? units[0] || null : null) : { en: null, sw: null, numbers: [] };
     const nameEn = c ? c.name_en : members[0].cat_name || (cid === '_other' ? null : cid);
     const nameSw = c && (c.name_sw_state === 'approved' || c.name_sw_state === 'edited') ? c.name_sw : null;
-    return { id: cid, name: nameEn, say_en: nameEn ? nameEn.toLowerCase() : null, say_sw: nameSw, count: members.length, item_ids: members.map((x) => x.id), popular: members.filter((x) => x.popular).map((x) => x.id), span: { en: span.en, sw: span.sw, numbers: span.numbers }, keys: [...new Set([...tokens(nameEn), ...tokens(nameSw)])] };
+    return { id: cid, name: nameEn, say_en: nameEn ? spokenGroupName(nameEn) : null, say_sw: nameSw ? spokenGroupName(nameSw, { lower: false }) : null, count: members.length, item_ids: members.map((x) => x.id), popular: members.filter((x) => x.popular).map((x) => x.id), span: { en: span.en, sw: span.sw, numbers: span.numbers }, keys: [...new Set([...tokens(nameEn), ...tokens(nameSw)])] };
   });
   if (items.length && categories.length === items.length && items.length > 8) issues.push({ code: 'one_item_categories', severity: 'warn', detail: 'Every item sits in its own category; group them so callers can narrow.' });
 

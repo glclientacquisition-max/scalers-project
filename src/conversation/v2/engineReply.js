@@ -41,13 +41,16 @@ function replyPack({ goal, text, receipts, machine, lang, caller, profile = null
   // KB v2 name lock (root cause 6): the names this call may say, already in the call language; legacy: no key
   const kbs = profile ? require('../../knowledge/kb/source').catalogueSource(profile) : null;
   const names = kbs && kbs.mode === 'kb' ? kbs.lockedNames(lang).filter((n, i, a) => a.indexOf(n) === i).slice(0, 60) : null;
+  // KB v2: a "not in the catalogue" receipt carries the typed facts, so the model writes the reply (never a template)
+  const miss = receipts.find((r) => r.kb && r.kind === 'not_in_catalogue');
   return {
     ...(names && names.length ? { ITEM_NAMES: { rule: 'Say catalogue item names exactly as written here, never translated or reworded. Say each price right after its own item.', names } } : {}),
-    TASK: task(goal),
+    TASK: miss ? `${task(goal)} The caller asked for something NOT in the catalogue: say plainly that we don't offer ${JSON.stringify(miss.asked)}, then name the ONE group from OFFERED_GROUPS closest to what they asked (or the first if none is close) and ask ONE short question. Never suggest anything outside OFFERED_GROUPS.` : task(goal),
+    ...(miss ? { OFFERED_GROUPS: miss.groups || [] } : {}),
     LANG: lang === 'sw' ? 'Swahili (reply ONLY in Swahili)' : 'English (reply ONLY in English)',
     CALLER_SAID: String(text || '').slice(0, 300),
     GOAL: { type: goal.type, slot: goal.slot || null, topics: goal.topics || goal.answers || [] },
-    RECEIPTS: receipts.map((r) => ({ tool: r.tool, text: r.text || null, place: r.place || r.name || null, covered: r.covered ?? null })).filter((r) => r.text || r.place),
+    RECEIPTS: receipts.map((r) => ({ tool: r.tool, text: r.text || null, place: r.place || r.name || null, covered: r.covered ?? null, ...(r.kb && r.kind === 'not_in_catalogue' ? { not_offered: r.asked } : {}) })).filter((r) => r.text || r.place),
     CALLER: { name: caller?.name || null, candidate: caller?.candidate || null },
     AGENT_LAST: String(machine.lastLine || '').slice(0, 200),
   };

@@ -96,6 +96,21 @@ and `preview` lines ("what callers hear") produced by the same call rules. Block
   with locked names; the stored legacy `tenants.spoken_catalogue` is never pinned next to the KB.
 - `not_included` (`excludes_en`) is spoken only when the caller asks whether X includes Y; `can_be_held` (`holdable`,
   products) answers "can you keep one for me?" (a hold is a callback capture with read-back + yes).
+- Catalogue asks are typed by the understanding engine (KB businesses only; the legacy request is unchanged):
+  `u.catalogue = { kind: 'overview' }` ("what do you offer", "mnauza nini") or `{ kind: 'item', item }` (the caller's own
+  words, "do you sell pianos" -> "pianos"), from the model's `asked_item`, else the rules reading
+  (`src/conversation/v2/catalogueAsk.js`) when the model is off, slow or silent. `engineTools.catalogueReceipt` answers an
+  overview with the count + group names + one narrowing question, and an item that no catalogue word touches (offered,
+  paused or not offered) with a `not_in_catalogue` receipt: a plain no plus the biggest offered groups. The reply engine
+  gets `not_offered` + `OFFERED_GROUPS` and writes the reply (closest group, one question); with no model the receipt line
+  is spoken. A word the catalogue shares ("house cleaning" at a cleaner) is never a miss.
+- Group names are spoken through `reader.spokenGroupName` (kb_categories has no spoken column): bracketed asides and a
+  spaced dash suffix are dropped ("Capsicum (Hoho) - Green" -> "capsicum"), "/" and "&" become words, approved Swahili
+  names only. Applied when a snapshot is opened, so older snapshots speak clean names without a re-publish; two groups
+  with the same spoken name are said once.
+- A yes to "shall the team call you when it's back?" carries the paused item (`E.flow.about`, turn-stamped
+  `machine.kbWhenBack`): the read-back says "about the <item>", the request row gets `item` + notes, and the owner alert
+  reason is "Call back when <item> is back (paused item)".
 
 ## Brain selector (retire the old brain: P1)
 

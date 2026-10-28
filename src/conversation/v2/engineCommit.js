@@ -58,7 +58,8 @@ async function runWrite(p, handlers) {
   }
   if (p.tool === 'create_handoff' || p.tool === 'owner_request') {
     if (!handlers?.createServiceRequest) return { ok: false, id: null, error: 'no_handler' };
-    return handlers.createServiceRequest({ idempotencyKey: p.idemKey, type: 'callback', name: p.name, phone: p.phone, notes: p.notes || `Callback: ${p.reason || 'caller asked'}` });
+    // KB v2: a callback for when a paused item is back names the item on the request row (Item + Notes in the alert)
+    return handlers.createServiceRequest({ idempotencyKey: p.idemKey, type: 'callback', name: p.name, phone: p.phone, notes: p.notes || `Callback: ${p.reason || 'caller asked'}`, ...(p.about && p.about.item ? { item: p.about.item } : {}) });
   }
   return { ok: false, id: null, error: 'unknown_tool' };
 }
