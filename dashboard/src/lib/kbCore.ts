@@ -211,17 +211,20 @@ export function mirrorLegacy(
     const mode = it.price_mode === "per_unit" ? "fixed" : it.price_mode === "site_visit" ? "quote" : it.price_mode;
     const amount = it.price_amount ?? it.price_min ?? null;
     const prevPricing = (prev.pricing && typeof prev.pricing === "object" ? prev.pricing : {}) as Record<string, unknown>;
+    // pricing.mode keeps the old Desk vocabulary (fixed / from / range / ask; catalogue_price_history checks it):
+    // quote and site visit are a deliberate ask (owner, confirmed), no price yet is an unconfirmed ask, free is 0.
+    const pricingMode = mode === "fixed" || mode === "from" || mode === "range" ? mode : mode === "free" ? "fixed" : "ask";
+    const pricingOwner = mode === "none" ? { confirmed: false, source: "parsed" } : { confirmed: true, source: "owner" };
     const pricing = {
       ...prevPricing,
-      mode,
+      mode: pricingMode,
       unit: it.unit || null,
       amount_ksh: amount,
       min_ksh: it.price_min,
       max_ksh: it.price_max,
       parsed_from: amount != null && mode === "fixed" ? String(amount) : (prevPricing.parsed_from ?? null),
       in_stock: paused ? false : it.in_stock,
-      confirmed: true,
-      source: "owner",
+      ...pricingOwner,
     };
     const base: LegacyRow = {
       ...prev,

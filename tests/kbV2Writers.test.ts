@@ -61,6 +61,28 @@ describe("kb writers: Desk port of fromLegacy", () => {
   });
 });
 
+describe("kb writers: mirror pricing.mode stays in the old vocabulary (catalogue_price_history check)", () => {
+  const mk = (id: string, o: Partial<KbItem>): KbItem => ({
+    id, kind: "service", name_en: id, name_sw: null, name_sw_state: "none", name_sw_suggested: null, aliases: [], category_id: null, description_en: null,
+    unit: null, price_mode: "fixed", price_amount: 100, price_min: null, price_max: null, in_stock: null, popular: false, delivery_fee_kes: null,
+    needs_visit: false, holdable: false, excludes_en: null, status_note: null, status: "active", sort: 0, source: "owner", legacy_ref: null, row_version: 1, ...o,
+  });
+  const items = [
+    mk("f", {}), mk("fr", { price_mode: "from" }), mk("r", { price_mode: "range", price_amount: null, price_min: 100, price_max: 200 }),
+    mk("q", { price_mode: "quote", price_amount: null }), mk("sv", { price_mode: "site_visit", price_amount: null, needs_visit: true }),
+    mk("n", { price_mode: "none", price_amount: null }), mk("fe", { price_mode: "free", price_amount: 0 }),
+    mk("pq", { kind: "product", price_mode: "quote", price_amount: null }),
+  ];
+  const m = mirrorLegacy(items, [], { services_catalog: [], product_catalog: [] });
+  it("every mirrored row has pricing.mode fixed / from / range / ask", () => {
+    for (const r of [...m.services_catalog, ...m.product_catalog]) assert.ok(["fixed", "from", "range", "ask"].includes(String((r.pricing as { mode: string }).mode)), String(r.id));
+  });
+  it("and reads back as the same price mode", () => {
+    const back = new Map(kbItemsFromLegacy(m).items.map((i) => [i.id, i.price_mode]));
+    assert.deepEqual(Object.fromEntries(back), { f: "fixed", fr: "from", r: "range", q: "quote", sv: "site_visit", n: "none", fe: "free", pq: "quote" });
+  });
+});
+
 describe("kb writers: no writer changes an owner's item state or hides items (Brain regression)", () => {
   const row = fixture("dnd");
   const base = kbFrom(row);
