@@ -11,6 +11,9 @@ import { Sheet } from "@/components/ui/Sheet";
 import { inboxRecordHref } from "@/lib/inboxHref";
 import { MIN_CALLS, type CallInsights as Insights, type InsightBar, type InsightSection } from "@/lib/callInsights";
 
+/** Overview shows this many insight rows before See all. */
+export const INSIGHTS_TOP = 3;
+
 const rowClass =
   "flex min-h-14 w-full items-center gap-3 px-4 py-2 text-start hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand";
 
@@ -20,7 +23,11 @@ const when = (iso: string) =>
 /** Overview: what callers told the Business Assistant. One grouped list; each row opens a Sheet. */
 export function CallInsights({ insights }: { insights: Insights }) {
   const [open, setOpen] = useState<InsightSection | null>(null);
+  const [all, setAll] = useState(false);
   const { calls, days, ready, sections } = insights;
+  // Top 3 first; See all shows the rest in place.
+  const shown = all ? sections : sections.slice(0, INSIGHTS_TOP);
+  const more = sections.length - shown.length;
 
   return (
     <section aria-labelledby="insights-title" data-call-insights="" className="min-w-0 space-y-1.5">
@@ -38,7 +45,7 @@ export function CallInsights({ insights }: { insights: Insights }) {
           </div>
         ) : (
           <ul className="divide-y divide-hairline">
-            {sections.map((s) => (
+            {shown.map((s) => (
               <li key={s.id}>
                 <button type="button" className={rowClass} onClick={() => setOpen(s)} aria-haspopup="dialog">
                   <span className="min-w-0 flex-1">
@@ -49,6 +56,13 @@ export function CallInsights({ insights }: { insights: Insights }) {
                 </button>
               </li>
             ))}
+            {more > 0 ? (
+              <li>
+                <button type="button" className={`${rowClass} min-h-11 text-body font-medium text-accent`} onClick={() => setAll(true)} data-insights-see-all="">
+                  {`See all ${sections.length}`}
+                </button>
+              </li>
+            ) : null}
           </ul>
         )}
       </div>

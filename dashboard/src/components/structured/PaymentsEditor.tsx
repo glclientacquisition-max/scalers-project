@@ -117,7 +117,7 @@ export function PaymentsEditor({
   const timingError = errors.deposit_percent || errors.timings;
 
   return (
-    <div className="space-y-6" data-payments-editor="">
+    <div id="payments" className="scroll-mt-24 space-y-6" data-payments-editor="">
       <SettingsGroup title="How customers pay">
         {unconfirmed ? (
           <div className="space-y-2 bg-accent-tonal px-4 py-3" role="note">

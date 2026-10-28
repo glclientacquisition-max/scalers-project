@@ -161,7 +161,8 @@ describe("Needs you whose-turn next-step", () => {
     assert.match(verbs, /if \(item.purpose === "live"\) return null/);
     assert.match(verbs, /inboxListDockRecipe\(item\)/);
     assert.match(verbs, /recipe === "confirm"[\s\S]*confirmStamp/);
-    assert.match(verbs, /recipe === "hold_done"[\s\S]*"Hold Done"/);
+    assert.match(verbs, /recipe === "hold_done"\) return holdDoneLabel\(item\.hold, vertical\)/);
+    assert.match(verbs, /"Hold Done" : "Mark done"/);
     assert.doesNotMatch(verbs, /Call or WhatsApp/);
     assert.doesNotMatch(verbs, /Your turn|Waiting on caller|Awaiting confirm/);
     assert.doesNotMatch(verbs, /lead_status:\s*"resolved"/);
@@ -169,7 +170,7 @@ describe("Needs you whose-turn next-step", () => {
     assert.match(read("dashboard/src/lib/inboxNiche.ts"), /confirmStamp: "Confirm visit"/);
     assert.match(read("dashboard/src/lib/inboxNiche.ts"), /HOSPITALITY_RESERVATIONS_EXIST = false/);
     assert.match(read("dashboard/src/lib/inboxNiche.ts"), /confirmStamp: "Confirm booking"/);
-    assert.match(verbs, /label: "Hold Done"/);
+    assert.match(verbs, /label: allHolds \? "Hold Done" : "Mark done"/);
   });
 
   it("mounts the line under the preview, not as a second dock verb", () => {

@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-243 variables.
+244 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -59,13 +59,14 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js`<br>`src/notifications/ownerCallSummary.js` |
 | `CALL_SUMMARY_EVENT` | voice | `src/conversation/callSummaryEvent.js` |
 | `CRON_SECRET` | desk | `dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/cron/ops-alerts/route.ts` |
-| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+69 more |
+| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+70 more |
 | `DASHBOARD_PASSWORD` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
 | `DATABASE_URL` | scripts | `scripts/verify-staging-schema.js` |
 | `DESK_ASSISTANT_SAY_PAGE` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_ATTEST_SERVICE_AREAS` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
+| `DESK_KB_ITEM_STATES` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_LOOKUP_PREVIEW` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_PLAN_CHANGE` | desk | `dashboard/src/lib/deskPlanChange.ts` |
 | `DESK_PUBLIC_URL` | voice | `server.js` |

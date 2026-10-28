@@ -170,6 +170,7 @@ export function BusinessSettingsShell({
               variant="index"
               optionStatus={optionStatus}
               assistantSayPage={assistantSayPage}
+              vertical={tenant.vertical}
             />
           </div>
         </div>

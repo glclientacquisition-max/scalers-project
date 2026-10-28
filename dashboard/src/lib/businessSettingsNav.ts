@@ -135,7 +135,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
         description: "What callers hear before your team calls back",
         target: { tab: "assistant-say" },
       },
-      { label: "Voice", description: "What it does on a call and its tools", target: { tab: "train", panel: "tools" } },
+      { label: "On calls", description: "What it can do during a call", target: { tab: "train", panel: "tools" } },
       { label: "Pronunciation", description: "Names and words it should say a certain way", target: { tab: "train", panel: "pronunciation" } },
       { label: "Test", description: "Call your line and hear it answer", target: { tab: "test" } },
       { label: "Calls & forwarding", description: "How calls reach your Business Assistant", target: { tab: "calls" } },
@@ -158,6 +158,21 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     ],
   },
 ];
+
+/**
+ * The Settings home line for an item, in the business's own words. Policies names
+ * delivery and returns only for a business that sells products.
+ */
+export function settingsNavDescription(item: SettingsNavItem, vertical?: string | null): string {
+  const target = item.target;
+  if ("tab" in target && target.tab === "train" && target.panel === "policies") {
+    const v = String(vertical || "").trim().toLowerCase();
+    if (v === "retail") return item.description;
+    if (v === "home_services") return "Payments, cancellations, guarantees and other rules";
+    return "Payments, bookings, cancellations and other rules";
+  }
+  return item.description;
+}
 
 export function settingsNavHref(target: SettingsNavTarget): string {
   if ("href" in target) return target.href;
