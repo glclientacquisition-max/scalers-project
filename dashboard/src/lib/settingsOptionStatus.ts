@@ -165,18 +165,18 @@ export function settingsOptionStatus(
   tenant: SettingsStatusTenant,
   voices: SettingsStatusVoice[] = []
 ): string {
-  if ("href" in target) return "";
-  if (target.tab === "test") {
-    const did = String(tenant.sautikit_virtual_number || "").trim();
-    return did && !/^pending:/i.test(did) ? "Line live" : "Not live yet";
-  }
-  if (target.tab === "catalog") {
+  if ("href" in target && target.href !== "/settings/knowledge") return "";
+  if ("href" in target || target.tab === "catalog") {
     const services = namedCount(tenant.services_catalog);
     const products = namedCount(tenant.product_catalog);
     if (services && products) return countLabel(services + products, "item", "items");
     if (services) return countLabel(services, "service", "services");
     if (products) return countLabel(products, "product", "products");
     return NEEDS_SETUP;
+  }
+  if (target.tab === "test") {
+    const did = String(tenant.sautikit_virtual_number || "").trim();
+    return did && !/^pending:/i.test(did) ? "Line live" : "Not live yet";
   }
   if (target.tab !== "train") return "";
   switch (target.panel) {

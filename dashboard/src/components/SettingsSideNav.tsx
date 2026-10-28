@@ -70,6 +70,7 @@ const SETTINGS_ICON: Record<string, typeof ClockIcon> = {
   alerts: BellIcon,
   "assistant-say": DocumentTextIcon,
   "/settings/areas": MapIcon,
+  "/settings/knowledge": ShoppingBagIcon,
   "/settings/plan": CreditCardIcon,
   "/settings/billing": ReceiptPercentIcon,
 };
@@ -82,7 +83,7 @@ function visibleSections(manageBilling: boolean, assistantSayPage: boolean): Set
     const items = section.items.filter((item) => {
       if ("tab" in item.target && item.target.tab === "assistant-say" && !assistantSayPage) return false;
       if (!("href" in item.target)) return true;
-      if (item.target.href === "/settings/areas") return true;
+      if (item.target.href === "/settings/areas" || item.target.href === "/settings/knowledge") return true;
       return manageBilling;
     });
     return items.length > 0 ? [{ ...section, items }] : [];
