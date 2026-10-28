@@ -1,4 +1,5 @@
 import type { SettingsNavTarget } from "@/lib/businessSettingsNav";
+import { greetingMissing } from "./identityGreeting.ts";
 
 export type SettingsStatusVoice = {
   id: string;
@@ -9,6 +10,7 @@ export type SettingsStatusVoice = {
 export type SettingsStatusTenant = {
   business_name?: string | null;
   spoken_name?: string | null;
+  greeting_invite?: string | null;
   vertical?: string | null;
   agent_name?: string | null;
   agent_tone?: string | null;
@@ -142,11 +144,15 @@ function toneLabel(raw: string): string {
   return "";
 }
 
-/** Tone, or the assistant name when it is not already the voice. */
+/**
+ * Needs setup while the business name or the greeting is missing. Otherwise the
+ * tone, or the assistant name when it is not already the voice.
+ */
 function identityStatus(
   tenant: SettingsStatusTenant,
   voices: SettingsStatusVoice[]
 ): string {
+  if (!String(tenant.business_name || "").trim() || greetingMissing(tenant)) return NEEDS_SETUP;
   const tone = toneLabel(String(tenant.agent_tone || ""));
   if (tone) return tone;
 

@@ -77,7 +77,9 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
   const assistantSayPage = deskAssistantSayPage();
   if (tab === "assistant-say" && !assistantSayPage) redirect("/settings");
-  const needsVoices = tab === "test" || (tab === "train" && trainPanel === "tools");
+  // The voice picker lives on Identity (How you answer); Voice links there.
+  const needsVoices =
+    tab === "test" || (tab === "train" && (trainPanel === "tools" || trainPanel === "identity"));
 
   let curatedVoices: CuratedSonioxVoice[] = [];
   if (needsVoices) {
@@ -113,6 +115,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
 
   // Typed data (payments, price checks, category). The columns may not exist before the migration: then null.
   let structuredSlot = null;
+  let businessCategory: string | null = null;
   // Catalogue is its own tab (?tab=catalog), not a train panel: the old check never showed its price cards.
   if (tab === "catalog" || (tab === "train" && trainPanel === "identity")) {
     const [canEdit, typed] = await Promise.all([memberCan("settings.edit"), readBusinessType(tenant.id)]);
@@ -122,6 +125,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
       businessType: typed?.business_type || (tenant.vertical === "home_services" || tenant.vertical === "retail" ? tenant.vertical : "general"),
       businessCategory: typed?.business_category ?? null,
     });
+    businessCategory = typed?.business_category ?? null;
   }
 
   let assistantSaySlot = null;
@@ -178,6 +182,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
       callsSlot={callsSlot}
       assistantSaySlot={assistantSaySlot}
       assistantSayPage={assistantSayPage}
+      businessCategory={businessCategory}
     />
   );
 }

@@ -5,25 +5,39 @@
  *
  * Identity does not own places or policies. The hours location line is owned by
  * Locations, which is the screen that edits it. Hours owns the weekly grid only.
- * Voice (`tools`) owns after_hours_mode (Message only or Full assistant). It also posts handoff_mode
- * with the rest of the form. Team owns that field, so a Voice save keeps the stored
- * handoff mode, directory, lexicon, catalogs, and FAQs.
+ * Voice (`tools`) owns after_hours_mode (Message only or Full assistant) and the tool
+ * switches. It also posts handoff_mode with the rest of the form. Team owns that field,
+ * so a Voice save keeps the stored handoff mode, voice, directory, lexicon, catalogs,
+ * and FAQs.
+ */
+const IDENTITY_BUSINESS = ["businessName", "vertical"] as const;
+const IDENTITY_ANSWER = [
+  "agentName",
+  "agentTone",
+  "spokenName",
+  "greetingInvite",
+  "sonioxVoiceId",
+  "sonioxVoiceLabel",
+] as const;
+const IDENTITY_CONTACTS = ["socialHandles"] as const;
+
+/**
+ * Identity is three cards that each save on their own (identity-business,
+ * identity-answer, identity-contacts). A card save keeps every other field as
+ * stored. "identity" stays the union for older clients that post the whole page.
+ * The voice moved from Voice (tools) to identity-answer, so a Voice save keeps
+ * the stored voice.
  */
 const SETTINGS_SCOPE_FIELDS: Record<string, readonly string[]> = {
-  identity: [
-    "businessName",
-    "spokenName",
-    "greetingInvite",
-    "agentName",
-    "agentTone",
-    "vertical",
-    "socialHandles",
-  ],
+  identity: [...IDENTITY_BUSINESS, ...IDENTITY_ANSWER, ...IDENTITY_CONTACTS],
+  "identity-business": IDENTITY_BUSINESS,
+  "identity-answer": IDENTITY_ANSWER,
+  "identity-contacts": IDENTITY_CONTACTS,
   catalog: ["servicesNotes", "servicesCatalog", "productCatalog"],
   hours: ["hoursSchedule"],
   locations: ["businessLocations", "locationNotes", "serviceAreas", "noPremises"],
   policies: ["businessPolicies", "unknownAnswerFallback"],
-  tools: ["agentTools", "sonioxVoiceId", "sonioxVoiceLabel", "afterHoursMode"],
+  tools: ["agentTools", "afterHoursMode"],
   pronunciation: ["ttsLexicon"],
   team: ["teamDirectory", "handoffMode"],
   faqs: ["faqs"],
@@ -66,6 +80,15 @@ function scopeOwns(scope: string, field: string): boolean {
 /** Whether this panel save may overwrite and attest the given form field. */
 export function settingsScopeIncludes(scope: string, field: string): boolean {
   return scopeOwns(scope, field);
+}
+
+/** The Identity card scopes, in page order. */
+export const IDENTITY_CARD_SCOPES = ["identity-business", "identity-answer", "identity-contacts"] as const;
+export type IdentityCardScope = (typeof IDENTITY_CARD_SCOPES)[number];
+
+/** Fields a scope may overwrite (null: unknown scope, the whole form). */
+export function settingsScopeFields(scope: string): readonly string[] | null {
+  return SETTINGS_SCOPE_FIELDS[scope] ?? null;
 }
 
 /** Errors for fields this scope owns. Other panels' fields do not fail the save. */

@@ -109,7 +109,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     id: "business",
     title: "Business",
     items: [
-      { label: "Identity", description: "Name, type of business and how callers hear it", target: { tab: "train", panel: "identity" } },
+      { label: "Identity", description: "Name, what you do, greeting, voice and contacts", target: { tab: "train", panel: "identity" } },
       { label: "Hours", description: "When you are open, including holidays", target: { tab: "train", panel: "hours" } },
       { label: "Locations", description: "Where callers can find you", target: { tab: "train", panel: "locations" } },
       { label: "Service areas", description: "Which counties, towns and estates you serve", target: { href: "/settings/areas" } },
@@ -134,7 +134,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
         description: "What callers hear before your team calls back",
         target: { tab: "assistant-say" },
       },
-      { label: "Voice", description: "How your Business Assistant sounds", target: { tab: "train", panel: "tools" } },
+      { label: "Voice", description: "What it does on a call and its tools", target: { tab: "train", panel: "tools" } },
       { label: "Pronunciation", description: "Names and words it should say a certain way", target: { tab: "train", panel: "pronunciation" } },
       { label: "Test", description: "Call your line and hear it answer", target: { tab: "test" } },
       { label: "Calls & forwarding", description: "How calls reach your Business Assistant", target: { tab: "calls" } },

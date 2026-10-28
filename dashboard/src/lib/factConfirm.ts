@@ -98,9 +98,26 @@ const SCOPE_SCALARS: Record<string, string[]> = {
     "policies.coverage_areas",
   ],
   tools: ["assistant.tools"],
+  // Settings › Identity cards (each saves on its own). Same paths as "identity", split.
+  "identity-business": ["identity.business_name", "identity.vertical"],
+  "identity-answer": ["identity.spoken_name", "assistant.agent_name", "assistant.tone"],
+  "identity-contacts": ["identity.social_handles"],
 };
 
-const KNOWN_SCOPES = new Set(["identity", "catalog", "hours", "locations", "policies", "tools", "pronunciation", "team", "faqs"]);
+const KNOWN_SCOPES = new Set([
+  "identity",
+  "identity-business",
+  "identity-answer",
+  "identity-contacts",
+  "catalog",
+  "hours",
+  "locations",
+  "policies",
+  "tools",
+  "pronunciation",
+  "team",
+  "faqs",
+]);
 
 function serviceAreaPathsFromRow(row: Row): string[] {
   if (!deskAttestServiceAreas()) return [];
@@ -120,7 +137,8 @@ export function scopeFactPaths(scope: string, row: Row): string[] {
   const all = !KNOWN_SCOPES.has(s);
   const out: string[] = [];
   for (const [key, paths] of Object.entries(SCOPE_SCALARS)) {
-    if (all || key === s) out.push(...paths);
+    // The identity-* card scopes are slices of "identity": the whole form takes them once.
+    if ((all && !key.startsWith("identity-")) || key === s) out.push(...paths);
   }
   if (all || s === "catalog") {
     out.push(...catalogPaths(row, "service"), ...catalogPaths(row, "product"));
