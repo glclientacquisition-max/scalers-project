@@ -227,7 +227,8 @@ describe("desk motion wiring", () => {
 
   it("spins Inbox SMS Send with pending", () => {
     const dock = read("dashboard/src/components/InboxSmsDock.tsx");
-    assert.match(dock, /pending=\{sendPending\}/);
+    // D3: with a Texts thread the bubble shows Sending; the spinner stays for the no-thread path.
+    assert.match(dock, /pending=\{sendPending && !threaded\}/);
     assert.match(dock, /sendPending/);
     assert.match(dock, /polishPending/);
     assert.match(dock, /pending=\{polishPending\}/);

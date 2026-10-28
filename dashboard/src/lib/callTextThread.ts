@@ -87,6 +87,12 @@ export function composerPlaceholder(name: string | null | undefined): string {
   return first ? `Text ${first}` : "Text caller";
 }
 
+/** Screen reader name for the composer box: "Text message to Chris". */
+export function composerLabel(name: string | null | undefined): string {
+  const first = String(name || "").trim().split(/\s+/)[0] || "";
+  return first ? `Text message to ${first}` : "Text message to caller";
+}
+
 export function textThreadEmpty(name: string | null | undefined): string {
   const who = String(name || "").trim() || "this caller";
   return `No texts with ${who} yet. Texts you send here show up in this thread.`;

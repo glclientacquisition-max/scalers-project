@@ -333,5 +333,7 @@ test("after Send, sent or failed: refresh the thread and switch to Texts", () =>
   assert.match(notes, /return \{ \.\.\.ownerSmsFailure\(sent\), attempted: true, token: Date\.now\(\) \}/);
   assert.match(notes, /return \{ ok: true, attempted: true, token: Date\.now\(\) \}/);
   const dock = src("components/InboxSmsDock.tsx");
-  assert.match(dock, /if \(sendState\.attempted\) onSentRef\.current\?\.\(\);\n\s+\}, \[sendState\]\);/);
+  // D3: Texts opens on tap (the Sending bubble is there), not after the server answers.
+  const send = dock.slice(dock.indexOf("function send()"));
+  assert.ok(send.indexOf("onSent?.()") > -1 && send.indexOf("onSent?.()") < send.indexOf("deliverPendingText("));
 });
