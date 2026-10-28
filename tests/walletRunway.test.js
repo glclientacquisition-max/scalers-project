@@ -9,7 +9,9 @@ function read(rel) {
 
 describe("owner usage surface", () => {
   const wallet = read("dashboard/src/lib/wallet.ts");
-  const home = read("dashboard/src/app/(desk)/home/page.tsx");
+  const home = read("dashboard/src/app/(desk)/home/page.tsx") +
+    // D2: usage, insights, call setup and checks stream from their own slots.
+    "\n" + read("dashboard/src/components/home/HomeOverviewSlots.tsx");
 
   it("keeps one beta rule for every surface", () => {
     assert.match(wallet, /export function isBetaBilling/);
