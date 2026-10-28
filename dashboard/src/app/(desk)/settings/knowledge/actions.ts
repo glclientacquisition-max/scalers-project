@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { memberDenied } from "@/lib/requireMember";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getCurrentTenant } from "@/lib/tenant";
-import { PASTE_MAX_ROWS, draftErrors, itemFromDraft, itemsFromPaste, parsePasteList, slug, type KbDraft, type KbItem, type KbKind, type KbPasteRow } from "@/lib/kbCore";
+import { PASTE_MAX_ROWS, draftErrors, gateDraftStatus, itemFromDraft, itemsFromPaste, parsePasteList, slug, type KbDraft, type KbItem, type KbKind, type KbPasteRow } from "@/lib/kbCore";
 import { KB_ITEM_COLS, afterKbWrite, kbRowToItem, loadKbItems, writeKbItems } from "@/lib/kbWrite.server";
 import { pingKbCompile } from "@/lib/kb.server";
+import { deskKbItemStates } from "@/lib/deskFeatureFlags";
 
 export type KbActionResult = { ok: true } | { ok: false; error: string };
 
@@ -48,7 +49,9 @@ export async function saveKbItemAction(draft: KbDraft): Promise<KbActionResult> 
   const errs = draftErrors(draft);
   if (errs.length) return { ok: false, error: errs.join(" ") };
   const prev = draft.id ? await loadItem(t.id, draft.id) : null;
-  const item = itemFromDraft(draft, prev, await categoryId(t.id, draft.category));
+  // Flag off: a client that still sends Paused / Not offered can't set it (the stored state is kept).
+  const gated = gateDraftStatus(draft, prev, deskKbItemStates());
+  const item = itemFromDraft(gated, prev, await categoryId(t.id, gated.category));
   return writeItems(t.id, [item]);
 }
 

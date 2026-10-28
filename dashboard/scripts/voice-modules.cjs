@@ -14,6 +14,9 @@ const VOICE_ENTRIES = [
   'src/knowledge/assistantSayReadiness.js',
   'src/knowledge/lookup.js',
   'src/knowledge/lookupOwnerReason.js',
+  'src/knowledge/kb/kbLive.js', // shared isKbLive contract (lib/kbLive.server.ts)
+  'src/knowledge/kb/live.js', // snapshot attach for the KB preview (lib/kbCaller.server.ts)
+  'src/knowledge/kb/source.js', // the one catalogue door (greeting line in the KB preview)
 ];
 
 function resolveRel(from, spec) {

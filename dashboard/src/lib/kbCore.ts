@@ -124,6 +124,21 @@ export function draftErrors(d: KbDraft): string[] {
   return out;
 }
 
+/**
+ * Item states flag gate for a save (DESK_KB_ITEM_STATES). Flag on: the draft as is. Flag off: a change TO paused or
+ * not offered is ignored (the stored state and its note are kept; a new item stays offered), and the rest of the
+ * save goes through. Putting a paused / not offered item back to Offered is still allowed (the Status control
+ * offers it when the flag is off), so an already-paused item is never silently flipped either way.
+ */
+export function gateDraftStatus(d: KbDraft, prev: Pick<KbItem, "status" | "status_note"> | null, statesEnabled: boolean): KbDraft {
+  if (statesEnabled) return d;
+  if (d.status !== "paused" && d.status !== "not_offered") return d;
+  const stored = prev?.status;
+  if (stored === d.status) return d.status === "paused" ? { ...d, status_note: prev?.status_note ?? "" } : d;
+  if (stored === "paused" || stored === "not_offered") return { ...d, status: stored, status_note: stored === "paused" ? prev?.status_note ?? "" : "" };
+  return { ...d, status: "active", status_note: "" };
+}
+
 export function itemFromDraft(d: KbDraft, prev: KbItem | null, categoryId: string | null): KbItem {
   const mode = d.price_mode;
   const amount = ["fixed", "per_unit", "from"].includes(mode) ? num(d.price_amount) : mode === "free" ? 0 : null;

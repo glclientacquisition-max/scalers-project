@@ -11,6 +11,8 @@ type View = {
   readyVersion?: number | null;
   brainTarget?: "v1" | "v2";
   onNewBrain?: boolean;
+  /** Shared isKbLive reason (gate_off | no_facts | held_v1 | no_live_version | never_ready | ready_stale | ready). */
+  onNewBrainReason?: string;
   items?: number | null;
   readiness?: { passed: boolean; version: number | null; checkedAt: string; checks: { id: string; ok: boolean; fix?: string | null }[]; tests: { name: string; ok: boolean; heard?: string | null; why?: string | null }[] } | null;
 };
@@ -44,7 +46,7 @@ export function BusinessKbBlock({ businessId }: { businessId: string }) {
   if (!v.available) return null;
 
   const r = v.readiness;
-  const state = v.onNewBrain ? { tone: "ok" as const, word: "New brain" } : v.brainTarget === "v1" ? { tone: "neutral" as const, word: "Held on old brain" } : { tone: "warn" as const, word: "Old brain until checks pass" };
+  const state = v.onNewBrain ? { tone: "ok" as const, word: "New brain" } : v.brainTarget === "v1" ? { tone: "neutral" as const, word: "Held on old brain" } : v.onNewBrainReason === "gate_off" ? { tone: "neutral" as const, word: "Old brain, KB gate off" } : { tone: "warn" as const, word: "Old brain until checks pass" };
   async function check() {
     setBusy(true); setMsg("");
     const res = await postJson(`/api/admin/businesses/${businessId}/kb`, { action: "check" });
