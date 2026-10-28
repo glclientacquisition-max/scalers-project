@@ -5,13 +5,13 @@ import { memberDenied } from "@/lib/requireMember";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getCurrentTenant } from "@/lib/tenant";
 import { bustTenantCache } from "@/lib/tenantCache";
-import { draftErrors, itemFromDraft, mirrorLegacy, slug, type KbCategory, type KbDraft, type KbItem } from "@/lib/kbCore";
+import { PASTE_MAX_ROWS, draftErrors, itemFromDraft, itemsFromPaste, mirrorLegacy, parsePasteList, slug, type KbCategory, type KbDraft, type KbItem, type KbKind, type KbPasteRow } from "@/lib/kbCore";
 import { pingKbCompile } from "@/lib/kb.server";
 
 export type KbActionResult = { ok: true } | { ok: false; error: string };
 
 const ITEM_COLS =
-  "id, kind, name_en, name_sw, name_sw_state, name_sw_suggested, aliases, category_id, description_en, unit, price_mode, price_amount, price_min, price_max, in_stock, popular, delivery_fee_kes, status, sort, source, legacy_ref, row_version";
+  "id, kind, name_en, name_sw, name_sw_state, name_sw_suggested, aliases, category_id, description_en, unit, price_mode, price_amount, price_min, price_max, in_stock, popular, delivery_fee_kes, needs_visit, holdable, excludes_en, status_note, status, sort, source, legacy_ref, row_version";
 
 async function ownerTenant(): Promise<{ id: string } | { error: string }> {
   const denied = await memberDenied("settings.edit");
@@ -121,4 +121,33 @@ export async function compileKbAction(): Promise<KbActionResult> {
   const r = await pingKbCompile(t.id, { by: "desk", force: true });
   revalidatePath("/settings/knowledge");
   return r.ok ? { ok: true } : { ok: false, error: "Couldn't reach your Business Assistant. Try again in a minute." };
+}
+
+async function loadAll(tenantId: string): Promise<KbItem[]> {
+  const { data } = await getSupabaseAdmin().from("kb_items").select(ITEM_COLS).eq("tenant_id", tenantId).order("sort").limit(20000);
+  return ((data || []) as Record<string, unknown>[]).map((r) => ({ ...(r as unknown as KbItem), price_amount: asNum(r.price_amount), price_min: asNum(r.price_min), price_max: asNum(r.price_max), aliases: Array.isArray(r.aliases) ? (r.aliases as string[]) : [] }));
+}
+
+/** Paste a list, step 1: parse for the preview (nothing saved). Names already in the catalogue are matched. */
+export async function previewKbPasteAction(text: string): Promise<{ ok: true; rows: KbPasteRow[] } | { ok: false; error: string }> {
+  const t = await ownerTenant();
+  if ("error" in t) return { ok: false, error: t.error };
+  if (String(text || "").length > 200_000) return { ok: false, error: "That list is too long. Paste up to 500 lines at a time." };
+  const rows = parsePasteList(text, await loadAll(t.id));
+  if (!rows.length) return { ok: false, error: "No items found. Put one item on each line." };
+  return { ok: true, rows };
+}
+
+/** Paste a list, step 2: one batch upsert of the previewed rows (re-parsed server side, so the browser can't change prices). */
+export async function importKbPasteAction(rows: KbPasteRow[], kind: KbKind, group: string): Promise<KbActionResult> {
+  const t = await ownerTenant();
+  if ("error" in t) return { ok: false, error: t.error };
+  if (!Array.isArray(rows) || !rows.length) return { ok: false, error: "Nothing to add." };
+  if (rows.length > PASTE_MAX_ROWS) return { ok: false, error: `Add up to ${PASTE_MAX_ROWS} at a time.` };
+  const k: KbKind = kind === "product" ? "product" : "service";
+  const existing = await loadAll(t.id);
+  const clean = parsePasteList(rows.map((r) => String(r.raw || "")).join("\n"), existing);
+  const items = itemsFromPaste(clean, k, existing, await categoryId(t.id, String(group || "")));
+  if (!items.length) return { ok: false, error: "Nothing to add." };
+  return writeItems(t.id, items);
 }

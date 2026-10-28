@@ -16,7 +16,7 @@ export type KbState = {
 } | { ok: false; reason: "no_tables" | "error" };
 
 const ITEM_COLS =
-  "id, kind, name_en, name_sw, name_sw_state, name_sw_suggested, aliases, category_id, description_en, unit, price_mode, price_amount, price_min, price_max, in_stock, popular, delivery_fee_kes, status, sort, source, legacy_ref, row_version";
+  "id, kind, name_en, name_sw, name_sw_state, name_sw_suggested, aliases, category_id, description_en, unit, price_mode, price_amount, price_min, price_max, in_stock, popular, delivery_fee_kes, needs_visit, holdable, excludes_en, status_note, status, sort, source, legacy_ref, row_version";
 
 const n = (v: unknown) => (v == null ? null : Number(v));
 

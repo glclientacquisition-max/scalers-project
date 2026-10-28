@@ -109,7 +109,16 @@ function openKb(doc) {
     const res = specific.length ? rank(hits, limit) : [];
     return { q, named, items: res, category, ms: Number(process.hrtime.bigint() - s0) / 1e6 };
   }
-  return { doc, byId, find, item: (id) => byId.get(id) || null, buildMs, categories: cats, tier: doc.items.length > TIER1_MAX_ITEMS ? 2 : 1 };
+  // paused / not-offered items (small list): answered only when the caller names one in full
+  const OFF = (Array.isArray(doc.off) ? doc.off : []).map((x) => ({ x, words: (x.name_keys || x.keys || []).filter((k) => !GENERIC.has(k)) })).filter((o) => o.words.length);
+  function findOff(text) {
+    if (!OFF.length) return null;
+    const q = tokens(text);
+    let best = null;
+    for (const o of OFF) if (o.words.every((k) => q.includes(k) || q.some((w) => near(w, k))) && (!best || o.words.length > best.len)) best = { item: o.x, len: o.words.length };
+    return best;
+  }
+  return { doc, byId, find, findOff, item: (id) => byId.get(id) || null, buildMs, categories: cats, tier: doc.items.length > TIER1_MAX_ITEMS ? 2 : 1 };
 }
 
 // ---- cache per business + version (bytes-capped LRU)

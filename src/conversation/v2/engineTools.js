@@ -27,7 +27,7 @@ function catalogueReceipt({ u, machine, profile, kbh, lang, text, wantsPrice, wa
   if (a.kind === 'none' && slot) a = KBR.answer(kbh, slot, { asksPrice: wantsPrice, lang, state: machine.kb || {} });
   if (a.kind === 'none' && wantsPrice && machine.slots?.service) a = KBR.answer(kbh, machine.slots.service, { asksPrice: true, lang, state: machine.kb || {} });
   machine.kb = a.state;
-  if (a.text) return { tool: wantsPrice ? 'prices' : 'catalogue', ok: true, kb: true, kind: a.kind, ids: a.ids, text: a.text, ms: Number((a.ms || 0).toFixed(3)), kbVersion: profile.kb.version };
+  if (a.text) return { tool: wantsPrice ? 'prices' : 'catalogue', ok: true, kb: true, kind: a.kind, ids: a.ids, text: a.text, ms: Number((a.ms || 0).toFixed(3)), kbVersion: profile.kb.version, ...(a.capture ? { capture: a.capture, service: a.name || null } : {}), ...(a.itemState ? { itemState: a.itemState } : {}) };
   if (asksList) { const o = KBR.overview(kbh, lang); if (o) return { tool: 'catalogue', ok: true, kb: true, kind: 'overview', ids: [], text: o, ms: Number((a.ms || 0).toFixed(3)), kbVersion: profile.kb.version }; }
   if (wantsPrice) return { tool: 'prices', ok: false, kb: true, kind: 'none', ids: [], text: null, ms: Number((a.ms || 0).toFixed(3)), kbVersion: profile.kb.version };
   return null;

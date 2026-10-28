@@ -21,6 +21,20 @@ versioned snapshot; the call reads the snapshot in-process. Design and decisions
 
 RPCs (service role only, `search_path = ''`): `kb_upsert_items`, `kb_publish_snapshot`, `kb_search_items` (tier 2), `kb_record_readiness`.
 
+### Item states (docs/supabase/kb_v2_item_states.sql, version 2026-10-28.2, after .1)
+
+- `price_mode` adds `site_visit` (priced after the team visits). `quote` and `site_visit` count as priced for readiness;
+  callers hear how it is priced plus an offer to take details, and a yes starts the callback capture.
+- `status`: `active`, `paused` (on hold for now, optional `status_note` up to 120), `not_offered` (an explicit "we don't
+  do this", so the brain says no instead of "not sure"), `hidden` (removed). Paused and not-offered items live in
+  `doc.off`: spoken only when a caller names one, never listed, counted, priced or put in the prompt index.
+- `holdable` (product can be held for a caller) and `excludes_en` (what a service does not include, up to 500).
+- Backfill: an old-Desk Quote (`pricing.mode` `ask` + `source` owner + `confirmed`, or `quote` in `pricing_mode` /
+  `price_mode`) becomes `quote`, or `site_visit` when `site_visit_required`; an untouched ask stays `none`.
+- Legacy mirror: not offered leaves `services_catalog` / `product_catalog`; paused reads as out of stock; site visit is
+  the old Quote plus `site_visit_required`; `excludes_en` -> `out_of_scope`; `holdable` kept.
+- `kb_search_items` returns `status` too (paused / not offered included, hidden never).
+
 ## Compile (src/knowledge/kb/compile.js)
 
 Rules only (compiler `kb-rules-2026-10-28.1`), no model on the publish path. Spoken names and prices (English digits,
@@ -70,7 +84,10 @@ compile, on Voice boot (`KB_BOOT_READINESS`, every 12 h) and on demand (Super Ad
 
 - Desk Settings > Catalogue opens `/settings/knowledge` (falls back to the old Catalogue tab when the tables are missing):
   ready card with fix links, what callers hear (English / Swahili), Swahili names to approve, issues, items by group with
-  the popular switch, item sheet. Server actions write `kb_items`, mirror the old columns, and ping `/internal/kb/compile`.
+  the popular switch, item sheet (price incl. site visit, callers hear: offered / paused / not offered, not included,
+  hold), and Paste a list (`previewKbPasteAction` parses one item per line with an optional price for a preview;
+  `importKbPasteAction` re-parses on the server and writes one `kb_upsert_items` batch, up to 500, names already in the
+  catalogue update that item). Server actions write `kb_items`, mirror the old columns, and ping `/internal/kb/compile`.
 - Super Admin Businesses > Calls & quality: brain state, readiness pills, Check again (safe), Hold on old brain / Allow new
   brain (`business-kb:set_brain_target`, Unlock + reason, audited).
 

@@ -51,6 +51,8 @@ function sayPrice(p = {}) {
       return { ...tail(`${enLo(p.price_min, p.price_max)} to ${enMoney(p.price_max)}`, `shilingi ${swBare(p.price_min)} hadi ${swBare(p.price_max)}`), numbers: [Number(p.price_min), Number(p.price_max)] };
     case 'quote':
       return { en: 'a custom quote after the team checks the job', sw: 'bei maalum baada ya timu kukagua kazi', numbers: [], quote: true };
+    case 'site_visit':
+      return { en: 'priced after a site visit', sw: 'bei baada ya kukagua eneo', numbers: [], quote: true, visit: true };
     case 'free':
       return { en: 'free', sw: 'bure', numbers: [0] };
     default: break;
