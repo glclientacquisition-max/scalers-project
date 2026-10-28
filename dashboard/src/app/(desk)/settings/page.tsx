@@ -4,6 +4,7 @@ import { memberCan } from "@/lib/requireMember";
 export const instant = false;
 import { structuredSettingsSlots } from "@/components/structured/StructuredSettingsSlots";
 import { readBusinessType } from "@/lib/structuredServer";
+import { readGreetingLanguage } from "@/lib/identityGreetingServer";
 import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
 import { MembersLoadError, MembersPanel } from "@/components/MembersPanel";
 import { loadMembers } from "@/lib/membersLoad";
@@ -118,7 +119,14 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   let businessCategory: string | null = null;
   // Catalogue is its own tab (?tab=catalog), not a train panel: the old check never showed its price cards.
   if (tab === "catalog" || (tab === "train" && trainPanel === "identity")) {
-    const [canEdit, typed] = await Promise.all([memberCan("settings.edit"), readBusinessType(tenant.id)]);
+    const identity = tab === "train" && trainPanel === "identity";
+    const [canEdit, typed, greeting] = await Promise.all([
+      memberCan("settings.edit"),
+      readBusinessType(tenant.id),
+      identity ? readGreetingLanguage(tenant.id) : Promise.resolve(null),
+    ]);
+    // How you answer shows the stored greeting language (Automatic when null).
+    if (greeting) tenant = { ...tenant, ...greeting };
     structuredSlot = structuredSettingsSlots({
       tenant,
       canEdit,

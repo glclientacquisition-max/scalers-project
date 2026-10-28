@@ -1,3 +1,5 @@
+import { parseGreetingLanguageField, type StoredGreetingLanguage } from "./identityGreeting.ts";
+
 /**
  * Which form fields a Settings panel is allowed to overwrite.
  * Other fields stay on the stored tenant so a Hours save cannot wipe the catalog.
@@ -18,6 +20,7 @@ const IDENTITY_ANSWER = [
   "greetingInvite",
   "sonioxVoiceId",
   "sonioxVoiceLabel",
+  "greetingLanguage",
 ] as const;
 const IDENTITY_CONTACTS = ["socialHandles"] as const;
 
@@ -147,4 +150,30 @@ export function settingsScopeValidationError(
     }
   }
   return null;
+}
+
+/**
+ * tenants.greeting_language for this save: only an Identity scope that owns it
+ * (identity, identity-answer) and only when the form posted the field. Every
+ * other scope, an older client and an invalid value leave the stored column
+ * alone (no key in the patch). Automatic is null, English 'en', Kiswahili 'sw'.
+ */
+export function greetingLanguagePatch(
+  scope: string,
+  posted: unknown
+): { greeting_language?: StoredGreetingLanguage } {
+  const owned = SETTINGS_SCOPE_FIELDS[scope];
+  if (!owned || !owned.includes("greetingLanguage")) return {};
+  if (posted === null || posted === undefined) return {};
+  const value = parseGreetingLanguageField(posted);
+  return value === undefined ? {} : { greeting_language: value };
+}
+
+/**
+ * An owner-session update that RLS filters out returns no error and 0 rows.
+ * True means nothing was saved and the save must report "not allowed".
+ * A null count (count not requested) is not a denial.
+ */
+export function saveMatchedNoRows(count: number | null | undefined): boolean {
+  return count === 0;
 }

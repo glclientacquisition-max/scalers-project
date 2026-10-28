@@ -42,6 +42,8 @@ import {
   buildGreetingSentence,
   greetingInviteLine,
   greetingIsAutomatic,
+  greetingLanguageForStorage,
+  greetingLanguagePickFromStored,
   resolveGreetingLanguage,
   type GreetingLanguage,
   type GreetingLanguagePick,
@@ -299,21 +301,25 @@ function AnswerCard({
   const [greetingInvite, setGreetingInvite] = useState(tenant.greeting_invite || "");
   const [storedVoiceId, setStoredVoiceId] = useState(() => initialVoiceId(tenant, voices));
   const [voiceId, setVoiceId] = useState(storedVoiceId);
-  // Not stored by this save (no Desk writer for greeting_language yet): calls use
-  // Automatic; a pick here only changes the sentence and Hear it.
-  const [languagePick, setLanguagePick] = useState<GreetingLanguagePick>("auto");
+  // tenants.greeting_language: the business's default greeting language.
+  // Automatic (null) follows the owner's own words; saved with this card.
+  const [languagePick, setLanguagePick] = useState<GreetingLanguagePick>(() =>
+    greetingLanguagePickFromStored(tenant.greeting_language)
+  );
+  const greetingText = tenant.greeting_text || "";
   const automatic = greetingIsAutomatic({ spokenName, greetingInvite });
   const [editingGreeting, setEditingGreeting] = useState(false);
   const storedLabel = String(tenant.soniox_voice_label || "").trim();
   // A label names the old voice; a new voice drops it.
   const voiceLabel = voiceId === storedVoiceId ? storedLabel : "";
-  const language = resolveGreetingLanguage(languagePick, greetingInvite);
+  const language = resolveGreetingLanguage(languagePick, greetingInvite, greetingText);
 
   const sentence = buildGreetingSentence({
     businessName,
     spokenName,
     agentName,
     greetingInvite,
+    greetingText,
     language,
   });
 
@@ -328,7 +334,7 @@ function AnswerCard({
   );
   const { dirty, justSaved } = useFormDraft(save, {
     id: formId,
-    values: [agentName, tone, spokenName, greetingInvite, voiceId],
+    values: [agentName, tone, spokenName, greetingInvite, voiceId, languagePick],
   });
 
   const [sampleUrl, setSampleUrl] = useState<string | null>(null);
@@ -353,7 +359,7 @@ function AnswerCard({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: sentence.text || greetingInviteLine("", language),
+          text: [sentence.text || greetingInviteLine("", language), sentence.notice].filter(Boolean).join(" "),
           language,
           lexicon: lexiconForStorage(parseTtsLexicon(tenant.tts_lexicon)),
           voiceId: resolveLiveCallVoiceId(voiceId, voices),
@@ -403,6 +409,11 @@ function AnswerCard({
           <input type="hidden" name="greeting_invite" value={greetingInvite} />
           <input type="hidden" name="soniox_voice_id" value={voiceId} />
           <input type="hidden" name="soniox_voice_label" value={voiceLabel} />
+          <input
+            type="hidden"
+            name="greeting_language"
+            value={greetingLanguageForStorage(languagePick) ?? "auto"}
+          />
         </>
       }
     >
@@ -420,17 +431,28 @@ function AnswerCard({
             </span>
           ) : null}
         </div>
-        <p
+        <div
           aria-labelledby="identity-greeting-label"
-          data-greeting-sentence=""
-          className="rounded-xl bg-surface-2 px-3 py-2.5 text-body text-ink [overflow-wrap:anywhere]"
+          className="space-y-1 rounded-xl bg-surface-2 px-3 py-2.5 [overflow-wrap:anywhere]"
         >
-          {sentence.text ? (
-            sentence.text
-          ) : (
-            <span className="text-ink-2">Add your business name and callers hear it here.</span>
-          )}
-        </p>
+          <p data-greeting-sentence="" className="text-body text-ink">
+            {sentence.text ? (
+              sentence.text
+            ) : (
+              <span className="text-ink-2">Add your business name and callers hear it here.</span>
+            )}
+          </p>
+          {sentence.text && sentence.notice ? (
+            <p data-greeting-notice="" className="text-meta text-ink-2">
+              {sentence.notice}
+            </p>
+          ) : null}
+        </div>
+        {sentence.text && sentence.notice ? (
+          <p className="text-meta text-ink-2" data-greeting-notice-help="">
+            Calls also get a short recording notice.
+          </p>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           <span data-role-exempt="">
             <Button
@@ -540,8 +562,7 @@ function AnswerCard({
           <p className="text-end text-body text-ink-2">No voices loaded</p>
         </SettingsRow>
       )}
-      {/* Preview only (nothing saved), so viewers can switch it too. */}
-      <div data-role-exempt="" data-greeting-language={languagePick}>
+      <div data-greeting-language={languagePick}>
         <ChoiceSheet
           id="identity_language"
           title="Greeting language"
@@ -549,15 +570,18 @@ function AnswerCard({
           value={languagePick}
           options={LANGUAGE_PICKS.map((opt) => ({
             ...opt,
-            label: opt.value === "auto" ? languageLabel("auto", autoGreetingLanguage(greetingInvite)) : opt.label,
+            label:
+              opt.value === "auto"
+                ? languageLabel("auto", autoGreetingLanguage(greetingInvite, greetingText))
+                : opt.label,
           }))}
-          onChange={setLanguagePick}
+          onChange={(next) => {
+            if (canEdit) setLanguagePick(next);
+          }}
         />
-        {languagePick !== "auto" ? (
-          <p className="px-4 pb-2 text-meta text-ink-2" data-language-note="">
-            Only Hear it uses this for now. Calls stay on Automatic.
-          </p>
-        ) : null}
+        <p className="px-4 pb-2 text-meta text-ink-2" data-language-note="">
+          Returning callers hear the language they used last.
+        </p>
       </div>
     </IdentityCard>
   );

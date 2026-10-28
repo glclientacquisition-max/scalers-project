@@ -57,6 +57,9 @@ const identityCustom = {
   greeting_invite: "Which book are you looking for",
 };
 
+/** ?identity=sw: Kiswahili saved as the business's default greeting language. */
+const identityKiswahili = { greeting_language: "sw" as const };
+
 /** ?identity=empty: a new business with no name, greeting, tone or contacts yet. */
 const identityEmpty = {
   business_name: "",
@@ -111,7 +114,9 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
       ? { ...policiesT, ...identityEmpty }
       : identityState === "custom"
         ? { ...policiesT, ...identityFilled, ...identityCustom }
-        : { ...policiesT, ...identityFilled }
+        : identityState === "sw"
+          ? { ...policiesT, ...identityFilled, ...identityKiswahili }
+          : { ...policiesT, ...identityFilled }
   ) as TenantRow;
   const roleRaw = Array.isArray(params.role) ? params.role[0] : params.role;
   const role = roleRaw === "viewer" || roleRaw === "staff" ? roleRaw : null;
