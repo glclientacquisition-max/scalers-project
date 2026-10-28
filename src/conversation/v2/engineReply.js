@@ -31,8 +31,12 @@ function task(goal) {
   return t;
 }
 
-function replyPack({ goal, text, receipts, machine, lang, caller }) {
+function replyPack({ goal, text, receipts, machine, lang, caller, profile = null }) {
+  // KB v2 name lock (root cause 6): the names this call may say, already in the call language; legacy: no key
+  const kbs = profile ? require('../../knowledge/kb/source').catalogueSource(profile) : null;
+  const names = kbs && kbs.mode === 'kb' ? kbs.lockedNames(lang).filter((n, i, a) => a.indexOf(n) === i).slice(0, 60) : null;
   return {
+    ...(names && names.length ? { ITEM_NAMES: { rule: 'Say catalogue item names exactly as written here, never translated or reworded. Say each price right after its own item.', names } } : {}),
     TASK: task(goal),
     LANG: lang === 'sw' ? 'Swahili (reply ONLY in Swahili)' : 'English (reply ONLY in English)',
     CALLER_SAID: String(text || '').slice(0, 300),
@@ -47,7 +51,7 @@ function replyPack({ goal, text, receipts, machine, lang, caller }) {
 async function writeReply({ goal, text, receipts, machine, profile, lang, caller, streamFor, modelId, hardMs = 2500, clock = () => Date.now(), log = () => {} }) {
   const t0 = clock();
   if (!streamFor || !modelId) return { text: '', ms: 0, outcome: 'skipped' };
-  const request = ML.replyRequest(replyPack({ goal, text, receipts, machine, lang, caller }), profile);
+  const request = ML.replyRequest(replyPack({ goal, text, receipts, machine, lang, caller, profile }), profile);
   const ac = new AbortController();
   let capTimer = null;
   let buf = '';

@@ -37,9 +37,9 @@ function attach(profile, kbExtras, { env = process.env, force = false } = {}) {
   profile.kb = { ...info, handle, loadMs: k.loadMs ?? null, items: k.doc.items.length };
   const legacy = docToLegacy(k.doc);
   if (legacy) { profile.servicesCatalog = legacy.servicesCatalog; profile.productCatalog = legacy.productCatalog; profile.kbProjected = true; }
-  // the old free-text services line is no longer read on the new path; its stand-in comes from the KB groups
-  const groups = (handle.categories || []).filter((c) => c.count > 0).slice(0, 4).map((c) => c.name);
-  profile.servicesOffered = groups.length ? groups.join(', ') : null;
+  // the old free-text services line (tenants.services_offered, now a derived copy) is not read on the KB path:
+  // every caller-facing reader goes through kb/source.js (groups for the greeting, item descriptions for notes)
+  profile.servicesOffered = null;
   return profile;
 }
 const handle = (profile) => (profile && profile.kb && profile.kb.handle) || null;

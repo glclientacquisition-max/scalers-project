@@ -679,12 +679,14 @@ function speechFactText(profile = {}) {
     const norm = normalisePrice(row);
     return priceIsSpeakable(norm) ? formatPriceDisplay(norm, 'en', legacyPriceText(row)) : '';
   };
-  const products = factProducts(profile.productCatalog, fieldMeta).map((row) => ({
+  // KB v2: the one catalogue door (kb/source.js); legacy mode reads the same profile fields as before
+  const kbSource = require('../knowledge/kb/source').catalogueSource(profile);
+  const products = factProducts(kbSource.products(), fieldMeta).map((row) => ({
     name: row.name,
     price: priceForSpeech(row),
     notes: row.notes || '',
   }));
-  const services = factServices(profile.servicesCatalog, fieldMeta).map((row) => ({
+  const services = factServices(kbSource.services(), fieldMeta).map((row) => ({
     name: row.name,
     price_range: priceForSpeech(row),
     notes: row.notes || '',
@@ -700,7 +702,7 @@ function speechFactText(profile = {}) {
     bulletin: profile.dailyBulletin || profile.daily_bulletin || '',
     team: profile.teamDirectory || profile.team_directory || '',
     social: profile.socialHandles || profile.social_handles || '',
-    notes: profile.servicesNotes || profile.servicesOffered || profile.services_offered || '',
+    notes: kbSource.mode === 'kb' ? '' : profile.servicesNotes || profile.servicesOffered || profile.services_offered || '',
     policies,
     products,
     services,

@@ -62,16 +62,66 @@ function oneItem(it, { asksPrice, lang }) {
   // rule 8: one fit, no choice offered
   return { kind: 'item', ids: [it.id], text: sw ? `Ndiyo, tuna ${short(it, lang)}.` : `Yes, we have ${short(it, lang)}.`, numbers: [] };
 }
-function offItem(it, lang) {
+/** One item and its own price, for a short list (root cause 5). */
+function pricePair(m, lang) {
+  const sw = isSw(lang); const nm = short(m, lang);
+  if (m.in_stock === false) return sw ? `${nm} imeisha kwa sasa` : `${nm} is out of stock`;
+  if (m.variants && m.variants.length) return sw ? `bei ya ${nm} inategemea aina` : `${nm} depends on the option`;
+  if (m.price.visit) return sw ? `${nm} hupangiwa bei baada ya kukagua eneo` : `${nm} is priced after a site visit`;
+  if (m.price.quote) return sw ? `${nm} ni bei maalum` : `${nm} is a custom quote`;
+  const say = sw ? m.price.say_sw : m.price.say_en;
+  if (say) return sw ? `${nm} ni ${say}` : `${nm} is ${say}`;
+  return sw ? `timu itathibitisha bei ya ${nm}` : `the team will confirm the price of ${nm}`;
+}
+// Swahili words that mark an owner note as written in Swahili (area-pick note rule: say it only in its own language)
+const SW_NOTE = /\b(tutarudi|itarudi|inarudi|wiki|ijayo|mwezi|kesho|baada|kwa sasa|hadi|mpaka|tumesimamisha|imesimamishwa|karibuni|siku)\b/i;
+const noteLang = (note) => (SW_NOTE.test(String(note || '')) ? 'sw' : 'en');
+/**
+ * A paused / not-offered item the caller named (root cause 2): a grounded answer, never "not sure".
+ * Paused: the owner's note in its own language (an English note in a Swahili call becomes "the team will confirm when
+ * it's back"), then one offer to have the team call back when it is back (capture 'when_back': a yes starts the normal
+ * callback capture with read-back + yes + commit gate). tail=false drops the closing question (combined answers).
+ */
+function offItem(it, lang, { tail = true } = {}) {
   const sw = isSw(lang);
   const name = (sw && it.say_sw) || it.say_en;
   if (it.state === 'paused') {
-    return { kind: 'item', ids: [it.id], itemState: 'paused', numbers: [],
-      text: sw ? `Samahani, ${name} haipatikani kwa sasa. Naweza kukusaidia na kitu kingine?` : `Sorry, ${name} isn't available right now${it.note ? ` (${it.note.replace(/[.!?]+$/, '')})` : ''}. Can I help with anything else?` };
+    const note = it.note ? it.note.replace(/[.!?]+$/, '') : null;
+    const noteSw = note && noteLang(note) === 'sw' ? note : null;
+    const en = `Sorry, ${name} isn't available right now${note && noteLang(note) === 'en' ? ` (${note})` : ''}.`;
+    const swt = `Samahani, ${name} haipatikani kwa sasa; ${noteSw ? `${noteSw.charAt(0).toLowerCase()}${noteSw.slice(1)}` : 'timu itathibitisha lini itarudi'}.`;
+    const q = sw ? 'Ungependa timu ikupigie ikirudi?' : "Shall I have the team call you when it's back?";
+    return { kind: 'item', ids: [it.id], itemState: 'paused', numbers: [], name: it.name, ...(tail ? { capture: 'when_back' } : {}),
+      text: tail ? `${sw ? swt : en} ${q}` : (sw ? swt : en) };
   }
   const product = it.kind === 'product';
+  const t = sw ? `Samahani, ${product ? 'hatuuzi' : 'hatufanyi'} ${name}.` : `Sorry, we don't ${product ? 'sell' : 'offer'} ${name}.`;
   return { kind: 'item', ids: [it.id], itemState: 'not_offered', numbers: [],
-    text: sw ? `Samahani, ${product ? 'hatuuzi' : 'hatufanyi'} ${name}. Naweza kukusaidia na kitu kingine?` : `Sorry, we don't ${product ? 'sell' : 'offer'} ${name}. Can I help with anything else?` };
+    text: tail ? `${t} ${sw ? 'Naweza kukusaidia na kitu kingine?' : 'Can I help with anything else?'}` : t };
+}
+// not_included (services): only when the caller asks whether X includes Y; can_be_held (products): "keep one for me?"
+const INCLUDE_RE = /\b(include|includes|including|included|come with|comes with|part of|cover|covers|also (?:do|clean|wash)|inahusisha|inajumuisha|pamoja na|mnafanya pia|pia mnafanya|inahusu)\b/i;
+const HOLD_RE = /\b(hold|keep|reserve|set aside|put aside|save)\b(?!\s+on\b)(?!\s+going\b).{0,30}\b(for me|one|it|them|some)\b|\b(niwekee|uniwekee|nihifadhie|unihifadhie|kuniwekea|kunihifadhia|mniwekee)\b/i;
+function excludedPart(it, text) {
+  if (!it || !it.excludes) return null;
+  const said = tokens(text).filter((w) => !GENERIC.has(w));
+  const own = new Set(tokens(it.name));
+  const ask = said.filter((w) => !own.has(w));
+  if (!ask.length) return null;
+  for (const part of String(it.excludes).split(/[,;\n]|\band\b|\bor\b/i).map((x) => x.trim()).filter(Boolean)) {
+    const ks = tokens(part).filter((w) => !GENERIC.has(w));
+    if (ks.length && ks.some((k) => ask.includes(k))) return part.replace(/[.!?]+$/, '');
+  }
+  return null;
+}
+function excludesAnswer(it, part, lang) {
+  const sw = isSw(lang); const nm = short(it, lang);
+  return { kind: 'item', ids: [it.id], numbers: [], itemState: 'not_included', text: sw ? `${cap(nm)} haihusishi ${part.toLowerCase()}.` : `${cap(nm)} doesn't include ${part.toLowerCase()}.` };
+}
+function holdAnswer(it, lang) {
+  const sw = isSw(lang); const nm = short(it, lang);
+  if (it.holdable) return { kind: 'item', ids: [it.id], numbers: [], hold: true, capture: 'hold', name: it.name, text: sw ? `Tunaweza kukuwekea ${nm}. Nichukue jina na nambari yako?` : `We can hold ${nm} for you. Shall I take your name and number?` };
+  return { kind: 'item', ids: [it.id], numbers: [], hold: false, text: sw ? `Hatuwezi kukuwekea ${nm}, lakini unaweza kuja au kuagiza.` : `We can't hold ${nm}, but you can come in or order.` };
 }
 function group(members, { cat = null, asksPrice, lang, offset = 0, narrowed = 0 }) {
   const sw = isSw(lang);
@@ -80,18 +130,28 @@ function group(members, { cat = null, asksPrice, lang, offset = 0, narrowed = 0 
   const nums = [];
   // rule 6: a group gets one range, said inside the count sentence (rule 12: the reply stays two sentences)
   let span = null;
-  if (asksPrice) {
+  // root cause 5 (price binding): a price is always said right after its own item. Up to 3 names with prices are
+  // item + price pairs; a bigger group may carry one true range (low to high) on its count, never a single
+  // number after a list of names ("Deep clean and Post-construction clean, 6,000 shillings").
+  if (asksPrice && offset === 0 && members.length <= MAX_NAMES) {
+    for (const m of shown) nums.push(...((!m.price.review && m.price.numbers) || []));
+    const pairs = shown.map((m) => pricePair(m, lang));
+    const s1p = `${cap(joinList(pairs, lang))}.`;
+    const q1 = members.length > 1 ? (sw ? 'Ungependa ipi?' : 'Which one would you like?') : null;
+    return { kind: 'group', ids: members.map((m) => m.id), shown: shown.map((m) => m.id), offset, total: members.length, text: q1 ? `${s1p} ${q1}` : s1p, question: q1, numbers: [...nums, members.length], bound: true };
+  }
+  if (asksPrice && offset === 0) {
     const priced = members.filter((m) => !m.price.review && (m.price.numbers || []).length);
     const all = priced.flatMap((m) => m.price.numbers).filter((v) => v > 0);
     const units = [...new Set(priced.map((m) => m.unit || ''))];
-    if (all.length) {
-      const sp = cat && cat.span && cat.span.en && priced.length === members.length ? cat.span : sayRange(Math.min(...all), Math.max(...all), units.length === 1 ? units[0] || null : null);
+    if (all.length && Math.min(...all) < Math.max(...all)) {
+      const sp = cat && cat.span && cat.span.en && priced.length === members.length && (cat.span.numbers || []).length > 1 ? cat.span : sayRange(Math.min(...all), Math.max(...all), units.length === 1 ? units[0] || null : null);
       span = sw ? sp.sw : sp.en; if (span) nums.push(...(sp.numbers || []));
     }
   }
   let s1;
   if (offset > 0) s1 = sw ? `Pia tuna ${names}.` : `We also have ${names}.`;
-  else if (members.length <= MAX_NAMES) s1 = span ? (sw ? `Tuna ${names}, bei ${span}.` : `We have ${names}, ${span}.`) : (sw ? `Tuna ${names}.` : `We have ${names}.`);
+  else if (members.length <= MAX_NAMES) s1 = sw ? `Tuna ${names}.` : `We have ${names}.`;
   else s1 = span ? (sw ? `Tuna ${groupLabel(cat, members, lang)}, bei ${span}, kama ${names}.` : `We have ${groupLabel(cat, members, lang)}, ${span}, like ${names}.`) : (sw ? `Tuna ${groupLabel(cat, members, lang)}, kama ${names}.` : `We have ${groupLabel(cat, members, lang)}, like ${names}.`);
   const s2 = '';
   const more = members.length > offset + MAX_NAMES;
@@ -128,9 +188,26 @@ function answer(kb, text, { asksPrice = false, lang = 'en', state = {} } = {}) {
   const f = kb.find(text);
   // an item the owner paused or marked "we don't do this", named in full: say so plainly instead of "not sure"
   const off = kb.findOff ? kb.findOff(text) : null;
-  if (off && (!f.named || off.len > tokens(f.named.name).filter((w) => !GENERIC.has(w)).length)) {
+  const namedLen = f.named ? tokens(f.named.name).filter((w) => !GENERIC.has(w)).length : 0;
+  // the item this turn is about: named now, else the one item just answered
+  const subject = f.named || (last && last.ids && last.ids.length === 1 ? kb.item(last.ids[0]) : null);
+  if (subject && (!off || off.len <= namedLen)) {
+    if (subject.kind !== 'product' && INCLUDE_RE.test(text)) {
+      const part = excludedPart(subject, text);
+      if (part) { st.last = { ids: [subject.id], shown: [subject.id], offset: 0 }; st.narrowed = 0; return done({ ...excludesAnswer(subject, part, lang), lookupMs: f.ms }, st); }
+    }
+    if (subject.kind === 'product' && HOLD_RE.test(text)) { st.last = { ids: [subject.id], shown: [subject.id], offset: 0 }; st.narrowed = 0; return done({ ...holdAnswer(subject, lang), lookupMs: f.ms }, st); }
+  }
+  if (off && (!f.named || off.len > namedLen)) {
     st.last = null; st.narrowed = 0;
     return done({ ...offItem(off.item, lang), lookupMs: f.ms }, st);
+  }
+  // an off item and a different active item in one turn: one sentence each (rule 12), the active one first
+  if (off && f.named && off.item.id !== f.named.id && !tokens(off.item.name).every((w) => tokens(f.named.name).includes(w))) {
+    const a = oneItem(f.named, { asksPrice, lang }); const o = offItem(off.item, lang, { tail: false });
+    st.last = { ids: [f.named.id], shown: [f.named.id], offset: 0 }; st.narrowed = 0;
+    const first = String(a.text).split(/(?<=[.!?])\s+/)[0];
+    return done({ ...a, ids: [f.named.id, off.item.id], itemState: `active+${off.item.state}`, text: `${first} ${o.text}`, capture: null, lookupMs: f.ms }, st);
   }
   if (f.named) { st.last = { ids: [f.named.id], shown: [f.named.id], offset: 0 }; st.narrowed = 0; return done({ ...oneItem(f.named, { asksPrice, lang }), lookupMs: f.ms }, st); }
   if (f.category) {
@@ -165,4 +242,4 @@ function overview(kb, lang = 'en') {
   return product ? `We have ${n} products, in groups like ${names}. What are you looking for?` : `We offer ${n} services, like ${names}. Which one do you need?`;
 }
 
-module.exports = { answer, overview, MAX_NAMES, MORE_RE };
+module.exports = { answer, overview, offItem, pricePair, noteLang, MAX_NAMES, MORE_RE, INCLUDE_RE, HOLD_RE };

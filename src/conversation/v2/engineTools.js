@@ -9,6 +9,7 @@ const L = require('./lexicon');
 
 const KBL = require('../../knowledge/kb/live');
 const KBR = require('../../knowledge/kb/rules');
+const KBS = require('../../knowledge/kb/source');
 
 function sw(lang) { return L.isSw(lang); }
 
@@ -17,10 +18,12 @@ const POS_OR_MORE = /\b(first|second|third|1st|2nd|3rd|last one|ya kwanza|ya pil
 /** The v2 KB receipt for this turn, or null when the turn is not about the catalogue. Pure, in memory, < 5 ms. */
 function catalogueReceipt({ u, machine, profile, kbh, lang, text, wantsPrice, wantsCoverage }) {
   const asksList = (u.answers || []).includes('services');
-  const follow = !!(machine.kb && machine.kb.last) && (KBR.MORE_RE.test(text) || POS_OR_MORE.test(text));
+  const follow = !!(machine.kb && machine.kb.last) && (KBR.MORE_RE.test(text) || POS_OR_MORE.test(text) || KBR.INCLUDE_RE.test(text) || KBR.HOLD_RE.test(text));
   const slot = u.slots?.service || null;
   // a question that names an item or a group is a catalogue question even when the understanding did not say so
-  const named = !wantsPrice && !asksList && !follow && ASK_RE.test(text) && ['ask', 'unknown', 'smalltalk', undefined, null].includes(u.intent) ? (() => { const f = kbh.find(text); return !!(f.named || f.category); })() : false;
+  // KB v2 root cause 2: one lookup over offered AND paused / not-offered items (kb/source findForCaller), so
+  // "do you do carpet cleaning?" (not offered) gets its grounded receipt instead of going to the model with none
+  const named = !wantsPrice && !asksList && !follow && (ASK_RE.test(text) || KBR.HOLD_RE.test(text)) && ['ask', 'unknown', 'smalltalk', undefined, null].includes(u.intent) ? !!KBS.catalogueSource(profile).findForCaller(text) : false;
   if (!wantsPrice && !asksList && !follow && !slot && !named) return null;
   if (wantsCoverage && !wantsPrice && !asksList && !follow) return null;
   let a = KBR.answer(kbh, text, { asksPrice: wantsPrice, lang, state: machine.kb || {} });

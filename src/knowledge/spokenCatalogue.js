@@ -357,6 +357,9 @@ function resolveSpokenCatalogueMeta(profile = {}, { env = process.env } = {}) {
   // VOICE_TURN_ARBITER: the doc pinned at call start (pinSpokenCatalogue) is the
   // only doc for the rest of the call. No hash check or compile on the hot path.
   if (profile.spokenCataloguePin?.doc) return { ...profile.spokenCataloguePin, pinned: true };
+  // KB v2 (root cause 4): a business on the KB never reads the stored legacy doc (a second, frozen catalogue next to
+  // the KB). Its doc is built from the KB projection (offered items only) with names locked to the KB names.
+  if (require('./kb/source').isKb(profile)) return { doc: kbLockedDoc(profile), stale: false, degraded: false, kb: true };
   const stored = profile.spokenCatalogue;
   if (storedFirst(env)) {
     if (stored && Array.isArray(stored.entries)) return { doc: stored, stale: needsRegeneration(stored, profile), degraded: false };
@@ -364,6 +367,28 @@ function resolveSpokenCatalogueMeta(profile = {}, { env = process.env } = {}) {
   }
   if (stored && !needsRegeneration(stored, profile)) return { doc: stored, stale: false, degraded: false };
   return { doc: compileMemo(profile), stale: false, degraded: false };
+}
+// KB mode: the rules doc over the KB projection, with every spoken name locked to the KB (root cause 6: the rules
+// Swahili forms such as "usafi wa kina" are never spoken; Swahili is the owner-approved name, else the English name).
+function kbLockedDoc(profile) {
+  const src = require('./kb/source').catalogueSource(profile);
+  const doc = JSON.parse(JSON.stringify(compileMemo(profile)));
+  const byName = new Map(src.offered().map((x) => [String(x.name || '').trim().toLowerCase(), x]));
+  const cats = new Map(src.groups().map((g) => [g.name.toLowerCase(), g]));
+  for (const e of doc.entries || []) {
+    const it = byName.get(String(e.raw?.name || '').trim().toLowerCase());
+    if (!it) continue;
+    e.spoken = { en: it.say_en, sw: it.say_sw || it.say_en };
+    e.source = { ...(e.source || {}), name_en: 'kb', name_sw: it.say_sw ? 'kb' : 'kb_en' };
+    const g = it.cat_name ? cats.get(String(it.cat_name).toLowerCase()) : null;
+    e.category = { ...(e.category || {}), en: g ? g.say_en : e.spoken.en, sw: g ? (g.say_sw || g.say_en) : e.spoken.sw };
+  }
+  for (const c of doc.categories || []) {
+    const m = (doc.entries || []).find((e) => e.category && e.category.id === c.id);
+    if (m) Object.assign(c, { en: m.category.en, sw: m.category.sw });
+  }
+  doc.kb = true;
+  return doc;
 }
 // Call start only: resolve once with Platform's resolver and pin the result on the profile.
 function pinSpokenCatalogue(profile = {}, opts = {}) {
@@ -387,4 +412,4 @@ function catalogueProfileFromRow(r = {}) {
 // Columns the Save rebuild selects: the catalogue columns, plus FAQs and policies for the fact store.
 const factStoreCols = () => (require('./factStore').factStoreEnabled() ? [...CATALOGUE_COLS, 'faqs', 'business_policies'] : CATALOGUE_COLS);
 
-module.exports = { CATALOGUE_COLS, factStoreCols, catalogueProfileFromRow, storedFirst, resolveSpokenCatalogueMeta, pinSpokenCatalogue, SCHEMA_VERSION, AI_SCHEMA, sourceHash, compileSpokenCatalogue, compileSync, needsRegeneration, applyOwnerEdit, approve, approvePrices, spokenName, sayName, entryForRaw, findEntry, resolveSpokenCatalogue, priceRules, swNameRules, explainRules, coverageRules, checkField, categoryLabel, slug };
+module.exports = { kbLockedDoc, CATALOGUE_COLS, factStoreCols, catalogueProfileFromRow, storedFirst, resolveSpokenCatalogueMeta, pinSpokenCatalogue, SCHEMA_VERSION, AI_SCHEMA, sourceHash, compileSpokenCatalogue, compileSync, needsRegeneration, applyOwnerEdit, approve, approvePrices, spokenName, sayName, entryForRaw, findEntry, resolveSpokenCatalogue, priceRules, swNameRules, explainRules, coverageRules, checkField, categoryLabel, slug };

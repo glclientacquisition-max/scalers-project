@@ -104,11 +104,11 @@ describe('kb item states: what callers hear', () => {
   it('an active item still wins when it is named', () => {
     assert.match(RU.answer(kb, 'how much is office cleaning', { asksPrice: true }).text, /4,500|four thousand/i);
   });
-  it('legacy projection: not offered leaves the old catalogue, paused reads out of stock, site visit is Quote + site_visit_required', () => {
+  it('legacy projection: not offered and paused both leave the old catalogue (KB reader root cause 1), site visit is Quote + site_visit_required', () => {
     const leg = I.docToLegacy(out.doc);
     const names = leg.servicesCatalog.map((s) => s.name);
     assert.ok(!names.includes('Carpet cleaning'));
-    assert.equal(leg.servicesCatalog.find((s) => s.name === 'Sofa cleaning').in_stock, 'no');
+    assert.ok(!names.includes('Sofa cleaning'));
     const pc = leg.servicesCatalog.find((s) => s.name === 'Post-construction clean');
     assert.equal(pc.pricing_mode, 'quote');
     assert.equal(pc.site_visit_required, true);

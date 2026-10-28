@@ -191,7 +191,9 @@ async function runBrainEnginesTurn({
     const kbCap = receipts.find((r) => r.kb && r.capture);
     if (kbCap) {
       E.offered = 'callback'; E.offeredTurn = machine.turn;
-      if (kbCap.service && machine.slots && !machine.slots.service) machine.slots.service = kbCap.service;
+      // a paused item is never a booking slot: a yes is a callback for when it's back (traced, read back like any callback)
+      if (kbCap.capture === 'when_back') machine.kbWhenBack = kbCap.service || null;
+      else if (kbCap.service && machine.slots && !machine.slots.service) machine.slots.service = kbCap.service;
     }
   }
 

@@ -161,9 +161,11 @@ function buildLiveGroundTruth(profile = {}) {
   } = require('./businessPolicies');
 
   const fieldMeta = profile.fieldMeta || null;
-  const services = normalizeServices(factServices(profile.servicesCatalog, fieldMeta));
+  // KB v2: the one catalogue door (kb/source.js). Legacy mode returns the same profile fields as before.
+  const kbSource = require('../knowledge/kb/source').catalogueSource(profile);
+  const services = normalizeServices(factServices(kbSource.services(), fieldMeta));
   const products = require('./productCatalog').normalizeProducts(
-    factProducts(profile.productCatalog, fieldMeta)
+    factProducts(kbSource.products(), fieldMeta)
   );
   const { formatProductsOverview } = require('./productCatalog');
   const { formatOpenVisitsForPrompt } = require('./visitCalendar');
@@ -201,7 +203,8 @@ function buildLiveGroundTruth(profile = {}) {
     unknownTopics.push('Services');
   }
   const unknown = String(profile.unknownAnswerFallback || '').trim();
-  const extras = String(profile.servicesNotes || profile.servicesOffered || '').trim();
+  // KB mode: no old free text (services_offered is a derived copy); item notes already ride the SERVICES rows
+  const extras = kbSource.mode === 'kb' ? '' : String(profile.servicesNotes || profile.servicesOffered || '').trim();
   const tools = parseAgentTools(profile.agentTools);
   const vertical = parseVertical(profile.vertical);
   const handoffMode = parseHandoffMode(profile.handoffMode);
@@ -246,7 +249,18 @@ function buildLiveGroundTruth(profile = {}) {
     limit: 4,
     messageOnly: isMessageOnlyMode(profile.afterHoursMode),
   });
-  if (spoken.catalogue.families.length) {
+  if (kbSource.mode === 'kb') {
+    // name lock (root cause 6): the names come from the KB, per language; never a rules-made Swahili form
+    const en = kbSource.promptBlock('en');
+    if (en) {
+      parts.push(
+        '',
+        'SPOKEN CATALOGUE (say item names exactly as written, never translated or reworded; say a price only right after its own item):',
+        `EN: ${en.replace(/\n/g, ' | ')}`,
+        `SW: ${String(kbSource.promptBlock('sw') || en).replace(/\n/g, ' | ')}`
+      );
+    }
+  } else if (spoken.catalogue.families.length) {
     parts.push(
       '',
       'SPOKEN CATALOGUE (how to say SERVICES on the phone. File titles stay above. Do not invent names.):',
