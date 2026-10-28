@@ -67,9 +67,12 @@ import { fieldPathsAttestedOnSettingsSave } from "@/lib/fieldPathsFromSettingsSa
 import { cleanFieldPaths } from "@/lib/fieldPathRegistry";
 import { factSaveIsConfirm } from "@/lib/deskFeatureFlags";
 import {
+  greetingLanguagePatch,
+  saveMatchedNoRows,
   settingsFieldFromScope,
   settingsScopeValidationError,
 } from "@/lib/settingsSaveScope";
+import { deniedMessage } from "@/lib/permissions";
 import { ownerUnknownAnswer, planUnknownAnswerSave } from "@/lib/unknownAnswerSpoken";
 import { generateUnknownAnswerSpoken } from "@/lib/unknownAnswerSpokenModel";
 import { withoutUnknownSpokenColumn } from "@/lib/peelMissingColumns";
@@ -489,6 +492,8 @@ export async function saveAndCompileSettings(
     business_policies: businessPoliciesForStorage(businessPolicies),
     ...(formAreas ? { service_areas: formAreas } : premisesAreas ? { service_areas: premisesAreas } : {}),
     tts_lexicon: ttsLexicon,
+    // How you answer owns the business's default greeting language; no other save writes it.
+    ...greetingLanguagePatch(scope, formData.get("greeting_language")),
   };
 
   // FACT_HASH_MODE: confirm only what changed (plus "Looks right" paths). Both
@@ -587,14 +592,18 @@ export async function saveAndCompileSettings(
   patch.llm_system_prompt = prompt;
   if (unknownPlan) Object.assign(patch, unknownPlan);
   const tCompile = Date.now();
-  let { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
+  // count: RLS (owner/admin only) filters a denied update to 0 rows with no error.
+  let { error, count } = await workspace.client.from("tenants").update(patch, { count: "exact" }).eq("id", tenant.id);
   // Spoken When unsure pair: not migrated, or no owner UPDATE grant yet. Save the rest.
   let spokenSkipped = false;
   if (error) {
     const peeled = withoutUnknownSpokenColumn(error.message, patch);
     if (peeled) {
       spokenSkipped = true;
-      ({ error } = await workspace.client.from("tenants").update(peeled).eq("id", tenant.id));
+      ({ error, count } = await workspace.client
+        .from("tenants")
+        .update(peeled, { count: "exact" })
+        .eq("id", tenant.id));
     }
   }
   bustTenantCache(tenant.id);
@@ -602,6 +611,9 @@ export async function saveAndCompileSettings(
 
   if (error) {
     return ownerSaveFailed("settings.save", error.message);
+  }
+  if (saveMatchedNoRows(count)) {
+    return { error: deniedMessage(null, "settings.edit") };
   }
   requestSpokenCatalogueCompile(tenant.id, patch);
 
