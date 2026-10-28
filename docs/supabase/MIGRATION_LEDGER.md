@@ -1,6 +1,6 @@
 ---
 owner: platform
-last_reviewed: 2026-10-19
+last_reviewed: 2026-10-28
 ---
 
 # Migration ledger
@@ -336,3 +336,8 @@ Checked against `supabase_migrations.schema_migrations` and object names only. N
 | LEDGER-POLICY-TOPICS | `policy_rules_valid` (wider), `set_policy_topic()` | Desk Policies (#938) per-topic saves | `policy_topics.sql`; down `policy_topics_down.sql` (prod's previous body = the down body, md5 `813d14fa`) | #938 | YES `20261025084246` | YES. `20261027143928` `policy_topics` (27 Oct 2026 17:39:28 EAT) | Staging + prod | Prod md5 = staging (`cee0ac55` / `4787ee00`); `set_policy_topic` security definer, service_role only; check constraint valid, 0 failing rows. |
 | LEDGER-SPOKEN-CATALOGUE | `tenants.spoken_catalogue`, `tenant_spoken_catalogue_versions` (RLS, member SELECT policy) | Spoken catalogue (Voice/Brain/Desk on-save) | `supabase/migrations/20261015063255_spoken_catalogue.sql`; down `spoken_catalogue_down.sql` | — | YES `20261015063255` | YES. `20261027143954` `spoken_catalogue` (27 Oct 2026 17:39:54 EAT) | Staging + prod | Prod: RLS true, policy `spoken_catalogue_versions_select_member` (authenticated SELECT), grants service_role + authenticated SELECT; 0 rows. Flags stay off until backfill. |
 | LEDGER-SAVE-SPOKEN-CATALOGUE-VERSION | `tenants.live_version`, `compile_error`, one-approved unique index, `save_spoken_catalogue_version()` | One-transaction save for `SPOKEN_CATALOGUE_ON_SAVE` | `supabase/migrations/20261015113748_save_spoken_catalogue_version.sql`; down `spoken_catalogue_down.sql` | — | YES `20261015113748` | YES. `20261027144019` `save_spoken_catalogue_version` (27 Oct 2026 17:40:19 EAT) | Staging + prod | RPC md5 `79a1617c`, security definer, `search_path=''`, service_role only. |
+| LEDGER-KB-V2 | `kb_*` tables, tenant KB columns, `kb_upsert_items`, `kb_publish_snapshot`, `kb_search_items`, `kb_record_readiness` | KB v2 (one knowledge base per business), parked 28 Oct | `kb_v2.sql` (2026-10-28.1); down `kb_v2_down.sql`. File on the staging branch only until promotion | #991 | YES `20261028072250` `kb_v2_2026_10_28_1` | **NO** (parked, HANDOVER §4c step 3) | staging only | Recorded 28 Oct from `list_migrations` (read-only) |
+| LEDGER-KB-V2-ITEM-STATES | Item states (site visit, paused, not offered, hold, not included) | KB v2 follow-up | `kb_v2_item_states.sql` (.2); down `kb_v2_item_states_down.sql` | #996 | YES `20261028074736` | **NO** (parked) | staging only | as above |
+| LEDGER-KB-V2-PASTE-REPLACE | `kb_import_items` (service role only) | Paste a list / Replace | `kb_v2_paste_replace.sql` (.3); down `kb_v2_paste_replace_down.sql` | #998 | YES `20261028083434` `kb_v2_paste_replace` | **NO** (parked) | staging only | as above |
+| LEDGER-KB-V2-BRAIN-MODE | `tenants.brain_mode` (+ `_set_by/_set_at/_source`), `tenant_brain_mode_audit`, `set_brain_mode()`, `set_kb_catalogue_complete()` | Retire-old-brain P1 safe mode | `kb_v2_brain_mode.sql` (.4); down `kb_v2_brain_mode_down.sql` | #1008 | YES `20261028140049` `kb_v2_brain_mode_2026_10_28_4` | **NO** (parked) | staging only | as above |
+| LEDGER-ADMIN-INVOICE-ACTIONS | Replaces live `enqueue_invoice_*` functions | Admin invoice actions | `admin_invoice_actions.sql`; down: draft #957 | — | YES `20261025092056` | **NO**, held: needs its own yes | staging only | as above |
