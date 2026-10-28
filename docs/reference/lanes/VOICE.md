@@ -54,7 +54,7 @@ SautiKit POST /voice/incoming → Stream XML (connect=true)
   → /voice/events → transcript / recording / notify / wallet charge
 ```
 
-Legacy `/ws/relay` (ConversationRelay) may still exist — do not expand it; production path is `/ws/media`.
+Legacy `/ws/relay` (ConversationRelay) is deleted (retire-old-brain V1). The only media path is `/ws/media`.
 
 ## Invariants (do not break)
 
@@ -89,9 +89,10 @@ See `.env.example` — key ones:
 
 - `SONIOX_API_KEY`, `SONIOX_SAMPLE_RATE`, `SONIOX_TTS_MODEL` (default `tts-rt-v2`; retired `tts-rt-v1` remaps so clones are not silent; curated voices: voice engine `src/data/soniox-voices.json`, desk mirror `dashboard/src/data/soniox-voices.json`; per-tenant pick in `tenants.soniox_voice_id`)
 - `SONIOX_STT_CONTEXT` (per-tenant vocabulary; default on), `SONIOX_STT_CONTEXT_MAX_TERMS`
-- `VOICE_GREETING_MODE`, `VOICE_FILLER`, `VOICE_FILLER_DELAY_MS`, `VOICE_FILLER_CACHE`
+- `VOICE_GREETING_MODE`, `VOICE_FILLER_DELAY_MS`, `VOICE_FILLER_CACHE` (`VOICE_FILLER` is gone: the turn filler is the engines stand-down in `src/speech/enginesFillerStanddown.js`)
 - `VOICE_PROFILE` (`balanced` | `snappy`), `VOICE_TTS_GAIN`, `SONIOX_TTS_SPEED`, `SONIOX_TTS_SPEED_EN`, `SONIOX_TTS_SPEED_SW`
-- `VOICE_LLM_STREAM`, `VOICE_STREAM_EARLY_CHARS` / `WORDS` (default 0: sentence-only TTS flush)
+- `VOICE_STREAM_EARLY_CHARS` / `WORDS` (default 0: sentence-only TTS flush). `VOICE_LLM_STREAM` is no longer read.
+- `VOICE_GRACE_QUEUE` (default on; `off` drops a caller final inside `VOICE_BARGE_GRACE_MS` instead of queueing it)
 - `VOICE_FLUSH_MIN_MS`, `VOICE_FLUSH_MAX_MS`, `VOICE_IDLE_NUDGE_MS` (default 10000; not armed until the caller has spoken)
 - `VOICE_BARGE_GRACE_MS`, `VOICE_BARGE_EARLY_MS`, `VOICE_BARGE_MIN_CHARS`
 - `VOICE_TTS_RESPEAK` (default on), `VOICE_TTS_RESPEAK_CONNECT_MS`, `VOICE_TTS_RESPEAK_MAX`, `VOICE_TTS_IDLE_RECYCLE_MS`, `VOICE_TTS_FALLBACK_GEMINI_MS` (invariant 16)

@@ -64,7 +64,7 @@ Status: **live** = production path in code and used. **partial** = code exists, 
 | RAG / embeddings | `knowledge_chunks` | Blueprint + BI roadmap | **docs-only** | Not in `src/`. Do not plan mid-call retrieve. |
 | Campaigns / growth send | Blast / re-engage | Company Brain §7 step 6 | **docs-only** | No engine. No Meta marketing templates in repo. |
 | Baileys / WA Web | Unofficial session | — | **dead** (hard kill) | Do not add. |
-| Twilio ConversationRelay | `/ws/relay` | `server.js` | **dead** (legacy wired) | Do not expand. |
+| Twilio ConversationRelay | `/ws/relay` | (deleted) | **removed** (retire-old-brain V1) | Upgrade gets 404. |
 | WhatsApp Calling | Meta calling on the Cloud number | `whatsappInbound.js` parks `calls` changes | **dead** (parked) | `scripts/smoke-whatsapp-did.js` FAIL is Calling-only. |
 | Chatwoot / Twilio inbox shapes | External inbox | Company Brain notes | **docs-only** (deferred) | Not a native path. |
 

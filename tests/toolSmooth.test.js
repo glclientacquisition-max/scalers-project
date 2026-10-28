@@ -54,8 +54,9 @@ test('server.js: every tool-smooth path is behind the flags (off = byte-identica
   // B2: the tool hold (speakToolHold / startHoldFill) and the cached receipt (playCachedReceipt) were only played by the
   // old Gemini turn, deleted with it; the engines filler owns the wait on v2 (Voice V1 decides any hold fill there)
   assert.doesNotMatch(src, /function speakToolHold|function startHoldFill|playCachedReceipt\(/);
-  assert.match(src, /if \(!smooth\.prefetch\) return null;/);
-  assert.match(src, /if \(smooth\.any\) \{\n\s+stopHoldFill\(\);/);
+  // V1: the hold/receipt prefetch warm (no player left) and the hold-fill state are gone; the heard-segment trace stays
+  assert.doesNotMatch(src, /smooth\.prefetch|toolSmooth\.warmPhrases|stopHoldFill|holdFillTimer|receiptCachedTurn/);
+  assert.match(src, /if \(smooth\.trace && mediaClock\) \{[\s\S]{0,400}voiceTrace\.noteAudioSegments\(\{\n\s+segments: mediaClock\.segmentsSince\(timing\.turnStartedAt\),\n\s+holdsQueued: 0,\n\s+receiptCached: false,/);
 });
 test('voiceScore: toolSmooth block is report-only (score unchanged)', () => {
   const { scoreTurns } = require('../src/speech/voiceScore');
@@ -91,10 +92,11 @@ test('77ce8123 traces (HD_db0e864043c1 C1 T9, HD_4ec204aafa93 C2 T9): why no hol
   assert.ok(after.gapP95Ms <= T.GAP_BAR_MS, `after p95 ${after.gapP95Ms}`); assert.equal(after.deadAir, 0);
 });
 
-test('server.js (B2): the old-turn hold fill is gone; the hold warm still pauses on turnBusy', () => {
+test('server.js (B2 + V1): the old-turn hold fill is gone, and so is its hold warm; the gap "Mm." warm stays for the engines Voice filler', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.doesNotMatch(src, /if \(startHoldFill\(\)\) return;/);
-  assert.match(src, /phrases: toolSmooth\.warmPhrases\(callLanguage\),\s*\/\/[^\n]*\n\s*waitWhile: \(\) => turnBusy,\s*shouldAbort: \(\) => speechOutageStarted \|\| !tts,/);
+  assert.doesNotMatch(src, /toolSmooth\.warmPhrases/);
+  assert.match(src, /const gapWarm = ackRule\.gapGuardEnabled\(\)[\s\S]{0,300}phrases: ackRule\.gapWarmPhrases\(callLanguage\)/);
 });
 
 test('warmFillerAckPcm: waitWhile pauses instead of dropping the pack', async () => {

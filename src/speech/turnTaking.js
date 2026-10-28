@@ -476,10 +476,13 @@ function outcome(partial) {
  *   phase: string
  * }}
  */
+/**
+ * Grace-window queue (HD_319eb6f7255d). On by default: it used to follow BRAIN_MODEL_LEAD=on, which every
+ * staging and prod call ran with, and the engines are now the only caller turn (B2). VOICE_GRACE_QUEUE=off is the
+ * kill switch (back to dropping a final that lands inside VOICE_BARGE_GRACE_MS).
+ */
 function graceQueueOn(env = process.env) {
-  const v = (k) => String(env[k] || '').trim().toLowerCase();
-  if (v('VOICE_GRACE_QUEUE') === 'off') return false;
-  return v('VOICE_GRACE_QUEUE') === 'on' || v('BRAIN_MODEL_LEAD') === 'on';
+  return String(env.VOICE_GRACE_QUEUE || '').trim().toLowerCase() !== 'off';
 }
 function isSubstantiveFinal(text, minChars = 5) {
   const t = String(text || '').trim();
@@ -516,9 +519,8 @@ function decideCallerEvent(opts = {}) {
 
   if (phase === 'speaking' && spokenForMs < graceMs) {
     // HD_319eb6f7255d (5.75 s dead air): a real caller sentence landing in the grace window right after a barge was
-    // dropped and no turn owned the floor. Behind BRAIN_MODEL_LEAD (or VOICE_GRACE_QUEUE=on) a substantive final is
-    // queued as the next turn instead (runs once playback stops). Short/backchannel finals are still ignored.
-    // [VOICE REVIEW] minimal Brain-lane change in Voice code; flag-off is unchanged.
+    // dropped and no turn owned the floor. A substantive final is queued as the next turn instead (runs once
+    // playback stops; VOICE_GRACE_QUEUE=off drops it). Short/backchannel finals are still ignored.
     if (opts.isFinal === true && graceQueueOn() && isSubstantiveFinal(text, minChars)) {
       return outcome({ ...base, action: 'queue', reason: 'grace_queued', queue: true, runGemini: true });
     }

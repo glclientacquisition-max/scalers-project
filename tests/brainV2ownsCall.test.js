@@ -71,9 +71,10 @@ test('server wiring: owned v2 writes pass v2Owned to applyGeminiTools, which han
   // the v1 old-path request de-dupe (type + item, quantity ignored) is skipped for v2 writes
   assert.match(SERVER, /if \(owedConfirmFoldEnabled\(\) && toolOpts\.v2Owned !== true\) \{\n\s+const dup = findDuplicateServiceRequest/);
   // B2: the old turn's rescue call (applyGeminiTools(callKey, rescue.parsed)) is gone with the old turn;
-  // /ws/relay (Voice V1) still calls it with no third argument
+  // V1: /ws/relay's safeApplyGeminiTools caller is gone too, so the owned v2 turn is the only caller
   assert.doesNotMatch(SERVER, /applyGeminiTools\(callKey, rescue\.parsed\)/);
-  assert.match(SERVER, /return await applyGeminiTools\(callSid, parsed\);/);
+  assert.doesNotMatch(SERVER, /safeApplyGeminiTools|applyGeminiTools\(callSid, parsed\)/);
+  assert.equal((SERVER.match(/applyGeminiTools\(/g) || []).length, 2, 'definition + the v2Owned caller');
 });
 
 test('server wiring (B2): the owned v2 turn is the only turn: always returns, skips the v1 file gate, no old-brain path', () => {

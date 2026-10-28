@@ -12,7 +12,7 @@
     "test:turns": "node tests/turnTaking.test.js && node --test tests/lateFinal.test.js",
     "test:overlap": "node tests/overlapHold.test.js",
     "test:stream": "node tests/spokenStreamBuffer.test.js",
-    "test:wiring": "node tests/voiceWiring.test.js",
+    "test:wiring": "node tests/voiceWiring.test.js && node --test tests/retireOldBrainV1.test.js",
     "test:inactive-tenant": "node --test tests/inactiveTenantGate.test.js tests/lineUnavailableAudio.test.js tests/closedTenantGuard.test.js tests/closedTenantLineDb.test.js tests/numberHoldClip.test.js",
     "test:idle-nudge": "node --test tests/idleNudge.test.js tests/unfinishedHold.test.js",
     "test:speed-control": "node tests/speedControl.test.js",

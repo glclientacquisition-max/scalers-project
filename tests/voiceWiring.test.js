@@ -113,10 +113,10 @@ assert.match(
   'Gemini tool markers must pass the tool guard after required-tool injection'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /finalSpeechGuardOpts\(callSid, execution\.results\)/,
-  'final spoken reply must carry state, profile, and tool results into the speech guard'
+  'V1: deleted with /ws/relay runGeminiTurn (was: final spoken reply must carry state, profile, and tool results into the speech guard)'
 );
 
 assert.match(
@@ -125,10 +125,10 @@ assert.match(
   'pace-only turns must not speak Okay or Sawa and return before the model'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /polishSpokenReply/,
-  'final Gemini speech must strip holding lines and service dumps'
+  'V1: deleted with /ws/relay runGeminiTurn (was: final Gemini speech must strip holding lines and service dumps)'
 );
 
 assert.match(
@@ -350,10 +350,10 @@ assert.doesNotMatch(
   'the stream path retries generateContentStream, not a second generateContent'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /geminiParts/,
-  'successful Gemini turns must keep model parts so the next turn can replay thought signatures'
+  'V1: deleted with /ws/relay runGeminiTurn (was: successful Gemini turns must keep model parts so the next turn can replay thought signatures)'
 );
 
 assert.match(
@@ -488,10 +488,10 @@ assert.match(
   'instant greeting must be marked local so it is not sent as an unsigned Gemini model turn'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /geminiTurnTimeoutMs/,
-  'Gemini voice turns must use a hang timeout so the caller is not left silent'
+  'V1: deleted with /ws/relay runGeminiTurn (was: Gemini voice turns must use a hang timeout so the caller is not left silent)'
 );
 
 assert.doesNotMatch(
@@ -539,10 +539,10 @@ assert.match(
   'call.completed without a URL must fetch GET /v1/calls/{id}/recording'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /spokenTextForToolTurn/,
-  'Gemini turns must drop model prose after outcome tools so confirmation is backend-only'
+  'V1: deleted with /ws/relay runGeminiTurn (was: Gemini turns must drop model prose after outcome tools so confirmation is backend-only)'
 );
 
 assert.doesNotMatch(
@@ -730,10 +730,10 @@ assert.match(
   /flushUtterance\(decision\)/,
   'applyTurnEnd must pass the unfinished decision into flush'
 );
-assert.match(
+assert.doesNotMatch(
   source,
   /lockFileNameAsk\(/,
-  'the file name ask must lock to the caller language before it is spoken'
+  'V1: deleted with /ws/relay runGeminiTurn (was: the file name ask must lock to the caller language before it is spoken)'
 );
 assert.doesNotMatch(
   source,
@@ -755,10 +755,10 @@ assert.match(
   /gateCallerFileSpeech\(/,
   'file name and open rows must pass the speak gate before TTS'
 );
-assert.match(
+assert.doesNotMatch(
   source,
   /applyToolsWithHold\(/,
-  'a tool call must be able to speak a hold while it is in flight'
+  'V1: deleted with /ws/relay runGeminiTurn (was: a tool call must be able to speak a hold while it is in flight)'
 );
 assert.doesNotMatch(
   source,

@@ -88,12 +88,11 @@ Prompt identity lives in `src/prompts.js` as `VOICE_SYSTEM_PROMPT_ID` (`voice.sy
 
 ```bash
 npm run voice:replay
-node scripts/replay-voice-suite.js --live
 ```
 
-`--live` needs `GEMINI_API_KEY`. CI uses recorded mode only. Recorded mode speaks `turns[].model.outputText`. A missing `outputText` with `canned.text` speaks that line. `unlogged: true` is a turn whose raw model text was never stored. It is omitted from the score so a missing log cannot fail the gate forever.
+Recorded mode is the only suite mode. `--live` (the old Gemini system prompt) was removed with the old brain (retire-old-brain V1). Recorded mode speaks `turns[].model.outputText`. A missing `outputText` with `canned.text` speaks that line. `unlogged: true` is a turn whose raw model text was never stored. It is omitted from the score so a missing log cannot fail the gate forever.
 
-A later brain passes `respond` to `replayCall(fixture, { mode: 'live', respond })`.
+Live mode needs an injected responder: `replayCall(fixture, { mode: 'live', respond })`. An engines responder is a follow-up; until then `scripts/brain-engines-sim.js` covers engines turns.
 
 ## Score
 

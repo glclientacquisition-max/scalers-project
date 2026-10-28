@@ -231,19 +231,15 @@ describe('caller name stays the file name', () => {
     assert.equal(shouldPublishOpenFileSentence(bookingHold, false), true);
 
     // B2: the old /ws/media Gemini turn and its name gate (planCallerModelTurn -> runGeminiTurn) are deleted; v2
-    // owns the media call and its name lock (callerFile carries nameConfirmed). /ws/relay keeps the old gate (Voice V1).
+    // owns the media call and its name lock (callerFile carries nameConfirmed). V1: /ws/relay and its old gate are
+    // deleted too, so no Gemini turn or old name gate is left anywhere in server.js.
     const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
     const start = server.indexOf('async function runCallerTurn');
     const end = server.indexOf('function flushUtterance', start);
     const turnSource = server.slice(start, end);
     assert.doesNotMatch(turnSource, /planCallerModelTurn\(brainState|runGeminiTurn|speakText\(localReply\.line\)/);
     assert.match(turnSource, /nameConfirmed/);
-    const promptStart = server.indexOf("if (data.type === 'prompt')");
-    const promptEnd = server.indexOf("ws.on('error'", promptStart);
-    const promptSource = server.slice(promptStart, promptEnd);
-    const promptGate = promptSource.indexOf('planCallerModelTurn');
-    const promptModel = promptSource.indexOf('runGeminiTurn');
-    assert.ok(promptGate >= 0 && promptModel > promptGate);
+    assert.doesNotMatch(server, /planCallerModelTurn|runGeminiTurn|data\.type === 'prompt'/);
   });
 
 

@@ -6,7 +6,6 @@ const {
   createLanguageState,
   languageDirective,
   confirmationLanguage,
-  pickFillerText,
 } = require('../src/conversation/language');
 
 describe('caller language (Kiswahili)', () => {
@@ -60,7 +59,5 @@ describe('confirmationLanguage', () => {
     assert.equal(confirmationLanguage('mixed'), 'sw');
     assert.equal(confirmationLanguage('en'), 'en');
     assert.equal(confirmationLanguage('unknown'), 'en');
-    assert.equal(pickFillerText('mixed'), 'Kidogo…');
-    assert.equal(pickFillerText('en'), 'One moment…');
   });
 });

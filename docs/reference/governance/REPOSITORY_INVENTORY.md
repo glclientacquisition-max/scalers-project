@@ -90,7 +90,7 @@ Classification: **CORE** · **ACTIVE** · **LEGACY** · **EXPERIMENTAL** · **DU
 
 | Path | Purpose | Status | Evidence |
 | --- | --- | --- | --- |
-| `server.js` `/ws/relay` handler | ConversationRelay text WS | LEGACY | Comment + `VOICE.md` |
+| `server.js` `/ws/relay` handler | ConversationRelay text WS | REMOVED | retire-old-brain V1 |
 | `docs/supabase/escalation_enabled.sql` | Telegram-era toggle | DEPRECATED | README: do not apply |
 | `dashboard/src/lib/auth.ts` legacy cookie | Super Admin auth | LEGACY | `isLegacyAuthenticated` |
 | Dual wallet columns in schema notes | Pre-one-wallet | DEPRECATED | `one_wallet_billing.sql` |

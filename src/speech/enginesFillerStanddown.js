@@ -13,7 +13,8 @@ const UNCUTTABLE_CAP_MS = 2000;
 // uncuttable:true on the Brain filler (#975 contract): the ready reply waits for the filler to finish instead of
 // the Phase A min-playout cut; caller barge-in still cuts it; a stuck filler is cut at UNCUTTABLE_CAP_MS playout.
 // The filler never joins the transcript or live.line (server.js pushes live.line only).
-// Off (BRAIN_ENGINES off, or not the BRAIN_MODEL_LEAD path) = server.js runs today's code; this is not used.
+// Retire-old-brain V1: this is the only filler path on a caller turn (the old v1Filler / onV1Sentence branch is gone).
+// phaseA (default true) = cut a playing Voice filler before the first reply line (fillerCut.planFillerCut min playout).
 
 /**
  * @param {object} o
