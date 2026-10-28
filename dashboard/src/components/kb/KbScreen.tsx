@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
-import { Field, Input, Select } from "@/components/ui/Field";
+import { Field, Input, Select, Textarea } from "@/components/ui/Field";
 import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { Switch } from "@/components/ui/Switch";
@@ -21,6 +21,7 @@ import {
   type KbDraft,
   type KbItem,
   type KbKind,
+  type KbPasteRow,
   type KbPriceMode,
   type KbReadiness,
   type KbSnapshotRow,
@@ -29,6 +30,8 @@ import {
   compileKbAction,
   decideSwNameAction,
   hideKbItemAction,
+  importKbPasteAction,
+  previewKbPasteAction,
   saveKbItemAction,
   setKbFlagAction,
   type KbActionResult,
@@ -49,6 +52,7 @@ const PRICE_MODES: { key: KbPriceMode; label: string }[] = [
   { key: "range", label: "Price range" },
   { key: "from", label: "Starting from" },
   { key: "quote", label: "Custom quote" },
+  { key: "site_visit", label: "After a site visit" },
   { key: "free", label: "Free" },
   { key: "none", label: "No price yet" },
 ];
@@ -63,6 +67,7 @@ export function KbScreen({ items, categories, live, latest, readiness, liveVersi
   const [lang, setLang] = useState<"en" | "sw">("en");
   const [editing, setEditing] = useState<KbDraft | null>(null);
   const [swEdit, setSwEdit] = useState<{ id: string; text: string } | null>(null);
+  const [pasting, setPasting] = useState(false);
 
   const run = (fn: () => Promise<KbActionResult>, done?: string) =>
     start(async () => {
@@ -222,12 +227,17 @@ export function KbScreen({ items, categories, live, latest, readiness, liveVersi
             ]}
             onSelect={(k) => setKind(k === "service" || k === "product" ? k : "all")}
           />
-          <Button variant="primary" size="sm" onClick={() => setEditing(draftFromItem(null, categories, kind === "product" ? "product" : "service"))}>
-            Add item
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="tonal" size="sm" onClick={() => setPasting(true)}>
+              Paste a list
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => setEditing(draftFromItem(null, categories, kind === "product" ? "product" : "service"))}>
+              Add item
+            </Button>
+          </div>
         </div>
         {!items.length ? (
-          <Empty title="Nothing here yet" line="Add what you sell so callers can hear prices." />
+          <Empty title="Nothing here yet" line="Add what you sell so callers can hear prices, or paste a list." />
         ) : (
           <div className="space-y-4">
             {groups.map((g) => (
@@ -245,6 +255,8 @@ export function KbScreen({ items, categories, live, latest, readiness, liveVersi
                           {it.unit ? ` per ${it.unit}` : ""}
                           {it.popular ? " · Popular" : ""}
                           {it.in_stock === false ? " · Out of stock" : ""}
+                          {it.status === "paused" ? " · Paused" : ""}
+                          {it.status === "not_offered" ? " · Not offered" : ""}
                         </span>
                       </button>
                       <Switch
@@ -263,6 +275,7 @@ export function KbScreen({ items, categories, live, latest, readiness, liveVersi
         )}
       </section>
 
+      {pasting ? <PasteSheet defaultKind={kind === "product" ? "product" : "service"} onClose={() => setPasting(false)} onSaved={() => { setPasting(false); router.refresh(); }} /> : null}
       {editing ? <ItemSheet draft={editing} categories={categories} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); router.refresh(); }} /> : null}
     </div>
   );
@@ -370,6 +383,25 @@ function ItemSheet({ draft, categories, onClose, onSaved }: { draft: KbDraft; ca
         <Field id="kb-desc" label="Short note">
           {(p) => <Input {...p} value={d.description_en} maxLength={300} onChange={(e) => set({ description_en: e.target.value })} />}
         </Field>
+        <Field id="kb-status" label="Callers hear" hint="Paused and not offered items stay in your list; callers who ask hear it plainly.">
+          {(p) => (
+            <Select {...p} value={d.status} onChange={(e) => set({ status: e.target.value as KbDraft["status"] })}>
+              <option value="active">We offer this</option>
+              <option value="paused">Paused for now</option>
+              <option value="not_offered">We don&apos;t offer this</option>
+            </Select>
+          )}
+        </Field>
+        {d.status === "paused" ? (
+          <Field id="kb-status-note" label="Note for callers" hint="Optional, for example: back next week.">
+            {(p) => <Input {...p} value={d.status_note} maxLength={120} onChange={(e) => set({ status_note: e.target.value })} />}
+          </Field>
+        ) : null}
+        {d.kind !== "product" && d.status !== "not_offered" ? (
+          <Field id="kb-excludes" label="Not included" hint="Optional, for example: outside windows.">
+            {(p) => <Input {...p} value={d.excludes_en} maxLength={500} onChange={(e) => set({ excludes_en: e.target.value })} />}
+          </Field>
+        ) : null}
         <div className="flex items-center justify-between">
           <span className="text-body text-ink">Popular pick</span>
           <Switch label="Popular pick" checked={d.popular} onCheckedChange={(v) => set({ popular: v })} />
@@ -378,6 +410,101 @@ function ItemSheet({ draft, categories, onClose, onSaved }: { draft: KbDraft; ca
           <span className="text-body text-ink">In stock</span>
           <Switch label="In stock" checked={d.in_stock !== false} onCheckedChange={(v) => set({ in_stock: v ? null : false })} />
         </div>
+        {d.kind === "product" ? (
+          <div className="flex items-center justify-between">
+            <span className="text-body text-ink">Callers can ask you to hold it</span>
+            <Switch label="Callers can ask you to hold it" checked={d.holdable} onCheckedChange={(v) => set({ holdable: v })} />
+          </div>
+        ) : null}
+      </div>
+    </Sheet>
+  );
+}
+
+function pastePrice(r: KbPasteRow): string {
+  return displayPrice(r) ? `${displayPrice(r)}${r.unit ? ` per ${r.unit}` : ""}` : "Needs a price";
+}
+
+/** Paste a list: one item per line, price optional. Preview first; nothing is saved until "Add". */
+function PasteSheet({ defaultKind, onClose, onSaved }: { defaultKind: KbKind; onClose: () => void; onSaved: () => void }) {
+  const [text, setText] = useState("");
+  const [kind, setKind] = useState<KbKind>(defaultKind);
+  const [group, setGroup] = useState("");
+  const [rows, setRows] = useState<KbPasteRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const good = (rows || []).filter((r) => !r.error);
+  const preview = () =>
+    start(async () => {
+      setError(null);
+      const r = await previewKbPasteAction(text);
+      if (!r.ok) setError(r.error);
+      else setRows(r.rows);
+    });
+  const add = () =>
+    start(async () => {
+      const r = await importKbPasteAction(good, kind, group);
+      if (!r.ok) setError(r.error);
+      else {
+        notify(`Added ${good.length}. Calls use them within a minute.`);
+        onSaved();
+      }
+    });
+  return (
+    <Sheet
+      open
+      onOpenChange={(o) => (o ? null : onClose())}
+      title="Paste a list"
+      footer={
+        rows ? (
+          <>
+            <Button variant="ghost" onClick={() => setRows(null)}>
+              Back
+            </Button>
+            <Button variant="primary" onClick={add} pending={pending} disabled={!good.length}>
+              {`Add ${good.length}`}
+            </Button>
+          </>
+        ) : (
+          <Button variant="primary" onClick={preview} pending={pending} disabled={!text.trim()}>
+            Preview
+          </Button>
+        )
+      }
+    >
+      <div className="space-y-3" data-kb-paste="">
+        {error ? <p className="rounded-xl bg-attention-tonal p-3 text-body text-attention">{error}</p> : null}
+        {!rows ? (
+          <>
+            <Field id="kb-paste" label="One item per line" hint="Price at the end is optional: Deep clean - 6,000-12,000 · Gloria F1, 3 per seedling · Carpet cleaning: quote">
+              {(p) => <Textarea {...p} rows={10} value={text} onChange={(e) => setText(e.target.value)} />}
+            </Field>
+            <Field id="kb-paste-kind" label="Type">
+              {(p) => (
+                <Select {...p} value={kind} onChange={(e) => setKind(e.target.value as KbKind)}>
+                  <option value="service">Services</option>
+                  <option value="product">Products</option>
+                </Select>
+              )}
+            </Field>
+            <Field id="kb-paste-group" label="Group" hint="Optional. New items join this group.">
+              {(p) => <Input {...p} value={group} maxLength={120} onChange={(e) => setGroup(e.target.value)} />}
+            </Field>
+          </>
+        ) : (
+          <ul className="divide-y divide-hairline rounded-xl border border-hairline">
+            {rows.map((r) => (
+              <li key={r.line} className="flex items-start gap-2 px-3 py-2">
+                <span className="min-w-0 flex-1 text-body text-ink">
+                  {r.name_en || r.raw}
+                  <span className={r.error ? "block text-meta text-attention" : "block text-meta text-ink-2"}>
+                    {r.error || `${pastePrice(r)}${r.match_id ? " · updates the item you have" : ""}`}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </Sheet>
   );

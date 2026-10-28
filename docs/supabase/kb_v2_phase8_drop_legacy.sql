@@ -1,6 +1,6 @@
 -- NOT APPLIED. Phase 8 of the v2 Knowledge Base: drop the legacy knowledge copies.
--- Apply only after: the old brain is retired on prod (BRAIN_KB_GATE=on for every business for 14 days,
--- BRAIN_KB_LEGACY_ROUTE unset), every Desk writer uses kb_items, and Alvin says yes in chat.
+-- Apply only after: the old brain is retired on prod (BRAIN_KB_GATE=on and every business ready on v2
+-- for 14 days, none held on brain_target 'v1'), every Desk writer uses kb_items, and Alvin says yes in chat.
 -- Not reversible without a backup: take `pg_dump -t public.tenants` first.
 -- Version 2026-10-28.1.
 begin;

@@ -27,7 +27,7 @@ function runReadiness(profile, { latest = null, currentHash = null, now = new Da
   const unpriced = items.filter((x) => !x.price.say_en && !x.price.quote);
   checks.push(check('catalogue', items.length > 0 && unpriced.length === 0,
     `${items.length} items${unpriced.length ? `, ${unpriced.length} without a price callers can hear: ${unpriced.slice(0, 5).map((x) => x.name).join(', ')}` : ''}`,
-    items.length ? 'Add a price (or mark it a custom quote) for each item listed.' : 'Add your products or services.'));
+    items.length ? 'Add a price (or mark it a custom quote or a site visit) for each item listed.' : 'Add your products or services.'));
   // the brain's own reader finds a sample of items by their name
   const sample = items.filter((_, i) => i % Math.max(1, Math.floor(items.length / 10)) === 0).slice(0, 10);
   const misses = kb ? sample.filter((it) => { const a = R.answer(kb, it.name, { asksPrice: true, lang: 'en' }); return !(a.ids || []).includes(it.id); }) : sample;

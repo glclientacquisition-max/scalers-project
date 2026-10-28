@@ -49,7 +49,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `invoices` | `amount_paid_kes`, `billing_source`, `created_at`, `credits_applied_kes`, `currency`, `due_at`, `id`, `invoice_number`, `issued_at`, `issuer_address`, `issuer_city`, `issuer_email`, `issuer_kra_pin`, `issuer_legal_name`, `issuer_phone`, `issuer_product`, `paid_at`, `period_end`, `period_start`, `reminders_paused_at`, `status`, `subtotal_kes`, `tax_kes`, `tenant_id`, `total_kes`, `updated_at` | `docs/supabase/admin_invoice_actions.sql`<br>`docs/supabase/billing_company.sql`<br>`docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_documents.sql`<br>`docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `kb_categories` | `id`, `name_en`, `name_sw`, `name_sw_state`, `sort`, `tenant_id`, `updated_at` | `docs/supabase/kb_v2.sql` |
 | `kb_item_variants` | `id`, `in_stock`, `item_id`, `label_en`, `label_sw`, `price_amount`, `price_max`, `price_min`, `price_mode`, `sort`, `tenant_id`, `unit`, `updated_at` | `docs/supabase/kb_v2.sql` |
-| `kb_items` | `aliases`, `bookable`, `category_id`, `created_at`, `currency`, `delivery_fee_kes`, `description_en`, `description_sw`, `facets`, `id`, `in_stock`, `kind`, `legacy_ref`, `name_en`, `name_sw`, `name_sw_state`, `name_sw_suggested`, `needs_visit`, `popular`, `price_amount`, `price_max`, `price_min`, `price_mode`, `row_version`, `search_text`, `search_tsv`, `sort`, `source`, `spoken_en`, `status`, `tenant_id`, `unit`, `updated_at` | `docs/supabase/kb_v2.sql` |
+| `kb_items` | `aliases`, `bookable`, `category_id`, `created_at`, `currency`, `delivery_fee_kes`, `description_en`, `description_sw`, `excludes_en`, `facets`, `holdable`, `id`, `in_stock`, `kind`, `legacy_ref`, `name_en`, `name_sw`, `name_sw_state`, `name_sw_suggested`, `needs_visit`, `popular`, `price_amount`, `price_max`, `price_min`, `price_mode`, `row_version`, `search_text`, `search_tsv`, `sort`, `source`, `spoken_en`, `status`, `status_note`, `tenant_id`, `unit`, `updated_at` | `docs/supabase/kb_v2.sql`<br>`docs/supabase/kb_v2_item_states.sql` |
 | `kb_readiness` | `brain`, `checked_at`, `checked_by`, `checks`, `id`, `passed`, `real_call_sid`, `snapshot_version`, `tenant_id`, `tests` | `docs/supabase/kb_v2.sql` |
 | `kb_snapshots` | `bytes`, `compiled_at`, `compiler`, `doc`, `id`, `issues`, `item_count`, `schema_version`, `source_hash`, `status`, `tenant_id`, `version` | `docs/supabase/kb_v2.sql` |
 | `notify_sends` | `attempts`, `audience`, `billed_to`, `body`, `call_id`, `call_sid`, `channel`, `created_at`, `error`, `failure_reason`, `held_units`, `id`, `idempotency_key`, `kind`, `outcome`, `overage`, `provider_message_id`, `recipient`, `reserved_at`, `settled_at`, `status`, `tenant_id`, `units` | `docs/supabase/notify_send_ledger.sql`<br>`docs/supabase/notify_send_reserve_settle.sql`<br>`docs/supabase/notify_sends_status.sql`<br>`docs/supabase/sms_allowance.sql` |
@@ -248,8 +248,8 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `kb_items_search_fill` | `docs/supabase/kb_v2.sql` |
 | `kb_publish_snapshot` | `docs/supabase/kb_v2.sql` |
 | `kb_record_readiness` | `docs/supabase/kb_v2.sql` |
-| `kb_search_items` | `docs/supabase/kb_v2.sql` |
-| `kb_upsert_items` | `docs/supabase/kb_v2.sql` |
+| `kb_search_items` | `docs/supabase/kb_v2.sql`<br>`docs/supabase/kb_v2_item_states.sql`<br>`docs/supabase/kb_v2_item_states_down.sql` |
+| `kb_upsert_items` | `docs/supabase/kb_v2.sql`<br>`docs/supabase/kb_v2_item_states.sql` |
 | `ke_mobile_e164` | `supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `ke_mobile_valid` | `supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `mark_billing_notice_read` | `docs/supabase/billing_data_layer.sql` |

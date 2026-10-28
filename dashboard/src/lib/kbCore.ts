@@ -5,7 +5,9 @@
  * snapshot (doc.preview), written by the same rules the call uses, so there is no second copy of them here.
  */
 export type KbKind = "service" | "product" | "package";
-export type KbPriceMode = "fixed" | "range" | "from" | "per_unit" | "quote" | "free" | "none";
+export type KbPriceMode = "fixed" | "range" | "from" | "per_unit" | "quote" | "site_visit" | "free" | "none";
+/** active: offered. paused: on hold for now (spoken "not available right now"). not_offered: an explicit "we don't do this". hidden: removed. */
+export type KbStatus = "active" | "paused" | "not_offered" | "hidden";
 export type KbSwState = "none" | "suggested" | "approved" | "edited" | "rejected";
 
 export type KbItem = {
@@ -26,7 +28,11 @@ export type KbItem = {
   in_stock: boolean | null;
   popular: boolean;
   delivery_fee_kes: number | null;
-  status: "active" | "hidden";
+  needs_visit: boolean;
+  holdable: boolean;
+  excludes_en: string | null;
+  status_note: string | null;
+  status: KbStatus;
   sort: number;
   source: string;
   legacy_ref: string | null;
@@ -62,6 +68,8 @@ export function displayPrice(it: Pick<KbItem, "price_mode" | "price_amount" | "p
       return it.price_amount != null ? `From KSh ${fmtKsh(it.price_amount)}` : null;
     case "quote":
       return "Custom quote";
+    case "site_visit":
+      return "After a site visit";
     case "free":
       return "Free";
     default:
@@ -92,6 +100,10 @@ export type KbDraft = {
   description_en: string;
   popular: boolean;
   in_stock: boolean | null;
+  status: Exclude<KbStatus, "hidden">;
+  status_note: string;
+  holdable: boolean;
+  excludes_en: string;
   row_version?: number;
 };
 
@@ -100,6 +112,8 @@ export function draftErrors(d: KbDraft): string[] {
   const out: string[] = [];
   if (!d.name_en.trim()) out.push("Add a name.");
   if (d.name_en.trim().length > 120) out.push("Keep the name under 120 letters.");
+  if (d.status_note.trim().length > 120) out.push("Keep the note under 120 letters.");
+  if (d.excludes_en.trim().length > 500) out.push("Keep \"not included\" under 500 letters.");
   if (["fixed", "per_unit", "from"].includes(d.price_mode) && num(d.price_amount) == null) out.push("Add the price.");
   if (d.price_mode === "range") {
     const lo = num(d.price_min);
@@ -131,7 +145,11 @@ export function itemFromDraft(d: KbDraft, prev: KbItem | null, categoryId: strin
     in_stock: d.in_stock,
     popular: d.popular,
     delivery_fee_kes: prev?.delivery_fee_kes ?? null,
-    status: "active",
+    needs_visit: mode === "site_visit" || (mode === "quote" && !!prev?.needs_visit),
+    holdable: d.holdable,
+    excludes_en: d.excludes_en.trim().slice(0, 500) || null,
+    status_note: d.status === "paused" ? d.status_note.trim().slice(0, 120) || null : null,
+    status: d.status,
     sort: prev?.sort ?? 9999,
     source: prev?.source ?? "owner",
     legacy_ref: prev?.legacy_ref ?? null,
@@ -155,6 +173,10 @@ export function draftFromItem(it: KbItem | null, categories: KbCategory[], kind:
     description_en: it?.description_en ?? "",
     popular: it?.popular ?? false,
     in_stock: it?.in_stock ?? null,
+    status: it && it.status !== "hidden" ? it.status : "active",
+    status_note: it?.status_note ?? "",
+    holdable: it?.holdable ?? false,
+    excludes_en: it?.excludes_en ?? "",
     row_version: it?.row_version,
   };
 }
@@ -163,7 +185,9 @@ type LegacyRow = Record<string, unknown> & { id?: string };
 
 /**
  * Mirror kb items onto today's services_catalog / product_catalog. Rows are merged by id, so fields the KB
- * does not carry (sku, booking notes, parsed_from on untouched rows) are kept. Hidden items leave the mirror.
+ * does not carry (sku, booking notes, parsed_from on untouched rows) are kept. Hidden and not-offered items leave the
+ * mirror (the old readers only know "offered"); a paused item reads as out of stock; a site visit is the old Quote plus
+ * site_visit_required.
  */
 export function mirrorLegacy(
   items: KbItem[],
@@ -178,11 +202,12 @@ export function mirrorLegacy(
   const services: LegacyRow[] = [];
   const products: LegacyRow[] = [];
   for (const it of [...items].sort((a, b) => a.sort - b.sort)) {
-    if (it.status === "hidden") continue;
+    if (it.status === "hidden" || it.status === "not_offered") continue;
+    const paused = it.status === "paused";
     const key = it.legacy_ref || it.id;
     const prev = old.get(key) || {};
     const price = displayPrice(it) || "";
-    const mode = it.price_mode === "per_unit" ? "fixed" : it.price_mode;
+    const mode = it.price_mode === "per_unit" ? "fixed" : it.price_mode === "site_visit" ? "quote" : it.price_mode;
     const amount = it.price_amount ?? it.price_min ?? null;
     const prevPricing = (prev.pricing && typeof prev.pricing === "object" ? prev.pricing : {}) as Record<string, unknown>;
     const pricing = {
@@ -193,7 +218,7 @@ export function mirrorLegacy(
       min_ksh: it.price_min,
       max_ksh: it.price_max,
       parsed_from: amount != null && mode === "fixed" ? String(amount) : (prevPricing.parsed_from ?? null),
-      in_stock: it.in_stock,
+      in_stock: paused ? false : it.in_stock,
       confirmed: true,
       source: "owner",
     };
@@ -203,12 +228,12 @@ export function mirrorLegacy(
       name: it.name_en,
       notes: it.description_en || (prev.notes as string) || "",
       category: (it.category_id && catName.get(it.category_id)) || "",
-      in_stock: it.in_stock === false ? "no" : it.in_stock === true ? "yes" : "",
+      in_stock: paused || it.in_stock === false ? "no" : it.in_stock === true ? "yes" : "",
       pricing,
       price_max: it.price_max,
     };
-    if (it.kind === "product") products.push({ ...base, unit: it.unit ? `per ${it.unit}` : "", price, aliases: it.aliases, price_mode: mode });
-    else services.push({ ...base, price: amount != null ? String(amount) : "", price_range: price, pricing_mode: mode });
+    if (it.kind === "product") products.push({ ...base, unit: it.unit ? `per ${it.unit}` : "", price, aliases: it.aliases, price_mode: mode, holdable: !!it.holdable });
+    else services.push({ ...base, price: amount != null ? String(amount) : "", price_range: price, pricing_mode: mode, out_of_scope: it.excludes_en || (prev.out_of_scope as string) || "", site_visit_required: !!it.needs_visit || it.price_mode === "site_visit" });
   }
   return { services_catalog: services, product_catalog: products };
 }
@@ -240,3 +265,93 @@ export const ISSUE_LINE: Record<string, string> = {
   sw_name_waiting: "has a Swahili name waiting for you",
   no_sw_name: "has no Swahili name yet",
 };
+
+// ---------------------------------------------------------------- paste a list (Desk bulk import)
+export type KbPasteRow = {
+  line: number;
+  raw: string;
+  name_en: string;
+  price_mode: KbPriceMode;
+  price_amount: number | null;
+  price_min: number | null;
+  price_max: number | null;
+  unit: string | null;
+  /** id of an item with the same name already in the catalogue: the import updates it instead of adding a copy */
+  match_id: string | null;
+  error: string | null;
+};
+export const PASTE_MAX_ROWS = 500;
+
+const PRICE_TAIL =
+  /^(.*?)(?:\s*[-–—:|,;\t]\s*|\s+)((?:from\s+|kuanzia\s+)?(?:ksh?s?\.?|kes|sh\.?)?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:-|–|to|hadi)\s*(?:ksh?s?\.?|kes|sh\.?)?\s*\d[\d,]*(?:\.\d+)?)?\s*(?:\/-)?(?:\s*(?:\/|per|kwa|a|an)\s*[a-z][a-z ]{0,20}|\s+each)?)\s*$/i;
+const WORD_TAIL = /^(.*?)\s*[-–—:|,;\t]\s*(custom quote|quote|on request|price on request|site visit|after (?:a )?site visit|free)\s*$/i;
+
+function parsePrice(t: string): Pick<KbPasteRow, "price_mode" | "price_amount" | "price_min" | "price_max" | "unit"> {
+  const s = t.trim();
+  const unitM = s.match(/(?:\/|\bper\b|\bkwa\b|\beach\b|\ba\b|\ban\b)\s*([a-z][a-z ]{0,20})$/i);
+  const unit = unitM ? (unitM[1].trim().toLowerCase() === "each" ? "piece" : unitM[1].trim().toLowerCase()) : /\beach\b/i.test(s) ? "piece" : null;
+  const nums = [...s.replace(/(\d),(\d)/g, "$1$2").matchAll(/\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
+  if (nums.length >= 2 && /(-|–|\bto\b|\bhadi\b)/i.test(s)) {
+    const [lo, hi] = [Math.min(nums[0], nums[1]), Math.max(nums[0], nums[1])];
+    return { price_mode: "range", price_amount: null, price_min: lo, price_max: hi, unit };
+  }
+  if (nums.length) return { price_mode: /^(from|kuanzia)\b/i.test(s) ? "from" : "fixed", price_amount: nums[0], price_min: null, price_max: null, unit };
+  return { price_mode: "none", price_amount: null, price_min: null, price_max: null, unit: null };
+}
+
+/**
+ * A pasted list -> rows to preview. One item per line, price optional at the end:
+ * "Deep clean - 6,000-12,000", "Gloria F1, 3 per seedling", "Carpet cleaning: quote", "Ansal F1	2.50".
+ * A first line that reads like a CSV header (name,price) is skipped. Nothing is saved here.
+ */
+export function parsePasteList(text: string, existing: Pick<KbItem, "id" | "name_en">[] = []): KbPasteRow[] {
+  const byName = new Map(existing.map((e) => [e.name_en.trim().toLowerCase(), e.id]));
+  const seen = new Set<string>();
+  const out: KbPasteRow[] = [];
+  const lines = String(text || "").replace(/\r/g, "").split("\n");
+  lines.forEach((rawLine, i) => {
+    const raw = rawLine.replace(/^\s*(?:[-*•·]|\d+[.)])\s+/, "").trim();
+    if (!raw) return;
+    if (i === 0 && /^name\s*[,\t;|]\s*price/i.test(raw)) return;
+    let name = raw;
+    let price: ReturnType<typeof parsePrice> = { price_mode: "none", price_amount: null, price_min: null, price_max: null, unit: null };
+    const w = raw.match(WORD_TAIL);
+    const m = w ? null : raw.match(PRICE_TAIL);
+    if (w) {
+      name = w[1];
+      const word = w[2].toLowerCase();
+      price = { ...price, price_mode: /visit/.test(word) ? "site_visit" : word === "free" ? "free" : "quote", price_amount: word === "free" ? 0 : null };
+    } else if (m && m[1].trim() && /[a-z]/i.test(m[1])) {
+      name = m[1];
+      price = parsePrice(m[2]);
+    }
+    name = name.replace(/\s*[-–—:|,;]\s*$/, "").replace(/^"|"$/g, "").replace(/\s+/g, " ").trim();
+    const key = name.toLowerCase();
+    let error: string | null = null;
+    if (!name || !/[a-z]/i.test(name)) error = "No name on this line.";
+    else if (name.length > 120) error = "Name is over 120 letters.";
+    else if (seen.has(key)) error = "Same name as a line above.";
+    if (out.length >= PASTE_MAX_ROWS) error = `Only the first ${PASTE_MAX_ROWS} lines are added at once.`;
+    seen.add(key);
+    out.push({ line: i + 1, raw: rawLine, name_en: name.slice(0, 120), ...price, match_id: byName.get(key) ?? null, error });
+  });
+  return out;
+}
+
+/** Preview rows -> kb_items rows for one batch upsert. Matching names update the existing item's price only. */
+export function itemsFromPaste(rows: KbPasteRow[], kind: KbKind, existing: KbItem[], categoryId: string | null): KbItem[] {
+  const byId = new Map(existing.map((e) => [e.id, e]));
+  let sort = existing.reduce((m, e) => Math.max(m, e.sort || 0), 0);
+  return rows.filter((r) => !r.error).map((r) => {
+    const prev = r.match_id ? byId.get(r.match_id) || null : null;
+    const price = { price_mode: r.price_mode, price_amount: r.price_amount, price_min: r.price_min, price_max: r.price_max };
+    if (prev) return { ...prev, ...(r.price_mode !== "none" ? price : {}), unit: r.unit ?? prev.unit, needs_visit: r.price_mode === "site_visit" || prev.needs_visit, status: prev.status === "hidden" ? "active" : prev.status };
+    sort += 1;
+    return {
+      id: newItemId(kind), kind, name_en: r.name_en, name_sw: null, name_sw_state: "none", name_sw_suggested: null, aliases: [],
+      category_id: categoryId, description_en: null, unit: r.unit, ...price, in_stock: null, popular: false, delivery_fee_kes: null,
+      needs_visit: r.price_mode === "site_visit", holdable: false, excludes_en: null, status_note: null, status: "active",
+      sort, source: "import", legacy_ref: null, row_version: 0,
+    } as KbItem;
+  });
+}

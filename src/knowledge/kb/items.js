@@ -32,12 +32,23 @@ function stock(v) {
   if (/^(yes|true|1|in|available)/.test(s)) return true;
   return null;
 }
-/** Price of one legacy row -> { price_mode, price_amount, price_min, price_max }. Keeps decimals ("2.20" stays 2.2). */
+/**
+ * Price of one legacy row -> { price_mode, price_amount, price_min, price_max }. Keeps decimals ("2.20" stays 2.2).
+ * Old Desk stores a deliberate Quote as pricing.mode "ask" with source owner + confirmed (catalogPricingMode.ts), and
+ * keeps "quote" in pricing_mode / price_mode: every mode key is read, and a deliberate ask becomes quote, or site_visit
+ * when the row needs a site visit. An untouched ask (parsed, unconfirmed) stays none, so readiness still asks for a price.
+ */
 function legacyPrice(row = {}) {
   const p = row.pricing && typeof row.pricing === 'object' ? row.pricing : {};
   const text = String(row.price_range || row.price || '').trim();
-  const mode0 = String(p.mode || row.pricing_mode || row.price_mode || '').toLowerCase();
-  if (/quote|on\s*request|custom/i.test(mode0) || /custom\s+quote|on\s+request|\bquote\b/i.test(text)) return { price_mode: 'quote', price_amount: null, price_min: null, price_max: null };
+  const modes = [p.mode, row.pricing_mode, row.price_mode].map((m) => String(m || '').toLowerCase()).filter(Boolean);
+  const mode0 = modes.find((m) => m !== 'ask') || modes[0] || '';
+  const visit = row.site_visit_required === true || /^(yes|true)$/i.test(String(row.site_visit_required ?? ''));
+  const NONE = { price_mode: 'none', price_amount: null, price_min: null, price_max: null };
+  const quote = () => ({ ...NONE, price_mode: visit ? 'site_visit' : 'quote' });
+  if (modes.some((m) => /site.?visit/.test(m))) return { ...NONE, price_mode: 'site_visit' };
+  if (modes.some((m) => /quote|on\s*request|custom/.test(m)) || /custom\s+quote|on\s+request|\bquote\b/i.test(text)) return quote();
+  if (/site\s+visit|after\s+(a\s+)?visit/i.test(text) && !/\d/.test(text)) return { ...NONE, price_mode: 'site_visit' };
   if (/free/.test(mode0) || /^free$/i.test(text)) return { price_mode: 'free', price_amount: 0, price_min: null, price_max: null };
   const parsed = num(p.parsed_from);
   const exactFixed = parsed != null && /^\s*\d[\d,]*(\.\d+)?\s*$/.test(String(p.parsed_from)) ? parsed : null;
@@ -47,7 +58,10 @@ function legacyPrice(row = {}) {
     return { price_mode: 'range', price_amount: null, price_min: min, price_max: hi };
   }
   const amt = exactFixed ?? num(p.amount_ksh) ?? num(row.price) ?? (text ? num(text.split(/[-–]|to/)[0]) : null);
-  if (amt == null) return { price_mode: 'none', price_amount: null, price_min: null, price_max: null };
+  if (amt == null) {
+    const deliberateAsk = modes.includes('ask') && String(p.source || '').toLowerCase() === 'owner' && p.confirmed === true;
+    return deliberateAsk || visit ? quote() : NONE;
+  }
   if (mode0 === 'from' || /^from\b|kuanzia/i.test(text)) return { price_mode: 'from', price_amount: amt, price_min: null, price_max: null };
   return { price_mode: 'fixed', price_amount: amt, price_min: null, price_max: null };
 }
@@ -70,8 +84,11 @@ function legacyRowToItem(row, i, kind) {
     unit: normUnit(unitRaw),
     ...pr,
     currency: 'KES',
-    needs_visit: /site visit|visit first|after the team checks/i.test(String(row.notes || '')) && pr.price_mode === 'quote',
+    needs_visit: pr.price_mode === 'site_visit' || row.site_visit_required === true
+      || (/site visit|visit first|after the team checks/i.test(String(row.notes || '')) && pr.price_mode === 'quote'),
     in_stock: stock(row.in_stock),
+    holdable: row.holdable === true,
+    excludes_en: String(row.out_of_scope || '').trim().slice(0, 500) || null,
     status: 'active',
     sort: i,
     source: 'legacy',
@@ -101,6 +118,7 @@ function displayPrice(it = {}) {
     case 'range': return it.price_min != null && it.price_max != null ? `KSh ${fmtNum(it.price_min)}–${fmtNum(it.price_max)}` : null;
     case 'from': return it.price_amount != null ? `From KSh ${fmtNum(it.price_amount)}` : null;
     case 'quote': return 'Custom quote';
+    case 'site_visit': return 'After a site visit';
     case 'free': return 'Free';
     default: return null;
   }
@@ -111,23 +129,25 @@ function toLegacy(items = [], categories = []) {
   const catName = new Map((categories || []).map((c) => [c.id, c.name_en]));
   const servicesCatalog = []; const productCatalog = [];
   for (const it of items || []) {
-    if (!it || it.status === 'hidden') continue;
+    // the old readers know only "offered": not-offered and hidden rows stay out; paused reads as out of stock
+    if (!it || it.status === 'hidden' || it.status === 'not_offered') continue;
+    const paused = it.status === 'paused';
     const price = displayPrice(it);
     const pricing = {
-      mode: it.price_mode === 'per_unit' ? 'fixed' : it.price_mode, unit: it.unit || null, source: 'owner', confirmed: true,
+      mode: it.price_mode === 'per_unit' ? 'fixed' : it.price_mode === 'site_visit' ? 'quote' : it.price_mode, unit: it.unit || null, source: 'owner', confirmed: true,
       amount_ksh: it.price_amount != null ? Number(it.price_amount) : it.price_min != null ? Number(it.price_min) : null,
       min_ksh: it.price_min != null ? Number(it.price_min) : null, max_ksh: it.price_max != null ? Number(it.price_max) : null,
-      in_stock: it.in_stock ?? null,
+      in_stock: paused ? false : it.in_stock ?? null,
     };
     const base = {
       id: it.id, name: it.name_en, notes: it.description_en || '', category: catName.get(it.category_id) || it.category_name || '',
-      in_stock: it.in_stock === false ? 'no' : it.in_stock === true ? 'yes' : '', source: it.source === 'legacy' ? 'owner' : it.source || 'owner',
+      in_stock: paused || it.in_stock === false ? 'no' : it.in_stock === true ? 'yes' : '', source: it.source === 'legacy' ? 'owner' : it.source || 'owner',
       pricing, price_max: it.price_max != null ? Number(it.price_max) : null,
     };
     if (it.kind === 'product') {
-      productCatalog.push({ ...base, sku: '', unit: it.unit ? `per ${it.unit}` : '', price: price || '', aliases: it.aliases || [], price_mode: pricing.mode });
+      productCatalog.push({ ...base, sku: '', unit: it.unit ? `per ${it.unit}` : '', price: price || '', aliases: it.aliases || [], price_mode: pricing.mode, holdable: !!it.holdable });
     } else {
-      servicesCatalog.push({ ...base, price: it.price_amount != null ? String(it.price_amount) : it.price_min != null ? String(it.price_min) : '', price_range: price || '', pricing_mode: pricing.mode, out_of_scope: '' });
+      servicesCatalog.push({ ...base, price: it.price_amount != null ? String(it.price_amount) : it.price_min != null ? String(it.price_min) : '', price_range: price || '', pricing_mode: pricing.mode, out_of_scope: it.excludes_en || '', site_visit_required: !!it.needs_visit || it.price_mode === 'site_visit' });
     }
   }
   return { servicesCatalog, productCatalog };
@@ -141,8 +161,9 @@ function docToLegacy(doc) {
   const rows = doc.items.map((x) => ({
     id: x.id, kind: x.kind, name_en: x.name, category_id: x.cat, category_name: x.cat_name, description_en: x.desc, unit: x.unit,
     price_mode: x.price.mode, price_amount: x.price.amount, price_min: x.price.min, price_max: x.price.max, in_stock: x.in_stock,
-    aliases: x.aliases, status: 'active', source: 'owner',
+    aliases: x.aliases, status: x.state || 'active', source: 'owner', needs_visit: x.needs_visit, holdable: x.holdable, excludes_en: x.excludes || null,
   }));
+  for (const x of Array.isArray(doc.off) ? doc.off : []) if (x.state === 'paused') rows.push({ id: x.id, kind: x.kind, name_en: x.name, category_id: x.cat, price_mode: 'none', status: 'paused', source: 'owner', aliases: [] });
   return toLegacy(rows, []);
 }
 module.exports.docToLegacy = docToLegacy;

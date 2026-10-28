@@ -7,6 +7,8 @@
 // 10 more only on request, in threes   11 sound-alike names keep their telling word (compile)   12 <= 2 short sentences
 const { numberToSw } = require('../../speech/spokenForms');
 const { joinList, sayRange } = require('./spoken');
+const { tokens } = require('./keys');
+const { GENERIC } = require('./reader');
 
 const MAX_NAMES = 3;
 const MORE_RE = /\b(more|others?|other ones|what else|any other|else|zingine|nyingine|zaidi|ingine)\b/i;
@@ -48,15 +50,28 @@ function priceSentence(it, lang) {
   }
   const say = sw ? it.price.say_sw : it.price.say_en;
   if (!say) return { text: sw ? `Sina bei kamili ya ${short(it, lang)} hapa; timu inaweza kuthibitisha.` : `I don't have the exact price for ${short(it, lang)} here; the team can confirm.`, ask: null, numbers: [], unknown: true };
-  if (it.price.quote) return { text: sw ? `${cap(short(it, lang))} ni ${say}.` : `${cap(short(it, lang))} is priced as ${say}.`, numbers: [] };
+  // a quote or a site visit is a real answer: say how it is priced, then offer to take details (capture)
+  if (it.price.visit) return { text: sw ? `Bei ya ${short(it, lang)} hutolewa baada ya kukagua eneo. Nichukue maelezo yako ili timu ipange?` : `${cap(short(it, lang))} is priced after a site visit. Shall I take your details so the team can arrange it?`, numbers: [], capture: 'site_visit' };
+  if (it.price.quote) return { text: sw ? `${cap(short(it, lang))} ni bei maalum; timu itakupa bei baada ya kukagua kazi. Nichukue maelezo yako?` : `${cap(short(it, lang))} is a custom quote; the team will give you a price after checking the job. Shall I take your details for that?`, numbers: [], capture: 'quote' };
   return { text: sw ? `${cap(short(it, lang))} ni ${say}.` : `${cap(short(it, lang))} is ${say}.`, numbers: it.price.numbers || [] };
 }
 function oneItem(it, { asksPrice, lang }) {
   const sw = isSw(lang);
   if (it.in_stock === false) return { kind: 'item', ids: [it.id], text: sw ? `Samahani, ${short(it, lang)} imeisha kwa sasa.` : `Sorry, ${short(it, lang)} is out of stock right now.`, numbers: [] };
-  if (asksPrice) { const p = priceSentence(it, lang); return { kind: 'item', ids: [it.id], text: p.text, numbers: p.numbers, unknown: !!p.unknown }; }
+  if (asksPrice) { const p = priceSentence(it, lang); return { kind: 'item', ids: [it.id], text: p.text, numbers: p.numbers, unknown: !!p.unknown, capture: p.capture || null, name: it.name }; }
   // rule 8: one fit, no choice offered
   return { kind: 'item', ids: [it.id], text: sw ? `Ndiyo, tuna ${short(it, lang)}.` : `Yes, we have ${short(it, lang)}.`, numbers: [] };
+}
+function offItem(it, lang) {
+  const sw = isSw(lang);
+  const name = (sw && it.say_sw) || it.say_en;
+  if (it.state === 'paused') {
+    return { kind: 'item', ids: [it.id], itemState: 'paused', numbers: [],
+      text: sw ? `Samahani, ${name} haipatikani kwa sasa. Naweza kukusaidia na kitu kingine?` : `Sorry, ${name} isn't available right now${it.note ? ` (${it.note.replace(/[.!?]+$/, '')})` : ''}. Can I help with anything else?` };
+  }
+  const product = it.kind === 'product';
+  return { kind: 'item', ids: [it.id], itemState: 'not_offered', numbers: [],
+    text: sw ? `Samahani, ${product ? 'hatuuzi' : 'hatufanyi'} ${name}. Naweza kukusaidia na kitu kingine?` : `Sorry, we don't ${product ? 'sell' : 'offer'} ${name}. Can I help with anything else?` };
 }
 function group(members, { cat = null, asksPrice, lang, offset = 0, narrowed = 0 }) {
   const sw = isSw(lang);
@@ -111,6 +126,12 @@ function answer(kb, text, { asksPrice = false, lang = 'en', state = {} } = {}) {
     }
   }
   const f = kb.find(text);
+  // an item the owner paused or marked "we don't do this", named in full: say so plainly instead of "not sure"
+  const off = kb.findOff ? kb.findOff(text) : null;
+  if (off && (!f.named || off.len > tokens(f.named.name).filter((w) => !GENERIC.has(w)).length)) {
+    st.last = null; st.narrowed = 0;
+    return done({ ...offItem(off.item, lang), lookupMs: f.ms }, st);
+  }
   if (f.named) { st.last = { ids: [f.named.id], shown: [f.named.id], offset: 0 }; st.narrowed = 0; return done({ ...oneItem(f.named, { asksPrice, lang }), lookupMs: f.ms }, st); }
   if (f.category) {
     const members = order(f.category.item_ids.map((id) => kb.item(id)).filter(Boolean));

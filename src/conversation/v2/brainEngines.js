@@ -187,6 +187,12 @@ async function runBrainEnginesTurn({
       model.push({ text: Lines.noModelFallback(goal, lang, { n: goal.n || 0, machine }), src: 'tail' });
     }
     if (goal.type === 'answer' && goal.offerCallback) { E.offered = 'callback'; E.offeredTurn = machine.turn; }
+    // v2 KB: a custom-quote / site-visit price offers to take details; the caller's yes starts the callback capture
+    const kbCap = receipts.find((r) => r.kb && r.capture);
+    if (kbCap) {
+      E.offered = 'callback'; E.offeredTurn = machine.turn;
+      if (kbCap.service && machine.slots && !machine.slots.service) machine.slots.service = kbCap.service;
+    }
   }
 
   // 5) assemble: model part capped at two sentences, then the fixed line; one commit-truth check for all
