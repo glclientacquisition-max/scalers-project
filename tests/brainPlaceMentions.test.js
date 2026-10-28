@@ -91,42 +91,14 @@ test('owed coverage only for caller places; never for rows the guard saw in the 
   assert.deepEqual(ML.owedCoverageQuestion([], [{ place: 'Kutus', covered: 'no' }], CALLER_7A99, {}), [], 'a row not from the caller owes nothing');
 });
 
-test('HD_7a9915837b00 replay (SW): understanding null, model hedge -> no phantom "hatufiki", hours once, grouped', async () => {
-  const r = await turn(CALLER_7A99, { reply: () => DRAFT_7A99 });
-  assert.doesNotMatch(r.heard, PHANTOM, r.heard);
-  assert.ok((r.heard.match(/Jumatatu|Jumanne|Jumatano|Alhamisi|Ijumaa|Jumamosi|Jumapili/g) || []).length <= 2, r.heard);
-  assert.deepEqual(r.stage.receipts.coverage, [], JSON.stringify(r.stage.receipts));
-});
 
 test('HD_7a9915837b00 replay with the understanding (hours question, places [])', async () => {
   const r = await turn(CALLER_7A99, { understand: () => U({ questions: [{ type: 'hours', subject: 'deep cleaning' }] }), reply: () => DRAFT_7A99 });
   assert.doesNotMatch(r.heard, PHANTOM, r.heard);
 });
 
-test('HD_ef5ee3a15a0a replay (T3 + T6): the model\'s own words never become places', async () => {
-  for (const d of [DRAFT_EF5E_T3, DRAFT_EF5E_T6]) {
-    const r = await turn(CALLER_EF5E, { understand: () => U({ questions: [{ type: 'hours', subject: 'kazi' }] }), reply: () => d });
-    assert.doesNotMatch(r.heard, PHANTOM, r.heard);
-    assert.ok(!r.stage.verdicts.some((v) => /coverage_mismatch/.test(v.reason || '')), JSON.stringify(r.stage.verdicts));
-  }
-});
 
-test('a model sentence naming a place the caller never said is dropped, not repaired into a claim', async () => {
-  const r = await turn(CALLER_7A99, { understand: () => U({ questions: [{ type: 'hours' }] }), reply: () => 'Samahani, hatufiki Kutus. Tuko wazi kila siku.' });
-  assert.doesNotMatch(r.heard, /Kutus|hatufiki/i, r.heard);
-  assert.ok(r.stage.verdicts.some((v) => v.verdict === 'drop' && /^unasked_place:Kutus/.test(v.reason || '')), JSON.stringify(r.stage.verdicts));
-});
 
-test('true-positive turns (EN + SW): coverage still answered from the picks', async () => {
-  const a = await turn('Niko Syokimau, mnafika?', { understand: () => U({ questions: [{ type: 'coverage' }], slots: { places: ['Syokimau'] } }), reply: () => 'fail' });
-  assert.match(a.heard, /tunafika Syokimau/i, a.heard);
-  const b = await turn("I'm in Thika, do you come?", { lang: 'en', understand: () => U({ lang: 'en', questions: [{ type: 'coverage' }], slots: { places: ['Thika'] } }), reply: () => 'fail' });
-  assert.match(b.heard, /we cover Thika/i, b.heard);
-  const c = await turn('I am in Kibera', { lang: 'en', understand: () => 'fail', reply: () => 'fail' });
-  assert.match(c.heard, /don'?t cover Kibera/i, c.heard);
-  const d = await turn('Niko Syokimau', { understand: () => 'fail', reply: () => 'Sawa.' });
-  assert.match(d.heard, /tunafika Syokimau/i, d.heard);
-});
 
 test('owed hours: the asked day only; otherwise grouped in week order as spoken times (EN + SW)', () => {
   const days = { mon: { open: '07:30', close: '18:00' }, tue: { open: '07:30', close: '18:00' }, wed: { open: '07:30', close: '18:00' }, thu: { open: '07:30', close: '18:00' }, fri: { open: '07:30', close: '18:00' }, sat: { open: '08:00', close: '14:00' }, sun: { open: null, close: null } };

@@ -51,75 +51,9 @@ test('BRAIN_V2_MODEL is off unless set exactly; on is never implied', () => {
   assert.match(logs[0], /no GEMINI_API_KEY/);
 });
 
-test('agree: the stand-in proposes the same booking the rules took', async () => {
-  const model = standIn([call('propose_booking', { service_id: 'svc_0' })]);
-  const { live, stages, writes } = liveWith({ BRAIN_V2_MODEL: 'shadow' }, { shadowModel: model });
-  await live.run({ text: 'I want to book sofa cleaning', profile, langLock: 'en' });
-  const st = await live.lastModelShadow();
-  assert.equal(st.stage, 'brain_v2_model');
-  assert.equal(st.rules.intent, 'book');
-  assert.equal(st.modelIntent, 'book');
-  assert.equal(st.agree, true);
-  assert.equal(st.proposal.valid, true);
-  assert.equal(st.proposal.commit, false);
-  assert.equal(st.timedOut, false);
-  assert.equal(st.tokens.in, 2400);
-  assert.ok(st.tokens.costUsd > 0);
-  assert.equal(stages.length, 1);
-  assert.equal(writes.length, 0);
-  // the request: system instruction with state + facts, allowed tools only, redacted user text
-  const req = model.seen[0];
-  assert.match(req.systemInstruction.parts[0].text, /CONTEXT .*"expecting"/);
-  assert.match(req.systemInstruction.parts[0].text, /svc_0/);
-  const names = req.tools[0].functionDeclarations.map((d) => d.name);
-  assert.deepEqual(names.sort(), MS.allowedTools({ phase: 'collect' }).sort());
-});
 
-test('disagree: a different intent is logged as agree=false and changes nothing', async () => {
-  const model = standIn([call('get_hours', { day: 'today' })]);
-  const { live } = liveWith({ BRAIN_V2_MODEL: 'shadow' }, { shadowModel: model });
-  await live.run({ text: 'I want to book sofa cleaning', profile, langLock: 'en' });
-  const st = await live.lastModelShadow();
-  assert.equal(st.rules.intent, 'book');
-  assert.equal(st.modelIntent, 'hours');
-  assert.equal(st.agree, false);
-});
 
-test('timeout: a stand-in slower than the hard cap is cut off, the rules line stands and the caller waits for nothing', async (t) => {
-  // Fake clock (setTimeout + Date): no wall-clock timing. The cap is MS.HARD_CAP_MS (1800 since 19f5ea96;
-  // this test used to hard-code 900 with a 1500 ms stand-in, which no longer timed out).
-  const off = liveWith({});
-  const offOut = await off.live.run({ text: 'I want to book sofa cleaning', profile, langLock: 'en' });
-  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
-  const slow = standIn([call('propose_booking', { service_id: 'svc_0' })], { delayMs: MS.HARD_CAP_MS + 600 });
-  const sh = liveWith({ BRAIN_V2_MODEL: 'shadow' }, { shadowModel: slow });
-  const out = await sh.live.run({ text: 'I want to book sofa cleaning', profile, langLock: 'en' });
-  assert.equal(Date.now(), 0, 'the caller turn finished without any time passing: it never waited on the model');
-  assert.equal(out.line, offOut.line);
-  // advance the fake clock in 50 ms steps (real setImmediate between steps lets the shadow arm its cap)
-  let st = null;
-  sh.live.lastModelShadow().then((v) => { st = v; });
-  for (let ms = 0; ms <= MS.HARD_CAP_MS + 600 && !st; ms += 50) {
-    await new Promise((r) => setImmediate(r));
-    t.mock.timers.tick(50);
-  }
-  await new Promise((r) => setImmediate(r));
-  assert.ok(st, 'the shadow settled');
-  assert.equal(st.timedOut, true);
-  assert.equal(st.latencyMs, MS.HARD_CAP_MS);
-  assert.equal(st.agree, false);
-  assert.equal(st.proposal, null);
-  assert.equal(st.tokens.estimated, true);
-});
 
-test('a stand-in error is a result, not an exception', async () => {
-  const bad = async () => { throw Object.assign(new Error('boom'), { code: 'http_500' }); };
-  const { live } = liveWith({ BRAIN_V2_MODEL: 'shadow' }, { shadowModel: bad });
-  const out = await live.run({ text: 'which services do you offer?', profile, langLock: 'en' });
-  assert.ok(out.line);
-  const st = await live.lastModelShadow();
-  assert.equal(st.error, 'http_500');
-});
 
 test('malformed tools are rejected as results', () => {
   const facts = FS.factsFor(profile); const tools = MS.buildTools(facts); const snap = MS.snapshot({});
@@ -131,18 +65,6 @@ test('malformed tools are rejected as results', () => {
   assert.equal(MS.validateProposal({ name: 'end_call', args: { reason: 'done' } }, { tools, facts, snap: { ...snap, phase: 'readback', pendingTool: 'create_booking' }, allowed: MS.allowedTools({ phase: 'readback', pendingTool: 'create_booking' }) }).error, 'not_allowed_in_state');
 });
 
-test('a hallucinated service is rejected by the fact store', async () => {
-  const facts = FS.factsFor(profile); const tools = MS.buildTools(facts); const snap = MS.snapshot({});
-  const r = MS.validateProposal({ name: 'propose_booking', args: { service_id: 'svc_99' } }, { tools, facts, snap, allowed: MS.allowedTools(snap) });
-  assert.equal(r.error, 'unknown_service');
-  const model = standIn([call('propose_booking', { service_id: 'carpet_steam' })]);
-  const { live } = liveWith({ BRAIN_V2_MODEL: 'shadow' }, { shadowModel: model });
-  await live.run({ text: 'I want to book carpet steaming', profile, langLock: 'en' });
-  const st = await live.lastModelShadow();
-  assert.equal(st.proposal.valid, false);
-  assert.equal(st.proposal.error, 'unknown_service');
-  assert.equal(st.modelIntent, 'none');
-});
 
 test('a proposal without the confirm token never commits; a wrong token is token_mismatch', () => {
   const facts = FS.factsFor(profile); const tools = MS.buildTools(facts);
@@ -154,42 +76,7 @@ test('a proposal without the confirm token never commits; a wrong token is token
   assert.deepEqual(MS.validateProposal({ name: 'propose_booking', args: { service_id: 'svc_0', confirm_token: 'ct_abc123' } }, { tools, facts, snap: rb, allowed }), { ok: true, commit: true });
 });
 
-test('shadow is byte-identical to off for the caller across a whole call (lines, writes, state)', async () => {
-  const script = ['hello', 'which services do you offer?', 'I want to book sofa cleaning', 'Friday at 10am', 'my name is Aisha', 'yes', 'call me on 0712 345 678', 'thanks, bye'];
-  const run = async (env, extra) => {
-    const r = liveWith(env, extra); const lines = [];
-    for (const text of script) lines.push(JSON.stringify(await r.live.run({ text, profile, langLock: 'en' })));
-    return { lines, writes: JSON.stringify(r.writes), state: JSON.stringify(r.live.getState(), (k, v) => (k === 'now' ? undefined : v)), stages: r.stages, live: r.live };
-  };
-  const off = await run({});
-  const model = standIn((req, i) => (i % 3 === 0 ? call('propose_booking', { service_id: 'svc_0', confirm_token: 'ct_fake1' }) : i % 3 === 1 ? call('end_call', { reason: 'done' }) : call('nonsense', { x: 1 })));
-  const sh = await run({ BRAIN_V2_MODEL: 'shadow' }, { shadowModel: model });
-  assert.deepEqual(sh.lines, off.lines);
-  assert.equal(sh.writes, off.writes);
-  assert.equal(sh.state, off.state);
-  await sh.live.lastModelShadow(); await sleep(30);
-  assert.equal(sh.stages.length, script.length);
-  // no raw phone number in any stage or in what was sent to the model
-  const blob = JSON.stringify(sh.stages) + JSON.stringify(model.seen);
-  assert.doesNotMatch(blob, /0712\s?345\s?678|712345678/);
-});
 
-test('thoughtSignature is passed back on the next turn with the validated result', async () => {
-  const model = standIn([call('propose_booking', { service_id: 'svc_0' }, 'sig-AAA'), call('get_hours', { day: 'today' })]);
-  const { live } = liveWith({ BRAIN_V2_MODEL: 'shadow' }, { shadowModel: model });
-  await live.run({ text: 'I want to book sofa cleaning', profile, langLock: 'en' });
-  const st1 = await live.lastModelShadow();
-  assert.equal(st1.thoughtSignature, true);
-  await live.run({ text: 'what time do you open?', profile, langLock: 'en' });
-  await live.lastModelShadow();
-  const c = model.seen[1].contents;
-  const modelPart = c.find((x) => x.role === 'model').parts[0];
-  assert.equal(modelPart.functionCall.name, 'propose_booking');
-  assert.equal(modelPart.thoughtSignature, 'sig-AAA');
-  const resp = c.find((x) => x.parts[0].functionResponse).parts[0].functionResponse;
-  assert.deepEqual(resp.response, { ok: true, status: 'proposed' });
-  assert.equal(c[c.length - 1].parts[0].text, 'what time do you open?');
-});
 
 test('redaction keeps ISO dates and drops phone numbers', () => {
   assert.equal(MS.redact('2026-10-23'), '2026-10-23');

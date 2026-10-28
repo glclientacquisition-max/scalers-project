@@ -91,30 +91,12 @@ describe('Tool outcome drops the redundant "Okay" after an ack', () => {
 });
 
 describe('server.js wiring', () => {
-  it('speakToolHold checks the same-turn ack before speaking a hold', () => {
-    const start = SERVER.indexOf('async function speakToolHold(');
-    const body = SERVER.slice(start, start + 1800);
-    assert.match(body, /thinkingAckTurn === activeTurnTiming/);
-    // planHoldTiming wraps holdSpeaksAfterAck; a recent ack defers the hold
-    // until the tool has run TOOL_HOLD_SLOW_MS instead of dropping it.
-    assert.match(body, /planHoldTiming\(/);
-    assert.match(body, /toolStillRunningAfter\(spoken\.toolSettled/);
-    assert.match(body, /tool hold skipped after thinking-ack/);
-  });
-
-  it('the thinking-ack timer records the turn and time', () => {
-    const at = SERVER.indexOf('fillerStarted = true;');
-    const block = SERVER.slice(at, at + 300);
-    assert.match(block, /thinkingAckTurn = turnTiming/);
-    assert.match(block, /thinkingAckAtMs = Date\.now\(\)/);
-  });
-
-  it('the tool outcome is trimmed and the transcript matches what is spoken', () => {
-    const at = SERVER.indexOf('const outcomeLine = trimAckLead(');
-    assert.ok(at > 0);
-    const block = SERVER.slice(at, at + 300);
-    assert.match(block, /callTranscript\.pushAgent\(outcomeLine\)/);
-    assert.match(block, /speakText\(outcomeLine\)/);
+  // B2: the tool hold, the thinking-ack timer and the trimmed tool outcome line were the old Gemini turn's; deleted
+  // with it. The v2 turn speaks its own receipt (engines commit line) and the engines filler owns the wait.
+  it('B2: the old turn\'s tool hold / thinking-ack timer / outcome line are gone', () => {
+    assert.ok(SERVER.indexOf('async function speakToolHold(') < 0);
+    assert.ok(SERVER.indexOf('fillerStarted = true;') < 0);
+    assert.ok(SERVER.indexOf('const outcomeLine = trimAckLead(') < 0);
   });
 
   it('tool turns still get the adaptive filler (#617)', () => {

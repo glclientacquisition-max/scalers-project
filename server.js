@@ -104,18 +104,14 @@ const { writeWavResponse } = require('./src/speech/wavPack');
 const {
   buildSystemPrompt,
   buildGreeting,
-  VOICE_SYSTEM_PROMPT_ID,
-  VOICE_SYSTEM_PROMPT_VERSION,
 } = require('./src/prompts');
 const { createVoiceTrace } = require('./src/speech/voiceTrace');
-const { brainV2ShadowEnabled, createBrainV2Shadow } = require('./src/conversation/v2Shadow');
-const { brainV2Enabled, brainV2Mode, brainEnginesOn } = require('./src/conversation/v2/flag');
 const { createEnginesFillerTurn } = require('./src/speech/enginesFillerStanddown');
 const brainV1Draft = require('./src/conversation/v2/v1draft');
 const { planFillerCut, carryHeldSpeech } = require('./src/speech/fillerCut');
 const { createBrainV2Live } = require('./src/conversation/v2/liveTurn');
 const brainModelLead = require('./src/conversation/v2/modelLead');
-// BRAIN_V2_OWNS_CALL (plan C3, default off): v2 is the only owner of a live-mode call.
+// v2 owns every call (B2: BRAIN_V2_OWNS_CALL collapsed to always on; there is no other caller-turn brain).
 const v2OwnsCall = require('./src/conversation/v2/ownsCall');
 const ownedV2Calls = v2OwnsCall.createOwnedCalls();
 const ackRule = require('./src/speech/ackRule');
@@ -204,13 +200,10 @@ const {
   liveCallerFileStamp,
 } = require('./src/conversation/callerMemory');
 const {
-  formatNameConfirmSpeech,
   looksLikeHistoryReview,
   looksLikeOpenVisitLookup,
   looksLikeVisitReviewMore,
-  openLineHoldDecision,
   planVisitReadTurn,
-  shouldPublishOpenFileSentence,
 } = require('./src/conversation/openLineSpeech');
 const { extractConversationEntities } = require('./src/conversation/entityExtraction');
 const { collectKnownCallerNames } = require('./src/conversation/callerNameMatch');
@@ -233,9 +226,6 @@ const {
 } = require('./src/conversation/toolExecution');
 const { deriveCallResolution } = require('./src/conversation/callResolution');
 const {
-  planConfirmFileRead,
-  planRejectedCreate,
-  markReaskSpoken,
   noteRejectedCreate,
   settleRejectedCreate,
   reaskSlotLine,
@@ -253,7 +243,6 @@ const {
   extractThoughtSignature,
   extractGeminiParts,
   extractGeminiFunctionCalls,
-  appendGeminiStreamParts,
   modelPartsForHistory,
   buildGeminiContents,
   geminiTurnTimeoutMs,
@@ -262,10 +251,6 @@ const {
   isRetryableGeminiError,
   classifyGeminiError,
   isHardGeminiOutage,
-  geminiPrimaryModel,
-  geminiBackupModel,
-  nextGeminiStreamAttempt,
-  resolvePrefetchedStreamSpeech,
   spokenTextForToolTurn,
 } = require('./src/conversation/geminiVoice');
 const {
@@ -363,45 +348,22 @@ const {
 const {
   generateDynamicGreeting,
   pickContextualAck,
-  pickActionProgress,
-  planEmptyGeminiSpeech,
-  shouldSpeakHandoffNameAsk,
-  pickLlmRecoveryLine,
   pickIdleNudgeLine,
   pickLlmRecoverySaved,
   shouldSkipCallerTurn,
-  shouldSpeakThinkingAck,
-  looksLikeBareCloser,
   polishSpokenReply,
-  polishSpokenDetail,
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
-const { resolveLocalReply, planCallerModelTurn } = require('./src/conversation/turnPolicy');
-const { planLookupTurn } = require('./src/conversation/router');
+const { planCallerModelTurn } = require('./src/conversation/turnPolicy');
 const { lookupWithDeadline, lookupToolDeclaration } = require('./src/knowledge/lookup');
 const { lookupToolEnabled } = require('./src/knowledge/flags');
 const { unfinishedTurnHold } = require('./src/conversation/unfinishedTurn');
-const {
-  drainSpokenSpeakSlots,
-  isSpeakSlotOutcome,
-} = require('./src/conversation/speakSlots');
-const { narratesInternalAction, groundFilePriceLine } = require('./src/conversation/speechGuard');
 const { promptClockStale, stampPromptClock } = require('./src/conversation/trustedFacts');
 const { usableLeadReason } = require('./src/conversation/leadReason');
 const { noteSpokenPendingAsk } = require('./src/conversation/callCorrectives');
-const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
-const { planV2CatalogueMouth } = require('./src/conversation/v2CatalogueTurn');
 const { createTurnArbiter, turnArbiterEnabled } = require('./src/speech/turnArbiter');
-const { buildTurnProposals, bookOutranksListTurn } = require('./src/conversation/turnProposals');
 const { pinSpokenCatalogue } = require('./src/knowledge/spokenCatalogue');
-const {
-  catalogueGeminiDirective,
-  geminiCatalogueEnabled,
-  geminiReasoningDown,
-  planCatalogueMouth,
-  softenCataloguePunctuation,
-} = require('./src/speech/catalogueMouth');
 const {
   shouldForwardOutboundPcm,
   isOrphanFragment,
@@ -425,25 +387,17 @@ const {
   speakerBound,
 } = require('./src/speech/callerFileSpeech');
 const {
-  authorizeSpeak,
   createSpeakCommit,
-  commitTurnFacts,
-  commitReadySpeakSlots,
 } = require('./src/speech/speakPacket');
 const {
   createToolHoldSession,
   fileReadFollowUp,
-  planHoldTiming,
-  toolStillRunningAfter,
-  trimAckLead,
   turnRequestsTool,
 } = require('./src/speech/toolHold');
 const { appendFinalPart, joinUtteranceParts } = require('./src/speech/utteranceJoin');
 const { queueToolOutcome, takeToolOutcome, peekToolOutcome } = require('./src/conversation/toolOutcomeQueue');
 const {
   owedConfirmFoldEnabled,
-  foldOwedIntoReply,
-  stripSavedClaimAfterReceipt,
 } = require('./src/speech/owedConfirmFold');
 const {
   findDuplicateServiceRequest,
@@ -460,14 +414,9 @@ const {
 } = require('./src/sautikit/closedTenantGuard');
 const closedLineCalls = createClosedLineCalls();
 const { startLineUnavailableClipRefresh } = require('./src/sautikit/lineUnavailableAudio');
-const { coverageNextStepFor } = require('./src/conversation/coverageNextStep');
 const {
-  createSpokenStreamBuffer,
-  joinSpokenPieces,
   speakPreparedSentences,
 } = require('./src/speech/spokenStreamBuffer');
-const { createStreamJoinTrace } = require('./src/speech/streamJoinTrace');
-const { cutNoAiSlop } = require('./src/speech/noAiSlop');
 const {
   createOverlapHold,
   createAgentReplayMemory,
@@ -478,7 +427,7 @@ const { createUnfinishedHold, unfinishedHoldMs } = require('./src/speech/unfinis
 const { noteCallTerminal, callTerminalSince } = require('./src/speech/callLifecycle');
 const endedCalls = require('./src/speech/endedCalls');
 const { createCallFinalizer } = require('./src/callFinalize');
-const { planBrainEndClose, runBrainEndClose, farewellHangupDelayMs } = require('./src/speech/callClose');
+const { farewellHangupDelayMs } = require('./src/speech/callClose');
 const {
   endCallHonourEnabled,
   createPlayoutClock,
@@ -1611,7 +1560,7 @@ const ownedV2FinishTimers = new Map();
 /** BRAIN_V2_OWNS_CALL: machine.finishCall once per call, at hangup. A provisional
  *  close (media dropped, the call may resume) waits out the reconnect window. */
 function finishOwnedV2Call(callSid, { provisional = false, source = 'hangup' } = {}) {
-  if (!callSid || !v2OwnsCall.ownsCallEnabled() || !ownedV2Calls.getLive(callSid)) return null;
+  if (!callSid || !ownedV2Calls.getLive(callSid)) return null;
   if (provisional) {
     if (!ownedV2FinishTimers.has(callSid)) {
       const t = setTimeout(() => {
@@ -2629,8 +2578,6 @@ mediaWss.on('connection', (ws, req) => {
   let playbackBytes = 0;
   let playbackStartedAt = 0;
   let lastAgentText = '';
-  let llmRecoveryOffered = false;
-  let emptyRepairOffered = false;
   let turnBusy = false;
   let utteranceParts = [];
   let utteranceLanguages = [];
@@ -2821,9 +2768,8 @@ mediaWss.on('connection', (ws, req) => {
     weakStt: false,
     tokenLanguages: [],
   };
-  // VOICE_GUARD_TRUSTED_FACTS: the clock instant behind CURRENT TIME IN KENYA.
+  // VOICE_GUARD_TRUSTED_FACTS: the clock instant the speech guard trusts (B2: no per-call system prompt).
   let promptClockAt = new Date();
-  let systemPrompt = buildSystemPrompt({}, { now: promptClockAt });
   let greetingLine = buildGreeting(process.env.BUSINESS_NAME || 'the business');
   let businessName = process.env.BUSINESS_NAME || 'the business';
   let agentName = process.env.AGENT_NAME || 'Receptionist';
@@ -2833,12 +2779,10 @@ mediaWss.on('connection', (ws, req) => {
   let openStatus = 'unknown';
   let afterHoursMode = 'serve';
   let closureNotice = null;
-  let messages = [{ role: 'system', content: systemPrompt }];
+  let messages = [];
   const callTranscript = createCallTranscript();
   if (sessionCallSid) callSpokenTranscripts.set(sessionCallSid, callTranscript);
-  /** BA v2 shadow runner; created on first caller turn only when BRAIN_V2_SHADOW is on. */
-  let brainV2Shadow = null;
-  /** BA v2 live mouth; created on first caller turn only when BRAIN_V2=on and MODE=live. */
+  /** The v2 brain for this call (one runner per call sid, ownedV2Calls); set on the first caller turn. */
   let brainV2Live = null;
   function logTurnTiming(timing, extra) {
     if (!timing) return null;
@@ -3065,78 +3009,20 @@ mediaWss.on('connection', (ws, req) => {
   let activeTurnTiming = null;
   // The turn whose thinking-ack started last, and when. A tool hold on that
   // same turn is skipped while the ack is recent (HD_c98820e579e1 t10).
-  let thinkingAckTurn = null;
-  let thinkingAckAtMs = 0;
-  // An ack or a hold played on this turn: a tool outcome drops its "Okay." lead.
-  let ackPlayedTurn = null;
-  // VOICE_TOOL_SMOOTH (default off): heard-audio clock, cached hold gap-fill, cached receipts.
   const smooth = toolSmooth.toolSmoothFlags();
   const mediaClock = smooth.trace || smooth.hold ? toolSmooth.createMediaClock() : null;
   if (mediaClock) MEDIA_CLOCKS.set(ws, mediaClock);
   let holdFillTimer = null;
   let holdsQueued = 0;
   /** Filler text this turn: the hold pack skips it (ack rule plays "Naangalia." on tool turns). */
-  let turnFillerText = '';
   let receiptCachedTurn = false;
   function stopHoldFill() {
     if (holdFillTimer) clearInterval(holdFillTimer);
     holdFillTimer = null;
   }
-  // Items 1-2: while the tool runs, queue a cached same-voice hold line just before
-  // the queued audio (ack/filler) runs out. Cached only: never a live-TTS seam.
-  function holdLinesForTurn() {
-    return toolSmooth.holdFillLines(callLanguage).filter((l) => l !== turnFillerText);
-  }
-  function lookupHoldPcm(line) {
-    return lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage: toolSmooth.holdLanguage(callLanguage), extraLexicon: ttsLexiconOverrides });
-  }
-  /** Returns false when the first hold line is not cached (caller falls back to live hold). */
-  function startHoldFill() {
-    if (!mediaClock || holdFillTimer) return Boolean(holdFillTimer);
-    const first = holdLinesForTurn()[0];
-    if (!isFillerCacheEnabled() || !lookupHoldPcm(first).pcm) {
-      console.log(`[ws/media][${sidLabel()}] tool-smooth hold miss (not warmed), live hold: ${first}`);
-      return false;
-    }
-    const turnAtStart = activeTurnTiming;
-    holdFillTimer = setInterval(() => {
-      if (!turnBusy || bargeInActive || activeTurnTiming !== turnAtStart || ttsSpeedScale !== 1) return stopHoldFill();
-      if (!toolSmooth.shouldQueueHold({ toolPending: true, remainingMs: mediaClock.remainingMs(), played: holdsQueued })) {
-        if (holdsQueued >= toolSmooth.HOLD_MAX) stopHoldFill();
-        return;
-      }
-      const line = holdLinesForTurn()[holdsQueued];
-      if (!line) return stopHoldFill();
-      const found = lookupHoldPcm(line);
-      if (!found.pcm) {
-        console.log(`[ws/media][${sidLabel()}] tool-smooth hold miss n=${holdsQueued}: ${line}`);
-        return stopHoldFill();
-      }
-      holdsQueued += 1;
-      ackPlayedTurn = activeTurnTiming;
-      voiceTrace.noteFiller({ text: line, before: line, language: callLanguage });
-      console.log(`[ws/media][${sidLabel()}] tool-smooth hold queued n=${holdsQueued} remaining=${mediaClock.remainingMs()}ms: ${line}`);
-      mediaClock.tag('hold');
-      sendPcmToMedia(ws, found.pcm);
-      mediaClock.tag('tts');
-    }, 40);
-    return true;
-  }
-  // Item 3: a receipt already rendered at call start plays with no TTS start-up seam.
-  function playCachedReceipt(line) {
-    if (turnArbiter.enabled && !turnArbiter.admit(line, { tracePath: 'cached_receipt' }).ok) return null;
-    if (!isFillerCacheEnabled() || ttsSpeedScale !== 1) return null;
-    const found = lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: line, callLanguage: toolSmooth.holdLanguage(callLanguage), extraLexicon: ttsLexiconOverrides });
-    if (!found.pcm) return null;
-    receiptCachedTurn = true;
-    voiceTrace.noteTts({ text: found.prepared.text, before: String(line), language: found.prepared.language });
-    console.log(`[ws/media][${sidLabel()}] tool-smooth receipt cached bytes=${found.pcm.length}: ${line}`);
-    return playCachedFillerPcm(found.pcm, { text: line, trace: false, kind: 'receipt' });
-  }
   // VOICE_ACK_RULE (default off): per-call heard-ack tracker. null = rule off.
   const ackTracker = ackRule.ackRuleEnabled() ? ackRule.createAckTracker() : null;
   /** VOICE_ACK_RULE: the turn on which a word filler (not Mm.) actually played. */
-  let wordAckTurn = null;
   /** Rolling interim hypothesis while agent is busy (for barge-in). */
   let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
@@ -3257,7 +3143,6 @@ mediaWss.on('connection', (ws, req) => {
       openStatus = openClosedStatus(hoursSchedule);
       closureNotice = bulletinClosureNotice(profile.dailyBulletin);
       promptClockAt = new Date();
-      systemPrompt = buildSystemPrompt(profile, { now: promptClockAt });
       ttsLexiconOverrides = Array.isArray(profile.ttsLexicon)
         ? profile.ttsLexicon
         : [];
@@ -3286,7 +3171,7 @@ mediaWss.on('connection', (ws, req) => {
         callerFileName:
           afterHoursMode === 'message' ? messageFileOwnerName(profile) : '',
       });
-      messages = [{ role: 'system', content: systemPrompt }];
+      messages = [];
       const carriedHistory = openingCarry()?.messages;
       if (Array.isArray(carriedHistory) && carriedHistory.length) messages.push(...carriedHistory);
       profileLoaded = true;
@@ -3781,41 +3666,6 @@ mediaWss.on('connection', (ws, req) => {
     }
   }
 
-  async function speakToolHold(spoken) {
-    if (!spoken?.speak || bargeInActive) return;
-    if (smooth.hold && spoken.kind === 'hold' && mediaClock) {
-      if (startHoldFill()) return;
-      // Cache miss: fall through to the live hold line below (never silent).
-    }
-    if (spoken.kind === 'hold' && thinkingAckTurn && thinkingAckTurn === activeTurnTiming) {
-      const timing = planHoldTiming({ kind: spoken.kind, ackAtMs: thinkingAckAtMs });
-      if (timing.mode === 'skip') {
-        console.log(
-          `[ws/media][${sidLabel()}] tool hold skipped after thinking-ack ${Date.now() - thinkingAckAtMs}ms: ${spoken.line}`
-        );
-        return;
-      }
-      if (timing.mode === 'defer') {
-        const turnAtDefer = activeTurnTiming;
-        const slow = await toolStillRunningAfter(spoken.toolSettled, timing.delayMs);
-        if (!slow) {
-          console.log(
-            `[ws/media][${sidLabel()}] tool hold skipped (tool done <${timing.delayMs}ms after thinking-ack): ${spoken.line}`
-          );
-          return;
-        }
-        if (bargeInActive || activeTurnTiming !== turnAtDefer) return;
-        console.log(
-          `[ws/media][${sidLabel()}] tool hold after thinking-ack (tool still running ${timing.delayMs}ms): ${spoken.line}`
-        );
-      }
-    }
-    if (spoken.kind === 'hold') ackPlayedTurn = activeTurnTiming;
-    await speakText(spoken.line, {
-      isFiller: spoken.kind === 'hold',
-      skipFileGate: spoken.kind === 'hold',
-    });
-  }
 
   async function speakText(text, opts = {}) {
     // VOICE_TURN_ARBITER: the only TTS entry. A claimed turn speaks its sealed packet only.
@@ -4037,12 +3887,6 @@ mediaWss.on('connection', (ws, req) => {
     releaseQueuedCallerSpeech(endingGen);
   }
 
-  function discardUnspokenAssistant(reply) {
-    const last = messages[messages.length - 1];
-    if (last?.role === 'assistant' && last.content === reply) {
-      messages.pop();
-    }
-  }
 
   let lastBargeSkipLogAt = 0;
   function maybeBargeIn(text, source) {
@@ -4167,84 +4011,6 @@ mediaWss.on('connection', (ws, req) => {
     });
   }
 
-  function currentLlmRecoveryLine() {
-    return pickLlmRecoveryLine({
-      language: callLanguage,
-      alreadyOffered: llmRecoveryOffered,
-    });
-  }
-
-  async function resolveLlmRecoverySpeech(userText = '', opts = {}) {
-    const health = getGeminiProviderHealth();
-    if (!llmRecoveryOffered && (health.billingExhausted || health.denied)) {
-      void noteSpeechOutage({ profile: brainProfile, kind: 'llm' }).catch((err) => {
-        console.warn(
-          `[ws/media][${sidLabel()}] owner reasoning alert failed:`,
-          err?.message || err
-        );
-      });
-    }
-    const planned = planLlmRecovery({
-      userText,
-      alreadyOffered: llmRecoveryOffered,
-      language: callLanguage,
-    });
-    if (planned.saved && planned.name) {
-      try {
-        await db.saveCallerInfo({
-          callSid: sidLabel(),
-          name: planned.name,
-          reason: 'Live line could not complete. Team to follow up.',
-        });
-        maybeSendWhatsAppNotification(sidLabel()).catch((err) => {
-          console.error(`[ws/media][${sidLabel()}] owner notify failed:`, err?.message || err);
-        });
-      } catch (err) {
-        console.error(
-          `[ws/media][${sidLabel()}] llm recovery save failed:`,
-          err?.message || err
-        );
-      }
-    }
-    // A catalogue outage speaks the Phase-0 list and must not burn the
-    // name-ask offer. The next miss still asks for a name.
-    if (opts.consumeOffer !== false) llmRecoveryOffered = true;
-    return planned.spoken;
-  }
-
-  // A demand spike or a broken stream asks them to repeat once.
-  // The reach-them name line is only for credits or a denied project.
-  async function speechWhenModelMissed(result, userText, localReply) {
-    if (result?.llmHardDown) {
-      const mouth = planCatalogueMouth({
-        localReply,
-        text: userText,
-        profile: brainProfile,
-        language: callLanguage,
-        reasoningDown: true,
-        geminiCatalogue: geminiCatalogueEnabled(),
-      });
-      if (mouth.speakLocal && mouth.line) {
-        await resolveLlmRecoverySpeech(userText, { consumeOffer: false });
-        return mouth.line;
-      }
-      return resolveLlmRecoverySpeech(userText);
-    }
-    const planned = planEmptyGeminiSpeech({
-      brainState,
-      language: callLanguage,
-      userText,
-      llmDown: false,
-      alreadyOffered: emptyRepairOffered,
-      toolResults: result?.toolResults,
-    });
-    if (planned.speak && planned.line) {
-      emptyRepairOffered = true;
-      return planned.line;
-    }
-    return '';
-  }
-
   async function runCallerTurn(userText, opts = {}) {
     let clean = String(userText || '').replace(/\s+/g, ' ').trim();
     const labelTurn = (text) =>
@@ -4259,10 +4025,9 @@ mediaWss.on('connection', (ws, req) => {
       });
     let flushed = labelTurn(clean);
     if (!clean) return;
-    // BRAIN_V2_OWNS_CALL: once v2 has ended the call (goodbye spoken, end honoured),
-    // no v1 path (reinvite, skip, local, Gemini) may open another turn.
+    // Once v2 has ended the call (goodbye spoken, end honoured), no turn may open again.
     // A media session that reconnects to a call v2 already ended asks for the same single hangup.
-    if (v2OwnsCall.ownsCallEnabled() && ownedV2Calls.ended(sidLabel())) {
+    if (ownedV2Calls.ended(sidLabel())) {
       console.log(`[ws/media][${sidLabel()}] brain_v2_owned: turn after end dropped: ${clean.slice(0, 80)}`);
       if (!callEnding) requestEndCall('v2_already_ended', ownedV2Calls.ended(sidLabel()).reason);
       return;
@@ -4455,7 +4220,6 @@ mediaWss.on('connection', (ws, req) => {
       promptClockStale(promptClockAt, promptNow)
     ) {
       promptClockAt = promptNow;
-      systemPrompt = buildSystemPrompt(brainProfile, { now: promptClockAt });
     }
     const nextBestAction = determineNextBestAction({ state: brainState, capabilities });
     brainState = setNextBestAction(brainState, nextBestAction);
@@ -4491,87 +4255,9 @@ mediaWss.on('connection', (ws, req) => {
     callTranscript.pushCaller(clean);
     messages.push({ role: 'user', content: clean });
     if (ackTracker) ackTracker.beginTurn({ callerText: clean });
-    // BA v2 shadow (BRAIN_V2_SHADOW, default off): log-only, never awaited,
-    // never spoken, dry-run writes only. Flag off = no code below runs.
-    if (
-      brainV2ShadowEnabled({ tenantId: brainProfile?.id }) &&
-      !(brainV2Enabled({ tenantId: brainProfile?.id }) && brainV2Mode() === 'live')
-    ) {
-      try {
-        if (!brainV2Shadow) {
-          brainV2Shadow = createBrainV2Shadow({
-            callLabel: () => callKey,
-            // Read once at the shadow's first turn (after caller memory hydrated).
-            callerFile: () => {
-              const mem = brainProfile?.callerMemory || {};
-              return {
-                callerPhone: brainState?.caller?.phone || mem.phone || null,
-                contactName: mem.fileOwnerName || mem.name || null,
-                openRows: Array.isArray(mem.openRows) ? mem.openRows : [],
-              };
-            },
-          });
-        }
-        const shadowTurnIndex = voiceTrace.currentTurnIndex();
-        void brainV2Shadow
-          .fire({
-            text: clean,
-            profile: brainProfile,
-            langLock: callLanguage,
-            turnIndex: shadowTurnIndex,
-            ...(ackTracker
-              ? {
-                  // true only when a word filler actually played this turn (read after the filler delay)
-                  acked: () => wordAckTurn === turnTiming,
-                  ackWaitMs: resolveVoiceProfile().fillerDelayMs + 80,
-                  ackRule: true,
-                  stripAck: ackRule.stripAckLead,
-                }
-              : {}),
-            onResult: (stage) => {
-              console.log(
-                `[brain_v2_shadow][${callKey}] turn=${shadowTurnIndex} ttft=${stage.ttftMs}` +
-                  ` total=${stage.totalMs} tools=${stage.toolIntents.map((t) => t.name).join(',') || '-'}` +
-                  ` timedOut=${stage.timedOut}`
-              );
-              if (shadowTurnIndex != null) voiceTrace.noteBrainV2Shadow(stage);
-            },
-          })
-          .catch(() => null);
-      } catch (err) {
-        console.warn(`[ws/media][${callKey}] brain_v2_shadow failed:`, err?.message || err);
-      }
-    }
-
-    const turnMatches = selectProductsForTurn({
-      catalog: brainProfile.productCatalog,
-      queryText: clean,
-      entities: brainState.entities,
-      intent: brainState.intent,
-    });
-    const catalogSize = normalizeProducts(brainProfile.productCatalog).length;
-    const turnSystemPrompt = [
-      systemPrompt,
-      formatAuthorityPolicy(capabilities),
-      formatBrainStateForPrompt(brainState),
-      formatEscalateActionDirective(brainState),
-      formatCreateRequestDirective(brainState),
-      formatTargetedProductsForPrompt(turnMatches, {
-        totalCatalogSize: catalogSize,
-        queryText: clean,
-        catalog: brainProfile.productCatalog,
-      }),
-      languageDirective(callLanguage),
-    ]
-      .filter(Boolean)
-      .join('\n\n');
-
     let spokeThisTurn = false;
     let progressAlreadySpoken = false;
-    let hidInternalNarration = false;
     let speechHold = { holdSpeech: false, holdNameConfirm: false, holdVisitLookup: false };
-    let suppressModelSpeech = false;
-    let spokeLookupSentence = false;
     try {
       // Ground the file fact and commit it before the name ask and before END.
       // A later gate reads the packet. It does not refuse the outcome.
@@ -4585,34 +4271,6 @@ mediaWss.on('connection', (ws, req) => {
             line: String(slot.line || ''),
             language: slot.language || null,
           }));
-      }
-      function packetRows() {
-        return [...speakCommit.unsaidPublic(), ...speakCommit.unsaidStepUp()].map((row) => ({
-          tier: row.tier,
-          outcome: row.outcome,
-          text: row.text,
-        }));
-      }
-      function traceCommittedPackets(before) {
-        const seen = new Set(before.map((row) => `${row.tier}|${row.outcome}|${row.text}`));
-        for (const row of packetRows()) {
-          const key = `${row.tier}|${row.outcome}|${row.text}`;
-          if (seen.has(key)) continue;
-          voiceTrace.noteSpeakPacket({
-            tier: row.tier,
-            outcome: row.outcome,
-            text: row.text,
-            committed: true,
-          });
-          seen.add(key);
-        }
-      }
-      function noteSlotDrain(before) {
-        const after = slotRows(brainState);
-        const removed = before.filter(
-          (slot) => !after.some((row) => row.outcome === slot.outcome && row.line === slot.line)
-        );
-        if (removed.length) voiceTrace.noteSpeakSlots({ action: 'drain', slots: removed });
       }
       if (turnArbiter.enabled) turnArbiter.beginTurn(clean);
       // A booking or callback confirmed after a barge-in is still owed.
@@ -4637,1506 +4295,142 @@ mediaWss.on('connection', (ws, req) => {
           }
         }
       }
-      function consumeOwedFold(replyLines) {
-        if (!owedConfirmFoldEnabled() || !owedReceiptForFold) {
-          return { lines: replyLines, folded: false };
-        }
-        const folded = foldOwedIntoReply(owedReceiptForFold, replyLines);
-        takeToolOutcome(brainState);
-        callBrainStates.set(callKey, brainState);
-        owedReceiptForFold = '';
-        if (folded.folded) {
-          console.log(`[ws/media][${callKey}] folded queued tool outcome into reply`);
-        }
-        return folded;
-      }
       const slotsBeforeReply = slotRows(brainState);
-      const v2Live = brainV2Enabled({ tenantId: brainProfile?.id }) && brainV2Mode() === 'live';
-      const v2Owns = v2Live && v2OwnsCall.ownsCallEnabled();
-      if (v2Owns) {
-        // BRAIN_V2_OWNS_CALL: v2 is the only owner of this turn. Its line (or the v2 repair
-        // template on an error) is spoken as is, past the v1 caller-file gate, and no v1
-        // local, lookup or Gemini path runs after it.
-        if (ownedV2Calls.ended(callKey)) {
-          console.log(`[ws/media][${callKey}] brain_v2_owned: call already ended by v2; no new turn`);
-          requestEndCall('v2_already_ended', ownedV2Calls.ended(callKey).reason);
-          return;
-        }
-        const makeLive = () => {
-          const mem = brainProfile?.callerMemory || {};
-          return createBrainV2Live({
-            applyTools: (parsed) => applyGeminiTools(callKey, parsed, { v2Owned: true }),
-            // C7 BRAIN_V2_MODEL=shadow: per-turn model-vs-rules stage on this turn's trace row (inert when off)
-            onModelStage: (stage) => { try { voiceTrace.noteBrainV2Model({ ...stage, turnIndex: stage.turnIndex ?? voiceTrace.currentTurnIndex() }); } catch { /* trace only */ } },
-            traceTurnIndex: () => voiceTrace.currentTurnIndex(),
-            callSid: callKey,
-            recordWriteReceipt: typeof db.recordWriteReceipt === 'function' ? db.recordWriteReceipt : undefined,
-            confirmCallerName: typeof db.confirmCallerName === 'function' ? db.confirmCallerName : undefined,
-            callerFile: {
-              callerPhone: brainState?.caller?.phone || mem.phone || null,
-              contactName: mem.fileOwnerName || mem.name || brainState?.caller?.name || null,
-              openRows: Array.isArray(mem.openRows) ? mem.openRows : [],
-              // BRAIN_MODEL_LEAD (decision 5): the file's confirmed-name flag (contacts.name_confirmed) and shared-line
-              // flag reach the brain, so a name confirmed on an earlier call is used and an unconfirmed one is asked.
-              ...(brainModelLead.leadOn({ tenantId: brainProfile?.id }) ? { nameConfirmed: mem.nameConfirmed === true, sharedLine: mem.sharedLine === true } : {}),
-            },
-          });
-        };
-        // One runner per call sid: a reconnecting media session keeps the same v2 state.
-        brainV2Live = ownedV2Calls.live(callKey, makeLive, {
-          businessName: brainProfile?.businessName || businessName || '',
-          callerPhone: brainState?.caller?.phone || brainProfile?.callerMemory?.phone || null,
-          profile: brainProfile,
-        });
-        // BRAIN_V1_DRAFT=on (DnD only): verified sentences stream to TTS one by one as they pass the
-        // verifier; the existing contextual filler plays at 0.9 s if nothing verified is ready yet.
-        const v1DraftOn = brainV1Draft.mode({ tenantId: brainProfile?.id }) === 'on';
-        const v1PhaseA = v1DraftOn && brainV1Draft.phaseA({ tenantId: brainProfile?.id });
-        let v1Chain = Promise.resolve();
-        let v1Streamed = 0;
-        let v1Filler = null;
-        // BRAIN_ENGINES (#975): the Brain emits its own topic filler ({ filler: true }) at 700 ms. One filler per
-        // turn: a Brain filler stands Voice's 900 ms filler down (and the reverse); a streamed result is never
-        // re-spoken. Off = the v1Filler / onV1Sentence code below, unchanged.
-        const enginesFiller = v1DraftOn && brainModelLead.leadOn({ tenantId: brainProfile?.id }) && brainEnginesOn({ tenantId: brainProfile?.id })
-          ? createEnginesFillerTurn({
-              fillerMs: brainV1Draft.DEADLINES.fillerMs,
-              isBarged: () => bargeInActive === true,
-              pickVoiceFiller: () => pickContextualAck(clean, fillerLanguage(callLanguage)),
-              playFiller: (text) => {
-                fillerPending = true;
-                return speakThinkingAck(text).catch(() => {}).finally(() => { fillerPending = false; abortPendingFiller = false; });
-              },
-              speakLine: (text) => speakText(text, { tracePath: 'brain_v1_draft', skipFileGate: true }),
-              cutFillerForReply,
-              phaseA: v1PhaseA,
-              markFiller: () => { if (turnTiming && typeof turnTiming.markFiller === 'function') turnTiming.markFiller(); },
-              markFirstSpokenChunk: () => { if (turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') turnTiming.markFirstSpokenChunk(); },
-              log: (m) => console.log(`[ws/media][${callKey}] ${m}`),
-            })
-          : null;
-        if (enginesFiller) enginesFiller.arm();
-        if (v1DraftOn && !enginesFiller) {
-          v1Filler = setTimeout(() => {
-            v1Filler = null;
-            if (v1Streamed || bargeInActive) return;
-            const f = pickContextualAck(clean, fillerLanguage(callLanguage));
-            if (!f) return;
-            if (turnTiming && typeof turnTiming.markFiller === 'function') turnTiming.markFiller();
-            console.log(`[ws/media][${callKey}] brain_v1_draft filler at=${brainV1Draft.DEADLINES.fillerMs}ms: ${f}`);
-            fillerPending = true;
-            speakThinkingAck(f).catch(() => {}).finally(() => { fillerPending = false; abortPendingFiller = false; });
-          }, brainV1Draft.DEADLINES.fillerMs);
-        }
-        const onV1Sentence = enginesFiller
-          ? enginesFiller.onSentence
-          : v1DraftOn
-          ? (s) => {
-              if (v1Filler) { clearTimeout(v1Filler); v1Filler = null; }
-              if (!v1Streamed && turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') turnTiming.markFirstSpokenChunk();
-              v1Streamed += 1;
-              const first = v1Streamed === 1;
-              v1Chain = v1Chain
-                .then(() => (v1PhaseA && first ? cutFillerForReply() : null))
-                .then(() => (bargeInActive ? { ok: false, barged: true } : speakText(s.text, { tracePath: 'brain_v1_draft', skipFileGate: true }))).catch(() => ({ ok: false }));
-            }
-          : undefined;
-        const live = await v2OwnsCall.runOwnedTurn(
-          brainV2Live,
-          {
-            text: clean,
-            profile: brainProfile,
-            langLock: callLanguage === 'en' || callLanguage === 'sw' ? callLanguage : null,
-            shouldAbort: () => bargeInActive === true,
-            ...(onV1Sentence ? { onSentence: onV1Sentence } : {}),
-            ...(v1PhaseA ? { heardAgent: v1HeardSinceLastTurn() } : {}),
-          },
-          { log: (m) => console.log(`[ws/media][${callKey}] ${m}`) }
-        );
-        if (v1Filler) { clearTimeout(v1Filler); v1Filler = null; }
-        if (enginesFiller) enginesFiller.cancel();
-        console.log(`[ws/media][${callKey}] brain_v2_live owned lang=${live.lang}${live.path ? ` path=${live.path}` : ''}${live.endHeld ? ` end_held=${live.endHeld}` : ''}: ${live.line}`);
-        callTranscript.pushAgent(live.line);
-        v1HeardMark = callTranscript.size();
-        let spoken;
-        const enginesSpoken = enginesFiller ? await enginesFiller.finish(live) : null;
-        if (enginesSpoken) {
-          spoken = enginesSpoken.spoken;
-        } else if (live.streamed && v1Streamed) {
-          spoken = await v1Chain;
-        } else {
-          if (turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') {
-            turnTiming.markFirstSpokenChunk();
-          }
-          if (v1PhaseA) await cutFillerForReply();
-          spoken = await speakText(live.line, {
-            tracePath: live.repaired ? 'brain_v2_repair' : 'brain_v2_live',
-            skipFileGate: true,
-          });
-        }
-        if (spoken?.ok !== false) {
-          spokeThisTurn = true;
-          messages.push({ role: 'assistant', content: live.line, local: true });
-          const v2End = endSignalFromBrain(live);
-          if (v2End.end) {
-            if (requestEndCall(v2End.source, v2End.reason)) {
-              ownedV2Calls.markEnded(callKey, v2End.reason);
-              console.log(`[ws/media][${callKey}] end-call signal source=${v2End.source}: hangup after audio`);
-            } else {
-              console.log(`[ws/media][${callKey}] brain_v2_owned: end not honoured (VOICE_END_CALL_HONOUR off); call stays open on v2`);
-            }
-          }
-        } else {
-          console.log(`[ws/media][${callKey}] brain_v2_owned: line not played (${spoken?.arbiter || (spoken?.gated ? 'gated' : spoken?.outage ? 'outage' : 'speak_failed')}); no v1 fallback`);
-        }
+      // v2 owns every turn (B2): its line (or the v2 repair template on an error) is spoken as is, past the
+      // caller-file gate. There is no other caller-turn brain to fall back to.
+      if (ownedV2Calls.ended(callKey)) {
+        console.log(`[ws/media][${callKey}] brain_v2_owned: call already ended by v2; no new turn`);
+        requestEndCall('v2_already_ended', ownedV2Calls.ended(callKey).reason);
         return;
       }
-      if (v2Live) {
-        try {
-          if (!brainV2Live) {
-            const mem = brainProfile?.callerMemory || {};
-            brainV2Live = createBrainV2Live({
-              applyTools: (parsed) => applyGeminiTools(callKey, parsed),
-              // C7 BRAIN_V2_MODEL=shadow: per-turn model-vs-rules stage on this turn's trace row (inert when off)
-              onModelStage: (stage) => { try { voiceTrace.noteBrainV2Model({ ...stage, turnIndex: stage.turnIndex ?? voiceTrace.currentTurnIndex() }); } catch { /* trace only */ } },
-              traceTurnIndex: () => voiceTrace.currentTurnIndex(),
-              // BRAIN_V2_COMMIT_SAFETY receipts (#845) + name confirm (#844, when present); unused with the flag off
-              callSid: callKey,
-              resumeState: openingCarry()?.brainV2State || null,
-              recordWriteReceipt: typeof db.recordWriteReceipt === 'function' ? db.recordWriteReceipt : undefined,
-              confirmCallerName: typeof db.confirmCallerName === 'function' ? db.confirmCallerName : undefined,
-              callerFile: {
-                callerPhone: brainState?.caller?.phone || mem.phone || null,
-                contactName: mem.fileOwnerName || mem.name || brainState?.caller?.name || null,
-                openRows: Array.isArray(mem.openRows) ? mem.openRows : [],
-              },
-            });
-          }
-          const live = await brainV2Live.run({
-            text: clean,
-            profile: brainProfile,
-            langLock: callLanguage === 'en' || callLanguage === 'sw' ? callLanguage : null,
-            shouldAbort: () => bargeInActive === true,
-          });
-          if (live?.line) {
-            console.log(`[ws/media][${callKey}] brain_v2_live lang=${live.lang}: ${live.line}`);
-            callTranscript.pushAgent(live.line);
-            if (turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') {
-              turnTiming.markFirstSpokenChunk();
-            }
-            const spoken = await speakText(live.line, { tracePath: 'brain_v2_live' });
-            if (spoken?.ok !== false) {
-              spokeThisTurn = true;
-              messages.push({ role: 'assistant', content: live.line, local: true });
-              // VOICE_END_CALL_HONOUR: v2 { end: true } hangs up once, after this line plays.
-              const v2End = endSignalFromBrain(live);
-              if (v2End.end && requestEndCall(v2End.source, v2End.reason)) {
-                console.log(`[ws/media][${callKey}] end-call signal source=${v2End.source}: hangup after audio`);
-              }
-              return;
-            }
-          }
-        } catch (err) {
-          console.warn(`[ws/media][${callKey}] brain_v2_live failed, using v1:`, err?.message || err);
-        }
-      }
-      const lookupPlan = planLookupTurn({
-        text: clean,
-        state: brainState,
-        profile: brainProfile,
-        language: callLanguage,
-        now: new Date(),
-        turnId: `${sidLabel()}:${brainState?.conversation?.turnCount || 0}`,
-      });
-      if (lookupPlan?.handled) {
-        const lookupWhy = (lookupPlan.lookups || [])
-          .map((row) => `${row.kind}:${row.status}:${row.id || '-'}:${row.reason || '-'}`)
-          .join(',');
-        console.log(
-          `[ws/media][${callKey}] lookup ${lookupPlan.outcome} ${lookupWhy} brainMs=${Number(lookupPlan.brainMs).toFixed(1)} lang=${callLanguage}`
-        );
-        voiceTrace.noteLookup({
-          handled: true,
-          outcome: lookupPlan.outcome,
-          lookups: lookupPlan.lookups,
-          brainMs: lookupPlan.brainMs,
+      const makeLive = () => {
+        const mem = brainProfile?.callerMemory || {};
+        return createBrainV2Live({
+          applyTools: (parsed) => applyGeminiTools(callKey, parsed, { v2Owned: true }),
+          // C7 BRAIN_V2_MODEL=shadow: per-turn model-vs-rules stage on this turn's trace row (inert when off)
+          onModelStage: (stage) => { try { voiceTrace.noteBrainV2Model({ ...stage, turnIndex: stage.turnIndex ?? voiceTrace.currentTurnIndex() }); } catch { /* trace only */ } },
+          traceTurnIndex: () => voiceTrace.currentTurnIndex(),
+          callSid: callKey,
+          recordWriteReceipt: typeof db.recordWriteReceipt === 'function' ? db.recordWriteReceipt : undefined,
+          confirmCallerName: typeof db.confirmCallerName === 'function' ? db.confirmCallerName : undefined,
+          callerFile: {
+            callerPhone: brainState?.caller?.phone || mem.phone || null,
+            contactName: mem.fileOwnerName || mem.name || brainState?.caller?.name || null,
+            openRows: Array.isArray(mem.openRows) ? mem.openRows : [],
+            // the file's confirmed-name flag (contacts.name_confirmed) and shared-line flag reach the brain, so a
+            // name confirmed on an earlier call is used and an unconfirmed one is asked (model-lead decision 5).
+            nameConfirmed: mem.nameConfirmed === true,
+            sharedLine: mem.sharedLine === true,
+          },
         });
-      }
-      const localReply = lookupPlan?.handled
-        ? { outcome: lookupPlan.outcome, line: lookupPlan.speech, lookup: true }
-        : resolveLocalReply({
-            text: clean,
-            state: brainState,
-            profile: brainProfile,
-            language: callLanguage,
-            agentName,
-            businessName,
-            nextBestAction,
-          });
-      const enqueuedSlots = slotRows(brainState).filter(
-        (slot) =>
-          !slotsBeforeReply.some((row) => row.outcome === slot.outcome && row.line === slot.line)
-      );
-      if (enqueuedSlots.length) {
-        voiceTrace.noteSpeakSlots({ action: 'enqueue', slots: enqueuedSlots });
-      }
-      function noteCatalogueListed() {
-        if (!brainState.conversation || typeof brainState.conversation !== 'object') {
-          brainState.conversation = {};
-        }
-        brainState.conversation.catalogueListed = true;
-        callBrainStates.set(callKey, brainState);
-      }
-      // Local Phase-0 breath owns a services ask, including one the name gate
-      // would otherwise take, and a Yes while that list is still pending.
-      const legacyCatalogueMouth = planCatalogueMouth({
-        localReply,
-        text: clean,
+      };
+      // One runner per call sid: a reconnecting media session keeps the same v2 state.
+      brainV2Live = ownedV2Calls.live(callKey, makeLive, {
+        businessName: brainProfile?.businessName || businessName || '',
+        callerPhone: brainState?.caller?.phone || brainProfile?.callerMemory?.phone || null,
         profile: brainProfile,
-        language: callLanguage,
-        state: brainState,
-        callerTurns: brainState?.conversation?.answersReceived,
-        catalogueListed: brainState?.conversation?.catalogueListed === true,
-        reasoningDown:
-          geminiReasoningDown(getGeminiProviderHealth()) ||
-          !String(process.env.GEMINI_API_KEY || '').trim(),
-        geminiCatalogue: geminiCatalogueEnabled(),
       });
-      // VOICE_V2_CATALOGUE off: same object back, nothing logged.
-      const catalogueMouth = await planV2CatalogueMouth(legacyCatalogueMouth, {
-        text: clean,
-        profile: brainProfile,
-        language: callLanguage,
-        state: brainState,
+      // Verified sentences stream to TTS one by one as they pass the guard. B2: the engines run every turn, so
+      // the old BRAIN_V1_DRAFT / PHASE_A / MODEL_LEAD / ENGINES gates are constants here. The non-engines
+      // v1Filler / onV1Sentence branch below is now unreachable (enginesFiller is always set); Voice V1 deletes it.
+      const v1DraftOn = true;
+      const v1PhaseA = true;
+      let v1Chain = Promise.resolve();
+      let v1Streamed = 0;
+      let v1Filler = null;
+      // Engines filler (#975): the Brain emits its own topic filler ({ filler: true }) at 700 ms. One filler per
+      // turn: a Brain filler stands Voice's 900 ms filler down (and the reverse); a streamed result is never
+      // re-spoken.
+      const enginesFiller = createEnginesFillerTurn({
+        fillerMs: brainV1Draft.DEADLINES.fillerMs,
+        isBarged: () => bargeInActive === true,
+        pickVoiceFiller: () => pickContextualAck(clean, fillerLanguage(callLanguage)),
+        playFiller: (text) => {
+          fillerPending = true;
+          return speakThinkingAck(text).catch(() => {}).finally(() => { fillerPending = false; abortPendingFiller = false; });
+        },
+        speakLine: (text) => speakText(text, { tracePath: 'brain_v1_draft', skipFileGate: true }),
+        cutFillerForReply,
+        phaseA: v1PhaseA,
+        markFiller: () => { if (turnTiming && typeof turnTiming.markFiller === 'function') turnTiming.markFiller(); },
+        markFirstSpokenChunk: () => { if (turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') turnTiming.markFirstSpokenChunk(); },
         log: (m) => console.log(`[ws/media][${callKey}] ${m}`),
-        topicLocked: turnArbiter.enabled && turnArbiter.lock()?.topic === 'catalogue',
       });
-      // BRAIN_V2_NLU_GAPS §6a (HD_69f53a46339b T2): "Which service do you offer? I want Deep cleaning
-      // tomorrow, Kilimani." names a service plus a date/place, so it is a booking. No catalogue list
-      // (local, legacy or v2) speaks this turn; the booking reply owns it. Off: same objects as before.
-      const bookOutranksList = bookOutranksListTurn(clean, brainProfile);
-      if (bookOutranksList) console.log(`[ws/media][${callKey}] catalogue yields: booking outranks list`);
-      const turnLocalReply = bookOutranksList && localReply?.outcome === 'catalogue' ? null : localReply;
-      const turnLegacyMouth = bookOutranksList ? null : legacyCatalogueMouth;
-      const turnCatalogueMouth = bookOutranksList ? { speakLocal: false, line: '', v2Proposals: [] } : catalogueMouth;
-      const groundedPriceLine = groundFilePriceLine({
-        profile: brainProfile,
-        text: clean,
-        callerTurns: brainState?.conversation?.answersReceived,
-        state: brainState,
-        language: callLanguage,
-      });
-      // VOICE_TURN_ARBITER: every mouth proposes; the decision is made after the
-      // visit-read / rejected-create paths below (those own their turns).
-      const arbiterProposals = turnArbiter.enabled
-        ? buildTurnProposals({
-            text: clean,
-            lang: callLanguage,
-            doc: brainProfile?.spokenCataloguePin?.doc || null,
-            docVersion: brainProfile?.spokenCataloguePin?.version ?? null,
-            localReply: turnLocalReply,
-            legacyMouth: turnLegacyMouth,
-            v2Mouth: turnCatalogueMouth,
-            groundedPrice: groundedPriceLine,
-            nameJustConfirmed: brainState?.caller?.nameJustConfirmed === true,
-            callerName: brainState?.caller?.name || '',
-            callerNameConfirmed: brainState?.caller?.nameConfirmed === true,
-            catalogueListed: brainState?.conversation?.catalogueListed === true,
-            lock: turnArbiter.lock(),
-          }).concat(turnCatalogueMouth.v2Proposals || []) // BRAIN_V2_TOPIC_PROPOSALS: v2 submits to the arbiter
-        : [];
-      const arbiterClaims = arbiterProposals.length > 0;
-      const packetsBeforeFacts = packetRows();
-      const localPacket = arbiterClaims ? null : commitTurnFacts(speakCommit, {
-        localReply: turnLocalReply,
-        catalogueLine: lookupPlan?.handled
-          ? ''
-          : turnCatalogueMouth.speakLocal && turnCatalogueMouth.line
-            ? turnCatalogueMouth.line
-            : '',
-        catalogueListed: brainState?.conversation?.catalogueListed === true,
-        groundedPrice: lookupPlan?.handled ? '' : groundedPriceLine,
-      });
-      traceCommittedPackets(packetsBeforeFacts);
-      if (turnLocalReply && !localPacket && !arbiterClaims && !authorizeSpeak(turnLocalReply)) {
-        voiceTrace.noteSpeakPacket({
-          tier: 'private',
-          outcome: localReply.outcome,
-          text: localReply.line,
-          committed: false,
-        });
-        console.log(
-          `[ws/media][${callKey}] ${localReply.outcome} local line not spoken lang=${callLanguage}: ${localReply.line}`
-        );
+      if (enginesFiller) enginesFiller.arm();
+      if (v1DraftOn && !enginesFiller) {
+        v1Filler = setTimeout(() => {
+          v1Filler = null;
+          if (v1Streamed || bargeInActive) return;
+          const f = pickContextualAck(clean, fillerLanguage(callLanguage));
+          if (!f) return;
+          if (turnTiming && typeof turnTiming.markFiller === 'function') turnTiming.markFiller();
+          console.log(`[ws/media][${callKey}] brain_v1_draft filler at=${brainV1Draft.DEADLINES.fillerMs}ms: ${f}`);
+          fillerPending = true;
+          speakThinkingAck(f).catch(() => {}).finally(() => { fillerPending = false; abortPendingFiller = false; });
+        }, brainV1Draft.DEADLINES.fillerMs);
       }
-      // Phone file already has a name: ask only that. Do not let the model
-      // ask as if the name were missing, and do not attach visits.
-      // A greeting barge reaches this gate before Gemini. The model does not run.
-      // A committed public fact still speaks before that ask.
-      // The unfinished hold was decided before Brain observed this turn. A
-      // held fragment that timed out is answered by the model, not the ask.
-      const nameGate = planCallerModelTurn(brainState, {
-        greetingBarged: greetingInterrupted && !greetingSettled,
-        fileNameAskCommitted: fileNameAsksCommitted > 0,
-        unfinishedDecided: true,
-        holdTimedOut: opts.holdTimedOut === true,
-        // A committed local fact line already answers the question first.
-        publicAnswerCommitted: Boolean(localPacket),
-      });
-      if (nameGate.nameAskDeferred) {
-        console.log(
-          nameGate.deferredFor
-            ? `[ws/media][${callKey}] name ask deferred: caller asked (${nameGate.deferredFor}), model answers first`
-            : `[ws/media][${callKey}] name ask deferred: held fragment timed out, model replies`
-        );
-      }
-      const fileNameAsk = lockFileNameAsk(nameGate.line, callLanguage);
-      const nameJustConfirmed = brainState?.caller?.nameJustConfirmed === true;
-      // BRAIN_CALL_FIXES_D199 (HD_1b3a67ea7ee9 8): "Yeah" to the name ask
-      // after "About my booking": visit_open first, before any other content.
-      const confirmRead = nameJustConfirmed
-        ? planConfirmFileRead(brainState, { language: callLanguage, now: new Date() })
-        : null;
-      if (confirmRead?.line) {
-        callBrainStates.set(callKey, brainState);
-        console.log(`[ws/media][${callKey}] confirm read before model: ${confirmRead.line}`);
-        voiceTrace.noteBrainLines(confirmRead.lines);
-        bargeInActive = false;
-        suppressReplyRemainder = false;
-        callTranscript.pushAgent(confirmRead.line);
-        turnTiming.markFirstSpokenChunk();
-        await speakText(confirmRead.line, { tracePath: 'visit_read' });
-        spokeThisTurn = true;
-        return;
-      }
-      // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 1b): a create the guard
-      // rejected is never left silent. Re-ask the slot once (reask_slot); the
-      // slot came in: save it; re-ask unanswered or a closing: save a callback.
-      const rescue = planRejectedCreate(brainState, { language: callLanguage, text: clean });
-      if (rescue && !(rescue.kind === 'reask' && !nameGate.runModel && fileNameAsk && !nameJustConfirmed)) {
-        if (rescue.kind === 'reask') {
-          markReaskSpoken(brainState);
-          callBrainStates.set(callKey, brainState);
-          console.log(`[ws/media][${callKey}] rejected create re-ask before model: ${rescue.line}`);
-          voiceTrace.noteBrainLines(rescue.lines);
-          bargeInActive = false;
-          suppressReplyRemainder = false;
-          callTranscript.pushAgent(rescue.line);
-          turnTiming.markFirstSpokenChunk();
-          await speakText(rescue.line);
-          spokeThisTurn = true;
-          return;
-        }
-        callBrainStates.set(callKey, brainState);
-        const rescued = await applyGeminiTools(callKey, rescue.parsed);
-        const rescueLine = formatToolConfirmation(rescued?.results || [], callLanguage);
-        console.log(`[ws/media][${callKey}] rejected create ${rescue.kind}: ${rescueLine}`);
-        voiceTrace.noteBrainLines(brainLinesForResults(rescued?.results || [], callLanguage).lines);
-        if (rescueLine) {
-          bargeInActive = false;
-          suppressReplyRemainder = false;
-          callTranscript.pushAgent(rescueLine);
-          turnTiming.markFirstSpokenChunk();
-          await speakText(rescueLine);
-          spokeThisTurn = true;
-          return;
-        }
-        brainState = callBrainStates.get(callKey) || brainState;
-      }
-      const askingName = !nameGate.runModel && Boolean(fileNameAsk) && !nameJustConfirmed;
-      const endClose = planBrainEndClose({
-        action: nextBestAction.action,
-        language: callLanguage,
-      });
-      const packetsBeforeSlots = packetRows();
-      const arbPacket = arbiterClaims && !endClose.close ? turnArbiter.speak(arbiterProposals) : null;
-      if (arbPacket) {
-        // One sealed packet. Brain localReply and live Gemini are no-ops this turn.
-        for (const line of arbPacket.lines) {
-          speakCommit.commit(authorizeSpeak({ outcome: arbPacket.topic === 'price' ? 'price' : 'catalogue', line }));
-        }
-        if (askingName && fileNameAsk) turnArbiter.extend(fileNameAsk, 'file_name_ask');
-      } else if (arbiterClaims && localReply && !authorizeSpeak(localReply)) {
-        voiceTrace.noteSpeakPacket({ tier: 'private', outcome: localReply.outcome, text: localReply.line, committed: false });
-      }
-      if (!arbPacket && (askingName || nameJustConfirmed || endClose.close)) {
-        commitReadySpeakSlots(speakCommit, brainState, {
-          nameJustConfirmed: nameJustConfirmed || endClose.close,
-          catalogueListed: brainState?.conversation?.catalogueListed === true,
-        });
-      }
-      traceCommittedPackets(packetsBeforeSlots);
-      const planned = speakCommit.planCommittedSpeech({
-        endAction: endClose.close ? 'END' : '',
-        nameAsk: askingName ? fileNameAsk : '',
-        nameJustConfirmed,
-        state: brainState,
-      });
-      if (planned.farewell) {
-        callEnding = true;
-        unfinishedHold.close();
-        console.log(
-          `[ws/media][${callKey}] brain-end farewell lang=${callLanguage}: ${endClose.line}`
-        );
-        await runBrainEndClose({
-          action: nextBestAction.action,
-          language: callLanguage,
-          idle: idleNudge,
-          speak: async (line) => {
-            bargeInActive = false;
-            suppressReplyRemainder = false;
-            callTranscript.pushAgent(line);
-            turnTiming.markFirstSpokenChunk();
-            playbackBytes = 0;
-            playbackStartedAt = 0;
-            await speakText(line);
-            spokeThisTurn = true;
-          },
-          hangup: () => {
-            if (requestEndCall('brain_end')) return;
-            const delay = farewellHangupDelayMs({
-              bytes: playbackBytes,
-              startedAt: playbackStartedAt,
-            });
-            console.log(`[ws/media][${sidLabel()}] brain-end hangup in ${delay}ms`);
-            setTimeout(() => {
-              try {
-                ws.close(1000, 'end_call');
-              } catch {
-                /* ignore */
-              }
-            }, delay);
-          },
-        });
-        return;
-      }
-      if (planned.lines.length) {
-        const slotsBeforePlanned = slotRows(brainState);
-        drainSpokenSpeakSlots(brainState, planned.lines);
-        noteSlotDrain(slotsBeforePlanned);
-        callBrainStates.set(callKey, brainState);
-        const spokeCatalogue = arbPacket
-          ? arbPacket.topic === 'catalogue'
-          : turnCatalogueMouth.speakLocal &&
-            Boolean(turnCatalogueMouth.line) &&
-            planned.lines.includes(turnCatalogueMouth.line);
-        if (spokeCatalogue && !arbPacket && catalogueMouth.reason === 'outage') {
-          await resolveLlmRecoverySpeech(clean, { consumeOffer: false });
-        }
-        if (spokeCatalogue) {
-          noteCatalogueListed();
-          console.log(
-            `[ws/media][${callKey}] catalogue fallback reason=${catalogueMouth.reason} lang=${callLanguage}: ${catalogueMouth.line}`
-          );
-        }
-        if (askingName && planned.lines.includes(fileNameAsk)) {
-          brainState.caller.fileNameAskSpoken = true;
-          fileNameAsksCommitted += 1;
-          callBrainStates.set(callKey, brainState);
-          console.log(`[ws/media][${callKey}] file name ask: ${fileNameAsk}`);
-          if (planned.lines.length > 1) {
-            console.log(
-              `[ws/media][${callKey}] local answer before name ask: ${planned.lines[0]}`
-            );
+      const onV1Sentence = enginesFiller
+        ? enginesFiller.onSentence
+        : v1DraftOn
+        ? (s) => {
+            if (v1Filler) { clearTimeout(v1Filler); v1Filler = null; }
+            if (!v1Streamed && turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') turnTiming.markFirstSpokenChunk();
+            v1Streamed += 1;
+            const first = v1Streamed === 1;
+            v1Chain = v1Chain
+              .then(() => (v1PhaseA && first ? cutFillerForReply() : null))
+              .then(() => (bargeInActive ? { ok: false, barged: true } : speakText(s.text, { tracePath: 'brain_v1_draft', skipFileGate: true }))).catch(() => ({ ok: false }));
           }
-        } else if (nameJustConfirmed) {
-          console.log(
-            `[ws/media][${callKey}] pending public after name lang=${callLanguage}: ${planned.lines[0]}`
-          );
-        }
-        bargeInActive = false;
-        suppressReplyRemainder = false;
-        const plannedFold = consumeOwedFold(planned.lines);
-        for (const line of plannedFold.lines) {
-          callTranscript.pushAgent(line);
-          turnTiming.markFirstSpokenChunk();
-          const nameAsk = askingName && line === fileNameAsk;
-          const plannedSpoken = await speakText(
-            line,
-            speakCommit.wasSpoken(line)
-              ? { skipFileGate: true, ...(nameAsk ? { tracePath: 'file_name_ask' } : {}) }
-              : nameAsk
-                ? { tracePath: 'file_name_ask' }
-                : {}
-          );
-          spokeThisTurn = true;
-          // VOICE_FACT_REFS: keep a locally spoken answer in the model's
-          // history, so the next turn does not answer it again
-          // (HD_9939ca74d492 repeated the Kileleshwa fee on the hours turn).
-          if (
-            plannedSpoken?.ok &&
-            (require('./src/conversation/factSheet').factRefsEnabled() ||
-              (lookupPlan?.handled && line === lookupPlan.speech))
-          ) {
-            messages.push({
-              role: 'assistant',
-              content: line,
-              local: true,
-              spokenAnswer: true,
-              ...(lookupPlan?.handled && line === lookupPlan.speech ? { turn_id: lookupPlan.turnId } : {}),
-            });
-          }
-        }
-        if (arbPacket) turnArbiter.release();
-        return;
-      }
-      if (arbPacket) {
-        // Claimed but nothing planned (already spoken): stay silent rather than let Gemini speak.
-        turnArbiter.release();
-        return;
-      }
-      // Name Yes: a public fact the name gate did not speak is still the answer.
-      // SpeakPacket already returned when it spoke the fact. This speaks a
-      // public slot that is still unanswered, then Voice drains that line.
-      if (
-        turnLocalReply &&
-        nameJustConfirmed &&
-        isSpeakSlotOutcome(localReply.outcome) &&
-        !speakCommit.wasSpoken(localReply.line)
-      ) {
-        const heldPacket = authorizeSpeak(localReply);
-        const catalogueAlready =
-          localReply.outcome === 'catalogue' &&
-          (brainState?.conversation?.catalogueListed === true ||
-            brainState?.conversation?.catalogueAnswered === true);
-        if (heldPacket && heldPacket.tier === 'public' && !catalogueAlready) {
-          const heldFact = heldPacket.text;
-          const slotsBeforeHeld = slotRows(brainState);
-          drainSpokenSpeakSlots(brainState, [heldFact]);
-          noteSlotDrain(slotsBeforeHeld);
-          callBrainStates.set(callKey, brainState);
-          console.log(
-            `[ws/media][${callKey}] speak slot after name yes ${localReply.outcome} lang=${callLanguage}: ${heldFact}`
-          );
-          bargeInActive = false;
-          suppressReplyRemainder = false;
-          callTranscript.pushAgent(heldFact);
-          turnTiming.markFirstSpokenChunk();
-          playbackBytes = 0;
-          playbackStartedAt = 0;
-          await speakText(heldFact, { skipFileGate: true });
-          spokeThisTurn = true;
-          return;
-        }
-      }
-      speechHold = holdCallerSpeech(callKey, messages);
-      const fileReadAsk = localReply?.outcome === 'file_read';
-      // Name lock holds speech in the hold record, but must not publish the
-      // open file. A visit lookup after the lock still can.
-      suppressModelSpeech = shouldPublishOpenFileSentence(speechHold, fileReadAsk);
-      const visitAsk =
-        looksLikeOpenVisitLookup(clean) ||
-        looksLikeVisitReviewMore(clean) ||
-        looksLikeHistoryReview(clean);
-      let visitAppointments = [];
-      if (
-        visitAsk &&
-        brainState?.messageOnly !== true &&
-        brainState?.caller?.nameConfirmed === true &&
-        brainState?.caller?.nameJustConfirmed !== true
-      ) {
-        visitAppointments = await loadVisitReviewAppointments(callKey, brainProfile);
-      }
-      const visitRead = planVisitReadTurn({
-        nameConfirmed: brainState?.caller?.nameConfirmed === true,
-        nameJustConfirmed: brainState?.caller?.nameJustConfirmed === true,
-        callerText: clean,
-        messageOnly: brainState?.messageOnly === true,
-        language: callLanguage,
-        openVisits: brainState?.returning?.openVisits,
-        appointments: visitAppointments,
-        cursor: brainState?.conversation?.visitReview || null,
-        // BRAIN_CALL_FIXES_D199: requests with visits; code file answers.
-        openRequests: brainState?.returning?.openRequests,
-        fileState: brainState,
-      });
-      if (visitRead.runModel === false && visitRead.line) {
-        if (!brainState.conversation || typeof brainState.conversation !== 'object') {
-          brainState.conversation = {};
-        }
-        brainState.conversation.visitReview = visitRead.cursor;
-        callBrainStates.set(callKey, brainState);
-        console.log(`[ws/media][${callKey}] visit read before model: ${visitRead.line}`);
-        if (Array.isArray(visitRead.lines)) voiceTrace.noteBrainLines(visitRead.lines);
-        bargeInActive = false;
-        suppressReplyRemainder = false;
-        callTranscript.pushAgent(visitRead.line);
-        turnTiming.markFirstSpokenChunk();
-        await speakText(visitRead.line, { tracePath: 'visit_read' });
-        spokeThisTurn = true;
-        return;
-      }
-      // A committed public fact already returned above. Gemini does not own that list.
-      let catalogueSystemPrompt = turnSystemPrompt;
-      // letGemini is always false. A catalogue ask already returned above.
-      if (catalogueMouth.letGemini) {
-        const note = catalogueGeminiDirective({
+        : undefined;
+      const live = await v2OwnsCall.runOwnedTurn(
+        brainV2Live,
+        {
+          text: clean,
           profile: brainProfile,
-          localReply,
-        });
-        if (note) catalogueSystemPrompt = `${turnSystemPrompt}\n\n${note}`;
-        console.log(
-          `[ws/media][${callKey}] catalogue gemini listen lang=${callLanguage}`
-        );
-      }
-      const bareCloser = looksLikeBareCloser(clean);
-
-      const actionMayExecute = ['CREATE_REQUEST', 'CAPTURE', 'ESCALATE', 'TRANSFER'].includes(
-        nextBestAction.action
+          langLock: callLanguage === 'en' || callLanguage === 'sw' ? callLanguage : null,
+          shouldAbort: () => bargeInActive === true,
+          ...(onV1Sentence ? { onSentence: onV1Sentence } : {}),
+          ...(v1PhaseA ? { heardAgent: v1HeardSinceLastTurn() } : {}),
+        },
+        { log: (m) => console.log(`[ws/media][${callKey}] ${m}`) }
       );
-      // Handoff name-ask is still detected (live miss: HD_b4cb560bae33 / Alvin).
-      // It must not speak a canned line or force the sentence stream off.
-      const handoffNameAsk =
-        !bareCloser &&
-        shouldSpeakHandoffNameAsk({
-          nextBestAction,
-          brainState,
-          userText: clean,
+      if (v1Filler) { clearTimeout(v1Filler); v1Filler = null; }
+      if (enginesFiller) enginesFiller.cancel();
+      console.log(`[ws/media][${callKey}] brain_v2_live owned lang=${live.lang}${live.path ? ` path=${live.path}` : ''}${live.endHeld ? ` end_held=${live.endHeld}` : ''}: ${live.line}`);
+      callTranscript.pushAgent(live.line);
+      v1HeardMark = callTranscript.size();
+      let spoken;
+      const enginesSpoken = enginesFiller ? await enginesFiller.finish(live) : null;
+      if (enginesSpoken) {
+        spoken = enginesSpoken.spoken;
+      } else if (live.streamed && v1Streamed) {
+        spoken = await v1Chain;
+      } else {
+        if (turnTiming && typeof turnTiming.markFirstSpokenChunk === 'function') {
+          turnTiming.markFirstSpokenChunk();
+        }
+        if (v1PhaseA) await cutFillerForReply();
+        spoken = await speakText(live.line, {
+          tracePath: live.repaired ? 'brain_v2_repair' : 'brain_v2_live',
+          skipFileGate: true,
         });
-      // Tool turns still wait on Gemini. The progress one-shot must not take
-      // the turn, and a handoff name-ask must not force the stream off.
-      const needsImmediateProgress = actionMayExecute;
-
-      /** @type {Promise<void>} */
-      let actionProgressSpeak = Promise.resolve();
-      if ((needsImmediateProgress || handoffNameAsk) && tts && !bargeInActive) {
-        const progressLine = pickActionProgress(nextBestAction.action, callLanguage);
-        console.log(
-          `[ws/media][${sidLabel()}] action-progress action=${nextBestAction.action}` +
-            `${handoffNameAsk ? ' handoffNameAsk=1' : ''}` +
-            ` lang=${callLanguage} withheld: ${progressLine}`
-        );
       }
-
-      // VOICE_FILLER=auto (default): adaptive ack on this turn if first audio is slow.
-      // Later turns may ack again. Do not latch the ack for the whole call.
-      // ack → always schedule a tiny backchannel; off → silence; custom → fixed phrase.
-      // Tool turns (ESCALATE / CREATE_REQUEST) get the same adaptive ack. The
-      // action-progress line above is withheld, so skipping the ack left 1.5-1.7 s
-      // of dead air until Gemini returned the tool block (HD_ee813bcf6248 t6-t12).
-      const fillerMode = (process.env.VOICE_FILLER || 'auto').toLowerCase();
-      const useFiller =
-        Boolean(tts) &&
-        fillerMode !== 'off' &&
-        !bareCloser && shouldSpeakThinkingAck(clean);
-      const fillerDelayMs = resolveVoiceProfile().fillerDelayMs;
-      const ruleFiller =
-        ackTracker && (fillerMode === 'ack' || fillerMode === 'auto')
-          ? ackRule.pickRuleFiller({
-              lang: fillerLanguage(callLanguage),
-              toolTurn: Boolean(needsImmediateProgress),
-              tracker: ackTracker,
-              callerText: clean,
-            })
-          : undefined;
-      // Rule on: null = rate-limited, no filler this turn.
-      const fillerText = ruleFiller === null
-        ? ''
-        : ruleFiller
-        ? ruleFiller.text
-        : fillerMode === 'ack' || fillerMode === 'auto'
-          ? pickContextualAck(clean, fillerLanguage(callLanguage))
-          : process.env.VOICE_FILLER;
-      if (smooth.hold) turnFillerText = fillerText || '';
-      let fillerStarted = false;
-      let firstSpokenChunk = false;
-
-      if (useFiller && fillerText) {
-        fillerTimer = setTimeout(() => {
-          fillerTimer = null;
-          // Adaptive: skip if LLM→TTS already started (stream chunk or full reply).
-          if (turnBusy && !speaking && !bargeInActive && !firstSpokenChunk) {
-            fillerStarted = true;
-            thinkingAckTurn = turnTiming;
-            thinkingAckAtMs = Date.now();
-            // Any filler (Mm included) makes the reply drop its leading ack.
-            ackPlayedTurn = turnTiming;
-            if (ruleFiller && ruleFiller.word) wordAckTurn = turnTiming;
-            if (ackTracker) ackTracker.noteHeard(fillerText);
-            turnTiming.markFiller();
-            console.log(
-              `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`
-            );
-            speakThinkingAck(fillerText).catch(() => {});
-          }
-        }, fillerDelayMs);
-      } else if (ackTracker && ruleFiller === null && tts && ackRule.gapGuardEnabled()) {
-        // VOICE_NO_ANSWER_DELETE gap guard (HD_b401138c8ffd: ~1.6 s silence, no
-        // filler on any turn). Neutral Mm., not an ack-led reply; the reply's ack
-        // lead is stripped so it cannot stack.
-        // Measured from end of turn (not from here), so the clip reaches the caller
-        // under 900 ms; cached clip only (no live TTS start-up), one per turn.
-        const gapDelay = ackRule.gapGuardDelay(turnTiming.turnStartedAt, Date.now());
-        fillerTimer = setTimeout(() => {
-          fillerTimer = null;
-          if (!turnBusy || speaking || bargeInActive || firstSpokenChunk || fillerStarted) return;
-          const found = isFillerCacheEnabled() && ttsSpeedScale === 1
-            ? lookupFillerPcm({ voiceId: tenantSonioxVoiceId, text: ackRule.GAP_FILL, callLanguage, extraLexicon: ttsLexiconOverrides })
-            : { pcm: null };
-          if (!found.pcm) {
-            console.log(`[ws/media][${sidLabel()}] gap-guard miss (not cached) lang=${callLanguage}`);
-            return;
-          }
-          fillerStarted = true;
-          thinkingAckTurn = turnTiming;
-          thinkingAckAtMs = Date.now();
-          ackPlayedTurn = turnTiming;
-          turnTiming.markFiller();
-          console.log(`[ws/media][${sidLabel()}] gap-guard lang=${callLanguage} at=${Date.now() - turnTiming.turnStartedAt}ms: ${ackRule.GAP_FILL}`);
-          playCachedFillerPcm(found.pcm, { text: ackRule.GAP_FILL }).catch(() => {});
-        }, gapDelay);
-      }
-
-      const streamOn =
-        Boolean(process.env.GEMINI_API_KEY) &&
-        Boolean(tts) &&
-        (!needsImmediateProgress || suppressModelSpeech) &&
-        (process.env.VOICE_LLM_STREAM || 'on').toLowerCase() !== 'off';
-
-      let speakSession = null;
-      /** @type {Promise<any>|null} */
-      let speakSessionReady = null;
-      let streamPlaybackGen = 0;
-      const spokenChunks = [];
-
-      // Warm Soniox TTS while Gemini starts so first chunk isn't paying setup latency.
-      if (streamOn && tts) {
-        speakSessionReady = tts
-          .beginSpeak({
-            callLanguage,
-            speedScale: ttsSpeedScale,
-            extraLexicon: ttsLexiconOverrides,
-            addressTerms: ttsAddressTerms,
-          })
-          .then((session) => {
-            speakSession = session;
-            console.log(`[ws/media][${sidLabel()}] llm→tts stream prefetched`);
-            return session;
-          })
-          .catch((err) => {
-            console.warn(
-              `[ws/media][${sidLabel()}] TTS prefetch failed:`,
-              err?.message || err
-            );
-            speakSessionReady = null;
-            return null;
-          });
-      }
-
-      function stopFillerForReply() {
-        clearFillerTimer();
-        if (smooth.any) stopHoldFill();
-        if (!fillerStarted) return;
-        fillerStarted = false;
-        // Drop filler PCM via generation bump + cancel ONLY the filler stream.
-        // Do NOT tts.cancel() with no id — that kills the prefetched reply stream.
-        playbackGeneration += 1;
-        speaking = false;
-        const cancelId = fillerStreamId;
-        fillerStreamId = null;
-        if (activeOutboundStreamId && cancelId && activeOutboundStreamId === cancelId) {
-          activeOutboundStreamId = null;
-        }
-        if (tts && isCancelableTtsStreamId(cancelId)) {
-          try {
-            tts.cancel(cancelId);
-          } catch {
-            /* ignore */
-          }
-        }
-        clearMediaPlayback(ws);
-        console.log(`[ws/media][${sidLabel()}] filler cancelled for reply audio`);
-      }
-
-      async function ensureReplySpeakSession() {
-        if (speakSession) return speakSession;
-        if (speakSessionReady) {
-          const prefetched = await speakSessionReady;
-          if (prefetched) return prefetched;
-        }
-        speakSession = await tts.beginSpeak({
-          callLanguage,
-          speedScale: ttsSpeedScale,
-          extraLexicon: ttsLexiconOverrides,
-          addressTerms: ttsAddressTerms,
-        });
-        console.log(`[ws/media][${sidLabel()}] llm→tts stream open`);
-        return speakSession;
-      }
-
-      async function onSpokenChunk(chunk) {
-        // Visit, hold, and order lookups speak nameConfirmSpeech, not the model.
-        if (suppressModelSpeech) return;
-        // VOICE_TURN_ARBITER: live Gemini is a proposer; never races a sealed packet.
-        if (typeof turnArbiter !== 'undefined' && turnArbiter.enabled && !turnArbiter.geminiAllowed()) return;
-        // Unclaimed turn: a Gemini line may only name services that are in the pinned doc (Brain #707 itemNamePostCheck).
-        if (typeof turnArbiter !== 'undefined' && turnArbiter.enabled && !turnArbiter.geminiLineOk(String(chunk || ''), brainProfile?.spokenCataloguePin?.doc)) return;
-        // Streamed chunks are spoken before tools run, so a saved claim or a
-        // number the caller never said must not reach TTS. Confirmation of a
-        // save comes from formatToolConfirmation after the tool result.
-        // A sentence that narrates the send ("I've sent that to the team",
-        // "I sent your name") is dropped. It must not become a repeat-ask.
-        const rawChunk = String(chunk || '');
-        const polishedDetail = polishSpokenDetail(String(chunk || ''), {
-          callerTurns: brainState.conversation?.answersReceived || [],
-          profile: brainProfile,
-          toolResults: [],
-          capabilities,
-          state: brainState,
-          language: callLanguage,
-          streamChunk: true,
-          spokenThisTurn: spokeThisTurn === true,
-        });
-        const polished = polishedDetail.text;
-        if (typeof voiceTrace !== 'undefined' && voiceTrace) {
-          voiceTrace.noteTransform({
-            stage: 'polish',
-            before: rawChunk,
-            after: polished,
-            reason: polishedDetail.reason || (polished.trim() ? 'rewritten' : 'dropped'),
-            dropReasons: polishedDetail.dropReasons,
-          });
-        }
-        if (!polished) {
-          if (rawChunk.trim() && narratesInternalAction(rawChunk)) hidInternalNarration = true;
-          return;
-        }
-        // Model text only. Visit / hold / order lines go out through
-        // speakLookupSentence and must not pass through this cut.
-        const gated = gateCallerFileSpeech(polished, brainState);
-        if (!gated.speak) {
-          console.log(
-            `[ws/media][${sidLabel()}] file speech held reason=${gated.reason}`
-          );
-          if (typeof voiceTrace !== 'undefined' && voiceTrace) {
-            voiceTrace.noteTransform({
-              stage: 'file_speech',
-              before: polished,
-              after: '',
-              reason: gated.reason || 'held',
-            });
-          }
-          return;
-        }
-        if (typeof voiceTrace !== 'undefined' && voiceTrace && gated.line !== polished) {
-          voiceTrace.noteTransform({
-            stage: 'file_speech',
-            before: polished,
-            after: gated.line,
-            reason: gated.reason || 'trimmed',
-          });
-        }
-        let text = cutNoAiSlop(gated.line);
-        if (typeof ackTracker !== 'undefined' && ackTracker && text) {
-          // Thinking-ack/never-two backstop: drop the lead if an ack already played or the rule forbids one.
-          const backstopped = ackRule.applyAckBackstop(text, {
-            tracker: ackTracker,
-            acked: ackPlayedTurn === turnTiming,
-            dropBare: true,
-          });
-          if (backstopped !== text && typeof voiceTrace !== 'undefined' && voiceTrace) {
-            voiceTrace.noteTransform({ stage: 'ack_rule', before: text, after: backstopped, reason: 'ack_lead' });
-          }
-          text = backstopped;
-          ackTracker.noteHeard(text);
-        }
-        if (typeof voiceTrace !== 'undefined' && voiceTrace) {
-          voiceTrace.noteTransform({
-            stage: 'no_ai_slop',
-            before: gated.line,
-            after: text,
-          });
-        }
-        if (!text) return;
-        text = withOwedNotice(text);
-        if (!tts) return;
-        if (suppressReplyRemainder || bargeInActive) return;
-        if (isOrphanFragment(bargeCancelledText, text)) {
-          console.log(`[ws/media][${sidLabel()}] drop fragment restart after barge`);
-          return;
-        }
-        firstSpokenChunk = true;
+      if (spoken?.ok !== false) {
         spokeThisTurn = true;
-        turnTiming.markFirstSpokenChunk();
-        stopFillerForReply();
-        if (bargeInActive || suppressReplyRemainder) return;
-
-        const session = await ensureReplySpeakSession();
-        if (!session || bargeInActive || suppressReplyRemainder) {
-          try {
-            session?.cancel();
-          } catch {
-            /* ignore */
-          }
-          speakSession = null;
-          return;
-        }
-
-        const startingPlayback = !speaking || activePlaybackGeneration !== playbackGeneration;
-        if (startingPlayback) {
-          const prev = activePlaybackGeneration;
-          activePlaybackGeneration = ++playbackGeneration;
-          streamPlaybackGen = activePlaybackGeneration;
-          speakStartedAt = Date.now();
-          if (prev > 0) overlapHold.reassignPending(prev, activePlaybackGeneration);
-        }
-        activeOutboundStreamId = session.streamId;
-        speaking = true;
-        if (/[.!?]$/.test(text)) bargeCancelledText = '';
-
-        if (typeof voiceTrace !== 'undefined' && voiceTrace && typeof prepareForTts === 'function') {
-          const traced = prepareForTts(text, {
-            callLanguage,
-            extraLexicon: typeof ttsLexiconOverrides !== 'undefined' ? ttsLexiconOverrides : [],
-            addressTerms: ttsAddressTerms,
-          });
-          voiceTrace.noteTts({
-            text: traced.text,
-            before: text,
-            language: traced.language,
-          });
-        }
-        session.pushText(text);
-        spokenChunks.push(text);
-        lastAgentText = spokenChunks.join(' ');
-      }
-
-      async function speakLookupSentence() {
-        if (!suppressModelSpeech || spokeLookupSentence || bargeInActive) return false;
-        const gatedLookup = gateCallerFileSpeech(
-          String(nameConfirmSpeech(callKey) || '').trim(),
-          callBrainStates.get(callKey)
-        );
-        const sentence = gatedLookup.speak ? gatedLookup.line : '';
-        if (!sentence || !tts) {
-          try {
-            speakSession?.cancel();
-          } catch {
-            /* ignore */
-          }
-          speakSession = null;
-          return false;
-        }
-        stopFillerForReply();
-        const session = await ensureReplySpeakSession();
-        if (!session || bargeInActive || suppressReplyRemainder) {
-          try {
-            session?.cancel();
-          } catch {
-            /* ignore */
-          }
-          speakSession = null;
-          return false;
-        }
-        const startingPlayback = !speaking || activePlaybackGeneration !== playbackGeneration;
-        if (startingPlayback) {
-          const prev = activePlaybackGeneration;
-          activePlaybackGeneration = ++playbackGeneration;
-          streamPlaybackGen = activePlaybackGeneration;
-          speakStartedAt = Date.now();
-          if (prev > 0) overlapHold.reassignPending(prev, activePlaybackGeneration);
-        }
-        activeOutboundStreamId = session.streamId;
-        speaking = true;
-        firstSpokenChunk = true;
-        spokeThisTurn = true;
-        turnTiming.markFirstSpokenChunk();
-        if (/[.!?]$/.test(sentence)) bargeCancelledText = '';
-        session.pushText(sentence);
-        spokenChunks.push(sentence);
-        lastAgentText = spokenChunks.join(' ');
-        agentReplay.beginSpeech(sentence);
-        try {
-          await session.end();
-        } catch (err) {
-          console.error(
-            `[ws/media][${sidLabel()}] TTS stream end failed:`,
-            err?.message || err
-          );
-        } finally {
-          if (activePlaybackGeneration === streamPlaybackGen) {
-            speaking = false;
-            commitAgentQuestionIfNeeded();
-            releaseQueuedCallerSpeech(streamPlaybackGen);
+        messages.push({ role: 'assistant', content: live.line, local: true });
+        const v2End = endSignalFromBrain(live);
+        if (v2End.end) {
+          if (requestEndCall(v2End.source, v2End.reason)) {
+            ownedV2Calls.markEnded(callKey, v2End.reason);
+            console.log(`[ws/media][${callKey}] end-call signal source=${v2End.source}: hangup after audio`);
           } else {
-            agentReplay.abandonPlayback();
+            console.log(`[ws/media][${callKey}] brain_v2_owned: end not honoured (VOICE_END_CALL_HONOUR off); call stays open on v2`);
           }
-          speakSession = null;
-        }
-        callTranscript.pushAgent(sentence);
-        spokeLookupSentence = true;
-        console.log(`[ws/media][${sidLabel()}] lookup sentence on stream: ${sentence}`);
-        return true;
-      }
-
-      // VOICE_INTENT_IN_MAIN_TURN (shadow): fold the catalogue command into this Gemini turn.
-      const intentGate = require('./src/conversation/v2/intentGate');
-      const foldDoc = intentGate.intentInMainTurnEnabled() ? brainProfile?.spokenCataloguePin?.doc || null : null;
-      const foldNote = foldDoc ? intentGate.foldInstruction(foldDoc) : '';
-      if (foldNote) catalogueSystemPrompt = `${catalogueSystemPrompt}\n\n${foldNote}`;
-      function logFoldedIntent(result) {
-        if (!foldNote) return;
-        try {
-          const folded = intentGate.foldedFromParsed(parseGeminiResponse(String(result?.rawText || '')), foldDoc);
-          const nlu = intentGate.nluIntent(clean, { profile: brainProfile, doc: foldDoc, topic: brainState?.v2CatalogueState?.lastInfo || null });
-          console.log(`[ws/media][${callKey}] intent_fold ${JSON.stringify({ folded, nlu, agree: Boolean(folded && folded.intent === nlu.intent && (folded.service_id || null) === (nlu.service_id || null)) })}`);
-        } catch (err) {
-          console.log(`[ws/media][${callKey}] intent_fold error ${String(err?.message || err).slice(0, 60)}`);
-        }
-      }
-      function traceModelResult(result) {
-        voiceTrace.noteModelOutput({
-          provider: 'gemini',
-          model: result?.model || geminiPrimaryModel(),
-          promptId: VOICE_SYSTEM_PROMPT_ID,
-          promptVersion: VOICE_SYSTEM_PROMPT_VERSION,
-          language: callLanguage,
-          outputText: result?.rawText || '',
-          chars: Number.isFinite(result?.rawChars)
-            ? result.rawChars
-            : String(result?.rawText || '').length,
-          spokenEmitted: result?.spokenEmitted ?? null,
-          firstTokenAt: result?.firstTokenAt || null,
-          stream: result?.streamJoins || null,
-        });
-      }
-
-      let result;
-      let turnOutcome = 'ok';
-      if (!process.env.GEMINI_API_KEY) {
-        result = {
-          spokenText:
-            callLanguage === 'sw'
-              ? 'Samahani, siwezi kufikia taarifa za biashara sasa hivi. Tafadhali jaribu tena.'
-              : "Sorry, I can't access the business information right now. Please try again.",
-          shouldEndCall: false,
-          rawText:
-            callLanguage === 'sw'
-              ? 'Samahani, siwezi kufikia taarifa za biashara sasa hivi. Tafadhali jaribu tena.'
-              : "Sorry, I can't access the business information right now. Please try again.",
-          model: 'canned',
-        };
-        voiceTrace.noteCanned({ path: 'llm_unavailable', text: result.spokenText });
-        traceModelResult(result);
-        stopFillerForReply();
-        if (speakSession) {
-          try {
-            speakSession.cancel();
-          } catch {
-            /* ignore */
-          }
-          speakSession = null;
-        }
-        if (!bargeInActive) {
-          if (suppressModelSpeech) {
-            await speakLookupSentence();
-          } else {
-            await actionProgressSpeak;
-            callTranscript.pushAgent(result.spokenText);
-            turnTiming.markFirstSpokenChunk();
-            await speakText(
-              catalogueMouth.letGemini
-                ? softenCataloguePunctuation(result.spokenText)
-                : result.spokenText,
-              { tracePath: 'llm_unavailable' }
-            );
-            spokeThisTurn = true;
-          }
-        }
-      } else if (streamOn) {
-        turnTiming.markLlmStart();
-        voiceTrace.noteModelRequest({
-          provider: 'gemini',
-          model: geminiPrimaryModel(),
-          promptId: VOICE_SYSTEM_PROMPT_ID,
-          promptVersion: VOICE_SYSTEM_PROMPT_VERSION,
-          language: callLanguage,
-        });
-        result = await runGeminiTurnStreaming(messages, sidLabel(), catalogueSystemPrompt, {
-          onSpokenChunk,
-          shouldAbort: () => bargeInActive,
-          onToolHold: speakToolHold,
-          catalogueBreath: catalogueMouth.letGemini,
-        });
-        traceModelResult(result);
-        logFoldedIntent(result);
-        stopFillerForReply();
-
-        if (suppressModelSpeech) {
-          if (bargeInActive) {
-            try {
-              speakSession?.cancel();
-            } catch {
-              /* ignore */
-            }
-            console.log(`[ws/media][${sidLabel()}] discarding streamed reply after barge-in`);
-            discardUnspokenAssistant(result?.spokenText || spokenChunks.join(' '));
-            queueToolOutcome(callBrainStates.get(callKey), result?.actionConfirmation || result?.bargedActionConfirmation);
-            bargeInActive = false;
-            speakSession = null;
-            if (activePlaybackGeneration === streamPlaybackGen) {
-              speaking = false;
-              releaseQueuedCallerSpeech(streamPlaybackGen);
-            }
-            logTurnTiming(turnTiming, { outcome: 'barge_in' });
-            if (activeTurnTiming === turnTiming) activeTurnTiming = null;
-            return;
-          }
-          await speakLookupSentence();
-        } else if (speakSession) {
-          if (bargeInActive) {
-            try {
-              speakSession.cancel();
-            } catch {
-              /* ignore */
-            }
-            console.log(`[ws/media][${sidLabel()}] discarding streamed reply after barge-in`);
-            discardUnspokenAssistant(result?.spokenText || spokenChunks.join(' '));
-            queueToolOutcome(callBrainStates.get(callKey), result?.actionConfirmation || result?.bargedActionConfirmation);
-            bargeInActive = false;
-            speakSession = null;
-            if (activePlaybackGeneration === streamPlaybackGen) {
-              speaking = false;
-              releaseQueuedCallerSpeech(streamPlaybackGen);
-            }
-            logTurnTiming(turnTiming, { outcome: 'barge_in' });
-            if (activeTurnTiming === turnTiming) activeTurnTiming = null;
-            return;
-          }
-          const planned = resolvePrefetchedStreamSpeech({
-            spokenChunks: spokenChunks.join(' '),
-            spokenText: result?.spokenText,
-            actionConfirmation: result?.actionConfirmation,
-            timedOut: result?.timedOut,
-            llmFailed: result?.llmFailed,
-            fallbackLine: currentLlmRecoveryLine(),
-          });
-          if (planned.alreadySpoken) {
-            if (planned.reply) {
-              agentReplay.beginSpeech(planned.reply);
-            }
-            try {
-              await speakSession.end();
-            } catch (err) {
-              console.error(
-                `[ws/media][${sidLabel()}] TTS stream end failed:`,
-                err?.message || err
-              );
-            } finally {
-              if (activePlaybackGeneration === streamPlaybackGen) {
-                speaking = false;
-                if (planned.reply) {
-                  commitAgentQuestionIfNeeded();
-                } else {
-                  agentReplay.abandonPlayback();
-                }
-                releaseQueuedCallerSpeech(streamPlaybackGen);
-              } else {
-                agentReplay.abandonPlayback();
-              }
-              speakSession = null;
-            }
-            if (planned.reply) callTranscript.pushAgent(planned.reply);
-            spokeThisTurn = true;
-          } else {
-            try {
-              speakSession.cancel();
-            } catch {
-              /* ignore */
-            }
-            speakSession = null;
-            if (planned.speakNow && planned.reply && !bargeInActive) {
-              const missed = Boolean(result?.timedOut || result?.llmFailed);
-              const reply = result?.lookupSpeech
-                ? result.lookupSpeech
-                : missed
-                  ? await speechWhenModelMissed(result, clean, localReply)
-                  : modelMouthLine(planned.reply, result, catalogueMouth.letGemini);
-              if (reply) {
-                if (result?.lookupAck) await speakText(result.lookupAck, { skipFileGate: true });
-                callTranscript.pushAgent(reply);
-                turnTiming.markFirstSpokenChunk();
-                await speakText(
-                  reply,
-                  result?.lookupSpeech ? { skipFileGate: true } : missed ? { tracePath: 'speech_repair' } : undefined
-                );
-                spokeThisTurn = true;
-                turnOutcome = result?.llmHardDown
-                  ? 'speech_guarantee'
-                  : result?.timedOut
-                    ? 'stream_timeout'
-                    : missed
-                      ? 'speech_repair'
-                      : 'stream_fallback_full';
-              }
-            }
-          }
-        } else if (!bargeInActive) {
-          // Stream produced no flushable chunks (or TTS never opened) — speak full reply.
-          if (speakSessionReady) {
-            try {
-              const unused = await speakSessionReady;
-              unused?.cancel?.();
-            } catch {
-              /* ignore */
-            }
-          }
-          const planned = resolvePrefetchedStreamSpeech({
-            spokenChunks: '',
-            spokenText: result?.spokenText,
-            actionConfirmation: result?.actionConfirmation,
-            timedOut: result?.timedOut,
-            llmFailed: result?.llmFailed,
-            fallbackLine: currentLlmRecoveryLine(),
-          });
-          if (planned.speakNow && planned.reply) {
-            const missed = Boolean(result?.timedOut || result?.llmFailed);
-            const reply = result?.lookupSpeech
-              ? result.lookupSpeech
-              : missed
-                ? await speechWhenModelMissed(result, clean, localReply)
-                : modelMouthLine(planned.reply, result, catalogueMouth.letGemini);
-            if (reply) {
-              if (result?.lookupAck) await speakText(result.lookupAck, { skipFileGate: true });
-              callTranscript.pushAgent(reply);
-              turnTiming.markFirstSpokenChunk();
-              await speakText(
-                reply,
-                result?.lookupSpeech ? { skipFileGate: true } : missed ? { tracePath: 'speech_repair' } : undefined
-              );
-              spokeThisTurn = true;
-              turnOutcome = result?.llmHardDown
-                ? 'speech_guarantee'
-                : result?.timedOut
-                  ? 'stream_timeout'
-                  : missed
-                    ? 'speech_repair'
-                    : 'stream_fallback_full';
-            }
-          }
-        } else {
-          discardUnspokenAssistant(result?.spokenText || '');
-          queueToolOutcome(callBrainStates.get(callKey), result?.actionConfirmation || result?.bargedActionConfirmation);
-          bargeInActive = false;
-          logTurnTiming(turnTiming, { outcome: 'barge_in' });
-          if (activeTurnTiming === turnTiming) activeTurnTiming = null;
-          return;
         }
       } else {
-        turnTiming.markLlmStart();
-        voiceTrace.noteModelRequest({
-          provider: 'gemini',
-          model: geminiPrimaryModel(),
-          promptId: VOICE_SYSTEM_PROMPT_ID,
-          promptVersion: VOICE_SYSTEM_PROMPT_VERSION,
-          language: callLanguage,
-        });
-        result = await runGeminiTurn(messages, sidLabel(), catalogueSystemPrompt, {
-          shouldAbort: () => bargeInActive,
-          onToolHold: speakToolHold,
-        });
-        traceModelResult(result);
-        stopFillerForReply();
-        if (speakSession) {
-          try {
-            speakSession.cancel();
-          } catch {
-            /* ignore */
-          }
-          speakSession = null;
-        }
-        const modelLine = result?.lookupSpeech
-          ? result.lookupSpeech
-          : result?.spokenText
-            ? modelMouthLine(result.spokenText, result, catalogueMouth.letGemini)
-            : '';
-        const reply =
-          (result?.spokenText ? modelLine : '') ||
-          (result?.actionConfirmation
-            ? ''
-            : result?.timedOut || result?.llmFailed
-              ? await speechWhenModelMissed(result, clean, localReply)
-              : '');
-        if (bargeInActive) {
-          console.log(`[ws/media][${sidLabel()}] discarding Gemini reply after barge-in`);
-          discardUnspokenAssistant(reply);
-          queueToolOutcome(callBrainStates.get(callKey), result?.actionConfirmation || result?.bargedActionConfirmation);
-          bargeInActive = false;
-          logTurnTiming(turnTiming, { outcome: 'barge_in' });
-          if (activeTurnTiming === turnTiming) activeTurnTiming = null;
-          return;
-        }
-        // Finish the progress line before the tool confirmation so they don't overlap.
-        await actionProgressSpeak;
-        // Handoff name-ask already spoke the required question — skip duplicate model prose.
-        const skipDuplicateAsk =
-          handoffNameAsk &&
-          progressAlreadySpoken &&
-          !result?.actionConfirmation;
-        if (suppressModelSpeech) {
-          await speakLookupSentence();
-        } else if (reply && !skipDuplicateAsk) {
-          if (result?.lookupAck) await speakText(result.lookupAck, { skipFileGate: true });
-          callTranscript.pushAgent(reply);
-          turnTiming.markFirstSpokenChunk();
-          await speakText(
-            reply,
-            result?.lookupSpeech
-              ? { skipFileGate: true }
-              : !result?.spokenText && (result?.timedOut || result?.llmFailed)
-                ? { tracePath: 'speech_repair' }
-              : undefined
-          );
-          spokeThisTurn = true;
-        }
+        console.log(`[ws/media][${callKey}] brain_v2_owned: line not played (${spoken?.arbiter || (spoken?.gated ? 'gated' : spoken?.outage ? 'outage' : 'speak_failed')}); no v1 fallback`);
       }
-
-      // BRAIN_CALL_FIXES_D199: the fact lines behind this reply (trace brain.lines[]).
-      if (Array.isArray(result?.brainLines) && result.brainLines.length) {
-        voiceTrace.noteBrainLines(result.brainLines);
-      }
-      if (result?.actionConfirmation && !bargeInActive) {
-        let confirmation = String(result.actionConfirmation).trim();
-        if (owedConfirmFoldEnabled() && owedReceiptForFold) {
-          const folded = consumeOwedFold([confirmation]);
-          confirmation = folded.lines.join(' ').trim();
-        } else if (owedConfirmFoldEnabled() && !owedReceiptForFold) {
-          // Receipt already folded into an earlier line this turn: drop a second claim.
-          confirmation = stripSavedClaimAfterReceipt(confirmation);
-        }
-        const lookupSpoken = spokenChunks.join(' ').trim();
-        // The lookup sentence is already on the stream. Do not speakText it.
-        const alreadySaid =
-          /take a message|nitachukua ujumbe/i.test(lookupSpoken) &&
-          /take a message|nitachukua ujumbe/i.test(confirmation);
-        if (confirmation && !(spokeLookupSentence && confirmation === lookupSpoken) && !alreadySaid) {
-          await actionProgressSpeak;
-          // "Alright." already played: say "They'll call you back.", not
-          // "Okay. They'll call you back." (HD_4d6ac592aeb3 t4).
-          const outcomeSource = ackTracker
-            ? ackRule.applyAckBackstop(confirmation, { tracker: ackTracker, acked: ackPlayedTurn === turnTiming })
-            : confirmation;
-          const outcomeLine = trimAckLead(outcomeSource, {
-            acked: ackPlayedTurn === turnTiming,
-          });
-          callTranscript.pushAgent(outcomeLine);
-          if (smooth.any) stopHoldFill();
-          await ((smooth.receipt && playCachedReceipt(outcomeLine)) || speakText(outcomeLine));
-          if (ackTracker) ackTracker.noteHeard(outcomeLine);
-          spokeThisTurn = true;
-        }
-      } else if (owedConfirmFoldEnabled() && owedReceiptForFold && !bargeInActive) {
-        // No model confirmation this turn: still deliver the owed receipt once.
-        const folded = consumeOwedFold([]);
-        for (const line of folded.lines) {
-          callTranscript.pushAgent(line);
-          await speakText(line);
-          spokeThisTurn = true;
-          messages.push({ role: 'assistant', content: line, local: true });
-        }
-      }
-
-      // A coverage answer from Gemini that ends on a bare list gets the next
-      // step, like the local coverage line (HD_ee813bcf6248 t6/t8).
-      if (spokeThisTurn && !bargeInActive && !suppressModelSpeech && !result?.actionConfirmation) {
-        const coverageNext = coverageNextStepFor(
-          spokenChunks.join(' ').trim() || String(result?.spokenText || ''),
-          { profile: brainProfile, language: callLanguage, state: brainState }
-        );
-        if (coverageNext) {
-          console.log(`[ws/media][${sidLabel()}] coverage next step lang=${callLanguage}: ${coverageNext}`);
-          callTranscript.pushAgent(coverageNext);
-          const askSpoken = await speakText(coverageNext);
-          if (askSpoken?.ok) messages.push({ role: 'assistant', content: coverageNext, local: true });
-        }
-      }
-
-      if (!result?.actionConfirmation && result?.bargedActionConfirmation) {
-        queueToolOutcome(callBrainStates.get(callKey), result.bargedActionConfirmation);
-      }
-
-      // Empty Gemini success asks them to repeat once. A 503 or a broken
-      // stream does the same. Credits or a denied project still uses the
-      // reach-them name line, once.
-      if (!spokeThisTurn && !hidInternalNarration && !bargeInActive && tts) {
-        if (result?.timedOut || result?.llmFailed) {
-          const guarantee = await speechWhenModelMissed(result, clean, localReply);
-          if (guarantee) {
-            console.warn(
-              `[ws/media][${sidLabel()}] turn speech ${result?.llmHardDown ? 'guarantee' : 'repair'} action=${nextBestAction.action}` +
-                ` slot=${nextBestAction.slot || ''} llmHardDown=${result?.llmHardDown ? 1 : 0}`
-            );
-            callTranscript.pushAgent(guarantee);
-            turnTiming.markFirstSpokenChunk();
-            await speakText(guarantee, {
-              tracePath: result?.llmHardDown ? 'speech_guarantee' : 'speech_repair',
-            });
-            spokeThisTurn = true;
-            turnOutcome = result?.llmHardDown ? 'speech_guarantee' : 'speech_repair';
-          } else {
-            console.log(
-              `[ws/media][${sidLabel()}] turn speech quiet action=${nextBestAction.action} reason=model_miss`
-            );
-          }
-        } else {
-          const planned = planEmptyGeminiSpeech({
-            brainState,
-            language: callLanguage,
-            userText: clean,
-            llmDown: false,
-            alreadyOffered: emptyRepairOffered,
-            toolResults: result?.toolResults,
-          });
-          if (planned.speak && planned.line) {
-            emptyRepairOffered = true;
-            console.warn(
-              `[ws/media][${sidLabel()}] turn speech repair action=${nextBestAction.action} kind=${planned.kind}`
-            );
-            callTranscript.pushAgent(planned.line);
-            turnTiming.markFirstSpokenChunk();
-            await speakText(planned.line, { tracePath: planned.kind || 'speech_repair' });
-            spokeThisTurn = true;
-            turnOutcome = 'speech_repair';
-          } else {
-            console.log(
-              `[ws/media][${sidLabel()}] turn speech quiet action=${nextBestAction.action} reason=empty_answer`
-            );
-            turnOutcome = 'speech_quiet';
-          }
-        }
-      }
-
-      if (endHonour && endSignalFromBrain(result).end && !bargeInActive) {
-        const sig = endSignalFromBrain(result);
-        console.log(`[ws/media][${sidLabel()}] end-call signal source=${sig.source}: hangup after audio`);
-        requestEndCall(sig.source, sig.reason);
-      } else if (result?.shouldEndCall && !bargeInActive) {
-        console.log(`[ws/media][${sidLabel()}] end-call marker — closing media shortly`);
-        setTimeout(() => {
-          try {
-            ws.close(1000, 'end_call');
-          } catch {
-            /* ignore */
-          }
-        }, 800);
-      } else if (hasPendingLiveTransfer(sessionCallSid) && !bargeInActive) {
-        // Staging spikes proved SautiKit does not continue the voice document
-        // after Stream (no Redirect, no StreamStopped on /voice/incoming).
-        // Closing media leaves dead air. Keep the AI on the line; SMS already sent.
-        console.warn(
-          `[ws/media][${sidLabel()}] live transfer Dial blocked — Stream does not continue; AI stays`
-        );
-      }
-      // VOICE_OPENING_V2: a streamed reply that finished is the last agent
-      // line, not cut (clears a barge cut from earlier in the call).
-      if (openingOn && opening && spokeThisTurn && !bargeInActive && lastAgentText) {
-        const said = String(lastAgentText).trim();
-        if (said && (said !== opening.session.lastAgentLine || opening.session.lastLineCut)) {
-          openingStore.noteLine(opening.session, said);
-        }
-      }
-      logTurnTiming(turnTiming, { outcome: turnOutcome });
-      if (activeTurnTiming === turnTiming) activeTurnTiming = null;
+      return;
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
       if (callEnding && requestEndCall('turn_error_while_ending')) {
@@ -6148,9 +4442,10 @@ mediaWss.on('connection', (ws, req) => {
           /* ignore */
         }
       } else if (!bargeInActive && !progressAlreadySpoken && !spokeThisTurn) {
-        const recovery = await resolveLlmRecoverySpeech(clean);
+        // B2: no old-brain recovery turn. The v2 repair template (EN/SW) is the only fallback line.
+        const recovery = v2OwnsCall.repairLine(callLanguage === 'sw' ? 'sw' : 'en');
         callTranscript.pushAgent(recovery);
-        await speakText(recovery, { tracePath: 'llm_recovery' });
+        await speakText(recovery, { tracePath: 'brain_v2_repair', skipFileGate: true });
       }
       logTurnTiming(turnTiming, { outcome: 'error' });
       if (activeTurnTiming === turnTiming) activeTurnTiming = null;
@@ -6435,11 +4730,11 @@ mediaWss.on('connection', (ws, req) => {
         return;
       }
 
-      // BRAIN_V1_DRAFT_PHASE_A (voice-qa 926 §2.4): "wait" / "no wait" gets a short ack instead of
+      // Phase A (voice-qa 926 §2.4; always on since B2): "wait" / "no wait" gets a short ack instead of
       // silence; a "Hello?" soon after a wait asks what to change instead of replaying the read-back.
       if (
         (decision.reason === 'interrupt_wait' || (decision.reason === 'hear_again' && v1WaitAt && Date.now() - v1WaitAt < 60000)) &&
-        !callEnding && !callIsOver() && !turnBusy && brainV1Draft.phaseA({ tenantId: brainProfile?.id })
+        !callEnding && !callIsOver() && !turnBusy
       ) {
         const key = decision.reason === 'interrupt_wait' ? 'wait' : 'afterWait';
         v1WaitAt = key === 'wait' ? Date.now() : 0;
@@ -8462,12 +6757,6 @@ function geminiVoiceConfig(systemPrompt, extra) {
   return config;
 }
 
-function modelMouthLine(text, result, soften) {
-  if (result?.lookupSpeech) return String(result.lookupSpeech);
-  const raw = String(text || '');
-  if (!raw) return '';
-  return soften ? softenCataloguePunctuation(cutNoAiSlop(raw)) : cutNoAiSlop(raw);
-}
 
 function voiceGeminiConfig(systemPrompt) {
   if (!lookupToolEnabled()) return geminiVoiceConfig(systemPrompt);
@@ -8831,36 +7120,13 @@ function nameJustConfirmed(callSid) {
   return callBrainStates.get(callSid)?.caller?.nameJustConfirmed === true;
 }
 
-function latestCallerUtterance(messages) {
-  if (!Array.isArray(messages)) return '';
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    if (messages[i]?.role === 'user') return String(messages[i].content || '');
-  }
-  return '';
-}
 
-function holdCallerSpeech(callSid, messages) {
-  const caller = callBrainStates.get(callSid)?.caller;
-  return openLineHoldDecision({
-    nameConfirmed: caller?.nameConfirmed === true,
-    nameJustConfirmed: caller?.nameJustConfirmed === true,
-    callerText: latestCallerUtterance(messages),
-  });
-}
 
 function clearNameJustConfirmed(callSid) {
   const caller = callBrainStates.get(callSid)?.caller;
   if (caller) caller.nameJustConfirmed = false;
 }
 
-function nameConfirmSpeech(callSid) {
-  const state = callBrainStates.get(callSid);
-  return formatNameConfirmSpeech({
-    openVisits: state?.returning?.openVisits,
-    openRequests: state?.returning?.openRequests,
-    language: state?.language?.current,
-  });
-}
 
 async function applyToolsWithHold(callSid, parsed, hooks = {}) {
   const shouldAbort = hooks.shouldAbort;
@@ -8904,229 +7170,6 @@ async function applyToolsWithHold(callSid, parsed, hooks = {}) {
     }
   }
   return { execution, toolHoldCancelled };
-}
-
-async function runGeminiTurnStreaming(
-  messages,
-  callSid,
-  systemPrompt = buildSystemPrompt(),
-  { onSpokenChunk, shouldAbort, onToolHold, catalogueBreath } = {}
-) {
-  const primary = geminiPrimaryModel();
-  const backup = geminiBackupModel();
-  const contents = buildGeminiContents(messages);
-  let model = primary;
-  const breath = catalogueBreath === true;
-  let buffer = createSpokenStreamBuffer({ catalogueBreath: breath });
-  let fullText = '';
-  let firstTokenAt = null;
-  let functionCalls = [];
-  let streamFailed = false;
-  let streamErr = null;
-  let thoughtSignature = '';
-  let modelParts = [];
-  let joinTrace = createStreamJoinTrace();
-  const timeoutMs = geminiTurnTimeoutMs();
-  let attempt = 0;
-
-  while (attempt < 3) {
-    fullText = '';
-    firstTokenAt = null;
-    buffer = createSpokenStreamBuffer({ catalogueBreath: breath });
-    thoughtSignature = '';
-    modelParts = [];
-    functionCalls = [];
-    joinTrace = createStreamJoinTrace();
-    streamErr = null;
-    streamFailed = false;
-    try {
-      console.log(
-        `[${callSid}] Calling Gemini stream (model: ${model}, attempt: ${attempt + 1}, messages: ${messages.length}, timeoutMs=${timeoutMs})`
-      );
-      await withTimeout(
-        (async () => {
-          const stream = await getGeminiClient().models.generateContentStream({
-            model,
-            contents,
-            config: voiceGeminiConfig(systemPrompt),
-          });
-
-          for await (const chunk of stream) {
-            if (shouldAbort?.()) {
-              console.log(`[${callSid}] Gemini stream aborted (barge-in)`);
-              break;
-            }
-            modelParts = appendGeminiStreamParts(modelParts, chunk);
-            functionCalls.push(...extractGeminiFunctionCalls(chunk));
-            thoughtSignature = extractThoughtSignature(chunk) || thoughtSignature;
-            const delta = extractGeminiText(chunk);
-            if (!delta) continue;
-            if (!firstTokenAt) firstTokenAt = Date.now();
-            const joinedBefore = fullText;
-            fullText = joinSpokenPieces(fullText, delta);
-            joinTrace.note(joinedBefore, delta, fullText);
-            const pieces = buffer.push(delta);
-            for (const piece of pieces) {
-              if (shouldAbort?.()) break;
-              if (typeof onSpokenChunk === 'function') {
-                try {
-                  await onSpokenChunk(piece);
-                } catch (err) {
-                  console.warn(
-                    `[${callSid}] spoken chunk TTS failed:`,
-                    err?.message || err
-                  );
-                }
-              }
-            }
-          }
-        })(),
-        timeoutMs,
-        'Gemini stream'
-      );
-      const joins = joinTrace.summary();
-      console.log(
-        `[${callSid}] Gemini stream done chars=${fullText.length} spokenEmitted=${buffer.getSpokenEmitted().length} deltas=${joins.deltas} unspacedJoins=${joins.unspacedJoins}`
-      );
-      break;
-    } catch (err) {
-      streamErr = err;
-      const spoke = Boolean(String(fullText).trim());
-      const next = nextGeminiStreamAttempt({
-        err,
-        attempt,
-        spoke,
-        primary,
-        backup,
-      });
-      if (next.action === 'stop') {
-        if (isTimeoutError(err) && spoke) {
-          console.warn(
-            `[${callSid}] Gemini stream timed out after ${timeoutMs}ms with partial text chars=${fullText.length}`
-          );
-        } else {
-          streamFailed = true;
-          console.error(
-            `[${callSid}] Gemini stream failed; stopping:`,
-            err?.message || err
-          );
-        }
-        break;
-      }
-      console.warn(
-        `[${callSid}] Gemini stream ${next.action} model=${next.model} after:`,
-        err?.message || err
-      );
-      if (next.waitMs) await sleep(next.waitMs);
-      model = next.model;
-      attempt += 1;
-    }
-  }
-
-  if (streamFailed && !fullText) {
-    const hardDown = isHardGeminiOutage(streamErr);
-    if (streamErr && !isTimeoutError(streamErr)) {
-      noteGeminiProviderError(classifyGeminiError(streamErr), streamErr);
-    }
-    return {
-      spokenText: '',
-      rawText: fullText || buffer.getRaw() || '',
-      firstTokenAt,
-      spokenEmitted: buffer.getSpokenEmitted().length,
-      model,
-      actionConfirmation: '',
-      toolResults: [],
-      shouldEndCall: false,
-      streamed: false,
-      llmFailed: true,
-      llmHardDown: hardDown,
-      timedOut: isTimeoutError(streamErr),
-    };
-  }
-
-  if (!shouldAbort?.()) {
-    for (const piece of buffer.finish()) {
-      if (typeof onSpokenChunk === 'function') {
-        try {
-          await onSpokenChunk(piece);
-        } catch (err) {
-          console.warn(
-            `[${callSid}] spoken chunk TTS failed:`,
-            err?.message || err
-          );
-        }
-      }
-    }
-  } else {
-    // Finalize buffer state without speaking remainder.
-    buffer.finish();
-  }
-
-  const parsed = parseGeminiResponse(fullText || buffer.getRaw());
-  const lookupTool = await spokenFromLookupTool(callSid, functionCalls, buffer.getSpokenEmitted().length > 0);
-  const heldTools = await applyToolsWithHold(callSid, parsed, { shouldAbort, onToolHold });
-  const execution = heldTools.execution;
-  let actionConfirmation = formatToolConfirmation(
-    execution.results,
-    callBrainStates.get(callSid)?.language?.current || 'en'
-  );
-  // A barge cancelled the hold. The outcome is not spoken on this turn, but
-  // the caller is still owed it on the next one (toolOutcomeQueue).
-  const bargedActionConfirmation = heldTools.toolHoldCancelled ? actionConfirmation : '';
-  if (heldTools.toolHoldCancelled) actionConfirmation = '';
-  // BRAIN_CALL_FIXES_D199: fact lines behind the confirmation (trace brain.lines[]).
-  let brainLines = brainLinesForResults(
-    execution.results,
-    callBrainStates.get(callSid)?.language?.current || 'en'
-  ).lines;
-  const spokenText = lookupTool
-    ? lookupTool.speech
-    : polishSpokenReply(
-        spokenTextForToolTurn({
-          spoken: spokenTextWithoutToolFallback({
-            spoken: buffer.getSpokenEmitted() || parsed.spokenText,
-            actionConfirmation,
-          }),
-          toolResults: execution.results,
-        }),
-        finalSpeechGuardOpts(callSid, execution.results)
-      );
-  // BRAIN_CALL_FIXES_D199: lines the speech guard put in (confirm_identity_first).
-  {
-    const conv = callBrainStates.get(callSid)?.conversation;
-    if (conv && Array.isArray(conv.pendingBrainLines) && conv.pendingBrainLines.length) {
-      brainLines = [...brainLines, ...conv.pendingBrainLines];
-      conv.pendingBrainLines = [];
-    }
-  }
-
-  const geminiParts = modelPartsForHistory({
-    geminiParts: modelParts,
-    text: fullText || buffer.getRaw(),
-    thoughtSignature,
-  });
-  messages.push({
-    role: 'assistant',
-    content: [spokenText, actionConfirmation].filter(Boolean).join(' '),
-    geminiParts,
-    thoughtSignature: thoughtSignature || undefined,
-  });
-  return {
-    spokenText,
-    rawText: fullText || buffer.getRaw() || '',
-    firstTokenAt,
-    spokenEmitted: buffer.getSpokenEmitted().length,
-    model,
-    actionConfirmation,
-    bargedActionConfirmation,
-    brainLines,
-    toolResults: execution.results,
-    shouldEndCall: execution.shouldEndCall,
-    streamed: !streamFailed,
-    streamJoins: joinTrace.summary(),
-    lookupSpeech: lookupTool?.speech || '',
-    lookupAck: lookupTool?.ack || '',
-  };
 }
 
 // Runs one turn of the conversation through Gemini, preserving the chat

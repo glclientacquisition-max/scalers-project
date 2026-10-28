@@ -34,40 +34,14 @@ function runCallerTurnSource() {
 describe('mid-call one-shots do not speak-and-return', () => {
   const turn = runCallerTurnSource();
 
-  it('does not force a period-paced catalogue ahead of Gemini', () => {
-    assert.doesNotMatch(turn, /speakText\(localReply\.line\)/);
-    assert.doesNotMatch(turn, /speakText\(paceLine\)/);
-    assert.doesNotMatch(turn, /speakText\(replayLine/);
-    assert.doesNotMatch(turn, /I don't have a booking for you/);
-    assert.doesNotMatch(turn, /sentenceBreaks/);
-    assert.doesNotMatch(turn, /renderSpokenList/);
-    assert.doesNotMatch(turn, /catalogue spoken/);
-    assert.match(turn, /local line not spoken/);
-    assert.match(turn, /pace-only stays on sentence stream/);
-    assert.match(turn, /resolveLocalReply\(\{/);
-    assert.match(turn, /planCatalogueMouth\(\{/);
-    assert.match(turn, /geminiCatalogueEnabled\(\)/);
-    assert.match(turn, /catalogue fallback reason=/);
-    assert.match(turn, /(?:turnC|c)atalogueMouth\.speakLocal && (?:turnC|c)atalogueMouth\.line/); // BRAIN_V2_NLU_GAPS §6a yield object or the mouth itself
-    assert.match(turn, /text: clean/);
-    assert.match(turn, /catalogueListed/);
-    assert.match(turn, /groundFilePriceLine\(\{/);
-    assert.match(turn, /authorizeSpeak\(/);
-    assert.match(turn, /commitTurnFacts\(speakCommit/);
-    assert.match(turn, /commitReadySpeakSlots\(speakCommit/);
-    assert.match(turn, /drainSpokenSpeakSlots\(brainState, planned\.lines\)/);
-    assert.match(turn, /planCommittedSpeech\(\{/);
-    assert.ok(turn.indexOf('commitReadySpeakSlots') < turn.indexOf('planCommittedSpeech'));
-    assert.ok(turn.indexOf('planCommittedSpeech') < turn.indexOf('drainSpokenSpeakSlots'));
+  // B2: the old Gemini media turn (local reply, catalogue mouth, committed speech, Gemini stream) is deleted; every
+  // media turn is the owned v2 turn, which speaks through the engines with skipFileGate.
+  it('B2: the media turn has no old catalogue mouth / local reply / Gemini stream left; v2 owns the turn', () => {
+    for (const re of [/speakText\(localReply\.line\)/, /speakText\(paceLine\)/, /speakText\(replayLine/, /I don't have a booking for you/, /sentenceBreaks/, /renderSpokenList/, /catalogue spoken/,
+      /resolveLocalReply\(\{/, /planCatalogueMouth\(\{/, /planCommittedSpeech\(\{/, /const streamOn/, /runGeminiTurn/, /pendingPriceAfterNameYes/]) assert.doesNotMatch(turn, re);
+    assert.match(turn, /v2OwnsCall\.runOwnedTurn\(/);
     assert.match(turn, /skipFileGate: true/);
-    assert.doesNotMatch(turn, /pendingPriceAfterNameYes/);
-    assert.doesNotMatch(turn, /outcome !== 'price'/);
-    assert.match(turn, /catalogueBreath: catalogueMouth\.letGemini/);
-    assert.ok(turn.indexOf('commitTurnFacts') < turn.indexOf('planBrainEndClose'));
     assert.doesNotMatch(serverSource, /fillerUsedThisCall/);
-    const gate = turn.indexOf('planCatalogueMouth');
-    const stream = turn.indexOf('const streamOn');
-    assert.ok(gate > 0 && stream > gate);
   });
 
   it('prepares catalogue and hours lines without treating them as a file read', () => {
@@ -101,32 +75,27 @@ describe('mid-call one-shots do not speak-and-return', () => {
       }),
       null
     );
-    // A public fact is a SpeakPacket and speaks before Gemini.
-    // A catalogue still goes through planCatalogueMouth.
+    // B2: the old turn's progress line (needsImmediateProgress) is deleted with it
     assert.doesNotMatch(turn, /speakText\(progressLine\)/);
-    assert.match(turn, /const needsImmediateProgress = actionMayExecute;/);
-    assert.doesNotMatch(turn, /needsImmediateProgress = actionMayExecute \|\| handoffNameAsk/);
+    assert.doesNotMatch(turn, /const needsImmediateProgress/);
   });
 
   it('leaves greeting, outage, and empty-speech recovery in place', () => {
     assert.match(serverSource, /async function speakGreetingSentences/);
     assert.match(serverSource, /function handleSpeechProviderOutage/);
-    assert.match(serverSource, /planEmptyGeminiSpeech\(\{/);
-    assert.match(serverSource, /Sorry, say that again\?|planned\.line/);
+    // B2: the empty-Gemini-speech recovery belonged to the deleted old turn; v2's repair template covers an empty turn
+    assert.doesNotMatch(serverSource, /planEmptyGeminiSpeech\(\{/);
+    assert.match(serverSource, /v2OwnsCall\.repairLine\(/);
   });
 });
 
 describe('visit lookup speaks the code sentence on the stream', () => {
   const turn = runCallerTurnSource();
 
-  it('pushes formatNameConfirmSpeech through the session and drops model text', () => {
-    assert.match(turn, /if \(suppressModelSpeech\) return;/);
-    assert.match(turn, /session\.pushText\(sentence\)/);
-    assert.match(turn, /await session\.end\(\)/);
-    assert.match(turn, /nameConfirmSpeech\(callKey\)/);
-    assert.match(turn, /localReply\?\.outcome === 'file_read'/);
+  it('formatNameConfirmSpeech still formats the open file (the old turn that streamed it is gone, B2)', () => {
+    // B2: the old turn's visit-lookup sentence path is deleted; v2 reads the caller file (lookup_caller receipt)
+    assert.doesNotMatch(turn, /if \(suppressModelSpeech\) return;|spokeLookupSentence && confirmation === lookupSpoken/);
     assert.doesNotMatch(turn, /speakText\(sentence\)/);
-    assert.match(turn, /spokeLookupSentence && confirmation === lookupSpoken/);
 
     const hold = openLineHoldDecision({
       nameConfirmed: true,

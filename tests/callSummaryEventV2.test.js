@@ -92,7 +92,7 @@ test('v2 read-back never answered → unconfirmed booking, not booked', async ()
 
 test('v2 failed write after yes → unconfirmed, never "booked"', async () => {
   const { e, fin } = await call(DD, ['Book sofa cleaning Friday at 10am in Kitengela, I am Alvin.', 'Yes.'], { failWrites: true });
-  assert.equal(fin.outcome, 'booked', 'legacy finishCall outcome is unchanged (known gap)');
+  assert.equal(fin.outcome, 'write_failed', 'B2: commit safety is always on, so the old known gap (finishCall said booked) is closed');
   assert.equal(e.outcome, 'info_only');
   assert.equal(confirmed(e).length, 0);
 });
@@ -311,19 +311,20 @@ test('C3 seam: A4 reads the cached once-only finish; finishCall runs once per ca
   const H = c1Handlers();
   const st = V2.createState({ profile: DD, callerPhone: '+254700000001', callId: 'HD_seam' });
   const live = owned.live('CA_seam', () => ({ getState: () => st }), { businessName: DD.businessName, callerPhone: '+254700000001', profile: DD });
-  assert.deepEqual(OC.a4V2Source(owned, 'CA_seam', { ownsCallOn: false }), { state: 'none', fin: null });
+  // B2: there is no ownsCallOn opt-out any more; a registered live call is always the v2 source
+  assert.equal(OC.a4V2Source(owned, 'CA_seam', { ownsCallOn: false }).state, 'pending', 'the old opt-out arg is ignored');
   for (const text of ['Can someone call me back?', 'Yes.']) await V2.runTurn(live.getState(), { text, profile: DD, now: NOW, handlers: H.h });
-  assert.equal(OC.a4V2Source(owned, 'CA_seam', { ownsCallOn: true }).state, 'pending', 'live, not finished yet: the summary waits');
+  assert.equal(OC.a4V2Source(owned, 'CA_seam').state, 'pending', 'live, not finished yet: the summary waits');
   const first = owned.finish('CA_seam', owned.meta('CA_seam'));
   assert.equal(first.once, true);
-  const src = OC.a4V2Source(owned, 'CA_seam', { ownsCallOn: true });
+  const src = OC.a4V2Source(owned, 'CA_seam');
   assert.equal(src.state, 'finished');
   assert.equal(src.fin.summaryReceipts[0].status, 'confirmed');
   assert.equal(owned.finish('CA_seam', owned.meta('CA_seam')).once, false);
-  OC.a4V2Source(owned, 'CA_seam', { ownsCallOn: true });
+  OC.a4V2Source(owned, 'CA_seam');
   assert.equal(owned.stats().finishRuns, 1, 'finishCall ran once');
   assert.ok(OC.summaryPatch(src.fin).brain_v2.summary_receipts.length);
-  assert.equal(OC.a4V2Source(owned, 'CA_other', { ownsCallOn: true }).state, 'none');
+  assert.equal(OC.a4V2Source(owned, 'CA_other').state, 'none');
 }));
 
 test('server.js A4 emitter never calls machine.finishCall itself (uses the C3 cached result)', () => {

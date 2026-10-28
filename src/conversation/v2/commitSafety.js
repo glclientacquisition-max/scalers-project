@@ -1,5 +1,5 @@
 'use strict';
-// BRAIN_V2_COMMIT_SAFETY (default off): plan row C1 (briefs/v2-greeting-and-path-plan.md).
+// Commit safety: plan row C1 (briefs/v2-greeting-and-path-plan.md).
 // Anything that commits the business (booking, order, quote, visit, callback) is a
 // two-phase write: propose_* mints a server-side confirm token bound to a hash of the
 // normalized slots; confirm redeems it only on the caller's NEXT turn, on an explicit
@@ -7,16 +7,11 @@
 // Validators (hours, service area, availability) run before propose. One idempotency
 // key (call + tool + slot hash) goes to the row and to the write receipt. A failed
 // write becomes an outbox owner task and the caller hears an honest line.
-// Off: nothing here is called; the machine keeps its Phase 1 behaviour.
+// B2: always on (BRAIN_V2_COMMIT_SAFETY / BRAIN_V2_OWNS_CALL no longer read). commitSafetyEnabled() stays as a
+// constant so the machine / receipts call sites read the same; there is no Phase 1 (unsafe) write path left.
 const crypto = require('crypto');
 
-const ON = /^(1|true|on|yes)$/i;
-// BRAIN_V2_OWNS_CALL (plan C3) removes the v1 guards from v2 writes, so it turns commit safety on with it.
-function commitSafetyEnabled(env = null) {
-  const cs = env ? env.BRAIN_V2_COMMIT_SAFETY : process.env.BRAIN_V2_COMMIT_SAFETY;
-  const owns = env ? env.BRAIN_V2_OWNS_CALL : process.env.BRAIN_V2_OWNS_CALL;
-  return ON.test(String(cs || '')) || ON.test(String(owns || ''));
-}
+function commitSafetyEnabled() { return true; }
 
 const low = (v) => String(v == null ? '' : v).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9:]+/g, ' ').trim();
 const digits = (v) => String(v || '').replace(/\D/g, '');

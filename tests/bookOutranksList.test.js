@@ -33,8 +33,9 @@ test('a plain services question still lists, gaps on', () => withGaps('1', () =>
   assert.strictEqual(bookOutranksListTurn('Mnafanya services gani?', DD, { now }), false);
 }));
 
-test('server wiring: every catalogue mouth reads the yielded objects', () => {
+// B2: the catalogue mouths lived in the old /ws/media Gemini turn, deleted with it (v2 / the engines own the turn).
+test('server wiring (B2): the old turn\'s catalogue mouths are gone from server.js', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  assert.match(src, /const bookOutranksList = bookOutranksListTurn\(clean, brainProfile\);/);
-  for (const re of [/localReply: turnLocalReply,\n\s*legacyMouth: turnLegacyMouth,\n\s*v2Mouth: turnCatalogueMouth,/, /\.concat\(turnCatalogueMouth\.v2Proposals \|\| \[\]\)/, /commitTurnFacts\(speakCommit, \{\n\s*localReply: turnLocalReply,/, /turnCatalogueMouth\.speakLocal && turnCatalogueMouth\.line\s*\?\s*turnCatalogueMouth\.line\s*:\s*''/]) assert.match(src, re);
+  assert.doesNotMatch(src, /const bookOutranksList = bookOutranksListTurn\(clean, brainProfile\);/);
+  for (const re of [/localReply: turnLocalReply,\n\s*legacyMouth: turnLegacyMouth,\n\s*v2Mouth: turnCatalogueMouth,/, /\.concat\(turnCatalogueMouth\.v2Proposals \|\| \[\]\)/, /commitTurnFacts\(speakCommit, \{\n\s*localReply: turnLocalReply,/, /turnCatalogueMouth\.speakLocal && turnCatalogueMouth\.line\s*\?\s*turnCatalogueMouth\.line\s*:\s*''/]) assert.doesNotMatch(src, re);
 });

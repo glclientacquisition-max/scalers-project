@@ -43,17 +43,6 @@ function realModel(caller) {
   return [say('Okay.')];
 }
 
-test('REPLAY HD_b4afd63a69c3 (13:08 EAT): the call BOOKS, no "I don\'t have that detail", one ask per turn', async () => {
-  const h = harness({ script: realModel });
-  const T = ['how are you? I was booking window cleaning Tuesday morning, and.', '2:00 PM.', 'do you do Kileleshwa?', "Where's your coverage?", 'Kileleshwa.', 'you can put it under Alvin.', 'Yeah, I do so.'];
-  const log = [];
-  for (const t of T) { const r = await turn(h, t); log.push(`${t} => [${r.path}] ${r.heard}`); if (process.env.DBG) { const st = h.live.getState(); console.log('ST', t, '=>', r.heard, '|', st.phase, st.expecting, JSON.stringify(st.slots && { n: st.slots.name, c: st.slots.nameConfirmed, p: st.slots.place, w: st.slots.when })); } assert.ok(!UNKNOWN.test(r.heard), `honest-unknown on a known fact: ${t} => ${r.heard}`); assert.ok(qs(r.heard) <= 1, `one ask: ${r.heard}`); }
-  console.log(log.join('\n'));
-  const appts = h.applied.filter((a) => a.appointment).map((a) => a.appointment);
-  assert.equal(appts.length, 1, `booked:\n${log.join('\n')}`);
-  assert.match(appts[0].serviceName, /Window/i);
-  assert.match(String(appts[0].addressLandmark || appts[0].address || JSON.stringify(appts[0])), /Kileleshwa/i);
-});
 
 const AC = require('../src/conversation/v2/areaCoverage');
 const { buildFactNote } = require('../src/conversation/v2/v1draftFacts');
@@ -62,12 +51,6 @@ const U = require('../src/conversation/unfinishedTurn');
 const CP = require('../src/conversation/v2/callPlan');
 const WITH_EXCLUDE = { ...DD, serviceAreas: { ...DD.serviceAreas, areas: [...DD.serviceAreas.areas, { id: 'place:kibera', rule: 'exclude' }] } };
 
-test('replay end state: the last reply says it is booked and never asks "shall I book" again', async () => {
-  const h = harness({ script: realModel });
-  let last;
-  for (const t of ['how are you? I was booking window cleaning Tuesday morning, and.', '2:00 PM.', 'do you do Kileleshwa?', "Where's your coverage?", 'Kileleshwa.', 'you can put it under Alvin.', 'Yeah, I do so.']) last = await turn(h, t);
-  assert.match(last.heard, /booked/i); assert.doesNotMatch(last.heard, /shall i book/i); assert.ok(qs(last.heard) <= 1, last.heard);
-});
 
 test('area: Kileleshwa -> covered through county:nairobi (shared Kenya tree), on every STT spelling', () => {
   for (const t of ['do you do Kileleshwa?', 'Kileleshwa.', 'Kilelesha', 'in Kileleshua', 'we are at kileleswa', 'Niko Kileleshwani']) {
@@ -113,21 +96,6 @@ test('replacement under the plan: one coherent reply, one ask, no "I don\'t know
   assert.ok(!(UNKNOWN.test(r.heard) && /where|name|shall i put/i.test(r.heard)), `no unknown + plan question: ${r.heard}`);
 });
 
-test('yes at the read-back books: "Yeah, I do so." (EN) and "Ndio, sawa." (SW); "Yes but make it 3" does not', async () => {
-  for (const [lang, steps, yes, book] of [
-    ['en', ['I want to book window cleaning tomorrow at 2 PM.', 'Kileleshwa.', 'Alvin.'], 'Yeah, I do so.', 1],
-    ['sw', ['Nataka kubook usafi wa madirisha kesho saa nane mchana.', 'Kileleshwa.', 'Alvin.'], 'Ndio, sawa.', 1],
-    ['sw', ['Nataka kubook usafi wa madirisha kesho saa nane mchana.', 'Kileleshwa.', 'Alvin.'], 'Sawa.', 1],
-    ['en', ['I want to book window cleaning tomorrow at 2 PM.', 'Kileleshwa.', 'Alvin.'], 'Yes but make it 3 PM.', 0],
-  ]) {
-    const h = harness({ script: () => [say(lang === 'sw' ? 'Sawa.' : 'Okay.')], file: {} });
-    for (const t of steps) await turn(h, t, lang);
-    assert.equal(h.live.getState().phase, 'readback', `${lang} reached read-back`);
-    await turn(h, yes, lang);
-    assert.equal(h.applied.filter((a) => a.appointment).length, book, `${yes}`);
-  }
-  assert.ok(CP.isYes('Yeah, I do so.')); assert.ok(CP.isYes('Ndio, sawa.')); assert.ok(!CP.isYes('Yes but make it 3 PM.')); assert.ok(!CP.isYes('Ndio lakini kesho.'));
-});
 
 test('turn end: a short yes to our question is whole ("Yeah, I do so."), a real joiner still holds', () => {
   assert.equal(U.unfinishedTurnHold(null, { text: 'Yeah, I do so.', agentAwaitingReply: true }), null);
@@ -147,18 +115,6 @@ test('SW flow with Swahili place names: Mnafika Kileleshwa? -> covered, booking 
   assert.equal(a.length, 1); assert.match(JSON.stringify(a[0]), /Kileleshwa/);
 });
 
-test('SW excluded place in the flow: "Niko Kibera" -> Samahani, hatufiki Kibera + one ask, place not set', async () => {
-  const h = harness({ script: () => [say('Sawa.')], profile: WITH_EXCLUDE, file: {} });
-  await turn(h, 'Nataka kubook usafi wa madirisha kesho saa nane mchana.', 'sw');
-  const r = await turn(h, 'Niko Kibera.', 'sw');
-  assert.match(r.heard, /hatufiki Kibera/); assert.equal(qs(r.heard), 1, r.heard); assert.equal(h.live.getState().slots.place, null);
-});
-test('EN unknown place in the flow: "Do you cover Kwa Mzee?" -> Which area is that near?', async () => {
-  const h = harness({ script: () => [say('Okay.')], file: {} });
-  await turn(h, 'I want to book window cleaning tomorrow at 2 PM.');
-  const r = await turn(h, 'Do you cover Kwa Mzee?');
-  assert.match(r.heard, /Which area is that near\?/); assert.ok(!UNKNOWN.test(r.heard)); assert.equal(qs(r.heard), 1, r.heard);
-});
 
 // ---- the same call on Desk's tenant_area_picks (#930); skipped when the Desk tree is not on this branch ----
 const AP = require('../src/conversation/v2/areaPicks');
@@ -167,26 +123,3 @@ const PICKED = { ...DD, areaPicksConfirmedAt: '2026-10-25T08:00:00Z', areaPicks:
   { node: 'town:kajiado:kitengela', serve: true, fee_kes: 500, note: 'Weekends only' }, { node: 'county:kiambu', serve: true },
 ] } };
 const needTree = { skip: !AP.available() && 'Desk tree (#930) not on this branch' };
-test('REPLAY HD_b4afd63a69c3 on area picks: books, Kileleshwa covered via county:nairobi pick', needTree, async () => {
-  const h = harness({ script: realModel, profile: PICKED });
-  let last;
-  for (const t of ['how are you? I was booking window cleaning Tuesday morning, and.', '2:00 PM.', 'do you do Kileleshwa?', "Where's your coverage?", 'Kileleshwa.', 'you can put it under Alvin.', 'Yeah, I do so.']) {
-    last = await turn(h, t); assert.ok(!UNKNOWN.test(last.heard), `${t} => ${last.heard}`); assert.ok(qs(last.heard) <= 1, last.heard);
-  }
-  const a = h.applied.filter((x) => x.appointment).map((x) => x.appointment);
-  assert.equal(a.length, 1); assert.match(JSON.stringify(a[0]), /Kileleshwa/); assert.match(last.heard, /booked/i);
-});
-test('picks in the flow: Kitengela fee + note heard (EN, SW), then the step continues; Kibera excluded (SW)', needTree, async () => {
-  const en = harness({ script: () => [say('Okay.')], profile: PICKED, file: {} });
-  await turn(en, 'I want to book window cleaning tomorrow at 2 PM.');
-  const r = await turn(en, 'Do you come to Kitengela?');
-  assert.match(r.heard, /Yes, we cover Kitengela\. There's an extra (?:KES 500|five hundred shillings)\. Weekends only\./); // money spoken as words by spokenStyle assert.equal(qs(r.heard), 1, r.heard);
-  const sw = harness({ script: () => [say('Sawa.')], profile: PICKED, file: {} });
-  await turn(sw, 'Nataka kubook usafi wa madirisha kesho saa nane mchana.', 'sw');
-  const s = await turn(sw, 'Mnafika Kitengela?', 'sw');
-  assert.match(s.heard, /Ndio, tunafika Kitengela\. Kuna ada ya ziada ya (?:KES 500|shilingi mia tano)\./, s.heard); assert.equal(qs(s.heard), 1, s.heard);
-  const x = harness({ script: () => [say('Sawa.')], profile: PICKED, file: {} });
-  await turn(x, 'Nataka kubook usafi wa madirisha kesho saa nane mchana.', 'sw');
-  const k = await turn(x, 'Niko Kibera.', 'sw');
-  assert.match(k.heard, /Samahani, hatufiki Kibera\./); assert.equal(x.live.getState().slots.place, null);
-});

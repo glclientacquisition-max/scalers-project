@@ -213,10 +213,12 @@ test('uncuttable filler already finished before the reply: no wait, no cut', asy
   assert.deepEqual(kinds(), ['filler', 'filler_end', 'line']);
 });
 
-// server.js wiring: the gate is used only when BRAIN_ENGINES (+ BRAIN_MODEL_LEAD path) is on; off = today's code.
-test('server.js: flag-off keeps the v1Filler / onV1Sentence / v1Chain path; gate is BRAIN_ENGINES-gated', () => {
+// server.js wiring (B2): the engines run every turn, so the gate is always built; the non-engines v1Filler /
+// onV1Sentence / v1Chain branch is left (unreachable) for Voice V1 to delete.
+test('server.js: the engines filler gate is always built (B2); the old flag gates are gone', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  assert.match(src, /const enginesFiller = v1DraftOn && brainModelLead\.leadOn\(\{ tenantId: brainProfile\?\.id \}\) && brainEnginesOn\(\{ tenantId: brainProfile\?\.id \}\)/);
+  assert.match(src, /const enginesFiller = createEnginesFillerTurn\(\{/);
+  assert.doesNotMatch(src, /brainEnginesOn|brainModelLead\.leadOn|brainV1Draft\.mode\(|brainV1Draft\.phaseA\(/);
   assert.match(src, /if \(v1DraftOn && !enginesFiller\) \{\n\s+v1Filler = setTimeout\(/);
   assert.match(src, /const onV1Sentence = enginesFiller\n\s+\? enginesFiller\.onSentence\n\s+: v1DraftOn/);
   assert.match(src, /const enginesSpoken = enginesFiller \? await enginesFiller\.finish\(live\) : null;/);
@@ -228,11 +230,8 @@ test('server.js: flag-off keeps the v1Filler / onV1Sentence / v1Chain path; gate
   assert.doesNotMatch(gateSrc, /pushAgent|callTranscript|appendTranscript/);
 });
 
-test('flag: BRAIN_ENGINES off by default', () => {
-  const { brainEnginesOn } = require('../src/conversation/v2/flag');
-  assert.equal(brainEnginesOn({ env: {} }), false);
-  assert.equal(brainEnginesOn({ env: { BRAIN_ENGINES: 'off' } }), false);
-  assert.equal(brainEnginesOn({ env: { BRAIN_ENGINES: 'on' } }), true);
+test('B2: no BRAIN_ENGINES switch (the flag module is gone)', () => {
+  assert.throws(() => require('../src/conversation/v2/flag'), /Cannot find module/);
 });
 
 // ---- end to end with #975's real runBrainEnginesTurn (stand-in models, real timers, no network)

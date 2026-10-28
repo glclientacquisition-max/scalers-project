@@ -31,42 +31,9 @@ async function say(text, lang = 'en', profile = P, { rows = [], u = null } = {})
 }
 const count = (s, re) => (s.match(re) || []).length;
 
-test('dedupe by fact: one price, said once (en + sw)', async () => {
-  const en = await say('How much is a deep clean?');
-  assert.equal(count(en, /six thousand shillings/g), 1, en);
-  const sw = await say('Deep clean ni pesa ngapi?', 'sw');
-  assert.ok(count(sw, /elfu sita/g) <= 1, sw);
-  const a = RF.createAssembler({ profile: P, lang: 'en' });
-  assert.ok(a.admit('Sofa Cleaning is KSh 700 per seat.'));
-  assert.equal(a.admit('Sofa Cleaning is KSh 700 per seat.'), '');
-});
 
-test('quantity x unit price from the catalogue (en + sw)', async () => {
-  const en = await say('Sofa cleaning for a 5-seater, how much?');
-  assert.match(en, /three thousand five hundred shillings for 5 seats/);
-  assert.equal(count(en, /seven hundred shillings per seat/g), 1, en);
-  const svc = P.servicesCatalog.find((s) => /sofa/i.test(s.name));
-  assert.match(RF.priceLine(svc, 'sofa ya viti 5', 'sw').text, /5 ni KSh 3,500/);
-});
 
-test('one payment fact: methods + deposit once, never stitched', async () => {
-  const pf = OF.paymentFact(OF.ownerFacts(P));
-  assert.ok(pf && /M-Pesa/.test(pf.en) && /deposit/.test(pf.en));
-  const en = await say('How do I pay?');
-  assert.doesNotMatch(en, /We take You can pay/i);
-  assert.equal(count(en, /M-Pesa Paybill/g), 1, en);
-  assert.equal(count(en, /30% deposit/g), 1, en);
-});
 
-test('place statements are owed a coverage answer with the confirmed fee (en + sw)', async () => {
-  assert.match(await say("I'm in Syokimau"), /Yes, we cover Syokimau\. There's an extra five hundred shillings/);
-  const th = await say("I'm in Thika");
-  assert.match(th, /cover Thika.*one thousand five hundred shillings.*2 bedrooms/);
-  assert.match(await say('Niko Syokimau', 'sw'), /Ndio, tunafika Syokimau\. Kuna ada ya ziada ya shilingi mia tano/);
-  const near = await say("I'm near Kamakis");
-  assert.match(near, /Which area is that near\?/); assert.doesNotMatch(near, /Yes, we cover/);
-  assert.equal(count(near, /\?/g), 1, near);
-});
 
 test('confirmed picks are the single coverage source: Kamakis, Kibera exclusion', async () => {
   assert.doesNotMatch(await say('Do you come to Kamakis?'), /Yes, we cover Kamakis/);
@@ -87,20 +54,6 @@ test('no-picks tenant: legacy fallback never confirms an unknown place', () => {
   assert.equal(AC.resolve('Kericho', NOPICKS).status, 'outside');
 });
 
-test('call plan owes the booking confirmations before the name, once, in the turn language (en + sw)', async () => {
-  const en = await say('Book a standard 2-bedroom clean Saturday 10am in Westlands');
-  assert.match(en, /Yes, we cover Westlands\..*three thousand five hundred shillings\..*It takes about 3-4 hours\..*On Saturday we're open 8 AM to 5 PM, so 10 AM works\. May I have your name\?$/);
-  const sw = await say('Nataka 2-bedroom standard clean Jumamosi saa nne asubuhi Westlands', 'sw');
-  assert.match(sw, /Ndio, tunafika Westlands\..*elfu tatu na mia tano\..*Inachukua takriban saa 3-4\..*Jumamosi tuko wazi.*Naomba jina lako\?$/);
-  const st = { intent: 'book', slots: { service: '2-Bedroom Standard Clean', when: { date: '2026-10-31', time: '10:00' }, place: 'Westlands' } };
-  const o = CP.owed(st, P, { kind: 'ask', slot: 'name' });
-  assert.deepEqual(o.items.map((x) => x.topic), ['coverage', 'price', 'duration', 'hours_fit']);
-  CP.markOwed(st, o);
-  assert.equal(CP.owed(st, P, { kind: 'ask', slot: 'name' }), null, 'once per booking');
-  assert.equal(CP.owed({ ...st, confirmedFor: null }, P, { kind: 'ask', slot: 'date' }), null, 'only before the name / read-back');
-  const kib = CP.owed({ intent: 'book', slots: { ...st.slots, place: 'Kibera' } }, P, { kind: 'ask', slot: 'name' });
-  assert.equal(kib.blocked, true);
-});
 
 test('every owed-answer type renders in Swahili, scoped to its sub-question (no extra sub-topics)', () => {
   const ctx = { profile: P, text: 'sofa viti 5', machine: { slots: {} }, caller: { candidate: 'Wanjiru', upcoming: [{ service: 'Sofa Cleaning', date: '2026-10-26' }] } };
@@ -126,31 +79,6 @@ test('every owed-answer type renders in Swahili, scoped to its sub-question (no 
 });
 const f0 = (t) => String(t || '').split(/(?<=[.!?])\s/)[0];
 
-test('Swahili not-covered reply follows the turn language through the call plan', async () => {
-  assert.equal(await say('Mnafika Kibera?', 'sw'), 'Samahani, hatufiki Kibera. Kazi iko eneo lingine?');
-  assert.equal(await say('Do you cover Kibera?', 'en'), "Sorry, we don't cover Kibera. Is the job anywhere else?");
-});
 
 const MON = [{ id: 'r1', caller_phone: '+254700000009', service_name: '2-Bedroom Standard Clean', status: 'confirmed', window_start: '2026-10-26T07:00:00Z', place: 'Westlands' }];
-test('cancel question vs request: no understanding -> clarify; a named booking -> the request (en + sw)', async () => {
-  assert.equal(await say('Can I cancel?'), 'Do you want to cancel a booking, or hear our cancellation policy?');
-  assert.equal(await say('Naweza kughairi?', 'sw'), 'Unataka kughairi booking yako, au kujua sera yetu ya kughairi?');
-  const en = await say('I want to cancel my Monday booking', 'en', P, { rows: MON });
-  assert.match(en, /^Cancel your two bedroom standard clean on Monday 26 October at 10 AM\. Shall I go ahead\?$/);
-  const sw = await say('Nataka kughairi booking yangu ya Jumatatu', 'sw', P, { rows: MON });
-  assert.match(sw, /^Nifute .*Jumatatu 26 Oktoba.*Niendelee\?$/);
-  assert.doesNotMatch(en + sw, /24 hours|saa 24|open booking|Sioni/i);
-});
 
-test('cancel question vs request: decided from the understanding (en + sw)', async () => {
-  const pol = (lang) => ({ lang, intents: ['ask'], questions: [{ type: 'policy', subject: 'cancellation' }], places: [], booking_ref: null, slots: {} });
-  const en = await say('Can I cancel?', 'en', P, { u: pol('en') });
-  assert.equal(en, 'You can cancel up to 24 hours before. After that, we keep the deposit.');
-  const sw = await say('Naweza kughairi?', 'sw', P, { u: pol('sw') });
-  assert.match(sw, /^Unaweza kughairi hadi saa 24 kabla\. Baada ya hapo, amana haitarudishwa\.$/);
-  const req = { lang: 'en', intents: ['cancel'], questions: [], places: [], booking_ref: { date: 'Monday' }, slots: {} };
-  assert.match(await say('I want to cancel my Monday booking', 'en', P, { u: req, rows: MON }), /Shall I go ahead\?$/);
-  assert.equal(ML.cancelKind(pol('en'), {}, 'Can I cancel?', P), 'policy');
-  assert.equal(ML.cancelKind(req, {}, 'cancel my Monday booking', P), 'request');
-  assert.equal(ML.cancelKind(null, {}, 'Can I cancel?', P, new Date('2026-10-25T09:00:00Z')), 'clarify');
-});

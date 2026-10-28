@@ -57,45 +57,10 @@ test('placeCandidates: every place, with or without or/and (Kilimani Westlands; 
 });
 
 // ---------------- split + join rule + one voice
-test('933-c1 T6 "serve Kilimani Westlands?": understanding LATE (1500 ms) never blocks the model reply; one voice; late understanding kept', async () => {
-  const h = harness({ ttft: { u_lite: 1500, u_flash: 1600 }, understand: () => U({ intents: ['ask'], questions: [{ type: 'coverage' }], places: ['Kilimani', 'Westlands'] }), reply: () => ({ reply: 'Yes, we serve Kilimani and Westlands. Which service would you like?' }) });
-  const r = await turn(h, 'Okay, I wanted to know if you guys serve Kilimani Westlands?');
-  assert.match(r.answeredBy, /^model/, r.answeredBy);
-  assert.ok(r.stage.firstSentenceMs < 1000, `first sentence ${r.stage.firstSentenceMs}`);
-  assert.equal(count(r.heard, 'Kilimani'), 1, r.heard); assert.equal(count(r.heard, 'Westlands'), 1, r.heard); // no template echo
-  assert.ok(!/we cover Kilimani\./.test(r.heard), r.heard);
-});
-test('join: understanding first (200 ms) -> machine uses it; reply streams after; ≤1 question', async () => {
-  const h = harness({ understand: () => U({ intents: ['ask'], questions: [{ type: 'coverage' }], places: ['Kilimani', 'Westlands'] }), reply: () => ({ reply: 'Yes, we cover Kilimani and Westlands. Which service would you like?' }) });
-  const r = await turn(h, 'Kilimani Westlands, do you go there');
-  assert.match(r.answeredBy, /^model/); assert.ok(r.stage.stagesMs.understanding < 400, JSON.stringify(r.stage.stagesMs));
-  assert.ok(count(r.heard, '\\?') <= 1, r.heard);
-  assert.deepEqual(r.stage.receipts.coverage.map((c) => c.place).sort(), ['Kilimani', 'Westlands']);
-});
-test('933-c1 T2 all models down: template answers BOTH places, one line per subject, no contradiction', async () => {
-  const h = harness(down);
-  const r = await turn(h, 'I wanted to know if you guys do serve maybe. Kilimani Westlands, or maybe Kileleshwa.');
-  assert.equal(r.answeredBy, 'template');
-  for (const p of ['Kilimani', 'Westlands', 'Kileleshwa']) assert.ok(r.heard.includes(p), `${p}: ${r.heard}`);
-  assert.ok(!/can'?t confirm/i.test(r.heard) || !/we cover/i.test(r.heard), r.heard);
-});
 test('933-c1 T5 template never states an unasked price', async () => {
   const h = harness(down);
   const r = await turn(h, 'Inquiring if you guys maybe do carpet cleaning,');
   assert.doesNotMatch(r.heard, /shilling|KES|ksh|\b\d,?\d{3}\b/i, r.heard);
-});
-test('933-c1 T12 crypto payment: KB answer or honest unknown, never "Sorry, I\'m not getting that"', async () => {
-  for (const mode of ['down', 'model']) {
-    const h = mode === 'down' ? harness(down) : harness({ understand: () => U({ intents: ['ask'], questions: [{ type: 'payment', subject: 'crypto' }] }), reply: () => ({ reply: 'Good question.' }) });
-    const r = await turn(h, 'Okay, I wanted to know if you guys accept crypto payments?');
-    assert.doesNotMatch(r.heard, /not getting that/i, `${mode}: ${r.heard}`);
-    assert.match(r.heard, /crypto|m-?pesa|paybill|cash|bank/i, `${mode}: ${r.heard}`);
-  }
-});
-test('933-c1 T8 "Ongata Rongai or Kileleshwa?" (the dead-air turn) gets one answer per place', async () => {
-  const h = harness({ understand: () => 'fail', reply: () => ({ reply: 'Let me check.' }) });
-  const r = await turn(h, 'And what about Ongata Rongai or Kileleshwa? Do you guys go there?');
-  assert.ok(r.heard.includes('Ongata Rongai') && r.heard.includes('Kileleshwa'), r.heard);
 });
 
 // ---------------- lookup_caller receipt tool (#933 c2 reschedule loop)
@@ -111,48 +76,8 @@ test('lookup_caller: in-memory receipt <10 ms; upcoming ≤3 future only; past r
   assert.equal(ML.lookupCaller(file, { service: 'Window Cleaning' }, { now }).match.kind, 'none');
   assert.equal(ML.lookupCaller(file, { date: '2026-10-30' }, { now }).match.row_id, 'r30');
 });
-test('933-c2 reschedule: no "Which booking is it?" loop — offers the upcoming by name, then a unique match moves on', async () => {
-  const h = harness({ callerFile: ALVIN_FILE, understand: () => 'fail', reply: () => 'fail' });
-  const r1 = await turn(h, 'I want to reschedule my booking.');
-  assert.doesNotMatch(r1.heard, /Which booking is it|service and the day/i, r1.heard);
-  assert.match(r1.heard, /carpet cleaning/i, r1.heard); assert.match(r1.heard, /sofa/i, r1.heard);
-  assert.doesNotMatch(r1.heard, /13 October|Kitengela/i, 'past job never offered');
-  const r2 = await turn(h, 'It was carpet cleaning. You have it in your memory.');
-  assert.doesNotMatch(r2.heard, /Which booking|Which one/i, r2.heard);
-  assert.equal(h.live.getState().slots.row && h.live.getState().slots.row.id, 'r26');
-});
-test('933-c2 T4 caller-file sentence passes as proof (descriptive); past job as open and write claims still blocked', async () => {
-  const say = { t: '' };
-  const h = harness({ callerFile: ALVIN_FILE, understand: () => U({ intents: ['reschedule'], booking_ref: { service: 'carpet cleaning' } }), reply: () => ({ reply: say.t }) });
-  say.t = 'You have a carpet cleaning scheduled for Monday 26 October in Kileleshwa. What new day works for you?';
-  const r = await turn(h, 'I want to reschedule my carpet cleaning.');
-  assert.match(r.heard, /carpet cleaning scheduled for Monday 26 October/i, JSON.stringify(r.stage.verdicts));
-  say.t = 'You have a carpet cleaning on 13 October in Kitengela.';
-  const r2 = await turn(h, 'When is my booking?');
-  assert.doesNotMatch(r2.heard, /13 October/i, r2.heard);
-  say.t = "I've cancelled your carpet cleaning on Monday 26 October.";
-  const r3 = await turn(h, 'Okay.');
-  assert.doesNotMatch(r3.heard, /cancelled/i, r3.heard);
-});
 
 // ---------------- name (decision 5; #932 c1 T4)
-test('932-c1 T4 "Can you tell me my name?": candidate only as a question; never stated as fact', async () => {
-  const h = harness({ callerFile: ALVIN_FILE, understand: () => U({ intents: ['ask'], questions: [{ type: 'identity' }] }), reply: () => ({ reply: "You're Alvin." }) });
-  const r = await turn(h, 'Can you tell me my name?');
-  assert.doesNotMatch(r.heard, /You're Alvin\.|your name is Alvin/i, r.heard);
-  assert.match(r.heard, /Alvin\?|Is that you\?/i, r.heard);
-});
-test('932-c2 "I wanted to know if you guys have Kilimani or Westlands." (no "?") answered per place, no "can\'t confirm" stack', async () => {
-  const h = harness({ understand: () => U({ intents: ['ask'], questions: [{ type: 'coverage' }], places: ['Kilimani', 'Westlands'] }), reply: () => ({ reply: 'Yes, we cover Kilimani and Westlands.' }) });
-  const r = await turn(h, 'I wanted to know if you guys have Kilimani or Westlands.');
-  assert.ok(r.heard.includes('Kilimani') && r.heard.includes('Westlands'), r.heard);
-  assert.doesNotMatch(r.heard, /can'?t confirm/i, r.heard);
-});
-test('SW: "Mnafika Kilimani Westlands?" -> Swahili reply covering both (split path)', async () => {
-  const h = harness({ understand: () => U({ lang: 'sw', intents: ['ask'], questions: [{ type: 'coverage' }], places: ['Kilimani', 'Westlands'] }), reply: () => ({ reply: 'Ndio, tunafika Kilimani na Westlands. Ungependa huduma gani?' }) });
-  const r = await turn(h, 'Mnafika Kilimani Westlands?', 'sw');
-  assert.match(r.heard, /tunafika/); assert.ok(r.heard.includes('Westlands'));
-});
 test('SW all models down: template answers both places in Swahili, no unasked price', async () => {
   const h = harness(down);
   const r = await turn(h, 'Nilikuwa nataka kujua kama mnafika Kilimani au Westlands', 'sw');

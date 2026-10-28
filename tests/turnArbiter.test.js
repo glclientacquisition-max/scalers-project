@@ -159,10 +159,10 @@ test('choke point: server.js routes every content TTS through the arbiter', () =
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'server.js'), 'utf8');
   const body = (name) => src.slice(src.indexOf(name), src.indexOf(name) + 600);
   assert.match(body('async function speakText(text, opts = {}) {'), /turnArbiter\.admit\(text, opts\)/);
-  assert.match(body('function playCachedReceipt(line) {'), /turnArbiter\.admit\(line/);
-  assert.match(body('async function onSpokenChunk(chunk) {'), /turnArbiter\.geminiAllowed\(\)/);
-  // beginSpeak only in the greeting, speakText internals and the Gemini reply session.
-  assert.equal((src.match(/tts\.beginSpeak\(/g) || []).length, 3);
+  // B2: playCachedReceipt and the Gemini reply session (onSpokenChunk) were the old turn's, deleted with it
+  assert.doesNotMatch(src, /function playCachedReceipt\(|async function onSpokenChunk\(/);
+  // beginSpeak only in the greeting and the speakText internals.
+  assert.equal((src.match(/tts\.beginSpeak\(/g) || []).length, 2);
   assert.match(src, /pinSpokenCatalogue\(profile\)/);
 });
 

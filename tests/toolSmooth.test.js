@@ -51,8 +51,9 @@ test('server.js: every tool-smooth path is behind the flags (off = byte-identica
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.match(src, /const mediaClock = smooth\.trace \|\| smooth\.hold \? toolSmooth\.createMediaClock\(\) : null;/);
   assert.match(src, /if \(mediaClock\) MEDIA_CLOCKS\.set\(ws, mediaClock\);/);
-  assert.match(src, /if \(smooth\.hold && spoken\.kind === 'hold' && mediaClock\) \{/);
-  assert.match(src, /await \(\(smooth\.receipt && playCachedReceipt\(outcomeLine\)\) \|\| speakText\(outcomeLine\)\);/);
+  // B2: the tool hold (speakToolHold / startHoldFill) and the cached receipt (playCachedReceipt) were only played by the
+  // old Gemini turn, deleted with it; the engines filler owns the wait on v2 (Voice V1 decides any hold fill there)
+  assert.doesNotMatch(src, /function speakToolHold|function startHoldFill|playCachedReceipt\(/);
   assert.match(src, /if \(!smooth\.prefetch\) return null;/);
   assert.match(src, /if \(smooth\.any\) \{\n\s+stopHoldFill\(\);/);
 });
@@ -90,10 +91,9 @@ test('77ce8123 traces (HD_db0e864043c1 C1 T9, HD_4ec204aafa93 C2 T9): why no hol
   assert.ok(after.gapP95Ms <= T.GAP_BAR_MS, `after p95 ${after.gapP95Ms}`); assert.equal(after.deadAir, 0);
 });
 
-test('server.js: hold cache miss is logged and falls back to the live hold; warm pauses on turnBusy', () => {
+test('server.js (B2): the old-turn hold fill is gone; the hold warm still pauses on turnBusy', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  assert.match(src, /if \(startHoldFill\(\)\) return;/);
-  assert.match(src, /tool-smooth hold miss/);
+  assert.doesNotMatch(src, /if \(startHoldFill\(\)\) return;/);
   assert.match(src, /phrases: toolSmooth\.warmPhrases\(callLanguage\),\s*\/\/[^\n]*\n\s*waitWhile: \(\) => turnBusy,\s*shouldAbort: \(\) => speechOutageStarted \|\| !tts,/);
 });
 

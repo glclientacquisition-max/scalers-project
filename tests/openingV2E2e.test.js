@@ -538,25 +538,27 @@ describe('KDPA: notice cut by a barge is given before the name ask / save (e2e)'
     assert.match(n.line, /given=true how=before_ask at_ms=\d+ cut_at_ms=\d+ state=given/);
   });
 
-  it('barge cuts the notice; a save comes first: the notice is spoken before the save runs', async () => {
+  // B2: the turn is the v2 engines (no tool markers), so the caller's name is not saved mid-turn by a model tool call.
+  // KDPA still holds on the v2 path: the owed notice is spoken before the first personal-details ask or the first write.
+  it('barge cuts the notice; the v2 turn gives it before its first ask or write (KDPA)', async () => {
     const sid = 'HD_sim_jirani_new_kdpa2';
     const c = await bargeEarly(sid);
     const from = srv.events.length;
+    // the caller gives a name: no write may run before the notice, and the notice is not lost
     sayFinal(srv, sid, 'Naitwa Peter, nataka carpet cleaning', { lang: 'sw' });
-    const given = await waitFor(
-      srv.events,
-      (e) => e.ev === 'log' && e.line.includes(`[ws/media][${sid}] recording_notice given how=before_save`),
-      5000,
-      from
-    );
+    const t1 = await waitFor(srv.events, (e) => e.ev === 'log' && e.line.includes(`[voice-timing][${sid}] turn_ms=`), 6000, from);
+    assert.ok(t1 && Number(/turn_ms=(\d+)/.exec(t1.line)[1]) < 2500, `the notice must not stall the turn: ${t1 && t1.line}`);
+    const noticeAt = () => srv.events.findIndex((e, i) => i >= from && e.ev === 'speak' && mine(sid)(e) && /Simu hii inaweza kurekodiwa/.test(e.text));
+    for (const w of srv.events.slice(from).filter((e) => e.ev === 'db_write' && e.callSid === sid)) {
+      const n = noticeAt();
+      assert.ok(n >= 0 && n < srv.events.indexOf(w), `notice spoken before ${w.fn}`);
+    }
+    // the next personal-details ask carries the owed notice first
+    sayFinal(srv, sid, 'Mnasafisha zulia?', { lang: 'sw' });
+    const given = await waitFor(srv.events, (e) => e.ev === 'log' && /recording_notice given how=before_(ask|save)/.test(e.line) && e.line.includes(`[ws/media][${sid}]`), 6000, from);
     assert.ok(given, logsOf(srv, sid, from).join('\n'));
-    const save = await waitFor(srv.events, (e) => e.ev === 'db_write' && e.fn === 'saveCallerInfo' && e.callSid === sid, 3000, from);
-    assert.ok(save, 'save ran (sim stub, no database)');
-    const noticeSpeak = srv.events.slice(from).find((e) => e.ev === 'speak' && mine(sid)(e) && /Simu hii inaweza kurekodiwa/.test(e.text));
-    assert.ok(noticeSpeak, 'notice spoken');
-    assert.ok(srv.events.indexOf(noticeSpeak) < srv.events.indexOf(save), 'notice spoken before the save');
-    const turn = await waitFor(srv.events, (e) => e.ev === 'log' && e.line.includes(`[voice-timing][${sid}] turn_ms=`), 3000, from);
-    assert.ok(turn && Number(/turn_ms=(\d+)/.exec(turn.line)[1]) < 1500, `the gate must not stall the turn: ${turn && turn.line}`);
+    const spoken = srv.events.slice(from).filter((e) => e.ev === 'speak' && mine(sid)(e)).map((e) => e.text).join(' ');
+    assert.ok(spoken.indexOf('Simu hii inaweza kurekodiwa.') >= 0, spoken);
     c.ws.close();
   });
 

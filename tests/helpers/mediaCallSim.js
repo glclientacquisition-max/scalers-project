@@ -27,6 +27,21 @@ const send = (msg) => {
   }
 };
 
+// --- Gemini over fetch (B2) ----------------------------------------------
+// Since B2 every media turn is the v2 engines, which call Gemini with fetch (SSE), not @google/genai. Never let a
+// sim call reach the network: Gemini URLs answer 503 (the engines run on rules + templates). A later preload
+// (endCallSim / openingSim) may replace this with a scripted reply.
+{
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (/generativelanguage\.googleapis\.com/.test(String(url))) {
+      send({ ev: 'gemini_fetch_blocked' });
+      return new Response('{}', { status: 503 });
+    }
+    return realFetch(url, init);
+  };
+}
+
 // 0.3 s of 16 kHz S16LE silence: a short cached greeting clip.
 const GREETING_PCM = Buffer.alloc(16000 * 2 * 0.3);
 

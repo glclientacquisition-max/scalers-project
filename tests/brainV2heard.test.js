@@ -8,23 +8,17 @@ const DD = require('../evals/v2/fixtures/tenants/done_and_dusted.json');
 const NOW = new Date('2026-10-14T05:00:00Z');
 const DD_STAGING = 'df4ad9d8-28ff-4810-b1e6-94f5495472b0';
 async function call(lines) {
-  const st = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] }); const h = V2.createDryRunHandlers(); const out = [];
+  // commit safety is always on (B2): a write is only spoken as saved with a row id, so the dry run returns one here
+  const st = V2.createState({ profile: DD, callerPhone: '+254700000001', openRows: [], pendingTasks: [] }); const h = V2.createDryRunHandlers(); let n = 0; for (const k of ['createAppointment', 'createServiceRequest', 'updateAppointment']) { const f = h[k]; h[k] = async (a) => ({ ...(await f(a)), id: `dry-${k}-${++n}` }); } const out = [];
   for (const text of lines) { const ev = []; for await (const e of V2.runTurnStream(st, { text, profile: DD, now: NOW, handlers: h })) ev.push(e); out.push({ c: text, ev, said: ev.filter((e) => e.type === 'sentence').map((e) => e.text).join(' ') }); }
   return out;
 }
 
-test('BRAIN_V2_SHADOW: off by default; BRAIN_V2_TENANTS scopes it to listed tenants only', () => {
-  assert.equal(V2.brainV2ShadowEnabled({ env: {}, tenantId: DD_STAGING }), false);
-  assert.equal(V2.brainV2ShadowEnabled({ env: { BRAIN_V2_SHADOW: '1' }, tenantId: 'any' }), true, 'unset allowlist = no restriction (matches Voice v2Shadow.js)');
-  const env = { BRAIN_V2_SHADOW: '1', BRAIN_V2_TENANTS: DD_STAGING };
-  assert.equal(V2.brainV2ShadowEnabled({ env, tenantId: DD_STAGING }), true);
-  assert.equal(V2.brainV2ShadowEnabled({ env, tenantId: DD_STAGING.toUpperCase() }), true, 'case-insensitive uuid');
-  assert.equal(V2.brainV2ShadowEnabled({ env, tenantId: 'other-tenant' }), false);
-  assert.equal(V2.brainV2ShadowEnabled({ env, tenantId: undefined }), false, 'unknown tenant never shadows when a list is set');
-  assert.equal(V2.brainV2ShadowEnabled({ env: { ...env, BRAIN_V2_TENANTS: ` ${DD_STAGING} , x ,` }, tenantId: DD_STAGING }), true, 'whitespace/trailing comma tolerated');
-  assert.equal(V2.brainV2ShadowEnabled({ env: { BRAIN_V2_SHADOW: '0', BRAIN_V2_TENANTS: DD_STAGING }, tenantId: DD_STAGING }), false);
-  assert.deepEqual(V2.tenantAllowlist({ BRAIN_V2_TENANTS: '' }), []);
-  assert.equal(V2.brainV2Enabled({ env: { BRAIN_V2: 'on', BRAIN_V2_TENANTS: DD_STAGING }, tenantId: 'x' }), false);
+test('B2: the shadow switch is gone (BRAIN_V2_SHADOW / BRAIN_V2_TENANTS no longer read by any brain code)', () => {
+  assert.equal(V2.brainV2ShadowEnabled, undefined);
+  assert.equal(require('../src/conversation/v2Shadow').brainV2ShadowEnabled, undefined);
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'server.js'), 'utf8');
+  assert.doesNotMatch(src, /brainV2ShadowEnabled|createBrainV2Shadow/);
 });
 
 test('splitSentences: no fragments from numbers or abbreviations', () => {
@@ -71,7 +65,10 @@ test('cut-off turns ("Hapana, n") never fill a slot, decline, or end the call; t
   assert.match(sw[1].said, /^Samahani.*Tuje wapi\?$/);
   assert.match(sw[3].said, /Ruiru, kwa Otieno/); assert.match(sw[4].said, /nimeweka Sofa Cleaning/);
   const en = await call(['Hi, I want to book sofa cleaning tomorrow at 10am', 'Kitengela', 'Alvin', 'No, w', 'Yes']);
-  assert.match(en[3].said, /^Sorry/); assert.match(en[4].said, /booked/);
+  // B2 (commit safety always on, as on prod): a cut-off "No, w" at the read-back is a safe decline: nothing is written,
+  // the call goes on (never a booking, never a goodbye). Before B2 the flag-off machine re-asked "Shall I book it?".
+  assert.match(en[3].said, /haven't saved anything/); assert.doesNotMatch(en[3].said, /booked|bye/i);
+  assert.ok(!en.flatMap((t) => t.ev).some((e) => e.type === 'tool' && e.name === 'createAppointment'), 'no write after a cut-off no');
   assert.equal(V2.nlu.extractName('Kitengela', { prompted: true }), null, 'a bare area is not a name');
   assert.equal(V2.nlu.extractName('Karen', { prompted: true }), 'Karen');
 });

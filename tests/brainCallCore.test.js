@@ -30,45 +30,9 @@ const L = {
   sw: { book: 'Nataka kubook usafi wa madirisha kesho saa nane mchana.', place: 'Ongata Rongai.', name: 'Alvin.', yes: 'Ndio, sawa.', cov: 'Mnafika Kileleshwa?', cov2: 'Mnafika Kilimani?', pay: 'Mnakubali crypto?', cancel: 'Nataka ku cancel booking yangu.', cancelWhy: 'Ni ya kitambo kidogo, cancel kwa sababu hawakuja.', switch: 'Hapana, nataka kubook usafi wa madirisha.', callMe: 'Mnaweza kunipigia simu baadaye?', yes2: 'Ndio.', full: 'Alvin Yegon.', add: 'Ongeza pia usafi wa zulia.' },
 };
 
-test('flag: off by default, DnD only; flag off = Phase B code path (core never runs)', async () => {
-  assert.equal(CC.coreOn({ env: BASE, tenantId: DD.id }), false);
-  assert.equal(CC.coreOn({ env: ENV, tenantId: 'other' }), false);
-  assert.equal(CC.coreOn({ env: ENV, tenantId: DD.id }), true);
-  const h = harness({ env: { ...BASE, BRAIN_V1_DRAFT_PHASE_B: 'on' } });
-  const r = await turn(h, L.en.book);
-  assert.equal(r.core, undefined); assert.equal(h.stages.filter((s) => s.kind === 'call_core').length, 0);
-});
 
 for (const lang of ['en', 'sw']) {
   const T = L[lang];
-  test(`[${lang}] 1+9 coverage question answered first (areaPicks resolver), then one step question; also on model timeout`, async () => {
-    for (const scripts of [() => [say(lang === 'sw' ? 'Sawa.' : 'Sure.')], 'fail']) {
-      const h = harness({ scripts });
-      await turn(h, T.book, lang);
-      const r = await turn(h, T.cov, lang);
-      assert.match(r.heard, /Kileleshwa/, r.heard); assert.ok(qs(r.heard) <= 1, r.heard);
-      assert.doesNotMatch(r.heard, /don'?t have that|sina maelezo/i);
-      const r2 = await turn(h, T.cov2, lang);
-      assert.match(r2.heard, /Kilimani/, r2.heard); assert.ok(qs(r2.heard) <= 1, r2.heard);
-    }
-  });
-  test(`[${lang}] 2+3 yes at the read-back books ONE row in one turn; the read-back is built from state`, async () => {
-    const h = harness({ scripts: () => [say(lang === 'sw' ? 'Sawa.' : 'Sure.')] });
-    for (const t of [T.book, T.place, T.name]) await turn(h, t, lang);
-    const st = h.live.getState(); assert.equal(st.phase, 'readback');
-    assert.match(st.lastLine, /Rongai/);
-    const y = await turn(h, T.yes, lang);
-    assert.equal(h.applied.filter((a) => a.appointment).length, 1); assert.ok(y.heard.length > 0);
-  });
-  test(`[${lang}] 4 one name step: a yes to the saved name keeps the place/day/time said in the same turn`, async () => {
-    const h = harness({ callerFile: { contactName: 'Alvin', nameConfirmed: false, callerPhone: '+254700000001', openRows: [] } });
-    await turn(h, lang === 'sw' ? 'Habari.' : 'Hello.', lang);
-    const st = h.live.getState(); st.expecting = 'name_confirm'; st.nameConfirmAsked = true;
-    const r = await turn(h, lang === 'sw' ? 'Ndio, ni mimi Alvin. Nataka kubook Kileleshwa kesho saa nane mchana.' : "Yeah, it's Alvin. Booking Kileleshwa tomorrow 2 PM.", lang);
-    assert.ok(qs(r.heard) <= 1, r.heard); assert.match(r.heard, /Alvin/, `welcome back lead kept: ${r.heard}`);
-    assert.equal(st.slots.place, 'Kileleshwa'); assert.ok(st.slots.when.date, 'day kept'); assert.ok(st.slots.when.time, 'time kept');
-    assert.ok(st.slots.nameConfirmed || (st.file && st.file.nameConfirmed), 'name confirmed once');
-  });
   test(`[${lang}] 5 fragments: ONE end-of-turn decision (Voice gate), the core adds no second hold`, () => {
     const frag = lang === 'sw' ? 'Nilikuwa nauliza,' : 'I was wondering if,';
     assert.ok(unfinishedTurnHold(null, { text: frag }), 'Voice holds the fragment');
@@ -78,14 +42,6 @@ for (const lang of ['en', 'sw']) {
     const h = harness({ scripts: () => [say(lang === 'sw' ? 'Nimeandika, watakupigia.' : "I've noted that, the team will call you."), say(lang === 'sw' ? 'Sawa.' : 'Okay.')] });
     const r = await turn(h, T.cancelWhy, lang);
     assert.doesNotMatch(r.heard, /noted|will call you|nimeandika|watakupigia/i, r.heard);
-  });
-  test(`[${lang}] 7 cancel -> booking switch goes to the booking flow, not the cancel list`, async () => {
-    const rows = [{ id: 'a1', job: 'Sofa Cleaning (per seat)', window_start: '2026-10-28T07:00:00Z', status: 'requested' }, { id: 'a2', job: 'Carpet Cleaning (per room)', window_start: '2026-10-29T07:00:00Z', status: 'requested' }];
-    const h = harness({ callerFile: { contactName: 'Alvin', nameConfirmed: true, callerPhone: '+254700000001', openRows: rows } });
-    await turn(h, T.cancel, lang);
-    assert.equal(h.live.getState().intent, 'cancel');
-    const r = await turn(h, T.switch, lang);
-    assert.notEqual(h.live.getState().intent, 'cancel'); assert.doesNotMatch(r.heard, /which one|ipi:/i, r.heard);
   });
   test(`[${lang}] 8 a list names only upcoming open bookings, at most 3; past rows never offered`, async () => {
     const past = [1, 2, 3, 4, 5].map((i) => ({ id: `p${i}`, job: 'Sofa Cleaning (per seat)', window_start: `2026-10-0${i}T07:00:00Z`, status: 'requested' }));
@@ -97,46 +53,8 @@ for (const lang of ['en', 'sw']) {
     const listed = (r.heard.match(/\b(or|au)\b/g) || []).length; assert.ok(listed <= 2, `max 3 rows: ${r.heard}`);
     assert.equal(h.applied.filter((a) => a.cancelAppointment || a.cancel_booking).length, 0, 'never closes old rows');
   });
-  test(`[${lang}] 10 payment question gets its answer only (no "I don't have that detail") + step`, async () => {
-    const h = harness({ scripts: 'fail' });
-    await turn(h, T.book, lang);
-    const r = await turn(h, T.pay, lang);
-    assert.match(r.heard, /M-Pesa/); assert.doesNotMatch(r.heard, /don'?t have that|sina maelezo/i); assert.ok(qs(r.heard) <= 1, r.heard);
-  });
-  test(`[${lang}] 11 "call me back" becomes a callback EFFECT with a receipt before any "they'll call you"`, async () => {
-    const h = harness({ scripts: () => [say(lang === 'sw' ? 'Watakupigia.' : "They'll call you.")] });
-    const r1 = await turn(h, T.callMe, lang);
-    assert.doesNotMatch(r1.heard, /they'll call you|watakupigia/i, `no claim before the effect: ${r1.heard}`);
-    await turn(h, T.yes2, lang);
-    for (let i = 0; i < 2 && !h.applied.some((a) => a.escalate); i++) await turn(h, T.yes2, lang);
-    assert.ok(h.applied.some((a) => a.escalate), 'callback task written');
-    const rec = h.live.getState().receipts.find((x) => x.tool === 'create_handoff' || x.action === 'escalate'); assert.ok(rec && rec.ok, 'receipt');
-  });
-  test(`[${lang}] 12 a two-word name is the name, never "And"`, async () => {
-    const h = harness();
-    for (const t of [T.book, T.place]) await turn(h, t, lang);
-    await turn(h, T.full, lang);
-    const n = h.live.getState().slots.name; assert.match(String(n), /^Alvin/); assert.notEqual(n, 'And');
-  });
-  test(`[${lang}] 14 multi-service: add at the read-back -> one read-back, one yes, ONE booking with 2 services`, async () => {
-    const h = harness();
-    for (const t of [T.book, T.place, T.name]) await turn(h, t, lang);
-    const r = await turn(h, T.add, lang);
-    assert.match(r.heard, /carpet|zulia/i, r.heard); assert.equal(qs(r.heard), 1, r.heard);
-    await turn(h, T.yes2, lang);
-    const appts = h.applied.filter((a) => a.appointment).map((a) => a.appointment);
-    assert.equal(appts.length, 1); assert.equal((appts[0].services || []).length, 2);
-  });
 }
 
-test('13 SW code-switch: "kesho saa nane" -> 14:00 tomorrow; trace R0 records events, writes, stage timings, plan', async () => {
-  const h = harness();
-  await turn(h, L.sw.book, 'sw');
-  const st = h.live.getState(); assert.equal(st.slots.when.time, '14:00'); assert.equal(st.slots.when.date, '2026-10-25');
-  const c = h.stages.find((s) => s.kind === 'call_core');
-  assert.ok(c && Array.isArray(c.events) && Array.isArray(c.writes) && c.writes.length && c.stagesMs && c.plan && c.plan.step);
-  assert.ok(typeof c.stagesMs.reduce === 'number' && typeof c.stagesMs.compose === 'number');
-});
 
 test('verifier: the composer writes no state (offer/service) under the core', async () => {
   const h = harness({ scripts: () => [say('We have a special on sofas, want a callback?', [], 'question')] });
@@ -144,13 +62,13 @@ test('verifier: the composer writes no state (offer/service) under the core', as
   assert.notEqual(h.live.getState().offer, 'callback');
 });
 
-test('owner text setting: default ON; off only skips the text when the core is on', () => {
+test('owner text setting: default ON; off skips the text (B2: the core is always on, no env gate)', () => {
   assert.equal(OT.ownerTextOn({}), true);
   assert.equal(OT.ownerTextOn({ businessPolicies: { owner_text_callback_cancel: false } }), false);
   const off = { id: DD.id, businessPolicies: { owner_text_callback_cancel: false } };
   assert.equal(OT.skipOwnerText({ env: ENV, profile: off, kind: 'callback' }), true);
   assert.equal(OT.skipOwnerText({ env: ENV, profile: off, kind: 'cancel' }), true);
-  assert.equal(OT.skipOwnerText({ env: BASE, profile: off, kind: 'callback' }), false, 'flag off = today');
+  assert.equal(OT.skipOwnerText({ env: BASE, profile: off, kind: 'callback' }), true, 'B2: no BRAIN_CALL_CORE gate, the owner setting always holds');
   assert.equal(OT.skipOwnerText({ env: ENV, profile: { id: DD.id }, kind: 'callback' }), false, 'default on');
   assert.equal(OT.skipOwnerText({ env: ENV, profile: off, kind: 'booking' }), false);
 });

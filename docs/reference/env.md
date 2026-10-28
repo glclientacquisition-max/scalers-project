@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-246 variables.
+237 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -36,25 +36,17 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BRAIN_AREA_PICKS` | voice | `src/conversation/v2/areaCoverage.js`<br>`src/db.js` |
 | `BRAIN_CALL_FIXES_D199` | desk | `dashboard/src/lib/tenantFieldProvenance.ts` |
 | `BRAIN_CONFIRMED_COVERAGE` | desk | `dashboard/src/lib/tenantFieldProvenance.ts` |
-| `BRAIN_ENGINES` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_ENGINES_FILLER_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_ENGINES_REPLY_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_ENGINES_UNDERSTAND_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_GEMINI_CATALOGUE` | voice | `src/conversation/catalogueMouth.js` |
 | `BRAIN_KB_GATE` | desk, scripts, voice | `dashboard/src/lib/kbLive.server.ts`<br>`scripts/kb-cutover.js`<br>`src/db.js` |
-| `BRAIN_MODEL_LEAD` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_SAFE_MODE` | desk, scripts, voice | `dashboard/src/lib/kbLive.server.ts`<br>`scripts/kb-cutover.js`<br>`server.js` |
-| `BRAIN_V1_DRAFT` | scripts | `scripts/brain-engines-sim.js` |
-| `BRAIN_V1_DRAFT_PHASE_A` | scripts | `scripts/brain-engines-sim.js` |
-| `BRAIN_V2` | scripts | `scripts/brain-engines-sim.js` |
-| `BRAIN_V2_COMMIT_SAFETY` | voice | `src/conversation/v2/commitSafety.js` |
 | `BRAIN_V2_FACT_STORE` | voice | `src/knowledge/factStore.js` |
-| `BRAIN_V2_MODE` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_V2_MODEL` | voice | `src/conversation/v2/modelShadow.js` |
 | `BRAIN_V2_MODEL_BACKUP_ID` | voice | `src/conversation/v2/modelShadow.js` |
 | `BRAIN_V2_MODEL_ID` | voice | `src/conversation/v2/modelShadow.js` |
 | `BRAIN_V2_NLU_GAPS` | voice | `src/conversation/turnProposals.js`<br>`src/conversation/v2/nlu.js` |
-| `BRAIN_V2_OWNS_CALL` | voice | `src/conversation/v2/commitSafety.js`<br>`src/conversation/v2/ownsCall.js` |
 | `BRAIN_V2_REPLY_OWNER` | voice | `src/conversation/v2/replyOwner.js`<br>`src/conversation/v2/turnModel.js`<br>`src/conversation/v2/turnResolver.js` |
 | `BUSINESS_KNOWLEDGE` | voice | `src/db.js`<br>`src/prompts.js`<br>`src/tenantProfile.js` |
 | `BUSINESS_NAME` | voice | `server.js`<br>`src/conversation/businessAssistantIntro.js`<br>`src/db.js`<br>+3 more |
@@ -76,7 +68,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `FACT_HASH_MODE` | desk, scripts, voice | `dashboard/src/lib/tenantFieldProvenance.ts`<br>`scripts/ack-rule-report.js`<br>`scripts/replay-voice-suite.js`<br>+2 more |
 | `FACT_PAYMENTS_V2_HASH` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
 | `FACT_SAVE_IS_CONFIRM` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
-| `GEMINI_API_KEY` | desk, scripts, voice | `dashboard/src/app/(desk)/settings/catalogActions.ts`<br>`dashboard/src/app/(desk)/settings/pronunciationGeminiScanActions.ts`<br>`dashboard/src/lib/faqFromTranscript.ts`<br>+12 more |
+| `GEMINI_API_KEY` | desk, scripts, voice | `dashboard/src/app/(desk)/settings/catalogActions.ts`<br>`dashboard/src/app/(desk)/settings/pronunciationGeminiScanActions.ts`<br>`dashboard/src/lib/faqFromTranscript.ts`<br>+11 more |
 | `GEMINI_AUDIO_MODEL` | desk | `dashboard/src/lib/gemini.ts` |
 | `GEMINI_BACKUP_MODEL` | voice | `src/conversation/geminiVoice.js` |
 | `GEMINI_MAX_OUTPUT_TOKENS` | voice | `server.js`<br>`src/speech/replayVoice.js` |
@@ -219,7 +211,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_FACT_REFS` | voice | `src/conversation/factSheet.js`<br>`src/conversation/numberWords.js` |
 | `VOICE_FALLBACK_BY_KIND` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
 | `VOICE_FAST_INBOUND` | scripts | `scripts/bench-inbound-webhook.js` |
-| `VOICE_FILLER` | voice | `server.js`<br>`src/conversation/language.js` |
+| `VOICE_FILLER` | voice | `src/conversation/language.js` |
 | `VOICE_FILLER_CACHE` | voice | `src/speech/fillerPcmCache.js` |
 | `VOICE_FLUSH_MAX_MS` | voice | `src/speech/turnTaking.js` |
 | `VOICE_FLUSH_MIN_MS` | voice | `src/speech/turnTaking.js` |
@@ -234,7 +226,6 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_LIVE_TRANSFER` | desk, voice | `dashboard/src/lib/deskLiveTransfer.ts`<br>`src/conversation/liveTransferReady.js` |
 | `VOICE_LIVE_TRANSFER_BETA_OUTBOUND` | voice | `src/billing/liveTransferLegs.js` |
 | `VOICE_LIVE_TRANSFER_IGNORE_HOURS` | voice | `src/conversation/liveTransferReady.js` |
-| `VOICE_LLM_STREAM` | voice | `server.js` |
 | `VOICE_LOOKUP_TOOL` | scripts, voice | `scripts/eval-release.js`<br>`src/knowledge/flags.js` |
 | `VOICE_LOOKUPS` | scripts, voice | `scripts/eval-release.js`<br>`src/knowledge/flags.js` |
 | `VOICE_OUTAGE_CLIP_DIR` | voice | `src/speech/outageClips.js` |

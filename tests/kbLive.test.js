@@ -129,20 +129,23 @@ test('staging tenants (fixture, 28 Oct): every one on the KB brain; quality reas
   }
 });
 
-test('the 5 unready staging businesses no longer land on the old Gemini turn (server.js v2Live = brainV2Enabled && mode live)', () => {
-  const flag = require('../src/conversation/v2/flag');
+// B2 (Brain): the old Gemini turn and every routing switch are deleted, so no business can land on it: there is no
+// v2/flag module, no v1draft mode/phaseA gate and no tenant list. Every turn is the engines, gate on or off.
+test('the 5 unready staging businesses can never land on the old Gemini turn (B2: no routing left)', async () => {
+  assert.throws(() => require('../src/conversation/v2/flag'), /Cannot find module/);
   const V1 = require('../src/conversation/v2/v1draft');
-  for (const id of ['78386574-aeb0-4b34-9296-00c5424cdd0e', '42cad929-b402-42bc-89c4-7b6544dfbc4c', '60283fd8-57ba-49da-9a3b-c1b194e3ea80', '9301dbca-e424-4534-9e9a-f209936ebb3d', '995e30d9-5d89-4e38-9855-dc7d0aac781c']) {
-    LIVE._REG.clear();
-    LIVE.attach({ id }, { version: 2, readyVersion: null, doc }, { env: STAGING_FLAGS });
-    assert.equal(flag.brainV2Enabled({ env: STAGING_FLAGS, tenantId: id }), true, id);
-    assert.equal(flag.brainV2Mode({ env: STAGING_FLAGS }), 'live');
-    assert.equal(flag.brainEnginesOn({ env: STAGING_FLAGS, tenantId: id }), true, `${id} engines`);
-    assert.equal(V1.mode({ env: STAGING_FLAGS, tenantId: id }), 'on', `${id} v1draft (not in BRAIN_V1_DRAFT_TENANTS)`);
+  assert.equal(V1.mode, undefined); assert.equal(V1.phaseA, undefined);
+  const { createBrainV2Live } = require('../src/conversation/v2/liveTurn');
+  for (const env of [STAGING_FLAGS, { ...STAGING_FLAGS, BRAIN_KB_GATE: 'off' }]) {
+    for (const id of ['78386574-aeb0-4b34-9296-00c5424cdd0e', '42cad929-b402-42bc-89c4-7b6544dfbc4c', '60283fd8-57ba-49da-9a3b-c1b194e3ea80', '9301dbca-e424-4534-9e9a-f209936ebb3d', '995e30d9-5d89-4e38-9855-dc7d0aac781c']) {
+      LIVE._REG.clear();
+      LIVE.attach({ id }, { version: 2, readyVersion: null, doc }, { env });
+      const live = createBrainV2Live({ env: { ...env, GEMINI_API_KEY: '' }, prewarm: false, log: () => {}, applyTools: async () => ({ results: [] }) });
+      const r = await live.run({ text: 'Hello', profile: { id, businessName: 'Test' }, langLock: 'en' });
+      assert.match(String(r.path || ''), /^brain_engines/, `${id} ${env.BRAIN_KB_GATE}`);
+      assert.ok(String(r.line || '').trim());
+    }
   }
-  // kill switch still routes by the env lists until P2 (gate off): a business outside BRAIN_V2_TENANTS is not on v2
-  const off = { ...STAGING_FLAGS, BRAIN_KB_GATE: 'off' };
-  assert.equal(flag.brainV2Enabled({ env: off, tenantId: '78386574-aeb0-4b34-9296-00c5424cdd0e' }), false);
 });
 
 test('contract surface: pure module, facts helper, columns, Desk closure ships it', () => {

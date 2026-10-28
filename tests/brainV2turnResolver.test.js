@@ -126,19 +126,20 @@ test('M3 one model request per turn, started on the partial; a changed text canc
   assert.ok(!/KSh|shilling|\b40\b|\b200\b/i.test(body), 'no prices in the request');
 });
 
-test('M4 the traced stage is the call the reply used; M5 model text is never spoken', async () => {
-  const w = svc(/window/i);
+// B2 rewrite of M4: the rules-turn model resolver (shadowModel + BRAIN_V2_MODEL in the deleted non-engines turn) is gone.
+// Every turn is the engines: exactly one traced stage per turn (the engines trace), and raw model text that is not the
+// typed JSON is never spoken (M5).
+test('M4 the traced stage is the one engines turn; M5 model text is never spoken', async () => {
   const stages = [];
-  const m = streamStandIn({ delayMs: 15, args: { asks: ['explain', 'price'], service_id: w.id } });
-  const wrapped = async (a) => { const r = await m(a); return { ...r, text: 'MODEL SAYS HELLO' }; };
-  const live = createBrainV2Live({ env: { BRAIN_V2: 'on', BRAIN_V2_MODE: 'live', BRAIN_V2_MODEL: 'on' }, shadowModel: wrapped, applyTools: async () => ({ results: [] }), onModelStage: (s) => stages.push(s), traceTurnIndex: () => 0, log: () => {}, callSid: 'm4' });
+  const seen = [];
+  const raw = () => async (a) => { seen.push(a); return { text: 'MODEL SAYS HELLO' }; };
+  const live = createBrainV2Live({ env: {}, modelLeadStreamFor: raw, prewarm: false, applyTools: async () => ({ results: [] }), onModelStage: (s) => stages.push(s), traceTurnIndex: () => 0, log: () => {}, callSid: 'm4' });
   const out = await live.run({ text: 'and the windows thing, how is it done and what does it cost', profile: DD, langLock: 'en' });
   assert.equal(stages.length, 1);
-  assert.equal(stages[0].used, true);
-  assert.equal(stages[0].callId, 'tm_1');
-  assert.equal(m.seen.length, 1);
-  const tr = live.getState().trace.find((t) => t.resolver);
-  assert.equal(tr.resolver.fields, 'model');
+  assert.equal(stages[0].kind, 'brain_engines');
+  assert.notEqual(stages[0].understanding.source, 'model', 'untyped model text is not an understanding');
+  assert.ok(seen.length >= 1, 'the understanding call was made');
+  assert.ok(String(out.line || '').trim(), 'a line is spoken');
   assert.ok(!/MODEL SAYS/.test(out.line), 'model text not spoken');
   TM.endCall('m4');
 });

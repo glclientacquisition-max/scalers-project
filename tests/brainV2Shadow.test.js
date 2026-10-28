@@ -12,28 +12,16 @@ const DD = require('../evals/v2/fixtures/tenants/done_and_dusted.json');
 const BOOK = ["Hi, I'd like to book interior window cleaning for Friday at 10am.", 'My name is Alvin', 'Kitengela, near Naivas', 'Yes'];
 const memSink = () => { const writes = []; const updates = []; return { writes, updates, write: async (r) => { writes.push(JSON.parse(JSON.stringify(r))); }, update: async (r) => { updates.push(JSON.parse(JSON.stringify(r))); } }; };
 
-test('flag: off by default and for falsy values; on for on/1/true; tenant allowlist', () => {
-  assert.equal(S.brainV2ShadowEnabled({ env: {} }), false);
-  for (const v of ['', 'off', '0', 'false', 'no']) assert.equal(S.brainV2ShadowEnabled({ env: { BRAIN_V2_SHADOW: v } }), false);
-  for (const v of ['on', '1', 'true', 'ON']) assert.equal(S.brainV2ShadowEnabled({ env: { BRAIN_V2_SHADOW: v } }), true);
-  assert.equal(S.brainV2ShadowEnabled({ env: { BRAIN_V2_SHADOW: 'on', BRAIN_V2_TENANTS: 'a,b' }, tenantId: 'c' }), false);
-  assert.equal(S.brainV2ShadowEnabled({ env: { BRAIN_V2_SHADOW: 'on', BRAIN_V2_TENANTS: 'a,b' }, tenantId: 'b' }), true);
-  // BRAIN_V2 / BRAIN_V2_MODE=live alone never arm the Voice hook
-  assert.equal(S.brainV2ShadowEnabled({ env: { BRAIN_V2: 'on', BRAIN_V2_MODE: 'live' } }), false);
+// B2: the shadow is removed from the live path. v2Shadow.js stays as a dead module for B3 (voiceTrace still diffs
+// against it); its switch is gone and server.js no longer loads or fires it.
+test('B2: no shadow switch (BRAIN_V2_SHADOW / BRAIN_V2_TENANTS unread); timeout helper kept for the dead module', () => {
+  assert.equal(S.brainV2ShadowEnabled, undefined);
   assert.equal(S.shadowTimeoutMs({}), 2500);
 });
 
-test('flag off: server.js hook is fully guarded and lazy (no v2 load, no runner)', () => {
+test('B2: server.js never loads or fires the shadow', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  // Guard: shadow flag on AND not BA v2 live (live speaks; shadow is skipped while live).
-  const i = src.search(/if \(\s*brainV2ShadowEnabled\(\{ tenantId: brainProfile\?\.id \}\)/);
-  assert.ok(i > 0, 'hook guarded by flag');
-  assert.match(src.slice(i, i + 240), /!\(brainV2Enabled\(\{ tenantId: brainProfile\?\.id \}\) && brainV2Mode\(\) === 'live'\)/, 'shadow skipped while live');
-  const hook = src.slice(i, src.indexOf('const turnMatches', i));
-  assert.match(hook, /void brainV2Shadow/);
-  assert.doesNotMatch(hook, /await /, 'never awaited on the live path');
-  assert.doesNotMatch(hook, /speakText|pushText|beginSpeak|sendPcmToMedia|onSpokenChunk|speakToolHold/, 'never speaks');
-  assert.equal((src.match(/brainV2Shadow\b/g) || []).length >= 3, true);
+  assert.doesNotMatch(src, /brainV2ShadowEnabled|createBrainV2Shadow|void brainV2Shadow|require\('\.\/src\/conversation\/v2Shadow'\)/);
   // shadow module does not require Brain v2 at load
   delete require.cache[require.resolve('../src/conversation/v2')];
   delete require.cache[require.resolve('../src/conversation/v2Shadow')];

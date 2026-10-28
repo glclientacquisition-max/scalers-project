@@ -230,32 +230,20 @@ describe('caller name stays the file name', () => {
     });
     assert.equal(shouldPublishOpenFileSentence(bookingHold, false), true);
 
+    // B2: the old /ws/media Gemini turn and its name gate (planCallerModelTurn -> runGeminiTurn) are deleted; v2
+    // owns the media call and its name lock (callerFile carries nameConfirmed). /ws/relay keeps the old gate (Voice V1).
     const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
     const start = server.indexOf('async function runCallerTurn');
     const end = server.indexOf('function flushUtterance', start);
     const turnSource = server.slice(start, end);
-    assert.match(turnSource, /planCallerModelTurn\(brainState/);
-    assert.match(
-      turnSource,
-      /const fileNameAsk = lockFileNameAsk\(nameGate\.line, callLanguage\)/
-    );
-    assert.match(
-      turnSource,
-      /nameAsk: askingName \? fileNameAsk : ''[\s\S]*?await speakText\(line/
-    );
-    const gateAt = turnSource.indexOf('planCallerModelTurn');
-    const modelAt = turnSource.indexOf('runGeminiTurn');
-    assert.ok(gateAt >= 0 && modelAt > gateAt);
+    assert.doesNotMatch(turnSource, /planCallerModelTurn\(brainState|runGeminiTurn|speakText\(localReply\.line\)/);
+    assert.match(turnSource, /nameConfirmed/);
     const promptStart = server.indexOf("if (data.type === 'prompt')");
     const promptEnd = server.indexOf("ws.on('error'", promptStart);
     const promptSource = server.slice(promptStart, promptEnd);
     const promptGate = promptSource.indexOf('planCallerModelTurn');
     const promptModel = promptSource.indexOf('runGeminiTurn');
     assert.ok(promptGate >= 0 && promptModel > promptGate);
-    assert.match(turnSource, /shouldPublishOpenFileSentence\(speechHold, fileReadAsk\)/);
-    assert.doesNotMatch(turnSource, /speechHold\.holdSpeech \|\| fileReadAsk/);
-    assert.doesNotMatch(turnSource, /speakText\(localReply\.line\)/);
-    assert.match(turnSource, /speak slot after name yes/);
   });
 
 

@@ -12,14 +12,9 @@
 // Anything else falls back to the step's template line. Caller-facing lines: [PROMPT-PLACEHOLDER].
 const R = require('./receipts');
 const L = require('./lexicon');
-const V1 = require('./v1draft');
 const AC = require('./areaCoverage');
 const CS = require('./commitSafety');
 const crypto = require('crypto');
-
-function phaseB({ env = process.env, tenantId } = {}) {
-  return V1.phaseA({ env, tenantId }) && String(env.BRAIN_V1_DRAFT_PHASE_B || 'off').trim().toLowerCase() === 'on';
-}
 
 const ADD = /\b(add|also|as well|plus|on top|together with|another|in addition|ongeza|ongezea|pia|pamoja na|na pia)\b/i;
 const SWITCH = /\b(instead|change (it|that|the service|the booking)? ?to|switch (it |that )?to|rather|badala ya|badilisha)\b/i;
@@ -303,4 +298,4 @@ function tail(st, ctx = {}) {
 }
 
 const split = (line) => String(line || '').match(/[^.!?]+[.!?]*/g)?.map((x) => x.trim()).filter(Boolean) || [];
-module.exports = { ownLine, owed, markOwed, isYes, YES, existingBooking, setPendingItems, split, phaseB, plan, before, after, step, stepNote, actCheck, tail, readbackLine, matchServices, lockedName, ADD, SWITCH, HAVE_NAME };
+module.exports = { ownLine, owed, markOwed, isYes, YES, existingBooking, setPendingItems, split, plan, before, after, step, stepNote, actCheck, tail, readbackLine, matchServices, lockedName, ADD, SWITCH, HAVE_NAME };

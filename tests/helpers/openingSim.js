@@ -253,4 +253,21 @@ if (geminiScript) {
     }
   }
   genai.GoogleGenAI = FakeGenAI;
+  // B2: every media turn is the v2 engines, which call Gemini over fetch (SSE), not @google/genai. Stub those
+  // requests too (no network): the understanding call fails (rules understanding), the reply call answers from the
+  // same script with the caller's words (CALLER_SAID).
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (!/generativelanguage\.googleapis\.com/.test(String(url))) return realFetch(url, init);
+    let req = {};
+    try { req = JSON.parse(init.body || '{}'); } catch { req = {}; }
+    if (req.generationConfig?.responseSchema?.properties?.intent) return new Response('{}', { status: 503 });
+    let said = '';
+    try { said = String(JSON.parse(req.contents?.[0]?.parts?.[0]?.text || '{}').CALLER_SAID || ''); } catch { said = ''; }
+    const hit = rules.find(([re]) => re.test(said));
+    const reply = hit ? hit[1].replace(/###TOOL###[\s\S]*?###ENDTOOL###/g, '').trim() : '';
+    send({ ev: 'gemini', said, reply, path: 'engines' });
+    const ev = { candidates: [{ content: { role: 'model', parts: [{ text: JSON.stringify({ reply }) }] } }] };
+    return new Response(`data: ${JSON.stringify(ev)}\n\n`, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+  };
 }

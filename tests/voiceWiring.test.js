@@ -11,22 +11,22 @@ const dbSource = fs.readFileSync(path.join(__dirname, '..', 'src/db.js'), 'utf8'
 const sttPath = path.join(__dirname, '..', 'src/speech/sonioxStt.js');
 const sttSource = fs.readFileSync(sttPath, 'utf8');
 
-assert.match(
+assert.doesNotMatch(
   source,
   /const\s*\{\s*createSpokenStreamBuffer[\s\S]*?\}\s*=\s*require\(['"]\.\/src\/speech\/spokenStreamBuffer['"]\)/,
-  'server.js must import createSpokenStreamBuffer before the streaming turn path uses it'
+  'B2: deleted with the old /ws/media Gemini turn (was: server.js must import createSpokenStreamBuffer before the streaming turn path uses it)'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /resolveLlmRecoverySpeech/,
-  'Gemini failure must speak a callback recovery line and persist it'
+  'B2: deleted with the old /ws/media Gemini turn (was: Gemini failure must speak a callback recovery line and persist it)'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /planLlmRecovery/,
-  'Gemini failure must persist a name they already said, not re-ask blindly'
+  'B2: deleted with the old /ws/media Gemini turn (was: Gemini failure must persist a name they already said, not re-ask blindly)'
 );
 
 assert.match(
@@ -83,28 +83,28 @@ assert.match(
   'idle check-in must not arm after the greeting before the caller has spoken'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /looksLikeBareCloser\(clean\)/,
-  'bare Okay/ok/fine/great must share one closer matcher on the media path'
+  'B2: deleted with the old /ws/media Gemini turn (was: bare Okay/ok/fine/great must share one closer matcher on the media path)'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /!bareCloser && shouldSpeakThinkingAck\(clean\)/,
-  'how-are-you and bare closers must not get a thinking-ack stall'
+  'B2: deleted with the old /ws/media Gemini turn (was: how-are-you and bare closers must not get a thinking-ack stall)'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /const localReply = lookupPlan\?\.handled[\s\S]*?resolveLocalReply\(\{[\s\S]*?nextBestAction,\s*\}\);/,
-  'a turn the lookup does not handle still passes turnPolicy.resolveLocalReply before Gemini'
+  'B2: deleted with the old /ws/media Gemini turn (was: a turn the lookup does not handle still passes turnPolicy.resolveLocalReply before Gemini)'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /polishSpokenDetail\(String\(chunk \|\| ''\)/,
-  'streamed chunks must pass polish (speech guard, menu strip) before TTS and keep the drop reason'
+  'B2: deleted with the old /ws/media Gemini turn (was: streamed chunks must pass polish (speech guard, menu strip) before TTS and keep the drop reason)'
 );
 
 assert.match(
@@ -155,16 +155,16 @@ assert.match(
   'replaying a committed question must arm the idle nudge again'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /planBrainEndClose\(\{[\s\S]*?action:\s*nextBestAction\.action/,
-  'Brain END must plan a farewell before Gemini on the media path'
+  'B2: deleted with the old /ws/media Gemini turn (was: Brain END must plan a farewell before Gemini on the media path)'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /playbackBytes = 0;[\s\S]*?await speakText\(line\);[\s\S]*?farewellHangupDelayMs\(\{[\s\S]*?bytes:\s*playbackBytes/,
-  'Brain END hangup must wait for the farewell PCM still queued, not a fixed 800ms'
+  'B2: deleted with the old /ws/media Gemini turn (was: Brain END hangup must wait for the farewell PCM still queued, not a fixed 800ms)'
 );
 
 assert.match(
@@ -185,10 +185,10 @@ assert.match(
   'question replay must not commit as a newly generated question'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /filler cancelled for reply audio/,
-  'reply path must cancel thinking-ack without awaiting remote TTS terminated'
+  'B2: deleted with the old /ws/media Gemini turn (was: reply path must cancel thinking-ack without awaiting remote TTS terminated)'
 );
 
 assert.match(
@@ -251,22 +251,22 @@ assert.match(
   'media path must stamp latency when a turn timing log fires'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /llm→tts stream prefetched/,
-  'reply TTS must be prefetched while Gemini starts'
+  'B2: deleted with the old /ws/media Gemini turn (was: reply TTS must be prefetched while Gemini starts)'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /cancel ONLY the filler stream/,
-  'filler stop must cancel only the filler stream id, not the reply prefetch'
+  'B2: deleted with the old /ws/media Gemini turn (was: filler stop must cancel only the filler stream id, not the reply prefetch)'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /action-progress action=/,
-  'action turns must speak a progress line before Gemini+tools dead air'
+  'B2: deleted with the old /ws/media Gemini turn (was: action turns must speak a progress line before Gemini+tools dead air)'
 );
 
 assert.match(
@@ -275,10 +275,10 @@ assert.match(
   'Stream lifecycle webhooks must be able to return Dial XML for a pending live transfer'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /live transfer Dial blocked/,
-  'must not close /ws/media for transfer until conference REST can ring a human'
+  'B2: deleted with the old /ws/media Gemini turn (was: must not close /ws/media for transfer until conference REST can ring a human)'
 );
 
 assert.match(
@@ -335,10 +335,10 @@ assert.match(
   'healthz must expose gitSha so staging Voice can be verified without merging to main'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /nextGeminiStreamAttempt/,
-  'a failed stream with no audio retries once, then one backup model'
+  'B2: deleted with the old /ws/media Gemini turn (was: a failed stream with no audio retries once, then one backup model)'
 );
 const streamFn = source.slice(
   source.indexOf('async function runGeminiTurnStreaming'),
@@ -452,10 +452,10 @@ assert.match(
   'speech outage must notify each owner at most once per cooldown'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /noteSpeechOutage\(\{ profile: brainProfile, kind: 'llm' \}\)/,
-  'Gemini credits / reasoning outage must notify each owner at most once per cooldown'
+  'B2: deleted with the old /ws/media Gemini turn (was: Gemini credits / reasoning outage must notify each owner at most once per cooldown)'
 );
 
 assert.match(
@@ -494,21 +494,21 @@ assert.match(
   'Gemini voice turns must use a hang timeout so the caller is not left silent'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /resolvePrefetchedStreamSpeech/,
-  'prefetched TTS with no chunks must speak fallback once, not also hit the guarantee'
+  'B2: deleted with the old /ws/media Gemini turn (was: prefetched TTS with no chunks must speak fallback once, not also hit the guarantee)'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /planEmptyGeminiSpeech/,
-  'empty Gemini success asks them to repeat once, not the downtime name-ask'
+  'B2: deleted with the old /ws/media Gemini turn (was: empty Gemini success asks them to repeat once, not the downtime name-ask)'
 );
-assert.match(
+assert.doesNotMatch(
   source,
   /turn speech quiet/,
-  'a second empty answer must log quiet continue instead of speaking the reach-them line'
+  'B2: deleted with the old /ws/media Gemini turn (was: a second empty answer must log quiet continue instead of speaking the reach-them line)'
 );
 assert.match(
   source,
@@ -521,10 +521,10 @@ assert.match(
   'a cancelled sentence tail must not open a new Soniox stream'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /shouldSpeakHandoffNameAsk/,
-  'handoff name-ask must skip when the caller already gave a name'
+  'B2: deleted with the old /ws/media Gemini turn (was: handoff name-ask must skip when the caller already gave a name)'
 );
 
 assert.match(
@@ -545,10 +545,10 @@ assert.match(
   'Gemini turns must drop model prose after outcome tools so confirmation is backend-only'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /spoken chunk TTS failed/,
-  'TTS errors on streamed chunks must not fail the Gemini stream (HD_5de59f6babc7)'
+  'B2: deleted with the old /ws/media Gemini turn (was: TTS errors on streamed chunks must not fail the Gemini stream (HD_5de59f6babc7))'
 );
 
 assert.match(
@@ -735,10 +735,10 @@ assert.match(
   /lockFileNameAsk\(/,
   'the file name ask must lock to the caller language before it is spoken'
 );
-assert.match(
+assert.doesNotMatch(
   source,
   /planCommittedSpeech\(\{[\s\S]*?nameAsk: askingName \? fileNameAsk : ''/,
-  'a committed public fact is spoken before the name ask, not dropped'
+  'B2: deleted with the old /ws/media Gemini turn (was: a committed public fact is spoken before the name ask, not dropped)'
 );
 assert.match(
   source,
@@ -760,10 +760,10 @@ assert.match(
   /applyToolsWithHold\(/,
   'a tool call must be able to speak a hold while it is in flight'
 );
-assert.match(
+assert.doesNotMatch(
   source,
   /onToolHold: speakToolHold/,
-  'barge-in during a tool hold must be able to cancel the follow-up'
+  'B2: deleted with the old /ws/media Gemini turn (was: barge-in during a tool hold must be able to cancel the follow-up)'
 );
 
 console.log('Voice runtime wiring checks passed.');

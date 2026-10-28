@@ -290,12 +290,13 @@ describe('hangupSautikitCall (POST /v1/calls/{id}/hangup)', () => {
 
 describe('server.js wiring', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  it('controller exists only with the flag on; flag off keeps the old timers', () => {
+  it('controller exists only with the flag on; the old turn timers are gone (B2)', () => {
     assert.match(src, /const endHonour = endCallHonourEnabled\(\)\s*\?/);
     assert.match(src, /: null;\n  \/\*\* Brain said the call is over/);
-    // Old paths still present for flag off.
-    assert.match(src, /else if \(result\?\.shouldEndCall && !bargeInActive\) \{\n\s*console\.log\(`\[ws\/media\]\[\$\{sidLabel\(\)\}\] end-call marker/);
-    assert.match(src, /if \(requestEndCall\('brain_end'\)\) return;\n\s*const delay = farewellHangupDelayMs/);
+    // B2: the old turn's end paths (###ENDCALL### marker 800 ms close, Brain END farewell timer) are deleted with it;
+    // v2's end signal is the only end of a media call.
+    assert.doesNotMatch(src, /else if \(result\?\.shouldEndCall && !bargeInActive\) \{\n\s*console\.log\(`\[ws\/media\]\[\$\{sidLabel\(\)\}\] end-call marker/);
+    assert.doesNotMatch(src, /if \(requestEndCall\('brain_end'\)\) return;\n\s*const delay = farewellHangupDelayMs/);
   });
   it('the playout clock is fed by every PCM send and cleared on barge-in', () => {
     assert.match(src, /const playout = PLAYOUT_CLOCKS\.get\(ws\);\n  if \(playout\) playout\.note\(pcm\.length\);/);
@@ -310,6 +311,7 @@ describe('server.js wiring', () => {
     assert.ok(guard > 0 && guard < flag && flag < alert, 'guard runs first');
   });
   it('v2 live: { end: true } after the spoken line requests the one hangup', () => {
-    assert.match(src, /const v2End = endSignalFromBrain\(live\);\n\s*if \(v2End\.end && requestEndCall\(v2End\.source, v2End\.reason\)\)/);
+    // B2: the owned v2 turn is the only one; a refused hangup (honour off) is logged and the call stays on v2
+    assert.match(src, /const v2End = endSignalFromBrain\(live\);\n\s*if \(v2End\.end\) \{\n\s*if \(requestEndCall\(v2End\.source, v2End\.reason\)\) \{\n\s*ownedV2Calls\.markEnded\(callKey, v2End\.reason\);/);
   });
 });

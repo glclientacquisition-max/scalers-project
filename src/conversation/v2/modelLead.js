@@ -1,5 +1,6 @@
 'use strict';
-// BRAIN_MODEL_LEAD (off|on; Done & Dusted only via BRAIN_V1_DRAFT_TENANTS; needs BRAIN_V1_DRAFT=on + PHASE_A=on).
+// modelLead: the model-lead library the engines are built on. B2: BRAIN_MODEL_LEAD no longer gates anything
+// (leadOn() is gone); the engines (brainEngines.js) are the only turn runner. History below is the original spec.
 // Spec: ship-briefs/2026-10-25_brain_model-led-call-core-spec.md (Alvin GO 2026-10-25 09:50 EAT, decisions 1-5 YES).
 // "The model leads, code guards." ONE structured model call per turn returns {understanding, tool_calls, reply}.
 // Code owns state (the v2 machine: name lock, dates, catalogue, writes), runs read-only tools BEFORE the model
@@ -7,17 +8,12 @@
 // receipts/KB/state. Fixed wording only for the read-back and the booked line; templates only when every model fails.
 // Off = byte-for-byte the #932 path (liveTurn never enters this module).
 // Caller-facing lines in this file: [PROMPT-PLACEHOLDER] (Prompt lane owns the copy).
-const V1 = require('./v1draft');
 const AC = require('./areaCoverage');
 const AP = require('./areaPicks');
 const CP = require('./callPlan');
 const CC = require('./callCore');
 const L = require('./lexicon');
 const { hoursFact } = require('./v1draftFacts');
-
-function leadOn({ env = process.env, tenantId } = {}) {
-  return V1.phaseA({ env, tenantId }) && String(env.BRAIN_MODEL_LEAD || 'off').trim().toLowerCase() === 'on';
-}
 
 // One place for every deadline (replaces v1draft r2FirstByMs 2600 on this path). Decision 2 + 3.
 const DEADLINES = { hedgeMs: 900, hardMs: 1800, repairMinLeftMs: 300, repairCapMs: 450, understandWaitMs: 1500 };
@@ -698,4 +694,4 @@ function paymentAnswer(profile = {}, text = '', lang = 'en') {
 }
 const UNASKED_PRICE = (s) => PRICE_WORD.test(s) && !/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|saa\s/i.test(s) && !/\b(20\d\d|october|oktoba)\b/i.test(s);
 
-module.exports = { yesClause, normQ, REPLY_WORD, REASK_MIN_MS, NEG, UNSURE, cancelKind, upcomingLine, coverageFor, addCallerPlaces, rememberCallerPlaces, callerAllowedPlaces, placesNamedInText, scanPlaces, owedCoverageQuestion, leadOn, splitOn, leadModels, SPLIT_DEADLINES, understandRequest, normUnderstanding, replyRequest, lookupCaller, callerFilters, ROW_INTENT, offerRowsLine, backedByCaller, pastAsOpen, paymentAnswer, UNASKED_PRICE, U_SCHEMA, R_SCHEMA, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };
+module.exports = { yesClause, normQ, REPLY_WORD, REASK_MIN_MS, NEG, UNSURE, cancelKind, upcomingLine, coverageFor, addCallerPlaces, rememberCallerPlaces, callerAllowedPlaces, placesNamedInText, scanPlaces, owedCoverageQuestion, splitOn, leadModels, SPLIT_DEADLINES, understandRequest, normUnderstanding, replyRequest, lookupCaller, callerFilters, ROW_INTENT, offerRowsLine, backedByCaller, pastAsOpen, paymentAnswer, UNASKED_PRICE, U_SCHEMA, R_SCHEMA, DEADLINES, UPCOMING_MAX, callerReceipt, placeCandidates, coverageReceipt, coverageAnswer, coverageSentence, kb, contextPack, buildRequest, staticPrefix, partialParse, sentencesOf, runHedged, guardTools, makeVerifier, owedAnswers, openingLine, storedWhenText, compareSaved, turnFieldsOf, identityFix, SCHEMA };

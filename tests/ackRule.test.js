@@ -84,11 +84,12 @@ test('v2Shadow acked: read after the filler delay; true only if a word filler pl
   await sh.fire({ text: 'y', profile: {}, turnIndex: 2, ackRule: true, acked: () => false, ackWaitMs: 10 });
   assert.deepEqual(seen, [true, false]);
 });
-test('server: shadow acked is the played word filler, not tracker.allowed()', () => {
+// B2: the shadow and the old Gemini turn's word filler (ruleFiller / wordAckTurn) are deleted with the old turn;
+// the v2 machine's ack rule (above) and the engines filler own acks on every call now.
+test('server (B2): no shadow ack hook and no old-turn word filler left', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'server.js'), 'utf8');
   assert.doesNotMatch(src, /acked: ackTracker\.allowed\(\)/);
-  assert.match(src, /acked: \(\) => wordAckTurn === turnTiming/);
-  assert.match(src, /if \(ruleFiller && ruleFiller\.word\) wordAckTurn = turnTiming;/);
+  assert.doesNotMatch(src, /wordAckTurn|ruleFiller/);
 });
 
 test('staging heard fixtures HD_db0e864043c1 + HD_4ec204aafa93: before >10% with stacks; rule replay 0 stacks, <=1 Voice ack; 4ec2 <=10% incl Mm', () => {

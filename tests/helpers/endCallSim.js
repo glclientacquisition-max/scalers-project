@@ -74,4 +74,20 @@ if (process.env.MEDIA_SIM_GEMINI) {
   } catch {
     Object.defineProperty(genai, 'GoogleGenAI', { value: FakeGoogleGenAI });
   }
+  // B2: the engines call Gemini over fetch (SSE). The understanding call fails (rules understanding); the reply call
+  // answers from the same script, matched on the caller's words (CALLER_SAID), v1 markers stripped. No network.
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (!/generativelanguage\.googleapis\.com/.test(String(url))) return prevFetch(url, init);
+    let req = {};
+    try { req = JSON.parse(init.body || '{}'); } catch { req = {}; }
+    if (req.generationConfig?.responseSchema?.properties?.intent) return new Response('{}', { status: 503 });
+    let said = '';
+    try { said = String(JSON.parse(req.contents?.[0]?.parts?.[0]?.text || '{}').CALLER_SAID || ''); } catch { said = ''; }
+    const step = script.find((row) => row.match && said.includes(row.match)) || script.find((row) => !row.match) || { delayMs: 0, text: '' };
+    await new Promise((r) => setTimeout(r, Number(step.delayMs) || 0));
+    const text = String(step.text || '').replace(/###[A-Z]+###/g, '').trim();
+    const ev = { candidates: [{ content: { role: 'model', parts: [{ text: JSON.stringify({ reply: text }) }] } }] };
+    return new Response(`data: ${JSON.stringify(ev)}\n\n`, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+  };
 }

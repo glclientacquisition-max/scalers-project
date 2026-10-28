@@ -9,7 +9,6 @@ const H = require('../src/conversation/v2/handoff');
 const { notifyHandoffOwner } = require('../src/conversation/v2/handoffNotify');
 const { runBrainEnginesTurn } = require('../src/conversation/v2/brainEngines');
 const { assertTurnInvariants, capSpokenLine } = require('../src/conversation/v2/engineInvariants');
-const { brainEnginesOn } = require('../src/conversation/v2/flag');
 const { createState } = require('../src/conversation/v2/machine');
 const { tenantProfileFromRow } = require('../src/tenantProfile');
 const { indexFieldMeta } = require('../src/conversation/provenance');
@@ -66,12 +65,14 @@ async function enginesTurn(m, text, understanding, { applyTools, dispatch, now =
   });
 }
 
-test('BRAIN_ENGINES flag defaults off', () => {
-  delete process.env.BRAIN_ENGINES;
-  assert.equal(brainEnginesOn({ env: process.env }), false);
-  process.env.BRAIN_ENGINES = '1';
-  assert.equal(brainEnginesOn({ env: process.env }), true);
-  delete process.env.BRAIN_ENGINES;
+test('B2: the engines are the only turn runner: no flag module, no BRAIN_ENGINES switch', async () => {
+  assert.throws(() => require('../src/conversation/v2/flag'), /Cannot find module/);
+  assert.equal(require('../src/conversation/v2/brainEngines').on, undefined);
+  // with every brain env unset (and BRAIN_ENGINES=off, ignored) a live turn still runs the engines
+  const live = createBrainV2Live({ env: { BRAIN_ENGINES: 'off' }, prewarm: false, now: () => CLOSED_EVENING, log: () => {}, callerFile: { callerPhone: '+254790381872' } });
+  const r = await live.run({ text: 'What time do you open?', profile: P, langLock: 'en' });
+  assert.ok(r && String(r.line || '').trim(), 'never a null / empty turn');
+  assert.equal(live.getState().engines, true);
 });
 
 test('notifyHandoffOwner is idempotent per call', async () => {
@@ -225,33 +226,32 @@ test('liveTurn routes to brain_engines when flag on', async () => {
   assert.equal(r.path, 'brain_engines');
 });
 
-test('split race logs when understanding missing after cap (flag off, no NLU inject)', async () => {
-  const ML = require('../src/conversation/v2/modelLead');
-  const logs = [];
-  const slowStream = () => async ({ request }) => {
+// B2 rewrite of the model-lead split-race test (runModelLead is deleted): the engines' understanding is capped
+// (BRAIN_ENGINES_UNDERSTAND_MS); a slow model past the cap never blocks the turn, rules understanding answers.
+test('engines: understanding slower than its cap -> rules understanding answers, the turn is never empty', async () => {
+  const slowStream = () => async ({ request, signal }) => {
     if (request.generationConfig?.responseSchema) {
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r, rej) => { const t = setTimeout(r, 500); signal?.addEventListener?.('abort', () => { clearTimeout(t); rej(new Error('aborted')); }); });
       return { text: JSON.stringify({ intent: 'ask', answers: ['hours'], yes_no: null, slots: {}, language: 'en', wants_human: false, closing: false }) };
     }
     return { text: JSON.stringify({ reply: '[PROMPT-PLACEHOLDER] Today we are open.' }) };
   };
-  const ENV = {
-    BRAIN_V2: '1', BRAIN_V2_MODE: 'live', BRAIN_V1_DRAFT: 'on', BRAIN_V1_DRAFT_PHASE_A: 'on',
-    BRAIN_MODEL_LEAD: 'on', BRAIN_MODEL_LEAD_SPLIT: 'on', BRAIN_ENGINES: 'off',
-  };
+  const traces = [];
   const live = createBrainV2Live({
-    env: ENV,
+    env: { BRAIN_ENGINES_UNDERSTAND_MS: '40' },
     applyTools: async () => ({ results: [] }),
     modelLeadStreamFor: slowStream,
-    v1DraftStreamFor: slowStream,
-    modelLeadDeadlines: { ...ML.SPLIT_DEADLINES, understandCapMs: 40 },
     prewarm: false,
     now: () => CLOSED_EVENING,
-    log: (m) => logs.push(String(m)),
+    log: () => {},
+    onModelStage: (st) => traces.push(st),
   });
   const r = await live.run({ text: 'when are you free?', profile: P, langLock: 'en' });
-  assert.ok(r && r.path);
-  assert.ok(logs.some((l) => l.includes('understanding null after race')));
+  assert.ok(r && String(r.line || '').trim());
+  assert.match(String(r.path || ''), /^brain_engines/);
+  const t = traces.find((x) => x.kind === 'brain_engines');
+  assert.ok(t, 'one engines trace per turn');
+  assert.notEqual(t.understanding?.source, 'model', 'the late model understanding is not used past the cap');
   assert.equal(live.getState().leadFallbackU, undefined);
 });
 

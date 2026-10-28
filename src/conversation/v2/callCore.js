@@ -11,16 +11,11 @@
 //   trace    - R0: events, state writes, stage timings, the plan, receipts (onModelStage kind=call_core)
 // Off = today's Phase B exactly. Caller-facing lines: [PROMPT-PLACEHOLDER].
 const CP = require('./callPlan');
-const V1 = require('./v1draft');
 const AC = require('./areaCoverage');
 const L = require('./lexicon');
 const { hoursFact } = require('./v1draftFacts');
 const OF = require('./ownerFacts');
 const RF = require('./replyFacts');
-
-function coreOn({ env = process.env, tenantId } = {}) {
-  return V1.phaseA({ env, tenantId }) && String(env.BRAIN_CALL_CORE || 'off').trim().toLowerCase() === 'on';
-}
 
 const sw = (lang) => L.isSw(lang);
 const isQ = (s) => /\?\s*$/.test(String(s || '').trim());
@@ -143,4 +138,4 @@ function callerFileTool(machine) {
   return { tool: 'lookup_file', ok: true, name: f.nameConfirmed ? f.contactName : null, candidate: !f.nameConfirmed ? f.contactName || null : null, lastJob: AM.lastJobRow(f) || null, upcoming: (f.openRows || []).length };
 }
 
-module.exports = { normalize, coreOn, events, applyPre, answers, receiptsSince, replyPlan, snapshot, diff, callerFileTool, CLAIM, BOOK, CANCEL };
+module.exports = { normalize, events, applyPre, answers, receiptsSince, replyPlan, snapshot, diff, callerFileTool, CLAIM, BOOK, CANCEL };

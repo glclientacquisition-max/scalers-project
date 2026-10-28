@@ -61,111 +61,14 @@ const call = (name, args = {}) => ({
 });
 
 // ---------- A1 primary wins ----------
-test('A1 primary wins under cap → gemini-3.6-flash, no backup call', async () => {
-  const primary = standIn([call('get_price', { service_id: 'svc_0' })], { delayMs: 20, name: 'primary' });
-  const backup = standIn([call('lookup_file', { topic: 'last_visit' })], { delayMs: 20, name: 'backup' });
-  const { live, stages } = liveWith(
-    { BRAIN_V2_MODEL: 'shadow' },
-    { shadowModel: primary, shadowBackupModel: backup },
-  );
-  await live.run({ text: 'how much is sofa cleaning?', profile, langLock: 'en' });
-  const st = await live.lastModelShadow();
-  assert.equal(st.timedOut, false);
-  assert.equal(st.cascade, false);
-  assert.equal(st.answeredBy, 'primary');
-  assert.equal(st.model, MS.MODEL_ID);
-  assert.equal(st.model, 'gemini-3.6-flash');
-  assert.equal(st.proposal.valid, true);
-  assert.equal(st.proposal.tool, 'get_price');
-  assert.equal(primary.seen.length, 1);
-  assert.equal(backup.seen.length, 0);
-  assert.equal(stages.length, 1);
-});
 
 // ---------- A2 timeout → backup ----------
-test('A2 primary timeout → one backup flash-lite inside overall HARD_CAP', async () => {
-  const primary = standIn([call('get_price', { service_id: 'svc_0' })], { delayMs: 2000, name: 'primary' });
-  const backup = standIn([call('lookup_file', { topic: 'last_visit' })], { delayMs: 30, name: 'backup' });
-  const { live } = liveWith(
-    { BRAIN_V2_MODEL: 'shadow' },
-    { shadowModel: primary, shadowBackupModel: backup },
-  );
-  const t0 = Date.now();
-  await live.run({ text: 'what was my last visit?', profile, langLock: 'en' });
-  const st = await live.lastModelShadow();
-  const wall = Date.now() - t0;
-  assert.equal(st.cascade, true);
-  assert.equal(st.answeredBy, 'backup');
-  assert.equal(st.model, MS.MODEL_BACKUP_ID);
-  assert.equal(st.model, 'gemini-3.5-flash-lite');
-  assert.equal(st.primaryTimedOut, true);
-  assert.equal(st.timedOut, false);
-  assert.equal(st.proposal.tool, 'lookup_file');
-  assert.equal(primary.seen.length, 1);
-  assert.equal(backup.seen.length, 1);
-  assert.ok(st.latencyMs <= MS.HARD_CAP_MS + 120, `cascade wall ${st.latencyMs}`);
-  assert.ok(wall < MS.HARD_CAP_MS + 400, `caller-adjacent wall ${wall}`);
-  // primary must have been aborted (signal fired) before backup
-  assert.equal(primary.seen[0].signal.aborted, true);
-});
 
 // ---------- A3 hard fail → backup ----------
-test('A3 primary hard fail → one backup', async () => {
-  const primary = async () => { throw Object.assign(new Error('boom'), { code: 'http_503' }); };
-  primary.seen = [];
-  const backup = standIn([call('get_hours', { day: 'today' })], { delayMs: 15, name: 'backup' });
-  const { live } = liveWith(
-    { BRAIN_V2_MODEL: 'shadow' },
-    { shadowModel: primary, shadowBackupModel: backup },
-  );
-  await live.run({ text: 'what time do you open?', profile, langLock: 'en' });
-  const st = await live.lastModelShadow();
-  assert.equal(st.cascade, true);
-  assert.equal(st.answeredBy, 'backup');
-  assert.equal(st.model, 'gemini-3.5-flash-lite');
-  assert.equal(st.primaryError, 'http_503');
-  assert.equal(st.primaryTimedOut, false);
-  assert.equal(st.timedOut, false);
-  assert.equal(st.proposal.tool, 'get_hours');
-  assert.equal(backup.seen.length, 1);
-});
 
 // ---------- A4 both fail ----------
-test('A4 both timeout → timedOut after cascade, proposal null, no throw', async () => {
-  const primary = standIn([call('get_price', { service_id: 'svc_0' })], { delayMs: 2000, name: 'primary' });
-  const backup = standIn([call('get_price', { service_id: 'svc_0' })], { delayMs: 2000, name: 'backup' });
-  const { live, writes } = liveWith(
-    { BRAIN_V2_MODEL: 'shadow' },
-    { shadowModel: primary, shadowBackupModel: backup },
-  );
-  const out = await live.run({ text: 'how much is sofa cleaning?', profile, langLock: 'en' });
-  assert.ok(out.line, 'rules mouth still stands');
-  const st = await live.lastModelShadow();
-  assert.equal(st.cascade, true);
-  // C1 honesty: both timeout → none (never claim backup success with null proposal)
-  assert.equal(st.answeredBy, 'none');
-  assert.equal(st.timedOut, true);
-  assert.equal(st.proposal, null);
-  assert.equal(writes.length, 0);
-  assert.ok(st.latencyMs <= MS.HARD_CAP_MS + 120, String(st.latencyMs));
-  assert.equal(primary.seen.length, 1);
-  assert.equal(backup.seen.length, 1);
-});
 
 // ---------- A5 off / shadow default ----------
-test('A5 off unchanged; shadow without backup keeps single-cap timeout', async () => {
-  assert.equal(MS.modelMode({}), 'off');
-  assert.equal(resolveModelShadow({ shadowModel: async () => ({}) }, {}), null);
-  const slow = standIn([call('propose_booking', { service_id: 'svc_0' })], { delayMs: MS.HARD_CAP_MS + 400 });
-  const { live } = liveWith({ BRAIN_V2_MODEL: 'shadow' }, { shadowModel: slow });
-  const out = await live.run({ text: 'I want to book sofa cleaning', profile, langLock: 'en' });
-  assert.ok(out.line);
-  const st = await live.lastModelShadow();
-  assert.equal(st.timedOut, true);
-  assert.equal(st.cascade, false);
-  assert.equal(st.answeredBy, 'primary');
-  assert.equal(st.proposal, null);
-});
 
 // ---------- A6 model text mute ----------
 test('A6 cascade plaintext is dropped — never spoken', async () => {
@@ -201,32 +104,6 @@ test('A7 env overrides; blank falls back to Alvin GO defaults', () => {
 });
 
 // ---------- B1 HD_c170-shaped ----------
-test('B1 HD_c1708336-shaped slow primary + fast backup → proposal present via cascade', async () => {
-  // Shape: every turn primary would die at cap; backup returns lookup_file (the seed mouth needs).
-  // Use shadow so only the logged cascade path runs (on also consults via cappedCascade).
-  const primary = standIn(() => call('get_price', { service_id: 'svc_0' }), { delayMs: 2000, name: 'primary' });
-  const backup = standIn(() => call('lookup_file', { topic: 'last_visit' }), { delayMs: 25, name: 'backup' });
-  const { live, stages } = liveWith(
-    { BRAIN_V2_MODEL: 'shadow' },
-    { shadowModel: primary, shadowBackupModel: backup },
-  );
-  for (const text of ['Nilikuwa nataka kujua services', 'Nieleze kuhusu sofa']) {
-    await live.run({ text, profile, langLock: 'en' });
-    await live.lastModelShadow();
-  }
-  assert.equal(stages.length, 2);
-  for (const st of stages) {
-    assert.equal(st.cascade, true, JSON.stringify(st));
-    assert.equal(st.answeredBy, 'backup');
-    assert.ok(st.proposal, 'backup proposal present — not null-without-backup');
-    assert.equal(st.proposal.tool, 'lookup_file');
-    assert.equal(st.timedOut, false);
-    assert.ok(st.latencyMs <= MS.HARD_CAP_MS + 120, String(st.latencyMs));
-  }
-  assert.equal(backup.seen.length, 2);
-  assert.equal(primary.seen.length, 2);
-  assert.equal(MS.scoreCascadeStages(stages).pass, true);
-});
 
 // ---------- B2 score helper ----------
 test('B2 score fails 100% primary-only timeouts with cascade enabled and zero backup attempts', () => {

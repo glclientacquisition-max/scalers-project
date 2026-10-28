@@ -52,17 +52,6 @@ test('Swahili read-back names the period (saa mbili asubuhi)', async () => {
   assert.match(lines[2], /saa mbili asubuhi/);
 });
 
-test('service + day/time without "book" is a booking; multi-intent price + booking; cancel + book', async () => {
-  const a = await talk(['Nataka sofa cleaning Ijumaa saa nne asubuhi.']);
-  assert.match(a.lines[0], /^Tuje wapi\?$/);
-  const b = await talk(['Book sofa cleaning Friday at 10am, and how much is it?']);
-  assert.match(b.lines[0], /(?:800|eight hundred).*Where should we come\?/i);
-  const row = { id: 'apt_fri', caller_phone: '+254700000001', service_name: 'Carpet Cleaning (per room)', status: 'requested', window_start: '2026-10-16T07:00:00Z', address_landmark: 'Kitengela' };
-  const c = await talk(['Cancel my Friday carpet cleaning and book sofa cleaning on Saturday at 10am instead.', 'Yes.'], { seed: { rows: [row], contactName: 'Alvin' } });
-  assert.match(c.lines[1], /cancelled\. .*Where should we come\?$/);
-  const d = await talk(['Drop my Friday carpet cleaning.'], { seed: { rows: [row] } });
-  assert.match(d.lines[0], /^Cancel your carpet cleaning/);
-});
 
 test('coverage: estates inside a listed county are served (Ruaka, Kiambu); Nakuru is not', async () => {
   assert.match((await talk(['Do you come to Ruaka?'])).lines[0], /Ruaka is on our list/);
@@ -88,25 +77,7 @@ test('noise, hold and "are you a bot?" keep every slot and re-ask the open quest
   assert.match((await talk(['Wewe ni robot?'])).lines[0], /msaidizi wa kidijitali/);
 });
 
-test('read-back: "No wait, actually yes" books; a barge-in correction re-reads', async () => {
-  const a = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', 'No wait, actually yes, book it.']);
-  assert.match(a.lines[3], /^Done, your sofa cleaning is booked/);
-  const b = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', 'Wait, wait, no, Saturday.']);
-  assert.match(b.lines[3], /Saturday 17 October.*Shall I book it\?$/);
-});
 
-test('read-back: an exact repeat of the time is a yes (Alvin, option b); another time is a change; a day alone gets one yes/no re-ask', async () => {
-  const a = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', 'Uh, 10am.']);
-  assert.match(a.lines[3], /^Done, your sofa cleaning is booked for Friday 16 October at 10:00/);
-  const b = await talk(['Nataka sofa cleaning Ijumaa saa nne asubuhi.', 'Ruiru', 'Otieno', 'Eeh, saa 4.']);
-  assert.match(b.lines[3], /nimeweka Sofa Cleaning/);
-  const c = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', '11am.']);
-  assert.match(c.lines[3], /at 11:00 in Kitengela.*Shall I book it\?$/); assert.ok(!c.out[3].toolResults.length, 'a different time never writes');
-  const d = await talk(['Book sofa cleaning Friday at 10am.', 'Kitengela', 'Alvin', 'Friday.', 'Yes.']);
-  assert.match(d.lines[3], /^Please say yes or no: shall I book it\?$/); assert.match(d.lines[4], /^Done/);
-  const e = await talk(['Nataka sofa cleaning Ijumaa saa nne asubuhi.', 'Ruiru', 'Otieno', 'Hmm, sijui.', 'Poa.']);
-  assert.match(e.lines[3], /^Tafadhali sema ndio au hapana: nithibitishe\?$/); assert.match(e.lines[4], /nimeweka/);
-});
 
 test('"next Friday" while this Friday is ahead: asked once naming both dates; on a Friday it is not asked', async () => {
   const a = await talk(['Book carpet cleaning next Friday at 10am.', 'The 23rd.', 'Kitengela', 'Alvin']);

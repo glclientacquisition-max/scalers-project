@@ -2,19 +2,38 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { brainV2Enabled, brainV2Mode } = require('../src/conversation/v2/flag');
 const { createLiveHandlers } = require('../src/conversation/v2/liveHandlers');
 const { createBrainV2Live } = require('../src/conversation/v2/liveTurn');
+const V2 = require('../src/conversation/v2');
+const { callerFile, endDecision: liveEndDecision } = require('../src/conversation/v2/liveTurn');
+
+// B2: createBrainV2Live always runs the engines, so the rules-machine behaviours these tests pinned through
+// live.run (phantom cancel, end-call, clock) are now pinned on the machine itself (V2.runTurn + the same live
+// handlers + the same endDecision live.run applies). Engine-level expectations use createBrainV2Live directly.
+function machineLive({ now, callerFile: cf, applyTools }) {
+  let st = null; let ended = false;
+  const handlers = createLiveHandlers({ applyTools });
+  return {
+    getState: () => st,
+    async run({ text, profile, langLock }) {
+      if (!st) { const f = callerFile({ callerFile: cf }); st = V2.createState({ profile, callerPhone: f.callerPhone, contactName: f.contactName, openRows: f.openRows }); }
+      const r = await V2.runTurn(st, { text, profile, now: now(), handlers, langLock });
+      const e = liveEndDecision({ done: r, machine: st, profile, line: r.line, alreadyEnded: ended });
+      if (e.end) ended = true;
+      return { ...r, end: e.end === true, endHeld: e.held, reason: e.reason };
+    },
+  };
+}
 
 // Pinned clock: a Thursday mid-morning EAT, so "tomorrow" never hits the small-hours
 // "later today or tomorrow?" question whatever time CI runs (Platform, 22 Oct).
 const DAY_EAT = '2026-10-22T10:00:00+03:00';
 
-test('BRAIN_V2 live is off unless both flags are set', () => {
-  assert.equal(brainV2Enabled({ env: {} }), false);
-  assert.equal(brainV2Mode({ env: {} }), 'shadow');
-  assert.equal(brainV2Enabled({ env: { BRAIN_V2: 'on' } }), true);
-  assert.equal(brainV2Mode({ env: { BRAIN_V2_MODE: 'live' } }), 'live');
+test('B2: v2 live has no on/off switch: the flag module is gone and a live turn runs with no env set', async () => {
+  assert.throws(() => require('../src/conversation/v2/flag'), /Cannot find module/);
+  const live = createBrainV2Live({ env: {}, applyTools: async () => ({ results: [] }), prewarm: false, log: () => {} });
+  const r = await live.run({ text: 'Hello', profile: { id: 't1', name: 'Test Co', services: [] }, langLock: 'en' });
+  assert.ok(String(r.line || '').trim(), 'a line is always spoken');
 });
 
 test('live handlers write through applyTools, not dry-run', async () => {
@@ -30,7 +49,7 @@ test('live handlers write through applyTools, not dry-run', async () => {
   assert.equal(seen[0].appointment.serviceName, 'Sofa cleaning');
 });
 
-test('live turn speaks a services list and does not invent a booking', async () => {
+test('live turn (engines) speaks a services list and does not invent a booking', async () => {
   const profile = {
     id: 'tenant-1',
     businessName: 'Jirani Cleaning Services',
@@ -41,9 +60,16 @@ test('live turn speaks a services list and does not invent a booking', async () 
     ],
   };
   const writes = [];
+  // stand-in models: typed understanding + a grounded reply (no network, no keys)
+  const streamFor = () => async ({ request }) => (request.generationConfig?.responseSchema?.properties?.intent
+    ? { text: JSON.stringify({ intent: 'ask', answers: ['services'], slots: {}, language: 'en' }) }
+    : { text: JSON.stringify({ reply: 'We do sofa cleaning and deep cleaning.' }) });
   const live = createBrainV2Live({
-    env: { BRAIN_V2: 'on', BRAIN_V2_MODE: 'live' },
+    env: {},
     now: () => new Date(DAY_EAT),
+    prewarm: false,
+    log: () => {},
+    modelLeadStreamFor: streamFor,
     applyTools: async (parsed) => {
       writes.push(parsed);
       return { results: [] };
@@ -54,8 +80,9 @@ test('live turn speaks a services list and does not invent a booking', async () 
     profile,
     langLock: 'en',
   });
-  assert.match(out.line, /We do sofas, and house cleaning by size|Deep clean, one bedroom|Sofa cleaning|We offer/i); // home services: plain categories (HD_89aa48bf657f lineage)
-  assert.doesNotMatch(out.line, /1 bedroom/);
+  assert.match(out.line, /sofa cleaning|deep clean/i);
+  assert.match(String(out.path || ''), /^brain_engines/);
+  assert.doesNotMatch(out.line, /booked|nimeweka/i);
   assert.equal(writes.length, 0);
 });
 
@@ -71,8 +98,7 @@ const PHANTOM_PROFILE = {
 };
 function phantomLive(openRows) {
   const writes = [];
-  const live = createBrainV2Live({
-    env: { BRAIN_V2: 'on', BRAIN_V2_MODE: 'live' },
+  const live = machineLive({
     now: () => new Date(DAY_EAT),
     callerFile: { callerPhone: '+254700000001', openRows },
     applyTools: async (parsed) => { writes.push(parsed); return { results: [{ action: 'update_appointment', status: 'succeeded', id: 'x' }] }; },
@@ -115,10 +141,8 @@ test('phantom cancel: a dated visit still reads back its date', async () => {
 // never with a write proposed and not committed, never when the owner turned end_call off.
 const END_PROFILE = { ...PHANTOM_PROFILE, agentTools: { escalate: true, end_call: true } };
 function endLive(now = DAY_EAT) {
-  return createBrainV2Live({
-    env: { BRAIN_V2: 'on', BRAIN_V2_MODE: 'live' },
+  return machineLive({
     now: () => new Date(now),
-    classify: async () => ({ kind: 'unknown', place: '' }),
     applyTools: async () => ({ results: [{ action: 'create_appointment', status: 'succeeded', id: 'apt_1' }] }),
   });
 }
