@@ -88,7 +88,8 @@ describe("contacts recents and favourites rate cards", () => {
     assert.match(profile, /isContactFavourite\(contact\.metadata\)/);
     assert.match(button, /Add to Favourites/);
     assert.match(button, /Favourited/);
-    assert.match(button, /variant=\{favourite \? "tonal" : "ghost"\}/);
+    assert.match(button, /variant=\{shown \? "tonal" : "ghost"\}/);
+    assert.match(button, /useOptimistic\(favourite/);
     assert.doesNotMatch(button, /bg-accent px-3.5 text-accent-on/);
     assert.match(actions, /export async function updateContactFavourite/);
     assert.match(actions, /withContactFavourite/);

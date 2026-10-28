@@ -25,6 +25,8 @@ import {
   inboxUnarchive,
 } from "@/lib/inboxLeadActions";
 import { announceInboxResult, writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
+import { runOptimistic, serverActionError } from "@/lib/optimisticAction";
+import { notify } from "@/components/ui/DeskNotice";
 import {
   inboxItemWithLocal,
   inboxOverflowActions,
@@ -37,6 +39,14 @@ const PRESS_HINT_MS = 100;
 const MOVE_CANCEL_PX = 12;
 
 type ActionId = InboxListActionId;
+
+const INBOX_ROW_FAIL: Record<string, string> = {
+  archive: "Could not archive.",
+  unarchive: "Could not unarchive.",
+  pin: "Could not pin.",
+  unpin: "Could not unpin.",
+  mark_done: "Could not mark done.",
+};
 
 const InboxRowMenuCtx = createContext<{
   open: boolean;
@@ -94,9 +104,10 @@ export function InboxRowShell({
   const [pressing, setPressing] = useState(false);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingId, setPendingId] = useState<ActionId | null>(null);
+  // Optimistic: the menu closes on tap, so nothing waits on a pending label.
+  const pendingId: ActionId | null = null;
   const busyRef = useRef(false);
-  const busy = pendingId !== null;
+  const busy = false;
 
   const clearPress = useCallback(() => {
     if (pressRef.current.timer) {
@@ -117,27 +128,57 @@ export function InboxRowShell({
       setError("Missing call.");
       return;
     }
+    if (busyRef.current) return;
     busyRef.current = true;
-    setPendingId(id);
     setError(null);
     const view = inboxItemWithLocal(item, local);
-    let res: { error?: string; ok?: boolean } = { ok: true };
-    let archivedNow: Awaited<ReturnType<typeof inboxArchive>> | null = null;
-    if (id === "pin" || id === "unpin") res = await inboxTogglePin(view);
-    if (id === "mark_done") res = await inboxMarkDone(item);
-    if (id === "archive") res = archivedNow = await inboxArchive(item);
-    let unarchivedText: string | null = null;
-    if (id === "unarchive") {
-      const one = await inboxUnarchive(item);
-      res = one;
-      unarchivedText = "text" in one ? one.text : null;
-    }
+    const before = { pinnedAt: local.pinnedAt, leadStatus: local.leadStatus };
+    const leaves = id === "archive" || id === "unarchive";
+    // Filled by the server call inside runOptimistic.
+    const got: { archived: Awaited<ReturnType<typeof inboxArchive>> | null; text: string | null } = {
+      archived: null,
+      text: null,
+    };
+
+    // Screen first: the row leaves, pins or reads Done the moment it is tapped.
+    // The server confirms in the background; on failure the row comes back
+    // and a notice offers Try again.
+    const out = await runOptimistic({
+      apply: () => {
+        if (leaves) patch({ hidden: true });
+        if (id === "pin") patch({ pinnedAt: new Date().toISOString() });
+        if (id === "unpin") patch({ pinnedAt: null });
+        if (id === "mark_done") patch({ leadStatus: "resolved" });
+        setOpen(false);
+      },
+      commit: async (): Promise<{ error?: string; ok?: boolean }> => {
+        if (id === "pin" || id === "unpin") return inboxTogglePin(view);
+        if (id === "mark_done") return inboxMarkDone(item);
+        if (id === "archive") return (got.archived = await inboxArchive(item));
+        if (id === "unarchive") {
+          const one = await inboxUnarchive(item);
+          got.text = "text" in one ? one.text : null;
+          return one;
+        }
+        return { ok: true };
+      },
+      rollback: () => {
+        if (leaves) patch({ hidden: false });
+        if (id === "pin" || id === "unpin") patch({ pinnedAt: before.pinnedAt });
+        if (id === "mark_done") patch({ leadStatus: before.leadStatus });
+      },
+      failed: serverActionError,
+      fallback: INBOX_ROW_FAIL[id] ?? "Could not save.",
+    });
     busyRef.current = false;
-    setPendingId(null);
-    if (res.error) {
-      setError(res.error);
+    if (!out.ok) {
+      notify(out.error, {
+        tone: "error",
+        action: { label: "Try again", run: () => void run(id) },
+      });
       return;
     }
+    const archivedNow = got.archived;
     if (id === "archive" && item.callId && archivedNow?.archived !== false) {
       // Call plus its open requests (one transaction); Undo uses the record.
       writeInboxArchiveUndo([{ id: item.id, callId: item.callId }], undefined, undefined, {
@@ -146,13 +187,8 @@ export function InboxRowShell({
         visitIds: archivedNow?.visitIds,
       });
     }
+    const unarchivedText = got.text;
     if (id === "unarchive") announceInboxResult(unarchivedText);
-    if (id === "archive" || id === "unarchive") {
-      patch({ hidden: true });
-    }
-    if (id === "pin") patch({ pinnedAt: new Date().toISOString() });
-    if (id === "unpin") patch({ pinnedAt: null });
-    setOpen(false);
     router.refresh();
   };
 
