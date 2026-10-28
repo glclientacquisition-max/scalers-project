@@ -19,6 +19,8 @@ const SLOT_WHY = {
   time: 'what time on that day',
   place: 'where the job is (estate or landmark)',
   change: 'what they would like to change',
+  phone: 'the phone number the team should call them back on',
+  reason: 'what they would like the team to call them back about',
 };
 
 function task(goal) {
@@ -28,6 +30,10 @@ function task(goal) {
     t = t.replace('SLOT', typeof w === 'object' ? (w[goal.why] || w.booking) : (w || goal.slot));
   }
   if (goal.type === 'answer' && goal.offerCallback) t += ' We are closed now: end by asking if they would like the owner to call them back.';
+  // B1: a degraded answer (the team will confirm) offers the callback; never a guessed fact
+  if (goal.type === 'answer' && goal.teamConfirm) t += ' The business has not set this up yet: say you will have the team confirm it (never "the team will"), never guess, and end by asking if they would like the team to call them back.';
+  // B1 safe mode: capture only
+  if (goal.safe) t += ' SAFE MODE: never give prices, items, areas, hours, times or bookings; for any such question say the team will call them back about it.';
   return t;
 }
 

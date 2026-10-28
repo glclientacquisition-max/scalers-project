@@ -13,6 +13,7 @@ const N = require('./nlu');
 const { shouldHandoff, handoffProposal, isOpen } = require('./handoff');
 const { missingSlots, callerName } = require('./enginePreconditions');
 const { engState } = require('./engineCommit');
+const D = require('./degrade');
 
 const businessOpen = (profile, now = new Date()) => isOpen(profile, now);
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -90,11 +91,46 @@ function sameProposal(a, b) {
 }
 
 function flowProposal(E, machine, profile, callerPhone, now) {
-  if (E.flow.tool === 'create_handoff') return handoffProposal({ machine, profile, callerPhone, reason: E.flow.reason, now });
+  if (E.flow.tool === 'create_handoff') return degradedRequest(handoffProposal({ machine, profile, callerPhone, reason: E.flow.reason, now }), E.flow, machine);
   return bookingProposal(machine, callerPhone);
 }
 
-function pickGoal({ understanding, machine, profile = {}, lang, callerPhone, now = new Date(), text = '' }) {
+/**
+ * B1: a callback opened by a degradation rule carries what the caller wanted, so the read-back, the request row and
+ * the owner alert say it (a booking request keeps the service + the caller's preferred time; a team_confirm keeps
+ * the ask). Plain callbacks are returned unchanged.
+ */
+function degradedRequest(p, flow, machine) {
+  if (!flow || !flow.degraded || !p || p.tool !== 'create_handoff') return p;
+  const s = machine.slots || {};
+  p.degraded = flow.degraded;
+  if (flow.request === 'booking') {
+    p.request = 'booking';
+    p.service = s.service || null;
+    p.preferred = { date: (s.when && s.when.date) || null, time: (s.when && s.when.time) || null };
+    if (p.service) p.topic = p.service;
+  } else if (flow.asked) p.topic = flow.asked;
+  p.notes = D.requestNotes({ rule: flow.degraded, asked: flow.asked || flow.said || null, booking: flow.request === 'booking', service: p.service || null, when: p.preferred || null });
+  p.alertReason = p.notes.replace(/^Callback \([^)]*\): /, '').replace(/\.$/, '');
+  return p;
+}
+
+/** B1: open the callback capture for a team_confirm receipt -> the first missing slot, else the read-back. */
+function openTeamConfirm({ machine, profile = {}, callerPhone, now = new Date(), rule, asked = null, said = null, answers = [] }) {
+  const E = engState(machine);
+  E.flow = { tool: 'create_handoff', reason: 'team_confirm', degraded: rule, asked: asked || null, said: said || null };
+  E.offered = null;
+  const miss = missingSlots('create_handoff', machine, { profile, callerPhone });
+  if (miss.length) {
+    const slot = miss[0]; const asked0 = E.asks[slot] || 0;
+    E.asks[slot] = asked0 + 1; E.lastAsk = slot;
+    return { type: 'ask', slot, n: asked0, why: 'callback', answers: answers.length ? answers : ['services'], degraded: rule };
+  }
+  E.lastAsk = null;
+  return { type: 'readback', p: flowProposal(E, machine, profile, callerPhone, now), answers: answers.length ? answers : ['services'], degraded: rule };
+}
+
+function pickGoal({ understanding, machine, profile = {}, lang, callerPhone, now = new Date(), text = '', rules = D.RULES }) {
   const E = engState(machine);
   const u = understanding || {};
   applySlots(machine, u, profile, { text, now });
@@ -135,8 +171,11 @@ function pickGoal({ understanding, machine, profile = {}, lang, callerPhone, now
   if (!E.flow || E.flow.done) {
     const trig = shouldHandoff({ understanding: u, machine, profile, now });
     if (trig) E.flow = { tool: 'create_handoff', reason: trig.reason };
-    else if (u.intent === 'book' || machine.intent === 'book') E.flow = { tool: 'create_booking' };
-    else E.flow = null;
+    else if (u.intent === 'book' || machine.intent === 'book') {
+      // B1 NO_HOURS_BOOKING_AS_REQUEST / EMPTY_CATALOGUE_CAPTURE: no hours (or nothing to book) = a request for the team
+      const rule = D.bookingAsRequest(profile, rules);
+      E.flow = rule ? { tool: 'create_handoff', reason: rule === 'NO_HOURS_BOOKING_AS_REQUEST' ? 'no_hours' : 'team_confirm', request: 'booking', degraded: rule } : { tool: 'create_booking' };
+    } else E.flow = null;
   } else if (E.flow.tool === 'create_booking') {
     const trig = shouldHandoff({ understanding: { ...u, intent: u.intent === 'book' ? 'book' : u.intent }, machine, profile, now });
     if (trig && trig.reason !== 'closed') E.flow = { tool: 'create_handoff', reason: trig.reason };
@@ -173,4 +212,4 @@ function pickGoal({ understanding, machine, profile = {}, lang, callerPhone, now
   return { type: 'open', answers };
 }
 
-module.exports = { pickGoal, applySlots, businessOpen, pendingAnswer, bookingProposal, normWhen, sameProposal };
+module.exports = { pickGoal, applySlots, businessOpen, pendingAnswer, bookingProposal, normWhen, sameProposal, openTeamConfirm, degradedRequest };

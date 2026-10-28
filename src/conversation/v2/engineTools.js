@@ -10,6 +10,7 @@ const L = require('./lexicon');
 const KBL = require('../../knowledge/kb/live');
 const KBR = require('../../knowledge/kb/rules');
 const KBS = require('../../knowledge/kb/source');
+const D = require('./degrade');
 
 function sw(lang) { return L.isSw(lang); }
 
@@ -75,8 +76,11 @@ function hoursReceipt(profile, lang, { day = null, now = new Date() } = {}) {
   return { tool: 'hours', ok: true, open: row.open, close: row.close, text: S ? `${L.cap(L.DOW_SW[dow])} tuko wazi kuanzia ${swT(row.open)} hadi ${swT(row.close)}.` : `On ${L.cap(L.DOW_EN[dow])} we're open from ${row.open} to ${row.close}.` };
 }
 
-function runTools({ understanding, machine, profile, lang, text, now = new Date() }) {
+function runTools({ understanding, machine, profile, lang, text, now = new Date(), rules = D.RULES }) {
   const receipts = [];
+  // B1: the degradation rules that reshaped a receipt this turn (named rules, ./degrade.js), for the trace
+  const degraded = [];
+  const fired = (d) => { if (d && d.fired && !degraded.includes(d.fired)) degraded.push(d.fired); return d; };
   const u = understanding || {};
   const caller = lookupCaller(machine, profile, now);
   receipts.push({ ...caller, tool: 'lookup_caller' });
@@ -88,7 +92,8 @@ function runTools({ understanding, machine, profile, lang, text, now = new Date(
     // a follow-up ("And the fee?") names no place: the call's place is still the subject
     const rows = cov.places.length || !place ? cov.places : ML.coverageReceipt([place], profile).places;
     for (const row of rows) {
-      const named = { ...row, name: row.name || row.place || place };
+      // B1 UNCONFIRMED_AREAS_NO_VERDICT: a firm yes / no only from the owner's confirmed area picks
+      const named = fired(D.areaRow({ ...row, name: row.name || row.place || place }, { rules })).row;
       const line = AC.line(named, lang) || row.line_en || row.line_sw || row.text || null;
       receipts.push({ tool: 'coverage', ...named, text: line });
     }
@@ -96,7 +101,9 @@ function runTools({ understanding, machine, profile, lang, text, now = new Date(
   const kbh = KBL.handle(profile);
   if (kbh) {
     // v2 KB: one catalogue receipt per turn built by the 12 call rules (<= 3 names, count first, price only on pick)
-    const r = catalogueReceipt({ u, machine, profile, kbh, lang, text, wantsPrice, wantsCoverage });
+    const r0 = catalogueReceipt({ u, machine, profile, kbh, lang, text, wantsPrice, wantsCoverage });
+    // B1 EMPTY_CATALOGUE_CAPTURE / SPARSE_UNKNOWN_ITEM: an empty or sparse catalogue never says "we don't offer"
+    const r = fired(D.catalogue({ receipt: r0, u, text, profile, lang, rules })).receipt;
     if (r) receipts.push(r);
     // shadow compare (KB_SHADOW=on): what the old price path would have said, logged next to the KB answer, never spoken
     if (wantsPrice && !wantsCoverage && /^(1|true|on|yes)$/i.test(String(process.env.KB_SHADOW || ''))) {
@@ -113,7 +120,8 @@ function runTools({ understanding, machine, profile, lang, text, now = new Date(
     if (pr.text) receipts.push(pr);
   }
   if (u.answers?.includes('hours')) {
-    receipts.push(hoursReceipt(profile, lang, { day: u.slots?.day || machine.slots?.when?.date, now }));
+    // B1 NO_HOURS_BOOKING_AS_REQUEST: no hours on file = the team confirms (never a guessed time)
+    receipts.push(fired(D.hours({ receipt: hoursReceipt(profile, lang, { day: u.slots?.day || machine.slots?.when?.date, now }), profile, lang, rules })).receipt);
   }
   if (u.answers?.includes('identity') || u.intent === 'identity') {
     const R = require('./receipts');
@@ -123,8 +131,10 @@ function runTools({ understanding, machine, profile, lang, text, now = new Date(
   if (u.answers?.includes('payment')) {
     const pf = OF.paymentFact(OF.ownerFacts(profile));
     if (pf) receipts.push({ tool: 'payment', ok: true, text: sw(lang) ? pf.sw : pf.en });
+    // B1 NO_POLICY_TEAM_CONFIRM: no payment policy on file = the team confirms
+    else { const d = fired(D.policy({ topic: 'payment', lang, profile, rules })); if (d.receipt) receipts.push(d.receipt); }
   }
-  return { caller, receipts };
+  return { caller, receipts, degraded };
 }
 
 module.exports = { runTools, lookupCaller, checkCoverage, priceReceipt, hoursReceipt, catalogueReceipt };

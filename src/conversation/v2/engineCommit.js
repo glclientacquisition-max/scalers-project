@@ -65,7 +65,7 @@ async function runWrite(p, handlers) {
 
 function summary(p) {
   if (p.tool === 'create_booking') return `booking ${p.service || ''} ${p.when?.date || ''} ${p.when?.time || ''} ${p.place || ''}`.replace(/\s+/g, ' ').trim();
-  return `callback (${p.reason || 'caller asked'})`;
+  return `callback (${p.alertReason || p.reason || 'caller asked'})`;
 }
 
 /**
@@ -86,7 +86,7 @@ async function commitWrite({ p, machine, handlers, profile = {}, notify, callerP
     E.ledger.push({ tool: p.tool, ok: true, id: res.id, receiptKey: rec.idempotencyKey, turn: machine.turn });
     let notified = false;
     if (p.tool === 'create_handoff' && typeof notify === 'function') {
-      try { const nr = await notify({ reason: p.reason, name: p.name, phone: p.phone }); notified = !!(nr && (nr.ok || nr.duplicate)); } catch { notified = false; }
+      try { const nr = await notify({ reason: p.alertReason || p.reason, name: p.name, phone: p.phone }); notified = !!(nr && (nr.ok || nr.duplicate)); } catch { notified = false; }
     }
     return { status: 'committed', id: res.id, notified };
   }

@@ -8,7 +8,7 @@ const L = require('./lexicon');
 const CP = require('./callPlan');
 const { callerName } = require('./enginePreconditions');
 
-const REASONS = new Set(['closed', 'area_unknown', 'area_outside', 'service_out', 'wants_human', 'stuck', 'caller_callback']);
+const REASONS = new Set(['closed', 'area_unknown', 'area_outside', 'service_out', 'wants_human', 'stuck', 'caller_callback', 'team_confirm', 'no_hours', 'safe_mode']);
 
 function initHandoff(state) {
   if (!state.handoff) state.handoff = { phase: 'idle', reason: null, committed: false, idempotencyKey: null };
@@ -38,7 +38,8 @@ function shouldHandoff({ understanding, machine, profile = {}, now = new Date() 
   if (booking && place) {
     const AC = require('./areaCoverage');
     const r = AC.resolve(place, profile);
-    if (r?.status === 'outside') return { reason: 'area_outside' };
+    // B1 UNCONFIRMED_AREAS_NO_VERDICT: an "outside" verdict from an unconfirmed list never routes the call
+    if (r?.status === 'outside' && require('./degrade').areaVerdictFirm(r)) return { reason: 'area_outside' };
   }
   return null;
 }
