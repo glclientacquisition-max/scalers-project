@@ -9,6 +9,7 @@ import {
   deskNoticeOpenClass,
 } from "@/lib/deskMotion";
 import { usePrefersReducedMotion } from "@/components/ui/usePrefersReducedMotion";
+import { Button } from "@/components/ui/Button";
 
 const PLACE_CLASS =
   "pointer-events-none fixed inset-x-0 z-30 px-4 bottom-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px)+0.75rem)] md:bottom-6";
@@ -18,7 +19,9 @@ const NOTIFY_HOLD_MS = 4000;
 export const NOTIFY_ERROR_HOLD_MS = 8000;
 
 type NoticeTone = "info" | "error";
-type NoticeRecord = { id: string; message: string; tone: NoticeTone };
+/** One short verb next to the message (Try again). Runs once, then the notice closes. */
+export type NoticeAction = { label: string; run: () => void };
+type NoticeRecord = { id: string; message: string; tone: NoticeTone; action?: NoticeAction };
 
 /** How long a notice stays on screen. */
 export function noticeHoldMs(tone: NoticeTone | undefined): number {
@@ -34,11 +37,16 @@ function emit() {
 
 let seq = 0;
 
-export function notify(message: string, options?: { tone?: NoticeTone }) {
+export function notify(message: string, options?: { tone?: NoticeTone; action?: NoticeAction }) {
   const text = message.trim();
   if (!text) return;
   seq += 1;
-  current = { id: `${Date.now()}-${seq}`, message: text, tone: options?.tone ?? "info" };
+  current = {
+    id: `${Date.now()}-${seq}`,
+    message: text,
+    tone: options?.tone ?? "info",
+    action: options?.action,
+  };
   emit();
 }
 
@@ -148,10 +156,27 @@ export function NotifyHost() {
   return (
     <DeskNotice open={!!notice}>
       {notice ? (
-        <div className="rounded-2xl border border-hairline bg-surface px-4 py-3 shadow-sheet">
-          <p className={notice.tone === "error" ? "text-body text-warn" : "text-body text-ink"} role={notice.tone === "error" ? "alert" : undefined}>
+        <div className="flex items-center gap-3 rounded-2xl border border-hairline bg-surface px-4 py-3 shadow-sheet">
+          <p
+            className={notice.tone === "error" ? "min-w-0 flex-1 text-body text-warn" : "min-w-0 flex-1 text-body text-ink"}
+            role={notice.tone === "error" ? "alert" : undefined}
+          >
             {notice.message}
           </p>
+          {notice.action ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const action = notice.action;
+                dismissNotice();
+                action?.run();
+              }}
+            >
+              {notice.action.label}
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </DeskNotice>

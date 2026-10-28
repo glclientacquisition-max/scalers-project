@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { notify } from "@/components/ui/DeskNotice";
+import { OPTIMISTIC_OFFLINE_ERROR } from "@/lib/optimisticAction";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { useInboxRowUi } from "@/components/InboxRowUi";
@@ -165,13 +167,45 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
     // cascaded (archived with its call), missed (server did not change it)
     // or skipped.
     // Unarchive goes through inbox_unarchive_calls (calls + their requests).
-    const archive = kind === "archive" ? await inboxArchiveItems(chosen) : null;
-    const unarchive = kind === "unarchive" ? await inboxUnarchiveItems(chosen) : null;
-    const res = archive ?? unarchive ?? (await inboxBulk(kind, chosen));
-    if (res.error) {
-      setError(res.error);
+    // Archive and Unarchive: every chosen row leaves the list now. Rows the
+    // server did not change come back below; on failure they all come back.
+    const hideNow = kind === "archive" || kind === "unarchive";
+    const chosenIds = chosen.map((item) => item.id);
+    if (hideNow) for (const id of chosenIds) patch(id, { hidden: true });
+    const sent = await (async () => {
+      try {
+        const archive = kind === "archive" ? await inboxArchiveItems(chosen) : null;
+        const unarchive = kind === "unarchive" ? await inboxUnarchiveItems(chosen) : null;
+        const res = archive ?? unarchive ?? (await inboxBulk(kind, chosen));
+        return { archive, unarchive, res };
+      } catch {
+        return null;
+      }
+    })();
+    if (!sent) {
+      if (hideNow) for (const id of chosenIds) patch(id, { hidden: false });
+      setError(OPTIMISTIC_OFFLINE_ERROR);
+      notify(OPTIMISTIC_OFFLINE_ERROR, {
+        tone: "error",
+        action: { label: "Try again", run: () => void run(kind) },
+      });
       setBusy(false);
       return;
+    }
+    const { archive, unarchive, res } = sent;
+    if (res.error) {
+      if (hideNow) for (const id of chosenIds) patch(id, { hidden: false });
+      setError(res.error);
+      notify(res.error, {
+        tone: "error",
+        action: { label: "Try again", run: () => void run(kind) },
+      });
+      setBusy(false);
+      return;
+    }
+    if (hideNow) {
+      const gone = new Set([...res.applied, ...(res.cascaded ?? [])].map((t) => t.itemId));
+      for (const id of chosenIds) if (!gone.has(id)) patch(id, { hidden: false });
     }
     if (archive) {
       // Undo restores exactly what the server archived (its undo record).

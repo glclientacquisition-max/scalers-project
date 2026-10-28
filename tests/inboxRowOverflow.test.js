@@ -74,8 +74,10 @@ describe("inbox row overflow menu", () => {
     assert.doesNotMatch(overflow, /Add label/);
     assert.doesNotMatch(overflow, /id: "delete"/);
     assert.doesNotMatch(overflow, /inboxDelete/);
-    assert.match(overflow, /if \(id === "archive" \|\| id === "unarchive"\) \{\n      patch\(\{ hidden: true \}\);/);
-    assert.doesNotMatch(overflow, /id === "mark_done"[\s\S]{0,400}patch\(\{ hidden/);
+    // Optimistic (D1): Archive and Unarchive hide the row on tap; Mark done never hides it.
+    assert.match(overflow, /const leaves = id === "archive" \|\| id === "unarchive";/);
+    assert.match(overflow, /if \(leaves\) patch\(\{ hidden: true \}\);/);
+    assert.doesNotMatch(overflow, /id === "mark_done"\) patch\(\{ hidden/);
   });
 
   it("closes after a successful run and keeps the menu on desk tokens", () => {
