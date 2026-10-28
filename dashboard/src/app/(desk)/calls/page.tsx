@@ -36,6 +36,7 @@ import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { createDeskTimer } from "@/lib/deskTiming";
 import { DeskPageGate } from "@/components/DeskPageGate";
+import { loadBrainSettings } from "@/lib/takeMessages.server";
 
 type CallsPageProps = {
   searchParams: Promise<{
@@ -79,10 +80,11 @@ async function CallsBody({ searchParams }: CallsPageProps) {
   const businessName = tenant.business_name?.trim() || "us";
   const vertical = tenant.vertical;
 
-  const { items: assembled, error, partialError } = await loadCachedInboxItems(
-    tenant.id,
-    vertical
-  );
+  // The "Taking messages only" note reads one tenants row beside the inbox load (never blocks it).
+  const [{ items: assembled, error, partialError }, brain] = await Promise.all([
+    loadCachedInboxItems(tenant.id, vertical),
+    loadBrainSettings(tenant.id).catch(() => null),
+  ]);
   timer.mark("data");
   console.info(timer.line("inbox"));
 
@@ -170,6 +172,7 @@ async function CallsBody({ searchParams }: CallsPageProps) {
         rpage={
           archivedReturn?.page != null ? String(archivedReturn.page) : undefined
         }
+        takeMessages={brain?.takeMessages ?? null}
       />
       </InboxPileSelectChrome>
 

@@ -18,6 +18,7 @@ export function DevCatalogue(props: Omit<CatalogueScreenProps, "actions">) {
       return rows.length ? { ok: true, rows } : { ok: false, error: "No items found. Put one item on each line." };
     },
     importPaste: async () => ({ ok: true }),
+    setComplete: async (complete) => (await wait(400), { ok: true, completeAt: complete ? new Date().toISOString() : null }),
   };
   return <CatalogueScreen {...props} actions={actions} />;
 }

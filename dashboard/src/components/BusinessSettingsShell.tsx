@@ -1,6 +1,7 @@
 "use client";
 
 import { policiesFormKey } from "@/lib/serviceAreas";
+import type { TakeMessagesState } from "@/lib/takeMessages";
 import { catalogContentKey } from "@/lib/catalogPricing";
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { nextFormMountKey, type FormMountKey } from "@/lib/formSave";
@@ -86,6 +87,7 @@ export function BusinessSettingsShell({
   assistantSaySlot = null,
   assistantSayPage = false,
   businessCategory = null,
+  takeMessages = null,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
@@ -103,6 +105,8 @@ export function BusinessSettingsShell({
   assistantSayPage?: boolean;
   /** Identity: tenants.business_category for the one "What you do" question. */
   businessCategory?: string | null;
+  /** Identity: "Take messages only" state (null = no switch). */
+  takeMessages?: TakeMessagesState | null;
 }) {
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
@@ -200,6 +204,7 @@ export function BusinessSettingsShell({
           heading={heading}
           sidebar={rail}
           businessCategory={businessCategory}
+          takeMessages={takeMessages}
         />
       ) : showForm && formPanel === "policies" ? (
         // Policies: cards that each save on their own, beside what callers hear.

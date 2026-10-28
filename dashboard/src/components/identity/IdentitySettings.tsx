@@ -73,6 +73,10 @@ import {
   previewErrorCopy,
 } from "@/lib/previewAudio";
 import type { IdentityCardScope } from "@/lib/settingsSaveScope";
+import { setTakeMessagesAction, type TakeMessagesResult } from "@/app/(desk)/settings/takeMessagesActions";
+import { TAKE_MESSAGES_COPY, type TakeMessagesState } from "@/lib/takeMessages";
+import { useInstantSave } from "@/components/useInstantSave";
+import { TakeMessagesRow } from "@/components/identity/TakeMessagesRow";
 
 const initial: SettingsCompileState = {};
 
@@ -277,12 +281,18 @@ function languageLabel(pick: GreetingLanguagePick, resolved: GreetingLanguage): 
   return pick === "auto" ? `Automatic · ${name}` : name;
 }
 
+export type SaveTakeMessages = (on: boolean) => Promise<TakeMessagesResult>;
+
+const OFF: TakeMessagesState = { on: false, by: null, setAt: null };
+
 function AnswerCard({
   tenant,
   businessName,
   voices,
   canEdit,
   onSaveActivity,
+  takeMessages,
+  saveTakeMessages,
 }: {
   tenant: TenantRow;
   /** The business name as typed in Your business, so Automatic follows a rename at once. */
@@ -290,8 +300,17 @@ function AnswerCard({
   voices: CuratedSonioxVoice[];
   canEdit: boolean;
   onSaveActivity?: () => void;
+  /** null / undefined = not available here (KB gate off or SQL .4 not applied): no switch. */
+  takeMessages?: TakeMessagesState | null;
+  saveTakeMessages: SaveTakeMessages;
 }) {
   const formId = "identity-answer-form";
+  // Saves on its own the moment it flips (never with this card's Save).
+  const messages = useInstantSave<TakeMessagesState>(takeMessages ?? OFF, async (next) => {
+    const r = await saveTakeMessages(next.on);
+    return r.ok ? { ok: true, value: r.state } : r;
+  });
+  const messagesOn = Boolean(takeMessages) && messages.value.on;
   const [agentName, setAgentName] = useState(tenant.agent_name || "");
   // Warm is the default tone, so a first save never stops on a choice.
   const [tone, setTone] = useState<OnboardingTone | "">(
@@ -487,6 +506,14 @@ function AnswerCard({
               Your own greeting
             </span>
           ) : null}
+          {messagesOn ? (
+            <span
+              data-take-messages-pill=""
+              className="rounded-md bg-accent-soft px-1.5 py-0.5 text-meta font-medium text-accent-deep"
+            >
+              {TAKE_MESSAGES_COPY.pill}
+            </span>
+          ) : null}
         </div>
         <div
           aria-labelledby="identity-greeting-label"
@@ -660,6 +687,14 @@ function AnswerCard({
           Returning callers hear the language they used last.
         </p>
       </div>
+      {takeMessages ? (
+        <TakeMessagesRow
+          state={messages.value}
+          status={messages.status}
+          canEdit={canEdit}
+          onChange={(on) => messages.change({ on, by: on ? "owner" : null, setAt: messages.value.setAt })}
+        />
+      ) : null}
     </IdentityCard>
   );
 }
@@ -826,6 +861,8 @@ function IdentitySettingsInner({
   sidebar,
   businessCategory,
   onSaveActivity,
+  takeMessages,
+  saveTakeMessages = setTakeMessagesAction,
 }: {
   tenant: TenantRow;
   curatedVoices?: CuratedSonioxVoice[];
@@ -834,6 +871,10 @@ function IdentitySettingsInner({
   /** tenants.business_category (null before the typed-data migration). */
   businessCategory?: string | null;
   onSaveActivity?: () => void;
+  /** "Take messages only" (tenants.brain_mode via brainMode()). null = no switch here. */
+  takeMessages?: TakeMessagesState | null;
+  /** Injected so the dev fixture saves without a database. */
+  saveTakeMessages?: SaveTakeMessages;
 }) {
   const canEdit = useCan("settings.edit");
   const [businessName, setBusinessName] = useState(tenant.business_name || "");
@@ -874,6 +915,8 @@ function IdentitySettingsInner({
               voices={voices}
               canEdit={canEdit}
               onSaveActivity={onSaveActivity}
+              takeMessages={takeMessages}
+              saveTakeMessages={saveTakeMessages}
             />
           </div>
           <div className="min-w-0 xl:col-start-1 xl:row-start-2">

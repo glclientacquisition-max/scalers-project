@@ -82,9 +82,9 @@ export const ADMIN_WRITE_ROUTES: AdminWriteRoute[] = [
   {
     file: "admin/businesses/[id]/kb", area: "businesses",
     prefix: "business-kb",
-    risky: ["set_brain_target"],
+    risky: ["set_brain_target", "set_brain_mode"],
     safe: ["check"],
-    note: "v2 Knowledge Base: hold a Business on the old brain or let readiness move it. Check again is read-only.",
+    note: "v2 Knowledge Base: hold a Business on the old brain or let readiness move it; Take messages only on or off. Check again is read-only.",
   },
   {
     file: "admin/billing/invoices/[id]/actions", area: "billing",

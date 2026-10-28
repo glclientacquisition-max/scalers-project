@@ -14,6 +14,8 @@ import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { Segmented } from "@/components/ui/Segmented";
 import { InboxFilterPills } from "@/components/InboxFilterPills";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
+import { TakeMessagesIndicator } from "@/components/TakeMessagesIndicator";
+import type { TakeMessagesState } from "@/lib/takeMessages";
 
 export function InboxToolbar({
   active,
@@ -26,6 +28,7 @@ export function InboxToolbar({
   backHref,
   from,
   rpage,
+  takeMessages,
 }: {
   active: InboxPurposeFilterId;
   counts: Record<InboxPurposeFilterId, number>;
@@ -37,6 +40,8 @@ export function InboxToolbar({
   backHref?: string;
   from?: string;
   rpage?: string;
+  /** "Take messages only" on: a small persistent note under the title, linking to the switch. */
+  takeMessages?: TakeMessagesState | null;
 }) {
   const nav = useInboxPileNav();
   const current = nav?.purpose ?? active;
@@ -138,6 +143,12 @@ export function InboxToolbar({
           </div>
         </div>
       )}
+
+      {takeMessages?.on ? (
+        <div data-inbox-take-messages="">
+          <TakeMessagesIndicator state={takeMessages} />
+        </div>
+      ) : null}
 
       {current === "job" ? (
         <Segmented
