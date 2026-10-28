@@ -16,14 +16,15 @@ const ON = { BRAIN_KB_GATE: 'on' };
 const STAGING_FLAGS = { BRAIN_KB_GATE: 'on', BRAIN_V2: '1', BRAIN_V2_MODE: 'live', BRAIN_ENGINES: 'on', BRAIN_V1_DRAFT: 'on', BRAIN_V1_DRAFT_PHASE_A: 'on', BRAIN_MODEL_LEAD: 'on', BRAIN_V2_TENANTS: 'df4ad9d8-28ff-4810-b1e6-94f5495472b0' };
 const doc = { items: [], off: [], categories: [], index: null, counts: { items: 0, services: 0, products: 0 } };
 
-test('gate off = kill switch (until P2): gate_off, selector null, no snapshot attached', () => {
+test('P2: no gate: every business live whatever BRAIN_KB_GATE says; snapshot always attached', () => {
   for (const g of [undefined, null, '', 'off', '0', 'false', 'maybe', false]) {
-    assert.deepEqual(isKbLive({ kb_live_version: 2, kb_ready_version: 2 }, { gate: g }), { live: false, reason: 'gate_off' });
+    assert.deepEqual(isKbLive({ kb_live_version: 2, kb_ready_version: 2 }, { gate: g }), { live: true, reason: 'ready' });
   }
-  assert.equal(LIVE.decision({ env: {}, tenantId: 'T' }), null);
-  assert.equal(LIVE.decision({ env: { BRAIN_KB_GATE: 'off' }, tenantId: 'T' }), null);
+  assert.equal(LIVE.decision({ env: {}, tenantId: 'T' }), true);
+  assert.equal(LIVE.decision({ env: { BRAIN_KB_GATE: 'off' }, tenantId: 'T' }), true);
+  assert.equal(LIVE.decision({ env: {}, tenantId: '' }), false);
   const p = LIVE.attach({ id: 'T-OFF' }, { version: 2, readyVersion: 2, doc }, { env: {} });
-  assert.equal(p.kb, undefined);
+  assert.ok(p.kb && p.kb.handle);
 });
 
 test('gate on + ready: live, reason ready', () => {
@@ -78,8 +79,9 @@ test('attach: gate on attaches the live snapshot for ready AND unready businesse
   } finally { console.warn = warn; }
   assert.equal(logs.filter((l) => /snapshot not loaded tenant=T-(NODOC|NULL|EXC) .*-> empty snapshot/.test(l)).length, 3, logs.join('\n'));
   assert.ok(logs.some((l) => /error=snapshot_missing/.test(l)));
-  // gate off (kill switch until P2): nothing attached
-  assert.equal(LIVE.attach({ id: 'T-OFF2' }, null, { env: {} }).kb, undefined);
+  // P2: no gate: even with BRAIN_KB_GATE unset a failed load is the empty snapshot
+  const w2 = console.warn; console.warn = () => {};
+  try { assert.equal(LIVE.attach({ id: 'T-OFF2' }, null, { env: {} }).kb.loadError, true); } finally { console.warn = w2; }
 });
 
 test('brainMode: default full; tenants.brain_mode safe; BRAIN_SAFE_MODE=all overrides every business', () => {
@@ -140,9 +142,9 @@ test('the 5 unready staging businesses no longer land on the old Gemini turn (se
     assert.equal(flag.brainEnginesOn({ env: STAGING_FLAGS, tenantId: id }), true, `${id} engines`);
     assert.equal(V1.mode({ env: STAGING_FLAGS, tenantId: id }), 'on', `${id} v1draft (not in BRAIN_V1_DRAFT_TENANTS)`);
   }
-  // kill switch still routes by the env lists until P2 (gate off): a business outside BRAIN_V2_TENANTS is not on v2
-  const off = { ...STAGING_FLAGS, BRAIN_KB_GATE: 'off' };
-  assert.equal(flag.brainV2Enabled({ env: off, tenantId: '78386574-aeb0-4b34-9296-00c5424cdd0e' }), false);
+  // P2: no switch left: BRAIN_KB_GATE off and no env list still keeps every business on the KB brain
+  const off = { ...STAGING_FLAGS, BRAIN_KB_GATE: 'off', BRAIN_V2_TENANTS: '' };
+  assert.equal(flag.brainV2Enabled({ env: off, tenantId: '78386574-aeb0-4b34-9296-00c5424cdd0e' }), true);
 });
 
 test('contract surface: pure module, facts helper, columns, Desk closure ships it', () => {
@@ -162,7 +164,7 @@ test('contract surface: pure module, facts helper, columns, Desk closure ships i
   const ts = fs.readFileSync(path.join(__dirname, '../dashboard/src/lib/kbLive.server.ts'), 'utf8');
   assert.match(ts, /requireVoice<KbLiveModule>\("\.\/src\/knowledge\/kb\/kbLive\.js"\)/, 'Desk calls the same module, no twin');
   assert.match(ts, /sb\.rpc\("set_brain_mode", \{ p_tenant: tenantId, p_mode: mode \}\)/, 'owner toggle uses the session client + RPC');
-  assert.match(ts, /process\.env\.BRAIN_KB_GATE/); assert.match(ts, /process\.env\.BRAIN_SAFE_MODE/);
+  assert.doesNotMatch(ts, /process\.env\.BRAIN_KB_GATE/, 'P2: Desk reads no gate'); assert.match(ts, /process\.env\.BRAIN_SAFE_MODE/);
   const sql = fs.readFileSync(path.join(__dirname, '../docs/supabase/kb_v2_brain_mode.sql'), 'utf8');
   assert.match(sql, /2026-10-28\.4/); assert.match(sql, /brain_mode in \('full', 'safe'\)/); assert.doesNotMatch(sql, /drop column/i, 'P1 SQL is additive');
 });
@@ -203,4 +205,14 @@ test('/healthz counts: safe mode by env / owner / admin and empty or missing sna
   assert.doesNotMatch(JSON.stringify(t), /"a"|"b"|"c"/, 'no tenant ids');
   const server = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
   assert.match(server, /counts: db\.kbHealthCountsCached\(\)/);
+});
+
+test('P2 SQL .5 drops brain_target; the down file restores it as v2 with its check', () => {
+  const up = fs.readFileSync(path.join(__dirname, '../docs/supabase/kb_v2_drop_brain_target.sql'), 'utf8');
+  const down = fs.readFileSync(path.join(__dirname, '../docs/supabase/kb_v2_drop_brain_target_down.sql'), 'utf8');
+  assert.match(up, /2026-10-28\.5/); assert.match(up, /drop column if exists brain_target/);
+  assert.match(down, /add column if not exists brain_target text not null default 'v2'/); assert.match(down, /brain_target in \('v1', 'v2'\)/);
+  for (const f of ['src/db.js', 'src/knowledge/kb/live.js', 'src/knowledge/kb/kbLive.js', 'scripts/kb-cutover.js']) {
+    assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, ''), /brain_target|brainTarget|BRAIN_KB_GATE/, `${f} reads no brain_target / gate`);
+  }
 });

@@ -14,7 +14,7 @@
 // Camel keys are accepted too ({ version, readyVersion, brainMode, brainModeSource }, Voice's loadKbLive shape).
 const ON = /^(1|true|on|yes)$/i;
 
-/** Gate value as the server passes it: boolean, or the raw env string ('1' | 'true' | 'on' | 'yes', any case). */
+/** Deprecated (P2): BRAIN_KB_GATE no longer switches anything. Kept for old callers / scripts that parse env flags. */
 function kbGateOn(gate) {
   if (typeof gate === 'boolean') return gate;
   return ON.test(String(gate == null ? '' : gate).trim());
@@ -53,8 +53,9 @@ function kbQuality(tenant) {
  *     'no_facts' (no row / KB load failed: the brain degrades safely), 'no_live_version' (nothing published; the
  *     backfill publishes one for every business), 'never_ready' (setup gaps), 'ready_stale', 'ready'.
  */
-function isKbLive(tenant, { gate } = {}) {
-  if (!kbGateOn(gate)) return { live: false, reason: 'gate_off' };
+// P2: the switch is gone (the old brain was deleted in Brain B2). `gate` is accepted and ignored for old callers.
+// eslint-disable-next-line no-unused-vars
+function isKbLive(tenant, _opts = {}) {
   return { live: true, reason: kbQuality(tenant) };
 }
 

@@ -6,9 +6,9 @@ import { requireVoice } from "@/lib/voiceRequire.server";
 /**
  * Desk side of the shared KB contract (docs/reference/platform/KB_V2.md, "isKbLive" + "Retire the old brain").
  * The rules live ONCE in src/knowledge/kb/kbLive.js (Voice calls the same functions); Desk never recomputes them.
- * Gate on: every business is on the KB brain and `reason` is readiness / quality only (Fix card, Super Admin).
- * Gate off: "gate_off" (kill switch, removed in P2). The gate is BRAIN_KB_GATE from THIS server's env and the
- * safe-mode override is BRAIN_SAFE_MODE from this server's env, both passed in like hashMode, never read on the client.
+ * Every business is on the KB brain and `reason` is readiness / quality only (Fix card, Super Admin). P2 removed
+ * the gate ("gate_off" is never returned; kept in the type until Desk D1). The safe-mode override is
+ * BRAIN_SAFE_MODE from this server's env, passed in like hashMode, never read on the client.
  */
 /** "held_v1" is never returned any more (kept so older callers still type-check). */
 export type KbLiveReason = "gate_off" | "no_facts" | "no_live_version" | "never_ready" | "ready_stale" | "ready" | "held_v1";
@@ -29,9 +29,9 @@ type KbLiveModule = {
 };
 const mod = () => requireVoice<KbLiveModule>("./src/knowledge/kb/kbLive.js");
 
-/** BRAIN_KB_GATE as this server sees it (raw string; the shared module parses it). */
-export function deskKbGate(): string | undefined {
-  return process.env.BRAIN_KB_GATE;
+/** Deprecated (P2): the gate env is gone; always "on". Kept so callers compile until Desk D1. */
+export function deskKbGate(): string {
+  return "on";
 }
 /** BRAIN_SAFE_MODE as this server sees it ('all' = every business on safe mode). */
 export function deskSafeEnv(): string | undefined {
@@ -56,8 +56,6 @@ export async function loadKbLive(
   opts: { gate?: boolean | string | null } = { gate: deskKbGate() },
 ): Promise<KbLiveDecision & { mode: BrainModeDecision; facts: KbLiveFacts | null }> {
   const m = mod();
-  const mode0 = m.brainMode(null, { safeEnv: deskSafeEnv() });
-  if (!m.kbGateOn(opts.gate)) return { ...m.isKbLive(null, opts), mode: mode0, facts: null };
   const sb = getSupabaseAdmin();
   let r = await sb.from("tenants").select(m.KB_LIVE_COLUMNS).eq("id", tenantId).maybeSingle();
   if (r.error && /brain_mode/.test(r.error.message || "")) r = await sb.from("tenants").select(m.KB_LIVE_COLUMNS_PRE_BRAIN_MODE).eq("id", tenantId).maybeSingle();

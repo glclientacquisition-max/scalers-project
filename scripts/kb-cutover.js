@@ -4,7 +4,7 @@
 //   node scripts/kb-cutover.js                  # read-only table (JSON)
 //   node scripts/kb-cutover.js --safe <uuid>    # emergency safe mode for one business (tenants.brain_mode safe)
 //   node scripts/kb-cutover.js --full <uuid>    # back to the full KB brain (brain_mode full)
-// No v1 hold any more: with BRAIN_KB_GATE on every business runs the KB brain; readiness is the `quality` column.
+// No v1 hold and no gate (P2): every business runs the KB brain; readiness is the `quality` column.
 // Needs SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY for the target project (never printed).
 const args = process.argv.slice(2);
 const flag = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
@@ -24,7 +24,7 @@ const flag = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : n
     const { data: r } = await supabase.from('kb_readiness').select('snapshot_version, passed, checks, tests, checked_by, checked_at').eq('tenant_id', t.id).order('checked_at', { ascending: false }).limit(1).maybeSingle();
     out.push({
       id: t.id, business: t.business_name, live: t.kb_live_version, ready: t.kb_ready_version,
-      on_kb: isKbLive(t, { gate: process.env.BRAIN_KB_GATE }).live, quality: K.kbQuality(t), mode: K.brainMode(t, { safeEnv: process.env.BRAIN_SAFE_MODE }).mode,
+      on_kb: isKbLive(t).live, quality: K.kbQuality(t), mode: K.brainMode(t, { safeEnv: process.env.BRAIN_SAFE_MODE }).mode,
       readiness: r ? { passed: r.passed, at: r.checked_at, by: r.checked_by, failing: [...(r.checks || []).filter((c) => !c.ok).map((c) => c.id), ...(r.tests || []).filter((x) => !x.ok).map((x) => `test:${x.name}`)] } : null,
     });
   }
