@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { InboxTicketView } from "@/components/InboxTicketView";
 import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { InboxToolbar } from "@/components/InboxToolbar";
@@ -209,8 +210,11 @@ const TURNS: TranscriptRow[] = [
   },
 ];
 
+export const instant = false;
+
 /** ?messages=on | support | env: the "Taking messages only" note in the header. */
 export default async function DevInboxPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  await connection();
   if (process.env.DASHBOARD_OPEN !== "true") {
     notFound();
   }

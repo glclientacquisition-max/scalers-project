@@ -17,13 +17,13 @@ export function TakeMessagesIndicator({ state }: { state: TakeMessagesState | nu
       data-take-messages-indicator={state.by || "owner"}
       aria-label={`${TAKE_MESSAGES_COPY.indicator}${note ? `. ${note}` : ""}. Open the setting`}
       className={cx(
-        "inline-flex min-h-11 max-w-full items-center gap-2 rounded-full bg-accent-soft px-3 text-meta font-medium text-accent-deep",
+        "inline-flex min-h-11 max-w-full items-center gap-2 rounded-2xl bg-accent-soft px-3 py-2 text-start text-meta font-medium text-accent-deep",
         "hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
         deskShiftClass,
       )}
     >
       <span aria-hidden className="size-2 shrink-0 rounded-full bg-accent" />
-      <span className="min-w-0 truncate">
+      <span className="min-w-0">
         {TAKE_MESSAGES_COPY.indicator}
         {note ? <span className="font-normal text-ink-2">{` · ${note}`}</span> : null}
       </span>

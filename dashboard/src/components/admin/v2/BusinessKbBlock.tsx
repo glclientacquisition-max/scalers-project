@@ -87,7 +87,7 @@ export function BusinessKbBlock({ businessId, fixture }: { businessId: string; f
 
   return (
     <div className="flex flex-col gap-ops-2" data-business-kb="">
-      <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-ops-4 gap-y-ops-1 text-ops-body">
+      <dl className="grid grid-cols-[minmax(9.5rem,auto)_1fr] gap-x-ops-4 gap-y-ops-1 text-ops-body">
         <dt className="text-ink-2">Brain</dt>
         <dd><StatusPill tone={state.tone}>{state.word}</StatusPill></dd>
         <dt className="text-ink-2">Knowledge</dt>
