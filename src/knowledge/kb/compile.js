@@ -21,11 +21,13 @@ function stableJson(v) {
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const SOURCE_FIELDS = ['id', 'kind', 'name_en', 'name_sw', 'name_sw_state', 'spoken_en', 'aliases', 'category_id', 'description_en', 'description_sw', 'unit', 'price_mode', 'price_amount', 'price_min', 'price_max', 'needs_visit', 'bookable', 'in_stock', 'popular', 'facets', 'delivery_fee_kes', 'status', 'sort', 'holdable', 'excludes_en', 'status_note'];
 const pick = (o, ks) => Object.fromEntries(ks.map((k) => [k, o[k] === undefined ? null : (typeof o[k] === 'string' && /^\d+(\.\d+)?$/.test(o[k]) && /price|fee/.test(k) ? Number(o[k]) : o[k])]));
-function sourceHash({ items = [], variants = [], categories = [] } = {}) {
+function sourceHash({ items = [], variants = [], categories = [], completeAt = null } = {}) {
   const it = items.map((x) => pick(x, SOURCE_FIELDS)).sort((a, b) => String(a.id).localeCompare(String(b.id)));
   const va = variants.map((x) => pick(x, ['item_id', 'id', 'label_en', 'label_sw', 'price_mode', 'price_amount', 'price_min', 'price_max', 'unit', 'in_stock', 'sort'])).sort((a, b) => `${a.item_id}/${a.id}`.localeCompare(`${b.item_id}/${b.id}`));
   const ca = categories.map((x) => pick(x, ['id', 'name_en', 'name_sw', 'name_sw_state', 'sort'])).sort((a, b) => String(a.id).localeCompare(String(b.id)));
-  return sha(stableJson({ v: SCHEMA, c: COMPILER, it, va, ca }));
+  // the owner's catalogue-complete mark is part of the source (set / clear = a new snapshot); absent = old hashes unchanged
+  const cp = completeAt ? { cp: new Date(completeAt).toISOString() } : {};
+  return sha(stableJson({ v: SCHEMA, c: COMPILER, it, va, ca, ...cp }));
 }
 const n = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
 function lev(a, b) {
@@ -143,6 +145,9 @@ function compileKb(src = {}) {
     counts: { items: items.length, services: items.filter((x) => x.kind === 'service').length, products: items.filter((x) => x.kind === 'product').length, hidden: allItems.length - shown.length,
       paused: off.filter((x) => x.state === 'paused').length, not_offered: off.filter((x) => x.state === 'not_offered').length },
     index, categories, items, off,
+    // owner-marked "this is my whole catalogue" (tenants.kb_catalogue_complete_at via set_kb_catalogue_complete);
+    // versioned with the snapshot. No mark = false: Brain B1 treats the catalogue as sparse.
+    complete: !!src.completeAt, complete_at: src.completeAt ? new Date(src.completeAt).toISOString() : null,
   };
   doc.preview = previewLines(doc);
   const bytes = Buffer.byteLength(JSON.stringify(doc));

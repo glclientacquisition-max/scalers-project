@@ -133,10 +133,10 @@ describe('kb v2: gate (BRAIN_KB_GATE) replaces the env allowlists; off is the ki
     const flag = require('../src/conversation/v2/flag');
     assert.equal(flag.tenantAllowed({ tenantId: p.id, env: { ...process.env, BRAIN_V2_TENANTS: '' } }), true);
   });
-  it('not ready: decision false, no snapshot attached (old brain)', () => {
+  it('not ready: still the KB brain (P1), snapshot attached, quality never_ready', () => {
     const { p } = profileFor('growtech', { ready: false });
-    assert.equal(L.decision({ tenantId: p.id }), false);
-    assert.equal(p.kb, undefined);
+    assert.equal(L.decision({ tenantId: p.id }), true);
+    assert.ok(p.kb && p.kb.handle);
   });
   it('gate off: decision null (env lists decide as before)', () => {
     assert.equal(L.decision({ env: { BRAIN_KB_GATE: 'off' }, tenantId: 'x' }), null);

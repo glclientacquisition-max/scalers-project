@@ -748,7 +748,9 @@ app.get('/healthz', (_req, res) => {
     gitBranch: resolveVoiceGitBranch(),
     startedAt: PROCESS_STARTED_AT,
     // v2 KB: readiness gate on/off and the in-process snapshot cache (no business data)
-    kb: { gate: require('./src/knowledge/kb/live').gateOn(), compileOnSave: kbCompileOnSave(), cache: require('./src/knowledge/kb/reader').cacheStats() },
+    // safeMode = how BRAIN_SAFE_MODE reads here ('off' | 'all' | 'invalid'); gate on = the KB brain for every business
+    // counts (cached 60 s, numbers only, no tenant ids): safe_mode { total, env, owner, admin }, snapshot_missing / _empty
+    kb: { gate: require('./src/knowledge/kb/live').gateOn(), safeMode: require('./src/knowledge/kb/kbLive').safeEnvState(process.env.BRAIN_SAFE_MODE), counts: db.kbHealthCountsCached(), compileOnSave: kbCompileOnSave(), cache: require('./src/knowledge/kb/reader').cacheStats() },
     soniox: {
       stt: isSonioxConfigured(),
       tts: isSonioxTtsConfigured(),

@@ -1524,8 +1524,14 @@ async function getTenantById(tenantId) {
   // column falls back to the same select; a null value means the rules baseline.
   const v2Catalogue = /^(1|true|on|yes)$/i.test(String(process.env.VOICE_V2_CATALOGUE || ''));
   let withCatalogue = v2Catalogue;
-  const cols = (base) => (withCatalogue ? `${base}, spoken_catalogue` : base);
+  // Safe mode (kb_v2_brain_mode.sql .4): brain_mode + brain_mode_source for B1's brainMode. A DB without them drops them (= full).
+  let withBrainMode = true;
+  const cols = (base) => `${withCatalogue ? `${base}, spoken_catalogue` : base}${withBrainMode ? ', brain_mode, brain_mode_source' : ''}`;
   let { data, error } = await selectTenantRowWithLine(tenantId, cols(fullCols));
+  if (error && /brain_mode/i.test(error.message || '')) {
+    withBrainMode = false;
+    ({ data, error } = await selectTenantRowWithLine(tenantId, cols(fullCols)));
+  }
   if (withCatalogue && error && /spoken_catalogue/i.test(error.message || '')) {
     withCatalogue = false;
     ({ data, error } = await selectTenantRowWithLine(tenantId, cols(fullCols)));
@@ -1675,23 +1681,70 @@ async function loadKbLive(tenantId, { force = false } = {}) {
   if (!tenantId || (!force && !/^(1|true|on|yes)$/i.test(String(process.env.BRAIN_KB_GATE || '').trim()))) return null;
   const t0 = Date.now();
   try {
-    const { data: t, error } = await supabase.from('tenants').select('kb_live_version, kb_ready_version, brain_target').eq('id', tenantId).maybeSingle();
-    if (error || !t || t.kb_live_version == null) return t ? { version: null, readyVersion: t.kb_ready_version ?? null, brainTarget: t.brain_target || 'v2', doc: null } : null;
+    const { data: t, error } = await selectKbTenantFacts(tenantId);
+    // anything that does not load = doc null + loadError: kb/live.attach gives the call an EMPTY snapshot (never the old brain)
+    if (error || !t) return { version: null, readyVersion: null, doc: null, loadError: error ? 'tenant_read' : 'no_row' };
+    if (t.kb_live_version == null) return { version: null, readyVersion: t.kb_ready_version ?? null, brainMode: t.brain_mode || 'full', brainModeSource: t.brain_mode_source || null, doc: null, loadError: 'no_live_version' };
     const key = `${tenantId}:${t.kb_live_version}`;
     let hit = KB_DOCS.get(key);
     if (!hit) {
       const { data: snap, error: e2 } = await supabase.from('kb_snapshots').select('doc, bytes').eq('tenant_id', tenantId).eq('version', t.kb_live_version).maybeSingle();
-      if (e2 || !snap) return { version: t.kb_live_version, readyVersion: t.kb_ready_version ?? null, brainTarget: t.brain_target || 'v2', doc: null };
+      if (e2 || !snap) return { version: t.kb_live_version, readyVersion: t.kb_ready_version ?? null, brainMode: t.brain_mode || 'full', brainModeSource: t.brain_mode_source || null, doc: null, loadError: e2 ? 'snapshot_read' : 'snapshot_missing' };
       hit = { doc: snap.doc, bytes: snap.bytes || null };
       for (const k of [...KB_DOCS.keys()]) if (k.startsWith(`${tenantId}:`)) KB_DOCS.delete(k);
       KB_DOCS.set(key, hit);
       if (KB_DOCS.size > 500) KB_DOCS.delete(KB_DOCS.keys().next().value);
     }
-    return { version: t.kb_live_version, readyVersion: t.kb_ready_version ?? null, brainTarget: t.brain_target || 'v2', doc: hit.doc, bytes: hit.bytes, loadMs: Date.now() - t0 };
+    return { version: t.kb_live_version, readyVersion: t.kb_ready_version ?? null, brainMode: t.brain_mode || 'full', brainModeSource: t.brain_mode_source || null, doc: hit.doc, bytes: hit.bytes, loadMs: Date.now() - t0 };
   } catch (err) {
     console.warn('[db] loadKbLive', err?.message || err);
-    return null;
+    return { version: null, readyVersion: null, doc: null, loadError: 'exception' };
   }
+}
+
+/**
+ * /healthz counts (no tenant ids): businesses on safe mode split by reason (env / owner / admin) and businesses whose
+ * live snapshot is missing or empty. One small read of tenants + live snapshot item counts, cached 60 s; never throws.
+ */
+let KB_HEALTH = { at: 0, value: null, inflight: null };
+async function kbHealthCounts({ maxAgeMs = 60000, env = process.env } = {}) {
+  if (KB_HEALTH.value && Date.now() - KB_HEALTH.at < maxAgeMs) return KB_HEALTH.value;
+  if (KB_HEALTH.inflight) return KB_HEALTH.inflight;
+  KB_HEALTH.inflight = (async () => {
+    try {
+      let r = await supabase.from('tenants').select('id, kb_live_version, brain_mode, brain_mode_source');
+      if (r.error && /brain_mode/.test(r.error.message || '')) r = await supabase.from('tenants').select('id, kb_live_version');
+      if (r.error) throw new Error(r.error.message);
+      const rows = r.data || [];
+      const live = rows.filter((t) => t.kb_live_version != null);
+      const counts = new Map();
+      if (live.length) {
+        const s = await supabase.from('kb_snapshots').select('tenant_id, version, item_count').in('tenant_id', live.map((t) => t.id));
+        if (s.error) throw new Error(s.error.message);
+        for (const x of s.data || []) counts.set(`${x.tenant_id}:${x.version}`, x.item_count);
+      }
+      KB_HEALTH.value = { ...require('./knowledge/kb/live').healthTally(rows, counts, { safeEnv: env.BRAIN_SAFE_MODE }), at: new Date().toISOString() };
+    } catch (e) {
+      KB_HEALTH.value = { error: String((e && e.message) || e).slice(0, 120), at: new Date().toISOString() };
+    }
+    KB_HEALTH.at = Date.now(); KB_HEALTH.inflight = null;
+    return KB_HEALTH.value;
+  })();
+  return KB_HEALTH.inflight;
+}
+/** Last cached counts without waiting (healthz answers at once; refresh runs in the background). */
+function kbHealthCountsCached() {
+  if (!KB_HEALTH.inflight && (!KB_HEALTH.value || Date.now() - KB_HEALTH.at >= 60000)) kbHealthCounts().catch(() => {});
+  return KB_HEALTH.value;
+}
+
+/** tenants KB facts (kbLive KB_LIVE_COLUMNS). Before kb_v2_brain_mode.sql (.4) there is no brain_mode column: read without it (= full). */
+async function selectKbTenantFacts(tenantId, extra = '') {
+  const K = require('./knowledge/kb/kbLive');
+  const sel = (cols) => supabase.from('tenants').select(extra ? `${cols}, ${extra}` : cols).eq('id', tenantId).maybeSingle();
+  const r = await sel(K.KB_LIVE_COLUMNS);
+  if (r.error && /brain_mode|kb_catalogue_complete/.test(r.error.message || '')) return sel(K.KB_LIVE_COLUMNS_PRE_BRAIN_MODE);
+  return r;
 }
 
 /** kb_items + variants + categories of one business (compile input, Desk editor). */
@@ -1702,7 +1755,12 @@ async function listKbSource(tenantId) {
     supabase.from('kb_categories').select('*').eq('tenant_id', tenantId).order('sort', { ascending: true }),
   ]);
   for (const r of [items, variants, categories]) if (r.error) throw new Error(`listKbSource: ${r.error.message}`);
-  return { items: items.data || [], variants: variants.data || [], categories: categories.data || [] };
+  // the owner's catalogue-complete mark (kb_v2_brain_mode.sql .4) is part of the compile source; no column = no mark
+  let completeAt = null;
+  const t = await supabase.from('tenants').select('kb_catalogue_complete_at').eq('id', tenantId).maybeSingle();
+  if (!t.error && t.data) completeAt = t.data.kb_catalogue_complete_at || null;
+  else if (t.error && !/kb_catalogue_complete_at/.test(t.error.message || '')) throw new Error(`listKbSource tenant: ${t.error.message}`);
+  return { items: items.data || [], variants: variants.data || [], categories: categories.data || [], completeAt };
 }
 
 /** One batch write (rpc kb_upsert_items). Category rows are upserted first so items can point at them. */
@@ -1728,7 +1786,7 @@ async function publishKbSnapshot(tenantId, { doc, sourceHash, issues = [], statu
 /** Latest snapshot row (any status) + the tenant pointers. */
 async function getKbState(tenantId) {
   const [{ data: t, error: e1 }, { data: last, error: e2 }] = await Promise.all([
-    supabase.from('tenants').select('id, business_name, kb_live_version, kb_ready_version, brain_target, hours_schedule, notify_channels, whatsapp_notification_number, alert_email').eq('id', tenantId).maybeSingle(),
+    selectKbTenantFacts(tenantId, 'id, business_name, hours_schedule, notify_channels, whatsapp_notification_number, alert_email'),
     supabase.from('kb_snapshots').select('version, status, source_hash, issues, item_count, bytes, compiled_at').eq('tenant_id', tenantId).order('version', { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (e1) throw new Error(`getKbState: ${e1.message}`);
@@ -1757,12 +1815,28 @@ async function listKbTenants() {
   return (data || []).map((r) => r.id);
 }
 
-/** Ops: hold a business on the old brain (v1) or let readiness move it (v2). */
-async function setBrainTarget(tenantId, target) {
-  if (!['v1', 'v2'].includes(target)) throw new Error('setBrainTarget: v1 or v2');
-  const { error } = await supabase.from('tenants').update({ brain_target: target }).eq('id', tenantId);
-  if (error) throw new Error(`setBrainTarget: ${error.message}`);
-  return true;
+/**
+ * Ops / Super Admin (service role): "Take messages only" for one business, or back to full. Goes through the one
+ * writer, public.set_brain_mode (kb_v2_brain_mode.sql): source 'admin', audited in tenant_brain_mode_audit.
+ * actor = the admin's auth user id (null for scripts).
+ */
+async function setBrainMode(tenantId, mode, { actor = null } = {}) {
+  if (!['full', 'safe'].includes(mode)) throw new Error('setBrainMode: full or safe');
+  const { data, error } = await supabase.rpc('set_brain_mode', { p_tenant: tenantId, p_mode: mode, p_actor: actor });
+  if (error) throw new Error(`setBrainMode: ${error.message}`);
+  return data;
+}
+
+/**
+ * Ops / Super Admin (service role): the owner's "this is my whole catalogue" mark, through its one writer
+ * public.set_kb_catalogue_complete (source 'admin', audited). The caller then recompiles (publish.compileAndPublish /
+ * POST /internal/kb/compile) so the next snapshot carries doc.complete.
+ */
+async function setKbCatalogueComplete(tenantId, complete, { actor = null } = {}) {
+  if (typeof complete !== 'boolean') throw new Error('setKbCatalogueComplete: boolean');
+  const { data, error } = await supabase.rpc('set_kb_catalogue_complete', { p_tenant: tenantId, p_complete: complete, p_actor: actor });
+  if (error) throw new Error(`setKbCatalogueComplete: ${error.message}`);
+  return data;
 }
 
 /**
@@ -3788,7 +3862,10 @@ module.exports = {
   getKbState,
   searchKbItems,
   recordKbReadiness,
-  setBrainTarget,
+  setBrainMode,
+  setKbCatalogueComplete,
+  kbHealthCounts,
+  kbHealthCountsCached,
   normalizeCallerLanguage,
   saveCallerLanguage,
   confirmCallerName,
