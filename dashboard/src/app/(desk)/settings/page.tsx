@@ -44,6 +44,8 @@ import { loadCallSetupState } from "@/lib/callSetupServer";
 import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
 import { toLocal07 } from "@/lib/callForwarding";
 import { formatKenyaNumber } from "@/lib/setupFlow";
+import { loadBrainSettings } from "@/lib/takeMessages.server";
+import type { TakeMessagesState } from "@/lib/takeMessages";
 
 /** Allow URL fetch + Gemini extract/compile without premature platform cutoffs. */
 export const maxDuration = 60;
@@ -133,14 +135,18 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   // Typed data (payments, price checks, category). The columns may not exist before the migration: then null.
   let structuredSlot = null;
   let businessCategory: string | null = null;
+  let takeMessages: TakeMessagesState | null = null;
   // Catalogue is its own tab (?tab=catalog), not a train panel: the old check never showed its price cards.
   if (tab === "catalog" || (tab === "train" && trainPanel === "identity")) {
     const identity = tab === "train" && trainPanel === "identity";
-    const [canEdit, typed, greeting] = await Promise.all([
+    const [canEdit, typed, greeting, brain] = await Promise.all([
       memberCan("settings.edit"),
       readBusinessType(tenant.id),
       identity ? readGreetingLanguage(tenant.id) : Promise.resolve(null),
+      // How you answer: "Take messages only" (members passed the settings.view check above).
+      identity ? loadBrainSettings(tenant.id).catch(() => null) : Promise.resolve(null),
     ]);
+    takeMessages = brain?.takeMessages ?? null;
     // How you answer shows the stored greeting language (Automatic when null).
     if (greeting) tenant = { ...tenant, ...greeting };
     structuredSlot = structuredSettingsSlots({
@@ -215,6 +221,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
       assistantSaySlot={assistantSaySlot}
       assistantSayPage={assistantSayPage}
       businessCategory={businessCategory}
+      takeMessages={takeMessages}
     />
   );
 }

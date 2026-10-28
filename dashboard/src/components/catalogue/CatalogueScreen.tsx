@@ -42,7 +42,9 @@ import {
   withChoice,
   type PriceChoice,
 } from "@/lib/catalogueView";
-import type { KbActionResult } from "@/app/(desk)/settings/knowledge/actions";
+import type { KbActionResult, KbCompleteResult } from "@/app/(desk)/settings/knowledge/actions";
+import { CatalogueCompleteRow } from "@/components/catalogue/CatalogueCompleteRow";
+import { useInstantSave } from "@/components/useInstantSave";
 
 /** The KB v2 server actions this screen calls. Injected so the dev fixture can render without a database. */
 export type CatalogueActions = {
@@ -52,6 +54,8 @@ export type CatalogueActions = {
   compile: () => Promise<KbActionResult>;
   previewPaste: (text: string) => Promise<{ ok: true; rows: KbPasteRow[] } | { ok: false; error: string }>;
   importPaste: (rows: KbPasteRow[], kind: KbKind, group: string, mode?: "append" | "replace") => Promise<KbActionResult>;
+  /** "My list is complete" (set_kb_catalogue_complete with the owner's session, then a recompile). */
+  setComplete?: (complete: boolean) => Promise<KbCompleteResult>;
 };
 
 export type CatalogueScreenProps = {
@@ -79,6 +83,11 @@ export type CatalogueScreenProps = {
    * still shows it, with the way back to Offered.
    */
   statesEnabled?: boolean;
+  /**
+   * tenants.kb_catalogue_complete_at: when the owner marked the list complete (null = not marked).
+   * undefined = the column is not there yet: no control. Editing items never clears it.
+   */
+  completeAt?: string | null;
   actions: CatalogueActions;
 };
 
@@ -101,6 +110,12 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
   const [checksOpen, setChecksOpen] = useState(false);
   const [lang, setLang] = useState<"en" | "sw">("en");
   const [swEdit, setSwEdit] = useState<{ id: string; text: string } | null>(null);
+  const showComplete = props.completeAt !== undefined && !!actions.setComplete;
+  const complete = useInstantSave<string | null>(props.completeAt ?? null, async (next) => {
+    if (!actions.setComplete) return { ok: false, error: "Couldn't save. Reload the page and try again." };
+    const r = await actions.setComplete(next !== null);
+    return r.ok ? { ok: true, value: r.completeAt } : r;
+  });
 
   const counts = useMemo(() => catalogueCounts(items), [items]);
   const list = useMemo(() => filterItems(items, categories, { query, kind, needPrice }), [items, categories, query, kind, needPrice]);
@@ -223,10 +238,19 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
           ) : null}
         </div>
 
+        {counts.total > 0 && showComplete ? (
+          <CatalogueCompleteRow
+            completeAt={complete.value}
+            status={complete.status}
+            canEdit={canEdit}
+            onChange={(on) => complete.change(on ? complete.value || new Date().toISOString() : null)}
+          />
+        ) : null}
+
         {counts.total ? (
           <>
             {both ? (
-              <div className="px-4">
+              <div className={cx("px-4", showComplete && "pt-3")}>
                 <Segmented
                   label="Show"
                   items={[

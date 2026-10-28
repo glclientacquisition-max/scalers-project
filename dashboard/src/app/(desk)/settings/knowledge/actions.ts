@@ -8,6 +8,8 @@ import { PASTE_MAX_ROWS, draftErrors, gateDraftStatus, itemFromDraft, itemsFromP
 import { KB_ITEM_COLS, afterKbWrite, kbRowToItem, loadKbItems, writeKbItems } from "@/lib/kbWrite.server";
 import { pingKbCompile } from "@/lib/kb.server";
 import { deskKbItemStates } from "@/lib/deskFeatureFlags";
+import { setKbCatalogueCompleteAsOwner } from "@/lib/kbLive.server";
+import { brainSettingError } from "@/lib/takeMessages";
 
 export type KbActionResult = { ok: true } | { ok: false; error: string };
 
@@ -141,4 +143,23 @@ export async function importKbPasteAction(rows: KbPasteRow[], kind: KbKind, grou
   const items = itemsFromPaste(clean, k, existing, await categoryId(t.id, String(group || "")));
   if (!items.length) return { ok: false, error: "Nothing to add." };
   return writeItems(t.id, items, mode === "replace" ? { replaceKind: k } : {});
+}
+
+export type KbCompleteResult = { ok: true; completeAt: string | null } | { ok: false; error: string };
+
+/**
+ * "My list is complete": the owner marks the catalogue as everything they offer (or clears it).
+ * set_kb_catalogue_complete with the owner's session (membership checked and audited in the database),
+ * then a recompile so callers hear it. Saving or removing items never touches the mark.
+ */
+export async function setKbCatalogueCompleteAction(complete: boolean): Promise<KbCompleteResult> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return { ok: false, error: denied.error };
+  if (typeof complete !== "boolean") return { ok: false, error: brainSettingError("invalid_complete") };
+  const t = await ownerTenant();
+  if ("error" in t) return { ok: false, error: t.error };
+  const r = await setKbCatalogueCompleteAsOwner(t.id, complete);
+  if (!r.ok) return { ok: false, error: brainSettingError(r.error) };
+  revalidatePath("/settings/knowledge");
+  return { ok: true, completeAt: r.complete ? r.completeAt : null };
 }

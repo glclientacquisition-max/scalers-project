@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { InboxTicketView } from "@/components/InboxTicketView";
 import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { InboxToolbar } from "@/components/InboxToolbar";
@@ -9,6 +10,7 @@ import { InboxSelectChrome } from "@/components/InboxRowSelect";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import type { InboxItem } from "@/lib/inboxPurpose";
 import type { TranscriptRow } from "@/lib/supabase";
+import { fixtureTakeMessages } from "../d1-safe-mode/fixtures";
 
 function item(partial: Partial<InboxItem> & Pick<InboxItem, "id" | "purpose" | "headline">): InboxItem {
   return {
@@ -208,10 +210,16 @@ const TURNS: TranscriptRow[] = [
   },
 ];
 
-export default function DevInboxPage() {
+export const instant = false;
+
+/** ?messages=on | support | env: the "Taking messages only" note in the header. */
+export default async function DevInboxPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  await connection();
   if (process.env.DASHBOARD_OPEN !== "true") {
     notFound();
   }
+  const sp = (await searchParams) || {};
+  const messagesRaw = Array.isArray(sp.messages) ? sp.messages[0] : sp.messages;
 
   const needYou = ROWS.filter((row) => row.needsYou).length;
 
@@ -234,6 +242,7 @@ export default function DevInboxPage() {
             archived: 14,
           }}
           q=""
+          takeMessages={messagesRaw ? fixtureTakeMessages(messagesRaw) : null}
         />
         </InboxSelectChrome>
         <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface lg:hidden">

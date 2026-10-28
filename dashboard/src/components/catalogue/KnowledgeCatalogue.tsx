@@ -8,6 +8,7 @@ import {
   importKbPasteAction,
   previewKbPasteAction,
   saveKbItemAction,
+  setKbCatalogueCompleteAction,
 } from "@/app/(desk)/settings/knowledge/actions";
 
 const ACTIONS: CatalogueActions = {
@@ -17,6 +18,7 @@ const ACTIONS: CatalogueActions = {
   compile: compileKbAction,
   previewPaste: previewKbPasteAction,
   importPaste: importKbPasteAction,
+  setComplete: setKbCatalogueCompleteAction,
 };
 
 /** Settings > Catalogue wired to the KB v2 server actions. */

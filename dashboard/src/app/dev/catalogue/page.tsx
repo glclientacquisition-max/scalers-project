@@ -8,7 +8,8 @@ import { homeCategories, homeItems, homeLive, readinessTodo, shopCategories, sho
 
 /**
  * Settings > Catalogue (KB v2) with fixture data. DASHBOARD_OPEN=true only.
- * ?vertical=retail, ?cat=empty, ?role=viewer, ?filter=unpriced, ?paste=1, ?states=on (Paused / Not offered control)
+ * ?vertical=retail, ?cat=empty, ?role=viewer, ?filter=unpriced, ?paste=1, ?states=on (Paused / Not offered control),
+ * ?complete=marked | unmarked ("My list is complete"; absent = the column is not there, no control)
  */
 export const instant = false;
 
@@ -46,6 +47,7 @@ export default async function DevCataloguePage({ searchParams }: Props) {
                     statesEnabled={one(p.states) === "on"}
                     initialNeedPrice={one(p.filter) === "unpriced"}
                     initialPaste={one(p.paste) === "1"}
+                    completeAt={one(p.complete) === "marked" ? "2026-10-28T09:30:00.000Z" : one(p.complete) === "unmarked" ? null : undefined}
                   />
                 </div>
               </div>

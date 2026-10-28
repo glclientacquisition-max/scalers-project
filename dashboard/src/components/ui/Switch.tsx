@@ -9,11 +9,16 @@ export function Switch({
   onCheckedChange,
   label,
   disabled = false,
+  id,
+  describedBy,
 }: {
   checked: boolean;
   onCheckedChange: (next: boolean) => void;
   label: string;
   disabled?: boolean;
+  id?: string;
+  /** id of the line that explains the switch (read after the name). */
+  describedBy?: string;
 }) {
   return (
     <label
@@ -28,6 +33,8 @@ export function Switch({
         checked={checked}
         disabled={disabled}
         aria-label={label}
+        id={id}
+        aria-describedby={describedBy}
         onChange={(event) => {
           if (disabled) return;
           onCheckedChange(event.target.checked);

@@ -12,6 +12,7 @@ import { memberCan } from "@/lib/requireMember";
 import { loadSettingsStatuses } from "@/lib/settingsRailStatus";
 import { getCurrentTenant } from "@/lib/tenant";
 import { parseVertical } from "@/lib/vertical";
+import { loadBrainSettings } from "@/lib/takeMessages.server";
 
 type Search = { filter?: string | string[]; paste?: string | string[] };
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -24,7 +25,11 @@ async function KnowledgeBody({ searchParams }: { searchParams: Promise<Search> }
   if (!tenant) return <DeskNoWorkspace />;
   const search = await searchParams;
   const needPrice = first(search.filter) === "unpriced";
-  const [state, statuses] = await Promise.all([loadKbState(tenant.id), loadSettingsStatuses(tenant)]);
+  const [state, statuses, brain] = await Promise.all([
+    loadKbState(tenant.id),
+    loadSettingsStatuses(tenant),
+    loadBrainSettings(tenant.id).catch(() => null),
+  ]);
   // Before the v2 tables exist (prod until the batch runs) the old Catalogue screen stays the editor.
   if (!state.ok && state.reason === "no_tables") redirect(`/settings?tab=catalog${needPrice ? "&filter=unpriced" : ""}`);
   if (!state.ok) return <DeskLoadError>Could not load your catalogue.</DeskLoadError>;
@@ -46,6 +51,7 @@ async function KnowledgeBody({ searchParams }: { searchParams: Promise<Search> }
             statesEnabled={deskKbItemStates()}
             initialNeedPrice={needPrice}
             initialPaste={first(search.paste) === "1"}
+            completeAt={brain ? brain.catalogueCompleteAt : undefined}
           />
         </div>
       </div>
