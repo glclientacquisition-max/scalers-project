@@ -117,11 +117,10 @@ describe('requestDedupe (ee17115a second callback)', () => {
   });
 });
 
-describe('server wiring stays on main path when flag is off', () => {
-  it('still takes and speaks the owed outcome (byte-identical off path)', () => {
-    assert.ok(SERVER.includes('const owedOutcome = takeToolOutcome(brainState);'));
-    assert.ok(SERVER.includes('speaking queued tool outcome'));
-    assert.ok(SERVER.includes('owedConfirmFoldEnabled'));
-    assert.ok(SERVER.includes('VOICE_OWED_CONFIRM_FOLD'));
+describe('server wiring (V1): the owed-outcome preface is gone; the fold flag only gates request bookkeeping', () => {
+  it('no take/peek of an owed outcome on the media turn; owedConfirmFoldEnabled still gates noteServiceRequestCreated', () => {
+    assert.ok(!SERVER.includes('const owedOutcome = takeToolOutcome(brainState);'));
+    assert.ok(!SERVER.includes('speaking queued tool outcome'));
+    assert.match(SERVER, /if \(owedConfirmFoldEnabled\(\)\) \{\n\s+noteServiceRequestCreated\(state, request, created\);/);
   });
 });

@@ -16,7 +16,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 
 | Subsystem | Source of truth | Path | Evidence | Alternatives | Status |
 | --- | --- | --- | --- | --- | --- |
-| Live telephony | SautiKit webhooks + PCM WS | `server.js` `/voice/incoming`, `/ws/media` | Active routes; `VOICE.md` contract | `/ws/relay` | LEGACY |
+| Live telephony | SautiKit webhooks + PCM WS | `server.js` `/voice/incoming`, `/ws/media` | Active routes; `VOICE.md` contract | — (`/ws/relay` removed) | — |
 | Webhook auth | SautiKit guard | `src/sautikit/webhook.js` | `sautikitWebhookGuard` on all voice POST routes | None | CORE |
 | Media transport | `audio.drachtio.org` S16LE 16 kHz | `server.js` `mediaWss` | Stream XML `connect="true"` | Twilio mu-law | DEPRECATED |
 
@@ -38,7 +38,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 
 | Subsystem | Source of truth | Path | Evidence | Alternatives | Status |
 | --- | --- | --- | --- | --- | --- |
-| Agent runtime | Gemini turn loop | `server.js` `runGeminiTurn*` | `@google/genai` import; called from media handler | `/ws/relay` path | CORE |
+| Agent runtime | v2 engines turn | `src/conversation/v2/liveTurn.js` → `brainEngines.js` (via `server.js` `runCallerTurn`) | `runGeminiTurn*` and `/ws/relay` removed (retire-old-brain B2/V1) | — | CORE |
 | Human handoff (async) | Escalate notify + desk note | `src/conversation/escalationFeature.js`, `server.js` `maybeSendEscalationNotification` | [`../ESCALATION.md`](../product/ESCALATION.md) | Live Dial | CORE |
 | Human handoff (live) | **Not offered: callbacks only since #658.** Was: conference + outbound REST (cold Dial after Stream blocked) | Gated off (`VOICE_LIVE_TRANSFER`) | [`../LIVE_TRANSFER.md`](../../archive/LIVE_TRANSFER.md), ADR-0004 | Closing `/ws/media` for Dial | PROPOSED |
 | Runtime prompt assembly | Context + rules + profile | `src/prompts.js` | `buildSystemPrompt`, `buildContextHeader` | Env `BUSINESS_*` | CORE |

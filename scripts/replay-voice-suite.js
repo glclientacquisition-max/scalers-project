@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Replay the seeded calls through the current mouth and fail if scores fall.
-// Recorded mode is the CI gate. --live asks Gemini. --update-baseline rewrites
+// Recorded mode is the CI gate (the only mode: --live used the old Gemini prompt). --update-baseline rewrites
 // the committed scorecard after an intentional gain.
 
 // Fixtures use P0 owner rows (no value_hash). An ambient FACT_HASH_MODE=on in the
@@ -41,7 +41,11 @@ function baselineShape(calls) {
 
 async function main() {
   const update = process.argv.includes('--update-baseline') || process.argv.includes('--write-baseline');
-  const live = process.argv.includes('--live');
+  const live = false;
+  if (process.argv.includes('--live')) {
+    console.error('--live was removed with the old Gemini prompt (retire-old-brain V1). Recorded mode only.');
+    process.exit(2);
+  }
   const fixtures = loadFixtures();
   const calls = [];
   for (const fixture of fixtures) {

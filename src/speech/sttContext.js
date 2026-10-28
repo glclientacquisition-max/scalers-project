@@ -2,7 +2,21 @@
 // Context improves recognition of brand/product/place names (hearing path).
 // Keep terms short and tenant-scoped — do not dump a global gazetteer.
 
-const { normalizeServices } = require('../conversation/liveKnowledge');
+// Catalogue names only. Same rows and names liveKnowledge.normalizeServices kept (an array or a JSON string; rows
+// with an empty name dropped), without importing the old-brain ground-truth module (retire-old-brain B3 deletes it).
+// On a KB business profile.servicesCatalog is the KB projection (kb/live.attach), so these are the KB item names.
+function catalogueServiceNames(raw) {
+  let rows = raw;
+  if (typeof rows === 'string') {
+    try {
+      rows = JSON.parse(rows);
+    } catch {
+      rows = [];
+    }
+  }
+  if (!Array.isArray(rows)) return [];
+  return rows.map((row) => String(row?.name || '').trim()).filter(Boolean);
+}
 const { normalizeLocations } = require('../conversation/businessLocations');
 const { coverageAreaNames } = require('../conversation/coverageAreas');
 
@@ -102,9 +116,7 @@ function collectTenantTerms(tenant = {}) {
   if (businessName) terms.push(businessName);
   if (agentName) terms.push(agentName);
 
-  for (const svc of normalizeServices(tenant.servicesCatalog || tenant.services_catalog)) {
-    if (svc.name) terms.push(svc.name);
-  }
+  for (const name of catalogueServiceNames(tenant.servicesCatalog || tenant.services_catalog)) terms.push(name);
   // KB v2: paused / not-offered names stay out of every list, but STT still hears them (so the caller gets the
   // grounded "not right now" / "we don't offer" answer instead of a mis-hearing). Legacy: nothing added.
   const kbOff = require('../knowledge/kb/live').handle(tenant);

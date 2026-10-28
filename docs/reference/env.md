@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-237 variables.
+232 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -68,18 +68,14 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `FACT_HASH_MODE` | desk, scripts, voice | `dashboard/src/lib/tenantFieldProvenance.ts`<br>`scripts/ack-rule-report.js`<br>`scripts/replay-voice-suite.js`<br>+2 more |
 | `FACT_PAYMENTS_V2_HASH` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
 | `FACT_SAVE_IS_CONFIRM` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
-| `GEMINI_API_KEY` | desk, scripts, voice | `dashboard/src/app/(desk)/settings/catalogActions.ts`<br>`dashboard/src/app/(desk)/settings/pronunciationGeminiScanActions.ts`<br>`dashboard/src/lib/faqFromTranscript.ts`<br>+11 more |
+| `GEMINI_API_KEY` | desk, scripts, voice | `dashboard/src/app/(desk)/settings/catalogActions.ts`<br>`dashboard/src/app/(desk)/settings/pronunciationGeminiScanActions.ts`<br>`dashboard/src/lib/faqFromTranscript.ts`<br>+10 more |
 | `GEMINI_AUDIO_MODEL` | desk | `dashboard/src/lib/gemini.ts` |
 | `GEMINI_BACKUP_MODEL` | voice | `src/conversation/geminiVoice.js` |
-| `GEMINI_MAX_OUTPUT_TOKENS` | voice | `server.js`<br>`src/speech/replayVoice.js` |
-| `GEMINI_MAX_RETRIES` | voice | `server.js` |
 | `GEMINI_MODEL` | desk, voice | `dashboard/src/lib/gemini.ts`<br>`server.js`<br>`src/conversation/callTranscriptReview.js`<br>+1 more |
 | `GEMINI_REVIEW_MODEL` | voice | `src/conversation/callTranscriptReview.js` |
-| `GEMINI_THINKING_LEVEL` | voice | `server.js` |
 | `GEMINI_TTS_MODEL` | voice | `src/speech/emergencyTts.js` |
 | `GEMINI_TTS_VOICE` | voice | `src/speech/emergencyTts.js` |
 | `GEMINI_TURN_TIMEOUT_MS` | voice | `src/conversation/geminiVoice.js` |
-| `GEMINI_VOICE_TEMPERATURE` | voice | `server.js`<br>`src/speech/replayVoice.js` |
 | `GIT_BRANCH` | voice | `server.js` |
 | `GIT_SHA` | voice | `server.js` |
 | `GITHUB_ACTIONS` | scripts | `scripts/docs/check-docs.js` |
@@ -211,7 +207,6 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_FACT_REFS` | voice | `src/conversation/factSheet.js`<br>`src/conversation/numberWords.js` |
 | `VOICE_FALLBACK_BY_KIND` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
 | `VOICE_FAST_INBOUND` | scripts | `scripts/bench-inbound-webhook.js` |
-| `VOICE_FILLER` | voice | `src/conversation/language.js` |
 | `VOICE_FILLER_CACHE` | voice | `src/speech/fillerPcmCache.js` |
 | `VOICE_FLUSH_MAX_MS` | voice | `src/speech/turnTaking.js` |
 | `VOICE_FLUSH_MIN_MS` | voice | `src/speech/turnTaking.js` |

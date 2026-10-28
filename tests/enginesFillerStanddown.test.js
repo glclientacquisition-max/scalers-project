@@ -213,18 +213,20 @@ test('uncuttable filler already finished before the reply: no wait, no cut', asy
   assert.deepEqual(kinds(), ['filler', 'filler_end', 'line']);
 });
 
-// server.js wiring (B2): the engines run every turn, so the gate is always built; the non-engines v1Filler /
-// onV1Sentence / v1Chain branch is left (unreachable) for Voice V1 to delete.
-test('server.js: the engines filler gate is always built (B2); the old flag gates are gone', () => {
+// server.js wiring (B2 + V1): the engines run every turn, so the gate is always built and is the only filler /
+// sentence path; the non-engines v1Filler / onV1Sentence / v1Chain branch is deleted (V1).
+test('server.js: the engines filler gate is the only filler path (B2 + V1); the old flag gates and v1 branch are gone', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.match(src, /const enginesFiller = createEnginesFillerTurn\(\{/);
   assert.doesNotMatch(src, /brainEnginesOn|brainModelLead\.leadOn|brainV1Draft\.mode\(|brainV1Draft\.phaseA\(/);
-  assert.match(src, /if \(v1DraftOn && !enginesFiller\) \{\n\s+v1Filler = setTimeout\(/);
-  assert.match(src, /const onV1Sentence = enginesFiller\n\s+\? enginesFiller\.onSentence\n\s+: v1DraftOn/);
-  assert.match(src, /const enginesSpoken = enginesFiller \? await enginesFiller\.finish\(live\) : null;/);
-  assert.match(src, /\} else if \(live\.streamed && v1Streamed\) \{\n\s+spoken = await v1Chain;/);
+  assert.doesNotMatch(src, /v1DraftOn|v1PhaseA|v1Filler|onV1Sentence|v1Chain|v1Streamed/);
+  assert.match(src, /enginesFiller\.arm\(\);/);
+  assert.match(src, /onSentence: enginesFiller\.onSentence,\n\s+heardAgent: v1HeardSinceLastTurn\(\),/);
+  assert.match(src, /const enginesSpoken = await enginesFiller\.finish\(live\);/);
+  // a non-streamed result: the playing filler is cut (fillerCut min playout) before the line is spoken
+  assert.match(src, /\} else \{\n[\s\S]{0,200}await cutFillerForReply\(\);\n\s+spoken = await speakText\(live\.line,/);
   // the filler never reaches the transcript: only live.line is pushed, and the gate has no transcript hook
-  assert.match(src, /if \(enginesFiller\) enginesFiller\.cancel\(\);\n.*\n\s+callTranscript\.pushAgent\(live\.line\);/);
+  assert.match(src, /enginesFiller\.cancel\(\);\n.*\n\s+callTranscript\.pushAgent\(live\.line\);/);
   assert.match(src, /return speakThinkingAck\(text\)\.catch/);
   const gateSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'speech', 'enginesFillerStanddown.js'), 'utf8');
   assert.doesNotMatch(gateSrc, /pushAgent|callTranscript|appendTranscript/);

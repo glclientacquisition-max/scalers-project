@@ -26,7 +26,7 @@ On each finalized caller utterance:
 5. Execute tools (`toolExecution.js`)
 6. Speak response via Soniox TTS
 
-**LEGACY alternate:** `/ws/relay` text-in/text-out path — not the production SautiKit PCM path.
+**Removed:** the `/ws/relay` text-in/text-out path is deleted (retire-old-brain V1).
 
 ---
 
@@ -144,7 +144,7 @@ Loaded once per media session in `ensureTenantPrompt()`.
 | Scenario | Behavior | Module |
 | --- | --- | --- |
 | Unknown facts | `unknown_answer_fallback` + policy | `prompts.js`, compiler |
-| Slow Gemini | Fillers / progress lines | `dynamicSpeech.js`, env `VOICE_FILLER` |
+| Slow brain turn | Engines topic filler, else Voice's contextual ack (one per turn) | `v2/engineFiller.js`, `speech/enginesFillerStanddown.js` |
 | Missing compile key | Local template on desk | `onboarding.ts` |
 | Required escalate omitted | Backend injects escalate | `requiredEscalate.js` |
 | Required visit/hold omitted | Backend injects create_appointment / create_service_request | `requiredCreateRequest.js` |

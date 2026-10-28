@@ -119,32 +119,13 @@ test('errors are caught: throwing loader / stream never reject fire()', async ()
   assert.ok(await c.fire({ text: 'hi', turnIndex: 1, onResult: () => { throw new Error('trace'); } }));
 });
 
-test('trace: shadow landing before commit is diffed against live tts/tools at commit', async () => {
-  const sink = memSink();
-  const tr = createVoiceTrace({ enabled: true, sink, callId: 'HD_abc', tenantId: null });
-  tr.beginTurn({ callerText: 'book', language: { current: 'en' } });
-  const idx = tr.currentTurnIndex();
-  tr.noteBrainV2Shadow({ stage: 'brain_v2_shadow', mode: 'shadow', turnIndex: idx, v2Text: 'Done, booked for Friday.', v2Lang: 'en', toolIntents: [{ name: 'createAppointment', v1Name: 'create_appointment', write: true }] });
-  tr.noteTool({ name: 'create_appointment', status: 'ok' });
-  tr.noteTts({ text: 'Booked for Friday.' });
-  const rec = tr.commitTurn({ outcome: 'ok' });
-  const st = rec.stages.find((s) => s.stage === 'brain_v2_shadow');
-  assert.equal(st.mode, 'shadow'); assert.equal(st.diff.toolIntentMatch, true);
-  assert.ok(st.diff.textSimilarity > 0.5); assert.equal(st.diff.langMismatch, false);
-  assert.equal(sink.writes[0].stages.some((s) => s.stage === 'brain_v2_shadow'), true);
-});
-
-test('trace: shadow landing after commit updates the same turn row via sink.update', async () => {
-  const sink = memSink();
-  const tr = createVoiceTrace({ enabled: true, sink, callId: 'HD_abc', tenantId: null });
-  tr.beginTurn({ callerText: 'hi', language: { current: 'sw' } }); const idx = tr.currentTurnIndex();
-  tr.noteTts({ text: 'Karibu.' }); tr.commitTurn({ outcome: 'ok' });
-  tr.noteBrainV2Shadow({ stage: 'brain_v2_shadow', mode: 'shadow', turnIndex: idx, v2Text: 'Welcome.', v2Lang: 'en', toolIntents: [] });
-  await tr.finishCall();
-  const up = sink.updates.find((u) => u.stages.some((s) => s.stage === 'brain_v2_shadow'));
-  assert.ok(up); assert.equal(up.turnIndex, idx);
-  const st = up.stages.find((s) => s.stage === 'brain_v2_shadow');
-  assert.equal(st.diff.langMismatch, true); assert.equal(st.diff.toolIntentMatch, true);
+// retire-old-brain V1: voiceTrace.noteBrainV2Shadow (the shadow-vs-live diff on the turn row) is deleted; nothing
+// called it after B2 removed the v2 shadow hook from server.js. The trace no longer exposes it:
+test('trace (V1): the v2 shadow diff hook is gone from voiceTrace', () => {
+  const tr = createVoiceTrace({ enabled: true, sink: memSink(), callId: 'HD_abc', tenantId: null });
+  assert.equal(tr.noteBrainV2Shadow, undefined);
+  assert.equal(createVoiceTrace({ enabled: false }).noteBrainV2Shadow, undefined);
+  assert.equal(typeof tr.noteBrainV2Model, 'function');
 });
 
 test('diff: similarity + tool agreement helpers', () => {

@@ -233,12 +233,11 @@ describe('5. A booking confirmed during a barge-in is still told', () => {
     assert.equal(queueToolOutcome(null, 'x'), '');
   });
 
-  // B2: the old Gemini media turn's copy is deleted; /ws/relay's runGeminiTurn keeps its one (Voice V1), and the media
-  // turn still speaks an owed outcome first, before the v2 turn.
-  it('server keeps the barged confirmation (relay) and the media turn speaks an owed outcome before the v2 turn', () => {
-    assert.equal((SERVER.match(/const bargedActionConfirmation = heldTools\.toolHoldCancelled/g) || []).length, 1);
-    const owed = SERVER.indexOf('const owedOutcome = takeToolOutcome(brainState);');
-    assert.ok(owed > 0 && owed < SERVER.indexOf('const live = await v2OwnsCall.runOwnedTurn('));
+  // B2 deleted the old Gemini media turn's copy; V1 deletes /ws/relay's runGeminiTurn (the last queueToolOutcome
+  // producer) and the media turn's owed-outcome preface, which had nothing left to speak. The queue module stays
+  // (Brain B3). Engines gap, not caused by V1: a receipt line cut by barge-in is not re-told on the next turn.
+  it('V1: no barged-confirmation queue or owed-outcome preface is left in server.js', () => {
+    assert.doesNotMatch(SERVER, /bargedActionConfirmation|takeToolOutcome|queueToolOutcome|peekToolOutcome|speaking queued tool outcome/);
   });
 });
 

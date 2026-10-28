@@ -87,7 +87,7 @@ See also: [`../governance/REPOSITORY_INVENTORY.md`](../../reference/governance/R
 **FACT:** Active path is SautiKit Stream XML → `wss /ws/media` with subprotocol `audio.drachtio.org`.  
 **FACT:** Webhook routes: `POST /`, `/voice/incoming`, `/voice`; events at `POST /voice/events`.  
 **FACT:** Twilio removed from telephony path (`server.js` header).  
-**FACT:** Legacy `/ws/relay` (ConversationRelay) still wired but documented as unused — LEGACY.
+**FACT:** Legacy `/ws/relay` (ConversationRelay) is deleted (retire-old-brain V1); `/ws/media` is the only WebSocket path.
 
 ---
 

@@ -40,7 +40,7 @@ Caller → SautiKit → server.js /voice/incoming
 
 `server.js` is still the orchestrator. Speech, brain, billing helpers, and notify already live under `src/`. The next code change is to lift telephony out of `server.js` into `src/telephony/` with no change to this path. That layout is a target, not the tree you clone: [`TARGET_MODULE_LAYOUT.md`](TARGET_MODULE_LAYOUT.md).
 
-`/ws/relay` is still wired. It is the old ConversationRelay text loop. It is not the production path.
+`/ws/relay` (the old ConversationRelay text loop) is deleted. `/ws/media` is the only WebSocket path.
 
 ## Not shipped
 

@@ -227,7 +227,6 @@ function noopTrace() {
     noteBrainLines: noop,
     noteCall: noop,
     noteAudioSegments: noop,
-    noteBrainV2Shadow: noop,
     noteBrainV2Model: noop,
     currentTurnIndex: noop,
     commitTurn: noop,
@@ -530,56 +529,8 @@ function createVoiceTrace(opts = {}) {
     callStages.push(stage);
   }
 
-  // BA v2 shadow (BRAIN_V2_SHADOW). Until Platform adds the `mode` + shadow
-  // columns, the stage lives in payload.stages (existing JSON field):
-  //   payload.stages[stage='brain_v2_shadow'].mode          -> voice_turn_traces.mode ('shadow')
-  //   .v2Text / .v2Lang / .toolIntents / .writeIntents     -> shadow_text / shadow_lang / shadow_tools / shadow_writes
-  //   .ttftMs / .totalMs / .timedOut / .aborted            -> shadow_ttft_ms / shadow_total_ms / shadow_timed_out / shadow_aborted
-  //   .diff.textSimilarity / .diff.toolIntentMatch         -> shadow_text_similarity / shadow_tool_match
-  // Same row as the live turn (call_id = HD id, record_kind='turn', turn_index).
-  const shadowPending = new Map();
-  function attachShadow(record, stage) {
-    let diff = null;
-    try {
-      diff = require('../conversation/v2Shadow').diffAgainstLive(stage, record);
-    } catch (err) {
-      diff = { error: String(err?.message || err) };
-    }
-    const row = {
-      ...stage,
-      v2Text: redactText(stage.v2Text || ''),
-      diff: diff && diff.liveText != null ? { ...diff, liveText: redactText(diff.liveText) } : diff,
-    };
-    if (Array.isArray(row.sentences)) {
-      row.sentences = row.sentences.map((s) => ({ ...s, text: redactText(s?.text || '') }));
-    }
-    record.stages.push(row);
-    record.shadow = { mode: 'shadow', present: true };
-    return row;
-  }
-
   function currentTurnIndex() {
     return open ? open.turnIndex : null;
-  }
-
-  function noteBrainV2Shadow(stage = {}) {
-    if (!stage || typeof stage !== 'object') return null;
-    const idx = Number(stage.turnIndex);
-    if (open && open.turnIndex === idx) {
-      shadowPending.set(idx, stage); // diffed at commit, when live text/tools are known
-      return null;
-    }
-    const record = committedTurns.find((row) => row.turnIndex === idx);
-    if (!record) return null;
-    const row = attachShadow(record, stage);
-    if (typeof sink.update === 'function') {
-      const update = Promise.resolve(sink.update(record)).catch((err) => {
-        console.warn('[voice-trace] shadow update failed:', err?.message || err);
-      });
-      pendingWrites.add(update);
-      update.finally(() => pendingWrites.delete(update));
-    }
-    return row;
   }
 
   // C7 BRAIN_V2_MODEL=shadow: payload.stages[stage='brain_v2_model'] on the same turn row.
@@ -625,11 +576,6 @@ function createVoiceTrace(opts = {}) {
     });
     open.stages.push({ stage: 'outcome', value: String(extra.outcome || 'ok') });
     open.voiceId = voiceOf() || null;
-    if (shadowPending.has(open.turnIndex)) {
-      const pendingShadow = shadowPending.get(open.turnIndex);
-      shadowPending.delete(open.turnIndex);
-      attachShadow(open, pendingShadow);
-    }
     if (modelPending.has(open.turnIndex)) {
       const pm = modelPending.get(open.turnIndex);
       modelPending.delete(open.turnIndex);
@@ -743,7 +689,6 @@ function createVoiceTrace(opts = {}) {
     noteBrainLines: guard(noteBrainLines),
     noteCall: guard(noteCall),
     noteAudioSegments: guard(noteAudioSegments),
-    noteBrainV2Shadow: guard(noteBrainV2Shadow),
     noteBrainV2Model: guard(noteBrainV2Model),
     currentTurnIndex: guard(currentTurnIndex),
     commitTurn: guard(commitTurn),

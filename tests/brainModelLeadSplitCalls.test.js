@@ -91,16 +91,18 @@ test('flag: BRAIN_MODEL_LEAD_SPLIT=off restores the #933 single call; lead model
 });
 
 // ---------------- turn-taking (HD_319eb6f7255d 5.75 s dead air) — Voice review
-test('grace window: a real caller sentence is queued (not dropped) under BRAIN_MODEL_LEAD; backchannel still ignored; flag off unchanged', () => {
+test('grace window: a real caller sentence is queued (not dropped) by default; backchannel still ignored; VOICE_GRACE_QUEUE=off drops it; BRAIN_MODEL_LEAD is not read', () => {
   const prev = { ...process.env };
   try {
     const at = { phase: 'speaking', speakStartedAt: 1000, now: 1100, isFinal: true };
-    process.env.BRAIN_MODEL_LEAD = 'on'; delete process.env.VOICE_GRACE_QUEUE;
+    delete process.env.BRAIN_MODEL_LEAD; delete process.env.VOICE_GRACE_QUEUE;
     const d = TT.decideCallerEvent({ ...at, text: 'Rongai or Kileleshwa?' });
     assert.equal(d.action, 'queue'); assert.equal(d.reason, 'grace_queued'); assert.equal(d.skip, false);
     assert.equal(TT.decideCallerEvent({ ...at, text: 'okay' }).action, 'ignore');
     process.env.VOICE_GRACE_QUEUE = 'off'; assert.equal(TT.decideCallerEvent({ ...at, text: 'Rongai or Kileleshwa?' }).reason, 'grace');
+    // retire-old-brain V1: BRAIN_MODEL_LEAD no longer decides the queue (it can be unset in P2)
     delete process.env.VOICE_GRACE_QUEUE; process.env.BRAIN_MODEL_LEAD = 'off';
-    assert.equal(TT.decideCallerEvent({ ...at, text: 'Rongai or Kileleshwa?' }).reason, 'grace');
+    assert.equal(TT.decideCallerEvent({ ...at, text: 'Rongai or Kileleshwa?' }).reason, 'grace_queued');
+    assert.equal(TT.decideCallerEvent({ ...at, text: 'Rongai or Kileleshwa?', isFinal: false }).reason, 'grace');
   } finally { for (const k of ['BRAIN_MODEL_LEAD', 'VOICE_GRACE_QUEUE']) { if (prev[k] === undefined) delete process.env[k]; else process.env[k] = prev[k]; } }
 });

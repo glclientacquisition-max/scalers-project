@@ -156,7 +156,7 @@ Status: `OPEN` unless noted.
 | **Evidence** | `server.js:2261+`, `VOICE.md` |
 | **Impact** | Dead code surface |
 | **Recommended action** | Deprecate + remove after production verification |
-| **Status** | OPEN |
+| **Status** | RESOLVED (retire-old-brain V1, Oct 2026): the `/ws/relay` upgrade and handler are deleted; an upgrade to it gets 404 |
 
 ### TD-P3-2: Package name drift
 

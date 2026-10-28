@@ -1,13 +1,14 @@
 // Replay recorded caller turns through the same mouth the live call uses:
 // polishSpokenReply, empty-turn repair, cutNoAiSlop, prepareForTts.
-// Recorded mode speaks the fixture's model text. Live mode asks Gemini,
-// then the same mouth. A later phase swaps `respond` without a new harness.
+// Recorded mode speaks the fixture's model text. Live mode needs an injected
+// `respond` (the old-brain Gemini prompt default went with retire-old-brain V1;
+// an engines responder is the follow-up).
 
 const { polishSpokenDetail, planEmptyGeminiSpeech } = require('../conversation/dynamicSpeech');
 const { parseGeminiResponse } = require('../conversation/toolMarkers');
 const { cutNoAiSlop } = require('./noAiSlop');
 const { prepareForTts } = require('./ttsNormalize');
-const { analyzeCallerLanguage, languageDirective } = require('../conversation/language');
+const { analyzeCallerLanguage } = require('../conversation/language');
 const { SCHEMA, SCHEMA_VERSION } = require('./voiceTrace');
 const { coverageNextStepFor } = require('../conversation/coverageNextStep');
 
@@ -327,43 +328,6 @@ function replayTurn(turn, ctx) {
   };
 }
 
-async function liveGeminiText({ caller, history, language, fixture }) {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY is required for live eval');
-  }
-  const { GoogleGenAI } = require('@google/genai');
-  const { buildSystemPrompt, VOICE_SYSTEM_PROMPT_ID, VOICE_SYSTEM_PROMPT_VERSION } = require('../prompts');
-  const { extractGeminiText, geminiPrimaryModel } = require('../conversation/geminiVoice');
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const system = [
-    buildSystemPrompt({ businessName: fixture.businessName || 'the business' }),
-    languageDirective(language),
-  ]
-    .filter(Boolean)
-    .join('\n\n');
-  const contents = history.slice(-16).map((message) => ({
-    role: message.role === 'model' ? 'model' : 'user',
-    parts: [{ text: String(message.content || '') }],
-  }));
-  contents.push({ role: 'user', parts: [{ text: caller }] });
-  const response = await ai.models.generateContent({
-    model: geminiPrimaryModel(),
-    contents,
-    config: {
-      systemInstruction: { parts: [{ text: system }] },
-      temperature: Number(process.env.GEMINI_VOICE_TEMPERATURE || 0.35),
-      maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 256),
-    },
-  });
-  return {
-    outputText: extractGeminiText(response),
-    provider: 'gemini',
-    model: geminiPrimaryModel(),
-    promptId: VOICE_SYSTEM_PROMPT_ID,
-    promptVersion: VOICE_SYSTEM_PROMPT_VERSION,
-  };
-}
-
 async function replayCall(fixture, opts = {}) {
   const mode = opts.mode === 'live' ? 'live' : 'recorded';
   const state = initialState(fixture);
@@ -381,7 +345,10 @@ async function replayCall(fixture, opts = {}) {
     ctx.turnIndex += 1;
     let next = turn;
     if (mode === 'live') {
-      const live = await (opts.respond || liveGeminiText)({
+      if (typeof opts.respond !== 'function') {
+        throw new Error('replayCall live mode needs opts.respond (the old Gemini prompt responder was removed)');
+      }
+      const live = await opts.respond({
         caller: turn.caller,
         history: ctx.history,
         language: ctx.language,
@@ -425,6 +392,5 @@ module.exports = {
   initialState,
   replayTurn,
   replayCall,
-  liveGeminiText,
   speakModelText,
 };

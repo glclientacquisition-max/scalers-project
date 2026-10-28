@@ -406,19 +406,6 @@ function resolveCallLanguage(previous, detected) {
 }
 
 /**
- * Short hold phrase while Gemini thinks. Language-matched.
- * @param {'en'|'sw'|'sheng'|'mixed'|'unknown'|null} lang
- */
-function pickFillerText(lang) {
-  const env = process.env.VOICE_FILLER;
-  if (env && env !== 'auto' && env !== 'off') return env;
-  const spoken = confirmationLanguage(lang);
-  if (spoken === 'sw') return 'Kidogo…';
-  if (spoken === 'sheng') return 'One sec…';
-  return 'One moment…';
-}
-
-/**
  * Sticky call-language → Soniox TTS code (no utterance inspection).
  * Prefer src/speech/ttsNormalize.resolveTtsLanguage for speak paths.
  */
@@ -490,7 +477,6 @@ module.exports = {
   resolveLanguageState,
   resolveCallLanguage,
   confirmationLanguage,
-  pickFillerText,
   ttsLanguageFor,
   isBackchannel,
   languageDirective,

@@ -155,10 +155,13 @@ test('flag-off sanity: the same turn glue with the arbiter off claims nothing', 
   assert.equal(arb.speak(buildTurnProposals({ text: 'services?', lang: 'en', doc: SC.compileSync(p), v2Mouth: { reason: 'v2_catalogue', line: 'We do x. Which would you like?' } })), null);
 });
 
-test('choke point: server.js routes every content TTS through the arbiter', () => {
+// V1: the arbiter is unwired from server.js. After B2 nothing called speak(), so admit() always passed (inert).
+// The call-start catalogue pin it gated is kept unconditionally (the v2 machine/topic/fact store read it).
+test('server.js (V1): no arbiter wiring; speakText has no admit gate; the call-start pin stays', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'server.js'), 'utf8');
   const body = (name) => src.slice(src.indexOf(name), src.indexOf(name) + 600);
-  assert.match(body('async function speakText(text, opts = {}) {'), /turnArbiter\.admit\(text, opts\)/);
+  assert.doesNotMatch(src, /turnArbiter|createTurnArbiter/);
+  assert.doesNotMatch(body('async function speakText(text, opts = {}) {'), /admit\(/);
   // B2: playCachedReceipt and the Gemini reply session (onSpokenChunk) were the old turn's, deleted with it
   assert.doesNotMatch(src, /function playCachedReceipt\(|async function onSpokenChunk\(/);
   // beginSpeak only in the greeting and the speakText internals.
