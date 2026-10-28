@@ -45,7 +45,8 @@ function build(profile) {
   const groups = () => (h.categories || []).filter((c) => c.count > 0 && c.name).map((c) => ({ id: c.id, say_en: c.say_en || c.name.toLowerCase(), say_sw: c.say_sw || null, name: c.name, count: c.count }));
   const groupName = (g, lang) => (isSw(lang) && g.say_sw) || g.say_en;
   // Hick rule 1 / Q3 default: the greeting may name groups (categories), never single items; one group = no names
-  const openerNames = (lang = 'en', n = 3) => { const gs = groups(); return gs.length > 1 ? gs.slice(0, n).map((g) => groupName(g, lang)) : []; };
+  // two owner groups can share one spoken name ("Capsicum (Hoho) - Green" / "- Coloured" -> "capsicum"): said once
+  const openerNames = (lang = 'en', n = 3) => { const ns = [...new Set(groups().map((g) => groupName(g, lang)).filter(Boolean))]; return ns.length > 1 ? ns.slice(0, n) : []; };
   const openerLine = (lang = 'en') => {
     const ns = openerNames(lang); if (!ns.length) return null;
     return isSw(lang) ? `Tunasaidia na ${joinList(ns, 'sw')}.` : `We help with ${joinList(ns, 'en')}.`;

@@ -10,6 +10,9 @@ const L = require('./lexicon');
 const KBL = require('../../knowledge/kb/live');
 const KBR = require('../../knowledge/kb/rules');
 const KBS = require('../../knowledge/kb/source');
+const { tokens } = require('../../knowledge/kb/keys');
+const { GENERIC } = require('../../knowledge/kb/reader');
+const { joinList } = require('../../knowledge/kb/spoken');
 
 function sw(lang) { return L.isSw(lang); }
 
@@ -31,9 +34,55 @@ function catalogueReceipt({ u, machine, profile, kbh, lang, text, wantsPrice, wa
   if (a.kind === 'none' && wantsPrice && machine.slots?.service) a = KBR.answer(kbh, machine.slots.service, { asksPrice: true, lang, state: machine.kb || {} });
   machine.kb = a.state;
   if (a.text) return { tool: wantsPrice ? 'prices' : 'catalogue', ok: true, kb: true, kind: a.kind, ids: a.ids, text: a.text, ms: Number((a.ms || 0).toFixed(3)), kbVersion: profile.kb.version, ...(a.capture ? { capture: a.capture, service: a.name || null } : {}), ...(a.itemState ? { itemState: a.itemState } : {}) };
+  // the caller asked for one thing by name and nothing in the catalogue (offered, paused or not offered) carries any
+  // of its words: a grounded "not in the catalogue" receipt with the groups we do offer (the reply engine names the
+  // closest one and asks one question). Words the catalogue shares ("house cleaning" at a cleaner) get the overview.
+  const asked = u.catalogue && u.catalogue.kind === 'item' ? u.catalogue.item : null;
+  if (asked && !wantsPrice && !wantsCoverage && !follow) {
+    const miss = catalogueMiss(kbh, profile, asked, lang);
+    if (miss) return { tool: 'catalogue', ok: true, kb: true, kind: 'not_in_catalogue', ids: [], ...miss, ms: Number((a.ms || 0).toFixed(3)), kbVersion: profile.kb.version };
+  }
   if (asksList) { const o = KBR.overview(kbh, lang); if (o) return { tool: 'catalogue', ok: true, kb: true, kind: 'overview', ids: [], text: o, ms: Number((a.ms || 0).toFixed(3)), kbVersion: profile.kb.version }; }
   if (wantsPrice) return { tool: 'prices', ok: false, kb: true, kind: 'none', ids: [], text: null, ms: Number((a.ms || 0).toFixed(3)), kbVersion: profile.kb.version };
   return null;
+}
+
+// every search word the catalogue knows (offered items, their groups, paused / not-offered items), per snapshot
+const VOCAB = new WeakMap();
+function vocabOf(kbh) {
+  let v = VOCAB.get(kbh);
+  if (v) return v;
+  v = new Set();
+  for (const x of kbh.doc.items || []) for (const k of [...(x.keys || []), ...(x.cat_keys || [])]) v.add(k);
+  for (const c of kbh.categories || []) for (const k of c.keys || []) v.add(k);
+  for (const x of kbh.doc.off || []) for (const k of x.keys || []) v.add(k);
+  VOCAB.set(kbh, v);
+  return v;
+}
+const NEAR = (a, b) => a === b || (a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a)));
+/**
+ * -> { asked, groups[], product, text } | null. Null when any word of the ask touches the catalogue (exact, prefix
+ * or stem), or the ask is only trade words: then it is not a miss, and the overview / item answer stands.
+ */
+function catalogueMiss(kbh, profile, asked, lang) {
+  const ws = tokens(asked);
+  if (!ws.length || !ws.some((w) => !GENERIC.has(w))) return null;
+  if (KBS.catalogueSource(profile).findForCaller(asked)) return null;
+  const vocab = vocabOf(kbh);
+  for (const w of ws) for (const k of vocab) if (NEAR(w, k)) return null;
+  // the biggest offered groups (the overview's order), each spoken name once: the reply engine picks the closest
+  const groups = [...new Set([...(kbh.categories || [])].filter((c) => c.name && c.count > 0).sort((x, y) => y.count - x.count)
+    .map((c) => (sw(lang) && c.say_sw) || c.say_en).filter(Boolean))].slice(0, 3);
+  const items = kbh.doc.items || [];
+  const product = items.length > 0 && items.every((x) => x.kind === 'product');
+  const what = String(asked).trim();
+  const S = sw(lang);
+  const list = groups.length ? joinList(groups, S ? 'sw' : 'en') : null;
+  // two short sentences (rule 12), the one question last (rule 7)
+  const text = list
+    ? (S ? `Samahani, hatuna ${what}; tuna ${list}. Ipi ingekusaidia?` : `Sorry, we don't ${product ? 'sell' : 'offer'} ${what}; we ${product ? 'have' : 'do'} ${list}. Would one of those help?`)
+    : (S ? `Samahani, hatuna ${what}. Naweza kukusaidia na kitu kingine?` : `Sorry, we don't ${product ? 'sell' : 'offer'} ${what}. Can I help with anything else?`);
+  return { asked: what, groups, product, text };
 }
 
 function lookupCaller(machine, profile, now) {
@@ -127,4 +176,4 @@ function runTools({ understanding, machine, profile, lang, text, now = new Date(
   return { caller, receipts };
 }
 
-module.exports = { runTools, lookupCaller, checkCoverage, priceReceipt, hoursReceipt, catalogueReceipt };
+module.exports = { runTools, lookupCaller, checkCoverage, priceReceipt, hoursReceipt, catalogueReceipt, catalogueMiss };
