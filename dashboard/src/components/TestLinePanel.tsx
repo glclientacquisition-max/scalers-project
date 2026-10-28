@@ -56,7 +56,7 @@ export function TestLinePanel({
 
   const greetingPreview = useMemo(() => {
     if (!businessName) return "";
-    // KB business: the call greets with groups only (kb/source.js greetingFields), never items or old notes.
+    // KB live: the call greets with groups only (kb/source.js greetingFields), never items or old notes.
     const kbLine = typeof tenant.kb_offering_line === "string" ? tenant.kb_offering_line : null;
     const sample = previewBusinessAssistantIntro({
       businessName,

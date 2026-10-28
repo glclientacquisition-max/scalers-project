@@ -1,13 +1,15 @@
 // Desk twin parity: dashboard/src/lib/provenance.ts speechFactText (and factPrice.ts, kbCaller.ts) against Voice
 // src/conversation/provenance.js on shared fixtures, legacy and KB v2 mode (Brain #1000: the fact sheet reads
-// through src/knowledge/kb/source.js; notes are empty for a KB business).
+// through src/knowledge/kb/source.js; notes are empty when the KB is live). One predicate, isKbLive =
+// BRAIN_KB_GATE on AND readiness passed for the live snapshot; BRAIN_CONFIRMED_COVERAGE passed in, default off.
 // Run: node --experimental-strip-types --no-warnings --import ./tests/registerTs.mjs --test tests/provenanceMirror.test.ts
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { catalogueMode, speechFactText as deskFacts, indexFieldMeta as deskIndex } from "../dashboard/src/lib/provenance.ts";
+import { catalogueMode, factPolicyMap as deskPolicyMap, indexFieldMeta as deskIndex, speechFactText as deskFacts, withConfirmedCoverage } from "../dashboard/src/lib/provenance.ts";
 import * as DP from "../dashboard/src/lib/factPrice.ts";
-import { isKbCallerBusiness, kbCallerRow, kbFactProfile, kbOpenerLine, offeredKbItems } from "../dashboard/src/lib/kbCaller.ts";
+import { isKbLive, kbCallerRow, kbFactProfile, kbOpenerLine, offeredKbItems } from "../dashboard/src/lib/kbCaller.ts";
+import { mirrorLegacy } from "../dashboard/src/lib/kbCore.ts";
 import { kbCatalogueView, withKbCatalogue } from "../dashboard/src/lib/kbRead.ts";
 import type { KbCategory, KbItem } from "../dashboard/src/lib/kbCore.ts";
 
@@ -90,18 +92,62 @@ test("KB: Desk reads a Voice-attached profile exactly like Voice (offered only, 
   assert.ok(!/legacy text/.test(voice));
 });
 
-test("KB: the Desk projection from kb_items gives Voice's fact sheet (names, prices, notes)", () => {
-  const voice = JSON.parse(PV.speechFactText(voiceKbProfile()));
-  const deskRow = kbCallerRow({ ...ROW, services_catalog: [], product_catalog: [] }, ITEMS, CATS);
-  assert.equal(deskRow.services_offered, null);
-  const deskProfile = kbFactProfile(tenantProfileFromRow(deskRow, { areaPicksRows: [] }), true);
-  const desk = JSON.parse(deskFacts(deskProfile));
-  assert.deepEqual(desk.services, voice.services);
-  assert.deepEqual(desk.products, voice.products);
-  assert.equal(desk.notes, "");
-  // Voice code on the Desk-projected row (the What it will say page path) is legacy mode yet reads the same.
-  assert.deepEqual(JSON.parse(PV.speechFactText(tenantProfileFromRow(deskRow, { areaPicksRows: [] }))).services, voice.services);
-  assert.equal(JSON.parse(PV.speechFactText(tenantProfileFromRow(deskRow, { areaPicksRows: [] }))).notes, "");
+// The stored row a KB business has today: the Desk mirror (all non-hidden rows) + the derived services text.
+const STORED = { ...ROW, ...mirrorLegacy(ITEMS, CATS, { services_catalog: [], product_catalog: [] }) };
+const voiceAttached = ({ gate, ready }: { gate: boolean; ready: boolean }) => {
+  const p = tenantProfileFromRow({ ...STORED }, { areaPicksRows: [] });
+  L.attach(p, { version: 3, readyVersion: ready ? 3 : 2, brainTarget: "v2", doc: compiled.doc, bytes: null, loadMs: 1 }, { env: { BRAIN_KB_GATE: gate ? "on" : "off" } });
+  return p;
+};
+const deskProfileFor = ({ gate, ready }: { gate: boolean; ready: boolean }) => {
+  const live = isKbLive({ gate, liveVersion: 3, brainTarget: "v2", readinessPassed: ready, snapshot: true });
+  return { live, profile: kbFactProfile(tenantProfileFromRow(kbCallerRow({ ...STORED }, ITEMS, CATS, live), { areaPicksRows: [] }), live) };
+};
+
+for (const c of [
+  { gate: false, ready: false, want: "legacy" },
+  { gate: false, ready: true, want: "legacy" },
+  { gate: true, ready: false, want: "legacy" },
+  { gate: true, ready: true, want: "kb" },
+] as const) {
+  test(`gate ${c.gate ? "on" : "off"}, readiness ${c.ready ? "passed" : "not passed"}: ${c.want}, same fact sheet as Voice`, () => {
+    const vp = voiceAttached(c);
+    assert.equal(S.catalogueSource(vp).mode, c.want);
+    const { live, profile } = deskProfileFor(c);
+    assert.equal(live, c.want === "kb");
+    assert.equal(catalogueMode(profile), c.want);
+    const voice = JSON.parse(PV.speechFactText(vp));
+    const desk = JSON.parse(deskFacts(profile));
+    assert.deepEqual(desk.services, voice.services);
+    assert.deepEqual(desk.products, voice.products);
+    assert.equal(desk.notes, voice.notes);
+    if (c.want === "legacy") {
+      assert.equal(deskFacts(profile), PV.speechFactText(vp), "legacy is byte for byte");
+      assert.match(desk.notes, /legacy text/);
+      assert.match(JSON.stringify(desk.services), /Sofa cleaning/, "legacy keeps the stored rows");
+    } else {
+      assert.equal(desk.notes, "");
+      assert.ok(!OFF_NAMES.test(JSON.stringify(desk)), "off item in the KB fact sheet");
+      // Voice code on the Desk-projected row (the What it will say page path) reads the same.
+      const onRow = JSON.parse(PV.speechFactText(tenantProfileFromRow(kbCallerRow({ ...STORED }, ITEMS, CATS, true), { areaPicksRows: [] })));
+      assert.deepEqual(onRow.services, voice.services);
+      assert.equal(onRow.notes, "");
+    }
+  });
+}
+
+test("isKbLive: gate, live version, v2 target, passed readiness and a snapshot are all required; default off", () => {
+  const ok = { gate: true, liveVersion: 3, brainTarget: "v2", readinessPassed: true, snapshot: true };
+  assert.equal(isKbLive(ok), true);
+  assert.equal(isKbLive({ ...ok, brainTarget: null }), true, "brain_target defaults to v2");
+  assert.equal(isKbLive(null), false);
+  assert.equal(isKbLive({}), false);
+  assert.equal(isKbLive({ ...ok, gate: undefined }), false);
+  assert.equal(isKbLive({ ...ok, gate: false }), false);
+  assert.equal(isKbLive({ ...ok, liveVersion: null }), false);
+  assert.equal(isKbLive({ ...ok, brainTarget: "v1" }), false);
+  assert.equal(isKbLive({ ...ok, readinessPassed: false }), false);
+  assert.equal(isKbLive({ ...ok, snapshot: false }), false);
 });
 
 test("KB: stale stored notes never reach the Desk fact sheet", () => {
@@ -115,22 +161,65 @@ test("KB: greeting offering line matches source.js openerLine (groups, never ite
   assert.equal(kbOpenerLine(ITEMS, CATS), "We help with home cleaning, fabric cleaning and office cleaning.");
   const one = ITEMS.filter((i) => i.category_id === "home");
   assert.equal(kbOpenerLine(one, CATS), "", "one group: no names");
-  const view = kbCatalogueView(ITEMS, CATS, { services_offered: STALE });
+  const view = kbCatalogueView(ITEMS, CATS, { services_offered: STALE }, { kbLive: true });
   assert.equal(view.offering_line, kbOpenerLine(ITEMS, CATS));
   const t = withKbCatalogue({ id: "x", services_offered: STALE } as { id: string; services_offered: string; kb_offering_line?: string | null }, view);
   assert.equal(t.kb_offering_line, view.offering_line);
 });
 
-test("not a KB business (no offered items): rows and views stay legacy", () => {
-  const offOnly = ITEMS.map((i) => ({ ...i, status: "paused" as const }));
-  assert.equal(isKbCallerBusiness(offOnly), false);
-  assert.equal(isKbCallerBusiness(null), false);
+test("not live: rows and views stay legacy", () => {
   const row = { ...ROW, services_catalog: [], product_catalog: [] };
-  assert.equal(kbCallerRow(row, offOnly, CATS), row);
-  assert.equal(kbCallerRow(row, null, CATS), row);
-  assert.equal(kbCatalogueView(offOnly, CATS, {}).offering_line, null);
-  assert.equal(withKbCatalogue({ id: "x" } as { id: string; kb_offering_line?: string | null }, kbCatalogueView(offOnly, CATS, {})).kb_offering_line, undefined);
+  assert.equal(kbCallerRow(row, ITEMS, CATS, false), row);
+  assert.equal(kbCallerRow(row, null, CATS, true), row);
+  assert.equal(kbCatalogueView(ITEMS, CATS, {}).offering_line, null, "kbLive defaults off");
+  assert.equal(withKbCatalogue({ id: "x" } as { id: string; kb_offering_line?: string | null }, kbCatalogueView(ITEMS, CATS, {})).kb_offering_line, undefined);
+  assert.equal(JSON.parse(deskFacts(kbFactProfile(tenantProfileFromRow({ ...ROW }, { areaPicksRows: [] }), false))).notes.length > 0, true);
   assert.deepEqual(offeredKbItems(ITEMS).map((i) => i.id), ["dc", "pc", "mould", "uph", "mat", "off", "bags", "mop"]);
+});
+
+test("BRAIN_CONFIRMED_COVERAGE: off by default, on mirrors Voice (owner-confirmed list only)", () => {
+  const policies = FR.row.business_policies;
+  const meta = PV.indexFieldMeta(FR.meta);
+  const noCoverageRow = PV.indexFieldMeta((FR.meta as { field_path?: string }[]).filter((r) => r.field_path !== "policies.coverage_areas"));
+  const ownerRow = PV.indexFieldMeta([...(FR.meta as { field_path?: string }[]).filter((r) => r.field_path !== "policies.coverage_areas"), { field_path: "policies.coverage_areas", source: "owner", confirmed_at: "2026-10-20T10:00:00Z" }]);
+  const seedRow = PV.indexFieldMeta([...(FR.meta as { field_path?: string }[]).filter((r) => r.field_path !== "policies.coverage_areas"), { field_path: "policies.coverage_areas", source: "seed" }]);
+  const cases: [string, unknown, unknown][] = [
+    ["fixture", policies, meta],
+    ["no coverage row", policies, noCoverageRow],
+    ["owner row", policies, ownerRow],
+    ["seed row", policies, seedRow],
+    ["empty list, owner row", { ...policies, coverage_areas: [] }, ownerRow],
+    ["empty list, no row", { ...policies, coverage_areas: [] }, noCoverageRow],
+    ["no fieldMeta", policies, null],
+  ];
+  const prev = process.env.BRAIN_CONFIRMED_COVERAGE;
+  try {
+    for (const [name, pol, fm] of cases) {
+      delete process.env.BRAIN_CONFIRMED_COVERAGE;
+      assert.deepEqual(deskPolicyMap(pol, fm), PV.factPolicyMap(pol, fm), `off: ${name}`);
+      assert.deepEqual(deskPolicyMap(pol, withConfirmedCoverage(fm, false)), PV.factPolicyMap(pol, fm), `off explicit: ${name}`);
+      process.env.BRAIN_CONFIRMED_COVERAGE = "on";
+      assert.deepEqual(deskPolicyMap(pol, withConfirmedCoverage(fm, true)), PV.factPolicyMap(pol, fm), `on: ${name}`);
+    }
+    // the rule changes something on these fixtures (else the parity above proves little)
+    delete process.env.BRAIN_CONFIRMED_COVERAGE;
+    const off = deskPolicyMap(policies, noCoverageRow);
+    const on = deskPolicyMap(policies, withConfirmedCoverage(noCoverageRow, true));
+    assert.ok(Array.isArray(off.policies.coverage_areas));
+    assert.equal(on.policies.coverage_areas, undefined);
+    assert.ok(on.unknown.includes("Areas we serve"));
+    assert.deepEqual(deskPolicyMap(policies, withConfirmedCoverage(ownerRow, true)).policies.coverage_areas, off.policies.coverage_areas);
+    // carried from indexFieldMeta like hashMode / seedFilter, and through the fact sheet
+    assert.equal(deskIndex(FR.meta, { confirmedCoverage: true })?.confirmedCoverage, true);
+    assert.equal(deskIndex(null, { confirmedCoverage: true })?.confirmedCoverage, true);
+    assert.equal(deskIndex(FR.meta)?.confirmedCoverage, undefined);
+    process.env.BRAIN_CONFIRMED_COVERAGE = "on";
+    const vp = { ...legacyProfile(), fieldMeta: noCoverageRow };
+    assert.equal(deskFacts({ ...legacyProfile(), fieldMeta: withConfirmedCoverage(noCoverageRow, true) }), PV.speechFactText(vp));
+  } finally {
+    if (prev === undefined) delete process.env.BRAIN_CONFIRMED_COVERAGE;
+    else process.env.BRAIN_CONFIRMED_COVERAGE = prev;
+  }
 });
 
 test("factPrice twin: same parse and display as Voice", () => {
@@ -145,4 +234,15 @@ test("factPrice twin: same parse and display as Voice", () => {
     assert.deepEqual(DP.normalisePrice(r), v, JSON.stringify(r));
     for (const lang of ["en", "sw"]) assert.equal(DP.formatPriceDisplay(v, lang, DP.legacyPriceText(r)), VP.formatPriceDisplay(v, lang, VP.legacyPriceText(r)), JSON.stringify(r));
   }
+});
+
+test("pure Desk twins never read env; the server reads BRAIN_KB_GATE and BRAIN_CONFIRMED_COVERAGE and passes them in", async () => {
+  const fs = await import("node:fs");
+  const read = (p: string) => fs.readFileSync(new URL(`../dashboard/src/${p}`, import.meta.url), "utf8");
+  for (const f of ["lib/provenance.ts", "lib/kbCaller.ts", "lib/factPrice.ts", "lib/kbRead.ts"]) assert.ok(!/process\.env\.[A-Z_]/.test(read(f)), f);
+  const server = read("lib/kbCaller.server.ts");
+  assert.match(server, /process\.env\.BRAIN_KB_GATE/);
+  assert.match(server, /from\("kb_readiness"\)\.select\("id"\)\.eq\("tenant_id", tenantId\)\.eq\("snapshot_version", live\)\.eq\("passed", true\)/);
+  assert.match(server, /createWorkspaceDataClient/, "readiness is read with the member's session");
+  assert.match(read("lib/tenantFieldProvenance.ts"), /indexFieldMeta\(rows, \{ hashMode: factHashModeFromEnv\(\), seedFilter, confirmedCoverage \}\)/);
 });

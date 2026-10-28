@@ -37,6 +37,8 @@ import {
   faqFactValue,
   holdsFactValue,
   stableRowId,
+  factValueForPath,
+  tenantRowFromProfile,
 } from './factHash';
 import { parseCoverageAreas } from './coverageAreas';
 import { formatPriceDisplay, legacyPriceText, normalisePrice, priceIsSpeakable } from './factPrice';
@@ -285,6 +287,20 @@ export function withSeedFilter(fieldMeta: any, seedFilter?: boolean): any {
   return { ...fieldMeta, seedFilter };
 }
 
+// BRAIN_CONFIRMED_COVERAGE twin (src/conversation/confirmedCoverage.js). This
+// file never reads env: the server sets it (tenantFieldProvenance.ts) and it
+// rides on fieldMeta like seedFilter. Off by default.
+function confirmedCoverageOf(fieldMeta: any): boolean {
+  return Boolean(fieldMeta && typeof fieldMeta === 'object' && fieldMeta.confirmedCoverage === true);
+}
+
+/** Carry the confirmed-coverage rule on fieldMeta, so factPolicyMap sees it. */
+export function withConfirmedCoverage(fieldMeta: any, confirmedCoverage?: boolean): any {
+  if (typeof confirmedCoverage !== 'boolean') return fieldMeta;
+  if (!fieldMeta) return confirmedCoverage ? { loaded: false, byPath: {}, confirmedCoverage: true } : null;
+  return { ...fieldMeta, confirmedCoverage };
+}
+
 export function isPackService(row: any) {
   if (!row || typeof row !== 'object') return false;
   const price = row.price_range || row.priceRange || row.price || '';
@@ -299,13 +315,14 @@ export function isPackService(row: any) {
  */
 export function indexFieldMeta(
   rows: any,
-  { hashMode, seedFilter }: { hashMode?: boolean; seedFilter?: boolean } = {}
+  { hashMode, seedFilter, confirmedCoverage }: { hashMode?: boolean; seedFilter?: boolean; confirmedCoverage?: boolean } = {}
 ) {
   if (!Array.isArray(rows)) {
     // Hash mode with no table loaded: every path is unconfirmed, so carry the
     // mode on an empty index instead of returning null (null = P0 heuristic).
     const empty = hashMode === true ? { loaded: false, hashMode: true, byPath: {} } : null;
-    return seedFilter === true ? withSeedFilter(empty, true) : empty;
+    const seeded = seedFilter === true ? withSeedFilter(empty, true) : empty;
+    return confirmedCoverage === true ? withConfirmedCoverage(seeded, true) : seeded;
   }
   const byPath: Record<string, any> = {};
   for (const row of rows) {
@@ -329,6 +346,7 @@ export function indexFieldMeta(
   const out: Record<string, any> = { loaded: true, byPath };
   if (typeof hashMode === 'boolean') out.hashMode = hashMode;
   if (seedFilter === true) out.seedFilter = true;
+  if (confirmedCoverage === true) out.confirmedCoverage = true;
   return out;
 }
 
@@ -478,6 +496,27 @@ function coverageAreaIds(obj: any): string[] | null {
   return parseCoverageAreas(obj.coverage_areas);
 }
 
+// The owner row on policies.coverage_areas (stricter than the P0 default: no
+// meta row is not an owner row).
+function coverageOwnerRow(fieldMeta: any): boolean {
+  const meta = lookupFieldMeta(fieldMeta, 'policies.coverage_areas');
+  return Boolean(meta && (meta.source === 'owner' || meta.confirmed_at || meta.confirmed_by));
+}
+
+function coverageIsFact(scoped: { businessPolicies: any; fieldMeta: any }): boolean {
+  const value = factValueForPath('policies.coverage_areas', tenantRowFromProfile(scoped));
+  return classifyRecord({}, { packSeed: false, fieldMeta: scoped.fieldMeta, fieldPath: 'policies.coverage_areas', value }).fact === true;
+}
+
+/**
+ * Twin of confirmedCoverage.js for the prompt (confirmedCoverageReading for a
+ * non-empty list, coverageOwnerRowConfirms for an empty one): both come down to
+ * an owner row on policies.coverage_areas whose record classifies as a fact.
+ */
+function coverageConfirmed(scoped: { businessPolicies: any; fieldMeta: any }): boolean {
+  return coverageOwnerRow(scoped.fieldMeta) && coverageIsFact(scoped);
+}
+
 /**
  * Split business_policies into what the prompt may state and what it must
  * call unknown. Every configured key lands on one side; none is dropped.
@@ -495,7 +534,11 @@ export function factPolicyMap(policies: any, fieldMeta: any = null) {
     else unknown.push(label);
   }
   const coverage = coverageAreaIds(obj);
-  if (coverage) out.coverage_areas = coverage;
+  if (coverage && confirmedCoverageOf(fieldMeta)) {
+    // BRAIN_CONFIRMED_COVERAGE: only an owner-confirmed list reaches the prompt.
+    if (coverageConfirmed({ businessPolicies: obj, fieldMeta })) out.coverage_areas = coverage;
+    else unknown.push('Areas we serve');
+  } else if (coverage) out.coverage_areas = coverage;
   for (const [key, raw] of Object.entries(obj)) {
     if (Object.prototype.hasOwnProperty.call(POLICY_TOPICS, key) || isPolicyMetaKey(key)) continue;
     if (typeof raw !== 'string' && typeof raw !== 'number') continue;
@@ -631,6 +674,7 @@ export function buildCompileSections({
   holdGate = null,
   hashMode = undefined,
   seedFilter = undefined,
+  confirmedCoverage = undefined,
 }: {
   faqs?: unknown[];
   policiesText?: string;
@@ -644,8 +688,10 @@ export function buildCompileSections({
   hashMode?: boolean;
   /** Pass from the server (BRAIN_CALL_FIXES_D199); otherwise read from fieldMeta.seedFilter. */
   seedFilter?: boolean;
+  /** Pass from the server (BRAIN_CONFIRMED_COVERAGE); otherwise read from fieldMeta.confirmedCoverage. */
+  confirmedCoverage?: boolean;
 } = {}) {
-  fieldMeta = withSeedFilter(withHashMode(fieldMeta, hashMode), seedFilter);
+  fieldMeta = withConfirmedCoverage(withSeedFilter(withHashMode(fieldMeta, hashMode), seedFilter), confirmedCoverage);
   const faqRows = asArray(faqs)
     .map((faq, index) => classifyFaq(faq, fieldMeta, faqFieldPath(index)))
     .filter((row) => row.question && row.answer);
@@ -738,7 +784,7 @@ export function buildCompileSections({
 /**
  * Catalogue mode for one profile, the same rule as src/knowledge/kb/source.js:
  * 'kb' when the profile carries a live KB handle (Voice attach) or Desk marked it
- * as a KB business (kbCaller.ts sets kbMode after projecting offered items only);
+ * KB live (kbCaller.ts isKbLive; kbFactProfile sets kbMode on the offered-only projection);
  * otherwise 'legacy'. KB mode never reads the old free-text services line.
  */
 export function catalogueMode(profile: any = {}): "kb" | "legacy" {

@@ -30,8 +30,8 @@ export function assistantSayStateFromTenant(tenant: TenantRow): AssistantSayStat
 }
 
 /**
- * KB business: the row is projected like the call reads it (offered items only, no old services text), so this
- * page never shows a paused item or stale notes. No KB (prod today): the stored row.
+ * KB live (isKbLive): the row is projected like the call reads it (offered items only, no old services text), so
+ * this page never shows a paused item or stale notes. Not live (gate off, readiness not passed, prod today): stored row.
  */
 export async function voiceProfileForAssistantSay(tenant: TenantRow) {
   const [provenance, row] = await Promise.all([loadCompileProvenance(tenant.id), loadKbCallerRow(tenant)]);
@@ -53,7 +53,7 @@ export type LookupPreviewSamples = { price: string; hours: string; delivery: str
 
 /**
  * Preview sample questions from this tenant's own catalogue and areas (same as the readiness probes).
- * Pass the row from loadKbCallerRow so a KB business never samples a paused item.
+ * Pass the row from loadKbCallerRow so a KB-live business never samples a paused item.
  */
 export function lookupPreviewSamples(tenant: TenantRow): LookupPreviewSamples {
   const { previewSampleQuestions } = requireVoice("./src/knowledge/assistantSayReadiness.js") as {

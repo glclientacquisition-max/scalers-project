@@ -36,7 +36,7 @@ import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
 import { DeskPageGate } from "@/components/DeskPageGate";
 import { deskAssistantSayPage } from "@/lib/deskFeatureFlags";
 import { loadAssistantSayState } from "@/lib/assistantSayVoice.server";
-import { loadKbCallerRow } from "@/lib/kbCaller.server";
+import { loadKbCallerRow, loadKbLive } from "@/lib/kbCaller.server";
 import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
 import { assistantSayBelowList } from "@/components/assistantSay/AssistantSayExtras";
 import { CallsForwardingPanel } from "@/components/CallsForwardingPanel";
@@ -155,7 +155,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   let assistantSaySlot = null;
   if (tab === "assistant-say" && assistantSayPage) {
     try {
-      // KB business: offered items only and no old services text, the same reads as the call.
+      // KB live (isKbLive): offered items only and no old services text, the same reads as the call.
       const sayTenant = await loadKbCallerRow(tenant);
       const state = await loadAssistantSayState(sayTenant);
       assistantSaySlot = <AssistantSayPanel state={state} belowList={assistantSayBelowList(sayTenant)} />;
@@ -191,7 +191,10 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   const planStatus: Record<string, SettingsListStatus> = planRow.row ? { "/settings/plan": planRow.row } : {};
 
   // Test panel greeting preview and the catalogue view read kb_items when the KB tables exist (stored columns otherwise).
-  const kbCatalogue = settingsViewReadsCatalogue(tab, trainPanel) ? await loadKbCatalogueView(tenant.id, tenant) : null;
+  // kbLive (isKbLive): the Test greeting preview then follows the call's KB greeting; otherwise legacy reads.
+  const kbCatalogue = settingsViewReadsCatalogue(tab, trainPanel)
+    ? await loadKbCatalogueView(tenant.id, tenant, { kbLive: await loadKbLive(tenant.id) })
+    : null;
   return (
     <BusinessSettingsShell
       tenant={tenantForSettingsView(tenant, tab, trainPanel, kbCatalogue)}

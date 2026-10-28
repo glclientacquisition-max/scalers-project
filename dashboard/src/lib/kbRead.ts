@@ -7,13 +7,13 @@
  */
 import { mirrorLegacy, type KbCategory, type KbItem } from "./kbCore";
 import { servicesOfferedFromKb } from "./kbLegacy";
-import { isKbCallerBusiness, kbOpenerLine } from "./kbCaller";
+import { kbOpenerLine } from "./kbCaller";
 
 export type KbCatalogueView = {
   services_catalog: unknown[];
   product_catalog: unknown[];
   services_offered: string;
-  /** Greeting offering line as the call builds it (kbCaller.ts); null when there are no offered items (legacy reads). */
+  /** Greeting offering line as the call builds it when the KB is live (kbCaller.ts isKbLive); null = legacy reads. */
   offering_line: string | null;
 };
 
@@ -21,13 +21,14 @@ export function kbCatalogueView(
   items: KbItem[],
   categories: KbCategory[],
   stored: { services_catalog?: unknown; product_catalog?: unknown; services_offered?: string | null },
+  opts: { kbLive?: boolean } = {},
 ): KbCatalogueView {
   const m = mirrorLegacy(items, categories, { services_catalog: stored.services_catalog ?? [], product_catalog: stored.product_catalog ?? [] });
   return {
     services_catalog: m.services_catalog,
     product_catalog: m.product_catalog,
     services_offered: servicesOfferedFromKb(items, categories, stored.services_offered),
-    offering_line: isKbCallerBusiness(items) ? kbOpenerLine(items, categories) : null,
+    offering_line: opts.kbLive === true ? kbOpenerLine(items, categories) : null,
   };
 }
 
