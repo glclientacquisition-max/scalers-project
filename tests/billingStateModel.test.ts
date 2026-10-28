@@ -153,7 +153,9 @@ describe("lowBalanceNotice", () => {
   });
 
   it("Home builds the notice from the shared total", () => {
-    const home = fs.readFileSync(path.join(root, "dashboard/src/app/(desk)/home/page.tsx"), "utf8");
+    const home = fs.readFileSync(path.join(root, "dashboard/src/app/(desk)/home/page.tsx"), "utf8") +
+    // D2: usage, insights, call setup and checks stream from their own slots.
+    "\n" + fs.readFileSync(path.join(root, "dashboard/src/components/home/HomeOverviewSlots.tsx"), "utf8");
     const model = fs.readFileSync(path.join(root, "dashboard/src/lib/billingStateModel.ts"), "utf8");
     assert.match(
       home,

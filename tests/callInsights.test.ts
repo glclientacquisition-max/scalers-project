@@ -63,7 +63,10 @@ test("insights: Overview wiring uses the kit Sheet and links each call", () => {
   assert.match(ui, /import \{ Sheet \} from "@\/components\/ui\/Sheet"/);
   assert.match(ui, /inboxRecordHref\(c\.callId/);
   assert.doesNotMatch(ui, /text-(xs|sm|lg|xl)\b|uppercase/);
-  const home = read("dashboard/src/app/(desk)/home/page.tsx");
+  const home = read("dashboard/src/app/(desk)/home/page.tsx") +
+    // D2: usage, insights, call setup and checks stream from their own slots.
+    "\n" + read("dashboard/src/components/home/HomeOverviewSlots.tsx");
   assert.match(home, /loadCallInsights\(client, tenant\.id, 30, tenant\.faqs\)/);
-  assert.match(home, /\{insights \? \(\s*<CallInsights insights=\{insights\} \/>/);
+  assert.match(home, /insights \? <CallInsights insights=\{insights\} \/> : null/);
+  assert.match(home, /<Suspense fallback=\{<HomeInsightsSkeleton \/>\}>/);
 });
