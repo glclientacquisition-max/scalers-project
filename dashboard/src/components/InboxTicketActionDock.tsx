@@ -2,13 +2,15 @@
 
 import { withRoleGate } from "@/components/DeskRole";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useOptimistic, useState, useTransition, type ReactNode } from "react";
 import { CheckIcon } from "@heroicons/react/24/outline";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import { CallLink } from "@/components/CallLink";
 import { InboxPingTeammate, type InboxPingPerson } from "@/components/InboxPingTeammate";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { IconButton } from "@/components/ui/IconButton";
+import { notify } from "@/components/ui/DeskNotice";
+import { OPTIMISTIC_OFFLINE_ERROR } from "@/lib/optimisticAction";
 
 function DockSlot({
   label,
@@ -27,42 +29,46 @@ function DockSlot({
 
 function DockMarkDone({ callId }: { callId: string }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
-  const [pending, setPending] = useState(false);
-  const name = pending ? "Saving" : done ? "Done" : "Mark done";
+  // Reads Done the moment it is tapped. React drops the optimistic value if
+  // the transition ends without setDone(true), so a failed save rolls back.
+  const [shownDone, showDone] = useOptimistic(done, (_current, next: boolean) => next);
+  const [, startTransition] = useTransition();
+  const name = shownDone ? "Done" : "Mark done";
+
+  function markDone() {
+    if (shownDone) return;
+    startTransition(async () => {
+      showDone(true);
+      let res: { ok?: boolean; error?: string };
+      try {
+        res = await updateLeadStatus(callId, "resolved");
+      } catch {
+        res = { error: OPTIMISTIC_OFFLINE_ERROR };
+      }
+      if (!res.ok) {
+        notify(res.error || "Could not mark done.", {
+          tone: "error",
+          action: { label: "Try again", run: markDone },
+        });
+        return;
+      }
+      setDone(true);
+      router.refresh();
+    });
+  }
 
   return (
     <DockSlot label="Done">
       <IconButton
         label={name}
         size="sm"
-        tone={done ? "ok" : "neutral"}
-        pending={pending}
-        disabled={pending || done}
-        onClick={() => {
-          if (pending || done) return;
-          setError(null);
-          setPending(true);
-          void (async () => {
-            const res = await updateLeadStatus(callId, "resolved");
-            setPending(false);
-            if (!res.ok) {
-              setError(res.error || "Could not mark done.");
-              return;
-            }
-            setDone(true);
-            router.refresh();
-          })();
-        }}
+        tone={shownDone ? "ok" : "neutral"}
+        disabled={shownDone}
+        onClick={markDone}
       >
         <CheckIcon aria-hidden="true" />
       </IconButton>
-      {error ? (
-        <span className="max-w-[6.5rem] text-center text-caption text-attention" role="alert">
-          {error}
-        </span>
-      ) : null}
     </DockSlot>
   );
 }

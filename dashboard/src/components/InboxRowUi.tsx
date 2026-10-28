@@ -1,5 +1,6 @@
 "use client";
 
+import type { LeadStatus } from "@/lib/supabase";
 import {
   createContext,
   useCallback,
@@ -24,6 +25,8 @@ import {
 export type InboxRowLocal = {
   hidden: boolean;
   pinnedAt?: string | null;
+  /** Set the moment Mark done is tapped (optimistic); cleared if the server says no. */
+  leadStatus?: LeadStatus | null;
 };
 
 const EMPTY: InboxRowLocal = {

@@ -1,5 +1,6 @@
 import { nicheCopy } from "@/lib/inboxNiche";
 import { itemInNeedsYouPile, itemIsArchived, type InboxItem } from "@/lib/inboxPurpose";
+import type { LeadStatus } from "@/lib/supabase";
 
 export type InboxListActionId =
   | "pin"
@@ -107,10 +108,14 @@ export function inboxTicketOverflowActions(opts: {
 /** Overlay owner Pin from the row session so the glyph and Unpin stay in sync before refresh. */
 export function inboxItemWithLocal(
   item: InboxItem,
-  local: { pinnedAt?: string | null }
+  local: { pinnedAt?: string | null; leadStatus?: LeadStatus | null }
 ): InboxItem {
-  if (local.pinnedAt === undefined) return item;
-  return { ...item, pinnedAt: local.pinnedAt };
+  let view = item;
+  if (local.pinnedAt !== undefined) view = { ...view, pinnedAt: local.pinnedAt };
+  if (local.leadStatus && view.lead) {
+    view = { ...view, lead: { ...view.lead, leadStatus: local.leadStatus } };
+  }
+  return view;
 }
 
 /** md+ overflow: Pin, Mark done when eligible, Archive or Unarchive. No Select. */
