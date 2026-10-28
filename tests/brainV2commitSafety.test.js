@@ -142,7 +142,7 @@ for (const [lang, book, yes] of [['en', BOOK_EN, 'Yes'], ['sw', BOOK_SW, 'Ndio']
     assert.equal(r.receipts[2].outboxTaskId, 'task_1'); // #845 keeps it only when it is a uuid
     const fin = V2.finishCall(r.st, { businessName: 'Done and Dusted', callerPhone: '+254700000001' });
     assert.equal(fin.outcome, 'write_failed');
-    assert.doesNotMatch(fin.ownerText, /Visit booked/); assert.match(fin.ownerText, /could not save this request\. Nothing was booked/);
+    assert.doesNotMatch(fin.ownerText, /Visit booked/); assert.match(fin.ownerText, /could not save this request\. Please call the caller back\./); assert.doesNotMatch(fin.ownerText, /Nothing was booked/); // Ops #1011: an earlier booking on the call may be real
     assert.equal(r.out[1].toolResults[0].status, 'failed');
     const r2 = await talk([book, yes], { fail: true, outboxFail: true });
     assert.equal(r2.out[1].line, lang === 'en' ? "Sorry, I couldn't save that just now. Please call us again a little later." : 'Samahani, sikuweza kuhifadhi hilo sasa hivi. Tafadhali piga simu tena baadaye kidogo.');

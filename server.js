@@ -605,6 +605,8 @@ if (typeof openingStore.shared.detect === 'function') void openingStore.shared.d
 // src/notifications/ownerCallSummary.js for flags and behaviour.
 const ownerCallSummary = require('./src/notifications/ownerCallSummary');
 const ownerSummarySender = ownerCallSummary.createOwnerSummarySender({ db, callDeskUrl });
+// B2 follow-up: a brain error with nothing saved, and no end-of-call summary coming, still alerts the owner.
+const alertBrainError = require('./src/notifications/brainErrorAlert').createBrainErrorAlerter({ db, dispatchToStaff, staffRecipients });
 callSummaryEvent.onCallSummaryReady((event, meta) =>
   ownerSummarySender.onEvent(event, meta)
 );
@@ -4316,6 +4318,8 @@ mediaWss.on('connection', (ws, req) => {
           onBrainError: (rec) => {
             console.log(`[ws/media][${callKey}] brain_error kind=${rec.kind} saved=${rec.ok ? 'yes' : 'no'}${rec.id ? ` id=${rec.id}` : ''}${rec.error ? ` code=${rec.error}` : ''}`);
             try { voiceTrace.noteTool({ name: 'brain_error_follow_up', status: rec.ok ? 'saved' : 'failed', args: `kind=${rec.kind}${rec.error ? ` code=${rec.error}` : ''}` }); } catch { /* trace only */ }
+            // Never silent: nothing saved and no end-of-call summary coming = one direct owner alert (once per call).
+            void alertBrainError(callKey, rec).catch(() => {});
           },
           callSid: callKey,
           recordWriteReceipt: typeof db.recordWriteReceipt === 'function' ? db.recordWriteReceipt : undefined,

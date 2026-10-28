@@ -277,6 +277,15 @@ function createBrainV2Live(opts = {}) {
         traceTurnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex : null,
       },
     });
+    // B2 follow-up: a failed write whose owner fallback also failed saved NOTHING for the owner. Report it once per
+    // call through the same brain-error hook (Voice sends the direct owner alert when no summary will go out).
+    if (r && r.write && r.write.status === 'failed_nothing_saved' && typeof opts.onBrainError === 'function') {
+      const E = machine.eng || (machine.eng = {});
+      if (!E.unsavedReported) {
+        E.unsavedReported = true;
+        try { opts.onBrainError({ ok: false, id: null, kind: 'write', error: String(r.write.error || 'write_failed').slice(0, 60), unsaved: true }); } catch { /* trace only */ }
+      }
+    }
     // end-call contract: same gate as every v2 path (never while a read-back or write is pending)
     const endCall = endDecision({ done: { end: r.end === true, endReason: r.reason || 'caller_done', toolResults: r.write && r.write.status !== 'committed' ? [{ ok: false }] : [] }, machine, profile, line: r.line, alreadyEnded: endSent });
     if (endCall.end) endSent = true;
