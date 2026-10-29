@@ -244,6 +244,12 @@ describe("business settings depth", () => {
     assert.match(read("dashboard/src/components/PhoneAlertsCard.tsx"), /if \(!VAPID_PUBLIC_KEY\) return null/);
     assert.match(read("dashboard/src/components/settingsUi.tsx"), /overflow-x-clip/);
     assert.match(read("dashboard/src/components/plan/PlanPicker.tsx"), /Plan changes are not open on this desk yet/);
+    assert.match(read("dashboard/src/components/plan/PlanPicker.tsx"), /planOverageLine/);
+    assert.match(read("dashboard/src/app/(desk)/settings/page.tsx"), /if \(teamPanel\)/);
+    assert.doesNotMatch(read("dashboard/src/app/(desk)/settings/page.tsx"), /teamPanel && teamInvitesEnabled/);
+    assert.match(read("dashboard/src/lib/requireMember.ts"), /legacy primaries may not have a tenant_members row/);
+    assert.match(read("dashboard/src/components/policies/PoliciesSettings.tsx"), /max-h-\[4\.5rem\]/);
+    assert.match(read("dashboard/src/components/MembersPanel.tsx"), /variant="danger"\s*\n\s*size="md"/);
   });
 
   it("names Policies empty next step without inventing Train facts", () => {

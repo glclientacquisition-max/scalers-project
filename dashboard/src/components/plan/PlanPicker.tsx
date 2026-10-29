@@ -28,6 +28,7 @@ import {
 } from "@/lib/planPricing";
 import type { OwnerPlanModel, PlanCycle, PlanSku, PublishedPlan } from "@/lib/ownerPlanLoad";
 import { deskConfirmHaptic } from "@/lib/deskFeel";
+import { overLabel } from "@/lib/minutes";
 
 function planFeedback(state: PlanActionState): string | undefined {
   if (state.ok) return state.message;
@@ -70,10 +71,74 @@ function SeatChangeNote({ model, next }: { model: OwnerPlanModel; next: number }
   return line ? <p className="mt-3 text-body text-ink-2">{line}</p> : null;
 }
 
-function CurrentPlanCard({ model, plan }: { model: OwnerPlanModel; plan: PublishedPlan }) {
+function planOverageLine(
+  minutesUsed: number,
+  included: number,
+  onDemandEnabled: boolean,
+  onDemandLocked: boolean,
+  periodEndLabel: string | null,
+): string | null {
+  if (included <= 0 || minutesUsed <= included) return null;
+  const over = overLabel((minutesUsed - included) * 60);
+  if (!over) return null;
+  if (onDemandLocked) {
+    return `${over} on this plan. Extra usage is not billed during trial.`;
+  }
+  if (onDemandEnabled) {
+    return `${over} on this plan. Extra minutes bill on your next invoice at your plan rates.`;
+  }
+  const until = periodEndLabel ? ` until ${periodEndLabel}` : " until the period renews";
+  return `${over} on this plan. On-demand usage is off, so calls stop${until}.`;
+}
+
+function PlanViewSummary({ model }: { model: OwnerPlanModel }) {
+  const plan = model.pinned;
+  const items: string[] = [];
+  if (plan) {
+    items.push(
+      `${formatKsh(priceFor(plan, model.cycle))} ${per(model.cycle)} on ${plan.name}`,
+    );
+    items.push(`${plan.seats} seats · ${plan.minutes.toLocaleString("en-KE")} call minutes each month`);
+  }
+  if (model.seatsIncluded > 0) {
+    items.push(`${model.seatsUsed} of ${model.seatsIncluded} seats in use`);
+  }
+  if (items.length === 0) {
+    items.push("Your package stays as it is on this desk.");
+  }
+  return (
+    <section
+      className="rounded-2xl border border-hairline bg-surface-2 px-4 py-3"
+      aria-label="Plan summary"
+    >
+      <ul className="space-y-1.5 text-body text-ink">
+        {items.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function CurrentPlanCard({
+  model,
+  plan,
+  onDemandEnabled,
+}: {
+  model: OwnerPlanModel;
+  plan: PublishedPlan;
+  onDemandEnabled: boolean;
+}) {
   const renew = model.nextPeriodStartLabel || model.periodEndLabel;
   const included = plan.minutes;
   const tone = meterTone(model.minutesUsed, included, MINUTES_WARN_SHARE);
+  const overLine = planOverageLine(
+    model.minutesUsed,
+    included,
+    onDemandEnabled,
+    model.onDemandLocked,
+    model.periodEndLabel,
+  );
   return (
     <section aria-label="Your plan" className="rounded-2xl border border-hairline bg-surface p-4">
       <h2 className="text-title text-ink">{plan.name}</h2>
@@ -87,6 +152,11 @@ function CurrentPlanCard({ model, plan }: { model: OwnerPlanModel; plan: Publish
             {model.minutesUsed.toLocaleString("en-KE")} of {included.toLocaleString("en-KE")} minutes used
           </p>
           <UsageBar used={model.minutesUsed} included={included} tone={tone} label="Minutes used" thin className="mt-2" />
+          {overLine ? (
+            <p className="mt-2 text-body text-warn" role="status">
+              {overLine}
+            </p>
+          ) : null}
         </>
       ) : null}
     </section>
@@ -135,12 +205,14 @@ export function PlanPicker({
   openSeat,
   startConfirm = null,
   planChangesEnabled = true,
+  onDemandEnabled = false,
 }: {
   model: OwnerPlanModel;
   openSeat: boolean;
   /** Dev preview only. Opens the confirm sheet on this plan. */
   startConfirm?: PlanSku | null;
   planChangesEnabled?: boolean;
+  onDemandEnabled?: boolean;
 }) {
   const router = useRouter();
   const trial = Boolean(model.trialText);
@@ -182,7 +254,7 @@ export function PlanPicker({
 
   return (
     <div className="mt-4 flex min-w-0 flex-col gap-4">
-      {pinned ? <CurrentPlanCard model={model} plan={pinned} /> : null}
+      {pinned ? <CurrentPlanCard model={model} plan={pinned} onDemandEnabled={onDemandEnabled} /> : null}
 
       {!planChangesEnabled ? (
         <p className="rounded-2xl border border-hairline bg-surface-2 px-4 py-3 text-body text-ink-2" role="status">
@@ -190,6 +262,10 @@ export function PlanPicker({
         </p>
       ) : null}
 
+      {!planChangesEnabled ? (
+        <PlanViewSummary model={model} />
+      ) : (
+        <>
       <SegmentedControl
         label="Billing period"
         value={cycle}
@@ -213,12 +289,6 @@ export function PlanPicker({
                 action = (
                   <p className="flex h-11 items-center justify-center rounded-xl bg-surface-2 text-body font-medium text-ink-2">
                     Your plan
-                  </p>
-                );
-              } else if (!planChangesEnabled) {
-                action = (
-                  <p className="flex h-11 items-center justify-center rounded-xl bg-surface-2 text-body font-medium text-ink-2">
-                    {isCurrent ? "Billing period" : "View only"}
                   </p>
                 );
               } else {
@@ -256,6 +326,8 @@ export function PlanPicker({
           <span className="tabular-nums text-ink-2">{model.extraSeats}</span>
         </button>
       ) : null}
+        </>
+      )}
 
       <ConfirmSheet
         model={model}

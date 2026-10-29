@@ -9,7 +9,6 @@ import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
 import { MembersLoadError, MembersPanel } from "@/components/MembersPanel";
 import { loadMembers } from "@/lib/membersLoad";
 import { currentMemberRole } from "@/lib/requireMember";
-import { teamInvitesEnabled } from "@/lib/teamInvitesFlag";
 import { can } from "@/lib/permissions";
 import { getAuthUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -116,9 +115,9 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   const teamEntry = planRowNow ? planEntry(planRowNow.billingStatus, canBilling) : null;
   const seatsFull = Boolean(seatCount && seatCount.included > 0 && seatCount.used >= seatCount.included);
 
-  // Team & access: Members (logins, paid seats) when the feature flag is on.
+  // Team & access: Members (logins, paid seats). Mutations stay gated in membersActions when invites are off.
   let membersSlot = null;
-  if (teamPanel && teamInvitesEnabled(tenant.id)) {
+  if (teamPanel) {
     const [role, user] = await Promise.all([currentMemberRole(), getAuthUser()]);
     if (role && user && can(role, "members.view")) {
       try {

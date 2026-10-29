@@ -39,7 +39,12 @@ async function PlanBody({ searchParams }: { searchParams: Promise<{ addon?: stri
       {loaded.model.surface.showDunningBanner && loaded.model.banner ? (
         <BillingNote banner={loaded.model.banner} />
       ) : null}
-      <PlanPicker model={loaded.model} openSeat={addon === "seat"} planChangesEnabled={deskPlanChangeEnabled()} />
+      <PlanPicker
+        model={loaded.model}
+        openSeat={addon === "seat"}
+        planChangesEnabled={deskPlanChangeEnabled()}
+        onDemandEnabled={Boolean(tenant.on_demand_usage_enabled)}
+      />
     </SettingsPlanFrame>
   );
 }
