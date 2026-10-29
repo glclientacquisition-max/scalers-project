@@ -1,4 +1,5 @@
-import { parseVertical, type BusinessVertical } from "@/lib/vertical";
+import { resolveBusinessType, type BusinessType } from "@/lib/businessType";
+import type { BusinessVertical } from "@/lib/vertical";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
 
 /**
@@ -6,13 +7,6 @@ import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
  * Home-services Confirm visit is never gated.
  */
 export const HOSPITALITY_RESERVATIONS_EXIST = false;
-
-const HOSPITALITY_RESERVATION_AFFORDANCES = {
-  jobCtaOne: "Confirm booking",
-  jobCtaMany: "Confirm bookings",
-  confirmStamp: "Confirm booking",
-  visitGhostStamp: "Booking not booked",
-} as const;
 
 /** Owner-facing vocabulary for one vertical. Intents stay canonical; copy changes. */
 export type InboxNicheCopy = {
@@ -139,42 +133,54 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
   },
 };
 
-export function nicheCopy(vertical?: string | null): InboxNicheCopy {
-  const parsed = parseVertical(vertical);
-  if (parsed === "hospitality" && !HOSPITALITY_RESERVATIONS_EXIST) {
-    return NICHE.general;
+function resolvedType(input?: string | null | { vertical?: string | null; business_type?: string | null }): BusinessType {
+  if (input && typeof input === "object") {
+    return resolveBusinessType(input);
   }
-  const copy = NICHE[parsed];
-  if (parsed !== "hospitality") return copy;
-  return { ...copy, ...HOSPITALITY_RESERVATION_AFFORDANCES };
+  return resolveBusinessType({ vertical: input });
+}
+
+export function nicheCopy(
+  input?: string | null | { vertical?: string | null; business_type?: string | null },
+): InboxNicheCopy {
+  const type = resolvedType(input);
+  if (type === "retail") return NICHE.retail;
+  if (type === "home_services") return NICHE.home_services;
+  return NICHE.general;
 }
 
 /** Shop book is holds. Visits stay on home services. */
-export function showsVisitQueue(vertical?: string | null): boolean {
-  return parseVertical(vertical) !== "retail";
+export function showsVisitQueue(
+  input?: string | null | { vertical?: string | null; business_type?: string | null },
+): boolean {
+  return resolvedType(input) !== "retail";
 }
 
 /** Home services book is visits. Holds stay on a shop. */
-export function showsHoldQueue(vertical?: string | null): boolean {
-  return parseVertical(vertical) !== "home_services";
+export function showsHoldQueue(
+  input?: string | null | { vertical?: string | null; business_type?: string | null },
+): boolean {
+  return resolvedType(input) !== "home_services";
 }
 
 /** Act, tape, one book, closed. The pack owns this list. */
-export function purposeFilters(vertical?: string | null): {
+export function purposeFilters(
+  input?: string | null | { vertical?: string | null; business_type?: string | null },
+): {
   id: InboxPurposeFilterId;
   label: string;
   divide?: boolean;
 }[] {
-  const copy = nicheCopy(vertical);
+  const copy = nicheCopy(input);
   const rows: { id: InboxPurposeFilterId; label: string; divide?: boolean }[] = [
     { id: "needs", label: "Needs you" },
     { id: "all", label: "All" },
   ];
-  if (showsVisitQueue(vertical)) {
+  if (showsVisitQueue(input)) {
     rows.push({ id: "job", label: copy.jobFilter, divide: true });
   }
-  if (showsHoldQueue(vertical)) {
-    rows.push({ id: "hold", label: copy.holdFilter, divide: !showsVisitQueue(vertical) });
+  if (showsHoldQueue(input)) {
+    rows.push({ id: "hold", label: copy.holdFilter, divide: !showsVisitQueue(input) });
   }
   rows.push(
     { id: "human", label: copy.returnCtaMany, divide: true },
@@ -186,11 +192,11 @@ export function purposeFilters(vertical?: string | null): {
 /** A book this pack does not own opens Needs you, or All when that pile is empty. */
 export function purposeForPack(
   filter: string,
-  vertical: string | null | undefined,
+  input: string | null | undefined | { vertical?: string | null; business_type?: string | null },
   needsCount: number
 ): InboxPurposeFilterId {
   if (filter === "archived") return "archived";
-  if (purposeFilters(vertical).some((row) => row.id === filter)) {
+  if (purposeFilters(input).some((row) => row.id === filter)) {
     return filter as InboxPurposeFilterId;
   }
   return needsCount > 0 ? "needs" : "all";

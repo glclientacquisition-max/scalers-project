@@ -9,10 +9,10 @@ import {
 import type { OnboardingTone } from "@/lib/onboarding";
 import { DEFAULT_AGENT_TONE, TONE_LABELS, TONE_OPTIONS } from "@/lib/onboarding";
 import {
-  DEFAULT_VERTICAL,
-  VERTICAL_OPTIONS,
-  type BusinessVertical,
-} from "@/lib/vertical";
+  BUSINESS_TYPE_OPTIONS,
+  parseBusinessType,
+  type BusinessType,
+} from "@/lib/businessType";
 import {
   HANDOFF_OPTIONS,
   liveConnectBlurb,
@@ -32,7 +32,6 @@ import { SUGGESTED_FAQ_CHIPS } from "@/lib/catalogSeeds";
 import { homeStakes, shopStakes } from "@/lib/baStakes";
 import { homeCatalogPasses, hoursCapturePasses, shopCatalogGap, shopCatalogPasses } from "@/lib/outcomeGates";
 import { ONBOARDING_DRAFT_KEY, parseOnboardingDraft, validateAgentName } from "@/lib/onboardingDraft";
-import { parseVertical } from "@/lib/vertical";
 import { parseHandoffMode } from "@/lib/handoffMode";
 import { emptyAreaPicks } from "@/lib/areaPicks";
 import { OnboardingAreasPanel } from "./OnboardingAreasPanel";
@@ -59,7 +58,7 @@ const initial: OnboardingState = {};
 
 export function OnboardingWizard() {
   const [step, setStep] = useState(0);
-  const [vertical, setVertical] = useState<BusinessVertical | "">(DEFAULT_VERTICAL);
+  const [vertical, setVertical] = useState<BusinessType | "">("");
   const [products, setProducts] = useState<ProductDraft[]>([]);
   const [services, setServices] = useState<ServiceDraft[]>([]);
   const [catalogSkipped, setCatalogSkipped] = useState(false);
@@ -88,7 +87,10 @@ export function OnboardingWizard() {
   useEffect(() => {
     const draft = parseOnboardingDraft(window.localStorage.getItem(ONBOARDING_DRAFT_KEY));
     if (draft) {
-      if (draft.vertical) setVertical(parseVertical(draft.vertical));
+      if (draft.vertical) {
+        const parsed = parseBusinessType(draft.vertical);
+        if (parsed) setVertical(parsed);
+      }
       if (draft.products) setProducts(draft.products as ProductDraft[]);
       if (draft.services) setServices(draft.services as ServiceDraft[]);
       if (draft.faqAnswers) setFaqAnswers(draft.faqAnswers);
@@ -249,7 +251,7 @@ export function OnboardingWizard() {
           <div>
             <h2 className="font-display text-page text-ink">Business type</h2>
             <div className="mt-5 space-y-3">
-              {VERTICAL_OPTIONS.map((opt) => {
+              {BUSINESS_TYPE_OPTIONS.map((opt) => {
                 const selected = vertical === opt.id;
                 return (
                   <button

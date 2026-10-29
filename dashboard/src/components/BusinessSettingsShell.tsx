@@ -28,7 +28,7 @@ const PoliciesSettings = dynamic(() => import("@/components/policies/PoliciesSet
 });
 import { PoliciesSettingsErrorBoundary } from "@/components/policies/PoliciesSettingsErrorBoundary";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
-import { parseVertical } from "@/lib/vertical";
+import { resolveTenantBusinessType } from "@/lib/businessType";
 import {
   settingsPanelHeading,
   type BusinessSettingsTab,
@@ -61,7 +61,7 @@ function SettingsPanelBody({
   curatedVoices: CuratedSonioxVoice[];
 }) {
   if (tab === "import") {
-    return parseVertical(tenant.vertical) === "retail" ? (
+    return resolveTenantBusinessType(tenant) === "retail" ? (
       <CatalogImportPanel tenant={tenant} />
     ) : (
       <KnowledgeIngestPanel tenant={tenant} />

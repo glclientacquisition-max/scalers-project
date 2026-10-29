@@ -14,9 +14,14 @@ test("niches: cleaning, shop and generic exist, and every topic they list is def
   for (const n of reg.NICHES) for (const s of n.sections) for (const t of s.topics) assert.ok(t === reg.PAYMENT_TOPIC || reg.TOPICS[t], `${n.id}: ${t}`);
 });
 
-test("niche pick: vertical, then keyword, else generic", () => {
+test("niche pick: business type and cleaning category only", () => {
+  assert.equal(reg.nicheFor({ business_type: "retail" }).id, "retail");
   assert.equal(reg.nicheFor({ vertical: "retail" }).id, "retail");
-  assert.equal(reg.nicheFor({ vertical: "home_services", business_name: "Done and Dusted" }).id, "cleaning");
+  assert.equal(
+    reg.nicheFor({ business_type: "home_services", business_category: "cleaning" }).id,
+    "cleaning",
+  );
+  assert.equal(reg.nicheFor({ vertical: "home_services", business_name: "Done and Dusted" }).id, "generic");
   assert.equal(reg.nicheFor({ vertical: "home_services", business_name: "Juma Plumbing" }).id, "generic");
 });
 
@@ -134,7 +139,7 @@ test("a new niche with a new topic works from config alone", () => {
   };
   const tailor: reg.NicheDef = { id: "tailor", label: "Tailor", keywords: ["tailor", "fundi"], sections: [{ id: "orders", label: "Orders", topics: ["fitting", "returns"] }] };
   const niches = [...reg.NICHES, tailor];
-  const n = reg.nicheFor({ business_name: "Mama Fundi Tailors" }, niches);
+  const n = reg.nicheById("tailor", niches);
   assert.equal(n.id, "tailor");
   assert.deepEqual(reg.nicheTopics(n, topics).map((t) => t.id), ["fitting", "returns"]);
   const rule = reg.ruleFromDraft(topics.fitting, { ...reg.draftFrom(topics.fitting, null), answer: "yes", values: { visits: 2 } });

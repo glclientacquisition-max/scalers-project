@@ -1,6 +1,7 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveTenantBusinessType } from "@/lib/businessType";
 import { bustTenantCache } from "@/lib/tenantCache";
 import { requestSpokenCatalogueCompile } from "@/lib/spokenCatalogueOnSave";
 import { revalidatePath } from "next/cache";
@@ -100,7 +101,7 @@ export async function saveBusinessCategoryAction(category: string): Promise<Stru
   if (denied) return { ok: false, error: denied.error };
   const ws = await workspace();
   if ("error" in ws) return { ok: false, error: ws.error ?? SAVE_FAILED };
-  const type = (ws.tenant as { business_type?: string | null }).business_type || ws.tenant.vertical || "general";
+  const type = resolveTenantBusinessType(ws.tenant as { business_type?: string | null; vertical?: string | null });
   if (!categoriesFor(type === "retail" || type === "home_services" ? type : "general").some((c) => c.id === category))
     return { ok: false, error: "Pick from the list." };
   const { error } = await ws.client.from("tenants").update({ business_category: category }).eq("id", ws.tenant.id);

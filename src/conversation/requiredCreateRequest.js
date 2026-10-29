@@ -2,6 +2,7 @@
 
 const { entityValue } = require('./entityExtraction');
 const { offeredVertical } = require('./vertical');
+const { isHomeVisitBusinessType, resolveBusinessType } = require('./businessType');
 const { isVisitClassEscalateReason } = require('./playbooks/homeServices');
 const { appendVisitNotes } = require('./visitLocation');
 const { looksLikeLeaveIt, looksLikeNonConsentAck } = require('./callCorrectives');
@@ -32,12 +33,22 @@ function slotsComplete(state = {}) {
   return !Array.isArray(state.goal?.missingSlots) || state.goal.missingSlots.length === 0;
 }
 
+function tenantBusinessType(state = {}) {
+  return resolveBusinessType({
+    business_type: state.businessType,
+    vertical: state.vertical,
+  });
+}
+
 function isHomeVisit(state = {}) {
-  return offeredVertical(state.vertical) === 'home_services';
+  return isHomeVisitBusinessType(tenantBusinessType(state));
 }
 
 function isShop(state = {}) {
-  return offeredVertical(state.vertical) === 'retail';
+  return offeredVertical({
+    business_type: state.businessType,
+    vertical: state.vertical,
+  }) === 'retail';
 }
 
 function slot(state, keys) {
@@ -243,7 +254,7 @@ function callerSaidNumber(state = {}, value) {
  * never said is dropped. A visit with a day but no time is not a calendar row.
  */
 function shouldBlockHomeVisitClassEscalate(state = {}, escalatePayload) {
-  if (offeredVertical(state.vertical) !== 'home_services') return false;
+  if (!isHomeVisitBusinessType(tenantBusinessType(state))) return false;
   if (String(state.intent || '') === 'booking') return true;
   const reason = String(
     escalatePayload?.reason || state.handoff?.reason || state.goal?.description || ''

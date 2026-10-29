@@ -222,7 +222,7 @@ describe("import switches start off", () => {
     assert.match(catalog, /label: "Text"/);
     assert.match(catalog, /label: "URL"/);
     assert.match(catalog, /label: "CSV"/);
-    assert.match(shell, /parseVertical\(tenant\.vertical\) === "retail"/);
+    assert.match(shell, /resolveTenantBusinessType\(tenant\) === "retail"/);
     assert.match(shell, /<CatalogImportPanel tenant=\{tenant\} \/>/);
     assert.match(shell, /<KnowledgeIngestPanel tenant=\{tenant\} \/>/);
     assert.doesNotMatch(shell, /<KnowledgeIngestPanel[\s\S]{0,80}<CatalogImportPanel/);

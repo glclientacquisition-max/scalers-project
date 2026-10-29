@@ -42,6 +42,7 @@ import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { parseAgentTools } from "@/lib/agentTools";
 import { DEFAULT_AGENT_TONE } from "@/lib/onboarding";
 import { parseVertical } from "@/lib/vertical";
+import { businessTypeForVertical } from "@/lib/identityCategory";
 import { parseHandoffMode } from "@/lib/handoffMode";
 import { parseSonioxVoiceId, parseSonioxVoiceLabel } from "@/lib/sonioxVoiceCatalog";
 import {
@@ -488,6 +489,7 @@ export async function saveAndCompileSettings(
     unknown_answer_fallback: unknownAnswerFallback || null,
     agent_tools: agentTools,
     vertical,
+    business_type: businessTypeForVertical(vertical),
     handoff_mode: handoffMode,
     soniox_voice_id: sonioxVoiceId,
     soniox_voice_label: sonioxVoiceLabel,

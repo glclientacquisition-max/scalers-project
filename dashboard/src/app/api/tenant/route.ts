@@ -1,3 +1,4 @@
+import { resolveTenantBusinessType } from "@/lib/businessType";
 import { bustTenantCache } from "@/lib/tenantCache";
 import { NextResponse } from "next/server";
 import { isAuthenticated, isLegacyAuthenticated } from "@/lib/auth";
@@ -53,7 +54,12 @@ export async function POST(request: Request) {
     : { error: null };
   bustTenantCache(id);
   if (!error && servicesText) {
-    await addKbItemsFromText(id, servicesText, tenant.vertical === "retail" ? "product" : "service", "api");
+    await addKbItemsFromText(
+      id,
+      servicesText,
+      resolveTenantBusinessType(tenant) === "retail" ? "product" : "service",
+      "api",
+    );
   }
   const read = error ? { data: null, error } : await workspace.client.from("tenants").select(cols).eq("id", id).single();
   const data = read.data;

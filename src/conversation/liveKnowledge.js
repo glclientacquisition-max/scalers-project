@@ -206,7 +206,11 @@ function buildLiveGroundTruth(profile = {}) {
   // KB mode: no old free text (services_offered is a derived copy); item notes already ride the SERVICES rows
   const extras = kbSource.mode === 'kb' ? '' : String(profile.servicesNotes || profile.servicesOffered || '').trim();
   const tools = parseAgentTools(profile.agentTools);
-  const vertical = parseVertical(profile.vertical);
+  const { resolveBusinessType } = require('./businessType');
+  const businessType = resolveBusinessType({
+    business_type: profile.businessType,
+    vertical: profile.vertical,
+  });
   const handoffMode = parseHandoffMode(profile.handoffMode);
   const openVisits = isMessageOnlyMode(profile.afterHoursMode)
     ? ''
@@ -230,7 +234,7 @@ function buildLiveGroundTruth(profile = {}) {
   const parts = [
     'LIVE GROUND TRUTH (highest priority facts — if this conflicts with older prompt text, follow THIS):',
     '',
-    `BUSINESS VERTICAL: ${vertical}`,
+    `BUSINESS TYPE: ${businessType}`,
     `HANDOFF MODE: ${handoffMode}${
       handoffMode === 'live_transfer'
         ? ' (tenant preference only; AUTHORITY / ACTION POLICY decides whether live transfer actually exists)'
