@@ -29,6 +29,7 @@ function tenantProfileFromRow(row, extras = {}) {
   const { parseAgentTools } = require('./conversation/agentTools');
   const { parseLexiconOverrides } = require('./speech/pronunciationLexicon');
   const { parseVertical } = require('./conversation/vertical');
+  const { resolveBusinessType } = require('./conversation/businessType');
   const { parseHandoffMode } = require('./conversation/handoffMode');
   const { parseNotifyChannels } = require('./notifications/notifyChannels');
   const afterHoursMode =
@@ -79,10 +80,19 @@ function tenantProfileFromRow(row, extras = {}) {
     sonioxVoiceId: row.soniox_voice_id || null,
     sonioxVoiceLabel: row.soniox_voice_label || null,
     vertical: parseVertical(row.vertical),
+    businessType: resolveBusinessType({
+      business_type: row.business_type,
+      vertical: row.vertical,
+    }),
     // Settings › Locations area terms (fee, time, mode) from tenants.service_areas.
     areaTerms: require('./conversation/areaTerms').readAreaTerms(
       row.service_areas !== undefined ? row.service_areas : extras.serviceAreas,
-      { vertical: parseVertical(row.vertical) }
+      {
+        vertical: resolveBusinessType({
+          business_type: row.business_type,
+          vertical: row.vertical,
+        }),
+      }
     ),
     handoffMode: parseHandoffMode(row.handoff_mode),
     businessLocations: row.business_locations || [],

@@ -7,6 +7,7 @@
  * A choice value is "<vertical>:<category>"; category may be empty.
  */
 import { BUSINESS_TYPES, categoriesFor } from "./structuredData.ts";
+import { resolveBusinessType } from "./businessType.ts";
 import { VERTICAL_LABELS, parseVertical, type BusinessVertical } from "./vertical.ts";
 
 export type IdentityCategoryChoice = {
@@ -20,7 +21,7 @@ export type IdentityCategoryChoice = {
 
 /** Taxonomy business type for a stored vertical (hospitality has no categories: general). */
 export function businessTypeForVertical(vertical: BusinessVertical): "retail" | "home_services" | "general" {
-  return vertical === "retail" || vertical === "home_services" ? vertical : "general";
+  return resolveBusinessType({ vertical });
 }
 
 export function categoryChoiceValue(vertical: BusinessVertical, category: string | null | undefined): string {

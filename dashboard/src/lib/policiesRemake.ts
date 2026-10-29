@@ -9,6 +9,7 @@
  * here changes what a rule says, only which rules are offered and how a card
  * writes its own keys.
  */
+import { resolveBusinessType } from "./businessType";
 import { UNKNOWN_ANSWER_DEFAULT_EN } from "./unknownAnswerSpoken";
 import {
   PAYMENT_TIMING,
@@ -34,7 +35,6 @@ import {
   TOPICS,
   applyTopicPatch,
   draftFrom,
-  nicheById,
   nicheFor,
   ruleFromDraft,
   spokenLine,
@@ -47,21 +47,24 @@ import {
 /** Services: home services and other booked work. Retail: shops. Picked from the type, then the name. */
 export type PoliciesKind = "services" | "retail";
 
-export type PoliciesTenantLike = { vertical?: string | null; business_name?: string | null; business_category?: string | null };
+export type PoliciesTenantLike = {
+  business_type?: string | null;
+  vertical?: string | null;
+  business_name?: string | null;
+  business_category?: string | null;
+};
 
 export function policiesKind(t: PoliciesTenantLike | string | null | undefined): PoliciesKind {
-  const like: PoliciesTenantLike = typeof t === "string" || t == null ? { vertical: t ?? null } : t;
-  const v = String(like.vertical ?? "").trim().toLowerCase();
-  if (v === "home_services" || v === "home") return "services";
-  if (v === "retail" || v === "shop") return "retail";
-  return nicheFor(like).id === "retail" ? "retail" : "services";
+  const like: PoliciesTenantLike =
+    typeof t === "string" || t == null ? { vertical: t ?? null } : t;
+  const type = resolveBusinessType(like);
+  return type === "retail" ? "retail" : "services";
 }
 
 /** The registry niche that words the spoken lines (cleaning, shop or general). */
 export function policiesNiche(t: PoliciesTenantLike, kind: PoliciesKind = policiesKind(t)): NicheDef {
-  const n = nicheFor(t);
-  if (kind === "retail") return nicheById("retail");
-  return n.id === "retail" ? nicheById("generic") : n;
+  void kind;
+  return nicheFor(t);
 }
 
 /** Rules each business type sees, in the order owners think about them. */

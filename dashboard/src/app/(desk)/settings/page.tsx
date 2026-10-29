@@ -25,7 +25,7 @@ import { settingsViewReadsCatalogue, tenantForSettingsView } from "@/lib/setting
 import { loadKbCatalogueView } from "@/lib/kbRead.server";
 import { getCurrentTenant } from "@/lib/tenant";
 import { kbTablesReady } from "@/lib/kb.server";
-import { parseVertical } from "@/lib/vertical";
+import { resolveTenantBusinessType } from "@/lib/businessType";
 import { loadPlanRowStatus } from "@/lib/ownerPlanLoad";
 import { loadSeatCount } from "@/lib/billingStateLoad";
 import { planEntry } from "@/lib/planEntry";
@@ -86,7 +86,8 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
   // KB v2 businesses edit the catalogue on /settings/knowledge. The old Catalogue tab (and the retail
   // Import tab, now "Paste a list" there) would write the retired catalogue columns, so send owners across.
-  if (tab === "catalog" || (tab === "import" && parseVertical(tenant.vertical) === "retail")) {
+  const tenantBusinessType = resolveTenantBusinessType({ vertical: tenant.vertical });
+  if (tab === "catalog" || (tab === "import" && tenantBusinessType === "retail")) {
     if (await kbTablesReady(tenant.id)) {
       const unpriced = (Array.isArray(params.filter) ? params.filter[0] : params.filter) === "unpriced";
       redirect(tab === "import" ? "/settings/knowledge?paste=1" : `/settings/knowledge${unpriced ? "?filter=unpriced" : ""}`);
@@ -146,7 +147,10 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     structuredSlot = structuredSettingsSlots({
       tenant,
       canEdit,
-      businessType: typed?.business_type || (tenant.vertical === "home_services" || tenant.vertical === "retail" ? tenant.vertical : "general"),
+      businessType: resolveTenantBusinessType({
+        business_type: typed?.business_type,
+        vertical: tenant.vertical,
+      }),
       businessCategory: typed?.business_category ?? null,
     });
     businessCategory = typed?.business_category ?? null;

@@ -1,6 +1,6 @@
 // Vertical playbook router — returns live prompt guidance for the active pack.
 
-const { parseVertical } = require('../vertical');
+const { resolveBusinessType, isHomeVisitBusinessType } = require('../businessType');
 const { parseHandoffMode } = require('../handoffMode');
 const { evaluateCapabilityGates } = require('../capabilityGates');
 const { formatRetailPlaybookForPrompt } = require('./retail');
@@ -13,25 +13,27 @@ const {
  * @returns {string} playbook block or empty string
  */
 function formatPlaybookForPrompt(profile = {}) {
-  const vertical = parseVertical(profile.vertical);
+  const type = resolveBusinessType({
+    business_type: profile.businessType,
+    vertical: profile.vertical,
+  });
   const handoffMode = parseHandoffMode(profile.handoffMode);
   const gates = evaluateCapabilityGates(profile);
 
-  if (vertical === 'retail') {
+  if (type === 'retail') {
     return formatRetailPlaybookForPrompt({
       handoffMode,
       placeHold: gates.holds.allowed,
     });
   }
-  if (vertical === 'home_services') {
+  if (type === 'home_services' || type === 'general') {
     return formatHomeServicesPlaybookForPrompt({
       handoffMode,
-      confirmVisit: gates.site_visits.allowed,
+      confirmVisit: isHomeVisitBusinessType(type) && gates.site_visits.allowed,
       confirmedSlot: gates.booking_slots.allowed,
     });
   }
 
-  // Hospitality and general have no completion pack yet.
   return '';
 }
 

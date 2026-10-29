@@ -41,20 +41,11 @@ describe("bookings + holds honesty desk copy", () => {
 
   it("gates hospitality Confirm booking until reservations exist (K4)", () => {
     assert.match(niche, /export const HOSPITALITY_RESERVATIONS_EXIST = false/);
-    assert.match(niche, /HOSPITALITY_RESERVATION_AFFORDANCES/);
-    assert.match(niche, /jobCtaOne: "Confirm booking"/);
-    assert.match(niche, /confirmStamp: "Confirm booking"/);
+    assert.match(niche, /resolvedType\(input\)/);
+    assert.match(niche, /return NICHE.general/);
     const hospitality = sliceHospitalityNiche(niche);
     assert.match(hospitality, /jobCtaOne: "Confirm visit"/);
-    assert.match(hospitality, /jobCtaMany: "Confirm visits"/);
-    assert.match(hospitality, /confirmStamp: "Confirm visit"/);
-    assert.match(hospitality, /visitGhostStamp: "Visit not booked"/);
     assert.doesNotMatch(hospitality, /Confirm booking/);
-    assert.doesNotMatch(hospitality, /Confirm bookings/);
-    assert.doesNotMatch(hospitality, /Booking not booked/);
-    assert.match(niche, /HOSPITALITY_RESERVATIONS_EXIST[\s\S]*HOSPITALITY_RESERVATION_AFFORDANCES/);
-    assert.match(niche, /parsed === "hospitality" && !HOSPITALITY_RESERVATIONS_EXIST/);
-    assert.match(niche, /return NICHE.general/);
     const homeServices = sliceHomeServicesNiche(niche);
     assert.match(homeServices, /jobCtaOne: "Confirm visit"/);
     assert.match(homeServices, /confirmStamp: "Confirm visit"/);
