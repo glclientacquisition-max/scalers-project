@@ -211,7 +211,7 @@ export function MembersPanel({
                   {viewerRole === "owner" && m.role === "admin" ? (
                     <Button
                       variant="tonal"
-                      size="sm"
+                      size="md"
                       disabled={pending}
                       pending={spinning(`owner:${m.userId}`)}
                       onClick={() =>
@@ -242,7 +242,7 @@ export function MembersPanel({
                   {manageable ? (
                     <Button
                       variant="danger"
-                      size="sm"
+                      size="md"
                       disabled={pending}
                       pending={spinning(`remove:${m.userId}`)}
                       aria-label={`Remove ${m.email}`}

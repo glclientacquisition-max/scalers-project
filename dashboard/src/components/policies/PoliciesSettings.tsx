@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { PlusIcon, SpeakerWaveIcon } from "@heroicons/react/20/solid";
+import { PlusIcon, SpeakerWaveIcon, ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/20/solid";
 import { useCan, withRoleGate } from "@/components/DeskRole";
 import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
 import { Switch } from "@/components/ui/Switch";
 import { TextAreaField } from "@/components/ui/TextField";
 import { SettingsPageHeader, settingsConsoleClass, settingsPanelClass } from "@/components/settingsUi";
@@ -289,18 +290,48 @@ function CallersHearCompact({
 }: {
   preview: ReturnType<typeof useCallersHearPreview>;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const compactLine = preview.text || (preview.lines[0] ? `${preview.lines[0].label}: ${preview.lines[0].text}` : "");
   return (
     <div
-      className="sticky top-0 z-10 col-span-full border-b border-hairline bg-canvas/95 px-1 py-2 backdrop-blur-sm supports-[backdrop-filter]:bg-canvas/80 xl:hidden"
+      className={cx(
+        "sticky top-0 z-10 col-span-full border-b border-hairline bg-surface px-3 py-2 shadow-sm xl:hidden",
+        expanded ? "" : "max-h-[4.5rem] overflow-hidden",
+      )}
       data-callers-hear-compact=""
     >
-      <p className="text-meta font-medium text-ink-2">Callers hear</p>
-      <p className="mt-0.5 line-clamp-2 text-body text-ink [overflow-wrap:anywhere]">{compactLine || "Nothing set yet."}</p>
-      {preview.lines.length > 1 ? <p className="mt-0.5 text-meta text-ink-3">{preview.lines.length} lines on the call</p> : null}
-      <div className="mt-2">
-        <CallersHearControls {...preview} />
+      <div className="flex min-h-11 max-h-11 items-center gap-2">
+        <p
+          className="min-w-0 flex-1 truncate text-body text-ink"
+          title={compactLine || undefined}
+        >
+          {compactLine || "Nothing set yet."}
+        </p>
+        {preview.text ? (
+          <Button
+            variant="tonal"
+            size="sm"
+            pending={preview.loading}
+            leading={<SpeakerWaveIcon aria-hidden className="size-4" />}
+            onClick={() => void preview.hear()}
+          >
+            Hear it
+          </Button>
+        ) : null}
+        <IconButton
+          label={expanded ? "Collapse callers hear" : "Expand callers hear"}
+          onClick={() => setExpanded((open) => !open)}
+        >
+          {expanded ? <ChevronUpIcon className="size-5" aria-hidden /> : <ChevronDownIcon className="size-5" aria-hidden />}
+        </IconButton>
       </div>
+      {expanded ? (
+        <div className="mt-2 space-y-2 border-t border-hairline pt-2 pb-1">
+          <p className="text-meta font-medium text-ink-2">Callers hear</p>
+          <CallersHearLinesList lines={preview.lines} />
+          <CallersHearControls {...preview} />
+        </div>
+      ) : null}
     </div>
   );
 }
