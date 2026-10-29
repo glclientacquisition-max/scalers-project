@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { adminActorName } from "@/lib/adminActor";
 import { recordAdminAction } from "@/lib/adminAudit";
 import { logAdminError, operatorError } from "@/lib/adminErrors";
-import { isLegacyAuthenticated } from "@/lib/auth";
+import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { syncPoolFromSautikit } from "@/lib/didPool";
 import { getSautikitKeyDiagnostics, isSautikitConfigured } from "@/lib/sautikit";
 
 export async function POST() {
-  if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  const gate = await requireAdminOperatorWrite();
+  if (!gate.ok) {
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
   if (!isSautikitConfigured()) {
     // Key diagnostics stay in the server log; the operator gets plain copy.

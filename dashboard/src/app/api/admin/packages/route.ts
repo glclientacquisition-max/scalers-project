@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { adminActorName } from "@/lib/adminActor";
 import { recordAdminAction } from "@/lib/adminAudit";
-import { isLegacyAuthenticated } from "@/lib/auth";
+import { requireAdminApiRead, requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import {
   loadPackageCatalog,
   parseCount,
@@ -13,8 +13,9 @@ import {
 } from "@/lib/packageCatalog";
 
 export async function GET() {
-  if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  const read = await requireAdminApiRead();
+  if (!read.ok) {
+    return NextResponse.json({ error: read.error }, { status: read.status });
   }
   try {
     const catalog = await loadPackageCatalog();
@@ -26,8 +27,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  const gate = await requireAdminOperatorWrite();
+  if (!gate.ok) {
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
 
   const body = await request.json();

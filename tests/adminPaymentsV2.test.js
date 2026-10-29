@@ -57,7 +57,7 @@ test("Payments v2: list+pane, UnlockCta, honest disabled actions, ADMIN_V2 branc
   const dev = read("dashboard/src/app/dev/admin-payments/page.tsx");
   assert.doesNotMatch(ui, /ReasonedSwitch/);
   assert.match(ui, /UnlockCta/);
-  assert.match(read("dashboard/src/components/ops/UnlockCta.tsx"), /Unlock to edit/);
+  assert.match(read("dashboard/src/components/ops/UnlockCta.tsx"), /label = "Unlock"/);
   assert.match(ui, /site="payments"/);
   assert.match(ui, /data-payments-table/);
   assert.match(ui, /data-phone-rows/);

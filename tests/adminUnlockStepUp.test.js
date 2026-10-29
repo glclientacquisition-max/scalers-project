@@ -8,7 +8,7 @@ test("s24: one StepUpSheet + UnlockCta; Unlock never writes domain state; enforc
   const sheet = read("dashboard/src/components/ops/StepUpSheet.tsx");
   assert.match(sheet, /\/api\/admin\/step-up/);
   assert.doesNotMatch(sheet, /did-pool|businesses|Dialog|framer-motion/);
-  assert.match(sheet, /doesn&apos;t change anything by itself/);
+  assert.match(sheet, /does not save by itself/);
   assert.match(sheet, /Authenticator not set up yet/);
   assert.match(sheet, /onObserved/);
   const cta = read("dashboard/src/components/ops/UnlockCta.tsx");
