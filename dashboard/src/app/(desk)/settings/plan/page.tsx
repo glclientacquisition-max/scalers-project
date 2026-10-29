@@ -30,6 +30,9 @@ async function PlanBody({ searchParams }: { searchParams: Promise<{ addon?: stri
           planName={view.packageName}
           periodEndLabel={view.periodEndLabel}
           rows={betaPlanRows(view, credits)}
+          freeBeta={loaded.model.freeBeta}
+          onDemandEnabled={tenant.on_demand_usage_enabled}
+          onDemandLocked={loaded.model.onDemandLocked}
         />
       </SettingsPlanFrame>
     );

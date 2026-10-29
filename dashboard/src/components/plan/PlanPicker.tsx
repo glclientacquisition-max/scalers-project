@@ -28,7 +28,7 @@ import {
 } from "@/lib/planPricing";
 import type { OwnerPlanModel, PlanCycle, PlanSku, PublishedPlan } from "@/lib/ownerPlanLoad";
 import { deskConfirmHaptic } from "@/lib/deskFeel";
-import { overLabel } from "@/lib/minutes";
+import { planOverageLines, resolvePlanOverageMode } from "@/lib/planOverageCopy";
 
 function planFeedback(state: PlanActionState): string | undefined {
   if (state.ok) return state.message;
@@ -69,26 +69,6 @@ function SeatChangeNote({ model, next }: { model: OwnerPlanModel; next: number }
         })
       : null;
   return line ? <p className="mt-3 text-body text-ink-2">{line}</p> : null;
-}
-
-function planOverageLine(
-  minutesUsed: number,
-  included: number,
-  onDemandEnabled: boolean,
-  onDemandLocked: boolean,
-  periodEndLabel: string | null,
-): string | null {
-  if (included <= 0 || minutesUsed <= included) return null;
-  const over = overLabel((minutesUsed - included) * 60);
-  if (!over) return null;
-  if (onDemandLocked) {
-    return `${over} on this plan. Extra usage is not billed during trial.`;
-  }
-  if (onDemandEnabled) {
-    return `${over} on this plan. Extra minutes bill on your next invoice at your plan rates.`;
-  }
-  const until = periodEndLabel ? ` until ${periodEndLabel}` : " until the period renews";
-  return `${over} on this plan. On-demand usage is off, so calls stop${until}.`;
 }
 
 function PlanViewSummary({ model }: { model: OwnerPlanModel }) {
@@ -132,11 +112,14 @@ function CurrentPlanCard({
   const renew = model.nextPeriodStartLabel || model.periodEndLabel;
   const included = plan.minutes;
   const tone = meterTone(model.minutesUsed, included, MINUTES_WARN_SHARE);
-  const overLine = planOverageLine(
+  const over = planOverageLines(
     model.minutesUsed,
     included,
-    onDemandEnabled,
-    model.onDemandLocked,
+    resolvePlanOverageMode({
+      freeBeta: model.freeBeta,
+      onDemandLocked: model.onDemandLocked,
+      onDemandEnabled,
+    }),
     model.periodEndLabel,
   );
   return (
@@ -152,10 +135,11 @@ function CurrentPlanCard({
             {model.minutesUsed.toLocaleString("en-KE")} of {included.toLocaleString("en-KE")} minutes used
           </p>
           <UsageBar used={model.minutesUsed} included={included} tone={tone} label="Minutes used" thin className="mt-2" />
-          {overLine ? (
-            <p className="mt-2 text-body text-warn" role="status">
-              {overLine}
-            </p>
+          {over ? (
+            <div className="mt-2 space-y-0.5" role="status">
+              <p className="text-body font-medium tabular-nums text-warn">{over.headline}</p>
+              <p className="text-meta text-ink-2">{over.detail}</p>
+            </div>
           ) : null}
         </>
       ) : null}

@@ -5,6 +5,7 @@ import { MINUTES_WARN_SHARE, meterTone } from "@/lib/planEntry";
 
 import type { OwnerBillingView } from "@/lib/billingStateModel";
 import type { MessageCreditsUsage } from "@/lib/messageCredits";
+import { planOverageLines, resolvePlanOverageMode, type PlanOverageMode } from "@/lib/planOverageCopy";
 
 export type BetaPlanRow = { key: string; label: string; included: number; used: number };
 
@@ -37,15 +38,43 @@ function count(n: number): string {
 }
 
 /** Beta Plan page: the plan, what it includes, and what is used. No prices. */
+function MinutesOverageNote({
+  used,
+  included,
+  mode,
+  periodEndLabel,
+}: {
+  used: number;
+  included: number;
+  mode: PlanOverageMode;
+  periodEndLabel: string | null;
+}) {
+  const over = planOverageLines(used, included, mode, periodEndLabel);
+  if (!over) return null;
+  return (
+    <div className="mt-2 space-y-0.5" role="status" data-plan-overage="">
+      <p className="text-body font-medium tabular-nums text-warn">{over.headline}</p>
+      <p className="text-meta text-ink-2">{over.detail}</p>
+    </div>
+  );
+}
+
 export function BetaPlanSummary({
   planName,
   periodEndLabel,
   rows,
+  freeBeta = true,
+  onDemandEnabled = null,
+  onDemandLocked = false,
 }: {
   planName: string | null;
   periodEndLabel: string | null;
   rows: BetaPlanRow[];
+  freeBeta?: boolean;
+  onDemandEnabled?: boolean | null;
+  onDemandLocked?: boolean;
 }) {
+  const overageMode = resolvePlanOverageMode({ freeBeta, onDemandLocked, onDemandEnabled });
   return (
     <section aria-label="Your plan" className="mt-4 rounded-2xl border border-hairline bg-surface p-4">
       <h2 className="text-title text-ink">{planName || "Your plan"}</h2>
@@ -70,6 +99,14 @@ export function BetaPlanSummary({
                   thin
                   className="mt-2"
                 />
+                {row.key === "minutes" ? (
+                  <MinutesOverageNote
+                    used={row.used}
+                    included={row.included}
+                    mode={overageMode}
+                    periodEndLabel={periodEndLabel}
+                  />
+                ) : null}
               </li>
             );
           })}
