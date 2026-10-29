@@ -32,7 +32,9 @@ import { TeamSeatsNote } from "@/components/plan/TeamSeatsNote";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
+import { Suspense } from "react";
 import { DeskPageGate } from "@/components/DeskPageGate";
+import { DeskPageSkeleton } from "@/components/DeskPageSkeleton";
 import { deskAssistantSayPage } from "@/lib/deskFeatureFlags";
 import { loadAssistantSayView } from "@/lib/assistantSayVoice.server";
 import { loadKbGreetingPreview } from "@/lib/kbCaller.server";
@@ -213,24 +215,26 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     : [null, null];
   const kbCatalogue = kbView && kbGreeting ? { ...kbView, offering_line: kbGreeting.offeringLine, pending: kbGreeting.pending } : kbView;
   return (
-    <BusinessSettingsShell
-      tenant={tenantForSettingsView(tenant, tab, trainPanel, kbCatalogue)}
-      tab={tab}
-      trainPanel={trainPanel}
-      curatedVoices={curatedVoices}
-      optionStatus={{ ...settingsIndexStatuses(tenant, curatedVoices, navTargets), ...planStatus }}
-      liveTransferExecutor={deskLiveTransferExecutorEnabled()}
-      membersSlot={membersSlot}
-      seatNoteSlot={
-        teamPanel && seatsFull && !membersSlot && seatCount ? (
-          <TeamSeatsNote included={seatCount.included} entry={teamEntry} />
-        ) : null
-      }
-      structuredSlot={structuredSlot}
-      callsSlot={callsSlot}
-      assistantSaySlot={assistantSaySlot}
-      assistantSayPage={assistantSayPage}
-      businessCategory={businessCategory}
-    />
+    <Suspense fallback={<DeskPageSkeleton />}>
+      <BusinessSettingsShell
+        tenant={tenantForSettingsView(tenant, tab, trainPanel, kbCatalogue)}
+        tab={tab}
+        trainPanel={trainPanel}
+        curatedVoices={curatedVoices}
+        optionStatus={{ ...settingsIndexStatuses(tenant, curatedVoices, navTargets), ...planStatus }}
+        liveTransferExecutor={deskLiveTransferExecutorEnabled()}
+        membersSlot={membersSlot}
+        seatNoteSlot={
+          teamPanel && seatsFull && !membersSlot && seatCount ? (
+            <TeamSeatsNote included={seatCount.included} entry={teamEntry} />
+          ) : null
+        }
+        structuredSlot={structuredSlot}
+        callsSlot={callsSlot}
+        assistantSaySlot={assistantSaySlot}
+        assistantSayPage={assistantSayPage}
+        businessCategory={businessCategory}
+      />
+    </Suspense>
   );
 }
