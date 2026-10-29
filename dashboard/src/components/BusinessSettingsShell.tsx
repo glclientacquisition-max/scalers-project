@@ -214,6 +214,7 @@ export function BusinessSettingsShell({
             sidebar={rail}
             saveCard={savePoliciesCardAction}
             saveUnknown={savePoliciesUnknownAction}
+            assistantSayPage={assistantSayPage}
           />
         </PoliciesSettingsErrorBoundary>
       ) : showForm ? (

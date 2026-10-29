@@ -17,10 +17,10 @@ for (const width of PHONE_WIDTHS) {
       await page.setViewportSize({ width, height: 844 });
       await page.emulateMedia({ colorScheme: scheme });
       await page.goto("/dev/settings-jobs?tab=assistant-say", { waitUntil: "networkidle" });
-      await expect(page.getByRole("heading", { name: "What your Business Assistant will say" })).toBeVisible();
-      const hoursRow = page.locator("main li").filter({ hasText: "Opening hours" });
+      await expect(page.getByRole("heading", { name: "What callers hear" })).toBeVisible();
+      const hoursRow = page.locator("main button").filter({ hasText: "Hours" });
       await expect(hoursRow.getByText("Will say", { exact: true })).toBeVisible();
-      await expect(page.getByText("Using team default")).toBeVisible();
+      await expect(page.getByText("Team default")).toBeVisible();
       await expectNoDevOverlay(page);
       await mkdir(OUT, { recursive: true });
       const file = join(OUT, `assistant-say-${width}-${scheme}.png`);

@@ -18,7 +18,7 @@ export function confirmCheckForItem(
   itemId: string,
   checks: OverviewDataCheck[]
 ): OverviewDataCheck | null {
-  if (itemId === "catalog") return checks.find((c) => c.kind === "prices") ?? null;
+  if (itemId === "catalog" || itemId === "prices") return checks.find((c) => c.kind === "prices") ?? null;
   if (itemId === "payment") return checks.find((c) => c.kind === "payments") ?? null;
   if (itemId === "hours") return checks.find((c) => c.kind === "hours") ?? null;
   return null;

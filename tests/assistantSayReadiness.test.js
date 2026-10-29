@@ -82,7 +82,7 @@ describe('assistantSayReadiness', () => {
 
     const hoursItem = checklist.items.find((i) => i.id === 'hours');
     const payItem = checklist.items.find((i) => i.id === 'payment');
-    const catalogItem = checklist.items.find((i) => i.id === 'catalog');
+    const catalogItem = checklist.items.find((i) => i.id === 'prices');
 
     assert.equal(hoursItem.complete, rowWillSay(say, 'hours'));
     assert.equal(payItem.complete, rowWillSay(say, 'payment'));
@@ -100,14 +100,11 @@ describe('assistantSayReadiness', () => {
     const say = evaluateAssistantSay(profile);
     const checklist = getReadyChecklist(profile);
     for (const item of checklist.items) {
-      if (item.id === 'identity') {
-        assert.equal(item.complete, Boolean(devRetailTenant.business_name?.trim()));
-        continue;
-      }
-      const rowId = item.id === 'catalog' ? 'prices' : item.id === 'payment' ? 'payment' : item.id;
-      const row = say.rows.find((r) => r.id === rowId);
-      assert.ok(row, rowId);
-      assert.equal(item.complete, row.willSay);
+      const row = say.rows.find((r) => r.id === item.id);
+      assert.ok(row, item.id);
+      const complete =
+        item.id === 'unsure' ? row.stampTone === 'ok' : item.id === 'greeting' ? row.willSay : row.isFact && row.willSay;
+      assert.equal(item.complete, complete, item.id);
       if (!item.complete) assert.equal(item.reason, row.reason);
     }
   });
@@ -116,7 +113,7 @@ describe('assistantSayReadiness', () => {
     for (const key of ['carry', 'list']) {
       const profile = profileFromReplay(key);
       const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
-      for (const id of ['prices', 'hours', 'delivery', 'payment']) {
+      for (const id of ['prices', 'hours', 'areas', 'payment']) {
         const row = say.rows.find((r) => r.id === id);
         const result = lookupProbeForRowId(id, profile, FIXTURE_NOW);
         assert.ok(row, `${key}/${id}`);
@@ -143,19 +140,19 @@ describe('assistantSayReadiness', () => {
     assert.match(prices.reason, /Ready on the next call/);
   });
 
-  it('when unsure uses neutral stamp labels, not Will say / Wont say', () => {
+  it('when unsure uses team default or will say stamps, not fact wont say', () => {
     const profile = tenantProfileFromRow({ ...devRetailTenant, unknown_answer_fallback: 'We will call you back.' }, {});
     const say = evaluateAssistantSay(profile);
     const unsure = say.rows.find((r) => r.id === 'unsure');
     assert.ok(unsure);
     assert.equal(unsure.isFact, false);
-    assert.equal(unsure.stampLabel, 'Callback line set');
+    assert.equal(unsure.stampLabel, 'Will say');
     assert.equal(unsure.stampTone, 'ok');
     assert.notEqual(unsure.stampLabel, "Won't say");
 
     const defaultSay = evaluateAssistantSay(tenantProfileFromRow(devRetailTenant, {}));
     const defaultUnsure = defaultSay.rows.find((r) => r.id === 'unsure');
-    assert.equal(defaultUnsure.stampLabel, 'Using team default');
+    assert.equal(defaultUnsure.stampLabel, 'Team default');
     assert.equal(defaultUnsure.stampTone, 'neutral');
   });
 
@@ -183,8 +180,8 @@ describe('assistantSayReadiness', () => {
     }, {});
     assert.deepEqual(readinessQuestions(profile).fee, ['Do you deliver to Westlands?']);
     assert.equal(previewSampleQuestions(profile).delivery, 'Do you deliver to Westlands?');
-    const row = evaluateAssistantSay(profile, { now: FIXTURE_NOW }).rows.find((r) => r.id === 'delivery');
-    assert.equal(row.willSay, lookupProbeForRowId('delivery', profile, FIXTURE_NOW).status === 'found');
+    const row = evaluateAssistantSay(profile, { now: FIXTURE_NOW }).rows.find((r) => r.id === 'areas');
+    assert.equal(row.willSay, lookupProbeForRowId('areas', profile, FIXTURE_NOW).status === 'found');
   });
 
   it('a tenant with no catalogue or areas gets no price or delivery question', () => {
@@ -194,7 +191,7 @@ describe('assistantSayReadiness', () => {
     assert.deepEqual(q.fee, []);
     const say = evaluateAssistantSay(empty, { now: FIXTURE_NOW });
     assert.equal(say.rows.find((r) => r.id === 'prices').willSay, false);
-    assert.equal(say.rows.find((r) => r.id === 'delivery').willSay, false);
+    assert.equal(say.rows.find((r) => r.id === 'areas').willSay, false);
     assert.deepEqual(previewSampleQuestions(empty), {
       price: '',
       hours: 'What are your opening hours?',
@@ -362,7 +359,7 @@ describe('assistantSayReadiness', () => {
       const samples = previewSampleQuestions(profile, { now: FIXTURE_NOW });
       const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
       const pricesRow = say.rows.find((r) => r.id === 'prices');
-      const deliveryRow = say.rows.find((r) => r.id === 'delivery');
+      const deliveryRow = say.rows.find((r) => r.id === 'areas');
       const c = { profile, language: 'en', now: FIXTURE_NOW, seed: 0 };
       if (samples.price) {
         const priceHit = lookup('price', samples.price, c);

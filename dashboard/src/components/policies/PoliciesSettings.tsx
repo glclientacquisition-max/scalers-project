@@ -12,6 +12,7 @@ import { SettingsPageHeader, settingsConsoleClass, settingsPanelClass } from "@/
 import type { SettingsCompileState } from "@/app/(desk)/settings/actions";
 import type { PoliciesCardResult, PoliciesUnknownInput } from "@/app/(desk)/settings/policiesCardActions";
 import type { TenantRow } from "@/lib/supabase";
+import { assistantSayTopicHref } from "@/lib/assistantSayTopics";
 import { cx } from "@/lib/cx";
 import { labelOfMethod, methodSummary, normalizePayments, type PaymentMethod } from "@/lib/payments";
 import { normalizeBusinessPolicies, readBookingMode, readHoldRules, seedStarterPolicies } from "@/lib/businessPolicies";
@@ -390,6 +391,7 @@ function PoliciesSettingsInner({
   saveCard,
   saveUnknown,
   initialSheet = null,
+  assistantSayPage = false,
 }: {
   tenant: TenantRow;
   heading?: string | null;
@@ -400,6 +402,7 @@ function PoliciesSettingsInner({
   saveCard: SaveCardFn;
   saveUnknown: SaveUnknownFn;
   initialSheet?: SheetState | null;
+  assistantSayPage?: boolean;
 }) {
   const canEdit = useCan("settings.edit");
   const kind: PoliciesKind = policiesKind(tenant);
@@ -731,13 +734,25 @@ function PoliciesSettingsInner({
             </PolicyCard>
 
             <PolicyCard id="unsure" title="When unsure" status={statusOf("unsure")} headingRef={refs.unsure} highlight={highlight === "unsure"}>
-              <SentenceRow
-                id="unsure-line"
-                title={unsure.automatic ? "Automatic" : "Your words"}
-                sentence={unsure.text}
-                canEdit={canEdit}
-                onChange={() => openSheet({ kind: "unsure" })}
-              />
+              {assistantSayPage ? (
+                <div className="space-y-3 px-4 py-3">
+                  <p className="text-body text-ink [overflow-wrap:anywhere]">{unsure.text}</p>
+                  <Link
+                    href={assistantSayTopicHref("unsure")}
+                    className="inline-flex min-h-11 items-center text-body font-medium text-accent-deep underline-offset-2 hover:underline"
+                  >
+                    Edit in What callers hear
+                  </Link>
+                </div>
+              ) : (
+                <SentenceRow
+                  id="unsure-line"
+                  title={unsure.automatic ? "Automatic" : "Your words"}
+                  sentence={unsure.text}
+                  canEdit={canEdit}
+                  onChange={() => openSheet({ kind: "unsure" })}
+                />
+              )}
             </PolicyCard>
           </div>
           <CallersHearAside preview={callersHearPreview} />

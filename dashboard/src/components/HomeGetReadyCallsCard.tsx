@@ -135,7 +135,7 @@ export function HomeGetReadyCallsCard({
               focusRingVisible,
             ].join(" ")}
           >
-            What your Business Assistant will say
+            What callers hear
           </Link>
         </p>
       </SettingsGroup>
