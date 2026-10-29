@@ -2,7 +2,8 @@
 
 import { policiesFormKey } from "@/lib/serviceAreas";
 import { catalogContentKey } from "@/lib/catalogPricing";
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { nextFormMountKey, type FormMountKey } from "@/lib/formSave";
 
 import type { TenantRow } from "@/lib/supabase";
@@ -31,6 +32,8 @@ import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import { resolveTenantBusinessType } from "@/lib/businessType";
 import {
   settingsPanelHeading,
+  parseBusinessSettingsPanel,
+  parseBusinessSettingsTab,
   type BusinessSettingsTab,
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
@@ -41,6 +44,20 @@ import {
   settingsPanelClass,
 } from "@/components/settingsUi";
 import { SettingsMenu, SettingsRail } from "@/components/SettingsSideNav";
+
+/** Client URL wins over a stale server tab during soft navigation (avoids a flash of the Settings home). */
+function useResolvedSettingsRoute(serverTab: BusinessSettingsTab, serverTrainPanel: SettingsPanel) {
+  const searchParams = useSearchParams();
+  return useMemo(() => {
+    const tabRaw = searchParams.get("tab");
+    const panelRaw = searchParams.get("panel");
+    const tabFromUrl = parseBusinessSettingsTab(tabRaw, panelRaw);
+    const trainFromUrl = parseBusinessSettingsPanel(panelRaw, tabRaw);
+    const tab = tabFromUrl !== "menu" ? tabFromUrl : serverTab;
+    const trainPanel = tabFromUrl !== "menu" || tabRaw || panelRaw ? trainFromUrl : serverTrainPanel;
+    return { tab, trainPanel };
+  }, [searchParams, serverTab, serverTrainPanel]);
+}
 
 function settingsLineState(did: string | null | undefined): {
   lineLive: boolean;
@@ -105,11 +122,12 @@ export function BusinessSettingsShell({
   /** Identity: tenants.business_category for the one "What you do" question. */
   businessCategory?: string | null;
 }) {
+  const { tab: activeTab, trainPanel: activeTrainPanel } = useResolvedSettingsRoute(tab, trainPanel);
   const formPanel: SettingsPanel =
-    tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
-  const showForm = tab === "catalog" || tab === "train";
-  const isMenu = tab === "menu";
-  const heading = settingsPanelHeading(tab, trainPanel, tenant.vertical);
+    activeTab === "catalog" ? "catalog" : activeTab === "train" ? activeTrainPanel : "identity";
+  const showForm = activeTab === "catalog" || activeTab === "train";
+  const isMenu = activeTab === "menu";
+  const heading = settingsPanelHeading(activeTab, activeTrainPanel, tenant.vertical);
   const { lineLive, lineDetail } = settingsLineState(tenant.sautikit_virtual_number);
   const businessName = tenant.business_name?.trim() || "Business";
 
@@ -152,8 +170,8 @@ export function BusinessSettingsShell({
 
   const rail = (
     <SettingsRail
-      tab={tab}
-      trainPanel={trainPanel}
+      tab={activeTab}
+      trainPanel={activeTrainPanel}
       optionStatus={optionStatus}
       assistantSayPage={assistantSayPage}
     />
@@ -174,8 +192,8 @@ export function BusinessSettingsShell({
               index
             />
             <SettingsMenu
-              tab={tab}
-              trainPanel={trainPanel}
+              tab={activeTab}
+              trainPanel={activeTrainPanel}
               variant="index"
               optionStatus={optionStatus}
               assistantSayPage={assistantSayPage}
@@ -235,7 +253,7 @@ export function BusinessSettingsShell({
         <div className={settingsConsoleClass}>
           {rail}
           <div className={settingsPanelClass}>
-            {tab === "alerts" ? (
+            {activeTab === "alerts" ? (
               <AlertsPanel tenant={tenant} businessName={businessName} />
             ) : (
               <>
@@ -243,15 +261,15 @@ export function BusinessSettingsShell({
                   businessName={businessName}
                   lineLive={lineLive}
                   lineDetail={lineDetail}
-                  showLine={tab === "test"}
+                  showLine={activeTab === "test"}
                   showBack
                   title={heading}
                 />
-                {tab === "calls" ? callsSlot : null}
-                {tab === "assistant-say" ? assistantSaySlot : null}
-                {tab === "import" || tab === "test" ? (
+                {activeTab === "calls" ? callsSlot : null}
+                {activeTab === "assistant-say" ? assistantSaySlot : null}
+                {activeTab === "import" || activeTab === "test" ? (
                   <SettingsPanelBody
-                    tab={tab}
+                    tab={activeTab}
                     tenant={tenant}
                     curatedVoices={curatedVoices}
                   />

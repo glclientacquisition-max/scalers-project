@@ -212,9 +212,28 @@ export function useFormSave<R extends FormSaveResult, P = FormData>(
     if (lastPayload.current !== null) submit(lastPayload.current);
   }, [submit]);
 
+  /** Inline errors only for the draft that was submitted when the save failed. */
+  const failedForSignature = useRef<string | null>(null);
+  if (live.landed > 0 && live.result !== null && live.result !== options.initialState) {
+    const landedOutcome = saveOutcome(live.result);
+    if (landedOutcome.kind === "error") {
+      const sig = submittedFor.get(live.result as object) ?? signatureRef.current;
+      if (sig !== null) failedForSignature.current = sig;
+    } else if (landedOutcome.kind === "ok") {
+      failedForSignature.current = null;
+    }
+  }
+
   const outcome = state === options.initialState ? null : saveOutcome(state);
-  const error =
-    outcome?.kind === "error" ? outcome.message : state.ok && state.error ? state.error : null;
+  const showInlineError =
+    failedForSignature.current !== null &&
+    failedForSignature.current === signatureRef.current &&
+    outcome?.kind === "error";
+  const error = showInlineError
+    ? outcome.message
+    : state.ok && state.error && state !== options.initialState
+      ? state.error
+      : null;
 
   return {
     state,

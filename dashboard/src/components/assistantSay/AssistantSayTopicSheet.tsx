@@ -119,7 +119,7 @@ export function AssistantSayTopicSheet({
 
   const save = useFormSave<FallbackSaveState>({
     action: saveFallbacks,
-    initialState: {},
+    initialState: { ok: true },
     successMessage: "Saved",
     formId: `assistant-say-sheet-${row.id}`,
     onLanded: (result) => {

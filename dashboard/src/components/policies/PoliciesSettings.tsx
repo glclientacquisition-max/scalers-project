@@ -13,6 +13,8 @@ import type { SettingsCompileState } from "@/app/(desk)/settings/actions";
 import type { PoliciesCardResult, PoliciesUnknownInput } from "@/app/(desk)/settings/policiesCardActions";
 import type { TenantRow } from "@/lib/supabase";
 import { assistantSayTopicHref } from "@/lib/assistantSayTopics";
+import { resolveTenantBusinessType } from "@/lib/businessType";
+import { parseUnknownAnswerByKind, spokenFallbackLine } from "@/lib/unknownAnswerByKindConstants";
 import { cx } from "@/lib/cx";
 import { labelOfMethod, methodSummary, normalizePayments, type PaymentMethod } from "@/lib/payments";
 import { normalizeBusinessPolicies, readBookingMode, readHoldRules, seedStarterPolicies } from "@/lib/businessPolicies";
@@ -498,6 +500,12 @@ function PoliciesSettingsInner({
   const holds = readHoldRules(bp.holds);
   const holdLabel = (h: number) => (h < 24 ? `${h} hours` : h === 24 ? "1 day" : `${h / 24} days`);
   const unsure = unknownAnswerSentence(ownerUnknownAnswer(unknown.text));
+  const assistantSayUnsureLine = useMemo(() => {
+    if (!assistantSayPage) return "";
+    const byKind = parseUnknownAnswerByKind(tenant.unknown_answer_by_kind);
+    const businessType = resolveTenantBusinessType(tenant);
+    return spokenFallbackLine("general", byKind, "en", tenant.unknown_answer_fallback, businessType);
+  }, [assistantSayPage, tenant]);
   const payNeedsCheck = Boolean(payments && payments.methods.length && !payments.confirmed);
   const legacyPay = !payments?.methods.length && !starterSet.has("payment") ? String(bp.payment || "").trim() : "";
   const callersHearPreview = useCallersHearPreview(lines, tenant, voices);
@@ -736,7 +744,7 @@ function PoliciesSettingsInner({
             <PolicyCard id="unsure" title="When unsure" status={statusOf("unsure")} headingRef={refs.unsure} highlight={highlight === "unsure"}>
               {assistantSayPage ? (
                 <div className="space-y-3 px-4 py-3">
-                  <p className="text-body text-ink [overflow-wrap:anywhere]">{unsure.text}</p>
+                  <p className="text-body text-ink [overflow-wrap:anywhere]">{assistantSayUnsureLine}</p>
                   <Link
                     href={assistantSayTopicHref("unsure")}
                     className="inline-flex min-h-11 items-center text-body font-medium text-accent-deep underline-offset-2 hover:underline"
