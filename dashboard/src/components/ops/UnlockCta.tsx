@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { StepUpSheet } from "./StepUpSheet";
+import { useAdminUnlockSession } from "./useAdminUnlockSession";
 
 /** One Unlock control for Admin v2. Opens StepUpSheet; never writes domain state alone. */
 export function UnlockCta({
-  action, what, site, target, label = "Unlock to edit", variant = "primary", size = "sm", onUnlocked, observedHint,
+  action, what, site, target, label = "Unlock", variant = "primary", size = "sm", onUnlocked, observedHint,
 }: {
   action: string;
   what: string;
@@ -19,6 +20,17 @@ export function UnlockCta({
   observedHint?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const session = useAdminUnlockSession();
+  const showUnlocked = session.unlocked && session.status?.mode === "enforce";
+
+  if (showUnlocked) {
+    return (
+      <span className="text-ops-label text-ink-2 tabular-nums" data-unlocked="" data-stepup={site}>
+        Unlocked · {session.remaining.text}
+      </span>
+    );
+  }
+
   return (
     <>
       <Button type="button" variant={variant} size={size} data-stepup={site} data-honest="unlock" onClick={() => setOpen(true)}>
@@ -30,7 +42,10 @@ export function UnlockCta({
         action={action}
         target={target}
         what={what}
-        onObserved={onUnlocked}
+        onObserved={() => {
+          void session.refresh();
+          onUnlocked?.();
+        }}
         observedHint={observedHint}
       />
     </>

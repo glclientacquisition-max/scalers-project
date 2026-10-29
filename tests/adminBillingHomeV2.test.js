@@ -53,8 +53,9 @@ test("Billing home denser: ops-tiles KPIs, catalog link, BusinessPane money", ()
   assert.doesNotMatch(ui, /bg-brand|ribbon/i);
 });
 
-test("Packages tab copy is catalog-only (assign stays on business)", () => {
+test("Packages tab lists packages with pagination and assign on business", () => {
   const ui = read("dashboard/src/components/admin/v2/AdminPackagesV2.tsx");
-  assert.match(ui, /Catalog only/);
-  assert.match(ui, /assign from the business/i);
+  assert.match(ui, /PAGE_SIZE = 25/);
+  assert.match(ui, /searchParams\.get\("page"/);
+  assert.match(ui, /UnlockCta/);
 });

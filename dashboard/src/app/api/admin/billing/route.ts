@@ -13,7 +13,7 @@ import { loadAdminShopInvoices, mintAdminInvoicePayLink } from "@/lib/adminBilli
 import { bookTotalForResolve, collectedFromCheckout } from "@/lib/invoicePay/webhook";
 import { effectivePaymentEnv } from "@/lib/billingRuntimeSettings";
 import { assertLiveTenant, bachsMode, paymentsClosed, payProviderFromEnv } from "@/lib/invoicePay/provider";
-import { isLegacyAuthenticated } from "@/lib/auth";
+import { requireAdminApiRead, requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { recordAdminAction } from "@/lib/adminAudit";
 import { assignBusinessPackage, loadBusinessPackageNames, unassignBusinessPackage } from "@/lib/packageCatalog";
 import {
@@ -70,8 +70,9 @@ async function totalForBookedResolve(
 }
 
 export async function GET(request: Request) {
-  if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  const read = await requireAdminApiRead();
+  if (!read.ok) {
+    return NextResponse.json({ error: read.error }, { status: read.status });
   }
 
   const { searchParams } = new URL(request.url);
@@ -110,8 +111,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  const gate = await requireAdminOperatorWrite();
+  if (!gate.ok) {
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
 
   const body = await request.json();
