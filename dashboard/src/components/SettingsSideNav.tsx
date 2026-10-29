@@ -181,7 +181,9 @@ export function SettingsMenu({
                         <SettingsRowIcon statusKey={key} />
                         <span className="min-w-0 flex-1 py-2">
                           <span className="block truncate">{item.label}</span>
-                          <span className="block text-meta font-normal text-ink-2">{settingsNavDescription(item, vertical)}</span>
+                          <span className="block line-clamp-2 text-meta font-normal text-ink-2 [overflow-wrap:anywhere]">
+                            {settingsNavDescription(item, vertical)}
+                          </span>
                         </span>
                       </>
                     )}

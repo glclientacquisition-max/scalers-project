@@ -26,6 +26,7 @@ const IdentitySettings = dynamic(() => import("@/components/identity/IdentitySet
 const PoliciesSettings = dynamic(() => import("@/components/policies/PoliciesSettings").then((m) => m.PoliciesSettings), {
   loading: () => <PoliciesSkeleton />,
 });
+import { PoliciesSettingsErrorBoundary } from "@/components/policies/PoliciesSettingsErrorBoundary";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import { parseVertical } from "@/lib/vertical";
 import {
@@ -163,7 +164,7 @@ export function BusinessSettingsShell({
     // Server-rendered with no viewport script, so nothing shifts after paint.
     return (
       <SettingsLeaveGuard>
-      <div className="w-full min-w-0" data-settings-console="" data-settings-home="" data-pull-dirty-guard="">
+      <div className="w-full min-w-0 overflow-x-clip" data-settings-console="" data-settings-home="" data-pull-dirty-guard="">
         <div className="w-full min-w-0">
           <div className={`${settingsPanelClass} mx-auto w-full md:max-w-3xl md:pt-4 xl:max-w-6xl`}>
             <SettingsPageHeader
@@ -189,7 +190,7 @@ export function BusinessSettingsShell({
 
   return (
     <SettingsLeaveGuard>
-    <div className="w-full min-w-0" data-settings-console="" data-desk-nested="" data-pull-dirty-guard="">
+    <div className="w-full min-w-0 overflow-x-clip" data-settings-console="" data-desk-nested="" data-pull-dirty-guard="">
       {showForm && formPanel === "identity" ? (
         // Identity: three cards that each save on their own (no shared form or Save).
         <IdentitySettings
@@ -203,16 +204,18 @@ export function BusinessSettingsShell({
         />
       ) : showForm && formPanel === "policies" ? (
         // Policies: cards that each save on their own, beside what callers hear.
-        <PoliciesSettings
-          key={`${tenant.id}:policies`}
-          onSaveActivity={markOwnSave}
-          tenant={tenant}
-          curatedVoices={curatedVoices}
-          heading={heading}
-          sidebar={rail}
-          saveCard={savePoliciesCardAction}
-          saveUnknown={savePoliciesUnknownAction}
-        />
+        <PoliciesSettingsErrorBoundary businessName={businessName} heading={heading} sidebar={rail}>
+          <PoliciesSettings
+            key={`${tenant.id}:policies`}
+            onSaveActivity={markOwnSave}
+            tenant={tenant}
+            curatedVoices={curatedVoices}
+            heading={heading}
+            sidebar={rail}
+            saveCard={savePoliciesCardAction}
+            saveUnknown={savePoliciesUnknownAction}
+          />
+        </PoliciesSettingsErrorBoundary>
       ) : showForm ? (
         <TenantForm
           key={tenantFormKey}

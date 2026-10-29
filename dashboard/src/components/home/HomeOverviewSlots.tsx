@@ -3,6 +3,7 @@ import { HomeCallSetupCard } from "@/components/HomeCallSetupCard";
 import { HomeGetReadyCallsCard } from "@/components/HomeGetReadyCallsCard";
 import { HomeUsageSection } from "@/components/HomeUsageSection";
 import { CallInsights } from "@/components/insights/CallInsights";
+import { HomeInsightsError } from "@/components/home/HomeInsightsError";
 import { OverviewDataChecksCard } from "@/components/structured/OverviewDataChecksCard";
 import { dataChecksFor } from "@/components/structured/StructuredSettingsSlots";
 import { areaConfirmCheck } from "@/lib/areaConfirmCheck.server";
@@ -116,6 +117,7 @@ export async function HomeChecksSlot({ tenant, canEditSettings }: { tenant: Home
 
 /** What callers told us (last 30 days). */
 export async function HomeInsightsSlot({ client, tenant }: { client: HomeClient; tenant: HomeTenant }) {
-  const insights = await loadCallInsights(client, tenant.id, 30, tenant.faqs);
-  return insights ? <CallInsights insights={insights} /> : null;
+  const loaded = await loadCallInsights(client, tenant.id, 30, tenant.faqs);
+  if (!loaded.ok) return <HomeInsightsError />;
+  return <CallInsights insights={loaded.insights} />;
 }

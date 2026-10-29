@@ -261,4 +261,11 @@ describe("desk motion wiring", () => {
     const root = read("dashboard/src/app/layout.tsx");
     assert.match(root, /<NotifyHost \/>/);
   });
+
+  it("optional desk feel eases the sheet behind DESK_FEEL", () => {
+    assert.match(css, /data-desk-feel="on"/);
+    assert.match(css, /prefers-reduced-motion: reduce/);
+    assert.match(read("dashboard/src/app/(desk)/layout.tsx"), /data-desk-feel=/);
+    assert.match(read("dashboard/src/lib/deskFeel.ts"), /deskConfirmHaptic/);
+  });
 });

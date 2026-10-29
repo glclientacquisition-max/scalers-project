@@ -19,7 +19,7 @@ export function SettingsPlanFrame({
   children: ReactNode;
 }) {
   return (
-    <div className="w-full min-w-0" data-settings-console="" data-desk-nested="">
+    <div className="w-full min-w-0 overflow-x-clip" data-settings-console="" data-desk-nested="">
       <div className={settingsConsoleClass}>
         <SettingsRail activePath={activePath} optionStatus={optionStatus} />
         <div className={`${settingsPanelClass} max-w-[55rem] [&>header]:max-w-none`}>

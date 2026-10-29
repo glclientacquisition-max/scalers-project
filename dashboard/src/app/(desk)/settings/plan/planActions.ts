@@ -3,20 +3,12 @@
 import { effectivePaymentEnv } from "@/lib/billingRuntimeSettings";
 import { memberDenied } from "@/lib/requireMember";
 import { planChangePort, type PlanCycle } from "@/lib/deskPlanChange";
+import { planChangesClosed, type PlanActionState } from "@/lib/planActionOutcome";
 
-export type PlanActionState = {
-  ok: false;
-  message?: string;
-  error?: string;
-  denied?: boolean;
-};
+export type { PlanActionState };
 
-const CLOSED: PlanActionState = { ok: false, message: "Plan changes open soon" };
-
-function closed(result: { ok: boolean }): PlanActionState {
-  if (result.ok) return CLOSED;
-  return CLOSED;
-}
+/** Total extra seats, 0 to 100. Same bound as owner_set_extra_seats. */
+const EXTRA_SEAT_TOTAL_MAX = 100;
 
 export async function confirmPlanChange(
   _prev: PlanActionState,
@@ -26,15 +18,19 @@ export async function confirmPlanChange(
   if (denied) return denied;
   const sku = String(formData.get("sku") || "");
   const cycle = String(formData.get("cycle") || "");
+  const idempotencyKey = String(formData.get("idempotency_key") || "").trim();
   if (!["starter", "growth", "scale"].includes(sku) || (cycle !== "month" && cycle !== "year")) {
     return { ok: false, error: "Choose a plan first." };
   }
+  if (!idempotencyKey) return { ok: false, error: "Try again." };
   const env = await effectivePaymentEnv();
-  return closed(await planChangePort(env).changePlan({ sku, cycle: cycle as PlanCycle }));
+  if (env.DESK_PLAN_CHANGE !== "on") return planChangesClosed();
+  return planChangePort(env).changePlan({
+    sku,
+    cycle: cycle as PlanCycle,
+    idempotencyKey,
+  });
 }
-
-/** Total extra seats, 0 to 100. Same bound as owner_set_extra_seats. */
-const EXTRA_SEAT_TOTAL_MAX = 100;
 
 export async function setExtraSeatsAction(
   _prev: PlanActionState,
@@ -49,5 +45,6 @@ export async function setExtraSeatsAction(
   }
   if (!idempotencyKey) return { ok: false, error: "Try again." };
   const env = await effectivePaymentEnv();
-  return closed(await planChangePort(env).setExtraSeats({ extraSeats, idempotencyKey }));
+  if (env.DESK_PLAN_CHANGE !== "on") return planChangesClosed();
+  return planChangePort(env).setExtraSeats({ extraSeats, idempotencyKey });
 }

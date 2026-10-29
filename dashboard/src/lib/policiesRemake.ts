@@ -276,7 +276,7 @@ export function callersHearLines(raw: StoredPolicies, kind: PoliciesKind, niche:
   const deposit = starters.has("deposit") ? "" : String(bp.deposit || "").trim();
   if (deposit) out.push({ key: "deposit", label: kind === "retail" ? "Holds" : "Deposits", text: deposit });
   const other = starters.has("other") ? "" : String(bp.other || "").trim();
-  if (other) out.push({ key: "other", label: "Anything else", text: other });
+  if (other) out.push({ key: "other", label: "Extra note", text: other });
   return out;
 }
 
@@ -480,5 +480,6 @@ export function sanitizePoliciesPatch(raw: unknown): PoliciesPatch {
 export const POLICIES_ANCHORS = ["payments", "pay-timing", "bookings", "holds", "rules", "other", "unsure"] as const;
 export function policiesAnchor(hash: string | null | undefined): (typeof POLICIES_ANCHORS)[number] | null {
   const h = String(hash ?? "").replace(/^#/, "");
+  if (h === "pay-timing") return "payments";
   return (POLICIES_ANCHORS as readonly string[]).includes(h) ? (h as (typeof POLICIES_ANCHORS)[number]) : null;
 }

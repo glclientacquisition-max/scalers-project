@@ -220,6 +220,8 @@ export function PhoneAlertsCard() {
     await refresh();
   }
 
+  if (!VAPID_PUBLIC_KEY) return null;
+
   return (
     <PhoneAlertsView
       state={state}

@@ -1,7 +1,8 @@
 "use server";
 
-import type { PolicySaveResult } from "@/app/(desk)/settings/policies/actions";
 import { draftErrors, type Draft } from "@/lib/policyRegistry";
+
+export type PolicySaveResult = { ok: true } | { ok: false; error: string };
 
 /** Dev harness save: writes nothing. Off unless DASHBOARD_OPEN=true. */
 export async function devSavePolicyTopicAction(_topic: string, draft: Draft): Promise<PolicySaveResult> {

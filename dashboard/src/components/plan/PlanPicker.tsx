@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState, type ReactNode } from "react";
+import { useActionState, useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { MinusIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
@@ -26,6 +27,12 @@ import {
   splitPayNote,
 } from "@/lib/planPricing";
 import type { OwnerPlanModel, PlanCycle, PlanSku, PublishedPlan } from "@/lib/ownerPlanLoad";
+import { deskConfirmHaptic } from "@/lib/deskFeel";
+
+function planFeedback(state: PlanActionState): string | undefined {
+  if (state.ok) return state.message;
+  return state.message || state.error;
+}
 
 const idle: PlanActionState = { ok: false };
 const TEAM_HREF = "/settings?tab=train&panel=team";
@@ -127,12 +134,15 @@ export function PlanPicker({
   model,
   openSeat,
   startConfirm = null,
+  planChangesEnabled = true,
 }: {
   model: OwnerPlanModel;
   openSeat: boolean;
   /** Dev preview only. Opens the confirm sheet on this plan. */
   startConfirm?: PlanSku | null;
+  planChangesEnabled?: boolean;
 }) {
+  const router = useRouter();
   const trial = Boolean(model.trialText);
   const [cycle, setCycle] = useState<PlanCycle>(model.cycle);
   const [sku, setSku] = useState<PlanSku | null>(startConfirm);
@@ -140,8 +150,21 @@ export function PlanPicker({
   const [seatOpen, setSeatOpen] = useState(openSeat);
   const [seats, setSeats] = useState(model.extraSeats);
   const [seatKey, setSeatKey] = useState(() => (openSeat ? crypto.randomUUID() : ""));
+  const [planKey, setPlanKey] = useState(() => (startConfirm ? crypto.randomUUID() : ""));
   const [planState, planAction, planPending] = useActionState(confirmPlanChange, idle);
   const [seatState, seatAction, seatPending] = useActionState(setExtraSeatsAction, idle);
+
+  useEffect(() => {
+    if (!planState.ok) return;
+    setConfirmOpen(false);
+    router.refresh();
+  }, [planState.ok, router]);
+
+  useEffect(() => {
+    if (!seatState.ok) return;
+    setSeatOpen(false);
+    router.refresh();
+  }, [seatState.ok, router]);
 
   const pinned = trial ? null : model.pinned;
   const selected = model.plans.find((plan) => plan.sku === sku) || null;
@@ -151,13 +174,21 @@ export function PlanPicker({
   const dids = model.plans[0]?.dids ?? 1;
 
   function open(next: PlanSku) {
+    if (!planChangesEnabled) return;
     setSku(next);
+    setPlanKey(crypto.randomUUID());
     setConfirmOpen(true);
   }
 
   return (
-    <div className="mt-4 flex flex-col gap-4">
+    <div className="mt-4 flex min-w-0 flex-col gap-4">
       {pinned ? <CurrentPlanCard model={model} plan={pinned} /> : null}
+
+      {!planChangesEnabled ? (
+        <p className="rounded-2xl border border-hairline bg-surface-2 px-4 py-3 text-body text-ink-2" role="status">
+          Plan changes are not open on this desk yet. Your package and usage stay as they are.
+        </p>
+      ) : null}
 
       <SegmentedControl
         label="Billing period"
@@ -173,8 +204,8 @@ export function PlanPicker({
       {model.plans.length === 0 ? (
         <p className="text-body text-ink-2">Plans show here once a package is published.</p>
       ) : (
-        <div>
-          <ul className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <div className="min-w-0">
+          <ul className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-3">
             {model.plans.map((plan) => {
               const isCurrent = onPublished && publishedCurrent?.sku === plan.sku;
               let action: ReactNode;
@@ -182,6 +213,12 @@ export function PlanPicker({
                 action = (
                   <p className="flex h-11 items-center justify-center rounded-xl bg-surface-2 text-body font-medium text-ink-2">
                     Your plan
+                  </p>
+                );
+              } else if (!planChangesEnabled) {
+                action = (
+                  <p className="flex h-11 items-center justify-center rounded-xl bg-surface-2 text-body font-medium text-ink-2">
+                    {isCurrent ? "Billing period" : "View only"}
                   </p>
                 );
               } else {
@@ -205,7 +242,7 @@ export function PlanPicker({
         </div>
       )}
 
-      {model.extraSeatMonthlyKes != null && !trial ? (
+      {model.extraSeatMonthlyKes != null && !trial && planChangesEnabled ? (
         <button
           type="button"
           onClick={() => {
@@ -231,6 +268,7 @@ export function PlanPicker({
         action={planAction}
         pending={planPending}
         state={planState}
+        idempotencyKey={planKey}
       />
 
       <Sheet
@@ -241,7 +279,13 @@ export function PlanPicker({
           model.extraSeatMonthlyKes != null ? `${formatKsh(model.extraSeatMonthlyKes)} a month each` : undefined
         }
         footer={
-          <form action={seatAction} className="w-full">
+          <form
+            action={seatAction}
+            className="w-full"
+            onSubmit={() => {
+              deskConfirmHaptic();
+            }}
+          >
             <input type="hidden" name="extra_seats" value={seats} />
             <input type="hidden" name="idempotency_key" value={seatKey} />
             <Button type="submit" variant="tonal" block pending={seatPending} disabled={seats === model.extraSeats}>
@@ -260,8 +304,8 @@ export function PlanPicker({
           </IconButton>
         </div>
         <SeatChangeNote model={model} next={seats} />
-        {seatState.message || seatState.error ? (
-          <p className="mt-3 text-body text-ink">{seatState.message || seatState.error}</p>
+        {planFeedback(seatState) ? (
+          <p className="mt-3 text-body text-ink">{planFeedback(seatState)}</p>
         ) : null}
       </Sheet>
     </div>
@@ -279,6 +323,7 @@ function ConfirmSheet({
   action,
   pending,
   state,
+  idempotencyKey,
 }: {
   model: OwnerPlanModel;
   current: PublishedPlan | null;
@@ -290,6 +335,7 @@ function ConfirmSheet({
   action: (payload: FormData) => void;
   pending: boolean;
   state: PlanActionState;
+  idempotencyKey: string;
 }) {
   const start = model.nextPeriodStartLabel || model.periodEndLabel;
   const sameCycle = cycle === model.cycle;
@@ -350,9 +396,16 @@ function ConfirmSheet({
             Team
           </ButtonLink>
         ) : (
-          <form action={action} className="w-full">
+          <form
+            action={action}
+            className="w-full"
+            onSubmit={() => {
+              deskConfirmHaptic();
+            }}
+          >
             <input type="hidden" name="sku" value={selected?.sku || ""} />
             <input type="hidden" name="cycle" value={cycle} />
+            <input type="hidden" name="idempotency_key" value={idempotencyKey} />
             <Button type="submit" variant="tonal" block pending={pending} disabled={!selected}>
               Confirm
             </Button>
@@ -386,7 +439,11 @@ function ConfirmSheet({
           {split ? <p className="mt-3 text-meta text-ink-2">{split}</p> : null}
         </>
       )}
-      {state.message || state.error ? <p className="mt-3 text-body text-ink">{state.message || state.error}</p> : null}
+      {planFeedback(state) ? (
+        <p className="mt-3 text-body text-ink" role={state.ok ? "status" : "alert"}>
+          {planFeedback(state)}
+        </p>
+      ) : null}
     </Sheet>
   );
 }

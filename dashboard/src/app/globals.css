@@ -558,6 +558,16 @@ h3,
   transition-duration: 0ms;
 }
 
+:root[data-desk-feel="on"] .desk-drawer:not([data-swiping]) {
+  transition: transform 380ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-desk-feel="on"] .desk-drawer:not([data-swiping]) {
+    transition: transform var(--sheet-ms) var(--ease-out);
+  }
+}
+
 .desk-drawer-backdrop {
   background-color: var(--scrim);
   opacity: calc(0.4 * (1 - var(--drawer-swipe-progress, 0)));
