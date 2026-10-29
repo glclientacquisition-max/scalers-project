@@ -2,10 +2,16 @@
  * Plan-change and seat RPCs. Screens stay off unless DESK_PLAN_CHANGE is on.
  */
 
-import { deskPlanChangeOn } from "./deskPlanChange";
-import { planChangesClosed, type PlanActionState } from "./planActionOutcome";
+import { planChangesClosed, type PlanActionState } from "./planActionOutcome.ts";
 
-export { deskPlanChangeOn };
+export function deskPlanChangeEnabled(): boolean {
+  return process.env.DESK_PLAN_CHANGE === "on";
+}
+
+export function deskPlanChangeOn(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env === process.env) return deskPlanChangeEnabled();
+  return env.DESK_PLAN_CHANGE === "on";
+}
 
 export type PlanCycle = "month" | "year";
 
@@ -29,10 +35,6 @@ const closedPort: PlanChangePort = {
     return planChangesClosed();
   },
 };
-
-export function deskPlanChangeEnabled(): boolean {
-  return process.env.DESK_PLAN_CHANGE === "on";
-}
 
 export function planChangePort(env: NodeJS.ProcessEnv = process.env): PlanChangePort {
   if (!deskPlanChangeOn(env)) return closedPort;

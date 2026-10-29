@@ -11,6 +11,7 @@ import { memberCan } from "@/lib/requireMember";
 import { loadSettingsStatuses } from "@/lib/settingsRailStatus";
 import { getCurrentTenant } from "@/lib/tenant";
 import { loadOwnerPlan, loadUsageBillingExtras } from "@/lib/ownerPlanLoad";
+import { deskPlanChangeEnabled } from "@/lib/deskPlanChange";
 import { messageCreditsUsage } from "@/lib/messageCredits";
 
 async function PlanBody({ searchParams }: { searchParams: Promise<{ addon?: string }> }) {
@@ -38,7 +39,7 @@ async function PlanBody({ searchParams }: { searchParams: Promise<{ addon?: stri
       {loaded.model.surface.showDunningBanner && loaded.model.banner ? (
         <BillingNote banner={loaded.model.banner} />
       ) : null}
-      <PlanPicker model={loaded.model} openSeat={addon === "seat"} />
+      <PlanPicker model={loaded.model} openSeat={addon === "seat"} planChangesEnabled={deskPlanChangeEnabled()} />
     </SettingsPlanFrame>
   );
 }

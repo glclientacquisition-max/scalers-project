@@ -90,9 +90,8 @@ export function MembersPanel({
     } catch {
       result = { ok: false, error: "Something went wrong. Try again." };
     }
-    const saved = (result as { ok: boolean }).ok;
-    if (!saved) {
-      setSeatNote(result.message || result.error || "Plan changes open soon");
+    if (!result.ok) {
+      setSeatNote(result.message || result.error || "Plan changes are not open on this desk yet.");
       return;
     }
     setSeatOpen(false);

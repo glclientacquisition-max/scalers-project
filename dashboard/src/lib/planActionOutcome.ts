@@ -7,7 +7,7 @@ export type PlanActionState =
   | { ok: true; message?: string }
   | { ok: false; message?: string; error?: string; denied?: boolean };
 
-const CLOSED_MESSAGE = "Plan changes open soon";
+const CLOSED_MESSAGE = "Plan changes are not open on this desk yet.";
 
 export function planChangesClosed(): PlanActionState {
   return { ok: false, message: CLOSED_MESSAGE };

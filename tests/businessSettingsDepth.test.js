@@ -242,6 +242,8 @@ describe("business settings depth", () => {
     assert.match(alerts, /Alert phone/);
     assert.doesNotMatch(alerts, /Add person/);
     assert.match(read("dashboard/src/components/PhoneAlertsCard.tsx"), /if \(!VAPID_PUBLIC_KEY\) return null/);
+    assert.match(read("dashboard/src/components/settingsUi.tsx"), /overflow-x-clip/);
+    assert.match(read("dashboard/src/components/plan/PlanPicker.tsx"), /Plan changes are not open on this desk yet/);
   });
 
   it("names Policies empty next step without inventing Train facts", () => {

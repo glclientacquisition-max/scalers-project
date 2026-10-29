@@ -29,7 +29,7 @@ async function KnowledgeBody({ searchParams }: { searchParams: Promise<Search> }
   if (!state.ok && state.reason === "no_tables") redirect(`/settings?tab=catalog${needPrice ? "&filter=unpriced" : ""}`);
   if (!state.ok) return <DeskLoadError>Could not load your catalogue.</DeskLoadError>;
   return (
-    <div className="w-full min-w-0" data-settings-console="" data-desk-nested="">
+    <div className="w-full min-w-0 overflow-x-clip" data-settings-console="" data-desk-nested="">
       <div className={settingsConsoleClass}>
         <SettingsRail optionStatus={statuses} activePath="/settings/knowledge" assistantSayPage={deskAssistantSayPage()} />
         <div className="min-w-0 flex-1 md:max-w-2xl xl:max-w-desk" data-kb-screen="">

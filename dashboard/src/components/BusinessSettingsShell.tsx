@@ -164,7 +164,7 @@ export function BusinessSettingsShell({
     // Server-rendered with no viewport script, so nothing shifts after paint.
     return (
       <SettingsLeaveGuard>
-      <div className="w-full min-w-0" data-settings-console="" data-settings-home="" data-pull-dirty-guard="">
+      <div className="w-full min-w-0 overflow-x-clip" data-settings-console="" data-settings-home="" data-pull-dirty-guard="">
         <div className="w-full min-w-0">
           <div className={`${settingsPanelClass} mx-auto w-full md:max-w-3xl md:pt-4 xl:max-w-6xl`}>
             <SettingsPageHeader
@@ -190,7 +190,7 @@ export function BusinessSettingsShell({
 
   return (
     <SettingsLeaveGuard>
-    <div className="w-full min-w-0" data-settings-console="" data-desk-nested="" data-pull-dirty-guard="">
+    <div className="w-full min-w-0 overflow-x-clip" data-settings-console="" data-desk-nested="" data-pull-dirty-guard="">
       {showForm && formPanel === "identity" ? (
         // Identity: three cards that each save on their own (no shared form or Save).
         <IdentitySettings

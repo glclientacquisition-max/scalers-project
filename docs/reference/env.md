@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-246 variables.
+247 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -68,6 +68,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `DATABASE_URL` | scripts | `scripts/verify-staging-schema.js` |
 | `DESK_ASSISTANT_SAY_PAGE` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_ATTEST_SERVICE_AREAS` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
+| `DESK_FEEL` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_KB_ITEM_STATES` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_LOOKUP_PREVIEW` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_PLAN_CHANGE` | desk | `dashboard/src/lib/deskPlanChange.ts` |

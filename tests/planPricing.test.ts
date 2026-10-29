@@ -116,7 +116,7 @@ describe("plan change port", () => {
         cycle: "year",
         idempotencyKey: "k1",
       });
-      assert.deepEqual(off, { ok: false, message: "Plan changes open soon" });
+      assert.deepEqual(off, { ok: false, message: "Plan changes are not open on this desk yet." });
     } finally {
       if (prev === undefined) delete process.env.DESK_PLAN_CHANGE;
       else process.env.DESK_PLAN_CHANGE = prev;

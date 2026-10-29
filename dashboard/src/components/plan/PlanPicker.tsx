@@ -29,6 +29,11 @@ import {
 import type { OwnerPlanModel, PlanCycle, PlanSku, PublishedPlan } from "@/lib/ownerPlanLoad";
 import { deskConfirmHaptic } from "@/lib/deskFeel";
 
+function planFeedback(state: PlanActionState): string | undefined {
+  if (state.ok) return state.message;
+  return state.message || state.error;
+}
+
 const idle: PlanActionState = { ok: false };
 const TEAM_HREF = "/settings?tab=train&panel=team";
 
@@ -129,11 +134,13 @@ export function PlanPicker({
   model,
   openSeat,
   startConfirm = null,
+  planChangesEnabled = true,
 }: {
   model: OwnerPlanModel;
   openSeat: boolean;
   /** Dev preview only. Opens the confirm sheet on this plan. */
   startConfirm?: PlanSku | null;
+  planChangesEnabled?: boolean;
 }) {
   const router = useRouter();
   const trial = Boolean(model.trialText);
@@ -167,14 +174,21 @@ export function PlanPicker({
   const dids = model.plans[0]?.dids ?? 1;
 
   function open(next: PlanSku) {
+    if (!planChangesEnabled) return;
     setSku(next);
     setPlanKey(crypto.randomUUID());
     setConfirmOpen(true);
   }
 
   return (
-    <div className="mt-4 flex flex-col gap-4">
+    <div className="mt-4 flex min-w-0 flex-col gap-4">
       {pinned ? <CurrentPlanCard model={model} plan={pinned} /> : null}
+
+      {!planChangesEnabled ? (
+        <p className="rounded-2xl border border-hairline bg-surface-2 px-4 py-3 text-body text-ink-2" role="status">
+          Plan changes are not open on this desk yet. Your package and usage stay as they are.
+        </p>
+      ) : null}
 
       <SegmentedControl
         label="Billing period"
@@ -190,8 +204,8 @@ export function PlanPicker({
       {model.plans.length === 0 ? (
         <p className="text-body text-ink-2">Plans show here once a package is published.</p>
       ) : (
-        <div>
-          <ul className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <div className="min-w-0">
+          <ul className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-3">
             {model.plans.map((plan) => {
               const isCurrent = onPublished && publishedCurrent?.sku === plan.sku;
               let action: ReactNode;
@@ -199,6 +213,12 @@ export function PlanPicker({
                 action = (
                   <p className="flex h-11 items-center justify-center rounded-xl bg-surface-2 text-body font-medium text-ink-2">
                     Your plan
+                  </p>
+                );
+              } else if (!planChangesEnabled) {
+                action = (
+                  <p className="flex h-11 items-center justify-center rounded-xl bg-surface-2 text-body font-medium text-ink-2">
+                    {isCurrent ? "Billing period" : "View only"}
                   </p>
                 );
               } else {
@@ -222,7 +242,7 @@ export function PlanPicker({
         </div>
       )}
 
-      {model.extraSeatMonthlyKes != null && !trial ? (
+      {model.extraSeatMonthlyKes != null && !trial && planChangesEnabled ? (
         <button
           type="button"
           onClick={() => {
@@ -284,8 +304,8 @@ export function PlanPicker({
           </IconButton>
         </div>
         <SeatChangeNote model={model} next={seats} />
-        {seatState.message || seatState.error ? (
-          <p className="mt-3 text-body text-ink">{seatState.message || seatState.error}</p>
+        {planFeedback(seatState) ? (
+          <p className="mt-3 text-body text-ink">{planFeedback(seatState)}</p>
         ) : null}
       </Sheet>
     </div>
@@ -419,9 +439,9 @@ function ConfirmSheet({
           {split ? <p className="mt-3 text-meta text-ink-2">{split}</p> : null}
         </>
       )}
-      {state.message || state.error ? (
+      {planFeedback(state) ? (
         <p className="mt-3 text-body text-ink" role={state.ok ? "status" : "alert"}>
-          {state.message || state.error}
+          {planFeedback(state)}
         </p>
       ) : null}
     </Sheet>
