@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { PackageVersionCatalog, PackageVersionRow, VersionPackage } from "@/lib/packageVersionCatalog";
 import { requestErrorText } from "@/lib/adminBillingCopy";
 import {
@@ -12,12 +12,15 @@ import {
   StatusPill,
   UnlockCta,
   Drawer,
+  OpsConfirm,
+  useAdminUnlockSession,
   type OpsTone,
 } from "@/components/ops";
 import { Button } from "@/components/ui/Button";
 import "@/styles/ops.css";
 
 const ksh = (n: number) => `KSh ${n.toLocaleString("en-KE")}`;
+const PAGE_SIZE = 25;
 
 function statusTone(s: PackageVersionRow["status"]): OpsTone {
   return s === "published" ? "ok" : s === "draft" ? "warn" : "neutral";
@@ -64,10 +67,13 @@ export function AdminPackagesV2({
   initialSel?: string | null;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
   const [sel, setSel] = useState<string | null>(initialSel);
-  const [unlocked, setUnlocked] = useState(false);
+  const unlockSession = useAdminUnlockSession();
   const [editOpen, setEditOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [form, setForm] = useState<CatalogForm | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +89,23 @@ export function AdminPackagesV2({
   const it = rows.find((r) => r.key === sel) ?? null;
   const publishedCount = rows.filter((r) => r.version.status === "published").length;
   const editorOn = catalog.packageEditorEnabled;
+  const unlocked =
+    unlockSession.status?.mode !== "enforce" ? true : unlockSession.unlocked;
   const canWrite = unlocked && editorOn;
+
+  const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10) || 1);
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  function goPage(next: number) {
+    const p = Math.min(pageCount, Math.max(1, next));
+    const q = new URLSearchParams(searchParams.toString());
+    if (p <= 1) q.delete("page");
+    else q.set("page", String(p));
+    const qs = q.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  }
 
   async function post(body: Record<string, unknown>) {
     setError(null);
@@ -169,30 +191,41 @@ export function AdminPackagesV2({
     startTransition(() => router.refresh());
   }
 
+  async function archiveVersion(reasonText: string) {
+    if (!it?.version || !reasonText.trim()) {
+      setError("A reason is required.");
+      return;
+    }
+    const archived = await post({
+      action: "archive",
+      version_id: it.version.id,
+      reason: reasonText.trim(),
+    });
+    if (!archived) return;
+    setStatus(`${it.pack.name} archived.`);
+    setArchiveOpen(false);
+    setSel(null);
+    startTransition(() => router.refresh());
+  }
+
   const list = (
     <div className="flex min-h-0 flex-col pe-ops-4">
       <PageHeader
         title="Packages"
         count={rows.length}
         actions={
-          unlocked ? (
-            <span className="text-ops-label text-ink-2" data-unlocked="">Unlocked · catalog edit</span>
-          ) : (
-            <UnlockCta
-              site="packages"
-              action="packages:edit"
-              what="edit package minutes and terms"
-              onUnlocked={() => setUnlocked(true)}
-              observedHint="Open a row, then Edit draft or Open draft for minutes and terms. Business assign stays on the business."
-            />
-          )
+          <UnlockCta
+            site="packages"
+            action="packages:edit"
+            what="edit package minutes and terms"
+            observedHint="Pick a row, then open or edit a draft."
+          />
         }
       />
       <p className="pb-ops-2 text-ops-label text-ink-2">
         <span className="font-semibold text-ink">{publishedCount} published</span>
         {" · "}
         {editorOn ? "Editor on" : "Editor off"}
-        {" · Catalog only — assign from the business"}
         {readOnlyHint ? <span className="ms-1">· {readOnlyHint}</span> : null}
         {status ? <span className="ms-1 text-ink">· {status}</span> : null}
       </p>
@@ -204,7 +237,7 @@ export function AdminPackagesV2({
       ) : (
         <>
           <ul className="divide-y divide-hairline bg-surface md:hidden">
-            {rows.map((r) => (
+            {pageRows.map((r) => (
               <li key={r.key}>
                 <button type="button" onClick={() => setSel(r.key)} className="flex min-h-ops-touch w-full flex-col gap-0.5 px-ops-3 py-2 text-start">
                   <span className="flex justify-between gap-2">
@@ -222,14 +255,12 @@ export function AdminPackagesV2({
                 <th className="px-ops-3 text-start font-normal">Package</th>
                 <th className="px-ops-3 text-start font-normal">Status</th>
                 <th className="px-ops-3 text-end font-normal">Monthly</th>
-                <th className="px-ops-3 text-end font-normal">Annual</th>
                 <th className="px-ops-3 text-end font-normal">Minutes</th>
-                <th className="px-ops-3 text-end font-normal">Seats</th>
                 <th className="px-ops-3 text-end font-normal">On it</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline bg-surface">
-              {rows.map((r) => (
+              {pageRows.map((r) => (
                 <tr
                   key={r.key}
                   aria-selected={sel === r.key}
@@ -243,14 +274,19 @@ export function AdminPackagesV2({
                   </td>
                   <td className="px-ops-3"><StatusPill tone={statusTone(r.version.status)}>{r.version.status}</StatusPill></td>
                   <td className="px-ops-3 text-end tabular-nums text-ink">{ksh(r.version.monthlyPriceKes)}</td>
-                  <td className="px-ops-3 text-end tabular-nums text-ink-2">{ksh(r.version.annualPriceKes)}</td>
                   <td className="px-ops-3 text-end tabular-nums text-ink-2">{r.version.minutes}</td>
-                  <td className="px-ops-3 text-end tabular-nums text-ink-2">{r.version.seats}</td>
                   <td className="px-ops-3 text-end tabular-nums text-ink-2">{r.version.subscriberCount}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {pageCount > 1 ? (
+            <div className="flex items-center justify-end gap-2 border-t border-hairline px-ops-3 py-ops-2" data-packages-pagination="">
+              <Button type="button" variant="ghost" size="sm" disabled={safePage <= 1} onClick={() => goPage(safePage - 1)}>Previous</Button>
+              <span className="text-ops-label text-ink-2 tabular-nums">Page {safePage} of {pageCount}</span>
+              <Button type="button" variant="ghost" size="sm" disabled={safePage >= pageCount} onClick={() => goPage(safePage + 1)}>Next</Button>
+            </div>
+          ) : null}
         </>
       )}
     </div>
@@ -259,13 +295,24 @@ export function AdminPackagesV2({
   const v = it?.version;
   const footer = it ? (
     <div className="flex w-full flex-col gap-ops-2">
-      <p className="text-ops-label text-ink-2">Catalog only. To put a business on a package, open that business.</p>
+      {v && v.subscriberCount > 0 ? (
+        <p className="text-ops-label text-attention">{v.subscriberCount} businesses on this version.</p>
+      ) : null}
       {canWrite ? (
         <div className="flex flex-wrap justify-end gap-2">
           {v?.status === "draft" ? (
             <Button type="button" variant="primary" size="sm" data-action="edit-draft" onClick={() => openEdit(it.pack, v)} disabled={pending}>
               Edit draft
             </Button>
+          ) : v?.status === "published" ? (
+            <>
+              <Button type="button" variant="ghost" size="sm" data-action="archive-version" onClick={() => setArchiveOpen(true)}>
+                Archive
+              </Button>
+              <Button type="button" variant="primary" size="sm" data-action="open-draft" pending={pending} onClick={() => void openOrCreateDraft(it.pack)}>
+                Open draft
+              </Button>
+            </>
           ) : (
             <Button type="button" variant="primary" size="sm" data-action="open-draft" pending={pending} onClick={() => void openOrCreateDraft(it.pack)}>
               Open draft
@@ -274,7 +321,7 @@ export function AdminPackagesV2({
         </div>
       ) : (
         <p className="text-right text-ops-label text-ink-2" data-blocked-why="">
-          {unlocked && !editorOn ? (readOnlyHint || "Editor is off.") : "Unlock to change minutes and terms."}
+          {unlocked && !editorOn ? (readOnlyHint || "Editor is off.") : "Unlock to edit."}
         </p>
       )}
     </div>
@@ -321,7 +368,9 @@ export function AdminPackagesV2({
         {form ? (
           <div className="flex flex-col gap-ops-3 text-ops-body text-ink" data-catalog-edit="">
             {error ? <p className="text-ops-label text-attention" role="alert">{error}</p> : null}
-            <p className="text-ops-label text-ink-2">Minutes and terms only. Business assign stays on the business pane.</p>
+            {form && Number(form.minutes) >= 0 && it?.version.subscriberCount ? (
+              <p className="text-ops-label text-ink-2">{it.version.subscriberCount} businesses on the live version.</p>
+            ) : null}
             <label className="flex flex-col gap-1">
               <span className="text-ops-label font-semibold">Monthly (KSh)</span>
               <input className="ops-field" inputMode="numeric" value={form.monthly} onChange={(e) => setForm({ ...form, monthly: e.target.value })} />
@@ -351,6 +400,23 @@ export function AdminPackagesV2({
           </div>
         ) : null}
       </Drawer>
+
+      <OpsConfirm
+        open={archiveOpen}
+        onClose={() => setArchiveOpen(false)}
+        title="Archive this version?"
+        strength="destructive"
+        confirmLabel="Archive"
+        pending={pending}
+        requireReason
+        onConfirm={(r) => void archiveVersion(r)}
+      >
+        {it ? (
+          <p className="text-ops-body text-ink-2">
+            {it.pack.name} v{it.version.version}. {it.version.subscriberCount} businesses on it.
+          </p>
+        ) : null}
+      </OpsConfirm>
     </div>
   );
 }

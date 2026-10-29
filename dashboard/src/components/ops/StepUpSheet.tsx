@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Drawer } from "./Drawer";
+import { STEP_UP_UNLOCKED_EVENT } from "./useAdminUnlockSession";
 
 /**
  * Platform Unlock. One sheet for every sensitive Admin write: bottom sheet on phones,
@@ -61,6 +62,10 @@ export function StepUpSheet({
         setStatus(s);
         if (s.mode !== "enforce") return setView("observe");
         setNeedsReenrol(!!s.needsReenrol);
+        if (s.lockedUntil && Date.parse(s.lockedUntil) > Date.now()) {
+          setMsg(`Locked until ${timeOf(s.lockedUntil)}.`);
+          return setView("code");
+        }
         if (s.unlockedUntil) { setUnlockedUntil(s.unlockedUntil); return setView(replace ? "setup_intro" : "unlocked"); }
         setView(s.enrolled ? "code" : "setup_intro");
       })
@@ -106,6 +111,7 @@ export function StepUpSheet({
       setUnlockedUntil(String(json.unlockedUntil || ""));
       setNeedsReenrol(!!json.needsReenrol);
       setView("unlocked");
+      window.dispatchEvent(new CustomEvent(STEP_UP_UNLOCKED_EVENT));
       onObserved?.();
     } catch {
       setState("error");
@@ -130,6 +136,7 @@ export function StepUpSheet({
     setUnlockedUntil(String(json.unlockedUntil || ""));
     setNeedsReenrol(false);
     setView("setup_codes");
+    window.dispatchEvent(new CustomEvent(STEP_UP_UNLOCKED_EVENT));
   };
 
   const pending = state === "pending";
@@ -153,7 +160,7 @@ export function StepUpSheet({
     footer = (
       <div className="flex w-full items-center justify-end gap-2" data-stepup-footer="">
         <Button variant="ghost" size="md" onClick={close} disabled={pending}>Cancel</Button>
-        <Button variant="primary" size="md" pending={pending} onClick={unlock} disabled={!codeOk} data-action="stepup-unlock">Unlock</Button>
+        <Button variant="primary" size="md" pending={pending} onClick={unlock} disabled={!codeOk || (!!status?.lockedUntil && Date.parse(status.lockedUntil) > Date.now())} data-action="stepup-unlock">Unlock</Button>
       </div>
     );
   } else if (view === "setup_intro") {
@@ -199,7 +206,7 @@ export function StepUpSheet({
     <Drawer open={open} title="Unlock" dismissible={!pending && view !== "setup_codes"} onOpenChange={(next) => { if (!next) close(); }} footer={footer}>
       <div className="ops-theme flex flex-col gap-ops-3 text-ops-body text-ink" data-stepup-sheet="" data-action-key={action} data-stepup-view={view}>
         <p>
-          Unlock lets you <span className="font-semibold">{what}</span>. It doesn&apos;t change anything by itself.
+          Unlock to <span className="font-semibold">{what}</span>. It does not save by itself.
         </p>
 
         {view === "loading" ? <p className="text-ops-label text-ink-2" role="status">Checking…</p> : null}
@@ -221,11 +228,15 @@ export function StepUpSheet({
 
         {view === "code" ? (
           <>
-            {codeField("Code from your authenticator app")}
-            <p className="text-ops-label text-ink-2">Unlock lasts the time set in Settings › Security (10 minutes unless changed). 5 wrong codes lock Unlock for 15 minutes.</p>
-            <button type="button" className="self-start text-ops-label text-ink underline" onClick={() => { setCode(""); setMsg(null); setView("backup"); }}>
-              Lost your phone? Use a backup code
-            </button>
+            {codeField(status?.lockedUntil && Date.parse(status.lockedUntil) > Date.now() ? "Try again after the lock ends" : "Authenticator code")}
+            {!status?.lockedUntil || Date.parse(status.lockedUntil) <= Date.now() ? (
+              <>
+                <p className="text-ops-label text-ink-2">Unlock length is in Settings › Security. Five wrong codes lock for 15 minutes.</p>
+                <button type="button" className="self-start text-ops-label text-ink underline" onClick={() => { setCode(""); setMsg(null); setView("backup"); }}>
+                  Use a backup code
+                </button>
+              </>
+            ) : null}
           </>
         ) : null}
 

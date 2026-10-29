@@ -2,9 +2,9 @@
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { getAdminSession, isLegacyAuthenticated } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { isAdminV2Enabled } from "@/lib/adminV2";
+import { requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { sendAccessRequestDeclineEmail } from "@/lib/accessRequestDeclineEmail";
 import {
   isAccessRequestsSchemaV2Error,
@@ -21,12 +21,11 @@ async function assertAdmin(): Promise<{ operator: string } | { error: string }> 
   if (!isAdminV2Enabled()) {
     return { error: "Access requests admin is not enabled." };
   }
-  if (!(await isLegacyAuthenticated())) {
-    return { error: "Not signed in." };
+  const gate = await requireAdminOperatorWrite();
+  if (!gate.ok) {
+    return { error: gate.error };
   }
-  const session = await getAdminSession();
-  const operator = session?.user?.name || session?.user?.email || "ops";
-  return { operator };
+  return { operator: gate.operator };
 }
 
 async function siteRedirectUrl(): Promise<string> {

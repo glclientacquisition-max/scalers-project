@@ -1,5 +1,5 @@
 import { findAdminOperator, normalizeAdminUsername } from "@/lib/adminOperators";
-import { getAdminSession } from "@/lib/auth";
+import { getAdminSession, isAdminAuthenticated } from "@/lib/auth";
 
 /**
  * Operator-only gate for Admin writes that must not accept the legacy
@@ -34,4 +34,12 @@ export async function requireAdminOperatorWrite(
     };
   }
   return { ok: true, operator: listed.username };
+}
+
+/** JSON API read gate: signed-in Super Admin (same session rules as pages). */
+export async function requireAdminApiRead(): Promise<{ ok: true } | AdminOperatorReject> {
+  if (!(await isAdminAuthenticated())) {
+    return { ok: false, status: 403, error: "Sign in to continue." };
+  }
+  return { ok: true };
 }

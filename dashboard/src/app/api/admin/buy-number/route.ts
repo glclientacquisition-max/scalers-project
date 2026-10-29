@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { adminActorName } from "@/lib/adminActor";
 import { recordAdminAction } from "@/lib/adminAudit";
 import { logAdminError, operatorError } from "@/lib/adminErrors";
-import { isLegacyAuthenticated } from "@/lib/auth";
+import { requireAdminApiRead, requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { stepUpGateSession } from "@/lib/ops/stepUpGate";
 import { buyNumberIntoPool } from "@/lib/didPool";
 import {
@@ -14,8 +14,9 @@ import {
 } from "@/lib/sautikit";
 
 export async function GET() {
-  if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  const read = await requireAdminApiRead();
+  if (!read.ok) {
+    return NextResponse.json({ error: read.error }, { status: read.status });
   }
   if (!isSautikitConfigured()) {
     logAdminError("buy-number", { message: "phone line key missing", diagnostics: getSautikitKeyDiagnostics() });
@@ -42,8 +43,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  const gate = await requireAdminOperatorWrite();
+  if (!gate.ok) {
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
   if (!isSautikitBuyConfigured()) {
     logAdminError("buy-number", { message: "buy key missing", diagnostics: getSautikitKeyDiagnostics() });

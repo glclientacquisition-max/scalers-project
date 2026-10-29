@@ -149,17 +149,34 @@ describe("requireSuperAdmin (server, before any data)", () => {
   });
 
   it("every admin JSON route checks the session before it reads", () => {
-    const apiDir = "dashboard/src/app/api/admin";
-    for (const name of fs.readdirSync(path.join(root, apiDir))) {
+    const apiDir = path.join(root, "dashboard/src/app/api/admin");
+    function walkRoutes(dir, out = []) {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) walkRoutes(p, out);
+        else if (e.name === "route.ts") out.push(p);
+      }
+      return out;
+    }
+    for (const filePath of walkRoutes(apiDir)) {
+      const name = path.relative(apiDir, path.dirname(filePath)).split(path.sep).join("/") || path.basename(path.dirname(filePath));
       if (name === "session") continue;
-      const src = read(`${apiDir}/${name}/route.ts`);
+      const src = read(path.relative(root, filePath));
       const handlers = src.split(/export async function (?:GET|POST|PUT|PATCH|DELETE)\b/).slice(1);
       assert.ok(handlers.length > 0, name);
       for (const h of handlers) {
-        // sign-in-2fa runs on the password-only session (signedInOperator) by design: it is the second factor.
-        const allowed = ["if (!(await isLegacyAuthenticated())) {", "const gate = await requireAdminOperatorWrite();"];
+        const body = h.slice(h.indexOf("{\n") + 2);
+        const stmt = firstStatement(body);
+        const allowed = [
+          "if (!(await isLegacyAuthenticated())) {",
+          "if (!(await isLegacyAuthenticated())) return NextResponse.json({ error: \"ops_only\" }, { status: 403 });",
+          "const read = await requireAdminApiRead();",
+          "const gate = await requireAdminOperatorWrite();",
+          "await requireSuperAdmin();",
+          "const { id } = await context.params;",
+        ];
         if (name === "sign-in-2fa") allowed.push("const op = await signedInOperator();");
-        assert.ok(allowed.includes(firstStatement(h.slice(h.indexOf("{\n") + 2))), name);
+        assert.ok(allowed.includes(stmt), `${name}: ${stmt}`);
       }
     }
   });

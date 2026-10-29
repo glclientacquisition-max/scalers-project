@@ -40,7 +40,7 @@ test("columns missing: Not on this environment; never invent values or placehold
 test("hub UI: Unlock reveals edit form; Services/Voices/Audit are text links; no fake success", () => {
   const ui = read("dashboard/src/components/admin/v2/AdminSettingsHubV2.tsx");
   assert.match(ui, /UnlockCta/);
-  assert.match(read("dashboard/src/components/ops/UnlockCta.tsx"), /Unlock to edit/);
+  assert.match(read("dashboard/src/components/ops/UnlockCta.tsx"), /label = "Unlock"/);
   assert.match(ui, /View only · unlock to change/);
   assert.match(ui, /data-number-hold/);
   assert.match(ui, /data-hold-edit/);

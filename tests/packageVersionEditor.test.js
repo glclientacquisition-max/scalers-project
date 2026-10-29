@@ -14,16 +14,17 @@ const route = read("dashboard/src/app/api/admin/package-versions/route.ts");
 describe("package version editor", () => {
   it("refuses a caller who is not a Super Admin before any database call", () => {
     const get = route.indexOf("export async function GET");
-    const getGate = route.indexOf('error: "ops_only"', get);
+    const getGate = route.indexOf("requireAdminApiRead", get);
     const list = route.indexOf("admin_list_package_versions", get);
     const post = route.indexOf("export async function POST");
-    const postGate = route.indexOf('error: "ops_only"', post);
+    const postGate = route.indexOf("requireAdminOperatorWrite", post);
     const write = route.indexOf("runEditorCommand(actor", post);
     assert.ok(get > 0 && post > get);
     assert.ok(getGate > get && list > getGate);
     assert.ok(postGate > post && write > postGate);
-    assert.match(route, /isLegacyAuthenticated\(\)/);
-    assert.match(route, /status: 403/);
+    assert.match(route, /requireAdminApiRead\(\)/);
+    assert.match(route, /requireAdminOperatorWrite\(\)/);
+    assert.match(route, /gate\.status/);
     assert.doesNotMatch(route, /body\.actor/);
     assert.match(route, /adminActorName\(\)/);
   });
