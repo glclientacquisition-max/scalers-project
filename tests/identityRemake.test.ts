@@ -22,6 +22,7 @@ const ALL = [
   "sonioxVoiceId",
   "sonioxVoiceLabel",
   "greetingLanguage",
+  "greetingTextClear",
   "socialHandles",
   "afterHoursMode",
   "agentTools",
@@ -39,7 +40,7 @@ test("save scope: each Identity card owns only its own fields", async () => {
   assert.deepEqual(owned("identity-business"), ["businessName", "vertical"]);
   assert.deepEqual(
     owned("identity-answer"),
-    ["agentName", "agentTone", "greetingInvite", "greetingLanguage", "sonioxVoiceId", "sonioxVoiceLabel", "spokenName"]
+    ["agentName", "agentTone", "greetingInvite", "greetingLanguage", "greetingTextClear", "sonioxVoiceId", "sonioxVoiceLabel", "spokenName"]
   );
   assert.deepEqual(owned("identity-contacts"), ["socialHandles"]);
   // The old whole-page scope is the union, for older clients.
