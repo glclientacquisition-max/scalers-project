@@ -22,6 +22,7 @@ test("Packages v2 paginates with ?page= and archives instead of delete", () => {
   assert.match(ui, /PAGE_SIZE = 25/);
   assert.match(ui, /searchParams\.get\("page"/);
   assert.match(ui, /data-packages-pagination/);
+  assert.match(ui, /"Locked"/);
   assert.match(ui, /action: "archive"/);
   assert.match(ui, /OpsConfirm/);
   assert.doesNotMatch(ui, /action: "delete"/);

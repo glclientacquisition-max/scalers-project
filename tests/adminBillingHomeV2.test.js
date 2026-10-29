@@ -57,5 +57,5 @@ test("Packages tab lists packages with pagination and assign on business", () =>
   const ui = read("dashboard/src/components/admin/v2/AdminPackagesV2.tsx");
   assert.match(ui, /PAGE_SIZE = 25/);
   assert.match(ui, /searchParams\.get\("page"/);
-  assert.match(ui, /UnlockCta/);
+  assert.match(ui, /useAdminUnlockSession/);
 });

@@ -45,7 +45,7 @@ test("Numbers v2 is behind ADMIN_V2; Assign/Release/Hold write via OpsConfirm + 
   assert.match(ui, /\/api\/admin\/number-hold/);
   assert.match(ui, /data-action="start-hold"|data-action="end-hold"|data-action="restore-hold"/);
   assert.match(ui, /data-hold-choice/);
-  assert.match(ui, /UnlockCta/);
+  assert.match(ui, /data-stepup="numbers"/);
   assert.doesNotMatch(ui, /254709221536|Done and Dusted/);
   for (const s of [ui, read("dashboard/src/lib/ops/numbersView.ts")]) assert.doesNotMatch(s, /sautikit|bachs|twilio|supabase|africastalking/i);
 });

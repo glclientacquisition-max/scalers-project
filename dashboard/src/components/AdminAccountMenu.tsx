@@ -9,6 +9,7 @@ import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
 import { Sheet } from "@/components/ui/Sheet";
 import { SignOutButton } from "@/components/ui/SignOutButton";
 import { AdminGlobalSearch } from "@/components/admin/AdminGlobalSearch";
+import { AdminHeaderUnlock } from "@/components/admin/AdminHeaderUnlock";
 import { AdminCommandPalette } from "@/components/admin/v2/AdminCommandPalette";
 import { cx } from "@/lib/cx";
 import { deskRowInitials } from "@/components/ui/deskRow";
@@ -53,6 +54,7 @@ export function AdminAccountMenu({ name, compact = false, palette = false }: { n
       <Sheet open={searchOpen} onOpenChange={setSearchOpen} title="Search" theme="admin">
         <AdminGlobalSearch layout="sheet" />
       </Sheet>
+      {palette ? <AdminHeaderUnlock /> : null}
       <Menu
         onOpenChange={(next) => {
           setOpen(next);

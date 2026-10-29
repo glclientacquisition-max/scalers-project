@@ -10,7 +10,6 @@ import {
   SplitLayout,
   SplitPane,
   StatusPill,
-  UnlockCta,
   Drawer,
   OpsConfirm,
   useAdminUnlockSession,
@@ -54,7 +53,7 @@ function formFrom(pack: VersionPackage, version: PackageVersionRow): CatalogForm
 
 /**
  * Packages catalog (ADMIN_V2): minutes/terms only.
- * Unlock → UnlockCta/StepUpSheet; after observe, draft/publish via /api/admin/package-versions.
+ * Unlock via header; draft/publish via /api/admin/package-versions.
  * Assigning a package to a business stays on BusinessPane.
  */
 export function AdminPackagesV2({
@@ -210,22 +209,15 @@ export function AdminPackagesV2({
 
   const list = (
     <div className="flex min-h-0 flex-col pe-ops-4">
-      <PageHeader
-        title="Packages"
-        count={rows.length}
-        actions={
-          <UnlockCta
-            site="packages"
-            action="packages:edit"
-            what="edit package minutes and terms"
-            observedHint="Pick a row, then open or edit a draft."
-          />
-        }
-      />
-      <p className="pb-ops-2 text-ops-label text-ink-2">
+      <PageHeader title="Packages" count={rows.length} />
+      <p className="pb-ops-2 text-ops-label text-ink-2" data-stepup="packages">
         <span className="font-semibold text-ink">{publishedCount} published</span>
         {" · "}
-        {editorOn ? "Editor on" : "Editor off"}
+        {unlockSession.status?.mode === "enforce" && !unlockSession.unlocked
+          ? "Locked"
+          : editorOn
+            ? "Editor on"
+            : "Editor off"}
         {readOnlyHint ? <span className="ms-1">· {readOnlyHint}</span> : null}
         {status ? <span className="ms-1 text-ink">· {status}</span> : null}
       </p>

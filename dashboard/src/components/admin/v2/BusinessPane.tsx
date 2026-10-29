@@ -8,7 +8,7 @@ import { statusLabel } from "@/lib/adminBusinessUi";
 import { businessTone, callLength, chargingLabel, intentLabel, numberLabel } from "@/lib/ops/businessesView";
 import { ksh } from "@/lib/ops/invoicesView";
 import { BUSINESS_PANE_SECTIONS, usedShare, type BusinessPaneData, type BusinessPaneSection } from "@/lib/ops/businessPane";
-import { OpsConfirm, SplitPane, StatusPill, StepUpSheet } from "@/components/ops";
+import { OpsConfirm, SplitPane, StatusPill, useOpenAdminUnlock } from "@/components/ops";
 import { Button } from "@/components/ui/Button";
 import { ARCHIVE_RESTORE_DAYS } from "@/lib/adminBusinessModel";
 import { postJson } from "@/lib/ops/archiveRelease";
@@ -171,7 +171,7 @@ export function BusinessPane({
     )),
   };
 
-  const [unlockOpen, setUnlockOpen] = useState(false);
+  const openUnlock = useOpenAdminUnlock();
   const [archiving, setArchiving] = useState(false);
   const [archivePending, setArchivePending] = useState(false);
   const [archiveError, setArchiveError] = useState("");
@@ -193,7 +193,22 @@ export function BusinessPane({
       {archived ? <p className="text-ops-body text-ink-2" role="status">Archived. Restore within {ARCHIVE_RESTORE_DAYS} days.</p> : null}
       {archiveError && !archiving ? <p className="text-ops-body text-attention" role="alert">{archiveError}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="ghost" size="sm" data-honest="unlock" data-stepup="business" onClick={() => setUnlockOpen(true)}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          data-honest="unlock"
+          data-stepup="business"
+          onClick={() =>
+            openUnlock({
+              action: "business:write",
+              target: businessId,
+              what: "change package, minutes, charging or archive this business",
+              observedHint:
+                "Archive stays on the confirm sheet. Number hold, end-early and restore live on Numbers. Package and charging edits land with the next BusinessPane write slice.",
+            })
+          }
+        >
           Unlock
         </Button>
         {canArchive ? (
@@ -230,14 +245,6 @@ export function BusinessPane({
         </div>
       </div>
     </SplitPane>
-    <StepUpSheet
-      open={unlockOpen && !!businessId}
-      onClose={() => setUnlockOpen(false)}
-      action="business:write"
-      target={businessId}
-      what="change package, minutes, charging or archive this business"
-      observedHint="Archive stays on the confirm sheet. Number hold, end-early and restore live on Numbers. Package and charging edits land with the next BusinessPane write slice."
-    />
     <OpsConfirm
       open={archiving && !!businessId}
       onClose={() => { if (!archivePending) setArchiving(false); }}
