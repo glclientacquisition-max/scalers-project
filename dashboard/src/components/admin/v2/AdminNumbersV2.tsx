@@ -34,7 +34,7 @@ import {
   type WaitingBusiness,
 } from "@/lib/ops/numbersView";
 import { Button } from "@/components/ui/Button";
-import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState, OpsConfirm, UnlockCta } from "@/components/ops";
+import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState, OpsConfirm } from "@/components/ops";
 import { NumberControls } from "./NumberControls";
 import "@/styles/ops.css";
 
@@ -329,7 +329,7 @@ export function AdminNumbersV2({
           />
         }
       />
-      <div className="flex flex-wrap items-center gap-2 pb-ops-3">
+      <div className="flex flex-wrap items-center gap-2 pb-ops-3" data-stepup="numbers">
         <div role="tablist" aria-label="Views" className="flex flex-wrap gap-1">
           {NUMBER_VIEWS.map((v) => (
             <button
@@ -468,16 +468,6 @@ export function AdminNumbersV2({
             Restore to {it.lastBusinessName ?? "previous business"}
           </Button>
         ) : null}
-        <span data-honest="unlock">
-          <UnlockCta
-            site="numbers"
-            action="numbers:write"
-            target={it?.e164 ?? null}
-            what="assign, release, hold, move or restore this number"
-            label="Unlock"
-            variant="ghost"
-          />
-        </span>
       </div>
       <NumberControls
         key={it.id}

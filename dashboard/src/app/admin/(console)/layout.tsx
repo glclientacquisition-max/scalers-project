@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { AdminShell } from "@/components/AdminNav";
 import { AdminPhonePull } from "@/components/PhonePullSurface";
-import { StepUpHost } from "@/components/ops/StepUpHost";
+import { AdminUnlockProvider } from "@/components/ops/AdminUnlockProvider";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { getAdminSession } from "@/lib/auth";
 import { isAdminV2Enabled } from "@/lib/adminV2";
@@ -33,17 +33,18 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <AdminShell
-      operatorName={operatorName}
-      v2={isAdminV2Enabled()}
-      showAccessRequests={isAdminV2Enabled()}
-      accessRequestsPendingCount={accessRequestsPendingCount}
-    >
-      <Suspense fallback={null}>
-        <AdminPhonePull scroll="admin" />
-      </Suspense>
-      {children}
-      <StepUpHost />
-    </AdminShell>
+    <AdminUnlockProvider>
+      <AdminShell
+        operatorName={operatorName}
+        v2={isAdminV2Enabled()}
+        showAccessRequests={isAdminV2Enabled()}
+        accessRequestsPendingCount={accessRequestsPendingCount}
+      >
+        <Suspense fallback={null}>
+          <AdminPhonePull scroll="admin" />
+        </Suspense>
+        {children}
+      </AdminShell>
+    </AdminUnlockProvider>
   );
 }

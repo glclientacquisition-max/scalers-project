@@ -161,11 +161,11 @@ describe("unlock grant for every risky action", () => {
     assert.match(gate, /error: d\.error, message: [^}]*action: actionKey/);
   });
 
-  it("UI catch-all: StepUpHost is mounted in the console layout and names every risky key", async () => {
+  it("UI catch-all: AdminUnlockProvider is mounted in the console layout and names every risky key", async () => {
     const { riskyActionKeys } = await load();
     const layout = read("dashboard/src/app/admin/(console)/layout.tsx");
-    assert.match(layout, /<StepUpHost \/>/);
-    const host = read("dashboard/src/components/ops/StepUpHost.tsx");
+    assert.match(layout, /<AdminUnlockProvider>/);
+    const host = read("dashboard/src/components/ops/AdminUnlockProvider.tsx");
     assert.match(host, /res\.status === 403/);
     assert.match(host, /step_up_required/);
     assert.match(host, /STEP_UP_WHAT/);

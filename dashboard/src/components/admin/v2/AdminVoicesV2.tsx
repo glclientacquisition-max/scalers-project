@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import type { PlatformSonioxVoiceRow as VoiceRow } from "@/lib/sonioxVoiceCatalog";
-import { EmptyState, PageHeader, StatusPill, UnlockCta } from "@/components/ops";
+import { EmptyState, PageHeader, StatusPill, useAdminUnlockSession } from "@/components/ops";
 import { AdminVoicesManager } from "@/components/AdminVoicesManager";
 import "@/styles/ops.css";
 
@@ -21,34 +20,19 @@ function label(v: VoiceRow) {
  * Unlock opens StepUpSheet; after observe, AdminVoicesManager appears. No dead switches.
  */
 export function AdminVoicesV2({ voices }: { voices: VoiceRow[] }) {
-  const [unlocked, setUnlocked] = useState(false);
+  const unlockSession = useAdminUnlockSession();
+  const unlocked = unlockSession.status?.mode !== "enforce" || unlockSession.unlocked;
   const live = voices.filter((v) => v.is_active).length;
   const off = voices.length - live;
   const def = voices.find((v) => v.is_default);
   return (
     <div className="ops-theme flex w-full flex-col gap-ops-3 pe-ops-4 text-ops-body">
-      <PageHeader
-        title="Voices"
-        count={voices.length}
-        actions={
-          unlocked ? (
-            <span className="text-ops-label text-ink-2" data-unlocked="">Unlocked · edit below</span>
-          ) : (
-            <UnlockCta
-              site="voices"
-              action="voices:edit"
-              what="add or change voices"
-              onUnlocked={() => setUnlocked(true)}
-              observedHint="The voice manager opens below — same save path as before."
-            />
-          )
-        }
-      />
-      <p className="text-ops-label text-ink-2">
+      <PageHeader title="Voices" count={voices.length} />
+      <p className="text-ops-label text-ink-2" data-stepup="voices">
         <span className="font-semibold text-ink">{live} live</span>
         {off ? <> · {off} off</> : null}
         {" · "}
-        {unlocked ? "Editing unlocked" : "View only · unlock to change"}
+        {unlocked ? "Editing unlocked" : "View only · unlock in header"}
       </p>
 
       <article className="overflow-hidden rounded-sm border border-hairline bg-surface">

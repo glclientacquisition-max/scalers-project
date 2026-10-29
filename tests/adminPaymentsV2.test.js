@@ -50,15 +50,15 @@ test("display status and search", async () => {
   assert.equal(matchesPayment(pay({}), "zzz"), false);
 });
 
-test("Payments v2: list+pane, UnlockCta, honest disabled actions, ADMIN_V2 branch", () => {
+test("Payments v2: list+pane, header unlock marker, honest disabled actions, ADMIN_V2 branch", () => {
   const ui = read("dashboard/src/components/admin/v2/AdminPaymentsV2.tsx");
   const page = read("dashboard/src/app/admin/(console)/billing/payments/page.tsx");
   const ld = read("dashboard/src/lib/adminPaymentsV2Load.ts");
   const dev = read("dashboard/src/app/dev/admin-payments/page.tsx");
   assert.doesNotMatch(ui, /ReasonedSwitch/);
-  assert.match(ui, /UnlockCta/);
-  assert.match(read("dashboard/src/components/ops/UnlockCta.tsx"), /label = "Unlock"/);
-  assert.match(ui, /site="payments"/);
+  assert.match(ui, /data-stepup="payments"/);
+  assert.match(read("dashboard/src/components/admin/AdminHeaderUnlock.tsx"), /Unlock/);
+  assert.match(ui, /data-stepup="payments"/);
   assert.match(ui, /data-payments-table/);
   assert.match(ui, /data-phone-rows/);
   assert.match(ui, /businessPaneHref/);

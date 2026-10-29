@@ -45,8 +45,8 @@ for (const r of remakes) {
     assert.doesNotMatch(ui, /ReasonedSwitch/, r.name);
     assert.match(ui, /ops-theme/, r.name);
     if (r.name !== "Audit") {
-      assert.match(ui, /UnlockCta/, r.name);
-      assert.match(read("dashboard/src/components/ops/UnlockCta.tsx"), /label = "Unlock"/);
+      assert.match(ui, /useAdminUnlockSession|data-stepup=/, r.name);
+      assert.match(read("dashboard/src/components/admin/AdminHeaderUnlock.tsx"), /Unlock/);
     }
     assert.match(screen, /isAdminV2Enabled\(\)/, r.name);
     assert.match(screen, new RegExp(`Admin${r.name === "Audit" ? "Audit" : r.name}V2`), r.name);
@@ -69,7 +69,8 @@ test("remakes ban vendor and engineering copy on screen", () => {
 
 test("Packages remake is catalog write after Unlock, not note-only", () => {
   const ui = read("dashboard/src/components/admin/v2/AdminPackagesV2.tsx");
-  assert.match(ui, /UnlockCta/);
+  assert.match(ui, /useAdminUnlockSession/);
+  assert.match(ui, /"Locked"/);
   assert.match(ui, /\/api\/admin\/package-versions/);
   assert.doesNotMatch(ui, /Secure sign-in is next|Packages remake\. Observe only/);
 });
