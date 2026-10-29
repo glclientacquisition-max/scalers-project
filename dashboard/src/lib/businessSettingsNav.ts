@@ -131,7 +131,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     title: "Business Assistant",
     items: [
       {
-        label: "What it will say",
+        label: "What callers hear",
         description: "What callers hear before your team calls back",
         target: { tab: "assistant-say" },
       },
@@ -220,7 +220,7 @@ export function settingsPanelHeading(
   }
   if (tab === "test") return "Test";
   if (tab === "calls") return "Calls & forwarding";
-  if (tab === "assistant-say") return "What your Business Assistant will say";
+  if (tab === "assistant-say") return "What callers hear";
   if (tab !== "train") return null;
   const item = settingsNavItems().find((entry) => {
     const target = entry.target;

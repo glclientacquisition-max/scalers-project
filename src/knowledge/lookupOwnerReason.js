@@ -6,8 +6,8 @@ const SAVE_ON = {
   price: 'Catalogue',
   prices: 'Catalogue',
   hours: 'Hours',
-  fee: 'Locations',
-  delivery: 'Locations',
+  fee: 'Service areas',
+  delivery: 'Service areas',
   pay: 'Policies',
   payment: 'Policies',
 };
@@ -26,7 +26,7 @@ function ownerLookupReason(kind, result) {
 
   if (code === 'hash_no_row' || code === 'hash_missing' || code === 'hash_mismatch') {
     if (kind === 'fee' || kind === 'delivery') {
-      return 'Area fees are saved but not confirmed. Open Locations and save.';
+      return 'Area fees are saved but not confirmed. Open Service areas and save.';
     }
     if (kind === 'pay' || kind === 'payment') {
       return 'Payment details are saved but not confirmed. Open Policies and save.';
@@ -65,11 +65,11 @@ function ownerLookupReason(kind, result) {
   if (kind === 'hours') return 'Add your opening hours.';
 
   if (kind === 'fee' || kind === 'delivery') {
-    if (status === 'no_data' || code === 'no_list') return 'Add delivery areas on Locations.';
+    if (status === 'no_data' || code === 'no_list') return 'Add delivery areas on Service areas.';
     if (status === 'not_found_in_list' || code === 'no_match') {
-      return 'That area is not on your list yet. Add it on Locations.';
+      return 'That area is not on your list yet. Add it on Service areas.';
     }
-    return 'Add delivery areas on Locations.';
+    return 'Add delivery areas on Service areas.';
   }
 
   if (kind === 'pay' || kind === 'payment') {

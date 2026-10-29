@@ -7,6 +7,8 @@ export type AssistantSayRow = {
   stampLabel: string;
   reason: string;
   fixHref: string;
+  /** Two-line list preview: what callers hear when ready, else empty. */
+  hearPreview?: string;
 };
 
 export type AssistantSayState = {
