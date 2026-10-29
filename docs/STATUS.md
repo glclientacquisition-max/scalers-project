@@ -1,13 +1,13 @@
 ---
 owner: platform
-last_reviewed: 2026-10-25
+last_reviewed: 2026-10-28
 ---
 
 # Scalers status and handoff (start here)
 
-> **Switching accounts or onboarding a new owner or agent? Read [`HANDOVER.md`](HANDOVER.md) first** (25 Oct 2026 snapshot: architecture, environments, lanes, rules, open work).
+> **Switching accounts or onboarding a new owner or agent? Read [`HANDOVER.md`](HANDOVER.md) first.** It's the 28 Oct 2026 handover from the Scalers Chief account to Alvin's other Grok Bot account, and it covers the parked staging work, the promotion order, open items and the rules.
 
-**Last updated 23 Oct 2026.** Production pay for Aris `SCL-2026-000001` still shows "Online payment isn't available yet" and has no payment attempt, so Bachs has not been called. Checkout calls `billing_live_tenant_allowed` at `/rest/v1/rest/v1/rpc/...` and gets 404. In flight: `cursor/pay-tenant-rpc-url-9679`. `GET /api/pay/<token>` is payable. The pay page can still be a CDN prerender (`x-nextjs-prerender`). Checked against the billing apply list. Items marked *per team notes* come from lane agents and Alvin, not from the repo. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule)).
+**Last updated 28 Oct 2026, ~17:45 EAT** (Scalers Chief wrap-up, read-only checks 17:00–17:45 EAT). Section 1 is the true current state; anything below it dated earlier is history. Items marked *per team notes* come from lane agents and Alvin, not from the repo. **Update this file in the same PR as any merge to `main`** (see [`CONTRIBUTING.md`](../CONTRIBUTING.md#status-rule)).
 
 New agent or new human: read this whole page before you touch code.
 
@@ -15,7 +15,35 @@ New agent or new human: read this whole page before you touch code.
 
 ---
 
-## 1. Where we are
+## 1. Where we are (28 Oct 2026, ~17:20 EAT)
+
+| | Prod | Staging |
+| --- | --- | --- |
+| Branch tip | `main` @ `9af65811` (#988, 10:36 EAT) | `staging/v2-c0-opening-2026-10-21` @ `1a20be8a` (#1008, 17:00 EAT) |
+| Voice (Railway) | `/healthz` gitSha **`c620b379`** (#985 promotion, deploy `a452a964`, started 00:08 EAT). Desk-only #986–#989 were skipped by watch paths, as intended | `1a20be8a`, `kb.gate=true` |
+| Desk (Vercel) | `dpl_9Wy77hoH…` READY at `9af65811` | follows the staging branch |
+| Rollback | Desk `dpl_B1o8GCnP…` (`c620b379`), then `dpl_BMyC15GK…` (`45596057`). Voice: previous good build, or `git revert -m 1 c620b379` (no force-push). Railway marks `27c536b8` as REMOVED, so check it before relying on it | n/a |
+| SQL | Through `20261027144019` | Prod's set + 4 KB v2 migrations + `admin_invoice_actions` |
+| SautiKit balance | **KES 9.29** (rental 1 Nov), needs a top-up | KES 34.05 |
+| Soniox | No error since start | **TTS 402, balance exhausted (17:01 EAT)** |
+
+- **What's on prod:**
+  - The #985 promotion (27 Oct, Alvin's yes): the v2 engines brain on for all 8 businesses, admin number controls v1.2 (536 releasable), area picks + `ke` backfill, policy topics, W1 write receipts, and spoken catalogue tables (flags off).
+  - Desk #986 optimistic actions, #987 Overview streaming, #988 Sending texts, and #989 Identity remake.
+- **Prod flags:**
+  - Vercel: `DESK_PLAN_CHANGE=on` (whether it's intended is an open question for Alvin), `ADMIN_V2=on`, `BRAIN_CALL_FIXES_D199=on`.
+  - Railway: the v2/engines env set.
+  - Off: live transfer, spoken catalogue and `FACT_HASH_MODE`.
+- **Live lines:** Esga Stationery +254709221542 and Grow Tech Nurseries +254709221536. The other 5 active businesses are waiting for numbers. Chapter One is archived.
+- **Calls since the promotion:** 1 (Grow Tech, 01:33 EAT, 79 s, complete). **It hasn't been graded.** No Esga call yet, and no prod test call because the balances are low.
+- **Parked on staging (Alvin, 17:12 EAT):**
+  - 36 commits: KB v2 #990–#1005, retire-old-brain B1 #1007 + P1 #1008, and 4 staging-only migrations.
+  - Staging needs a merge from `main` first (`16735cf4` prod SQL record).
+  - The exact order and risks are in [`HANDOVER.md` §4](HANDOVER.md#4-parked-on-staging-36-commits-not-on-prod); the runbooks are in [`plans/`](plans/).
+- **Security:** staging backup table `_backup_tenants_unknown_answer_20261019` got RLS on 28 Oct (the critical advisor is cleared). Warnings remain; the proposed REVOKE SQL for 21 anon-executable SECURITY DEFINER functions is in HANDOVER §5 (not applied).
+
+### Earlier "where we are" notes (17–27 Oct, history; superseded by the table above)
+
 
 **Prod (25 Oct 2026, ~14:05 EAT): #951 Desk installable app + phone alerts + light-by-default theme merged to `main`** (port of staging #935; web push sender `src/notifications/push.js` NOT wired into Voice dispatch, so Railway prod needs no VAPID vars yet). Also: darkMode test skips StepUpSheet (white QR plate must stay scannable). SQL on prod `fjxcdccgyhnvnnlnovcl`: `push_subscriptions.sql` + `revoke truncate, references, trigger on public.push_subscriptions from authenticated` (RLS on, 4 own-row policies, anon none; 0 rows). Vercel `scalers-project` Production env (new prod keypair, not staging's): `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (sensitive), `VAPID_SUBJECT`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`. No Aris data touched. Rollback: `git revert -m 1 <#951 merge>` (restarts prod Voice); delete the four Production `VAPID_*` vars and redeploy; `docs/supabase/push_subscriptions_down.sql`; set `SW_KILL = true` and redeploy if a service worker misbehaves on devices. Approver: Alvin (25 Oct 13:58 EAT).
 
@@ -43,7 +71,7 @@ Prod Voice (Railway) and prod Desk (Vercel `scalers-project`) run **`main` @ `b6
 
 **Depends on #930** (the tree file and the table) landing on the same branch first. Not merged, not staged, no env change, no migration. Prod and Aris are untouched.
 
-Prod DID **+254709221536** is Aris, the live paying customer: **never release, reassign, or re-point it.** Esga is on prod DID +254709221542. Staging DID is **+254709221537** (staging tenant Jirani Cleaning Services, *per team notes*).
+Prod DID **+254709221536** (on Grow Tech Nurseries on prod since 27 Oct; earlier notes call it the Aris line): since 27 Oct 2026 (Alvin, 15:54 EAT, "yes we want it release able") it is an ordinary number in Admin, with Unlock, a typed reason, a confirm sheet and an audit row like any other. Admin number controls v1.2 removes the refusal: applied on staging 27 Oct 15:58 EAT (`20261027125836`) and on prod 27 Oct 17:37:43 EAT (`20261027143743`, Alvin's yes 17:36 EAT); the UI side reaches prod with the promotion merge. Esga is on prod DID +254709221542. Staging DID is **+254709221537** (staging tenant Jirani Cleaning Services, *per team notes*).
 
 **Product is callbacks only (#658, 11 Oct).** There is no live call transfer: the assistant takes a message and alerts a teammate. [`LIVE_TRANSFER.md`](archive/LIVE_TRANSFER.md) is archived as history.
 
@@ -64,6 +92,9 @@ Design: all UI follows Frontend 2.0 ([`FRONTEND_2_0_CHARTER.md`](explanation/fro
 ---
 
 ## 2. Shipped to prod (since 14 Oct)
+
+- **28 Oct 2026, 09:54–10:36 EAT:** Desk-only #989 Identity remake, #986 D1 optimistic actions, #987 D2 Overview streaming and #988 D3 Sending texts merged to `main`. Vercel prod READY at `9af65811`. Railway Voice skipped them (watch paths).
+- **28 Oct 2026, 00:07 EAT:** #985 promotion (staging → main, merge `c620b379`; Alvin's yes 27 Oct). Railway `a452a964` SUCCESS, Vercel `dpl_B1o8GCnP` READY. Prod SQL had already been applied on 27 Oct 17:37–17:40 EAT (`16735cf4`). The v2 engines brain is on for all 8 businesses.
 
 Times EAT. SHAs are the squash commits on `main` (first-parent log). Older history: `git log --first-parent origin/main` and the previous STATUS in git (`30086771`, #686).
 
@@ -166,6 +197,8 @@ Earlier merges since 9 Oct (see git log for detail):
 
 Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since merged). So staging is behind prod: it lacks #631, #650, #647.
 
+- **Promotion prod SQL (27 Oct 2026, Alvin's yes 17:36 EAT, applied one at a time at 0 live calls):** `20261027143703` `write_receipts_prod_w1` (17:37:03), `20261027143743` `admin_number_controls_v1_2` (17:37:43), `20261027143833` `tenant_area_picks` (17:38:33), `20261027143900` `tenant_area_picks_prod_backfill_ke` (17:39:00, 3 `ke` rows), `20261027143928` `policy_topics` (17:39:28), `20261027143954` `spoken_catalogue` (17:39:54), `20261027144019` `save_spoken_catalogue_version` (17:40:19). All post-verified (grants, RLS, md5 = staging); +254709221536 pool row and Grow Tech row unchanged. No prod vars, merge or Voice restart yet. Not applied: `brain_write_receipts_call_id_fill.sql`, `tenant_area_picks_to_rows`/`_backfill`, `appointment_services`, caller memory. See MIGRATION_LEDGER.
+- **Admin number controls (27 Oct 2026):** SQL on staging and, since 27 Oct 15:41-15:42 EAT, **on prod** (Alvin's yes 15:40 EAT): prod versions `20261027124118` `number_hold_winback`, `20261027124149` `admin_number_controls_v1`, `20261027124210` `admin_number_controls_v1_1`; prod hold set On, 14 days, KSh 1,000 (audited, `platform:alvin-approved`). All 15 functions service_role only, bodies md5-equal to staging; +254709221536 untouched. Code (#972 + #974) goes to `main` in the number-controls merge PR. #885 `number_hold_winback.sql` applied on staging 23 Oct 00:15 EAT (`20261022211546`); hold set On, 14 days, KSh 1,000 on 24 Oct (prod will use the same, Alvin 27 Oct). #968 `20261027081642_admin_number_controls_v1` (11:16 EAT) and `20261027082533_admin_number_controls_v1_1` (11:25 EAT) applied on staging. UI #972 + #974 merged into `staging/v2-c0-opening-2026-10-21`; Alvin tested move and back on staging 13:14 EAT. The code merge to `main` restarts prod Voice (`package.json` is a watch path); no Voice behaviour change. Ledger: `LEDGER-NUMBER-HOLD-WINBACK`, `LEDGER-ADMIN-NUMBER-CONTROLS-V1`.
 - **#737** (Desk Suspend/Archive/Purge): the functions are on staging and on production. Production recorded `admin_business_suspend_737`, `archive_tenant_billing_737` and `purge_archived_tenants_737` at 12:06 EAT on 18 Oct, before the 12:10 EAT merge. Staging has the functions. Those three names are not in staging's migration list. The purge schedule is not applied on either database.
 - Caller files memory v2 SQL (#673) is applied on **staging only** (carried from 14 Oct).
 - **#762** (Desk call setup per account): `tenants.call_setup` + `save_call_setup()` applied on staging 18 Oct 13:34 EAT; re-applied 14:19 EAT with the test phone fields (`test_from`, `test_started_at`) and the test-call check. Additive, 0 rows changed. **Also on prod since 18 Oct 14:59 EAT** (see Ops changes); the #762 code is not on prod yet.
@@ -178,6 +211,15 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 ---
 
 ## 4. Open PRs
+
+**28 Oct 2026 clean-up:** there were 102 open PRs. The stale, superseded ones were closed with a pointer to the handover PR, and their branches were kept. Still open:
+- the parked retire-old-brain drafts #1009 and #1010
+- #975 (Brain to confirm before closing)
+- #894 (parked)
+- #653 (legal)
+- #957 (`admin_invoice_actions` down)
+- the ones to check: #952, #934, #761, #751, #733, #709
+Live list: `gh pr list -R glclientacquisition-max/scalers-project --state open`. The tables below are history.
 - **2026-10-25 Installable Desk + phone alerts (staging only, draft PR, not merged, SQL not applied, not restaged):** branch `feat/desk-pwa-push` on `staging/v2-c0-opening-2026-10-21` (SHA in the PR). Manifest + maskable icons, hand-written `sw.js` (offline page only, never caches signed-in pages; kill switch), `/api/push/subscribe`, `docs/supabase/push_subscriptions.sql` (file only), `src/notifications/push.js` (not wired into dispatch), Settings › How we notify › Phone alerts, 360px install card. Env names: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`. dispatchAlert hook = Voice/Brain lane (spec in `docs/reference/platform/DESK_PWA_PUSH.md`). Approver: Alvin GO via Chief 2026-10-25 10:13 EAT (build on staging). Merge, SQL apply and restage each need Alvin's own GO. Rollback = revert; `SW_KILL = true`; `push_subscriptions_down.sql`.
 - `brain/v1-draft-phase-a` (draft) — `BRAIN_V1_DRAFT_PHASE_A` (default off; only with `BRAIN_V1_DRAFT=on`, DnD only): one model result per turn (no shadow/classify while the draft is on; v2 turn model runs on owned turns), handoff carries draft slots/asks ("is it possible" answered), filler cut for the reply (Voice review), wait ack + hello-after-wait, greeting fed to draft history (no repeat "how can I help"), healthz `brain.lastOkAt`, one spoken style for times/prices. From voice-qa `2026-10-24_926-dials-two-systems.md`; replay of HD_4e388c38f7b5 in `tests/brainV1DraftPhaseA.test.js`. Not merged/restaged; env unchanged.
 - ~~`brain/v1-draft-kb-verify` (#926)~~ merged to staging 24 Oct. Was: `brain/v1-draft-kb-verify` — `BRAIN_V1_DRAFT` (off|shadow|on, default off, Done & Dusted only via `BRAIN_V1_DRAFT_TENANTS` default): v1-style single streaming model call drafts the reply as `say{text,refs}` function calls; every sentence is verified against the KB fact note before TTS (whole sentence replaced by an honest unknown + one callback if any fact is unverified; availability never from the model); v2 reply owner (#925) + conv state (#924) is the total fallback. Design `ship-briefs/2026-10-24_brain_v1-draft-kb-verify-design.md`. Not merged/restaged; env unchanged.
@@ -322,16 +364,18 @@ Paid-mode copy on Usage still says "next invoice". That wording is a Desk hand-o
 
 ---
 
-## 7. Alvin's to-do list
+## 7. Alvin's to-do list (28 Oct)
 
-1. **Make a clean Aris test call** on +254709221536; Voice scores it. This unlocks section 4's queue.
-2. **Send the SautiKit ticket** (21:52 media degradation, 22:00–22:25 missing dials, which secret signs voice and `events_url` posts).
-3. **Recording decision:** record with a spoken notice, record without one, or don't record.
-4. **Staging Jirani `events_url`** is set (`https://scalers-staging-staging.up.railway.app/voice/events`, confirmed 20 Oct). Keep it.
-5. **GO or no** for Brain #733 (#732 merged 18 Oct 14:48).
-6. **Carried:** top up TextSMS; staging full-scope SautiKit key for Railway staging Voice (masked card); Meta WhatsApp currency (131042).
-7. **Invoice letterhead still open:** physical address, city, and KRA PIN. Legal name (Scalers Ventures), phone (+254119774470), and billing email (support@scalers.co.ke) are on staging `billing_company`. Set the rest with the update in [`INVOICE_PAY.md`](reference/operations/INVOICE_PAY.md). Blank lines stay off the invoice until then. On Vercel Preview (`scalers-staging`) set `BACHS_MODE=sandbox`, `BACHS_API_KEY`, and `BACHS_WEBHOOK_SECRET`. Leave `BACHS_LIVE_ALLOWED` unset and leave `BILLING_NOTICES_SEND` off. Live money on Vercel production (`scalers-project`) stays closed until the owner sets `BACHS_MODE=live`, `BACHS_LIVE_ALLOWED=true`, `BACHS_API_KEY`, `BACHS_WEBHOOK_SECRET`, and `BACHS_LIVE_TENANT_ALLOWLIST` to one tenant id. An unset allowlist refuses every business. `*` is the only value that opens live checkout to every business. Do not set those until P19 is on prod and Alvin says GO. P1 through P18 are already on prod. Never re-run P5, P9, P11, P12, P14, P15, P16, P17, or P18. `GET /api/billing/live-tenants` redirects a signed-out visitor to `/admin/login`. That is expected. It does not return 401. #798, #806, #808, #820, and #824 are on `main`. The retry route is `GET /api/cron/billing-payment-retry`. Vercel Hobby can run it once a day, so the schedule is `7 3 * * *` (03:07 UTC). The four-times-an-hour schedule failed the deploy of `5e4813d7`. It does not call Bachs while the gate is closed. Steps: [`payments-go-live.md`](runbooks/payments-go-live.md).
-8. **Fact lookups:** `VOICE_LOOKUPS=on` (staging and prod). Leave `VOICE_LOOKUP_TOOL` and `VOICE_PERSONA_ONLY_PROMPT` unset.
+1. **Top up SautiKit prod** (KES 9.29; rental due 1 Nov), and **fund Soniox or turn on its autopay** (staging TTS 402 since 17:01 EAT).
+2. **Dial the prod test calls** on Esga and Grow Tech ([HANDOVER §7](HANDOVER.md#7-how-to-verify-prod)).
+3. **Confirm `DESK_PLAN_CHANGE=on`** on prod is intended.
+4. **Decide the walk-in-shop areas rule** for KB readiness (it blocks ALFAAL and Esga).
+5. **Give the new account access** (GitHub, Railway, Vercel, Supabase), then give go-aheads, one at a time in each lane's chat:
+   - the back-merge of main into staging
+   - the KB v2 promotion steps
+   - the advisor REVOKE
+6. **Turn on leaked-password protection** in Supabase Auth (both projects).
+7. **Carried:** invoice letterhead (address, KRA PIN), the legal pack #653, the SautiKit ticket, and Meta WhatsApp currency (131042).
 
 ---
 
@@ -340,7 +384,7 @@ Paid-mode copy on Usage still says "next invoice". That wording is a Desk hand-o
 - **Billing.** Packages + on-demand only; beta charging off; no prepaid wallet; no waive overage. Production has P1 through P18. Only P19 remains, after a backup and Alvin's GO. Never re-run P5, P9, P11, P12, P14, P15, P16, P17, or P18. #798, #806, #808, #820, #824, and #827 are on `main`. #827 is the production Desk deploy. The payment retry cron is once a day (`7 3 * * *`) because this Vercel account is Hobby. Do not turn live money on until P19 is on that database as well. Staging first. Runbook: [`payments-go-live.md`](runbooks/payments-go-live.md).
 - **Prod flags:** `FACT_HASH_MODE` is unset on prod. `VOICE_STREAM_RECORD=1` and `VOICE_LOOKUPS=on` from 19 Oct (owner-approved). Native functions stay off on Aris until speech-hold is staging-tested (*per team notes*). `VOICE_LOOKUP_TOOL` and `VOICE_PERSONA_ONLY_PROMPT` stay unset.
 - **Deploys.** One deploy at a time. After each: check prod `/healthz` (SHA and `ok`), then an Aris check before the next one. Prod Voice has **no watch paths** (Railway service config, 18 Oct; `railway.toml` sets none), so every merge to `main`, docs-only included, rebuilds and restarts prod Voice and drops live calls. Merge when no call is active.
-- **DID.** Never release, reassign or re-point **+254709221536** (Aris).
+- **DID.** +254709221536 (Grow Tech on prod) is releasable like any other number since 27 Oct (Alvin 15:54 EAT): only through Admin with Unlock, a typed reason, confirm and an audit row.
 - **Model.** Use an economical model by default; a bigger one only when the task needs it.
 - **Lanes.** Stay in your lane's owns paths ([`AGENTS.md`](../AGENTS.md), `.cursor/rules/*.mdc`). Schema, RPC, and auth changes go to Platform first.
 - **Needs Alvin's explicit yes:** any prod write (SQL, env vars, Railway, Vercel or SautiKit settings), rotating secrets, releasing a DID, and merging to `main`. Merging to `main` deploys prod Voice and prod Desk. Ops-Billing and Brain need his GO in their own chats.

@@ -1,164 +1,317 @@
 ---
 owner: platform
-last_reviewed: 2026-10-25
+last_reviewed: 2026-10-28
 ---
 
 # Scalers handover (start here if you are a new account, owner or agent)
 
-Written 25 Oct 2026, 14:45 EAT, updated 15:05 EAT, at Alvin's request: "documentation of everything so that even when we switch accounts the other can pick up well".
-Facts are as of this date. Current state always wins from `docs/STATUS.md` in the repo; this file is the map for picking the work back up.
+Written 28 Oct 2026, ~17:45 EAT, by the **Scalers Chief** Grok Bot account, which is wrapping up. Alvin's decision (28 Oct 17:12 EAT, "A with good instruction"): **park the staging-only work for the other Grok Bot account** and close out this one.
+The repo is now the only shared surface. Nothing on the old account's box (`/workspace`, briefs, skills, memory) can be reached from the new account. Everything you need is in this file, [`STATUS.md`](STATUS.md) and [`docs/plans/`](plans/).
 **No secret values are in this file.** Only env var names and where they live.
+
+Facts in this file were checked between 17:00 and 17:45 EAT on 28 Oct, read-only: GitHub API, Railway and Vercel deploy lists, `/healthz`, and Supabase SELECTs and advisors. Current state always wins from `docs/STATUS.md`.
 
 ## 1. What Scalers is
 
-Scalers ([scalers.co.ke](https://scalers.co.ke)) is a Kenya-focused multi-tenant Business Assistant. A business gets a phone number. When a call is missed, busy or after hours, the assistant answers, takes the caller's name and reason, and notifies the owner. The owner works in the Desk: setup, the call inbox, contacts, approve-first SMS and WhatsApp, and package usage.
-
-Beachhead: home cleaning (tenant **Done and Dusted, "DnD"**) first; retail (ChapterOne) second. MVP bar: at least 90% fully resolved beachhead calls; escalate to humans only when the playbook says so.
+Scalers ([scalers.co.ke](https://scalers.co.ke)) is a Kenya-focused, multi-tenant Business Assistant. A business gets a phone number, and when a call is missed, busy or after hours, the assistant answers, takes the caller's name and reason, answers from the business's own facts, and notifies the owner. The owner works in the **Desk** (setup, call inbox, contacts, approve-first SMS and WhatsApp, package usage). Super Admin (inside the Desk at `/admin`) runs businesses, numbers, billing and quality.
 
 ## 2. Architecture
 
 | Part | What | Where it runs |
 | --- | --- | --- |
-| Voice | `server.js` at repo root: HTTP server, media websocket, turn loop. Telephony via **SautiKit** (Twilio is dead). STT/TTS Soniox; reasoning Gemini (light models, e.g. flash-lite) | Railway (prod service + `staging` env) |
-| Brain | Conversation logic in `src/conversation/` (modelLead, areaCoverage, owed answers, guard, playbooks). Runs inside the Voice process | Railway, same as Voice |
-| Desk | Next.js App Router app in `dashboard/` (owner desk + marketing landing) | Vercel: prod `app.scalers.co.ke` / `scalers.co.ke`, staging `scalers-staging.vercel.app` |
-| Admin | Super Admin inside the Desk (`/admin/...`; Admin v2 behind `ADMIN_V2`, step-up two-step sign-in #922) | Vercel, with Desk |
-| Data | Supabase: tenants, calls, transcripts, `voice_turn_traces`, appointments, billing, auth | prod `fjxcdccgyhnvnnlnovcl`, staging `sgcdncjxauhsbunobmob` |
+| Voice | `server.js` at repo root: HTTP, `/ws/media`, turn loop. Telephony **SautiKit**; STT/TTS **Soniox**; model **Gemini** | Railway project `scalers-project`: prod service `9b09d8c6` (env `8dd0b8ef`), staging service `e37d143d` (env `99dd41c1`) |
+| Brain | Conversation logic in `src/conversation/` and `src/knowledge/`. Runs inside the Voice process. Prod runs the **v2 three-engine stack** (`BRAIN_ENGINES`) | Railway, same as Voice |
+| Desk + Admin | Next.js App Router in `dashboard/` | Vercel project `scalers-project` (prod `app.scalers.co.ke`), staging project `scalers-staging` |
+| Data | Supabase | prod ALCR `fjxcdccgyhnvnnlnovcl`, staging `sgcdncjxauhsbunobmob` |
 
-Repo docs for depth: `docs/explanation/architecture/SYSTEM_ARCHITECTURE.md`, `docs/reference/platform/PLATFORM_SYSTEM_MAP.md`, `docs/reference/lanes/*.md`, `CONTEXT.md` (glossary). Two apps, one repo, deployed separately, no npm workspace. Node 22.
+Depth: `docs/explanation/architecture/SYSTEM_ARCHITECTURE.md`, `docs/reference/platform/PLATFORM_SYSTEM_MAP.md`, `docs/reference/lanes/*.md`, `CONTEXT.md`. Node 22. Two apps, one repo, deployed separately.
 
-## 3. Environments, branches, numbers
+## 3. Environments right now (28 Oct, ~17:20 EAT)
 
-| | Staging | Prod |
+| | Prod | Staging |
 | --- | --- | --- |
-| Branch | `staging/v2-c0-opening-2026-10-21` | `main` |
-| Running SHA (25 Oct 15:05) | `924878f6` deployed 14:21 EAT: #944–#949, #946 + Dockerfile boot fix (branch tip moves with docs-only STATUS commits) | `0cbedc04` deployed 14:04 EAT (#951 PWA + #922 Admin 2FA). `main` head is `6e2b8574` (#954 favicon). Desk is setting `ADMIN_V2=on` on prod per Alvin's GO |
-| Phone balance (15:05) | KES 49.03 | KES 18.43, **needs a top-up** |
-| DID | **+254709221537** = DnD test line | **+254709221536** = Aris (live customer) |
-| Supabase | `sgcdncjxauhsbunobmob` | `fjxcdccgyhnvnnlnovcl` |
+| Branch | `main` @ **`9af65811`** (#988, 10:36 EAT) | `staging/v2-c0-opening-2026-10-21` @ **`1a20be8a`** (#1008, 17:00 EAT) |
+| Voice running | **`c620b379`** (#985 promotion, deploy `a452a964`, started 00:08 EAT 28 Oct). Main moved on with Desk-only commits #986–#989; Railway **skipped** those (watch paths), so Voice is behind main on purpose | `1a20be8a`, started 17:02 EAT, `kb.gate=true`, 9 tenants, 3 empty KB snapshots |
+| Desk running | `dpl_9Wy77hoH…` READY at `9af65811` | follows the staging branch (see the alias issue in §8) |
+| Rollback | Desk: `dpl_B1o8GCnP…` (`c620b379`), then `dpl_BMyC15GK…` (`45596057`). Voice: redeploy the previous successful build or `git revert -m 1 c620b379` (new commit, never force-push). `27c536b8` (`45596057`) is marked REMOVED in Railway; confirm it can still roll back before relying on it | Railway keeps the last good deploy if a build fails |
+| Migrations | Complete through `20261027144019` (`save_spoken_catalogue_version`) | Prod's set **plus** the 4 KB v2 migrations and `admin_invoice_actions` (§5) |
+| Phone balance (SautiKit) | **KES 9.29** (16:53 EAT). DID rental due 1 Nov. **Top up before any test call** | KES 34.05 |
+| Soniox | No error on prod since start, but it hasn't spoken since 01:33 EAT | **TTS 402 "organization balance exhausted" at 17:01 EAT.** If prod shares the Soniox org, prod calls will play the downtime clip |
+| SMS (TextSMS) | 126 credits | 125 |
 
-**Never release either DID. Never touch Aris's number mapping.**
+**Prod businesses (8):** ALFAAL Ventures, Done and Dusted Cleaning Services, Esga Stationery, Grok Test, Grow Tech Nurseries Ltd, Scalers Business Solutions, Uwezo enterprises (all active), Chapter One Bookstore (archived).
+**Live lines (prod):** Esga Stationery **+254709221542**, Grow Tech Nurseries **+254709221536**. The other businesses are waiting for numbers. Staging test line: Done and Dusted **+254709221537** (sample data).
+**+254709221536 is releasable** like any other number since 27 Oct (Alvin, 15:54 EAT), but only through Admin with Unlock, a typed reason, confirm and an audit row.
+**Calls since the 28 Oct promotion:** one, Grow Tech, 01:33 EAT, 79 s, `complete`. **Nobody has graded it yet.**
 
-**Branch fork.** Staging has forked from main: it carries the v2 Brain/Voice work (#926 v1 draft + KB verify, #936 grace queue, #942 owed answers, #946 area notes, #948 alerts, #949 AI-first place fix, Admin v2 #941). Main gets Desk-only ports (e.g. #951 = port of #935) and approved fixes. Anything promoted from staging to main must bring its dependencies. Known one: **#948 needs the Dockerfile line `COPY dashboard/src/lib/alertTypeDefaults.json ./dashboard/src/lib/` (or #955) or prod will crash at boot.** The live staging branch is `staging/v2-c0-opening-2026-10-21`. (`ENVIRONMENTS.md` and AGENTS.md rule 6 still name an older Stage-PR rebuild branch; treat those lines as stale until fixed.)
+**Prod flags (names and values only where non-secret):**
+- Vercel prod: `DESK_PLAN_CHANGE=on`, `ADMIN_V2=on`, `BRAIN_CALL_FIXES_D199=on`.
+- Railway prod: the v2 Brain env set (`BRAIN_V2`, `BRAIN_V2_MODE=live`, `BRAIN_V2_OWNS_CALL`, `BRAIN_ENGINES=on`, `BRAIN_V1_DRAFT_TENANTS` = all 8 ids, and others). The new brain is on for every prod business.
+- Off on prod: live transfer (`/healthz` `liveTransfer.executor=false`), spoken catalogue, `FACT_HASH_MODE` (unset).
+- Never set `VOICE_GEMINI_CATALOGUE` or `BRAIN_GEMINI_CATALOGUE`.
 
-**Release direction (Alvin, 15:03 EAT):** everything non-voice goes to prod; voice stays on staging. Brain is reworking the prod release plan (`/workspace/scalers/ship-briefs/2026-10-25_brain_prod-release-plan.md`); nothing executed yet.
+## 4. Parked on staging (36 commits, not on prod)
 
-**How to restage (only after Alvin's GO):**
-1. Merge the approved PR into the staging branch; run `npm run test:brain` / `test:voice` (3 known failures before 25 Oct, 1 known timeout after).
-2. `railway up` from the staging worktree, linked to the staging environment; set `GIT_SHA` to the commit.
-3. Check `/healthz` ok and its `gitSha` matches; TTS/STT/Gemini/telephony clear, `billingExhausted` false; DnD catalogue version (v4 on 25 Oct); staging phone balance.
-4. If the health check fails, Railway keeps the old deploy running. Read the boot logs (25 Oct cause: missing file in Docker image).
-5. Add a STATUS line (docs-only commit). Nobody dials; Alvin dials and an agent scores.
+Alvin parked these at 17:12 EAT on 28 Oct, to be promoted from the new account. They're on `staging/v2-c0-opening-2026-10-21` but not on `main` (`git log main..origin/staging/v2-c0-opening-2026-10-21`):
 
-## 4. Accounts and services (names only)
-
-- **GitHub:** `glclientacquisition-max/scalers-project` (one shared account; merges by lanes all show as that account, so record the approver in commit/PR text). `gh` CLI authenticated on the box.
-- **Railway:** Voice prod service and staging environment. Railway CLI on the box is **unauthorized** as of 25 Oct 15:05 (needs a fresh login before logs or `railway up`).
-- **Vercel:** Desk prod and `scalers-staging` projects. Vercel MCP connected to the bot.
-- **Supabase:** prod and staging projects above; Supabase MCP connected. SQL is manual (`docs/explanation/database/DATABASE_GOVERNANCE.md`). Staging is free tier (cannot edit auth templates without custom SMTP).
-- **SautiKit:** telephony, DIDs, phone balances (staging and prod balances are prepaid and run low; Alvin tops up).
-- **Soniox** (STT/TTS), **Google Gemini** (model), email via the platform mail provider, Web Push (VAPID) for the installable Desk app.
-- **Env var names** (values live in Railway / Vercel project settings, never in the repo): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `GEMINI_API_KEY`, `SONIOX_API_KEY`, `SAUTIKIT_*`, `VOICE_INTERNAL_SECRET`, `VOICE_PUBLIC_BASE_URL`, `PUBLIC_BASE_URL`, `GIT_SHA`, VAPID keys for push, admin step-up key. Full generated list: `docs/reference/env.md`.
-- **Behaviour flags seen 25 Oct:** `BRAIN_MODEL_LEAD` on (staging), `BRAIN_V1_DRAFT` on (DnD via `BRAIN_V1_DRAFT_TENANTS`), `SPLIT` and `GRACE_QUEUE` unset = on in current staging code, `BRAIN_CALL_FIXES_D199=on` and `VOICE_ENDED_CALL_GUARD=on` (prod), `ADMIN_V2`. Never set `VOICE_GEMINI_CATALOGUE` or `BRAIN_GEMINI_CATALOGUE`.
-
-## 4a. Key custody
-
-- The live VAPID push keys and the Admin step-up key are set in **Railway and Vercel** project env. Alvin keeps those accounts, so the keys survive an account switch with no action.
-- Never paste key values into chat, docs, commits or PRs.
-
-## 5. Team lanes and seats
-
-All seats report to **Chief of Scalers**, who reports to Alvin. One task, one lane, one PR. Lanes write thick problem-to-done briefs for Cursor cloud agents; Cursor writes code.
-
-| Seat | Owns | Skills (hard-load) |
-| --- | --- | --- |
-| Chief of Scalers | Product/ops chief, coordinates lanes, carries GOs to the asking lane verbatim, tracks PRs | brief-before-act, scalers-billing-as-is, scalers-call-score, scalers-landing-craft, scalers-prompt-craft |
-| Voice Engineer | Telephony, SautiKit + Soniox + Gemini runtime, barge-in, latency. Does not score calls or write copy | brief-before-act, scalers-agents-md-lane-sync, scalers-barge-in-review, scalers-ship-brief, scalers-voice-oss-watch |
-| Brain Engineer | Playbooks, turn gates (state/speech/tool), coverage, tools. Hands Prompt criteria, not copy | brief-before-act, scalers-agents-md-lane-sync, scalers-brain-turn-gates, scalers-playbook-research, scalers-prompt-craft |
-| Desk Engineer | Owner web / Admin UI, Kenya-mobile density (360/390) | brief-before-act, scalers-desk-cursor-brief, scalers-design-authority, scalers-frontend-design, scalers-kenya-mobile-desk, scalers-ui-review, scalers-responsive-universal, scalers-a11y-audit, scalers-chrome-density, scalers-anti-slop-notes, scalers-landing-craft, scalers-agents-md-lane-sync, shadcn-ui, antislop(+ui, copywriting), avoid-ai-writing, frontend-design, hallmark, awesome-design-md, ui-ux-pro-max, vercel-react-best-practices, web-design-guidelines |
-| Ops-Billing Engineer | Money path: packages, minutes, on-demand, Admin Billing home | brief-before-act, scalers-agents-md-lane-sync, scalers-billing-as-is, scalers-metering-event-shape, scalers-package-minute-idempotency |
-| Prompt | Owner-facing words the caller hears, thick briefs, no code/deploy | brief-before-act, scalers-prompt-craft, scalers-brain-turn-gates, scalers-design-authority, scalers-anti-slop-notes, scalers-landing-craft, avoid-ai-writing |
-
-Repo lane contracts: `docs/reference/lanes/{VOICE,BRAIN,DESK_UX,OPS_BILLING,PLATFORM}.md`, chat starters in `PROMPTS.md`. Platform is a repo lane without its own seat (Ops-Billing carries a thin watch).
-
-Box skill files: `/home/box/agent-data/workflows/scalers-*` (30 skills; `scalers-wallet-idempotency` is deprecated). Seat profiles: `/home/box/agent-data/agents/<id>/profile.json`.
-
-## 6. Standing rules and locks
-
-1. **Billing = packages + on-demand only.** No prepaid wallet product, no KES credit as the lever. Admin has one Billing home (package, minutes, on-demand, soft/hard, overage).
-2. **Alvin-only GOs** for merge, restage, any SQL, any prod change (env, Railway/Vercel settings), releasing a DID, rotating secrets. The GO goes to the lane that asked, in its own question's words. Record approver + time in commit/STATUS.
-3. **Agents never dial.** Alvin dials; agents read recordings, transcripts, `voice_turn_traces`, logs and score.
-4. **Light models** by default (Cursor and runtime); heavier only when a run stalls.
-5. **Owner copy:** no vendor names (no Resend, Soniox, Gemini, SautiKit, API keys or env controls on product screens), no AI slop; run no-ai-slop on new strings.
-6. **Root cause first:** trace the symptom to the cause with evidence before proposing a fix; prefer structural fixes over patches.
-7. **Phone-sized diagrams** and plain language in reports to Alvin.
-8. **Desk is light theme by default** (dark is optional). Marketing tokens: light canvas, CTA `#005CCC`, mark `#0096FF`, DM Sans + Sora.
-9. **Transparent icon** for the app/PWA mark.
-10. **Per-niche policies** (cancellation, deposit, payment) live per tenant/niche, not hard-coded.
-11. **Area tree:** coverage reads only the Desk area tree (tenant picks + surcharges + notes). Unknown place: "which area is that near?", never a guess. Since #949 the place check is AI-first: a place counts only if the model understood one and the caller's own words confirm it; without the model, only exact/landmark names inside a place slot ("in", "kwa", "-ni") with a stoplist.
-12. No force-push. Update `docs/STATUS.md` in the same PR as any merge to `main`.
-
-## 7. Open PRs (25 Oct, 114 open; key ones)
-
-| PR | Base | State | What |
+| # | SHA | When (EAT) | Commit |
 | --- | --- | --- | --- |
-| #939 | staging | draft, awaiting GO | Voice grace-queue hardening (tenant gate, merge not double reply). Needs two staging settings on at go-live. **Relevant to the double-response issue** |
-| #953 | staging | draft | Brain: bare place names that exactly match the tenant's own picks |
-| #955 | staging | draft, awaiting GO | Shared JSON in `src/shared`, server never imports `dashboard/` (permanent fix for #948 crash) |
-| #952 | main | draft, HOLD | Prod release of Desk service-areas picker (port of #930 + #944) |
-| #894 | staging | draft | Brain caller profile v1 (flag off) |
-| #848–#856 | main / stacked | draft | Brain v2 C0–C7 stack (one branch of record, commit safety, owns call, fact store, hybrid tool calling) |
-| #859 | main | draft | Voice query batching (flag off) |
-| #934 | main | draft | Keep 24-hour visit times |
-| #886, #885 | main | draft | Number hold clip + SQL (never applied) |
-| #872–#876 | main | draft | Voice/Brain flags-off work (transcript resume, recording notice, silence re-invite, admin docs) |
-| #887–#891 | desk branches | draft | Admin v2 slices (nav, numbers, billing home) |
-| #761, #751 | main | open (not draft) | Brain trusted hours; honest owner text |
-| #492 | main | draft | Private-beta marketing landing |
-| #529 | main | closed | Prepaid dialect hygiene (closed, not open) |
-| #935 | — | closed in favour of #951, which is merged and live on prod (Alvin's "GO prod #951") |
-| Double-reply fixes | staging | draft (Brain building) | Fixes 1, 2, 4, 5 as one draft on staging; fix 3 as a draft stacked on #939. Unmerged |
+| 1 | `4f7dfbe4` | 28 Oct 09:55 | Desk: Identity settings remake (slice 1) (#989) (#990) |
+| 2 | `3293eeb3` | 28 Oct 10:25 | KB v2 (3/4): Desk Catalogue editor on kb_items, Swahili approve, what callers hear, ready card |
+| 3 | `f461ac23` | 28 Oct 10:25 | KB v2 (4/4): Super Admin brain gate in the Business pane |
+| 4 | `120f8d41` | 28 Oct 10:25 | KB v2 (2/4): lookup, the 12 call rules, brain tools, readiness selector, compat writer |
+| 5 | `a79febb8` | 28 Oct 10:25 | KB v2 (1/4): schema, RLS, RPCs and the rules compiler |
+| 6 | `3342a5e7` | 28 Oct 10:27 | Merge branch 'platform/kb-v2-2026-10-28-brain' into platform/kb-v2-2026-10-28-desk |
+| 7 | `2938f917` | 28 Oct 10:27 | Merge branch 'platform/kb-v2-2026-10-28-desk' into platform/kb-v2-2026-10-28-admin |
+| 8 | `f1c8f25a` | 28 Oct 10:27 | Merge branch 'platform/kb-v2-2026-10-28' into platform/kb-v2-2026-10-28-brain |
+| 9 | `68a517fe` | 28 Oct 10:27 | docs: regenerate docs/reference/schema.md for kb_v2.sql (npm run docs:reference) |
+| 10 | `00679a4a` | 28 Oct 10:27 | Merge branch 'platform/kb-v2-2026-10-28-brain' into platform/kb-v2-2026-10-28-desk |
+| 11 | `540d46cf` | 28 Oct 10:27 | Merge branch 'platform/kb-v2-2026-10-28-desk' into platform/kb-v2-2026-10-28-admin |
+| 12 | `1e89b307` | 28 Oct 10:27 | docs: regenerate docs/reference/env.md |
+| 13 | `ca2ab180` | 28 Oct 10:27 | docs: regenerate docs/reference/env.md on the brain slice |
+| 14 | `227583ab` | 28 Oct 10:29 | Merge #994: KB v2 (4/4): Super Admin brain gate in the Business pane |
+| 15 | `c21a8dce` | 28 Oct 10:29 | Merge #993: KB v2 (3/4): Desk Catalogue editor, Swahili approve, what callers hear, ready card |
+| 16 | `7a449ef9` | 28 Oct 10:29 | Merge #992: KB v2 (2/4): lookup, 12 call rules, brain tools, readiness selector, compat writer |
+| 17 | `0fe1b362` | 28 Oct 10:29 | Merge #991: KB v2 (1/4): schema, RLS, RPCs, rules compiler |
+| 18 | `39a96998` | 28 Oct 10:39 | Desk: polish D1–D3 (optimistic actions, Overview streaming, Sending texts) onto staging (cherry-pick of #986 d98c8b7b, #987 1d30ad47, #988 9af65811) (#995) |
+| 19 | `f362fa70` | 28 Oct 10:51 | KB v2 follow-up: item states (site visit, paused, not offered, hold, not included), honest Quote backfill, paste a list |
+| 20 | `bbb8a558` | 28 Oct 10:52 | Merge #996: KB v2 (5/5): item states, honest Quote backfill, paste a list |
+| 21 | `c9102832` | 28 Oct 11:44 | Platform: KB v2 writers — retire services_offered writes, add-only catalogue imports, paste Replace, memberDenied on kb actions |
+| 22 | `f3a2fac0` | 28 Oct 11:49 | Platform: lint fix; regenerate schema reference (kb_import_items) |
+| 23 | `5aa6d9ce` | 28 Oct 11:51 | Merge #998: KB v2 writers — kb_items is the source (services_offered retired, add-only imports, paste Replace, guards) |
+| 24 | `43913740` | 28 Oct 12:00 | Platform: KB mirror writes pricing.mode in the old vocabulary (fixed/from/range/ask) so catalogue_price_history accepts it |
+| 25 | `4147648d` | 28 Oct 12:05 | Merge #999: KB mirror pricing.mode in the old vocabulary |
+| 26 | `3a037cd9` | 28 Oct 12:19 | Desk: Catalogue remake on KB v2 (/settings/knowledge) + Replace my list + kb_items reads (staging) (#997) |
+| 27 | `e543589e` | 28 Oct 13:20 | Brain: KB v2 reader - one catalogue door (kb/source.js) for every caller-facing read |
+| 28 | `c014579c` | 28 Oct 13:47 | desk: Impeccable critique fixes (identity greeting, item states gate, renames, home, catalogue, copy) (#1001) |
+| 29 | `7826b391` | 28 Oct 13:48 | Desk: Policies remake (self-saving cards, gated by business type) (#1002) |
+| 30 | `f6557e8e` | 28 Oct 13:54 | Merge #1000: Brain KB v2 reader (one catalogue door for caller reads, BRAIN_KB_GATE) |
+| 31 | `ca7b6155` | 28 Oct 14:23 | Platform: shared isKbLive contract (one 'on the KB' predicate for Voice and Desk) |
+| 32 | `ba3ae066` | 28 Oct 14:26 | Merge #1005: shared isKbLive contract (one 'on the KB' predicate for Voice and Desk) |
+| 33 | `3895f95b` | 28 Oct 14:44 | Desk: KB v2 provenance mirror (offered only, no stale notes) + item states flag gate on save (#1003) |
+| 34 | `52108111` | 28 Oct 16:46 | Brain: KB v2 reader follow-ups (typed catalogue asks, clean group names, paused-item callback names the item) (#1004) |
+| 35 | `3956afd7` | 28 Oct 16:53 | Brain B1: fail-closed degradation + safe mode (additive; retire-old-brain plan §2c/§2d) (#1007) |
+| 36 | `1a20be8a` | 28 Oct 17:00 | Platform P1 (retire old brain), stacked on B1 #1007: KB brain for every business, brainMode.js, safe mode + catalogue-complete RPCs, empty-snapshot fallback, healthz counts (#1008) |
 
-Full list: `gh pr list -R glclientacquisition-max/scalers-project --state open --limit 200`.
+What these are:
+- **KB v2:** one knowledge base for each business's catalogue, policies and facts (`kb_items`, snapshots, readiness, the rules compiler). PRs #991–#994 and #996–#1005.
+- **The Desk Catalogue remake:** `/settings/knowledge`.
+- **Desk polish:** Identity, Policies and critique fixes (#990, #995, #1001–#1003).
+- **The first two steps of "retire the old brain":** Brain **B1** #1007 (fail-closed degradation + safe mode) and Platform **P1** #1008 (KB brain for every business, `brainMode`, `tenants.brain_mode`, catalogue-complete RPCs, healthz counts).
 
-## 8. Open issues
+Still open as drafts:
+- **#1010** B2 (delete the old turn) and **#1009** P2 (env and SQL clean-up). Both are stacked on `platform/kb-p1-on-b1-2026-10-28`.
+- **#975** (Brain engines root fixes) stays open: its content went to staging through `824db1b7` and to prod through #985. **Don't close it without Brain's check.**
 
-1. **Double response** (Alvin's post-#949 test call HD_6d4e7863db76): RCA done; five fixes. Brain is building 1, 2, 4, 5 as a draft PR on staging and 3 stacked on #939. Both unmerged.
-2. **Reconnect dead air** after a media stream reconnect (#875 draft has transcript resume).
-3. **"Hello" treated as backchannel**, so a bare hello after the greeting gets no reply (#836 tests).
-4. **Swahili not-covered reply comes out in English**; also language lock stuck on English from the greeting (13:15 call).
-5. **Desk payment-policy save drops the `sw` line.**
-6. **Kiswahili copy needs a native review** (hours wording is still a placeholder; `[PROMPT-PLACEHOLDER]` copy remains).
-7. **#948 Dockerfile line must ship with any main promotion** (or #955).
-8. #949 gaps: single-word rule still counts places outside tenant picks ("Nataka usafi Kericho kesho"); stoplist must grow; sim does not exercise the model path.
-9. TTS gain clipping (+0.47 dBFS); "Can I cancel?" adds an unasked line.
-10. Prod pay for Aris: pay RPC 404 at a doubled `/rest/v1/rest/v1/` path (STATUS, 23 Oct).
+### 4a. Staging-only migrations (applied on staging, NOT on prod)
 
-## 9. DnD sample data and the test script
+| Order | File (`docs/supabase/`) | Staging version | Down file |
+| --- | --- | --- | --- |
+| 1 | `kb_v2.sql` (2026-10-28.1) | `20261028072250` `kb_v2_2026_10_28_1` | `kb_v2_down.sql` |
+| 2 | `kb_v2_item_states.sql` (.2) | `20261028074736` `kb_v2_item_states_2026_10_28_2` | `kb_v2_item_states_down.sql` |
+| 3 | `kb_v2_paste_replace.sql` (.3) | `20261028083434` `kb_v2_paste_replace` | `kb_v2_paste_replace_down.sql` |
+| 4 | `kb_v2_brain_mode.sql` (.4) | `20261028140049` `kb_v2_brain_mode_2026_10_28_4` | `kb_v2_brain_mode_down.sql` |
+| — | `admin_invoice_actions.sql` | `20261025092056` | none in repo (draft #957). Held on purpose: it replaces the live `enqueue_invoice_*` functions and needs its own yes |
+| — | `kb_v2_phase8_drop_legacy.sql` | not applied anywhere | phase 8, separate yes, never in the first batch |
 
-Tenant `df4ad9d8-28ff-4810-b1e6-94f5495472b0` on staging; catalogue v4. Files: `/workspace/scalers/ops/dnd-sample/` (sample.json, gen-dnd-sample.ts, caller-test-script.md, backups, rebuild SQL), snapshot + restore `/workspace/scalers/ops/dnd-staging-snapshot-2026-10-25.*`, `dnd-staging-restore-2026-10-25.sh`, coverage seed SQL (+ `_down`).
+These SQL files live on the staging branch only. They reach `main` with the promotion merge.
 
-Dial **+254709221537** and ask, in order:
-1. "How much is a deep clean?" → KSh 6,000–12,000 by house size.
-2. "Sofa cleaning for a 5-seater?" → KSh 700/seat = KSh 3,500.
-3. "Do you come to Kilimani?" → Yes, no extra fee.
-4. "Do you cover Kibera?" → No.
-5. "I'm in Syokimau." / "I'm in Thika." → +KES 500 / +KES 1,500, Thika from 2 bedrooms up.
-6. "Do you come to Mlolongo?" → No.
-7. "I'm near Kamakis." → "Which area is that near?"
-8. "Can I cancel?" → Up to 24 hours before; after that the deposit is kept.
-9. "How do I pay?" → M-Pesa or cash; 30% deposit on deep / move-out / post-construction.
-10. "Book a standard 2-bedroom clean, Saturday 10am, in Westlands." → KSh 3,500, ~3–4 h, confirms area/price/hours, then name + landmark; booking request logged.
-Plus the Kiswahili regression: "Deep cleaning nipo saa ngapi?" (the 13:29 "rogue" call, HD_7a9915837b00).
+### 4b. Staging needs a merge from main first
 
-Call evidence: `/workspace/scalers/voice-qa/` (25 Oct: rogue-call report, root-cause architecture, dial scores), recordings in `/workspace/*.mp3`.
+Main has 14 commits staging doesn't: the #985 promotion merges, plus **`16735cf4`**, the prod SQL record. That commit carries STATUS, MIGRATION_LEDGER, the v1.2 / W1 write receipts / area picks + `ke` backfill / spoken catalogue SQL and down files, and two `supabase/migrations/` files. Desk #986–#989 are already on staging as the cherry-picks #990 and #995, so expect conflicts in those Desk files; keep the staging side.
+**Step 0 of any promotion:** `git merge origin/main` into the staging branch, resolve, run the gates, and push. Pushing to staging needs Alvin's yes.
 
-## 10. How to resume on a new account (checklist)
+### 4c. Exact promotion order (each prod step needs Alvin's yes in that lane's chat)
 
-1. Get access: GitHub repo, Railway, Vercel, Supabase (both projects), SautiKit; confirm with Alvin which account owns each. Install `gh`, Railway and Vercel CLIs, Node 22.
-2. Clone the repo; read `AGENTS.md` → `docs/STATUS.md` → your lane contract → this file.
-3. Re-create the seats (Chief, Voice, Brain, Desk, Ops-Billing, Prompt) using the profile descriptions in section 5 and load the `scalers-*` skills (copy `/home/box/agent-data/workflows/scalers-*` if the box is not carried over).
-4. Re-provision secrets from Railway/Vercel into the new tooling; never paste values in chat.
-5. Verify state: `/healthz` on staging and prod, SHAs vs section 3, phone balances, DnD catalogue version.
-6. Re-read open PRs (section 7) and open issues (section 8); next actions on 25 Oct: review the double-reply drafts, GO decisions on #939, #953, #955, and the non-voice prod release plan.
-7. Follow the rules in section 6, especially Alvin-only GOs and agents never dial.
+The full runbooks are in [`plans/kb-v2-prod-batch-2026-10-28.md`](plans/kb-v2-prod-batch-2026-10-28.md) and [`plans/retire-old-brain-plan-2026-10-28.md`](plans/retire-old-brain-plan-2026-10-28.md).
+
+0. **Back-merge main → staging** (§4b). Restage, then check that staging `/healthz` gitSha equals the tip.
+1. **Soak on staging:** at least a day with `BRAIN_KB_GATE=on`, plus 2 graded real calls (Grow Tech, D&D) and 1 Swahili call. A fresh signup must end with a filled Catalogue. **Soniox staging must be funded first.**
+2. **Alvin decides:** does a walk-in shop with no delivery (bookstore, stationery) need confirmed service areas to pass readiness? This decides whether ALFAAL and Esga pass without an owner tap.
+3. **Prod SQL, in order:** .1 → .2 → .3 → .4. All are additive. After them, check: 5 `kb_*` tables, the tenant columns, the RPCs, and a clean security advisor.
+4. **Backfill:**
+   - `node scripts/kb-backfill.js` dry run, then `--apply`, with the prod service-role key from the vault (never printed).
+   - Expected: Grow Tech 69 products, D&D 1, Esga 2, ALFAAL 1, Grok Test 1, and 3 businesses empty.
+   - `scripts/kb-ensure-live.js` publishes empty snapshots for the rest.
+5. **One promotion PR from staging into main, merged with a merge commit.** Never force-push.
+   - Run the live-call check (zero active calls) right before merging; prod Voice redeploys on push.
+   - Gates: `test:brain`, `test:voice`, `test:mvp`, `test:desk-bundle`, `docs:check`, `docs:reference:check`, then dashboard lint + build.
+   - **#997 (Catalogue redirect) must never reach prod without #998 (kb_items as the source).** One merge carries both.
+6. **Re-run the backfill once.** It's add-only and catches owner edits made in the window.
+7. **Prod Voice env** (stage + accept-deploy, live-call check before each):
+   - first `KB_COMPILE_ON_SAVE=on`, `KB_SW_SUGGEST=on`, `KB_SHADOW=on`
+   - last, `BRAIN_KB_GATE=on` on Railway prod and the Vercel prod Desk, with a fresh Desk build
+   - Brake: `BRAIN_SAFE_MODE=all`, or `BRAIN_KB_GATE=off`.
+8. **Then retire the old brain:**
+   - B2 #1010 + Voice V1 + Desk D1, then B3 (staging first, each soaked)
+   - then P2 #1009 (env removal, drop `brain_target`), at least 24 h after B2/B3 are healthy
+   - snapshot the env before removing anything
+
+### 4d. Risks
+
+- **Unconfirmed service areas.** No prod business passes KB readiness today, because owners haven't confirmed their areas. Until they do, the brain must say "the team will confirm", which B1 does.
+- **Grow Tech's catalogue.** It lives only in `product_catalog`, and today's prod engines don't read it ("not sure" answers). Backfill fixes this.
+- **The backfill and merge window.** Price edits made between the backfill and the deploy aren't carried over. Check `catalogue_price_history`.
+- **Watch paths.** Desk-only merges skip the Voice redeploy, but anything touching Voice paths restarts prod Voice. Always do the live-call check first.
+- **Rollback.** Revert the merge commit, then run the SQL downs in reverse (.4 → .1). The legacy catalogue columns are never dropped in this batch, and the mirror keeps them current.
+- **Phone and voice balances.** SautiKit and Soniox balances are near zero, so test calls will fail until Alvin tops up.
+- **The GitHub "Deploy staging Voice" workflow can't run.** It's missing the `RAILWAY_STAGING_*` repo secrets. Staging deploys happen through Railway's GitHub trigger.
+
+## 5. Open items (not parked work)
+
+1. **Money:** top up SautiKit prod (KES 9.29; rental 1 Nov), and fund Soniox or turn on autopay (staging is already at 402).
+2. **Grade the 01:33 EAT Grow Tech call**, then have Alvin dial prod test calls on Esga and Grow Tech (§7).
+3. **`DESK_PLAN_CHANGE=on` on Vercel prod:** Alvin hasn't confirmed this is intended. It lets owners change plans themselves.
+4. **Spoken catalogue backfill on prod** needs the prod service-role key from the vault (`tenants.spoken_catalogue` is empty on prod; the flags stay off). It becomes moot once KB v2 ships.
+5. **5 `billingReviewMoney` test failures** (Ops-Billing lane, known, not yet fixed).
+6. **#894 caller profile v1:** parked by Alvin. Draft on staging, flag off.
+7. **The staging Desk alias conflict:** Vercel branch-follow and `scripts/stage-desk-alias.js` both move the staging alias. One owner is needed (Platform).
+8. **`admin_invoice_actions`:** on staging only, and needs its own yes (§4a).
+9. **The legal pack #653:** waiting on Alvin and a lawyer.
+10. **Supabase advisors (both projects):**
+   - 0 errors. The staging backup table `_backup_tenants_unknown_answer_20261019` got RLS on 28 Oct.
+   - Warnings: 53 functions with a mutable `search_path`; **21 SECURITY DEFINER functions executable by `anon`**; 42 (prod) / 44 (staging) executable by `authenticated`; `citext` in `public`; leaked-password protection off (a dashboard setting).
+   - The proposed fix for the 21 anon-executable functions is below. **NOT APPLIED.** Platform lane: staging first, then prod, each with Alvin's yes.
+   - The riskiest are `upsert_tenant_field_meta`, `backfill_tenant_field_meta_seed`, `confirm_tenant_field` and `_tenant_append_field_history`.
+   - **Check before applying:** `current_user_tenant_ids`, `member_can_*` and `current_member_role` are used inside RLS policies. If any page queries those tables while signed out, revoking anon turns an empty result into a permission error.
+   - Drafts #864 and #865 (open grants, default privileges) cover related ground.
+
+```sql
+-- PROPOSED, NOT APPLIED (28 Oct 2026). Platform lane. Staging first, then prod, each with Alvin's yes.
+-- Pre-check: is any of these called while signed out (sign-up trigger, public pages, RLS policies evaluated as anon)? If so, drop it from the list.
+begin;
+revoke execute on function public._tenant_append_field_history(uuid, text, text, text, jsonb, jsonb) from public, anon;
+revoke execute on function public._tenant_assert_member(uuid) from public, anon;
+revoke execute on function public._tenant_catalog_product_score(uuid, jsonb, boolean) from public, anon;
+revoke execute on function public._tenant_catalog_service_score(uuid, jsonb, boolean) from public, anon;
+revoke execute on function public._tenant_field_meta_admin_guard() from public, anon;
+revoke execute on function public._tenant_field_meta_source(uuid, text) from public, anon;
+revoke execute on function public._tenant_field_score(uuid, text, boolean) from public, anon;
+revoke execute on function public._tenant_holds_allowed(uuid, jsonb) from public, anon;
+revoke execute on function public._tenant_owner_holdable_product(uuid, jsonb) from public, anon;
+revoke execute on function public.backfill_tenant_field_meta_seed() from public, anon;
+revoke execute on function public.confirm_tenant_field(uuid, text, uuid) from public, anon;
+revoke execute on function public.current_member_role(uuid) from public, anon;
+revoke execute on function public.current_user_tenant_ids() from public, anon;
+revoke execute on function public.handle_new_user_tenant() from public, anon;
+revoke execute on function public.member_can_admin(uuid) from public, anon;
+revoke execute on function public.member_can_write(uuid) from public, anon;
+revoke execute on function public.platform_soniox_voices_enforce_single_default() from public, anon;
+revoke execute on function public.tenant_completeness_score(uuid) from public, anon;
+revoke execute on function public.tenant_hold_gate(uuid) from public, anon;
+revoke execute on function public.tenant_subscriptions_clear_spend_hold() from public, anon;
+revoke execute on function public.upsert_tenant_field_meta(uuid, text, text, text, numeric, integer, text, jsonb, jsonb) from public, anon;
+grant execute on function public._tenant_append_field_history(uuid, text, text, text, jsonb, jsonb) to authenticated, service_role;
+grant execute on function public._tenant_assert_member(uuid) to authenticated, service_role;
+grant execute on function public._tenant_catalog_product_score(uuid, jsonb, boolean) to authenticated, service_role;
+grant execute on function public._tenant_catalog_service_score(uuid, jsonb, boolean) to authenticated, service_role;
+grant execute on function public._tenant_field_meta_admin_guard() to authenticated, service_role;
+grant execute on function public._tenant_field_meta_source(uuid, text) to authenticated, service_role;
+grant execute on function public._tenant_field_score(uuid, text, boolean) to authenticated, service_role;
+grant execute on function public._tenant_holds_allowed(uuid, jsonb) to authenticated, service_role;
+grant execute on function public._tenant_owner_holdable_product(uuid, jsonb) to authenticated, service_role;
+grant execute on function public.backfill_tenant_field_meta_seed() to authenticated, service_role;
+grant execute on function public.confirm_tenant_field(uuid, text, uuid) to authenticated, service_role;
+grant execute on function public.current_member_role(uuid) to authenticated, service_role;
+grant execute on function public.current_user_tenant_ids() to authenticated, service_role;
+grant execute on function public.handle_new_user_tenant() to authenticated, service_role;
+grant execute on function public.member_can_admin(uuid) to authenticated, service_role;
+grant execute on function public.member_can_write(uuid) to authenticated, service_role;
+grant execute on function public.platform_soniox_voices_enforce_single_default() to authenticated, service_role;
+grant execute on function public.tenant_completeness_score(uuid) to authenticated, service_role;
+grant execute on function public.tenant_hold_gate(uuid) to authenticated, service_role;
+grant execute on function public.tenant_subscriptions_clear_spend_hold() to authenticated, service_role;
+grant execute on function public.upsert_tenant_field_meta(uuid, text, text, text, numeric, integer, text, jsonb, jsonb) to authenticated, service_role;
+commit;
+
+-- Down (restores today's grants):
+-- begin;
+-- grant execute on function public._tenant_append_field_history(uuid, text, text, text, jsonb, jsonb) to public, anon;
+-- grant execute on function public._tenant_assert_member(uuid) to public, anon;
+-- grant execute on function public._tenant_catalog_product_score(uuid, jsonb, boolean) to public, anon;
+-- grant execute on function public._tenant_catalog_service_score(uuid, jsonb, boolean) to public, anon;
+-- grant execute on function public._tenant_field_meta_admin_guard() to public, anon;
+-- grant execute on function public._tenant_field_meta_source(uuid, text) to public, anon;
+-- grant execute on function public._tenant_field_score(uuid, text, boolean) to public, anon;
+-- grant execute on function public._tenant_holds_allowed(uuid, jsonb) to public, anon;
+-- grant execute on function public._tenant_owner_holdable_product(uuid, jsonb) to public, anon;
+-- grant execute on function public.backfill_tenant_field_meta_seed() to public, anon;
+-- grant execute on function public.confirm_tenant_field(uuid, text, uuid) to public, anon;
+-- grant execute on function public.current_member_role(uuid) to public, anon;
+-- grant execute on function public.current_user_tenant_ids() to public, anon;
+-- grant execute on function public.handle_new_user_tenant() to public, anon;
+-- grant execute on function public.member_can_admin(uuid) to public, anon;
+-- grant execute on function public.member_can_write(uuid) to public, anon;
+-- grant execute on function public.platform_soniox_voices_enforce_single_default() to public, anon;
+-- grant execute on function public.tenant_completeness_score(uuid) to public, anon;
+-- grant execute on function public.tenant_hold_gate(uuid) to public, anon;
+-- grant execute on function public.tenant_subscriptions_clear_spend_hold() to public, anon;
+-- grant execute on function public.upsert_tenant_field_meta(uuid, text, text, text, numeric, integer, text, jsonb, jsonb) to public, anon;
+-- commit;
+```
+
+## 6. Lanes and who owns what
+
+Lane contracts: `docs/reference/lanes/{VOICE,BRAIN,DESK_UX,OPS_BILLING,PLATFORM}.md`, and `AGENTS.md`. **One task, one lane, one PR.**
+
+| Lane | Owns | Parked work it picks up |
+| --- | --- | --- |
+| Chief | Coordinates the lanes, carries Alvin's yes to the lane that asked, runs Admin and the client Desk front end, keeps STATUS true | This handover, the promotion checklist |
+| Platform | Supabase schema/RLS/RPCs, `src/db.js` contracts, auth, Railway/Vercel deploy glue, docs/STATUS | §4b back-merge, §4c SQL + backfill + promotion PR, P1/P2, advisor fixes, the alias conflict |
+| Brain | Prompts, turn logic, engines, KB reader, evals | B1 soak, B2 #1010, B3, #975 check, #894 (parked) |
+| Voice | Telephony, Soniox, `/ws/media`, latency, fillers | V1 (old-brain speech removal) after B2 |
+| Desk | Owner Desk + Admin UI (Apple/iOS design system, light by default) | D1 Admin brain pill + Safe mode control, prod smoke |
+| Ops-Billing | Packages, DIDs, wallet metering, Admin billing | the `billingReviewMoney` failures, `admin_invoice_actions` |
+
+## 7. How to verify prod
+
+1. `curl https://scalers-project-production.up.railway.app/healthz` must show:
+   - `ok:true`
+   - `gitSha` equal to the merge you expect (today `c620b379…`)
+   - `soniox.lastError.billingExhausted:false`, and `telephony.lastError.balanceMinor` > 0
+   Staging: `https://scalers-staging-staging.up.railway.app/healthz`.
+2. Vercel project `scalers-project`: the newest Production deployment is READY at `main`'s SHA.
+3. Supabase prod: `list_migrations` ends at `20261027144019` (until the KB batch); the security advisor has 0 ERROR.
+4. **Test calls (Alvin dials; agents never dial):**
+   - **Esga +254709221542, in English:** ask about a product, hours, a place, then leave a request. Expect the read-back, a saved request and the owner alert.
+   - **Grow Tech +254709221536:** ask about a product, an unconfirmed area, then the same in Swahili.
+   - After each call, check the `calls` and `service_requests` rows, the transcript, `voice_turn_traces`, the owner SMS/WhatsApp, and the wallet meter.
+5. **Admin → Numbers on prod:**
+   - lift, move and restore all ask for Unlock
+   - a noop shows "Already done"
+   - +254709221536 shows as releasable
+   - **Don't release a live line.**
+6. **Desk smoke on prod:**
+   - sign-in, and the Overview loads in parts (D2)
+   - Archive, Done, Pin and Favourite with undo (D1)
+   - a sent text goes Sending → Sent (D3)
+   - the Identity page saves (#989)
+   - Locations "We come to you", the areas picker, and viewer read-only
+
+## 8. Rules (carry these over exactly)
+
+1. **Alvin's explicit yes** for: every prod write (SQL, env, Railway/Vercel/SautiKit settings), any merge to `main`, any push to `staging/*` or Railway redeploy, releasing a DID, and rotating secrets. Each lane needs the yes **in its own chat**: a relayed okay or another bot's okay doesn't count. Record the approver and time in the commit, PR or STATUS.
+2. **Git identity:** never set git config. Commit with `git -c user.name='Alvin Yegon' -c user.email='alvin@scalers.co.ke'`.
+3. **No force-push.** The only historical exception was `cursor/staging-voice-468b`, and Platform was promised no more pushes there.
+4. **Never print secrets.** Docs list names only. Secrets go in through masked cards that Alvin fills in.
+5. **Agents never dial.** Alvin dials; agents score from recordings, transcripts, traces and logs.
+6. **Root cause first**, researched against Vapi, Retell, LiveKit and Pipecat, and done scalable and end to end. Test end to end and report honestly. Keep costs low; build on the box.
+7. **Docs are the source of truth:** update `docs/STATUS.md` in the same PR as any merge to `main`, parked plans included.
+8. **Owner copy:** no vendor names on product screens, no AI slop. Desk uses the Apple/iOS design system, light by default.
+9. **Billing:** packages + on-demand only. No prepaid wallet product.
+10. **Live-call check before any prod deploy:** no `/voice/incoming` or `/ws/media` in the last 10 minutes, and no active `calls` rows.
+
+## 9. How to resume on the new account (checklist)
+
+1. **Access** (Alvin grants it): the GitHub repo plus a token for `gh`, and the Railway, Vercel and Supabase MCPs or CLIs for both projects. SautiKit and Soniox dashboards stay with Alvin. Install Node 22, `gh`, and the Railway and Vercel CLIs.
+2. Clone the repo and read: `AGENTS.md` → `docs/STATUS.md` → this file → your lane contract → `docs/plans/*-2026-10-28.md`.
+3. Set up the seats (Chief, Platform, Brain, Voice, Desk, Ops-Billing) from §6. The old account's skills and memory don't carry over; the lane contracts in the repo replace them.
+4. Run §7 checks 1–3 and compare with §3. Anything different means something changed after this handover.
+5. Ask Alvin for the top-ups, then do §5 items 1–2.
+6. When Alvin says go, start §4c step 0.
+
+## 10. Housekeeping done on 28 Oct (old account)
+
+- **Stale PRs closed:** superseded flag-off drafts from 13–25 Oct and the Brain v2 C-series stack. Each was closed with a comment pointing here. Their branches were kept, so any of them can be reopened.
+- **Branches deleted (691):** only those whose PR was **merged** before 28 Oct 00:00 EAT and whose tip equals the merged head. 75 branches with commits added after their merge, and 29 merged on 27–28 Oct, were kept. The list, with SHAs, is in [`plans/branch-deleted-2026-10-28.txt`](plans/branch-deleted-2026-10-28.txt). To restore one: `git push origin <sha>:refs/heads/<name>`.
+- **Kept:** `main`, `staging/*`, `backup/*`, `cursor/staging-voice-468b`, every open PR's head and base, and every branch with commits added after its merge.

@@ -135,7 +135,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
         description: "What callers hear before your team calls back",
         target: { tab: "assistant-say" },
       },
-      { label: "On calls", description: "What it can do during a call", target: { tab: "train", panel: "tools" } },
+      { label: "Voice", description: "What it does on a call and its tools", target: { tab: "train", panel: "tools" } },
       { label: "Pronunciation", description: "Names and words it should say a certain way", target: { tab: "train", panel: "pronunciation" } },
       { label: "Test", description: "Call your line and hear it answer", target: { tab: "test" } },
       { label: "Calls & forwarding", description: "How calls reach your Business Assistant", target: { tab: "calls" } },
