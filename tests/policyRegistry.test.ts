@@ -148,8 +148,8 @@ test("a new niche with a new topic works from config alone", () => {
   const sql = fs.readFileSync(path.join(root, "docs/supabase/policy_topics.sql"), "utf8");
   assert.match(sql, /k !~ '\^\[a-z\]\[a-z0-9_\]\{0,39\}\$'/);
   // The screen has no per-niche code: it reads the registry only.
-  const screen = dash("components/policies/PoliciesScreen.tsx");
-  assert.ok(!/"cleaning"|"retail"/.test(screen));
+  const settings = dash("components/policies/PoliciesSettings.tsx");
+  assert.ok(!/"cleaning"|"retail"/.test(settings));
 });
 
 test("policyRules: cancel allowed:false, guarantee none, custom mode and note_sw survive and speak", () => {
@@ -174,11 +174,11 @@ test("Policies has no area or fee inputs; it links to Service areas", () => {
   const editor = dash("components/structured/PolicyRulesEditor.tsx");
   assert.ok(!editor.includes("rule-delivery-areas") && !editor.includes("rule-delivery-fee"));
   assert.ok(editor.includes('href="/settings/areas"'));
-  assert.ok(dash("components/policies/PoliciesScreen.tsx").includes('href="/settings/areas"'));
+  assert.ok(dash("components/policies/PoliciesSettings.tsx").includes('href="/settings/areas"'));
 });
 
 test("Policies copy: no em dashes, no AI wording", () => {
-  const src = dash("lib/policyRegistry.ts") + dash("components/policies/PoliciesScreen.tsx");
+  const src = dash("lib/policyRegistry.ts") + dash("components/policies/PoliciesSettings.tsx") + dash("components/policies/policiesSheets.tsx");
   const strings = src.match(/"[^"\n]*"/g) ?? [];
   for (const s of strings) {
     assert.ok(!s.includes("—"), s);

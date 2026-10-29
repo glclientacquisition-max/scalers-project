@@ -241,6 +241,7 @@ describe("business settings depth", () => {
     assert.doesNotMatch(team, /Alert phone/);
     assert.match(alerts, /Alert phone/);
     assert.doesNotMatch(alerts, /Add person/);
+    assert.match(read("dashboard/src/components/PhoneAlertsCard.tsx"), /if \(!VAPID_PUBLIC_KEY\) return null/);
   });
 
   it("names Policies empty next step without inventing Train facts", () => {

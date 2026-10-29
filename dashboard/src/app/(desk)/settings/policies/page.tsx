@@ -1,35 +1,21 @@
-import { DeskPageGate } from "@/components/DeskPageGate";
-import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
-import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
-import { PoliciesScreen } from "@/components/policies/PoliciesScreen";
-import { nicheFor, type Rule } from "@/lib/policyRegistry";
-import { memberCan } from "@/lib/requireMember";
-import { getCurrentTenant } from "@/lib/tenant";
+import { redirect } from "next/navigation";
+import { PAYMENT_TOPIC, TOPICS } from "@/lib/policyRegistry";
 
-async function PoliciesBody({ searchParams }: { searchParams: Promise<{ topic?: string }> }) {
-  if (!(await memberCan("settings.edit"))) return <DeskNoAccess what="Policies" />;
-  const tenant = await getCurrentTenant();
-  if (!tenant) return <DeskNoWorkspace />;
-  const bp = (tenant.business_policies as Record<string, unknown> | null) ?? {};
-  const rules = (bp.rules && typeof bp.rules === "object" ? bp.rules : {}) as Record<string, Rule>;
-  const payment = String(bp.payment ?? "").trim() || null;
-  const niche = nicheFor(tenant as { vertical?: string | null; business_name?: string | null });
-  return (
-    <div className="mx-auto w-full min-w-0 md:max-w-2xl" data-desk-nested="">
-      <PoliciesScreen
-        nicheId={niche.id}
-        rules={rules}
-        payment={{ line: payment, href: "/settings?tab=train&panel=policies" }}
-        initialTopic={(await searchParams).topic ?? null}
-      />
-    </div>
-  );
+function policiesRedirectHash(topic: string | undefined): string {
+  const id = String(topic ?? "").trim();
+  if (!id) return "";
+  if (id === PAYMENT_TOPIC) return "#payments";
+  if (id in TOPICS) return `#rule-${id}`;
+  return "";
 }
 
-export default function PoliciesPage({ searchParams }: { searchParams: Promise<{ topic?: string }> }) {
-  return (
-    <DeskPageGate>
-      <PoliciesBody searchParams={searchParams} />
-    </DeskPageGate>
-  );
+/** Legacy `/settings/policies` bookmarks open Train › Policies. */
+export default async function PoliciesRedirectPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ topic?: string }>;
+}) {
+  const { topic } = await searchParams;
+  const hash = policiesRedirectHash(topic);
+  redirect(`/settings?tab=train&panel=policies${hash}`);
 }

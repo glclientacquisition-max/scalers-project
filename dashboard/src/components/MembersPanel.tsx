@@ -96,6 +96,7 @@ export function MembersPanel({
       return;
     }
     setSeatOpen(false);
+    router.refresh();
     run(() => inviteMemberAction(email, role), { key: "invite" });
   }
   const busy = useRef(false);

@@ -140,6 +140,7 @@ test("Home payments nudge deep-links to the payments card", async () => {
   assert.doesNotMatch(slots, /Press Save on Policies/);
   const { policiesAnchor } = await lib();
   assert.equal(policiesAnchor("#payments"), "payments");
+  assert.equal(policiesAnchor("#pay-timing"), "payments");
   assert.equal(policiesAnchor("#nope"), null);
 });
 

@@ -62,6 +62,17 @@ const SAVED_FOR_MS = 8000;
 const OFFLINE_COPY = "Couldn't save. Check your connection and try again.";
 const IDLE: CardSaveState = { state: "idle" };
 
+function mergeCardStatus(...states: CardSaveState[]): CardSaveState {
+  for (const s of states) {
+    if (s.state === "saving") return s;
+    if (s.state === "error") return s;
+  }
+  for (const s of states) {
+    if (s.state === "saved") return s;
+  }
+  return IDLE;
+}
+
 /** Ordered card saves: one request at a time, newest view on screen at once. */
 function useCardQueue(initial: StoredPolicies, save: SaveCardFn, niche: Parameters<typeof applyPoliciesPatch>[2], onSaveActivity?: () => void) {
   const [base, setBase] = useState<StoredPolicies>(initial);
@@ -160,15 +171,11 @@ const linkRowClass =
 const quietButtonClass =
   "inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-body font-medium text-accent hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand";
 
-function CallersHear({
-  lines,
-  tenant,
-  voices,
-}: {
-  lines: ReturnType<typeof callersHearLines>;
-  tenant: TenantRow;
-  voices: CuratedSonioxVoice[];
-}) {
+function useCallersHearPreview(
+  lines: ReturnType<typeof callersHearLines>,
+  tenant: TenantRow,
+  voices: CuratedSonioxVoice[],
+) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -208,52 +215,111 @@ function CallersHear({
     }
   }
 
+  return { lines, text, url, error, loading, hear, onPreviewAudioError: () => {
+    setUrl((u) => {
+      if (u) URL.revokeObjectURL(u);
+      return null;
+    });
+    setError(NO_VOICE_SAMPLE_COPY);
+  } };
+}
+
+function CallersHearLinesList({ lines }: { lines: ReturnType<typeof callersHearLines> }) {
+  if (!lines.length) {
+    return <p className="text-body text-ink-2">Nothing yet. Callers hear that the team will confirm.</p>;
+  }
   return (
-    <aside aria-labelledby="policies-hear-title" className="min-w-0 space-y-1.5 xl:sticky xl:top-6" data-callers-hear="">
+    <dl className="space-y-3">
+      {lines.map((l) => (
+        <div key={l.key}>
+          <dt className="text-meta text-ink-2">{l.label}</dt>
+          <dd className="text-body text-ink [overflow-wrap:anywhere]">{l.text}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function CallersHearControls({
+  text,
+  url,
+  error,
+  loading,
+  hear,
+  onPreviewAudioError,
+}: {
+  text: string;
+  url: string | null;
+  error: string | null;
+  loading: boolean;
+  hear: () => void;
+  onPreviewAudioError: () => void;
+}) {
+  return (
+    <>
+      {text ? (
+        <div className="flex flex-wrap items-center gap-2" data-role-exempt="">
+          <Button variant="tonal" size="md" pending={loading} leading={<SpeakerWaveIcon aria-hidden className="size-4" />} onClick={() => void hear()}>
+            Hear it
+          </Button>
+        </div>
+      ) : null}
+      {url ? (
+        <audio
+          controls
+          autoPlay
+          preload="metadata"
+          className="max-w-full"
+          onError={onPreviewAudioError}
+        >
+          <source src={url} type="audio/wav" />
+        </audio>
+      ) : error ? (
+        <p className="text-meta text-warn" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+/** Phone: sticky preview while scrolling cards. Desktop: side column (unchanged). */
+function CallersHearCompact({
+  preview,
+}: {
+  preview: ReturnType<typeof useCallersHearPreview>;
+}) {
+  const compactLine = preview.text || (preview.lines[0] ? `${preview.lines[0].label}: ${preview.lines[0].text}` : "");
+  return (
+    <div
+      className="sticky top-0 z-10 col-span-full -mx-1 border-b border-hairline bg-canvas/95 px-1 py-2 backdrop-blur-sm supports-[backdrop-filter]:bg-canvas/80 xl:hidden"
+      data-callers-hear-compact=""
+    >
+      <p className="text-meta font-medium text-ink-2">Callers hear</p>
+      <p className="mt-0.5 line-clamp-2 text-body text-ink [overflow-wrap:anywhere]">{compactLine || "Nothing set yet."}</p>
+      {preview.lines.length > 1 ? <p className="mt-0.5 text-meta text-ink-3">{preview.lines.length} lines on the call</p> : null}
+      <div className="mt-2">
+        <CallersHearControls {...preview} />
+      </div>
+    </div>
+  );
+}
+
+function CallersHearAside({ preview }: { preview: ReturnType<typeof useCallersHearPreview> }) {
+  return (
+    <aside
+      aria-labelledby="policies-hear-title"
+      className="hidden min-w-0 space-y-1.5 xl:col-start-2 xl:row-start-1 xl:block xl:sticky xl:top-6"
+      data-callers-hear=""
+    >
       <div className="flex min-h-11 items-center px-1">
         <h2 id="policies-hear-title" className="text-meta font-medium text-ink-2">
           Callers hear
         </h2>
       </div>
       <div className="space-y-3 rounded-2xl border border-hairline bg-surface px-4 py-4">
-        {lines.length ? (
-          <dl className="space-y-3">
-            {lines.map((l) => (
-              <div key={l.key}>
-                <dt className="text-meta text-ink-2">{l.label}</dt>
-                <dd className="text-body text-ink [overflow-wrap:anywhere]">{l.text}</dd>
-              </div>
-            ))}
-          </dl>
-        ) : (
-          <p className="text-body text-ink-2">Nothing yet. Callers hear that the team will confirm.</p>
-        )}
-        {text ? (
-          <div className="flex flex-wrap items-center gap-2" data-role-exempt="">
-            <Button variant="tonal" size="md" pending={loading} leading={<SpeakerWaveIcon aria-hidden className="size-4" />} onClick={() => void hear()}>
-              Hear it
-            </Button>
-          </div>
-        ) : null}
-        {url ? (
-          <audio
-            controls
-            autoPlay
-            preload="metadata"
-            className="max-w-full"
-            onError={() => {
-              URL.revokeObjectURL(url);
-              setUrl(null);
-              setError(NO_VOICE_SAMPLE_COPY);
-            }}
-          >
-            <source src={url} type="audio/wav" />
-          </audio>
-        ) : error ? (
-          <p className="text-meta text-warn" role="alert">
-            {error}
-          </p>
-        ) : null}
+        <CallersHearLinesList lines={preview.lines} />
+        <CallersHearControls {...preview} />
       </div>
     </aside>
   );
@@ -361,13 +427,12 @@ function PoliciesSettingsInner({
 
   const refs = {
     payments: useRef<HTMLHeadingElement | null>(null),
-    "pay-timing": useRef<HTMLHeadingElement | null>(null),
     bookings: useRef<HTMLHeadingElement | null>(null),
     holds: useRef<HTMLHeadingElement | null>(null),
     rules: useRef<HTMLHeadingElement | null>(null),
     other: useRef<HTMLHeadingElement | null>(null),
     unsure: useRef<HTMLHeadingElement | null>(null),
-  } satisfies Record<CardId, RefObject<HTMLHeadingElement | null>>;
+  } satisfies Partial<Record<CardId, RefObject<HTMLHeadingElement | null>>>;
   const highlight = useAnchorFocus(refs);
 
   const timing = payTimingSentence(payments, kind);
@@ -376,6 +441,7 @@ function PoliciesSettingsInner({
   const unsure = unknownAnswerSentence(ownerUnknownAnswer(unknown.text));
   const payNeedsCheck = Boolean(payments && payments.methods.length && !payments.confirmed);
   const legacyPay = !payments?.methods.length && !starterSet.has("payment") ? String(bp.payment || "").trim() : "";
+  const callersHearPreview = useCallersHearPreview(lines, tenant, voices);
 
   function addMethod(m: PaymentMethod) {
     if (methodNeedsFields(m)) {
@@ -393,8 +459,15 @@ function PoliciesSettingsInner({
       <div className={`${settingsPanelClass} space-y-4`}>
         <SettingsPageHeader businessName={tenant.business_name?.trim() || "Business"} lineLive={false} showBack wide title={heading ?? "Policies"} />
         <div className="grid w-full min-w-0 max-w-desk grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]" data-policies-page={kind}>
-          <div className="min-w-0 space-y-6">
-            <PolicyCard id="payments" title="How customers pay" status={statusOf("payments")} headingRef={refs.payments} highlight={highlight === "payments"}>
+          <CallersHearCompact preview={callersHearPreview} />
+          <div className="min-w-0 space-y-6 xl:col-start-1 xl:row-start-1">
+            <PolicyCard
+              id="payments"
+              title="Payment"
+              status={mergeCardStatus(statusOf("payments"), statusOf("pay-timing"))}
+              headingRef={refs.payments}
+              highlight={highlight === "payments"}
+            >
               {payments?.methods.map((m) => (
                 <SentenceRow
                   key={m}
@@ -442,10 +515,16 @@ function PoliciesSettingsInner({
                   </button>
                 </ActionRow>
               ) : null}
-            </PolicyCard>
-
-            <PolicyCard id="pay-timing" title="When customers pay" status={statusOf("pay-timing")} headingRef={refs["pay-timing"]} highlight={highlight === "pay-timing"}>
-              <SentenceRow id="pay-when" title="Customers pay" sentence={timing.text} suggested={timing.suggested} canEdit={canEdit} onChange={() => openSheet({ kind: "pay-timing" })} />
+              <div className="border-t border-hairline">
+                <SentenceRow
+                  id="pay-when"
+                  title="When"
+                  sentence={timing.text}
+                  suggested={timing.suggested}
+                  canEdit={canEdit}
+                  onChange={() => openSheet({ kind: "pay-timing" })}
+                />
+              </div>
             </PolicyCard>
 
             {kind === "services" ? (
@@ -502,7 +581,7 @@ function PoliciesSettingsInner({
               </PolicyCard>
             )}
 
-            <PolicyCard id="rules" title="Rules" status={statusOf("rules")} headingRef={refs.rules} highlight={highlight === "rules"}>
+            <PolicyCard id="rules" title="Topics" status={statusOf("rules")} headingRef={refs.rules} highlight={highlight === "rules"}>
               {rows.map((r) => (
                 <SentenceRow
                   key={r.topic}
@@ -527,12 +606,12 @@ function PoliciesSettingsInner({
               ) : null}
             </PolicyCard>
 
-            <PolicyCard id="other" title="Anything else" status={statusOf("other")} headingRef={refs.other} highlight={highlight === "other"}>
+            <PolicyCard id="other" title="Extra note" status={statusOf("other")} headingRef={refs.other} highlight={highlight === "other"}>
               <div className="space-y-3 px-4 py-3">
                 <TextAreaField
                   id="policy-other"
-                  label="Other rules callers should know (optional)"
-                  hint="One or two short sentences. Use the rules above where you can."
+                  label="Note (optional)"
+                  hint="One or two short sentences. Use Topics above where you can."
                   rows={3}
                   maxLength={PATCH_TEXT_MAX}
                   disabled={!canEdit}
@@ -605,8 +684,7 @@ function PoliciesSettingsInner({
               />
             </PolicyCard>
           </div>
-
-          <CallersHear lines={lines} tenant={tenant} voices={voices} />
+          <CallersHearAside preview={callersHearPreview} />
         </div>
       </div>
 

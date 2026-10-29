@@ -39,8 +39,7 @@ export function PoliciesSkeleton() {
         </div>
         <div className="grid w-full min-w-0 max-w-desk grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
           <div className="min-w-0 space-y-6">
-            <CardShape rows={2} />
-            <CardShape rows={1} />
+            <CardShape rows={3} />
             <CardShape rows={1} />
             <CardShape rows={4} />
           </div>

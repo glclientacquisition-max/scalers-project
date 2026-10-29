@@ -37,3 +37,8 @@ export function voiceFallbackByKind(): boolean {
 export function deskLookupPreview(): boolean {
   return envFlagOn(process.env.DESK_LOOKUP_PREVIEW);
 }
+
+/** Subtle desk haptics and sheet easing. Server flag DESK_FEEL=on. */
+export function deskFeelEnabled(): boolean {
+  return envFlagOn(process.env.DESK_FEEL);
+}

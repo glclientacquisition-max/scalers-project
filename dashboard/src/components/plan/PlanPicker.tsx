@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState, type ReactNode } from "react";
+import { useActionState, useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { MinusIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
@@ -26,6 +27,7 @@ import {
   splitPayNote,
 } from "@/lib/planPricing";
 import type { OwnerPlanModel, PlanCycle, PlanSku, PublishedPlan } from "@/lib/ownerPlanLoad";
+import { deskConfirmHaptic } from "@/lib/deskFeel";
 
 const idle: PlanActionState = { ok: false };
 const TEAM_HREF = "/settings?tab=train&panel=team";
@@ -133,6 +135,7 @@ export function PlanPicker({
   /** Dev preview only. Opens the confirm sheet on this plan. */
   startConfirm?: PlanSku | null;
 }) {
+  const router = useRouter();
   const trial = Boolean(model.trialText);
   const [cycle, setCycle] = useState<PlanCycle>(model.cycle);
   const [sku, setSku] = useState<PlanSku | null>(startConfirm);
@@ -140,8 +143,21 @@ export function PlanPicker({
   const [seatOpen, setSeatOpen] = useState(openSeat);
   const [seats, setSeats] = useState(model.extraSeats);
   const [seatKey, setSeatKey] = useState(() => (openSeat ? crypto.randomUUID() : ""));
+  const [planKey, setPlanKey] = useState(() => (startConfirm ? crypto.randomUUID() : ""));
   const [planState, planAction, planPending] = useActionState(confirmPlanChange, idle);
   const [seatState, seatAction, seatPending] = useActionState(setExtraSeatsAction, idle);
+
+  useEffect(() => {
+    if (!planState.ok) return;
+    setConfirmOpen(false);
+    router.refresh();
+  }, [planState.ok, router]);
+
+  useEffect(() => {
+    if (!seatState.ok) return;
+    setSeatOpen(false);
+    router.refresh();
+  }, [seatState.ok, router]);
 
   const pinned = trial ? null : model.pinned;
   const selected = model.plans.find((plan) => plan.sku === sku) || null;
@@ -152,6 +168,7 @@ export function PlanPicker({
 
   function open(next: PlanSku) {
     setSku(next);
+    setPlanKey(crypto.randomUUID());
     setConfirmOpen(true);
   }
 
@@ -231,6 +248,7 @@ export function PlanPicker({
         action={planAction}
         pending={planPending}
         state={planState}
+        idempotencyKey={planKey}
       />
 
       <Sheet
@@ -241,7 +259,13 @@ export function PlanPicker({
           model.extraSeatMonthlyKes != null ? `${formatKsh(model.extraSeatMonthlyKes)} a month each` : undefined
         }
         footer={
-          <form action={seatAction} className="w-full">
+          <form
+            action={seatAction}
+            className="w-full"
+            onSubmit={() => {
+              deskConfirmHaptic();
+            }}
+          >
             <input type="hidden" name="extra_seats" value={seats} />
             <input type="hidden" name="idempotency_key" value={seatKey} />
             <Button type="submit" variant="tonal" block pending={seatPending} disabled={seats === model.extraSeats}>
@@ -279,6 +303,7 @@ function ConfirmSheet({
   action,
   pending,
   state,
+  idempotencyKey,
 }: {
   model: OwnerPlanModel;
   current: PublishedPlan | null;
@@ -290,6 +315,7 @@ function ConfirmSheet({
   action: (payload: FormData) => void;
   pending: boolean;
   state: PlanActionState;
+  idempotencyKey: string;
 }) {
   const start = model.nextPeriodStartLabel || model.periodEndLabel;
   const sameCycle = cycle === model.cycle;
@@ -350,9 +376,16 @@ function ConfirmSheet({
             Team
           </ButtonLink>
         ) : (
-          <form action={action} className="w-full">
+          <form
+            action={action}
+            className="w-full"
+            onSubmit={() => {
+              deskConfirmHaptic();
+            }}
+          >
             <input type="hidden" name="sku" value={selected?.sku || ""} />
             <input type="hidden" name="cycle" value={cycle} />
+            <input type="hidden" name="idempotency_key" value={idempotencyKey} />
             <Button type="submit" variant="tonal" block pending={pending} disabled={!selected}>
               Confirm
             </Button>
@@ -386,7 +419,11 @@ function ConfirmSheet({
           {split ? <p className="mt-3 text-meta text-ink-2">{split}</p> : null}
         </>
       )}
-      {state.message || state.error ? <p className="mt-3 text-body text-ink">{state.message || state.error}</p> : null}
+      {state.message || state.error ? (
+        <p className="mt-3 text-body text-ink" role={state.ok ? "status" : "alert"}>
+          {state.message || state.error}
+        </p>
+      ) : null}
     </Sheet>
   );
 }

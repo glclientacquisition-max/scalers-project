@@ -50,7 +50,7 @@ const EXPECT: Record<string, Array<"admin" | "staff" | "viewer">> = {
   inboxArchiveCallsAction: ["admin", "staff"], inboxUnarchiveCallsAction: ["admin", "staff"], inboxUndoArchiveAction: ["admin", "staff"],
   inboxBulkAction: ["admin", "staff"], retryCallTextAction: ["admin", "staff"],
   saveOverviewHoursAction: ["admin"], saveOverviewPaymentsAction: ["admin"], saveOverviewPricesAction: ["admin"],
-  saveAreaPicksAction: ["admin"], savePolicyTopicAction: ["admin"], saveUnknownAnswerByKindAction: ["admin"],
+  saveAreaPicksAction: ["admin"], savePoliciesCardAction: ["admin"], savePoliciesUnknownAction: ["admin"], saveUnknownAnswerByKindAction: ["admin"],
   // Read only preview of what the assistant will say: every member, like the other read actions.
   previewDeskLookupAction: ["admin", "staff", "viewer"],
 };

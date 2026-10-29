@@ -26,6 +26,7 @@ const IdentitySettings = dynamic(() => import("@/components/identity/IdentitySet
 const PoliciesSettings = dynamic(() => import("@/components/policies/PoliciesSettings").then((m) => m.PoliciesSettings), {
   loading: () => <PoliciesSkeleton />,
 });
+import { PoliciesSettingsErrorBoundary } from "@/components/policies/PoliciesSettingsErrorBoundary";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import { parseVertical } from "@/lib/vertical";
 import {
@@ -203,16 +204,18 @@ export function BusinessSettingsShell({
         />
       ) : showForm && formPanel === "policies" ? (
         // Policies: cards that each save on their own, beside what callers hear.
-        <PoliciesSettings
-          key={`${tenant.id}:policies`}
-          onSaveActivity={markOwnSave}
-          tenant={tenant}
-          curatedVoices={curatedVoices}
-          heading={heading}
-          sidebar={rail}
-          saveCard={savePoliciesCardAction}
-          saveUnknown={savePoliciesUnknownAction}
-        />
+        <PoliciesSettingsErrorBoundary businessName={businessName} heading={heading} sidebar={rail}>
+          <PoliciesSettings
+            key={`${tenant.id}:policies`}
+            onSaveActivity={markOwnSave}
+            tenant={tenant}
+            curatedVoices={curatedVoices}
+            heading={heading}
+            sidebar={rail}
+            saveCard={savePoliciesCardAction}
+            saveUnknown={savePoliciesUnknownAction}
+          />
+        </PoliciesSettingsErrorBoundary>
       ) : showForm ? (
         <TenantForm
           key={tenantFormKey}
