@@ -1,5 +1,12 @@
 import type { TenantRow } from "@/lib/supabase";
 import type { AssistantSayState, ReadyChecklistItem } from "@/lib/assistantSayTypes";
+import {
+  applyTopicTitles,
+  assistantSayTopicHref,
+  mapChecklistItemToTopicId,
+  readyChecklistLabelForItem,
+} from "@/lib/assistantSayTopics";
+import { resolveTenantBusinessType } from "@/lib/businessType";
 import { loadCompileProvenance } from "@/lib/tenantFieldProvenance";
 import { requireVoice } from "@/lib/voiceRequire.server";
 import { attachKbSnapshot, loadKbPreview } from "@/lib/kbCaller.server";
@@ -22,7 +29,8 @@ const readiness = () =>
   };
 
 export async function loadAssistantSayState(tenant: TenantRow): Promise<AssistantSayState> {
-  return readiness().evaluateAssistantSay(await voiceProfileForAssistantSay(tenant));
+  const bt = resolveTenantBusinessType(tenant);
+  return applyTopicTitles(readiness().evaluateAssistantSay(await voiceProfileForAssistantSay(tenant)), bt);
 }
 
 /**
@@ -32,11 +40,14 @@ export async function loadAssistantSayState(tenant: TenantRow): Promise<Assistan
 export async function loadAssistantSayView(tenant: TenantRow): Promise<{ state: AssistantSayState; samples: LookupPreviewSamples; pending: boolean }> {
   const [profile, preview] = await Promise.all([voiceProfileForAssistantSay(tenant), loadKbPreview(tenant.id)]);
   const r = readiness();
-  return { state: r.evaluateAssistantSay(profile), samples: r.previewSampleQuestions(profile), pending: !!preview.snapshot && preview.pending };
+  const businessType = resolveTenantBusinessType(tenant);
+  const state = applyTopicTitles(r.evaluateAssistantSay(profile), businessType);
+  return { state, samples: r.previewSampleQuestions(profile), pending: !!preview.snapshot && preview.pending };
 }
 
 export function assistantSayStateFromTenant(tenant: TenantRow): AssistantSayState {
-  return readiness().evaluateAssistantSay(voiceProfileFromTenant(tenant));
+  const bt = resolveTenantBusinessType(tenant);
+  return applyTopicTitles(readiness().evaluateAssistantSay(voiceProfileFromTenant(tenant)), bt);
 }
 
 /**
@@ -54,7 +65,16 @@ export async function voiceProfileForAssistantSay(tenant: TenantRow) {
 }
 
 export async function loadReadyChecklist(tenant: TenantRow) {
-  return readiness().getReadyChecklist(await voiceProfileForAssistantSay(tenant));
+  const businessType = resolveTenantBusinessType(tenant);
+  const raw = await readiness().getReadyChecklist(await voiceProfileForAssistantSay(tenant));
+  return {
+    ...raw,
+    items: raw.items.map((item) => ({
+      ...item,
+      label: readyChecklistLabelForItem(item.id, businessType),
+      href: assistantSayTopicHref(mapChecklistItemToTopicId(item.id)),
+    })),
+  };
 }
 
 export type LookupPreviewSamples = { price: string; hours: string; delivery: string; pay: string };
