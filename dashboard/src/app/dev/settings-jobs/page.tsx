@@ -17,8 +17,10 @@ import type { TenantRow } from "@/lib/supabase";
 import { parsePaymentsText } from "@/lib/payments";
 import { assistantSayStateFromTenant } from "@/lib/assistantSayVoice.server";
 import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
+import { lookupPreviewSamples } from "@/lib/assistantSayVoice.server";
+import { parseUnknownAnswerByKind } from "@/lib/unknownAnswerByKindConstants";
+import { resolveTenantBusinessType } from "@/lib/businessType";
 import { DeskRoleProvider, ViewOnlyBanner } from "@/components/DeskRole";
-import { assistantSayBelowList } from "@/components/assistantSay/AssistantSayExtras";
 
 /**
  * Settings job list and rail. DASHBOARD_OPEN=true only.
@@ -152,7 +154,14 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
   };
   const assistantSaySlot =
     tab === "assistant-say" ? (
-      <AssistantSayPanel state={assistantSayStateFromTenant(t)} belowList={assistantSayBelowList(t)} />
+      <AssistantSayPanel
+        state={assistantSayStateFromTenant(t)}
+        samples={lookupPreviewSamples(t)}
+        tenant={t}
+        businessType={resolveTenantBusinessType(t)}
+        initialByKind={parseUnknownAnswerByKind(t.unknown_answer_by_kind)}
+        legacyGeneral={t.unknown_answer_fallback}
+      />
     ) : null;
 
   const callsSlot =
