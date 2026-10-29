@@ -37,7 +37,7 @@ import { deskAssistantSayPage } from "@/lib/deskFeatureFlags";
 import { loadAssistantSayView } from "@/lib/assistantSayVoice.server";
 import { loadKbGreetingPreview } from "@/lib/kbCaller.server";
 import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
-import { assistantSayBelowList } from "@/components/assistantSay/AssistantSayExtras";
+import { parseUnknownAnswerByKind } from "@/lib/unknownAnswerByKindConstants";
 import { CallsForwardingPanel } from "@/components/CallsForwardingPanel";
 import { loadCallSetupState } from "@/lib/callSetupServer";
 import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
@@ -93,6 +93,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     }
   }
   const assistantSayPage = deskAssistantSayPage();
+  const topicRaw = Array.isArray(params.topic) ? params.topic[0] : params.topic;
   if (tab === "assistant-say" && !assistantSayPage) redirect("/settings");
   // The voice picker lives on Identity (How you answer); Voice links there.
   const needsVoices =
@@ -160,9 +161,21 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     try {
       // isKbLive: rows and samples read the published snapshot (what callers hear now); else the stored row.
       const view = await loadAssistantSayView(tenant);
-      assistantSaySlot = <AssistantSayPanel state={view.state} pending={view.pending} belowList={assistantSayBelowList(tenant, view.samples)} />;
+      const businessType = resolveTenantBusinessType(tenant);
+      assistantSaySlot = (
+        <AssistantSayPanel
+          state={view.state}
+          pending={view.pending}
+          samples={view.samples}
+          tenant={tenant}
+          businessType={businessType}
+          initialTopic={topicRaw}
+          initialByKind={parseUnknownAnswerByKind(tenant.unknown_answer_by_kind)}
+          legacyGeneral={tenant.unknown_answer_fallback}
+        />
+      );
     } catch {
-      assistantSaySlot = <DeskLoadError>Could not load what your Business Assistant will say.</DeskLoadError>;
+      assistantSaySlot = <DeskLoadError>Could not load what callers hear.</DeskLoadError>;
     }
   }
 

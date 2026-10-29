@@ -1,18 +1,47 @@
 'use strict';
 
-const { lookup } = require('./lookup');
+const { lookup, speechOf } = require('./lookup');
 const { ownerLookupReason } = require('./lookupOwnerReason');
 const { readAreaTerms } = require('../conversation/areaTerms');
 
-const INTRO =
-  'These are the answers your Business Assistant gives callers. Anything it cannot answer, it takes a message and your team calls back.';
+const INTRO = '';
+
+function greetingPreview(profile) {
+  const owner = String(profile?.greetingText || '').trim();
+  if (owner) return owner.length > 160 ? `${owner.slice(0, 157)}…` : owner;
+  const spoken = String(profile?.spokenName || profile?.spoken_name || '').trim();
+  const usesSpoken = Boolean(spoken) && !/^the business$/i.test(spoken);
+  const name = usesSpoken
+    ? spoken
+    : String(profile?.businessName || profile?.business_name || '').trim();
+  if (!name) return '';
+  const inviteRaw = String(profile?.greetingInvite || profile?.greeting_invite || '').trim();
+  const invite = inviteRaw || 'How can I help?';
+  return `${name}. ${invite}`;
+}
+
+function greetingRow(profile) {
+  const hearPreview = greetingPreview(profile);
+  const willSay = Boolean(hearPreview);
+  return {
+    id: 'greeting',
+    title: 'Greeting',
+    isFact: false,
+    willSay,
+    stampTone: willSay ? 'ok' : 'attention',
+    stampLabel: willSay ? 'Will say' : "Won't say",
+    reason: willSay ? 'Ready on the next call.' : 'Add your business name on Identity.',
+    fixHref: '/settings?tab=train&panel=identity',
+    hearPreview,
+  };
+}
 
 const FIX = {
-  prices: '/settings?tab=catalog',
+  prices: '/settings/knowledge',
   hours: '/settings?tab=train&panel=hours',
-  delivery: '/settings?tab=train&panel=locations',
+  areas: '/settings/areas',
   payment: '/settings?tab=train&panel=policies',
-  unsure: '/settings?tab=train&panel=policies',
+  unsure: '/settings?tab=assistant-say&topic=unsure',
 };
 
 function ctx(profile, now) {
@@ -104,7 +133,7 @@ function probeKind(kind, profile, now) {
 const FACT_PROBES = {
   prices: (profile, now) => probeKind('price', profile, now),
   hours: (profile, now) => probeKind('hours', profile, now),
-  delivery: (profile, now) => probeKind('fee', profile, now),
+  areas: (profile, now) => probeKind('fee', profile, now),
   payment: (profile, now) => probeKind('pay', profile, now),
 };
 
@@ -112,7 +141,8 @@ function factRow(kind, title, profile, now) {
   const probe = FACT_PROBES[kind];
   const result = probe(profile, now);
   const willSay = result?.status === 'found';
-  const reasonKind = kind === 'delivery' ? 'delivery' : kind === 'payment' ? 'payment' : kind;
+  const reasonKind = kind === 'areas' ? 'delivery' : kind === 'payment' ? 'payment' : kind;
+  const hearPreview = willSay ? speechOf(result, 'en') : '';
   return {
     id: kind,
     title,
@@ -122,31 +152,42 @@ function factRow(kind, title, profile, now) {
     stampLabel: willSay ? 'Will say' : "Won't say",
     reason: ownerLookupReason(reasonKind, result),
     fixHref: FIX[kind],
+    hearPreview,
     _lookupResult: result,
   };
 }
 
 function unsureRow(profile) {
-  const custom = String(profile?.unknownAnswerFallback || '').trim();
-  const hasLine = Boolean(custom);
+  const byKind = profile?.unknownAnswerByKind;
+  const generalCustom =
+    String(byKind?.general?.en || '').trim() || String(byKind?.general?.sw || '').trim();
+  const legacy = String(profile?.unknownAnswerFallback || '').trim();
+  const kindKeys = ['general', 'price', 'hours', 'fee', 'pay'];
+  const hasOverride = kindKeys.some((k) => {
+    const row = byKind?.[k];
+    return Boolean(String(row?.en || '').trim() || String(row?.sw || '').trim());
+  });
+  const hasLine = Boolean(generalCustom || legacy || hasOverride);
   return {
     id: 'unsure',
     title: 'When unsure',
     isFact: false,
-    willSay: false,
+    willSay: hasLine,
     stampTone: hasLine ? 'ok' : 'neutral',
-    stampLabel: hasLine ? 'Callback line set' : 'Using team default',
+    stampLabel: hasLine ? 'Will say' : 'Team default',
     reason: hasLine ? 'Callers hear your callback line.' : 'Team default until you write a line.',
     fixHref: FIX.unsure,
+    hearPreview: legacy || generalCustom || '',
   };
 }
 
 function evaluateAssistantSay(profile, opts = {}) {
   const now = opts.now || new Date();
   const rows = [
+    greetingRow(profile),
     factRow('prices', 'Prices and quotes', profile, now),
     factRow('hours', 'Opening hours', profile, now),
-    factRow('delivery', 'Delivery and areas', profile, now),
+    factRow('areas', 'Delivery and areas', profile, now),
     factRow('payment', 'Payment details', profile, now),
     unsureRow(profile),
   ].map((row) => {
@@ -154,9 +195,12 @@ function evaluateAssistantSay(profile, opts = {}) {
     const { _lookupResult, ...rest } = row;
     return rest;
   });
-  const readyCount = rows.filter((r) => r.isFact && r.willSay).length;
-  const factTotal = rows.filter((r) => r.isFact).length;
-  return { intro: INTRO, rows, readyCount, total: factTotal };
+  const readyCount = rows.filter((r) => {
+    if (r.id === 'unsure') return r.stampTone === 'ok';
+    if (r.id === 'greeting') return r.willSay;
+    return r.isFact && r.willSay;
+  }).length;
+  return { intro: INTRO, rows, readyCount, total: 6 };
 }
 
 function lookupProbeForRowId(rowId, profile, now) {
@@ -165,11 +209,19 @@ function lookupProbeForRowId(rowId, profile, now) {
 }
 
 const CHECKLIST_META = [
-  { id: 'identity', label: 'Business name', href: '/settings?tab=train&panel=identity', rowId: null },
-  { id: 'catalog', label: 'Catalogue and prices', href: '/settings?tab=catalog', rowId: 'prices' },
-  { id: 'hours', label: 'Opening hours', href: '/settings?tab=train&panel=hours', rowId: 'hours' },
-  { id: 'payment', label: 'Payment details', href: '/settings?tab=train&panel=policies', rowId: 'payment' },
+  { id: 'greeting', label: 'Greeting', href: '/settings?tab=assistant-say&topic=greeting', rowId: 'greeting' },
+  { id: 'prices', label: 'Prices and quotes', href: '/settings?tab=assistant-say&topic=prices', rowId: 'prices' },
+  { id: 'hours', label: 'Opening hours', href: '/settings?tab=assistant-say&topic=hours', rowId: 'hours' },
+  { id: 'areas', label: 'Areas', href: '/settings?tab=assistant-say&topic=areas', rowId: 'areas' },
+  { id: 'payment', label: 'Payment details', href: '/settings?tab=assistant-say&topic=payment', rowId: 'payment' },
+  { id: 'unsure', label: 'When unsure', href: '/settings?tab=assistant-say&topic=unsure', rowId: 'unsure' },
 ];
+
+function rowIsChecklistComplete(row) {
+  if (row.id === 'unsure') return row.stampTone === 'ok';
+  if (row.id === 'greeting') return row.willSay;
+  return row.isFact && row.willSay;
+}
 
 function identityComplete(profile) {
   return Boolean(String(profile?.businessName || profile?.business_name || '').trim());
@@ -179,20 +231,10 @@ function getReadyChecklist(profile, opts = {}) {
   const say = evaluateAssistantSay(profile, opts);
   const byId = new Map(say.rows.map((r) => [r.id, r]));
   const items = CHECKLIST_META.map((meta) => {
-    let complete = false;
-    if (meta.rowId) {
-      complete = byId.get(meta.rowId)?.willSay === true;
-    } else {
-      complete = identityComplete(profile);
-    }
+    const row = meta.rowId ? byId.get(meta.rowId) : null;
+    const complete = row ? rowIsChecklistComplete(row) : false;
     let reason = '';
-    if (!complete) {
-      if (meta.rowId) {
-        reason = byId.get(meta.rowId)?.reason || '';
-      } else if (!identityComplete(profile)) {
-        reason = 'Add your business name.';
-      }
-    }
+    if (!complete && row) reason = row.reason || '';
     return { id: meta.id, label: meta.label, href: meta.href, complete, reason };
   });
   const allDone = items.every((i) => i.complete);

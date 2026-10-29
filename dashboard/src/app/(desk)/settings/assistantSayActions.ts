@@ -10,23 +10,26 @@ import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import type { TenantRow } from "@/lib/supabase";
 import { updateWithColumnPeel } from "@/lib/peelMissingColumns";
 import {
-  DEFAULT_BY_KIND,
   FALLBACK_KINDS,
   parseUnknownAnswerByKind,
   UNKNOWN_ANSWER_BY_KIND_COLUMN,
   type UnknownAnswerByKind,
 } from "@/lib/unknownAnswerByKindConstants";
+import { defaultByKindForBusinessType } from "@/lib/assistantSayBusinessDefaults";
+import { resolveTenantBusinessType } from "@/lib/businessType";
 
 function trimLine(raw: FormDataEntryValue | null): string {
   return String(raw || "").trim().slice(0, 220);
 }
 
-function buildByKindPayload(formData: FormData): UnknownAnswerByKind | null {
+function buildByKindPayload(formData: FormData, tenant: TenantRow): UnknownAnswerByKind | null {
+  const businessType = resolveTenantBusinessType(tenant);
+  const defaultsFor = defaultByKindForBusinessType(businessType);
   const out: UnknownAnswerByKind = {};
   for (const kind of FALLBACK_KINDS) {
     const en = trimLine(formData.get(`fallback_${kind}_en`));
     const sw = trimLine(formData.get(`fallback_${kind}_sw`));
-    const defaults = DEFAULT_BY_KIND[kind];
+    const defaults = defaultsFor[kind];
     if (en === defaults.en && sw === defaults.sw) continue;
     if (en || sw) {
       out[kind] = {
@@ -46,7 +49,7 @@ export async function saveUnknownAnswerByKindAction(formData: FormData) {
   const workspace = await createWorkspaceDataClient();
   if (!workspace) return { ok: false as const, error: "Not signed in." };
 
-  const payload = buildByKindPayload(formData);
+  const payload = buildByKindPayload(formData, tenant);
   const patch: Record<string, unknown> = {
     [UNKNOWN_ANSWER_BY_KIND_COLUMN]: payload,
   };
