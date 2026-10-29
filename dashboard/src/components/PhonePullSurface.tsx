@@ -141,7 +141,15 @@ function PhonePullSurface({
   }
 
   const pulling = usePhoneListPull(rootRef, refresh, {
-    allow: yieldToOwned ? () => !visibleOwnedPullRoot() : undefined,
+    allow: yieldToOwned
+      ? () => {
+          if (typeof window !== "undefined" && window.location.pathname.startsWith("/settings")) return false;
+          return !visibleOwnedPullRoot();
+        }
+      : () => {
+          if (typeof window !== "undefined" && window.location.pathname.startsWith("/settings")) return false;
+          return true;
+        },
     getScrollTop:
       scroll === "window"
         ? () => windowGestureScrollTop()
@@ -150,6 +158,7 @@ function PhonePullSurface({
           : (target) => deskGestureScrollTop(target),
   });
   usePhoneTabRefresh(refresh, () => {
+    if (typeof window !== "undefined" && window.location.pathname.startsWith("/settings")) return false;
     if (!pullRootVisible(rootRef.current)) return false;
     if (yieldToOwned && visibleOwnedPullRoot()) return false;
     return true;

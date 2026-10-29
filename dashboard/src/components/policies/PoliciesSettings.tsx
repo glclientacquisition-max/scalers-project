@@ -102,7 +102,8 @@ function useCardQueue(initial: StoredPolicies, save: SaveCardFn, niche: Paramete
       setPending((p) => [...p, { id, patch }]);
       setCard(card, { state: "saving" });
       onSaveActivity?.();
-      chain.current = chain.current.then(async () => {
+      chain.current = chain.current
+        .then(async () => {
         let res: PoliciesCardResult;
         try {
           res = await save(patch);
@@ -122,7 +123,11 @@ function useCardQueue(initial: StoredPolicies, save: SaveCardFn, niche: Paramete
           setPending((p) => p.filter((x) => x.id !== id));
           setCard(card, { state: "error", error: res.error || OFFLINE_COPY, retry: () => run(card, patch, undoable) });
         }
-      });
+      })
+        .catch(() => {
+          setPending((p) => p.filter((x) => x.id !== id));
+          setCard(card, { state: "error", error: OFFLINE_COPY, retry: () => run(card, patch, undoable) });
+        });
     },
     [niche, onSaveActivity, save, setCard]
   );
@@ -180,10 +185,20 @@ function useCallersHearPreview(
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      setLoading(false);
+    };
+  }, []);
   useEffect(() => () => void (url && URL.revokeObjectURL(url)), [url]);
   const text = hearItText(lines);
 
   async function hear() {
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
     setLoading(true);
     setError(null);
     if (url) {
@@ -194,6 +209,7 @@ function useCallersHearPreview(
       const res = await fetch("/api/pronunciation/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: ac.signal,
         body: JSON.stringify({
           text,
           language: "en",
@@ -201,6 +217,7 @@ function useCallersHearPreview(
           voiceId: resolveLiveCallVoiceId(String(tenant.soniox_voice_id || ""), voices),
         }),
       });
+      if (ac.signal.aborted) return;
       const preview = await objectUrlFromPreviewResponse(res);
       try {
         await assertPreviewAudioPlayable(preview.url);
@@ -208,11 +225,19 @@ function useCallersHearPreview(
         URL.revokeObjectURL(preview.url);
         throw err;
       }
+      if (ac.signal.aborted) {
+        URL.revokeObjectURL(preview.url);
+        return;
+      }
       setUrl(preview.url);
     } catch (err) {
+      if (ac.signal.aborted) return;
       setError(previewErrorCopy(err));
     } finally {
-      setLoading(false);
+      if (abortRef.current === ac) {
+        abortRef.current = null;
+        setLoading(false);
+      }
     }
   }
 

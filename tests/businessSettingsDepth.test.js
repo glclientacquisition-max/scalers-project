@@ -244,7 +244,11 @@ describe("business settings depth", () => {
     assert.match(read("dashboard/src/components/PhoneAlertsCard.tsx"), /if \(!VAPID_PUBLIC_KEY\) return null/);
     assert.match(read("dashboard/src/components/settingsUi.tsx"), /overflow-x-clip/);
     assert.match(read("dashboard/src/components/plan/PlanPicker.tsx"), /Plan changes are not open on this desk yet/);
-    assert.match(read("dashboard/src/components/plan/PlanPicker.tsx"), /planOverageLine/);
+    assert.match(read("dashboard/src/components/plan/PlanPicker.tsx"), /planOverageLines/);
+    assert.match(read("dashboard/src/components/plan/BetaPlanSummary.tsx"), /data-plan-overage/);
+    assert.match(read("dashboard/src/app/(desk)/settings/plan/page.tsx"), /onDemandLocked=\{loaded\.model\.onDemandLocked\}/);
+    assert.match(read("dashboard/src/components/policies/PoliciesSettings.tsx"), /AbortController/);
+    assert.match(read("dashboard/src/components/PhonePullSurface.tsx"), /pathname\.startsWith\("\/settings"\)/);
     assert.match(read("dashboard/src/app/(desk)/settings/page.tsx"), /if \(teamPanel\)/);
     assert.doesNotMatch(read("dashboard/src/app/(desk)/settings/page.tsx"), /teamPanel && teamInvitesEnabled/);
     assert.match(read("dashboard/src/lib/requireMember.ts"), /legacy primaries may not have a tenant_members row/);

@@ -201,3 +201,36 @@ describe("plan change copy", () => {
     assert.equal(seatBlockCopy(3, 3), null);
   });
 });
+
+describe("plan overage copy", () => {
+  it("shows extra minutes whenever used is above included", async () => {
+    const { planOverageHeadline, planOverageLines, resolvePlanOverageMode } = await import(
+      "../dashboard/src/lib/planOverageCopy.ts"
+    );
+    assert.equal(planOverageHeadline(369, 300), "69 extra minutes");
+    assert.equal(planOverageHeadline(301, 300), "1 extra minute");
+    assert.equal(planOverageHeadline(300, 300), null);
+
+    const beta = planOverageLines(369, 300, resolvePlanOverageMode({ freeBeta: true }), "31 Oct");
+    assert.ok(beta);
+    assert.match(beta.detail, /Free during beta/);
+
+    const onDemand = planOverageLines(
+      369,
+      300,
+      resolvePlanOverageMode({ freeBeta: false, onDemandEnabled: true }),
+      null,
+    );
+    assert.ok(onDemand);
+    assert.match(onDemand.detail, /bill on your next invoice/);
+
+    const hardStop = planOverageLines(
+      369,
+      300,
+      resolvePlanOverageMode({ freeBeta: false, onDemandEnabled: null }),
+      "31 Oct",
+    );
+    assert.ok(hardStop);
+    assert.match(hardStop.detail, /Calls stop/);
+  });
+});
