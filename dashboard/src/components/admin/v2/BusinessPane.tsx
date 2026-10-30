@@ -8,7 +8,8 @@ import { statusLabel } from "@/lib/adminBusinessUi";
 import { businessTone, callLength, chargingLabel, intentLabel, numberLabel } from "@/lib/ops/businessesView";
 import { ksh } from "@/lib/ops/invoicesView";
 import { BUSINESS_PANE_SECTIONS, usedShare, type BusinessPaneData, type BusinessPaneSection } from "@/lib/ops/businessPane";
-import { OpsConfirm, SplitPane, StatusPill, useOpenAdminUnlock } from "@/components/ops";
+import { OpsConfirm, Sparkline, SplitPane, StatusPill, useOpenAdminUnlock } from "@/components/ops";
+import { MinutesMeter } from "@/components/ui/MinutesMeter";
 import { Button } from "@/components/ui/Button";
 import { ARCHIVE_RESTORE_DAYS } from "@/lib/adminBusinessModel";
 import { postJson } from "@/lib/ops/archiveRelease";
@@ -222,6 +223,31 @@ export function BusinessPane({
     <>
     <SplitPane open={!!businessId} onClose={onClose} title={b?.business_name || (businessId ? "Business" : "")} footer={footer}>
       <div ref={body} data-business-pane="">
+        <div className="mb-ops-3 flex flex-col items-start gap-2" data-sheet-header="">
+          {b ? <StatusPill tone={businessTone(b.status)}>{statusLabel(b.status)}</StatusPill> : null}
+          {pending ? <p className="text-ops-body text-ink-2">Loading.</p> : null}
+          {failed ? <p className="text-ops-body text-attention" role="alert">Could not load this business.</p> : null}
+          {u ? (
+            <MinutesMeter
+              shape="bar"
+              input={{
+                included: u.minutesIncluded,
+                used: u.minutesUsed,
+                left: u.minutesRemaining,
+                underOne: false,
+                mode: u.minutesIncluded > 0 ? (u.onDemand ? "metered" : "capped") : "none",
+                overLabel: null,
+              }}
+            />
+          ) : loaded ? <p className="text-ops-body text-ink-2">No package this period.</p> : null}
+          {m ? (
+            <p className="text-ops-body tabular-nums text-ink">
+              {m.balanceCents > 0 ? `${ksh(m.balanceCents)} owed` : "Nothing owed."}
+              {m.overdueCount > 0 ? <StatusPill tone="danger">{`${m.overdueCount} overdue`}</StatusPill> : null}
+            </p>
+          ) : null}
+          {badge?.scores && badge.scores.length >= 2 ? <Sparkline points={badge.scores} label="Quality" /> : null}
+        </div>
         <nav aria-label="Sections" className="sticky top-0 z-10 -mx-ops-4 -mt-ops-3 mb-ops-2 flex gap-1 overflow-x-auto border-b border-hairline bg-surface px-ops-4">
           {BUSINESS_PANE_SECTIONS.map((s) => (
             <button
