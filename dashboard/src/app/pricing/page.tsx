@@ -11,10 +11,10 @@ import { marketingFontClass } from "@/app/marketingFonts";
 
 export const metadata: Metadata = {
   title: "Pricing · Scalers",
-  description: "Monthly packages in KES. Request access to start.",
+  description: "Monthly or annual packages in KES. Request access to start.",
 };
 
-/** Public prices from billing_packages (read only). Same dark hero as home, then the plans. Beta is featured. */
+/** Public prices from each package's published version. Dark hero, then three paid plans. */
 export default function PricingPage() {
   return (
     <div className={`${marketingFontClass} contents`}>
@@ -60,8 +60,12 @@ export default function PricingPage() {
             </nav>
           </header>
           <section id="pricing-start" className="mx-auto max-w-desk px-5 pb-28 pt-8 sm:px-8">
-            <h1 className="font-display text-[2.25rem] leading-[1.1] tracking-tight text-white text-balance sm:text-5xl">Pricing</h1>
-            <p className="mt-3 max-w-md text-lg leading-relaxed text-white/90">Monthly packages in KES.</p>
+            <h1 className="font-display text-[2.25rem] leading-[1.1] tracking-tight text-white text-balance sm:text-5xl">
+              Pick your monthly call minutes.
+            </h1>
+            <p className="mt-3 max-w-md text-lg leading-relaxed text-white/90">
+              {"Your assistant answers when you're busy, closed, or on another call."}
+            </p>
           </section>
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-b from-transparent to-canvas" data-pricing-fade="" />
         </div>

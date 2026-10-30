@@ -127,7 +127,7 @@ export function LandingPackages() {
         <h2 id="landing-packages" className={h2}>
           Pricing
         </h2>
-        <p className="mt-3 max-w-xl text-base leading-relaxed text-ink-2">Monthly packages in KES.</p>
+        <p className="mt-3 max-w-xl text-base leading-relaxed text-ink-2">Monthly or annual, in KES.</p>
         <Link
           href="/pricing"
           className="landing-focus mt-2 inline-flex min-h-11 items-center text-base font-semibold text-[var(--landing-cta)] underline-offset-4 hover:underline"
