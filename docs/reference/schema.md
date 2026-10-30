@@ -89,7 +89,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (250)
+## Functions (251)
 
 | Function | Defined in |
 | --- | --- |
@@ -329,6 +329,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_subscriptions_b_pin_version` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/package_version_editor.sql` |
 | `tenant_subscriptions_c_require_version_pin` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `tenant_subscriptions_clear_spend_hold` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
+| `tenant_subscriptions_d_block_retired_version` | `supabase/migrations/20261031005522_block_retired_package_version.sql` |
 | `tenants_a_new_signup_trial` | `docs/supabase/package_version_editor.sql` |
 | `tenants_archived_billing_guard` | `docs/supabase/archive_tenant_billing.sql` |
 | `tenants_billing_purge_flag` | `docs/supabase/billing_data_layer.sql` |
