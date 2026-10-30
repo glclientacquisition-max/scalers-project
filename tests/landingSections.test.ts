@@ -35,3 +35,11 @@ test("off code matches the forwarding lib", () => {
   assert.match(fwd, /ALL_OFF_CODE = "##002#"/);
   assert.match(sections, /##002#/);
 });
+
+test("cleaning page reuses the skeleton with cleaning words", () => {
+  const route = read("app/cleaning/page.tsx");
+  const copy = read("components/marketing/landingCopy.ts");
+  assert.match(route, /copy=\{CLEANING_COPY\}/);
+  assert.match(copy, /h1: "Never lose a cleaning job to a missed call\."/);
+  assert.doesNotMatch(copy, /coming soon|free trial|guarantee|\d+%/i);
+});

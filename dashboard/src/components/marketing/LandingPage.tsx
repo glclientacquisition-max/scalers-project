@@ -9,6 +9,7 @@ import {
   LandingQuestions,
   LandingTrust,
 } from "@/components/marketing/LandingSections";
+import { HOME_COPY, type LandingCopy } from "@/components/marketing/landingCopy";
 import { LandingCta } from "@/components/marketing/LandingCta";
 import { AppearanceFooter } from "@/components/ThemePicker";
 
@@ -17,11 +18,11 @@ import { AppearanceFooter } from "@/components/ThemePicker";
  * primary CTA only, with a faint glow of the same colour behind the hero call card and the final CTA.
  * Signed-in owners get a way back to their Desk instead.
  */
-export function LandingPage({ signedIn = false }: { signedIn?: boolean }) {
+export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?: boolean; copy?: LandingCopy }) {
   return (
-    <main className="landing-scope overflow-x-clip bg-canvas text-ink" data-landing="">
+    <main className="landing-scope overflow-x-clip bg-canvas text-ink" data-landing={copy.key}>
       <header className="mx-auto flex max-w-desk items-center justify-between gap-2 px-5 pt-[max(1rem,env(safe-area-inset-top))] sm:px-8">
-        <BrandWordmark href="/" context="Home" variant="lockup" priority />
+        <BrandWordmark href="/" context={copy.context} variant="lockup" priority />
         <nav className="flex shrink-0 items-center gap-1">
           {signedIn ? (
             <a
@@ -44,12 +45,9 @@ export function LandingPage({ signedIn = false }: { signedIn?: boolean }) {
       <section className="mx-auto grid max-w-desk items-center gap-10 px-5 pb-14 pt-8 sm:px-8 lg:grid-cols-[1.1fr_1fr] lg:gap-14 lg:pb-20 lg:pt-14">
         <div className="min-w-0 max-w-xl">
           <h1 className="landing-rise font-display text-[2rem] leading-[1.12] tracking-tight text-ink text-balance sm:text-5xl">
-            Your calls get answered, even when you can&apos;t.
+            {copy.h1}
           </h1>
-          <p className="landing-rise landing-rise-delay-1 mt-4 text-base leading-relaxed text-ink-2 sm:text-lg">
-            On a job, on another call, or closed for the night. Your Business Assistant answers with your prices and
-            hours, then texts you the details.
-          </p>
+          <p className="landing-rise landing-rise-delay-1 mt-4 text-base leading-relaxed text-ink-2 sm:text-lg">{copy.sub}</p>
           <div className="landing-rise landing-rise-delay-2 mt-7 flex flex-wrap items-center gap-3">
             {signedIn ? <LandingCta href="/home" label="Open Desk" /> : <LandingCta />}
           </div>
@@ -59,11 +57,11 @@ export function LandingPage({ signedIn = false }: { signedIn?: boolean }) {
         </div>
         <div className="relative min-w-0">
           <div className="landing-glow pointer-events-none absolute -inset-8" aria-hidden />
-          <HeroCall />
+          <HeroCall ask={copy.ask} />
         </div>
       </section>
 
-      <LandingMoments />
+      <LandingMoments items={copy.moments} />
       <LandingHowItWorks />
       <LandingTrust />
       <LandingKeepNumber />
@@ -73,7 +71,7 @@ export function LandingPage({ signedIn = false }: { signedIn?: boolean }) {
       <section className="relative overflow-hidden px-5 pb-16 pt-6 sm:px-8" data-landing-final="">
         <div className="landing-glow pointer-events-none absolute inset-x-0 bottom-0 h-64" aria-hidden />
         <div className="relative mx-auto max-w-desk">
-          <h2 className="font-display text-2xl tracking-tight text-ink sm:text-3xl">Stop losing jobs to missed calls.</h2>
+          <h2 className="font-display text-2xl tracking-tight text-ink sm:text-3xl">{copy.finalHeading}</h2>
           <div className="mt-6">{signedIn ? <LandingCta href="/home" label="Open Desk" /> : <LandingCta />}</div>
         </div>
       </section>

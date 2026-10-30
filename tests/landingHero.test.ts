@@ -12,7 +12,8 @@ const css = read("app/globals.css");
 test("hero is on the light canvas, one H1, no dark brand plane", () => {
   assert.doesNotMatch(landing, /bg-brand-900|text-white|glass-chrome/);
   assert.equal((landing.match(/<h1/g) || []).length, 1);
-  assert.match(landing, /Your calls get answered, even when you can&apos;t\./);
+  const copy = read("components/marketing/landingCopy.ts");
+  assert.match(copy, /h1: "Your calls get answered, even when you can't\."/);
   assert.match(landing, /Keep your number\. Turn it off with one code\./);
 });
 

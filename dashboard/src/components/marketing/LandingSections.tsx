@@ -6,13 +6,6 @@ import Link from "next/link";
  * Screens are anonymised Desk captures (fixture data, no client names or numbers).
  */
 
-const MOMENTS: ReadonlyArray<[string, string]> = [
-  ["On a job", "Hands busy, phone in your pocket."],
-  ["On another call", "The second caller still gets an answer."],
-  ["After closing", "Evening and weekend calls are answered too."],
-  ["Phone off or no signal", "Forwarded calls still reach your Business Assistant."],
-];
-
 const HOW: ReadonlyArray<{ src: string; alt: string; w: number; h: number; title: string; line: string }> = [
   {
     src: "/landing/how-prices.webp",
@@ -63,7 +56,7 @@ const QUESTIONS: ReadonlyArray<[string, string]> = [
 
 const h2 = "font-display text-2xl tracking-tight text-ink sm:text-3xl";
 
-export function LandingMoments() {
+export function LandingMoments({ items }: { items: ReadonlyArray<readonly [string, string]> }) {
   return (
     <section className="px-5 py-12 sm:px-8" aria-labelledby="landing-moments" data-landing-section="moments">
       <div className="mx-auto max-w-desk">
@@ -71,7 +64,7 @@ export function LandingMoments() {
           When you can&apos;t pick up
         </h2>
         <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-          {MOMENTS.map(([title, line]) => (
+          {items.map(([title, line]) => (
             <li key={title} className="rounded-2xl border border-hairline bg-surface px-4 py-3">
               <p className="text-base font-semibold text-ink">{title}</p>
               <p className="mt-0.5 text-sm text-ink-2">{line}</p>

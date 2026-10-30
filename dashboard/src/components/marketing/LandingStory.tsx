@@ -22,7 +22,7 @@ function usePlayOnMount() {
 }
 
 /** Hero call card: an incoming call, answered, then the details sent to the owner. Plays once; reduced motion shows the end. */
-export function HeroCall() {
+export function HeroCall({ ask = "They asked for a booking." }: { ask?: string }) {
   const ref = usePlayOnMount();
   return (
     <div
@@ -44,7 +44,7 @@ export function HeroCall() {
               <p className="text-base font-medium">Business Assistant</p>
             </div>
           </div>
-          <p className="mt-5 font-display text-2xl leading-tight tracking-tight text-ink sm:text-3xl">They asked for a booking.</p>
+          <p className="mt-5 font-display text-2xl leading-tight tracking-tight text-ink sm:text-3xl">{ask}</p>
           <div className="mt-4 flex h-7 items-end gap-1 overflow-hidden">
             <span className="hero-wave hero-wave-a inline-block h-4 w-1 rounded-full bg-accent" />
             <span className="hero-wave hero-wave-b inline-block h-6 w-1 rounded-full bg-accent" />
