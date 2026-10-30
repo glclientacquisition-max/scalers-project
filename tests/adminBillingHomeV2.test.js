@@ -24,6 +24,14 @@ test("month totals use Nairobi month start and skip void and draft", async () =>
   assert.deepEqual([t.overdueCents, t.overdueCount], [100000, 1]);
 });
 
+test("last month collected stays hidden until that month has a payment", async () => {
+  const { lastMonthCollected } = await load();
+  assert.equal(lastMonthCollected([inv({})], now), null);
+  const hit = lastMonthCollected([inv({ status: "paid", paidCents: 5000, paidAt: "2026-09-15T09:00:00Z" })], now);
+  assert.equal(hit.cents, 5000);
+  assert.equal(hit.label, "September");
+});
+
 test("who owes: most days late first, one row per business", async () => {
   const { owingBusinesses } = await load();
   const o = owingBusinesses([

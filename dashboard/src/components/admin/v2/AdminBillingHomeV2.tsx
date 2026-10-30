@@ -3,7 +3,7 @@
 import { businessPaneHref } from "@/lib/ops/businessPane";
 import { useEffect, useMemo, useState } from "react";
 import { balanceCents, daysOverdue, displayStatus, ksh, statusTone, type InvoiceRow } from "@/lib/ops/invoicesView";
-import { billingHomeTotals, owingBusinesses } from "@/lib/ops/billingHomeView";
+import { billingHomeTotals, lastMonthCollected, owingBusinesses } from "@/lib/ops/billingHomeView";
 import { EmptyState, KpiTile, PageHeader, SplitLayout, SplitPane, StatusPill } from "@/components/ops";
 import { ButtonLink } from "@/components/ui/Button";
 import "@/styles/ops.css";
@@ -16,6 +16,8 @@ const day = (iso: string | null) => (iso ? DATE.format(new Date(iso)) : "—");
 export function AdminBillingHomeV2({ rows, nowIso }: { rows: InvoiceRow[]; nowIso: string }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const totals = useMemo(() => billingHomeTotals(rows, now), [rows, now]);
+  const prior = useMemo(() => lastMonthCollected(rows, now), [rows, now]);
+  const asOf = useMemo(() => new Intl.DateTimeFormat("en-KE", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Africa/Nairobi" }).format(now), [now]);
   const owing = useMemo(() => owingBusinesses(rows, now), [rows, now]);
   const [sel, setSel] = useState<string | null>(null);
   useEffect(() => {
@@ -56,10 +58,10 @@ export function AdminBillingHomeV2({ rows, nowIso }: { rows: InvoiceRow[]; nowIs
         }
       />
       <div className="ops-tiles pb-ops-3" data-billing-kpis="">
-        <KpiTile label="Billed this month" value={ksh(totals.billedThisMonthCents)} />
-        <KpiTile label="Collected this month" value={ksh(totals.collectedThisMonthCents)} />
-        <KpiTile label="Outstanding" value={ksh(totals.outstandingCents)} />
-        <KpiTile label={`Overdue · ${totals.overdueCount}`} value={ksh(totals.overdueCents)} />
+        <KpiTile label="Billed" period="This month" asOf={asOf} href="/admin/billing/invoices" value={ksh(totals.billedThisMonthCents)} />
+        <KpiTile label="Collected" period="This month" asOf={asOf} href="/admin/billing/payments" value={ksh(totals.collectedThisMonthCents)} compare={prior ? `vs ${prior.label} ${ksh(prior.cents)}` : null} />
+        <KpiTile label="Outstanding" period="Now" asOf={asOf} href="/admin/billing/invoices" value={ksh(totals.outstandingCents)} />
+        <KpiTile label={`Overdue · ${totals.overdueCount}`} period="Now" asOf={asOf} href="/admin/billing/invoices" value={ksh(totals.overdueCents)} />
       </div>
       <div className="flex flex-wrap items-baseline justify-between gap-x-ops-3 pb-ops-2">
         <h2 className="text-ops-heading text-ink">
