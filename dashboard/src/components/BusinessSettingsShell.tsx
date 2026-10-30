@@ -72,16 +72,18 @@ function SettingsPanelBody({
   tab,
   tenant,
   curatedVoices,
+  importFacts = false,
 }: {
   tab: "import" | "test";
   tenant: TenantRow;
   curatedVoices: CuratedSonioxVoice[];
+  importFacts?: boolean;
 }) {
   if (tab === "import") {
     return resolveTenantBusinessType(tenant) === "retail" ? (
       <CatalogImportPanel tenant={tenant} />
     ) : (
-      <KnowledgeIngestPanel tenant={tenant} />
+      <KnowledgeIngestPanel tenant={tenant} importFacts={importFacts} />
     );
   }
   return <TestLinePanel tenant={tenant} curatedVoices={curatedVoices} />;
@@ -104,6 +106,7 @@ export function BusinessSettingsShell({
   assistantSaySlot = null,
   assistantSayPage = false,
   businessCategory = null,
+  importFacts = false,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
@@ -121,6 +124,8 @@ export function BusinessSettingsShell({
   assistantSayPage?: boolean;
   /** Identity: tenants.business_category for the one "What you do" question. */
   businessCategory?: string | null;
+  /** Import review per fact (DESK_IMPORT_FACTS). */
+  importFacts?: boolean;
 }) {
   const { tab: activeTab, trainPanel: activeTrainPanel } = useResolvedSettingsRoute(tab, trainPanel);
   const formPanel: SettingsPanel =
@@ -272,6 +277,7 @@ export function BusinessSettingsShell({
                     tab={activeTab}
                     tenant={tenant}
                     curatedVoices={curatedVoices}
+                    importFacts={importFacts}
                   />
                 ) : null}
               </>

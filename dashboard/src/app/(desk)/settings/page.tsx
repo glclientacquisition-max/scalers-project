@@ -35,7 +35,7 @@ import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
 import { Suspense } from "react";
 import { DeskPageGate } from "@/components/DeskPageGate";
 import { DeskPageSkeleton } from "@/components/DeskPageSkeleton";
-import { deskAssistantSayPage } from "@/lib/deskFeatureFlags";
+import { deskAssistantSayPage, deskImportFacts } from "@/lib/deskFeatureFlags";
 import { loadAssistantSayView } from "@/lib/assistantSayVoice.server";
 import { loadKbGreetingPreview } from "@/lib/kbCaller.server";
 import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
@@ -217,6 +217,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   return (
     <Suspense fallback={<DeskPageSkeleton />}>
       <BusinessSettingsShell
+        importFacts={deskImportFacts()}
         tenant={tenantForSettingsView(tenant, tab, trainPanel, kbCatalogue)}
         tab={tab}
         trainPanel={trainPanel}
