@@ -176,29 +176,27 @@ export function AssistantSayTopicSheet({
     });
   }, [row.id, tenant]);
 
+  // Opening the sheet only resets "Try a question". No lookup runs until the owner asks one, so the
+  // status and "Callers hear" below never wait on, or get replaced by, a live preview.
   useEffect(() => {
     if (!open || row.id === "greeting" || row.id === "unsure") return;
-    const sample = sampleForTopic(row.id, samples);
-    setQuery(sample);
-    startPreview(async () => {
-      const res = await previewDeskLookupAction(lookupKind, sample);
-      if (res.ok) {
-        setPreview(res.result);
-        setPreviewError(null);
-      } else {
-        setPreview(null);
-        setPreviewError(res.error);
-      }
-    });
-  }, [open, row.id, lookupKind, samples]);
+    setQuery(sampleForTopic(row.id, samples));
+    setPreview(null);
+    setPreviewError(null);
+  }, [open, row.id, samples]);
 
+  // Status and "Callers hear" come only from the readiness row (the same result as the list).
+  const readyLineEn = row.willSay ? String(row.hearPreview || "").trim() : "";
+  const readyLineSw = row.willSay ? String(row.hearPreviewSw || "").trim() : "";
   const callersLineEn =
-    preview?.speechEn ||
-    (row.id === "greeting" ? greetingSentence?.text : row.hearPreview) ||
+    (row.id === "greeting" ? greetingSentence?.text : readyLineEn) ||
     spokenFallbackLine("general", byKind, "en", legacyGeneral, businessType);
   const callersLineSw =
-    preview?.speechSw ||
-    (row.id === "greeting" ? "" : spokenFallbackLine(fallbackKinds[0] || "general", byKind, "sw", legacyGeneral, businessType));
+    row.id === "greeting"
+      ? ""
+      : row.willSay && row.id !== "unsure"
+        ? readyLineSw
+        : spokenFallbackLine(fallbackKinds[0] || "general", byKind, "sw", legacyGeneral, businessType);
 
   const displayLine = lang === "sw" && callersLineSw ? callersLineSw : callersLineEn;
 
@@ -310,15 +308,9 @@ export function AssistantSayTopicSheet({
               {callersLineSw}
             </p>
           ) : null}
-          {preview ? (
-            <div className="mt-3 flex items-center gap-2">
-              <Stamp tone={preview.stampTone}>{preview.stampLabel}</Stamp>
-            </div>
-          ) : (
-            <div className="mt-3 flex items-center gap-2">
-              <Stamp tone={row.stampTone}>{row.stampLabel}</Stamp>
-            </div>
-          )}
+          <div className="mt-3 flex items-center gap-2">
+            <Stamp tone={row.stampTone}>{row.stampLabel}</Stamp>
+          </div>
         </div>
 
         {row.id !== "unsure" ? (
@@ -403,6 +395,17 @@ export function AssistantSayTopicSheet({
             <Button type="button" variant="tonal" size="md" onClick={runTryQuestion} disabled={pendingPreview}>
               {pendingPreview ? "Showing" : "Show answer"}
             </Button>
+            {preview ? (
+              <div className="rounded-2xl border border-hairline bg-surface-2 p-4" data-try-answer="">
+                <p className="text-meta font-medium text-ink-2">Answer to this question</p>
+                <p className="mt-2 text-body text-ink [overflow-wrap:anywhere]">&ldquo;{preview.speechEn}&rdquo;</p>
+                {preview.speechSw ? (
+                  <p className="mt-1 text-meta text-ink-3 [overflow-wrap:anywhere]" lang="sw">
+                    {preview.speechSw}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             {previewError ? <p className="text-meta text-attention">{previewError}</p> : null}
           </CollapsibleSection>
         ) : null}
