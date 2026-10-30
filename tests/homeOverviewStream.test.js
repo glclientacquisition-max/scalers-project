@@ -29,7 +29,7 @@ describe("Overview streams in parts (D2)", () => {
 
   it("folds the independent first reads into one Promise.all", () => {
     assert.match(page, /Promise\.all\(\[\s*createWorkspaceDataClient\(\),\s*memberCan\("settings\.edit"\),\s*\]\)/);
-    assert.match(page, /const \[todayRes, inbox, score, hold\] = await Promise\.all\(/);
+    assert.match(page, /const \[todayRes, inbox, score, hold, factsRes\] = await Promise\.all\(/);
   });
 
   it("wraps every slot in its own Suspense with a shaped or empty fallback", () => {
