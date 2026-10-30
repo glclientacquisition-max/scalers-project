@@ -73,6 +73,9 @@ if [ "$is_staging" = 1 ]; then
   if [ "$ref" = "$STAGING_V2_BRANCH" ]; then
     build "scalers-staging builds $STAGING_V2_BRANCH for scalers-staging.vercel.app"
   fi
+  case "$ref" in
+    shots/*) build "scalers-staging builds $ref as a screenshot-only preview (not aliased)" ;;
+  esac
   skip "scalers-staging builds only $STAGING_BRANCH and $STAGING_V2_BRANCH, not ${ref:-an unnamed ref}"
 fi
 
