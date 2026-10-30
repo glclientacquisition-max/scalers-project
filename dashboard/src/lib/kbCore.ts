@@ -314,7 +314,41 @@ export const PASTE_MAX_ROWS = 500;
 
 const PRICE_TAIL =
   /^(.*?)(?:\s*[-–—:|,;\t]\s*|\s+)((?:from\s+|kuanzia\s+)?(?:ksh?s?\.?|kes|sh\.?)?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:-|–|to|hadi)\s*(?:ksh?s?\.?|kes|sh\.?)?\s*\d[\d,]*(?:\.\d+)?)?\s*(?:\/-)?(?:\s*(?:\/|per|kwa|a|an)\s*[a-z][a-z ]{0,20}|\s+each)?)\s*$/i;
-const WORD_TAIL = /^(.*?)\s*[-–—:|,;\t]\s*(custom quote|quote|on request|price on request|site visit|after (?:a )?site visit|free)\s*$/i;
+const WORD_TAIL = /^(.*?)\s*[-–—:|,;\t]\s*(custom quote|quote|call for (?:a )?(?:quote|price)|on request|price on request|bei ya maongezi|negotiable|site visit|after (?:a )?site visit|free|bure)\s*$/i;
+
+/**
+ * Imported text, before any parsing (30 Oct): Unicode NFKC (full-width digits, ligatures), no control, zero-width or
+ * bidi characters, no-break spaces as spaces, curly quotes straight. Line breaks and tabs stay.
+ */
+export function normaliseImportText(text: string): string {
+  return String(text || "")
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\u2060\uFEFF\u202A-\u202E\u2066-\u2069]/g, "")
+    .replace(/[\u00A0\u2007\u202F]/g, " ")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g, "");
+}
+
+/** A name that a spreadsheet would run as a formula (=, +, @) loses those leading characters. */
+export function neutraliseFormula(name: string): string {
+  return name.replace(/^[=+@]+\s*/, "").trim();
+}
+
+/**
+ * Kenyan price writing -> the forms PRICE_TAIL reads: "1,500/=" and "1500 bob" -> 1500, "2k" / "1.5k" -> 2000 / 1500,
+ * "Item @ 300" -> "Item - 300", "bei 500" -> 500. Only the price text changes; names are untouched.
+ */
+export function kenyanPriceText(line: string): string {
+  return line
+    .replace(/(\d[\d,]*(?:\.\d+)?)\s*\/=/g, "$1")
+    .replace(/\b(\d+(?:\.\d+)?)k\b/gi, (_m, n: string) => String(Math.round(Number(n) * 1000)))
+    .replace(/(\d)\s*(?:bob|shillings?|shilingi)\b/gi, "$1")
+    .replace(/\s+@\s*(?=(?:ksh?s?\.?|kes|sh\.?)?\s*\d)/gi, " - ")
+    .replace(/\bbei\s+(?=(?:ksh?s?\.?|kes|sh\.?)?\s*\d)/gi, "")
+    .replace(/\s+$/, "");
+}
 
 function parsePrice(t: string): Pick<KbPasteRow, "price_mode" | "price_amount" | "price_min" | "price_max" | "unit"> {
   const s = t.trim();
@@ -338,9 +372,9 @@ export function parsePasteList(text: string, existing: Pick<KbItem, "id" | "name
   const byName = new Map(existing.map((e) => [e.name_en.trim().toLowerCase(), e.id]));
   const seen = new Set<string>();
   const out: KbPasteRow[] = [];
-  const lines = String(text || "").replace(/\r/g, "").split("\n");
+  const lines = normaliseImportText(text).split("\n");
   lines.forEach((rawLine, i) => {
-    const raw = rawLine.replace(/^\s*(?:[-*•·]|\d+[.)])\s+/, "").trim();
+    const raw = kenyanPriceText(rawLine.replace(/^\s*(?:[-*•·]|\d+[.)])\s+/, "").trim().slice(0, 300));
     if (!raw) return;
     if (i === 0 && /^name\s*[,\t;|]\s*price/i.test(raw)) return;
     let name = raw;
@@ -350,12 +384,13 @@ export function parsePasteList(text: string, existing: Pick<KbItem, "id" | "name
     if (w) {
       name = w[1];
       const word = w[2].toLowerCase();
-      price = { ...price, price_mode: /visit/.test(word) ? "site_visit" : word === "free" ? "free" : "quote", price_amount: word === "free" ? 0 : null };
+      const free = word === "free" || word === "bure";
+      price = { ...price, price_mode: /visit/.test(word) ? "site_visit" : free ? "free" : "quote", price_amount: free ? 0 : null };
     } else if (m && m[1].trim() && /[a-z]/i.test(m[1])) {
       name = m[1];
       price = parsePrice(m[2]);
     }
-    name = name.replace(/\s*[-–—:|,;]\s*$/, "").replace(/^"|"$/g, "").replace(/\s+/g, " ").trim();
+    name = neutraliseFormula(name.replace(/\s*[-–—:|,;]\s*$/, "").replace(/^"|"$/g, "").replace(/\s+/g, " ").trim());
     const key = name.toLowerCase();
     let error: string | null = null;
     if (!name || !/[a-z]/i.test(name)) error = "No name on this line.";
