@@ -242,7 +242,7 @@ export function DeskRail({
   return (
     <div
       data-desk-rail=""
-      className="glass-chrome hidden h-full w-[5.5rem] shrink-0 flex-col border-r border-hairline/80 md:flex"
+      className="glass-chrome relative z-10 hidden h-full w-[5.5rem] shrink-0 flex-col border-r border-hairline/80 md:flex"
     >
       <div className="flex h-14 items-center justify-center">
         <DeskHint label="Scalers">

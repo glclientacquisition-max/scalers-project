@@ -101,11 +101,12 @@
   --motion-live: 1.4s;
   --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Glass chrome (tab bar, rail, menus, auth cards). Dark sheets stay opaque. */
+  /* Glass chrome (tab bar, rail, menus, auth cards). Dark sheets stay opaque.
+     Phone blur is 12px; desktop (md) raises it to 20px. Light fill stays at least 0.72. */
   --surface-3: #ffffff;
-  --glass: color-mix(in srgb, var(--surface) 78%, transparent);
+  --glass: color-mix(in srgb, var(--surface) 72%, transparent);
   --glass-highlight: rgb(255 255 255 / 0.72);
-  --glass-blur: 16px;
+  --glass-blur: 12px;
   /* Overlay dim. Always a dark wash. Never --ink (ink flips pale in dark). */
   --scrim: #0a192f;
 }
@@ -170,7 +171,7 @@
   --warn-deep: #f5d76e;
   --shadow-sheet: 0 12px 32px -12px rgb(0 0 0 / 0.6);
   --shadow-menu: 0 8px 24px -8px rgb(0 0 0 / 0.55);
-  --glass: color-mix(in srgb, var(--surface) 58%, transparent);
+  --glass: color-mix(in srgb, var(--surface) 72%, transparent);
   --glass-highlight: rgb(255 255 255 / 0.1);
   --scrim: #000000;
   --tw-ring-offset-color: var(--surface);
@@ -224,12 +225,83 @@ html {
   backdrop-filter: blur(var(--glass-blur)) saturate(1.35);
 }
 
-@media (prefers-reduced-transparency: reduce) {
+/* Solid plate: no blur engine, Reduce effects, or an OS reduce preference.
+   1px slate hairline. data-glass-fallback is the same plate for engines that
+   still report backdrop-filter support (visual proof). */
+html[data-effects="reduced"] .glass-chrome,
+html[data-glass-fallback="1"] .glass-chrome {
+  background-color: var(--surface);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--hairline);
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-reduced-motion: reduce) {
   .glass-chrome {
     background-color: var(--surface);
     box-shadow: none;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
+    border: 1px solid var(--hairline);
+  }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass-chrome {
+    background-color: var(--surface);
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: 1px solid var(--hairline);
+  }
+}
+
+/*
+ * One glow behind shell glass so the frost never sits on a flat canvas.
+ * DESK_SHELL_GLOW (default on for scalers-staging only) sets data-shell-glow.
+ * Soft azure plus a faint orange. Wide falloff, no hard edge. Content stays opaque.
+ * Orange is only in this wash, never on buttons or text.
+ */
+html[data-shell-glow="on"] .desk-theme,
+html[data-shell-glow="on"] [data-admin-shell] {
+  isolation: isolate;
+}
+
+html[data-shell-glow="on"]:not([data-effects="reduced"]) .desk-theme::before,
+html[data-shell-glow="on"]:not([data-effects="reduced"]) [data-admin-shell]::before {
+  content: "";
+  position: fixed;
+  /* Above the page, under the tab bar (z-50) and the rail (z-10). */
+  z-index: 1;
+  pointer-events: none;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--desk-tabbar-h) + env(safe-area-inset-bottom, 0px));
+  background:
+    radial-gradient(ellipse 150% 240% at 36% 130%, color-mix(in srgb, var(--brand) 70%, transparent), transparent 58%),
+    radial-gradient(ellipse 100% 220% at 96% 150%, color-mix(in srgb, var(--attention) 55%, transparent), transparent 56%);
+}
+
+@media (min-width: 768px) {
+  html[data-shell-glow="on"]:not([data-effects="reduced"]) .desk-theme::before,
+  html[data-shell-glow="on"]:not([data-effects="reduced"]) [data-admin-shell]::before {
+    inset: 0;
+    width: auto;
+    height: auto;
+    /* Azure stays in the rail. Faint orange stays in the header band. The page column stays clear. */
+    background:
+      radial-gradient(14rem 8rem at 2rem 0, color-mix(in srgb, var(--attention) 18%, transparent), transparent 68%),
+      radial-gradient(12rem 70vh at 1rem 45%, color-mix(in srgb, var(--brand) 40%, transparent), transparent 70%);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-reduced-motion: reduce) {
+  html[data-shell-glow="on"]:not([data-effects="reduced"]) .desk-theme::before,
+  html[data-shell-glow="on"]:not([data-effects="reduced"]) [data-admin-shell]::before {
+    content: none;
+    background: none;
   }
 }
 
@@ -402,6 +474,7 @@ html:has([data-admin-shell]:not([style*="display: none"], [style*="display: none
     --desk-header-h: 0px;
     --desk-tabbar-h: 0px;
     --desk-tabbar-clearance: 2.5rem;
+    --glass-blur: 20px;
   }
 }
 
