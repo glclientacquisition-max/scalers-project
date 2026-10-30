@@ -13,6 +13,7 @@ import { Empty } from "@/components/ui/Empty";
 import { notify } from "@/components/ui/DeskNotice";
 import { deskShiftClass } from "@/lib/deskMotion";
 import { cx } from "@/lib/cx";
+import { IMPORT_FILE_ACCEPT, IMPORT_FILE_MAX_BYTES, delimitedToPasteText } from "@/lib/importCsv";
 import { CHECK_FIX, CHECK_LABEL, ISSUE_LINE, type KbCategory, type KbDraft, type KbItem, type KbKind, type KbPasteRow, type KbReadiness, type KbSnapshotRow } from "@/lib/kbCore";
 import {
   PRICE_CHOICES,
@@ -73,6 +74,8 @@ export type CatalogueScreenProps = {
   initialNeedPrice?: boolean;
   /** ?paste=1 (old Import links) opens Paste a list. */
   initialPaste?: boolean;
+  /** "Add many" (staging flag DESK_ADD_MANY): one sheet for a pasted list or a CSV file. Off: Paste a list. */
+  addMany?: boolean;
   /**
    * Paused and Not offered (the item Status control). Server flag DESK_KB_ITEM_STATES, off by default
    * until the KB writers and the Brain KB reader are live. Off: an item already in one of those states
@@ -88,6 +91,8 @@ const SHOW_STEP = 150;
 
 export function CatalogueScreen(props: CatalogueScreenProps) {
   const { items, categories, live, latest, readiness, liveVersion, onCalls, vertical, canEdit, actions } = props;
+  const addMany = !!props.addMany;
+  const manyLabel = addMany ? "Add many" : "Paste a list";
   const statesEnabled = !!props.statesEnabled;
   const router = useRouter();
   const homeServices = vertical === "home_services";
@@ -213,7 +218,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
           {canEdit && counts.total ? (
             <div className="flex gap-2">
               <Button variant="tonal" size="md" onClick={() => setPasting(true)}>
-                Paste a list
+                {manyLabel}
               </Button>
               {/* One filled button per screen: Fix while prices are missing, else Add. */}
               <Button variant={counts.needPrice ? "tonal" : "primary"} size="md" leading={<PlusIcon aria-hidden="true" className="size-4" />} onClick={() => setEditing({ draft: newDraft(defaultKind, categories), fixing: false })} data-add="">
@@ -310,7 +315,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
               canEdit ? (
                 <div className="flex flex-wrap justify-center gap-2">
                   <Button variant="tonal" onClick={() => setPasting(true)}>
-                    Paste a list
+                    {manyLabel}
                   </Button>
                   <Button variant="primary" onClick={() => setEditing({ draft: newDraft(defaultKind, categories), fixing: false })}>
                     {homeServices ? "Add a service" : "Add an item"}
@@ -409,6 +414,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
 
       {pasting ? (
         <PasteSheet
+          addMany={addMany}
           existing={items}
           homeServices={homeServices}
           defaultKind={defaultKind}
@@ -739,6 +745,7 @@ function ItemSheet({
 
 /** Paste a list: preview first, then one batch of up to 500. Replaces the Import tab for the catalogue. */
 function PasteSheet({
+  addMany,
   existing,
   homeServices,
   defaultKind,
@@ -746,6 +753,7 @@ function PasteSheet({
   onClose,
   onSaved,
 }: {
+  addMany: boolean;
   existing: KbItem[];
   homeServices: boolean;
   defaultKind: KbKind;
@@ -754,6 +762,8 @@ function PasteSheet({
   onSaved: () => void;
 }) {
   const [text, setText] = useState("");
+  const [source, setSource] = useState<"paste" | "file">("paste");
+  const [fileName, setFileName] = useState<string | null>(null);
   const [kind, setKind] = useState<KbKind>(homeServices ? "service" : defaultKind);
   const [group, setGroup] = useState("");
   const [rows, setRows] = useState<KbPasteRow[] | null>(null);
@@ -765,14 +775,26 @@ function PasteSheet({
   const removed = rows ? replaceRemovals(rows, existing, kind) : [];
   const clashes = rows ? replaceKindClashes(rows, existing, kind) : [];
   const confirm = replaceConfirmLine(removed, kind);
-  const preview = () =>
+  const preview = (body: string = text) =>
     start(async () => {
       setError(null);
       setReplacing(false);
-      const r = await actions.previewPaste(text);
+      const r = await actions.previewPaste(body);
       if (!r.ok) setError(r.error);
       else setRows(r.rows);
     });
+  // A file is read here as plain text (no formulas run), turned into lines, then the same preview as a paste.
+  const readFile = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    if (file.size > IMPORT_FILE_MAX_BYTES) return setError("That file is over 1 MB. Save a smaller part and try again.");
+    if (!/\.(csv|tsv|txt)$/i.test(file.name)) return setError("Use a CSV, TSV or text file. From Excel: Save As, CSV.");
+    const lines = delimitedToPasteText(await file.text());
+    if (!lines.trim()) return setError("We could not find any items in that file.");
+    setFileName(file.name);
+    setText(lines);
+    preview(lines);
+  };
   const add = (mode: "append" | "replace") =>
     start(async () => {
       if (!summary) return;
@@ -792,7 +814,7 @@ function PasteSheet({
     <Sheet
       open
       onOpenChange={(o) => (o ? null : onClose())}
-      title={replacing ? "Replace my list" : "Paste a list"}
+      title={replacing ? "Replace my list" : addMany ? "Add many" : "Paste a list"}
       size="lg"
       description={summary ? pasteSummaryLine(summary) : undefined}
       footer={
@@ -817,9 +839,11 @@ function PasteSheet({
             </>
           )
         ) : (
-          <Button variant="primary" onClick={preview} pending={pending} disabled={!text.trim()}>
-            Preview
-          </Button>
+          source === "file" ? null : (
+            <Button variant="primary" onClick={() => preview()} pending={pending} disabled={!text.trim()}>
+              Preview
+            </Button>
+          )
         )
       }
     >
@@ -838,9 +862,36 @@ function PasteSheet({
                 ]}
               />
             ) : null}
-            <Field id="paste-text" label="One item per line" hint="Price at the end is optional. For example: Deep clean, 6,000 to 12,000. Up to 500 lines.">
-              {(p) => <Textarea {...p} rows={10} value={text} onChange={(e) => setText(e.target.value)} />}
-            </Field>
+            {addMany ? (
+              <SegmentedControl
+                label="From"
+                value={source}
+                onChange={(v) => setSource(v === "file" ? "file" : "paste")}
+                items={[
+                  { value: "paste", label: "Paste" },
+                  { value: "file", label: "File" },
+                ]}
+              />
+            ) : null}
+            {source === "file" ? (
+              <Field id="add-many-file" label="CSV or text file" hint="One item per row, name and price. Excel: Save As, CSV. Up to 1 MB and 500 rows.">
+                {(p) => (
+                  <input
+                    {...p}
+                    type="file"
+                    accept={IMPORT_FILE_ACCEPT}
+                    onChange={(e) => void readFile(e.target.files?.[0])}
+                    className="block min-h-11 w-full rounded-xl border border-hairline bg-surface px-3 py-2 text-body text-ink file:me-3 file:min-h-9 file:rounded-lg file:border-0 file:bg-surface-2 file:px-3 file:text-meta file:font-semibold"
+                    data-add-many-file=""
+                  />
+                )}
+              </Field>
+            ) : (
+              <Field id="paste-text" label="One item per line" hint="Price at the end is optional. For example: Deep clean, 6,000 to 12,000. Up to 500 lines.">
+                {(p) => <Textarea {...p} rows={10} value={text} onChange={(e) => setText(e.target.value)} />}
+              </Field>
+            )}
+            {fileName && source === "file" ? <p className="text-meta text-ink-2">{fileName}</p> : null}
             <Field id="paste-group" label="Group" hint="Optional. New items join this group.">
               {(p) => <Input {...p} value={group} maxLength={120} onChange={(e) => setGroup(e.target.value)} />}
             </Field>
