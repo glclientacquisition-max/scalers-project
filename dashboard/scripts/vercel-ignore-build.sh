@@ -11,6 +11,8 @@
 #     - build cursor/staging-voice-468b (Stage-PR rebuild) and, since
 #       25 Oct 2026, staging/v2-c0-opening-2026-10-21, which now holds
 #       scalers-staging.vercel.app (Alvin, 25 Oct 13:05 EAT).
+#     - build land/* (open landing PRs, 30 Oct 2026): preview links only,
+#       never aliased to scalers-staging.vercel.app.
 #     - skip every other branch, including main (main skip matches the
 #       Ignored Build Step that Stage-PR has always set on this project).
 #   scalers-project (prod Desk, prj_GYOg...) and any unknown project:
@@ -73,7 +75,10 @@ if [ "$is_staging" = 1 ]; then
   if [ "$ref" = "$STAGING_V2_BRANCH" ]; then
     build "scalers-staging builds $STAGING_V2_BRANCH for scalers-staging.vercel.app"
   fi
-  skip "scalers-staging builds only $STAGING_BRANCH and $STAGING_V2_BRANCH, not ${ref:-an unnamed ref}"
+  case "$ref" in
+    land/*) build "scalers-staging builds $ref as an open landing PR preview (review links, not aliased)" ;;
+  esac
+  skip "scalers-staging builds only $STAGING_BRANCH, $STAGING_V2_BRANCH and land/*, not ${ref:-an unnamed ref}"
 fi
 
 if [ "$env_name" = "production" ]; then
