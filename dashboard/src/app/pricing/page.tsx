@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default function PricingPage() {
   return (
     <div className={`${marketingFontClass} contents`}>
-      <main className="landing-scope min-h-dvh bg-canvas text-ink" data-pricing="">
+      <main className="landing-scope min-h-dvh overflow-x-clip bg-canvas text-ink" data-pricing="">
         <header className="mx-auto flex max-w-desk items-center justify-between gap-2 px-5 pt-[max(1rem,env(safe-area-inset-top))] sm:px-8">
           <BrandWordmark href={marketingHomeHref()} context="Pricing" variant="lockup" priority />
           <a
@@ -27,10 +27,8 @@ export default function PricingPage() {
           </a>
         </header>
         <section className="mx-auto max-w-desk px-5 pb-12 pt-8 sm:px-8">
-          <h1 className="font-display text-[2rem] leading-tight tracking-tight text-ink sm:text-4xl">Pricing</h1>
-          <p className="mt-3 max-w-xl text-base leading-relaxed text-ink-2">
-            Pick a package, or join the Beta program. Each package is a monthly price with minutes and messages included.
-          </p>
+          <h1 className="font-display text-[2.25rem] leading-tight tracking-tight text-ink sm:text-4xl">Pricing</h1>
+          <p className="mt-3 max-w-xl text-lg leading-relaxed text-ink-2">Monthly packages in KES. Pay on demand past them.</p>
           <div className="mt-8">
             <Suspense fallback={<div className="h-96 rounded-2xl bg-surface-2" aria-hidden="true" />}>
               <Plans />
