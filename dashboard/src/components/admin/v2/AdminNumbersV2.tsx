@@ -329,6 +329,26 @@ export function AdminNumbersV2({
           />
         }
       />
+      <section className="mb-ops-3 flex flex-col gap-2 rounded-lg border border-hairline bg-surface p-ops-3" aria-label="Pool">
+        {counts.assigned + counts.available + counts.held + counts.disabled === 0 ? (
+          <p className="text-ops-body text-ink-2">No numbers in the pool.</p>
+        ) : (
+          <>
+            <div className="flex h-2 overflow-hidden rounded-full bg-surface-2" role="img" aria-label={`${counts.assigned} assigned, ${counts.available} free, ${counts.held} on hold, ${counts.disabled} disabled`}>
+              {([
+                ["assigned", counts.assigned, "var(--status-ok-fg)"],
+                ["available", counts.available, "var(--status-info-fg)"],
+                ["held", counts.held, "var(--status-warn-fg)"],
+                ["disabled", counts.disabled, "var(--status-neutral-fg)"],
+              ] as const).filter(([, n]) => n > 0).map(([key, n, color]) => (
+                <span key={key} style={{ width: `${(n / (counts.assigned + counts.available + counts.held + counts.disabled)) * 100}%`, background: color }} />
+              ))}
+            </div>
+            <p className="text-ops-label tabular-nums text-ink-2">{counts.assigned} assigned · {counts.available} free · {counts.held} on hold · {counts.disabled} disabled</p>
+          </>
+        )}
+        {waiting.length === 0 ? <p className="text-ops-body text-ink-2">No business is waiting for a number.</p> : null}
+      </section>
       <div className="flex flex-wrap items-center gap-2 pb-ops-3" data-stepup="numbers">
         <div role="tablist" aria-label="Views" className="flex flex-wrap gap-1">
           {NUMBER_VIEWS.map((v) => (
@@ -349,9 +369,9 @@ export function AdminNumbersV2({
           ))}
         </div>
         {waiting.length ? (
-          <p className="text-ops-body text-ink md:ms-auto" data-waiting="" title={waiting.map((w) => `${w.name} since ${day(w.since)}`).join(" · ")}>
-            <span className="font-semibold">{waiting.length === 1 ? "1 business waiting for a number" : `${waiting.length} businesses waiting for a number`}</span>
-            <span className="text-ink-2"> · oldest {waiting[0].name}, since {day(waiting[0].since)}</span>
+          <p className="flex flex-wrap items-center gap-2 text-ops-body text-ink md:ms-auto" data-waiting="" title={waiting.map((w) => `${w.name} since ${day(w.since)}`).join(" · ")}>
+            <StatusPill tone="warn">{waiting.length === 1 ? "1 waiting" : `${waiting.length} waiting`}</StatusPill>
+            <span className="text-ink-2">oldest {waiting[0].name}, since {day(waiting[0].since)}</span>
           </p>
         ) : null}
       </div>
