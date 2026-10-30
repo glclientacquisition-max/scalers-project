@@ -14,8 +14,8 @@ import { LandingCta } from "@/components/marketing/LandingCta";
 import { AppearanceFooter } from "@/components/ThemePicker";
 
 /**
- * Marketing home on the light canvas. One job: request access. The warm accent (landing token) is on the
- * primary CTA only, with a faint glow of the same colour behind the hero call card and the final CTA.
+ * Marketing home on the light canvas. One job: request access. Blue (landing token) is the only button colour;
+ * soft blue orbs sit behind the hero call card. Short words: one headline, one line, one button.
  * Signed-in owners get a way back to their Desk instead.
  */
 export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?: boolean; copy?: LandingCopy }) {
@@ -44,20 +44,25 @@ export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?:
 
       <section className="mx-auto grid max-w-desk items-center gap-10 px-5 pb-14 pt-8 sm:px-8 lg:grid-cols-[1.1fr_1fr] lg:gap-14 lg:pb-20 lg:pt-14">
         <div className="min-w-0 max-w-xl">
-          <h1 className="landing-rise font-display text-[2rem] leading-[1.12] tracking-tight text-ink text-balance sm:text-5xl">
+          <h1 className="landing-rise font-display text-[2.25rem] leading-[1.1] tracking-tight text-ink text-balance sm:text-5xl lg:text-6xl">
             {copy.h1}
           </h1>
-          <p className="landing-rise landing-rise-delay-1 mt-4 text-base leading-relaxed text-ink-2 sm:text-lg">{copy.sub}</p>
-          <div className="landing-rise landing-rise-delay-2 mt-7 flex flex-wrap items-center gap-3">
-            {signedIn ? <LandingCta href="/home" label="Open Desk" /> : <LandingCta />}
+          <p className="landing-rise landing-rise-delay-1 mt-4 max-w-md text-lg leading-relaxed text-ink-2">{copy.sub}</p>
+          <div className="landing-rise landing-rise-delay-2 mt-7 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-4">
+            {signedIn ? <LandingCta href="/home" label="Open Desk" wide /> : <LandingCta wide />}
+            <a
+              href="/pricing"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-base font-semibold text-[var(--landing-cta)] focus-visible:outline-none focus-visible:shadow-focus"
+            >
+              See pricing
+            </a>
           </div>
-          <p className="landing-rise landing-rise-delay-3 mt-4 text-sm text-ink-2" data-landing-trust="">
-            Keep your number. Turn it off with one code.
-          </p>
         </div>
         <div className="relative min-w-0">
-          <div className="landing-glow pointer-events-none absolute -inset-8" aria-hidden />
-          <HeroCall ask={copy.ask} />
+          <div className="landing-orbs" aria-hidden data-landing-orbs="" />
+          <div className="relative">
+            <HeroCall ask={copy.ask} />
+          </div>
         </div>
       </section>
 

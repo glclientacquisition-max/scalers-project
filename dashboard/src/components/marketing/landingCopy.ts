@@ -14,8 +14,8 @@ export type LandingCopy = {
 export const HOME_COPY: LandingCopy = {
   key: "home",
   context: "Home",
-  h1: "Your calls get answered, even when you can't.",
-  sub: "On a job, on another call, or closed for the night. Your Business Assistant answers with your prices and hours, then texts you the details.",
+  h1: "Your 24-hour Business Assistant.",
+  sub: "Answers your calls when you're busy, closed, or on another call.",
   ask: "They asked for a booking.",
   moments: [
     ["On a job", "Hands busy, phone in your pocket."],
