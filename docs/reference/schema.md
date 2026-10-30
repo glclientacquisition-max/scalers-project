@@ -89,7 +89,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (250)
+## Functions (251)
 
 | Function | Defined in |
 | --- | --- |
@@ -192,6 +192,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `attach_invoice_pay_checkout` | `docs/supabase/invoice_pay.sql` |
 | `backfill_tenant_field_meta_seed` | `docs/supabase/tenant_field_provenance.sql` |
 | `billing_add_months` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/package_state_rules.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
+| `billing_append_only_guard` | `supabase/migrations/20261031030000_billing_append_only_grants_audit.sql` |
 | `billing_audit_log_freeze` | `docs/supabase/billing_data_layer.sql` |
 | `billing_grant_minutes_for_period` | `docs/supabase/package_state_rules.sql` |
 | `billing_latest_package_version` | `docs/supabase/billing_data_layer.sql` |
