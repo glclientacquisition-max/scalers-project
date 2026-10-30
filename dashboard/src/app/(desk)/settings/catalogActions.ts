@@ -36,6 +36,7 @@ import { generateGeminiText } from "@/lib/gemini";
 import { readCatalogFresh } from "@/lib/catalogFresh";
 import { PRODUCT_ID_PREFIX, withImportedPricing } from "@/lib/catalogPricing";
 import { assignServiceIds } from "@/lib/serviceIds";
+import { afterKbWrite, importCatalogueToKb, loadKbItems, writeKbItems } from "@/lib/kbWrite.server";
 
 export type CatalogImportState = {
   error?: string;
@@ -257,6 +258,40 @@ export async function applyCatalogImportAction(
   if (!fresh) return ownerSaveFailed("catalog", "fresh read failed");
   const existing = normalizeProductCatalog(fresh.product_catalog);
   const merged = assignServiceIds(mergeProductCatalog(existing, stamped, mode), existing, PRODUCT_ID_PREFIX);
+
+  // KB is the source once its tables exist: import there (owner-confirmed rows re-stamped), never write the old
+  // column directly, or the next KB mirror would undo it. Replace hides the products that were not ticked.
+  const kbItems = await loadKbItems(tenant.id);
+  if (kbItems) {
+    const kb = await importCatalogueToKb(tenant.id, { product_catalog: merged }, {
+      legacyServicesOffered: "",
+      by: "import",
+      contentEdits: mode !== "merge",
+      restamp: confirm,
+    });
+    if (!kb.ok) return ownerSaveFailed("catalog", "kb import failed");
+    if (mode === "replace") {
+      const keep = new Set(merged.map((p) => String(p.id)));
+      const drop = ((await loadKbItems(tenant.id)) || []).filter((i) => i.kind === "product" && i.status !== "hidden" && !keep.has(i.id));
+      if (drop.length) {
+        const w = await writeKbItems(tenant.id, drop.map((i) => ({ ...i, status: "hidden" as const })));
+        if (!w.ok) return { error: w.error };
+        await afterKbWrite(tenant.id, "import");
+      }
+    }
+    if (includeSocial) {
+      await workspace.client.from("tenants").update({ social_handles: social }).eq("id", tenant.id);
+      bustTenantCache(tenant.id);
+    }
+    revalidatePath("/settings");
+    const kept = kb.kept ? ` Kept ${kb.kept} you already had.` : "";
+    return {
+      ok: true,
+      message: confirm
+        ? `Added ${kb.added} product${kb.added === 1 ? "" : "s"}.${kept}`
+        : `Added ${kb.added} product${kb.added === 1 ? "" : "s"}.${kept} Check the prices to confirm them.`,
+    };
+  }
 
   const patch: Record<string, unknown> = {
     product_catalog: merged,
