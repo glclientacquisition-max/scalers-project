@@ -209,18 +209,25 @@ export function withChoice(d: KbDraft, mode: PriceChoice): KbDraft {
 }
 
 /** draftErrors plus the Desk rules the sheet adds (per unit needs its unit). */
+/** The sheet has something to save: a new item, or a draft that differs from what it opened with. */
+export function draftDirty(now: KbDraft, opened: KbDraft): boolean {
+  return !opened.id || JSON.stringify(now) !== JSON.stringify(opened);
+}
+
 export function sheetErrors(d: KbDraft): string[] {
   const out = draftErrors(d);
   if (d.price_mode === "per_unit" && !d.unit.trim()) out.push("Add what the price is per, like sqm or hour.");
   return out;
 }
 
-/** Saved message names what callers hear now. */
-export function savedLine(d: KbDraft): string {
+/** Saved message names what callers hear now, and never says "on calls" when it is not. */
+export function savedLine(d: KbDraft, r: { unchanged?: boolean; restamped?: boolean } = {}): string {
+  if (r.unchanged) return "Nothing changed.";
+  if (r.restamped === false) return "Saved. Calls will use it after the next check.";
   if (d.status === "not_offered") return "Saved. Callers who ask hear that you don't offer it.";
   if (d.status === "paused") return "Saved. Callers who ask hear it is paused.";
   if (d.price_mode === "none") return "Saved. It still needs a price.";
-  return "Saved. Calls use it within a minute.";
+  return "Saved. On calls within a minute.";
 }
 
 // ------------------------------------------------------------- paste a list preview

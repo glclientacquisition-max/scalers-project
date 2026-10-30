@@ -172,6 +172,17 @@ export function itemFromDraft(d: KbDraft, prev: KbItem | null, categoryId: strin
   };
 }
 
+/** Content an owner can change (not row_version / sort / source). Equal content: the save is a no-op. */
+export function sameKbContent(a: KbItem, b: KbItem): boolean {
+  const pick = (i: KbItem) =>
+    JSON.stringify([
+      i.kind, i.name_en, i.name_sw ?? null, i.name_sw_state, [...(i.aliases || [])], i.category_id ?? null, i.description_en ?? null, i.unit ?? null,
+      i.price_mode, i.price_amount ?? null, i.price_min ?? null, i.price_max ?? null, i.in_stock ?? null, !!i.popular, !!i.needs_visit,
+      !!i.holdable, i.excludes_en ?? null, i.status_note ?? null, i.status,
+    ]);
+  return pick(a) === pick(b);
+}
+
 export function draftFromItem(it: KbItem | null, categories: KbCategory[], kind: KbKind = "service"): KbDraft {
   const cat = it?.category_id ? categories.find((c) => c.id === it.category_id)?.name_en ?? "" : "";
   return {

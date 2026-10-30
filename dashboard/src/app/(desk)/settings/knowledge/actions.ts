@@ -4,13 +4,13 @@ import { revalidatePath } from "next/cache";
 import { memberDenied } from "@/lib/requireMember";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getCurrentTenant } from "@/lib/tenant";
-import { PASTE_MAX_ROWS, draftErrors, gateDraftStatus, itemFromDraft, itemsFromPaste, parsePasteList, slug, type KbDraft, type KbItem, type KbKind, type KbPasteRow } from "@/lib/kbCore";
+import { PASTE_MAX_ROWS, sameKbContent, draftErrors, gateDraftStatus, itemFromDraft, itemsFromPaste, parsePasteList, slug, type KbDraft, type KbItem, type KbKind, type KbPasteRow } from "@/lib/kbCore";
 import { KB_ITEM_COLS, afterKbWrite, kbRowToItem, loadKbItems, writeKbItems } from "@/lib/kbWrite.server";
 import { pingKbCompile } from "@/lib/kb.server";
 import { deskKbItemStates } from "@/lib/deskFeatureFlags";
 
 /** restamped false: saved, but the call facts could not be re-checked yet (the Desk says so instead of "on calls"). */
-export type KbActionResult = { ok: true; restamped?: boolean } | { ok: false; error: string };
+export type KbActionResult = { ok: true; restamped?: boolean; unchanged?: boolean } | { ok: false; error: string };
 
 async function ownerTenant(): Promise<{ id: string } | { error: string }> {
   const tenant = await getCurrentTenant();
@@ -55,6 +55,8 @@ export async function saveKbItemAction(draft: KbDraft): Promise<KbActionResult> 
   // Flag off: a client that still sends Paused / Not offered can't set it (the stored state is kept).
   const gated = gateDraftStatus(draft, prev, deskKbItemStates());
   const item = itemFromDraft(gated, prev, await categoryId(t.id, gated.category));
+  // Nothing changed: no write, no row_version bump, no mirror or compile.
+  if (prev && sameKbContent(item, prev)) return { ok: true, unchanged: true };
   return writeItems(t.id, [item]);
 }
 
