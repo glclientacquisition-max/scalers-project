@@ -38,15 +38,17 @@ export function TodayCalls({
   const total = split ? splitTotal(split) : 0;
   const showSplit = lineLive && split != null && total > 0;
   return (
-    <section aria-label="Calls today" className="mt-6">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-title text-ink">Calls today</h2>
-        {rows.length > 0 ? (
-          <Link href={callsHref({ purpose: "all" })} className={`text-body font-medium text-accent ${focusRingVisible}`}>
-            See all
-          </Link>
-        ) : null}
-      </div>
+    <section aria-label="Outcomes" className="mt-6">
+      {showSplit || rows.length > 0 ? (
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="font-display text-title text-ink">Outcomes</h2>
+          {rows.length > 0 ? (
+            <Link href={callsHref({ purpose: "all" })} className={`text-body font-medium text-accent ${focusRingVisible}`}>
+              See all
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
       {split == null ? (
         <p role="alert" className="mt-2 text-body text-attention">Could not load outcomes for today.</p>
       ) : null}
