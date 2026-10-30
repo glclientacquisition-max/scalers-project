@@ -220,8 +220,9 @@ describe("kb writers: Paste a list Replace (2026-10-28.3)", () => {
   });
   it("the action keeps append as the default and sends Replace through kb_import_items", () => {
     const a = read("dashboard/src/app/(desk)/settings/knowledge/actions.ts");
-    assert.match(a, /importKbPasteAction\(rows: KbPasteRow\[\], kind: KbKind, group: string, mode: "append" \| "replace" = "append"\)/);
-    assert.match(a, /mode === "replace" \? \{ replaceKind: k \} : \{\}/);
+    assert.match(a, /mode: "append" \| "replace" = "append",/);
+    assert.match(a, /const replace = mode === "replace";/);
+    assert.match(a, /replace \? \{ replaceKind: k \} : \{\}/);
     assert.match(read("dashboard/src/lib/kbWrite.server.ts"), /rpc\("kb_import_items", \{ p_tenant: tenantId, p_kind: opts\.replaceKind, p_items: clean, p_replace: true \}\)/);
   });
 });
