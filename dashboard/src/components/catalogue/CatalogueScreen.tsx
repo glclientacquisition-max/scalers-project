@@ -15,6 +15,7 @@ import { deskShiftClass } from "@/lib/deskMotion";
 import { cx } from "@/lib/cx";
 import { PHOTO_MAX_BASE64 } from "@/lib/importPhoto";
 import { IMPORT_FILE_ACCEPT, IMPORT_FILE_MAX_BYTES, delimitedToPasteText } from "@/lib/importCsv";
+import { FAQ_CHANGE_LINE, tickedFacts, type FactCard } from "@/lib/factCards";
 import { CHECK_FIX, CHECK_LABEL, ISSUE_LINE, type KbCategory, type KbDraft, type KbItem, type KbKind, type KbPasteRow, type KbReadiness, type KbSnapshotRow } from "@/lib/kbCore";
 import {
   PRICE_CHOICES,
@@ -55,9 +56,15 @@ export type CatalogueActions = {
   previewPaste: (text: string) => Promise<{ ok: true; rows: KbPasteRow[] } | { ok: false; error: string }>;
   importPaste: (rows: KbPasteRow[], kind: KbKind, group: string, mode?: "append" | "replace") => Promise<KbActionResult>;
   /** Add many from a photo or a website (DESK_IMPORT_PHOTO): both return paste lines for the same preview. */
-  photoToLines?: (mimeType: string, base64: string) => Promise<{ ok: true; text: string } | { ok: false; error: string }>;
-  websiteToLines?: (url: string) => Promise<{ ok: true; text: string } | { ok: false; error: string }>;
+  photoToLines?: (mimeType: string, base64: string) => Promise<LinesResult>;
+  websiteToLines?: (url: string) => Promise<LinesResult>;
+  /** Hours, policies, payment, areas and FAQs found in a paste or file (photo and website return them with the lines). */
+  findFacts?: (text: string) => Promise<{ ok: true; cards: FactCard[] } | { ok: false; error: string }>;
+  /** One found fact, saved through the action its own settings screen uses. */
+  saveFact?: (card: FactCard) => Promise<{ ok: true } | { ok: false; error: string }>;
 };
+
+type LinesResult = { ok: true; text: string; facts?: FactCard[] } | { ok: false; error: string };
 
 export type CatalogueScreenProps = {
   items: KbItem[];
@@ -796,6 +803,10 @@ function PasteSheet({
   const [kind, setKind] = useState<KbKind>(homeServices ? "service" : defaultKind);
   const [group, setGroup] = useState("");
   const [rows, setRows] = useState<KbPasteRow[] | null>(null);
+  // Found facts: one card each, ticked per lib/importFactDiff (owner-set and payment start unticked).
+  const [facts, setFacts] = useState<FactCard[]>([]);
+  const [ticks, setTicks] = useState<Record<string, boolean>>({});
+  const picked = tickedFacts(facts, ticks);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   // Replace my list: off by default; one tap shows the confirm with the count and names that go.
@@ -804,13 +815,21 @@ function PasteSheet({
   const removed = rows ? replaceRemovals(rows, existing, kind) : [];
   const clashes = rows ? replaceKindClashes(rows, existing, kind) : [];
   const confirm = replaceConfirmLine(removed, kind);
-  const preview = (body: string = text) =>
+  // Items and facts are read together; facts never block the item list (a failure is no cards).
+  const preview = (body: string = text, found?: FactCard[], factText?: string) =>
     start(async () => {
       setError(null);
       setReplacing(false);
-      const r = await actions.previewPaste(body);
-      if (!r.ok) setError(r.error);
-      else setRows(r.rows);
+      const findFacts = actions.findFacts;
+      const [r, cards] = await Promise.all([
+        body.trim() ? actions.previewPaste(body) : Promise.resolve({ ok: false as const, error: "No items found. Put one item on each line." }),
+        found ?? (findFacts ? findFacts(factText ?? body).then((x) => (x.ok ? x.cards : []), () => []) : Promise.resolve([] as FactCard[])),
+      ]);
+      setFacts(cards);
+      setTicks({});
+      if (r.ok) setRows(r.rows);
+      else if (cards.length) setRows([]);
+      else setError(r.error);
     });
   // A file is read here as plain text (no formulas run), turned into lines, then the same preview as a paste.
   const readFile = async (file: File | undefined) => {
@@ -818,17 +837,19 @@ function PasteSheet({
     setError(null);
     if (file.size > IMPORT_FILE_MAX_BYTES) return setError("That file is over 1 MB. Save a smaller part and try again.");
     if (!/\.(csv|tsv|txt)$/i.test(file.name)) return setError("Use a CSV, TSV or text file. From Excel: Save As, CSV.");
-    const lines = delimitedToPasteText(await file.text());
+    const raw = await file.text();
+    const lines = delimitedToPasteText(raw);
     if (!lines.trim()) return setError("We could not find any items in that file.");
     setFileName(file.name);
     setText(lines);
-    preview(lines);
+    // Facts read the file as written, so a text file with hours or Q&A is not cut into item lines first.
+    preview(lines, undefined, raw);
   };
   // Photo or website: the server reads it into lines; the owner checks the same preview before anything is saved.
-  const fromLines = (r: { ok: true; text: string } | { ok: false; error: string }) => {
+  const fromLines = (r: LinesResult) => {
     if (!r.ok) return setError(r.error);
     setText(r.text);
-    preview(r.text);
+    preview(r.text, r.facts ?? []);
   };
   const readPhoto = (file: File | undefined) =>
     start(async () => {
@@ -849,18 +870,36 @@ function PasteSheet({
   const add = (mode: "append" | "replace") =>
     start(async () => {
       if (!summary) return;
-      const r = await actions.importPaste(summary.ready, kind, group, mode);
-      if (!r.ok) setError(r.error);
-      else {
+      if (summary.ready.length) {
+        const r = await actions.importPaste(summary.ready, kind, group, mode);
+        if (!r.ok) return setError(r.error);
         const when = r.restamped === false ? "Calls will use it after the next check." : "On calls within a minute.";
         notify(
           mode === "replace"
             ? `Your list is now these ${summary.ready.length}${removed.length ? `. Removed ${removed.length}` : ""}. ${when}`
             : `${[summary.adds ? `Added ${summary.adds}` : "", summary.updates ? `updated ${summary.updates}` : ""].filter(Boolean).join(", ") || "Saved"}. ${when}`.replace(/^updated/, "Updated"),
         );
-        onSaved();
       }
+      // Each ticked fact through its own save, one after another so two Policies cards never race.
+      if (mode === "append" && picked.length && actions.saveFact) {
+        const failed: string[] = [];
+        for (const card of picked) {
+          const r = await actions.saveFact(card).catch(() => ({ ok: false as const, error: "" }));
+          if (!r.ok) failed.push(card.kind === "faq" ? `"${card.question}"` : card.label);
+        }
+        const saved = picked.length - failed.length;
+        if (saved) notify(`Saved ${saved} ${saved === 1 ? "detail" : "details"} to your settings.`);
+        if (failed.length) notify(`Could not save ${failed.join(", ")}. Set ${failed.length === 1 ? "it" : "them"} in Settings.`, { tone: "error" });
+      }
+      onSaved();
     });
+  const addLabel = !summary
+    ? ""
+    : summary.ready.length && picked.length
+      ? `Add ${summary.ready.length} and ${picked.length} ${picked.length === 1 ? "detail" : "details"}`
+      : summary.ready.length
+        ? `Add ${summary.ready.length}`
+        : `Save ${picked.length} ${picked.length === 1 ? "detail" : "details"}`;
   return (
     <Sheet
       open
@@ -881,11 +920,17 @@ function PasteSheet({
             </>
           ) : (
             <>
-              <Button variant="ghost" onClick={() => setRows(null)}>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setRows(null);
+                  setFacts([]);
+                }}
+              >
                 Back
               </Button>
-              <Button variant="primary" onClick={() => add("append")} pending={pending} disabled={!summary.ready.length}>
-                {`Add ${summary.ready.length}`}
+              <Button variant="primary" onClick={() => add("append")} pending={pending} disabled={!summary.ready.length && !picked.length} data-add-many-add="">
+                {addLabel}
               </Button>
             </>
           )
@@ -1002,11 +1047,12 @@ function PasteSheet({
                 </p>
               ) : null}
             </div>
-          ) : existing.some((e) => e.kind === kind && e.status !== "hidden") ? (
+          ) : rows.length && existing.some((e) => e.kind === kind && e.status !== "hidden") ? (
             <button type="button" onClick={() => setReplacing(true)} className="min-h-11 text-meta font-semibold text-accent" data-replace-start="">
               Replace my list instead
             </button>
           ) : null}
+          {rows.length ? (
           <ul className="divide-y divide-hairline rounded-xl border border-hairline" data-paste-preview="">
             {rows.map((r) => (
               <li key={r.line} className="flex min-h-12 items-center gap-3 px-3 py-2" data-paste-row={r.error ? "skip" : r.match_id ? "update" : "new"}>
@@ -1015,9 +1061,53 @@ function PasteSheet({
               </li>
             ))}
           </ul>
+          ) : null}
+          {facts.length && !replacing ? <FoundFacts cards={facts} ticks={ticks} onTick={(id, on) => setTicks((t) => ({ ...t, [id]: on }))} /> : null}
           </>
         )}
       </div>
     </Sheet>
+  );
+}
+
+/** What a found fact card says under Now and Found. */
+function factNote(card: FactCard): string | null {
+  if (card.kind === "payment") return "Check the number before you save. Payment is never ticked for you.";
+  if (card.ownerSet) return "You set this yourself. Tick only to replace it.";
+  return null;
+}
+
+/** Add many, found facts: one card per fact, Now next to Found, each with its own tick. */
+function FoundFacts({ cards, ticks, onTick }: { cards: FactCard[]; ticks: Record<string, boolean>; onTick: (id: string, on: boolean) => void }) {
+  return (
+    <section className="space-y-2" data-found-facts="" data-found-count={cards.length}>
+      <div>
+        <h3 className="text-body font-semibold text-ink">Also found</h3>
+        <p className="text-meta text-ink-2">Each one you tick saves to its own setting. Nothing else changes.</p>
+      </div>
+      <ul className="divide-y divide-hairline rounded-xl border border-hairline">
+        {cards.map((c) => {
+          const on = ticks[c.id] ?? c.on;
+          const note = factNote(c);
+          const title = c.kind === "faq" ? c.question : c.label;
+          return (
+            <li key={c.id} className="flex items-start gap-3 px-3 py-2" data-fact-card={c.kind} data-fact-on={on ? "1" : "0"}>
+              <div className="min-w-0 flex-1 space-y-0.5">
+                {c.kind === "faq" ? <p className="text-meta text-ink-2">{`FAQ · ${FAQ_CHANGE_LINE[c.change]}`}</p> : null}
+                <p className="break-words text-body font-semibold text-ink">{title}</p>
+                <p className="break-words text-meta text-ink-2">
+                  <span className="font-semibold">Now:</span> {c.now}
+                </p>
+                <p className="break-words text-meta text-ink">
+                  <span className="font-semibold">Found:</span> {c.found}
+                </p>
+                {note ? <p className="text-meta text-attention">{note}</p> : null}
+              </div>
+              <Switch label={`Save ${title}`} checked={on} onCheckedChange={(v) => onTick(c.id, v)} />
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
