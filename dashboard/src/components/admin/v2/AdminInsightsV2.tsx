@@ -68,7 +68,12 @@ export function AdminInsightsV2({ data }: { data: InsightsData }) {
       />
 
       {data.calls === 0 ? (
-        <EmptyState title={`No reviewed calls in the last ${data.days} days.`} />
+        <EmptyState
+          title={`No reviewed calls in the last ${data.days} days.`}
+          action={data.days < 90 ? (
+            <a href={`?days=${data.days === 7 ? 30 : 90}`} className="inline-flex min-h-11 items-center text-ops-body font-medium text-accent">Wider range</a>
+          ) : undefined}
+        />
       ) : (
         <>
           <GroupTable groups={data.groups} total={data.calls} label="All businesses by reason" />
