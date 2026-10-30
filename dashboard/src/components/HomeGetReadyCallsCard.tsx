@@ -57,6 +57,14 @@ export function HomeGetReadyCallsCard({
           </span>
         }
       >
+        <div className="px-4 pb-2" aria-hidden="true">
+          <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
+            <div
+              className="h-full w-full origin-left bg-accent"
+              style={{ transform: `scaleX(${total ? readyCount / total : 0})` }}
+            />
+          </div>
+        </div>
         <ul className="divide-y divide-hairline">
           {items.map((item) => {
             const confirmCheck = confirmCheckForReadyItem(item, checks);
@@ -69,6 +77,9 @@ export function HomeGetReadyCallsCard({
                 className="flex min-h-12 flex-col gap-2 px-4 py-2 sm:flex-row sm:items-center sm:gap-3"
               >
                 <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
+                  <span className={item.complete ? "text-meta text-ink-3" : canEdit ? "text-meta font-semibold text-ink" : "text-meta text-ink-2"}>
+                    {item.complete ? "Done" : canEdit ? "To do" : "Cannot start yet"}
+                  </span>
                   <span
                     className={[
                       "flex size-6 shrink-0 items-center justify-center rounded-full",
