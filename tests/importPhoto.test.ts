@@ -47,3 +47,12 @@ test("server actions are flag-gated and use the hardened fetch", () => {
   assert.match(ui, /data-add-many-photo/);
   assert.match(ui, /data-add-many-site/);
 });
+
+test("every Add many source keeps its primary action in the sticky sheet footer", () => {
+  const ui = fs.readFileSync(path.join(import.meta.dirname, "..", "dashboard/src/components/catalogue/CatalogueScreen.tsx"), "utf8");
+  assert.match(ui, /data-add-many-pick=""/);
+  assert.match(ui, /\{source === "file" \? "Choose a file" : "Choose a photo"\}/);
+  assert.match(ui, /ref=\{fileRef\}/);
+  assert.match(ui, /ref=\{photoRef\}/);
+  assert.doesNotMatch(ui, /source === "file" \|\| source === "photo" \? null/);
+});
