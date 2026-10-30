@@ -12,6 +12,7 @@ import { catalogImportPriceHintText } from "@/components/settings/catalog/Catalo
 import type { IngestDraft } from "@/lib/ingest/extract";
 import { FAQ_ANSWER_MAX, FAQ_QUESTION_MAX } from "@/lib/faqs";
 import { formatHoursForCompiler } from "@/lib/hoursSchedule";
+import { FAQ_DIFF_LINE, diffHint, faqDiffs, hoursDiff, locationsDiff, policyDiffs } from "@/lib/importFactDiff";
 import {
   applyIngestAction,
   extractKnowledgeAction,
@@ -86,7 +87,8 @@ function serviceCsvPlaceholder(vertical: string | null | undefined): string {
   return "name,price\nHome cleaning,2500 KES\nSofa cleaning,1500 KES";
 }
 
-function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
+/** importFacts (staging flag DESK_IMPORT_FACTS): each fact shows what calls use now next to what the import found. */
+function KnowledgeIngestPanelInner({ tenant, importFacts = false }: { tenant: TenantRow; importFacts?: boolean }) {
   const router = useRouter();
   const knowledgePasteExample = useMountedPoolPick(
     placeholderPool(KNOWLEDGE_PASTE_POOLS, parseVertical(tenant.vertical))
@@ -143,6 +145,7 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
     () => [...selectedFaqs].sort((a, b) => a - b).join(","),
     [selectedFaqs]
   );
+  const faqDiff = useMemo(() => (importFacts && draft ? faqDiffs(tenant, draft) : []), [importFacts, draft, tenant]);
   const nothingSelected =
     selectedServices.size === 0 &&
     selectedFaqs.size === 0 &&
@@ -285,7 +288,7 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
                 {draft.locations?.length ? (
                   <SettingsRow
                     label="Location"
-                    hint={draft.locations
+                    hint={importFacts && locationsDiff(tenant, draft) ? diffHint(locationsDiff(tenant, draft)!) : draft.locations
                       .map((loc) =>
                         [loc.label, loc.address, loc.landmark, loc.coverage_notes]
                           .filter(Boolean)
@@ -305,6 +308,7 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
                   <SettingsRow
                     label="Hours"
                     hint={
+                      (importFacts && hoursDiff(tenant, draft) ? diffHint(hoursDiff(tenant, draft)!) : "") ||
                       draft.hoursNotes?.trim() ||
                       formatHoursForCompiler(draft.hoursSchedule ?? null).trim() ||
                       undefined
@@ -324,7 +328,7 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
                 ) ? (
                   <SettingsRow
                     label="Policies"
-                    hint={Object.entries(draft.policies)
+                    hint={importFacts ? policyDiffs(tenant, draft).map((x) => `${x.label}. ${diffHint(x.diff)}`).join(" · ") : Object.entries(draft.policies)
                       .filter(([, v]) => String(v || "").trim())
                       .map(([k, v]) => `${k}: ${v}`)
                       .join(" · ")}
@@ -392,7 +396,14 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
                 {draft.faqs.map((f, i) => (
                   <div key={`faq-${i}`} className="space-y-2 px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-body font-medium text-ink">FAQ {i + 1}</p>
+                      <p className="text-body font-medium text-ink">
+                        FAQ {i + 1}
+                        {importFacts ? (
+                          <span className={faqDiff[i] === "changes" ? "ms-2 text-meta font-semibold text-attention" : "ms-2 text-meta text-ink-2"} data-faq-diff={faqDiff[i]}>
+                            {FAQ_DIFF_LINE[faqDiff[i] ?? "new"]}
+                          </span>
+                        ) : null}
+                      </p>
                       <ToolSwitch
                         checked={selectedFaqs.has(i)}
                         onChange={() => toggle(selectedFaqs, i, setSelectedFaqs)}

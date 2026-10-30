@@ -4,6 +4,11 @@ import { formatServiceAreasForCompiler, normalizeServiceAreas, serviceAreasFromC
 import { bustTenantCache } from "@/lib/tenantCache";
 import { memberDenied } from "@/lib/requireMember";
 import { importCatalogueToKb } from "@/lib/kbWrite.server";
+import { deskImportFacts } from "@/lib/deskFeatureFlags";
+import { factHashModeFromEnv } from "@/lib/tenantFieldProvenance";
+import { ownerConfirmPlan, readSavedFactRow } from "@/lib/ownerAttestFields";
+import { planFactConfirm } from "@/lib/factConfirm";
+import { normalizeFactRow } from "@/lib/factRowNormalize";
 
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
@@ -451,6 +456,11 @@ export async function applyIngestAction(
     patch.business_policies = nextPolicies;
   }
 
+  // DESK_IMPORT_FACTS: the owner reviewed each fact against what calls use now, so the ticked facts are confirmed
+  // as saved (hash mode). Read the stored row first; only paths that really changed get confirmed.
+  const confirmFacts = deskImportFacts() && factHashModeFromEnv();
+  const storedBefore = confirmFacts ? await readSavedFactRow(workspace.client, tenant.id) : null;
+
   let { error } = await workspace.client
     .from("tenants")
     .update(patch)
@@ -465,6 +475,25 @@ export async function applyIngestAction(
 
   if (error) {
     return ownerSaveFailed("ingest", error.message);
+  }
+  if (confirmFacts && storedBefore) {
+    const scopes = [
+      includeHours ? "hours" : "",
+      draftLocations.length > 0 ? "locations" : "",
+      policiesFilled ? "policies" : "",
+      merged.touched.faqs ? "faqs" : "",
+    ].filter(Boolean);
+    try {
+      const saved = await readSavedFactRow(workspace.client, tenant.id);
+      if (saved) {
+        for (const scope of scopes) {
+          await ownerConfirmPlan(tenant.id, planFactConfirm({ scope, before: storedBefore, after: saved, normalize: normalizeFactRow }));
+        }
+      }
+    } catch (err) {
+      // The import is saved; an unconfirmed fact only reads as "Check this".
+      console.warn("[ingest] fact confirm skipped:", err instanceof Error ? err.message : "");
+    }
   }
   // Owner ticked these rows: re-stamp what was added (restamp), and report the KB's own counts.
   const kb = importedServices
