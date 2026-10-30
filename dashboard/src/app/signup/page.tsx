@@ -1,12 +1,18 @@
 import { AppearanceFooter } from "@/components/ThemePicker";
 import Link from "next/link";
+import { Suspense } from "react";
 import { BrandWordmark } from "@/components/brand/BrandMark";
 import { marketingHomeHref } from "@/lib/adminHost";
 import { getSignupMode, signupCtaLabel } from "@/lib/signupMode";
+import { accessPlanFromParam } from "@/lib/accessPlan";
 import { RequestAccessForm } from "./RequestAccessForm";
 import { SignupForm } from "./SignupForm";
 
-export default function SignupPage() {
+export default function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ plan?: string | string[] }>;
+}) {
   const requestMode = getSignupMode() === "request";
   const cta = signupCtaLabel();
 
@@ -20,7 +26,9 @@ export default function SignupPage() {
             <p className="mt-3 text-body text-ink-2">
               Tell us about your business. We&apos;ll email you when your workspace is ready.
             </p>
-            <RequestAccessForm />
+            <Suspense fallback={<RequestAccessForm />}>
+              <PlanRequestForm searchParams={searchParams} />
+            </Suspense>
           </>
         ) : (
           <SignupForm />
@@ -37,4 +45,10 @@ export default function SignupPage() {
       </div>
     </main>
   );
+}
+
+/** Plan picked on /pricing (?plan=) rides along as a hidden field. */
+async function PlanRequestForm({ searchParams }: { searchParams: Promise<{ plan?: string | string[] }> }) {
+  const plan = accessPlanFromParam((await searchParams).plan);
+  return <RequestAccessForm plan={plan} />;
 }

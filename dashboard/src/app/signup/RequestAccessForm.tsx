@@ -3,11 +3,12 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { requestAccessAction, type SignupState } from "./actions";
+import { accessPlanLabel } from "@/lib/accessPlan";
 import { btnPrimary, deskFieldClass, pendingSpinnerClass } from "@/components/ui/deskChrome";
 
 const initial: SignupState = {};
 
-export function RequestAccessForm() {
+export function RequestAccessForm({ plan = null }: { plan?: string | null }) {
   const [state, formAction, pending] = useActionState(requestAccessAction, initial);
 
   if (state.submitted) {
@@ -32,6 +33,17 @@ export function RequestAccessForm() {
       action={formAction}
       className="mt-8 space-y-4 rounded-panel border border-line bg-surface p-5 sm:p-6"
     >
+      {plan ? (
+        <p className="flex flex-wrap items-center justify-between gap-2 text-sm text-ink-2" data-access-plan={plan}>
+          <span>
+            Plan: <span className="font-medium text-ink">{accessPlanLabel(plan)}</span>
+          </span>
+          <a href="/pricing" className="inline-flex min-h-11 items-center font-medium text-accent-deep hover:underline">
+            Change
+          </a>
+          <input type="hidden" name="plan" value={plan} />
+        </p>
+      ) : null}
       <div className="absolute -left-[9999px] h-px w-px overflow-hidden" aria-hidden>
         <label htmlFor="company_website">Company website</label>
         <input

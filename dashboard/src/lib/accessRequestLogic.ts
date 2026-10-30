@@ -1,3 +1,4 @@
+import { accessPlanFromParam, withPlanPrefix } from "./accessPlan";
 import { normalizeKenyaPhone } from "./kenyaPhone";
 
 export type AccessRequestFields = {
@@ -40,7 +41,7 @@ export function parseAccessRequestForm(formData: FormData): AccessRequestParseRe
 
   return {
     ok: true,
-    fields: { name, business, phone, email, about },
+    fields: { name, business, phone, email, about: withPlanPrefix(about, accessPlanFromParam(formData.get("plan"))) },
   };
 }
 

@@ -15,10 +15,13 @@ it("landing page does not prefetch app routes with next/link", () => {
   assert.doesNotMatch(src, /from "next\/link"/);
   assert.match(src, /appEntryHref\("\/login"\)/);
 });
-it("/pricing exists, says Free beta, shows no KES prices", () => {
+it("/pricing shows real packages from billing_packages and no free-beta copy", () => {
   const p = "dashboard/src/app/pricing/page.tsx";
   assert.ok(existsSync(p));
   const src = readFileSync(p, "utf8");
-  assert.match(src, /Free beta/);
-  assert.doesNotMatch(src, /KES|KSh|\d{3,}/);
+  assert.match(src, /loadPublicPackageOffers\(\)/);
+  assert.match(src, /<PackagePrices board=\{board\} \/>/);
+  assert.doesNotMatch(src, /free/i);
+  // Prices are never hard-coded on the page.
+  assert.doesNotMatch(src, /KSh \d|KES \d|\d{1,3},\d{3}/);
 });

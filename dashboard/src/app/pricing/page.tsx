@@ -1,27 +1,51 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { BrandWordmark } from "@/components/brand/BrandMark";
 import { appEntryHref, marketingHomeHref } from "@/lib/adminHost";
-import { btnPrimary } from "@/components/ui/deskChrome";
+import { loadPublicPackageOffers } from "@/lib/packageCatalog";
+import { PackagePrices } from "@/components/marketing/PackagePrices";
+import { AppearanceFooter } from "@/components/ThemePicker";
+import { marketingFontClass } from "@/app/marketingFonts";
 
 export const metadata: Metadata = {
   title: "Pricing · Scalers",
-  description: "Scalers is in free beta.",
+  description: "Scalers packages in KES, plus our Beta program. Request access to start.",
 };
 
-/** Package prices stay off public pages until pricing is ready (see LandingPage). */
+/** Public prices from billing_packages (read only). Beta program is the featured plan. */
 export default function PricingPage() {
   return (
-    <main className="flex min-h-dvh items-center justify-center px-6 py-16">
-      <div className="w-full max-w-md">
-        <BrandWordmark href={marketingHomeHref()} context="Pricing" variant="lockup" priority />
-        <h1 className="mt-8 font-display text-page tracking-tight text-ink">Free beta</h1>
-        <p className="mt-3 leading-relaxed text-ink-2">
-          Scalers is free while we&apos;re in beta. We&apos;ll tell you before any charges start.
-        </p>
-        <a href={appEntryHref("/signup")} className={`${btnPrimary} mt-6 inline-flex`}>
-          Sign up
-        </a>
-      </div>
-    </main>
+    <div className={`${marketingFontClass} contents`}>
+      <main className="landing-scope min-h-dvh bg-canvas text-ink" data-pricing="">
+        <header className="mx-auto flex max-w-desk items-center justify-between gap-2 px-5 pt-[max(1rem,env(safe-area-inset-top))] sm:px-8">
+          <BrandWordmark href={marketingHomeHref()} context="Pricing" variant="lockup" priority />
+          <a
+            href={appEntryHref("/login")}
+            className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-ink-2 hover:text-ink focus-visible:outline-none focus-visible:shadow-focus"
+          >
+            Sign in
+          </a>
+        </header>
+        <section className="mx-auto max-w-desk px-5 pb-12 pt-8 sm:px-8">
+          <h1 className="font-display text-[2rem] leading-tight tracking-tight text-ink sm:text-4xl">Pricing</h1>
+          <p className="mt-3 max-w-xl text-base leading-relaxed text-ink-2">
+            Pick a package, or join the Beta program. Each package is a monthly price with minutes and messages included.
+          </p>
+          <div className="mt-8">
+            <Suspense fallback={<div className="h-96 rounded-2xl bg-surface-2" aria-hidden="true" />}>
+              <Plans />
+            </Suspense>
+          </div>
+        </section>
+        <footer className="flex justify-center pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+          <AppearanceFooter />
+        </footer>
+      </main>
+    </div>
   );
+}
+
+async function Plans() {
+  const board = await loadPublicPackageOffers();
+  return <PackagePrices board={board} />;
 }
