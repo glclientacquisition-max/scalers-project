@@ -9,9 +9,9 @@ import Link from "next/link";
 const STEPS: readonly string[] = ["Request access", "Add your services and hours", "Forward your calls"];
 
 const QUESTIONS: ReadonlyArray<[string, string]> = [
-  ["What do callers hear?", "A calm voice that answers for your business, using only your prices, hours and answers."],
-  ["What if it doesn't know?", "It tells the caller you'll call back. It never makes up a price."],
-  ["Who sees my calls?", "You, and the teammates you add to your Desk."],
+  ["What do callers hear?", "A voice with your prices, hours and answers."],
+  ["What if it doesn't know?", "It says you'll call back. It never invents a price."],
+  ["Who sees my calls?", "You, and teammates on your Desk."],
 ];
 
 const h2 = "font-display text-2xl tracking-tight text-ink sm:text-3xl";
@@ -46,7 +46,7 @@ export function LandingReach() {
           <h2 id="landing-reach" className={h2}>
             What reaches you
           </h2>
-          <p className="mt-3 max-w-md text-base leading-relaxed text-ink-2">An SMS with the details. The call waits in your inbox.</p>
+          <p className="mt-3 max-w-md text-base leading-relaxed text-ink-2">SMS, WhatsApp, and email. The call is in your inbox.</p>
         </div>
         <div className={`min-w-0 overflow-hidden ${card}`}>
           <Image
@@ -96,7 +96,7 @@ export function LandingKeepNumber() {
           Keep your number
         </h2>
         <p className="mt-3 max-w-xl text-base leading-relaxed text-ink-2">
-          Forward the calls you miss. To stop, dial <span className="font-semibold tabular-nums text-ink">##002#</span>.
+          Forward missed calls. To stop, dial <span className="font-semibold tabular-nums text-ink">##002#</span>.
         </p>
       </div>
     </section>
@@ -110,7 +110,7 @@ export function LandingPackages() {
         <h2 id="landing-packages" className={h2}>
           Pricing
         </h2>
-        <p className="mt-3 max-w-xl text-base leading-relaxed text-ink-2">Monthly packages in KES, with minutes included.</p>
+        <p className="mt-3 max-w-xl text-base leading-relaxed text-ink-2">Monthly packages in KES.</p>
         <Link
           href="/pricing"
           className="mt-2 inline-flex min-h-11 items-center text-base font-semibold text-[var(--landing-cta)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:shadow-focus"

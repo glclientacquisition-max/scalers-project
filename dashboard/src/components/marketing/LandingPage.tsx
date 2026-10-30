@@ -85,7 +85,7 @@ export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?:
           </div>
           <div className="relative min-w-0">
             <div className="landing-warm-orb" aria-hidden data-landing-warm="" />
-            <div className="relative">
+            <div className="relative z-10">
               <HeroCall glass ask={copy.ask} />
             </div>
           </div>

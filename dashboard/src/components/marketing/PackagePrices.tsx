@@ -37,8 +37,8 @@ function Pick({
   const on = picked === value;
   return (
     <label
-      className={`${cardBase} ${on ? "shadow-lift" : "border-line"}`}
-      style={on ? { borderColor: "var(--landing-cta)" } : undefined}
+      className={`${cardBase} ${on || featured ? "shadow-lift" : "border-line"}`}
+      style={on || featured ? { borderColor: "var(--landing-cta)" } : undefined}
       data-plan-card={value}
       data-featured={featured ? "" : undefined}
     >
@@ -59,7 +59,7 @@ function PackageCard({ pack }: { pack: PublicPackageOffer }) {
   return (
     <>
       <h3 className="font-display text-title text-ink">{pack.name}</h3>
-      <p className="mt-3 font-display text-3xl tracking-tight tabular-nums text-ink">
+      <p className="mt-3 font-display text-4xl tracking-tight tabular-nums text-ink">
         {kes(pack.monthlyPriceKes)}
         <span className="ms-1 [font-family:var(--font-body)] text-sm font-normal tracking-normal text-ink-2">a month</span>
       </p>
@@ -75,11 +75,12 @@ function PackageCard({ pack }: { pack: PublicPackageOffer }) {
   );
 }
 
-/** True facts only (billing code as of 30 Oct): packages + on-demand, per-second metering, monthly reset. */
+/** Objections the billing code can answer: overage, period reset, alerts, keeping the number. */
 const BILLING_FAQ: ReadonlyArray<[string, string]> = [
-  ["What is in a package?", "A monthly price with call minutes and messages included."],
-  ["What if I use more?", "Past what's included, you pay on demand at the rates above. Calls are metered by the second."],
-  ["Do unused minutes carry over?", "No. Included minutes end with each billing period."],
+  ["What if I use more?", "You pay the on-demand rates. Calls are billed by the second."],
+  ["Do unused minutes carry over?", "No. Included amounts reset each billing period."],
+  ["How will I hear about a call?", "By SMS, WhatsApp, and email. The call is in your inbox."],
+  ["Can I keep my number?", "Forward missed calls. To stop, dial ##002#."],
 ];
 
 /** Pick a plan, then Request access with it. Beta program is featured and picked first. Prices come from billing_packages. */
@@ -88,6 +89,7 @@ export function PackagePrices({ board }: { board: PublicPackageBoard }) {
   const packs = board.packages.filter((pack) => pack.monthlyPriceKes > 0).slice(0, MAX_PUBLIC_PACKAGES);
   const rows = usageRows(board);
   const example = workedExample(board);
+  const pickedName = picked === BETA_PLAN ? BETA_PROGRAM.name : packs.find((pack) => pack.sku === picked)?.name ?? BETA_PROGRAM.name;
   return (
     <div>
       <fieldset>
@@ -130,6 +132,7 @@ export function PackagePrices({ board }: { board: PublicPackageBoard }) {
           <h2 id="pricing-usage" className="font-display text-xl tracking-tight text-ink">
             On demand
           </h2>
+          <p className="mt-2 text-base text-ink-2">Past the included amounts.</p>
           <dl className="mt-3 rounded-2xl border border-hairline bg-surface px-5">
             {rows.map(([label, value]) => (
               <div key={label} className="flex items-baseline justify-between gap-3 border-b border-line py-3 last:border-0">
@@ -161,6 +164,9 @@ export function PackagePrices({ board }: { board: PublicPackageBoard }) {
       </section>
 
       <div className="sticky bottom-0 z-10 -mx-5 mt-10 border-t border-line bg-canvas/95 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+        <p className="mb-2 text-center text-sm font-medium text-ink sm:text-start" data-pricing-picked="">
+          {pickedName}
+        </p>
         <LandingCta href={`/signup?plan=${encodeURIComponent(picked)}`} wide />
       </div>
     </div>

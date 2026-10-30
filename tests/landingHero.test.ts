@@ -39,12 +39,31 @@ test("reduced motion shows the finished call card; marketing fonts are DM Sans +
   assert.match(read("app/page.tsx"), /marketingFontClass/);
 });
 
-test("one soft orange orb behind the hero card; orange nowhere else; stops with reduced motion", () => {
+test("orange appears only in the hero glow, strong enough to read, and stops with reduced motion", () => {
   assert.match(landing, /className="landing-warm-orb" aria-hidden/);
-  assert.equal((css.match(/rgb\(255 122 26/g) || []).length, 2);
-  assert.doesNotMatch(landing + cta, /(bg|text|border|from|via|to)-(orange|amber)|#ff7a1a|ember/i);
+  const orbAt = css.indexOf(".landing-warm-orb {");
+  const orbEnd = css.indexOf("@keyframes landing-warm");
+  const orb = css.slice(orbAt, orbEnd);
+  assert.ok(orbAt > 0 && orbEnd > orbAt);
+  assert.match(orb, /--landing-warm:\s*255 122 26;/);
+  assert.match(orb, /rgb\(var\(--landing-warm\) \/ 0\.9[0-9]\)/);
+  assert.doesNotMatch(orb, /filter:\s*blur/);
+  const outside = css.slice(0, orbAt) + css.slice(orbEnd);
+  assert.doesNotMatch(outside, /--landing-warm|255 122 26|#ff7a1a/i);
+  const marketing = [
+    landing,
+    cta,
+    read("components/marketing/LandingSections.tsx"),
+    read("components/marketing/LandingStory.tsx"),
+    read("components/marketing/PackagePrices.tsx"),
+    read("components/marketing/landingCopy.ts"),
+    read("app/pricing/page.tsx"),
+    read("app/cleaning/page.tsx"),
+  ].join("\n");
+  assert.doesNotMatch(marketing, /--landing-warm|255 122 26|#ff7a1a|(bg|text|border|from|via|to)-(orange|amber)|ember/i);
   assert.match(css, /\.landing-cta-on-dark \{ background: #ffffff; color: #0a192f; \}/);
   assert.match(css, /\.landing-warm-orb, \.landing-drift \{ animation: none; \}/);
+  assert.match(css, /\.landing-warm-orb,\n {2}\.desk-live-ping/);
 });
 
 test("premium backdrop is CSS-only orbs behind the hero card and stops with reduced motion", () => {

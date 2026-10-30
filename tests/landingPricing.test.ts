@@ -42,8 +42,12 @@ test("pricing v2: at most 3 live packages, rates and the worked example from the
   assert.match(ui, /MAX_PUBLIC_PACKAGES = 3/);
   assert.match(ui, /\.slice\(0, MAX_PUBLIC_PACKAGES\)/);
   assert.match(ui, /className="landing-orbs" aria-hidden data-pricing-orbs=""/);
+  const page = read("app/pricing/page.tsx");
+  assert.match(page, /data-pricing-hero=/);
+  assert.match(page, /from-brand-900 via-brand-800\/95 to-brand-700\/80/);
+  assert.doesNotMatch(page, /landing-warm|--landing-warm/);
   // No prepaid wallet, M-Pesa, annual toggle or VAT claim on the public page.
-  assert.doesNotMatch(ui + read("app/pricing/page.tsx"), /wallet|top.?up|m-?pesa|annual|yearly|vat/i);
+  assert.doesNotMatch(ui + page, /wallet|top.?up|m-?pesa|annual|yearly|vat/i);
   const { workedExample, usageRows } = await import("../dashboard/src/components/marketing/pricingMath.ts");
   const board = { discountPercent: 0, inboundKesPerMinute: 6, outboundKesPerMinute: 9, smsKes: 1, emailKes: 0, whatsappKes: 2, packages: [] };
   assert.equal(workedExample(board), "KES 18");

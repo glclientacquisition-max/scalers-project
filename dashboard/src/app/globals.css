@@ -541,21 +541,29 @@ h3,
   72%, 100% { opacity: 1; transform: none; }
 }
 /*
- * Dark hero (30 Oct v3, Alvin): main's navy plane. White CTA with navy text (16.9:1), hover #EAF6FF. One soft orange
- * orb behind the call card for warmth; orange is used nowhere else (no buttons, no text). Static blur, very slow drift.
+ * Dark hero (30 Oct v3): navy plane, white CTA with navy text (16.9:1), hover #EAF6FF.
+ * One warm light leak behind and around the frosted call card. Orange is this glow only:
+ * no buttons, no text. Radial gradients, no filter blur. A slow transform drift; none with reduced motion.
  */
 .landing-cta-on-dark { background: #ffffff; color: #0a192f; }
 .landing-cta-on-dark:hover { background: #eaf6ff; }
 .landing-warm-orb {
-  position: absolute; left: 62%; top: 58%; z-index: 0; width: min(150%, 680px); aspect-ratio: 1;
-  border-radius: 9999px; pointer-events: none; transform: translate(-50%, -50%);
-  background: radial-gradient(closest-side, rgb(255 122 26 / 0.34), rgb(255 122 26 / 0.12) 62%, transparent);
-  filter: blur(56px);
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  /* Bigger than the card so the leak sits in the padding around it, and a pool shows through the frost. */
+  inset: -10% -6% -14%;
+  border-radius: 9999px;
+  --landing-warm: 255 122 26;
+  background:
+    radial-gradient(ellipse 78% 62% at 50% 54%, rgb(var(--landing-warm) / 0.72), transparent 68%),
+    radial-gradient(ellipse 72% 26% at 50% 0%, rgb(var(--landing-warm) / 0.92), transparent 72%),
+    radial-gradient(ellipse 80% 30% at 50% 100%, rgb(var(--landing-warm) / 0.95), transparent 74%);
   animation: landing-warm 40s ease-in-out alternate infinite;
 }
 @keyframes landing-warm {
-  from { transform: translate(-50%, -50%) scale(1); }
-  to { transform: translate(-47%, -52%) scale(1.06); }
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(0, -1.5%, 0) scale(1.04); }
 }
 /* Reduced motion: the finished state, no movement. */
 @media (prefers-reduced-motion: reduce) {
@@ -708,6 +716,7 @@ h3,
 
   .landing-rise,
   .landing-drift,
+  .landing-warm-orb,
   .desk-live-ping,
   .desk-just-landed::after,
   .hero-call,

@@ -7,8 +7,8 @@ export const BETA_PLAN = "beta";
 /** Beta program copy (one place, easy to edit). Terms are Alvin's to confirm: no "free", no trial. */
 export const BETA_PROGRAM = {
   name: "Beta program",
-  line: "Join the first group of businesses on Scalers. We review each request by hand and agree your terms with you before you start.",
-  points: ["Set up with us, step by step", "Your prices, hours and answers", "Keep your number"],
+  line: "We review each request and agree terms before you start.",
+  points: ["We set it up with you", "Your prices, hours and answers", "Keep your number"],
 } as const;
 
 const SKU = /^[a-z0-9_-]{1,32}$/;
