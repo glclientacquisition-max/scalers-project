@@ -8,9 +8,10 @@ import { buildFactCards, mightHaveFacts } from "@/lib/importFactDiff";
 const DEV_FACTS = buildFactCards({
   tenant: { business_hours: "Mon-Sat 8am-6pm", hours_schedule: null, business_locations: [], business_policies: { deposit: "50% to book", provenance: { deposit: { source: "owner" } } }, faqs: [{ question: "Do you bring soap?", answer: "Yes.", source: "owner" }] } as never,
   draft: {
+    hoursNotes: "Mon-Fri 8 to 6, Sat half day, Sun closed",
     hoursSchedule: { timezone: "Africa/Nairobi", location: "", days: { mon: { open: "07:00", close: "19:00" }, tue: { open: "07:00", close: "19:00" }, wed: { open: "07:00", close: "19:00" }, thu: { open: "07:00", close: "19:00" }, fri: { open: "07:00", close: "19:00" }, sat: { open: "08:00", close: "14:00" }, sun: null } } as never,
     policies: { deposit: "30% to book", delivery: "Free within 5 km", payment: "M-Pesa till 000000" } as never,
-    locations: [{ label: "Main", address: "", landmark: "", directions: "", coverage_notes: "Kilimani, Westlands and Karen" }] as never,
+    locations: [{ label: "Main", address: "Ngong Road, Kilimani", landmark: "Opposite Prestige Plaza", directions: "", coverage_notes: "Kilimani, Westlands and Karen" }] as never,
     faqs: [{ question: "Do you bring soap?", answer: "Yes, we bring everything." }, { question: "Is there a call-out fee?", answer: "Free within 5 km." }],
   },
 });

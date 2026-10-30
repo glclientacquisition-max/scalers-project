@@ -8,6 +8,7 @@ import { findFactCards } from "@/lib/foundFacts.server";
 import { clampFaq, mergeFaqs } from "@/lib/faqs";
 import type { FactCard } from "@/lib/factCards";
 import type { FaqEntry } from "@/lib/supabase";
+import { emptyLocation, normalizeBusinessLocations } from "@/lib/businessLocations";
 import { saveAndCompileSettings } from "@/app/(desk)/settings/actions";
 
 export type FactsResult = { ok: true; cards: FactCard[] } | { ok: false; error: string };
@@ -43,6 +44,36 @@ export async function saveFoundFaqAction(input: { question: string; answer: stri
   formData.set("id", tenant.id);
   formData.set("settings_scope", "faqs");
   formData.set("faqs", JSON.stringify(merged.faqs));
+  formData.set("owner_field_paths", "[]");
+  const res = await saveAndCompileSettings({}, formData);
+  if (res.error) return { ok: false, error: res.error };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+const cleanText = (v: unknown, max: number) =>
+  String(v ?? "").replace(/[\u0000-\u001f\u007f<>]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+
+/**
+ * The found business address: set on the first stored place (a new "Main" place when there is none). Only that
+ * place's address changes, and its landmark only when empty. Saved with scope "locations-address", so location
+ * notes, service areas, the no-premises switch and every other setting stay as stored.
+ */
+export async function saveFoundAddressAction(input: { address: string; landmark?: string }): Promise<FactSaveResult> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return { ok: false, error: denied.error };
+  const tenant = await getCurrentTenant();
+  if (!tenant) return { ok: false, error: "Not signed in." };
+  const address = cleanText(input?.address, 160);
+  const landmark = cleanText(input?.landmark, 120);
+  if (address.length < 4 || /https?:|www\.|@/i.test(address)) return { ok: false, error: "That address does not look right." };
+  const places = normalizeBusinessLocations(tenant.business_locations || []);
+  if (!places.length) places.push({ ...emptyLocation(), label: "Main", address, landmark });
+  else places[0] = { ...places[0], address, landmark: places[0].landmark || landmark };
+  const formData = new FormData();
+  formData.set("id", tenant.id);
+  formData.set("settings_scope", "locations-address");
+  formData.set("business_locations", JSON.stringify(places));
   formData.set("owner_field_paths", "[]");
   const res = await saveAndCompileSettings({}, formData);
   if (res.error) return { ok: false, error: res.error };
