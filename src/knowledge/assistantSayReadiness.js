@@ -142,6 +142,7 @@ const FACT_PROBES = {
 
 /** A stale stored hash on an owner-saved row (never "no row": nothing was ever saved from the Desk). */
 const STALE_HASH = new Set(['hash_missing', 'hash_mismatch']);
+const HASH_REASONS = new Set(['hash_no_row', ...STALE_HASH]);
 
 /**
  * Prices as calls read them on the KB path: the published snapshot rows
@@ -159,7 +160,9 @@ function kbPriceAnswer(profile) {
     const name = String(row?.name || '').trim();
     if (!name) continue;
     const say = typedPrice(row).say;
-    if (say) return `${name} is ${String(say).replace(/\bKSh\s+KSh\b/gi, 'KSh')}.`;
+    if (!say) continue;
+    const value = String(say).replace(/\bKSh\s+KSh\b/gi, 'KSh');
+    return { en: `${name} is ${value}.`, sw: `${name} ni ${value}.` };
   }
   return null;
 }
@@ -190,9 +193,36 @@ function sheetPayAnswer(profile) {
   const bag = profile?.businessPolicies?.payments;
   const ownerSaved = Boolean(bag && typeof bag === 'object' && bag.source === 'owner' && bag.confirmed === true);
   if (!policyFact && !ownerSaved) return null;
-  return facts
-    .map((f) => factSentence({ ...f, confirmed: true }, 'en', profile))
-    .join(' ');
+  return bothLines(facts.map((f) => ({ ...f, confirmed: true })), profile);
+}
+
+/** One spoken line per language from call fact-sheet facts. */
+function bothLines(facts, profile) {
+  return {
+    en: facts.map((f) => factSentence(f, 'en', profile)).join(' '),
+    sw: facts.map((f) => factSentence(f, 'sw', profile)).join(' '),
+  };
+}
+
+/**
+ * Areas as calls read them (factStore / areaTerms): an area the owner saved
+ * and confirmed on Service areas (source owner, confirmed true) with a free or
+ * fixed fee. Used only when the stricter lookup misses on a fact-hash reason
+ * (stale, missing, or no hash row): those calls do not read tenant_field_meta.
+ */
+function sheetAreaAnswer(profile, result) {
+  if (!HASH_REASONS.has(String(result?.reason || ''))) return null;
+  const raw = profile?.service_areas || profile?.serviceAreas;
+  const terms = raw ? readAreaTerms(raw, { vertical: profile?.vertical, env: { VOICE_AREA_FEES: 'on' } }) : null;
+  if (!terms?.areas?.length) return null;
+  let facts;
+  try {
+    facts = [...buildFactSheet({ ...profile, areaTerms: terms }).facts.values()];
+  } catch {
+    return null;
+  }
+  const fee = facts.find((f) => f.kind === 'fee' && f.confirmed);
+  return fee ? bothLines([fee], profile) : null;
 }
 
 /**
@@ -203,7 +233,7 @@ function sheetHoursAnswer(profile, result) {
   if (!STALE_HASH.has(String(result?.reason || ''))) return null;
   if (lookupFieldMeta(profile?.fieldMeta, 'hours.weekly_grid')?.source !== 'owner') return null;
   const week = sheetFacts(profile, 'hours').find((f) => f.id === 'hours.week' && f.confirmed);
-  return week ? factSentence(week, 'en', profile) : null;
+  return week ? bothLines([week], profile) : null;
 }
 
 /** When the lookup probe misses, the answer calls give from the same saved data (or null). */
@@ -211,6 +241,7 @@ function callPathAnswer(kind, profile, result) {
   if (kind === 'prices') return kbPriceAnswer(profile);
   if (kind === 'payment') return sheetPayAnswer(profile);
   if (kind === 'hours') return sheetHoursAnswer(profile, result);
+  if (kind === 'areas') return sheetAreaAnswer(profile, result);
   return null;
 }
 
@@ -221,7 +252,8 @@ function factRow(kind, title, profile, now) {
   const fallback = found ? null : callPathAnswer(kind, profile, result);
   const willSay = found || Boolean(fallback);
   const reasonKind = kind === 'areas' ? 'delivery' : kind === 'payment' ? 'payment' : kind;
-  const hearPreview = found ? speechOf(result, 'en') : fallback || '';
+  const hearPreview = found ? speechOf(result, 'en') : fallback?.en || '';
+  const hearPreviewSw = found ? speechOf(result, 'sw') : fallback?.sw || '';
   return {
     id: kind,
     title,
@@ -232,6 +264,7 @@ function factRow(kind, title, profile, now) {
     reason: fallback ? 'Ready on the next call.' : ownerLookupReason(reasonKind, result),
     fixHref: FIX[kind],
     hearPreview,
+    hearPreviewSw,
     _lookupResult: result,
   };
 }

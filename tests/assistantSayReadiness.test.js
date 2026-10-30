@@ -69,6 +69,20 @@ const devRetailTenant = {
   unknown_answer_fallback: null,
 };
 
+/**
+ * Lookup found => the row says Will say. The row may also say Will say when the
+ * stricter lookup misses only on a fact-hash reason and the call path answers
+ * from the same saved data (call-path readiness below).
+ */
+function assertRowAgreesWithLookup(row, result, label) {
+  if (result.status === 'found') {
+    assert.equal(row.willSay, true, label);
+  } else if (row.willSay) {
+    assert.match(String(result.reason || ''), /^hash_/, `${label}: Will say only via call-path fallback`);
+    assert.ok(row.hearPreview, `${label}: call-path line`);
+  }
+}
+
 function rowWillSay(state, id) {
   const row = state.rows.find((r) => r.id === id);
   return Boolean(row && row.willSay);
@@ -117,7 +131,7 @@ describe('assistantSayReadiness', () => {
         const row = say.rows.find((r) => r.id === id);
         const result = lookupProbeForRowId(id, profile, FIXTURE_NOW);
         assert.ok(row, `${key}/${id}`);
-        assert.equal(row.willSay, result.status === 'found', `${key}/${id}`);
+        assertRowAgreesWithLookup(row, result, `${key}/${id}`);
       }
     }
   });
@@ -363,11 +377,11 @@ describe('assistantSayReadiness', () => {
       const c = { profile, language: 'en', now: FIXTURE_NOW, seed: 0 };
       if (samples.price) {
         const priceHit = lookup('price', samples.price, c);
-        assert.equal(priceHit.status === 'found', pricesRow.willSay, `${key} price preview`);
+        assertRowAgreesWithLookup(pricesRow, priceHit, `${key} price preview`);
       }
       if (samples.delivery) {
         const feeHit = lookup('fee', samples.delivery, c);
-        assert.equal(feeHit.status === 'found', deliveryRow.willSay, `${key} delivery preview`);
+        assertRowAgreesWithLookup(deliveryRow, feeHit, `${key} delivery preview`);
       }
       assert.equal(samples.hours, readinessQuestions(profile).hours[0], key);
       assert.equal(samples.pay, readinessQuestions(profile).pay[0], key);
@@ -619,5 +633,45 @@ describe('assistantSayReadiness', () => {
       const none = evaluateAssistantSay(profileOf(t, metaFor(t, BASE_PATHS.filter((p) => p !== 'hours.weekly_grid'))), { now: FIXTURE_NOW });
       assert.equal(rowOf(none, 'hours').willSay, false);
     });
+    it('owner-confirmed areas with no hash row read as calls do (Jirani shape); unconfirmed areas stay not ready', () => {
+      const t = dndTenant();
+      t.service_areas = {
+        areas: [
+          { id: 'place:kilimani', modes: ['visit'], source: 'owner', confirmed: true, fee_mode: 'free', fee_ksh: null },
+          { id: 'place:kileleshwa', modes: ['visit'], source: 'owner', confirmed: true, fee_mode: 'fixed', fee_ksh: 300 },
+        ],
+      };
+      const ready = evaluateAssistantSay(profileOf(t, metaFor(t, ['hours.weekly_grid', 'policies.payment'])), { now: FIXTURE_NOW });
+      const row = rowOf(ready, 'areas');
+      assert.equal(row.willSay, true);
+      assert.match(row.hearPreview, /Kilimani/);
+      assert.ok(row.hearPreviewSw);
+      t.service_areas.areas = t.service_areas.areas.map((a) => ({ ...a, source: 'import', confirmed: false }));
+      const notReady = evaluateAssistantSay(profileOf(t, metaFor(t, ['hours.weekly_grid', 'policies.payment'])), { now: FIXTURE_NOW });
+      assert.equal(rowOf(notReady, 'areas').willSay, false);
+    });
+
+    it('ready rows carry a Kiswahili line from the same result', () => {
+      const t = dndTenant();
+      const stale = [...CATALOG_PATHS(t), 'payments.methods'];
+      const profile = profileOf(t, metaFor(t, [...BASE_PATHS, ...CATALOG_PATHS(t)], { stale }), { kbProjected: true });
+      const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
+      assert.match(rowOf(say, 'prices').hearPreviewSw, /1-Bedroom Standard Clean ni KSh 2,500/);
+      assert.match(rowOf(say, 'payment').hearPreviewSw, /5123456/);
+      assert.ok(rowOf(say, 'hours').hearPreviewSw);
+      assert.ok(rowOf(say, 'areas').hearPreviewSw);
+    });
+  it('topic sheet status and "Callers hear" come from the readiness row, never the live lookup preview', () => {
+    const text = fs.readFileSync(
+      path.join(__dirname, '..', 'dashboard/src/components/assistantSay/AssistantSayTopicSheet.tsx'),
+      'utf8'
+    );
+    assert.ok(!/preview\??\.stamp(Label|Tone)/.test(text), 'sheet stamp must not read the lookup preview');
+    assert.ok(!/preview\?\.speech(En|Sw)\s*\|\|/.test(text), '"Callers hear" must not prefer the lookup preview');
+    assert.ok(/<Stamp tone=\{row\.stampTone\}>\{row\.stampLabel\}<\/Stamp>/.test(text), 'sheet stamp is the row stamp');
+    // opening the sheet does not run a lookup; only "Show answer" does
+    const effects = text.match(/useEffect\(\(\) => \{[\s\S]*?\}, \[[^\]]*\]\);/g) || [];
+    for (const e of effects) assert.ok(!/previewDeskLookupAction/.test(e), 'no lookup preview on open');
+  });
   });
 });
