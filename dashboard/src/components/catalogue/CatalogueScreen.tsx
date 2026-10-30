@@ -11,6 +11,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Switch } from "@/components/ui/Switch";
 import { Empty } from "@/components/ui/Empty";
 import { notify } from "@/components/ui/DeskNotice";
+import { ImportUndoBar } from "./ImportUndoBar";
 import { deskShiftClass } from "@/lib/deskMotion";
 import { cx } from "@/lib/cx";
 import { PHOTO_MAX_BASE64 } from "@/lib/importPhoto";
@@ -54,7 +55,9 @@ export type CatalogueActions = {
   decideSwName: (id: string, decision: "approve" | "edit" | "reject", text?: string) => Promise<KbActionResult>;
   compile: () => Promise<KbActionResult>;
   previewPaste: (text: string) => Promise<{ ok: true; rows: KbPasteRow[] } | { ok: false; error: string }>;
-  importPaste: (rows: KbPasteRow[], kind: KbKind, group: string, mode?: "append" | "replace") => Promise<KbActionResult>;
+  importPaste: (rows: KbPasteRow[], kind: KbKind, group: string, mode?: "append" | "replace", source?: string) => Promise<KbActionResult>;
+  /** Put the list back as it was before an Add many import (10 minutes). */
+  undoImport?: (importId: string) => Promise<KbActionResult>;
   /** Add many from a photo or a website (DESK_IMPORT_PHOTO): both return paste lines for the same preview. */
   photoToLines?: (mimeType: string, base64: string) => Promise<LinesResult>;
   websiteToLines?: (url: string) => Promise<LinesResult>;
@@ -83,6 +86,8 @@ export type CatalogueScreenProps = {
   canEdit: boolean;
   /** ?filter=unpriced from Overview "Add prices". Always shown with a way out. */
   initialNeedPrice?: boolean;
+  /** Dev fixture only: open with the undo bar showing. */
+  initialUndo?: { id: string; at: number; summary: string };
   /** ?many=1 (and old ?paste=1 / Import links) opens Add many. */
   initialPaste?: boolean;
   /** Photo and Website sources in Add many (staging flag DESK_IMPORT_PHOTO). */
@@ -114,6 +119,19 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
   const [editing, setEditing] = useState<{ draft: KbDraft; fixing: boolean } | null>(null);
   const [pasting, setPasting] = useState(!!props.initialPaste && canEdit);
   const [checksOpen, setChecksOpen] = useState(false);
+  const [lastImport, setLastImport] = useState<{ id: string; at: number; summary: string } | null>(props.initialUndo ?? null);
+  const undoImport = () =>
+    start(async () => {
+      if (!lastImport || !actions.undoImport) return;
+      const r = await actions.undoImport(lastImport.id);
+      if (!r.ok) {
+        notify(r.error, { tone: "error" });
+        return setLastImport(null);
+      }
+      setLastImport(null);
+      notify("Done. Your list is back to how it was before the import.");
+      router.refresh();
+    });
   const [lang, setLang] = useState<"en" | "sw">("en");
   const [swEdit, setSwEdit] = useState<{ id: string; text: string } | null>(null);
 
@@ -219,6 +237,10 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
         <p className="rounded-xl bg-attention-tonal p-3 text-body text-attention" role="status">
           Your last change could not be used, so calls still use the earlier catalogue. Fix the items below, then save again.
         </p>
+      ) : null}
+
+      {lastImport && canEdit ? (
+        <ImportUndoBar at={lastImport.at} summary={lastImport.summary} pending={pending} onUndo={undoImport} onExpire={() => setLastImport(null)} />
       ) : null}
 
       {/* Card B: what you sell. */}
@@ -430,8 +452,9 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
           defaultKind={defaultKind}
           actions={actions}
           onClose={() => setPasting(false)}
-          onSaved={() => {
+          onSaved={(done) => {
             setPasting(false);
+            if (done && actions.undoImport) setLastImport({ ...done, at: Date.now() });
             router.refresh();
           }}
         />
@@ -791,7 +814,7 @@ function PasteSheet({
   defaultKind: KbKind;
   actions: CatalogueActions;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (done?: { id: string; summary: string }) => void;
 }) {
   const [text, setText] = useState("");
   const [source, setSource] = useState<ManySource>("paste");
@@ -870,15 +893,17 @@ function PasteSheet({
   const add = (mode: "append" | "replace") =>
     start(async () => {
       if (!summary) return;
+      let done: { id: string; summary: string } | undefined;
       if (summary.ready.length) {
-        const r = await actions.importPaste(summary.ready, kind, group, mode);
+        const r = await actions.importPaste(summary.ready, kind, group, mode, source === "website" ? "url" : source);
         if (!r.ok) return setError(r.error);
         const when = r.restamped === false ? "Calls will use it after the next check." : "On calls within a minute.";
-        notify(
+        const what =
           mode === "replace"
-            ? `Your list is now these ${summary.ready.length}${removed.length ? `. Removed ${removed.length}` : ""}. ${when}`
-            : `${[summary.adds ? `Added ${summary.adds}` : "", summary.updates ? `updated ${summary.updates}` : ""].filter(Boolean).join(", ") || "Saved"}. ${when}`.replace(/^updated/, "Updated"),
-        );
+            ? `Your list is now these ${summary.ready.length}${removed.length ? `. Removed ${removed.length}` : ""}.`
+            : `${[summary.adds ? `Added ${summary.adds}` : "", summary.updates ? `updated ${summary.updates}` : ""].filter(Boolean).join(", ") || "Saved"}.`.replace(/^updated/, "Updated");
+        notify(`${what} ${when}`);
+        if (r.importId) done = { id: r.importId, summary: `Nice, your list is updated. ${what}` };
       }
       // Each ticked fact through its own save, one after another so two Policies cards never race.
       if (mode === "append" && picked.length && actions.saveFact) {
@@ -891,7 +916,7 @@ function PasteSheet({
         if (saved) notify(`Saved ${saved} ${saved === 1 ? "detail" : "details"} to your settings.`);
         if (failed.length) notify(`Could not save ${failed.join(", ")}. Set ${failed.length === 1 ? "it" : "them"} in Settings.`, { tone: "error" });
       }
-      onSaved();
+      onSaved(done);
     });
   const addLabel = !summary
     ? ""

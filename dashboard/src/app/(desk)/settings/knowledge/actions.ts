@@ -7,10 +7,13 @@ import { getCurrentTenant } from "@/lib/tenant";
 import { PASTE_MAX_ROWS, sameKbContent, draftErrors, gateDraftStatus, itemFromDraft, itemsFromPaste, parsePasteList, slug, type KbDraft, type KbItem, type KbKind, type KbPasteRow } from "@/lib/kbCore";
 import { KB_ITEM_COLS, afterKbWrite, kbRowToItem, loadKbItems, writeKbItems } from "@/lib/kbWrite.server";
 import { pingKbCompile } from "@/lib/kb.server";
+import { requireSupabaseUser } from "@/lib/tenant";
+import { logImportRun, rowsBeforeImport, undoImportRun } from "@/lib/kbImportRuns.server";
+import { importSource } from "@/lib/importUndo";
 import { deskKbItemStates } from "@/lib/deskFeatureFlags";
 
 /** restamped false: saved, but the call facts could not be re-checked yet (the Desk says so instead of "on calls"). */
-export type KbActionResult = { ok: true; restamped?: boolean; unchanged?: boolean } | { ok: false; error: string };
+export type KbActionResult = { ok: true; restamped?: boolean; unchanged?: boolean; importId?: string } | { ok: false; error: string };
 
 async function ownerTenant(): Promise<{ id: string } | { error: string }> {
   const tenant = await getCurrentTenant();
@@ -133,7 +136,13 @@ export async function previewKbPasteAction(text: string): Promise<{ ok: true; ro
  * mode "append" (default): add new rows, update matched ones. mode "replace": the paste becomes the whole list for that
  * kind; the kind's rows not in the paste are soft-removed (hidden, restorable), all in one transaction.
  */
-export async function importKbPasteAction(rows: KbPasteRow[], kind: KbKind, group: string, mode: "append" | "replace" = "append"): Promise<KbActionResult> {
+export async function importKbPasteAction(
+  rows: KbPasteRow[],
+  kind: KbKind,
+  group: string,
+  mode: "append" | "replace" = "append",
+  source?: string,
+): Promise<KbActionResult> {
   const denied = await memberDenied("settings.edit");
   if (denied) return { ok: false, error: denied.error };
   const t = await ownerTenant();
@@ -145,5 +154,36 @@ export async function importKbPasteAction(rows: KbPasteRow[], kind: KbKind, grou
   const clean = parsePasteList(rows.map((r) => String(r.raw || "")).join("\n"), existing);
   const items = itemsFromPaste(clean, k, existing, await categoryId(t.id, String(group || "")));
   if (!items.length) return { ok: false, error: "Nothing to add." };
-  return writeItems(t.id, items, mode === "replace" ? { replaceKind: k } : {});
+  const replace = mode === "replace";
+  // Undo needs the rows as they were. If they can't be read, the import still runs, just without undo.
+  const before = await rowsBeforeImport(t.id, items.map((i) => i.id), replace ? k : undefined);
+  const r = await writeItems(t.id, items, replace ? { replaceKind: k } : {});
+  if (!r.ok || !before) return r;
+  const user = await requireSupabaseUser().catch(() => null);
+  const importId = await logImportRun({
+    tenantId: t.id,
+    userId: user?.id ?? null,
+    source: importSource(source),
+    mode: replace ? "replace" : "append",
+    kind: k,
+    items,
+    before,
+    counts: { rows: items.length, existing: before.length },
+  });
+  return importId ? { ...r, importId } : r;
+}
+
+/** Undo an Add many import within 10 minutes: new rows go, changed rows go back to how they were. One transaction. */
+export async function undoKbImportAction(importId: string): Promise<KbActionResult> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return { ok: false, error: denied.error };
+  const t = await ownerTenant();
+  if ("error" in t) return { ok: false, error: t.error };
+  if (!/^[0-9a-f-]{36}$/i.test(String(importId || ""))) return { ok: false, error: "We couldn't find that import." };
+  const u = await undoImportRun(t.id, importId);
+  if (!u.ok) return u;
+  if (u.already) return { ok: true };
+  const { restamped } = await afterKbWrite(t.id, "desk", { restampIds: u.restoredIds });
+  revalidatePath("/settings/knowledge");
+  return { ok: true, ...(restamped === false ? { restamped: false } : {}) };
 }

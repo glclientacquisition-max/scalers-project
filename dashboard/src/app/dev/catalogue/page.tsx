@@ -46,6 +46,7 @@ export default async function DevCataloguePage({ searchParams }: Props) {
                     statesEnabled={one(p.states) === "on"}
                     initialNeedPrice={one(p.filter) === "unpriced"}
                     initialPaste={one(p.paste) === "1" || one(p.many) === "1"}
+                    initialUndo={one(p.undo) === "1" ? { id: "00000000-0000-4000-8000-000000000001", at: Date.now(), summary: "Nice, your list is updated. Added 12, updated 3." } : undefined}
                     importPhoto={one(p.many) === "1"}
                   />
                 </div>

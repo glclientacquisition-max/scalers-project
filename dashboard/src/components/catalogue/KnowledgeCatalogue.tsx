@@ -6,6 +6,7 @@ import {
   decideSwNameAction,
   hideKbItemAction,
   importKbPasteAction,
+  undoKbImportAction,
   previewKbPasteAction,
   saveKbItemAction,
 } from "@/app/(desk)/settings/knowledge/actions";
@@ -38,6 +39,7 @@ const ACTIONS: CatalogueActions = {
   compile: compileKbAction,
   previewPaste: previewKbPasteAction,
   importPaste: importKbPasteAction,
+  undoImport: undoKbImportAction,
   photoToLines: photoToLinesAction,
   websiteToLines: websiteToLinesAction,
   findFacts: findFactsAction,
