@@ -25,6 +25,12 @@ export default function VisualStatusPage() {
         <p className="mt-2 text-body text-ink-2">No business matches.</p>
         <p className="mt-1 text-meta text-attention">Could not load this business.</p>
       </section>
+      <section className="rounded-2xl border border-hairline bg-surface px-4 py-4" aria-label="Billing">
+        <h2 className="text-title">Collected of billed</h2>
+        <p className="mt-1 text-body text-ink-2">Nothing billed this month.</p>
+        <h2 className="mt-3 text-title">Overdue by age</h2>
+        <p className="mt-1 text-body text-ink-2">Nothing overdue.</p>
+      </section>
       <div className="ops-theme grid grid-cols-2 gap-2">
         <KpiTile label="Collected" period="This month" state="empty" emptyTitle="No payments this month." href="/admin/billing/payments" />
         <KpiTile label="Billed" period="This month" state="error" errorTitle="Could not load billed." />
