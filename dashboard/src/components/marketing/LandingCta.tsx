@@ -12,12 +12,15 @@ export function LandingCta({
   label = LANDING_CTA_LABEL,
   size = "lg",
   wide = false,
+  tone = "light",
 }: {
   href?: string;
   label?: string;
   size?: "md" | "lg";
   /** Full width on phones (Fitts: one big target under the thumb), natural width from sm up. */
   wide?: boolean;
+  /** onDark: white button with navy text for the dark hero (main's look). */
+  tone?: "light" | "onDark";
 }) {
   const pad = size === "lg" ? "min-h-[3.25rem] px-6 text-base" : "min-h-11 px-4 text-sm";
   const width = wide ? "w-full sm:w-auto" : "";
@@ -25,7 +28,7 @@ export function LandingCta({
     <a
       href={appEntryHref(href)}
       data-landing-cta=""
-      className={`landing-cta inline-flex items-center justify-center whitespace-nowrap rounded-xl font-semibold transition-colors focus-visible:outline-none focus-visible:shadow-focus ${pad} ${width}`}
+      className={`${tone === "onDark" ? "landing-cta-on-dark" : "landing-cta"} inline-flex items-center justify-center whitespace-nowrap rounded-xl font-semibold transition-colors focus-visible:outline-none focus-visible:shadow-focus ${pad} ${width}`}
     >
       {label}
     </a>
