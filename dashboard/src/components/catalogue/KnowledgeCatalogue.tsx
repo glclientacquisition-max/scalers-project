@@ -11,7 +11,7 @@ import {
   saveKbItemAction,
 } from "@/app/(desk)/settings/knowledge/actions";
 import { photoToLinesAction, websiteToLinesAction } from "@/app/(desk)/settings/knowledge/addManyActions";
-import { findFactsAction, saveFoundFaqAction } from "@/app/(desk)/settings/knowledge/foundFactsActions";
+import { findFactsAction, saveFoundAddressAction, saveFoundFaqAction } from "@/app/(desk)/settings/knowledge/foundFactsActions";
 import { saveOverviewHoursAction } from "@/app/(desk)/settings/overviewActions";
 import { savePoliciesCardAction } from "@/app/(desk)/settings/policiesCardActions";
 import { saveAreaPicksAction } from "@/app/(desk)/settings/areas/actions";
@@ -24,7 +24,9 @@ async function saveFoundFact(card: FactCard): Promise<{ ok: true } | { ok: false
       ? await saveOverviewHoursAction(card.schedule)
       : card.kind === "policy" || card.kind === "payment"
         ? await savePoliciesCardAction(factPolicyPatch(card))
-        : card.kind === "areas"
+        : card.kind === "address"
+          ? await saveFoundAddressAction({ address: card.address, landmark: card.landmark })
+          : card.kind === "areas"
           ? await saveAreaPicksAction(card.picks, false)
           : await saveFoundFaqAction({ question: card.question, answer: card.answer });
   return r.ok ? { ok: true } : { ok: false, error: r.error || "Could not save." };

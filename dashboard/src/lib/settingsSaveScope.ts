@@ -40,6 +40,9 @@ const SETTINGS_SCOPE_FIELDS: Record<string, readonly string[]> = {
   catalog: ["servicesNotes", "servicesCatalog", "productCatalog"],
   hours: ["hoursSchedule"],
   locations: ["businessLocations", "locationNotes", "serviceAreas", "noPremises"],
+  // Add many address card: the places list only (address merged onto the stored first place on the server).
+  // Location notes, service areas and the no-premises switch stay as stored.
+  "locations-address": ["businessLocations"],
   policies: ["businessPolicies", "unknownAnswerFallback"],
   // Policies remake: each card saves its own keys of business_policies (merged on the
   // server onto the stored value), and When unsure saves on its own. Neither wipes the other.

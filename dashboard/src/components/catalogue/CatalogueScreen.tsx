@@ -1099,6 +1099,7 @@ function PasteSheet({
 function factNote(card: FactCard): string | null {
   if (card.kind === "payment") return "Check the number before you save. Payment is never ticked for you.";
   if (card.ownerSet) return "You set this yourself. Tick only to replace it.";
+  if (card.note) return card.note;
   return null;
 }
 
