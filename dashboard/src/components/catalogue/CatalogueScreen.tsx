@@ -13,6 +13,7 @@ import { Empty } from "@/components/ui/Empty";
 import { notify } from "@/components/ui/DeskNotice";
 import { deskShiftClass } from "@/lib/deskMotion";
 import { cx } from "@/lib/cx";
+import { PHOTO_MAX_BASE64 } from "@/lib/importPhoto";
 import { IMPORT_FILE_ACCEPT, IMPORT_FILE_MAX_BYTES, delimitedToPasteText } from "@/lib/importCsv";
 import { CHECK_FIX, CHECK_LABEL, ISSUE_LINE, type KbCategory, type KbDraft, type KbItem, type KbKind, type KbPasteRow, type KbReadiness, type KbSnapshotRow } from "@/lib/kbCore";
 import {
@@ -53,6 +54,9 @@ export type CatalogueActions = {
   compile: () => Promise<KbActionResult>;
   previewPaste: (text: string) => Promise<{ ok: true; rows: KbPasteRow[] } | { ok: false; error: string }>;
   importPaste: (rows: KbPasteRow[], kind: KbKind, group: string, mode?: "append" | "replace") => Promise<KbActionResult>;
+  /** Add many from a photo or a website (DESK_IMPORT_PHOTO): both return paste lines for the same preview. */
+  photoToLines?: (mimeType: string, base64: string) => Promise<{ ok: true; text: string } | { ok: false; error: string }>;
+  websiteToLines?: (url: string) => Promise<{ ok: true; text: string } | { ok: false; error: string }>;
 };
 
 export type CatalogueScreenProps = {
@@ -76,6 +80,8 @@ export type CatalogueScreenProps = {
   initialPaste?: boolean;
   /** "Add many" (staging flag DESK_ADD_MANY): one sheet for a pasted list or a CSV file. Off: Paste a list. */
   addMany?: boolean;
+  /** Photo and Website sources in Add many (staging flag DESK_IMPORT_PHOTO). Needs addMany. */
+  importPhoto?: boolean;
   /**
    * Paused and Not offered (the item Status control). Server flag DESK_KB_ITEM_STATES, off by default
    * until the KB writers and the Brain KB reader are live. Off: an item already in one of those states
@@ -415,6 +421,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
       {pasting ? (
         <PasteSheet
           addMany={addMany}
+          importPhoto={addMany && !!props.importPhoto && !!actions.photoToLines && !!actions.websiteToLines}
           existing={items}
           homeServices={homeServices}
           defaultKind={defaultKind}
@@ -743,9 +750,32 @@ function ItemSheet({
   );
 }
 
+type ManySource = "paste" | "file" | "photo" | "website";
+const MANY_SOURCES: ManySource[] = ["paste", "file", "photo", "website"];
+
+/** Shrink a phone photo to 1600px JPEG in the browser so it fits the server action body and reads fast. */
+async function shrinkPhoto(file: File): Promise<{ mimeType: string; base64: string } | null> {
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext("2d")?.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    for (const q of [0.8, 0.6, 0.45]) {
+      const base64 = canvas.toDataURL("image/jpeg", q).split(",")[1] || "";
+      if (base64 && base64.length <= PHOTO_MAX_BASE64) return { mimeType: "image/jpeg", base64 };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Paste a list: preview first, then one batch of up to 500. Replaces the Import tab for the catalogue. */
 function PasteSheet({
   addMany,
+  importPhoto,
   existing,
   homeServices,
   defaultKind,
@@ -754,6 +784,7 @@ function PasteSheet({
   onSaved,
 }: {
   addMany: boolean;
+  importPhoto: boolean;
   existing: KbItem[];
   homeServices: boolean;
   defaultKind: KbKind;
@@ -762,7 +793,8 @@ function PasteSheet({
   onSaved: () => void;
 }) {
   const [text, setText] = useState("");
-  const [source, setSource] = useState<"paste" | "file">("paste");
+  const [source, setSource] = useState<ManySource>("paste");
+  const [siteUrl, setSiteUrl] = useState("");
   const [fileName, setFileName] = useState<string | null>(null);
   const [kind, setKind] = useState<KbKind>(homeServices ? "service" : defaultKind);
   const [group, setGroup] = useState("");
@@ -795,6 +827,28 @@ function PasteSheet({
     setText(lines);
     preview(lines);
   };
+  // Photo or website: the server reads it into lines; the owner checks the same preview before anything is saved.
+  const fromLines = (r: { ok: true; text: string } | { ok: false; error: string }) => {
+    if (!r.ok) return setError(r.error);
+    setText(r.text);
+    preview(r.text);
+  };
+  const readPhoto = (file: File | undefined) =>
+    start(async () => {
+      if (!file || !actions.photoToLines) return;
+      setError(null);
+      if (!/^image\//.test(file.type)) return setError("Use a photo (JPG, PNG or WebP).");
+      const shrunk = await shrinkPhoto(file);
+      if (!shrunk) return setError("We could not open that photo. Try another one.");
+      setFileName(file.name);
+      fromLines(await actions.photoToLines(shrunk.mimeType, shrunk.base64));
+    });
+  const readSite = () =>
+    start(async () => {
+      if (!actions.websiteToLines || !siteUrl.trim()) return;
+      setError(null);
+      fromLines(await actions.websiteToLines(siteUrl));
+    });
   const add = (mode: "append" | "replace") =>
     start(async () => {
       if (!summary) return;
@@ -839,7 +893,11 @@ function PasteSheet({
             </>
           )
         ) : (
-          source === "file" ? null : (
+          source === "file" || source === "photo" ? null : source === "website" ? (
+            <Button variant="primary" onClick={readSite} pending={pending} disabled={!siteUrl.trim()} data-add-many-site-read="">
+              Read the page
+            </Button>
+          ) : (
             <Button variant="primary" onClick={() => preview()} pending={pending} disabled={!text.trim()}>
               Preview
             </Button>
@@ -866,14 +924,38 @@ function PasteSheet({
               <SegmentedControl
                 label="From"
                 value={source}
-                onChange={(v) => setSource(v === "file" ? "file" : "paste")}
+                onChange={(v) => setSource(MANY_SOURCES.includes(v as ManySource) ? (v as ManySource) : "paste")}
                 items={[
                   { value: "paste", label: "Paste" },
                   { value: "file", label: "File" },
+                  ...(importPhoto
+                    ? [
+                        { value: "photo", label: "Photo" },
+                        { value: "website", label: "Website" },
+                      ]
+                    : []),
                 ]}
               />
             ) : null}
-            {source === "file" ? (
+            {source === "photo" ? (
+              <Field id="add-many-photo" label="Photo of your price list" hint="A menu, rate card or price board. We read it, you check every line before anything is saved.">
+                {(p) => (
+                  <input
+                    {...p}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    capture="environment"
+                    onChange={(e) => readPhoto(e.target.files?.[0])}
+                    className="block min-h-11 w-full rounded-xl border border-hairline bg-surface px-3 py-2 text-body text-ink file:me-3 file:min-h-9 file:rounded-lg file:border-0 file:bg-surface-2 file:px-3 file:text-meta file:font-semibold"
+                    data-add-many-photo=""
+                  />
+                )}
+              </Field>
+            ) : source === "website" ? (
+              <Field id="add-many-site" label="Your website page with prices" hint="For example: yourshop.co.ke/prices. We keep the lines that have a price, you check them next.">
+                {(p) => <Input {...p} type="url" inputMode="url" value={siteUrl} maxLength={500} placeholder="https://" onChange={(e) => setSiteUrl(e.target.value)} data-add-many-site="" />}
+              </Field>
+            ) : source === "file" ? (
               <Field id="add-many-file" label="CSV or text file" hint="One item per row, name and price. Excel: Save As, CSV. Up to 1 MB and 500 rows.">
                 {(p) => (
                   <input
@@ -891,7 +973,8 @@ function PasteSheet({
                 {(p) => <Textarea {...p} rows={10} value={text} onChange={(e) => setText(e.target.value)} />}
               </Field>
             )}
-            {fileName && source === "file" ? <p className="text-meta text-ink-2">{fileName}</p> : null}
+            {pending && source === "photo" ? <p className="text-meta text-ink-2" role="status">Reading the photo…</p> : null}
+            {fileName && (source === "file" || source === "photo") ? <p className="text-meta text-ink-2">{fileName}</p> : null}
             <Field id="paste-group" label="Group" hint="Optional. New items join this group.">
               {(p) => <Input {...p} value={group} maxLength={120} onChange={(e) => setGroup(e.target.value)} />}
             </Field>
