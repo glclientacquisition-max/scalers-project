@@ -213,6 +213,8 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 
 ## 4. Open PRs
 
+**Draft PR (31 Oct 2026, EAT), billing schema baseline:** branch `billing/schema-baseline`. `supabase/migrations/20261031020000_billing_schema_baseline.sql` is generated from prod catalogs: 29 billing tables, 5 views, 134 functions, triggers, RLS, policies, grants, and the 2 billing pg_cron jobs. It is re-runnable and changes nothing on prod. Generator and drift check are in `scripts/billing-schema/`. Staging dry-run (rolled back): before, 32 objects differ from prod; after applying it once or twice, only `suspend_line_for_nonpayment(uuid)` remains, a staging-only extra. The PR also carries #1055 (the retired-version guard migration, already on prod 31 Oct 00:55 EAT). Not applied anywhere. Prod needs only a ledger row (`supabase_migrations.schema_migrations`), on Alvin's GO.
+
 **28 Oct 2026 clean-up:** there were 102 open PRs. The stale, superseded ones were closed with a pointer to the handover PR, and their branches were kept. Still open:
 - the parked retire-old-brain drafts #1009 and #1010
 - #975 (Brain to confirm before closing)
