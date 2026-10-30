@@ -6,6 +6,7 @@ import { noQualityBadges, qualityBadges } from "@/lib/adminQuality";
 import { logAdminError } from "@/lib/adminErrors";
 import { requireSuperAdmin } from "@/lib/adminGuard";
 import { isAdminV2Enabled } from "@/lib/adminV2";
+import { loadUsageForAttention } from "@/lib/adminAttentionLoad";
 
 export const instant = false;
 
@@ -13,15 +14,20 @@ export default async function AdminBusinessesPage() {
   await requireSuperAdmin();
   let overview;
   let badges;
+  let usage;
   try {
-    [overview, badges] = await Promise.all([getAdminOverview(), qualityBadges().catch(noQualityBadges("businesses:quality"))]);
+    [overview, badges, usage] = await Promise.all([
+      getAdminOverview(),
+      qualityBadges().catch(noQualityBadges("businesses:quality")),
+      loadUsageForAttention(),
+    ]);
   } catch (err) {
     logAdminError("businesses", err);
     return <AdminSetupError />;
   }
 
   if (isAdminV2Enabled()) {
-    return <AdminBusinessesV2 businesses={overview.businesses} badges={badges} />;
+    return <AdminBusinessesV2 businesses={overview.businesses} badges={badges} usage={usage} />;
   }
 
   return (

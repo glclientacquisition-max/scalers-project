@@ -205,6 +205,7 @@ export async function qualityBadges(): Promise<Record<string, QualityBadge>> {
       score: row.score,
       dropping: row.dropping,
       droppingReason: row.droppingReason,
+      ...(row.trend.length >= 2 ? { scores: row.trend } : {}),
     };
   }
   return badges;
