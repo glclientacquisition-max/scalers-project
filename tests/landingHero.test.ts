@@ -15,7 +15,7 @@ test("hero is a luminous blue that fades into the page, with a frosted call card
   assert.match(landing, /to-canvas/);
   assert.doesNotMatch(landing, /bg-brand-900/);
   assert.match(landing, /<HeroCall glass/);
-  assert.match(landing, /text-sky-100\/90/);
+  assert.match(landing, /text-white\/90/);
   assert.equal((landing.match(/<h1/g) || []).length, 1);
   const copy = read("components/marketing/landingCopy.ts");
   assert.match(copy, /h1: "Your 24-hour Business Assistant\."/);

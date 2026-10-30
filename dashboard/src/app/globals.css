@@ -522,6 +522,28 @@ h3,
 }
 .landing-cta { background: var(--landing-cta); color: var(--landing-cta-on); }
 .landing-cta:hover { background: var(--landing-cta-hover); }
+/* Visible on both the blue hero and the light page. Brand is the focus ring. */
+.landing-focus:focus-visible,
+.landing-card:focus-within {
+  outline: none;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 5px #0096ff;
+}
+.landing-skip {
+  position: absolute;
+  left: 1rem;
+  top: 0.5rem;
+  z-index: 40;
+  transform: translateY(-150%);
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  color: #0a192f;
+  font-weight: 600;
+}
+.landing-skip:focus {
+  transform: none;
+}
 .landing-glow { background: radial-gradient(55% 60% at 50% 55%, var(--landing-glow), transparent 72%); }
 /*
  * Premium backdrop: two large, soft blue orbs behind the product card (reference video). Radial gradients only, no

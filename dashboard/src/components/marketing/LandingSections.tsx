@@ -1,3 +1,4 @@
+import { PlusIcon } from "@heroicons/react/20/solid";
 import Link from "next/link";
 import { Stamp } from "@/components/ui/Stamp";
 
@@ -129,7 +130,7 @@ export function LandingPackages() {
         <p className="mt-3 max-w-xl text-base leading-relaxed text-ink-2">Monthly packages in KES.</p>
         <Link
           href="/pricing"
-          className="mt-2 inline-flex min-h-11 items-center text-base font-semibold text-[var(--landing-cta)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:shadow-focus"
+          className="landing-focus mt-2 inline-flex min-h-11 items-center text-base font-semibold text-[var(--landing-cta)] underline-offset-4 hover:underline"
         >
           See pricing
         </Link>
@@ -148,11 +149,9 @@ export function LandingQuestions() {
         <div className="mt-4 max-w-xl divide-y divide-hairline border-y border-hairline">
           {QUESTIONS.map(([q, a]) => (
             <details key={q} className="group py-1">
-              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-ink focus-visible:outline-none focus-visible:shadow-focus [&::-webkit-details-marker]:hidden">
+              <summary className="landing-focus flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-md text-base font-semibold text-ink [&::-webkit-details-marker]:hidden">
                 {q}
-                <span aria-hidden className="text-xl text-ink-2 transition-transform group-open:rotate-45 motion-reduce:transition-none">
-                  +
-                </span>
+                <PlusIcon aria-hidden className="h-5 w-5 shrink-0 text-ink-2 transition-transform group-open:rotate-45 motion-reduce:transition-none" />
               </summary>
               <p className="pb-3 text-base leading-relaxed text-ink-2">{a}</p>
             </details>

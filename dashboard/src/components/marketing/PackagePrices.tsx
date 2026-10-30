@@ -19,7 +19,7 @@ const INCLUDED: Array<{ label: string; key: "minutes" | "sms" | "email" | "staff
 
 
 const cardBase =
-  "relative flex h-full cursor-pointer flex-col rounded-2xl border-2 bg-surface p-5 transition-colors focus-within:shadow-focus";
+  "landing-card relative flex h-full cursor-pointer flex-col rounded-2xl border-2 bg-surface p-5 transition-colors";
 
 function Pick({
   value,
@@ -171,7 +171,7 @@ export function PackagePrices({ board }: { board: PublicPackageBoard }) {
       </section>
 
       <div
-        className="sticky bottom-0 z-10 -mx-5 mt-8 flex items-center gap-3 border-t border-line bg-canvas px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:static sm:mx-0 sm:mt-10 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0"
+        className="mt-10 flex items-center gap-3"
         data-pricing-dock=""
       >
         <p className="max-w-[42%] shrink-0 truncate text-sm font-medium text-ink" data-pricing-picked="">

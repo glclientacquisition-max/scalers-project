@@ -23,6 +23,7 @@ import { AppearanceFooter } from "@/components/ThemePicker";
 export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?: boolean; copy?: LandingCopy }) {
   return (
     <main className="landing-scope overflow-x-clip bg-canvas text-ink" data-landing={copy.key}>
+      <a href="#landing-start" className="landing-skip landing-focus">Skip to content</a>
       <div className="relative isolate overflow-hidden text-white" data-landing-hero="">
         <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
           <div
@@ -44,7 +45,7 @@ export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?:
           <a
             href="/"
             aria-label="Scalers home"
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl focus-visible:outline-none focus-visible:shadow-focus"
+            className="landing-focus inline-flex min-h-11 items-center gap-2 rounded-xl"
           >
             <Image src={brandAssets.iconTransparent} alt="" width={36} height={36} priority className="h-9 w-9 object-contain" />
             <span className="font-display text-xl tracking-tight text-white">Scalers</span>
@@ -53,14 +54,14 @@ export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?:
             {signedIn ? (
               <a
                 href={appEntryHref("/home")}
-                className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white focus-visible:outline-none focus-visible:shadow-focus"
+                className="landing-focus inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white"
               >
                 Open Desk
               </a>
             ) : (
               <a
                 href={appEntryHref("/login")}
-                className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus"
+                className="landing-focus inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/90 hover:text-white"
               >
                 Sign in
               </a>
@@ -68,17 +69,17 @@ export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?:
           </nav>
         </header>
 
-        <section className="mx-auto grid max-w-desk items-center gap-10 px-5 pb-16 pt-8 sm:px-8 lg:grid-cols-[1.1fr_1fr] lg:gap-14 lg:pb-24 lg:pt-14">
+        <section id="landing-start" className="mx-auto grid max-w-desk items-center gap-10 px-5 pb-16 pt-8 sm:px-8 lg:grid-cols-[1.1fr_1fr] lg:gap-14 lg:pb-24 lg:pt-14">
           <div className="min-w-0 max-w-xl">
             <h1 className="landing-rise font-display text-[2.25rem] leading-[1.1] tracking-tight text-white text-balance sm:text-5xl lg:text-6xl">
               {copy.h1}
             </h1>
-            <p className="landing-rise landing-rise-delay-1 mt-4 max-w-md text-lg leading-relaxed text-sky-100/90">{copy.sub}</p>
+            <p className="landing-rise landing-rise-delay-1 mt-4 max-w-md text-lg leading-relaxed text-white/90">{copy.sub}</p>
             <div className="landing-rise landing-rise-delay-2 mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
               {signedIn ? <LandingCta href="/home" label="Open Desk" tone="onDark" wide /> : <LandingCta tone="onDark" wide />}
               <a
                 href="/pricing"
-                className="inline-flex min-h-[3.25rem] items-center justify-center rounded-xl border border-white/30 px-6 text-base font-semibold text-white transition-colors hover:border-white/55 hover:bg-white/5 focus-visible:outline-none focus-visible:shadow-focus"
+                className="landing-focus inline-flex min-h-[3.25rem] items-center justify-center rounded-xl border border-white/40 px-6 text-base font-semibold text-white transition-colors hover:border-white/70 hover:bg-white/10"
               >
                 See pricing
               </a>

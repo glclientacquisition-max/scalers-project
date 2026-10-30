@@ -18,6 +18,7 @@ export default function PricingPage() {
   return (
     <div className={`${marketingFontClass} contents`}>
       <main className="landing-scope min-h-dvh overflow-x-clip bg-canvas text-ink" data-pricing="">
+        <a href="#pricing-start" className="landing-skip landing-focus">Skip to content</a>
         <div className="relative isolate overflow-hidden bg-brand-900 text-white" data-pricing-hero="">
           <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
             <div
@@ -37,21 +38,21 @@ export default function PricingPage() {
             <a
               href={marketingHomeHref()}
               aria-label="Scalers home"
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl focus-visible:outline-none focus-visible:shadow-focus"
+              className="landing-focus inline-flex min-h-11 items-center gap-2 rounded-xl"
             >
               <Image src={brandAssets.iconTransparent} alt="" width={36} height={36} priority className="h-9 w-9 object-contain" />
               <span className="font-display text-xl tracking-tight text-white">Scalers</span>
             </a>
             <a
               href={appEntryHref("/login")}
-              className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus"
+              className="landing-focus inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/90 hover:text-white"
             >
               Sign in
             </a>
           </header>
-          <section className="mx-auto max-w-desk px-5 pb-28 pt-8 sm:px-8">
+          <section id="pricing-start" className="mx-auto max-w-desk px-5 pb-28 pt-8 sm:px-8">
             <h1 className="font-display text-[2.25rem] leading-[1.1] tracking-tight text-white text-balance sm:text-5xl">Pricing</h1>
-            <p className="mt-3 max-w-md text-lg leading-relaxed text-sky-100/90">Monthly packages in KES.</p>
+            <p className="mt-3 max-w-md text-lg leading-relaxed text-white/90">Monthly packages in KES.</p>
           </section>
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-b from-transparent to-canvas" data-pricing-fade="" />
         </div>
