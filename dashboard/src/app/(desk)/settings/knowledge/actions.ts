@@ -9,7 +9,8 @@ import { KB_ITEM_COLS, afterKbWrite, kbRowToItem, loadKbItems, writeKbItems } fr
 import { pingKbCompile } from "@/lib/kb.server";
 import { deskKbItemStates } from "@/lib/deskFeatureFlags";
 
-export type KbActionResult = { ok: true } | { ok: false; error: string };
+/** restamped false: saved, but the call facts could not be re-checked yet (the Desk says so instead of "on calls"). */
+export type KbActionResult = { ok: true; restamped?: boolean } | { ok: false; error: string };
 
 async function ownerTenant(): Promise<{ id: string } | { error: string }> {
   const tenant = await getCurrentTenant();
@@ -26,9 +27,11 @@ async function loadItem(tenantId: string, id: string): Promise<KbItem | null> {
 async function writeItems(tenantId: string, items: KbItem[], opts: { replaceKind?: KbKind } = {}): Promise<KbActionResult> {
   const w = await writeKbItems(tenantId, items, opts);
   if (!w.ok) return { ok: false, error: w.error };
-  await afterKbWrite(tenantId, "desk");
+  // Owner-reviewed write: re-stamp the call facts for what was written (hidden rows leave the catalogue).
+  const restampIds = items.filter((i) => i.status !== "hidden").map((i) => i.id);
+  const { restamped } = await afterKbWrite(tenantId, "desk", { restampIds });
   revalidatePath("/settings/knowledge");
-  return { ok: true };
+  return { ok: true, ...(restamped === false ? { restamped: false } : {}) };
 }
 
 async function categoryId(tenantId: string, name: string): Promise<string | null> {

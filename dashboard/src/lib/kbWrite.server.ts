@@ -5,6 +5,10 @@ import { pingKbCompile } from "@/lib/kb.server";
 import { mirrorLegacy, type KbCategory, type KbItem, type KbKind } from "@/lib/kbCore";
 import { extractServicesNotes } from "@/lib/servicesCatalog";
 import { planLegacyImport, planTextImport, servicesOfferedFromKb, type KbLegacyItem } from "@/lib/kbLegacy";
+import { catalogRestampPaths } from "@/lib/kbRestamp";
+import { planFactConfirm } from "@/lib/factConfirm";
+import { ownerConfirmPlan, readSavedFactRow } from "@/lib/ownerAttestFields";
+import { listTenantFieldMeta } from "@/lib/tenantFieldProvenance";
 
 /**
  * v2 KB writes, Desk side. kb_items is the source of truth (Alvin, 28 Oct). Rules for every caller:
@@ -81,11 +85,37 @@ export async function mirrorKbToLegacy(tenantId: string, opts: { notes?: string 
   return !error;
 }
 
-/** After any KB write: mirror, bust caches, ask Voice to compile (in the background). */
-export async function afterKbWrite(tenantId: string, by = "desk", opts: { notes?: string } = {}): Promise<void> {
-  await mirrorKbToLegacy(tenantId, opts);
+/**
+ * Owner-reviewed KB write: re-stamp tenant_field_meta for the written items (and rows the owner had already confirmed)
+ * as the mirror now reads them. Without this every Catalogue save left the `.name` hash stale. Never fails the save.
+ * Returns false when the re-stamp could not run (the save still stands).
+ */
+export async function restampKbCatalogMeta(tenantId: string, ids: string[]): Promise<boolean> {
+  try {
+    const [saved, meta] = await Promise.all([readSavedFactRow(getSupabaseAdmin(), tenantId), listTenantFieldMeta(tenantId)]);
+    if (!saved) return false;
+    const ownerPaths = (meta || []).filter((m) => m.source === "owner" && String(m.field_path).startsWith("catalog.")).map((m) => String(m.field_path));
+    const paths = catalogRestampPaths(saved, ids, ownerPaths);
+    if (!paths.length) return true;
+    // before = after: nothing reads as changed, so only these explicit paths are stamped (same as restampPriceHash).
+    await ownerConfirmPlan(tenantId, planFactConfirm({ scope: "catalog", before: saved, after: saved, explicitPaths: paths }));
+    return true;
+  } catch (err) {
+    console.warn(`[kb] catalog meta restamp tenant=${tenantId} failed`, err instanceof Error ? err.message : "");
+    return false;
+  }
+}
+
+/**
+ * After any KB write: mirror, bust caches, ask Voice to compile (in the background). `restampIds`: owner-reviewed
+ * writes only (Desk editor, Paste, Import confirm); onboarding and /api/tenant stay unstamped for the owner to confirm.
+ */
+export async function afterKbWrite(tenantId: string, by = "desk", opts: { notes?: string; restampIds?: string[] } = {}): Promise<{ restamped: boolean | null }> {
+  const mirrored = await mirrorKbToLegacy(tenantId, opts);
+  const restamped = opts.restampIds && mirrored ? await restampKbCatalogMeta(tenantId, opts.restampIds) : opts.restampIds ? false : null;
   bustTenantCache(tenantId);
   void pingKbCompile(tenantId, { by });
+  return { restamped };
 }
 
 export type KbAddResult = { ok: true; added: number; kept: number } | { ok: false; skipped: "no_kb" | "error" };
