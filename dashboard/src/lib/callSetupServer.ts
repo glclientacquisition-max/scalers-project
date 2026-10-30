@@ -1,7 +1,7 @@
 import "server-only";
 import { createWorkspaceDataClient } from "@/lib/tenant";
 import { parseCallSetup, type CallSetup } from "@/lib/callSetupStore";
-import { TEST_WINDOW_MINUTES, matchTestCall, suggestTestPhone, type CallSetupActivity } from "@/lib/callSetupStatus";
+import { TEST_WINDOW_MINUTES, matchTestCall, matchTestCallId, suggestTestPhone, type CallSetupActivity } from "@/lib/callSetupStatus";
 
 export type CallSetupState = {
   /** False until tenants.call_setup exists (prod before its migration): the UI falls back to browser storage. */
@@ -31,7 +31,7 @@ export async function loadCallSetupState(tenantId: string): Promise<CallSetupSta
   const setup = parseCallSetup(raw);
   if (!setup.opened_at && !setup.tested_at) return { supported: true, setup, activity: null };
 
-  type Row = { created_at: string; caller_number?: string | null };
+  type Row = { id?: string | null; created_at: string; caller_number?: string | null };
   const none = Promise.resolve({ data: [] as Row[], error: null });
   const calls = (cols = "created_at") => ws.client.from("calls").select(cols).eq("tenant_id", tenantId);
   const start = setup.test_started_at ? Date.parse(setup.test_started_at) : NaN;
@@ -41,7 +41,7 @@ export async function loadCallSetupState(tenantId: string): Promise<CallSetupSta
       : none,
     calls().order("created_at", { ascending: false }).limit(1),
     setup.test_from && !Number.isNaN(start) && !setup.tested_at
-      ? calls("created_at, caller_number")
+      ? calls("id, created_at, caller_number")
           .gte("created_at", new Date(start).toISOString())
           .lte("created_at", new Date(start + TEST_WINDOW_MINUTES * 60_000).toISOString())
           .order("created_at", { ascending: true })
@@ -55,10 +55,14 @@ export async function loadCallSetupState(tenantId: string): Promise<CallSetupSta
     setup,
     rows(window).map((r) => ({ caller_number: r.caller_number ?? null, created_at: String(r.created_at) }))
   );
+  const testMatchCallId = matchTestCallId(
+    setup,
+    rows(window).map((r) => ({ id: r.id ?? null, caller_number: r.caller_number ?? null, created_at: String(r.created_at) }))
+  );
   return {
     supported: true,
     setup,
-    activity: { testMatchAt, firstCallAfterOpenAt: at(first), lastCallAt: at(last) },
+    activity: { testMatchAt, testMatchCallId, firstCallAfterOpenAt: at(first), lastCallAt: at(last) },
   };
 }
 
