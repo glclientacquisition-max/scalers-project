@@ -37,6 +37,26 @@ export function nairobiMonthStart(now: Date): number {
   return Date.UTC(eat.getUTCFullYear(), eat.getUTCMonth(), 1) - 3 * 3600000;
 }
 
+/** Collected last calendar month in Nairobi. Null when that month has no payments. */
+export function lastMonthCollected(rows: InvoiceRow[], now: Date): { cents: number; label: string } | null {
+  const start = nairobiMonthStart(now);
+  const eat = new Date(start + 3 * 3600000);
+  const prevStart = Date.UTC(eat.getUTCFullYear(), eat.getUTCMonth() - 1, 1) - 3 * 3600000;
+  let cents = 0;
+  let n = 0;
+  for (const r of rows) {
+    if (!counts(r) || !r.paidAt) continue;
+    const t = Date.parse(r.paidAt);
+    if (t >= prevStart && t < start) {
+      cents += r.paidCents;
+      n += 1;
+    }
+  }
+  if (n === 0) return null;
+  const label = new Intl.DateTimeFormat("en-KE", { month: "long", timeZone: "Africa/Nairobi" }).format(new Date(prevStart + 3 * 3600000));
+  return { cents, label };
+}
+
 export function billingHomeTotals(rows: InvoiceRow[], now: Date): BillingHomeTotals {
   const start = nairobiMonthStart(now);
   const t: BillingHomeTotals = { billedThisMonthCents: 0, collectedThisMonthCents: 0, outstandingCents: 0, overdueCents: 0, overdueCount: 0 };
