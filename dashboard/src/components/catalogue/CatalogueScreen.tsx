@@ -36,7 +36,6 @@ import {
   statusChoices,
   savedLine,
   draftDirty,
-  savesInstantly,
   sheetErrors,
   statusLine,
   withAmount,
@@ -154,7 +153,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
             </p>
           </div>
           {canEdit && counts.needPrice ? (
-            <Button size="sm" variant="primary" onClick={() => openFix(null)} data-fix="">
+            <Button size="md" variant="primary" onClick={() => openFix(null)} data-fix="">
               Fix
             </Button>
           ) : null}
@@ -179,11 +178,11 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
                       <span className={c.ok ? "w-12 shrink-0 text-ink-2" : "w-12 shrink-0 font-semibold text-attention"}>{c.ok ? "Done" : "To do"}</span>
                       <span className="min-w-0 flex-1 text-ink">{CHECK_LABEL[c.id] || c.id}</span>
                       {!c.ok && c.id === "catalogue" && canEdit ? (
-                        <button type="button" className="text-meta font-semibold text-accent" onClick={() => openFix(null)}>
+                        <button type="button" className="-my-3 inline-flex min-h-11 items-center text-meta font-semibold text-accent" onClick={() => openFix(null)}>
                           Fix
                         </button>
                       ) : !c.ok && CHECK_FIX[c.id] && CHECK_FIX[c.id] !== "/settings/knowledge" ? (
-                        <Link href={CHECK_FIX[c.id]} className="text-meta font-semibold text-accent">
+                        <Link href={CHECK_FIX[c.id]} className="-my-3 inline-flex min-h-11 items-center text-meta font-semibold text-accent">
                           Fix
                         </Link>
                       ) : null}
@@ -191,7 +190,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
                   ))}
                 </ul>
                 {canEdit ? (
-                  <Button variant="tonal" size="sm" pending={pending} onClick={() => run(actions.compile, "Checking now. This takes a few seconds.")}>
+                  <Button variant="tonal" size="md" pending={pending} onClick={() => run(actions.compile, "Checking now. This takes a few seconds.")}>
                     Check again
                   </Button>
                 ) : null}
@@ -213,11 +212,11 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
           <h2 className={heading}>What you sell</h2>
           {canEdit && counts.total ? (
             <div className="flex gap-2">
-              <Button variant="tonal" size="sm" onClick={() => setPasting(true)}>
+              <Button variant="tonal" size="md" onClick={() => setPasting(true)}>
                 Paste a list
               </Button>
               {/* One filled button per screen: Fix while prices are missing, else Add. */}
-              <Button variant={counts.needPrice ? "tonal" : "primary"} size="sm" leading={<PlusIcon aria-hidden="true" className="size-4" />} onClick={() => setEditing({ draft: newDraft(defaultKind, categories), fixing: false })} data-add="">
+              <Button variant={counts.needPrice ? "tonal" : "primary"} size="md" leading={<PlusIcon aria-hidden="true" className="size-4" />} onClick={() => setEditing({ draft: newDraft(defaultKind, categories), fixing: false })} data-add="">
                 Add
               </Button>
             </div>
@@ -268,13 +267,13 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
                   const muted = itemState(it) !== "offered";
                   const body = (
                     <>
-                      <span className="min-w-0 flex-1">
+                      <span className="min-w-0 flex-1 max-[399px]:basis-full">
                         <span className={cx("block truncate text-body font-medium", muted ? "text-ink-2" : "text-ink")}>{it.name_en}</span>
                         {group || tags.length ? (
                           <span className="block truncate text-meta text-ink-2">{[...tags, group].filter(Boolean).join(" · ")}</span>
                         ) : null}
                       </span>
-                      <span className={cx("shrink-0 text-right text-body tabular-nums", unpriced ? "font-semibold text-attention" : "text-ink")} data-price-words="">
+                      <span className={cx("shrink-0 text-right text-body tabular-nums max-[399px]:text-left max-[399px]:text-meta", unpriced ? "font-semibold text-attention" : "text-ink")} data-price-words="">
                         {it.status === "not_offered" ? "" : rowPriceInWords(it)}
                       </span>
                     </>
@@ -282,11 +281,11 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
                   return (
                     <li key={it.id} data-item-row={it.id} data-item-state={itemState(it)}>
                       {canEdit ? (
-                        <button type="button" onClick={() => setEditing({ draft: editDraft(it, categories), fixing: false })} className={cx("flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left hover:bg-surface-2", deskShiftClass)}>
+                        <button type="button" onClick={() => setEditing({ draft: editDraft(it, categories), fixing: false })} className={cx("flex min-h-14 w-full flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-2 text-left hover:bg-surface-2", deskShiftClass)} data-row-two-line="">
                           {body}
                         </button>
                       ) : (
-                        <div className="flex min-h-14 items-center gap-3 px-4 py-2">{body}</div>
+                        <div className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-2">{body}</div>
                       )}
                     </li>
                   );
@@ -297,7 +296,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
             )}
             {list.length > shown ? (
               <div className="border-t border-hairline px-4 py-2">
-                <Button variant="ghost" size="sm" onClick={() => setShown((n) => n + SHOW_STEP)}>
+                <Button variant="ghost" size="md" onClick={() => setShown((n) => n + SHOW_STEP)}>
                   {`Show ${Math.min(SHOW_STEP, list.length - shown)} more`}
                 </Button>
               </div>
@@ -367,19 +366,19 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
                 {swEdit?.id === it.id ? (
                   <>
                     <Input aria-label={`Kiswahili name for ${it.name_en}`} value={swEdit.text} onChange={(e) => setSwEdit({ id: it.id, text: e.target.value })} className="max-w-56" />
-                    <Button size="sm" variant="tonal" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "edit", swEdit.text), "Saved")}>
+                    <Button size="md" variant="tonal" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "edit", swEdit.text), "Saved")}>
                       Save
                     </Button>
                   </>
                 ) : (
                   <>
-                    <Button size="sm" variant="tonal" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "approve"), "Approved")}>
+                    <Button size="md" variant="tonal" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "approve"), "Approved")}>
                       Approve
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setSwEdit({ id: it.id, text: it.name_sw_suggested || "" })}>
+                    <Button size="md" variant="ghost" onClick={() => setSwEdit({ id: it.id, text: it.name_sw_suggested || "" })}>
                       Edit
                     </Button>
-                    <Button size="sm" variant="ghost" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "reject"))}>
+                    <Button size="md" variant="ghost" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "reject"))}>
                       Reject
                     </Button>
                   </>
@@ -476,9 +475,6 @@ function ItemSheet({
   const [d, setD] = useState<KbDraft>(draft);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const extraChoice = d.price_mode !== "none" && d.price_mode !== "fixed";
-  const [choicesOpen, setChoicesOpen] = useState(false);
-  const showChoices = choicesOpen || extraChoice;
   // More opens by itself only when the item is paused or not offered, so that state is never hidden.
   const [moreOpen, setMoreOpen] = useState(d.status !== "active");
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -501,12 +497,8 @@ function ItemSheet({
     });
   };
 
-  const choose = (mode: PriceChoice) => {
-    const next = withChoice(d, mode);
-    setD(next);
-    // One rule: a price that needs no number saves the moment it is picked (existing items).
-    if (savesInstantly(mode) && !isNew) save(next);
-  };
+  // Picking a price type never saves by itself (30 Oct): Save is the one way to save.
+  const choose = (mode: PriceChoice) => setD(withChoice(d, mode));
 
   const remove = () =>
     start(async () => {
@@ -514,7 +506,15 @@ function ItemSheet({
       const r = await actions.hideItem(d.id);
       if (!r.ok) setError(r.error);
       else {
-        notify(`Removed ${d.name_en}.`);
+        const removed = { ...d, row_version: undefined };
+        notify(`Removed ${d.name_en}.`, {
+          action: {
+            label: "Undo",
+            run: () => {
+              void actions.saveItem(removed).then((u) => notify(u.ok ? `${removed.name_en} is back.` : u.error, u.ok ? undefined : { tone: "error" }));
+            },
+          },
+        });
         onSaved(undefined);
       }
     });
@@ -589,6 +589,27 @@ function ItemSheet({
 
         <fieldset className="space-y-2" data-price-section="">
           <legend className="mb-1.5 text-meta font-medium text-ink">Price</legend>
+          <div id="item-price-choices" role="radiogroup" aria-label="Price type" className="flex flex-wrap gap-2" data-price-choices="">
+            {PRICE_CHOICES.map((c) => {
+              const on = d.price_mode === c.key;
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => choose(c.key)}
+                  className={cx(
+                    "min-h-11 rounded-xl border px-3 text-meta font-medium",
+                    deskShiftClass,
+                    on ? "border-accent bg-accent-tonal text-accent" : "border-hairline bg-surface text-ink hover:border-ink-3",
+                  )}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
           {d.price_mode === "range" ? (
             <div className="grid grid-cols-2 gap-2">
               <Field id="item-min" label="Lowest (KSh)">
@@ -627,42 +648,6 @@ function ItemSheet({
           )}
           {d.price_mode === "none" ? <p className="text-meta font-medium text-attention">Needs a price</p> : null}
 
-          {extraChoice ? null : (
-            <button
-              type="button"
-              aria-expanded={choicesOpen}
-              aria-controls="item-price-choices"
-              onClick={() => setChoicesOpen((v) => !v)}
-              className="inline-flex min-h-11 items-center gap-1 text-meta font-semibold text-accent"
-            >
-              Price changes?
-              <ChevronDownIcon aria-hidden="true" className={cx("size-4", choicesOpen && "rotate-180")} />
-            </button>
-          )}
-          {showChoices ? (
-            <div id="item-price-choices" role="radiogroup" aria-label="Price type" className="flex flex-wrap gap-2" data-price-choices="">
-              {PRICE_CHOICES.map((c) => {
-                const on = d.price_mode === c.key;
-                return (
-                  <button
-                    key={c.key}
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    onClick={() => choose(c.key)}
-                    className={cx(
-                      "min-h-11 rounded-xl border px-3 text-meta font-medium",
-                      deskShiftClass,
-                      on ? "border-accent bg-accent-tonal text-accent" : "border-hairline bg-surface text-ink hover:border-ink-3",
-                    )}
-                  >
-                    {c.label}
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
-          {showChoices && !isNew ? <p className="text-meta text-ink-2">Custom quote, site visit and Free save as soon as you pick them.</p> : null}
         </fieldset>
 
         <div className="border-t border-hairline pt-2">
