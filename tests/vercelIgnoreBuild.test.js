@@ -142,6 +142,11 @@ describe("vercel-ignore-build.sh on scalers-staging", () => {
     assert.equal(r.status, 0, r.out);
   });
 
+  it("builds land/* landing PR previews", () => {
+    const r = run({ ...base, VERCEL_GIT_COMMIT_REF: "land/hero", VERCEL_GIT_PREVIOUS_SHA: shas.root, VERCEL_GIT_COMMIT_SHA: shas.desk });
+    assert.equal(r.status, 1, r.out);
+  });
+
   it("skips main (production target on scalers-staging)", () => {
     const r = run({ ...base, VERCEL_ENV: "production", VERCEL_GIT_COMMIT_REF: "main", VERCEL_GIT_COMMIT_SHA: shas.desk });
     assert.equal(r.status, 0, r.out);
