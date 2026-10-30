@@ -129,12 +129,6 @@ test("wiring: confirm-price patches one item by id from a fresh read", () => {
   assert.ok(/readCatalogFresh\(/.test(src));
 });
 
-test("wiring: import merges into a fresh read and stamps typed prices", () => {
-  const src = read("dashboard/src/app/(desk)/settings/catalogActions.ts");
-  assert.ok(/readCatalogFresh\(/.test(src));
-  assert.ok(src.includes("withImportedPricing("));
-});
-
 test("wiring: Add prices list freezes while typing and uses the shared rule", () => {
   const src = read("dashboard/src/components/TenantForm.tsx");
   assert.ok(src.includes("isUnpricedRow("));

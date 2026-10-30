@@ -24,7 +24,6 @@ test("tenant row is cached per tenant with a tag, and every tenants write busts 
   assert.match(src("lib/tenantCache.ts"), /`tenant:\$\{tenantId\}`/);
   for (const f of [
     "app/(desk)/settings/actions.ts",
-    "app/(desk)/settings/catalogActions.ts",
     "app/(desk)/settings/structuredActions.ts",
     "app/api/tenant/route.ts",
     "app/onboarding/setupActions.ts",

@@ -167,7 +167,6 @@ describe("kb writers: no writer changes an owner's item state or hides items (Br
     const files = {
       "dashboard/src/app/onboarding/setupActions.ts": /importCatalogueToKb\(/,
       "dashboard/src/app/onboarding/actions.ts": /importCatalogueToKb\(/,
-      "dashboard/src/app/(desk)/settings/ingestActions.ts": /importCatalogueToKb\(/,
       "dashboard/src/app/(desk)/settings/actions.ts": /importCatalogueToKb\(/,
       "dashboard/src/app/api/tenant/route.ts": /addKbItemsFromText\(/,
     };

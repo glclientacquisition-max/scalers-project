@@ -7,13 +7,13 @@ import { SettingsRail } from "@/components/SettingsSideNav";
 import { settingsConsoleClass } from "@/components/settingsUi";
 import { KnowledgeCatalogue } from "@/components/catalogue/KnowledgeCatalogue";
 import { loadKbState } from "@/lib/kb.server";
-import { deskAddMany, deskAssistantSayPage, deskImportPhoto, deskKbItemStates } from "@/lib/deskFeatureFlags";
+import { deskAssistantSayPage, deskImportPhoto, deskKbItemStates } from "@/lib/deskFeatureFlags";
 import { memberCan } from "@/lib/requireMember";
 import { loadSettingsStatuses } from "@/lib/settingsRailStatus";
 import { getCurrentTenant } from "@/lib/tenant";
 import { parseVertical } from "@/lib/vertical";
 
-type Search = { filter?: string | string[]; paste?: string | string[]; import?: string | string[] };
+type Search = { filter?: string | string[]; paste?: string | string[]; import?: string | string[]; many?: string | string[] };
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 /** v2 Knowledge Base: what you sell, what it costs, and whether calls use it yet. Viewers read it. */
@@ -45,8 +45,7 @@ async function KnowledgeBody({ searchParams }: { searchParams: Promise<Search> }
             canEdit={canEdit}
             statesEnabled={deskKbItemStates()}
             initialNeedPrice={needPrice}
-            initialPaste={first(search.paste) === "1" || first(search.import) === "1"}
-            addMany={deskAddMany()}
+            initialPaste={first(search.many) === "1" || first(search.paste) === "1" || first(search.import) === "1"}
             importPhoto={deskImportPhoto()}
           />
         </div>

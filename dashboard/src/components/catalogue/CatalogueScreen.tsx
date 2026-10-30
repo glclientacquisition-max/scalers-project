@@ -76,11 +76,9 @@ export type CatalogueScreenProps = {
   canEdit: boolean;
   /** ?filter=unpriced from Overview "Add prices". Always shown with a way out. */
   initialNeedPrice?: boolean;
-  /** ?paste=1 (old Import links) opens Paste a list. */
+  /** ?many=1 (and old ?paste=1 / Import links) opens Add many. */
   initialPaste?: boolean;
-  /** "Add many" (staging flag DESK_ADD_MANY): one sheet for a pasted list or a CSV file. Off: Paste a list. */
-  addMany?: boolean;
-  /** Photo and Website sources in Add many (staging flag DESK_IMPORT_PHOTO). Needs addMany. */
+  /** Photo and Website sources in Add many (staging flag DESK_IMPORT_PHOTO). */
   importPhoto?: boolean;
   /**
    * Paused and Not offered (the item Status control). Server flag DESK_KB_ITEM_STATES, off by default
@@ -97,8 +95,7 @@ const SHOW_STEP = 150;
 
 export function CatalogueScreen(props: CatalogueScreenProps) {
   const { items, categories, live, latest, readiness, liveVersion, onCalls, vertical, canEdit, actions } = props;
-  const addMany = !!props.addMany;
-  const manyLabel = addMany ? "Add many" : "Paste a list";
+  const manyLabel = "Add many";
   const statesEnabled = !!props.statesEnabled;
   const router = useRouter();
   const homeServices = vertical === "home_services";
@@ -420,8 +417,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
 
       {pasting ? (
         <PasteSheet
-          addMany={addMany}
-          importPhoto={addMany && !!props.importPhoto && !!actions.photoToLines && !!actions.websiteToLines}
+          importPhoto={!!props.importPhoto && !!actions.photoToLines && !!actions.websiteToLines}
           existing={items}
           homeServices={homeServices}
           defaultKind={defaultKind}
@@ -772,9 +768,8 @@ async function shrinkPhoto(file: File): Promise<{ mimeType: string; base64: stri
   }
 }
 
-/** Paste a list: preview first, then one batch of up to 500. Replaces the Import tab for the catalogue. */
+/** Add many: paste, a file, a photo or a website; preview first, then one batch of up to 500. The only bulk add (the Import tab is gone). */
 function PasteSheet({
-  addMany,
   importPhoto,
   existing,
   homeServices,
@@ -783,7 +778,6 @@ function PasteSheet({
   onClose,
   onSaved,
 }: {
-  addMany: boolean;
   importPhoto: boolean;
   existing: KbItem[];
   homeServices: boolean;
@@ -871,7 +865,7 @@ function PasteSheet({
     <Sheet
       open
       onOpenChange={(o) => (o ? null : onClose())}
-      title={replacing ? "Replace my list" : addMany ? "Add many" : "Paste a list"}
+      title={replacing ? "Replace my list" : "Add many"}
       size="lg"
       description={summary ? pasteSummaryLine(summary) : undefined}
       footer={
@@ -932,7 +926,7 @@ function PasteSheet({
                 ]}
               />
             ) : null}
-            {addMany ? (
+            {(
               <SegmentedControl
                 label="From"
                 value={source}
@@ -948,7 +942,7 @@ function PasteSheet({
                     : []),
                 ]}
               />
-            ) : null}
+            )}
             {source === "photo" ? (
               <Field id="add-many-photo" label="Photo of your price list" hint="A menu, rate card or price board. We read it, you check every line before anything is saved.">
                 {(p) => (

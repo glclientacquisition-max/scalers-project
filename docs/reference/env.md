@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-250 variables.
+248 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -66,11 +66,9 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
 | `DATABASE_URL` | scripts | `scripts/verify-staging-schema.js` |
-| `DESK_ADD_MANY` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_ASSISTANT_SAY_PAGE` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_ATTEST_SERVICE_AREAS` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
 | `DESK_FEEL` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
-| `DESK_IMPORT_FACTS` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_IMPORT_PHOTO` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_KB_ITEM_STATES` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_LOOKUP_PREVIEW` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
@@ -80,7 +78,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `FACT_HASH_MODE` | desk, scripts, voice | `dashboard/src/lib/tenantFieldProvenance.ts`<br>`scripts/ack-rule-report.js`<br>`scripts/replay-voice-suite.js`<br>+2 more |
 | `FACT_PAYMENTS_V2_HASH` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
 | `FACT_SAVE_IS_CONFIRM` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
-| `GEMINI_API_KEY` | desk, scripts, voice | `dashboard/src/app/(desk)/settings/catalogActions.ts`<br>`dashboard/src/app/(desk)/settings/pronunciationGeminiScanActions.ts`<br>`dashboard/src/lib/faqFromTranscript.ts`<br>+12 more |
+| `GEMINI_API_KEY` | desk, scripts, voice | `dashboard/src/app/(desk)/settings/pronunciationGeminiScanActions.ts`<br>`dashboard/src/lib/faqFromTranscript.ts`<br>`dashboard/src/lib/gemini.ts`<br>+11 more |
 | `GEMINI_AUDIO_MODEL` | desk | `dashboard/src/lib/gemini.ts` |
 | `GEMINI_BACKUP_MODEL` | voice | `src/conversation/geminiVoice.js` |
 | `GEMINI_MAX_OUTPUT_TOKENS` | voice | `server.js`<br>`src/speech/replayVoice.js` |

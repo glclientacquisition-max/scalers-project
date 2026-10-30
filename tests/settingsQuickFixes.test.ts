@@ -159,7 +159,6 @@ test("import: per-row warnings for the preview", () => {
   assert.deepEqual(catalog.productImportWarnings({ name: "Dune", price: "2,500 KES" }), []);
   const sheet = read("dashboard/src/components/settings/catalog/CatalogImportSheet.tsx");
   assert.match(sheet, /warningsFor\?\.\(row\)\.length/);
-  assert.match(read("dashboard/src/components/CatalogImportPanel.tsx"), /productImportWarnings\(p\)/);
 });
 
 test("import: Update prices of existing items matches by name, any case, and removes nothing", () => {
@@ -177,14 +176,11 @@ test("import: Update prices of existing items matches by name, any case, and rem
   const kept = catalog.mergeProductCatalog(existing, incoming, "merge");
   assert.equal(kept[0].price, "2000");
   assert.equal(catalog.mergeProductCatalog(existing, incoming, "replace").length, 3);
-  const actions = read("dashboard/src/app/(desk)/settings/catalogActions.ts");
-  assert.match(actions, /rawMode === "update" \? "update"/);
-  assert.match(read("dashboard/src/components/CatalogImportPanel.tsx"), /\{ id: "update" as const, label: "Update prices" \}/);
   assert.match(read("dashboard/src/components/TenantForm.tsx"), /bulkProductsUpdate \? "update" : "merge"/);
 });
 
 test("import: a file picker sits next to the paste box", () => {
-  for (const f of ["dashboard/src/components/CatalogImportPanel.tsx", "dashboard/src/components/settings/catalog/CatalogImportSheet.tsx"]) {
+  for (const f of ["dashboard/src/components/settings/catalog/CatalogImportSheet.tsx"]) {
     const src = read(f);
     assert.match(src, /type="file"/);
     assert.match(src, /Choose a file/);
@@ -201,13 +197,6 @@ test("catalogue: phone service rows show their labels", () => {
     assert.match(form, new RegExp(`<label className=\\{serviceMobileLabelClass\\} htmlFor=\\{\`${id}-`));
     assert.doesNotMatch(form, new RegExp(`<label className="sr-only" htmlFor=\\{\`${id}-`));
   }
-});
-
-test("catalogue: Add to catalogue does not claim the next call hears it", () => {
-  const actions = read("dashboard/src/app/(desk)/settings/catalogActions.ts");
-  assert.doesNotMatch(actions, /Catalogue saved for the next call/);
-  assert.match(actions, /Added to your catalogue\. Check the prices to confirm them\./);
-  assert.doesNotMatch(actions, /Live catalog/);
 });
 
 test("identity: no other business's name as a placeholder; the toast names the field", () => {
