@@ -36,3 +36,17 @@ test("Beta is featured and picked first; no free, no trial, no hard-coded price"
   assert.match(read("app/signup/page.tsx"), /<RequestAccessForm plan=\{plan\} \/>/);
   assert.match(read("app/signup/page.tsx"), /<PlanRequestForm searchParams=\{searchParams\} \/>/);
 });
+
+test("pricing v2: at most 3 live packages, rates and the worked example from the live board, true FAQ only", async () => {
+  const ui = read("components/marketing/PackagePrices.tsx") + read("components/marketing/pricingMath.ts");
+  assert.match(ui, /MAX_PUBLIC_PACKAGES = 3/);
+  assert.match(ui, /\.slice\(0, MAX_PUBLIC_PACKAGES\)/);
+  assert.match(ui, /className="landing-orbs" aria-hidden data-pricing-orbs=""/);
+  // No prepaid wallet, M-Pesa, annual toggle or VAT claim on the public page.
+  assert.doesNotMatch(ui + read("app/pricing/page.tsx"), /wallet|top.?up|m-?pesa|annual|yearly|vat/i);
+  const { workedExample, usageRows } = await import("../dashboard/src/components/marketing/pricingMath.ts");
+  const board = { discountPercent: 0, inboundKesPerMinute: 6, outboundKesPerMinute: 9, smsKes: 1, emailKes: 0, whatsappKes: 2, packages: [] };
+  assert.equal(workedExample(board), "KES 18");
+  assert.equal(workedExample({ ...board, inboundKesPerMinute: 0 }), null);
+  assert.deepEqual(usageRows(board).map((r) => r[0]), ["Answered calls", "SMS", "WhatsApp"]);
+});
