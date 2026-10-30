@@ -212,6 +212,8 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 
 ## 4. Open PRs
 
+**Draft PR (31 Oct 2026, EAT), billing tests in CI:** branch `billing/wire-orphan-tests`. Adds `npm run test:billing`, run first inside `test:mvp` (CI step "test:mvp"; the bot token cannot edit workflow files). It runs 14 billing test files that no script ran before, plus a guard test (`tests/billingTestsWired.test.js`) that fails if a billing, package, wallet, invoice or grant test file is not named by any script. One stale assertion was fixed: `billingDataLayerReview` read only the first 2500 characters of the apply-order section, and the P1–P10 table had moved below the P11–P19 table. 73 tests pass, 0 fail (Node 22). No runtime change.
+
 **28 Oct 2026 clean-up:** there were 102 open PRs. The stale, superseded ones were closed with a pointer to the handover PR, and their branches were kept. Still open:
 - the parked retire-old-brain drafts #1009 and #1010
 - #975 (Brain to confirm before closing)
