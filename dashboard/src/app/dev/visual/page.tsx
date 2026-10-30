@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { HealthStrip } from "@/components/admin/v2/HealthStrip";
 import { MinutesMeter } from "@/components/ui/MinutesMeter";
+import { TodayCalls } from "@/components/home/TodayCalls";
 
 /**
  * Status vocabulary at 360. Words only: no sample counts.
@@ -17,6 +18,7 @@ export default function VisualStatusPage() {
     <main className="mx-auto flex w-full max-w-[360px] flex-col gap-4 bg-canvas px-4 py-6 text-ink">
       <h1 className="text-page">Needs attention</h1>
       <HealthStrip signals={null} />
+      <TodayCalls lineLive split={{ answered: 0, handed: 0, hung: 0, other: 0 }} rows={[]} truncated={false} />
       <section className="rounded-2xl border border-hairline bg-surface px-4 py-4" aria-label="Minutes">
         <h2 className="text-title">Minutes</h2>
         <div className="mt-2">
