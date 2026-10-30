@@ -13,6 +13,7 @@ import { inboxRecordHref } from "@/lib/inboxHref";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { assessMvpAnswerReadiness } from "@/lib/mvpAnswerReadiness";
 import { lineStatusLabel, resolveLineStatus } from "@/lib/lineStatus";
+import { StatusMark, type StatusIcon, type StatusTone } from "@/components/ui/StatusMark";
 import {
   deskPreviewClass,
   deskShiftClass,
@@ -120,6 +121,12 @@ async function HomeOverviewBody() {
     agentTools: tenant.agent_tools,
   });
   const line = resolveLineStatus(tenant.sautikit_virtual_number, readiness.ready);
+  const linePill: { tone: StatusTone; icon: StatusIcon; word: string } =
+    line === "live"
+      ? { tone: "ok", icon: "check", word: "Live" }
+      : line === "pending"
+        ? { tone: "neutral", icon: "clock", word: "Number pending" }
+        : { tone: "warn", icon: "tri", word: "Needs training" };
   const vertical = tenant.vertical;
   const copy = nicheCopy(vertical);
 
@@ -460,9 +467,23 @@ async function HomeOverviewBody() {
         ) : null}
         </div>
 
-        <aside className="min-w-0 lg:sticky lg:top-24 lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1">
+        <aside className="order-first min-w-0 lg:sticky lg:top-24 lg:order-none lg:col-span-5 lg:col-start-8 lg:row-start-1">
           <div className="overflow-hidden rounded-2xl border border-hairline bg-surface">
-            <section aria-label="Today" className="px-3 py-3">
+            <section aria-label="Line" className="px-4 py-4">
+              <h2 className="sr-only">{lineStatusLabel(line)}</h2>
+              <StatusMark tone={linePill.tone} icon={linePill.icon}>{linePill.word}</StatusMark>
+              {line === "live" ? (
+                <p className="mt-2 truncate font-mono text-body text-ink">
+                  {didDisplay || tenant.sautikit_virtual_number}
+                </p>
+              ) : (
+                <p className="mt-2 text-body text-ink-2">
+                  {line === "pending" ? "Your number is not live yet." : "Train the line before it can answer."}
+                </p>
+              )}
+            </section>
+
+            <section aria-label="Today" className="border-t border-hairline px-3 py-3">
               <Link
                 href={callsHref({ purpose: "all" })}
                 className={[
@@ -472,28 +493,13 @@ async function HomeOverviewBody() {
                 ].join(" ")}
               >
                 <span>Calls today</span>
-                {todayCount === null ? null : (
-                  <span className="tabular-nums font-medium text-ink">{todayCount}</span>
+                {todayCount === null ? (
+                  <span className="text-meta text-ink-2">Could not load</span>
+                ) : (
+                  <span className="tabular-nums text-title font-semibold text-ink">{todayCount}</span>
                 )}
               </Link>
             </section>
-
-            <section aria-label="Line" className="border-t border-hairline px-4 py-4">
-              <p className="text-body font-medium text-ink">
-                {lineStatusLabel(line)}
-              </p>
-              {line === "live" ? (
-                <p className="mt-0.5 truncate font-mono text-meta text-ink-2">
-                  {didDisplay || tenant.sautikit_virtual_number}
-                </p>
-              ) : null}
-            </section>
-
-            <RoleGate action="usage.view" mode="hide">
-              <Suspense fallback={<HomeUsageSkeleton />}>
-                <HomeUsageSlot tenant={tenant} isBeta={isBeta} />
-              </Suspense>
-            </RoleGate>
 
             {showCta ? (
               <div className="border-t border-hairline px-4 py-4">
@@ -504,6 +510,12 @@ async function HomeOverviewBody() {
             ) : null}
           </div>
         </aside>
+
+        <RoleGate action="usage.view" mode="hide">
+          <Suspense fallback={<HomeUsageSkeleton />}>
+            <HomeUsageSlot tenant={tenant} isBeta={isBeta} />
+          </Suspense>
+        </RoleGate>
 
         <section
           className="min-w-0 lg:col-span-7 lg:col-start-1 lg:row-start-2"
