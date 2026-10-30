@@ -540,11 +540,14 @@ async function HomeOverviewBody() {
               >
                 <span>Calls today</span>
                 {todayCount === null ? (
-                  <span className="text-meta text-ink-2">Could not load</span>
+                  <span className="text-meta text-attention">Could not load</span>
                 ) : (
                   <span className="tabular-nums text-title font-semibold text-ink">{todayCount}</span>
                 )}
               </Link>
+              {todayCount === null ? (
+                <Link href="/home" className={`mt-1 inline-flex min-h-11 items-center px-2 text-body font-medium text-accent ${focusRingVisible}`}>Retry</Link>
+              ) : null}
             </section>
 
             {showCta ? (
