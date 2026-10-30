@@ -51,7 +51,8 @@ describe("production billing apply order", () => {
     const readme = read("docs/supabase/README.md");
     const start = readme.indexOf("## Production billing apply order");
     assert.ok(start > 0);
-    const chunk = readme.slice(start, start + 2500);
+    const next = readme.indexOf("\n## ", start + 1);
+    const chunk = readme.slice(start, next > 0 ? next : undefined);
     const steps = [
       ["P1", "billing_data_layer.sql"],
       ["P2", "billing_data_layer_billing_status_not_null.sql"],
