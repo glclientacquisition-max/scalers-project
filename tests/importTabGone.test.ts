@@ -8,13 +8,13 @@ import path from "node:path";
 const root = path.join(import.meta.dirname, "..");
 const read = (p: string) => fs.readFileSync(path.join(root, p), "utf8");
 
+// importFactDiff came back inside Add many (found-facts cards, tests/addManyFacts.test.ts), not as a page.
 test("old Import UI and actions are deleted", () => {
   for (const f of [
     "dashboard/src/components/CatalogImportPanel.tsx",
     "dashboard/src/components/KnowledgeIngestPanel.tsx",
     "dashboard/src/app/(desk)/settings/ingestActions.ts",
     "dashboard/src/app/(desk)/settings/catalogActions.ts",
-    "dashboard/src/lib/importFactDiff.ts",
   ]) assert.equal(fs.existsSync(path.join(root, f)), false, f);
 });
 
