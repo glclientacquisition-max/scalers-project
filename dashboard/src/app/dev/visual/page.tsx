@@ -4,6 +4,7 @@ import { Stamp } from "@/components/ui/Stamp";
 import { Empty } from "@/components/ui/Empty";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Button, ButtonLink } from "@/components/ui/Button";
+import { HealthStrip } from "@/components/admin/v2/HealthStrip";
 
 /**
  * Status vocabulary at 360. Words only: no sample counts.
@@ -13,7 +14,9 @@ export default function VisualStatusPage() {
   if (process.env.DASHBOARD_OPEN !== "true") notFound();
   return (
     <main className="mx-auto flex w-full max-w-[360px] flex-col gap-4 bg-canvas px-4 py-6 text-ink">
-      <h1 className="text-page">Line</h1>
+      <h1 className="text-page">Needs attention</h1>
+      <HealthStrip signals={null} />
+      <h2 className="text-title">Line</h2>
       <section className="overflow-hidden rounded-2xl border border-hairline bg-surface" aria-label="Line">
         <div className="px-4 py-4">
           <StatusMark tone="neutral" icon="clock">Number pending</StatusMark>
