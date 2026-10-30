@@ -45,8 +45,7 @@ export default async function DevCataloguePage({ searchParams }: Props) {
                     canEdit={!viewer}
                     statesEnabled={one(p.states) === "on"}
                     initialNeedPrice={one(p.filter) === "unpriced"}
-                    initialPaste={one(p.paste) === "1"}
-                    addMany={one(p.many) === "1"}
+                    initialPaste={one(p.paste) === "1" || one(p.many) === "1"}
                     importPhoto={one(p.many) === "1"}
                   />
                 </div>

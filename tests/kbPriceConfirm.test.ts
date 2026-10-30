@@ -42,8 +42,5 @@ test("one bad or missing item saves nothing", () => {
 test("actions use the KB when it exists", () => {
   const read = (p: string) => fs.readFileSync(path.join(import.meta.dirname, "..", p), "utf8");
   const s = read("dashboard/src/app/(desk)/settings/structuredActions.ts");
-  const c = read("dashboard/src/app/(desk)/settings/catalogActions.ts");
   assert.ok(s.indexOf("loadKbItems(tenantId)") < s.indexOf("runPriceBatch("));
-  assert.ok(c.indexOf("importCatalogueToKb(tenant.id, { product_catalog: merged }") < c.indexOf("product_catalog: merged,\n  };"));
-  assert.match(c, /restamp: confirm/);
 });

@@ -43,16 +43,6 @@ export function deskFeelEnabled(): boolean {
   return envFlagOn(process.env.DESK_FEEL);
 }
 
-/** Catalogue "Add many" sheet (paste or a CSV file, one preview). Staging flag DESK_ADD_MANY=on (30 Oct). */
-export function deskAddMany(): boolean {
-  return envFlagOn(process.env.DESK_ADD_MANY);
-}
-
-/** Import review shows hours, payments, FAQs and policies as per-fact rows. Staging flag DESK_IMPORT_FACTS=on. */
-export function deskImportFacts(): boolean {
-  return envFlagOn(process.env.DESK_IMPORT_FACTS);
-}
-
 /** "Add many" also reads a photo of a price list or a website. Staging flag DESK_IMPORT_PHOTO=on. */
 export function deskImportPhoto(): boolean {
   return envFlagOn(process.env.DESK_IMPORT_PHOTO);

@@ -35,7 +35,7 @@ import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
 import { Suspense } from "react";
 import { DeskPageGate } from "@/components/DeskPageGate";
 import { DeskPageSkeleton } from "@/components/DeskPageSkeleton";
-import { deskAssistantSayPage, deskImportFacts } from "@/lib/deskFeatureFlags";
+import { deskAssistantSayPage } from "@/lib/deskFeatureFlags";
 import { loadAssistantSayView } from "@/lib/assistantSayVoice.server";
 import { loadKbGreetingPreview } from "@/lib/kbCaller.server";
 import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
@@ -85,14 +85,13 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   const planRowPromise = loadPlanRowStatus(tenant.id);
   const tab = parseBusinessSettingsTab(tabRaw, panelRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
-  // KB v2 businesses edit the catalogue on /settings/knowledge. The old Catalogue tab (and the retail
-  // Import tab, now "Paste a list" there) would write the retired catalogue columns, so send owners across.
-  const tenantBusinessType = resolveTenantBusinessType({ vertical: tenant.vertical });
-  if (tab === "catalog" || (tab === "import" && tenantBusinessType === "retail")) {
-    if (await kbTablesReady(tenant.id)) {
-      const unpriced = (Array.isArray(params.filter) ? params.filter[0] : params.filter) === "unpriced";
-      redirect(tab === "import" ? "/settings/knowledge?paste=1" : `/settings/knowledge${unpriced ? "?filter=unpriced" : ""}`);
-    }
+  // The Import tab is gone: old ?tab=import links open Add many on the Catalogue.
+  if (tab === "import") redirect("/settings/knowledge?many=1");
+  // KB v2 businesses edit the catalogue on /settings/knowledge. The old Catalogue tab would write the
+  // retired catalogue columns, so send owners across.
+  if (tab === "catalog" && (await kbTablesReady(tenant.id))) {
+    const unpriced = (Array.isArray(params.filter) ? params.filter[0] : params.filter) === "unpriced";
+    redirect(`/settings/knowledge${unpriced ? "?filter=unpriced" : ""}`);
   }
   const assistantSayPage = deskAssistantSayPage();
   const topicRaw = Array.isArray(params.topic) ? params.topic[0] : params.topic;
@@ -217,7 +216,6 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   return (
     <Suspense fallback={<DeskPageSkeleton />}>
       <BusinessSettingsShell
-        importFacts={deskImportFacts()}
         tenant={tenantForSettingsView(tenant, tab, trainPanel, kbCatalogue)}
         tab={tab}
         trainPanel={trainPanel}

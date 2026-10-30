@@ -63,30 +63,6 @@ export const SERVICES_PASTE_POOLS = {
   ],
 } as const;
 
-export const KNOWLEDGE_PASTE_POOLS = {
-  retail: [
-    "Westlands Books, Nairobi\nMon-Sat 9am-7pm\nQ: Do you deliver in Nairobi?\nA: Yes, same day before noon.",
-    "Print shop, Nairobi\nMon-Sat 8am-5pm\nQ: Can I pick up today?\nA: Yes, after 2pm.",
-    "Stationery shop, Nairobi\nMon-Fri 8am-6pm\nQ: Do you print business cards?\nA: Yes. Ready the next day.",
-    "Paper shop, Nairobi\nMon-Sat 9am-6pm\nQ: Do you deliver A4?\nA: Yes, same day in Nairobi.",
-  ],
-  home_services: [
-    "Cleaning service, Nairobi\nMon-Sun 8am-6pm\nHome cleaning from 2,500 KES\nQ: Do you cover Westlands?\nA: Yes, same day before noon.",
-    "Plumbing desk, Nairobi\nMon-Sat 8am-5pm\nCall-out from 1,500 KES\nQ: Do you cover Kilimani?\nA: Yes, same day.",
-    "Sofa cleaning, Nairobi\nMon-Fri 8am-6pm\nSofa cleaning from 1,500 KES\nQ: Do you cover Karen?\nA: Yes. Book a visit.",
-  ],
-  hospitality: [
-    "Lodge, Nairobi\nDaily 7am-10pm\nQ: Do you take walk-ins?\nA: Yes, until 9pm.",
-    "Restaurant, Nairobi\nDaily 12pm-10pm\nQ: Are you fully booked tonight?\nA: Yes. Try tomorrow.",
-    "Hotel, Nairobi\nFront desk all night\nQ: Is breakfast included?\nA: Yes, from 7am.",
-  ],
-  general: [
-    "Office, Nairobi\nMon-Fri 8am-5pm\nQ: Are you open Saturday?\nA: No. Monday to Friday.",
-    "Studio, Nairobi\nMon-Fri 9am-4pm\nQ: Can I call tomorrow?\nA: Yes, from 9am.",
-    "Desk, Nairobi\nMon-Thu 8am-5pm\nQ: Are you closed Friday?\nA: Yes. Back Monday.",
-  ],
-} as const;
-
 export type PlaceholderPools = Record<string, readonly string[]>;
 
 export function placeholderPool(

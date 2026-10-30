@@ -148,121 +148,8 @@ register(${JSON.stringify(hookPath)}, { parentURL: pathToFileURL(${JSON.stringif
   return JSON.parse(ran.stdout);
 }
 
-describe("import switches start off", () => {
-  const ingest = read("dashboard/src/components/KnowledgeIngestPanel.tsx");
-  const catalog = read("dashboard/src/components/CatalogImportPanel.tsx");
-  const scope = read("dashboard/src/lib/settingsSaveScope.ts");
-  const shell = read("dashboard/src/components/BusinessSettingsShell.tsx");
-
-  const afterScan = ingest.slice(
-    ingest.indexOf("if (extractState.ok && extractState.draft)"),
-    ingest.indexOf('setMergeMode("merge")')
-  );
-
-  it("starts knowledge include switches off after a scan", () => {
-    for (const flag of [
-      "includeLocations",
-      "includeHours",
-      "includePolicies",
-    ]) {
-      assert.match(ingest, new RegExp(`\\[${flag}, set\\w+\\] = useState\\(false\\)`));
-      assert.match(afterScan, new RegExp(`set\\w*${flag[0].toUpperCase()}${flag.slice(1)}\\(false\\)`));
-    }
-    assert.doesNotMatch(afterScan, /setInclude\w+\(\s*Boolean/);
-    assert.match(ingest, /label="Hours"/);
-    assert.match(ingest, /label="Location"/);
-    assert.match(ingest, /label="Policies"/);
-    // 30 Oct: import no longer offers business type, alert phone or the unsure line.
-    assert.doesNotMatch(ingest, /label="Business type"/);
-    assert.doesNotMatch(ingest, /label="Sales \/ WhatsApp phone"/);
-    assert.doesNotMatch(ingest, /title="When unsure"/);
-    assert.match(ingest, /draft\.hoursNotes \|\| draft\.hoursSchedule/);
-    assert.match(ingest, /draft\.locations\?\.length/);
-    assert.doesNotMatch(ingest, /Weekly schedule extracted/);
-    assert.doesNotMatch(ingest, /[—–]/);
-  });
-
-  it("labels the knowledge apply Add selected and mutes Start over", () => {
-    assert.match(ingest, /\{applyPending \? "Adding…" : "Add selected"\}/);
-    assert.doesNotMatch(ingest, /Add to my assistant/);
-    assert.match(ingest, /disabled=\{applyPending \|\| nothingSelected\}/);
-    assert.match(ingest, /className=\{settingsPrimaryButtonClass\}/);
-    const applyButton = ingest.slice(
-      ingest.indexOf('{applyPending ? "Adding…" : "Add selected"}') - 220,
-      ingest.indexOf('{applyPending ? "Adding…" : "Add selected"}')
-    );
-    assert.match(applyButton, /settingsPrimaryButtonClass/);
-    assert.match(ingest, /Select what to add\./);
-    assert.match(ingest, />\s*Start over\s*</);
-    const startOver = ingest.slice(
-      ingest.indexOf("Start over") - 280,
-      ingest.indexOf("Start over")
-    );
-    assert.match(startOver, /settingsActionClass/);
-    assert.doesNotMatch(startOver, /settingsPrimaryButtonClass/);
-  });
-
-  it("does not scroll either import path to train", () => {
-    assert.doesNotMatch(ingest, /getElementById\("train"\)/);
-    assert.doesNotMatch(ingest, /scrollIntoView/);
-    assert.doesNotMatch(catalog, /getElementById\("train"\)/);
-    assert.doesNotMatch(catalog, /scrollIntoView/);
-    assert.equal(fs.existsSync(path.join(__dirname, "../dashboard/src/app/(desk)/loading.tsx")), false);
-  });
-
-  it("keeps retail catalog import as one product job", () => {
-    assert.match(catalog, /\{applyPending \? "Saving…" : "Add to catalogue"\}/);
-    assert.doesNotMatch(catalog, /Add selected/);
-    assert.doesNotMatch(catalog, /includeHours|includePolicies|includeVertical|includeUnknown/);
-    assert.match(catalog, /title="Products"/);
-    assert.match(catalog, /name="products_json"/);
-    assert.match(catalog, /label: "Text"/);
-    assert.match(catalog, /label: "URL"/);
-    assert.match(catalog, /label: "CSV"/);
-    assert.match(shell, /resolveTenantBusinessType\(tenant\) === "retail"/);
-    assert.match(shell, /<CatalogImportPanel tenant=\{tenant\} \/>/);
-    assert.match(shell, /<KnowledgeIngestPanel tenant=\{tenant\}[^>]*\/>/);
-    assert.doesNotMatch(shell, /<KnowledgeIngestPanel[\s\S]{0,80}<CatalogImportPanel/);
-  });
-
-  it("still writes only the checked include flags and protects save scope", () => {
-    for (const name of ["include_locations", "include_hours", "include_policies"]) {
-      assert.match(ingest, new RegExp(`name="${name}"`));
-    }
-    // Import never sets the unsure line, business type, name, alert number or team (30 Oct).
-    for (const name of ["include_unknown", "include_vertical", "include_contact_phone", "rename_business", "selected_team"]) {
-      assert.doesNotMatch(ingest, new RegExp(`name="${name}"`));
-    }
-    assert.match(scope, /catalog: \["servicesNotes", "servicesCatalog", "productCatalog"\]/);
-    assert.match(scope, /faqs: \["faqs"\]/);
-    assert.match(scope, /team: \["teamDirectory", "handoffMode"\]/);
-    assert.match(scope, /pronunciation: \["ttsLexicon"\]/);
-  });
-
-  it("starts service, FAQ, and team rows unchecked", () => {
-    assert.match(afterScan, /setSelectedServices\(new Set\(\)\)/);
-    assert.match(afterScan, /setSelectedFaqs\(new Set\(\)\)/);
-    assert.doesNotMatch(afterScan, /draft\.services\.map/);
-    assert.doesNotMatch(afterScan, /draft\.faqs\.map/);
-    assert.doesNotMatch(afterScan, /draft\.team\.map/);
-    assert.match(ingest, /const allOn = selected > 0 && selected === total/);
-    assert.match(ingest, /const label = allOn \? "Clear all" : "Select all"/);
-    assert.match(ingest, /className=\{settingsGhostButtonClass\}/);
-    assert.match(ingest, /s\.name/);
-    assert.match(ingest, /htmlFor=\{`ingest-faq-q-/);
-    assert.match(ingest, /htmlFor=\{`ingest-faq-a-/);
-    const ghost = read("dashboard/src/components/settingsUi.tsx");
-    assert.match(ghost, /export const settingsGhostButtonClass =/);
-    assert.match(
-      ghost.slice(ghost.indexOf("export const settingsGhostButtonClass")),
-      /min-h-11[\s\S]{0,180}text-ink-2/
-    );
-    assert.doesNotMatch(catalog, /ListSelectAll|selected_services/);
-  });
-});
-
+// The Import tab and its panels are gone (30 Oct); the shared merge rules in lib/ingest still hold.
 describe("import row selection", () => {
-  const actions = read("dashboard/src/app/(desk)/settings/ingestActions.ts");
 
   it("does not turn a blank selection into row 0 or wipe an off list when hours are on", () => {
     const cases = loadMergeCases();
@@ -326,24 +213,5 @@ describe("import row selection", () => {
       "Sofa cleaning"
     );
 
-    const hours = actions.slice(
-      actions.indexOf("if (includeHours)"),
-      actions.indexOf("if (policiesFilled)")
-    );
-    assert.match(hours, /patch\.business_hours = businessHours/);
-    assert.doesNotMatch(hours, /services_catalog|faqs|team_directory/);
-    assert.match(
-      actions,
-      /const businessHours = includeHours\s*\?\s*draftHoursNotes \|\| compiledHours \|\| "Hours not set yet\. Confirm with the team\."\s*: compiledHours;/
-    );
-    assert.doesNotMatch(actions, /else if \(!String\(tenant\.business_hours/);
-    assert.match(actions, /if \(merged\.touched\.services\)/);
-    // Imported rows keep stable ids (assignServiceIds against the stored catalogue).
-    assert.match(actions, /if \(merged\.touched\.services\) \{\s*patch\.services_catalog = assignServiceIds\(\s*merged\.services,/);
-    assert.match(actions, /parseIngestIndexes\(formData\.get\("selected_services"\)\)/);
-    assert.doesNotMatch(
-      actions.slice(actions.indexOf("const merged = mergeIngestDraft"), actions.indexOf("if (merged.touched.services)")),
-      /draftServices/
-    );
   });
 });

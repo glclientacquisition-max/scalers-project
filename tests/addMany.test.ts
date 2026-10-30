@@ -27,7 +27,9 @@ test("quotes, BOM, blank rows; formulas stay text and are neutralised by the pre
 test("sheet wiring", () => {
   const src = fs.readFileSync(path.join(import.meta.dirname, "../dashboard/src/components/catalogue/CatalogueScreen.tsx"), "utf8");
   const flags = fs.readFileSync(path.join(import.meta.dirname, "../dashboard/src/lib/deskFeatureFlags.ts"), "utf8");
-  assert.match(src, /addMany \? "Add many" : "Paste a list"/);
+  // Add many is the only bulk add now: no flag, no "Paste a list" fallback, no Import tab.
+  assert.match(src, /const manyLabel = "Add many";/);
+  assert.doesNotMatch(src, /Paste a list/);
   assert.match(src, /IMPORT_FILE_MAX_BYTES/);
-  assert.match(flags, /process\.env\.DESK_ADD_MANY/);
+  assert.doesNotMatch(flags, /DESK_ADD_MANY|DESK_IMPORT_FACTS/);
 });

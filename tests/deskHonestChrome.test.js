@@ -43,8 +43,7 @@ describe("honest chrome P0", () => {
   const shell = read("dashboard/src/components/BusinessSettingsShell.tsx");
   const home = read("dashboard/src/app/(desk)/home/page.tsx");
   const calls = read("dashboard/src/app/(desk)/calls/page.tsx");
-  const catalog = read("dashboard/src/components/CatalogImportPanel.tsx");
-  const ingest = read("dashboard/src/components/KnowledgeIngestPanel.tsx");
+  const addMany = read("dashboard/src/components/catalogue/CatalogueScreen.tsx");
   const form = read("dashboard/src/components/TenantForm.tsx");
   const ticket = read("dashboard/src/components/InboxTicketView.tsx");
 
@@ -80,17 +79,11 @@ describe("honest chrome P0", () => {
     assert.match(calls, /purposeFilters\(vertical\)/);
   });
 
-  it("uses one Text URL CSV importer and keeps book SKUs off home services import", () => {
-    assert.match(shell, /resolveTenantBusinessType\(tenant\) === "retail"/);
-    assert.match(catalog, /label: "Text"/);
-    assert.match(catalog, /label: "URL"/);
-    assert.match(catalog, /label: "CSV"/);
-    assert.match(ingest, /label: "Text"/);
-    assert.match(ingest, /label: "URL"/);
-    assert.match(ingest, /label: "CSV"/);
-    assert.doesNotMatch(catalog, /Atomic Habits/);
-    assert.doesNotMatch(ingest, /Atomic Habits/);
-    assert.doesNotMatch(shell, /<KnowledgeIngestPanel[\s\S]{0,80}<CatalogImportPanel/);
+  it("uses one bulk add (Add many: Paste, File) and no separate Import panels", () => {
+    assert.match(addMany, /\{ value: "paste", label: "Paste" \}/);
+    assert.match(addMany, /\{ value: "file", label: "File" \}/);
+    assert.doesNotMatch(addMany, /Atomic Habits/);
+    assert.doesNotMatch(shell, /KnowledgeIngestPanel|CatalogImportPanel/);
   });
 
   it("labels the three notify toggles Urgent, Follow-up, and Ops", () => {

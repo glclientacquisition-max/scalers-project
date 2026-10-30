@@ -62,7 +62,6 @@ function isSettingsNestedTab(tab: string): boolean {
   return (
     tab === "catalog" ||
     tab === "train" ||
-    tab === "import" ||
     tab === "test" ||
     tab === "alerts"
   );

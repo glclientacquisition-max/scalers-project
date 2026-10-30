@@ -99,7 +99,7 @@ export type SettingsNavSection = {
  * Settings destinations. /settings with no section is the Settings home on every width
  * (phone: the whole screen; tablet and desktop: the right pane beside the rail).
  * One header each: Business, Knowledge, Assistant, People, then Plan and billing.
- * Import sits directly under Catalog. Team is People, ahead of Alerts.
+ * Bulk add lives in Catalogue (Add many); old ?tab=import links redirect there. Team is People, ahead of Alerts.
  * Plan and Billing are the last section. The rail shows them to the owner and an admin.
  * Appearance is the account-menu theme cluster. It is not a settings tab.
  * URLs stay `?tab=` / `?panel=`.
@@ -121,8 +121,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     title: "Knowledge",
     items: [
       // v2 Knowledge Base editor; before the v2 tables exist it sends the owner to the old tab: "catalog" screen.
-      { label: "Catalogue", description: "What you sell and what it costs", target: { href: "/settings/knowledge" } },
-      { label: "Import", description: "Add items from a file or your website", target: { tab: "import" } },
+      { label: "Catalogue", description: "What you sell and its prices. Add many at once", target: { href: "/settings/knowledge" } },
       { label: "FAQs", description: "Answers to the questions callers ask most", target: { tab: "train", panel: "faqs" } },
     ],
   },
@@ -203,21 +202,11 @@ export function settingsNavItems(): SettingsNavItem[] {
 
 export function settingsPanelHeading(
   tab: BusinessSettingsTab,
-  trainPanel: SettingsPanel,
-  vertical?: string | null
+  trainPanel: SettingsPanel
 ): string | null {
   if (tab === "menu") return null;
   if (tab === "catalog") return "Catalogue";
   if (tab === "alerts") return "How we notify";
-  if (tab === "import") {
-    const v = String(vertical || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[\s-]+/g, "_");
-    return v === "retail" || v === "shop" || v === "shops"
-      ? "Import catalogue"
-      : "Import knowledge";
-  }
   if (tab === "test") return "Test";
   if (tab === "calls") return "Calls & forwarding";
   if (tab === "assistant-say") return "What callers hear";

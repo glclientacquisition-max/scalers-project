@@ -13,8 +13,6 @@ import { Skeleton } from "@/components/ui/Skeleton";
 
 // Heavy panels load only when their section opens (keeps them out of the Settings home and form bundle).
 const panelLoading = () => <Skeleton className="h-64 w-full rounded-2xl" />;
-const KnowledgeIngestPanel = dynamic(() => import("@/components/KnowledgeIngestPanel").then((m) => m.KnowledgeIngestPanel), { loading: panelLoading });
-const CatalogImportPanel = dynamic(() => import("@/components/CatalogImportPanel").then((m) => m.CatalogImportPanel), { loading: panelLoading });
 const TestLinePanel = dynamic(() => import("@/components/TestLinePanel").then((m) => m.TestLinePanel), { loading: panelLoading });
 import { SettingsLeaveGuard } from "@/components/SettingsLeaveGuard";
 import { savePoliciesCardAction, savePoliciesUnknownAction } from "@/app/(desk)/settings/policiesCardActions";
@@ -29,7 +27,6 @@ const PoliciesSettings = dynamic(() => import("@/components/policies/PoliciesSet
 });
 import { PoliciesSettingsErrorBoundary } from "@/components/policies/PoliciesSettingsErrorBoundary";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
-import { resolveTenantBusinessType } from "@/lib/businessType";
 import {
   settingsPanelHeading,
   parseBusinessSettingsPanel,
@@ -69,23 +66,12 @@ function settingsLineState(did: string | null | undefined): {
 }
 
 function SettingsPanelBody({
-  tab,
   tenant,
   curatedVoices,
-  importFacts = false,
 }: {
-  tab: "import" | "test";
   tenant: TenantRow;
   curatedVoices: CuratedSonioxVoice[];
-  importFacts?: boolean;
 }) {
-  if (tab === "import") {
-    return resolveTenantBusinessType(tenant) === "retail" ? (
-      <CatalogImportPanel tenant={tenant} />
-    ) : (
-      <KnowledgeIngestPanel tenant={tenant} importFacts={importFacts} />
-    );
-  }
   return <TestLinePanel tenant={tenant} curatedVoices={curatedVoices} />;
 }
 
@@ -106,7 +92,6 @@ export function BusinessSettingsShell({
   assistantSaySlot = null,
   assistantSayPage = false,
   businessCategory = null,
-  importFacts = false,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
@@ -124,15 +109,13 @@ export function BusinessSettingsShell({
   assistantSayPage?: boolean;
   /** Identity: tenants.business_category for the one "What you do" question. */
   businessCategory?: string | null;
-  /** Import review per fact (DESK_IMPORT_FACTS). */
-  importFacts?: boolean;
 }) {
   const { tab: activeTab, trainPanel: activeTrainPanel } = useResolvedSettingsRoute(tab, trainPanel);
   const formPanel: SettingsPanel =
     activeTab === "catalog" ? "catalog" : activeTab === "train" ? activeTrainPanel : "identity";
   const showForm = activeTab === "catalog" || activeTab === "train";
   const isMenu = activeTab === "menu";
-  const heading = settingsPanelHeading(activeTab, activeTrainPanel, tenant.vertical);
+  const heading = settingsPanelHeading(activeTab, activeTrainPanel);
   const { lineLive, lineDetail } = settingsLineState(tenant.sautikit_virtual_number);
   const businessName = tenant.business_name?.trim() || "Business";
 
@@ -272,13 +255,8 @@ export function BusinessSettingsShell({
                 />
                 {activeTab === "calls" ? callsSlot : null}
                 {activeTab === "assistant-say" ? assistantSaySlot : null}
-                {activeTab === "import" || activeTab === "test" ? (
-                  <SettingsPanelBody
-                    tab={activeTab}
-                    tenant={tenant}
-                    curatedVoices={curatedVoices}
-                    importFacts={importFacts}
-                  />
+                {activeTab === "test" ? (
+                  <SettingsPanelBody tenant={tenant} curatedVoices={curatedVoices} />
                 ) : null}
               </>
             )}
