@@ -3,7 +3,7 @@ import type { IngestDraft } from "./ingest/extract";
 import { formatHoursForCompiler, formatHoursForOwner, parseHoursSchedule, type HoursSchedule } from "./hoursSchedule";
 import { normalizePayments, paymentsSentence } from "./payments";
 import { FACT_POLICY_KEYS, type FactCard } from "./factCards";
-import { parseHoursText } from "./hoursText";
+import { ALL_DAY_NOTE, isAllDayEveryDay, parseHoursText } from "./hoursText";
 import { normalizeBusinessLocations } from "./businessLocations";
 import { areaNode, matchAreaText, normalizeAreaPicks, type AreaPicks } from "./areaPicks";
 
@@ -101,11 +101,26 @@ export function buildFactCards(input: {
   const policyOwner = (key: string) => owner.has(`policies.${key}`) || policies.provenance?.[key]?.source === "owner";
 
   const hours = foundHours(d, t);
+  const hoursRaw = clean(d.hoursNotes, 240);
+  if (!hours && hoursRaw) {
+    // Hours we could not read are shown, not dropped: the owner sets them in Hours.
+    cards.push({
+      id: "hours_check",
+      kind: "hours_check",
+      label: "Opening hours · Check this",
+      now: currentHoursLine(t) || "Not set",
+      found: `“${hoursRaw}”`,
+      ownerSet: false,
+      on: false,
+      note: "We couldn't read these hours. Set them in Settings › Hours.",
+      raw: hoursRaw,
+    });
+  }
   if (hours) {
     const found = formatHoursForOwner(hours.schedule) || formatHoursForCompiler(hours.schedule);
-    const nowSchedule = parseHoursSchedule((t.hours_schedule as never) ?? null);
-    const now = (nowSchedule ? formatHoursForOwner(nowSchedule) : "") || String(t.business_hours || "").trim();
+    const now = currentHoursLine(t);
     const x = diff(now, found);
+    const allDay = isAllDayEveryDay(hours.schedule);
     if (!x.same) {
       const ownerSet = owner.has("hours.weekly_grid");
       cards.push({
@@ -115,8 +130,9 @@ export function buildFactCards(input: {
         now: x.now,
         found: x.next,
         ownerSet,
-        on: !ownerSet && !hours.unsure,
-        note: hours.unsure ? hours.note || "Read from a sentence. Check it before you tick." : null,
+        // "24/7" is never ticked for the owner: open all day, every day is a big promise to callers.
+        on: !ownerSet && !hours.unsure && !allDay,
+        note: allDay ? (hours.note?.includes(ALL_DAY_NOTE) ? hours.note : [ALL_DAY_NOTE, hours.note].filter(Boolean).join(" ")) : hours.unsure ? hours.note || "Read from a sentence. Check it before you tick." : null,
         schedule: hours.schedule,
       });
     }
@@ -124,6 +140,7 @@ export function buildFactCards(input: {
 
   const addr = addressCard(t, d.locations, owner.has("locations.branches"));
   if (addr) cards.push(addr);
+  cards.push(...branchCards(t, d.locations));
 
   const foundPolicies = (d.policies || {}) as Record<string, unknown>;
   for (const key of FACT_POLICY_KEYS) {
@@ -190,6 +207,11 @@ function foundHours(d: { hoursSchedule?: unknown; hoursNotes?: string }, t: Tena
   return null;
 }
 
+function currentHoursLine(t: Tenant): string {
+  const nowSchedule = parseHoursSchedule((t.hours_schedule as never) ?? null);
+  return (nowSchedule ? formatHoursForOwner(nowSchedule) : "") || String(t.business_hours || "").trim();
+}
+
 const clean = (v: unknown, max: number) =>
   String(v ?? "").replace(/[\u0000-\u001f\u007f<>]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 
@@ -216,6 +238,44 @@ function addressCard(t: Tenant, locations: IngestDraft["locations"], ownerSet: b
     address,
     landmark,
   };
+}
+
+export const BRANCH_CARDS_MAX = 5;
+const addrKey = (s: unknown) => norm(s).replace(/\b(road|rd|street|st|avenue|ave)\b/g, "").replace(/\s+/g, " ").trim();
+
+/**
+ * Every place found after the first: one unticked suggestion each. Saving one adds a new place (the first card still
+ * sets the first place's address). Places already stored with the same address, and repeats, are skipped.
+ */
+function branchCards(t: Tenant, locations: IngestDraft["locations"]): FactCard[] {
+  const withAddress = (locations || []).filter((l) => clean(l?.address, 160));
+  const stored = normalizeBusinessLocations(t.business_locations || []);
+  const seen = new Set(stored.map((p) => addrKey(p.address)).filter(Boolean));
+  if (withAddress[0]) seen.add(addrKey(clean(withAddress[0].address, 160)));
+  const out: FactCard[] = [];
+  for (const l of withAddress.slice(1)) {
+    const address = clean(l.address, 160);
+    const key = addrKey(address);
+    if (address.length < 4 || /https?:|www\.|@/i.test(address) || !key || seen.has(key)) continue;
+    seen.add(key);
+    const landmark = clean(l.landmark, 120);
+    const placeLabel = clean((l as { label?: string }).label, 40) || `Branch ${out.length + 2}`;
+    out.push({
+      id: `branch:${out.length}`,
+      kind: "branch",
+      label: `Another branch · ${placeLabel}`,
+      now: "Not in your places",
+      found: [address, landmark].filter(Boolean).join(" · "),
+      ownerSet: false,
+      on: false,
+      note: "Tick to add it as a new place.",
+      placeLabel,
+      address,
+      landmark,
+    });
+    if (out.length >= BRANCH_CARDS_MAX) break;
+  }
+  return out;
 }
 
 /** Place names in the found locations' coverage notes ("We serve Kilimani, Westlands and Karen"). */

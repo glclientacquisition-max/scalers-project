@@ -11,7 +11,8 @@ import {
   saveKbItemAction,
 } from "@/app/(desk)/settings/knowledge/actions";
 import { photoToLinesAction, websiteToLinesAction } from "@/app/(desk)/settings/knowledge/addManyActions";
-import { findFactsAction, saveFoundAddressAction, saveFoundFaqAction } from "@/app/(desk)/settings/knowledge/foundFactsActions";
+import { findFactsAction, saveFoundAddressAction, saveFoundBranchAction, saveFoundFaqAction } from "@/app/(desk)/settings/knowledge/foundFactsActions";
+import { beginImportFactsAction, endImportFactsAction, restoreImportFactAction } from "@/app/(desk)/settings/knowledge/factImportActions";
 import { saveOverviewHoursAction } from "@/app/(desk)/settings/overviewActions";
 import { savePoliciesCardAction } from "@/app/(desk)/settings/policiesCardActions";
 import { saveAreaPicksAction } from "@/app/(desk)/settings/areas/actions";
@@ -19,6 +20,7 @@ import { factPolicyPatch, type FactCard } from "@/lib/factCards";
 
 /** Each found fact saves through the action its own settings screen uses (Hours, Policies, Service areas, FAQs). */
 async function saveFoundFact(card: FactCard): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (card.kind === "hours_check") return { ok: false, error: "Set these hours in Settings." };
   const r =
     card.kind === "hours"
       ? await saveOverviewHoursAction(card.schedule)
@@ -26,6 +28,8 @@ async function saveFoundFact(card: FactCard): Promise<{ ok: true } | { ok: false
         ? await savePoliciesCardAction(factPolicyPatch(card))
         : card.kind === "address"
           ? await saveFoundAddressAction({ address: card.address, landmark: card.landmark })
+          : card.kind === "branch"
+          ? await saveFoundBranchAction({ label: card.placeLabel, address: card.address, landmark: card.landmark })
           : card.kind === "areas"
           ? await saveAreaPicksAction(card.picks, false)
           : await saveFoundFaqAction({ question: card.question, answer: card.answer });
@@ -44,6 +48,9 @@ const ACTIONS: CatalogueActions = {
   websiteToLines: websiteToLinesAction,
   findFacts: findFactsAction,
   saveFact: saveFoundFact,
+  factsBegin: beginImportFactsAction,
+  factsEnd: endImportFactsAction,
+  restoreFact: restoreImportFactAction,
 };
 
 /** Settings > Catalogue wired to the KB v2 server actions. */

@@ -127,8 +127,8 @@ test("wired into Add many, each card through its own save action, no separate Im
   assert.match(ui, /data-found-facts=""/);
   assert.match(ui, /findFacts\(factText \?\? body\)/);
   assert.match(ui, /preview\(lines, undefined, raw\)/);
-  assert.match(ui, /for \(const card of picked\)/);
-  assert.match(ui, /mode === "append" && picked\.length/);
+  assert.match(ui, /for \(const \[i, card\] of facts\.entries\(\)\)/);
+  assert.match(ui, /mode === "append" && actions\.saveFact \? picked : \[\]/);
   assert.equal(fs.existsSync(path.join(import.meta.dirname, "..", "dashboard/src/components/KnowledgeIngestPanel.tsx")), false);
   assert.doesNotMatch(ui, /from "@\/lib\/importFactDiff"/, "the sheet loads the light card module, not the area tree");
 });

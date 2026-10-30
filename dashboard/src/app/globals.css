@@ -676,3 +676,20 @@ h3,
 :root[data-theme="dark"] [data-admin-main] {
   scrollbar-color: var(--hairline) var(--canvas);
 }
+
+/* Add many: calm finish check. Drawn once; nothing moves for reduced motion. */
+@keyframes desk-check-draw {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes desk-check-pop {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.desk-check-ring { animation: desk-check-pop 280ms ease-out both; }
+.desk-check-mark { stroke-dasharray: 24; animation: desk-check-draw 360ms 120ms ease-out both; }
+.desk-progress-fill { transition: width 300ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .desk-check-ring, .desk-check-mark { animation: none; stroke-dashoffset: 0; }
+  .desk-progress-fill { transition: none; }
+}

@@ -9,11 +9,13 @@ import { KB_ITEM_COLS, afterKbWrite, kbRowToItem, loadKbItems, writeKbItems } fr
 import { pingKbCompile } from "@/lib/kb.server";
 import { requireSupabaseUser } from "@/lib/tenant";
 import { logImportRun, rowsBeforeImport, undoImportRun } from "@/lib/kbImportRuns.server";
-import { importSource } from "@/lib/importUndo";
+import { importSource, type FactKey } from "@/lib/importUndo";
 import { deskKbItemStates } from "@/lib/deskFeatureFlags";
 
 /** restamped false: saved, but the call facts could not be re-checked yet (the Desk says so instead of "on calls"). */
-export type KbActionResult = { ok: true; restamped?: boolean; unchanged?: boolean; importId?: string } | { ok: false; error: string };
+export type KbActionResult =
+  | { ok: true; restamped?: boolean; unchanged?: boolean; importId?: string; restoreFacts?: FactKey[] }
+  | { ok: false; error: string };
 
 async function ownerTenant(): Promise<{ id: string } | { error: string }> {
   const tenant = await getCurrentTenant();
@@ -183,7 +185,8 @@ export async function undoKbImportAction(importId: string): Promise<KbActionResu
   const u = await undoImportRun(t.id, importId);
   if (!u.ok) return u;
   if (u.already) return { ok: true };
-  const { restamped } = await afterKbWrite(t.id, "desk", { restampIds: u.restoredIds });
+  const { restamped } = u.restoredIds.length || u.removed ? await afterKbWrite(t.id, "desk", { restampIds: u.restoredIds }) : { restamped: undefined };
   revalidatePath("/settings/knowledge");
-  return { ok: true, ...(restamped === false ? { restamped: false } : {}) };
+  // Found facts from the same import come back next, one request each (restoreImportFactAction), in this order.
+  return { ok: true, ...(restamped === false ? { restamped: false } : {}), ...(u.factKeys.length ? { restoreFacts: u.factKeys } : {}) };
 }
