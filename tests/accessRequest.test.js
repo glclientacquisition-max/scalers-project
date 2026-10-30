@@ -35,8 +35,8 @@ describe("request access sign-up", () => {
     assert.match(requestForm, /Thanks, we/);
   });
 
-  it("uses signup CTA helper on marketing and request access form", () => {
-    assert.match(landing, /signupCtaLabel/);
+  it("marketing CTA is Request access (30 Oct decision) and the form says so", () => {
+    assert.match(landing, /<LandingCta/);
     assert.match(requestForm, /Request access/);
     assert.doesNotMatch(landing, /Create workspace/);
   });

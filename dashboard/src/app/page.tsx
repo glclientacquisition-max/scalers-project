@@ -1,19 +1,12 @@
 import { Suspense } from "react";
-import { Sora } from "next/font/google";
 import { redirect } from "next/navigation";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import { LandingPage } from "@/components/marketing/LandingPage";
-
-/* Display face ships on marketing only. The app runs on the system stack. */
-const display = Sora({
-  subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
-});
+import { marketingFontClass } from "@/app/marketingFonts";
 
 export default function Home() {
   return (
-    <div className={`${display.variable} contents`}>
+    <div className={`${marketingFontClass} contents`}>
       <Suspense fallback={<LandingPage signedIn={false} />}>
         <HomeGate />
       </Suspense>

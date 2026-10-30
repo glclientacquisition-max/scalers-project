@@ -1,151 +1,76 @@
-import Image from "next/image";
 import { appEntryHref } from "@/lib/adminHost";
-import { brandAssets } from "@/components/brand/assets";
+import { BrandWordmark } from "@/components/brand/BrandMark";
 import { HeroCall, HowStage } from "@/components/marketing/LandingStory";
+import { LandingCta } from "@/components/marketing/LandingCta";
 import { AppearanceFooter } from "@/components/ThemePicker";
-import { signupCtaLabel } from "@/lib/signupMode";
 
 /**
- * Marketing home: hero, how it works, then sign up.
- * Package prices stay off this page until pricing is ready.
- * Authenticated owners get a direct path back to their workspace.
+ * Marketing home on the light canvas. One job: request access. The warm accent (landing token) is on the
+ * primary CTA only, with a faint glow of the same colour behind the hero call card and the final CTA.
+ * Signed-in owners get a way back to their Desk instead.
  */
-export function LandingPage({
-  signedIn = false,
-}: {
-  signedIn?: boolean;
-}) {
-  const actionHref = signedIn ? "/home" : "/signup";
-  const actionLabel = signedIn ? "Dashboard" : signupCtaLabel();
+export function LandingPage({ signedIn = false }: { signedIn?: boolean }) {
   return (
-    <main>
-      <section className="relative min-h-dvh overflow-hidden">
-      {/* Full-bleed brand visual plane */}
-      <div className="pointer-events-none absolute inset-0" aria-hidden>
-        <div className="absolute inset-0 bg-brand-900" />
-        <div
-          className="absolute inset-0 opacity-[0.22] landing-drift"
-          style={{
-            backgroundImage: `url(${brandAssets.iconTransparent})`,
-            backgroundRepeat: "no-repeat",
-            backgroundPosition: "78% 42%",
-            backgroundSize: "min(92vw, 720px)",
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-brand-900 via-brand-800/95 to-brand-700/80" />
-        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-brand-900 to-transparent" />
-      </div>
+    <main className="landing-scope bg-canvas text-ink" data-landing="">
+      <header className="mx-auto flex max-w-desk items-center justify-between gap-2 px-5 pt-[max(1rem,env(safe-area-inset-top))] sm:px-8">
+        <BrandWordmark href="/" context="Home" variant="lockup" priority />
+        <nav className="flex shrink-0 items-center gap-1">
+          {signedIn ? (
+            <a
+              href={appEntryHref("/home")}
+              className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-accent-deep focus-visible:outline-none focus-visible:shadow-focus"
+            >
+              Open Desk
+            </a>
+          ) : (
+            <a
+              href={appEntryHref("/login")}
+              className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-ink-2 hover:text-ink focus-visible:outline-none focus-visible:shadow-focus"
+            >
+              Sign in
+            </a>
+          )}
+        </nav>
+      </header>
 
-      <div className="relative z-10 mx-auto flex min-h-dvh max-w-desk flex-col px-6 pb-10 pt-6 sm:px-8">
-        <header className="glass-chrome flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/15 px-3 py-2 landing-rise">
-          <span className="shrink-0 font-display text-base tracking-tight text-white sm:text-xl">
-            Scalers
-          </span>
-          <nav className="flex shrink-0 items-center gap-1 sm:gap-2">
-            {signedIn ? (
-              <a
-                href={appEntryHref(actionHref)}
-                className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl bg-white px-3 text-sm font-medium text-brand-900 hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus sm:px-4"
-              >
-                {actionLabel}
-              </a>
-            ) : (
-              <>
-                <a
-                  href={appEntryHref("/login")}
-                  className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl px-2 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus sm:px-3"
-                >
-                  Sign in
-                </a>
-                <a
-                  href={appEntryHref(actionHref)}
-                  className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl bg-white px-3 text-sm font-medium text-brand-900 hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus sm:px-4"
-                >
-                  {actionLabel}
-                </a>
-              </>
-            )}
-          </nav>
-        </header>
-
-        <section className="grid flex-1 items-stretch gap-10 py-12 lg:grid-cols-2 lg:grid-rows-[minmax(28rem,1fr)] lg:gap-12 lg:py-16">
-          <div className="max-w-xl min-w-0 self-center">
-            <div className="landing-rise landing-rise-delay-1 flex items-center gap-3">
-              <span className="relative inline-flex h-14 w-14 shrink-0 sm:h-16 sm:w-16">
-                <Image
-                  src={brandAssets.iconTransparent}
-                  alt=""
-                  width={64}
-                  height={64}
-                  priority
-                  className="h-full w-full object-contain"
-                />
-              </span>
-              <p className="font-display text-4xl tracking-tight text-white sm:text-5xl md:text-6xl">
-                Scalers
-              </p>
-            </div>
-
-            <h1 className="landing-rise landing-rise-delay-2 mt-8 font-display text-3xl leading-tight tracking-tight text-white sm:text-4xl md:text-[2.75rem] text-balance">
-              Your 24-hour Business Assistant, so you do not miss the client.
-            </h1>
-
-            <p className="landing-rise landing-rise-delay-3 mt-4 max-w-md text-base leading-relaxed text-sky-100/90 sm:text-lg">
-              It answers when you are busy, after hours, on another call, or the line is off.
-            </p>
-
-            <p className="landing-rise landing-rise-delay-3 mt-3 max-w-md text-sm leading-relaxed text-sky-100/65">
-              Scalers is a Business Assistant that actually helps you run the business, from the
-              client call through to the booking, the order, or whatever comes next.
-            </p>
-
-            <div className="landing-rise landing-rise-delay-4 mt-10 flex flex-wrap items-center gap-3">
-              <a
-                href={appEntryHref(actionHref)}
-                className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-6 py-3 text-base font-medium text-brand-900 transition hover:bg-brand-50 focus-visible:outline-none focus-visible:shadow-focus"
-              >
-                {actionLabel}
-              </a>
-              {!signedIn ? (
-                <a
-                  href={appEntryHref("/login")}
-                  className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/30 px-6 py-3 text-base font-medium text-white transition hover:border-white/55 hover:bg-white/5 focus-visible:outline-none focus-visible:shadow-focus"
-                >
-                  Sign in
-                </a>
-              ) : null}
-            </div>
+      <section className="mx-auto grid max-w-desk items-center gap-10 px-5 pb-14 pt-8 sm:px-8 lg:grid-cols-[1.1fr_1fr] lg:gap-14 lg:pb-20 lg:pt-14">
+        <div className="min-w-0 max-w-xl">
+          <h1 className="landing-rise font-display text-[2rem] leading-[1.12] tracking-tight text-ink text-balance sm:text-5xl">
+            Your calls get answered, even when you can&apos;t.
+          </h1>
+          <p className="landing-rise landing-rise-delay-1 mt-4 text-base leading-relaxed text-ink-2 sm:text-lg">
+            On a job, on another call, or closed for the night. Your Business Assistant answers with your prices and
+            hours, then texts you the details.
+          </p>
+          <div className="landing-rise landing-rise-delay-2 mt-7 flex flex-wrap items-center gap-3">
+            {signedIn ? <LandingCta href="/home" label="Open Desk" /> : <LandingCta />}
           </div>
+          <p className="landing-rise landing-rise-delay-3 mt-4 text-sm text-ink-2" data-landing-trust="">
+            Keep your number. Turn it off with one code.
+          </p>
+        </div>
+        <div className="relative min-w-0">
+          <div className="landing-glow pointer-events-none absolute -inset-8" aria-hidden />
           <HeroCall />
-        </section>
-
-      </div>
+        </div>
       </section>
 
-      <section className="bg-canvas px-6 py-16 text-ink sm:px-8">
+      <section className="px-5 py-14 sm:px-8">
         <div className="mx-auto max-w-desk">
-          <h2 className="font-display text-display text-ink">How it works</h2>
+          <h2 className="font-display text-2xl tracking-tight text-ink sm:text-3xl">How it works</h2>
           <HowStage />
         </div>
       </section>
 
-      <section className="bg-canvas px-6 pb-20 pt-4 text-ink sm:px-8">
-        <div className="mx-auto max-w-desk">
-          <div className="max-w-xl">
-            <p className="text-base leading-relaxed text-ink">
-              Scalers is a Business Assistant that actually helps you run the business, from the
-              client call through to the booking, the order, or whatever comes next.
-            </p>
-            <a
-              href={appEntryHref(actionHref)}
-              className="mt-6 inline-flex min-h-12 items-center justify-center rounded-xl bg-brand-900 px-6 py-3 text-base font-medium text-white transition hover:bg-brand-800 focus-visible:outline-none focus-visible:shadow-focus"
-            >
-              {actionLabel}
-            </a>
-          </div>
+      <section className="relative overflow-hidden px-5 pb-16 pt-6 sm:px-8" data-landing-final="">
+        <div className="landing-glow pointer-events-none absolute inset-x-0 bottom-0 h-64" aria-hidden />
+        <div className="relative mx-auto max-w-desk">
+          <h2 className="font-display text-2xl tracking-tight text-ink sm:text-3xl">Stop losing jobs to missed calls.</h2>
+          <div className="mt-6">{signedIn ? <LandingCta href="/home" label="Open Desk" /> : <LandingCta />}</div>
         </div>
       </section>
-      <footer className="flex justify-center border-t border-hairline bg-canvas px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3">
+
+      <footer className="flex justify-center border-t border-hairline px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3">
         <AppearanceFooter />
       </footer>
     </main>
