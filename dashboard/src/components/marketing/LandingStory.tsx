@@ -42,12 +42,12 @@ function usePlayOnView() {
 }
 
 /** Hero call card: an incoming call, answered, then the details sent to the owner. Plays once; reduced motion shows the end. */
-export function HeroCall() {
+export function HeroCall({ glass = false }: { glass?: boolean } = {}) {
   const ref = usePlayOnMount();
   return (
     <div
       ref={ref}
-      className="hero-call relative h-full min-h-[20rem] w-full min-w-0 rounded-2xl border border-hairline bg-surface text-ink shadow-lift sm:min-h-[26rem]"
+      className={`hero-call relative h-full min-h-[20rem] w-full min-w-0 rounded-2xl border text-ink shadow-lift sm:min-h-[26rem] ${glass ? "glass-chrome border-white/25" : "border-hairline bg-surface"}`}
       aria-hidden
     >
       <div className="hero-in flex h-full flex-col justify-center p-6 sm:p-10">

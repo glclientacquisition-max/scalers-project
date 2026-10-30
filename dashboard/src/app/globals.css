@@ -540,11 +540,29 @@ h3,
   0%, 62% { opacity: 0; transform: translateY(8px); }
   72%, 100% { opacity: 1; transform: none; }
 }
+/*
+ * Dark hero (30 Oct v3, Alvin): main's navy plane. White CTA with navy text (16.9:1), hover #EAF6FF. One soft orange
+ * orb behind the call card for warmth; orange is used nowhere else (no buttons, no text). Static blur, very slow drift.
+ */
+.landing-cta-on-dark { background: #ffffff; color: #0a192f; }
+.landing-cta-on-dark:hover { background: #eaf6ff; }
+.landing-warm-orb {
+  position: absolute; left: 50%; top: 50%; z-index: 0; width: min(115%, 560px); aspect-ratio: 1;
+  border-radius: 9999px; pointer-events: none; transform: translate(-50%, -50%);
+  background: radial-gradient(closest-side, rgb(255 122 26 / 0.32), rgb(255 122 26 / 0.1) 60%, transparent);
+  filter: blur(48px);
+  animation: landing-warm 40s ease-in-out alternate infinite;
+}
+@keyframes landing-warm {
+  from { transform: translate(-50%, -50%) scale(1); }
+  to { transform: translate(-47%, -52%) scale(1.06); }
+}
 /* Reduced motion: the finished state, no movement. */
 @media (prefers-reduced-motion: reduce) {
   .hero-in, .hero-ring { opacity: 0; }
   .hero-out, .hero-sms, .hiw-mock { opacity: 1; transform: none; }
   .landing-rise, .landing-orbs::before, .landing-orbs::after { animation: none; }
+  .landing-warm-orb, .landing-drift { animation: none; }
 }
 
 .hero-call[data-play="1"] .hero-in { animation: hero-in 7s ease-out both; }
