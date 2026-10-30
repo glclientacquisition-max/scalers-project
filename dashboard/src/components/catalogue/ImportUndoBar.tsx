@@ -50,11 +50,17 @@ export function ImportUndoBar({
   onExpire: () => void;
   onDismiss?: () => void;
 }) {
-  const [now, setNow] = useState(() => Date.now());
+  // Start from `at` so server and first client render match; the effect reads the clock right away.
+  const [now, setNow] = useState(at);
   useEffect(() => {
     if (outcome) return;
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0);
     const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
+    return () => {
+      clearTimeout(first);
+      clearInterval(t);
+    };
   }, [outcome]);
   const left = at + IMPORT_UNDO_WINDOW_MS - now;
   useEffect(() => {

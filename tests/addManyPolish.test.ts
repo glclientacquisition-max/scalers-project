@@ -117,3 +117,8 @@ test("saving steps are real (no timers), reward has no confetti and respects red
   assert.match(bar, /min-h-11 min-w-11/);
   assert.match(bar, /data-undo-outcome/);
 });
+
+test("Add many save is not inside a transition, so each saving step renders as it completes", () => {
+  const screen = read("dashboard/src/components/catalogue/CatalogueScreen.tsx");
+  assert.match(screen, /const add = \(mode: "append" \| "replace"\) =>\n    void \(async \(\) => \{/);
+});

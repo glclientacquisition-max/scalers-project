@@ -913,8 +913,9 @@ function PasteSheet({
   // Saving: real steps only, each ticked when its request returns; the bar counts finished requests.
   const [saving, setSaving] = useState<SaveProgress | null>(null);
   const [reward, setReward] = useState<SaveReward | null>(null);
+  // Not a transition: React holds state set inside an async transition until it ends, so the steps would never show.
   const add = (mode: "append" | "replace") =>
-    start(async () => {
+    void (async () => {
       if (!summary) return;
       const n = summary.ready.length;
       const facts = mode === "append" && actions.saveFact ? picked : [];
@@ -973,7 +974,7 @@ function PasteSheet({
       setSaving(null);
       setReward(result);
       finishRef.current = done;
-    });
+    })();
   const finishRef = useRef<{ id: string; summary: string } | undefined>(undefined);
   const addLabel = !summary
     ? ""
