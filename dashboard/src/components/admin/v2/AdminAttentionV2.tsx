@@ -11,6 +11,8 @@ import {
 } from "@/lib/ops/attentionView";
 import { callLength, intentLabel, type PaneCall } from "@/lib/ops/businessesView";
 import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState } from "@/components/ops";
+import { HealthStrip } from "@/components/admin/v2/HealthStrip";
+import type { OpsSignal } from "@/lib/platformOpsModel";
 import { ButtonLink } from "@/components/ui/Button";
 import "@/styles/ops.css";
 
@@ -38,12 +40,15 @@ export function AdminAttentionV2({
   items,
   unavailable = [],
   callsFixture,
+  signals = null,
 }: {
   items: AttentionItem[];
   /** Reasons whose read failed, so an empty tab is not mistaken for "all clear". */
   unavailable?: AttentionKind[];
   /** Dev fixture only: skips the read. */
   callsFixture?: Record<string, PaneCall[]>;
+  /** Platform signals already loaded on this page. Null when that read did not arrive. */
+  signals?: OpsSignal[] | null;
 }) {
   const [view, setView] = useState<ViewId>("all");
   const [sel, setSel] = useState<string | null>(null);
@@ -106,6 +111,9 @@ export function AdminAttentionV2({
   );
   const list = (
     <div className="flex min-h-0 flex-col pe-ops-4">
+      <div className="pb-ops-3">
+        <HealthStrip signals={signals} />
+      </div>
       <PageHeader title="Needs attention" count={items.length} actions={tabs} />
       {missing.length ? (
         <p className="pb-ops-2 text-ops-label text-ink-2" data-unavailable="">
