@@ -9,6 +9,7 @@ import {
   previewKbPasteAction,
   saveKbItemAction,
 } from "@/app/(desk)/settings/knowledge/actions";
+import { photoToLinesAction, websiteToLinesAction } from "@/app/(desk)/settings/knowledge/addManyActions";
 
 const ACTIONS: CatalogueActions = {
   saveItem: saveKbItemAction,
@@ -17,6 +18,8 @@ const ACTIONS: CatalogueActions = {
   compile: compileKbAction,
   previewPaste: previewKbPasteAction,
   importPaste: importKbPasteAction,
+  photoToLines: photoToLinesAction,
+  websiteToLines: websiteToLinesAction,
 };
 
 /** Settings > Catalogue wired to the KB v2 server actions. */
