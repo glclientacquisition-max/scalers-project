@@ -492,6 +492,33 @@ h3,
 
 .hiw-mock { opacity: 0; transform: translateY(12px); }
 
+/*
+ * Landing-only accent (decision 30 Oct: Ember #C2410C, white text 5.2:1). Scoped to marketing pages so the Desk keeps
+ * its own CTA blue. Swap the accent here only.
+ */
+.landing-scope {
+  --landing-cta: #c2410c;
+  --landing-cta-hover: #9a3412;
+  --landing-cta-on: #ffffff;
+  --landing-glow: rgb(194 65 12 / 0.12);
+  font-family: var(--font-body), var(--font-sans, system-ui), system-ui, sans-serif;
+}
+.landing-cta { background: var(--landing-cta); color: var(--landing-cta-on); }
+.landing-cta:hover { background: var(--landing-cta-hover); }
+.landing-glow { background: radial-gradient(55% 60% at 50% 55%, var(--landing-glow), transparent 72%); }
+.hero-sms { opacity: 1; }
+.hero-call[data-play="1"] .hero-sms { animation: hero-sms 7s ease-out both; }
+@keyframes hero-sms {
+  0%, 62% { opacity: 0; transform: translateY(8px); }
+  72%, 100% { opacity: 1; transform: none; }
+}
+/* Reduced motion: the finished state, no movement. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-in, .hero-ring { opacity: 0; }
+  .hero-out, .hero-sms, .hiw-mock { opacity: 1; transform: none; }
+  .landing-rise { animation: none; }
+}
+
 .hero-call[data-play="1"] .hero-in { animation: hero-in 7s ease-out both; }
 .hero-call[data-play="1"] .hero-out { animation: hero-out 7s ease-out both; }
 .hero-call[data-play="1"] .hero-ring { animation: hero-ring 7s ease-out both; }

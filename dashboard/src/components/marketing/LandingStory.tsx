@@ -41,33 +41,41 @@ function usePlayOnView() {
   return ref;
 }
 
+/** Hero call card: an incoming call, answered, then the details sent to the owner. Plays once; reduced motion shows the end. */
 export function HeroCall() {
   const ref = usePlayOnMount();
   return (
-    <div ref={ref} className="hero-call glass-chrome h-full min-h-[28rem] w-full min-w-0 rounded-2xl text-ink shadow-lift" aria-hidden>
-      <div className="hero-in flex h-full min-h-[28rem] flex-col justify-center p-8 sm:p-10">
-        <p className="text-sm text-ink-soft">Incoming</p>
+    <div
+      ref={ref}
+      className="hero-call relative h-full min-h-[20rem] w-full min-w-0 rounded-2xl border border-hairline bg-surface text-ink shadow-lift sm:min-h-[26rem]"
+      aria-hidden
+    >
+      <div className="hero-in flex h-full flex-col justify-center p-6 sm:p-10">
+        <p className="text-sm text-ink-2">Incoming call</p>
         <p className="mt-2 font-display text-3xl tracking-tight">Client</p>
-        <span className="hero-ring mt-8 h-16 w-16 rounded-full border border-accent" />
+        <span className="hero-ring mt-8 h-16 w-16 rounded-full border-2 border-accent" />
       </div>
-      <div className="hero-out flex h-full min-h-[28rem] flex-col justify-between gap-8 p-8 sm:p-10">
+      <div className="hero-out flex h-full flex-col justify-between gap-6 p-6 sm:p-10">
         <div className="min-w-0">
-          <Mark className="h-10 w-10 object-contain" />
-          <p className="mt-8 text-sm text-ink-soft">Answered</p>
-          <p className="mt-1 font-display text-2xl tracking-tight">Client</p>
-          <p className="mt-2 text-base">Business Assistant</p>
-        </div>
-        <div className="min-w-0">
-          <p className="font-display text-4xl leading-tight tracking-tight text-ink sm:text-5xl">
-            They asked for a booking.
-          </p>
-          <div className="mt-6 flex h-7 items-end gap-1 overflow-hidden">
+          <div className="flex items-center gap-3">
+            <Mark className="h-9 w-9 object-contain" />
+            <div>
+              <p className="text-sm text-ink-2">Answered</p>
+              <p className="text-base font-medium">Business Assistant</p>
+            </div>
+          </div>
+          <p className="mt-6 font-display text-3xl leading-tight tracking-tight text-ink sm:text-4xl">They asked for a booking.</p>
+          <div className="mt-4 flex h-7 items-end gap-1 overflow-hidden">
             <span className="hero-wave hero-wave-a inline-block h-4 w-1 rounded-full bg-accent" />
             <span className="hero-wave hero-wave-b inline-block h-6 w-1 rounded-full bg-accent" />
             <span className="hero-wave hero-wave-a inline-block h-3 w-1 rounded-full bg-accent" />
             <span className="hero-wave hero-wave-b inline-block h-7 w-1 rounded-full bg-accent" />
             <span className="hero-wave hero-wave-a inline-block h-5 w-1 rounded-full bg-accent" />
           </div>
+        </div>
+        <div className="hero-sms rounded-xl border border-hairline bg-canvas p-3">
+          <p className="text-caption font-medium text-ink-2">SMS to you</p>
+          <p className="mt-1 text-sm text-ink">New caller. Name, number and what they asked for are in your inbox.</p>
         </div>
       </div>
     </div>
