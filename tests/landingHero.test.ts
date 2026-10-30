@@ -9,8 +9,10 @@ const landing = read("components/marketing/LandingPage.tsx");
 const cta = read("components/marketing/LandingCta.tsx");
 const css = read("app/globals.css");
 
-test("hero is on the light canvas, one H1, no dark brand plane", () => {
-  assert.doesNotMatch(landing, /bg-brand-900|text-white|glass-chrome/);
+test("hero is main's dark navy plane with a frosted call card, one H1", () => {
+  assert.match(landing, /bg-gradient-to-br from-brand-900 via-brand-800\/95 to-brand-700\/80/);
+  assert.match(landing, /<HeroCall glass/);
+  assert.match(landing, /text-sky-100\/90/);
   assert.equal((landing.match(/<h1/g) || []).length, 1);
   const copy = read("components/marketing/landingCopy.ts");
   assert.match(copy, /h1: "Your 24-hour Business Assistant\."/);
@@ -37,8 +39,15 @@ test("reduced motion shows the finished call card; marketing fonts are DM Sans +
   assert.match(read("app/page.tsx"), /marketingFontClass/);
 });
 
+test("one soft orange orb behind the hero card; orange nowhere else; stops with reduced motion", () => {
+  assert.match(landing, /className="landing-warm-orb" aria-hidden/);
+  assert.equal((css.match(/rgb\(255 122 26/g) || []).length, 2);
+  assert.doesNotMatch(landing + cta, /(bg|text|border|from|via|to)-(orange|amber)|#ff7a1a|ember/i);
+  assert.match(css, /\.landing-cta-on-dark \{ background: #ffffff; color: #0a192f; \}/);
+  assert.match(css, /\.landing-warm-orb, \.landing-drift \{ animation: none; \}/);
+});
+
 test("premium backdrop is CSS-only orbs behind the hero card and stops with reduced motion", () => {
-  assert.match(landing, /className="landing-orbs" aria-hidden/);
   assert.match(css, /\.landing-orbs::before \{[^}]*radial-gradient/);
   assert.doesNotMatch(css.slice(css.indexOf(".landing-orbs {"), css.indexOf("@keyframes landing-orb")), /filter:\s*blur/);
   assert.match(css, /\.landing-rise, \.landing-orbs::before, \.landing-orbs::after \{ animation: none; \}/);
