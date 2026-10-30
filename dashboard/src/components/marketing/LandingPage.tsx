@@ -7,7 +7,7 @@ import {
   LandingMoments,
   LandingPackages,
   LandingQuestions,
-  LandingTrust,
+  LandingReach,
 } from "@/components/marketing/LandingSections";
 import { LandingCta } from "@/components/marketing/LandingCta";
 import { AppearanceFooter } from "@/components/ThemePicker";
@@ -68,8 +68,8 @@ export function LandingPage({ signedIn = false }: { signedIn?: boolean }) {
       </section>
 
       <LandingMoments />
+      <LandingReach />
       <LandingHowItWorks />
-      <LandingTrust />
       <LandingKeepNumber />
       <LandingPackages />
       <LandingQuestions />
@@ -78,7 +78,7 @@ export function LandingPage({ signedIn = false }: { signedIn?: boolean }) {
         <div className="landing-glow pointer-events-none absolute inset-x-0 bottom-0 h-64" aria-hidden />
         <div className="relative mx-auto max-w-desk">
           <h2 className="font-display text-2xl tracking-tight text-ink sm:text-3xl">Stop losing jobs to missed calls.</h2>
-          <div className="mt-6">{signedIn ? <LandingCta href="/home" label="Open Desk" /> : <LandingCta />}</div>
+          <div className="mt-6">{signedIn ? <LandingCta href="/home" label="Open Desk" wide /> : <LandingCta wide />}</div>
         </div>
       </section>
 
