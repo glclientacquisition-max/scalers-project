@@ -110,6 +110,17 @@
   --scrim: #0a192f;
 }
 
+/* Overage past the allowance. Shape, not colour alone. */
+.status-hatch {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--status-warn-bg),
+    var(--status-warn-bg) 3px,
+    var(--status-warn-fg) 3px,
+    var(--status-warn-fg) 4px
+  );
+}
+
 /*
  * Native option lists follow the document color-scheme. System leaves this
  * unset so the OS wins. `only` forbids UA scheme overrides on an explicit pick.

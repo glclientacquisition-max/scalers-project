@@ -3,6 +3,8 @@
 import { businessPaneHref } from "@/lib/ops/businessPane";
 import { useEffect, useMemo, useState } from "react";
 import { Headline, SplitLayout, SplitPane, StatusPill, EmptyState } from "@/components/ops";
+import { MinutesMeter } from "@/components/ui/MinutesMeter";
+import type { MinutesMeterMode } from "@/lib/minutesMeter";
 import {
   RESOLUTION_LABEL,
   buildUsage,
@@ -49,11 +51,17 @@ export function AdminUsageV2({ data, tenantId, nowIso, currentPeriod }: { data: 
           { label: "Calls", href: businessPaneHref(tenantId, "calls") },
         ]}
       >
-        {includedSec > 0 ? (
-          <div className="h-2 w-full overflow-hidden rounded-sm bg-surface-2" role="img" aria-label={`${pct}% of included minutes used`}>
-            <div className="h-full" style={{ width: `${Math.min(100, pct ?? 0)}%`, background: `var(--ops-status-${tone}-fg)` }} />
-          </div>
-        ) : null}
+        <MinutesMeter
+          shape="bar"
+          input={{
+            included: data.includedMinutes,
+            used: v.usedMinutes,
+            left: Math.max(0, data.includedMinutes - v.usedMinutes),
+            underOne: data.includedMinutes * 60 - data.meteredSeconds > 0 && data.includedMinutes * 60 - data.meteredSeconds < 60,
+            mode: (data.includedMinutes <= 0 ? "none" : data.onDemandEnabled ? "metered" : "capped") as MinutesMeterMode,
+            overLabel: v.onDemandMinutes > 0 ? `${v.onDemandMinutes.toLocaleString("en-KE")} min over` : null,
+          }}
+        />
       </Headline>
 
       <dl className="grid grid-cols-2 gap-x-ops-4 gap-y-ops-2 text-ops-body md:grid-cols-4" data-usage-facts="">
