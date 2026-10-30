@@ -18,12 +18,15 @@ type CardBase = {
   ownerSet: boolean;
   /** Ticked when the sheet opens. Owner-set facts and payment never are. */
   on: boolean;
+  /** Why the card opens unticked although nobody set it (hours read from a sentence with a guess). */
+  note?: string | null;
 };
 
 export type FactCard =
   | (CardBase & { kind: "hours"; schedule: HoursSchedule })
   | (CardBase & { kind: "policy"; key: FactPolicyKey; value: string })
   | (CardBase & { kind: "payment"; value: string })
+  | (CardBase & { kind: "address"; address: string; landmark: string })
   | (CardBase & { kind: "areas"; picks: AreaPicks })
   | (CardBase & { kind: "faq"; question: string; answer: string; change: "new" | "changes" });
 

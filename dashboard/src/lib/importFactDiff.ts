@@ -1,8 +1,10 @@
 import type { FaqEntry, TenantRow } from "./supabase";
 import type { IngestDraft } from "./ingest/extract";
-import { formatHoursForCompiler, formatHoursForOwner, parseHoursSchedule } from "./hoursSchedule";
+import { formatHoursForCompiler, formatHoursForOwner, parseHoursSchedule, type HoursSchedule } from "./hoursSchedule";
 import { normalizePayments, paymentsSentence } from "./payments";
 import { FACT_POLICY_KEYS, type FactCard } from "./factCards";
+import { parseHoursText } from "./hoursText";
+import { normalizeBusinessLocations } from "./businessLocations";
 import { areaNode, matchAreaText, normalizeAreaPicks, type AreaPicks } from "./areaPicks";
 
 export { FACT_POLICY_KEYS, factPolicyPatch, tickedFacts, type FactCard, type FactPolicyKey } from "./factCards";
@@ -88,7 +90,7 @@ export const FACT_CARDS_MAX_FAQS = 25;
  */
 export function buildFactCards(input: {
   tenant: Tenant;
-  draft: Pick<IngestDraft, "hoursSchedule" | "policies" | "faqs" | "locations">;
+  draft: Pick<IngestDraft, "hoursSchedule" | "policies" | "faqs" | "locations"> & { hoursNotes?: string };
   ownerPaths?: ReadonlySet<string>;
   areas?: { picks: AreaPicks | null; confirmed: boolean } | null;
 }): FactCard[] {
@@ -98,17 +100,30 @@ export function buildFactCards(input: {
   const policies = (t.business_policies || {}) as Record<string, unknown> & { provenance?: Record<string, { source?: string }> };
   const policyOwner = (key: string) => owner.has(`policies.${key}`) || policies.provenance?.[key]?.source === "owner";
 
-  const schedule = parseHoursSchedule(d.hoursSchedule ?? null);
-  if (schedule) {
-    const found = formatHoursForOwner(schedule) || formatHoursForCompiler(schedule);
+  const hours = foundHours(d, t);
+  if (hours) {
+    const found = formatHoursForOwner(hours.schedule) || formatHoursForCompiler(hours.schedule);
     const nowSchedule = parseHoursSchedule((t.hours_schedule as never) ?? null);
     const now = (nowSchedule ? formatHoursForOwner(nowSchedule) : "") || String(t.business_hours || "").trim();
     const x = diff(now, found);
     if (!x.same) {
       const ownerSet = owner.has("hours.weekly_grid");
-      cards.push({ id: "hours", kind: "hours", label: "Opening hours", now: x.now, found: x.next, ownerSet, on: !ownerSet, schedule });
+      cards.push({
+        id: "hours",
+        kind: "hours",
+        label: "Opening hours",
+        now: x.now,
+        found: x.next,
+        ownerSet,
+        on: !ownerSet && !hours.unsure,
+        note: hours.unsure ? hours.note || "Read from a sentence. Check it before you tick." : null,
+        schedule: hours.schedule,
+      });
     }
   }
+
+  const addr = addressCard(t, d.locations, owner.has("locations.branches"));
+  if (addr) cards.push(addr);
 
   const foundPolicies = (d.policies || {}) as Record<string, unknown>;
   for (const key of FACT_POLICY_KEYS) {
@@ -161,6 +176,48 @@ export function buildFactCards(input: {
   return cards;
 }
 
+/**
+ * Hours from the draft: a sentence ("Mon-Fri 8 to 6, Sat half day") read on its own first, since the model's grid for
+ * those is often a guess; else the model's grid. Keeps the stored hours location line (Locations owns it).
+ */
+function foundHours(d: { hoursSchedule?: unknown; hoursNotes?: string }, t: Tenant): { schedule: HoursSchedule; unsure: boolean; note: string | null } | null {
+  const stored = parseHoursSchedule((t.hours_schedule as never) ?? null);
+  const location = stored?.location || "";
+  const fromText = parseHoursText(String(d.hoursNotes || ""), location);
+  if (fromText) return fromText;
+  const grid = parseHoursSchedule(d.hoursSchedule ?? null);
+  if (grid) return { schedule: { ...grid, location }, unsure: false, note: null };
+  return null;
+}
+
+const clean = (v: unknown, max: number) =>
+  String(v ?? "").replace(/[\u0000-\u001f\u007f<>]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+
+/** The business address found (first place): only the address and landmark, saved onto the first stored place. */
+function addressCard(t: Tenant, locations: IngestDraft["locations"], ownerSet: boolean): FactCard | null {
+  const first = (locations || []).find((l) => clean(l?.address, 160));
+  if (!first) return null;
+  const address = clean(first.address, 160);
+  const landmark = clean(first.landmark, 120);
+  if (/https?:|www\.|@/i.test(address) || address.length < 4) return null;
+  const stored = normalizeBusinessLocations(t.business_locations || [])[0];
+  const nowLine = stored ? [stored.address, stored.landmark].filter(Boolean).join(" · ") : "";
+  const foundLine = [address, landmark && !stored?.landmark ? landmark : ""].filter(Boolean).join(" · ");
+  const x = diff(stored?.address || "", address);
+  if (x.same) return null;
+  return {
+    id: "address",
+    kind: "address",
+    label: "Business address",
+    now: nowLine || "Not set",
+    found: foundLine,
+    ownerSet,
+    on: !ownerSet,
+    address,
+    landmark,
+  };
+}
+
 /** Place names in the found locations' coverage notes ("We serve Kilimani, Westlands and Karen"). */
 export function foundAreaNames(locations: IngestDraft["locations"]): string[] {
   const out: string[] = [];
@@ -193,7 +250,7 @@ function areasCard(locations: IngestDraft["locations"], areas: { picks: AreaPick
   return { id: "areas", kind: "areas", label: "Areas you serve", now: now || "Not set", found: `Add ${added.map(nameOf).join(", ")}`, ownerSet, on: !ownerSet, picks };
 }
 
-const FACT_HINT = /\b(open|opens|opening|closed|hours|mon(day)?|tue(s|sday)?|wed(nesday)?|thu(rs|rsday)?|fri(day)?|sat(urday)?|sun(day)?|weekdays?|deliver(y|ies)?|deposit|refunds?|returns?|exchange|cancel(lation)?|warranty|guarantee|m-?pesa|paybill|till|pay(ment)?|cash|card|we serve|we cover|areas?)\b|\?/i;
+const FACT_HINT = /\b(open|opens|opening|closed|hours|mon(day)?|tue(s|sday)?|wed(nesday)?|thu(rs|rsday)?|fri(day)?|sat(urday)?|sun(day)?|weekdays?|deliver(y|ies)?|deposit|refunds?|returns?|exchange|cancel(lation)?|warranty|guarantee|m-?pesa|paybill|till|pay(ment)?|cash|card|we serve|we cover|areas?|located|address|street|st|road|rd|avenue|ave|building|floor|plaza|mall|house|opposite|next to|weekdays?|daily)\b|\?/i;
 
 /** Cheap check before spending a model call: does this text say anything about hours, policies, payment, areas or Q&A? */
 export function mightHaveFacts(text: string): boolean {
