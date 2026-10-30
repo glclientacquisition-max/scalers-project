@@ -128,7 +128,7 @@ export async function addKbItemsFromLegacy(
   tenantId: string,
   rows: { services_catalog?: unknown; product_catalog?: unknown },
   by = "desk",
-  mirror: { notes?: string; contentEdits?: boolean } = {},
+  mirror: { notes?: string; contentEdits?: boolean; restamp?: boolean } = {},
 ): Promise<KbAddResult> {
   const existing = await loadKbItems(tenantId);
   if (!existing) return { ok: false, skipped: "no_kb" };
@@ -146,7 +146,9 @@ export async function addKbItemsFromLegacy(
     const w = await writeKbItems(tenantId, plan.fresh as KbItem[]);
     if (!w.ok) return { ok: false, skipped: "error" };
   }
-  await afterKbWrite(tenantId, by, mirror.notes !== undefined ? { notes: mirror.notes } : {});
+  // restamp: the owner reviewed these rows (Import confirm), so their call facts are re-stamped as written.
+  const restampIds = mirror.restamp ? [...plan.edits, ...plan.fresh].map((i) => String((i as { id: string }).id)) : undefined;
+  await afterKbWrite(tenantId, by, { ...(mirror.notes !== undefined ? { notes: mirror.notes } : {}), ...(restampIds ? { restampIds } : {}) });
   return { ok: true, added: plan.fresh.length, kept: plan.kept };
 }
 
@@ -158,9 +160,9 @@ export async function addKbItemsFromLegacy(
 export async function importCatalogueToKb(
   tenantId: string,
   rows: { services_catalog?: unknown; product_catalog?: unknown },
-  opts: { legacyServicesOffered: string; by: string; legacyColumns?: Record<string, unknown>; notes?: string; contentEdits?: boolean },
+  opts: { legacyServicesOffered: string; by: string; legacyColumns?: Record<string, unknown>; notes?: string; contentEdits?: boolean; restamp?: boolean },
 ): Promise<KbAddResult> {
-  const r = await addKbItemsFromLegacy(tenantId, rows, opts.by, { ...(opts.notes !== undefined ? { notes: opts.notes } : {}), contentEdits: opts.contentEdits === true });
+  const r = await addKbItemsFromLegacy(tenantId, rows, opts.by, { ...(opts.notes !== undefined ? { notes: opts.notes } : {}), contentEdits: opts.contentEdits === true, restamp: opts.restamp === true });
   if (!r.ok && r.skipped === "no_kb") {
     const { error } = await getSupabaseAdmin().from("tenants").update({ ...(opts.legacyColumns || {}), services_offered: opts.legacyServicesOffered }).eq("id", tenantId);
     if (error) console.warn(`[kb] pre-KB services text tenant=${tenantId} failed`);

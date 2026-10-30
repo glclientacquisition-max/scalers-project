@@ -484,7 +484,9 @@ describe("settings save scope", () => {
     assert.doesNotMatch(ingest, /Open Train to review/);
     assert.doesNotMatch(catalog, /Catalogue saved for the next call/);
     assert.match(catalog, /Added to your catalogue\. Check the prices to confirm them\./);
-    assert.match(ingest, /Catalogue saved for the next call/);
+    // Import reports the KB's own counts (30 Oct), never a blanket "Catalogue saved".
+    assert.doesNotMatch(ingest, /Catalogue saved for the next call/);
+    assert.match(ingest, /Added \$\{parts\.join\(", "\)\}/);
     assert.match(read("dashboard/src/app/(desk)/settings/actions.ts"), /settingsScopeValidationError/);
   });
 

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { KNOWLEDGE_PASTE_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
 import { useMountedPoolPick } from "@/lib/useMountedPoolPick";
 import type { TenantRow } from "@/lib/supabase";
-import { parseVertical, VERTICAL_LABELS, type BusinessVertical } from "@/lib/vertical";
+import { parseVertical } from "@/lib/vertical";
 import { structureImportedCatalogRow } from "@/lib/catalogPricingMode";
 import { catalogImportPriceHintText } from "@/components/settings/catalog/CatalogImportPriceLine";
 import type { IngestDraft } from "@/lib/ingest/extract";
@@ -79,11 +79,6 @@ function ingestServicePriceHint(service: { price_range?: string; notes?: string 
   return [catalogImportPriceHintText(structured), service.notes].filter(Boolean).join(" · ");
 }
 
-function verticalImportLabel(raw: string): string {
-  const id = parseVertical(raw);
-  return VERTICAL_LABELS[id as BusinessVertical] ?? raw;
-}
-
 function serviceCsvPlaceholder(vertical: string | null | undefined): string {
   if (parseVertical(vertical) === "retail") {
     return "name,price\nA4 paper,500 KES\nBinding,300 KES";
@@ -102,14 +97,9 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
   const [draft, setDraft] = useState<IngestDraft | null>(null);
   const [selectedServices, setSelectedServices] = useState<Set<number>>(new Set());
   const [selectedFaqs, setSelectedFaqs] = useState<Set<number>>(new Set());
-  const [selectedTeam, setSelectedTeam] = useState<Set<number>>(new Set());
-  const [includeUnknown, setIncludeUnknown] = useState(false);
   const [includeLocations, setIncludeLocations] = useState(false);
   const [includeHours, setIncludeHours] = useState(false);
   const [includePolicies, setIncludePolicies] = useState(false);
-  const [includeVertical, setIncludeVertical] = useState(false);
-  const [includeContactPhone, setIncludeContactPhone] = useState(false);
-  const [renameBusiness, setRenameBusiness] = useState(false);
   const [mergeMode, setMergeMode] = useState<"merge" | "replace_services_faqs">("merge");
   const [dismissedExtract, setDismissedExtract] = useState<IngestExtractState | null>(null);
 
@@ -127,21 +117,12 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
       setDraft(extractState.draft);
       setSelectedServices(new Set());
       setSelectedFaqs(new Set());
-      setSelectedTeam(new Set());
       // Scanned values stay on the rows. Row ticks and section switches start off.
-      setIncludeUnknown(false);
       setIncludeLocations(false);
       setIncludeHours(false);
       setIncludePolicies(false);
-      setIncludeVertical(false);
-      setIncludeContactPhone(false);
-      setRenameBusiness(false);
-      // For a full business brief, default to start fresh so headings/junk don't linger.
-      const looksLikeBrief =
-        Boolean(extractState.draft.locations?.length) ||
-        Boolean(extractState.draft.hoursNotes) ||
-        (extractState.draft.faqs?.length || 0) >= 3;
-      setMergeMode(looksLikeBrief ? "replace_services_faqs" : "merge");
+      // Import only adds by default. Replacing FAQs is an explicit choice, never preselected.
+      setMergeMode("merge");
     }
   }, [extractState]);
 
@@ -162,21 +143,12 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
     () => [...selectedFaqs].sort((a, b) => a - b).join(","),
     [selectedFaqs]
   );
-  const selectedTeamCsv = useMemo(
-    () => [...selectedTeam].sort((a, b) => a - b).join(","),
-    [selectedTeam]
-  );
   const nothingSelected =
     selectedServices.size === 0 &&
     selectedFaqs.size === 0 &&
-    selectedTeam.size === 0 &&
-    !includeUnknown &&
     !includeLocations &&
     !includeHours &&
-    !includePolicies &&
-    !includeVertical &&
-    !includeContactPhone &&
-    !renameBusiness;
+    !includePolicies;
 
   function toggle(set: Set<number>, index: number, setter: (s: Set<number>) => void) {
     const next = new Set(set);
@@ -302,43 +274,14 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
             ) : null}
           </div>
 
-          {(draft.vertical ||
-            draft.businessNameSuggestion ||
-            draft.locations?.length ||
+          {(draft.locations?.length ||
             draft.hoursNotes ||
             draft.hoursSchedule ||
-            draft.contactPhone ||
             (draft.policies &&
               Object.values(draft.policies).some((v) =>
                 String(v || "").trim()
               ))) ? (
             <SettingsGroup title="Business details">
-                {draft.businessNameSuggestion ? (
-                  <SettingsRow
-                    label="Rename business to"
-                    hint={draft.businessNameSuggestion}
-                    control="switch"
-                  >
-                    <ToolSwitch
-                      checked={renameBusiness}
-                      onChange={setRenameBusiness}
-                      label="Rename business from import"
-                    />
-                  </SettingsRow>
-                ) : null}
-                {draft.vertical ? (
-                  <SettingsRow
-                    label="Business type"
-                    hint={verticalImportLabel(draft.vertical)}
-                    control="switch"
-                  >
-                    <ToolSwitch
-                      checked={includeVertical}
-                      onChange={setIncludeVertical}
-                      label="Apply business type"
-                    />
-                  </SettingsRow>
-                ) : null}
                 {draft.locations?.length ? (
                   <SettingsRow
                     label="Location"
@@ -391,19 +334,6 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
                       checked={includePolicies}
                       onChange={setIncludePolicies}
                       label="Apply policies"
-                    />
-                  </SettingsRow>
-                ) : null}
-                {draft.contactPhone ? (
-                  <SettingsRow
-                    label="Sales / WhatsApp phone"
-                    hint={draft.contactPhone}
-                    control="switch"
-                  >
-                    <ToolSwitch
-                      checked={includeContactPhone}
-                      onChange={setIncludeContactPhone}
-                      label="Apply contact phone"
                     />
                   </SettingsRow>
                 ) : null}
@@ -509,59 +439,26 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
             </SettingsGroup>
           ) : null}
 
-          {draft.team.length ? (
-            <SettingsGroup title="Team">
-                {draft.team.map((t, i) => (
-                  <SettingsRow
-                    key={`team-${i}`}
-                    label={t.name}
-                    hint={
-                      [t.role, t.phone, t.email].filter(Boolean).join(" · ") ||
-                      "No contact yet"
-                    }
-                    control="switch"
-                  >
-                    <ToolSwitch
-                      checked={selectedTeam.has(i)}
-                      onChange={() => toggle(selectedTeam, i, setSelectedTeam)}
-                      label={`Keep teammate ${t.name}`}
-                    />
-                  </SettingsRow>
-                ))}
-            </SettingsGroup>
-          ) : null}
-
-          {draft.unknownAnswerFallback ? (
-            <SettingsGroup title="When unsure">
-              <SettingsRow
-                label="If we don't offer something, say"
-                hint={draft.unknownAnswerFallback}
-                control="switch"
-              >
-                <ToolSwitch
-                  checked={includeUnknown}
-                  onChange={setIncludeUnknown}
-                  label="If we don't offer something, say"
-                />
-              </SettingsRow>
-            </SettingsGroup>
-          ) : null}
-
           <div className="space-y-1.5">
             <p className="px-1 text-meta font-medium text-ink-2">
               Keep or replace
             </p>
             <SettingsSegmented
-              label="Keep your current list, or start fresh?"
+              label="Add to your FAQs, or replace them?"
               value={mergeMode}
               options={
                 [
-                  { id: "merge" as const, label: "Keep my current list" },
-                  { id: "replace_services_faqs" as const, label: "Start fresh" },
+                  { id: "merge" as const, label: "Add to what I have" },
+                  { id: "replace_services_faqs" as const, label: "Replace my FAQs" },
                 ] as const
               }
               onChange={setMergeMode}
             />
+            <p className="px-1 text-meta text-ink-2" data-import-replace-note="">
+              {mergeMode === "replace_services_faqs"
+                ? "Your current FAQs are replaced by the ticked ones. Services are only added; items you already have stay as they are."
+                : "Ticked items are added. Items you already have stay as they are."}
+            </p>
           </div>
 
           <form action={applyAction} className="flex flex-wrap gap-2">
@@ -569,13 +466,7 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
             <input type="hidden" name="draft_json" value={JSON.stringify(draft)} />
             <input type="hidden" name="selected_services" value={selectedServiceCsv} />
             <input type="hidden" name="selected_faqs" value={selectedFaqCsv} />
-            <input type="hidden" name="selected_team" value={selectedTeamCsv} />
             <input type="hidden" name="merge_mode" value={mergeMode} />
-            <input
-              type="hidden"
-              name="include_unknown"
-              value={includeUnknown ? "1" : "0"}
-            />
             <input
               type="hidden"
               name="include_locations"
@@ -590,21 +481,6 @@ function KnowledgeIngestPanelInner({ tenant }: { tenant: TenantRow }) {
               type="hidden"
               name="include_policies"
               value={includePolicies ? "1" : "0"}
-            />
-            <input
-              type="hidden"
-              name="include_vertical"
-              value={includeVertical ? "1" : "0"}
-            />
-            <input
-              type="hidden"
-              name="include_contact_phone"
-              value={includeContactPhone ? "1" : "0"}
-            />
-            <input
-              type="hidden"
-              name="rename_business"
-              value={renameBusiness ? "1" : "0"}
             />
             <button
               type="submit"
