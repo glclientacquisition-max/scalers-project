@@ -3,6 +3,9 @@
 const { lookup, speechOf } = require('./lookup');
 const { ownerLookupReason } = require('./lookupOwnerReason');
 const { readAreaTerms } = require('../conversation/areaTerms');
+const { buildFactSheet, factSentence } = require('../conversation/factSheet');
+const { factPolicyMap, lookupFieldMeta } = require('../conversation/provenance');
+const { typedPrice } = require('./factStore');
 
 const INTRO = '';
 
@@ -137,12 +140,88 @@ const FACT_PROBES = {
   payment: (profile, now) => probeKind('pay', profile, now),
 };
 
+/** A stale stored hash on an owner-saved row (never "no row": nothing was ever saved from the Desk). */
+const STALE_HASH = new Set(['hash_missing', 'hash_mismatch']);
+
+/**
+ * Prices as calls read them on the KB path: the published snapshot rows
+ * (profile.kbProjected) priced by factStore.typedPrice. A row with a
+ * speakable, confirmed price is what a caller hears; the stored-row fact hash
+ * is not part of that path (a Catalogue save does not refresh it).
+ */
+function kbPriceAnswer(profile) {
+  if (!profile?.kbProjected) return null;
+  const rows = [
+    ...asList(profile.servicesCatalog),
+    ...asList(profile.productCatalog),
+  ];
+  for (const row of rows) {
+    const name = String(row?.name || '').trim();
+    if (!name) continue;
+    const say = typedPrice(row).say;
+    if (say) return `${name} is ${String(say).replace(/\bKSh\s+KSh\b/gi, 'KSh')}.`;
+  }
+  return null;
+}
+
+/** Confirmed facts of one kind on the call's fact sheet (factSheet.js, the FACT CARD). */
+function sheetFacts(profile, kind) {
+  let sheet;
+  try {
+    sheet = buildFactSheet(profile || {});
+  } catch {
+    return [];
+  }
+  return [...sheet.facts.values()].filter((f) => f.kind === kind);
+}
+
+/**
+ * Payment as calls read it: numbers from the structured payments bag, spoken
+ * when the payment policy is a fact (factPolicyMap, same as paymentFacts) or
+ * the bag itself is owner-saved and confirmed. A note with no number gives no
+ * fact here, so it stays not ready.
+ */
+function sheetPayAnswer(profile) {
+  const facts = sheetFacts(profile, 'pay');
+  if (!facts.length) return null;
+  const policyFact = Boolean(
+    String(factPolicyMap(profile?.businessPolicies, profile?.fieldMeta || null).policies?.payment || '').trim()
+  );
+  const bag = profile?.businessPolicies?.payments;
+  const ownerSaved = Boolean(bag && typeof bag === 'object' && bag.source === 'owner' && bag.confirmed === true);
+  if (!policyFact && !ownerSaved) return null;
+  return facts
+    .map((f) => factSentence({ ...f, confirmed: true }, 'en', profile))
+    .join(' ');
+}
+
+/**
+ * Hours as calls read them: the parsed weekly grid on the fact sheet. Used only
+ * when the owner saved hours on the Desk and the stored hash went stale.
+ */
+function sheetHoursAnswer(profile, result) {
+  if (!STALE_HASH.has(String(result?.reason || ''))) return null;
+  if (lookupFieldMeta(profile?.fieldMeta, 'hours.weekly_grid')?.source !== 'owner') return null;
+  const week = sheetFacts(profile, 'hours').find((f) => f.id === 'hours.week' && f.confirmed);
+  return week ? factSentence(week, 'en', profile) : null;
+}
+
+/** When the lookup probe misses, the answer calls give from the same saved data (or null). */
+function callPathAnswer(kind, profile, result) {
+  if (kind === 'prices') return kbPriceAnswer(profile);
+  if (kind === 'payment') return sheetPayAnswer(profile);
+  if (kind === 'hours') return sheetHoursAnswer(profile, result);
+  return null;
+}
+
 function factRow(kind, title, profile, now) {
   const probe = FACT_PROBES[kind];
   const result = probe(profile, now);
-  const willSay = result?.status === 'found';
+  const found = result?.status === 'found';
+  const fallback = found ? null : callPathAnswer(kind, profile, result);
+  const willSay = found || Boolean(fallback);
   const reasonKind = kind === 'areas' ? 'delivery' : kind === 'payment' ? 'payment' : kind;
-  const hearPreview = willSay ? speechOf(result, 'en') : '';
+  const hearPreview = found ? speechOf(result, 'en') : fallback || '';
   return {
     id: kind,
     title,
@@ -150,7 +229,7 @@ function factRow(kind, title, profile, now) {
     willSay,
     stampTone: willSay ? 'ok' : 'attention',
     stampLabel: willSay ? 'Will say' : "Won't say",
-    reason: ownerLookupReason(reasonKind, result),
+    reason: fallback ? 'Ready on the next call.' : ownerLookupReason(reasonKind, result),
     fixHref: FIX[kind],
     hearPreview,
     _lookupResult: result,
