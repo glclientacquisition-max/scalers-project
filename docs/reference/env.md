@@ -61,7 +61,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js`<br>`src/notifications/ownerCallSummary.js` |
 | `CALL_SUMMARY_EVENT` | voice | `src/conversation/callSummaryEvent.js` |
 | `CRON_SECRET` | desk | `dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/cron/ops-alerts/route.ts` |
-| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+71 more |
+| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+72 more |
 | `DASHBOARD_PASSWORD` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
