@@ -3,7 +3,7 @@ import { StatusMark } from "@/components/ui/StatusMark";
 import { Stamp } from "@/components/ui/Stamp";
 import { Empty } from "@/components/ui/Empty";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 
 /**
  * Status vocabulary at 360. Words only: no sample counts.
@@ -13,7 +13,20 @@ export default function VisualStatusPage() {
   if (process.env.DASHBOARD_OPEN !== "true") notFound();
   return (
     <main className="mx-auto flex w-full max-w-[360px] flex-col gap-4 bg-canvas px-4 py-6 text-ink">
-      <h1 className="text-page">Status</h1>
+      <h1 className="text-page">Line</h1>
+      <section className="overflow-hidden rounded-2xl border border-hairline bg-surface" aria-label="Line">
+        <div className="px-4 py-4">
+          <StatusMark tone="neutral" icon="clock">Number pending</StatusMark>
+          <p className="mt-2 text-body text-ink-2">Your number is not live yet.</p>
+        </div>
+        <div className="border-t border-hairline px-4 py-3">
+          <p className="text-body text-ink-2">Calls today</p>
+          <p className="mt-1 text-meta text-ink-2">Not loaded on this page.</p>
+        </div>
+        <div className="border-t border-hairline px-4 py-4">
+          <ButtonLink href="/settings" className="w-full">Train</ButtonLink>
+        </div>
+      </section>
       <section className="flex flex-wrap gap-2" aria-label="Pills">
         <StatusMark tone="ok">Live</StatusMark>
         <StatusMark tone="neutral" icon="clock">Number pending</StatusMark>

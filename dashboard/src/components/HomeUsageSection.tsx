@@ -26,7 +26,7 @@ export function HomeUsageSection({
   isBeta?: boolean;
 }) {
   return (
-    <section aria-label="Usage" className="border-t border-hairline px-4 py-4">
+    <section aria-label="Usage" className="min-w-0 overflow-hidden rounded-2xl border border-hairline bg-surface px-4 py-4 lg:col-span-5 lg:col-start-8 lg:row-start-2">
       <p className="text-body font-medium tabular-nums text-ink">
         {minutesLeftLabel({ left: minutesLeft, underOneMinute: minutesUnderOne })}
       </p>
