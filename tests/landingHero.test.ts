@@ -39,16 +39,24 @@ test("reduced motion shows the finished call card; marketing fonts are DM Sans +
   assert.match(read("app/page.tsx"), /marketingFontClass/);
 });
 
-test("orange appears only in the hero glow, strong enough to read, and stops with reduced motion", () => {
-  assert.match(landing, /className="landing-warm-orb" aria-hidden/);
-  const orbAt = css.indexOf(".landing-warm-orb {");
-  const orbEnd = css.indexOf("@keyframes landing-warm");
-  const orb = css.slice(orbAt, orbEnd);
-  assert.ok(orbAt > 0 && orbEnd > orbAt);
-  assert.match(orb, /--landing-warm:\s*255 122 26;/);
-  assert.match(orb, /rgb\(var\(--landing-warm\) \/ 0\.9[0-9]\)/);
-  assert.doesNotMatch(orb, /filter:\s*blur/);
-  const outside = css.slice(0, orbAt) + css.slice(orbEnd);
+test("orange is a soft sunset across the hero, nowhere else, and static when effects are reduced", () => {
+  assert.match(landing, /className="landing-horizon"/);
+  assert.doesNotMatch(landing, /landing-warm-orb|border-radius:\s*9999px/);
+  const hero = landing.slice(landing.indexOf("data-landing-hero"), landing.indexOf("<HeroCall"));
+  assert.match(hero, /landing-horizon/, "the wash is on the hero plane, not on the call card");
+  const tokenAt = css.indexOf("--landing-warm:");
+  const at = css.lastIndexOf(".landing-horizon {", tokenAt);
+  const end = css.indexOf("@keyframes landing-horizon-in", tokenAt);
+  const wash = css.slice(at, end);
+  assert.ok(at > 0 && end > at);
+  assert.match(wash, /--landing-warm:\s*255 122 26;/);
+  assert.match(wash, /linear-gradient\(to top/);
+  assert.match(wash, /transparent 74%\)/);
+  assert.match(wash, /animation: landing-horizon-in var\(--motion-fast\)/);
+  assert.doesNotMatch(wash, /border-radius|filter:\s*blur|0\.9\d/);
+  const alphas = [...wash.matchAll(/\/ (0\.\d+)/g)].map((m) => Number(m[1]));
+  assert.ok(alphas.length >= 3 && Math.max(...alphas) <= 0.5, alphas.join(","));
+  const outside = css.slice(0, at) + css.slice(end);
   assert.doesNotMatch(outside, /--landing-warm|255 122 26|#ff7a1a/i);
   const marketing = [
     landing,
@@ -62,8 +70,9 @@ test("orange appears only in the hero glow, strong enough to read, and stops wit
   ].join("\n");
   assert.doesNotMatch(marketing, /--landing-warm|255 122 26|#ff7a1a|(bg|text|border|from|via|to)-(orange|amber)|ember/i);
   assert.match(css, /\.landing-cta-on-dark \{ background: #ffffff; color: #0a192f; \}/);
-  assert.match(css, /\.landing-warm-orb, \.landing-drift \{ animation: none; \}/);
-  assert.match(css, /\.landing-warm-orb,\n {2}\.desk-live-ping/);
+  assert.match(css, /\.landing-horizon, \.landing-drift \{ animation: none; \}/);
+  assert.match(css, /\.landing-horizon,\n {2}\.desk-live-ping/);
+  assert.match(css, /@media \(max-width: 767px\) \{\s*\.landing-scope \.glass-chrome \{[^}]*blur\(12px\)/);
 });
 
 test("premium backdrop is CSS-only orbs behind the hero card and stops with reduced motion", () => {

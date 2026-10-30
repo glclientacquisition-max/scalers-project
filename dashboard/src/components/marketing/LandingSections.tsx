@@ -1,10 +1,15 @@
-import Image from "next/image";
 import Link from "next/link";
+import { Stamp } from "@/components/ui/Stamp";
 
 /**
- * Home sections under the hero (v2, 30 Oct). Few words, one idea per section, real claims only: every line is
- * something the product does today. The screen is an anonymised Desk capture (fixture data, no client names or numbers).
+ * Home sections under the hero. Few words, one idea per section, real claims only.
+ * The inbox is a drawn example, not a capture of a real desk.
  */
+
+const INBOX: ReadonlyArray<{ who: string; state: string; tone: "attention" | "ok"; line: string; when: string }> = [
+  { who: "New caller", state: "Call back", tone: "attention", line: "Asked about Saturday", when: "Just now" },
+  { who: "Caller", state: "Answered", tone: "ok", line: "House cleaning", when: "Today" },
+];
 
 const STEPS: readonly string[] = ["Request access", "Add your services and hours", "Forward your calls"];
 
@@ -48,15 +53,26 @@ export function LandingReach() {
           </h2>
           <p className="mt-3 max-w-md text-base leading-relaxed text-ink-2">SMS, WhatsApp, and email. The call is in your inbox.</p>
         </div>
-        <div className={`min-w-0 overflow-hidden ${card}`}>
-          <Image
-            src="/landing/how-inbox.webp"
-            alt="Desk inbox with two callers, one marked Call back and one ready to confirm"
-            width={585}
-            height={393}
-            sizes="(min-width: 1024px) 45vw, 100vw"
-            className="h-auto w-full"
-          />
+        <div className={`min-w-0 ${card}`} data-landing-inbox="" aria-hidden>
+          <ul>
+            {INBOX.map((row) => (
+              <li key={row.state} className="flex min-h-16 items-center gap-3 border-b border-line px-4 py-3 last:border-0">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-2 text-sm font-medium text-ink-2">
+                  {row.who.charAt(0)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="truncate text-base font-medium text-ink">{row.who}</span>
+                    <span className="shrink-0 text-meta text-ink-3">{row.when}</span>
+                  </span>
+                  <span className="mt-0.5 flex items-center justify-between gap-3">
+                    <span className="truncate text-sm text-ink-2">{row.line}</span>
+                    <Stamp tone={row.tone}>{row.state}</Stamp>
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </section>

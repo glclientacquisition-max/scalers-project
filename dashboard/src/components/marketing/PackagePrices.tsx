@@ -163,11 +163,16 @@ export function PackagePrices({ board }: { board: PublicPackageBoard }) {
         </dl>
       </section>
 
-      <div className="sticky bottom-0 z-10 -mx-5 mt-10 border-t border-line bg-canvas/95 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
-        <p className="mb-2 text-center text-sm font-medium text-ink sm:text-start" data-pricing-picked="">
+      <div
+        className="sticky bottom-0 z-10 -mx-5 mt-8 flex items-center gap-3 border-t border-line bg-canvas px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:static sm:mx-0 sm:mt-10 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0"
+        data-pricing-dock=""
+      >
+        <p className="max-w-[42%] shrink-0 truncate text-sm font-medium text-ink" data-pricing-picked="">
           {pickedName}
         </p>
-        <LandingCta href={`/signup?plan=${encodeURIComponent(picked)}`} wide />
+        <div className="min-w-0 flex-1">
+          <LandingCta href={`/signup?plan=${encodeURIComponent(picked)}`} size="md" wide />
+        </div>
       </div>
     </div>
   );

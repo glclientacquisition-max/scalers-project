@@ -49,10 +49,11 @@ export default function PricingPage() {
               Sign in
             </a>
           </header>
-          <section className="mx-auto max-w-desk px-5 pb-12 pt-8 sm:px-8 sm:pb-16">
+          <section className="mx-auto max-w-desk px-5 pb-28 pt-8 sm:px-8">
             <h1 className="font-display text-[2.25rem] leading-[1.1] tracking-tight text-white text-balance sm:text-5xl">Pricing</h1>
             <p className="mt-3 max-w-md text-lg leading-relaxed text-sky-100/90">Monthly packages in KES.</p>
           </section>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-b from-transparent to-canvas" data-pricing-fade="" />
         </div>
 
         <section className="mx-auto max-w-desk px-5 pb-12 pt-8 sm:px-8">

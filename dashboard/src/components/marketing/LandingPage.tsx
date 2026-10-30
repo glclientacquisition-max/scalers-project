@@ -15,8 +15,8 @@ import { LandingCta } from "@/components/marketing/LandingCta";
 import { AppearanceFooter } from "@/components/ThemePicker";
 
 /**
- * Marketing home. The hero is main's dark navy plane (30 Oct v3, Alvin) with a frosted call card and one soft orange
- * glow behind it; orange is used nowhere else. The rest of the page stays on the light canvas with blue buttons.
+ * Marketing home. The hero is the navy-to-royal plane with a frosted call card. Orange is a wide sunset
+ * along the bottom of that plane, layered with a soft blue wash. Orange is used nowhere else.
  * One job: request access. Short words: one headline, one line, one button.
  * Signed-in owners get a way back to their Desk instead.
  */
@@ -35,7 +35,7 @@ export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?:
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-br from-brand-900 via-brand-800/95 to-brand-700/80" />
-          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-brand-900 to-transparent" />
+          <div className="landing-horizon" data-landing-warm="" />
         </div>
         <header className="mx-auto flex max-w-desk items-center justify-between gap-2 px-5 pt-[max(1rem,env(safe-area-inset-top))] sm:px-8">
           {/* Plain <a>: marketing pages never prefetch app routes (tests/marketingLinks). */}
@@ -83,11 +83,8 @@ export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?:
               </a>
             </div>
           </div>
-          <div className="relative min-w-0">
-            <div className="landing-warm-orb" aria-hidden data-landing-warm="" />
-            <div className="relative z-10">
-              <HeroCall glass ask={copy.ask} />
-            </div>
+          <div className="relative z-10 min-w-0">
+            <HeroCall glass ask={copy.ask} />
           </div>
         </section>
       </div>

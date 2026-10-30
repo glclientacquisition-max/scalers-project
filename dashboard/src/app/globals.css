@@ -187,11 +187,21 @@ html {
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .glass-chrome {
+  .glass-chrome,
+  .landing-scope .glass-chrome {
     background-color: var(--surface);
     box-shadow: none;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
+  }
+  .landing-horizon { animation: none; }
+}
+
+/* Phones: frost on floating marketing chrome stays at 12px. The Desk token is unchanged. */
+@media (max-width: 767px) {
+  .landing-scope .glass-chrome {
+    -webkit-backdrop-filter: blur(12px) saturate(1.35);
+    backdrop-filter: blur(12px) saturate(1.35);
   }
 }
 
@@ -541,36 +551,36 @@ h3,
   72%, 100% { opacity: 1; transform: none; }
 }
 /*
- * Dark hero (30 Oct v3): navy plane, white CTA with navy text (16.9:1), hover #EAF6FF.
- * One warm light leak behind and around the frosted call card. Orange is this glow only:
- * no buttons, no text. Radial gradients, no filter blur. A slow transform drift; none with reduced motion.
+ * Dark hero: navy to royal blue, white CTA with navy text (16.9:1), hover #EAF6FF.
+ * Sunset: a wide low-opacity orange wash along the bottom, strongest at the horizon and gone
+ * before the headline. The bright core sits below the hero so there is no disc and no rim.
+ * A soft blue wash sits in the same layer. Orange is this wash only. 150ms opacity in;
+ * reduced motion and reduced transparency leave it static.
  */
 .landing-cta-on-dark { background: #ffffff; color: #0a192f; }
 .landing-cta-on-dark:hover { background: #eaf6ff; }
-.landing-warm-orb {
+.landing-horizon {
   position: absolute;
-  z-index: 0;
+  inset: 0;
   pointer-events: none;
-  /* Bigger than the card so the leak sits in the padding around it, and a pool shows through the frost. */
-  inset: -10% -6% -14%;
-  border-radius: 9999px;
   --landing-warm: 255 122 26;
   background:
-    radial-gradient(ellipse 78% 62% at 50% 54%, rgb(var(--landing-warm) / 0.72), transparent 68%),
-    radial-gradient(ellipse 72% 26% at 50% 0%, rgb(var(--landing-warm) / 0.92), transparent 72%),
-    radial-gradient(ellipse 80% 30% at 50% 100%, rgb(var(--landing-warm) / 0.95), transparent 74%);
-  animation: landing-warm 40s ease-in-out alternate infinite;
+    linear-gradient(to top, rgb(var(--landing-warm) / 0.48) 0%, rgb(var(--landing-warm) / 0.16) 14%, transparent 42%),
+    radial-gradient(150% 62% at 50% 112%, rgb(var(--landing-warm) / 0.4) 0%, rgb(var(--landing-warm) / 0.1) 40%, transparent 74%),
+    linear-gradient(to top, rgb(10 25 47 / 0.5) 0%, transparent 46%),
+    radial-gradient(110% 48% at 72% 108%, rgb(0 150 255 / 0.22) 0%, transparent 70%);
+  animation: landing-horizon-in var(--motion-fast) var(--motion-ease) both;
 }
-@keyframes landing-warm {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(0, -1.5%, 0) scale(1.04); }
+@keyframes landing-horizon-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 /* Reduced motion: the finished state, no movement. */
 @media (prefers-reduced-motion: reduce) {
   .hero-in, .hero-ring { opacity: 0; }
   .hero-out, .hero-sms, .hiw-mock { opacity: 1; transform: none; }
   .landing-rise, .landing-orbs::before, .landing-orbs::after { animation: none; }
-  .landing-warm-orb, .landing-drift { animation: none; }
+  .landing-horizon, .landing-drift { animation: none; }
 }
 
 .hero-call[data-play="1"] .hero-in { animation: hero-in 7s ease-out both; }
@@ -716,7 +726,7 @@ h3,
 
   .landing-rise,
   .landing-drift,
-  .landing-warm-orb,
+  .landing-horizon,
   .desk-live-ping,
   .desk-just-landed::after,
   .hero-call,
