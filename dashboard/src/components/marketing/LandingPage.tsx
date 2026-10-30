@@ -1,6 +1,14 @@
 import { appEntryHref } from "@/lib/adminHost";
 import { BrandWordmark } from "@/components/brand/BrandMark";
-import { HeroCall, HowStage } from "@/components/marketing/LandingStory";
+import { HeroCall } from "@/components/marketing/LandingStory";
+import {
+  LandingHowItWorks,
+  LandingKeepNumber,
+  LandingMoments,
+  LandingPackages,
+  LandingQuestions,
+  LandingTrust,
+} from "@/components/marketing/LandingSections";
 import { LandingCta } from "@/components/marketing/LandingCta";
 import { AppearanceFooter } from "@/components/ThemePicker";
 
@@ -11,7 +19,7 @@ import { AppearanceFooter } from "@/components/ThemePicker";
  */
 export function LandingPage({ signedIn = false }: { signedIn?: boolean }) {
   return (
-    <main className="landing-scope bg-canvas text-ink" data-landing="">
+    <main className="landing-scope overflow-x-clip bg-canvas text-ink" data-landing="">
       <header className="mx-auto flex max-w-desk items-center justify-between gap-2 px-5 pt-[max(1rem,env(safe-area-inset-top))] sm:px-8">
         <BrandWordmark href="/" context="Home" variant="lockup" priority />
         <nav className="flex shrink-0 items-center gap-1">
@@ -55,12 +63,12 @@ export function LandingPage({ signedIn = false }: { signedIn?: boolean }) {
         </div>
       </section>
 
-      <section className="px-5 py-14 sm:px-8">
-        <div className="mx-auto max-w-desk">
-          <h2 className="font-display text-2xl tracking-tight text-ink sm:text-3xl">How it works</h2>
-          <HowStage />
-        </div>
-      </section>
+      <LandingMoments />
+      <LandingHowItWorks />
+      <LandingTrust />
+      <LandingKeepNumber />
+      <LandingPackages />
+      <LandingQuestions />
 
       <section className="relative overflow-hidden px-5 pb-16 pt-6 sm:px-8" data-landing-final="">
         <div className="landing-glow pointer-events-none absolute inset-x-0 bottom-0 h-64" aria-hidden />
