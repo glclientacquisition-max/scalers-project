@@ -93,6 +93,7 @@ Design: all UI follows Frontend 2.0 ([`FRONTEND_2_0_CHARTER.md`](explanation/fro
 
 ## 2. Shipped to prod (since 14 Oct)
 
+- **31 Oct 2026, 00:55 EAT:** v1 billing package versions retired on prod (Trial/Starter/Growth/Scale v1 → `status='retired'`, `retired_at` set, nothing deleted, 4 audit rows) and new guard trigger `tenant_subscriptions_d_block_retired_version` (no subscription can be pinned to a retired/draft version). SQL applied on prod at 00:55 EAT (staging 00:49 EAT); migration `20261031005522_block_retired_package_version.sql` in this PR. 0 tenants were on v1 in prod (all 3 on Starter v2); catalog shows v2 only. Rollback: drop the trigger + function, then disable `billing_package_versions_freeze` for one UPDATE back to `published`/`retired_at=null` (ops file `2026-10-31_v1_retire_prod_rollback.sql`). Approved by Alvin 31 Oct 00:54 EAT.
 - **28 Oct 2026, 09:54–10:36 EAT:** Desk-only #989 Identity remake, #986 D1 optimistic actions, #987 D2 Overview streaming and #988 D3 Sending texts merged to `main`. Vercel prod READY at `9af65811`. Railway Voice skipped them (watch paths).
 - **28 Oct 2026, 00:07 EAT:** #985 promotion (staging → main, merge `c620b379`; Alvin's yes 27 Oct). Railway `a452a964` SUCCESS, Vercel `dpl_B1o8GCnP` READY. Prod SQL had already been applied on 27 Oct 17:37–17:40 EAT (`16735cf4`). The v2 engines brain is on for all 8 businesses.
 
