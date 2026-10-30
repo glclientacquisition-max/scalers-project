@@ -23,7 +23,7 @@ export default function VisualStatusPage() {
       <section className="rounded-2xl border border-hairline bg-surface px-4 py-4" aria-label="Businesses">
         <h2 className="text-title">Businesses</h2>
         <p className="mt-2 text-body text-ink-2">No business matches.</p>
-        <p className="mt-1 text-meta text-attention">Could not load usage.</p>
+        <p className="mt-1 text-meta text-attention">Could not load this business.</p>
       </section>
       <div className="ops-theme grid grid-cols-2 gap-2">
         <KpiTile label="Collected" period="This month" state="empty" emptyTitle="No payments this month." href="/admin/billing/payments" />
