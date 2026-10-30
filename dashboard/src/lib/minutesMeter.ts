@@ -12,7 +12,7 @@ export type MinutesMeterInput = {
   overLabel: string | null;
 };
 
-export type MinutesMeterState = "none" | "beta" | "under" | "low" | "over" | "limit" | "under1";
+export type MinutesMeterState = "none" | "beta" | "under" | "low" | "over" | "limit" | "under1" | "usedup";
 
 /** Below this share of the included minutes, the meter warns. Matches billing LOW_SHARE. */
 const LOW_SHARE = 0.1;
@@ -22,8 +22,10 @@ export function minutesMeterState(input: MinutesMeterInput): MinutesMeterState {
   const over = input.used > input.included;
   if (input.mode === "capped" && input.left <= 0) return "limit";
   if (input.mode === "metered" && over) return "over";
+  // Zero whole minutes left is used up, not "running low". Under 1 min still has seconds.
+  if (input.left <= 0 && !input.underOne) return "usedup";
   if (input.underOne) return "under1";
-  const low = input.left <= Math.max(1, Math.floor(input.included * LOW_SHARE));
+  const low = input.left > 0 && input.left <= Math.max(1, Math.floor(input.included * LOW_SHARE));
   if (input.mode === "beta") return low ? "low" : "beta";
   if (low) return "low";
   return "under";
@@ -33,4 +35,10 @@ export function minutesMeterState(input: MinutesMeterInput): MinutesMeterState {
 export function minutesMeterFill(input: MinutesMeterInput): number {
   if (!(input.included > 0)) return 0;
   return Math.max(0, Math.min(1, input.used / input.included));
+}
+
+/** Ring shows what is left. Used up is an empty ring, not a full one. */
+export function minutesRingFill(input: MinutesMeterInput): number {
+  if (minutesMeterState(input) === "usedup" || minutesMeterState(input) === "limit") return 0;
+  return minutesMeterFill(input);
 }

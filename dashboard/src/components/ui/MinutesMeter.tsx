@@ -1,5 +1,5 @@
 import { StatusMark } from "@/components/ui/StatusMark";
-import { minutesMeterFill, minutesMeterState, type MinutesMeterInput } from "@/lib/minutesMeter";
+import { minutesMeterFill, minutesMeterState, minutesRingFill, type MinutesMeterInput } from "@/lib/minutesMeter";
 
 const TONE: Record<string, "info" | "warn" | "danger"> = {
   beta: "info",
@@ -8,6 +8,7 @@ const TONE: Record<string, "info" | "warn" | "danger"> = {
   low: "warn",
   over: "warn",
   limit: "danger",
+  usedup: "danger",
 };
 
 /**
@@ -25,13 +26,15 @@ export function MinutesMeter({
   if (state === "none") {
     return <p className="text-body text-ink-2">No package</p>;
   }
-  const fill = minutesMeterFill(input);
+  const fill = shape === "ring" ? minutesRingFill(input) : (state === "usedup" || state === "limit" ? 0 : minutesMeterFill(input));
   const tone = TONE[state] ?? "info";
   const color = `var(--status-${tone}-fg)`;
   const label =
-    state === "limit"
-      ? "Limit reached"
-      : state === "over"
+    state === "usedup"
+      ? "No minutes left"
+      : state === "limit"
+        ? "Limit reached"
+        : state === "over"
         ? input.overLabel || "Over the package"
         : state === "under1"
           ? "Under 1 min left"
@@ -70,17 +73,19 @@ function Ring({ fill, color, label }: { fill: number; color: string; label: stri
   return (
     <svg width="56" height="56" viewBox="0 0 56 56" role="img" aria-label={label} className="shrink-0">
       <circle cx="28" cy="28" r={r} fill="none" stroke="var(--surface-2)" strokeWidth="6" />
-      <circle
-        cx="28"
-        cy="28"
-        r={r}
-        fill="none"
-        stroke={color}
-        strokeWidth="6"
-        strokeLinecap="round"
-        strokeDasharray={dash}
-        transform="rotate(-90 28 28)"
-      />
+      {fill > 0 ? (
+        <circle
+          cx="28"
+          cy="28"
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth="6"
+          strokeLinecap="round"
+          strokeDasharray={dash}
+          transform="rotate(-90 28 28)"
+        />
+      ) : null}
     </svg>
   );
 }
