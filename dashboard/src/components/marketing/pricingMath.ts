@@ -1,9 +1,7 @@
 import type { CreditBurns } from "../../lib/messageCredits.ts";
 import type { PublicPackageBoard, PublicPackageOffer } from "../../lib/packageCatalog.ts";
 import { formatKes } from "../../lib/packagePriceLabel.ts";
-
-/** Worked example length. The cost is always computed from the live rate, never written down. */
-export const EXAMPLE_MINUTES = 3;
+import { spendLimitDisplayKes } from "../../lib/planPricing.ts";
 
 /** Day price and "minutes a day" use a 30-day month. The page does not invent a calendar. */
 export const BILLING_MONTH_DAYS = 30;
@@ -71,40 +69,95 @@ function countWord(n: number): string {
   return `${shown} ${n === 1 ? "credit" : "credits"}`;
 }
 
-export const EXTRA_USAGE_LINE =
-  "Extra usage is off until you turn it on, and it stops at a spend limit you set.";
-
-/**
- * Only past the included minutes, and only named for Starter.
- * "After your included minutes, on Starter, a 3-minute answered call costs KES 78."
- */
-export function workedExample(board: PublicPackageBoard): string | null {
-  const starter =
-    board.packages.find((pack) => pack.sku.toLowerCase() === "starter") ||
-    board.packages.find((pack) => pack.name.toLowerCase() === "starter") ||
-    null;
-  if (!starter || !(starter.inboundKesPerMinute > 0)) return null;
-  const cost = Math.round(starter.inboundKesPerMinute * EXAMPLE_MINUTES * 100) / 100;
-  return `After your included minutes, on ${starter.name}, a ${EXAMPLE_MINUTES}-minute answered call costs ${kes(cost)}`;
-}
-
 export function fitLine(minutes: number): string | null {
   const perDay = perDayMinutes(minutes);
   if (!(perDay > 0)) return null;
   return `About ${perDay.toLocaleString("en-KE")} minutes of calls a day`;
 }
 
-/** Five answers. The credit sentence uses the live burn, or leaves the numbers out. */
+/** Same spend-limit share on every plan. Null when any version omits it or they differ. */
+export function sharedSpendShare(packs: readonly PublicPackageOffer[]): number | null {
+  if (!packs.length) return null;
+  const first = packs[0]?.spendLimitSharePercent;
+  if (first == null) return null;
+  return packs.every((pack) => pack.spendLimitSharePercent === first) ? first : null;
+}
+
+/** One block under the cards. Figures stay on the cards. The half-price line only when every version says 50. */
+export function billingLines(packs: readonly PublicPackageOffer[]): string[] {
+  const limit =
+    sharedSpendShare(packs) === 50
+      ? "It stops at half your monthly price, unless you set another limit."
+      : "It stops at your spend limit.";
+  return [
+    "Minutes and credits reset each month. Nothing carries over.",
+    "Extra usage stays off until you turn it on.",
+    limit,
+    "Past your minutes, calls are billed by the second.",
+    "Moving up starts now. Moving down starts next month.",
+  ];
+}
+
+export type MonthCost = {
+  sku: string;
+  name: string;
+  totalKes: number;
+  extraKes: number;
+  unanswered: number;
+};
+
+/**
+ * Package price plus extra minutes at that version's rate.
+ * Extra usage off: minutes past the plan are not answered.
+ * Extra usage on: billed minutes stop at the spend limit (version share, or the column default).
+ */
+export function monthCost(pack: PublicPackageOffer, minutes: number, extraOn: boolean): MonthCost {
+  const used = Math.max(0, Math.floor(Number(minutes) || 0));
+  const over = Math.max(0, used - Math.max(0, pack.minutes));
+  const rate = pack.inboundKesPerMinute;
+  const cap = spendLimitDisplayKes(null, pack.monthlyPriceKes, pack.spendLimitSharePercent) ?? 0;
+  let extraKes = 0;
+  let unanswered = 0;
+  if (over > 0) {
+    if (extraOn && rate > 0) {
+      const affordable = cap > 0 ? Math.floor(cap / rate) : over;
+      const billed = Math.min(over, affordable);
+      extraKes = Math.round(billed * rate * 100) / 100;
+      unanswered = over - billed;
+    } else {
+      unanswered = over;
+    }
+  }
+  return {
+    sku: pack.sku,
+    name: pack.name,
+    totalKes: Math.round((pack.monthlyPriceKes + extraKes) * 100) / 100,
+    extraKes,
+    unanswered,
+  };
+}
+
+/** Lowest total among plans that answer every typed minute. */
+export function lowestThatAnswers(rows: readonly MonthCost[]): MonthCost | null {
+  const full = rows.filter((row) => row.unanswered === 0);
+  if (!full.length) return null;
+  return full.reduce((best, row) => (row.totalKes < best.totalKes ? row : best));
+}
+
+/** Five objections. Credit numbers come from the version burns. */
 export function pricingFaq(burns: CreditBurns | null): Array<[string, string]> {
   const use = creditUseLine(burns);
   const credits = use
     ? `${use} Call alerts, not chats with callers.`
     : "Call alerts to you, not chats with callers.";
   return [
-    ["Do unused minutes carry over?", "No. Minutes and credits reset each month."],
-    ["What do message credits cover?", credits],
-    ["What if I run out?", EXTRA_USAGE_LINE],
-    ["Can I change package?", "Moving up applies now. Moving down starts next month."],
+    [
+      "What happens when my minutes run out?",
+      "Calls stop until the month ends. Turn extra usage on to keep going, up to your spend limit.",
+    ],
     ["Can I keep my number?", "Yes. Forward your calls, and dial ##002# to stop."],
+    ["What counts as a message credit?", credits],
+    ["Can I change plan?", "Moving up starts now. Moving down starts next month."],
+    ["How does annual billing work?", "You pay the year's price once. Minutes and credits still reset each month."],
   ];
 }

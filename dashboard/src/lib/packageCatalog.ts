@@ -68,6 +68,8 @@ export type PublicPackageOffer = {
   inboundKesPerMinute: number;
   /** SMS, WhatsApp, and email credits per alert. Null when any burn is missing. */
   creditBurns: CreditBurns | null;
+  /** Version `spend_limit_share_percent`. Null when the column is empty. */
+  spendLimitSharePercent: number | null;
 };
 
 export type PublicPackageBoard = {
@@ -123,6 +125,8 @@ export function publishedPublicOffers(
       stored != null && stored > 0 ? Math.round(stored) : discount > 0 ? annualPriceKes(monthlyPriceKes, discount) : 0;
     const creditsRaw = version.message_credits;
     const credits = creditsRaw == null || creditsRaw === "" ? null : Math.round(num(creditsRaw));
+    const shareRaw = version.spend_limit_share_percent;
+    const share = shareRaw == null || shareRaw === "" ? null : num(shareRaw);
     const name = String(row.name || "");
     if (!name) continue;
     offers.push({
@@ -137,6 +141,7 @@ export function publishedPublicOffers(
       dids: num(version.dids, 1),
       inboundKesPerMinute: inboundKesPerMinute(num(version.inbound_kes_per_second)),
       creditBurns: creditBurnsFrom(version),
+      spendLimitSharePercent: share != null && share >= 0 ? share : null,
     });
   }
   return offers;
@@ -309,7 +314,7 @@ export async function loadPublicPackageOffers(): Promise<PublicPackageBoard> {
       admin
         .from("billing_package_versions")
         .select(
-          "package_id, version, monthly_price_kes, annual_price_kes, annual_discount_percent, minutes, seats, dids, message_credits, inbound_kes_per_second, sms_credit_burn, whatsapp_credit_burn, email_credit_burn",
+          "package_id, version, monthly_price_kes, annual_price_kes, annual_discount_percent, minutes, seats, dids, message_credits, inbound_kes_per_second, sms_credit_burn, whatsapp_credit_burn, email_credit_burn, spend_limit_share_percent",
         )
         .eq("status", "published"),
     ]);

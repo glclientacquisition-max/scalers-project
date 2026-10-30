@@ -68,10 +68,12 @@ test("pricing v2: at most 3 live packages, rates and the worked example from the
   assert.match(loader, /message_credits/);
   assert.doesNotMatch(loader, /annualPriceKes\(monthlyPriceKes, discount\)/);
   assert.match(ui, /pack\.inboundKesPerMinute/);
+  assert.match(ui, /How billing works/);
+  assert.match(ui, /What a month costs/);
+  assert.doesNotMatch(ui, /Every package includes|KES 1 each|data-pricing-example|On demand/);
   assert.doesNotMatch(ui, /Answered calls/);
-  const { workedExample, pricingFaq, plansForPage, perDayKes, perDayMinutes, creditUseLine } = await import(
-    "../dashboard/src/components/marketing/pricingMath.ts"
-  );
+  const { pricingFaq, plansForPage, perDayKes, perDayMinutes, creditUseLine, monthCost, billingLines, lowestThatAnswers } =
+    await import("../dashboard/src/components/marketing/pricingMath.ts");
   const { publishedInboundPerMinute, publishedPublicOffers, annualPriceKes } = await import(
     "../dashboard/src/lib/packageCatalog.ts"
   );
@@ -95,6 +97,7 @@ test("pricing v2: at most 3 live packages, rates and the worked example from the
     dids: 1,
     inboundKesPerMinute: rate,
     creditBurns: { sms: 1, whatsapp: 2, email: 1 },
+    spendLimitSharePercent: 50,
   });
   const board = {
     discountPercent: 17,
@@ -109,12 +112,21 @@ test("pricing v2: at most 3 live packages, rates and the worked example from the
       offer("growth", "Growth", 25, 800, 2500, 194400, 10),
     ],
   };
-  assert.deepEqual(plansForPage(board).map((pack) => pack.sku), ["starter", "growth", "scale"]);
-  assert.equal(
-    workedExample(board),
-    "After your included minutes, on Starter, a 3-minute answered call costs KES 78",
-  );
-  assert.equal(workedExample({ ...board, packages: [] }), null);
+  const plans = plansForPage(board);
+  assert.deepEqual(plans.map((pack) => pack.sku), ["starter", "growth", "scale"]);
+  assert.match(billingLines(plans).join(" "), /half your monthly price/);
+  assert.doesNotMatch(billingLines([{ ...plans[0], spendLimitSharePercent: null }]).join(" "), /half your monthly price/);
+  const starter = plans.find((pack) => pack.sku === "starter");
+  const growthPlan = plans.find((pack) => pack.sku === "growth");
+  assert.ok(starter && growthPlan);
+  assert.equal(monthCost(starter, 450, false).unanswered, 150);
+  assert.equal(monthCost(starter, 450, false).totalKes, 7000);
+  const over = monthCost(starter, 450, true);
+  assert.equal(over.extraKes, 134 * 26);
+  assert.equal(over.unanswered, 16);
+  assert.equal(monthCost(starter, 303, true).extraKes, 78);
+  const quiet = plans.map((pack) => monthCost(pack, 450, false));
+  assert.equal(lowestThatAnswers(quiet)?.sku, "growth");
   assert.equal(perDayKes(7000), 233);
   assert.equal(perDayMinutes(300), 10);
   assert.equal(perDayMinutes(800), 27);
@@ -126,7 +138,18 @@ test("pricing v2: at most 3 live packages, rates and the worked example from the
     assert.ok(answer.split(/\s+/).length <= 20, answer);
     assert.doesNotMatch(answer, /vat|most popular|chat with callers/i);
   }
-  assert.match(faq[1][1], /not chats with callers/);
+  assert.deepEqual(
+    faq.map(([q]) => q),
+    [
+      "What happens when my minutes run out?",
+      "Can I keep my number?",
+      "What counts as a message credit?",
+      "Can I change plan?",
+      "How does annual billing work?",
+    ],
+  );
+  assert.match(faq[2][1], /not chats with callers/);
+  assert.doesNotMatch(faq.map((row) => row.join(" ")).join(" "), /vat|m-?pesa|trial|booking|coming soon/i);
   const offers = publishedPublicOffers(
     [
       { id: "s", sku: "starter", name: "Starter", is_active: true },

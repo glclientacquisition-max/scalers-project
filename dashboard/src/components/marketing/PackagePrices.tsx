@@ -3,19 +3,21 @@
 import { useState } from "react";
 import type { PublicPackageBoard, PublicPackageOffer } from "@/lib/packageCatalog";
 import {
-  EXTRA_USAGE_LINE,
-  creditUseLine,
+  billingLines,
   fitLine,
   isGrowthPlan,
   kes,
+  lowestThatAnswers,
+  monthCost,
   perDayKes,
   plansForPage,
   pricingFaq,
   sharedCreditBurns,
-  workedExample,
 } from "@/components/marketing/pricingMath";
 import { LandingCta } from "@/components/marketing/LandingCta";
 import { SegmentedControl } from "@/components/ui/Segmented";
+import { Field, Input } from "@/components/ui/Field";
+import { Switch } from "@/components/ui/Switch";
 import { appEntryHref } from "@/lib/adminHost";
 
 /** Hick: three paid plans. Beta is not a plan on this page. */
@@ -100,10 +102,13 @@ export function PackagePrices({ board }: { board: PublicPackageBoard }) {
   const yearly = cycle === "year";
   const showAnnual = packs.some((pack) => pack.annualPriceKes > 0);
   const burns = sharedCreditBurns(packs);
-  const credits = creditUseLine(burns);
-  const example = workedExample(board);
-  const oneNumber = packs.length > 0 && packs.every((pack) => pack.dids === 1);
   const faq = pricingFaq(burns);
+  const [minutesRaw, setMinutesRaw] = useState("450");
+  const [extraOn, setExtraOn] = useState(false);
+  const minutes = Math.max(0, Math.floor(Number(minutesRaw) || 0));
+  const costs = packs.map((pack) => monthCost(pack, minutes, extraOn));
+  const best = lowestThatAnswers(costs);
+  const how = billingLines(packs);
   return (
     <div>
       {showAnnual ? (
@@ -131,31 +136,66 @@ export function PackagePrices({ board }: { board: PublicPackageBoard }) {
       ) : null}
 
       {packs.length ? (
-        <section className="mt-12 max-w-xl" aria-labelledby="pricing-included" data-pricing-included="">
-          <h2 id="pricing-included" className="font-display text-xl tracking-tight text-ink">
-            Every package includes
+        <section className="mt-12 max-w-xl" aria-labelledby="pricing-billing" data-pricing-billing="">
+          <h2 id="pricing-billing" className="font-display text-xl tracking-tight text-ink">
+            How billing works
           </h2>
           <ul className="mt-3 space-y-2 text-base text-ink">
-            <li>{"Answers when you're busy, closed, or on another call"}</li>
-            <li>An inbox of calls</li>
-            <li>Call alerts by SMS, WhatsApp, or email</li>
-            {oneNumber ? <li>One number</li> : null}
+            {how.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
           </ul>
-          {credits ? <p className="mt-3 text-base text-ink-2">{credits}</p> : null}
         </section>
       ) : null}
 
-      <section className="mt-12 max-w-xl" aria-labelledby="pricing-usage" data-pricing-usage="">
-        <h2 id="pricing-usage" className="font-display text-xl tracking-tight text-ink">
-          If you go past your minutes
-        </h2>
-        <p className="mt-2 text-base text-ink-2">{EXTRA_USAGE_LINE}</p>
-        {example ? (
-          <p className="mt-3 rounded-2xl bg-[var(--landing-glow)] px-5 py-4 text-base text-ink" data-pricing-example="">
-            {example}
-          </p>
-        ) : null}
-      </section>
+      {packs.length ? (
+        <section className="mt-12 max-w-xl" aria-labelledby="pricing-calculator" data-pricing-calculator="">
+          <h2 id="pricing-calculator" className="font-display text-xl tracking-tight text-ink">
+            What a month costs
+          </h2>
+          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end">
+            <Field id="pricing-minutes" label="Call minutes a month" className="min-w-0 flex-1">
+              {(field) => (
+                <Input
+                  {...field}
+                  inputMode="numeric"
+                  value={minutesRaw}
+                  onChange={(event) => setMinutesRaw(event.target.value.replace(/[^\d]/g, ""))}
+                />
+              )}
+            </Field>
+            <div className="flex min-h-11 items-center gap-3">
+              <Switch checked={extraOn} onCheckedChange={setExtraOn} label="Extra usage" />
+              <span className="text-base text-ink">Extra usage</span>
+            </div>
+          </div>
+          <ul className="mt-4 divide-y divide-hairline border-y border-hairline">
+            {costs.map((row) => (
+              <li key={row.sku} className="flex items-baseline justify-between gap-3 py-3" data-cost={row.sku}>
+                <span className="text-base text-ink">
+                  {row.name}
+                  {row.extraKes > 0 ? (
+                    <span className="mt-0.5 block text-sm text-ink-2">Extra {kes(row.extraKes)}</span>
+                  ) : null}
+                  {row.unanswered > 0 ? (
+                    <span className="mt-0.5 block text-sm text-ink-2">
+                      {row.unanswered.toLocaleString("en-KE")} minutes not answered
+                    </span>
+                  ) : null}
+                </span>
+                <span className="text-base font-semibold tabular-nums text-ink">{kes(row.totalKes)}</span>
+              </li>
+            ))}
+          </ul>
+          {best ? (
+            <p className="mt-3 text-base text-ink">
+              {best.name} answers every call for {kes(best.totalKes)}.
+            </p>
+          ) : (
+            <p className="mt-3 text-base text-ink-2">No plan answers all of those minutes inside the spend limit.</p>
+          )}
+        </section>
+      ) : null}
 
       <section className="mt-12 max-w-xl" aria-labelledby="pricing-faq" data-pricing-faq="">
         <h2 id="pricing-faq" className="font-display text-xl tracking-tight text-ink">
