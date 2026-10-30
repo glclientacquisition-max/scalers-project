@@ -83,6 +83,25 @@ export function sharedSpendShare(packs: readonly PublicPackageOffer[]): number |
   return packs.every((pack) => pack.spendLimitSharePercent === first) ? first : null;
 }
 
+/** Slider ceiling: twice the largest included allowance, so the control can pass every plan. */
+export function calculatorMaxMinutes(packs: readonly PublicPackageOffer[]): number {
+  const top = packs.reduce((max, pack) => Math.max(max, pack.minutes), 0);
+  return top > 0 ? top * 2 : 0;
+}
+
+export type BillingStep = { title: string; body: string };
+
+/** Four steps. Same facts as billingLines, grouped so the block scans. */
+export function billingSteps(packs: readonly PublicPackageOffer[]): BillingStep[] {
+  const lines = billingLines(packs);
+  return [
+    { title: "Each month", body: lines[0] ?? "" },
+    { title: "Extra usage", body: `${lines[1] ?? ""} ${lines[2] ?? ""}`.trim() },
+    { title: "Past your minutes", body: lines[3] ?? "" },
+    { title: "Changing plan", body: lines[4] ?? "" },
+  ];
+}
+
 /** One block under the cards. Figures stay on the cards. The half-price line only when every version says 50. */
 export function billingLines(packs: readonly PublicPackageOffer[]): string[] {
   const limit =

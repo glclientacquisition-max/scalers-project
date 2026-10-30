@@ -70,10 +70,24 @@ test("pricing v2: at most 3 live packages, rates and the worked example from the
   assert.match(ui, /pack\.inboundKesPerMinute/);
   assert.match(ui, /How billing works/);
   assert.match(ui, /What a month costs/);
+  assert.match(ui, /type="range"/);
+  assert.match(ui, /<details/);
+  assert.match(ui, /min-h-11/);
+  assert.match(ui, /data-pricing-band/);
   assert.doesNotMatch(ui, /Every package includes|KES 1 each|data-pricing-example|On demand/);
   assert.doesNotMatch(ui, /Answered calls/);
-  const { pricingFaq, plansForPage, perDayKes, perDayMinutes, creditUseLine, monthCost, billingLines, lowestThatAnswers } =
-    await import("../dashboard/src/components/marketing/pricingMath.ts");
+  const {
+    pricingFaq,
+    plansForPage,
+    perDayKes,
+    perDayMinutes,
+    creditUseLine,
+    monthCost,
+    billingLines,
+    billingSteps,
+    calculatorMaxMinutes,
+    lowestThatAnswers,
+  } = await import("../dashboard/src/components/marketing/pricingMath.ts");
   const { publishedInboundPerMinute, publishedPublicOffers, annualPriceKes } = await import(
     "../dashboard/src/lib/packageCatalog.ts"
   );
@@ -114,6 +128,8 @@ test("pricing v2: at most 3 live packages, rates and the worked example from the
   };
   const plans = plansForPage(board);
   assert.deepEqual(plans.map((pack) => pack.sku), ["starter", "growth", "scale"]);
+  assert.equal(billingSteps(plans).length, 4);
+  assert.equal(calculatorMaxMinutes(plans), 3200);
   assert.match(billingLines(plans).join(" "), /half your monthly price/);
   assert.doesNotMatch(billingLines([{ ...plans[0], spendLimitSharePercent: null }]).join(" "), /half your monthly price/);
   const starter = plans.find((pack) => pack.sku === "starter");

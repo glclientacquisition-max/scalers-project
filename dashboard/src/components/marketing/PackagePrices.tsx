@@ -1,9 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import {
+  ArrowPathIcon,
+  ArrowsRightLeftIcon,
+  ClockIcon,
+  MinusIcon,
+  PauseCircleIcon,
+  PlusIcon,
+} from "@heroicons/react/24/outline";
 import type { PublicPackageBoard, PublicPackageOffer } from "@/lib/packageCatalog";
 import {
-  billingLines,
+  billingSteps,
+  calculatorMaxMinutes,
   fitLine,
   isGrowthPlan,
   kes,
@@ -16,9 +25,12 @@ import {
 } from "@/components/marketing/pricingMath";
 import { LandingCta } from "@/components/marketing/LandingCta";
 import { SegmentedControl } from "@/components/ui/Segmented";
-import { Field, Input } from "@/components/ui/Field";
+import { IconButton } from "@/components/ui/IconButton";
 import { Switch } from "@/components/ui/Switch";
 import { appEntryHref } from "@/lib/adminHost";
+
+const STEP_ICONS = [ArrowPathIcon, PauseCircleIcon, ClockIcon, ArrowsRightLeftIcon] as const;
+const MINUTE_STEP = 10;
 
 /** Hick: three paid plans. Beta is not a plan on this page. */
 export const MAX_PUBLIC_PACKAGES = 3;
@@ -103,12 +115,15 @@ export function PackagePrices({ board }: { board: PublicPackageBoard }) {
   const showAnnual = packs.some((pack) => pack.annualPriceKes > 0);
   const burns = sharedCreditBurns(packs);
   const faq = pricingFaq(burns);
+  const steps = billingSteps(packs);
+  const maxMinutes = calculatorMaxMinutes(packs);
   const [minutesRaw, setMinutesRaw] = useState("450");
   const [extraOn, setExtraOn] = useState(false);
-  const minutes = Math.max(0, Math.floor(Number(minutesRaw) || 0));
-  const costs = packs.map((pack) => monthCost(pack, minutes, extraOn));
-  const best = lowestThatAnswers(costs);
-  const how = billingLines(packs);
+  const typed = Math.max(0, Math.floor(Number(minutesRaw) || 0));
+  const minutes = maxMinutes > 0 ? Math.min(maxMinutes, typed) : typed;
+  const costs = packs.map((pack) => ({ pack, row: monthCost(pack, minutes, extraOn) }));
+  const best = lowestThatAnswers(costs.map((item) => item.row));
+  const setMinutes = (next: number) => setMinutesRaw(String(Math.min(maxMinutes, Math.max(0, next))));
   return (
     <div>
       {showAnnual ? (
@@ -136,87 +151,126 @@ export function PackagePrices({ board }: { board: PublicPackageBoard }) {
       ) : null}
 
       {packs.length ? (
-        <section className="mt-12 max-w-xl" aria-labelledby="pricing-billing" data-pricing-billing="">
-          <h2 id="pricing-billing" className="font-display text-xl tracking-tight text-ink">
+        <section className="mt-14" aria-labelledby="pricing-billing" data-pricing-billing="">
+          <h2 id="pricing-billing" className="font-display text-2xl tracking-tight text-ink">
             How billing works
           </h2>
-          <ul className="mt-3 space-y-2 text-base text-ink">
-            {how.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
+          <ol className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {steps.map((step, index) => {
+              const Icon = STEP_ICONS[index] ?? ArrowPathIcon;
+              return (
+                <li key={step.title} className="flex gap-3 rounded-2xl border border-hairline bg-surface p-4" data-billing-step={step.title}>
+                  <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-ink-2">
+                    <Icon aria-hidden className="h-6 w-6" />
+                  </span>
+                  <span>
+                    <span className="block font-display text-base text-ink">{step.title}</span>
+                    <span className="mt-1 block text-sm leading-relaxed text-ink-2">{step.body}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
         </section>
       ) : null}
 
-      {packs.length ? (
-        <section className="mt-12 max-w-xl" aria-labelledby="pricing-calculator" data-pricing-calculator="">
-          <h2 id="pricing-calculator" className="font-display text-xl tracking-tight text-ink">
+      {packs.length && maxMinutes > 0 ? (
+        <section className="mt-14" aria-labelledby="pricing-calculator" data-pricing-calculator="">
+          <h2 id="pricing-calculator" className="font-display text-2xl tracking-tight text-ink">
             What a month costs
           </h2>
-          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end">
-            <Field id="pricing-minutes" label="Call minutes a month" className="min-w-0 flex-1">
-              {(field) => (
-                <Input
-                  {...field}
-                  inputMode="numeric"
-                  value={minutesRaw}
-                  onChange={(event) => setMinutesRaw(event.target.value.replace(/[^\d]/g, ""))}
-                />
-              )}
-            </Field>
-            <div className="flex min-h-11 items-center gap-3">
+          <div className="mt-5 rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+            <p className="font-display text-4xl tabular-nums tracking-tight text-ink" data-pricing-minutes="">
+              {minutes.toLocaleString("en-KE")}
+            </p>
+            <p className="text-sm text-ink-2">minutes a month</p>
+            <div className="mt-4 flex items-center gap-2">
+              <IconButton label="Fewer minutes" disabled={minutes <= 0} onClick={() => setMinutes(minutes - MINUTE_STEP)}>
+                <MinusIcon />
+              </IconButton>
+              <input
+                type="range"
+                min={0}
+                max={maxMinutes}
+                step={MINUTE_STEP}
+                value={minutes}
+                aria-label="Call minutes a month"
+                onChange={(event) => setMinutes(Number(event.target.value))}
+                className="landing-focus h-11 min-w-0 flex-1 accent-[var(--landing-cta)]"
+              />
+              <IconButton
+                label="More minutes"
+                disabled={minutes >= maxMinutes}
+                onClick={() => setMinutes(minutes + MINUTE_STEP)}
+              >
+                <PlusIcon />
+              </IconButton>
+            </div>
+            <div className="mt-4 flex min-h-11 items-center gap-3">
               <Switch checked={extraOn} onCheckedChange={setExtraOn} label="Extra usage" />
               <span className="text-base text-ink">Extra usage</span>
             </div>
-          </div>
-          <ul className="mt-4 divide-y divide-hairline border-y border-hairline">
-            {costs.map((row) => (
-              <li key={row.sku} className="flex items-baseline justify-between gap-3 py-3" data-cost={row.sku}>
-                <span className="text-base text-ink">
-                  {row.name}
-                  {row.extraKes > 0 ? (
-                    <span className="mt-0.5 block text-sm text-ink-2">Extra {kes(row.extraKes)}</span>
-                  ) : null}
-                  {row.unanswered > 0 ? (
-                    <span className="mt-0.5 block text-sm text-ink-2">
-                      {row.unanswered.toLocaleString("en-KE")} minutes not answered
+            <ul className="mt-4 grid gap-3">
+              {costs.map(({ pack, row }) => {
+                const recommended = isGrowthPlan(pack);
+                return (
+                  <li
+                    key={row.sku}
+                    data-cost={row.sku}
+                    data-recommended={recommended ? "" : undefined}
+                    className={`flex items-center justify-between gap-3 rounded-2xl border-2 px-4 py-4 ${recommended ? "" : "border-line"}`}
+                    style={recommended ? { borderColor: "var(--landing-cta)", background: "var(--landing-glow)" } : undefined}
+                  >
+                    <span>
+                      <span className="block font-display text-xl text-ink">{row.name}</span>
+                      {row.extraKes > 0 ? (
+                        <span className="mt-0.5 block text-sm text-ink-2">Extra {kes(row.extraKes)}</span>
+                      ) : null}
+                      {row.unanswered > 0 ? (
+                        <span className="mt-0.5 block text-sm text-ink-2">
+                          {row.unanswered.toLocaleString("en-KE")} minutes not answered
+                        </span>
+                      ) : null}
                     </span>
-                  ) : null}
-                </span>
-                <span className="text-base font-semibold tabular-nums text-ink">{kes(row.totalKes)}</span>
-              </li>
-            ))}
-          </ul>
-          {best ? (
-            <p className="mt-3 text-base text-ink">
-              {best.name} answers every call for {kes(best.totalKes)}.
-            </p>
-          ) : (
-            <p className="mt-3 text-base text-ink-2">No plan answers all of those minutes inside the spend limit.</p>
-          )}
+                    <span className="font-display text-2xl tabular-nums tracking-tight text-ink">{kes(row.totalKes)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+            {best ? (
+              <p className="mt-4 text-base text-ink">
+                {best.name} answers every call for {kes(best.totalKes)}.
+              </p>
+            ) : (
+              <p className="mt-4 text-base text-ink-2">No plan answers all of those minutes inside the spend limit.</p>
+            )}
+          </div>
         </section>
       ) : null}
 
-      <section className="mt-12 max-w-xl" aria-labelledby="pricing-faq" data-pricing-faq="">
-        <h2 id="pricing-faq" className="font-display text-xl tracking-tight text-ink">
+      <section className="mt-14" aria-labelledby="pricing-faq" data-pricing-faq="">
+        <h2 id="pricing-faq" className="font-display text-2xl tracking-tight text-ink">
           Questions
         </h2>
-        <dl className="mt-3 divide-y divide-hairline border-y border-hairline">
+        <div className="mt-4 divide-y divide-hairline border-y border-hairline">
           {faq.map(([q, a]) => (
-            <div key={q} className="py-3">
-              <dt className="text-base font-semibold text-ink">{q}</dt>
-              <dd className="mt-1 text-base leading-relaxed text-ink-2">{a}</dd>
-            </div>
+            <details key={q} className="group">
+              <summary className="landing-focus flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-md text-base font-semibold text-ink [&::-webkit-details-marker]:hidden">
+                {q}
+                <PlusIcon aria-hidden className="h-5 w-5 shrink-0 text-ink-2 transition-transform group-open:rotate-45 motion-reduce:transition-none" />
+              </summary>
+              <p className="pb-3 text-base leading-relaxed text-ink-2">{a}</p>
+            </details>
           ))}
-        </dl>
+        </div>
       </section>
 
-      <div className="mt-10 flex items-center gap-3" data-pricing-dock="">
-        <div className="min-w-0 flex-1">
-          <LandingCta href="/signup" size="md" wide />
+      <section className="mt-14 rounded-2xl border border-hairline bg-surface px-5 py-8 sm:px-8" data-pricing-band="">
+        <p className="font-display text-2xl tracking-tight text-ink">We set up your assistant with you.</p>
+        <div className="mt-6 flex items-center" data-pricing-dock="">
+          <LandingCta href="/signup" size="md" />
         </div>
-      </div>
-      <p className="mt-3 text-sm text-ink-2">We set up your assistant with you.</p>
+      </section>
     </div>
   );
 }
