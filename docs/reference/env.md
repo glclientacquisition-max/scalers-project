@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-248 variables.
+251 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -74,6 +74,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `DESK_LOOKUP_PREVIEW` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_PLAN_CHANGE` | desk | `dashboard/src/lib/deskPlanChange.ts` |
 | `DESK_PUBLIC_URL` | voice | `server.js` |
+| `DESK_SHELL_GLOW` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DOCS_STALE_DAYS` | scripts | `scripts/docs/check-docs.js` |
 | `FACT_HASH_MODE` | desk, scripts, voice | `dashboard/src/lib/tenantFieldProvenance.ts`<br>`scripts/ack-rule-report.js`<br>`scripts/replay-voice-suite.js`<br>+2 more |
 | `FACT_PAYMENTS_V2_HASH` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
@@ -209,7 +210,9 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VAPID_PUBLIC_KEY` | voice | `src/notifications/push.js` |
 | `VAPID_SUBJECT` | voice | `src/notifications/push.js` |
 | `VERCEL_ENV` | desk | `dashboard/src/lib/ops/stepUpStore.ts`<br>`dashboard/src/lib/opsAlerts.ts`<br>`dashboard/src/lib/platformOps.ts` |
+| `VERCEL_PROJECT_ID` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `VERCEL_TOKEN` | scripts | `scripts/stage-desk-alias.js` |
+| `VERCEL_URL` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `VOICE_AREA_FEES` | voice | `src/conversation/areaTerms.js`<br>`src/conversation/numberWords.js` |
 | `VOICE_BARGE_EARLY_MS` | voice | `src/speech/turnTaking.js` |
 | `VOICE_BARGE_GRACE_MS` | voice | `src/speech/turnTaking.js` |
