@@ -311,6 +311,13 @@ export type PoliciesPatch = {
 const OWNER = { source: "owner", confirmed: true } as const;
 export const PATCH_TEXT_MAX = 1200;
 
+/** True when the patch changes the stored policies. An empty or repeat save does not. */
+export function policiesPatchChanges(stored: StoredPolicies, patch: PoliciesPatch, niche: NicheDef): boolean {
+  const base = applyPoliciesPatch(stored, {}, niche);
+  const next = applyPoliciesPatch(stored, patch, niche);
+  return JSON.stringify(base) !== JSON.stringify(next);
+}
+
 /**
  * Apply one card's patch on top of stored business_policies. Used by the page (optimistic
  * view) and by the server action (merge onto the row read fresh). Rules go through the

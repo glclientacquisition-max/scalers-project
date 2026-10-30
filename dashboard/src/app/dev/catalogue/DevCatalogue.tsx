@@ -31,7 +31,7 @@ export function DevCatalogue(props: Omit<CatalogueScreenProps, "actions">) {
   const actions: CatalogueActions = {
     saveItem: async () => (await wait(300), { ok: true }),
     hideItem: async () => (await wait(300), { ok: true }),
-    decideSwName: async () => ({ ok: true }),
+    decideSwName: async () => (await wait(700), { ok: true }),
     compile: async () => ({ ok: true }),
     previewPaste: async (text) => {
       await wait(200);

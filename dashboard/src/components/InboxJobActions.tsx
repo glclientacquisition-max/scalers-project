@@ -1,15 +1,13 @@
 "use client";
 
 import { withRoleGate } from "@/components/DeskRole";
-import { useActionState } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   updateAppointmentStatus,
   type AppointmentStatusState,
 } from "@/app/(desk)/appointments/actions";
 import { Button } from "@/components/ui/Button";
 import { Stamp } from "@/components/ui/Stamp";
-
-const initial: AppointmentStatusState = {};
 
 function ownerError(error?: string) {
   if (!error) return null;
@@ -27,14 +25,36 @@ function InboxJobActionsInner({
   extra?: boolean;
   banner?: boolean;
 }) {
-  const [state, formAction, pending] = useActionState(
-    updateAppointmentStatus,
-    initial
-  );
-
-  const normalized = ["requested", "confirmed", "done", "cancelled"].includes(status)
-    ? status
+  const [override, setOverride] = useState<string | null>(null);
+  const [pendingValue, setPendingValue] = useState<string | null>(null);
+  const [state, setState] = useState<AppointmentStatusState>({});
+  const [, startQuiet] = useTransition();
+  const token = useRef(0);
+  const shown = pendingValue ? status : (override ?? status);
+  const normalized = ["requested", "confirmed", "done", "cancelled"].includes(shown)
+    ? shown
     : "requested";
+
+  function choose(next: string) {
+    if (next === normalized || pendingValue === next) return;
+    const mine = ++token.current;
+    setPendingValue(next);
+    const data = new FormData();
+    data.set("id", id);
+    data.set("status", next);
+    startQuiet(async () => {
+      let res: AppointmentStatusState;
+      try {
+        res = await updateAppointmentStatus({}, data);
+      } catch {
+        res = { error: "Could not save." };
+      }
+      if (token.current !== mine) return;
+      setPendingValue(null);
+      setState(res);
+      if (!res.error) setOverride(next);
+    });
+  }
   const err = ownerError(state.error);
   const wide = extra || banner;
   const stack = wide
@@ -42,34 +62,31 @@ function InboxJobActionsInner({
     : "flex items-center justify-end";
 
   return (
-    <form action={formAction} className={wide ? "flex w-full flex-col gap-1" : "flex flex-col items-end gap-1"}>
-      <input type="hidden" name="id" value={id} />
+    <div className={wide ? "flex w-full flex-col gap-1" : "flex flex-col items-end gap-1"} data-job-actions={id} data-row-pending={pendingValue ? "1" : "0"}>
       <div className={stack}>
         {normalized === "requested" ? (
           <>
             <Button
-              type="submit"
-              name="status"
-              value="confirmed"
-              pending={pending}
+              type="button"
+              pending={pendingValue === "confirmed"}
               variant={wide ? "primary" : "tonal"}
               size={wide ? "md" : "sm"}
               block={wide}
-              aria-label={pending ? "Saving" : "Confirm"}
+              aria-label={pendingValue === "confirmed" ? "Saving" : "Confirm"}
+              onClick={() => choose("confirmed")}
             >
-              {pending ? "Saving" : "Confirm"}
+              {pendingValue === "confirmed" ? "Saving" : "Confirm"}
             </Button>
             {extra && !banner ? (
               <Button
-                type="submit"
-                name="status"
-                value="cancelled"
-                disabled={pending}
+                type="button"
+                pending={pendingValue === "cancelled"}
                 variant="ghost"
                 size="md"
                 block
+                onClick={() => choose("cancelled")}
               >
-                Cancel
+                {pendingValue === "cancelled" ? "Saving" : "Cancel"}
               </Button>
             ) : null}
           </>
@@ -77,28 +94,26 @@ function InboxJobActionsInner({
         {normalized === "confirmed" ? (
           <>
             <Button
-              type="submit"
-              name="status"
-              value="done"
-              pending={pending}
+              type="button"
+              pending={pendingValue === "done"}
               variant={wide ? "primary" : "tonal"}
               size={wide ? "md" : "sm"}
               block={wide}
-              aria-label={pending ? "Saving" : "Done"}
+              aria-label={pendingValue === "done" ? "Saving" : "Done"}
+              onClick={() => choose("done")}
             >
-              {pending ? "Saving" : "Done"}
+              {pendingValue === "done" ? "Saving" : "Done"}
             </Button>
             {extra && !banner ? (
               <Button
-                type="submit"
-                name="status"
-                value="cancelled"
-                disabled={pending}
+                type="button"
+                pending={pendingValue === "cancelled"}
                 variant="ghost"
                 size="md"
                 block
+                onClick={() => choose("cancelled")}
               >
-                Cancel
+                {pendingValue === "cancelled" ? "Saving" : "Cancel"}
               </Button>
             ) : null}
           </>
@@ -114,15 +129,14 @@ function InboxJobActionsInner({
         ) : null}
         {normalized === "cancelled" ? (
           <Button
-            type="submit"
-            name="status"
-            value="requested"
-            disabled={pending}
+            type="button"
+            pending={pendingValue === "requested"}
             variant="ghost"
             size={wide ? "md" : "sm"}
             block={Boolean(extra)}
+            onClick={() => choose("requested")}
           >
-            Reopen
+            {pendingValue === "requested" ? "Saving" : "Reopen"}
           </Button>
         ) : null}
       </div>
@@ -136,7 +150,7 @@ function InboxJobActionsInner({
           {state.notice}
         </p>
       ) : null}
-    </form>
+    </div>
   );
 }
 

@@ -9,6 +9,7 @@ import { notify } from "@/components/ui/DeskNotice";
 import { SettingsGroup } from "@/components/settingsUi";
 import { PRICING_MODES, UNITS, spokenPrice, type PricingMode, type StructuredPrice } from "@/lib/structuredData";
 import type { StructuredResult } from "@/app/(desk)/settings/structuredActions";
+import { clearRowPending, markRowPending, rowIsPending } from "@/lib/rowPending";
 import { Chips } from "./Chips";
 
 export type PriceToConfirm = { kind: "product" | "service"; id?: string | null; name: string; pricing: StructuredPrice; text: string };
@@ -23,21 +24,31 @@ const SERVICE_UNITS = ["job", "visit", "hour", "room", "sqm", "seat"];
 export function PriceConfirmCards({ items, save, canEdit }: { items: PriceToConfirm[]; save: SaveFn; canEdit: boolean }) {
   const [done, setDone] = useState<string[]>([]);
   const [editing, setEditing] = useState<PriceToConfirm | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-  const left = items.filter((i) => !done.includes(`${i.kind}:${i.id || i.name}`));
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
+  const [, startQuiet] = useTransition();
+  const left = items.filter((i) => !done.includes(`${i.kind}:${i.id || i.name}`) || rowIsPending(busy, `${i.kind}:${i.id || i.name}`));
   if (!left.length) return null;
 
   function run(item: PriceToConfirm, pricing: StructuredPrice, after?: () => void) {
     const key = `${item.kind}:${item.id || item.name}`;
-    setBusy(key);
-    start(async () => {
-      const res = await save({ kind: item.kind, id: item.id ?? null, name: item.name, pricing });
-      setBusy(null);
-      notify(res.ok ? res.message : res.error);
+    if (rowIsPending(busy, key)) return;
+    if (item.pricing.confirmed && JSON.stringify(item.pricing) === JSON.stringify(pricing)) return;
+    setBusy((prev) => markRowPending(prev, key));
+    setDone((d) => (d.includes(key) ? d : [...d, key]));
+    startQuiet(async () => {
+      let res: StructuredResult;
+      try {
+        res = await save({ kind: item.kind, id: item.id ?? null, name: item.name, pricing });
+      } catch {
+        res = { ok: false, error: "Couldn't save. Nothing was changed. Try again." };
+      }
+      setBusy((prev) => clearRowPending(prev, key));
       if (res.ok) {
-        setDone((d) => [...d, key]);
+        notify(res.message);
         after?.();
+      } else {
+        setDone((d) => d.filter((id) => id !== key));
+        notify(res.error);
       }
     });
   }
@@ -51,7 +62,7 @@ export function PriceConfirmCards({ items, save, canEdit }: { items: PriceToConf
           const shown = spokenPrice(item.pricing, item.text);
           const wrote = item.text.trim();
           return (
-            <li key={key} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-hairline px-4 py-3 last:border-b-0">
+            <li key={key} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-hairline px-4 py-3 last:border-b-0" data-price-row={key} data-row-pending={rowIsPending(busy, key) ? "1" : "0"}>
               <div className="min-w-0 flex-1 basis-full sm:basis-0">
                 <p className="truncate text-body text-ink">{item.name}</p>
                 <p className="text-meta text-ink-2">
@@ -61,11 +72,11 @@ export function PriceConfirmCards({ items, save, canEdit }: { items: PriceToConf
               </div>
               {canEdit ? (
                 <div className="flex w-full shrink-0 justify-end gap-2 sm:w-auto">
-                  <Button variant="tonal" size="sm" disabled={pending} pending={busy === key}
-                    aria-label={`Yes, ${item.name} is ${shown}`} onClick={() => run(item, item.pricing)}>
+                  <Button variant="tonal" size="sm" pending={rowIsPending(busy, key)}
+                    aria-label={`Yes, ${item.name} is ${shown}`} onClick={() => run(item, { ...item.pricing, source: "owner", confirmed: true })}>
                     Yes
                   </Button>
-                  <Button variant="ghost" size="sm" disabled={pending} aria-label={`Change the price of ${item.name}`} onClick={() => setEditing(item)}>
+                  <Button variant="ghost" size="sm" aria-label={`Change the price of ${item.name}`} onClick={() => setEditing(item)}>
                     Change
                   </Button>
                 </div>
@@ -76,7 +87,7 @@ export function PriceConfirmCards({ items, save, canEdit }: { items: PriceToConf
       </ul>
       {left.length > SHOWN ? <p className="px-4 py-3 text-meta text-ink-2">{left.length - SHOWN} more after these.</p> : null}
       {editing ? (
-        <PriceSheet item={editing} pending={pending} onClose={() => setEditing(null)} onSave={(pricing) => run(editing, pricing, () => setEditing(null))} />
+        <PriceSheet item={editing} pending={rowIsPending(busy, `${editing.kind}:${editing.id || editing.name}`)} onClose={() => setEditing(null)} onSave={(pricing) => run(editing, pricing, () => setEditing(null))} />
       ) : null}
     </SettingsGroup>
   );

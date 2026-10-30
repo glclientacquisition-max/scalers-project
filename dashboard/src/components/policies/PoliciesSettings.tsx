@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode, type RefObject } from "react";
 import { PlusIcon, SpeakerWaveIcon, ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/20/solid";
 import { useCan, withRoleGate } from "@/components/DeskRole";
 import { Button } from "@/components/ui/Button";
+import { clearRowPending, markRowPending, rowIsPending } from "@/lib/rowPending";
 import { IconButton } from "@/components/ui/IconButton";
 import { Switch } from "@/components/ui/Switch";
 import { TextAreaField } from "@/components/ui/TextField";
@@ -37,6 +38,7 @@ import {
   payTimingSentence,
   policiesAnchor,
   policiesKind,
+  policiesPatchChanges,
   policiesNiche,
   ruleRows,
   unknownAnswerSentence,
@@ -83,6 +85,8 @@ function useCardQueue(initial: StoredPolicies, save: SaveCardFn, niche: Paramete
   const baseRef = useRef(base);
   const [pending, setPending] = useState<Array<{ id: number; patch: PoliciesPatch }>>([]);
   const [status, setStatus] = useState<Partial<Record<CardId, CardSaveState>>>({});
+  const [savingRows, setSavingRows] = useState<ReadonlySet<string>>(new Set());
+  const [, startQuiet] = useTransition();
   const chain = useRef<Promise<void>>(Promise.resolve());
   const seq = useRef(0);
   const timers = useRef<Partial<Record<CardId, ReturnType<typeof setTimeout>>>>({});
@@ -100,44 +104,57 @@ function useCardQueue(initial: StoredPolicies, save: SaveCardFn, niche: Paramete
   }, []);
 
   const enqueue = useCallback(
-    function run(card: CardId, patch: PoliciesPatch, undoable = true) {
+    function run(card: CardId, patch: PoliciesPatch, undoable = true, rowKey?: string) {
+      if (!policiesPatchChanges(baseRef.current, patch, niche)) return;
       const id = ++seq.current;
+      const row = rowKey ?? card;
       setPending((p) => [...p, { id, patch }]);
+      setSavingRows((prev) => markRowPending(prev, row));
       setCard(card, { state: "saving" });
       onSaveActivity?.();
-      chain.current = chain.current
-        .then(async () => {
-        let res: PoliciesCardResult;
-        try {
-          res = await save(patch);
-        } catch {
-          res = { ok: false, error: OFFLINE_COPY };
-        }
-        if (res.ok) {
-          const before = baseRef.current;
-          const after = applyPoliciesPatch(before, patch, niche);
-          baseRef.current = after;
-          setBase(after);
-          setPending((p) => p.filter((x) => x.id !== id));
-          const inverse = invertPoliciesPatch(before, patch);
-          setCard(card, { state: "saved", undo: undoable ? () => run(card, inverse, false) : undefined });
-          onSaveActivity?.();
-        } else {
-          setPending((p) => p.filter((x) => x.id !== id));
-          setCard(card, { state: "error", error: res.error || OFFLINE_COPY, retry: () => run(card, patch, undoable) });
-        }
-      })
-        .catch(() => {
-          setPending((p) => p.filter((x) => x.id !== id));
-          setCard(card, { state: "error", error: OFFLINE_COPY, retry: () => run(card, patch, undoable) });
-        });
+      const finishRow = () => setSavingRows((prev) => clearRowPending(prev, row));
+      chain.current = chain.current.then(
+        () =>
+          new Promise<void>((resolve) => {
+            startQuiet(() => {
+              void (async () => {
+                let res: PoliciesCardResult;
+                try {
+                  res = await save(patch);
+                } catch {
+                  res = { ok: false, error: OFFLINE_COPY };
+                }
+                if (res.ok) {
+                  const before = baseRef.current;
+                  const after = applyPoliciesPatch(before, patch, niche);
+                  baseRef.current = after;
+                  setBase(after);
+                  setPending((p) => p.filter((x) => x.id !== id));
+                  const inverse = invertPoliciesPatch(before, patch);
+                  setCard(card, { state: "saved", undo: undoable ? () => run(card, inverse, false) : undefined });
+                  onSaveActivity?.();
+                } else {
+                  setPending((p) => p.filter((x) => x.id !== id));
+                  setCard(card, { state: "error", error: res.error || OFFLINE_COPY, retry: () => run(card, patch, undoable, rowKey) });
+                }
+                finishRow();
+                resolve();
+              })().catch(() => {
+                setPending((p) => p.filter((x) => x.id !== id));
+                setCard(card, { state: "error", error: OFFLINE_COPY, retry: () => run(card, patch, undoable, rowKey) });
+                finishRow();
+                resolve();
+              });
+            });
+          })
+      );
     },
-    [niche, onSaveActivity, save, setCard]
+    [niche, onSaveActivity, save, setCard, startQuiet]
   );
 
   const view = useMemo(() => pending.reduce((acc, p) => applyPoliciesPatch(acc, p.patch, niche), base), [base, pending, niche]);
   const statusOf = (card: CardId): CardSaveState => status[card] ?? IDLE;
-  return { view, enqueue, statusOf, setCard };
+  return { view, enqueue, statusOf, setCard, savingRows };
 }
 
 /** Jumps from Home (#payments) land on the card, focus its heading and mark it for a moment. */
@@ -410,7 +427,7 @@ function PoliciesSettingsInner({
   const kind: PoliciesKind = policiesKind(tenant);
   const niche = useMemo(() => policiesNiche(tenant, kind), [tenant, kind]);
   const voices = curatedVoices && curatedVoices.length ? curatedVoices : listCuratedSonioxVoicesSync();
-  const { view, enqueue, statusOf, setCard } = useCardQueue(
+  const { view, enqueue, statusOf, setCard, savingRows } = useCardQueue(
     (tenant.business_policies as StoredPolicies | null) ?? {},
     saveCard,
     niche,
@@ -687,7 +704,7 @@ function PoliciesSettingsInner({
                 />
                 {otherDirty && canEdit ? (
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="primary" size="md" onClick={() => enqueue("other", { other })}>
+                    <Button variant="primary" size="md" pending={rowIsPending(savingRows, "other-note")} onClick={() => enqueue("other", { other }, true, "other-note")}>
                       Save
                     </Button>
                     <Button variant="ghost" size="md" onClick={() => setOther(bp.other || "")}>
@@ -697,17 +714,17 @@ function PoliciesSettingsInner({
                 ) : null}
               </div>
               {starters.map((s) => (
-                <div key={s.key} className="space-y-1 px-4 py-3" data-starter={s.key}>
+                <div key={s.key} className="space-y-1 px-4 py-3" data-starter={s.key} data-row-pending={rowIsPending(savingRows, `starter:${s.key}`) || rowIsPending(savingRows, `starter-remove:${s.key}`) ? "1" : "0"}>
                   <p className="text-meta text-ink-2">{s.label}: starter text, not used yet</p>
                   <p className="text-body text-ink [overflow-wrap:anywhere]">{s.text}</p>
                   {canEdit ? (
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" className={quietButtonClass} onClick={() => enqueue("other", { confirm: [s.key] })}>
+                      <Button variant="tonal" size="md" pending={rowIsPending(savingRows, `starter:${s.key}`)} onClick={() => enqueue("other", { confirm: [s.key] }, true, `starter:${s.key}`)}>
                         Keep it
-                      </button>
-                      <button type="button" className={cx(quietButtonClass, "text-ink-2")} onClick={() => enqueue("other", starterRemovePatch(s.key))}>
+                      </Button>
+                      <Button variant="ghost" size="md" pending={rowIsPending(savingRows, `starter-remove:${s.key}`)} onClick={() => enqueue("other", starterRemovePatch(s.key), true, `starter-remove:${s.key}`)}>
                         Remove
-                      </button>
+                      </Button>
                     </div>
                   ) : null}
                 </div>

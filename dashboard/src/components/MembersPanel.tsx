@@ -66,7 +66,7 @@ export function MembersPanel({
   const roles = assignableRoles(viewerRole);
   const [role, setRole] = useState<Role>(roles.includes("staff") ? "staff" : roles[0] || "viewer");
   const [flash, setFlash] = useState<MembersActionResult | null>(null);
-  const [pending, start] = useTransition();
+  const [, start] = useTransition();
   const [confirming, setConfirming] = useState<Pending | null>(null);
   const [typed, setTyped] = useState("");
   const [seatOpen, setSeatOpen] = useState(false);
@@ -75,9 +75,9 @@ export function MembersPanel({
   const seatOffer = data.seatOffer;
   const seatPrice = seatOffer?.extraSeatMonthlyKes ?? null;
   const maxAdd = Math.max(0, 100 - (seatOffer?.extraSeats ?? 0));
-  /** The control whose action is in flight; only it shows a spinner, the rest just disable. */
-  const [activeKey, setActiveKey] = useState<string | null>(null);
-  const spinning = (key: string) => pending && activeKey === key;
+  /** Each row action spins on its own. Other rows stay tappable. */
+  const [activeKeys, setActiveKeys] = useState<ReadonlySet<string>>(new Set());
+  const spinning = (key: string) => activeKeys.has(key);
 
   async function confirmSeatInvite() {
     if (!seatOffer || seatPrice == null || !email.trim()) return;
@@ -98,7 +98,7 @@ export function MembersPanel({
     router.refresh();
     run(() => inviteMemberAction(email, role), { key: "invite" });
   }
-  const busy = useRef(false);
+  const inflight = useRef(new Set<string>());
   const router = useRouter();
   const canInvite = roles.length > 0;
   const { seats, totals, limits } = data;
@@ -121,9 +121,14 @@ export function MembersPanel({
 
   /** Runs one action at a time and always shows the outcome: inline + desk toast (survives a re-render). */
   function run(fn: () => Promise<MembersActionResult>, opts?: { refreshAll?: boolean; onDone?: () => void; key?: string }) {
-    if (busy.current) return; // double-click safe
-    busy.current = true;
-    setActiveKey(opts?.key ?? null);
+    const key = opts?.key ?? "default";
+    if (inflight.current.has(key)) return;
+    inflight.current.add(key);
+    setActiveKeys((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
     start(async () => {
       let result: MembersActionResult;
       try {
@@ -132,8 +137,12 @@ export function MembersPanel({
         result = { error: "Something went wrong. Nothing was changed. Try again." };
       }
       if (!result.ok && !result.error) result = { ...result, error: "Something went wrong. Try again." };
-      busy.current = false;
-      setActiveKey(null);
+      inflight.current.delete(key);
+      setActiveKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
       setFlash(result);
       notify(result.error || result.message || "Done.");
       opts?.onDone?.();
@@ -159,7 +168,7 @@ export function MembersPanel({
   const roleOptions = roles.map((r) => ({ value: r, label: ROLE_LABELS[r], detail: ROLE_BLURBS[r] }));
 
   return (
-    <div className="space-y-6" aria-busy={pending}>
+    <div className="space-y-6">
       <section className="min-w-0 space-y-1.5" aria-labelledby="members-title">
         <div className="flex items-end justify-between gap-3 px-1">
           <div className="min-w-0">
@@ -212,7 +221,6 @@ export function MembersPanel({
                     <Button
                       variant="tonal"
                       size="md"
-                      disabled={pending}
                       pending={spinning(`owner:${m.userId}`)}
                       onClick={() =>
                         ask({
@@ -243,7 +251,6 @@ export function MembersPanel({
                     <Button
                       variant="danger"
                       size="md"
-                      disabled={pending}
                       pending={spinning(`remove:${m.userId}`)}
                       aria-label={`Remove ${m.email}`}
                       onClick={() =>
@@ -288,13 +295,12 @@ export function MembersPanel({
                   </div>
                   {canInvite && canManageMember(viewerRole, i.role) ? (
                     <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:w-auto">
-                      <Button variant="tonal" size="sm" disabled={pending} pending={spinning(`resend:${i.id}`)} aria-label={`Resend invite to ${i.email}`} onClick={() => run(() => resendInviteAction(i.id), { key: `resend:${i.id}` })}>
+                      <Button variant="tonal" size="sm" pending={spinning(`resend:${i.id}`)} aria-label={`Resend invite to ${i.email}`} onClick={() => run(() => resendInviteAction(i.id), { key: `resend:${i.id}` })}>
                         Resend
                       </Button>
                       <Button
                         variant="danger"
                         size="sm"
-                        disabled={pending}
                         pending={spinning(`revoke:${i.id}`)}
                         aria-label={`Cancel invite to ${i.email}`}
                         onClick={() =>
@@ -385,10 +391,10 @@ export function MembersPanel({
                 variant="primary"
                 size="md"
                 pending={spinning("invite")}
-                disabled={pending || !email.trim()}
+                disabled={spinning("invite") || !email.trim()}
                 onClick={() => run(() => inviteMemberAction(email, role), { key: "invite" })}
               >
-                {pending ? "Sending…" : "Send invite"}
+                {spinning("invite") ? "Sending…" : "Send invite"}
               </Button>
             </div>
           </SettingsGroup>
@@ -412,7 +418,7 @@ export function MembersPanel({
               variant="tonal"
               block
               pending={spinning("invite")}
-              disabled={pending || !email.trim()}
+              disabled={spinning("invite") || !email.trim()}
               onClick={() => void confirmSeatInvite()}
             >
               Confirm
@@ -468,7 +474,7 @@ export function MembersPanel({
         title={confirming?.title || ""}
         confirmLabel={confirming?.confirmLabel || "Confirm"}
         danger={confirming?.danger}
-        pending={pending}
+        pending={confirming ? spinning(confirming.key) : false}
         confirmDisabled={!!confirming?.typeToConfirm && !transferConfirmMatches(typed, confirming.typeToConfirm)}
         onClose={() => setConfirming(null)}
         onConfirm={() => {

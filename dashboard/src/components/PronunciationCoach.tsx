@@ -4,6 +4,7 @@ import { withRoleGate } from "@/components/DeskRole";
 import { TTS_MATCH_MAX, TTS_SAY_MAX } from "@/lib/pronunciationLexicon";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { clearRowPending, markRowPending } from "@/lib/rowPending";
 import { DeskSelect } from "@/components/ui/DeskSelect";
 import { Pagination } from "@/components/ui/Pagination";
 import {
@@ -197,6 +198,7 @@ function PronunciationCoachInner({
 
   const [geminiBatch, setGeminiBatch] = useState<number>(GEMINI_SCAN_DEFAULT_BATCH);
   const [geminiConfirmOpen, setGeminiConfirmOpen] = useState(false);
+  const [acting, setActing] = useState<ReadonlySet<string>>(new Set());
   const [reviewQueue, setReviewQueue] = useState<PronunciationReviewCandidate[]>(
     () =>
       initialReview.filter(
@@ -259,11 +261,11 @@ function PronunciationCoachInner({
     geminiScanRecentCallsAction,
     geminiScanInitial
   );
-  const [approveState, approveAction, approvePending] = useActionState(
+  const [approveState] = useActionState(
     approveGeminiScanCandidateAction,
     geminiQueueInitial
   );
-  const [dismissState, dismissAction, dismissPending] = useActionState(
+  const [dismissState] = useActionState(
     dismissGeminiScanCandidateAction,
     geminiQueueInitial
   );
@@ -828,24 +830,68 @@ function PronunciationCoachInner({
   }
 
   function approveCandidate(c: PronunciationReviewCandidate) {
+    if (acting.has(c.id) || c.status !== "pending") return;
+    const edited = (reviewEdits[c.id] ?? c.suggested_form).trim();
+    if (edited && edited === (c.edited_say || "").trim() && c.status !== "pending") return;
     const fd = new FormData();
     fd.set("id", tenantId);
     fd.set("candidate_id", c.id);
     fd.set("current_lexicon", lexiconJson);
-    const edited = (reviewEdits[c.id] ?? c.suggested_form).trim();
     if (edited) fd.set("edited_say", edited);
-    startTransition(() => approveAction(fd));
+    const speech = reviewQueue;
+    const hints = sttHints;
+    setActing((prev) => markRowPending(prev, c.id));
+    void (async () => {
+      let res: GeminiScanQueueState;
+      try {
+        res = await approveGeminiScanCandidateAction(geminiQueueInitial, fd);
+      } catch {
+        res = { error: "Couldn't save. Nothing was changed. Try again." };
+      }
+      setActing((prev) => clearRowPending(prev, c.id));
+      if (!res.ok) {
+        setReviewQueue(speech);
+        setSttHints(hints);
+        if (res.error) setGeminiNote(res.error);
+        return;
+      }
+      setReviewQueue((q) => q.filter((row) => row.id !== c.id));
+      setSttHints((q) => q.filter((row) => row.id !== c.id));
+      if (res.message) setGeminiNote(res.message);
+      if (res.lexicon) setLexicon(parseTtsLexicon(res.lexicon));
+    })();
   }
 
   function dismissCandidate(
     c: PronunciationReviewCandidate,
     mode: "rejected" | "snoozed"
   ) {
+    if (acting.has(c.id)) return;
     const fd = new FormData();
     fd.set("id", tenantId);
     fd.set("candidate_id", c.id);
     fd.set("mode", mode);
-    startTransition(() => dismissAction(fd));
+    const speech = reviewQueue;
+    const hints = sttHints;
+    setActing((prev) => markRowPending(prev, c.id));
+    void (async () => {
+      let res: GeminiScanQueueState;
+      try {
+        res = await dismissGeminiScanCandidateAction(geminiQueueInitial, fd);
+      } catch {
+        res = { error: "Couldn't save. Nothing was changed. Try again." };
+      }
+      setActing((prev) => clearRowPending(prev, c.id));
+      if (!res.ok) {
+        setReviewQueue(speech);
+        setSttHints(hints);
+        if (res.error) setGeminiNote(res.error);
+        return;
+      }
+      setReviewQueue((q) => q.filter((row) => row.id !== c.id));
+      setSttHints((q) => q.filter((row) => row.id !== c.id));
+      if (res.message) setGeminiNote(res.message);
+    })();
   }
 
   function recordCandidateInstead(c: PronunciationReviewCandidate) {
@@ -1443,27 +1489,28 @@ function PronunciationCoachInner({
                             type="button"
                             onClick={() => approveCandidate(c)}
                             disabled={
-                              approvePending ||
-                              dismissPending ||
+                              acting.has(c.id) ||
                               unsavedReview ||
                               !heardThis
                             }
+                            data-row-pending={acting.has(c.id) ? "1" : "0"}
                             className={
                               unsavedReview || geminiConfirmOpen
                                 ? `${libraryMutedClass} disabled:opacity-60`
                                 : `${btnPrimary} w-auto shrink-0`
                             }
                           >
-                            {approvePending ? "Saving…" : "Use this"}
+                            {acting.has(c.id) ? "Saving…" : "Use this"}
                           </button>
                         ) : (
                           <button
                             type="button"
                             onClick={() => dismissCandidate(c, "rejected")}
-                            disabled={dismissPending || unsavedReview}
+                            disabled={acting.has(c.id) || unsavedReview}
+                            data-row-pending={acting.has(c.id) ? "1" : "0"}
                             className={`${libraryMutedClass} disabled:opacity-60`}
                           >
-                            Dismiss
+                            {acting.has(c.id) ? "Saving…" : "Dismiss"}
                           </button>
                         )}
                         {row.primaryAction === "use" ? (

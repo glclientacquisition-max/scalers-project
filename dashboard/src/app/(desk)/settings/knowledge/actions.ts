@@ -11,6 +11,7 @@ import { requireSupabaseUser } from "@/lib/tenant";
 import { logImportRun, rowsBeforeImport, undoImportRun } from "@/lib/kbImportRuns.server";
 import { importSource, type FactKey } from "@/lib/importUndo";
 import { deskKbItemStates } from "@/lib/deskFeatureFlags";
+import { planSwDecision } from "@/lib/rowPending";
 
 /** restamped false: saved, but the call facts could not be re-checked yet (the Desk says so instead of "on calls"). */
 export type KbActionResult =
@@ -29,13 +30,15 @@ async function loadItem(tenantId: string, id: string): Promise<KbItem | null> {
 }
 
 /** Write rows, keep today's catalogue columns in step (derived mirror), then ask Voice to compile (runs after the reply). */
-async function writeItems(tenantId: string, items: KbItem[], opts: { replaceKind?: KbKind } = {}): Promise<KbActionResult> {
+async function writeItems(tenantId: string, items: KbItem[], opts: { replaceKind?: KbKind; revalidate?: boolean } = {}): Promise<KbActionResult> {
   const w = await writeKbItems(tenantId, items, opts);
   if (!w.ok) return { ok: false, error: w.error };
   // Owner-reviewed write: re-stamp the call facts for what was written (hidden rows leave the catalogue).
   const restampIds = items.filter((i) => i.status !== "hidden").map((i) => i.id);
   const { restamped } = await afterKbWrite(tenantId, "desk", { restampIds });
-  revalidatePath("/settings/knowledge");
+  // A single Kiswahili decision updates that row on the client. Refreshing the
+  // catalogue route repaints every other row.
+  if (opts.revalidate !== false) revalidatePath("/settings/knowledge");
   return { ok: true, ...(restamped === false ? { restamped: false } : {}) };
 }
 
@@ -93,17 +96,14 @@ export async function decideSwNameAction(id: string, decision: "approve" | "edit
   if ("error" in t) return { ok: false, error: t.error };
   const prev = await loadItem(t.id, id);
   if (!prev) return { ok: false, error: "That item is gone. Reload the page." };
-  if (decision === "approve") {
-    const sw = (prev.name_sw_suggested || "").trim();
-    if (!sw) return { ok: false, error: "There is no suggestion to approve." };
-    return writeItems(t.id, [{ ...prev, name_sw: sw, name_sw_state: "approved" }]);
+  const plan = planSwDecision(prev, decision, text);
+  if (!plan.fire) {
+    if (plan.reason === "empty") {
+      return { ok: false, error: decision === "edit" ? "Type the Kiswahili name." : "There is no suggestion to approve." };
+    }
+    return { ok: true, unchanged: true };
   }
-  if (decision === "edit") {
-    const sw = String(text || "").trim().slice(0, 120);
-    if (!sw) return { ok: false, error: "Type the Kiswahili name." };
-    return writeItems(t.id, [{ ...prev, name_sw: sw, name_sw_state: "edited" }]);
-  }
-  return writeItems(t.id, [{ ...prev, name_sw: null, name_sw_state: "rejected" }]);
+  return writeItems(t.id, [{ ...prev, name_sw: plan.name_sw, name_sw_state: plan.name_sw_state }], { revalidate: false });
 }
 
 /** "Check again": compile now and re-run the readiness checks. */
