@@ -2,10 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
+import { SetupChecklist } from "@/components/SetupChecklist";
+import { checklistProgress } from "@/lib/setupChecklist";
 import { Button, buttonClass } from "@/components/ui/Button";
 import { saveCallSetupAction } from "@/app/onboarding/line/callSetupActions";
 import { browserCallSetupStore, showFinishCallsCard } from "@/lib/callSetupStore";
 import { callSetupCardMode, shortDay, worksTitle, type CallSetupCardMode, type CallSetupStatus } from "@/lib/callSetupStatus";
+
+/** On Home, setup is done; only the test call is left. */
+const HOME_PROGRESS = checklistProgress({ furthestStep: 0, setupDone: true, lineTested: false });
 
 export const CALLS_SETTINGS_HREF = "/settings?tab=calls";
 
@@ -57,6 +62,7 @@ export function HomeCallSetupCard({
             Finish setting up your calls
           </h2>
           <p className="mt-0.5 text-meta text-ink-2">Share your number or forward your line, then test it.</p>
+          <SetupChecklist progress={HOME_PROGRESS} className="mt-3" />
         </div>
         <Link href="/onboarding/line" className={buttonClass({ variant: "tonal", size: "md" })}>
           Set up

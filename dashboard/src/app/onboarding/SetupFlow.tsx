@@ -1,4 +1,6 @@
 "use client";
+import { SetupChecklist } from "@/components/SetupChecklist";
+import { CHECKLIST_TOTAL, checklistItemForStep, checklistLabel, checklistProgress } from "@/lib/setupChecklist";
 import { AppearanceFooter } from "@/components/ThemePicker";
 
 import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
@@ -329,6 +331,7 @@ export function SetupFlow({
   }, []);
 
   if (finishing) return <FinishingScreen />;
+  const progress = checklistProgress({ furthestStep: furthest });
 
   return (
     <main data-setup-flow="" className="min-h-dvh pb-[calc(10rem+env(safe-area-inset-bottom))]">
@@ -351,8 +354,8 @@ export function SetupFlow({
             )}
             <BrandWordmark href="/onboarding" context="Setup" variant="lockup" priority />
           </div>
-          <p className="ml-auto text-meta tabular-nums text-ink-2" aria-hidden>
-            {index + 1} of {SETUP_STEPS.length}
+          <p className="ml-auto text-meta tabular-nums text-ink-2" aria-hidden data-setup-count="">
+            {checklistLabel(progress.count)}
           </p>
           {signOut}
         </div>
@@ -360,12 +363,12 @@ export function SetupFlow({
           className="h-0.5 bg-hairline"
           role="progressbar"
           aria-label="Setup progress"
-          aria-valuemin={1}
-          aria-valuemax={SETUP_STEPS.length}
-          aria-valuenow={index + 1}
-          aria-valuetext={`Step ${index + 1} of ${SETUP_STEPS.length}: ${step.title}`}
+          aria-valuemin={0}
+          aria-valuemax={CHECKLIST_TOTAL}
+          aria-valuenow={progress.count}
+          aria-valuetext={`${checklistLabel(progress.count)}. Now: ${checklistItemForStep(key).title}, ${step.title}`}
         >
-          <div className="h-full bg-accent" style={{ width: `${((index + 1) / SETUP_STEPS.length) * 100}%` }} />
+          <div className="h-full bg-accent" style={{ width: `${(progress.count / CHECKLIST_TOTAL) * 100}%` }} />
         </div>
       </header>
 
@@ -374,6 +377,7 @@ export function SetupFlow({
           {step.title}
         </h1>
         <p className="mt-2 text-body text-ink-2">{LEADS[key](businessName)}</p>
+        {index === 0 ? <SetupChecklist progress={progress} className="mt-4 rounded-2xl border border-hairline bg-surface px-4 py-3" /> : null}
 
         {message ? (
           <p
