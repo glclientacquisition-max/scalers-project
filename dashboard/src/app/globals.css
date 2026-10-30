@@ -547,10 +547,10 @@ h3,
 .landing-cta-on-dark { background: #ffffff; color: #0a192f; }
 .landing-cta-on-dark:hover { background: #eaf6ff; }
 .landing-warm-orb {
-  position: absolute; left: 50%; top: 50%; z-index: 0; width: min(115%, 560px); aspect-ratio: 1;
+  position: absolute; left: 62%; top: 58%; z-index: 0; width: min(150%, 680px); aspect-ratio: 1;
   border-radius: 9999px; pointer-events: none; transform: translate(-50%, -50%);
-  background: radial-gradient(closest-side, rgb(255 122 26 / 0.32), rgb(255 122 26 / 0.1) 60%, transparent);
-  filter: blur(48px);
+  background: radial-gradient(closest-side, rgb(255 122 26 / 0.34), rgb(255 122 26 / 0.12) 62%, transparent);
+  filter: blur(56px);
   animation: landing-warm 40s ease-in-out alternate infinite;
 }
 @keyframes landing-warm {
