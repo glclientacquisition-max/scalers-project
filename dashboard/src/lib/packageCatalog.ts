@@ -5,6 +5,7 @@ import {
   type PackageUsageCounters,
 } from "@/lib/packageUsageAlign";
 import { minutesUsedFromSeconds } from "@/lib/minutes";
+import { creditBurnsFrom, type CreditBurns } from "@/lib/messageCredits";
 
 export type BillingRateCard = {
   inboundKesPerSecond: number;
@@ -54,13 +55,21 @@ export type PublicPackageOffer = {
   sku: string;
   name: string;
   monthlyPriceKes: number;
+  /** From this package's current published version, not the rate-card percent. */
   annualPriceKes: number;
+  /** Percent off on that same version. Starter and Growth are not the same number. */
+  annualDiscountPercent: number;
   seats: number;
   minutes: number;
-  sms: number;
-  email: number;
-  staffWa: number;
+  /** One pool. Null when the published version has no message_credits. */
+  messageCredits: number | null;
   dids: number;
+  /** Extra answered minute from the current published version. 0 when that row has no rate. */
+  inboundKesPerMinute: number;
+  /** SMS, WhatsApp, and email credits per alert. Null when any burn is missing. */
+  creditBurns: CreditBurns | null;
+  /** Version `spend_limit_share_percent`. Null when the column is empty. */
+  spendLimitSharePercent: number | null;
 };
 
 export type PublicPackageBoard = {
@@ -84,6 +93,82 @@ const DEFAULT_RATES: BillingRateCard = {
 
 export function inboundKesPerMinute(perSecond: number): number {
   return Math.round(Number(perSecond) * 60 * 100) / 100;
+}
+
+/**
+ * Public card figures from each package's latest published version.
+ * Annual price and the percent off come from that version. The rate-card percent is not applied.
+ * A package with no published version is left out.
+ */
+export function publishedPublicOffers(
+  packages: ReadonlyArray<Record<string, unknown>>,
+  versions: ReadonlyArray<Record<string, unknown>>,
+): PublicPackageOffer[] {
+  const latest = new Map<string, Record<string, unknown>>();
+  for (const row of versions) {
+    const id = String(row.package_id || "");
+    if (!id) continue;
+    const prev = latest.get(id);
+    if (prev && num(row.version) <= num(prev.version)) continue;
+    latest.set(id, row);
+  }
+  const offers: PublicPackageOffer[] = [];
+  for (const row of packages) {
+    if (row.is_active === false) continue;
+    const version = latest.get(String(row.id || ""));
+    if (!version) continue;
+    const monthlyPriceKes = num(version.monthly_price_kes);
+    const discount = num(version.annual_discount_percent);
+    const storedRaw = version.annual_price_kes;
+    const stored = storedRaw == null || storedRaw === "" ? null : num(storedRaw);
+    const annualPriceKesValue =
+      stored != null && stored > 0 ? Math.round(stored) : discount > 0 ? annualPriceKes(monthlyPriceKes, discount) : 0;
+    const creditsRaw = version.message_credits;
+    const credits = creditsRaw == null || creditsRaw === "" ? null : Math.round(num(creditsRaw));
+    const shareRaw = version.spend_limit_share_percent;
+    const share = shareRaw == null || shareRaw === "" ? null : num(shareRaw);
+    const name = String(row.name || "");
+    if (!name) continue;
+    offers.push({
+      sku: String(row.sku || ""),
+      name,
+      monthlyPriceKes,
+      annualPriceKes: annualPriceKesValue,
+      annualDiscountPercent: discount,
+      seats: num(version.seats),
+      minutes: num(version.minutes),
+      messageCredits: credits != null && credits > 0 ? credits : null,
+      dids: num(version.dids, 1),
+      inboundKesPerMinute: inboundKesPerMinute(num(version.inbound_kes_per_second)),
+      creditBurns: creditBurnsFrom(version),
+      spendLimitSharePercent: share != null && share >= 0 ? share : null,
+    });
+  }
+  return offers;
+}
+
+/**
+ * Extra minute for each package: inbound_kes_per_second × 60 on its current published version.
+ * Rows must already be status published. A later version wins. A missing or zero rate stays off the map.
+ */
+export function publishedInboundPerMinute(
+  rows: ReadonlyArray<{ package_id?: unknown; version?: unknown; inbound_kes_per_second?: unknown }>,
+): Map<string, number> {
+  const latest = new Map<string, { version: number; perSecond: number }>();
+  for (const row of rows) {
+    const id = String(row.package_id || "");
+    if (!id) continue;
+    const version = num(row.version);
+    const prev = latest.get(id);
+    if (prev && version <= prev.version) continue;
+    latest.set(id, { version, perSecond: num(row.inbound_kes_per_second) });
+  }
+  const rates = new Map<string, number>();
+  for (const [id, row] of latest) {
+    const perMinute = inboundKesPerMinute(row.perSecond);
+    if (perMinute > 0) rates.set(id, perMinute);
+  }
+  return rates;
 }
 
 export function outboundKesPerMinute(perSecond: number): number {
@@ -216,53 +301,37 @@ export function emptyPublicBoard(): PublicPackageBoard {
 export async function loadPublicPackageOffers(): Promise<PublicPackageBoard> {
   try {
     const admin = getSupabaseAdmin();
-    const [ratesRes, packsRes] = await Promise.all([
+    const [ratesRes, packsRes, versionsRes] = await Promise.all([
       admin
         .from("billing_rate_card")
-        .select(
-          "inbound_kes_per_second, outbound_kes_per_second, whatsapp_kes, sms_kes, email_kes, annual_discount_percent"
-        )
+        .select("inbound_kes_per_second, outbound_kes_per_second, whatsapp_kes, sms_kes, email_kes")
         .eq("id", 1)
         .maybeSingle(),
       admin
         .from("billing_packages")
-        .select("sku, name, monthly_price_kes, seats, minutes, sms, email, staff_wa, dids, sort_order, is_active")
+        .select("id, sku, name, sort_order, is_active")
         .order("sort_order", { ascending: true }),
+      admin
+        .from("billing_package_versions")
+        .select(
+          "package_id, version, monthly_price_kes, annual_price_kes, annual_discount_percent, minutes, seats, dids, message_credits, inbound_kes_per_second, sms_credit_burn, whatsapp_credit_burn, email_credit_burn, spend_limit_share_percent",
+        )
+        .eq("status", "published"),
     ]);
-    if (packsRes.error || !packsRes.data?.length) return emptyPublicBoard();
+    if (packsRes.error || versionsRes.error || !packsRes.data?.length) return emptyPublicBoard();
+    const packages = publishedPublicOffers(
+      (packsRes.data || []) as Record<string, unknown>[],
+      (versionsRes.data || []) as Record<string, unknown>[],
+    );
+    if (!packages.length) return emptyPublicBoard();
     const rateRow =
       ratesRes.error || !ratesRes.data ? null : (ratesRes.data as Record<string, unknown>);
-    const discountRaw = rateRow?.annual_discount_percent;
-    const discount =
-      rateRow && discountRaw != null && discountRaw !== ""
-        ? parseDiscountPercent(discountRaw)
-        : null;
-    const packages = packsRes.data
-      .filter((row) => row.is_active !== false)
-      .map((row) => {
-        const monthlyPriceKes = num(row.monthly_price_kes);
-        return {
-          sku: String(row.sku || ""),
-          name: String(row.name || ""),
-          monthlyPriceKes,
-          annualPriceKes:
-            discount == null ? 0 : annualPriceKes(monthlyPriceKes, discount),
-          seats: num(row.seats),
-          minutes: num(row.minutes),
-          sms: num(row.sms),
-          email: num(row.email),
-          staffWa: num(row.staff_wa),
-          dids: num(row.dids, 1),
-        };
-      })
-      .filter((pack) => pack.name);
-    if (!packages.length) return emptyPublicBoard();
     const money = (raw: unknown) => {
       const n = parseMoney(raw);
       return n == null ? 0 : n;
     };
     return {
-      discountPercent: discount ?? 0,
+      discountPercent: 0,
       inboundKesPerMinute: rateRow ? inboundKesPerMinute(money(rateRow.inbound_kes_per_second)) : 0,
       outboundKesPerMinute: rateRow ? outboundKesPerMinute(money(rateRow.outbound_kes_per_second)) : 0,
       smsKes: rateRow ? money(rateRow.sms_kes) : 0,

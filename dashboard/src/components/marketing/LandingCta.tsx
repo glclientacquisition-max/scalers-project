@@ -28,7 +28,7 @@ export function LandingCta({
     <a
       href={appEntryHref(href)}
       data-landing-cta=""
-      className={`${tone === "onDark" ? "landing-cta-on-dark" : "landing-cta"} inline-flex items-center justify-center whitespace-nowrap rounded-xl font-semibold transition-colors focus-visible:outline-none focus-visible:shadow-focus ${pad} ${width}`}
+      className={`${tone === "onDark" ? "landing-cta-on-dark" : "landing-cta"} landing-focus inline-flex items-center justify-center whitespace-nowrap rounded-xl font-semibold transition-colors ${pad} ${width}`}
     >
       {label}
     </a>

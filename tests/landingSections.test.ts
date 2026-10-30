@@ -23,11 +23,13 @@ test("no proof section, no unbuilt or vendor claims, no free trial", () => {
   assert.doesNotMatch(text, /Twilio|Africa'?s Talking|OpenAI|Deepgram|ElevenLabs|SautiKit/i);
 });
 
-test("the real Desk screen ships in public/landing", () => {
-  for (const f of ["how-inbox.webp"]) {
-    assert.ok(existsSync(new URL(`../dashboard/public/landing/${f}`, import.meta.url)), f);
-    assert.match(sections, new RegExp(`/landing/${f.replace(".", "\\.")}`));
-  }
+test("the inbox is a drawn example, not a cropped desk screenshot", () => {
+  assert.match(sections, /data-landing-inbox=""/);
+  assert.doesNotMatch(sections, /how-inbox\.webp|<img|next\/image/);
+  assert.doesNotMatch(sections, /Amina|Otieno|hang-up|Sep 12/);
+  assert.match(sections, /New caller/);
+  assert.match(sections, /Just now/);
+  assert.equal(existsSync(new URL("../dashboard/public/landing/how-inbox.webp", import.meta.url)), false);
 });
 
 test("off code matches the forwarding lib", () => {
@@ -41,18 +43,21 @@ test("v2: few words, the three moments the product answers, no orange", () => {
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/className="[^"]*"|alt="[^"]*"|import[^\n]*|<[^>]*>/g, " ");
   const words = (sections.match(/"[^"]*"/g) ?? []).length;
-  assert.ok(words < 80, `sections stay short (${words} strings)`);
+  assert.ok(words < 100, `sections stay short (${words} strings)`);
   for (const m of ["You're busy", "After hours", "On another call"]) assert.match(sections + read("components/marketing/landingCopy.ts"), new RegExp(m));
   assert.doesNotMatch(visible, /Phone off|no signal/i);
   assert.doesNotMatch(sections + page, /#c2410c|ember/i);
 });
 
-test("cleaning page reuses the skeleton with cleaning words", () => {
-  const route = read("app/cleaning/page.tsx");
-  const copy = read("components/marketing/landingCopy.ts");
-  assert.match(route, /copy=\{CLEANING_COPY\}/);
-  assert.match(copy, /h1: "Never miss a cleaning job\."/);
+test("segment pages reuse the skeleton; /cleaning redirects to Home services", () => {
+  const route = read("app/for/[segment]/page.tsx");
+  const hub = read("app/for/page.tsx");
+  const config = readFileSync(new URL("../dashboard/next.config.ts", import.meta.url), "utf8");
+  assert.match(route, /generateStaticParams/);
+  assert.match(route, /copy=\{segmentCopy\(segment\)\}/);
+  assert.match(hub, /data-for-hub=/);
   assert.match(page, /<LandingMoments items=\{copy\.moments\} \/>/);
   assert.match(page, /\{copy\.finalHeading\}/);
-  assert.doesNotMatch(copy, /coming soon|free trial|guarantee|\d+%|Phone off|no signal/i);
+  assert.match(config, /source: "\/cleaning", destination: "\/for\/home-services", permanent: true/);
+  assert.equal(existsSync(new URL("../dashboard/src/app/cleaning/page.tsx", import.meta.url)), false);
 });

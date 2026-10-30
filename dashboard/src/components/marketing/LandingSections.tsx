@@ -1,17 +1,23 @@
-import Image from "next/image";
+import { PlusIcon } from "@heroicons/react/20/solid";
 import Link from "next/link";
+import { Stamp } from "@/components/ui/Stamp";
 
 /**
- * Home sections under the hero (v2, 30 Oct). Few words, one idea per section, real claims only: every line is
- * something the product does today. The screen is an anonymised Desk capture (fixture data, no client names or numbers).
+ * Home sections under the hero. Few words, one idea per section, real claims only.
+ * The inbox is a drawn example, not a capture of a real desk.
  */
+
+const INBOX: ReadonlyArray<{ who: string; state: string; tone: "attention" | "ok"; line: string; when: string }> = [
+  { who: "New caller", state: "Call back", tone: "attention", line: "Asked about Saturday", when: "Just now" },
+  { who: "Caller", state: "Answered", tone: "ok", line: "House cleaning", when: "Today" },
+];
 
 const STEPS: readonly string[] = ["Request access", "Add your services and hours", "Forward your calls"];
 
 const QUESTIONS: ReadonlyArray<[string, string]> = [
-  ["What do callers hear?", "A calm voice that answers for your business, using only your prices, hours and answers."],
-  ["What if it doesn't know?", "It tells the caller you'll call back. It never makes up a price."],
-  ["Who sees my calls?", "You, and the teammates you add to your Desk."],
+  ["What do callers hear?", "A voice with your prices, hours and answers."],
+  ["What if it doesn't know?", "It says you'll call back. It never invents a price."],
+  ["Who sees my calls?", "You, and teammates on your Desk."],
 ];
 
 const h2 = "font-display text-2xl tracking-tight text-ink sm:text-3xl";
@@ -46,17 +52,28 @@ export function LandingReach() {
           <h2 id="landing-reach" className={h2}>
             What reaches you
           </h2>
-          <p className="mt-3 max-w-md text-base leading-relaxed text-ink-2">An SMS with the details. The call waits in your inbox.</p>
+          <p className="mt-3 max-w-md text-base leading-relaxed text-ink-2">SMS, WhatsApp, and email. The call is in your inbox.</p>
         </div>
-        <div className={`min-w-0 overflow-hidden ${card}`}>
-          <Image
-            src="/landing/how-inbox.webp"
-            alt="Desk inbox with two callers, one marked Call back and one ready to confirm"
-            width={585}
-            height={393}
-            sizes="(min-width: 1024px) 45vw, 100vw"
-            className="h-auto w-full"
-          />
+        <div className={`min-w-0 ${card}`} data-landing-inbox="" aria-hidden>
+          <ul>
+            {INBOX.map((row) => (
+              <li key={row.state} className="flex min-h-16 items-center gap-3 border-b border-line px-4 py-3 last:border-0">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-2 text-sm font-medium text-ink-2">
+                  {row.who.charAt(0)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="truncate text-base font-medium text-ink">{row.who}</span>
+                    <span className="shrink-0 text-meta text-ink-3">{row.when}</span>
+                  </span>
+                  <span className="mt-0.5 flex items-center justify-between gap-3">
+                    <span className="truncate text-sm text-ink-2">{row.line}</span>
+                    <Stamp tone={row.tone}>{row.state}</Stamp>
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </section>
@@ -96,7 +113,7 @@ export function LandingKeepNumber() {
           Keep your number
         </h2>
         <p className="mt-3 max-w-xl text-base leading-relaxed text-ink-2">
-          Forward the calls you miss. To stop, dial <span className="font-semibold tabular-nums text-ink">##002#</span>.
+          Forward missed calls. To stop, dial <span className="font-semibold tabular-nums text-ink">##002#</span>.
         </p>
       </div>
     </section>
@@ -110,10 +127,10 @@ export function LandingPackages() {
         <h2 id="landing-packages" className={h2}>
           Pricing
         </h2>
-        <p className="mt-3 max-w-xl text-base leading-relaxed text-ink-2">Monthly packages in KES, with minutes included.</p>
+        <p className="mt-3 max-w-xl text-base leading-relaxed text-ink-2">Monthly or annual, in KES.</p>
         <Link
           href="/pricing"
-          className="mt-2 inline-flex min-h-11 items-center text-base font-semibold text-[var(--landing-cta)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:shadow-focus"
+          className="landing-focus mt-2 inline-flex min-h-11 items-center text-base font-semibold text-[var(--landing-cta)] underline-offset-4 hover:underline"
         >
           See pricing
         </Link>
@@ -132,11 +149,9 @@ export function LandingQuestions() {
         <div className="mt-4 max-w-xl divide-y divide-hairline border-y border-hairline">
           {QUESTIONS.map(([q, a]) => (
             <details key={q} className="group py-1">
-              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-ink focus-visible:outline-none focus-visible:shadow-focus [&::-webkit-details-marker]:hidden">
+              <summary className="landing-focus flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-md text-base font-semibold text-ink [&::-webkit-details-marker]:hidden">
                 {q}
-                <span aria-hidden className="text-xl text-ink-2 transition-transform group-open:rotate-45 motion-reduce:transition-none">
-                  +
-                </span>
+                <PlusIcon aria-hidden className="h-5 w-5 shrink-0 text-ink-2 transition-transform group-open:rotate-45 motion-reduce:transition-none" />
               </summary>
               <p className="pb-3 text-base leading-relaxed text-ink-2">{a}</p>
             </details>
