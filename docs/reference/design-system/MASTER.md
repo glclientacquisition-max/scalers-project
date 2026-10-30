@@ -1,6 +1,6 @@
 ---
 owner: desk
-last_reviewed: 2026-10-23
+last_reviewed: 2026-10-30
 ---
 
 # Scalers design system (MASTER)
@@ -193,6 +193,20 @@ Map a surface to a type, then to a verb. Do not invent a per-page animation.
 | Route | Overview, Inbox, Contacts, Usage, Settings | Instant shell. A tap paints the list skeleton over the page slot and holds it until that page's content commits. No fade. No route spinner. The new page's lists land on later inserts only. |
 
 Landing marketing only: `.landing-rise`, `.landing-drift`. Desk never uses those classes. Owner overlays are the `Sheet` drawer. Other verbs do not grow a second enter animation. Catalog: `/dev/motion` when `DASHBOARD_OPEN`. Reduced motion: named kills plus a global `animation-duration` / `transition-duration` fallback.
+
+---
+
+## Feedback
+
+Progress, finish, undo, and save: [`FEEDBACK_PATTERNS.md`](../../explanation/frontend/FEEDBACK_PATTERNS.md).
+
+- Under ~400ms: `Button` `pending` only.
+- Over that: steps that check off when the request returns. No timer that pretends a step finished.
+- Bars and "N of M" use finished work. The end state is one sentence with a real count. No confetti.
+- Undo with the time left when the write can be reversed (`ImportUndoBar`, inbox archive toast). `ConfirmSheet` / `OpsConfirm` stay for release, void, delete, and charge.
+- Save shows when `useFormDraft` is dirty. "Saving", then "Saved", or "Nothing changed."
+
+shadcn is a pattern guide only. Build these from `dashboard/src/components/ui/`. No Progress package, no Sonner, no second toast.
 
 ---
 
