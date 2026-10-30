@@ -11,8 +11,11 @@ import {
   LandingReach,
 } from "@/components/marketing/LandingSections";
 import { HOME_COPY, type LandingCopy } from "@/components/marketing/landingCopy";
+import { exampleLine } from "@/components/marketing/segments";
 import { LandingCta } from "@/components/marketing/LandingCta";
 import { AppearanceFooter } from "@/components/ThemePicker";
+
+const h2 = "font-display text-2xl tracking-tight text-ink sm:text-3xl";
 
 /**
  * Marketing home and trade pages. The hero is a luminous blue that fades into the page, with a
@@ -20,7 +23,20 @@ import { AppearanceFooter } from "@/components/ThemePicker";
  * One job: request access. Short words: one headline, one line, one button.
  * Signed-in owners get a way back to their Desk instead.
  */
-export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?: boolean; copy?: LandingCopy }) {
+export function LandingPage({
+  signedIn = false,
+  copy = HOME_COPY,
+  examples = [],
+  example = null,
+  cta = "Request access",
+}: {
+  signedIn?: boolean;
+  copy?: LandingCopy;
+  examples?: readonly string[];
+  example?: { caller: string; does: string } | null;
+  cta?: string;
+}) {
+  const forExample = exampleLine(examples);
   return (
     <main className="landing-scope overflow-x-clip bg-canvas text-ink" data-landing={copy.key}>
       <a href="#landing-start" className="landing-skip landing-focus">Skip to content</a>
@@ -51,6 +67,14 @@ export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?:
             <span className="font-display text-xl tracking-tight text-white">Scalers</span>
           </a>
           <nav className="flex shrink-0 items-center gap-1">
+            {/* Plain <a>: this file must not import next/link (tests/marketingLinks). */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+            <a
+              href="/for"
+              className="landing-focus inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/90 hover:text-white"
+            >
+              Businesses
+            </a>
             {signedIn ? (
               <a
                 href={appEntryHref("/home")}
@@ -75,8 +99,9 @@ export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?:
               {copy.h1}
             </h1>
             <p className="landing-rise landing-rise-delay-1 mt-4 max-w-md text-lg leading-relaxed text-white/90">{copy.sub}</p>
+            {forExample ? <p className="landing-rise mt-3 text-base text-white/90">{forExample}</p> : null}
             <div className="landing-rise landing-rise-delay-2 mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-              {signedIn ? <LandingCta href="/home" label="Open Desk" tone="onDark" wide /> : <LandingCta tone="onDark" wide />}
+              {signedIn ? <LandingCta href="/home" label="Open Desk" tone="onDark" wide /> : <LandingCta label={cta} tone="onDark" wide />}
               <a
                 href="/pricing"
                 className="landing-focus inline-flex min-h-[3.25rem] items-center justify-center rounded-xl border border-white/40 px-6 text-base font-semibold text-white transition-colors hover:border-white/70 hover:bg-white/10"
@@ -92,6 +117,17 @@ export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?:
       </div>
 
       <LandingMoments items={copy.moments} />
+      {example ? (
+        <section className="px-5 py-12 sm:px-8" aria-labelledby="landing-example" data-landing-section="example">
+          <div className="mx-auto max-w-desk">
+            <h2 id="landing-example" className={h2}>
+              A call
+            </h2>
+            <p className="mt-3 max-w-xl text-base text-ink">{example.caller}</p>
+            <p className="mt-2 max-w-xl text-base leading-relaxed text-ink-2">{example.does}</p>
+          </div>
+        </section>
+      ) : null}
       <LandingReach />
       <LandingHowItWorks />
       <LandingKeepNumber />
@@ -102,7 +138,7 @@ export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?:
         <div className="landing-glow pointer-events-none absolute inset-x-0 bottom-0 h-64" aria-hidden />
         <div className="relative mx-auto max-w-desk">
           <h2 className="font-display text-2xl tracking-tight text-ink sm:text-3xl">{copy.finalHeading}</h2>
-          <div className="mt-6">{signedIn ? <LandingCta href="/home" label="Open Desk" wide /> : <LandingCta wide />}</div>
+          <div className="mt-6">{signedIn ? <LandingCta href="/home" label="Open Desk" wide /> : <LandingCta label={cta} wide />}</div>
         </div>
       </section>
 

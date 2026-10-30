@@ -51,6 +51,8 @@ const nextConfig: NextConfig = {
       { source: "/setup", destination: "/settings", permanent: false },
       // Owners and docs say "Usage"; the page lives at /wallet.
       { source: "/usage", destination: "/wallet", permanent: false },
+      // The cleaning ad URL now lives on the Home services segment page.
+      { source: "/cleaning", destination: "/for/home-services", permanent: true },
     ];
   },
   turbopack: {

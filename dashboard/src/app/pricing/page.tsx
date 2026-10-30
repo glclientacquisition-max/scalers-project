@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import { Suspense } from "react";
 import { brandAssets } from "@/components/brand/assets";
 import { appEntryHref, marketingHomeHref } from "@/lib/adminHost";
@@ -43,12 +44,20 @@ export default function PricingPage() {
               <Image src={brandAssets.iconTransparent} alt="" width={36} height={36} priority className="h-9 w-9 object-contain" />
               <span className="font-display text-xl tracking-tight text-white">Scalers</span>
             </a>
-            <a
-              href={appEntryHref("/login")}
-              className="landing-focus inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/90 hover:text-white"
-            >
-              Sign in
-            </a>
+            <nav className="flex shrink-0 items-center gap-1">
+              <Link
+                href="/for"
+                className="landing-focus inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/90 hover:text-white"
+              >
+                Businesses
+              </Link>
+              <a
+                href={appEntryHref("/login")}
+                className="landing-focus inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/90 hover:text-white"
+              >
+                Sign in
+              </a>
+            </nav>
           </header>
           <section id="pricing-start" className="mx-auto max-w-desk px-5 pb-28 pt-8 sm:px-8">
             <h1 className="font-display text-[2.25rem] leading-[1.1] tracking-tight text-white text-balance sm:text-5xl">Pricing</h1>

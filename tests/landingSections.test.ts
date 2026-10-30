@@ -49,12 +49,15 @@ test("v2: few words, the three moments the product answers, no orange", () => {
   assert.doesNotMatch(sections + page, /#c2410c|ember/i);
 });
 
-test("cleaning page reuses the skeleton with cleaning words", () => {
-  const route = read("app/cleaning/page.tsx");
-  const copy = read("components/marketing/landingCopy.ts");
-  assert.match(route, /copy=\{CLEANING_COPY\}/);
-  assert.match(copy, /h1: "Never miss a cleaning job\."/);
+test("segment pages reuse the skeleton; /cleaning redirects to Home services", () => {
+  const route = read("app/for/[segment]/page.tsx");
+  const hub = read("app/for/page.tsx");
+  const config = readFileSync(new URL("../dashboard/next.config.ts", import.meta.url), "utf8");
+  assert.match(route, /generateStaticParams/);
+  assert.match(route, /copy=\{segmentCopy\(segment\)\}/);
+  assert.match(hub, /data-for-hub=/);
   assert.match(page, /<LandingMoments items=\{copy\.moments\} \/>/);
   assert.match(page, /\{copy\.finalHeading\}/);
-  assert.doesNotMatch(copy, /coming soon|free trial|guarantee|\d+%|Phone off|no signal/i);
+  assert.match(config, /source: "\/cleaning", destination: "\/for\/home-services", permanent: true/);
+  assert.equal(existsSync(new URL("../dashboard/src/app/cleaning/page.tsx", import.meta.url)), false);
 });

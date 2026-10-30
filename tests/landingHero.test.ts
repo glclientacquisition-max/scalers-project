@@ -70,7 +70,9 @@ test("orange is a soft sunset across the hero, nowhere else, and static when eff
     read("components/marketing/PackagePrices.tsx"),
     read("components/marketing/landingCopy.ts"),
     read("app/pricing/page.tsx"),
-    read("app/cleaning/page.tsx"),
+    read("app/for/page.tsx"),
+    read("app/for/[segment]/page.tsx"),
+    read("components/marketing/segments.ts"),
   ].join("\n");
   assert.doesNotMatch(marketing, /--landing-warm|255 122 26|#ff7a1a|(bg|text|border|from|via|to)-(orange|amber)|ember/i);
   assert.match(css, /\.landing-cta-on-dark \{ background: #ffffff; color: #0a192f; \}/);
