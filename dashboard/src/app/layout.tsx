@@ -1,8 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { DeskEffectsBoot } from "@/components/DeskEffectsBoot";
 import { DeskThemeProvider } from "@/components/DeskThemeProvider";
 import { NotifyHost } from "@/components/ui/DeskNotice";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { TooltipProvider } from "@/components/ui/Tooltip";
+import { DESK_EFFECTS_INIT_SCRIPT } from "@/lib/deskEffects";
+import { deskShellGlowEnabled } from "@/lib/deskFeatureFlags";
 import {
   DESK_THEME_COLOR_LIGHT,
   DESK_THEME_INIT_SCRIPT,
@@ -76,14 +79,18 @@ export default function RootLayout({
     <html
       lang="en"
       data-theme="light"
+      data-shell-glow={deskShellGlowEnabled() ? "on" : "off"}
       style={{ colorScheme: "light only" }}
       suppressHydrationWarning
     >
       <head>
         {/* Before first paint: a saved dark pick (localStorage, then cookie) wins over the light default. */}
         <script dangerouslySetInnerHTML={{ __html: DESK_THEME_INIT_SCRIPT }} />
+        {/* Before first paint: Reduce effects drops blur and the shell glow. */}
+        <script dangerouslySetInnerHTML={{ __html: DESK_EFFECTS_INIT_SCRIPT }} />
       </head>
       <body className="min-h-dvh bg-canvas font-sans text-ink antialiased">
+        <DeskEffectsBoot />
         <DeskThemeProvider initial="light">
           <TooltipProvider>{children}</TooltipProvider>
         </DeskThemeProvider>

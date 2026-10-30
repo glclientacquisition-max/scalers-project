@@ -43,6 +43,36 @@ export function deskFeelEnabled(): boolean {
   return envFlagOn(process.env.DESK_FEEL);
 }
 
+/** scalers-staging Vercel project. Glow defaults on here and off everywhere else. */
+export const STAGING_DESK_PROJECT_ID = "prj_koYxAaXjOZ9QYA7hVB2SUOEAmyoB";
+
+/**
+ * Shell glow behind Desk and Admin glass.
+ * DESK_SHELL_GLOW=off forces it off. on (also true, 1, yes) forces it on.
+ * Unset: on for the scalers-staging project only.
+ */
+export function deskShellGlowFromEnv(env: {
+  DESK_SHELL_GLOW?: string | null;
+  VERCEL_PROJECT_ID?: string | null;
+  VERCEL_URL?: string | null;
+}): boolean {
+  const raw = String(env.DESK_SHELL_GLOW ?? "").trim().toLowerCase();
+  if (raw === "off" || raw === "0" || raw === "false" || raw === "no") return false;
+  if (raw === "on" || raw === "true" || raw === "1" || raw === "yes") return true;
+  const project = String(env.VERCEL_PROJECT_ID ?? "").trim();
+  if (project === STAGING_DESK_PROJECT_ID) return true;
+  const url = String(env.VERCEL_URL ?? "").trim().toLowerCase();
+  return url.startsWith("scalers-staging");
+}
+
+export function deskShellGlowEnabled(): boolean {
+  return deskShellGlowFromEnv({
+    DESK_SHELL_GLOW: process.env.DESK_SHELL_GLOW,
+    VERCEL_PROJECT_ID: process.env.VERCEL_PROJECT_ID,
+    VERCEL_URL: process.env.VERCEL_URL,
+  });
+}
+
 /** "Add many" also reads a photo of a price list or a website. Staging flag DESK_IMPORT_PHOTO=on. */
 export function deskImportPhoto(): boolean {
   return envFlagOn(process.env.DESK_IMPORT_PHOTO);

@@ -5,9 +5,16 @@ import { Popover } from "@base-ui/react/popover";
 import { useDeskThemeInitial } from "@/components/DeskThemeProvider";
 import { focusRingVisible } from "@/components/ui/deskChrome";
 import { Sheet } from "@/components/ui/Sheet";
+import { Switch } from "@/components/ui/Switch";
 import { useIsPhone } from "@/components/ui/useIsPhone";
 import { cx } from "@/lib/cx";
 import { SegmentedControl } from "@/components/ui/Segmented";
+import {
+  applyDeskEffects,
+  readDeskEffects,
+  subscribeDeskEffects,
+  writeDeskEffects,
+} from "@/lib/deskEffects";
 import {
   applyDeskTheme,
   readDeskTheme,
@@ -31,6 +38,16 @@ export function useThemeChoice() {
   };
 
   return { choice, pick };
+}
+
+function useReduceEffects() {
+  const mode = useSyncExternalStore(subscribeDeskEffects, readDeskEffects, () => "full" as const);
+  const setReduced = (reduced: boolean) => {
+    const next = reduced ? "reduced" : "full";
+    writeDeskEffects(next);
+    applyDeskEffects(next);
+  };
+  return { reduced: mode === "reduced", setReduced };
 }
 
 /** "Appearance · Light". The one worded entry point, inside and outside the desk. */
@@ -91,6 +108,7 @@ export function AppearanceFooter({ tone = "ink", className }: { tone?: "ink" | "
 /** Device theme. Light by default, dark only when picked. Instant apply. Never a tenant setting. */
 export function ThemePicker() {
   const { choice, pick } = useThemeChoice();
+  const { reduced, setReduced } = useReduceEffects();
 
   return (
     <div data-theme-cluster="">
@@ -102,6 +120,10 @@ export function ThemePicker() {
         className="grid w-full p-1 [&_button]:min-h-11"
         items={CHOICES.map((opt) => ({ value: opt.id, label: opt.label }))}
       />
+      <div className="mt-3 flex min-h-11 items-center justify-between gap-3 ps-1">
+        <span className="text-body text-ink">Reduce effects</span>
+        <Switch checked={reduced} onCheckedChange={setReduced} label="Reduce effects" />
+      </div>
     </div>
   );
 }

@@ -284,7 +284,7 @@ export function AdminRail() {
   return (
     <div
       data-admin-rail=""
-      className="glass-chrome hidden h-full w-[5.5rem] shrink-0 flex-col border-r border-hairline/80 md:flex"
+      className="glass-chrome relative z-10 hidden h-full w-[5.5rem] shrink-0 flex-col border-r border-hairline/80 md:flex"
     >
       <div className="flex h-14 items-center justify-center">
         <DeskHint label="Scalers">
@@ -354,7 +354,7 @@ export function AdminSideNav() {
     <div
       data-admin-side=""
       data-collapsed={collapsed ? "" : undefined}
-      className="admin-side hidden h-full shrink-0 flex-col border-e border-hairline bg-surface md:flex"
+      className="admin-side relative z-10 hidden h-full shrink-0 flex-col border-e border-hairline bg-surface md:flex"
     >
       <div className="flex h-10 shrink-0 items-center gap-2 border-b border-hairline px-2">
         <BrandLockup href="/admin" name="Scalers" size="sm" markOnly priority scroll={false} className="min-h-9 min-w-9 justify-center" />
