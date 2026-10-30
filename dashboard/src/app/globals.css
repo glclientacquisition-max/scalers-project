@@ -493,19 +493,47 @@ h3,
 .hiw-mock { opacity: 0; transform: translateY(12px); }
 
 /*
- * Landing-only accent (decision 30 Oct: Ember #C2410C, white text 5.2:1). Scoped to marketing pages so the Desk keeps
- * its own CTA blue. Swap the accent here only.
+ * Landing-only tokens (30 Oct v2, Alvin): blue #005CCC is the one button colour, white text 6.1:1. #0096FF is for the
+ * logo, icons and the soft glow only. Scoped to marketing pages; the Desk keeps its own tokens.
  */
 .landing-scope {
-  --landing-cta: #c2410c;
-  --landing-cta-hover: #9a3412;
+  --landing-cta: #005ccc;
+  --landing-cta-hover: #004a9f;
   --landing-cta-on: #ffffff;
-  --landing-glow: rgb(194 65 12 / 0.12);
+  --landing-glow: rgb(0 150 255 / 0.12);
+  --landing-orb-a: rgb(0 150 255 / 0.2);
+  --landing-orb-b: rgb(0 92 204 / 0.14);
   font-family: var(--font-body), var(--font-sans, system-ui), system-ui, sans-serif;
+}
+:root[data-theme="dark"] .landing-scope {
+  --landing-glow: rgb(0 150 255 / 0.16);
+  --landing-orb-a: rgb(0 150 255 / 0.22);
+  --landing-orb-b: rgb(0 92 204 / 0.26);
 }
 .landing-cta { background: var(--landing-cta); color: var(--landing-cta-on); }
 .landing-cta:hover { background: var(--landing-cta-hover); }
 .landing-glow { background: radial-gradient(55% 60% at 50% 55%, var(--landing-glow), transparent 72%); }
+/*
+ * Premium backdrop: two large, soft blue orbs behind the product card (reference video). Radial gradients only, no
+ * filter: blur, so it paints once and costs nothing on low-end phones. A very slow drift; none with reduced motion.
+ */
+.landing-orbs { position: absolute; inset: -18% -24%; pointer-events: none; z-index: 0; }
+.landing-orbs::before,
+.landing-orbs::after { content: ""; position: absolute; aspect-ratio: 1; border-radius: 9999px; }
+.landing-orbs::before {
+  width: 72%; left: 2%; top: 0;
+  background: radial-gradient(closest-side, var(--landing-orb-a), transparent);
+  animation: landing-orb 24s ease-in-out alternate infinite;
+}
+.landing-orbs::after {
+  width: 58%; right: 0; bottom: 2%;
+  background: radial-gradient(closest-side, var(--landing-orb-b), transparent);
+  animation: landing-orb 30s ease-in-out alternate-reverse infinite;
+}
+@keyframes landing-orb {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(4%, 3%, 0); }
+}
 .hero-sms { opacity: 1; }
 .hero-call[data-play="1"] .hero-sms { animation: hero-sms 7s ease-out both; }
 @keyframes hero-sms {
@@ -516,7 +544,7 @@ h3,
 @media (prefers-reduced-motion: reduce) {
   .hero-in, .hero-ring { opacity: 0; }
   .hero-out, .hero-sms, .hiw-mock { opacity: 1; transform: none; }
-  .landing-rise { animation: none; }
+  .landing-rise, .landing-orbs::before, .landing-orbs::after { animation: none; }
 }
 
 .hero-call[data-play="1"] .hero-in { animation: hero-in 7s ease-out both; }

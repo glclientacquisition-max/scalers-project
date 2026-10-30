@@ -11,17 +11,21 @@ export function LandingCta({
   href = "/signup",
   label = LANDING_CTA_LABEL,
   size = "lg",
+  wide = false,
 }: {
   href?: string;
   label?: string;
   size?: "md" | "lg";
+  /** Full width on phones (Fitts: one big target under the thumb), natural width from sm up. */
+  wide?: boolean;
 }) {
-  const pad = size === "lg" ? "min-h-12 px-6 text-base" : "min-h-11 px-4 text-sm";
+  const pad = size === "lg" ? "min-h-[3.25rem] px-6 text-base" : "min-h-11 px-4 text-sm";
+  const width = wide ? "w-full sm:w-auto" : "";
   return (
     <a
       href={appEntryHref(href)}
       data-landing-cta=""
-      className={`landing-cta inline-flex items-center justify-center whitespace-nowrap rounded-xl font-semibold transition-colors focus-visible:outline-none focus-visible:shadow-focus ${pad}`}
+      className={`landing-cta inline-flex items-center justify-center whitespace-nowrap rounded-xl font-semibold transition-colors focus-visible:outline-none focus-visible:shadow-focus ${pad} ${width}`}
     >
       {label}
     </a>
