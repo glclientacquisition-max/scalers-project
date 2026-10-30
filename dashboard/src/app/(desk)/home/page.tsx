@@ -340,10 +340,8 @@ async function HomeOverviewBody() {
                   <span className="flex min-w-0 items-center gap-3 text-ink-2">
                     <span className={`min-w-0 ${deskPreviewClass}`}>
                       <span className={`tabular-nums text-body font-semibold text-ink ${queue.count === 0 ? "opacity-60" : ""}`}>
-                        {queue.count}
+                        {queue.count}{queue.count > 0 && queue.wait ? <span className="font-normal text-meta text-ink-2">{` · oldest ${queue.wait}`}</span> : null}{queue.unit ? <span className="font-normal text-meta text-ink-2">{` ${queue.unit}`}</span> : null}
                       </span>
-                      {queue.count > 0 && queue.wait ? <span className="text-meta text-ink-2">oldest {queue.wait}</span> : null}
-                      {queue.unit ? ` ${queue.unit}` : ""}
                     </span>
                     <svg
                       viewBox="0 0 20 20"
