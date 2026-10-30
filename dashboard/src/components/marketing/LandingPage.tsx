@@ -15,26 +15,27 @@ import { LandingCta } from "@/components/marketing/LandingCta";
 import { AppearanceFooter } from "@/components/ThemePicker";
 
 /**
- * Marketing home. The hero is the navy-to-royal plane with a frosted call card. Orange is a wide sunset
- * along the bottom of that plane, layered with a soft blue wash. Orange is used nowhere else.
+ * Marketing home and trade pages. The hero is a luminous blue that fades into the page, with a
+ * soft orange warmth only at the horizon. Orange is used nowhere else.
  * One job: request access. Short words: one headline, one line, one button.
  * Signed-in owners get a way back to their Desk instead.
  */
 export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?: boolean; copy?: LandingCopy }) {
   return (
     <main className="landing-scope overflow-x-clip bg-canvas text-ink" data-landing={copy.key}>
-      <div className="relative isolate overflow-hidden bg-brand-900 text-white" data-landing-hero="">
+      <div className="relative isolate overflow-hidden text-white" data-landing-hero="">
         <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
           <div
-            className="landing-drift absolute inset-0 opacity-[0.12]"
+            className="landing-drift absolute inset-0 opacity-[0.1]"
             style={{
               backgroundImage: `url(${brandAssets.iconTransparent})`,
               backgroundRepeat: "no-repeat",
-              backgroundPosition: "78% 42%",
+              backgroundPosition: "78% 28%",
               backgroundSize: "min(92vw, 720px)",
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-brand-900 via-brand-800/95 to-brand-700/80" />
+          <div className="landing-hero-sky absolute inset-0" />
+          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-canvas" data-landing-fade="" />
           <div className="landing-horizon" data-landing-warm="" />
         </div>
         <header className="mx-auto flex max-w-desk items-center justify-between gap-2 px-5 pt-[max(1rem,env(safe-area-inset-top))] sm:px-8">

@@ -55,9 +55,30 @@ test("pricing v2: at most 3 live packages, rates and the worked example from the
   assert.doesNotMatch(dock, /backdrop-blur|pt-4|mb-2/);
   // No prepaid wallet, M-Pesa, annual toggle or VAT claim on the public page.
   assert.doesNotMatch(ui + page, /wallet|top.?up|m-?pesa|annual|yearly|vat/i);
+  const catalog = read("lib/packageCatalog.ts");
+  assert.match(catalog, /billing_package_versions/);
+  assert.match(catalog, /publishedInboundPerMinute/);
+  assert.match(ui, /pack\.inboundKesPerMinute/);
+  assert.doesNotMatch(ui, /Answered calls/);
   const { workedExample, usageRows } = await import("../dashboard/src/components/marketing/pricingMath.ts");
-  const board = { discountPercent: 0, inboundKesPerMinute: 6, outboundKesPerMinute: 9, smsKes: 1, emailKes: 0, whatsappKes: 2, packages: [] };
-  assert.equal(workedExample(board), "KES 18");
-  assert.equal(workedExample({ ...board, inboundKesPerMinute: 0 }), null);
-  assert.deepEqual(usageRows(board).map((r) => r[0]), ["Answered calls", "SMS", "WhatsApp"]);
+  const { publishedInboundPerMinute } = await import("../dashboard/src/lib/packageCatalog.ts");
+  const offer = (sku: string, name: string, rate: number) => ({
+    sku, name, monthlyPriceKes: 7000, annualPriceKes: 0, seats: 1, minutes: 300, sms: 200, email: 0, staffWa: 0, dids: 1, inboundKesPerMinute: rate,
+  });
+  const board = {
+    discountPercent: 0, inboundKesPerMinute: 6, outboundKesPerMinute: 9, smsKes: 1, emailKes: 0, whatsappKes: 2,
+    packages: [offer("starter", "Starter", 26), offer("growth", "Growth", 25), offer("scale", "Scale", 24)],
+  };
+  assert.equal(workedExample(board), "On Starter, a 3-minute answered call costs KES 78");
+  assert.equal(workedExample({ ...board, packages: [] }), null);
+  assert.deepEqual(usageRows(board).map((r) => r[0]), ["SMS", "WhatsApp"]);
+  const rates = publishedInboundPerMinute([
+    { package_id: "s", version: 1, inbound_kes_per_second: 0.1 },
+    { package_id: "s", version: 2, inbound_kes_per_second: 26 / 60 },
+    { package_id: "g", version: 2, inbound_kes_per_second: 25 / 60 },
+    { package_id: "c", version: 2, inbound_kes_per_second: 24 / 60 },
+  ]);
+  assert.equal(rates.get("s"), 26);
+  assert.equal(rates.get("g"), 25);
+  assert.equal(rates.get("c"), 24);
 });

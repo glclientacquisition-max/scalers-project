@@ -9,8 +9,11 @@ const landing = read("components/marketing/LandingPage.tsx");
 const cta = read("components/marketing/LandingCta.tsx");
 const css = read("app/globals.css");
 
-test("hero is main's dark navy plane with a frosted call card, one H1", () => {
-  assert.match(landing, /bg-gradient-to-br from-brand-900 via-brand-800\/95 to-brand-700\/80/);
+test("hero is a luminous blue that fades into the page, with a frosted call card, one H1", () => {
+  assert.match(landing, /landing-hero-sky/);
+  assert.match(landing, /data-landing-fade=/);
+  assert.match(landing, /to-canvas/);
+  assert.doesNotMatch(landing, /bg-brand-900/);
   assert.match(landing, /<HeroCall glass/);
   assert.match(landing, /text-sky-100\/90/);
   assert.equal((landing.match(/<h1/g) || []).length, 1);
@@ -51,7 +54,8 @@ test("orange is a soft sunset across the hero, nowhere else, and static when eff
   assert.ok(at > 0 && end > at);
   assert.match(wash, /--landing-warm:\s*255 122 26;/);
   assert.match(wash, /linear-gradient\(to top/);
-  assert.match(wash, /transparent 74%\)/);
+  assert.match(wash, /transparent 72%\)/);
+  assert.doesNotMatch(wash, /rgb\(10 25 47/);
   assert.match(wash, /animation: landing-horizon-in var\(--motion-fast\)/);
   assert.doesNotMatch(wash, /border-radius|filter:\s*blur|0\.9\d/);
   const alphas = [...wash.matchAll(/\/ (0\.\d+)/g)].map((m) => Number(m[1]));

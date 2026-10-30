@@ -61,6 +61,8 @@ export type PublicPackageOffer = {
   email: number;
   staffWa: number;
   dids: number;
+  /** Extra answered minute from the current published version. 0 when that row has no rate. */
+  inboundKesPerMinute: number;
 };
 
 export type PublicPackageBoard = {
@@ -84,6 +86,30 @@ const DEFAULT_RATES: BillingRateCard = {
 
 export function inboundKesPerMinute(perSecond: number): number {
   return Math.round(Number(perSecond) * 60 * 100) / 100;
+}
+
+/**
+ * Extra minute for each package: inbound_kes_per_second × 60 on its current published version.
+ * Rows must already be status published. A later version wins. A missing or zero rate stays off the map.
+ */
+export function publishedInboundPerMinute(
+  rows: ReadonlyArray<{ package_id?: unknown; version?: unknown; inbound_kes_per_second?: unknown }>,
+): Map<string, number> {
+  const latest = new Map<string, { version: number; perSecond: number }>();
+  for (const row of rows) {
+    const id = String(row.package_id || "");
+    if (!id) continue;
+    const version = num(row.version);
+    const prev = latest.get(id);
+    if (prev && version <= prev.version) continue;
+    latest.set(id, { version, perSecond: num(row.inbound_kes_per_second) });
+  }
+  const rates = new Map<string, number>();
+  for (const [id, row] of latest) {
+    const perMinute = inboundKesPerMinute(row.perSecond);
+    if (perMinute > 0) rates.set(id, perMinute);
+  }
+  return rates;
 }
 
 export function outboundKesPerMinute(perSecond: number): number {
@@ -216,7 +242,7 @@ export function emptyPublicBoard(): PublicPackageBoard {
 export async function loadPublicPackageOffers(): Promise<PublicPackageBoard> {
   try {
     const admin = getSupabaseAdmin();
-    const [ratesRes, packsRes] = await Promise.all([
+    const [ratesRes, packsRes, versionsRes] = await Promise.all([
       admin
         .from("billing_rate_card")
         .select(
@@ -226,10 +252,17 @@ export async function loadPublicPackageOffers(): Promise<PublicPackageBoard> {
         .maybeSingle(),
       admin
         .from("billing_packages")
-        .select("sku, name, monthly_price_kes, seats, minutes, sms, email, staff_wa, dids, sort_order, is_active")
+        .select("id, sku, name, monthly_price_kes, seats, minutes, sms, email, staff_wa, dids, sort_order, is_active")
         .order("sort_order", { ascending: true }),
+      admin
+        .from("billing_package_versions")
+        .select("package_id, version, inbound_kes_per_second")
+        .eq("status", "published"),
     ]);
     if (packsRes.error || !packsRes.data?.length) return emptyPublicBoard();
+    const minuteByPackage = versionsRes.error
+      ? new Map<string, number>()
+      : publishedInboundPerMinute((versionsRes.data || []) as Record<string, unknown>[]);
     const rateRow =
       ratesRes.error || !ratesRes.data ? null : (ratesRes.data as Record<string, unknown>);
     const discountRaw = rateRow?.annual_discount_percent;
@@ -253,6 +286,7 @@ export async function loadPublicPackageOffers(): Promise<PublicPackageBoard> {
           email: num(row.email),
           staffWa: num(row.staff_wa),
           dids: num(row.dids, 1),
+          inboundKesPerMinute: minuteByPackage.get(String(row.id || "")) ?? 0,
         };
       })
       .filter((pack) => pack.name);

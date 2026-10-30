@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { PublicPackageBoard, PublicPackageOffer } from "@/lib/packageCatalog";
 import { BETA_PLAN, BETA_PROGRAM } from "@/lib/accessPlan";
-import { EXAMPLE_MINUTES, kes, usageRows, workedExample } from "@/components/marketing/pricingMath";
+import { kes, usageRows, workedExample } from "@/components/marketing/pricingMath";
 import { LandingCta } from "@/components/marketing/LandingCta";
 
 /** Hick: three packages at most next to the featured Beta program. More live packages stay off the public page. */
@@ -71,6 +71,11 @@ function PackageCard({ pack }: { pack: PublicPackageOffer }) {
           </div>
         ))}
       </dl>
+      {pack.inboundKesPerMinute > 0 ? (
+        <p className="mt-3 text-sm text-ink-2">
+          Extra minute <span className="font-semibold tabular-nums text-ink">{kes(pack.inboundKesPerMinute)}</span>
+        </p>
+      ) : null}
     </>
   );
 }
@@ -127,23 +132,25 @@ export function PackagePrices({ board }: { board: PublicPackageBoard }) {
         <p className="mt-4 text-sm text-ink-2">Package prices are not on this page yet.</p>
       ) : null}
 
-      {rows.length ? (
+      {rows.length || example ? (
         <section className="mt-12 max-w-xl" aria-labelledby="pricing-usage" data-pricing-usage="">
           <h2 id="pricing-usage" className="font-display text-xl tracking-tight text-ink">
             On demand
           </h2>
           <p className="mt-2 text-base text-ink-2">Past the included amounts.</p>
-          <dl className="mt-3 rounded-2xl border border-hairline bg-surface px-5">
-            {rows.map(([label, value]) => (
-              <div key={label} className="flex items-baseline justify-between gap-3 border-b border-line py-3 last:border-0">
-                <dt className="text-base text-ink">{label}</dt>
-                <dd className="text-base font-semibold tabular-nums text-ink">{value}</dd>
-              </div>
-            ))}
-          </dl>
+          {rows.length ? (
+            <dl className="mt-3 rounded-2xl border border-hairline bg-surface px-5">
+              {rows.map(([label, value]) => (
+                <div key={label} className="flex items-baseline justify-between gap-3 border-b border-line py-3 last:border-0">
+                  <dt className="text-base text-ink">{label}</dt>
+                  <dd className="text-base font-semibold tabular-nums text-ink">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
           {example ? (
             <p className="mt-3 rounded-2xl bg-[var(--landing-glow)] px-5 py-4 text-base text-ink" data-pricing-example="">
-              A {EXAMPLE_MINUTES}-minute answered call costs <b className="tabular-nums">{example}</b>.
+              {example}
             </p>
           ) : null}
         </section>
