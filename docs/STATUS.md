@@ -212,6 +212,8 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 
 ## 4. Open PRs
 
+**Draft PR (31 Oct 2026, EAT), append-only grants and ops audit:** branch `billing/append-only-grants-audit`. `supabase/migrations/20261031030000_billing_append_only_grants_audit.sql` blocks UPDATE, DELETE and TRUNCATE on `tenant_minute_grants` and `ops_audit_log`; a correction is a new row. The one exception is removing a business (`scalers.billing_purge`), so the FK cascade and SET NULL still work. It also revokes `ops_audit_log` from anon and authenticated, which held every privilege including TRUNCATE. No code path updates either table. Staging test (rolled back, Test Archive Co): inserts ok; update, delete and truncate blocked on both tables; removing the tenant still cascades. Not applied. Prod needs Alvin's GO.
+
 **28 Oct 2026 clean-up:** there were 102 open PRs. The stale, superseded ones were closed with a pointer to the handover PR, and their branches were kept. Still open:
 - the parked retire-old-brain drafts #1009 and #1010
 - #975 (Brain to confirm before closing)
