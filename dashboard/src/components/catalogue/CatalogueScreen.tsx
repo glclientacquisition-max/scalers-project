@@ -35,6 +35,7 @@ import {
   searchCountLine,
   statusChoices,
   savedLine,
+  draftDirty,
   savesInstantly,
   sheetErrors,
   statusLine,
@@ -483,6 +484,7 @@ function ItemSheet({
   const [confirmRemove, setConfirmRemove] = useState(false);
   const set = (patch: Partial<KbDraft>) => setD((x) => ({ ...x, ...patch }));
   const isNew = !d.id;
+  const dirty = draftDirty(d, draft);
   const statuses = statusChoices(statesEnabled, draft.status);
 
   const save = (next: KbDraft = d) => {
@@ -493,7 +495,7 @@ function ItemSheet({
       const r = await actions.saveItem(next);
       if (!r.ok) setError(r.error);
       else {
-        notify(savedLine(next));
+        notify(savedLine(next, r));
         onSaved(next.id);
       }
     });
@@ -549,7 +551,12 @@ function ItemSheet({
                 Remove
               </Button>
             ) : null}
-            <Button variant="primary" onClick={() => save()} pending={pending}>
+            {!dirty && !pending ? (
+              <span className="text-meta text-ink-2" data-no-changes="">
+                No changes yet
+              </span>
+            ) : null}
+            <Button variant="primary" onClick={() => save()} pending={pending} disabled={!dirty} data-save-item="">
               Save
             </Button>
           </>
@@ -787,10 +794,11 @@ function PasteSheet({
       const r = await actions.importPaste(summary.ready, kind, group, mode);
       if (!r.ok) setError(r.error);
       else {
+        const when = r.restamped === false ? "Calls will use it after the next check." : "On calls within a minute.";
         notify(
           mode === "replace"
-            ? `Your list is now these ${summary.ready.length}${removed.length ? `. Removed ${removed.length}` : ""}. Calls use it within a minute.`
-            : `Added ${summary.ready.length}. Calls use them within a minute.`,
+            ? `Your list is now these ${summary.ready.length}${removed.length ? `. Removed ${removed.length}` : ""}. ${when}`
+            : `${[summary.adds ? `Added ${summary.adds}` : "", summary.updates ? `updated ${summary.updates}` : ""].filter(Boolean).join(", ") || "Saved"}. ${when}`.replace(/^updated/, "Updated"),
         );
         onSaved();
       }
