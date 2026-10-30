@@ -1,6 +1,6 @@
 ---
 owner: desk
-last_reviewed: 2026-10-12
+last_reviewed: 2026-10-30
 ---
 
 # Scalers Frontend 2.0 Charter
@@ -98,6 +98,7 @@ Rules that stay, restated once:
 - Nav: one link list per shell. Tabs below `md`, rail on `md+`. Nested screens hide tabs and lead with Back.
 - Layout: one composition per dataset that reflows. Split pane from `lg`. `min-w-0` on text columns.
 - Motion: pending, live, land, shift, press. Under 300ms. Reduced motion respected.
+- Feedback: real steps past ~400ms, earned progress, a calm finish with a count, undo when the write can be reversed, Save only when the draft changed. [`FEEDBACK_PATTERNS.md`](FEEDBACK_PATTERNS.md).
 - Auth: Supabase SSR and RLS for owners. Service role never reaches the browser. Owner and admin shells never merge navigation.
 
 ---
