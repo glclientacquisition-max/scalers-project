@@ -27,6 +27,10 @@ export type FactCard =
   | (CardBase & { kind: "policy"; key: FactPolicyKey; value: string })
   | (CardBase & { kind: "payment"; value: string })
   | (CardBase & { kind: "address"; address: string; landmark: string })
+  /** Another branch found after the first: a suggestion that adds a new place. Never preticked. */
+  | (CardBase & { kind: "branch"; placeLabel: string; address: string; landmark: string })
+  /** Hours text we could not read: shown as Check this with the raw words, never saved from here. */
+  | (CardBase & { kind: "hours_check"; raw: string })
   | (CardBase & { kind: "areas"; picks: AreaPicks })
   | (CardBase & { kind: "faq"; question: string; answer: string; change: "new" | "changes" });
 
@@ -44,7 +48,7 @@ export function factPolicyPatch(card: Extract<FactCard, { kind: "policy" | "paym
 
 /** "Ticked 3 of 5" style counts for the footer. */
 export function tickedFacts(cards: FactCard[], ticks: Record<string, boolean>): FactCard[] {
-  return cards.filter((c) => ticks[c.id] ?? c.on);
+  return cards.filter((c) => c.kind !== "hours_check" && (ticks[c.id] ?? c.on));
 }
 
 export type FaqChange = "new" | "changes";

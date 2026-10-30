@@ -46,7 +46,8 @@ export default async function DevCataloguePage({ searchParams }: Props) {
                     statesEnabled={one(p.states) === "on"}
                     initialNeedPrice={one(p.filter) === "unpriced"}
                     initialPaste={one(p.paste) === "1" || one(p.many) === "1"}
-                    initialUndo={one(p.undo) === "1" ? { id: "00000000-0000-4000-8000-000000000001", at: Date.now(), summary: "Nice, your list is updated. Added 12, updated 3." } : undefined}
+                    initialUndoOutcome={one(p.undo) === "done" ? { ok: true, text: "Undone. Your list and details are back to how they were." } : one(p.undo) === "refused" ? { ok: false, text: "Some details from this import were changed after it, so undo is off. Edit them instead." } : undefined}
+                    initialUndo={one(p.undo) ? { id: "00000000-0000-4000-8000-000000000001", at: Date.now(), summary: "Nice, your list is updated. Added 12, updated 3." } : undefined}
                     importPhoto={one(p.many) === "1"}
                   />
                 </div>

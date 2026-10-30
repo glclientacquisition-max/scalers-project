@@ -11,12 +11,13 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Switch } from "@/components/ui/Switch";
 import { Empty } from "@/components/ui/Empty";
 import { notify } from "@/components/ui/DeskNotice";
-import { ImportUndoBar } from "./ImportUndoBar";
+import { ImportUndoBar, type UndoOutcome } from "./ImportUndoBar";
 import { deskShiftClass } from "@/lib/deskMotion";
 import { cx } from "@/lib/cx";
 import { PHOTO_MAX_BASE64 } from "@/lib/importPhoto";
 import { IMPORT_FILE_ACCEPT, IMPORT_FILE_MAX_BYTES, delimitedToPasteText } from "@/lib/importCsv";
 import { FAQ_CHANGE_LINE, tickedFacts, type FactCard } from "@/lib/factCards";
+import { FACT_RESTORE_ORDER, type FactKey } from "@/lib/importUndo";
 import { CHECK_FIX, CHECK_LABEL, ISSUE_LINE, type KbCategory, type KbDraft, type KbItem, type KbKind, type KbPasteRow, type KbReadiness, type KbSnapshotRow } from "@/lib/kbCore";
 import {
   PRICE_CHOICES,
@@ -65,6 +66,11 @@ export type CatalogueActions = {
   findFacts?: (text: string) => Promise<{ ok: true; cards: FactCard[] } | { ok: false; error: string }>;
   /** One found fact, saved through the action its own settings screen uses. */
   saveFact?: (card: FactCard) => Promise<{ ok: true } | { ok: false; error: string }>;
+  /** Found facts join the import's undo: log before (opens a log for a facts-only import) and after the saves. */
+  factsBegin?: (kinds: string[], importId: string | null, source?: string) => Promise<{ ok: true; importId: string | null } | { ok: false; error: string }>;
+  factsEnd?: (importId: string, kinds: string[], saved: number) => Promise<{ ok: boolean }>;
+  /** Second half of an undo: one fact back to how it was, in its own request. */
+  restoreFact?: (importId: string, key: FactKey) => Promise<{ ok: true } | { ok: false; error: string }>;
 };
 
 type LinesResult = { ok: true; text: string; facts?: FactCard[] } | { ok: false; error: string };
@@ -88,6 +94,8 @@ export type CatalogueScreenProps = {
   initialNeedPrice?: boolean;
   /** Dev fixture only: open with the undo bar showing. */
   initialUndo?: { id: string; at: number; summary: string };
+  /** Dev only: open the undo bar on its done or refused state. */
+  initialUndoOutcome?: UndoOutcome;
   /** ?many=1 (and old ?paste=1 / Import links) opens Add many. */
   initialPaste?: boolean;
   /** Photo and Website sources in Add many (staging flag DESK_IMPORT_PHOTO). */
@@ -100,6 +108,8 @@ export type CatalogueScreenProps = {
   statesEnabled?: boolean;
   actions: CatalogueActions;
 };
+
+const FACT_WORD: Record<FactKey, string> = { hours: "hours", policies: "policies and payment", locations: "places", faqs: "FAQs", areas: "areas" };
 
 const card = "overflow-hidden rounded-2xl border border-hairline bg-surface";
 const heading = "text-body font-semibold text-ink";
@@ -120,16 +130,25 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
   const [pasting, setPasting] = useState(!!props.initialPaste && canEdit);
   const [checksOpen, setChecksOpen] = useState(false);
   const [lastImport, setLastImport] = useState<{ id: string; at: number; summary: string } | null>(props.initialUndo ?? null);
+  const [undoOutcome, setUndoOutcome] = useState<UndoOutcome | null>(props.initialUndoOutcome ?? null);
+  const closeUndo = () => {
+    setUndoOutcome(null);
+    setLastImport(null);
+  };
   const undoImport = () =>
     start(async () => {
       if (!lastImport || !actions.undoImport) return;
       const r = await actions.undoImport(lastImport.id);
-      if (!r.ok) {
-        notify(r.error, { tone: "error" });
-        return setLastImport(null);
+      if (!r.ok) return setUndoOutcome({ ok: false, text: r.error });
+      // Facts saved in the same import go back one by one, each through its own settings save.
+      const failed: FactKey[] = [];
+      for (const key of FACT_RESTORE_ORDER.filter((k) => r.restoreFacts?.includes(k))) {
+        const f = actions.restoreFact ? await actions.restoreFact(lastImport.id, key).catch(() => ({ ok: false as const, error: "" })) : { ok: false as const };
+        if (!f.ok) failed.push(key);
       }
-      setLastImport(null);
-      notify("Done. Your list is back to how it was before the import.");
+      if (failed.length)
+        setUndoOutcome({ ok: false, text: `Your list is back, but we couldn't put back your ${failed.map((k) => FACT_WORD[k]).join(", ")}. Check ${failed.length === 1 ? "it" : "them"} in Settings.` });
+      else setUndoOutcome({ ok: true, text: r.restoreFacts?.length ? "Undone. Your list and details are back to how they were." : "Undone. Your list is back to how it was." });
       router.refresh();
     });
   const [lang, setLang] = useState<"en" | "sw">("en");
@@ -240,7 +259,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
       ) : null}
 
       {lastImport && canEdit ? (
-        <ImportUndoBar at={lastImport.at} summary={lastImport.summary} pending={pending} onUndo={undoImport} onExpire={() => setLastImport(null)} />
+        <ImportUndoBar at={lastImport.at} summary={lastImport.summary} pending={pending} outcome={undoOutcome} onUndo={undoImport} onExpire={() => setLastImport(null)} onDismiss={closeUndo} />
       ) : null}
 
       {/* Card B: what you sell. */}
@@ -454,6 +473,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
           onClose={() => setPasting(false)}
           onSaved={(done) => {
             setPasting(false);
+            setUndoOutcome(null);
             if (done && actions.undoImport) setLastImport({ ...done, at: Date.now() });
             router.refresh();
           }}
@@ -890,34 +910,71 @@ function PasteSheet({
       setError(null);
       fromLines(await actions.websiteToLines(siteUrl));
     });
+  // Saving: real steps only, each ticked when its request returns; the bar counts finished requests.
+  const [saving, setSaving] = useState<SaveProgress | null>(null);
+  const [reward, setReward] = useState<SaveReward | null>(null);
   const add = (mode: "append" | "replace") =>
     start(async () => {
       if (!summary) return;
+      const n = summary.ready.length;
+      const facts = mode === "append" && actions.saveFact ? picked : [];
+      const steps: SaveStep[] = [
+        ...(n ? [{ id: "items", label: `Saving ${n} ${n === 1 ? "item" : "items"}`, state: "todo" as const }] : []),
+        ...(facts.length ? [{ id: "facts", label: `Saving ${facts.length} ${facts.length === 1 ? "detail" : "details"}`, state: "todo" as const }] : []),
+      ];
+      const total = (n ? 1 : 0) + facts.length;
+      let finished = 0;
+      const mark = (id: string, state: SaveStep["state"], label?: string) =>
+        setSaving((p) => (p ? { ...p, done: finished, steps: p.steps.map((st) => (st.id === id ? { ...st, state, label: label ?? st.label } : st)) } : p));
+      setError(null);
+      setSaving({ total, done: 0, steps });
       let done: { id: string; summary: string } | undefined;
-      if (summary.ready.length) {
+      const result: SaveReward = { adds: 0, updates: 0, removed: 0, details: 0, failed: [], replace: mode === "replace" };
+      if (n) {
+        mark("items", "now");
         const r = await actions.importPaste(summary.ready, kind, group, mode, source === "website" ? "url" : source);
-        if (!r.ok) return setError(r.error);
-        const when = r.restamped === false ? "Calls will use it after the next check." : "On calls within a minute.";
+        if (!r.ok) {
+          setSaving(null);
+          return setError(r.error);
+        }
+        finished += 1;
+        mark("items", "done");
+        result.adds = mode === "replace" ? n : summary.adds;
+        result.updates = mode === "replace" ? 0 : summary.updates;
+        result.removed = mode === "replace" ? removed.length : 0;
         const what =
           mode === "replace"
-            ? `Your list is now these ${summary.ready.length}${removed.length ? `. Removed ${removed.length}` : ""}.`
+            ? `Your list is now these ${n}${removed.length ? `. Removed ${removed.length}` : ""}.`
             : `${[summary.adds ? `Added ${summary.adds}` : "", summary.updates ? `updated ${summary.updates}` : ""].filter(Boolean).join(", ") || "Saved"}.`.replace(/^updated/, "Updated");
-        notify(`${what} ${when}`);
-        if (r.importId) done = { id: r.importId, summary: `Nice, your list is updated. ${what}` };
+        if (r.importId) done = { id: r.importId, summary: `Your list is updated. ${what}` };
       }
-      // Each ticked fact through its own save, one after another so two Policies cards never race.
-      if (mode === "append" && picked.length && actions.saveFact) {
-        const failed: string[] = [];
-        for (const card of picked) {
+      // Each ticked fact through its own save, one after another so two Policies cards never race. Logged around
+      // the saves so the same undo puts them back.
+      if (facts.length && actions.saveFact) {
+        mark("facts", "now");
+        const kinds = [...new Set(facts.map((c) => c.kind))];
+        const log = actions.factsBegin ? await actions.factsBegin(kinds, done?.id ?? null, source === "website" ? "url" : source).catch(() => null) : null;
+        const runId = log?.ok ? log.importId : null;
+        for (const [i, card] of facts.entries()) {
           const r = await actions.saveFact(card).catch(() => ({ ok: false as const, error: "" }));
-          if (!r.ok) failed.push(card.kind === "faq" ? `"${card.question}"` : card.label);
+          if (!r.ok) result.failed.push(card.kind === "faq" ? `"${card.question}"` : card.label);
+          finished += 1;
+          mark("facts", i === facts.length - 1 ? "done" : "now", `Saving details · ${i + 1} of ${facts.length}`);
         }
-        const saved = picked.length - failed.length;
-        if (saved) notify(`Saved ${saved} ${saved === 1 ? "detail" : "details"} to your settings.`);
-        if (failed.length) notify(`Could not save ${failed.join(", ")}. Set ${failed.length === 1 ? "it" : "them"} in Settings.`, { tone: "error" });
+        const saved = facts.length - result.failed.length;
+        result.details = saved;
+        mark("facts", "done", `Saved ${saved} of ${facts.length} ${facts.length === 1 ? "detail" : "details"}`);
+        if (runId && actions.factsEnd) await actions.factsEnd(runId, kinds, saved).catch(() => null);
+        if (runId && saved) {
+          const line = `${saved} ${saved === 1 ? "detail" : "details"} saved`;
+          done = done ? { id: done.id, summary: `${done.summary.replace(/\.$/, "")}, plus ${line}.` } : { id: runId, summary: `${line[0].toUpperCase()}${line.slice(1)} to your settings.` };
+        }
       }
-      onSaved(done);
+      setSaving(null);
+      setReward(result);
+      finishRef.current = done;
     });
+  const finishRef = useRef<{ id: string; summary: string } | undefined>(undefined);
   const addLabel = !summary
     ? ""
     : summary.ready.length && picked.length
@@ -925,6 +982,27 @@ function PasteSheet({
       : summary.ready.length
         ? `Add ${summary.ready.length}`
         : `Save ${picked.length} ${picked.length === 1 ? "detail" : "details"}`;
+  if (saving || reward) {
+    const r = reward;
+    const anything = !!r && r.adds + r.updates + r.details + r.removed > 0;
+    return (
+      <Sheet
+        open
+        onOpenChange={(o) => (o || saving ? null : onSaved(finishRef.current))}
+        title={saving ? "Preparing your shop…" : anything ? "Your shop is ready" : "Nothing was saved"}
+        size="lg"
+        footer={
+          r ? (
+            <Button variant="primary" className="w-full sm:w-auto" onClick={() => onSaved(finishRef.current)} data-add-many-done="">
+              Done
+            </Button>
+          ) : null
+        }
+      >
+        {saving ? <SavingSteps progress={saving} /> : r ? <SaveRewardPanel reward={r} anything={anything} /> : null}
+      </Sheet>
+    );
+  }
   return (
     <Sheet
       open
@@ -1129,11 +1207,83 @@ function FoundFacts({ cards, ticks, onTick }: { cards: FactCard[]; ticks: Record
                 </p>
                 {note ? <p className="text-meta text-attention">{note}</p> : null}
               </div>
-              <Switch label={`Save ${title}`} checked={on} onCheckedChange={(v) => onTick(c.id, v)} />
+              {c.kind === "hours_check" ? (
+                <a href="/settings?tab=train&panel=hours" className="min-h-11 shrink-0 content-center text-meta font-semibold text-accent" data-hours-check-link="">
+                  Set hours
+                </a>
+              ) : (
+                <Switch label={`Save ${title}`} checked={on} onCheckedChange={(v) => onTick(c.id, v)} />
+              )}
             </li>
           );
         })}
       </ul>
     </section>
+  );
+}
+
+type SaveStep = { id: string; label: string; state: "todo" | "now" | "done" };
+type SaveProgress = { total: number; done: number; steps: SaveStep[] };
+type SaveReward = { adds: number; updates: number; removed: number; details: number; failed: string[]; replace: boolean };
+
+/** The real steps of an Add many save, each ticked when its request comes back, and a bar of finished requests. */
+function SavingSteps({ progress }: { progress: SaveProgress }) {
+  const pct = progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
+  return (
+    <div className="space-y-4 py-2" role="status" aria-live="polite" data-add-many-saving="">
+      <div className="h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Saving">
+        <div className="desk-progress-fill h-full rounded-full bg-accent" style={{ width: `${Math.max(pct, 4)}%` }} />
+      </div>
+      <ol className="space-y-2">
+        {progress.steps.map((st) => (
+          <li key={st.id} className="flex min-h-11 items-center gap-3" data-save-step={st.state}>
+            <span
+              className={cx(
+                "grid size-6 shrink-0 place-items-center rounded-full text-caption font-semibold",
+                st.state === "done" ? "bg-accent text-accent-on" : st.state === "now" ? "border-2 border-accent" : "border-2 border-hairline",
+              )}
+              aria-hidden="true"
+            >
+              {st.state === "done" ? "✓" : null}
+            </span>
+            <span className={cx("text-body", st.state === "todo" ? "text-ink-2" : "text-ink", st.state === "now" && "font-semibold")}>{st.label}</span>
+          </li>
+        ))}
+      </ol>
+      <p className="text-meta text-ink-2">Keep this open. It takes a few seconds.</p>
+    </div>
+  );
+}
+
+/** Calm finish: a drawn check and the real counts. No confetti. */
+function SaveRewardPanel({ reward: r, anything }: { reward: SaveReward; anything: boolean }) {
+  const lines = [
+    r.adds ? `${r.adds} ${r.adds === 1 ? "item" : "items"} ${r.replace ? "in your list" : "added"}` : "",
+    r.updates ? `${r.updates} updated` : "",
+    r.removed ? `${r.removed} removed` : "",
+    r.details ? `${r.details} ${r.details === 1 ? "detail" : "details"} saved` : "",
+  ].filter(Boolean);
+  return (
+    <div className="flex flex-col items-center gap-3 py-6 text-center" role="status" data-add-many-reward="">
+      {anything ? (
+        <svg viewBox="0 0 48 48" className="desk-check-ring size-14" aria-hidden="true">
+          <circle cx="24" cy="24" r="22" className="fill-accent-tonal" />
+          <path d="M15 24.5l6 6 12-13" fill="none" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" className="desk-check-mark stroke-accent" />
+        </svg>
+      ) : null}
+      {lines.length ? (
+        <ul className="space-y-1">
+          {lines.map((l) => (
+            <li key={l} className="text-body font-semibold text-ink">
+              {l}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {anything ? <p className="text-meta text-ink-2">Callers hear it within a minute. You can undo for 10 minutes.</p> : null}
+      {r.failed.length ? (
+        <p className="text-meta text-attention">{`Couldn't save ${r.failed.join(", ")}. Set ${r.failed.length === 1 ? "it" : "them"} in Settings.`}</p>
+      ) : null}
+    </div>
   );
 }

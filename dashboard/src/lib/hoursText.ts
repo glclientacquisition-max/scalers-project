@@ -64,21 +64,51 @@ function to24(c: Clock): number {
   return c.h;
 }
 
-/** "8 to 6", "8am-6pm", "08:00 - 18:00". guessed: a bare hour had to be read as am/pm. */
-function segmentTimes(seg: string): { open: string; close: string; guessed: boolean } | null {
-  const T = "(\\d{1,2}(?:[:.]\\d{2})?\\s*(?:a\\.?m\\.?|p\\.?m\\.?)?)";
-  const m = seg.toLowerCase().match(new RegExp(`(?:^|[^\\d:])${T}\\s*(?:-|–|—|to|till|until)\\s*${T}(?![\\d:])`));
-  if (!m) return null;
-  const a = clock(m[1]);
-  const b = clock(m[2]);
+type Range = { open: string; close: string; guessed: boolean };
+const T = "(\\d{1,2}(?:[:.]\\d{2})?\\s*(?:a\\.?m\\.?|p\\.?m\\.?)?)";
+const RANGE_RE = () => new RegExp(`(?:^|[^\\d:])${T}\\s*(?:-|–|—|to|till|until)\\s*${T}(?![\\d:])`, "g");
+
+/**
+ * "8 to 6", "8am-6pm", "08:00 - 18:00". guessed: a bare hour had to be read as am/pm. A split shift ("8-12 and 2-6")
+ * has two ranges: the grid holds one per day, so it becomes first open to last close, with split set for a note.
+ */
+function segmentTimes(seg: string): (Range & { split: boolean }) | null {
+  const ranges: Range[] = [];
+  let prevClose = -1;
+  for (const m of seg.toLowerCase().matchAll(RANGE_RE())) {
+    // A later range reads its bare hours after the one before it ("8-12 and 2-6": 2 is 2 PM).
+    const r = oneRange(m[1], m[2], prevClose);
+    if (!r) return null;
+    ranges.push(r);
+    prevClose = minutes(r.close);
+  }
+  if (!ranges.length) return null;
+  if (ranges.length === 1) return { ...ranges[0], split: false };
+  const open = ranges.map((r) => r.open).sort()[0];
+  const close = ranges.map((r) => r.close).sort().at(-1) as string;
+  return { open, close, guessed: ranges.some((r) => r.guessed), split: true };
+}
+/** "14:30" as "2:30 PM", for notes. */
+const spoken = (t: string) => {
+  const h = Number(t.slice(0, 2));
+  const m = t.slice(3, 5);
+  return `${h % 12 || 12}${m === "00" ? "" : `:${m}`} ${h < 12 ? "AM" : "PM"}`;
+};
+const minutes = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+
+function oneRange(rawA: string, rawB: string, after: number): Range | null {
+  const a = clock(rawA);
+  const b = clock(rawB);
   if (!a || !b) return null;
   let guessed = false;
   let oh = to24(a);
   let ch = to24(b);
   if (!a.ap && a.h >= 1 && a.h <= 12) {
-    // A bare opening hour: 6..12 is morning or noon; 1..5 is a guess at afternoon.
+    // A bare opening hour: 6..12 is morning or noon; 1..5 is a guess at afternoon. After an earlier range, a bare
+    // hour at or before its close is afternoon (that is how split shifts are written).
     oh = a.h >= 6 ? a.h : a.h + 12;
-    if (a.h < 6) guessed = true;
+    if (after >= 0 && a.h < 12 && a.h * 60 + a.m < after) oh = a.h + 12;
+    else if (a.h < 6) guessed = true;
   }
   if (!b.ap && b.h <= 12) {
     if (b.h * 60 + b.m <= oh * 60 + a.m) {
@@ -100,9 +130,15 @@ export function parseHoursText(text: string, location = ""): HoursTextResult | n
   let unsure = false;
   let lastOpen: string | null = null;
   // Split on commas, semicolons, new lines and full stops (not the dot inside 8.30).
-  const segments = body.split(/[,;\n|]|\.(?!\d)|\band\b(?=\s*(?:mon|tue|wed|thu|fri|sat|sun|week))/i).map((s) => s.trim()).filter(Boolean);
+  // "except" / "but" start a new segment, so "Mon-Fri 8-6 except Wed 10-6" lets Wednesday differ.
+  const segments = body
+    .split(/[,;\n|]|\.(?!\d)|\b(?:and|except|but)\b(?=\s*(?:on\s+)?(?:mon|tue|wed|thu|fri|sat|sun|week))/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
   for (const seg of segments) {
     let days = segmentDays(seg);
+    // "Open 24/7" names no day: it means every day.
+    if (!days.length && /\b24\s*\/\s*7\b|\b24\s*(hours|hrs)\s*(a|per)\s*day\b/i.test(seg)) days = [...DAY_ORDER];
     const times = segmentTimes(seg);
     if (!days.length && times && !anyOpen && segments.length === 1) {
       days = ["mon", "tue", "wed", "thu", "fri", "sat"];
@@ -123,6 +159,10 @@ export function parseHoursText(text: string, location = ""): HoursTextResult | n
       for (const d of days) schedule.days[d] = { open: times.open, close: times.close };
       anyOpen = true;
       lastOpen = times.open;
+      if (times.split) {
+        unsure = true;
+        notes.push(`Split hours are saved as ${spoken(times.open)} to ${spoken(times.close)}. Callers hear one range.`);
+      }
       if (times.guessed) {
         unsure = true;
         notes.push("Check AM and PM.");
@@ -141,6 +181,20 @@ export function parseHoursText(text: string, location = ""): HoursTextResult | n
     notes.push("Some days had no time, so they show as closed.");
   }
   if (!anyOpen) return null;
+  if (isAllDayEveryDay(schedule)) {
+    unsure = true;
+    notes.unshift(ALL_DAY_NOTE);
+  }
   const note = [...new Set(notes)].join(" ") || null;
   return { schedule, unsure, note };
+}
+
+export const ALL_DAY_NOTE = "Confirm you're open all day, every day.";
+
+/** Open 00:00 to 23:59 on all seven days: "24/7". Never ticked for the owner. */
+export function isAllDayEveryDay(schedule: HoursSchedule | null): boolean {
+  return !!schedule && DAY_ORDER.every((d) => {
+    const h = schedule.days[d];
+    return !!h && h.open === "00:00" && (h.close === "23:59" || h.close === "24:00");
+  });
 }

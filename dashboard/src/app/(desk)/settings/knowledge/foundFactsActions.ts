@@ -8,7 +8,7 @@ import { findFactCards } from "@/lib/foundFacts.server";
 import { clampFaq, mergeFaqs } from "@/lib/faqs";
 import type { FactCard } from "@/lib/factCards";
 import type { FaqEntry } from "@/lib/supabase";
-import { emptyLocation, normalizeBusinessLocations } from "@/lib/businessLocations";
+import { LOCATIONS_MAX, emptyLocation, normalizeBusinessLocations } from "@/lib/businessLocations";
 import { saveAndCompileSettings } from "@/app/(desk)/settings/actions";
 
 export type FactsResult = { ok: true; cards: FactCard[] } | { ok: false; error: string };
@@ -70,6 +70,35 @@ export async function saveFoundAddressAction(input: { address: string; landmark?
   const places = normalizeBusinessLocations(tenant.business_locations || []);
   if (!places.length) places.push({ ...emptyLocation(), label: "Main", address, landmark });
   else places[0] = { ...places[0], address, landmark: places[0].landmark || landmark };
+  const formData = new FormData();
+  formData.set("id", tenant.id);
+  formData.set("settings_scope", "locations-address");
+  formData.set("business_locations", JSON.stringify(places));
+  formData.set("owner_field_paths", "[]");
+  const res = await saveAndCompileSettings({}, formData);
+  if (res.error) return { ok: false, error: res.error };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+/**
+ * Another branch found by Add many: added as a new place (the first stays as it is). Skipped when a place with the
+ * same address is already stored. Same scope as the address card: only the places list changes.
+ */
+export async function saveFoundBranchAction(input: { label?: string; address: string; landmark?: string }): Promise<FactSaveResult> {
+  const denied = await memberDenied("settings.edit");
+  if (denied) return { ok: false, error: denied.error };
+  const tenant = await getCurrentTenant();
+  if (!tenant) return { ok: false, error: "Not signed in." };
+  const address = cleanText(input?.address, 160);
+  const landmark = cleanText(input?.landmark, 120);
+  const label = cleanText(input?.label, 40) || "Branch";
+  if (address.length < 4 || /https?:|www\.|@/i.test(address)) return { ok: false, error: "That address does not look right." };
+  const places = normalizeBusinessLocations(tenant.business_locations || []);
+  const key = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (places.some((p) => key(p.address) === key(address))) return { ok: true };
+  if (places.length >= LOCATIONS_MAX) return { ok: false, error: `You have ${LOCATIONS_MAX} places already. Remove one in Settings › Locations first.` };
+  places.push({ ...emptyLocation(), label, address, landmark });
   const formData = new FormData();
   formData.set("id", tenant.id);
   formData.set("settings_scope", "locations-address");
