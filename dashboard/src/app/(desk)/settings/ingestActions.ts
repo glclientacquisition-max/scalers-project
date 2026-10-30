@@ -235,22 +235,21 @@ export async function applyIngestAction(
     String(formData.get("merge_mode") || "merge").trim() === "replace_services_faqs"
       ? "replace_services_faqs"
       : "merge";
-  const includeUnknown = String(formData.get("include_unknown") || "") === "1";
+  // Import never sets the "when unsure" line, team (transfer numbers), business type, name or the alert number:
+  // those live on their own screens. Older clients that still post the switches are ignored.
+  const includeUnknown = false;
   const includeLocations =
     String(formData.get("include_locations") || "") === "1";
   const includeHours = String(formData.get("include_hours") || "") === "1";
   const includePolicies =
     String(formData.get("include_policies") || "") === "1";
-  const includeVertical =
-    String(formData.get("include_vertical") || "") === "1";
-  const includeContactPhone =
-    String(formData.get("include_contact_phone") || "") === "1";
-  const renameBusiness =
-    String(formData.get("rename_business") || "") === "1";
+  const includeVertical = false;
+  const includeContactPhone = false;
+  const renameBusiness = false;
 
   const selectedServiceIndexes = parseIngestIndexes(formData.get("selected_services"));
   const selectedFaqIndexes = parseIngestIndexes(formData.get("selected_faqs"));
-  const selectedTeamIndexes = parseIngestIndexes(formData.get("selected_team"));
+  const selectedTeamIndexes: number[] = [];
 
   const existingServices = normalizeServicesCatalog(tenant.services_catalog).filter(
     (s) => s.name && !isProseServiceName(s.name)
@@ -439,9 +438,6 @@ export async function applyIngestAction(
   if (!tenant.agent_tone) {
     patch.agent_tone = agentTone;
   }
-  if (nameSuggestion) {
-    patch.business_name = nameSuggestion;
-  }
   if (draftLocations.length > 0) {
     patch.business_locations = nextLocations;
   }
@@ -453,12 +449,6 @@ export async function applyIngestAction(
   }
   if (policiesFilled) {
     patch.business_policies = nextPolicies;
-  }
-  if (draftVertical) {
-    patch.vertical = draftVertical;
-  }
-  if (draftPhone) {
-    patch.whatsapp_notification_number = draftPhone.replace(/\s+/g, "");
   }
 
   let { error } = await workspace.client
@@ -476,21 +466,22 @@ export async function applyIngestAction(
   if (error) {
     return ownerSaveFailed("ingest", error.message);
   }
-  if (importedServices) {
-    await importCatalogueToKb(tenant.id, { services_catalog: importedServices }, {
-      legacyServicesOffered: servicesOffered,
-      legacyColumns: { services_catalog: importedServices },
-      by: "import",
-    });
-  }
+  // Owner ticked these rows: re-stamp what was added (restamp), and report the KB's own counts.
+  const kb = importedServices
+    ? await importCatalogueToKb(tenant.id, { services_catalog: importedServices }, {
+        legacyServicesOffered: servicesOffered,
+        legacyColumns: { services_catalog: importedServices },
+        by: "import",
+        restamp: true,
+      })
+    : null;
 
   revalidatePath("/settings");
 
   const parts = [];
-  if (merged.added.services) {
-    parts.push(
-      `${merged.added.services} service${merged.added.services === 1 ? "" : "s"}`
-    );
+  const addedServices = kb && kb.ok ? kb.added : merged.added.services;
+  if (addedServices) {
+    parts.push(`${addedServices} service${addedServices === 1 ? "" : "s"}`);
   }
   if (merged.added.faqs) {
     parts.push(`${merged.added.faqs} FAQ${merged.added.faqs === 1 ? "" : "s"}`);
@@ -513,21 +504,18 @@ export async function applyIngestAction(
         } could not fit (max 25).`
       : "";
 
+  const kept = kb && kb.ok && kb.kept ? ` Kept ${kb.kept} you already had.` : "";
   if (mode === "replace_services_faqs" || parts.length > 0) {
     return {
       ok: true,
       source,
-      message: capNote.trim()
-        ? `Catalogue saved for the next call.${capNote}`
-        : "Catalogue saved for the next call.",
+      message: `${parts.length ? `Added ${parts.join(", ")}.` : "Saved."}${kept}${capNote}`,
     };
   }
 
   return {
     ok: true,
     source,
-    message: capNote
-      ? `Nothing new fit.${capNote}`
-      : "Nothing new to add (those items were already on file).",
+    message: capNote ? `Nothing new fit.${capNote}` : `Nothing new to add.${kept || " Those items were already on file."}`,
   };
 }

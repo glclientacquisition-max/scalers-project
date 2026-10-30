@@ -156,18 +156,14 @@ describe("import switches start off", () => {
 
   const afterScan = ingest.slice(
     ingest.indexOf("if (extractState.ok && extractState.draft)"),
-    ingest.indexOf("const looksLikeBrief")
+    ingest.indexOf('setMergeMode("merge")')
   );
 
   it("starts knowledge include switches off after a scan", () => {
     for (const flag of [
-      "includeUnknown",
       "includeLocations",
       "includeHours",
       "includePolicies",
-      "includeVertical",
-      "includeContactPhone",
-      "renameBusiness",
     ]) {
       assert.match(ingest, new RegExp(`\\[${flag}, set\\w+\\] = useState\\(false\\)`));
       assert.match(afterScan, new RegExp(`set\\w*${flag[0].toUpperCase()}${flag.slice(1)}\\(false\\)`));
@@ -176,9 +172,10 @@ describe("import switches start off", () => {
     assert.match(ingest, /label="Hours"/);
     assert.match(ingest, /label="Location"/);
     assert.match(ingest, /label="Policies"/);
-    assert.match(ingest, /label="Business type"/);
-    assert.match(ingest, /label="Sales \/ WhatsApp phone"/);
-    assert.match(ingest, /title="When unsure"/);
+    // 30 Oct: import no longer offers business type, alert phone or the unsure line.
+    assert.doesNotMatch(ingest, /label="Business type"/);
+    assert.doesNotMatch(ingest, /label="Sales \/ WhatsApp phone"/);
+    assert.doesNotMatch(ingest, /title="When unsure"/);
     assert.match(ingest, /draft\.hoursNotes \|\| draft\.hoursSchedule/);
     assert.match(ingest, /draft\.locations\?\.length/);
     assert.doesNotMatch(ingest, /Weekly schedule extracted/);
@@ -229,16 +226,12 @@ describe("import switches start off", () => {
   });
 
   it("still writes only the checked include flags and protects save scope", () => {
-    for (const name of [
-      "include_unknown",
-      "include_locations",
-      "include_hours",
-      "include_policies",
-      "include_vertical",
-      "include_contact_phone",
-      "rename_business",
-    ]) {
+    for (const name of ["include_locations", "include_hours", "include_policies"]) {
       assert.match(ingest, new RegExp(`name="${name}"`));
+    }
+    // Import never sets the unsure line, business type, name, alert number or team (30 Oct).
+    for (const name of ["include_unknown", "include_vertical", "include_contact_phone", "rename_business", "selected_team"]) {
+      assert.doesNotMatch(ingest, new RegExp(`name="${name}"`));
     }
     assert.match(scope, /catalog: \["servicesNotes", "servicesCatalog", "productCatalog"\]/);
     assert.match(scope, /faqs: \["faqs"\]/);
@@ -249,7 +242,6 @@ describe("import switches start off", () => {
   it("starts service, FAQ, and team rows unchecked", () => {
     assert.match(afterScan, /setSelectedServices\(new Set\(\)\)/);
     assert.match(afterScan, /setSelectedFaqs\(new Set\(\)\)/);
-    assert.match(afterScan, /setSelectedTeam\(new Set\(\)\)/);
     assert.doesNotMatch(afterScan, /draft\.services\.map/);
     assert.doesNotMatch(afterScan, /draft\.faqs\.map/);
     assert.doesNotMatch(afterScan, /draft\.team\.map/);
