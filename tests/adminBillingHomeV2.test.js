@@ -32,6 +32,13 @@ test("last month collected stays hidden until that month has a payment", async (
   assert.equal(hit.label, "September");
 });
 
+test("overdue aging is empty until an invoice is late", async () => {
+  const { overdueAging } = await load();
+  assert.deepEqual(overdueAging([inv({ dueAt: "2026-11-01T00:00:00Z" })], now), { to7: 0, to30: 0, over30: 0 });
+  const late = overdueAging([inv({ dueAt: "2026-10-20T09:00:00Z", totalCents: 4000 })], now);
+  assert.equal(late.to7, 4000);
+});
+
 test("who owes: most days late first, one row per business", async () => {
   const { owingBusinesses } = await load();
   const o = owingBusinesses([

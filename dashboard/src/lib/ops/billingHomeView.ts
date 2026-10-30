@@ -57,6 +57,22 @@ export function lastMonthCollected(rows: InvoiceRow[], now: Date): { cents: numb
   return { cents, label };
 }
 
+export type OverdueAging = { to7: number; to30: number; over30: number };
+
+/** Overdue balance in cents by age. All zeros means nothing is overdue. */
+export function overdueAging(rows: InvoiceRow[], now: Date): OverdueAging {
+  const aging: OverdueAging = { to7: 0, to30: 0, over30: 0 };
+  for (const r of rows) {
+    if (!isOverdue(r, now)) continue;
+    const days = daysOverdue(r, now);
+    const cents = balanceCents(r);
+    if (days <= 7) aging.to7 += cents;
+    else if (days <= 30) aging.to30 += cents;
+    else aging.over30 += cents;
+  }
+  return aging;
+}
+
 export function billingHomeTotals(rows: InvoiceRow[], now: Date): BillingHomeTotals {
   const start = nairobiMonthStart(now);
   const t: BillingHomeTotals = { billedThisMonthCents: 0, collectedThisMonthCents: 0, outstandingCents: 0, overdueCents: 0, overdueCount: 0 };
