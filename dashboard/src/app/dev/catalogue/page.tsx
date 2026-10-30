@@ -8,7 +8,7 @@ import { homeCategories, homeItems, homeLive, readinessTodo, shopCategories, sho
 
 /**
  * Settings > Catalogue (KB v2) with fixture data. DASHBOARD_OPEN=true only.
- * ?vertical=retail, ?cat=empty, ?role=viewer, ?filter=unpriced, ?paste=1, ?many=1 (Add many), ?states=on (Paused / Not offered control)
+ * ?vertical=retail, ?cat=empty, ?role=viewer, ?filter=unpriced, ?paste=1, ?many=1 (Add many, with Photo and Website), ?states=on (Paused / Not offered control)
  */
 export const instant = false;
 
@@ -47,6 +47,7 @@ export default async function DevCataloguePage({ searchParams }: Props) {
                     initialNeedPrice={one(p.filter) === "unpriced"}
                     initialPaste={one(p.paste) === "1"}
                     addMany={one(p.many) === "1"}
+                    importPhoto={one(p.many) === "1"}
                   />
                 </div>
               </div>

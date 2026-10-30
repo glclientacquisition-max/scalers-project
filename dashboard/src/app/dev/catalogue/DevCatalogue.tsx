@@ -18,6 +18,8 @@ export function DevCatalogue(props: Omit<CatalogueScreenProps, "actions">) {
       return rows.length ? { ok: true, rows } : { ok: false, error: "No items found. Put one item on each line." };
     },
     importPaste: async () => ({ ok: true }),
+    photoToLines: async () => (await wait(400), { ok: true, text: "Deep clean, KSh 6,000\nSofa cleaning, 800 per seat" }),
+    websiteToLines: async () => (await wait(400), { ok: true, text: "Carpet cleaning KSh 1,500\nMattress cleaning 2,500/=" }),
   };
   return <CatalogueScreen {...props} actions={actions} />;
 }

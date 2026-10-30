@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDownIcon, MagnifyingGlassIcon, PlusIcon } from "@heroicons/react/20/solid";
 import { Button } from "@/components/ui/Button";
@@ -795,6 +795,9 @@ function PasteSheet({
   const [text, setText] = useState("");
   const [source, setSource] = useState<ManySource>("paste");
   const [siteUrl, setSiteUrl] = useState("");
+  // File and Photo: the footer button opens the picker, so the primary action stays in the sticky footer at 390px.
+  const fileRef = useRef<HTMLInputElement>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [kind, setKind] = useState<KbKind>(homeServices ? "service" : defaultKind);
   const [group, setGroup] = useState("");
@@ -893,7 +896,16 @@ function PasteSheet({
             </>
           )
         ) : (
-          source === "file" || source === "photo" ? null : source === "website" ? (
+          source === "file" || source === "photo" ? (
+            <Button
+              variant="primary"
+              onClick={() => (source === "file" ? fileRef : photoRef).current?.click()}
+              pending={pending}
+              data-add-many-pick=""
+            >
+              {source === "file" ? "Choose a file" : "Choose a photo"}
+            </Button>
+          ) : source === "website" ? (
             <Button variant="primary" onClick={readSite} pending={pending} disabled={!siteUrl.trim()} data-add-many-site-read="">
               Read the page
             </Button>
@@ -942,6 +954,7 @@ function PasteSheet({
                 {(p) => (
                   <input
                     {...p}
+                    ref={photoRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     capture="environment"
@@ -960,6 +973,7 @@ function PasteSheet({
                 {(p) => (
                   <input
                     {...p}
+                    ref={fileRef}
                     type="file"
                     accept={IMPORT_FILE_ACCEPT}
                     onChange={(e) => void readFile(e.target.files?.[0])}
