@@ -25,6 +25,11 @@ export default function VisualStatusPage() {
         <p className="mt-2 text-body text-ink-2">No business matches.</p>
         <p className="mt-1 text-meta text-attention">Could not load this business.</p>
       </section>
+      <section className="rounded-2xl border border-hairline bg-surface px-4 py-4" aria-label="Numbers">
+        <h2 className="text-title">Numbers</h2>
+        <p className="mt-1 text-body text-ink-2">No numbers in the pool.</p>
+        <p className="mt-1 text-body text-ink-2">No business is waiting for a number.</p>
+      </section>
       <section className="rounded-2xl border border-hairline bg-surface px-4 py-4" aria-label="Billing">
         <h2 className="text-title">Collected of billed</h2>
         <p className="mt-1 text-body text-ink-2">Nothing billed this month.</p>
