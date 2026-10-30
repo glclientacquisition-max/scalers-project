@@ -20,6 +20,11 @@ export default function VisualStatusPage() {
     <main className="mx-auto flex w-full max-w-[360px] flex-col gap-4 bg-canvas px-4 py-6 text-ink">
       <h1 className="text-page">Needs attention</h1>
       <HealthStrip signals={null} />
+      <section className="rounded-2xl border border-hairline bg-surface px-4 py-4" aria-label="Businesses">
+        <h2 className="text-title">Businesses</h2>
+        <p className="mt-2 text-body text-ink-2">No business matches.</p>
+        <p className="mt-1 text-meta text-attention">Could not load usage.</p>
+      </section>
       <div className="ops-theme grid grid-cols-2 gap-2">
         <KpiTile label="Collected" period="This month" state="empty" emptyTitle="No payments this month." href="/admin/billing/payments" />
         <KpiTile label="Billed" period="This month" state="error" errorTitle="Could not load billed." />

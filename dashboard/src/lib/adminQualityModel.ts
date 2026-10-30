@@ -233,6 +233,8 @@ export type QualityBadge = {
   score: number | null;
   dropping: boolean;
   droppingReason: string;
+  /** Oldest to newest. Present only with 2 or more real points. */
+  scores?: number[];
 };
 
 export type VoiceFixtureTurn = {
