@@ -23,8 +23,8 @@
   --ops-status-ok-bg: #e8f5ee;
   --ops-status-info-fg: #005ccc;
   --ops-status-info-bg: #e3eeff;
-  --ops-status-warn-fg: #a3360a;
-  --ops-status-warn-bg: #fdf0e8;
+  --ops-status-warn-fg: #8a5a00;
+  --ops-status-warn-bg: #fff5d6;
   --ops-status-danger-fg: #b42318;
   --ops-status-danger-bg: #fef3f2;
   --ops-status-neutral-fg: #4a5b73;
@@ -59,8 +59,8 @@
   --ops-status-ok-bg: #122a1c;
   --ops-status-info-fg: #63b0ff;
   --ops-status-info-bg: #12294a;
-  --ops-status-warn-fg: #f4955a;
-  --ops-status-warn-bg: #2b1a12;
+  --ops-status-warn-fg: #f5d76e;
+  --ops-status-warn-bg: #2a2410;
   --ops-status-danger-fg: #f97066;
   --ops-status-danger-bg: #2d1416;
   --ops-status-neutral-fg: #9dafc6;
@@ -83,8 +83,8 @@
     --ops-status-ok-bg: #122a1c;
     --ops-status-info-fg: #63b0ff;
     --ops-status-info-bg: #12294a;
-    --ops-status-warn-fg: #f4955a;
-    --ops-status-warn-bg: #2b1a12;
+    --ops-status-warn-fg: #f5d76e;
+    --ops-status-warn-bg: #2a2410;
     --ops-status-danger-fg: #f97066;
     --ops-status-danger-bg: #2d1416;
     --ops-status-neutral-fg: #9dafc6;

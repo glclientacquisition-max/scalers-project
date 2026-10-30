@@ -54,6 +54,13 @@ describe("ops status contrast", () => {
       assert.equal(token(sys, `ops-status-${t}-${k}`), token(themes[1][1], `ops-status-${t}-${k}`));
     }
   });
+  it("light warn is amber, not orange", () => {
+    assert.equal(token(block(ops, ".ops-theme {"), "ops-status-warn-fg"), "8a5a00");
+    assert.equal(token(block(ops, ".ops-theme {"), "ops-status-warn-bg"), "fff5d6");
+    assert.equal(token(block(globals, ":root {"), "warn"), "8a5a00");
+    assert.equal(token(block(globals, ":root {"), "status-warn-fg"), "8a5a00");
+    assert.notEqual(token(block(globals, ":root {"), "attention"), "b13a0a");
+  });
   it("no hex in ops components", () => {
     const dir = path.join(root, "dashboard/src/components/ops");
     for (const f of fs.readdirSync(dir)) assert.doesNotMatch(fs.readFileSync(path.join(dir, f), "utf8"), /#[0-9a-fA-F]{3,6}\b/, f);

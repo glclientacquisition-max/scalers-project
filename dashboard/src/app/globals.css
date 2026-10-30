@@ -25,10 +25,25 @@
   --accent-tonal: #e3eeff;
   --accent-on: #ffffff;
   --brand: #0096ff;
-  --attention: #b13a0a;
-  --attention-tonal: #fdf0e8;
-  /* On attention fill (dangerSolid). Same invert rule as --accent-on. */
+  /* Problem fill. Red, never orange. White label passes 4.5:1. */
+  --attention: #b42318;
+  --attention-tonal: #fef3f2;
   --attention-on: #ffffff;
+  /* Warning text and pills. Amber #8A5A00 on #FFF5D6. Not a button fill. */
+  --warn: #8a5a00;
+  --warn-soft: #fff5d6;
+  --status-ok-fg: #146c34;
+  --status-ok-bg: #e8f5ee;
+  --status-info-fg: #005ccc;
+  --status-info-bg: #e3eeff;
+  --status-warn-fg: #8a5a00;
+  --status-warn-bg: #fff5d6;
+  --status-danger-fg: #b42318;
+  --status-danger-bg: #fef3f2;
+  --status-neutral-fg: #4a5b73;
+  --status-neutral-bg: #e9eef5;
+  --status-beta-fg: #005ccc;
+  --status-beta-bg: #e3eeff;
   --ok: #15803d;
   --ok-tonal: #e8f5ee;
   --lead: #b98a1f;
@@ -59,9 +74,7 @@
   --accent-fill-hover: var(--accent-hover);
   --accent-fill-active: var(--accent-active);
   --accent-on-fill: var(--accent-on);
-  --warn: var(--attention);
-  --warn-soft: var(--attention-tonal);
-  --warn-deep: #9a3209;
+  --warn-deep: #6e4700;
   --ok-soft: var(--ok-tonal);
   --email: var(--accent);
 
@@ -119,9 +132,23 @@
   --accent-tonal: #12294a;
   --accent-on: #071426;
   --brand: #2aa8ff;
-  --attention: #f4955a;
-  --attention-tonal: #2b1a12;
+  --attention: #f97066;
+  --attention-tonal: #2d1416;
   --attention-on: #071426;
+  --warn: #f5d76e;
+  --warn-soft: #2a2410;
+  --status-ok-fg: #4ade80;
+  --status-ok-bg: #122a1c;
+  --status-info-fg: #63b0ff;
+  --status-info-bg: #12294a;
+  --status-warn-fg: #f5d76e;
+  --status-warn-bg: #2a2410;
+  --status-danger-fg: #f97066;
+  --status-danger-bg: #2d1416;
+  --status-neutral-fg: #9dafc6;
+  --status-neutral-bg: #1a2638;
+  --status-beta-fg: #63b0ff;
+  --status-beta-bg: #12294a;
   --ok: #4ade80;
   --ok-tonal: #122a1c;
   --lead: #d9a62e;
@@ -129,7 +156,7 @@
   --bubble-caller: #14321f;
   --bubble-caller-ink: #7fe3a5;
   --sms: #38bdf8;
-  --warn-deep: #fdba74;
+  --warn-deep: #f5d76e;
   --shadow-sheet: 0 12px 32px -12px rgb(0 0 0 / 0.6);
   --shadow-menu: 0 8px 24px -8px rgb(0 0 0 / 0.55);
   --glass: color-mix(in srgb, var(--surface) 58%, transparent);
