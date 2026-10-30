@@ -7,7 +7,7 @@ import { marketingFontClass } from "@/app/marketingFonts";
 
 export const metadata: Metadata = {
   title: "Scalers for cleaning businesses",
-  description: "Never lose a cleaning job to a missed call. Your Business Assistant answers with your prices and texts you the details.",
+  description: "Never miss a cleaning job. Your Business Assistant answers your calls when you're mid-clean, closed, or on another call.",
 };
 
 /** Cleaning trade page: the home skeleton with cleaning words. For cleaning ads and referrals. */

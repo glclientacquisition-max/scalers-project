@@ -7,7 +7,7 @@ import {
   LandingMoments,
   LandingPackages,
   LandingQuestions,
-  LandingTrust,
+  LandingReach,
 } from "@/components/marketing/LandingSections";
 import { HOME_COPY, type LandingCopy } from "@/components/marketing/landingCopy";
 import { LandingCta } from "@/components/marketing/LandingCta";
@@ -67,8 +67,8 @@ export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?:
       </section>
 
       <LandingMoments items={copy.moments} />
+      <LandingReach />
       <LandingHowItWorks />
-      <LandingTrust />
       <LandingKeepNumber />
       <LandingPackages />
       <LandingQuestions />
@@ -77,7 +77,7 @@ export function LandingPage({ signedIn = false, copy = HOME_COPY }: { signedIn?:
         <div className="landing-glow pointer-events-none absolute inset-x-0 bottom-0 h-64" aria-hidden />
         <div className="relative mx-auto max-w-desk">
           <h2 className="font-display text-2xl tracking-tight text-ink sm:text-3xl">{copy.finalHeading}</h2>
-          <div className="mt-6">{signedIn ? <LandingCta href="/home" label="Open Desk" /> : <LandingCta />}</div>
+          <div className="mt-6">{signedIn ? <LandingCta href="/home" label="Open Desk" wide /> : <LandingCta wide />}</div>
         </div>
       </section>
 

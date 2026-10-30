@@ -7,7 +7,8 @@ export type LandingCopy = {
   sub: string;
   /** Hero call card: what the caller asked. */
   ask: string;
-  moments: ReadonlyArray<readonly [string, string]>;
+  /** "When it answers" rows: busy, after hours, on another call, in the trade's words. */
+  moments: readonly string[];
   finalHeading: string;
 };
 
@@ -17,26 +18,16 @@ export const HOME_COPY: LandingCopy = {
   h1: "Your 24-hour Business Assistant.",
   sub: "Answers your calls when you're busy, closed, or on another call.",
   ask: "They asked for a booking.",
-  moments: [
-    ["On a job", "Hands busy, phone in your pocket."],
-    ["On another call", "The second caller still gets an answer."],
-    ["After closing", "Evening and weekend calls are answered too."],
-    ["Phone off or no signal", "Forwarded calls still reach your Business Assistant."],
-  ],
+  moments: ["You're busy", "After hours", "On another call"],
   finalHeading: "Stop losing jobs to missed calls.",
 };
 
 export const CLEANING_COPY: LandingCopy = {
   key: "cleaning",
   context: "Cleaning",
-  h1: "Never lose a cleaning job to a missed call.",
-  sub: "You're mid-clean with gloves on. Your Business Assistant answers with your prices, takes the visit request, then texts you the details.",
+  h1: "Never miss a cleaning job.",
+  sub: "Answers your calls when you're mid-clean, closed, or on another call.",
   ask: "They asked for a deep clean on Saturday.",
-  moments: [
-    ["Mid-clean", "Gloves on, phone in the bag."],
-    ["Driving between jobs", "The caller still gets an answer."],
-    ["On a quote visit", "New callers don't wait for you to finish."],
-    ["After hours", "Evening calls for tomorrow's jobs are answered too."],
-  ],
+  moments: ["Mid-clean", "After hours", "On another call"],
   finalHeading: "Answer every cleaning call.",
 };
