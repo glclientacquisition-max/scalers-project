@@ -38,3 +38,10 @@ test("setup header and Home card use the checklist count", () => {
   const card = readFileSync(new URL("../dashboard/src/components/HomeCallSetupCard.tsx", import.meta.url), "utf8");
   assert.match(card, /<SetupChecklist/);
 });
+
+test("checklist v2: blue ticks and a progress bar from the same count", () => {
+  const ui = readFileSync(new URL("../dashboard/src/components/SetupChecklist.tsx", import.meta.url), "utf8");
+  assert.match(ui, /done \? "border-accent bg-accent text-white"/);
+  assert.match(ui, /progress\.count \/ CHECKLIST_TOTAL/);
+  assert.match(ui, /motion-reduce:transition-none/);
+});
