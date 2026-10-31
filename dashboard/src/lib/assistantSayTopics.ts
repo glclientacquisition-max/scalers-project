@@ -1,5 +1,6 @@
 import type { AssistantSayRow, AssistantSayState } from "@/lib/assistantSayTypes";
 import type { BusinessType } from "@/lib/businessType";
+import { playedGreetingFromTenant, type PlayedGreetingTenant } from "@/lib/identityGreeting";
 
 export const ASSISTANT_SAY_PAGE_TITLE = "What callers hear";
 
@@ -67,6 +68,49 @@ export function sortAssistantSayRows(rows: AssistantSayRow[]): AssistantSayRow[]
     if (na !== nb) return na - nb;
     return (TOPIC_ORDER.get(a.id) ?? 99) - (TOPIC_ORDER.get(b.id) ?? 99);
   });
+}
+
+/** "We cover Nairobi, Kiambu and Kitengela." from stored area ids. Empty when none are stored. */
+export function areasCoverLine(coverage: unknown): string {
+  if (!Array.isArray(coverage)) return "";
+  const names = coverage
+    .map((id) => {
+      const slug = String(id || "").split(":").pop() || "";
+      const words = slug.replace(/[_-]+/g, " ").trim();
+      if (!words) return "";
+      return words.charAt(0).toUpperCase() + words.slice(1);
+    })
+    .filter(Boolean);
+  if (!names.length) return "";
+  if (names.length === 1) return `We cover ${names[0]}.`;
+  return `We cover ${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}.`;
+}
+
+/** Greeting and areas rows use the line callers hear, not a travel-fee stand-in. */
+export function withCallerLines(
+  state: AssistantSayState,
+  tenant: PlayedGreetingTenant & { business_policies?: unknown },
+): AssistantSayState {
+  const played = playedGreetingFromTenant(tenant);
+  const policies = tenant.business_policies;
+  const coverage = policies && typeof policies === "object" ? (policies as { coverage_areas?: unknown }).coverage_areas : null;
+  const cover = areasCoverLine(coverage);
+  const rows = state.rows.map((row) => {
+    if (row.id === "greeting") {
+      return {
+        ...row,
+        hearPreview: played,
+        willSay: Boolean(played),
+        stampTone: played ? ("ok" as const) : ("attention" as const),
+        stampLabel: played ? "Will say" : "Won't say",
+      };
+    }
+    if (row.id === "areas" && cover && /travel fee/i.test(row.hearPreview || "")) {
+      return { ...row, hearPreview: cover, willSay: true, stampTone: "ok" as const, stampLabel: "Will say" };
+    }
+    return row;
+  });
+  return { ...state, rows, readyCount: rows.filter((row) => rowIsReady(row)).length };
 }
 
 export function applyTopicTitles(state: AssistantSayState, businessType: BusinessType): AssistantSayState {

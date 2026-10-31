@@ -5,9 +5,9 @@ import {
   assistantSayTopicHref,
   mapChecklistItemToTopicId,
   readyChecklistLabelForItem,
+  withCallerLines,
 } from "@/lib/assistantSayTopics";
 import { resolveTenantBusinessType } from "@/lib/businessType";
-import { playedGreetingFromTenant } from "@/lib/identityGreeting";
 import { loadCompileProvenance } from "@/lib/tenantFieldProvenance";
 import { requireVoice } from "@/lib/voiceRequire.server";
 import { attachKbSnapshot, loadKbPreview } from "@/lib/kbCaller.server";
@@ -31,7 +31,7 @@ const readiness = () =>
 
 export async function loadAssistantSayState(tenant: TenantRow): Promise<AssistantSayState> {
   const bt = resolveTenantBusinessType(tenant);
-  return applyTopicTitles(readiness().evaluateAssistantSay(await voiceProfileForAssistantSay(tenant)), bt);
+  return withCallerLines(applyTopicTitles(readiness().evaluateAssistantSay(await voiceProfileForAssistantSay(tenant)), bt), tenant);
 }
 
 /**
@@ -42,22 +42,13 @@ export async function loadAssistantSayView(tenant: TenantRow): Promise<{ state: 
   const [profile, preview] = await Promise.all([voiceProfileForAssistantSay(tenant), loadKbPreview(tenant.id)]);
   const r = readiness();
   const businessType = resolveTenantBusinessType(tenant);
-  const state = applyTopicTitles(r.evaluateAssistantSay(profile), businessType);
+  const state = withCallerLines(applyTopicTitles(r.evaluateAssistantSay(profile), businessType), tenant);
   return { state, samples: r.previewSampleQuestions(profile), pending: !!preview.snapshot && preview.pending };
 }
 
 export function assistantSayStateFromTenant(tenant: TenantRow): AssistantSayState {
   const bt = resolveTenantBusinessType(tenant);
-  const state = applyTopicTitles(readiness().evaluateAssistantSay(voiceProfileFromTenant(tenant)), bt);
-  const played = playedGreetingFromTenant(tenant);
-  return {
-    ...state,
-    rows: state.rows.map((row) =>
-      row.id === "greeting"
-        ? { ...row, hearPreview: played, willSay: Boolean(played), stampTone: played ? "ok" : "attention", stampLabel: played ? "Will say" : "Won't say" }
-        : row,
-    ),
-  };
+  return withCallerLines(applyTopicTitles(readiness().evaluateAssistantSay(voiceProfileFromTenant(tenant)), bt), tenant);
 }
 
 /**
