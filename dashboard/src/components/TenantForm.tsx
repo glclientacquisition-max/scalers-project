@@ -7,6 +7,8 @@ import { CharCount as KitCharCount, FieldCard, TextAreaField, TextField } from "
 import { POLICY_TEXT_MAX } from "@/lib/lengthLimits";
 import { normalizeContactPhone } from "@/lib/teamValidation";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ChevronRightIcon } from "@heroicons/react/20/solid";
+import { Sheet } from "@/components/ui/Sheet";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
@@ -461,6 +463,7 @@ function TenantFormInner({
   const [spokenName] = useState(tenant.spoken_name || "");
   const [greetingInvite] = useState(tenant.greeting_invite || "");
   const [tone] = useState<OnboardingTone | "">(initialTone(tenant));
+  const [daySheet, setDaySheet] = useState<DayKey | null>(null);
   const [hoursSchedule, setHoursSchedule] = useState<HoursSchedule>(() =>
     scheduleForForm(tenant.hours_schedule, tenant.business_hours || "")
   );
@@ -947,6 +950,16 @@ function TenantFormInner({
     saveAfterPasteRef.current = true;
     setBulkProductsText("");
     setBulkProductsError(null);
+  }
+
+  function copyDayToWeekdays(day: DayKey) {
+    setHoursSchedule((prev) => {
+      const slot = prev.days[day];
+      return {
+        ...prev,
+        days: { ...prev.days, mon: slot, tue: slot, wed: slot, thu: slot, fri: slot },
+      };
+    });
   }
 
   function setDayOpen(day: DayKey, open: boolean) {
@@ -1671,8 +1684,30 @@ function TenantFormInner({
       </section>
 
       <section className={panel === "hours" ? "space-y-6" : "hidden"}>
+        <p className="px-1 text-body text-ink md:hidden" data-hours-summary="">
+          {formatHoursForOwner(hoursSchedule) || "Set your open days"}
+        </p>
+        <ul className="overflow-hidden rounded-2xl border border-hairline bg-surface md:hidden">
+          {DAY_ORDER.map((day) => {
+            const slot = hoursSchedule.days[day];
+            return (
+              <li key={day} className="border-b border-hairline last:border-b-0">
+                <button
+                  type="button"
+                  onClick={() => setDaySheet(day)}
+                  className="flex min-h-11 w-full items-center gap-3 px-4 text-start hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+                >
+                  <span className="min-w-0 flex-1 text-body font-medium text-ink">{DAY_LABELS[day]}</span>
+                  <span className="shrink-0 text-meta tabular-nums text-ink-2">{slot ? `${slot.open}-${slot.close}` : "Closed"}</span>
+                  <ChevronRightIcon className="size-5 shrink-0 text-ink-3" aria-hidden />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="hidden md:block">
         <SettingsGroup title="Hours">
-          <div className="hidden bg-surface-canvas px-3 py-2 text-meta font-medium text-ink-2 lg:grid lg:grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-x-3">
+          <div className="hidden bg-surface-canvas px-3 py-2 text-meta font-medium text-ink-2 md:grid md:grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] md:items-center md:gap-x-3">
             <span>Day</span>
             <span>Open</span>
             <span>Opens</span>
@@ -1683,7 +1718,7 @@ function TenantFormInner({
             const open = Boolean(slot);
             return (
               <div key={day} className="px-4 py-2 lg:px-3 lg:py-1.5">
-                <div className="flex min-h-12 items-center justify-between gap-3 lg:hidden">
+                <div className="hidden">
                   <span className="min-w-0 truncate text-body font-medium text-ink">
                     {DAY_LABELS[day]}
                   </span>
@@ -1694,7 +1729,7 @@ function TenantFormInner({
                   />
                 </div>
                 {open && slot ? (
-                  <div className="mt-2 grid grid-cols-2 gap-2 lg:hidden">
+                  <div className="hidden">
                     <div className="min-w-0">
                       <label
                         className="block text-meta font-medium text-ink-2"
@@ -1727,7 +1762,7 @@ function TenantFormInner({
                     </div>
                   </div>
                 ) : null}
-                <div className="hidden lg:grid lg:grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-x-3">
+                <div className="hidden md:grid md:grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] md:items-center md:gap-x-3">
                   <span className="min-w-0 truncate text-body font-medium text-ink">
                     {DAY_LABELS[day]}
                   </span>
@@ -1767,6 +1802,54 @@ function TenantFormInner({
             );
           })}
         </SettingsGroup>
+        </div>
+        <Sheet
+          open={daySheet != null}
+          onOpenChange={(next) => { if (!next) setDaySheet(null); }}
+          title={daySheet ? DAY_LABELS[daySheet] : "Day"}
+        >
+          {daySheet ? (
+            <div className="space-y-3">
+              <div className="flex min-h-11 items-center justify-between gap-3">
+                <span className="text-body font-medium text-ink">Open</span>
+                <ToolSwitch
+                  checked={Boolean(hoursSchedule.days[daySheet])}
+                  onChange={(next) => setDayOpen(daySheet, next)}
+                  label={`${DAY_LABELS[daySheet]} open`}
+                />
+              </div>
+              {hoursSchedule.days[daySheet] ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block text-meta text-ink-2">
+                    Opens
+                    <input
+                      type="time"
+                      value={hoursSchedule.days[daySheet]?.open || ""}
+                      onChange={(e) => setDayTime(daySheet, "open", e.target.value)}
+                      className="mt-1 min-h-11 w-full rounded-xl border border-hairline bg-surface px-3 text-body text-ink"
+                    />
+                  </label>
+                  <label className="block text-meta text-ink-2">
+                    Closes
+                    <input
+                      type="time"
+                      value={hoursSchedule.days[daySheet]?.close || ""}
+                      onChange={(e) => setDayTime(daySheet, "close", e.target.value)}
+                      className="mt-1 min-h-11 w-full rounded-xl border border-hairline bg-surface px-3 text-body text-ink"
+                    />
+                  </label>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className="inline-flex min-h-11 items-center text-body font-medium text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                onClick={() => copyDayToWeekdays(daySheet)}
+              >
+                Copy to weekdays
+              </button>
+            </div>
+          ) : null}
+        </Sheet>
       </section>
 
       <section
