@@ -1,6 +1,6 @@
 ---
 owner: voice
-last_reviewed: 2026-10-17
+last_reviewed: 2026-10-31
 ---
 
 # Voice lane contract
@@ -98,6 +98,14 @@ See `.env.example` — key ones:
 - `VOICE_CLOSED_TENANT_GUARD` (default on; invariant 17)
 - `VOICE_ENDED_CALL_GUARD` (default off; only `on` enables; invariant 18)
 - `VOICE_NUMBER_HOLD_CLIP` (default off; only `on` enables; invariant 20)
+- `DEMO_ENABLED` (default off; only the exact value `on` enables `POST /demo/token` and `/ws/demo`. `On`, `true`, and anything else stay off. No dial. Phone path unchanged while off.)
+- `DEMO_OPUS` (default off; only `on` accepts Opus on `/ws/demo`. Otherwise the socket speaks PCM)
+- `DEMO_RECORD` (read and ignored. The demo session does not record)
+- `DEMO_ALLOWED_ORIGINS` (comma-separated exact origins), `DEMO_TOKEN_SECRET`, `DEMO_IP_SALT`, `TURNSTILE_SECRET_KEY` (names only; values stay in env), `DEMO_MAX_CONCURRENT` (default 5)
+- `DEMO_SESSIONS_PER_VISITOR` (default 1). A hashed IP or hashed device past that count gets `POST /demo/token` 429 `{reason: used}`. The marker does not expire. `GET /demo/status` reports `used` for that hashed IP, and for `device_id` when the query includes it. One open session per IP stays 429 `rate` when the visitor still has a session or a grant left. The raw IP is not stored.
+- `DEMO_VISITOR_PERSIST` (default off; only `on` reloads `demo_visitor_use` after a restart. The SQL file is not applied by Voice. Off resets the marker on restart.)
+- `POST /demo/grant` requires `x-voice-internal-secret` equal to `VOICE_INTERNAL_SECRET`. It adds one grant to one visitor hash. A grant is consumed by the next session. Either hash still at zero grants keeps the visitor used.
+- `DEMO_DAILY_CAP_USD` (default 2), `DEMO_MONTHLY_CAP_USD` (default 50). `DEMO_SPEND_PERSIST` (default off; only `on` reloads `demo_spend` after a restart. The SQL file is not applied by Voice.)
 - Soniox endpointing: `SONIOX_MAX_ENDPOINT_DELAY_MS`, `SONIOX_ENDPOINT_SENSITIVITY`, …
 
 ## Caller file on the call

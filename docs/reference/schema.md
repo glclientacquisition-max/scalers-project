@@ -9,7 +9,7 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (71)
+## Tables (74)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
@@ -42,12 +42,15 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `catalogue_price_history` | `amount_ksh`, `confirmed`, `effective_from`, `id`, `in_stock`, `item_key`, `item_name`, `kind`, `max_ksh`, `min_ksh`, `mode`, `source`, `tenant_id`, `unit` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `contacts` | `created_at`, `id`, `last_language`, `last_language_at`, `last_reason`, `metadata`, `name`, `name_confirmed`, `name_confirmed_at`, `name_confirmed_call_id`, `name_confirmed_source`, `notes`, `phone`, `tenant_id`, `updated_at` | `docs/supabase/contacts_and_requests.sql`<br>`docs/supabase/greeting_language.sql` |
 | `data_quality_snapshots` | `report`, `taken_on`, `tenant_id` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
+| `demo_spend` | `cost_usd`, `created_at`, `day`, `minutes`, `model_input_tokens`, `model_output_tokens`, `month`, `session_id`, `stt_seconds`, `tts_seconds` | `docs/supabase/demo_spend.sql` |
+| `demo_visitor_use` | `first_used_at`, `granted_at`, `granted_by`, `grants_remaining`, `kind`, `visitor_hash` | `docs/supabase/demo_visitor_use.sql` |
 | `inbox_archive_undo` | `consumed_at`, `created_at`, `created_by`, `id`, `payload`, `tenant_id` | `docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `invoice_lines` | `amount_kes`, `description`, `id`, `invoice_id`, `kind`, `quantity`, `sort_order`, `tenant_id`, `unit_amount_kes` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_documents.sql` |
 | `invoice_pay_tokens` | `created_at`, `expires_at`, `id`, `invoice_id`, `revoked_at`, `tenant_id`, `token_hash` | `docs/supabase/invoice_pay.sql` |
 | `invoice_receipts` | `amount_kes`, `created_at`, `id`, `invoice_id`, `method`, `paid_at`, `payment_id`, `provider_ref`, `receipt_number`, `tenant_id` | `docs/supabase/invoice_documents.sql` |
 | `invoices` | `amount_paid_kes`, `billing_source`, `created_at`, `credits_applied_kes`, `currency`, `due_at`, `id`, `invoice_number`, `issued_at`, `issuer_address`, `issuer_city`, `issuer_email`, `issuer_kra_pin`, `issuer_legal_name`, `issuer_phone`, `issuer_product`, `paid_at`, `period_end`, `period_start`, `reminders_paused_at`, `status`, `subtotal_kes`, `tax_kes`, `tenant_id`, `total_kes`, `updated_at` | `docs/supabase/admin_invoice_actions.sql`<br>`docs/supabase/billing_company.sql`<br>`docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_documents.sql`<br>`docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `kb_categories` | `id`, `name_en`, `name_sw`, `name_sw_state`, `sort`, `tenant_id`, `updated_at` | `docs/supabase/kb_v2.sql` |
+| `kb_import_runs` | `after_versions`, `before_rows`, `counts`, `created_at`, `fact_after`, `fact_before`, `id`, `kind`, `mode`, `new_ids`, `source`, `tenant_id`, `undone_at`, `user_id` | `docs/supabase/kb_import_runs.sql`<br>`docs/supabase/kb_import_runs_facts.sql` |
 | `kb_item_variants` | `id`, `in_stock`, `item_id`, `label_en`, `label_sw`, `price_amount`, `price_max`, `price_min`, `price_mode`, `sort`, `tenant_id`, `unit`, `updated_at` | `docs/supabase/kb_v2.sql` |
 | `kb_items` | `aliases`, `bookable`, `category_id`, `created_at`, `currency`, `delivery_fee_kes`, `description_en`, `description_sw`, `excludes_en`, `facets`, `holdable`, `id`, `in_stock`, `kind`, `legacy_ref`, `name_en`, `name_sw`, `name_sw_state`, `name_sw_suggested`, `needs_visit`, `popular`, `price_amount`, `price_max`, `price_min`, `price_mode`, `row_version`, `search_text`, `search_tsv`, `sort`, `source`, `spoken_en`, `status`, `status_note`, `tenant_id`, `unit`, `updated_at` | `docs/supabase/kb_v2.sql`<br>`docs/supabase/kb_v2_item_states.sql` |
 | `kb_readiness` | `brain`, `checked_at`, `checked_by`, `checks`, `id`, `passed`, `real_call_sid`, `snapshot_version`, `tenant_id`, `tests` | `docs/supabase/kb_v2.sql` |
@@ -96,7 +99,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (258)
+## Functions (259)
 
 | Function | Defined in |
 | --- | --- |
@@ -265,6 +268,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `kb_publish_snapshot` | `docs/supabase/kb_v2.sql` |
 | `kb_record_readiness` | `docs/supabase/kb_v2.sql` |
 | `kb_search_items` | `docs/supabase/kb_v2.sql`<br>`docs/supabase/kb_v2_item_states.sql`<br>`docs/supabase/kb_v2_item_states_down.sql` |
+| `kb_undo_import` | `docs/supabase/kb_import_runs.sql` |
 | `kb_upsert_items` | `docs/supabase/kb_v2.sql`<br>`docs/supabase/kb_v2_item_states.sql` |
 | `ke_mobile_e164` | `supabase/migrations/20261012090000_payments_policies_v2.sql` |
 | `ke_mobile_valid` | `supabase/migrations/20261012090000_payments_policies_v2.sql` |
