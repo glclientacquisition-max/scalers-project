@@ -82,13 +82,14 @@ export function StatusMark({
   return (
     <span
       className={cx(
-        "inline-flex h-7 max-w-full items-center gap-1 rounded-full px-2.5 text-meta font-semibold",
+        "inline-flex max-w-full min-w-0 gap-1 rounded-full px-2.5 text-meta font-semibold",
+        wrap ? "h-auto min-h-7 items-center py-1" : "h-7 items-center",
         className,
       )}
       style={{ color: `var(--status-${tone}-fg)`, background: `var(--status-${tone}-bg)` }}
     >
       <Glyph kind={icon ?? DEFAULT_ICON[tone]} tone={tone} />
-      <span className={wrap ? "text-pretty leading-snug" : "truncate"}>{children}</span>
+      <span className={wrap ? "min-w-0 whitespace-normal text-pretty leading-snug" : "truncate"}>{children}</span>
     </span>
   );
 }

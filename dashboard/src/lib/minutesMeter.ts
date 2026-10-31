@@ -46,3 +46,30 @@ export function minutesRingFill(input: MinutesMeterInput): number {
   if (minutesMeterState(input) === "usedup" || minutesMeterState(input) === "limit") return 0;
   return minutesMeterFill(input);
 }
+
+export type MinutesMeterTone = "info" | "warn" | "danger";
+
+/**
+ * The chip word. "Within" stays one short word so it fits a half card
+ * and a Kiswahili line of similar length ("Ndani").
+ */
+export function minutesMeterMark(input: MinutesMeterInput): { word: string; tone: MinutesMeterTone } | null {
+  const state = minutesMeterState(input);
+  if (state === "none") return null;
+  const tone: MinutesMeterTone = state === "limit" ? "danger" : state === "under" || state === "beta" ? "info" : "warn";
+  const word =
+    state === "usedup"
+      ? "No minutes left"
+      : state === "limit"
+        ? "Limit reached"
+        : state === "over"
+          ? input.overLabel || "Over the package"
+          : state === "under1"
+            ? "Under 1 min left"
+            : state === "low"
+              ? "Low"
+              : state === "beta"
+                ? "Beta"
+                : "Within";
+  return { word, tone };
+}

@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
 test("minutes meter states follow the package, not a sample", async () => {
-  const { minutesMeterState, minutesMeterFill, minutesRingFill } = await import("../dashboard/src/lib/minutesMeter.ts");
+  const { minutesMeterState, minutesMeterFill, minutesRingFill, minutesMeterMark } = await import("../dashboard/src/lib/minutesMeter.ts");
   assert.equal(minutesMeterState({ included: 0, used: 0, left: 0, underOne: false, mode: "none", overLabel: null }), "none");
   assert.equal(minutesMeterState({ included: 300, used: 40, left: 260, underOne: false, mode: "beta", overLabel: null }), "beta");
   assert.equal(minutesMeterState({ included: 300, used: 280, left: 20, underOne: false, mode: "capped", overLabel: null }), "low");
@@ -17,4 +17,6 @@ test("minutes meter states follow the package, not a sample", async () => {
   assert.equal(minutesMeterState(usedUp), "usedup");
   assert.equal(minutesRingFill(usedUp), 0);
   assert.equal(minutesRingFill({ included: 300, used: 300, left: 0, underOne: false, mode: "beta", overLabel: null }), 1);
+  assert.equal(minutesMeterMark({ included: 300, used: 40, left: 260, underOne: false, mode: "capped", overLabel: null })?.word, "Within");
+  assert.equal(minutesMeterMark({ included: 300, used: 40, left: 260, underOne: false, mode: "beta", overLabel: null })?.word, "Beta");
 });

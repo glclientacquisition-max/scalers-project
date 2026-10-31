@@ -1,15 +1,5 @@
 import { StatusMark } from "@/components/ui/StatusMark";
-import { minutesMeterFill, minutesMeterState, minutesRingFill, type MinutesMeterInput } from "@/lib/minutesMeter";
-
-const TONE: Record<string, "info" | "warn" | "danger"> = {
-  beta: "info",
-  under: "info",
-  under1: "warn",
-  low: "warn",
-  over: "warn",
-  limit: "danger",
-  usedup: "warn",
-};
+import { minutesMeterFill, minutesMeterMark, minutesMeterState, minutesRingFill, type MinutesMeterInput } from "@/lib/minutesMeter";
 
 /**
  * Allowance as length. Ring on Desk, bar in Admin.
@@ -18,31 +8,21 @@ const TONE: Record<string, "info" | "warn" | "danger"> = {
 export function MinutesMeter({
   input,
   shape,
+  showChip = true,
 }: {
   input: MinutesMeterInput;
   shape: "bar" | "ring";
+  /** Desk Overview draws the chip under the minutes figure, where the half card has width. */
+  showChip?: boolean;
 }) {
   const state = minutesMeterState(input);
-  if (state === "none") {
+  const mark = minutesMeterMark(input);
+  if (state === "none" || !mark) {
     return <p className="text-body text-ink-2">No package</p>;
   }
   const fill = shape === "ring" ? minutesRingFill(input) : (state === "usedup" || state === "limit" ? 0 : minutesMeterFill(input));
-  const tone = TONE[state] ?? "info";
+  const { word: label, tone } = mark;
   const color = `var(--status-${tone}-fg)`;
-  const label =
-    state === "usedup"
-      ? "No minutes left"
-      : state === "limit"
-        ? "Limit reached"
-        : state === "over"
-        ? input.overLabel || "Over the package"
-        : state === "under1"
-          ? "Under 1 min left"
-          : state === "low"
-            ? "Low"
-            : state === "beta"
-              ? "Beta"
-              : "Within package";
 
   const track = shape === "ring" ? (
     <Ring fill={fill} color={color} label={label} />
@@ -59,9 +39,9 @@ export function MinutesMeter({
   );
 
   return (
-    <div className={shape === "ring" ? "flex items-center gap-3" : "flex flex-col gap-2"}>
+    <div className={shape === "ring" ? "flex items-center" : "flex flex-col gap-2"}>
       {track}
-      <StatusMark tone={tone}>{label}</StatusMark>
+      {showChip ? <StatusMark tone={tone} wrap>{label}</StatusMark> : null}
     </div>
   );
 }
