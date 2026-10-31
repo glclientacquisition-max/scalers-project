@@ -3,14 +3,18 @@
 // Browser demo session. PCM in, PCM out, at 16 kHz, through the same STT,
 // Brain, and TTS factories as a phone call. It does not apply phone gain,
 // does not drain an inbound setup burst, does not speak the drachtio
-// subprotocol, and does not record. 180 s and 30 s idle live here until
-// PR3 moves them onto createCallLimits. Reconnect is not supported.
+// subprotocol, and does not record. 180 s and 30 s idle go through
+// createCallLimits for this session only. Reconnect is not supported.
 
 const crypto = require('crypto');
 const { createSttSilenceGate, frameRms } = require('../speech/sttSilenceGate');
+const { createCallLimits } = require('../speech/callLimits');
+const { createCallMeter } = require('../speech/callMeter');
 const { MAX_SEC, demoRecordOn } = require('./flags');
+const { hashValue } = require('./guards');
 const { createDemoCodec } = require('./codec');
 const { fixtureProfile, acceptStoredProfile, openerFor } = require('./profiles');
+const { createDemoMeter, getDemoLedger } = require('./meter');
 const pipeline = require('./pipeline');
 
 const IDLE_MS = 30000;
@@ -18,6 +22,14 @@ const BARGE_RMS = 300;
 const GOODBYE = Object.freeze({
   en: 'Thank you. Goodbye.',
   sw: 'Asante. Kwaheri.',
+});
+const CAP = Object.freeze({
+  en: 'This demo has reached its limit for now. Please try again later. Goodbye.',
+  sw: 'Onyesho hili limefika kikomo kwa sasa. Tafadhali jaribu tena baadaye. Kwaheri.',
+});
+const KILL = Object.freeze({
+  en: 'The demo is paused. Please try again later. Goodbye.',
+  sw: 'Onyesho limepumzishwa. Tafadhali jaribu tena baadaye. Kwaheri.',
 });
 const END_REASONS = new Set(['max_time', 'idle', 'user', 'cap', 'kill', 'error']);
 
@@ -28,14 +40,23 @@ function createDemoSession(opts) {
   const codecKind = opts.codec;
   const env = opts.env || process.env;
   const log = opts.log || (() => {});
+  const now = opts.now || (() => Date.now());
   const maxMs = Number.isFinite(opts.maxMs) ? opts.maxMs : MAX_SEC * 1000;
   const idleMs = Number.isFinite(opts.idleMs) ? opts.idleMs : IDLE_MS;
+  const tickMs = Number.isFinite(opts.tickMs)
+    ? opts.tickMs
+    : Math.min(1000, Math.max(50, Math.round(Math.min(maxMs, idleMs))));
   const createStt = opts.createStt || pipeline.createDemoStt;
   const createTts = opts.createTts || pipeline.createDemoTts;
   const brain = opts.brain || pipeline.createDemoBrain;
   const loadProfile = opts.loadProfile || defaultLoadProfile;
+  const ledger = opts.ledger === undefined ? getDemoLedger() : opts.ledger;
   const sessionId = `demo_${crypto.randomUUID()}`;
-  const startedAt = Date.now();
+  const startedAt = now();
+  const usage = createDemoMeter();
+  const byteMeter = createCallMeter({ callSid: sessionId });
+  const salt = String(env.DEMO_IP_SALT || '');
+  const deviceHash = salt && claims.device_id ? hashValue(salt, claims.device_id) : null;
 
   let lang = lang0;
   let profile = fixtureProfile(claims.tenant);
@@ -49,10 +70,35 @@ function createDemoSession(opts) {
   let stopReason = null;
   let cleaned = false;
   let loggedEnd = false;
-  let maxTimer = null;
-  let idleTimer = null;
+  let recorded = false;
   let outBuf = Buffer.alloc(0);
   let turnChain = Promise.resolve();
+
+  const limits = createCallLimits({
+    env,
+    maxCallMs: maxMs,
+    deadAirMs: idleMs,
+    now,
+    tickMs,
+    setInterval: opts.setInterval,
+    clearInterval: opts.clearInterval,
+    onTick() {
+      if (stopReason) return true;
+      if (env.DEMO_ENABLED !== 'on') {
+        finish('kill');
+        return true;
+      }
+      if (ledger && ledger.blocked()) {
+        finish('cap');
+        return true;
+      }
+      return false;
+    },
+    onLimit(kind) {
+      if (kind === 'maxCall') finish('max_time');
+      else if (kind === 'deadAir') finish('idle');
+    },
+  });
 
   function sendJson(payload) {
     if (!ws || ws.readyState !== 1) return;
@@ -71,7 +117,7 @@ function createDemoSession(opts) {
       lang,
       codec: codecKind,
       ip_hash: claims.ip_hash || null,
-      device_id: claims.device_id || null,
+      device_hash: deviceHash,
       origin: opts.origin || null,
       recording: false,
       record: demoRecordOn(env) ? 'ignored' : 'off',
@@ -80,7 +126,8 @@ function createDemoSession(opts) {
     const safe = {};
     for (const key of [
       'session_id', 'tenant', 'tenant_id', 'lang', 'codec', 'ip_hash',
-      'device_id', 'origin', 'recording', 'record', 'reason', 'duration_ms',
+      'device_hash', 'origin', 'recording', 'record', 'reason', 'duration_ms',
+      'minutes', 'cost_usd',
     ]) {
       if (fields[key] != null && fields[key] !== '') safe[key] = fields[key];
     }
@@ -96,22 +143,7 @@ function createDemoSession(opts) {
   }
 
   function clearTimers() {
-    if (maxTimer) clearTimeout(maxTimer);
-    if (idleTimer) clearTimeout(idleTimer);
-    maxTimer = null;
-    idleTimer = null;
-  }
-
-  function armIdle() {
-    if (idleTimer) clearTimeout(idleTimer);
-    if (stopReason) return;
-    idleTimer = setTimeout(() => { finish('idle'); }, idleMs);
-    idleTimer.unref?.();
-  }
-
-  function armMax() {
-    maxTimer = setTimeout(() => { finish('max_time'); }, maxMs);
-    maxTimer.unref?.();
+    try { limits.stop(); } catch { /* ignore */ }
   }
 
   function cleanup() {
@@ -123,6 +155,12 @@ function createDemoSession(opts) {
     try { tts && tts.close(); } catch { /* ignore */ }
     try { stt && stt.close(); } catch { /* ignore */ }
     try { codec && codec.close(); } catch { /* ignore */ }
+  }
+
+  function closingLine(why) {
+    const pack = why === 'cap' ? CAP : why === 'kill' ? KILL : (why === 'max_time' || why === 'idle') ? GOODBYE : null;
+    if (!pack) return '';
+    return pack[lang] || pack.en;
   }
 
   function sendWire(frames, gen) {
@@ -156,13 +194,25 @@ function createDemoSession(opts) {
   }
 
   function onTtsAudio(pcm) {
+    const buf = Buffer.isBuffer(pcm) ? pcm : Buffer.from(pcm || []);
+    if (buf.length) {
+      usage.noteTts('', buf.length);
+      byteMeter.tts('', buf.length);
+    }
     if (!speaking || activeGen !== playGen) return;
-    emitPcm(Buffer.isBuffer(pcm) ? pcm : Buffer.from(pcm || []), activeGen);
+    emitPcm(buf, activeGen);
+  }
+
+  function noteSpend() {
+    if (stopReason || !ledger) return;
+    if (ledger.blocked()) ledger.touch();
   }
 
   async function speak(text, stateName, { closing = false } = {}) {
     const line = String(text || '').trim();
     if (!line || !tts) return;
+    usage.noteTts(line, 0);
+    byteMeter.tts(line, 0);
     const gen = ++playGen;
     activeGen = gen;
     speaking = true;
@@ -186,6 +236,7 @@ function createDemoSession(opts) {
         if (!closing && !stopReason) sendJson({ type: 'state', state: 'listening' });
       }
     }
+    noteSpend();
   }
 
   function barge() {
@@ -198,22 +249,28 @@ function createDemoSession(opts) {
   }
 
   function feedStt(pcm) {
-    if (!stt || !pcm || !pcm.length) return;
+    if (!stt || !sttGate || !pcm || !pcm.length) return;
     const gated = sttGate.admit(pcm, { ttsSpeaking: speaking });
-    if (gated.voiced) armIdle();
+    if (gated.voiced) limits.activity();
     for (const frame of gated.send) {
+      usage.noteStt(frame.length);
       try { stt.sendAudio(frame); } catch { /* ignore */ }
     }
     if (gated.keepalive && typeof stt.sendKeepalive === 'function') {
       try { stt.sendKeepalive(); } catch { /* ignore */ }
     }
     if (speaking && gated.voiced && frameRms(pcm) >= BARGE_RMS) barge();
+    noteSpend();
   }
 
   function ensureOn() {
     if (stopReason) return false;
     if (env.DEMO_ENABLED !== 'on') {
       finish('kill');
+      return false;
+    }
+    if (ledger && ledger.blocked()) {
+      finish('cap');
       return false;
     }
     return true;
@@ -251,6 +308,9 @@ function createDemoSession(opts) {
     if (stopReason) return;
     if (reply && (reply.lang === 'en' || reply.lang === 'sw')) lang = reply.lang;
     const line = typeof reply === 'string' ? reply : reply && reply.text;
+    usage.noteModel(spoken, line || '');
+    noteSpend();
+    if (stopReason) return;
     if (!line) {
       sendJson({ type: 'state', state: 'listening' });
       return;
@@ -299,23 +359,46 @@ function createDemoSession(opts) {
     }
   }
 
+  async function settle(why) {
+    const durationMs = Math.max(0, now() - startedAt);
+    const summary = usage.summary(durationMs);
+    if (!recorded) {
+      recorded = true;
+      try { byteMeter.finish(sttGate && sttGate.stats || {}, now()); } catch { /* ignore */ }
+      if (ledger) {
+        try {
+          await ledger.record({ sessionId, ...summary });
+        } catch {
+          /* the ledger keeps the in-memory row when the store write fails */
+        }
+      }
+    }
+    if (!loggedEnd) {
+      loggedEnd = true;
+      writeLog('demo_session_end', {
+        reason: why,
+        duration_ms: durationMs,
+        minutes: summary.minutes,
+        cost_usd: summary.costUsd,
+      });
+    }
+  }
+
   async function finish(reason) {
     const why = END_REASONS.has(reason) ? reason : 'error';
     if (stopReason) return;
     stopReason = why;
     clearTimers();
-    if ((why === 'max_time' || why === 'idle') && tts && !cleaned) {
+    const line = closingLine(why);
+    if (line && tts && !cleaned) {
       try {
-        await speak(GOODBYE[lang] || GOODBYE.en, 'speaking', { closing: true });
+        await speak(line, 'speaking', { closing: true });
       } catch {
         /* still close */
       }
     }
     cleanup();
-    if (!loggedEnd) {
-      loggedEnd = true;
-      writeLog('demo_session_end', { reason: why, duration_ms: Date.now() - startedAt });
-    }
+    await settle(why);
     if (ws && ws.readyState === 1) {
       sendJson({ type: 'end', reason: why });
       try { ws.close(why === 'error' ? 1011 : 1000, why); } catch { /* ignore */ }
@@ -336,14 +419,11 @@ function createDemoSession(opts) {
       else onBinary(buf);
     });
     ws.on('close', () => {
-      if (!stopReason) {
-        stopReason = 'user';
-        cleanup();
-        if (!loggedEnd) {
-          loggedEnd = true;
-          writeLog('demo_session_end', { reason: 'user', duration_ms: Date.now() - startedAt });
-        }
-      }
+      if (stopReason) return;
+      stopReason = 'user';
+      clearTimers();
+      cleanup();
+      settle('user');
     });
     ws.on('error', () => {});
   }
@@ -385,6 +465,25 @@ function createDemoSession(opts) {
       await finish('error');
       return;
     }
+    limits.start();
+    if (ledger && typeof ledger.ready === 'function') {
+      try { await ledger.ready(); } catch { /* in-memory totals still apply */ }
+    }
+    if (env.DEMO_ENABLED !== 'on') {
+      await finish('kill');
+      return;
+    }
+    if (ledger && ledger.blocked()) {
+      await finish('cap');
+      return;
+    }
+    if (ledger && typeof ledger.attach === 'function') {
+      ledger.attach(sessionId, {
+        costUsd: () => usage.costUsd(),
+        minutes: () => Math.max(0, (now() - startedAt) / 60000),
+        onCap: () => { finish('cap'); },
+      });
+    }
     sendJson({
       type: 'session',
       session_id: sessionId,
@@ -399,8 +498,6 @@ function createDemoSession(opts) {
     });
     // DEMO_RECORD is ignored. Recording stays off until a later decision.
     writeLog('demo_session_start');
-    armMax();
-    armIdle();
     const greeting = openerFor(profile, lang);
     try {
       await speak(greeting, 'greeting');
@@ -429,6 +526,8 @@ module.exports = {
   IDLE_MS,
   BARGE_RMS,
   GOODBYE,
+  CAP,
+  KILL,
   END_REASONS,
   createDemoSession,
 };

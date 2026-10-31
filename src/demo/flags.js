@@ -32,7 +32,30 @@ function processDemoEnv() {
     PUBLIC_BASE_URL: process.env.PUBLIC_BASE_URL,
     DEMO_OPUS: process.env.DEMO_OPUS,
     DEMO_RECORD: process.env.DEMO_RECORD,
+    DEMO_DAILY_CAP_USD: process.env.DEMO_DAILY_CAP_USD,
+    DEMO_MONTHLY_CAP_USD: process.env.DEMO_MONTHLY_CAP_USD,
+    DEMO_SPEND_PERSIST: process.env.DEMO_SPEND_PERSIST,
   };
+}
+
+function spendPersistOn(env = process.env) {
+  return env.DEMO_SPEND_PERSIST === 'on';
+}
+
+function moneyCap(env, name, dflt) {
+  const raw = env[name];
+  if (raw == null || String(raw).trim() === '') return dflt;
+  const n = Number(String(raw).trim());
+  if (!Number.isFinite(n) || n < 0 || n > 100000) return dflt;
+  return n;
+}
+
+function dailyCapUsd(env = process.env) {
+  return moneyCap(env, 'DEMO_DAILY_CAP_USD', 2);
+}
+
+function monthlyCapUsd(env = process.env) {
+  return moneyCap(env, 'DEMO_MONTHLY_CAP_USD', 50);
 }
 
 function demoEnabled(env = process.env) {
@@ -86,6 +109,9 @@ module.exports = {
   demoEnabled,
   demoOpusOn,
   demoRecordOn,
+  spendPersistOn,
+  dailyCapUsd,
+  monthlyCapUsd,
   allowedOrigins,
   originAllowed,
   maxConcurrent,

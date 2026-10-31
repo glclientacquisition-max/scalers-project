@@ -102,6 +102,7 @@ See `.env.example` — key ones:
 - `DEMO_OPUS` (default off; only `on` accepts Opus on `/ws/demo`. Otherwise the socket speaks PCM)
 - `DEMO_RECORD` (read and ignored. The demo session does not record)
 - `DEMO_ALLOWED_ORIGINS` (comma-separated exact origins), `DEMO_TOKEN_SECRET`, `DEMO_IP_SALT`, `TURNSTILE_SECRET_KEY` (names only; values stay in env), `DEMO_MAX_CONCURRENT` (default 5)
+- `DEMO_DAILY_CAP_USD` (default 2), `DEMO_MONTHLY_CAP_USD` (default 50). `DEMO_SPEND_PERSIST` (default off; only `on` reloads `demo_spend` after a restart. The SQL file is not applied by Voice.)
 - Soniox endpointing: `SONIOX_MAX_ENDPOINT_DELAY_MS`, `SONIOX_ENDPOINT_SENSITIVITY`, …
 
 ## Caller file on the call

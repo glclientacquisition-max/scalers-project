@@ -50,6 +50,7 @@ const {
 const { createSttSilenceGate } = require('./src/speech/sttSilenceGate');
 const { createCallLimits, limitLine } = require('./src/speech/callLimits');
 const { callMeterOn, createCallMeter, dailyMeterTotals } = require('./src/speech/callMeter');
+const { demoHealthCounts } = require('./src/demo/meter');
 const { mergeIdentityLexicon } = require('./src/speech/pronunciationLexicon');
 const {
   createInitialBurstGate,
@@ -795,6 +796,7 @@ app.get('/healthz', (_req, res) => {
       executor: envLiveTransferExecutorEnabled(),
       ignoreHours: envLiveTransferIgnoreHours(),
     },
+    demo: demoHealthCounts(),
     voiceProfile: publicVoiceProfile(),
   });
 });
@@ -2221,12 +2223,19 @@ function handleSautikitRootPost(req, res) {
 // Browser demo token. Off unless DEMO_ENABLED is exactly `on`.
 // Unset or any other value: 503 {reason: disabled}. Phone routes below
 // are not branched on this flag. Limits are in-memory, one instance.
-const { handleDemoTokenRequest, PAUSED_MESSAGE } = require('./src/demo/guards');
+const { handleDemoTokenRequest, handleDemoStatusRequest, PAUSED_MESSAGE } = require('./src/demo/guards');
 const { handleDemoUpgrade } = require('./src/demo/upgrade');
 app.use('/demo/token', (req, res, next) => {
   if (req.method !== 'POST' && req.method !== 'OPTIONS') return next();
   Promise.resolve(handleDemoTokenRequest(req, res)).catch(() => {
     if (!res.headersSent) res.status(503).json({ reason: 'disabled', message: PAUSED_MESSAGE });
+  });
+});
+app.get('/demo/status', (req, res) => {
+  Promise.resolve(handleDemoStatusRequest(req, res)).catch(() => {
+    if (!res.headersSent) {
+      res.status(503).json({ enabled: false, busy: false, cap: false, reason: 'disabled' });
+    }
   });
 });
 

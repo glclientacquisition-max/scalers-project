@@ -5,6 +5,8 @@
 // VOICE_MAX_CALL=on: at VOICE_MAX_CALL_SEC (default 1200) speak one polite
 //   line and hang up.
 // Both default OFF; only the exact value `on` enables them.
+// A demo session may pass maxCallMs / deadAirMs. That override applies to
+// that one limiter only. It does not change VOICE_MAX_CALL_SEC or the phone path.
 
 function num(env, name, dflt, min, max) {
   const n = Number(env[name]);
@@ -44,6 +46,9 @@ function limitLine(kind, language) {
  * @param {{
  *   canFire?: () => boolean,       // false while agent speaks / turn busy / call over
  *   onLimit: (kind: 'deadAir'|'maxCall') => unknown,
+ *   onTick?: () => boolean,        // return true to skip the limit check (demo kill / cap)
+ *   maxCallMs?: number,            // per session. Enables max for this limiter only.
+ *   deadAirMs?: number,            // per session. Enables dead air for this limiter only.
  *   env?: object, now?: () => number, tickMs?: number,
  *   setInterval?: typeof setInterval, clearInterval?: typeof clearInterval,
  * }} opts
@@ -51,10 +56,12 @@ function limitLine(kind, language) {
 function createCallLimits(opts) {
   const env = opts.env || process.env;
   const now = opts.now || (() => Date.now());
-  const dead = deadAirHangupOn(env);
-  const max = maxCallOn(env);
-  const deadMs = deadAirMs(env);
-  const maxMs = maxCallMs(env);
+  const hasMax = Number.isFinite(opts.maxCallMs) && opts.maxCallMs > 0;
+  const hasDead = Number.isFinite(opts.deadAirMs) && opts.deadAirMs > 0;
+  const dead = hasDead || deadAirHangupOn(env);
+  const max = hasMax || maxCallOn(env);
+  const deadMs = hasDead ? opts.deadAirMs : deadAirMs(env);
+  const maxMs = hasMax ? opts.maxCallMs : maxCallMs(env);
   const startedAt = now();
   let lastActivity = startedAt;
   let fired = null;
@@ -66,6 +73,11 @@ function createCallLimits(opts) {
 
   function check() {
     if (fired) return null;
+    if (typeof opts.onTick === 'function') {
+      let halt = false;
+      try { halt = opts.onTick() === true; } catch { halt = false; }
+      if (halt) return fired;
+    }
     const t = now();
     if (max && t - startedAt >= maxMs) fired = 'maxCall';
     else if (dead && t - lastActivity >= deadMs) {

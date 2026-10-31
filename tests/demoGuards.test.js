@@ -12,6 +12,7 @@ const {
   TURNSTILE_URL,
   BUSY_MESSAGE,
   PAUSED_MESSAGE,
+  STATUS_MAX,
   createDemoGuard,
   handleDemoTokenRequest,
 } = require('../src/demo/guards');
@@ -313,6 +314,93 @@ describe('demo token guards', () => {
   });
 });
 
+describe('demo status', () => {
+  function statusRequest(ip) {
+    return {
+      method: 'GET',
+      headers: { origin: 'https://staging.example' },
+      ip: ip || IP,
+    };
+  }
+
+  it('returns enabled, busy, and cap with no counts and no raw IP', async () => {
+    const { guard, lines } = harness();
+    const open = await guard.status(statusRequest());
+    assert.equal(open.status, 200);
+    assert.deepEqual(open.body, { enabled: true, busy: false, cap: false, reason: null });
+    assert.deepEqual(Object.keys(open.body).sort(), ['busy', 'cap', 'enabled', 'reason']);
+
+    const paused = createDemoGuard({
+      env: env({ DEMO_ENABLED: 'off' }),
+      now: () => Date.parse('2026-10-31T08:00:00Z'),
+      fetch: async () => { throw new Error('no turnstile'); },
+      log: () => {},
+    });
+    const off = await paused.status(statusRequest());
+    assert.equal(off.status, 200);
+    assert.deepEqual(off.body, { enabled: false, busy: false, cap: false, reason: 'disabled' });
+
+    const full = harness({ DEMO_MAX_CONCURRENT: '1' });
+    assert.equal((await full.guard.decide(request({ ip: '203.0.113.21', body: { device_id: 'device-status1' } }))).status, 200);
+    const busy = await full.guard.status(statusRequest('203.0.113.22'));
+    assert.equal(busy.status, 200);
+    assert.equal(busy.body.busy, true);
+    assert.equal(busy.body.reason, 'busy');
+    assert.equal(busy.body.cap, false);
+    assert.equal(JSON.stringify(busy.body).includes('1'), false);
+
+    const { createDemoLedger, createMemorySpendStore } = require('../src/demo/meter');
+    const ledger = createDemoLedger({
+      store: createMemorySpendStore(),
+      env: env({ DEMO_DAILY_CAP_USD: '2' }),
+      now: () => Date.parse('2026-10-31T08:00:00Z'),
+    });
+    await ledger.ready();
+    await ledger.record({
+      sessionId: 'demo_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9',
+      minutes: 1,
+      sttSeconds: 1,
+      ttsSeconds: 1,
+      modelInputTokens: 1,
+      modelOutputTokens: 1,
+      costUsd: 2,
+    });
+    const cappedLines = [];
+    const capped = createDemoGuard({
+      env: env(),
+      now: () => Date.parse('2026-10-31T08:00:00Z'),
+      spend: ledger,
+      fetch: async () => { throw new Error('no turnstile'); },
+      log: (line) => cappedLines.push(line),
+    });
+    const cap = await capped.status(statusRequest('203.0.113.23'));
+    assert.equal(cap.status, 200);
+    assert.deepEqual(cap.body, { enabled: true, busy: false, cap: true, reason: 'cap' });
+    const dumped = JSON.stringify(cap.body);
+    for (const secret of ['dayUsd', 'daySessions', 'monthUsd', IP, 'device', 'audio', 'transcript']) {
+      assert.equal(dumped.includes(secret), false, secret);
+    }
+    assert.equal(lines.join('\n').includes(IP), false);
+  });
+
+  it('rate-limits status polls per IP and does not log the raw address', async () => {
+    const { guard, lines } = harness();
+    for (let i = 0; i < STATUS_MAX; i += 1) {
+      const out = await guard.status(statusRequest());
+      assert.equal(out.status, 200, String(i));
+    }
+    const blocked = await guard.status(statusRequest());
+    assert.equal(blocked.status, 429);
+    assert.deepEqual(blocked.body, { reason: 'rate' });
+    const other = await guard.status(statusRequest('198.51.100.40'));
+    assert.equal(other.status, 200);
+    const text = lines.join('\n');
+    assert.match(text, /demo_status_reject/);
+    assert.equal(text.includes(IP), false);
+    assert.equal(text.includes('audio'), false);
+  });
+});
+
 describe('phone path unchanged', () => {
   it('keeps the phone limits and Aris protection when the demo flag is off', () => {
     assert.equal(maxCallOn({}), false);
@@ -402,7 +490,7 @@ describe('phone path unchanged', () => {
     const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
     assert.match(source, /if \(req\.method !== 'POST' && req\.method !== 'OPTIONS'\) return next\(\);/);
     assert.equal(source.includes("app.post('/demo/"), false);
-    assert.equal(source.includes("app.get('/demo/"), false);
+    assert.equal(source.split("app.get('/demo/status'").length - 1, 1);
     assert.equal(typeof handleDemoTokenRequest, 'function');
   });
 });

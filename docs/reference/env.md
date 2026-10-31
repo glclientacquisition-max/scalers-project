@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-257 variables.
+260 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -67,12 +67,15 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
 | `DATABASE_URL` | scripts | `scripts/verify-staging-schema.js` |
 | `DEMO_ALLOWED_ORIGINS` | voice | `src/demo/flags.js` |
+| `DEMO_DAILY_CAP_USD` | voice | `src/demo/flags.js` |
 | `DEMO_ENABLED` | voice | `src/demo/flags.js` |
 | `DEMO_IP_SALT` | voice | `src/demo/flags.js` |
 | `DEMO_MAX_CONCURRENT` | voice | `src/demo/flags.js` |
+| `DEMO_MONTHLY_CAP_USD` | voice | `src/demo/flags.js` |
 | `DEMO_OPUS` | voice | `src/demo/flags.js` |
 | `DEMO_PUBLIC_BASE_URL` | voice | `src/demo/flags.js` |
 | `DEMO_RECORD` | voice | `src/demo/flags.js` |
+| `DEMO_SPEND_PERSIST` | voice | `src/demo/flags.js` |
 | `DEMO_TOKEN_SECRET` | voice | `src/demo/flags.js` |
 | `DESK_ASSISTANT_SAY_PAGE` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_ATTEST_SERVICE_AREAS` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
