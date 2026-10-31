@@ -29,6 +29,7 @@ function tenantProfileFromRow(row, extras = {}) {
   const { parseAgentTools } = require('./conversation/agentTools');
   const { parseLexiconOverrides } = require('./speech/pronunciationLexicon');
   const { parseVertical } = require('./conversation/vertical');
+  const { resolveBusinessType } = require('./conversation/businessType');
   const { parseHandoffMode } = require('./conversation/handoffMode');
   const { parseNotifyChannels } = require('./notifications/notifyChannels');
   const afterHoursMode =
@@ -53,6 +54,9 @@ function tenantProfileFromRow(row, extras = {}) {
     notifyChannels: parseNotifyChannels(row.notify_channels),
     did: row.sautikit_virtual_number || null,
     hoursSchedule: row.hours_schedule || null,
+    // B1 safe mode: tenants.brain_mode ('full' | 'safe'), added by Platform P1. undefined on today's select = 'full'.
+    brainMode: row.brain_mode == null ? null : String(row.brain_mode),
+    brainModeSource: row.brain_mode_source == null ? null : String(row.brain_mode_source),
     businessHours: row.business_hours || null,
     afterHoursMode,
     servicesCatalog: row.services_catalog || [],
@@ -76,10 +80,19 @@ function tenantProfileFromRow(row, extras = {}) {
     sonioxVoiceId: row.soniox_voice_id || null,
     sonioxVoiceLabel: row.soniox_voice_label || null,
     vertical: parseVertical(row.vertical),
+    businessType: resolveBusinessType({
+      business_type: row.business_type,
+      vertical: row.vertical,
+    }),
     // Settings › Locations area terms (fee, time, mode) from tenants.service_areas.
     areaTerms: require('./conversation/areaTerms').readAreaTerms(
       row.service_areas !== undefined ? row.service_areas : extras.serviceAreas,
-      { vertical: parseVertical(row.vertical) }
+      {
+        vertical: resolveBusinessType({
+          business_type: row.business_type,
+          vertical: row.vertical,
+        }),
+      }
     ),
     handoffMode: parseHandoffMode(row.handoff_mode),
     businessLocations: row.business_locations || [],

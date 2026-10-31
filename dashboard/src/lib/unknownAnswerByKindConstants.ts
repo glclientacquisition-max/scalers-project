@@ -1,4 +1,5 @@
-/** Keep in sync with src/conversation/unknownAnswerByKind.js DEFAULT_BY_KIND. */
+import type { BusinessType } from "@/lib/businessType";
+import { defaultByKindForBusinessType } from "@/lib/assistantSayBusinessDefaults";
 
 export const FALLBACK_KINDS = ["general", "price", "hours", "fee", "pay"] as const;
 
@@ -92,7 +93,8 @@ export function spokenFallbackLine(
   kind: FallbackKind,
   byKind: UnknownAnswerByKind | null,
   lang: "en" | "sw",
-  legacyGeneral?: string | null
+  legacyGeneral?: string | null,
+  businessType: BusinessType = "general"
 ): string {
   const custom = byKind?.[kind]?.[lang]?.trim();
   if (custom && callbackSafeLine(custom) && (kind === "price" || !isQuoteStyleFallbackLine(custom))) return custom;
@@ -100,7 +102,7 @@ export function spokenFallbackLine(
   const legacy = lang === "en" ? String(legacyGeneral || "").trim() : "";
   const general = fromJson || legacy;
   if (general && generalFitsFallbackKind(general, kind) && callbackSafeLine(general)) return general;
-  return DEFAULT_BY_KIND[kind][lang];
+  return defaultByKindForBusinessType(businessType)[kind][lang];
 }
 
 /** @deprecated Use spokenFallbackLine */

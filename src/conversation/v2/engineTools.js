@@ -7,7 +7,84 @@ const OF = require('./ownerFacts');
 const { hoursFact } = require('./v1draftFacts');
 const L = require('./lexicon');
 
+const KBL = require('../../knowledge/kb/live');
+const KBR = require('../../knowledge/kb/rules');
+const KBS = require('../../knowledge/kb/source');
+const D = require('./degrade');
+const { tokens } = require('../../knowledge/kb/keys');
+const { GENERIC } = require('../../knowledge/kb/reader');
+const { joinList } = require('../../knowledge/kb/spoken');
+
 function sw(lang) { return L.isSw(lang); }
+
+const ASK_RE = /\?|\b(what|which|do you (have|sell|do|offer)|have you got|any|kinds?|types?|varieties|mna|una|mnauza|mnayo|gani|kuna)\b/i;
+const POS_OR_MORE = /\b(first|second|third|1st|2nd|3rd|last one|ya kwanza|ya pili|ya tatu|wa kwanza|wa pili|wa tatu|ya mwisho)\b/i;
+/** The v2 KB receipt for this turn, or null when the turn is not about the catalogue. Pure, in memory, < 5 ms. */
+function catalogueReceipt({ u, machine, profile, kbh, lang, text, wantsPrice, wantsCoverage }) {
+  const asksList = (u.answers || []).includes('services');
+  const follow = !!(machine.kb && machine.kb.last) && (KBR.MORE_RE.test(text) || POS_OR_MORE.test(text) || KBR.INCLUDE_RE.test(text) || KBR.HOLD_RE.test(text));
+  const slot = u.slots?.service || null;
+  // a question that names an item or a group is a catalogue question even when the understanding did not say so
+  // KB v2 root cause 2: one lookup over offered AND paused / not-offered items (kb/source findForCaller), so
+  // "do you do carpet cleaning?" (not offered) gets its grounded receipt instead of going to the model with none
+  const named = !wantsPrice && !asksList && !follow && (ASK_RE.test(text) || KBR.HOLD_RE.test(text)) && ['ask', 'unknown', 'smalltalk', undefined, null].includes(u.intent) ? !!KBS.catalogueSource(profile).findForCaller(text) : false;
+  if (!wantsPrice && !asksList && !follow && !slot && !named) return null;
+  if (wantsCoverage && !wantsPrice && !asksList && !follow) return null;
+  let a = KBR.answer(kbh, text, { asksPrice: wantsPrice, lang, state: machine.kb || {} });
+  if (a.kind === 'none' && slot) a = KBR.answer(kbh, slot, { asksPrice: wantsPrice, lang, state: machine.kb || {} });
+  if (a.kind === 'none' && wantsPrice && machine.slots?.service) a = KBR.answer(kbh, machine.slots.service, { asksPrice: true, lang, state: machine.kb || {} });
+  machine.kb = a.state;
+  if (a.text) return { tool: wantsPrice ? 'prices' : 'catalogue', ok: true, kb: true, kind: a.kind, ids: a.ids, text: a.text, ms: Number((a.ms || 0).toFixed(3)), kbVersion: profile.kb.version, ...(a.capture ? { capture: a.capture, service: a.name || null } : {}), ...(a.itemState ? { itemState: a.itemState } : {}) };
+  // the caller asked for one thing by name and nothing in the catalogue (offered, paused or not offered) carries any
+  // of its words: a grounded "not in the catalogue" receipt with the groups we do offer (the reply engine names the
+  // closest one and asks one question). Words the catalogue shares ("house cleaning" at a cleaner) get the overview.
+  const asked = u.catalogue && u.catalogue.kind === 'item' ? u.catalogue.item : null;
+  if (asked && !wantsPrice && !wantsCoverage && !follow) {
+    const miss = catalogueMiss(kbh, profile, asked, lang);
+    if (miss) return { tool: 'catalogue', ok: true, kb: true, kind: 'not_in_catalogue', ids: [], ...miss, ms: Number((a.ms || 0).toFixed(3)), kbVersion: profile.kb.version };
+  }
+  if (asksList) { const o = KBR.overview(kbh, lang); if (o) return { tool: 'catalogue', ok: true, kb: true, kind: 'overview', ids: [], text: o, ms: Number((a.ms || 0).toFixed(3)), kbVersion: profile.kb.version }; }
+  if (wantsPrice) return { tool: 'prices', ok: false, kb: true, kind: 'none', ids: [], text: null, ms: Number((a.ms || 0).toFixed(3)), kbVersion: profile.kb.version };
+  return null;
+}
+
+// every search word the catalogue knows (offered items, their groups, paused / not-offered items), per snapshot
+const VOCAB = new WeakMap();
+function vocabOf(kbh) {
+  let v = VOCAB.get(kbh);
+  if (v) return v;
+  v = new Set();
+  for (const x of kbh.doc.items || []) for (const k of [...(x.keys || []), ...(x.cat_keys || [])]) v.add(k);
+  for (const c of kbh.categories || []) for (const k of c.keys || []) v.add(k);
+  for (const x of kbh.doc.off || []) for (const k of x.keys || []) v.add(k);
+  VOCAB.set(kbh, v);
+  return v;
+}
+const NEAR = (a, b) => a === b || (a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a)));
+/**
+ * -> { asked, groups[], product, text } | null. Null when any word of the ask touches the catalogue (exact, prefix
+ * or stem), or the ask is only trade words: then it is not a miss, and the overview / item answer stands.
+ */
+function catalogueMiss(kbh, profile, asked, lang) {
+  const ws = tokens(asked);
+  if (!ws.length || !ws.some((w) => !GENERIC.has(w))) return null;
+  if (KBS.catalogueSource(profile).findForCaller(asked)) return null;
+  const vocab = vocabOf(kbh);
+  for (const w of ws) for (const k of vocab) if (NEAR(w, k)) return null;
+  // the biggest offered groups (the overview's order), each spoken name once: the reply engine picks the closest
+  const groups = [...new Set([...(kbh.categories || [])].filter((c) => c.name && c.count > 0).sort((x, y) => y.count - x.count)
+    .map((c) => (sw(lang) && c.say_sw) || c.say_en).filter(Boolean))].slice(0, 3);
+  const items = kbh.doc.items || [];
+  const product = items.length > 0 && items.every((x) => x.kind === 'product');
+  const what = String(asked).trim();
+  const S = sw(lang);
+  const list = groups.length ? joinList(groups, S ? 'sw' : 'en') : null;
+  // two short sentences (rule 12), the one question last (rule 7)
+  const text = list
+    ? (S ? `Samahani, hatuna ${what}; tuna ${list}. Ipi ingekusaidia?` : `Sorry, we don't ${product ? 'sell' : 'offer'} ${what}; we ${product ? 'have' : 'do'} ${list}. Would one of those help?`)
+    : (S ? `Samahani, hatuna ${what}. Naweza kukusaidia na kitu kingine?` : `Sorry, we don't ${product ? 'sell' : 'offer'} ${what}. Can I help with anything else?`);
+  return { asked: what, groups, product, text };
+}
 
 function lookupCaller(machine, profile, now) {
   return ML.lookupCaller(machine.file || {}, {}, { now, lockedName: require('./callPlan').lockedName(machine) });
@@ -48,8 +125,11 @@ function hoursReceipt(profile, lang, { day = null, now = new Date() } = {}) {
   return { tool: 'hours', ok: true, open: row.open, close: row.close, text: S ? `${L.cap(L.DOW_SW[dow])} tuko wazi kuanzia ${swT(row.open)} hadi ${swT(row.close)}.` : `On ${L.cap(L.DOW_EN[dow])} we're open from ${row.open} to ${row.close}.` };
 }
 
-function runTools({ understanding, machine, profile, lang, text, now = new Date() }) {
+function runTools({ understanding, machine, profile, lang, text, now = new Date(), rules = D.RULES }) {
   const receipts = [];
+  // B1: the degradation rules that reshaped a receipt this turn (named rules, ./degrade.js), for the trace
+  const degraded = [];
+  const fired = (d) => { if (d && d.fired && !degraded.includes(d.fired)) degraded.push(d.fired); return d; };
   const u = understanding || {};
   const caller = lookupCaller(machine, profile, now);
   receipts.push({ ...caller, tool: 'lookup_caller' });
@@ -61,17 +141,36 @@ function runTools({ understanding, machine, profile, lang, text, now = new Date(
     // a follow-up ("And the fee?") names no place: the call's place is still the subject
     const rows = cov.places.length || !place ? cov.places : ML.coverageReceipt([place], profile).places;
     for (const row of rows) {
-      const named = { ...row, name: row.name || row.place || place };
+      // B1 UNCONFIRMED_AREAS_NO_VERDICT: a firm yes / no only from the owner's confirmed area picks
+      const named = fired(D.areaRow({ ...row, name: row.name || row.place || place }, { rules })).row;
       const line = AC.line(named, lang) || row.line_en || row.line_sw || row.text || null;
       receipts.push({ tool: 'coverage', ...named, text: line });
     }
   }
-  if (wantsPrice && !wantsCoverage) {
+  const kbh = KBL.handle(profile);
+  if (kbh) {
+    // v2 KB: one catalogue receipt per turn built by the 12 call rules (<= 3 names, count first, price only on pick)
+    const r0 = catalogueReceipt({ u, machine, profile, kbh, lang, text, wantsPrice, wantsCoverage });
+    // B1 EMPTY_CATALOGUE_CAPTURE / SPARSE_UNKNOWN_ITEM: an empty or sparse catalogue never says "we don't offer"
+    const r = fired(D.catalogue({ receipt: r0, u, text, profile, lang, rules })).receipt;
+    if (r) receipts.push(r);
+    // shadow compare (KB_SHADOW=on): what the old price path would have said, logged next to the KB answer, never spoken
+    if (wantsPrice && !wantsCoverage && /^(1|true|on|yes)$/i.test(String(process.env.KB_SHADOW || ''))) {
+      try {
+        const old = priceReceipt(u.slots?.service || machine.slots?.service, profile, text, lang);
+        const nums = (t) => (String(t || '').match(/\d[\d,]*/g) || []).map((x) => x.replace(/,/g, ''));
+        const known = KBL.knownNumbers(profile);
+        const extra = nums(old.text).filter((n) => !known.has(n));
+        console.log(`[kb_shadow] tenant=${profile.id} kb_v=${profile.kb.version} kb_kind=${r ? r.kind : 'none'} old=${old.text ? 'price' : 'none'} agree=${!extra.length} old_only_numbers=${extra.slice(0, 4).join('|') || '-'}`);
+      } catch (e) { console.warn(`[kb_shadow] failed: ${e && e.message}`); }
+    }
+  } else if (wantsPrice && !wantsCoverage) {
     const pr = priceReceipt(u.slots?.service || machine.slots?.service, profile, text, lang);
     if (pr.text) receipts.push(pr);
   }
   if (u.answers?.includes('hours')) {
-    receipts.push(hoursReceipt(profile, lang, { day: u.slots?.day || machine.slots?.when?.date, now }));
+    // B1 NO_HOURS_BOOKING_AS_REQUEST: no hours on file = the team confirms (never a guessed time)
+    receipts.push(fired(D.hours({ receipt: hoursReceipt(profile, lang, { day: u.slots?.day || machine.slots?.when?.date, now }), profile, lang, rules })).receipt);
   }
   if (u.answers?.includes('identity') || u.intent === 'identity') {
     const R = require('./receipts');
@@ -81,8 +180,10 @@ function runTools({ understanding, machine, profile, lang, text, now = new Date(
   if (u.answers?.includes('payment')) {
     const pf = OF.paymentFact(OF.ownerFacts(profile));
     if (pf) receipts.push({ tool: 'payment', ok: true, text: sw(lang) ? pf.sw : pf.en });
+    // B1 NO_POLICY_TEAM_CONFIRM: no payment policy on file = the team confirms
+    else { const d = fired(D.policy({ topic: 'payment', lang, profile, rules })); if (d.receipt) receipts.push(d.receipt); }
   }
-  return { caller, receipts };
+  return { caller, receipts, degraded };
 }
 
-module.exports = { runTools, lookupCaller, checkCoverage, priceReceipt, hoursReceipt };
+module.exports = { runTools, lookupCaller, checkCoverage, priceReceipt, hoursReceipt, catalogueReceipt, catalogueMiss };

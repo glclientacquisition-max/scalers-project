@@ -9,7 +9,6 @@ import { DeskNoAccess } from "@/components/ui/DeskNoAccess";
 import { MembersLoadError, MembersPanel } from "@/components/MembersPanel";
 import { loadMembers } from "@/lib/membersLoad";
 import { currentMemberRole } from "@/lib/requireMember";
-import { teamInvitesEnabled } from "@/lib/teamInvitesFlag";
 import { can } from "@/lib/permissions";
 import { getAuthUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -21,8 +20,11 @@ import {
 } from "@/lib/businessSettingsNav";
 import { listCuratedSonioxVoices, type CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import { settingsIndexStatuses, type SettingsListStatus } from "@/lib/settingsOptionStatus";
-import { tenantForSettingsView } from "@/lib/settingsPanelPayload";
+import { settingsViewReadsCatalogue, tenantForSettingsView } from "@/lib/settingsPanelPayload";
+import { loadKbCatalogueView } from "@/lib/kbRead.server";
 import { getCurrentTenant } from "@/lib/tenant";
+import { kbTablesReady } from "@/lib/kb.server";
+import { resolveTenantBusinessType } from "@/lib/businessType";
 import { loadPlanRowStatus } from "@/lib/ownerPlanLoad";
 import { loadSeatCount } from "@/lib/billingStateLoad";
 import { planEntry } from "@/lib/planEntry";
@@ -30,11 +32,14 @@ import { TeamSeatsNote } from "@/components/plan/TeamSeatsNote";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
+import { Suspense } from "react";
 import { DeskPageGate } from "@/components/DeskPageGate";
+import { DeskPageSkeleton } from "@/components/DeskPageSkeleton";
 import { deskAssistantSayPage } from "@/lib/deskFeatureFlags";
-import { loadAssistantSayState } from "@/lib/assistantSayVoice.server";
+import { loadAssistantSayView } from "@/lib/assistantSayVoice.server";
+import { loadKbGreetingPreview } from "@/lib/kbCaller.server";
 import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
-import { assistantSayBelowList } from "@/components/assistantSay/AssistantSayExtras";
+import { parseUnknownAnswerByKind } from "@/lib/unknownAnswerByKindConstants";
 import { CallsForwardingPanel } from "@/components/CallsForwardingPanel";
 import { loadCallSetupState } from "@/lib/callSetupServer";
 import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
@@ -57,18 +62,22 @@ export default function SettingsPage(props: SettingsPageProps) {
 }
 
 async function SettingsBody({ searchParams }: SettingsPageProps) {
-  if (!(await memberCan("settings.view"))) return <DeskNoAccess what="Settings" />;
+  // Params first (no fetch), then role and row together, not one after another.
   const params = (await searchParams) || {};
   const tabRaw = Array.isArray(params.tab) ? params.tab[0] : params.tab;
   const panelRaw = Array.isArray(params.panel) ? params.panel[0] : params.panel;
   if (tabRaw === "appearance") redirect("/settings");
+  const [canView, loaded] = await Promise.all([
+    memberCan("settings.view"),
+    getCurrentTenant().then(
+      (row) => ({ ok: true as const, row }),
+      () => ({ ok: false as const, row: null })
+    ),
+  ]);
+  if (!canView) return <DeskNoAccess what="Settings" />;
 
-  let tenant;
-  try {
-    tenant = await getCurrentTenant();
-  } catch {
-    return <DeskLoadError>Could not load Settings.</DeskLoadError>;
-  }
+  if (!loaded.ok) return <DeskLoadError>Could not load Settings.</DeskLoadError>;
+  let tenant = loaded.row;
 
   if (!tenant) {
     return <DeskNoWorkspace />;
@@ -76,7 +85,16 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   const planRowPromise = loadPlanRowStatus(tenant.id);
   const tab = parseBusinessSettingsTab(tabRaw, panelRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
+  // The Import tab is gone: old ?tab=import links open Add many on the Catalogue.
+  if (tab === "import") redirect("/settings/knowledge?many=1");
+  // KB v2 businesses edit the catalogue on /settings/knowledge. The old Catalogue tab would write the
+  // retired catalogue columns, so send owners across.
+  if (tab === "catalog" && (await kbTablesReady(tenant.id))) {
+    const unpriced = (Array.isArray(params.filter) ? params.filter[0] : params.filter) === "unpriced";
+    redirect(`/settings/knowledge${unpriced ? "?filter=unpriced" : ""}`);
+  }
   const assistantSayPage = deskAssistantSayPage();
+  const topicRaw = Array.isArray(params.topic) ? params.topic[0] : params.topic;
   if (tab === "assistant-say" && !assistantSayPage) redirect("/settings");
   // The voice picker lives on Identity (How you answer); Voice links there.
   const needsVoices =
@@ -99,9 +117,9 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   const teamEntry = planRowNow ? planEntry(planRowNow.billingStatus, canBilling) : null;
   const seatsFull = Boolean(seatCount && seatCount.included > 0 && seatCount.used >= seatCount.included);
 
-  // Team & access: Members (logins, paid seats) when the feature flag is on.
+  // Team & access: Members (logins, paid seats). Mutations stay gated in membersActions when invites are off.
   let membersSlot = null;
-  if (teamPanel && teamInvitesEnabled(tenant.id)) {
+  if (teamPanel) {
     const [role, user] = await Promise.all([currentMemberRole(), getAuthUser()]);
     if (role && user && can(role, "members.view")) {
       try {
@@ -130,7 +148,10 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     structuredSlot = structuredSettingsSlots({
       tenant,
       canEdit,
-      businessType: typed?.business_type || (tenant.vertical === "home_services" || tenant.vertical === "retail" ? tenant.vertical : "general"),
+      businessType: resolveTenantBusinessType({
+        business_type: typed?.business_type,
+        vertical: tenant.vertical,
+      }),
       businessCategory: typed?.business_category ?? null,
     });
     businessCategory = typed?.business_category ?? null;
@@ -139,10 +160,23 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   let assistantSaySlot = null;
   if (tab === "assistant-say" && assistantSayPage) {
     try {
-      const state = await loadAssistantSayState(tenant);
-      assistantSaySlot = <AssistantSayPanel state={state} belowList={assistantSayBelowList(tenant)} />;
+      // isKbLive: rows and samples read the published snapshot (what callers hear now); else the stored row.
+      const view = await loadAssistantSayView(tenant);
+      const businessType = resolveTenantBusinessType(tenant);
+      assistantSaySlot = (
+        <AssistantSayPanel
+          state={view.state}
+          pending={view.pending}
+          samples={view.samples}
+          tenant={tenant}
+          businessType={businessType}
+          initialTopic={topicRaw}
+          initialByKind={parseUnknownAnswerByKind(tenant.unknown_answer_by_kind)}
+          legacyGeneral={tenant.unknown_answer_fallback}
+        />
+      );
     } catch {
-      assistantSaySlot = <DeskLoadError>Could not load what your Business Assistant will say.</DeskLoadError>;
+      assistantSaySlot = <DeskLoadError>Could not load what callers hear.</DeskLoadError>;
     }
   }
 
@@ -172,25 +206,34 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   const planRow = await planRowPromise;
   const planStatus: Record<string, SettingsListStatus> = planRow.row ? { "/settings/plan": planRow.row } : {};
 
+  // Test panel greeting preview and the catalogue view read kb_items when the KB tables exist (stored columns otherwise).
+  // isKbLive with a readable snapshot: the Test greeting preview uses the call's snapshot greeting; else legacy reads.
+  const readsCatalogue = settingsViewReadsCatalogue(tab, trainPanel);
+  const [kbView, kbGreeting] = readsCatalogue
+    ? await Promise.all([loadKbCatalogueView(tenant.id, tenant), loadKbGreetingPreview(tenant)])
+    : [null, null];
+  const kbCatalogue = kbView && kbGreeting ? { ...kbView, offering_line: kbGreeting.offeringLine, pending: kbGreeting.pending } : kbView;
   return (
-    <BusinessSettingsShell
-      tenant={tenantForSettingsView(tenant, tab, trainPanel)}
-      tab={tab}
-      trainPanel={trainPanel}
-      curatedVoices={curatedVoices}
-      optionStatus={{ ...settingsIndexStatuses(tenant, curatedVoices, navTargets), ...planStatus }}
-      liveTransferExecutor={deskLiveTransferExecutorEnabled()}
-      membersSlot={membersSlot}
-      seatNoteSlot={
-        teamPanel && seatsFull && !membersSlot && seatCount ? (
-          <TeamSeatsNote included={seatCount.included} entry={teamEntry} />
-        ) : null
-      }
-      structuredSlot={structuredSlot}
-      callsSlot={callsSlot}
-      assistantSaySlot={assistantSaySlot}
-      assistantSayPage={assistantSayPage}
-      businessCategory={businessCategory}
-    />
+    <Suspense fallback={<DeskPageSkeleton />}>
+      <BusinessSettingsShell
+        tenant={tenantForSettingsView(tenant, tab, trainPanel, kbCatalogue)}
+        tab={tab}
+        trainPanel={trainPanel}
+        curatedVoices={curatedVoices}
+        optionStatus={{ ...settingsIndexStatuses(tenant, curatedVoices, navTargets), ...planStatus }}
+        liveTransferExecutor={deskLiveTransferExecutorEnabled()}
+        membersSlot={membersSlot}
+        seatNoteSlot={
+          teamPanel && seatsFull && !membersSlot && seatCount ? (
+            <TeamSeatsNote included={seatCount.included} entry={teamEntry} />
+          ) : null
+        }
+        structuredSlot={structuredSlot}
+        callsSlot={callsSlot}
+        assistantSaySlot={assistantSaySlot}
+        assistantSayPage={assistantSayPage}
+        businessCategory={businessCategory}
+      />
+    </Suspense>
   );
 }

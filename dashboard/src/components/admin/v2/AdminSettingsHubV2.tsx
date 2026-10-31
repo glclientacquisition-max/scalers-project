@@ -6,7 +6,7 @@ import { startTransition, useEffect, useState } from "react";
 import { holdSettings, type SettingsHubRaw } from "@/lib/ops/settingsHubView";
 import { clampHoldDays, reactivationFeeSurface } from "@/lib/ops/numberHold";
 import { Button } from "@/components/ui/Button";
-import { PageHeader, UnlockCta, OpsConfirm } from "@/components/ops";
+import { PageHeader, OpsConfirm, useAdminUnlockSession } from "@/components/ops";
 import "@/styles/ops.css";
 
 const WHEN = new Intl.DateTimeFormat("en-KE", {
@@ -29,7 +29,9 @@ export function AdminSettingsHubV2({ raw }: { raw: SettingsHubRaw | null }) {
   const here = rows.every((r) => r.state !== "absent");
   const feeSurface = reactivationFeeSurface(raw?.reactivation_fee_kes ?? null);
 
-  const [unlocked, setUnlocked] = useState(false);
+  const unlockSession = useAdminUnlockSession();
+  const unlocked = unlockSession.status?.mode !== "enforce" || unlockSession.unlocked;
+  const [editHold, setEditHold] = useState(false);
   const [enabled, setEnabled] = useState(raw?.hold_winback_enabled !== false);
   const [days, setDays] = useState(clampHoldDays(raw?.number_hold_days, 14));
   const [feeText, setFeeText] = useState(
@@ -47,6 +49,11 @@ export function AdminSettingsHubV2({ raw }: { raw: SettingsHubRaw | null }) {
     setFeeText(raw?.reactivation_fee_kes == null ? "" : String(raw.reactivation_fee_kes));
     setClearFee(raw?.reactivation_fee_kes == null);
   }, [raw?.hold_winback_enabled, raw?.number_hold_days, raw?.reactivation_fee_kes, raw?.updated_at]);
+
+  useEffect(() => {
+    if (unlocked && here) setEditHold(true);
+    if (!unlocked) setEditHold(false);
+  }, [unlocked, here]);
 
   async function save(reason: string) {
     setPending(true);
@@ -89,20 +96,7 @@ export function AdminSettingsHubV2({ raw }: { raw: SettingsHubRaw | null }) {
 
   return (
     <div className="ops-theme flex w-full flex-col gap-ops-3 pe-ops-4 text-ops-body">
-      <PageHeader
-        title="General"
-        actions={
-          here ? (
-            <UnlockCta
-              site="settings"
-              action="settings:hold"
-              what="edit number-hold settings"
-              onUnlocked={() => setUnlocked(true)}
-              observedHint="Edit form is open below. Saving still asks for a reason and writes through the hold API."
-            />
-          ) : undefined
-        }
-      />
+      <PageHeader title="General" />
       {status ? (
         <p className="text-ops-body text-ok" role="status" data-hold-settings-status="">
           {status}
@@ -113,7 +107,7 @@ export function AdminSettingsHubV2({ raw }: { raw: SettingsHubRaw | null }) {
           {error}
         </p>
       ) : null}
-      <article className="overflow-hidden rounded-sm border border-hairline bg-surface" data-number-hold="">
+      <article className="overflow-hidden rounded-sm border border-hairline bg-surface" data-number-hold="" data-stepup="settings">
         <header className="flex flex-wrap items-start justify-between gap-x-ops-4 gap-y-1 border-b border-hairline px-ops-3 py-ops-2">
           <div className="min-w-0">
             <h2 className="font-semibold text-ink">Number hold</h2>
@@ -124,12 +118,12 @@ export function AdminSettingsHubV2({ raw }: { raw: SettingsHubRaw | null }) {
             </p>
           </div>
           <p className="shrink-0 text-ops-label text-ink-2">
-            {unlocked && here ? "Editing · confirm to save" : "View only · unlock to change"}
+            {unlocked && editHold && here ? "Editing · confirm to save" : "View only · unlock in header"}
             {raw?.updated_at ? <span className="ms-1 block tabular-nums md:inline">· {WHEN.format(new Date(raw.updated_at))}</span> : null}
           </p>
         </header>
 
-        {unlocked && here ? (
+        {unlocked && editHold && here ? (
           <div className="flex flex-col gap-ops-3 px-ops-3 py-ops-3" data-hold-edit="">
             <label className="flex min-h-ops-touch items-start gap-3">
               <input
@@ -192,7 +186,18 @@ export function AdminSettingsHubV2({ raw }: { raw: SettingsHubRaw | null }) {
               <Button type="button" variant="primary" size="sm" data-action="save-hold-settings" onClick={() => { setError(""); setConfirm(true); }}>
                 Save hold settings
               </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setUnlocked(false)}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setEditHold(false);
+                  setEnabled(raw?.hold_winback_enabled !== false);
+                  setDays(clampHoldDays(raw?.number_hold_days, 14));
+                  setFeeText(raw?.reactivation_fee_kes == null ? "" : String(raw.reactivation_fee_kes));
+                  setClearFee(raw?.reactivation_fee_kes == null);
+                }}
+              >
                 Cancel edit
               </Button>
             </div>
@@ -210,10 +215,12 @@ export function AdminSettingsHubV2({ raw }: { raw: SettingsHubRaw | null }) {
             ))}
           </dl>
         )}
-        {!unlocked ? (
+        {!unlocked || !editHold ? (
           <p className="border-t border-hairline px-ops-3 py-ops-3 text-ops-label text-ink-2">
             {here
-              ? "To change these, unlock with secure sign-in. Unlock opens the step-up sheet — then the edit form appears. Saving still asks for a reason."
+              ? unlocked
+                ? "Edit form hidden. Unlock stays live in the header."
+                : "Unlock in the header to edit. Saving asks for a reason."
               : "Hold columns are not on this environment. Nothing to edit here."}
           </p>
         ) : null}

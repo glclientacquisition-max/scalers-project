@@ -8,6 +8,7 @@ import {
 } from "@/app/(desk)/requests/actions";
 import { Button } from "@/components/ui/Button";
 import { Stamp } from "@/components/ui/Stamp";
+import { holdDoneLabel } from "@/lib/inboxListVerbs";
 
 const initial: RequestStatusState = {};
 
@@ -21,11 +22,16 @@ function RequestStatusToggleInner({
   status,
   extra = false,
   banner = false,
+  requestType = null,
+  vertical = null,
 }: {
   id: string;
   status: string;
   extra?: boolean;
   banner?: boolean;
+  /** service_requests.request_type: a callback or enquiry is "Mark done", a hold is "Hold Done". */
+  requestType?: string | null;
+  vertical?: string | null;
 }) {
   const [state, formAction, pending] = useActionState(
     updateServiceRequestStatus,
@@ -35,7 +41,7 @@ function RequestStatusToggleInner({
   const normalized = status === "fulfilled" || status === "cancelled" ? status : "open";
   const err = ownerError(state.error);
   const wide = extra || banner;
-  const holdDoneLabel = wide ? "Hold Done" : "Done";
+  const doneLabel = wide ? holdDoneLabel({ request_type: requestType }, vertical) : "Done";
   const stack = wide
     ? "flex w-full flex-col gap-2"
     : "flex items-center justify-end";
@@ -54,9 +60,9 @@ function RequestStatusToggleInner({
               variant={wide ? "primary" : "tonal"}
               size={wide ? "md" : "sm"}
               block={wide}
-              aria-label={pending ? "Saving" : holdDoneLabel}
+              aria-label={pending ? "Saving" : doneLabel}
             >
-              {pending ? "Saving" : holdDoneLabel}
+              {pending ? "Saving" : doneLabel}
             </Button>
             {extra && !banner ? (
               <Button

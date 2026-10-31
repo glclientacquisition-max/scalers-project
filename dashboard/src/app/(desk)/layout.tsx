@@ -23,6 +23,7 @@ import { createDeskTimer } from "@/lib/deskTiming";
 import { loadCachedInboxNeedsCount } from "@/lib/inboxLoad";
 import { tenantNeedsOnboarding } from "@/lib/onboarding";
 import { getDeskShellTenant } from "@/lib/tenant";
+import { deskFeelEnabled } from "@/lib/deskFeatureFlags";
 
 // instant = false: owner cookie session must run before chrome. Do not wrap the gate in Suspense.
 export const instant = false;
@@ -77,6 +78,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
   }
 
   const hideHrefs = hiddenDeskHrefs(role);
+  const deskFeel = deskFeelEnabled();
 
   return (
     <DeskRoleProvider role={role}>
@@ -84,7 +86,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
       <Suspense fallback={null}>
         <WelcomeToast />
       </Suspense>
-      <div className={deskShellClass}>
+      <div className={deskShellClass} data-desk-feel={deskFeel ? "on" : "off"}>
         {tenant ? <LiveInbox tenantId={tenant.id} /> : null}
         <DeskRail hideHrefs={hideHrefs} />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

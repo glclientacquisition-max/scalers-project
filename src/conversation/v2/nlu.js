@@ -381,7 +381,9 @@ function understand(text, { profile = {}, now, expecting = null, topic = null, p
   const norm = G ? normaliseAsr(t) : t;
   const intents = detectIntents(t);
   if (G && norm !== t) for (const i of detectIntents(norm)) if (!intents.includes(i)) intents.push(i);
-  const catalog = profile.servicesCatalog || [];
+  // KB v2: matchers read the one catalogue door (offered items only on the KB: a paused / not-offered item never binds
+  // as the caller's service; it is answered from its KB receipt). Legacy: profile.servicesCatalog, as before.
+  const catalog = require('../../knowledge/kb/source').catalogueSource(profile).services() || [];
   const FSON = FS.factStoreEnabled();
   const facts = FSON ? FS.factsFor(profile) : null;
   const bound = FSON ? bindService(G ? norm : t, facts) : null;

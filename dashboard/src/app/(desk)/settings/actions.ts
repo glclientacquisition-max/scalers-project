@@ -2,6 +2,7 @@
 
 import { bustTenantCache } from "@/lib/tenantCache";
 import { requestSpokenCatalogueCompile } from "@/lib/spokenCatalogueOnSave";
+import { importCatalogueToKb } from "@/lib/kbWrite.server";
 import { PRODUCT_ID_PREFIX, parseBaseline, settleCatalogPrices } from "@/lib/catalogPricing";
 import { readCatalogFresh } from "@/lib/catalogFresh";
 import { normalizePhone } from "@/lib/setupFlow";
@@ -41,6 +42,7 @@ import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { parseAgentTools } from "@/lib/agentTools";
 import { DEFAULT_AGENT_TONE } from "@/lib/onboarding";
 import { parseVertical } from "@/lib/vertical";
+import { businessTypeForVertical } from "@/lib/identityCategory";
 import { parseHandoffMode } from "@/lib/handoffMode";
 import { parseSonioxVoiceId, parseSonioxVoiceLabel } from "@/lib/sonioxVoiceCatalog";
 import {
@@ -68,6 +70,7 @@ import { cleanFieldPaths } from "@/lib/fieldPathRegistry";
 import { factSaveIsConfirm } from "@/lib/deskFeatureFlags";
 import {
   greetingLanguagePatch,
+  greetingTextClearPatch,
   saveMatchedNoRows,
   settingsFieldFromScope,
   settingsScopeValidationError,
@@ -469,9 +472,10 @@ export async function saveAndCompileSettings(
 
   const patch: Record<string, unknown> = {
     business_name: businessName,
-    services_offered: servicesOffered,
-    services_catalog: servicesCatalog,
-    product_catalog: productCatalog,
+    // kb_items is the source of truth (28 Oct). services_offered is never written from this form (the KB mirror
+    // derives it), and the old catalogue columns are written only by a save that owns them (no stale copy back).
+    ...(ownsServices ? { services_catalog: servicesCatalog } : {}),
+    ...(ownsProducts ? { product_catalog: productCatalog } : {}),
     social_handles: socialHandles,
     business_hours: businessHours,
     hours_schedule: scheduleForSave,
@@ -485,6 +489,7 @@ export async function saveAndCompileSettings(
     unknown_answer_fallback: unknownAnswerFallback || null,
     agent_tools: agentTools,
     vertical,
+    business_type: businessTypeForVertical(vertical),
     handoff_mode: handoffMode,
     soniox_voice_id: sonioxVoiceId,
     soniox_voice_label: sonioxVoiceLabel,
@@ -494,6 +499,8 @@ export async function saveAndCompileSettings(
     tts_lexicon: ttsLexicon,
     // How you answer owns the business's default greeting language; no other save writes it.
     ...greetingLanguagePatch(scope, formData.get("greeting_language")),
+    // Go back to automatic clears the owner's full greeting (column grant, owner RLS). Not a compile input.
+    ...greetingTextClearPatch(scope, formData.get("greeting_text_clear")),
   };
 
   // FACT_HASH_MODE: confirm only what changed (plus "Looks right" paths). Both
@@ -614,6 +621,16 @@ export async function saveAndCompileSettings(
   }
   if (saveMatchedNoRows(count)) {
     return { error: deniedMessage(null, "settings.edit") };
+  }
+  if (ownsServices || ownsProducts) {
+    // Old catalogue tab (#997 sends it to the Catalogue once the KB tables exist): new rows are added to kb_items,
+    // price/name edits reach existing items, but never their state (paused / not offered / held / not included) and
+    // nothing is hidden. The mirror then rewrites the old columns + services_offered from the KB.
+    await importCatalogueToKb(
+      tenant.id,
+      { ...(ownsServices ? { services_catalog: servicesCatalog } : {}), ...(ownsProducts ? { product_catalog: productCatalog } : {}) },
+      { legacyServicesOffered: servicesOffered, by: "settings", notes: servicesNotes, contentEdits: true },
+    );
   }
   requestSpokenCatalogueCompile(tenant.id, patch);
 

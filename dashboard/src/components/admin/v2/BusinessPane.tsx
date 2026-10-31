@@ -8,10 +8,12 @@ import { statusLabel } from "@/lib/adminBusinessUi";
 import { businessTone, callLength, chargingLabel, intentLabel, numberLabel } from "@/lib/ops/businessesView";
 import { ksh } from "@/lib/ops/invoicesView";
 import { BUSINESS_PANE_SECTIONS, usedShare, type BusinessPaneData, type BusinessPaneSection } from "@/lib/ops/businessPane";
-import { OpsConfirm, SplitPane, StatusPill, StepUpSheet } from "@/components/ops";
+import { OpsConfirm, Sparkline, SplitPane, StatusPill, useOpenAdminUnlock } from "@/components/ops";
+import { MinutesMeter } from "@/components/ui/MinutesMeter";
 import { Button } from "@/components/ui/Button";
 import { ARCHIVE_RESTORE_DAYS } from "@/lib/adminBusinessModel";
 import { postJson } from "@/lib/ops/archiveRelease";
+import { BusinessKbBlock } from "@/components/admin/v2/BusinessKbBlock";
 
 const DATE = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" });
 const day = (iso: string | null | undefined) => (iso ? DATE.format(new Date(iso)) : "—");
@@ -153,6 +155,7 @@ export function BusinessPane({
           </ol>
         ) : <p className="text-ops-body text-ink-2">No calls yet.</p>)}
         {b ? <Go href={`/admin/quality?pane=${b.id}`}>All calls and quality</Go> : null}
+        {businessId && !fixture ? <BusinessKbBlock businessId={businessId} /> : null}
       </>
     ),
     history: wait("history", (
@@ -169,7 +172,7 @@ export function BusinessPane({
     )),
   };
 
-  const [unlockOpen, setUnlockOpen] = useState(false);
+  const openUnlock = useOpenAdminUnlock();
   const [archiving, setArchiving] = useState(false);
   const [archivePending, setArchivePending] = useState(false);
   const [archiveError, setArchiveError] = useState("");
@@ -191,7 +194,22 @@ export function BusinessPane({
       {archived ? <p className="text-ops-body text-ink-2" role="status">Archived. Restore within {ARCHIVE_RESTORE_DAYS} days.</p> : null}
       {archiveError && !archiving ? <p className="text-ops-body text-attention" role="alert">{archiveError}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="ghost" size="sm" data-honest="unlock" data-stepup="business" onClick={() => setUnlockOpen(true)}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          data-honest="unlock"
+          data-stepup="business"
+          onClick={() =>
+            openUnlock({
+              action: "business:write",
+              target: businessId,
+              what: "change package, minutes, charging or archive this business",
+              observedHint:
+                "Archive stays on the confirm sheet. Number hold, end-early and restore live on Numbers. Package and charging edits land with the next BusinessPane write slice.",
+            })
+          }
+        >
           Unlock
         </Button>
         {canArchive ? (
@@ -205,6 +223,31 @@ export function BusinessPane({
     <>
     <SplitPane open={!!businessId} onClose={onClose} title={b?.business_name || (businessId ? "Business" : "")} footer={footer}>
       <div ref={body} data-business-pane="">
+        <div className="mb-ops-3 flex flex-col items-start gap-2" data-sheet-header="">
+          {b ? <StatusPill tone={businessTone(b.status)}>{statusLabel(b.status)}</StatusPill> : null}
+          {pending ? <p className="text-ops-body text-ink-2">Loading.</p> : null}
+          {failed ? <p className="text-ops-body text-attention" role="alert">Could not load this business.</p> : null}
+          {u ? (
+            <MinutesMeter
+              shape="bar"
+              input={{
+                included: u.minutesIncluded,
+                used: u.minutesUsed,
+                left: u.minutesRemaining,
+                underOne: false,
+                mode: u.minutesIncluded > 0 ? (u.onDemand ? "metered" : "capped") : "none",
+                overLabel: null,
+              }}
+            />
+          ) : loaded ? <p className="text-ops-body text-ink-2">No package this period.</p> : null}
+          {m ? (
+            <p className="text-ops-body tabular-nums text-ink">
+              {m.balanceCents > 0 ? `${ksh(m.balanceCents)} owed` : "Nothing owed."}
+              {m.overdueCount > 0 ? <StatusPill tone="danger">{`${m.overdueCount} overdue`}</StatusPill> : null}
+            </p>
+          ) : null}
+          {badge?.scores && badge.scores.length >= 2 ? <Sparkline points={badge.scores} label="Quality" /> : null}
+        </div>
         <nav aria-label="Sections" className="sticky top-0 z-10 -mx-ops-4 -mt-ops-3 mb-ops-2 flex gap-1 overflow-x-auto border-b border-hairline bg-surface px-ops-4">
           {BUSINESS_PANE_SECTIONS.map((s) => (
             <button
@@ -228,14 +271,6 @@ export function BusinessPane({
         </div>
       </div>
     </SplitPane>
-    <StepUpSheet
-      open={unlockOpen && !!businessId}
-      onClose={() => setUnlockOpen(false)}
-      action="business:write"
-      target={businessId}
-      what="change package, minutes, charging or archive this business"
-      observedHint="Archive stays on the confirm sheet. Number hold, end-early and restore live on Numbers. Package and charging edits land with the next BusinessPane write slice."
-    />
     <OpsConfirm
       open={archiving && !!businessId}
       onClose={() => { if (!archivePending) setArchiving(false); }}

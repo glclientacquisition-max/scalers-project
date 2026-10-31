@@ -17,9 +17,28 @@ import {
   type BusinessView,
 } from "@/lib/ops/businessesView";
 import { parsePaneSection, type BusinessPaneSection } from "@/lib/ops/businessPane";
-import { PageHeader, SplitLayout, StatusPill, EmptyState } from "@/components/ops";
+import { PageHeader, SplitLayout, StatusPill, EmptyState, Sparkline } from "@/components/ops";
+import type { UsageInput } from "@/lib/ops/attentionView";
 import { BusinessPane } from "./BusinessPane";
 import "@/styles/ops.css";
+
+function scoresOf(badge: QualityBadge | undefined): number[] {
+  return badge?.scores && badge.scores.length >= 2 ? badge.scores : [];
+}
+
+function UsageBit({ row }: { row?: UsageInput }) {
+  if (!row || !(row.includedMinutes > 0)) return null;
+  const used = Math.floor(Math.max(0, row.usedSeconds) / 60);
+  const fill = Math.max(0, Math.min(1, row.usedSeconds / (row.includedMinutes * 60)));
+  return (
+    <span className="ms-auto flex shrink-0 items-center gap-1">
+      <span className="relative h-1.5 w-14 overflow-hidden rounded-full bg-surface-2" aria-hidden="true">
+        <span className="block h-full w-full origin-left bg-accent" style={{ transform: `scaleX(${fill})` }} />
+      </span>
+      <span className="tabular-nums text-ink">{used} of {row.includedMinutes}</span>
+    </span>
+  );
+}
 
 const DATE = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" });
 const day = (iso: string) => (iso ? DATE.format(new Date(iso)) : "—");
@@ -28,13 +47,21 @@ const day = (iso: string) => (iso ? DATE.format(new Date(iso)) : "—");
 export function AdminBusinessesV2({
   businesses,
   badges = {},
+  usage = null,
   paneFixture,
 }: {
   businesses: AdminBusiness[];
   badges?: Record<string, QualityBadge>;
+  /** Null when the usage read failed. Missing id means that business has no included minutes. */
+  usage?: UsageInput[] | null;
   /** Dev fixture only: skips the pane read. */
   paneFixture?: ComponentProps<typeof BusinessPane>["fixture"];
 }) {
+  const usageById = useMemo(() => {
+    const map = new Map<string, UsageInput>();
+    for (const row of usage || []) map.set(row.tenantId, row);
+    return map;
+  }, [usage]);
   const [view, setView] = useState<BusinessView>(() => defaultView(businesses));
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState<string | null>(null);
@@ -100,6 +127,7 @@ export function AdminBusinessesV2({
           className="ops-field ms-auto w-full text-ink md:w-auto md:min-w-0 md:flex-1 md:max-w-64"
         />
       </div>
+      {usage == null ? <p className="pb-ops-2 text-ops-label text-ink-2">Could not load usage. Minute bars may be missing.</p> : null}
       {rows.length === 0 ? (
         <EmptyState title={query.trim() ? "No business matches." : "Nothing in this view."} />
       ) : (
@@ -112,7 +140,13 @@ export function AdminBusinessesV2({
                     <span className="min-w-0 truncate text-ink">{r.business_name}</span>
                     <StatusPill tone={businessTone(r.status)}>{statusLabel(r.status)}</StatusPill>
                   </span>
-                  <span className="text-ops-label text-ink-2">{r.package_name || "No package"} · {numberLabel(r)}</span>
+                  <span className="flex w-full items-center gap-2 text-ops-label text-ink-2">
+                    <span className="min-w-0 truncate">{r.package_name || "No package"} · {numberLabel(r)}</span>
+                    <UsageBit row={usageById.get(r.id)} />
+                    {scoresOf(badges[r.id]).length >= 2 ? (
+                      <Sparkline points={scoresOf(badges[r.id])} label={`${r.business_name} quality`} />
+                    ) : null}
+                  </span>
                 </button>
               </li>
             ))}

@@ -103,8 +103,6 @@ describe("role-aware UI", () => {
     ContactImportForm: "contacts.import",
     TenantForm: "settings.edit",
     AlertsPanel: "settings.edit",
-    CatalogImportPanel: "settings.edit",
-    KnowledgeIngestPanel: "settings.edit",
     PronunciationCoach: "settings.edit",
     DailyBulletinPanel: "settings.edit",
   };

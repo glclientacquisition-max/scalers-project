@@ -6,35 +6,30 @@ const {
   parseVertical,
   offeredVertical,
 } = require('../src/conversation/vertical');
+const desk = require('../dashboard/src/lib/businessType.ts');
 
 function read(rel) {
   return fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
 }
 
 describe('business type offer', () => {
-  const verticalTs = read('dashboard/src/lib/vertical.ts');
-  // Identity › Your business asks one "What you do" question over pack + category.
+  const businessTypeTs = read('dashboard/src/lib/businessType.ts');
   const form = read('dashboard/src/components/identity/IdentitySettings.tsx');
   const identityCategory = read('dashboard/src/lib/identityCategory.ts');
   const wizard = read('dashboard/src/app/onboarding/OnboardingWizard.tsx');
   const compiler = read('dashboard/src/lib/promptCompiler.ts');
   const niche = read('dashboard/src/lib/inboxNiche.ts');
 
-  it('sells Shop and Home services only', () => {
-    assert.match(verticalTs, /label: VERTICAL_LABELS.retail/);
-    assert.match(verticalTs, /retail: "Shop"/);
-    assert.match(verticalTs, /blurb: "Holds, stock, pickup\."/);
-    assert.match(verticalTs, /blurb: "We come to you\."/);
-    assert.match(verticalTs, /export type OfferedVertical = "retail" \| "home_services"/);
-    assert.doesNotMatch(verticalTs, /label: "Retail \/ shop"/);
-    assert.doesNotMatch(wizard, /Hotel \/ lodge \/ restaurant/);
-    assert.doesNotMatch(wizard, /Other \/ general/);
-    assert.match(wizard, /DEFAULT_VERTICAL/);
-    assert.match(wizard, /VERTICAL_OPTIONS/);
-    assert.match(wizard, /opt\.blurb/);
+  it('offers Shop, Home services, and Other business', () => {
+    assert.match(businessTypeTs, /retail: "Shop"/);
+    assert.match(businessTypeTs, /home_services: "Home services"/);
+    assert.match(businessTypeTs, /general: "Other business"/);
+    assert.doesNotMatch(wizard, /DEFAULT_VERTICAL/);
+    assert.match(wizard, /BUSINESS_TYPE_OPTIONS/);
+    assert.match(wizard, /useState<BusinessType \| "">\(""\)/);
     assert.match(form, /identityCategoryChoices\(storedVertical\)/);
     assert.match(identityCategory, /VERTICAL_LABELS\[vertical\]/);
-    assert.match(identityCategory, /current === "hospitality"/); // legacy pack keeps its row
+    assert.match(identityCategory, /current === "hospitality"/);
   });
 
   it('maps shop onto retail and keeps hospitality as a stored id', () => {
@@ -46,6 +41,7 @@ describe('business type offer', () => {
     assert.equal(offeredVertical('hospitality'), 'general');
     assert.equal(offeredVertical('general'), 'general');
     assert.equal(offeredVertical('home_services'), 'home_services');
+    assert.equal(desk.resolveBusinessType({ vertical: 'hospitality' }), 'general');
   });
 
   it('does not compile a shop or visit job for hospitality or general', () => {
@@ -56,8 +52,8 @@ describe('business type offer', () => {
     );
   });
 
-  it('uses general Inbox copy for hospitality until reservations exist', () => {
-    assert.match(niche, /parsed === "hospitality" && !HOSPITALITY_RESERVATIONS_EXIST/);
+  it('uses general Inbox copy for non-retail non-home-services types', () => {
+    assert.match(niche, /resolvedType\(input\)/);
     assert.match(niche, /return NICHE.general/);
   });
 });

@@ -36,7 +36,7 @@ async function AreasBody({ searchParams }: { searchParams: Promise<{ view?: stri
   if (view === "home" && !row && oldList.length) view = "check";
   if (view === "check" && !oldList.length) view = "home";
   return (
-    <div className="w-full min-w-0" data-settings-console="" data-desk-nested="">
+    <div className="w-full min-w-0 overflow-x-clip" data-settings-console="" data-desk-nested="">
       <div className={settingsConsoleClass}>
         <SettingsRail optionStatus={statuses} activePath="/settings/areas" />
         <div className="min-w-0 flex-1 md:max-w-2xl" data-area-picker="">

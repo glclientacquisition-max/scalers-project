@@ -1,6 +1,6 @@
 ---
 owner: desk
-last_reviewed: 2026-10-23
+last_reviewed: 2026-10-30
 ---
 
 # Scalers design system (MASTER)
@@ -29,7 +29,8 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 | Card | `--card` `#FFFFFF` | `surface` |
 | Line | `--line` `#D5DEE9` | `line` |
 | Accent wash | `--accent-soft` `#EAF6FF` | `accent-soft` / `brand-50` |
-| Warn | `--warn` (`--attention`) `#B13A0A` (AA 4.5:1+ on canvas, surface, surface-2, tonal) | `warn` |
+| Warn | `--warn` `#8A5A00` on `--warn-soft` `#FFF5D6`. Not a button fill. | `warn` |
+| Problem | `--attention` `#B42318` | Destructive fill and problem text. Not orange. `attention` |
 | On attention fill | `--attention-on` | Label on solid attention (`dangerSolid`). Light `#FFFFFF`, dark `#071426` (same invert as `--accent-on`). `attention-on` |
 | Ok | `--ok` `#15803D` | `ok` |
 | Lead | `--lead` `#B98A1F` | `lead` |

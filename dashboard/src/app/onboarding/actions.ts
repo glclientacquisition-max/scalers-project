@@ -13,7 +13,7 @@ import { compileReceptionistPrompt, parseAgentTone } from "@/lib/promptCompiler"
 import { ownerUnknownAnswer } from "@/lib/unknownAnswerSpoken";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerFacingError } from "@/lib/ownerFacingError";
-import { parseVertical } from "@/lib/vertical";
+import { parseBusinessType, verticalForBusinessType } from "@/lib/businessType";
 import { parseHandoffMode } from "@/lib/handoffMode";
 import { formatLocationsForCompiler } from "@/lib/businessLocations";
 import { formatHoursForCompiler } from "@/lib/hoursSchedule";
@@ -28,6 +28,7 @@ import {
 } from "@/lib/outcomeGates";
 import { upsertTenantFieldMeta } from "@/lib/deskProvenance";
 import { memberDenied } from "@/lib/requireMember";
+import { importCatalogueToKb } from "@/lib/kbWrite.server";
 import { updateWithColumnPeel } from "@/lib/peelMissingColumns";
 import { validateAgentName } from "@/lib/onboardingDraft";
 
@@ -59,7 +60,11 @@ export async function completeOnboardingAction(
     redirect("/home");
   }
 
-  const vertical = parseVertical(formData.get("vertical"));
+  const businessType = parseBusinessType(formData.get("vertical"));
+  if (!businessType) {
+    return { error: "Pick a business type.", step: 0 };
+  }
+  const vertical = verticalForBusinessType(businessType);
   const catalogSkipped = String(formData.get("catalog_skipped") || "") === "1";
   const hoursSkipped = String(formData.get("hours_skipped") || "") === "1";
   const hoursRaw = String(formData.get("hours_location") || "").trim();
@@ -82,13 +87,13 @@ export async function completeOnboardingAction(
   const faqs = parseConfirmedFaqs(formData.get("faqs_json"));
 
   if (!catalogSkipped) {
-    if (vertical === "home_services" && !homeCatalogPasses(services)) {
+    if (businessType === "home_services" && !homeCatalogPasses(services)) {
       return {
         error: "Add three services with a price mode and a site visit, or skip.",
         step: 1,
       };
     }
-    if (vertical !== "home_services" && !shopCatalogPasses(products)) {
+    if (businessType !== "home_services" && !shopCatalogPasses(products)) {
       return { error: "Add at least one product with a valid price, or skip.", step: 1 };
     }
   }
@@ -124,7 +129,7 @@ export async function completeOnboardingAction(
   }
   const agentName = agentNameCheck.name;
   const servicesOffered =
-    vertical === "home_services"
+    businessType === "home_services"
       ? formatServicesForCompiler(services, "")
       : formatProductsForCompiler(products);
   const hoursLocation = schedule ? formatHoursForCompiler(schedule) : "";
@@ -177,14 +182,15 @@ export async function completeOnboardingAction(
     return { error: "Not signed in." };
   }
 
+  // services_offered is no longer written here: kb_items is the source; the KB mirror derives that text (below).
   const patch: Record<string, unknown> = {
-    services_offered: servicesOffered,
-    services_catalog: vertical === "home_services" ? services : [],
-    product_catalog: vertical === "home_services" ? [] : products,
+    services_catalog: businessType === "home_services" ? services : [],
+    product_catalog: businessType === "home_services" ? [] : products,
     business_hours: hoursLocation,
     agent_tone: tone,
     agent_name: agentName,
     vertical,
+    business_type: businessType,
     handoff_mode: handoffMode,
     business_locations: businessLocations,
     faqs,
@@ -216,6 +222,12 @@ export async function completeOnboardingAction(
   if (dropped.length) {
     console.warn("[onboarding] saved without missing columns:", dropped.join(", "));
   }
+  // The Catalogue starts filled: these rows go into kb_items (add-only), then the mirror + compile ping.
+  await importCatalogueToKb(
+    tenant.id,
+    { services_catalog: patch.services_catalog, product_catalog: patch.product_catalog },
+    { legacyServicesOffered: servicesOffered, by: "onboarding" },
+  );
   requestSpokenCatalogueCompile(tenant.id, patch);
 
   await recordCaptureMeta({

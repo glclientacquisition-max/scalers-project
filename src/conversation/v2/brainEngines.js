@@ -25,6 +25,10 @@ const { writeReply } = require('./engineReply');
 const { speakable } = require('./engineSpeech');
 const { pickFiller, fillerDelayMs } = require('./engineFiller');
 const { buildTrace, emitTrace } = require('./engineTrace');
+const D = require('./degrade');
+const Safe = require('./safeMode');
+const { callMode } = require('./brainModeAdapter');
+const { openTeamConfirm } = require('./enginePlan');
 
 const ACK_ONLY = /^\W*(ok(?:ay)?|sawa|haya|poa|yes|yeah|yep|no|nope|ndio|ndiyo|hapana|eeh|sure|thanks?|thank you|asante(?: sana)?|alright)\W*$/i;
 
@@ -102,18 +106,45 @@ async function runBrainEnginesTurn({
   const lang = decideLang({ u, text, prev: prevLang, langLock });
   E.lang = lang; machine.lang = lang; u.language = lang; turnLang = lang;
 
-  // 2) plan: exactly one goal
-  let goal = pickGoal({ understanding: u, machine, profile, lang, callerPhone, now, text });
-  // 3) read-only tools for this turn's facts
-  const toolOut = runTools({ understanding: u, machine, profile, lang, text, now });
-  const receipts = toolOut.receipts.filter((r) => r.tool !== 'lookup_caller');
+  // B1: the call's brain mode (decided on its first turn, pinned for the call) and the named degradation rules
+  const mode = callMode(machine, profile, env);
+  const safe = mode.mode === 'safe';
+  const rules = D.rulesFor(opts.degradeRules || null);
+  const writePhone = safe ? Safe.phoneOf(machine, callerPhone) : callerPhone;
 
-  const fixed = []; const model = []; const guard = []; let write = null; let path = 'brain_engines';
+  // 2) plan: exactly one goal (safe mode: the capture-only plan)
+  let goal = safe
+    ? Safe.pickSafeGoal({ understanding: u, machine, profile, callerPhone, now, text })
+    : pickGoal({ understanding: u, machine, profile, lang, callerPhone, now, text, rules });
+  // 3) read-only tools for this turn's facts (safe mode: no catalogue, prices, areas, hours or bookings)
+  const toolOut = safe
+    ? (() => { const sr = Safe.safeReceipt(u, text, lang); return { caller: require('./engineTools').lookupCaller(machine, profile, now), receipts: sr ? [sr] : [], degraded: [] }; })()
+    : runTools({ understanding: u, machine, profile, lang, text, now, rules });
+  const receipts = toolOut.receipts.filter((r) => r.tool !== 'lookup_caller');
+  const degraded = [...(toolOut.degraded || [])];
+  if (goal.p && goal.p.degraded && !degraded.includes(goal.p.degraded)) degraded.push(goal.p.degraded);
+  // v2 KB: lookup timing + what kind of catalogue answer this turn carried (trace only)
+  const kbr = receipts.find((r) => r.kb);
+  if (kbr) { timings.kbLookupMs = kbr.ms; timings.kbKind = kbr.kind; timings.kbVersion = kbr.kbVersion ?? null; }
+  // a catalogue question the understanding missed ("what tomato seedlings do you have") is answered, not met with an open line
+  if (kbr && kbr.text && goal.type === 'open') goal = { type: 'answer', topics: ['services'], answers: ['services'], offerCallback: false };
+  // B1: a team_confirm catalogue receipt (empty / sparse catalogue) opens the callback capture with the ask as the reason;
+  // a team_confirm hours / payment answer offers the callback (the caller's yes opens it)
+  if (!safe && !E.pending && (!E.flow || E.flow.done) && ['answer', 'open'].includes(goal.type)) {
+    const tc = receipts.find((r) => r.capture === 'team_confirm');
+    if (tc) goal = openTeamConfirm({ machine, profile, callerPhone, now, rule: tc.degraded, asked: tc.asked, said: Safe.cleanReason(text), answers: u.answers || [] });
+    else if (goal.type === 'answer' && receipts.some((r) => r.kind === 'team_confirm')) goal = { ...goal, teamConfirm: true };
+  }
+  if (goal.degraded && !degraded.includes(goal.degraded)) degraded.push(goal.degraded);
+  if (goal.teamConfirm) { E.offered = 'callback'; E.offeredTurn = machine.turn; }
+  if (safe) goal.safe = true;
+
+  const fixed = []; const model = []; const guard = []; let write = null; let path = safe ? 'brain_engines_safe' : 'brain_engines';
   // 4a) the write (only on a yes to the read-back the caller heard)
   if (goal.type === 'commit') {
     const p = goal.p;
     const notify = opts.notify || (opts.dispatch ? createHandoffNotifier(profile, { dispatch: opts.dispatch, machine }) : null);
-    const res = await commitWrite({ p, machine, handlers, profile, notify, callerPhone, log });
+    const res = await commitWrite({ p, machine, handlers, profile, notify, callerPhone: writePhone, log });
     write = { status: res.status, id: res.id || null, fallbackId: res.fallbackId || null, notified: !!res.notified, error: res.error || null, idempotencyKey: p.idemKey };
     if (res.status === 'blocked') {
       goal = { type: 'ask', slot: res.missing[0], why: p.tool === 'create_handoff' ? 'callback' : 'booking', answers: goal.answers };
@@ -121,6 +152,9 @@ async function runBrainEnginesTurn({
       path = 'brain_engines_commit';
       E.pending = null;
       E.flow = null;
+      // B1: a safe-mode request is the end of the script (saved or honestly not); a booking request ends the booking
+      if (p.safe) Safe.safeState(machine).done = true;
+      if (p.request === 'booking') machine.intent = null;
       if (res.status === 'committed') {
         if (p.name) bindCallerName(machine, handlers, p.name);
         if (p.tool === 'create_handoff') Object.assign(machine.handoff, { committed: true, phase: 'done', reason: p.reason, idempotencyKey: p.idemKey });
@@ -157,6 +191,7 @@ async function runBrainEnginesTurn({
       profile,
       questions: (u.answers || []).map((a) => ({ type: a })),
       lang, machine, text, u, confirm: [],
+      kbReceipt: (receipts.find((r) => r.kb && r.text) || {}).text || null,
     };
     const allowed = allowedTimes({ receipts, machine, profile, extra: E.pending?.p?.callbackWhen?.at ? [E.pending.p.callbackWhen.at.time] : [] });
     const ver = makeEnginesVerifier(ctx, { allowed, readbackTurn: goal.type === 'readback' || goal.type === 'reask' });
@@ -173,11 +208,25 @@ async function runBrainEnginesTurn({
       if (receiptText && receiptText === machine.lastLine) receiptText = (u.answers || []).includes('price') ? (E.offered = 'callback', E.offeredTurn = machine.turn, require('./receipts').info({ kind: 'price', found: false }, lang)) : null;
       const n = goal.type === 'open' ? (E.openFallbacks = (E.openFallbacks || 0) + 1) - 1 : (goal.n || 0);
       const fb = Lines.noModelFallback(goal, lang, { n, machine, receiptText });
-      if (fb) model.push({ text: fb, src: receiptText ? 'receipt' : 'fallback' });
+      // v2 KB: an ask turn that also carried a catalogue question answers it first (model unavailable only)
+      // B1 safe mode: the safe receipt ("the team will call you back about that") comes first the same way
+      const firstText = (kbr && kbr.text) || (safe ? (receipts.find((r) => r.tool === 'safe_mode') || {}).text : null);
+      const kbFirst = goal.type === 'ask' && firstText && (goal.answers || []).length ? firstText : null;
+      if (kbFirst) model.push({ text: /\?\s*$/.test(kbFirst) ? kbFirst : `${kbFirst} ${fb || ''}`.trim(), src: 'receipt' });
+      else if (fb) model.push({ text: fb, src: receiptText ? 'receipt' : 'fallback' });
     } else if (goal.type === 'ask' && !model.some((x) => /\?\s*$/.test(x.text))) {
       model.push({ text: Lines.noModelFallback(goal, lang, { n: goal.n || 0, machine }), src: 'tail' });
     }
     if (goal.type === 'answer' && goal.offerCallback) { E.offered = 'callback'; E.offeredTurn = machine.turn; }
+    // v2 KB: a custom-quote / site-visit price offers to take details; the caller's yes starts the callback capture
+    const kbCap = receipts.find((r) => r.kb && r.capture && r.capture !== 'team_confirm');
+    if (kbCap) {
+      E.offered = 'callback'; E.offeredTurn = machine.turn;
+      // a paused item is never a booking slot: a yes is a callback for when it's back (traced, read back like any callback)
+      // turn-stamped, so only a yes to THIS offer names the item in the owner request and alert
+      machine.kbWhenBack = kbCap.capture === 'when_back' && kbCap.service ? { item: kbCap.service, turn: machine.turn } : null;
+      if (kbCap.capture === 'when_back') { /* never a booking slot */ } else if (kbCap.service && machine.slots && !machine.slots.service) machine.slots.service = kbCap.service;
+    }
   }
 
   // 5) assemble: model part capped at two sentences, then the fixed line; one commit-truth check for all
@@ -220,12 +269,13 @@ async function runBrainEnginesTurn({
     turn: machine.turn,
     turnIndex: typeof opts.traceTurnIndex === 'function' ? opts.traceTurnIndex() : null,
     u, lang, goal, write, guard, dropped: truth.dropped, filler, timings, stripped, path,
+    mode, degraded,
   });
   emitTrace(rec, { machine, onStage: opts.onModelStage, log });
   return {
     line, lang, sentences: spoken, path, understanding: u, goal, lead: true, answeredBy,
     streamed: streaming, phase: machine.phase, end, ...(end ? { reason: 'caller_done' } : {}),
-    write, filler: filler ? filler.text : null, timings,
+    write, filler: filler ? filler.text : null, timings, brainMode: mode.mode, degraded,
   };
   } finally {
     spokeReal = true;

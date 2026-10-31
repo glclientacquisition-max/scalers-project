@@ -1,40 +1,33 @@
+import {
+  BUSINESS_TYPE_LABELS,
+  BUSINESS_TYPE_OPTIONS,
+  resolveBusinessType,
+  type BusinessType,
+} from "./businessType";
+
 export type BusinessVertical =
   | "general"
   | "retail"
   | "home_services"
   | "hospitality";
 
-/** Packs owners can pick. Stored id for Shop stays `retail`. */
-export type OfferedVertical = "retail" | "home_services";
+/** @deprecated Use BusinessType from businessType.ts */
+export type OfferedVertical = BusinessType;
 
-export const DEFAULT_VERTICAL: OfferedVertical = "retail";
+/** @deprecated Onboarding requires an explicit pick; do not default to Shop. */
+export const DEFAULT_VERTICAL: BusinessType = "retail";
 
 export const VERTICAL_LABELS: Record<BusinessVertical, string> = {
-  retail: "Shop",
-  home_services: "Home services",
+  retail: BUSINESS_TYPE_LABELS.retail,
+  home_services: BUSINESS_TYPE_LABELS.home_services,
   hospitality: "Hotel / lodge / restaurant",
-  general: "Other",
+  general: BUSINESS_TYPE_LABELS.general,
 };
 
-export const VERTICAL_OPTIONS: {
-  id: OfferedVertical;
-  label: string;
-  blurb: string;
-}[] = [
-  {
-    id: "retail",
-    label: VERTICAL_LABELS.retail,
-    blurb: "Holds, stock, pickup.",
-  },
-  {
-    id: "home_services",
-    label: VERTICAL_LABELS.home_services,
-    blurb: "We come to you.",
-  },
-];
+export const VERTICAL_OPTIONS = BUSINESS_TYPE_OPTIONS;
 
 const VERTICAL_LEGACY_OPTIONS: {
-  id: Exclude<BusinessVertical, OfferedVertical>;
+  id: "hospitality";
   label: string;
   blurb: string;
 }[] = [
@@ -42,11 +35,6 @@ const VERTICAL_LEGACY_OPTIONS: {
     id: "hospitality",
     label: VERTICAL_LABELS.hospitality,
     blurb: "Hours and messages.",
-  },
-  {
-    id: "general",
-    label: VERTICAL_LABELS.general,
-    blurb: "Hours, FAQ, message.",
   },
 ];
 
@@ -65,10 +53,12 @@ export function parseVertical(raw: unknown): BusinessVertical {
 }
 
 /** Playbook and force-save pack. Hospitality runs as general until reservations exist. */
-export function offeredVertical(raw: unknown): OfferedVertical | "general" {
-  const v = parseVertical(raw);
-  if (v === "retail" || v === "home_services") return v;
-  return "general";
+export function offeredVertical(raw: unknown): BusinessType {
+  const input =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as { business_type?: unknown; vertical?: unknown })
+      : { vertical: raw };
+  return resolveBusinessType(input);
 }
 
 export function isOfferedVertical(raw: unknown): raw is OfferedVertical {

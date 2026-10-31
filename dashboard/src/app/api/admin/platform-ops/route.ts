@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { adminActorName } from "@/lib/adminActor";
 import { recordAdminAction } from "@/lib/adminAudit";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
-import { isLegacyAuthenticated } from "@/lib/auth";
+import { requireAdminApiRead, requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import {
   ensureOpsResendDomain,
   getOpsResendDomain,
@@ -22,8 +22,9 @@ import {
 } from "@/lib/platformOpsModel";
 
 export async function GET(request: Request) {
-  if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  const read = await requireAdminApiRead();
+  if (!read.ok) {
+    return NextResponse.json({ error: read.error }, { status: read.status });
   }
   // Read-only: how many recordings the next purge would delete at a proposed setting.
   // A GET, like other admin reads, so it is not an admin write and writes no Activity row.
@@ -47,8 +48,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  const gate = await requireAdminOperatorWrite();
+  if (!gate.ok) {
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
 
   const body = await request.json().catch(() => ({}));

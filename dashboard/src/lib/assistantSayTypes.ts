@@ -7,6 +7,10 @@ export type AssistantSayRow = {
   stampLabel: string;
   reason: string;
   fixHref: string;
+  /** Two-line list preview: what callers hear when ready, else empty. */
+  hearPreview?: string;
+  /** Kiswahili line from the same readiness result, when ready. */
+  hearPreviewSw?: string;
 };
 
 export type AssistantSayState = {

@@ -154,16 +154,25 @@ export function brainCallFixesD199FromEnv(): boolean {
   return String(process.env.BRAIN_CALL_FIXES_D199 || "").trim() === "on";
 }
 
+/**
+ * BRAIN_CONFIRMED_COVERAGE, on only when exactly 'on' (same name and rule as Voice confirmedCoverage.js).
+ * Only an owner-confirmed coverage list reaches the prompt and the fact sheet. Server only; off by default.
+ */
+export function brainConfirmedCoverageFromEnv(): boolean {
+  return process.env.BRAIN_CONFIRMED_COVERAGE === "on";
+}
+
 /** Index meta rows and the hold gate for compile. Null fields keep the pack heuristic. */
 export async function loadCompileProvenance(tenantId: string) {
   const seedFilter = brainCallFixesD199FromEnv();
-  if (!tenantId) return { fieldMeta: indexFieldMeta(null, { hashMode: factHashModeFromEnv(), seedFilter }), holdGate: null };
+  const confirmedCoverage = brainConfirmedCoverageFromEnv();
+  if (!tenantId) return { fieldMeta: indexFieldMeta(null, { hashMode: factHashModeFromEnv(), seedFilter, confirmedCoverage }), holdGate: null };
   const [rows, gate] = await Promise.all([
     listTenantFieldMeta(tenantId),
     getTenantHoldGate(tenantId),
   ]);
   // Server-side default for confirm v2 hash mode. Client code passes hashMode in.
-  const fieldMeta = indexFieldMeta(rows, { hashMode: factHashModeFromEnv(), seedFilter });
+  const fieldMeta = indexFieldMeta(rows, { hashMode: factHashModeFromEnv(), seedFilter, confirmedCoverage });
   const reasons = Array.isArray(gate?.reasons) ? gate.reasons.map((reason) => String(reason)) : [];
   const holdGate =
     gate && typeof gate.allowed === "boolean" && !reasons.includes("provenance_rpc_missing")

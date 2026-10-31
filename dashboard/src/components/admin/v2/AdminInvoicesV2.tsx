@@ -27,7 +27,7 @@ import {
   isValidResendEmail,
   type ResendMode,
 } from "@/lib/ops/invoiceActions";
-import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState, OpsConfirm, Drawer, UnlockCta } from "@/components/ops";
+import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState, OpsConfirm, Drawer, useAdminUnlockSession } from "@/components/ops";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { useRouter } from "next/navigation";
 import { startTransition, useEffect, useMemo, useState } from "react";
@@ -57,7 +57,8 @@ export function AdminInvoicesV2({
   const [view, setView] = useState<InvoiceView>(() => defaultInvoiceView(all, now));
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState<string | null>(null);
-  const [unlocked, setUnlocked] = useState(false);
+  const unlockSession = useAdminUnlockSession();
+  const unlocked = unlockSession.status?.mode !== "enforce" || unlockSession.unlocked;
   const [confirm, setConfirm] = useState<ConfirmKind>(null);
   const [resendOpen, setResendOpen] = useState(false);
   const [resendMode, setResendMode] = useState<ResendMode>("saved");
@@ -299,18 +300,9 @@ export function AdminInvoicesV2({
                 {it.remindersPausedAt ? (
                   <p className="text-ops-label text-ink-2">Disputed — reminders paused.</p>
                 ) : null}
-                <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                <div className="flex w-full flex-wrap items-center justify-between gap-2" data-stepup="invoices">
                   {!unlocked ? (
-                    <UnlockCta
-                      site="invoices"
-                      action="invoices:money"
-                      target={it.id}
-                      what="resend, credit or void this invoice"
-                      label="Unlock"
-                      variant="ghost"
-                      onUnlocked={() => setUnlocked(true)}
-                      observedHint="Money actions are open for this invoice. Authenticator enforce still waits on #876."
-                    />
+                    <p className="text-ops-label text-ink-2">Unlock in header for money actions.</p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {canResendInvoice(it) ? (

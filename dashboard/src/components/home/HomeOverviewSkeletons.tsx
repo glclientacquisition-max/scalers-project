@@ -2,10 +2,10 @@ import { Skeleton, SkeletonHeader } from "@/components/ui/Skeleton";
 
 /** Overview skeletons (D2). Each matches the box it stands in for, so nothing jumps when data lands. */
 
-/** Same box as HomeUsageSection: border-t, two lines. */
+/** Same box as HomeUsageSection: a card under the line card on large screens. */
 export function HomeUsageSkeleton() {
   return (
-    <section aria-label="Usage" aria-busy="true" className="border-t border-hairline px-4 py-4">
+    <section aria-label="Usage" aria-busy="true" className="min-w-0 overflow-hidden rounded-2xl border border-hairline bg-surface px-4 py-4 lg:col-span-5 lg:col-start-8 lg:row-start-2">
       <Skeleton className="h-5 w-32" />
       <Skeleton className="mt-1.5 h-3.5 w-24" />
     </section>
@@ -57,19 +57,18 @@ export function HomeSkeleton() {
             ))}
           </ul>
         </div>
-        <aside className="min-w-0 lg:col-span-5 lg:col-start-8">
+        <aside className="order-first min-w-0 lg:order-none lg:col-span-5 lg:col-start-8">
           <div className="overflow-hidden rounded-2xl border border-hairline bg-surface" aria-hidden="true">
-            <div className="flex min-h-11 items-center justify-between gap-3 px-5 py-4">
+            <div className="px-4 py-4">
+              <Skeleton className="h-7 w-28 rounded-full" />
+              <Skeleton className="mt-2 h-4 w-40" />
+            </div>
+            <div className="flex min-h-11 items-center justify-between gap-3 border-t border-hairline px-5 py-3">
               <Skeleton className="h-4 w-24" />
               <Skeleton className="h-4 w-6" />
             </div>
             <div className="border-t border-hairline px-4 py-4">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="mt-1.5 h-3.5 w-32" />
-            </div>
-            <div className="border-t border-hairline px-4 py-4">
-              <Skeleton className="h-5 w-32" />
-              <Skeleton className="mt-1.5 h-3.5 w-24" />
+              <Skeleton className="h-11 w-full rounded-xl" />
             </div>
           </div>
         </aside>

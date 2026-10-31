@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import type { OpsNotice, OpsSettings, OpsSignal } from "@/lib/platformOpsModel";
 import { kindLabel, type OpsNoticeKind } from "@/lib/platformOpsModel";
-import { PageHeader, StatusPill, UnlockCta, type OpsTone } from "@/components/ops";
+import { PageHeader, StatusPill, useAdminUnlockSession, type OpsTone } from "@/components/ops";
 import { AdminOpsNotices, AdminPlatformOpsForm } from "@/components/AdminPlatformOpsForm";
 import "@/styles/ops.css";
 
@@ -41,30 +40,16 @@ function infraTone(t: InfraRow["tone"]): OpsTone {
  * Unlock opens StepUpSheet; after observe, AdminPlatformOpsForm (postOps) appears. No dead switches.
  */
 export function AdminServicesV2({ snapshot }: { snapshot: Snapshot }) {
-  const [unlocked, setUnlocked] = useState(false);
+  const unlockSession = useAdminUnlockSession();
+  const unlocked = unlockSession.status?.mode !== "enforce" || unlockSession.unlocked;
   const open = snapshot.notices.filter((n) => n.status === "open");
   const people = snapshot.settings.people;
   return (
     <div className="ops-theme flex w-full flex-col gap-ops-3 pe-ops-4 text-ops-body">
-      <PageHeader
-        title="Services"
-        actions={
-          unlocked ? (
-            <span className="text-ops-label text-ink-2" data-unlocked="">Unlocked · edit below</span>
-          ) : (
-            <UnlockCta
-              site="services"
-              action="services:edit"
-              what="change alerts, retention or who to notify"
-              onUnlocked={() => setUnlocked(true)}
-              observedHint="Alerts, recordings and people open below — same postOps path as the old Platform form."
-            />
-          )
-        }
-      />
-      <p className="flex flex-wrap items-center justify-between gap-2 text-ops-label text-ink-2">
+      <PageHeader title="Services" />
+      <p className="flex flex-wrap items-center justify-between gap-2 text-ops-label text-ink-2" data-stepup="services">
         <StatusPill tone={stripTone(snapshot.strip.tone)}>{snapshot.strip.label}</StatusPill>
-        <span>{unlocked ? "Editing unlocked" : "View only · unlock to change"}</span>
+        <span>{unlocked ? "Editing unlocked" : "View only · unlock in header"}</span>
       </p>
 
       <article className="overflow-hidden rounded-sm border border-hairline bg-surface">

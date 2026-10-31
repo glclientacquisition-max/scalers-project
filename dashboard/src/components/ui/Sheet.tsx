@@ -20,6 +20,7 @@ export function Sheet({
   children,
   footer,
   size = "md",
+  height = "default",
   dismissible = true,
   theme = "desk",
 }: {
@@ -31,6 +32,11 @@ export function Sheet({
   /** Actions. Rendered as a row, primary last. */
   footer?: ReactNode;
   size?: "md" | "lg";
+  /**
+   * "compact" caps the drawer lower from `lg`, so the page behind it (a preview or aside)
+   * stays in view on desktop. Phone height is the same either way.
+   */
+  height?: "default" | "compact";
   /** When false, swipe, scrim, and Escape leave the drawer open. */
   dismissible?: boolean;
   /** Portal sits on document.body, so the shell theme has to travel with it. */
@@ -59,6 +65,7 @@ export function Sheet({
                 "desk-drawer pointer-events-auto flex max-h-[85dvh] w-full flex-col rounded-t-2xl bg-surface text-ink shadow-sheet outline-none motion-reduce:transition-none",
                 themeClass,
                 size === "lg" ? "sm:max-w-2xl" : "sm:max-w-md",
+                height === "compact" && "lg:max-h-[70dvh]",
               )}
             >
               <div className="flex h-7 items-center justify-center pt-1" aria-hidden="true">

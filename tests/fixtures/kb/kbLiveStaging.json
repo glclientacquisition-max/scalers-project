@@ -1,0 +1,68 @@
+{
+  "_note": "Staging tenants readiness facts (sgcdncjxauhsbunobmob), read 28 Oct 2026 14:30 EAT. Ids truncated to 8. expect = the quality reason (with the gate on every business is live).",
+  "tenants": [
+    {
+      "id8": "42cad929",
+      "kb_live_version": 2,
+      "kb_ready_version": null,
+      "brain_target": "v2",
+      "expect": "never_ready"
+    },
+    {
+      "id8": "51a6c7c6",
+      "kb_live_version": 2,
+      "kb_ready_version": null,
+      "brain_target": "v2",
+      "expect": "never_ready"
+    },
+    {
+      "id8": "60283fd8",
+      "kb_live_version": 2,
+      "kb_ready_version": null,
+      "brain_target": "v2",
+      "expect": "never_ready"
+    },
+    {
+      "id8": "78386574",
+      "kb_live_version": 2,
+      "kb_ready_version": null,
+      "brain_target": "v2",
+      "expect": "never_ready"
+    },
+    {
+      "id8": "9301dbca",
+      "kb_live_version": 2,
+      "kb_ready_version": null,
+      "brain_target": "v2",
+      "expect": "never_ready"
+    },
+    {
+      "id8": "995e30d9",
+      "kb_live_version": 2,
+      "kb_ready_version": null,
+      "brain_target": "v2",
+      "expect": "never_ready"
+    },
+    {
+      "id8": "b123e978",
+      "kb_live_version": 2,
+      "kb_ready_version": 2,
+      "brain_target": "v2",
+      "expect": "ready"
+    },
+    {
+      "id8": "da25c497",
+      "kb_live_version": 2,
+      "kb_ready_version": null,
+      "brain_target": "v2",
+      "expect": "never_ready"
+    },
+    {
+      "id8": "df4ad9d8",
+      "kb_live_version": 2,
+      "kb_ready_version": 2,
+      "brain_target": "v2",
+      "expect": "ready"
+    }
+  ]
+}

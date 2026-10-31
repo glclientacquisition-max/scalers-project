@@ -11,6 +11,7 @@ import { memberCan } from "@/lib/requireMember";
 import { loadSettingsStatuses } from "@/lib/settingsRailStatus";
 import { getCurrentTenant } from "@/lib/tenant";
 import { loadOwnerPlan, loadUsageBillingExtras } from "@/lib/ownerPlanLoad";
+import { deskPlanChangeEnabled } from "@/lib/deskPlanChange";
 import { messageCreditsUsage } from "@/lib/messageCredits";
 
 async function PlanBody({ searchParams }: { searchParams: Promise<{ addon?: string }> }) {
@@ -29,6 +30,9 @@ async function PlanBody({ searchParams }: { searchParams: Promise<{ addon?: stri
           planName={view.packageName}
           periodEndLabel={view.periodEndLabel}
           rows={betaPlanRows(view, credits)}
+          freeBeta={loaded.model.freeBeta}
+          onDemandEnabled={tenant.on_demand_usage_enabled}
+          onDemandLocked={loaded.model.onDemandLocked}
         />
       </SettingsPlanFrame>
     );
@@ -38,7 +42,12 @@ async function PlanBody({ searchParams }: { searchParams: Promise<{ addon?: stri
       {loaded.model.surface.showDunningBanner && loaded.model.banner ? (
         <BillingNote banner={loaded.model.banner} />
       ) : null}
-      <PlanPicker model={loaded.model} openSeat={addon === "seat"} />
+      <PlanPicker
+        model={loaded.model}
+        openSeat={addon === "seat"}
+        planChangesEnabled={deskPlanChangeEnabled()}
+        onDemandEnabled={Boolean(tenant.on_demand_usage_enabled)}
+      />
     </SettingsPlanFrame>
   );
 }

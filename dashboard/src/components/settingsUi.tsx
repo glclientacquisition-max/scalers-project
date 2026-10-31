@@ -31,7 +31,7 @@ export const settingsSectionClass = "space-y-3";
 
 /** Nested settings: packed inner rail + fluid panel. Fills the desk canvas from md. */
 export const settingsConsoleClass =
-  "flex w-full min-w-0 flex-col gap-6 md:flex-row md:items-start md:justify-start md:gap-3";
+  "flex w-full min-w-0 flex-col gap-6 overflow-x-clip md:flex-row md:items-start md:justify-start md:gap-3";
 
 export const settingsRailWrapClass =
   "hidden min-w-0 shrink-0 md:block md:w-64";

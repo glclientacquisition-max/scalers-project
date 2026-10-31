@@ -10,6 +10,7 @@
 // gates are computed from the tenant row with the provenance twin.
 
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
+import { resolveTenantBusinessType } from "@/lib/businessType";
 import { confirmedSlotEnabled, factServices, holdOrdersEnabled } from "@/lib/provenance";
 
 export type CapabilityId = "holds" | "site_visits" | "booking_slots" | "callbacks";
@@ -86,6 +87,7 @@ function gate(
 }
 
 export type GateTenant = {
+  business_type?: string | null;
   vertical?: string | null;
   product_catalog?: unknown;
   services_catalog?: unknown;
@@ -126,10 +128,10 @@ export function capabilityGates(
   tenant: GateTenant,
   opts: { holdGate?: { allowed: boolean; reasons: string[] } | null; fieldMeta?: unknown } = {},
 ): CapabilityGate[] {
-  const vertical = tenant.vertical === "home_services" ? "home_services" : "retail";
+  const businessType = resolveTenantBusinessType(tenant);
   const out: CapabilityGate[] = [];
 
-  if (vertical === "retail") {
+  if (businessType === "retail") {
     const hg = opts.holdGate;
     let missing: RequirementId[];
     if (hg && hg.allowed) missing = [];
@@ -202,7 +204,7 @@ export function capabilityGates(
     gate(
       {
         id: "callbacks",
-        title: "Callbacks",
+        title: "Call backs",
         question: "Can I talk to the owner?",
         callerHearsLive: `"I've taken your details. The owner will call you back."`,
         callerHearsLocked: `"I've taken your message and passed it to the team."`,

@@ -1,5 +1,7 @@
 'use strict';
 
+const { resolveBusinessType } = require('./businessType');
+
 const TEAM_DEFAULT_LINE = {
   en: 'Let me check with the team and get back to you.',
   sw: 'Wacha niulize timu kisha nikujulishe.',
@@ -36,6 +38,38 @@ const DEFAULT_BY_KIND = {
     sw: 'Timu itakupigia simu kukupa maelezo ya malipo.',
   },
 };
+
+function defaultByKindForBusinessType(type) {
+  const base = DEFAULT_BY_KIND;
+  if (type === 'home_services') {
+    return {
+      ...base,
+      general: {
+        en: "I'll check and someone will call you back to arrange it.",
+        sw: 'Nitaangalia na mtu atakupigia simu kupanga.',
+      },
+      price: {
+        en: "I'll note what you need and someone will call you back with a price.",
+        sw: 'Nitaweka ombi lako na mtu atakupigia simu kwa bei.',
+      },
+      fee: {
+        en: "I'll check whether we cover your area and someone will call you back.",
+        sw: 'Nitaangalia kama tunafikisha eneo lako na mtu atakupigia.',
+      },
+    };
+  }
+  if (type === 'general') {
+    return {
+      ...base,
+      general: { en: TEAM_DEFAULT_LINE.en, sw: TEAM_DEFAULT_LINE.sw },
+      price: {
+        en: "I'll note what you need and someone will call you back with a price.",
+        sw: 'Nitaweka ombi lako na mtu atakupigia simu kwa bei.',
+      },
+    };
+  }
+  return base;
+}
 
 function parseByKind(raw) {
   let obj = raw;
@@ -108,7 +142,8 @@ function lineForKind(byKind, kind, language, profile = null) {
   if (custom && callbackSafeLine(custom) && (kind === 'price' || !isQuoteStyleFallbackLine(custom))) return custom;
   const general = ownerGeneralLine(byKind, profile, language);
   if (general && generalFitsFallbackKind(general, kind) && callbackSafeLine(general)) return general;
-  const fallback = DEFAULT_BY_KIND[kind] || DEFAULT_BY_KIND.general;
+  const bt = resolveBusinessType(profile || {});
+  const fallback = defaultByKindForBusinessType(bt)[kind] || defaultByKindForBusinessType(bt).general;
   return fallback[key] || fallback.en;
 }
 

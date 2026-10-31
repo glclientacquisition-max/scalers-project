@@ -1,6 +1,7 @@
 // Structured, call-local Brain state.
 // This is conversation memory, not tenant knowledge or long-term customer memory.
 
+const { resolveBusinessType } = require('./businessType');
 const {
   entityValue,
   isBackchannelOrFragment,
@@ -277,6 +278,10 @@ function createBrainState(profile = {}) {
   const state = {
     version: 2,
     vertical: String(profile.vertical || 'general'),
+    businessType: resolveBusinessType({
+      business_type: profile.businessType,
+      vertical: profile.vertical,
+    }),
     caller: {
       name: caller.name || null,
       phone: caller.phone || null,

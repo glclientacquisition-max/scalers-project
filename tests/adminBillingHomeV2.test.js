@@ -24,6 +24,21 @@ test("month totals use Nairobi month start and skip void and draft", async () =>
   assert.deepEqual([t.overdueCents, t.overdueCount], [100000, 1]);
 });
 
+test("last month collected stays hidden until that month has a payment", async () => {
+  const { lastMonthCollected } = await load();
+  assert.equal(lastMonthCollected([inv({})], now), null);
+  const hit = lastMonthCollected([inv({ status: "paid", paidCents: 5000, paidAt: "2026-09-15T09:00:00Z" })], now);
+  assert.equal(hit.cents, 5000);
+  assert.equal(hit.label, "September");
+});
+
+test("overdue aging is empty until an invoice is late", async () => {
+  const { overdueAging } = await load();
+  assert.deepEqual(overdueAging([inv({ dueAt: "2026-11-01T00:00:00Z" })], now), { to7: 0, to30: 0, over30: 0 });
+  const late = overdueAging([inv({ dueAt: "2026-10-20T09:00:00Z", totalCents: 4000 })], now);
+  assert.equal(late.to7, 4000);
+});
+
 test("who owes: most days late first, one row per business", async () => {
   const { owingBusinesses } = await load();
   const o = owingBusinesses([
@@ -53,8 +68,9 @@ test("Billing home denser: ops-tiles KPIs, catalog link, BusinessPane money", ()
   assert.doesNotMatch(ui, /bg-brand|ribbon/i);
 });
 
-test("Packages tab copy is catalog-only (assign stays on business)", () => {
+test("Packages tab lists packages with pagination and assign on business", () => {
   const ui = read("dashboard/src/components/admin/v2/AdminPackagesV2.tsx");
-  assert.match(ui, /Catalog only/);
-  assert.match(ui, /assign from the business/i);
+  assert.match(ui, /PAGE_SIZE = 25/);
+  assert.match(ui, /searchParams\.get\("page"/);
+  assert.match(ui, /useAdminUnlockSession/);
 });

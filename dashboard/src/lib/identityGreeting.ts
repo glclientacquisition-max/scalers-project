@@ -2,9 +2,10 @@
  * Settings › Identity: the greeting as one sentence an owner can read.
  *
  * Display mirror of the opening the voice line builds (src/speech/callOpening.js
- * PACK identity + invite). Desk shows it and reads it aloud for "Hear it"; it
- * never writes greeting_text and never feeds Brain compile. The stored fields
- * stay spoken_name (40) and greeting_invite (80).
+ * PACK identity + invite). Desk shows it and reads it aloud for "Hear it". The only
+ * greeting_text write Desk makes is clearing it ("Go back to automatic"); it never
+ * types one and greeting_text never feeds Brain compile. The stored fields stay
+ * spoken_name (40) and greeting_invite (80).
  */
 
 import {
@@ -242,4 +243,29 @@ export function greetingIsAutomatic(fields: { spokenName?: string | null; greeti
   const usesSpoken = Boolean(spoken) && !/^the business$/i.test(spoken);
   const invite = clean(fields.greetingInvite, GREETING_INVITE_MAX).replace(/[.!?\u2026]+$/g, "").trim();
   return !usesSpoken && (!invite || /^how can i help$/i.test(invite));
+}
+
+/**
+ * Identity › How you answer has three greeting states. "own": the owner's full
+ * greeting_text is saved, so Voice says it word for word and the Name and Then asks
+ * fields do nothing a caller can hear. "custom": a spoken name or question of their
+ * own. "automatic": built from the business name.
+ */
+export type GreetingMode = "own" | "custom" | "automatic";
+
+export function greetingMode(fields: {
+  greetingText?: string | null;
+  spokenName?: string | null;
+  greetingInvite?: string | null;
+}): GreetingMode {
+  if (clean(fields.greetingText, 400)) return "own";
+  return greetingIsAutomatic(fields) ? "automatic" : "custom";
+}
+
+/**
+ * The posted greeting_text_clear field. Only "1" clears the stored greeting
+ * (Go back to automatic); anything else leaves greeting_text as stored.
+ */
+export function parseGreetingTextClear(raw: unknown): boolean {
+  return String(raw ?? "").trim() === "1";
 }

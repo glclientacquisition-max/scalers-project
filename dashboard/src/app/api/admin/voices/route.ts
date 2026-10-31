@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { adminActorName } from "@/lib/adminActor";
 import { recordAdminAction } from "@/lib/adminAudit";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
-import { isLegacyAuthenticated } from "@/lib/auth";
+import { requireAdminApiRead, requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { stepUpGateSession } from "@/lib/ops/stepUpGate";
 import {
   deletePlatformSonioxVoice,
@@ -14,8 +14,9 @@ import {
 } from "@/lib/sonioxVoiceCatalog";
 
 export async function GET() {
-  if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const read = await requireAdminApiRead();
+  if (!read.ok) {
+    return NextResponse.json({ error: read.error }, { status: read.status });
   }
   try {
     const voices = await listPlatformSonioxVoicesAdmin();
@@ -27,8 +28,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const gate = await requireAdminOperatorWrite();
+  if (!gate.ok) {
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
 
   const body = await request.json().catch(() => ({}));

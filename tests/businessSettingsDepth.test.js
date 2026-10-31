@@ -13,7 +13,6 @@ describe("business settings depth", () => {
   const form = read("dashboard/src/components/TenantForm.tsx") + read("dashboard/src/components/identity/IdentitySettings.tsx");
   const policies = read("dashboard/src/lib/businessPolicies.ts");
   const handoff = read("dashboard/src/lib/handoffMode.ts");
-  const ingest = read("dashboard/src/components/KnowledgeIngestPanel.tsx");
   const bulletin = read("dashboard/src/components/DailyBulletinPanel.tsx");
   const faqs = read("dashboard/src/lib/faqs.ts");
   const alerts = read("dashboard/src/components/AlertsPanel.tsx");
@@ -72,12 +71,6 @@ describe("business settings depth", () => {
   });
 
   it("keeps import and updates example-first", () => {
-    assert.match(ingest, /label: "Text"/);
-    assert.match(ingest, /label: "URL"/);
-    assert.match(ingest, /label: "CSV"/);
-    assert.doesNotMatch(ingest, /Atomic Habits/);
-    assert.match(ingest, /useMountedPoolPick/);
-    assert.match(ingest, /KNOWLEDGE_PASTE_POOLS/);
     assert.match(bulletin, /Callers hear/);
     assert.match(bulletin, /useMountedPoolPick/);
     assert.match(bulletin, /CALLERS_HEAR_POOLS/);
@@ -92,8 +85,6 @@ describe("business settings depth", () => {
     assert.doesNotMatch(faqs, /Westlands, opposite Naivas|free parking|M-Pesa|within Nairobi/);
     assert.doesNotMatch(bulletin, /Out of chicken today/);
     assert.doesNotMatch(form, /Plumbing\\nElectrical/);
-    assert.doesNotMatch(ingest, /Home cleaning from 2,500 KES/);
-    assert.doesNotMatch(ingest, /Paste your menu/);
     assert.doesNotMatch(form, /Super Admin can add them/);
   });
 
@@ -106,7 +97,6 @@ describe("business settings depth", () => {
       import {
         CALLERS_HEAR_POOLS,
         SERVICES_PASTE_POOLS,
-        KNOWLEDGE_PASTE_POOLS,
         placeholderPool,
         pickFromPool,
       } from ${JSON.stringify(helperPath)};
@@ -114,7 +104,6 @@ describe("business settings depth", () => {
       const tables = {
         hear: CALLERS_HEAR_POOLS,
         paste: SERVICES_PASTE_POOLS,
-        ingest: KNOWLEDGE_PASTE_POOLS,
       };
       const out = {};
       for (const vertical of verticals) {
@@ -137,13 +126,12 @@ describe("business settings depth", () => {
     const shopTrade = /Plumbing|Electrical|Home cleaning|chicken/i;
     const shopHear = /pickup|delivery|print|paper|binding|A4/i;
     const shopPaste = /print|binding|card|flyer|stamp|photocopy|letterhead|envelope|pickup|delivery|lamination/i;
-    const shopIngest = /book|print|stationer|paper|deliver|pick up/i;
     const hsHear = /booked|cleaning|plumb|visit|sofa/i;
     const hsPaste = /clean|plumb|electr|sofa|carpet|mattress|upholster|window/i;
     const night = /tonight|booked|table|kitchen|seating|room|walk-in|breakfast|lodge|restaurant|hotel|checkout|airport|dinner|bed/i;
 
     for (const vertical of ["retail", "home_services", "hospitality", "general"]) {
-      for (const key of ["hear", "paste", "ingest"]) {
+      for (const key of ["hear", "paste"]) {
         const { pool, picks } = got[vertical][key];
         assert.ok(pool.length >= 3 && pool.length <= 5, `${vertical} ${key} pool size`);
         assert.ok(new Set(picks).size >= 2, `${vertical} ${key} rotates`);
@@ -159,14 +147,8 @@ describe("business settings depth", () => {
       assert.match(line, shopPaste);
       assert.doesNotMatch(line, shopTrade);
     }
-    for (const line of got.retail.ingest.pool) {
-      assert.match(line, shopIngest);
-      assert.doesNotMatch(line, shopTrade);
-    }
     for (const line of got.home_services.hear.pool) assert.match(line, hsHear);
     for (const line of got.home_services.paste.pool) assert.match(line, hsPaste);
-    assert.match(got.home_services.ingest.pool.join("\n"), /Home cleaning from 2,500 KES/);
-    assert.doesNotMatch(got.home_services.ingest.pool.join("\n"), /Westlands Books/);
     for (const line of got.hospitality.hear.pool) assert.match(line, /tonight|booked|table|kitchen|seating|room/i);
     for (const line of got.hospitality.paste.pool) {
       assert.match(line, night);
@@ -241,6 +223,19 @@ describe("business settings depth", () => {
     assert.doesNotMatch(team, /Alert phone/);
     assert.match(alerts, /Alert phone/);
     assert.doesNotMatch(alerts, /Add person/);
+    assert.match(read("dashboard/src/components/PhoneAlertsCard.tsx"), /if \(!VAPID_PUBLIC_KEY\) return null/);
+    assert.match(read("dashboard/src/components/settingsUi.tsx"), /overflow-x-clip/);
+    assert.match(read("dashboard/src/components/plan/PlanPicker.tsx"), /Plan changes are not open on this desk yet/);
+    assert.match(read("dashboard/src/components/plan/PlanPicker.tsx"), /planOverageLines/);
+    assert.match(read("dashboard/src/components/plan/BetaPlanSummary.tsx"), /data-plan-overage/);
+    assert.match(read("dashboard/src/app/(desk)/settings/plan/page.tsx"), /onDemandLocked=\{loaded\.model\.onDemandLocked\}/);
+    assert.match(read("dashboard/src/components/policies/PoliciesSettings.tsx"), /AbortController/);
+    assert.match(read("dashboard/src/components/PhonePullSurface.tsx"), /pathname\.startsWith\("\/settings"\)/);
+    assert.match(read("dashboard/src/app/(desk)/settings/page.tsx"), /if \(teamPanel\)/);
+    assert.doesNotMatch(read("dashboard/src/app/(desk)/settings/page.tsx"), /teamPanel && teamInvitesEnabled/);
+    assert.match(read("dashboard/src/lib/requireMember.ts"), /legacy primaries may not have a tenant_members row/);
+    assert.match(read("dashboard/src/components/policies/PoliciesSettings.tsx"), /max-h-\[4\.5rem\]/);
+    assert.match(read("dashboard/src/components/MembersPanel.tsx"), /variant="danger"\s*\n\s*size="md"/);
   });
 
   it("names Policies empty next step without inventing Train facts", () => {

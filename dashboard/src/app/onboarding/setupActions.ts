@@ -1,5 +1,6 @@
 "use server";
 
+import { parseBusinessType, verticalForBusinessType, verticalToBusinessType } from "@/lib/businessType";
 import { bustTenantCache } from "@/lib/tenantCache";
 import { requestSpokenCatalogueCompile } from "@/lib/spokenCatalogueOnSave";
 import { parsePaymentsText } from "@/lib/structuredData";
@@ -30,6 +31,7 @@ import {
   type StepKey,
 } from "@/lib/setupFlow";
 import { compileReceptionistPrompt } from "@/lib/promptCompiler";
+import { importCatalogueToKb } from "@/lib/kbWrite.server";
 import { compilePromptLocally, tenantNeedsOnboarding, type OnboardingAnswers } from "@/lib/onboarding";
 import { formatLocationsForCompiler } from "@/lib/businessLocations";
 import { formatProductsForCompiler, normalizeProductCatalog } from "@/lib/productCatalog";
@@ -159,12 +161,16 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
     return { ok: false, step: key, error: result.ok ? UNAVAILABLE : result.error };
   }
 
-  const vertical = draft.business.vertical;
-  const { services, products } = catalogueForTenant(draft.catalogue, vertical);
+  const businessType = parseBusinessType(draft.business.vertical) ?? verticalToBusinessType(draft.business.vertical);
+  const vertical = verticalForBusinessType(businessType);
+  const { services, products } = catalogueForTenant(
+    draft.catalogue,
+    businessType === "home_services" ? "home_services" : "retail",
+  );
   const servicesCatalog = normalizeServicesCatalog(services).filter((r) => r.name);
   const productCatalog = normalizeProductCatalog(products);
   const servicesOffered =
-    vertical === "home_services" ? formatServicesForCompiler(servicesCatalog, "") : formatProductsForCompiler(productCatalog);
+    businessType === "home_services" ? formatServicesForCompiler(servicesCatalog, "") : formatProductsForCompiler(productCatalog);
   const productsText = formatProductsForCompiler(productCatalog);
   const hoursOn = !draft.hours.skipped;
   const businessHours = hoursOn ? hoursText(draft.hours.days) : "";
@@ -212,15 +218,15 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
 
   const tPrep = Date.now();
   const fromFaqs = policiesFromFaqs(faqs.map((f) => ({ question: String(f.question || ""), answer: String(f.answer || "") })), vertical);
+  // services_offered is no longer written here: kb_items is the source; the KB mirror derives that text (below).
   const patch: Record<string, unknown> = {
-    services_offered: servicesOffered,
     services_catalog: servicesCatalog,
     product_catalog: productCatalog,
     business_hours: businessHours,
     agent_tone: voice.tone,
     agent_name: voice.agentName,
     vertical,
-    business_type: vertical,
+    business_type: businessType,
     handoff_mode: voice.handoff,
     business_locations: locations,
     faqs,
@@ -237,7 +243,10 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
   if (teamDirectory.length) patch.team_directory = teamDirectory;
   // Typed payments read from the owner's own FAQ answer; Settings asks "Is this right?" before it's trusted.
   const parsedPayments = fromFaqs.payment ? parsePaymentsText(fromFaqs.payment) : null;
-  const capabilityPolicies = capabilityPoliciesFromSetup(draft.catalogue, vertical);
+  const capabilityPolicies = capabilityPoliciesFromSetup(
+    draft.catalogue,
+    businessType === "home_services" ? "home_services" : "retail",
+  );
   if (Object.keys(fromFaqs).length || Object.keys(capabilityPolicies).length) {
     patch.business_policies = {
       ...(row.business_policies && typeof row.business_policies === "object" ? row.business_policies : {}),
@@ -266,6 +275,9 @@ export async function finishSetupAction(input: { tenantId: string; version: numb
     return { ok: false, conflict: true, error: "Setup was changed in another tab. Review this step, then finish again." };
   }
 
+  // The Catalogue starts filled: the setup rows go into kb_items (add-only), then the mirror + compile ping.
+  const kb = await importCatalogueToKb(row.id, { services_catalog: servicesCatalog, product_catalog: productCatalog }, { legacyServicesOffered: servicesOffered, by: "setup" });
+  if (!kb.ok && kb.skipped === "error") console.error(`[setup] finish kb import tenant=${row.id} failed`);
   const tWrite = Date.now();
   requestSpokenCatalogueCompile(row.id, patch);
   // Number assignment stays inline (one DB call) so the next screen can show it.

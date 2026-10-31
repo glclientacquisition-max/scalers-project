@@ -20,16 +20,19 @@ function parseVertical(raw) {
   return 'general';
 }
 
+const { resolveBusinessType } = require('./businessType');
+
 /**
- * Pack the phone is allowed to finish. Hospitality stays stored;
- * runtime job is general until a reservation pack exists.
- * @param {unknown} raw
+ * Resolved business type for call packs (retail, home_services, general).
+ * @param {unknown} raw vertical string or { business_type, vertical }
  * @returns {'retail'|'home_services'|'general'}
  */
 function offeredVertical(raw) {
-  const v = parseVertical(raw);
-  if (v === 'retail' || v === 'home_services') return v;
-  return 'general';
+  const input =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? raw
+      : { vertical: raw };
+  return resolveBusinessType(input);
 }
 
 module.exports = { parseVertical, offeredVertical };

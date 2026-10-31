@@ -111,7 +111,7 @@ describe('capability gates (Overview twin)', () => {
 
   it('callbacks, never a live transfer: needs an alert contact with WhatsApp or email', { skip: !twin }, () => {
     const none = twin.capabilityGates({ vertical: 'retail', handoff_mode: 'live_transfer' }).find((x) => x.id === 'callbacks');
-    assert.equal(none.title, 'Callbacks');
+    assert.equal(none.title, 'Call backs'); // same words as the Call back stamp
     assert.deepEqual(none.missing.map((r) => r.id), ['callback_contact']);
     assert.match(none.missing[0].href, /team/);
     const ok = twin

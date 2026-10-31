@@ -6,11 +6,11 @@ import { useMemo, useState } from "react";
 import { CheckIcon } from "@heroicons/react/20/solid";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { SettingsGroup } from "@/components/settingsUi";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClass } from "@/components/ui/Button";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import type { ReadyChecklistItem } from "@/lib/assistantSayTypes";
 import type { OverviewDataCheck } from "@/components/structured/OverviewDataChecksCard";
-import { confirmCheckForReadyItem } from "@/lib/overviewDataChecks";
+import { confirmCheckForReadyItem, readyItemConfirmLink } from "@/lib/overviewDataChecks";
 import {
   OverviewCheckSheetHost,
   openSheetFromCheck,
@@ -57,15 +57,29 @@ export function HomeGetReadyCallsCard({
           </span>
         }
       >
+        <div className="px-4 pb-2" aria-hidden="true">
+          <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
+            <div
+              className="h-full w-full origin-left bg-accent"
+              style={{ transform: `scaleX(${total ? readyCount / total : 0})` }}
+            />
+          </div>
+        </div>
         <ul className="divide-y divide-hairline">
           {items.map((item) => {
             const confirmCheck = confirmCheckForReadyItem(item, checks);
+            // No sheet for this fact: a named button opens the exact spot instead of "Open Policies and save".
+            const confirmLink = !confirmCheck && canEdit ? readyItemConfirmLink(item) : null;
+            const reason = confirmLink ? confirmLink.reason : item.reason;
             return (
               <li
                 key={item.id}
                 className="flex min-h-12 flex-col gap-2 px-4 py-2 sm:flex-row sm:items-center sm:gap-3"
               >
                 <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
+                  <span className={item.complete ? "text-meta text-ink-3" : canEdit ? "text-meta font-semibold text-ink" : "text-meta text-ink-2"}>
+                    {item.complete ? "Done" : canEdit ? "To do" : "Cannot start yet"}
+                  </span>
                   <span
                     className={[
                       "flex size-6 shrink-0 items-center justify-center rounded-full",
@@ -93,8 +107,8 @@ export function HomeGetReadyCallsCard({
                         >
                           {item.label}
                         </Link>
-                        {item.reason ? (
-                          <p className="mt-0.5 line-clamp-2 text-meta text-ink-3">{item.reason}</p>
+                        {reason ? (
+                          <p className="mt-0.5 line-clamp-2 text-meta text-ink-3">{reason}</p>
                         ) : null}
                       </>
                     )}
@@ -110,6 +124,14 @@ export function HomeGetReadyCallsCard({
                   >
                     Confirm
                   </Button>
+                ) : confirmLink ? (
+                  <Link
+                    href={confirmLink.href}
+                    data-ready-confirm={item.id}
+                    className={buttonClass({ variant: "tonal", size: "sm", className: "shrink-0 self-start sm:self-center" })}
+                  >
+                    {confirmLink.label}
+                  </Link>
                 ) : null}
               </li>
             );
@@ -124,7 +146,7 @@ export function HomeGetReadyCallsCard({
               focusRingVisible,
             ].join(" ")}
           >
-            What your Business Assistant will say
+            What callers hear
           </Link>
         </p>
       </SettingsGroup>

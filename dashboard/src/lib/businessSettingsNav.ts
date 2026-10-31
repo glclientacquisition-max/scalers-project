@@ -80,7 +80,7 @@ export function businessSettingsHref(tab: BusinessSettingsTab, panel?: SettingsP
 export type SettingsNavTarget =
   | { tab: Exclude<BusinessSettingsTab, "train" | "menu"> }
   | { tab: "train"; panel: Exclude<SettingsPanel, "catalog"> }
-  | { href: "/settings/plan" | "/settings/billing" | "/settings/areas" };
+  | { href: "/settings/plan" | "/settings/billing" | "/settings/areas" | "/settings/knowledge" };
 
 export type SettingsNavItem = {
   label: string;
@@ -99,7 +99,7 @@ export type SettingsNavSection = {
  * Settings destinations. /settings with no section is the Settings home on every width
  * (phone: the whole screen; tablet and desktop: the right pane beside the rail).
  * One header each: Business, Knowledge, Assistant, People, then Plan and billing.
- * Import sits directly under Catalog. Team is People, ahead of Alerts.
+ * Bulk add lives in Catalogue (Add many); old ?tab=import links redirect there. Team is People, ahead of Alerts.
  * Plan and Billing are the last section. The rail shows them to the owner and an admin.
  * Appearance is the account-menu theme cluster. It is not a settings tab.
  * URLs stay `?tab=` / `?panel=`.
@@ -120,8 +120,8 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     id: "knowledge",
     title: "Knowledge",
     items: [
-      { label: "Catalogue", description: "What you sell and what it costs", target: { tab: "catalog" } },
-      { label: "Import", description: "Add items from a file or your website", target: { tab: "import" } },
+      // v2 Knowledge Base editor; before the v2 tables exist it sends the owner to the old tab: "catalog" screen.
+      { label: "Catalogue", description: "What you sell and its prices. Add many at once", target: { href: "/settings/knowledge" } },
       { label: "FAQs", description: "Answers to the questions callers ask most", target: { tab: "train", panel: "faqs" } },
     ],
   },
@@ -130,7 +130,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     title: "Business Assistant",
     items: [
       {
-        label: "What it will say",
+        label: "What callers hear",
         description: "What callers hear before your team calls back",
         target: { tab: "assistant-say" },
       },
@@ -157,6 +157,21 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     ],
   },
 ];
+
+/**
+ * The Settings home line for an item, in the business's own words. Policies names
+ * delivery and returns only for a business that sells products.
+ */
+export function settingsNavDescription(item: SettingsNavItem, vertical?: string | null): string {
+  const target = item.target;
+  if ("tab" in target && target.tab === "train" && target.panel === "policies") {
+    const v = String(vertical || "").trim().toLowerCase();
+    if (v === "retail") return item.description;
+    if (v === "home_services") return "Payments, cancellations, guarantees and other rules";
+    return "Payments, bookings, cancellations and other rules";
+  }
+  return item.description;
+}
 
 export function settingsNavHref(target: SettingsNavTarget): string {
   if ("href" in target) return target.href;
@@ -187,24 +202,14 @@ export function settingsNavItems(): SettingsNavItem[] {
 
 export function settingsPanelHeading(
   tab: BusinessSettingsTab,
-  trainPanel: SettingsPanel,
-  vertical?: string | null
+  trainPanel: SettingsPanel
 ): string | null {
   if (tab === "menu") return null;
   if (tab === "catalog") return "Catalogue";
   if (tab === "alerts") return "How we notify";
-  if (tab === "import") {
-    const v = String(vertical || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[\s-]+/g, "_");
-    return v === "retail" || v === "shop" || v === "shops"
-      ? "Import catalogue"
-      : "Import knowledge";
-  }
   if (tab === "test") return "Test";
   if (tab === "calls") return "Calls & forwarding";
-  if (tab === "assistant-say") return "What your Business Assistant will say";
+  if (tab === "assistant-say") return "What callers hear";
   if (tab !== "train") return null;
   const item = settingsNavItems().find((entry) => {
     const target = entry.target;

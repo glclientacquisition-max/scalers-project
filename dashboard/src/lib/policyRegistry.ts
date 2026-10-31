@@ -9,6 +9,7 @@
  */
 
 import taxonomy from "./taxonomy.json" with { type: "json" };
+import { resolveBusinessType } from "./businessType.ts";
 import { CANCELLATION_TEXT_MAX, joinWholeSentences } from "./policyRules";
 
 /**
@@ -285,13 +286,22 @@ export function nicheById(id: string, niches: NicheDef[] = NICHES): NicheDef {
   return niches.find((n) => n.id === id) ?? niches.find((n) => n.id === "generic")!;
 }
 
-/** Pick the niche: vertical first, then a keyword in the category or business name, else generic. */
-export function nicheFor(t: { vertical?: string | null; business_category?: string | null; business_name?: string | null }, niches: NicheDef[] = NICHES): NicheDef {
-  const v = String(t.vertical ?? "").toLowerCase();
-  const byVertical = niches.find((n) => n.verticals?.includes(v));
-  if (byVertical) return byVertical;
-  const words = `${t.business_category ?? ""} ${t.business_name ?? ""}`.toLowerCase();
-  return niches.find((n) => n.keywords?.some((k) => words.includes(k))) ?? nicheById("generic", niches);
+/** Pick the niche from business type and category (no name guessing). */
+export function nicheFor(
+  t: {
+    business_type?: string | null;
+    vertical?: string | null;
+    business_category?: string | null;
+    business_name?: string | null;
+  },
+  niches: NicheDef[] = NICHES,
+): NicheDef {
+  const type = resolveBusinessType({ business_type: t.business_type, vertical: t.vertical });
+  if (type === "retail") return nicheById("retail", niches);
+  if (type === "home_services" && String(t.business_category ?? "").trim() === "cleaning") {
+    return nicheById("cleaning", niches);
+  }
+  return nicheById("generic", niches);
 }
 
 export function nicheTopics(niche: NicheDef, topics: Record<string, TopicDef> = TOPICS): TopicDef[] {

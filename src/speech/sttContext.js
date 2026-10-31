@@ -105,6 +105,10 @@ function collectTenantTerms(tenant = {}) {
   for (const svc of normalizeServices(tenant.servicesCatalog || tenant.services_catalog)) {
     if (svc.name) terms.push(svc.name);
   }
+  // KB v2: paused / not-offered names stay out of every list, but STT still hears them (so the caller gets the
+  // grounded "not right now" / "we don't offer" answer instead of a mis-hearing). Legacy: nothing added.
+  const kbOff = require('../knowledge/kb/live').handle(tenant);
+  if (kbOff && Array.isArray(kbOff.doc.off)) for (const x of kbOff.doc.off) if (x.name) terms.push(x.name);
 
   for (const loc of normalizeLocations(tenant.businessLocations || tenant.business_locations)) {
     if (loc.label) terms.push(loc.label);

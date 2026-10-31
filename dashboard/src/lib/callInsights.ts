@@ -156,7 +156,8 @@ export function buildCallInsights(input: CallFactRow[], days = 30, opts: { faqQu
   });
 
   const langRows = rows.filter((r) => r.language);
-  const langs = tally(langRows, (r) => [{ id: r.language as string, label: label(taxonomy.languages, r.language as string) }]);
+  // Owner words: the language is Kiswahili (taxonomy.json keeps Brain's label).
+  const langs = tally(langRows, (r) => [{ id: r.language as string, label: r.language === "sw" ? "Kiswahili" : label(taxonomy.languages, r.language as string) }]);
 
   const pct = (a: number, b: number) => `${Math.round((a / Math.max(1, b)) * 100)}%`;
   const enough = (basis: number) => n >= MIN_CALLS && basis >= MIN_SECTION;

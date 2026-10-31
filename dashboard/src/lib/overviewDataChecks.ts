@@ -18,7 +18,7 @@ export function confirmCheckForItem(
   itemId: string,
   checks: OverviewDataCheck[]
 ): OverviewDataCheck | null {
-  if (itemId === "catalog") return checks.find((c) => c.kind === "prices") ?? null;
+  if (itemId === "catalog" || itemId === "prices") return checks.find((c) => c.kind === "prices") ?? null;
   if (itemId === "payment") return checks.find((c) => c.kind === "payments") ?? null;
   if (itemId === "hours") return checks.find((c) => c.kind === "hours") ?? null;
   return null;
@@ -30,4 +30,21 @@ export function confirmCheckForReadyItem(
 ): OverviewDataCheck | null {
   if (item.complete || !reasonNeedsOverviewConfirm(item.reason)) return null;
   return confirmCheckForItem(item.id, checks);
+}
+
+/** Policies, scrolled to the payment details. */
+export const PAYMENTS_SECTION_HREF = "/settings?tab=train&panel=policies#payments";
+
+/**
+ * A Get ready row whose fix is a named button instead of "Open Policies and save":
+ * payment details that are saved but not confirmed open the exact spot to confirm them.
+ */
+export function readyItemConfirmLink(
+  item: ReadyChecklistItem
+): { href: string; label: string; reason: string } | null {
+  if (item.complete || !reasonNeedsOverviewConfirm(item.reason)) return null;
+  if (item.id === "payment") {
+    return { href: PAYMENTS_SECTION_HREF, label: "Confirm payment details", reason: "Saved but not confirmed." };
+  }
+  return null;
 }

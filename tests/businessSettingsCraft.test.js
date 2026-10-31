@@ -105,13 +105,14 @@ describe("business settings craft", () => {
     assert.match(nav, /label: "Hours"/);
     assert.match(nav, /label: "Locations"/);
     assert.match(nav, /label: "Policies"/);
-    assert.match(nav, /label: "Voice"/);
+    assert.match(nav, /label: "On calls"/);
+    assert.doesNotMatch(nav, /label: "Voice"/, "one setting called Voice (the speaking voice in Identity)");
     assert.match(nav, /label: "Pronunciation"/);
     assert.doesNotMatch(nav, /label: "Updates"/);
     assert.match(nav, /label: "Test"/);
     assert.match(nav, /label: "FAQs"/);
     assert.match(nav, /label: "Catalogue"/);
-    assert.match(nav, /label: "Import"/);
+    assert.doesNotMatch(nav, /label: "Import"/);
     assert.match(nav, /label: "How we notify"/);
     assert.match(nav, /label: "Team"/);
     assert.doesNotMatch(nav, /label: "Appearance"/);
@@ -125,8 +126,8 @@ describe("business settings craft", () => {
     assert.match(nav, /panel: "team"/);
     assert.doesNotMatch(nav, /tab: "updates"/);
     assert.match(nav, /tab: "test"/);
-    assert.match(nav, /tab: "catalog"/);
-    assert.match(nav, /tab: "import"/);
+    assert.match(nav, /href: "\/settings\/knowledge"/);
+    assert.doesNotMatch(nav, /tab: "import"/);
     assert.match(nav, /tab: "alerts"/);
     assert.doesNotMatch(nav, /return "Appearance"/);
     assert.match(nav, /raw === "alerts"/);
@@ -136,8 +137,7 @@ describe("business settings craft", () => {
     assert.match(shell, /AlertsPanel/);
     assert.doesNotMatch(shell, /AppearancePanel/);
     assert.doesNotMatch(shell, /DailyBulletinPanel/);
-    assert.match(shell, /KnowledgeIngestPanel/);
-    assert.match(shell, /CatalogImportPanel/);
+    assert.doesNotMatch(shell, /KnowledgeIngestPanel|CatalogImportPanel/);
     assert.match(shell, /TestLinePanel/);
     assert.match(side, /SETTINGS_NAV/);
     assert.match(side, /useCan\("billing.manage"\)/);
@@ -344,11 +344,6 @@ describe("business settings craft", () => {
     assert.match(form, /TEAM_NOTIFY_FLAGS/);
     assert.match(form, /settingsTrashButtonClass/);
     assert.doesNotMatch(form, /TEAM_NOTIFY_CHIPS/);
-    const ingest = read("dashboard/src/components/KnowledgeIngestPanel.tsx");
-    const catalogImport = read("dashboard/src/components/CatalogImportPanel.tsx");
-    assert.match(ingest, /\{extractPending \? "Scanning…" : "Scan"\}/);
-    assert.match(catalogImport, /\{previewPending \? "Scanning…" : "Scan"\}/);
-    assert.doesNotMatch(ingest, /Scan and suggest/);
     assert.match(test, /settingsPrimaryButtonClass/);
     assert.match(test, /Call \{did\}/);
     assert.doesNotMatch(form, /choiceChipClass/);
@@ -389,10 +384,9 @@ describe("business settings craft", () => {
       "Service areas",
       "Policies",
       "Catalogue",
-      "Import",
       "FAQs",
       "What it will say",
-      "Voice",
+      "On calls",
       "Pronunciation",
       "Test",
       "Calls & forwarding",
@@ -415,7 +409,7 @@ describe("business settings craft", () => {
     assert.equal(got.billingOff, false);
     assert.equal(got.omitted, false);
     assert.equal(new Set(got.sections.map((section) => section.id)).size, got.sections.length);
-    assert.equal(got.labels[got.labels.indexOf("Catalogue") + 1], "Import");
+    assert.equal(got.labels[got.labels.indexOf("Catalogue") + 1], "FAQs");
     assert.equal(got.labels.indexOf("Identity") + 1, got.labels.indexOf("Hours"));
     const people = got.sections.find((section) => section.title === "People");
     assert.deepEqual(people.labels, ["Team", "How we notify"]);
@@ -436,7 +430,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(nav, /SETTINGS_HOURS_HREF|settingsWideDefaultHref/);
     assert.match(page, /parseBusinessSettingsPanel\(panelRaw, tabRaw\)/);
     for (const item of nav.match(/\{ label: "[^"]+", description: "[^"]+"/g) || []) assert.ok(item.length < 120, item);
-    assert.equal((nav.match(/description: "/g) || []).length, 17, "one line per destination, Service areas and What it will say included");
+    assert.equal((nav.match(/description: "/g) || []).length, 16, "one line per destination, Service areas and What it will say included");
     const activeFn = nav.slice(
       nav.indexOf("export function settingsNavItemActive"),
       nav.indexOf("export function settingsNavItems")
@@ -463,17 +457,7 @@ describe("business settings craft", () => {
   });
 
   it("keeps one filled primary per settings panel", () => {
-    const ingest = read("dashboard/src/components/KnowledgeIngestPanel.tsx");
-    const catalogImport = read("dashboard/src/components/CatalogImportPanel.tsx");
     const coach = read("dashboard/src/components/PronunciationCoach.tsx");
-    assert.match(ingest, /settingsPrimaryButtonClass/);
-    assert.match(catalogImport, /settingsActionClass/);
-    const catalogScan = catalogImport.slice(
-      catalogImport.indexOf("{previewPending ? \"Scanning…\" : \"Scan\"}") - 180,
-      catalogImport.indexOf("{previewPending ? \"Scanning…\" : \"Scan\"}") + 40
-    );
-    assert.match(catalogScan, /settingsActionClass/);
-    assert.doesNotMatch(catalogScan, /settingsPrimaryButtonClass/);
     assert.match(form, /Changes save as you go/);
     assert.doesNotMatch(form, /panel === "pronunciation" \? undefined/);
     assert.match(coach, /btnPrimary|<Button\b/); // kit Button replaced the one-off class

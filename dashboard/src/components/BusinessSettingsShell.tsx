@@ -2,7 +2,8 @@
 
 import { policiesFormKey } from "@/lib/serviceAreas";
 import { catalogContentKey } from "@/lib/catalogPricing";
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { nextFormMountKey, type FormMountKey } from "@/lib/formSave";
 
 import type { TenantRow } from "@/lib/supabase";
@@ -12,16 +13,24 @@ import { Skeleton } from "@/components/ui/Skeleton";
 
 // Heavy panels load only when their section opens (keeps them out of the Settings home and form bundle).
 const panelLoading = () => <Skeleton className="h-64 w-full rounded-2xl" />;
-const KnowledgeIngestPanel = dynamic(() => import("@/components/KnowledgeIngestPanel").then((m) => m.KnowledgeIngestPanel), { loading: panelLoading });
-const CatalogImportPanel = dynamic(() => import("@/components/CatalogImportPanel").then((m) => m.CatalogImportPanel), { loading: panelLoading });
 const TestLinePanel = dynamic(() => import("@/components/TestLinePanel").then((m) => m.TestLinePanel), { loading: panelLoading });
 import { SettingsLeaveGuard } from "@/components/SettingsLeaveGuard";
-import { TenantForm } from "@/components/TenantForm";
-import { IdentitySettings } from "@/components/identity/IdentitySettings";
+import { savePoliciesCardAction, savePoliciesUnknownAction } from "@/app/(desk)/settings/policiesCardActions";
+import { PoliciesSkeleton } from "@/components/policies/PoliciesSkeleton";
+
+// Each panel is its own chunk, so opening Policies does not download the whole settings form.
+const formLoading = () => <Skeleton className="h-96 w-full rounded-2xl" />;
+const TenantForm = dynamic(() => import("@/components/TenantForm").then((m) => m.TenantForm), { loading: formLoading });
+const IdentitySettings = dynamic(() => import("@/components/identity/IdentitySettings").then((m) => m.IdentitySettings), { loading: formLoading });
+const PoliciesSettings = dynamic(() => import("@/components/policies/PoliciesSettings").then((m) => m.PoliciesSettings), {
+  loading: () => <PoliciesSkeleton />,
+});
+import { PoliciesSettingsErrorBoundary } from "@/components/policies/PoliciesSettingsErrorBoundary";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
-import { parseVertical } from "@/lib/vertical";
 import {
   settingsPanelHeading,
+  parseBusinessSettingsPanel,
+  parseBusinessSettingsTab,
   type BusinessSettingsTab,
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
@@ -33,6 +42,20 @@ import {
 } from "@/components/settingsUi";
 import { SettingsMenu, SettingsRail } from "@/components/SettingsSideNav";
 
+/** Client URL wins over a stale server tab during soft navigation (avoids a flash of the Settings home). */
+function useResolvedSettingsRoute(serverTab: BusinessSettingsTab, serverTrainPanel: SettingsPanel) {
+  const searchParams = useSearchParams();
+  return useMemo(() => {
+    const tabRaw = searchParams.get("tab");
+    const panelRaw = searchParams.get("panel");
+    const tabFromUrl = parseBusinessSettingsTab(tabRaw, panelRaw);
+    const trainFromUrl = parseBusinessSettingsPanel(panelRaw, tabRaw);
+    const tab = tabFromUrl !== "menu" ? tabFromUrl : serverTab;
+    const trainPanel = tabFromUrl !== "menu" || tabRaw || panelRaw ? trainFromUrl : serverTrainPanel;
+    return { tab, trainPanel };
+  }, [searchParams, serverTab, serverTrainPanel]);
+}
+
 function settingsLineState(did: string | null | undefined): {
   lineLive: boolean;
   lineDetail: string;
@@ -43,21 +66,12 @@ function settingsLineState(did: string | null | undefined): {
 }
 
 function SettingsPanelBody({
-  tab,
   tenant,
   curatedVoices,
 }: {
-  tab: "import" | "test";
   tenant: TenantRow;
   curatedVoices: CuratedSonioxVoice[];
 }) {
-  if (tab === "import") {
-    return parseVertical(tenant.vertical) === "retail" ? (
-      <CatalogImportPanel tenant={tenant} />
-    ) : (
-      <KnowledgeIngestPanel tenant={tenant} />
-    );
-  }
   return <TestLinePanel tenant={tenant} curatedVoices={curatedVoices} />;
 }
 
@@ -96,11 +110,12 @@ export function BusinessSettingsShell({
   /** Identity: tenants.business_category for the one "What you do" question. */
   businessCategory?: string | null;
 }) {
+  const { tab: activeTab, trainPanel: activeTrainPanel } = useResolvedSettingsRoute(tab, trainPanel);
   const formPanel: SettingsPanel =
-    tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
-  const showForm = tab === "catalog" || tab === "train";
-  const isMenu = tab === "menu";
-  const heading = settingsPanelHeading(tab, trainPanel, tenant.vertical);
+    activeTab === "catalog" ? "catalog" : activeTab === "train" ? activeTrainPanel : "identity";
+  const showForm = activeTab === "catalog" || activeTab === "train";
+  const isMenu = activeTab === "menu";
+  const heading = settingsPanelHeading(activeTab, activeTrainPanel);
   const { lineLive, lineDetail } = settingsLineState(tenant.sautikit_virtual_number);
   const businessName = tenant.business_name?.trim() || "Business";
 
@@ -143,8 +158,8 @@ export function BusinessSettingsShell({
 
   const rail = (
     <SettingsRail
-      tab={tab}
-      trainPanel={trainPanel}
+      tab={activeTab}
+      trainPanel={activeTrainPanel}
       optionStatus={optionStatus}
       assistantSayPage={assistantSayPage}
     />
@@ -155,7 +170,7 @@ export function BusinessSettingsShell({
     // Server-rendered with no viewport script, so nothing shifts after paint.
     return (
       <SettingsLeaveGuard>
-      <div className="w-full min-w-0" data-settings-console="" data-settings-home="" data-pull-dirty-guard="">
+      <div className="w-full min-w-0 overflow-x-clip" data-settings-console="" data-settings-home="" data-pull-dirty-guard="">
         <div className="w-full min-w-0">
           <div className={`${settingsPanelClass} mx-auto w-full md:max-w-3xl md:pt-4 xl:max-w-6xl`}>
             <SettingsPageHeader
@@ -165,11 +180,12 @@ export function BusinessSettingsShell({
               index
             />
             <SettingsMenu
-              tab={tab}
-              trainPanel={trainPanel}
+              tab={activeTab}
+              trainPanel={activeTrainPanel}
               variant="index"
               optionStatus={optionStatus}
               assistantSayPage={assistantSayPage}
+              vertical={tenant.vertical}
             />
           </div>
         </div>
@@ -180,7 +196,7 @@ export function BusinessSettingsShell({
 
   return (
     <SettingsLeaveGuard>
-    <div className="w-full min-w-0" data-settings-console="" data-desk-nested="" data-pull-dirty-guard="">
+    <div className="w-full min-w-0 overflow-x-clip" data-settings-console="" data-desk-nested="" data-pull-dirty-guard="">
       {showForm && formPanel === "identity" ? (
         // Identity: three cards that each save on their own (no shared form or Save).
         <IdentitySettings
@@ -192,6 +208,21 @@ export function BusinessSettingsShell({
           sidebar={rail}
           businessCategory={businessCategory}
         />
+      ) : showForm && formPanel === "policies" ? (
+        // Policies: cards that each save on their own, beside what callers hear.
+        <PoliciesSettingsErrorBoundary businessName={businessName} heading={heading} sidebar={rail}>
+          <PoliciesSettings
+            key={`${tenant.id}:policies`}
+            onSaveActivity={markOwnSave}
+            tenant={tenant}
+            curatedVoices={curatedVoices}
+            heading={heading}
+            sidebar={rail}
+            saveCard={savePoliciesCardAction}
+            saveUnknown={savePoliciesUnknownAction}
+            assistantSayPage={assistantSayPage}
+          />
+        </PoliciesSettingsErrorBoundary>
       ) : showForm ? (
         <TenantForm
           key={tenantFormKey}
@@ -210,7 +241,7 @@ export function BusinessSettingsShell({
         <div className={settingsConsoleClass}>
           {rail}
           <div className={settingsPanelClass}>
-            {tab === "alerts" ? (
+            {activeTab === "alerts" ? (
               <AlertsPanel tenant={tenant} businessName={businessName} />
             ) : (
               <>
@@ -218,18 +249,14 @@ export function BusinessSettingsShell({
                   businessName={businessName}
                   lineLive={lineLive}
                   lineDetail={lineDetail}
-                  showLine={tab === "test"}
+                  showLine={activeTab === "test"}
                   showBack
                   title={heading}
                 />
-                {tab === "calls" ? callsSlot : null}
-                {tab === "assistant-say" ? assistantSaySlot : null}
-                {tab === "import" || tab === "test" ? (
-                  <SettingsPanelBody
-                    tab={tab}
-                    tenant={tenant}
-                    curatedVoices={curatedVoices}
-                  />
+                {activeTab === "calls" ? callsSlot : null}
+                {activeTab === "assistant-say" ? assistantSaySlot : null}
+                {activeTab === "test" ? (
+                  <SettingsPanelBody tenant={tenant} curatedVoices={curatedVoices} />
                 ) : null}
               </>
             )}

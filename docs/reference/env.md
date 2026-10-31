@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-237 variables.
+248 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -35,12 +35,15 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BILLING_NOTICES_SEND` | voice | `src/billing/billingNoticeSend.js` |
 | `BRAIN_AREA_PICKS` | voice | `src/conversation/v2/areaCoverage.js`<br>`src/db.js` |
 | `BRAIN_CALL_FIXES_D199` | desk | `dashboard/src/lib/tenantFieldProvenance.ts` |
+| `BRAIN_CONFIRMED_COVERAGE` | desk | `dashboard/src/lib/tenantFieldProvenance.ts` |
 | `BRAIN_ENGINES` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_ENGINES_FILLER_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_ENGINES_REPLY_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_ENGINES_UNDERSTAND_MS` | scripts | `scripts/brain-engines-latency.js` |
 | `BRAIN_GEMINI_CATALOGUE` | voice | `src/conversation/catalogueMouth.js` |
+| `BRAIN_KB_GATE` | desk, scripts, voice | `dashboard/src/lib/kbLive.server.ts`<br>`scripts/kb-cutover.js`<br>`src/db.js` |
 | `BRAIN_MODEL_LEAD` | scripts | `scripts/brain-engines-sim.js` |
+| `BRAIN_SAFE_MODE` | desk, scripts, voice | `dashboard/src/lib/kbLive.server.ts`<br>`scripts/kb-cutover.js`<br>`server.js` |
 | `BRAIN_V1_DRAFT` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_V1_DRAFT_PHASE_A` | scripts | `scripts/brain-engines-sim.js` |
 | `BRAIN_V2` | scripts | `scripts/brain-engines-sim.js` |
@@ -58,13 +61,16 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `BUSINESS_OWNER_WHATSAPP_NUMBER` | voice | `server.js`<br>`src/notifications/ownerCallSummary.js` |
 | `CALL_SUMMARY_EVENT` | voice | `src/conversation/callSummaryEvent.js` |
 | `CRON_SECRET` | desk | `dashboard/src/app/api/cron/billing-payment-retry/route.ts`<br>`dashboard/src/app/api/cron/ops-alerts/route.ts` |
-| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+68 more |
+| `DASHBOARD_OPEN` | desk | `dashboard/src/app/(desk)/calls/noteActions.ts`<br>`dashboard/src/app/(desk)/settings/assistantSayActions.ts`<br>`dashboard/src/app/dev/admin-activity/page.tsx`<br>+71 more |
 | `DASHBOARD_PASSWORD` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
 | `DATABASE_URL` | scripts | `scripts/verify-staging-schema.js` |
 | `DESK_ASSISTANT_SAY_PAGE` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_ATTEST_SERVICE_AREAS` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
+| `DESK_FEEL` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
+| `DESK_IMPORT_PHOTO` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
+| `DESK_KB_ITEM_STATES` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_LOOKUP_PREVIEW` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_PLAN_CHANGE` | desk | `dashboard/src/lib/deskPlanChange.ts` |
 | `DESK_PUBLIC_URL` | voice | `server.js` |
@@ -72,7 +78,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `FACT_HASH_MODE` | desk, scripts, voice | `dashboard/src/lib/tenantFieldProvenance.ts`<br>`scripts/ack-rule-report.js`<br>`scripts/replay-voice-suite.js`<br>+2 more |
 | `FACT_PAYMENTS_V2_HASH` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
 | `FACT_SAVE_IS_CONFIRM` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
-| `GEMINI_API_KEY` | desk, scripts, voice | `dashboard/src/app/(desk)/settings/catalogActions.ts`<br>`dashboard/src/app/(desk)/settings/pronunciationGeminiScanActions.ts`<br>`dashboard/src/lib/faqFromTranscript.ts`<br>+12 more |
+| `GEMINI_API_KEY` | desk, scripts, voice | `dashboard/src/app/(desk)/settings/pronunciationGeminiScanActions.ts`<br>`dashboard/src/lib/faqFromTranscript.ts`<br>`dashboard/src/lib/gemini.ts`<br>+11 more |
 | `GEMINI_AUDIO_MODEL` | desk | `dashboard/src/lib/gemini.ts` |
 | `GEMINI_BACKUP_MODEL` | voice | `src/conversation/geminiVoice.js` |
 | `GEMINI_MAX_OUTPUT_TOKENS` | voice | `server.js`<br>`src/speech/replayVoice.js` |
@@ -92,6 +98,11 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `GITHUB_STEP_SUMMARY` | scripts | `scripts/stage-pull-request-hold.js` |
 | `HEAD_REF` | scripts | `scripts/stage-pull-request.js` |
 | `HEAD_REPO` | scripts | `scripts/stage-pull-request.js` |
+| `KB_BOOT_READINESS` | voice | `server.js` |
+| `KB_CACHE_MAX_MB` | voice | `src/knowledge/kb/reader.js` |
+| `KB_COMPILE_ON_SAVE` | voice | `server.js` |
+| `KB_SHADOW` | voice | `src/conversation/v2/engineTools.js` |
+| `KB_SW_SUGGEST` | voice | `server.js` |
 | `NEXT_PUBLIC_ADMIN_HOST` | desk | `dashboard/src/components/ServiceWorkerRegister.tsx` |
 | `NEXT_PUBLIC_APP_HOST` | desk | `dashboard/src/components/ServiceWorkerRegister.tsx` |
 | `NEXT_PUBLIC_APP_URL` | voice | `server.js` |
@@ -218,7 +229,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_GREETING_CACHE` | voice | `src/speech/greetingPcmCache.js` |
 | `VOICE_GREETING_MODE` | voice | `src/conversation/dynamicSpeech.js` |
 | `VOICE_GREETING_TIMEOUT_MS` | voice | `src/conversation/dynamicSpeech.js` |
-| `VOICE_INTERNAL_SECRET` | desk, voice | `dashboard/src/app/(desk)/calls/escalateActions.ts`<br>`dashboard/src/lib/spokenCatalogueOnSave.ts`<br>`dashboard/src/lib/voicePreview.ts`<br>+1 more |
+| `VOICE_INTERNAL_SECRET` | desk, voice | `dashboard/src/app/(desk)/calls/escalateActions.ts`<br>`dashboard/src/lib/kb.server.ts`<br>`dashboard/src/lib/spokenCatalogueOnSave.ts`<br>+2 more |
 | `VOICE_LINE_UNAVAILABLE_CLIP_DIR` | voice | `src/sautikit/lineUnavailableAudio.js` |
 | `VOICE_LINE_UNAVAILABLE_REFRESH` | voice | `src/sautikit/lineUnavailableAudio.js` |
 | `VOICE_LINE_UNAVAILABLE_REFRESH_MS` | voice | `src/sautikit/lineUnavailableAudio.js` |

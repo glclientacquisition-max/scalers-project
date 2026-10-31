@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminActorName } from "@/lib/adminActor";
 import { adminFacingError, logAdminError } from "@/lib/adminErrors";
-import { isLegacyAuthenticated } from "@/lib/auth";
+import { requireAdminApiRead, requireAdminOperatorWrite } from "@/lib/adminOperatorWrite";
 import { stepUpGateSession } from "@/lib/ops/stepUpGate";
 import {
   confirmTenantBillingMode,
@@ -11,8 +11,9 @@ import {
 } from "@/lib/adminWallets";
 
 export async function GET(request: Request) {
-  if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  const read = await requireAdminApiRead();
+  if (!read.ok) {
+    return NextResponse.json({ error: read.error }, { status: read.status });
   }
 
   const { searchParams } = new URL(request.url);
@@ -37,8 +38,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!(await isLegacyAuthenticated())) {
-    return NextResponse.json({ error: "ops_only" }, { status: 403 });
+  const gate = await requireAdminOperatorWrite();
+  if (!gate.ok) {
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
 
   const body = await request.json();

@@ -433,8 +433,10 @@ function pricedRows(profile) {
     const price = formatPriceDisplay(norm, 'en', legacyPriceText(row));
     if (price) rows.push({ name, price, norm, legacy: legacyPriceText(row) });
   };
-  for (const row of factServices(profile?.servicesCatalog, fieldMeta)) push(row);
-  for (const row of factProducts(profile?.productCatalog, fieldMeta)) push(row);
+  // KB v2: the one catalogue door (kb/source.js); legacy mode reads the same profile fields as before
+  const kbSource = require('../knowledge/kb/source').catalogueSource(profile || {});
+  for (const row of factServices(profile ? kbSource.services() : undefined, fieldMeta)) push(row);
+  for (const row of factProducts(profile ? kbSource.products() : undefined, fieldMeta)) push(row);
   return rows;
 }
 
@@ -532,7 +534,7 @@ function catalogueRowNamedWithoutPrice(text, profile) {
     .trim()
     .toLowerCase();
   if (!want) return false;
-  const row = factServices(profile?.servicesCatalog, profile?.fieldMeta || null).find((item) => {
+  const row = factServices(profile ? require('../knowledge/kb/source').catalogueSource(profile).services() : undefined, profile?.fieldMeta || null).find((item) => {
     const name = String(item?.name || '')
       .replace(/\([^)]*\)/g, ' ')
       .replace(/\s+/g, ' ')

@@ -69,6 +69,20 @@ const devRetailTenant = {
   unknown_answer_fallback: null,
 };
 
+/**
+ * Lookup found => the row says Will say. The row may also say Will say when the
+ * stricter lookup misses only on a fact-hash reason and the call path answers
+ * from the same saved data (call-path readiness below).
+ */
+function assertRowAgreesWithLookup(row, result, label) {
+  if (result.status === 'found') {
+    assert.equal(row.willSay, true, label);
+  } else if (row.willSay) {
+    assert.match(String(result.reason || ''), /^hash_/, `${label}: Will say only via call-path fallback`);
+    assert.ok(row.hearPreview, `${label}: call-path line`);
+  }
+}
+
 function rowWillSay(state, id) {
   const row = state.rows.find((r) => r.id === id);
   return Boolean(row && row.willSay);
@@ -82,7 +96,7 @@ describe('assistantSayReadiness', () => {
 
     const hoursItem = checklist.items.find((i) => i.id === 'hours');
     const payItem = checklist.items.find((i) => i.id === 'payment');
-    const catalogItem = checklist.items.find((i) => i.id === 'catalog');
+    const catalogItem = checklist.items.find((i) => i.id === 'prices');
 
     assert.equal(hoursItem.complete, rowWillSay(say, 'hours'));
     assert.equal(payItem.complete, rowWillSay(say, 'payment'));
@@ -100,14 +114,11 @@ describe('assistantSayReadiness', () => {
     const say = evaluateAssistantSay(profile);
     const checklist = getReadyChecklist(profile);
     for (const item of checklist.items) {
-      if (item.id === 'identity') {
-        assert.equal(item.complete, Boolean(devRetailTenant.business_name?.trim()));
-        continue;
-      }
-      const rowId = item.id === 'catalog' ? 'prices' : item.id === 'payment' ? 'payment' : item.id;
-      const row = say.rows.find((r) => r.id === rowId);
-      assert.ok(row, rowId);
-      assert.equal(item.complete, row.willSay);
+      const row = say.rows.find((r) => r.id === item.id);
+      assert.ok(row, item.id);
+      const complete =
+        item.id === 'unsure' ? row.stampTone === 'ok' : item.id === 'greeting' ? row.willSay : row.isFact && row.willSay;
+      assert.equal(item.complete, complete, item.id);
       if (!item.complete) assert.equal(item.reason, row.reason);
     }
   });
@@ -116,11 +127,11 @@ describe('assistantSayReadiness', () => {
     for (const key of ['carry', 'list']) {
       const profile = profileFromReplay(key);
       const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
-      for (const id of ['prices', 'hours', 'delivery', 'payment']) {
+      for (const id of ['prices', 'hours', 'areas', 'payment']) {
         const row = say.rows.find((r) => r.id === id);
         const result = lookupProbeForRowId(id, profile, FIXTURE_NOW);
         assert.ok(row, `${key}/${id}`);
-        assert.equal(row.willSay, result.status === 'found', `${key}/${id}`);
+        assertRowAgreesWithLookup(row, result, `${key}/${id}`);
       }
     }
   });
@@ -143,19 +154,19 @@ describe('assistantSayReadiness', () => {
     assert.match(prices.reason, /Ready on the next call/);
   });
 
-  it('when unsure uses neutral stamp labels, not Will say / Wont say', () => {
+  it('when unsure uses team default or will say stamps, not fact wont say', () => {
     const profile = tenantProfileFromRow({ ...devRetailTenant, unknown_answer_fallback: 'We will call you back.' }, {});
     const say = evaluateAssistantSay(profile);
     const unsure = say.rows.find((r) => r.id === 'unsure');
     assert.ok(unsure);
     assert.equal(unsure.isFact, false);
-    assert.equal(unsure.stampLabel, 'Callback line set');
+    assert.equal(unsure.stampLabel, 'Will say');
     assert.equal(unsure.stampTone, 'ok');
     assert.notEqual(unsure.stampLabel, "Won't say");
 
     const defaultSay = evaluateAssistantSay(tenantProfileFromRow(devRetailTenant, {}));
     const defaultUnsure = defaultSay.rows.find((r) => r.id === 'unsure');
-    assert.equal(defaultUnsure.stampLabel, 'Using team default');
+    assert.equal(defaultUnsure.stampLabel, 'Team default');
     assert.equal(defaultUnsure.stampTone, 'neutral');
   });
 
@@ -183,8 +194,8 @@ describe('assistantSayReadiness', () => {
     }, {});
     assert.deepEqual(readinessQuestions(profile).fee, ['Do you deliver to Westlands?']);
     assert.equal(previewSampleQuestions(profile).delivery, 'Do you deliver to Westlands?');
-    const row = evaluateAssistantSay(profile, { now: FIXTURE_NOW }).rows.find((r) => r.id === 'delivery');
-    assert.equal(row.willSay, lookupProbeForRowId('delivery', profile, FIXTURE_NOW).status === 'found');
+    const row = evaluateAssistantSay(profile, { now: FIXTURE_NOW }).rows.find((r) => r.id === 'areas');
+    assert.equal(row.willSay, lookupProbeForRowId('areas', profile, FIXTURE_NOW).status === 'found');
   });
 
   it('a tenant with no catalogue or areas gets no price or delivery question', () => {
@@ -194,7 +205,7 @@ describe('assistantSayReadiness', () => {
     assert.deepEqual(q.fee, []);
     const say = evaluateAssistantSay(empty, { now: FIXTURE_NOW });
     assert.equal(say.rows.find((r) => r.id === 'prices').willSay, false);
-    assert.equal(say.rows.find((r) => r.id === 'delivery').willSay, false);
+    assert.equal(say.rows.find((r) => r.id === 'areas').willSay, false);
     assert.deepEqual(previewSampleQuestions(empty), {
       price: '',
       hours: 'What are your opening hours?',
@@ -362,15 +373,15 @@ describe('assistantSayReadiness', () => {
       const samples = previewSampleQuestions(profile, { now: FIXTURE_NOW });
       const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
       const pricesRow = say.rows.find((r) => r.id === 'prices');
-      const deliveryRow = say.rows.find((r) => r.id === 'delivery');
+      const deliveryRow = say.rows.find((r) => r.id === 'areas');
       const c = { profile, language: 'en', now: FIXTURE_NOW, seed: 0 };
       if (samples.price) {
         const priceHit = lookup('price', samples.price, c);
-        assert.equal(priceHit.status === 'found', pricesRow.willSay, `${key} price preview`);
+        assertRowAgreesWithLookup(pricesRow, priceHit, `${key} price preview`);
       }
       if (samples.delivery) {
         const feeHit = lookup('fee', samples.delivery, c);
-        assert.equal(feeHit.status === 'found', deliveryRow.willSay, `${key} delivery preview`);
+        assertRowAgreesWithLookup(deliveryRow, feeHit, `${key} delivery preview`);
       }
       assert.equal(samples.hours, readinessQuestions(profile).hours[0], key);
       assert.equal(samples.pay, readinessQuestions(profile).pay[0], key);
@@ -453,5 +464,214 @@ describe('assistantSayReadiness', () => {
       assert.ok(!/deliver to [A-Z]/.test(text), `${rel}: literal place`);
       assert.ok(!/sofa|kilimani/i.test(text), `${rel}: tenant-specific sample`);
     }
+  });
+  describe('call-path readiness when stored fact hashes are stale', () => {
+    const { indexFieldMeta } = requireRoot('./src/conversation/provenance.js');
+
+    /** Done-and-Dusted-shaped sample tenant (made-up numbers, no real customer data). */
+    function dndTenant() {
+      return {
+        id: 'fixture-dnd-shape',
+        business_name: 'Sample Cleaning Co',
+        vertical: 'home_services',
+        greeting_text: 'Karibu Sample Cleaning, tunasafisha nyumba na ofisi. Tukusaidie vipi?',
+        unknown_answer_fallback: "I don't have that exact detail, I can note it for the team.",
+        services_catalog: [
+          {
+            id: 'svc_std_1br',
+            name: '1-Bedroom Standard Clean',
+            price: '2500',
+            price_range: 'KSh 2,500',
+            source: 'owner',
+            pricing: { mode: 'fixed', unit: 'job', source: 'owner', amount_ksh: 2500, min_ksh: null, max_ksh: null, confirmed: true },
+          },
+          {
+            id: 'svc_deep',
+            name: 'Deep Clean',
+            price: '6000',
+            price_range: 'KSh 6,000-12,000',
+            source: 'owner',
+            pricing: { mode: 'range', unit: 'job', source: 'owner', min_ksh: 6000, max_ksh: 12000, amount_ksh: 6000, confirmed: true },
+          },
+        ],
+        product_catalog: [],
+        hours_schedule: {
+          timezone: 'Africa/Nairobi',
+          days: {
+            mon: { open: '07:30', close: '18:00' },
+            tue: { open: '07:30', close: '18:00' },
+            wed: { open: '07:30', close: '18:00' },
+            thu: { open: '07:30', close: '18:00' },
+            fri: { open: '07:30', close: '18:00' },
+            sat: { open: '08:00', close: '17:00' },
+            sun: { open: '09:00', close: '15:00' },
+          },
+        },
+        service_areas: {
+          areas: [
+            { id: 'county:nairobi', modes: ['visit'], source: 'owner', fee_ksh: null, fee_mode: 'free', confirmed: true },
+          ],
+        },
+        business_policies: {
+          payment: 'You can pay by M-Pesa Buy Goods Till 5123456, M-Pesa Paybill 600100, or cash.',
+          payments: {
+            version: 2,
+            source: 'owner',
+            confirmed: true,
+            methods: ['mpesa_till', 'mpesa_paybill', 'cash'],
+            timings: ['after_service'],
+            mpesa_till: '5123456',
+            mpesa_paybill: { business_no: '600100', account: null, account_mode: 'customer_phone' },
+          },
+        },
+      };
+    }
+
+    const CATALOG_PATHS = (t) =>
+      t.services_catalog.flatMap((r) => [`catalog.service.${r.id}.name`, `catalog.service.${r.id}.price`]);
+
+    /** Owner meta rows; paths in `stale` carry a hash of an older value (a save that did not refresh it). */
+    function metaFor(tenant, paths, { stale = [], source = 'owner' } = {}) {
+      return paths.map((field_path) => ({
+        field_path,
+        source,
+        value_hash: stale.includes(field_path)
+          ? hashFactValue({ old: field_path })
+          : hashFactValue(factValueForPath(field_path, tenant)),
+      }));
+    }
+
+    function profileOf(tenant, metaRows, { kbProjected = false } = {}) {
+      const profile = tenantProfileFromRow(tenant, {
+        fieldMeta: indexFieldMeta(metaRows, { hashMode: true }),
+        holdGate: {},
+      });
+      // kb/live.attach sets this when the published snapshot's rows replace the stored catalogue.
+      if (kbProjected) profile.kbProjected = true;
+      return profile;
+    }
+
+    const BASE_PATHS = ['hours.weekly_grid', 'service_areas.county:nairobi', 'policies.payment', 'payments.methods'];
+
+    function rowOf(state, id) {
+      return state.rows.find((r) => r.id === id);
+    }
+
+    it('Done-and-Dusted shape scores 6/6: stale catalogue and payments.methods hashes, KB path live', () => {
+      const t = dndTenant();
+      const stale = [...CATALOG_PATHS(t), 'payments.methods'];
+      const profile = profileOf(t, metaFor(t, [...BASE_PATHS, ...CATALOG_PATHS(t)], { stale }), { kbProjected: true });
+      // the cause: the stricter lookup check reads the stale hashes
+      const c = { profile, language: 'en', now: FIXTURE_NOW, seed: 0 };
+      assert.equal(lookup('price', 'How much is Deep Clean?', c).status, 'unconfirmed');
+      assert.equal(lookup('pay', 'How do I pay?', c).status, 'unconfirmed');
+      const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
+      assert.equal(say.readyCount, 6, JSON.stringify(say.rows.map((r) => [r.id, r.stampLabel, r.reason])));
+      assert.equal(say.total, 6);
+      assert.match(rowOf(say, 'prices').hearPreview, /1-Bedroom Standard Clean is KSh 2,500/);
+      assert.equal(rowOf(say, 'prices').reason, 'Ready on the next call.');
+      assert.match(rowOf(say, 'payment').hearPreview, /5123456/);
+      assert.match(rowOf(say, 'payment').hearPreview, /600100/);
+      assert.equal(getReadyChecklist(profile, { now: FIXTURE_NOW }).allDone, true);
+    });
+
+    it('stale catalogue hash on the stored row (no KB snapshot) still reads Won\'t say', () => {
+      const t = dndTenant();
+      const profile = profileOf(t, metaFor(t, [...BASE_PATHS, ...CATALOG_PATHS(t)], { stale: CATALOG_PATHS(t) }));
+      assert.equal(rowOf(evaluateAssistantSay(profile, { now: FIXTURE_NOW }), 'prices').willSay, false);
+    });
+
+    it('KB rows with only unconfirmed or ask-for-quote prices are not ready', () => {
+      const t = dndTenant();
+      t.services_catalog = t.services_catalog.map((r, i) => ({
+        ...r,
+        pricing: i === 0 ? { ...r.pricing, confirmed: false } : { mode: 'ask', confirmed: true },
+        price_range: i === 0 ? r.price_range : 'Custom quote',
+        price: i === 0 ? r.price : '',
+      }));
+      const profile = profileOf(t, metaFor(t, [...BASE_PATHS, ...CATALOG_PATHS(t)], { stale: CATALOG_PATHS(t) }), { kbProjected: true });
+      assert.equal(rowOf(evaluateAssistantSay(profile, { now: FIXTURE_NOW }), 'prices').willSay, false);
+    });
+
+    it('owner-saved payments bag is ready even when the payment policy hash is stale too', () => {
+      const t = dndTenant();
+      const profile = profileOf(t, metaFor(t, BASE_PATHS, { stale: ['payments.methods', 'policies.payment'] }));
+      const row = rowOf(evaluateAssistantSay(profile, { now: FIXTURE_NOW }), 'payment');
+      assert.equal(row.willSay, true);
+      assert.match(row.hearPreview, /till number is 5123456/);
+    });
+
+    it('a parsed (not owner-saved) payments bag with no confirmed payment policy is not ready', () => {
+      const t = dndTenant();
+      t.business_policies.payments = { ...t.business_policies.payments, source: 'parsed', confirmed: false };
+      const profile = profileOf(t, metaFor(t, BASE_PATHS, { stale: ['payments.methods', 'policies.payment'] }));
+      assert.equal(rowOf(evaluateAssistantSay(profile, { now: FIXTURE_NOW }), 'payment').willSay, false);
+    });
+
+    it('a payment note with no number stays not ready (genuine miss)', () => {
+      const t = dndTenant();
+      t.business_policies = { payment: 'M-Pesa or cash after the job. No payment before the team arrives.' };
+      const profile = profileOf(t, metaFor(t, ['hours.weekly_grid', 'policies.payment']));
+      const row = rowOf(evaluateAssistantSay(profile, { now: FIXTURE_NOW }), 'payment');
+      assert.equal(row.willSay, false);
+      assert.equal(row.stampLabel, "Won't say");
+    });
+
+    it('owner hours with a stale hash read as the call fact sheet does; no owner row stays not ready', () => {
+      const t = dndTenant();
+      const stale = evaluateAssistantSay(profileOf(t, metaFor(t, BASE_PATHS, { stale: ['hours.weekly_grid'] })), { now: FIXTURE_NOW });
+      assert.equal(rowOf(stale, 'hours').willSay, true);
+      assert.match(rowOf(stale, 'hours').hearPreview, /Monday to Friday/);
+      const seeded = evaluateAssistantSay(
+        profileOf(t, [
+          ...metaFor(t, BASE_PATHS.filter((p) => p !== 'hours.weekly_grid')),
+          ...metaFor(t, ['hours.weekly_grid'], { stale: ['hours.weekly_grid'], source: 'seed' }),
+        ]),
+        { now: FIXTURE_NOW }
+      );
+      assert.equal(rowOf(seeded, 'hours').willSay, false);
+      const none = evaluateAssistantSay(profileOf(t, metaFor(t, BASE_PATHS.filter((p) => p !== 'hours.weekly_grid'))), { now: FIXTURE_NOW });
+      assert.equal(rowOf(none, 'hours').willSay, false);
+    });
+    it('owner-confirmed areas with no hash row read as calls do (Jirani shape); unconfirmed areas stay not ready', () => {
+      const t = dndTenant();
+      t.service_areas = {
+        areas: [
+          { id: 'place:kilimani', modes: ['visit'], source: 'owner', confirmed: true, fee_mode: 'free', fee_ksh: null },
+          { id: 'place:kileleshwa', modes: ['visit'], source: 'owner', confirmed: true, fee_mode: 'fixed', fee_ksh: 300 },
+        ],
+      };
+      const ready = evaluateAssistantSay(profileOf(t, metaFor(t, ['hours.weekly_grid', 'policies.payment'])), { now: FIXTURE_NOW });
+      const row = rowOf(ready, 'areas');
+      assert.equal(row.willSay, true);
+      assert.match(row.hearPreview, /Kilimani/);
+      assert.ok(row.hearPreviewSw);
+      t.service_areas.areas = t.service_areas.areas.map((a) => ({ ...a, source: 'import', confirmed: false }));
+      const notReady = evaluateAssistantSay(profileOf(t, metaFor(t, ['hours.weekly_grid', 'policies.payment'])), { now: FIXTURE_NOW });
+      assert.equal(rowOf(notReady, 'areas').willSay, false);
+    });
+
+    it('ready rows carry a Kiswahili line from the same result', () => {
+      const t = dndTenant();
+      const stale = [...CATALOG_PATHS(t), 'payments.methods'];
+      const profile = profileOf(t, metaFor(t, [...BASE_PATHS, ...CATALOG_PATHS(t)], { stale }), { kbProjected: true });
+      const say = evaluateAssistantSay(profile, { now: FIXTURE_NOW });
+      assert.match(rowOf(say, 'prices').hearPreviewSw, /1-Bedroom Standard Clean ni KSh 2,500/);
+      assert.match(rowOf(say, 'payment').hearPreviewSw, /5123456/);
+      assert.ok(rowOf(say, 'hours').hearPreviewSw);
+      assert.ok(rowOf(say, 'areas').hearPreviewSw);
+    });
+  it('topic sheet status and "Callers hear" come from the readiness row, never the live lookup preview', () => {
+    const text = fs.readFileSync(
+      path.join(__dirname, '..', 'dashboard/src/components/assistantSay/AssistantSayTopicSheet.tsx'),
+      'utf8'
+    );
+    assert.ok(!/preview\??\.stamp(Label|Tone)/.test(text), 'sheet stamp must not read the lookup preview');
+    assert.ok(!/preview\?\.speech(En|Sw)\s*\|\|/.test(text), '"Callers hear" must not prefer the lookup preview');
+    assert.ok(/<Stamp tone=\{row\.stampTone\}>\{row\.stampLabel\}<\/Stamp>/.test(text), 'sheet stamp is the row stamp');
+    // opening the sheet does not run a lookup; only "Show answer" does
+    const effects = text.match(/useEffect\(\(\) => \{[\s\S]*?\}, \[[^\]]*\]\);/g) || [];
+    for (const e of effects) assert.ok(!/previewDeskLookupAction/.test(e), 'no lookup preview on open');
+  });
   });
 });

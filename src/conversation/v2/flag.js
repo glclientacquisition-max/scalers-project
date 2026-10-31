@@ -9,7 +9,11 @@ const ON = /^(1|true|on|yes)$/i;
 function tenantAllowlist(env = process.env) {
   return String(env.BRAIN_V2_TENANTS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 }
+//   BRAIN_KB_GATE=on     v2 KB readiness picks the brain per business (tenants.brain_target + kb_ready_version);
+//                        BRAIN_V2_TENANTS and BRAIN_V1_DRAFT_TENANTS are ignored. Off/unset = the env lists (kill switch).
 function tenantAllowed({ env = process.env, tenantId } = {}) {
+  const gate = require('../../knowledge/kb/live').decision({ env, tenantId });
+  if (gate !== null) return gate;
   const allow = tenantAllowlist(env);
   if (!allow.length) return true;
   return tenantId != null && allow.includes(String(tenantId).trim().toLowerCase());

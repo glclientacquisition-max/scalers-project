@@ -67,6 +67,7 @@ test("insights: Overview wiring uses the kit Sheet and links each call", () => {
     // D2: usage, insights, call setup and checks stream from their own slots.
     "\n" + read("dashboard/src/components/home/HomeOverviewSlots.tsx");
   assert.match(home, /loadCallInsights\(client, tenant\.id, 30, tenant\.faqs\)/);
-  assert.match(home, /insights \? <CallInsights insights=\{insights\} \/> : null/);
+  assert.match(home, /HomeInsightsError/);
+  assert.doesNotMatch(home, /insights \? <CallInsights insights=\{insights\} \/> : null/);
   assert.match(home, /<Suspense fallback=\{<HomeInsightsSkeleton \/>\}>/);
 });

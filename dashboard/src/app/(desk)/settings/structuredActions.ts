@@ -1,6 +1,7 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveTenantBusinessType } from "@/lib/businessType";
 import { bustTenantCache } from "@/lib/tenantCache";
 import { requestSpokenCatalogueCompile } from "@/lib/spokenCatalogueOnSave";
 import { revalidatePath } from "next/cache";
@@ -19,6 +20,8 @@ import {
 import { reportFactHashRestampFailure } from "@/lib/factHashRestampReport";
 import { PRICE_SAVE_FAILED, runPriceBatch, type CatalogColumns, type PriceConfirmInput } from "@/lib/priceBatch";
 import type { TenantRow } from "@/lib/supabase";
+import { afterKbWrite, loadKbItems, writeKbItems } from "@/lib/kbWrite.server";
+import { kbPriceEdits } from "@/lib/kbPriceConfirm";
 
 export type StructuredResult = { ok: true; message: string } | { ok: false; error: string; fields?: Record<string, string> };
 
@@ -69,6 +72,17 @@ export async function confirmPricesAction(inputs: PriceConfirmInput[]): Promise<
   const ws = await workspace();
   if ("error" in ws) return { ok: false, error: ws.error ?? PRICE_SAVE_FAILED };
   const tenantId = ws.tenant.id;
+  // KB is the source once its tables exist: confirm there, then the mirror rewrites the old columns.
+  const kbItems = await loadKbItems(tenantId);
+  if (kbItems) {
+    const planned = kbPriceEdits(kbItems, inputs);
+    if (!planned.ok) return planned;
+    const w = await writeKbItems(tenantId, planned.edits);
+    if (!w.ok) return { ok: false, error: w.error };
+    await afterKbWrite(tenantId, "desk", { restampIds: planned.edits.map((i) => i.id) });
+    revalidatePath("/settings");
+    return { ok: true, message: inputs.length === 1 ? "Price saved." : "Prices saved." };
+  }
   const res = await runPriceBatch(
     {
       // Read the columns as stored now (not the cached tenant) and patch only the confirmed items.
@@ -100,7 +114,7 @@ export async function saveBusinessCategoryAction(category: string): Promise<Stru
   if (denied) return { ok: false, error: denied.error };
   const ws = await workspace();
   if ("error" in ws) return { ok: false, error: ws.error ?? SAVE_FAILED };
-  const type = (ws.tenant as { business_type?: string | null }).business_type || ws.tenant.vertical || "general";
+  const type = resolveTenantBusinessType(ws.tenant as { business_type?: string | null; vertical?: string | null });
   if (!categoriesFor(type === "retail" || type === "home_services" ? type : "general").some((c) => c.id === category))
     return { ok: false, error: "Pick from the list." };
   const { error } = await ws.client.from("tenants").update({ business_category: category }).eq("id", ws.tenant.id);

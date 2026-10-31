@@ -54,7 +54,9 @@ export const currentMemberRole = cache(async (): Promise<Role | null> => {
   if (!tenant) return null;
   if (!teamInvitesEnabled(tenant.id)) return "owner";
   const row = (await memberRowsForUser(user.id)).find((r) => r.tenant_id === tenant.id);
-  return row ? normalizeRole(row.role) : null;
+  if (row) return normalizeRole(row.role);
+  // Workspace is reachable (RLS); legacy primaries may not have a tenant_members row yet.
+  return "owner";
 });
 
 /**

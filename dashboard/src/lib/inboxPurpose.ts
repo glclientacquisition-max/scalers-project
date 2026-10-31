@@ -424,7 +424,8 @@ export function holdTypeLabel(type: string, vertical?: string | null): string {
     case "order":
       return "Order";
     case "callback":
-      return "Callback";
+      // Same words as the Call back stamp, so one row never says both.
+      return "Call back";
     case "enquiry":
       return "Enquiry";
     default:

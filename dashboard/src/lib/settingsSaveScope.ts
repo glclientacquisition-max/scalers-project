@@ -1,4 +1,4 @@
-import { parseGreetingLanguageField, type StoredGreetingLanguage } from "./identityGreeting.ts";
+import { parseGreetingLanguageField, parseGreetingTextClear, type StoredGreetingLanguage } from "./identityGreeting.ts";
 
 /**
  * Which form fields a Settings panel is allowed to overwrite.
@@ -21,6 +21,7 @@ const IDENTITY_ANSWER = [
   "sonioxVoiceId",
   "sonioxVoiceLabel",
   "greetingLanguage",
+  "greetingTextClear",
 ] as const;
 const IDENTITY_CONTACTS = ["socialHandles"] as const;
 
@@ -39,7 +40,14 @@ const SETTINGS_SCOPE_FIELDS: Record<string, readonly string[]> = {
   catalog: ["servicesNotes", "servicesCatalog", "productCatalog"],
   hours: ["hoursSchedule"],
   locations: ["businessLocations", "locationNotes", "serviceAreas", "noPremises"],
+  // Add many address card: the places list only (address merged onto the stored first place on the server).
+  // Location notes, service areas and the no-premises switch stay as stored.
+  "locations-address": ["businessLocations"],
   policies: ["businessPolicies", "unknownAnswerFallback"],
+  // Policies remake: each card saves its own keys of business_policies (merged on the
+  // server onto the stored value), and When unsure saves on its own. Neither wipes the other.
+  "policies-rules": ["businessPolicies"],
+  "policies-unknown": ["unknownAnswerFallback"],
   tools: ["agentTools", "afterHoursMode"],
   pronunciation: ["ttsLexicon"],
   team: ["teamDirectory", "handoffMode"],
@@ -88,6 +96,10 @@ export function settingsScopeIncludes(scope: string, field: string): boolean {
 /** The Identity card scopes, in page order. */
 export const IDENTITY_CARD_SCOPES = ["identity-business", "identity-answer", "identity-contacts"] as const;
 export type IdentityCardScope = (typeof IDENTITY_CARD_SCOPES)[number];
+
+/** The Policies card scopes. */
+export const POLICIES_CARD_SCOPES = ["policies-rules", "policies-unknown"] as const;
+export type PoliciesCardScope = (typeof POLICIES_CARD_SCOPES)[number];
 
 /** Fields a scope may overwrite (null: unknown scope, the whole form). */
 export function settingsScopeFields(scope: string): readonly string[] | null {
@@ -167,6 +179,18 @@ export function greetingLanguagePatch(
   if (posted === null || posted === undefined) return {};
   const value = parseGreetingLanguageField(posted);
   return value === undefined ? {} : { greeting_language: value };
+}
+
+/**
+ * tenants.greeting_text for this save: Desk only ever clears it (Go back to
+ * automatic), and only from a scope that owns the greeting (identity,
+ * identity-answer) when the form posted greeting_text_clear=1. Every other
+ * save leaves the owner's full greeting as stored. Never sent to Brain compile.
+ */
+export function greetingTextClearPatch(scope: string, posted: unknown): { greeting_text?: null } {
+  const owned = SETTINGS_SCOPE_FIELDS[scope];
+  if (!owned || !owned.includes("greetingTextClear")) return {};
+  return parseGreetingTextClear(posted) ? { greeting_text: null } : {};
 }
 
 /**

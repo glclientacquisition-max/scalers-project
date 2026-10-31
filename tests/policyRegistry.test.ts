@@ -14,9 +14,14 @@ test("niches: cleaning, shop and generic exist, and every topic they list is def
   for (const n of reg.NICHES) for (const s of n.sections) for (const t of s.topics) assert.ok(t === reg.PAYMENT_TOPIC || reg.TOPICS[t], `${n.id}: ${t}`);
 });
 
-test("niche pick: vertical, then keyword, else generic", () => {
+test("niche pick: business type and cleaning category only", () => {
+  assert.equal(reg.nicheFor({ business_type: "retail" }).id, "retail");
   assert.equal(reg.nicheFor({ vertical: "retail" }).id, "retail");
-  assert.equal(reg.nicheFor({ vertical: "home_services", business_name: "Done and Dusted" }).id, "cleaning");
+  assert.equal(
+    reg.nicheFor({ business_type: "home_services", business_category: "cleaning" }).id,
+    "cleaning",
+  );
+  assert.equal(reg.nicheFor({ vertical: "home_services", business_name: "Done and Dusted" }).id, "generic");
   assert.equal(reg.nicheFor({ vertical: "home_services", business_name: "Juma Plumbing" }).id, "generic");
 });
 
@@ -134,7 +139,7 @@ test("a new niche with a new topic works from config alone", () => {
   };
   const tailor: reg.NicheDef = { id: "tailor", label: "Tailor", keywords: ["tailor", "fundi"], sections: [{ id: "orders", label: "Orders", topics: ["fitting", "returns"] }] };
   const niches = [...reg.NICHES, tailor];
-  const n = reg.nicheFor({ business_name: "Mama Fundi Tailors" }, niches);
+  const n = reg.nicheById("tailor", niches);
   assert.equal(n.id, "tailor");
   assert.deepEqual(reg.nicheTopics(n, topics).map((t) => t.id), ["fitting", "returns"]);
   const rule = reg.ruleFromDraft(topics.fitting, { ...reg.draftFrom(topics.fitting, null), answer: "yes", values: { visits: 2 } });
@@ -148,8 +153,8 @@ test("a new niche with a new topic works from config alone", () => {
   const sql = fs.readFileSync(path.join(root, "docs/supabase/policy_topics.sql"), "utf8");
   assert.match(sql, /k !~ '\^\[a-z\]\[a-z0-9_\]\{0,39\}\$'/);
   // The screen has no per-niche code: it reads the registry only.
-  const screen = dash("components/policies/PoliciesScreen.tsx");
-  assert.ok(!/"cleaning"|"retail"/.test(screen));
+  const settings = dash("components/policies/PoliciesSettings.tsx");
+  assert.ok(!/"cleaning"|"retail"/.test(settings));
 });
 
 test("policyRules: cancel allowed:false, guarantee none, custom mode and note_sw survive and speak", () => {
@@ -174,11 +179,11 @@ test("Policies has no area or fee inputs; it links to Service areas", () => {
   const editor = dash("components/structured/PolicyRulesEditor.tsx");
   assert.ok(!editor.includes("rule-delivery-areas") && !editor.includes("rule-delivery-fee"));
   assert.ok(editor.includes('href="/settings/areas"'));
-  assert.ok(dash("components/policies/PoliciesScreen.tsx").includes('href="/settings/areas"'));
+  assert.ok(dash("components/policies/PoliciesSettings.tsx").includes('href="/settings/areas"'));
 });
 
 test("Policies copy: no em dashes, no AI wording", () => {
-  const src = dash("lib/policyRegistry.ts") + dash("components/policies/PoliciesScreen.tsx");
+  const src = dash("lib/policyRegistry.ts") + dash("components/policies/PoliciesSettings.tsx") + dash("components/policies/policiesSheets.tsx");
   const strings = src.match(/"[^"\n]*"/g) ?? [];
   for (const s of strings) {
     assert.ok(!s.includes("—"), s);

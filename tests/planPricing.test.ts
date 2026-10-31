@@ -4,6 +4,9 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   allowanceChanges,
   allowanceLines,
@@ -104,20 +107,29 @@ describe("plan pricing", () => {
 });
 
 describe("plan change port", () => {
-  it("stays closed with the flag off and with the flag on", async () => {
+  it("stays closed when the flag is off", async () => {
     const prev = process.env.DESK_PLAN_CHANGE;
     try {
       delete process.env.DESK_PLAN_CHANGE;
-      const off = await planChangePort().changePlan({ sku: "growth", cycle: "year" });
-      assert.deepEqual(off, { ok: false, message: "Plan changes open soon" });
-      process.env.DESK_PLAN_CHANGE = "on";
-      const on = await planChangePort().setExtraSeats({ extraSeats: 2, idempotencyKey: "seat-key" });
-      assert.equal(on.ok, false);
-      assert.equal(on.message, "Plan changes open soon");
+      const off = await planChangePort().changePlan({
+        sku: "growth",
+        cycle: "year",
+        idempotencyKey: "k1",
+      });
+      assert.deepEqual(off, { ok: false, message: "Plan changes are not open on this desk yet." });
     } finally {
       if (prev === undefined) delete process.env.DESK_PLAN_CHANGE;
       else process.env.DESK_PLAN_CHANGE = prev;
     }
+  });
+
+  it("delegates to owner billing RPCs when the flag is on", () => {
+    const src = fs.readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), "../dashboard/src/lib/deskPlanChange.ts"),
+      "utf8",
+    );
+    assert.match(src, /planChangeRpc\.server/);
+    assert.match(src, /rpcChangePlan/);
   });
 });
 
@@ -187,5 +199,38 @@ describe("plan change copy", () => {
     assert.equal(seatBlockCopy(5, 3), "Remove 2 team members first.");
     assert.equal(seatBlockCopy(4, 3), "Remove 1 team member first.");
     assert.equal(seatBlockCopy(3, 3), null);
+  });
+});
+
+describe("plan overage copy", () => {
+  it("shows extra minutes whenever used is above included", async () => {
+    const { planOverageHeadline, planOverageLines, resolvePlanOverageMode } = await import(
+      "../dashboard/src/lib/planOverageCopy.ts"
+    );
+    assert.equal(planOverageHeadline(369, 300), "69 extra minutes");
+    assert.equal(planOverageHeadline(301, 300), "1 extra minute");
+    assert.equal(planOverageHeadline(300, 300), null);
+
+    const beta = planOverageLines(369, 300, resolvePlanOverageMode({ freeBeta: true }), "31 Oct");
+    assert.ok(beta);
+    assert.match(beta.detail, /Free during beta/);
+
+    const onDemand = planOverageLines(
+      369,
+      300,
+      resolvePlanOverageMode({ freeBeta: false, onDemandEnabled: true }),
+      null,
+    );
+    assert.ok(onDemand);
+    assert.match(onDemand.detail, /bill on your next invoice/);
+
+    const hardStop = planOverageLines(
+      369,
+      300,
+      resolvePlanOverageMode({ freeBeta: false, onDemandEnabled: null }),
+      "31 Oct",
+    );
+    assert.ok(hardStop);
+    assert.match(hardStop.detail, /Calls stop/);
   });
 });

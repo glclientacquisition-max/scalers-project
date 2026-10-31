@@ -471,8 +471,6 @@ describe("settings save scope", () => {
     // Settings form copy: TenantForm plus the Identity cards (settings remake slice 1).
   const form = read("dashboard/src/components/TenantForm.tsx") + read("dashboard/src/components/identity/IdentitySettings.tsx");
     const save = read("dashboard/src/components/TenantSettingsSaveButton.tsx");
-    const catalog = read("dashboard/src/app/(desk)/settings/catalogActions.ts");
-    const ingest = read("dashboard/src/app/(desk)/settings/ingestActions.ts");
     assert.match(save, /\bSave\b/);
     assert.match(save, /Saving/);
     assert.doesNotMatch(save, /Save and train|Training/);
@@ -480,11 +478,7 @@ describe("settings save scope", () => {
     assert.doesNotMatch(form, /FAQ_STARTERS/);
     assert.doesNotMatch(form, /free parking behind the building/);
     assert.match(form, /displaySonioxVoiceLabel\("", voice\.id, voices\)/);
-    assert.doesNotMatch(catalog, /Open Train to review/);
-    assert.doesNotMatch(ingest, /Open Train to review/);
-    assert.doesNotMatch(catalog, /Catalogue saved for the next call/);
-    assert.match(catalog, /Added to your catalogue\. Check the prices to confirm them\./);
-    assert.match(ingest, /Catalogue saved for the next call/);
+    // Import reports the KB's own counts (30 Oct), never a blanket "Catalogue saved".
     assert.match(read("dashboard/src/app/(desk)/settings/actions.ts"), /settingsScopeValidationError/);
   });
 

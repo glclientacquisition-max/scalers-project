@@ -3,7 +3,7 @@
 import { businessPaneHref } from "@/lib/ops/businessPane";
 import { useEffect, useMemo, useState } from "react";
 import { balanceCents, daysOverdue, displayStatus, ksh, statusTone, type InvoiceRow } from "@/lib/ops/invoicesView";
-import { billingHomeTotals, owingBusinesses } from "@/lib/ops/billingHomeView";
+import { billingHomeTotals, lastMonthCollected, overdueAging, owingBusinesses } from "@/lib/ops/billingHomeView";
 import { EmptyState, KpiTile, PageHeader, SplitLayout, SplitPane, StatusPill } from "@/components/ops";
 import { ButtonLink } from "@/components/ui/Button";
 import "@/styles/ops.css";
@@ -16,6 +16,11 @@ const day = (iso: string | null) => (iso ? DATE.format(new Date(iso)) : "—");
 export function AdminBillingHomeV2({ rows, nowIso }: { rows: InvoiceRow[]; nowIso: string }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const totals = useMemo(() => billingHomeTotals(rows, now), [rows, now]);
+  const prior = useMemo(() => lastMonthCollected(rows, now), [rows, now]);
+  const aging = useMemo(() => overdueAging(rows, now), [rows, now]);
+  const agingTotal = aging.to7 + aging.to30 + aging.over30;
+  const collectedShare = totals.billedThisMonthCents > 0 ? Math.min(1, totals.collectedThisMonthCents / totals.billedThisMonthCents) : null;
+  const asOf = useMemo(() => new Intl.DateTimeFormat("en-KE", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Africa/Nairobi" }).format(now), [now]);
   const owing = useMemo(() => owingBusinesses(rows, now), [rows, now]);
   const [sel, setSel] = useState<string | null>(null);
   useEffect(() => {
@@ -56,11 +61,31 @@ export function AdminBillingHomeV2({ rows, nowIso }: { rows: InvoiceRow[]; nowIs
         }
       />
       <div className="ops-tiles pb-ops-3" data-billing-kpis="">
-        <KpiTile label="Billed this month" value={ksh(totals.billedThisMonthCents)} />
-        <KpiTile label="Collected this month" value={ksh(totals.collectedThisMonthCents)} />
-        <KpiTile label="Outstanding" value={ksh(totals.outstandingCents)} />
-        <KpiTile label={`Overdue · ${totals.overdueCount}`} value={ksh(totals.overdueCents)} />
+        <KpiTile label="Billed" period="This month" asOf={asOf} href="/admin/billing/invoices" value={ksh(totals.billedThisMonthCents)} />
+        <KpiTile label="Collected" period="This month" asOf={asOf} href="/admin/billing/payments" value={ksh(totals.collectedThisMonthCents)} compare={prior ? `vs ${prior.label} ${ksh(prior.cents)}` : null} />
+        <KpiTile label="Outstanding" period="Now" asOf={asOf} href="/admin/billing/invoices" value={ksh(totals.outstandingCents)} />
+        <KpiTile label={`Overdue · ${totals.overdueCount}`} period="Now" asOf={asOf} href="/admin/billing/invoices" value={ksh(totals.overdueCents)} />
       </div>
+      <section className="flex flex-col gap-2 pb-ops-3" aria-label="Collected and overdue">
+        <h2 className="text-ops-heading text-ink">Collected of billed</h2>
+        {collectedShare == null ? (
+          <p className="text-ops-body text-ink-2">Nothing billed this month.</p>
+        ) : (
+          <div className="h-2 overflow-hidden rounded-full bg-surface-2" role="img" aria-label={`${Math.round(collectedShare * 100)} percent collected`}>
+            <div className="h-full w-full origin-left bg-accent" style={{ transform: `scaleX(${collectedShare})` }} />
+          </div>
+        )}
+        <h2 className="text-ops-heading text-ink">Overdue by age</h2>
+        {agingTotal === 0 ? (
+          <p className="text-ops-body text-ink-2">Nothing overdue.</p>
+        ) : (
+          <div className="flex h-2 overflow-hidden rounded-full bg-surface-2" role="img" aria-label="Overdue by age">
+            {([["to7", aging.to7, "var(--status-warn-fg)"], ["to30", aging.to30, "var(--status-danger-fg)"], ["over30", aging.over30, "var(--ink)"]] as const).filter(([, n]) => n > 0).map(([key, n, color]) => (
+              <span key={key} style={{ width: `${(n / agingTotal) * 100}%`, background: color }} />
+            ))}
+          </div>
+        )}
+      </section>
       <div className="flex flex-wrap items-baseline justify-between gap-x-ops-3 pb-ops-2">
         <h2 className="text-ops-heading text-ink">
           Who owes <span className="ops-num font-normal text-ink-2">{owing.length}</span>

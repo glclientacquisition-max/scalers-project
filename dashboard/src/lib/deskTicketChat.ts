@@ -62,7 +62,6 @@ function isSettingsNestedTab(tab: string): boolean {
   return (
     tab === "catalog" ||
     tab === "train" ||
-    tab === "import" ||
     tab === "test" ||
     tab === "alerts"
   );
@@ -82,7 +81,7 @@ export function isDeskNestedPath(
   if (path === "/contacts/import") return true;
   if (path === "/dev/contacts/file" || path === "/dev/ticket") return true;
   if (/^\/contacts\/[^/]+$/.test(path)) return true;
-  if (path === "/settings/plan" || path === "/settings/billing" || path === "/settings/areas" || path === "/settings/policies") return true;
+  if (path === "/settings/plan" || path === "/settings/billing" || path === "/settings/areas" || path === "/settings/knowledge") return true;
   if (path === "/settings") {
     return isSettingsNestedTab(settingsSearchTab(search));
   }

@@ -38,6 +38,20 @@ export function inboxCanVisitDone(item: InboxItem): boolean {
   return String(item.job?.status || "").toLowerCase() === "confirmed";
 }
 
+/**
+ * The done verb for an open request. "Hold Done" only for a real hold (a retail
+ * hold or pickup); a callback, order or enquiry, and every request at a business
+ * that does not hold stock, gets "Mark done".
+ */
+export function holdDoneLabel(
+  hold: { request_type?: string | null } | null | undefined,
+  vertical?: string | null
+): string {
+  if (String(vertical || "").trim().toLowerCase() === "home_services") return "Mark done";
+  const type = String(hold?.request_type || "").trim().toLowerCase();
+  return type === "hold_or_pickup" || type === "hold" || type === "pickup" ? "Hold Done" : "Mark done";
+}
+
 export type InboxListDockRecipe = "confirm" | "visit_done" | "hold_done" | "none";
 
 /**
@@ -65,7 +79,7 @@ export function inboxNeedsYouNextStep(
   if (item.purpose === "live") return null;
   const recipe = inboxListDockRecipe(item);
   if (recipe === "confirm") return nicheCopy(vertical).confirmStamp;
-  if (recipe === "hold_done") return "Hold Done";
+  if (recipe === "hold_done") return holdDoneLabel(item.hold, vertical);
   return null;
 }
 
@@ -150,14 +164,17 @@ export function inboxBulkSharedAction(
 }
 
 /** Header select bar: only verbs true for every selected row. */
-export function inboxBulkActions(items: InboxItem[]): InboxListAction[] {
+export function inboxBulkActions(items: InboxItem[], vertical?: string | null): InboxListAction[] {
   if (!items.length) return [];
   const out: InboxListAction[] = [];
   const leave = inboxBulkLeaveAction(items);
   if (leave === "archive") out.push({ id: "archive", label: "Archive" });
   if (leave === "unarchive") out.push({ id: "unarchive", label: "Unarchive" });
   if (items.every(inboxCanConfirm)) out.push({ id: "confirm", label: "Confirm" });
-  if (items.every(inboxCanHoldDone)) out.push({ id: "done", label: "Hold Done" });
+  if (items.every(inboxCanHoldDone)) {
+    const allHolds = items.every((i) => holdDoneLabel(i.hold, vertical) === "Hold Done");
+    out.push({ id: "done", label: allHolds ? "Hold Done" : "Mark done" });
+  }
   if (items.every(inboxCanMarkDone)) out.push({ id: "mark_done", label: "Mark done" });
   return out;
 }

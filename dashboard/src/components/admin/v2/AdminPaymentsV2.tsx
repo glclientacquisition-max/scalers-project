@@ -16,7 +16,7 @@ import {
   type PaymentRow,
   type PaymentView,
 } from "@/lib/ops/paymentsView";
-import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState, UnlockCta } from "@/components/ops";
+import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState } from "@/components/ops";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import "@/styles/ops.css";
 
@@ -79,19 +79,8 @@ export function AdminPaymentsV2({
 
   const list = (
     <div className="flex min-h-0 flex-col pe-ops-4">
-      <PageHeader
-        title="Payments"
-        count={all.length}
-        actions={
-          <UnlockCta
-            site="payments"
-            action="payments:money"
-            what="collect, void or record a payment"
-            observedHint="Collect, void and record stay disabled until Unlock enforce (#876 Q9). Observe only logged the gate."
-          />
-        }
-      />
-      <div className="flex flex-wrap items-center gap-2 pb-ops-3">
+      <PageHeader title="Payments" count={all.length} />
+      <div className="flex flex-wrap items-center gap-2 pb-ops-3" data-stepup="payments">
         <div role="tablist" aria-label="Views" className="flex flex-wrap gap-1">
           {PAYMENT_VIEWS.map((v) => (
             <button

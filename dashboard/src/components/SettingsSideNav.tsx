@@ -30,6 +30,7 @@ import {
 import { deskShiftClass } from "@/components/ui/deskChrome";
 import {
   SETTINGS_NAV,
+  settingsNavDescription,
   settingsNavHref,
   settingsNavItemActive,
   type BusinessSettingsTab,
@@ -70,6 +71,7 @@ const SETTINGS_ICON: Record<string, typeof ClockIcon> = {
   alerts: BellIcon,
   "assistant-say": DocumentTextIcon,
   "/settings/areas": MapIcon,
+  "/settings/knowledge": ShoppingBagIcon,
   "/settings/plan": CreditCardIcon,
   "/settings/billing": ReceiptPercentIcon,
 };
@@ -82,7 +84,7 @@ function visibleSections(manageBilling: boolean, assistantSayPage: boolean): Set
     const items = section.items.filter((item) => {
       if ("tab" in item.target && item.target.tab === "assistant-say" && !assistantSayPage) return false;
       if (!("href" in item.target)) return true;
-      if (item.target.href === "/settings/areas") return true;
+      if (item.target.href === "/settings/areas" || item.target.href === "/settings/knowledge") return true;
       return manageBilling;
     });
     return items.length > 0 ? [{ ...section, items }] : [];
@@ -101,10 +103,13 @@ export function SettingsMenu({
   optionStatus,
   activePath,
   assistantSayPage = false,
+  vertical = null,
 }: {
   tab: BusinessSettingsTab;
   trainPanel: SettingsPanel;
   assistantSayPage?: boolean;
+  /** tenants.vertical: Settings home lines use the business's own words (Policies). */
+  vertical?: string | null;
   variant: "index" | "rail";
   optionStatus: Record<string, SettingsListStatus>;
   /** Live pages use the real pathname. The billing fixture passes the settings path it is standing in for. */
@@ -170,20 +175,22 @@ export function SettingsMenu({
                     ].join(" ")}
                   >
                     {isRail ? (
-                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      <span className="min-w-0 flex-1 truncate" title={item.label}>{item.label}</span>
                     ) : (
                       <>
                         <SettingsRowIcon statusKey={key} />
                         <span className="min-w-0 flex-1 py-2">
                           <span className="block truncate">{item.label}</span>
-                          <span className="block text-meta font-normal text-ink-2">{item.description}</span>
+                          <span className="block line-clamp-2 text-meta font-normal text-ink-2 [overflow-wrap:anywhere]">
+                            {settingsNavDescription(item, vertical)}
+                          </span>
                         </span>
                       </>
                     )}
                     {statusText ? (
                       <span
                         title={status?.title || statusText}
-                        className={`max-w-[40%] shrink-0 truncate text-meta font-normal tabular-nums ${needsAction(statusText) ? "text-attention" : "text-ink-2"}`}
+                        className={`${isRail ? "max-w-[60%]" : "max-w-[40%]"} shrink-0 truncate text-meta font-normal tabular-nums ${needsAction(statusText) ? "text-attention" : "text-ink-2"}`}
                       >
                         {statusText}
                       </span>

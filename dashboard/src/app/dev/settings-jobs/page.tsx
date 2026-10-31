@@ -17,8 +17,10 @@ import type { TenantRow } from "@/lib/supabase";
 import { parsePaymentsText } from "@/lib/payments";
 import { assistantSayStateFromTenant } from "@/lib/assistantSayVoice.server";
 import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
+import { lookupPreviewSamples } from "@/lib/assistantSayVoice.server";
+import { parseUnknownAnswerByKind } from "@/lib/unknownAnswerByKindConstants";
+import { resolveTenantBusinessType } from "@/lib/businessType";
 import { DeskRoleProvider, ViewOnlyBanner } from "@/components/DeskRole";
-import { assistantSayBelowList } from "@/components/assistantSay/AssistantSayExtras";
 
 /**
  * Settings job list and rail. DASHBOARD_OPEN=true only.
@@ -55,6 +57,12 @@ const identityFilled = {
 const identityCustom = {
   spoken_name: "Chapter One Books",
   greeting_invite: "Which book are you looking for",
+};
+
+/** ?identity=owntext: the owner's full greeting is saved (greeting_text), so Voice says it word for word. */
+const identityOwnText = {
+  business_name: "Done and Dusted",
+  greeting_text: "Karibu Done and Dusted, home cleaning made easy. How can we help you today?",
 };
 
 /** ?identity=sw: Kiswahili saved as the business's default greeting language. */
@@ -114,6 +122,8 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
       ? { ...policiesT, ...identityEmpty }
       : identityState === "custom"
         ? { ...policiesT, ...identityFilled, ...identityCustom }
+        : identityState === "owntext"
+          ? { ...policiesT, ...identityFilled, ...identityOwnText }
         : identityState === "sw"
           ? { ...policiesT, ...identityFilled, ...identityKiswahili }
           : { ...policiesT, ...identityFilled }
@@ -144,7 +154,14 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
   };
   const assistantSaySlot =
     tab === "assistant-say" ? (
-      <AssistantSayPanel state={assistantSayStateFromTenant(t)} belowList={assistantSayBelowList(t)} />
+      <AssistantSayPanel
+        state={assistantSayStateFromTenant(t)}
+        samples={lookupPreviewSamples(t)}
+        tenant={t}
+        businessType={resolveTenantBusinessType(t)}
+        initialByKind={parseUnknownAnswerByKind(t.unknown_answer_by_kind)}
+        legacyGeneral={t.unknown_answer_fallback}
+      />
     ) : null;
 
   const callsSlot =

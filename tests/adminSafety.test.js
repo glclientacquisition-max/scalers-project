@@ -260,16 +260,33 @@ describe("A0: confirms are ConfirmSheet bottom drawers", () => {
 });
 
 describe("A0: operator-only writes + step-up observe (s21)", () => {
-  const writeRoutes = [
+  const operatorWriteRoutes = [
     `${DASH}/app/api/did-pool/route.ts`,
     `${DASH}/app/api/admin/businesses/route.ts`,
+    `${DASH}/app/api/admin/billing/route.ts`,
+    `${DASH}/app/api/admin/wallets/route.ts`,
+    `${DASH}/app/api/admin/voices/route.ts`,
+    `${DASH}/app/api/admin/platform-ops/route.ts`,
+    `${DASH}/app/api/admin/buy-number/route.ts`,
+    `${DASH}/app/api/admin/package-versions/route.ts`,
+    `${DASH}/app/api/admin/packages/route.ts`,
+    `${DASH}/app/api/admin/sautikit-sync/route.ts`,
+  ];
+  const stepUpWriteRoutes = [
+    `${DASH}/app/api/did-pool/route.ts`,
+    `${DASH}/app/api/admin/businesses/route.ts`,
+    `${DASH}/app/api/admin/billing/route.ts`,
+    `${DASH}/app/api/admin/wallets/route.ts`,
+    `${DASH}/app/api/admin/voices/route.ts`,
+    `${DASH}/app/api/admin/platform-ops/route.ts`,
+    `${DASH}/app/api/admin/buy-number/route.ts`,
+    `${DASH}/app/api/admin/package-versions/route.ts`,
   ];
 
   it("POST write routes require a Better Auth operator and reject the legacy cookie alone", () => {
-    for (const rel of writeRoutes) {
+    for (const rel of operatorWriteRoutes) {
       const src = read(rel);
       assert.match(src, /requireAdminOperatorWrite/, rel);
-      // POST must not lean on isLegacyAuthenticated (HMAC cookie still allowed on GET reads).
       const post = src.slice(src.indexOf("export async function POST"));
       assert.match(post, /requireAdminOperatorWrite/, rel);
       assert.doesNotMatch(post, /isLegacyAuthenticated/, `${rel} POST must not accept the legacy cookie`);
@@ -286,10 +303,14 @@ describe("A0: operator-only writes + step-up observe (s21)", () => {
     assert.match(step, /ADMIN_STEP_UP/);
     assert.match(step, /would-require-step-up/);
     assert.match(step, /ADMIN_STEP_UP_ENFORCE/);
-    for (const rel of writeRoutes) {
+    for (const rel of stepUpWriteRoutes) {
       const src = read(rel);
       const post = src.slice(src.indexOf("export async function POST"));
-      assert.match(post, /stepUpGate\(/, rel);
+      assert.match(post, /stepUpGate\(|stepUpGateSession\(/, rel);
+    }
+    for (const rel of [`${DASH}/app/api/did-pool/route.ts`, `${DASH}/app/api/admin/businesses/route.ts`]) {
+      const src = read(rel);
+      const post = src.slice(src.indexOf("export async function POST"));
       const stepAt = post.indexOf("stepUpGate(");
       const markers = ["addDidToPool", "assign_did_from_pool", "releasePoolNumber", "releaseBusinessNumber", "assign_specific_did", "suspendBusiness"];
       const writeAt = Math.min(
@@ -305,12 +326,12 @@ describe("A0: operator-only writes + step-up observe (s21)", () => {
   it("Numbers v2 Unlock is honest; Assign/Release/Hold use OpsConfirm + number-hold API", () => {
     const ui = read(`${DASH}/components/admin/v2/AdminNumbersV2.tsx`);
     assert.match(ui, /OpsConfirm/);
-    assert.match(ui, /data-honest="unlock"|UnlockCta/);
+    assert.match(ui, /data-honest="unlock"|data-stepup="numbers"/);
     assert.match(ui, /\/api\/admin\/number-hold/);
     assert.match(ui, /data-hold-choice/);
     assert.match(ui, /confirmLabel="Assign number"/);
     assert.match(ui, /Release number|Release and hold/);
-    assert.match(ui, /UnlockCta/);
+    assert.match(ui, /data-stepup="numbers"/);
     assert.doesNotMatch(ui, /showHonest\(/);
   });
 });
