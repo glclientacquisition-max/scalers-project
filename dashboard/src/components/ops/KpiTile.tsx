@@ -32,7 +32,7 @@ export function KpiTile({
   errorTitle?: string;
   onRetry?: () => void;
 }) {
-  return (
+  const body = (
     <div className="flex min-w-0 flex-col gap-1 rounded-lg bg-surface p-ops-3">
       <span className="flex items-baseline justify-between gap-2">
         <span className="truncate text-ops-label text-ink-2">{label}</span>
@@ -58,11 +58,14 @@ export function KpiTile({
           </span>
         )}
         {trend && trend.length >= 2 ? <Sparkline points={trend} label={label} /> : null}
-        {href ? (
-          <Link href={href} className="text-ops-caption font-medium text-accent underline-offset-2 hover:underline">Open</Link>
-        ) : null}
       </span>
       {asOf ? <span className="text-ops-caption text-ink-3">As of {asOf}</span> : null}
     </div>
+  );
+  if (!href || state !== "ready") return body;
+  return (
+    <Link href={href} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
+      {body}
+    </Link>
   );
 }
