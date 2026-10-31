@@ -121,7 +121,7 @@ export function AreaPicker({
   const [picks, setPicks] = useState<AreaPicks>(initialPicks);
   const [view, setViewState] = useState<AreaView>(initialView);
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState<Set<string>>(() => new Set([homeCounty && areaNode(homeCounty) ? homeCounty : "county:nairobi"]));
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [showAll, setShowAll] = useState(false);
   const [sheet, setSheet] = useState<string | null>(null);
   const [isConfirmed, setConfirmed] = useState(confirmed);
@@ -199,12 +199,9 @@ export function AreaPicker({
   const line = areaLineNotes(saved);
   const joinNames = (names: string[]) =>
     names.length <= 1 ? names[0] ?? "" : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-  const lineNote = line.nothingReaches
-    ? "Your phone line can't use these areas yet. Callers still hear your previous list."
-    : [
-        line.yesStill.length ? `Callers still hear yes for ${joinNames(line.yesStill)}. The phone line can't skip a place inside an area yet.` : "",
-        line.notOnLine.length ? `${joinNames(line.notOnLine)} can't reach your phone line yet.` : "",
-      ].filter(Boolean).join(" ");
+  const lineNote = line.yesStill.length
+    ? `Callers asking about ${joinNames(line.yesStill)} still hear yes for now.`
+    : "";
   const results = query.trim() ? searchAreaTree(query) : null;
 
   return (
@@ -228,7 +225,7 @@ export function AreaPicker({
         </button>
       </div>
       {lineNote ? (
-        <p className="mx-4 mt-1 rounded-2xl border border-hairline bg-surface p-3.5 text-meta text-attention" role="note" data-area-line-note="">
+        <p className="mx-4 mt-1 rounded-2xl border border-hairline bg-surface p-3.5 text-meta text-warn" role="note" data-area-line-note="">
           {lineNote}
         </p>
       ) : null}
@@ -246,7 +243,7 @@ export function AreaPicker({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search area or landmark"
+          placeholder="Search places"
           className="h-full min-w-0 flex-1 bg-transparent text-body text-ink outline-none placeholder:text-ink-3"
           enterKeyHint="search"
         />
@@ -294,7 +291,7 @@ export function AreaPicker({
           })}
           {nearSet && (hiddenCount > 0 || showAll) ? (
             <li className={cx(rowBase, "justify-between")} data-area-county-filter="">
-              <span className="min-w-0 flex-1 py-2 text-meta text-ink-2">
+              <span className="min-w-0 flex-1 truncate whitespace-nowrap py-2 text-meta text-ink-2">
                 {showAll ? "Showing every county" : `Showing ${homeName} and nearby counties`}
               </span>
               <button

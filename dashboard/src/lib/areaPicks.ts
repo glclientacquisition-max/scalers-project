@@ -280,8 +280,12 @@ export function areaRowMeta(picks: AreaPicks, id: string): string {
   if (state === "off") return "Off";
   const onKids = kids.filter((k) => resolveArea(picks, k.id).covered);
   if (!resolveArea(picks, id).covered && onKids.length <= 2) return `${joinNames(onKids.map((k) => k.name))} only`;
+  const offKids = kids.filter((k) => areaState(picks, k.id) === "off" || !resolveArea(picks, k.id).covered);
+  const namedOff = offKids.filter((k) => k.kind !== "country").slice(0, 2);
+  if (namedOff.length === 1) return `${onKids.length} of ${kids.length} served · ${namedOff[0].name} off`;
+  if (namedOff.length > 1 && offKids.length <= 2) return `${onKids.length} of ${kids.length} served · ${joinNames(namedOff.map((k) => k.name))} off`;
   const off = kids.length - onKids.length;
-  return `${onKids.length} of ${kids.length} shown${off ? ` · ${off} off` : ""}`;
+  return `${onKids.length} of ${kids.length} served${off ? ` · ${off} off` : ""}`;
 }
 
 // ---------- search ----------
