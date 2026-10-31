@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDownIcon, MagnifyingGlassIcon, PlusIcon } from "@heroicons/react/20/solid";
+import { ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon, PlusIcon } from "@heroicons/react/20/solid";
 import { Button } from "@/components/ui/Button";
 import { Field, Input, Textarea } from "@/components/ui/Field";
 import { Segmented, SegmentedControl } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { Switch } from "@/components/ui/Switch";
 import { Empty } from "@/components/ui/Empty";
+import { SettingsBackLink } from "@/components/settingsUi";
 import { notify } from "@/components/ui/DeskNotice";
 import { ImportUndoBar, type UndoOutcome } from "./ImportUndoBar";
 import { deskShiftClass } from "@/lib/deskMotion";
@@ -237,7 +238,10 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
 
   return (
     <div className="space-y-4 px-4 py-4 md:px-0" data-catalogue="">
-      <h1 className="text-title font-semibold text-ink">Catalogue</h1>
+      <header className="flex min-h-11 items-center gap-1">
+        <SettingsBackLink />
+        <h1 className="text-title font-semibold text-ink">Catalogue</h1>
+      </header>
       <div className={cx("grid min-w-0 grid-cols-1 items-start gap-4", hasAside ? "xl:grid-cols-[minmax(0,1fr)_22rem]" : "max-w-2xl")}>
       <div className="min-w-0 space-y-4">
 
@@ -387,6 +391,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
                       {canEdit ? (
                         <button type="button" onClick={() => setEditing({ draft: editDraft(it, categories), fixing: false })} className={cx("flex min-h-14 w-full flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-2 text-left hover:bg-surface-2", deskShiftClass)} data-row-two-line="">
                           {body}
+                          <ChevronRightIcon className="size-5 shrink-0 text-ink-3" aria-hidden />
                         </button>
                       ) : (
                         <div className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-2">{body}</div>
@@ -437,6 +442,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
               label="Language"
               value={lang}
               onChange={(v) => setLang(v === "sw" ? "sw" : "en")}
+              className="[&_button]:!min-h-11"
               items={[
                 { value: "en", label: "English" },
                 { value: "sw", label: "Kiswahili" },
@@ -444,7 +450,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
             />
           </div>
           <ul className="space-y-3 px-4 pb-4">
-            {live.doc.preview.map((p) => (
+            {live.doc.preview.filter((p, i, all) => all.findIndex((q) => (q.en || q.sw) === (p.en || p.sw)) === i).map((p) => (
               <li key={p.asked}>
                 <p className="text-meta text-ink-2">Caller: {p.asked}</p>
                 <p className="text-body text-ink">{(lang === "sw" ? p.sw : p.en) || "Nothing to say yet."}</p>
