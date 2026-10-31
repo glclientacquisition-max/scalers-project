@@ -13,7 +13,7 @@ import {
 } from "@/lib/planPricing";
 import { creditBurnsFrom, type CreditBurns } from "@/lib/messageCredits";
 import { trialRemaining } from "@/lib/trialRemaining";
-import { planRowText } from "@/lib/planEntry";
+import { planOverageRowText, planRowText } from "@/lib/planEntry";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { minutesUsedFromSeconds } from "@/lib/minutes";
 
@@ -588,11 +588,16 @@ export async function loadUsageBillingExtras(tenantId: string): Promise<UsageBil
   }
 }
 
-export type PlanRowStatus = { billingStatus: string; row: { text: string; title: string } | null };
+export type PlanRowStatus = {
+  billingStatus: string;
+  row: { text: string; title: string; tone?: "quiet" | "attention" } | null;
+  /** During free beta there are no invoices. Null when billing is live and unread. */
+  billingRow: { text: string; title: string } | null;
+};
 
-/** Settings Plan row: the plan name, "Choose a plan" on trial. Beta reads the package from tenant_billing_state. */
+/** Settings Plan row: the plan name, "Choose a plan" on trial, "Over by N min" when over. */
 export async function loadPlanRowStatus(tenantId: string): Promise<PlanRowStatus> {
-  const none: PlanRowStatus = { billingStatus: "beta", row: null };
+  const none: PlanRowStatus = { billingStatus: "beta", row: null, billingRow: null };
   if (!tenantId) return none;
   try {
     const ws = await createWorkspaceDataClient();
@@ -609,17 +614,39 @@ export async function loadPlanRowStatus(tenantId: string): Promise<PlanRowStatus
       const pack = await ws.client.from("billing_packages").select("name").eq("sku", row.package_sku).maybeSingle();
       if (!pack.error && pack.data) name = String((pack.data as { name?: unknown }).name || "") || null;
     }
-    if (!name && isFreeBeta(status)) {
+    let minutesIncluded = 0;
+    let minutesUsed = 0;
+    let packageState: string | null = null;
+    let packageName: string | null = null;
+    try {
       const state = await getSupabaseAdmin()
         .from("tenant_billing_state")
-        .select("package_state, package_name")
+        .select("package_state, package_name, included_minutes, used_seconds")
         .eq("tenant_id", tenantId)
         .maybeSingle();
-      const data = (state.error ? null : state.data) as { package_state?: string; package_name?: string } | null;
-      if (data?.package_state === "active" && data.package_name) name = String(data.package_name);
+      const data = (state.error ? null : state.data) as {
+        package_state?: string;
+        package_name?: string;
+        included_minutes?: number | string | null;
+        used_seconds?: number | string | null;
+      } | null;
+      packageState = data?.package_state ?? null;
+      packageName = data?.package_name ? String(data.package_name) : null;
+      minutesIncluded = Number(data?.included_minutes) || 0;
+      minutesUsed = minutesUsedFromSeconds(data?.used_seconds);
+    } catch {
+      minutesIncluded = 0;
+      minutesUsed = 0;
     }
-    const text = planRowText(status, name);
-    return { billingStatus: status, row: text ? { text, title: text } : null };
+    if (!name && isFreeBeta(status) && packageState === "active" && packageName) name = packageName;
+    const over = planOverageRowText(minutesUsed, minutesIncluded);
+    const text = over || planRowText(status, name);
+    const billingRow = isFreeBeta(status) ? { text: "No invoices", title: "No invoices" } : null;
+    return {
+      billingStatus: status,
+      row: text ? { text, title: text, tone: over ? "attention" : undefined } : null,
+      billingRow,
+    };
   } catch {
     return none;
   }

@@ -25,6 +25,14 @@ export function planRowText(status: string | null | undefined, planName: string 
   return String(planName || "").trim();
 }
 
+/** "Over by 69 min" when used minutes pass the included amount. Null when not over. */
+export function planOverageRowText(minutesUsed: number, minutesIncluded: number): string | null {
+  if (!Number.isFinite(minutesUsed) || !Number.isFinite(minutesIncluded) || minutesIncluded <= 0) return null;
+  const over = Math.floor(minutesUsed) - Math.floor(minutesIncluded);
+  if (over <= 0) return null;
+  return `Over by ${over} min`;
+}
+
 export type MeterTone = "ok" | "warn" | "full";
 
 /** Minutes warn from this share used. Seats and message credits warn only when used up. */

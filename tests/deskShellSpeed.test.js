@@ -508,11 +508,16 @@ describe("settings save scope", () => {
       `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { business_name: "Done and Dusted", spoken_name: "Done and Dusted", agent_name: "Shy", soniox_voice_label: "Shy" }, [])`
     );
     assert.equal(identityCollision, "Done and Dusted");
-    const voiceKeepsLabel = load(
+    const voiceSkipsAssistantName = load(
       "dashboard/src/lib/settingsOptionStatus.ts",
       `mod.settingsOptionStatus({ tab: "train", panel: "tools" }, { business_name: "Done and Dusted", spoken_name: "Done and Dusted", agent_name: "Shy", soniox_voice_label: "Shy" }, [])`
     );
-    assert.equal(voiceKeepsLabel, "Shy");
+    assert.equal(voiceSkipsAssistantName, "");
+    const voiceUsesCatalog = load(
+      "dashboard/src/lib/settingsOptionStatus.ts",
+      `mod.settingsOptionStatus({ tab: "train", panel: "tools" }, { agent_name: "Shy", soniox_voice_id: "v1", soniox_voice_label: "Shy" }, [{ id: "v1", description: "Kenyan Woman" }])`
+    );
+    assert.equal(voiceUsesCatalog, "Kenyan Woman");
     const line = load(
       "dashboard/src/lib/settingsOptionStatus.ts",
       `mod.settingsOptionStatus({ tab: "test" }, { sautikit_virtual_number: "+254700000000" })`

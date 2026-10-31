@@ -25,6 +25,7 @@ import {
 } from "@/app/(desk)/settings/alertsActions";
 import { TenantSettingsSaveButton } from "@/components/TenantSettingsSaveButton";
 import { useFormDraft, useFormSave } from "@/components/useFormSave";
+import { useDirty } from "@/lib/settingsDirty";
 
 const initial: AlertsActionState = {};
 
@@ -55,10 +56,14 @@ function AlertsPanelInner({
     onSaved: () => router.refresh(),
   });
   const { pending } = save;
-  const { justSaved, markClean } = useFormDraft(save, {
+  const alertDraft = { ownerWhatsapp, alertEmail, notifyChannels };
+  const { dirty, justSaved, markClean } = useFormDraft(save, {
     id: "alerts",
-    values: { ownerWhatsapp, alertEmail, notifyChannels },
+    values: alertDraft,
   });
+  const [alertSnapshot] = useState(alertDraft);
+  const counted = useDirty(alertSnapshot, alertDraft);
+  const changes = dirty ? counted : 0;
 
   useEffect(() => {
     const phone = tenant.whatsapp_notification_number || "";
@@ -90,6 +95,7 @@ function AlertsPanelInner({
             form={ALERTS_SETTINGS_FORM_ID}
             pending={pending}
             saved={justSaved}
+            changes={changes}
           />
         }
       />

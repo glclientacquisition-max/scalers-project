@@ -101,7 +101,7 @@ export type SettingsNavSection = {
  * One header each: Business, Knowledge, Assistant, People, then Plan and billing.
  * Bulk add lives in Catalogue (Add many); old ?tab=import links redirect there. Team is People, ahead of Alerts.
  * Plan and Billing are the last section. The rail shows them to the owner and an admin.
- * Appearance is the account-menu theme cluster. It is not a settings tab.
+ * Appearance is a Settings home row that opens the Appearance sheet. It is not a settings tab.
  * URLs stay `?tab=` / `?panel=`.
  */
 export const SETTINGS_NAV: SettingsNavSection[] = [
@@ -110,7 +110,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     title: "Business",
     items: [
       { label: "Identity", description: "Name, what you do, greeting, voice and contacts", target: { tab: "train", panel: "identity" } },
-      { label: "Hours", description: "When you are open, including holidays", target: { tab: "train", panel: "hours" } },
+      { label: "Hours", description: "When you are open", target: { tab: "train", panel: "hours" } },
       { label: "Locations", description: "Where callers can find you", target: { tab: "train", panel: "locations" } },
       { label: "Service areas", description: "Which counties, towns and estates you serve", target: { href: "/settings/areas" } },
       { label: "Policies", description: "Payments, delivery, returns and other rules", target: { tab: "train", panel: "policies" } },

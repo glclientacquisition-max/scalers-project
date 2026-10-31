@@ -35,6 +35,7 @@ import {
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
 import { type SettingsListStatus } from "@/lib/settingsOptionStatus";
+import { formatKenyaNumber } from "@/lib/setupFlow";
 import {
   SettingsPageHeader,
   settingsConsoleClass,
@@ -62,7 +63,7 @@ function settingsLineState(did: string | null | undefined): {
 } {
   const value = String(did ?? "").trim();
   const lineLive = Boolean(value) && !/^pending:/i.test(value);
-  return { lineLive, lineDetail: lineLive ? value : "" };
+  return { lineLive, lineDetail: lineLive ? formatKenyaNumber(value) : "" };
 }
 
 function SettingsPanelBody({
