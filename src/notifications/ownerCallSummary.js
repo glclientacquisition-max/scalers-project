@@ -48,6 +48,20 @@ const DEDUPE_REASONS = new Set([
   'table_missing',
 ]);
 
+// B2 (#1010): a brain error / failed save on the call outranks everything but
+// missed and escalated (contract precedence: missed > escalated >
+// brain_error / write_failed > the rest). Brain derives this already; the
+// sender keeps it sticky so a newer pre-send copy can never quietly turn a
+// "call back needed" into a booking or an enquiry.
+const FAILURE_OUTCOMES = new Set(['brain_error', 'write_failed']);
+const ABOVE_FAILURE = new Set(['missed', 'escalated']);
+
+function withStickyFailure(prev, next) {
+  if (!prev || !FAILURE_OUTCOMES.has(prev.outcome)) return next;
+  if (FAILURE_OUTCOMES.has(next.outcome) || ABOVE_FAILURE.has(next.outcome)) return next;
+  return { ...next, outcome: prev.outcome };
+}
+
 function flagOn(raw) {
   return /^(1|true|on|yes)$/i.test(String(raw || '').trim());
 }
@@ -253,7 +267,8 @@ function createOwnerSummarySender(deps = {}) {
       return { action: 'invalid' };
     }
     const entry = entryFor(String(event.callId));
-    entry.event = event; // newest wins (also stored on calls.summary by Brain)
+    // Newest wins (also stored on calls.summary by Brain), except a failure outcome stays.
+    entry.event = withStickyFailure(entry.event, event);
     if (entry.sent || entry.sending) {
       log.log?.(
         `[owner-summary] ${event.callId} re-emit after send${meta.replaces ? ' (replaces)' : ''}: Desk copy only, no resend`
@@ -459,6 +474,7 @@ module.exports = {
   FALLBACK_MS,
   ownerCallSummaryEnabled,
   legacyOwnerSendsSuppressed,
+  withStickyFailure,
   answeredStatus,
   whatsAppWindowOpen,
   sendOwnerSummaryToPerson,
