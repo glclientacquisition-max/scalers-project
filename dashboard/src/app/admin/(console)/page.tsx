@@ -71,7 +71,7 @@ export default async function AdminTodayPage() {
       missed: missedDemand(facts || [], now),
       now,
     });
-    return <AdminAttentionV2 items={items} unavailable={unavailable} signals={ops.signals} />;
+    return <AdminAttentionV2 items={items} unavailable={unavailable} />;
   }
 
   const [calling, overdueInvoices] = await Promise.all([

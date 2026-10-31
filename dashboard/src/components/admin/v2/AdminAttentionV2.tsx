@@ -11,8 +11,6 @@ import {
 } from "@/lib/ops/attentionView";
 import { callLength, intentLabel, type PaneCall } from "@/lib/ops/businessesView";
 import { PageHeader, SplitLayout, SplitPane, StatusPill, EmptyState } from "@/components/ops";
-import { HealthStrip } from "@/components/admin/v2/HealthStrip";
-import type { OpsSignal } from "@/lib/platformOpsModel";
 import { ButtonLink } from "@/components/ui/Button";
 import "@/styles/ops.css";
 
@@ -40,17 +38,15 @@ export function AdminAttentionV2({
   items,
   unavailable = [],
   callsFixture,
-  signals = null,
 }: {
   items: AttentionItem[];
   /** Reasons whose read failed, so an empty tab is not mistaken for "all clear". */
   unavailable?: AttentionKind[];
   /** Dev fixture only: skips the read. */
   callsFixture?: Record<string, PaneCall[]>;
-  /** Platform signals already loaded on this page. Null when that read did not arrive. */
-  signals?: OpsSignal[] | null;
 }) {
   const [view, setView] = useState<ViewId>("all");
+  const [more, setMore] = useState(false);
   const [sel, setSel] = useState<string | null>(null);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -89,9 +85,21 @@ export function AdminAttentionV2({
   }, [rows, sel]);
 
   const missing = view === "all" ? unavailable : unavailable.filter((k) => k === view);
+  const kindTabs = ATTENTION_VIEWS.filter((v) => v.id !== "all" && counts[v.id] > 0);
+  const shownTabs = more ? kindTabs : kindTabs.slice(0, 4);
   const tabs = (
-    <div role="tablist" aria-label="Reasons" className="flex flex-wrap gap-1">
-      {ATTENTION_VIEWS.map((v) => (
+    <div role="tablist" aria-label="Reasons" className="flex gap-1 overflow-x-auto">
+      <button
+        role="tab"
+        type="button"
+        aria-selected={view === "all"}
+        onClick={() => setView("all")}
+        className={["inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl px-3 text-body md:h-8", view === "all" ? "bg-surface-2 font-semibold text-ink" : "text-ink-2 hover:bg-surface-2"].join(" ")}
+      >
+        All
+        <span className="tabular-nums text-ink-2">{counts.all}</span>
+      </button>
+      {shownTabs.map((v) => (
         <button
           key={v.id}
           role="tab"
@@ -99,7 +107,7 @@ export function AdminAttentionV2({
           aria-selected={view === v.id}
           onClick={() => setView(v.id)}
           className={[
-            "inline-flex h-ops-touch items-center gap-1.5 rounded-sm px-ops-3 text-ops-body md:h-8",
+            "inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl px-3 text-body md:h-8",
             view === v.id ? "bg-surface-2 font-semibold text-ink" : "text-ink-2 hover:bg-surface-2",
           ].join(" ")}
         >
@@ -107,13 +115,15 @@ export function AdminAttentionV2({
           <span className="tabular-nums text-ink-2">{counts[v.id]}</span>
         </button>
       ))}
+      {kindTabs.length > 4 ? (
+        <button type="button" onClick={() => setMore((m) => !m)} className="inline-flex h-11 shrink-0 items-center px-3 text-body font-medium text-accent">
+          {more ? "Less" : "More"}
+        </button>
+      ) : null}
     </div>
   );
   const list = (
     <div className="flex min-h-0 flex-col pe-ops-4">
-      <div className="pb-ops-3">
-        <HealthStrip signals={signals} />
-      </div>
       <PageHeader title="Needs attention" count={items.length} actions={tabs} />
       {missing.length ? (
         <p className="pb-ops-2 text-ops-label text-ink-2" data-unavailable="">
@@ -124,7 +134,34 @@ export function AdminAttentionV2({
         <EmptyState title={missing.length ? "Nothing found that could be checked." : "Nothing needs attention here."} />
       ) : (
         <>
-          <ul className="divide-y divide-hairline bg-surface md:hidden" data-phone-rows="">
+          {view === "all" ? (
+            <div className="flex flex-col gap-4 md:hidden">
+              {kindTabs.map((k) => {
+                const group = items.filter((i) => i.kind === k.id);
+                return (
+                  <section key={k.id} aria-label={k.label}>
+                    <div className="flex items-baseline justify-between gap-2 px-1 pb-1">
+                      <h2 className="text-ops-heading text-ink">{k.label} <span className="tabular-nums font-normal text-ink-2">{group.length}</span></h2>
+                      {group.length > 3 ? (
+                        <button type="button" onClick={() => setView(k.id)} className="text-ops-body font-medium text-accent">View all</button>
+                      ) : null}
+                    </div>
+                    <ul className="divide-y divide-hairline bg-surface">
+                      {group.slice(0, 3).map((r) => (
+                        <li key={r.key}>
+                          <button type="button" onClick={() => setSel(r.key)} className="flex min-h-ops-touch w-full flex-col items-start gap-0.5 px-ops-3 py-2 text-start">
+                            <span className="min-w-0 truncate text-ink">{r.businessName}</span>
+                            <span className="text-ops-label text-ink-2">{r.detail}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
+          ) : null}
+          <ul className={`divide-y divide-hairline bg-surface md:hidden ${view === "all" ? "hidden" : ""}`} data-phone-rows="">
             {rows.map((r) => (
               <li key={r.key}>
                 <button type="button" onClick={() => setSel(r.key)} className="flex min-h-ops-touch w-full flex-col items-start gap-0.5 px-ops-3 py-2 text-start">
