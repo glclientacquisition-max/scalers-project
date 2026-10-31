@@ -22,8 +22,8 @@ Errors:
 | 403 | `origin` | `Origin` is missing or not in `DEMO_ALLOWED_ORIGINS` |
 | 403 | `turnstile` | Turnstile token missing or siteverify failed |
 | 403 | `tenant` | Tenant is not home, shop, or other, or the request names Aris `+254709221536` |
-| 429 | `rate` | This IP already has a demo session in progress |
-| 429 | `limit_daily` | 4th session in the EAT day for this hashed IP or this device |
+| 429 | `used` | This hashed IP or this device already has `DEMO_SESSIONS_PER_VISITOR` sessions (default 1) inside the last `DEMO_VISITOR_WINDOW_HOURS` hours (default 24). Body is `{reason: used}` |
+| 429 | `rate` | This hashed IP already has a demo session in progress, and this visitor still has a session left in the window |
 | 503 | `busy` | Live reservations are at `DEMO_MAX_CONCURRENT` (default 5). Body includes "All demo lines are busy, try again in a minute." |
 | 503 | `disabled` | Flag off, or token secret, IP salt, or Turnstile secret missing. Body message is "Demo paused." |
 | 503 | `cap` | Today's demo spend is at `DEMO_DAILY_CAP_USD` (default 2) or this month is at `DEMO_MONTHLY_CAP_USD` (default 50). Body is `{reason: cap}` |
@@ -32,7 +32,9 @@ The token is HS256, 60 seconds, single-use (`jti`). Claims are only `tenant` (`d
 
 Logs are `demo_token_ok` and `demo_token_reject` with a `reason`. They include the hashed IP, a hash of the device id, origin, Turnstile result, tenant, `consent_ts`, and `notice_v`. They do not include the raw IP, the raw device id, the token, the Turnstile secret, or audio.
 
-The rate limiter and the concurrency counter are in memory on one instance. A second instance does not share them.
+`used` is the visitor allowance. A blank, missing, or non-integer `DEMO_SESSIONS_PER_VISITOR` means 1. Integers 1 through 100 are kept. A blank, missing, or non-integer `DEMO_VISITOR_WINDOW_HOURS` means 24. Integers 1 through 8784 are kept. The window is a rolling count of hours. Crossing midnight in East Africa Time does not clear it. With the default of 1, a second attempt is `used` even while the first session is still open, because that session already spent the allowance. `rate` applies when the allowance is higher and this hashed IP already has one session open. The `used` response is 429 and the body is only `{reason: used}`.
+
+The visitor window, the one-at-a-time counter, and the concurrency counter are in memory on one instance. The IP key is a hash. The raw IP is not stored. A second instance does not share them.
 
 ## `GET /demo/status`
 
@@ -45,9 +47,9 @@ Success: `200 {enabled, busy, cap, reason}`.
 | `enabled` | `DEMO_ENABLED` is exactly `on` |
 | `busy` | Live reservations are at `DEMO_MAX_CONCURRENT` |
 | `cap` | The daily or monthly spend cap is reached |
-| `reason` | `null`, or the first of `disabled`, `cap`, `busy` |
+| `reason` | `null`, or the first of `disabled`, `cap`, `used`, `busy` |
 
-There are no minute counts, dollar amounts, session ids, hashes, or addresses in the body.
+`used` means this request's hashed IP is already at the visitor limit. The hash is the same one `POST /demo/token` stores. This route has no device id, so a limit that only the device would trip is not reported here. There are no minute counts, dollar amounts, session ids, hashes, or addresses in the body.
 
 A missing or disallowed `Origin` is `403 {reason: origin}`. More than 30 polls from one IP in a minute is `429 {reason: rate}`. The limiter is in memory on one instance and stores only a hash of the IP. A second instance does not share it.
 

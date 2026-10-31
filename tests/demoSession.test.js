@@ -451,7 +451,38 @@ describe('demo websocket session', () => {
   });
 
   it('ends on user, max_time, idle, and kill, and releases the concurrency slot', async () => {
-    const user = await started({ mint: { device: 'device-user1' }, idleMs: 30000, maxMs: 30000 });
+    const spent = await started({ mint: { device: 'device-spent' } });
+    const spentConn = await connect(spent.port, spent.token, { codec: 'pcm16' });
+    await waitFor(spentConn.messages, (m) => m.json && m.json.type === 'session');
+    spentConn.ws.send(JSON.stringify({ type: 'end' }));
+    await waitFor(spentConn.messages, (m) => m.json && m.json.type === 'end');
+    await new Promise((resolve) => {
+      if (spentConn.ws.readyState === WebSocket.CLOSED) return resolve();
+      spentConn.ws.once('close', resolve);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    const stillUsed = await spent.guard.decide({
+      method: 'POST',
+      headers: { origin: 'https://staging.example' },
+      body: {
+        tenant: 'home',
+        lang: 'en',
+        turnstile: 'ok-token',
+        device_id: 'device-spent2',
+        consent_ts: 1760000000000,
+        notice_v: '2026-10-31',
+      },
+      ip: '203.0.113.10',
+    });
+    assert.equal(stillUsed.status, 429);
+    assert.deepEqual(stillUsed.body, { reason: 'used' });
+
+    const user = await started({
+      env: { DEMO_SESSIONS_PER_VISITOR: '2' },
+      mint: { device: 'device-user1' },
+      idleMs: 30000,
+      maxMs: 30000,
+    });
     const live = await connect(user.port, user.token, { codec: 'pcm16' });
     await waitFor(live.messages, (m) => m.json && m.json.type === 'session');
     const busy = await user.guard.decide({

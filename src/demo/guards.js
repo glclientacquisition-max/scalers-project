@@ -5,31 +5,28 @@ const {
   TENANT_IDS,
   TOKEN_TTL_SEC,
   MAX_SEC,
-  DAILY_SESSION_LIMIT,
   processDemoEnv,
   demoEnabled,
   originAllowed,
   maxConcurrent,
+  sessionsPerVisitor,
+  visitorWindowHours,
   mentionsAris,
 } = require('./flags');
 const { createTokenStore, mintDemoToken, verifyDemoToken } = require('./token');
 
 // In-memory visit limits for one Voice instance. A second instance does not
-// share that counter. Per hashed IP: 3 sessions per EAT day and 1 at a
-// time. Per device id: 3 sessions per EAT day. The spend cap is separate
-// and can reload from demo_spend when DEMO_SPEND_PERSIST is exactly on.
-// There is no dial. The spec's per-/24 burst is an estimate and is not enforced.
+// share that counter. Per hashed IP and per device id: DEMO_SESSIONS_PER_VISITOR
+// (default 1) inside DEMO_VISITOR_WINDOW_HOURS (default 24). One session at a
+// time per hashed IP. The maps store the hash and the device id, never the
+// raw IP. The spend cap is separate and can reload from demo_spend when
+// DEMO_SPEND_PERSIST is exactly on. There is no dial.
 
 const TURNSTILE_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
-const EAT_OFFSET_MS = 3 * 60 * 60 * 1000;
 const BUSY_MESSAGE = 'All demo lines are busy, try again in a minute.';
 const PAUSED_MESSAGE = 'Demo paused.';
 const STATUS_WINDOW_MS = 60 * 1000;
 const STATUS_MAX = 30;
-
-function eatDay(nowMs) {
-  return new Date(nowMs + EAT_OFFSET_MS).toISOString().slice(0, 10);
-}
 
 function hashValue(salt, value) {
   return crypto.createHash('sha256').update(`${salt}|${value}`).digest('hex');
@@ -72,8 +69,8 @@ function createDemoGuard(opts = {}) {
   const store = opts.store || createTokenStore();
   const spend = opts.spend || null;
   const reservations = new Map();
-  const ipDay = new Map();
-  const deviceDay = new Map();
+  const ipHits = new Map();
+  const deviceHits = new Map();
   const ipActive = new Map();
   const statusHits = new Map();
   let active = 0;
@@ -102,10 +99,12 @@ function createDemoGuard(opts = {}) {
     for (const [jti, row] of store) {
       if (row.expMs <= at) store.delete(jti);
     }
-    const day = eatDay(at);
-    for (const map of [ipDay, deviceDay]) {
-      for (const [key, row] of map) {
-        if (row.day !== day) map.delete(key);
+    const span = windowMs(envOf());
+    for (const map of [ipHits, deviceHits]) {
+      for (const [key, list] of map) {
+        const kept = freshHits(list, at, span);
+        if (kept.length === 0) map.delete(key);
+        else if (kept.length !== list.length) map.set(key, kept);
       }
     }
   }
@@ -125,28 +124,31 @@ function createDemoGuard(opts = {}) {
     return true;
   }
 
-  function dayCount(map, key, day) {
-    const row = map.get(key);
-    if (!row || row.day !== day) return 0;
-    return row.count;
+  function readHits(map, key, at, span) {
+    const kept = freshHits(map.get(key), at, span);
+    if (kept.length === 0) map.delete(key);
+    else map.set(key, kept);
+    return kept;
   }
 
-  function bumpDay(map, key, day) {
-    const row = map.get(key);
-    if (!row || row.day !== day) map.set(key, { day, count: 1 });
-    else row.count += 1;
+  function bumpHit(map, key, at, span) {
+    const kept = readHits(map, key, at, span);
+    kept.push(at);
+    map.set(key, kept);
   }
 
-  function unbumpDay(map, key, day) {
-    const row = map.get(key);
-    if (!row || row.day !== day || row.count < 1) return;
-    row.count -= 1;
+  function unbumpHit(map, key) {
+    const list = map.get(key);
+    if (!list || list.length < 1) return;
+    list.pop();
+    if (list.length === 0) map.delete(key);
   }
 
   function limitReason(ipHash, deviceId, at, env) {
-    const day = eatDay(at);
-    if (dayCount(ipDay, ipHash, day) >= DAILY_SESSION_LIMIT) return 'limit_daily';
-    if (dayCount(deviceDay, deviceId, day) >= DAILY_SESSION_LIMIT) return 'limit_daily';
+    const span = windowMs(env);
+    const limit = sessionsPerVisitor(env);
+    if (readHits(ipHits, ipHash, at, span).length >= limit) return 'used';
+    if (deviceId && readHits(deviceHits, deviceId, at, span).length >= limit) return 'used';
     if ((ipActive.get(ipHash) || 0) >= 1) return 'rate';
     if (active >= maxConcurrent(env)) return 'busy';
     return null;
@@ -155,9 +157,9 @@ function createDemoGuard(opts = {}) {
   function commitReservation({ ipHash, deviceId, at, env }) {
     const reason = limitReason(ipHash, deviceId, at, env);
     if (reason) return { ok: false, reason };
-    const day = eatDay(at);
-    bumpDay(ipDay, ipHash, day);
-    bumpDay(deviceDay, deviceId, day);
+    const span = windowMs(env);
+    bumpHit(ipHits, ipHash, at, span);
+    bumpHit(deviceHits, deviceId, at, span);
     ipActive.set(ipHash, (ipActive.get(ipHash) || 0) + 1);
     active += 1;
     return { ok: true };
@@ -395,9 +397,8 @@ function createDemoGuard(opts = {}) {
       const left = (ipActive.get(ipHash) || 1) - 1;
       if (left <= 0) ipActive.delete(ipHash);
       else ipActive.set(ipHash, left);
-      const day = eatDay(again);
-      unbumpDay(ipDay, ipHash, day);
-      unbumpDay(deviceDay, deviceId, day);
+      unbumpHit(ipHits, ipHash);
+      unbumpHit(deviceHits, deviceId);
       writeLog('demo_token_reject', { reason: minted.reason, origin: clip(origin), tenant });
       const status = minted.reason === 'tenant' ? 403 : 503;
       return {
@@ -494,7 +495,7 @@ function createDemoGuard(opts = {}) {
     return true;
   }
 
-  function statusView() {
+  function statusView(at, ipHash) {
     const env = envOf();
     const enabled = demoEnabled(env);
     let cap = false;
@@ -504,9 +505,11 @@ function createDemoGuard(opts = {}) {
       cap = false;
     }
     const busy = active >= maxConcurrent(env);
+    const used = Boolean(ipHash) && readHits(ipHits, ipHash, at, windowMs(env)).length >= sessionsPerVisitor(env);
     let reason = null;
     if (!enabled) reason = 'disabled';
     else if (cap) reason = 'cap';
+    else if (used) reason = 'used';
     else if (busy) reason = 'busy';
     return { enabled, busy, cap, reason };
   }
@@ -538,11 +541,24 @@ function createDemoGuard(opts = {}) {
     return {
       status: 200,
       headers: corsHeaders(origin, env),
-      body: statusView(),
+      body: statusView(at, ipHash),
     };
   }
 
   return { decide, respond, verify, release, status, store };
+}
+
+function windowMs(env) {
+  return visitorWindowHours(env) * 60 * 60 * 1000;
+}
+
+function freshHits(list, at, span) {
+  if (!list || list.length === 0) return [];
+  const kept = [];
+  for (const ts of list) {
+    if (at - ts < span) kept.push(ts);
+  }
+  return kept;
 }
 
 function missingConfig(env) {
@@ -624,5 +640,4 @@ module.exports = {
   handleDemoStatusRequest,
   hashValue,
   clientIp,
-  eatDay,
 };

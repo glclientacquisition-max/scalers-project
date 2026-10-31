@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const { demoEnabled, maxConcurrent } = require('../src/demo/flags');
+const { demoEnabled, maxConcurrent, sessionsPerVisitor, visitorWindowHours } = require('../src/demo/flags');
 const { maxCallMs, maxCallOn, deadAirHangupOn } = require('../src/speech/callLimits');
 const { numberHoldClipEnabled, isProtectedNumber } = require('../src/sautikit/numberHold');
 const {
@@ -93,6 +93,21 @@ describe('demo flags', () => {
     assert.equal(maxConcurrent({ DEMO_MAX_CONCURRENT: 'nope' }), 5);
     assert.equal(maxConcurrent({ DEMO_MAX_CONCURRENT: '2' }), 2);
   });
+
+  it('defaults to one session per visitor in a 24 hour window', () => {
+    assert.equal(sessionsPerVisitor({}), 1);
+    assert.equal(visitorWindowHours({}), 24);
+    for (const value of ['', 'nope', '0', '1.5', '-1', '101']) {
+      assert.equal(sessionsPerVisitor({ DEMO_SESSIONS_PER_VISITOR: value }), 1, JSON.stringify(value));
+    }
+    for (const value of ['', 'nope', '0', '24.5', '-3', '8785']) {
+      assert.equal(visitorWindowHours({ DEMO_VISITOR_WINDOW_HOURS: value }), 24, JSON.stringify(value));
+    }
+    assert.equal(sessionsPerVisitor({ DEMO_SESSIONS_PER_VISITOR: '2' }), 2);
+    assert.equal(sessionsPerVisitor({ DEMO_SESSIONS_PER_VISITOR: '100' }), 100);
+    assert.equal(visitorWindowHours({ DEMO_VISITOR_WINDOW_HOURS: '1' }), 1);
+    assert.equal(visitorWindowHours({ DEMO_VISITOR_WINDOW_HOURS: '8784' }), 8784);
+  });
 });
 
 describe('demo token guards', () => {
@@ -158,39 +173,55 @@ describe('demo token guards', () => {
     assert.equal(failed.lines.join('\n').includes(TURNSTILE_SECRET), false);
   });
 
-  it('rate-limits the 4th session per hashed IP', async () => {
-    const { guard, clock, calls } = harness();
-    for (let i = 0; i < 3; i += 1) {
-      const out = await guard.decide(request({ body: { device_id: `device-ip${i}x` } }));
-      assert.equal(out.status, 200, String(i));
-      clock.t += 61_000;
-    }
-    const fourth = await guard.decide(request({ body: { device_id: 'device-ip4x' } }));
-    assert.equal(fourth.status, 429);
-    assert.equal(fourth.body.reason, 'limit_daily');
-    assert.equal(calls.length, 3);
+  it('returns used after one session for this hashed IP', async () => {
+    const { guard, clock, calls, lines } = harness();
+    const first = await guard.decide(request({ body: { device_id: 'device-ip0x' } }));
+    assert.equal(first.status, 200);
+    clock.t += 61_000;
+    const second = await guard.decide(request({ body: { device_id: 'device-ip1x' } }));
+    assert.equal(second.status, 429);
+    assert.deepEqual(second.body, { reason: 'used' });
+    assert.equal(calls.length, 1);
+    const logged = JSON.parse(lines.at(-1).slice('demo_token_reject '.length));
+    assert.equal(logged.reason, 'used');
+    assert.equal(logged.ip_hash, IP_HASH);
+    assert.equal(logged.device_id, undefined);
+    const text = lines.join('\n');
+    assert.equal(text.includes(IP), false);
+    assert.equal(text.includes('device-ip1x'), false);
   });
 
-  it('rate-limits the 4th session per device', async () => {
-    const { guard, clock } = harness();
-    for (let i = 0; i < 3; i += 1) {
-      const out = await guard.decide(request({
-        ip: `198.51.100.${i + 1}`,
-        body: { device_id: 'device-same' },
-      }));
-      assert.equal(out.status, 200, String(i));
-      clock.t += 61_000;
-    }
-    const fourth = await guard.decide(request({
+  it('returns used after one session for this device', async () => {
+    const { guard, lines } = harness();
+    const first = await guard.decide(request({
+      ip: '198.51.100.1',
+      body: { device_id: 'device-same' },
+    }));
+    assert.equal(first.status, 200);
+    const second = await guard.decide(request({
       ip: '198.51.100.9',
       body: { device_id: 'device-same' },
     }));
-    assert.equal(fourth.status, 429);
-    assert.equal(fourth.body.reason, 'limit_daily');
+    assert.equal(second.status, 429);
+    assert.deepEqual(second.body, { reason: 'used' });
+    const text = lines.join('\n');
+    assert.equal(text.includes('198.51.100.9'), false);
+    assert.equal(text.includes('device-same'), false);
   });
 
-  it('allows one session at a time per IP', async () => {
-    const { guard, calls } = harness();
+  it('reads the visitor allowance from DEMO_SESSIONS_PER_VISITOR', async () => {
+    const { guard, clock } = harness({ DEMO_SESSIONS_PER_VISITOR: '2' });
+    assert.equal((await guard.decide(request({ body: { device_id: 'device-n1xx' } }))).status, 200);
+    clock.t += 61_000;
+    assert.equal((await guard.decide(request({ body: { device_id: 'device-n2xx' } }))).status, 200);
+    clock.t += 61_000;
+    const third = await guard.decide(request({ body: { device_id: 'device-n3xx' } }));
+    assert.equal(third.status, 429);
+    assert.deepEqual(third.body, { reason: 'used' });
+  });
+
+  it('allows one session at a time per IP when the visitor still has a session left', async () => {
+    const { guard, calls } = harness({ DEMO_SESSIONS_PER_VISITOR: '2' });
     const first = await guard.decide(request());
     const second = await guard.decide(request({ body: { device_id: 'device-other' } }));
     assert.equal(first.status, 200);
@@ -287,19 +318,24 @@ describe('demo token guards', () => {
     assert.equal(clock.t > 0, true);
   });
 
-  it('rolls the daily limit at the EAT day boundary', async () => {
+  it('keeps the visitor limit across EAT midnight and opens a new window after the hours elapse', async () => {
     const { guard, clock } = harness();
     clock.t = Date.parse('2026-10-31T20:30:00Z');
-    for (let i = 0; i < 3; i += 1) {
-      const out = await guard.decide(request({ body: { device_id: `device-day${i}` } }));
-      assert.equal(out.status, 200, String(i));
-      clock.t += 61_000;
-    }
-    const blocked = await guard.decide(request({ body: { device_id: 'device-day4' } }));
-    assert.equal(blocked.body.reason, 'limit_daily');
+    assert.equal((await guard.decide(request({ body: { device_id: 'device-day0' } }))).status, 200);
     clock.t = Date.parse('2026-10-31T21:30:00Z');
-    const nextDay = await guard.decide(request({ body: { device_id: 'device-day5' } }));
-    assert.equal(nextDay.status, 200);
+    const nextEatDay = await guard.decide(request({ body: { device_id: 'device-day1' } }));
+    assert.equal(nextEatDay.status, 429);
+    assert.equal(nextEatDay.body.reason, 'used');
+
+    const short = harness({ DEMO_VISITOR_WINDOW_HOURS: '1' });
+    assert.equal((await short.guard.decide(request({ body: { device_id: 'device-hour0' } }))).status, 200);
+    short.clock.t += 60 * 60 * 1000 - 1;
+    const inside = await short.guard.decide(request({ body: { device_id: 'device-hour1' } }));
+    assert.equal(inside.body.reason, 'used');
+    short.clock.t += 1;
+    const after = await short.guard.decide(request({ body: { device_id: 'device-hour2' } }));
+    assert.equal(after.status, 200);
+    assert.equal(clock.t > 0, true);
   });
 
   it('does not call any host except Turnstile siteverify', async () => {
@@ -381,6 +417,24 @@ describe('demo status', () => {
       assert.equal(dumped.includes(secret), false, secret);
     }
     assert.equal(lines.join('\n').includes(IP), false);
+
+    const usedGuard = harness();
+    assert.equal((await usedGuard.guard.decide(request())).status, 200);
+    const used = await usedGuard.guard.status(statusRequest());
+    assert.equal(used.status, 200);
+    assert.equal(used.body.enabled, true);
+    assert.equal(used.body.cap, false);
+    assert.equal(used.body.reason, 'used');
+    assert.deepEqual(Object.keys(used.body).sort(), ['busy', 'cap', 'enabled', 'reason']);
+    const otherVisitor = await usedGuard.guard.status(statusRequest('198.51.100.77'));
+    assert.equal(otherVisitor.body.reason, null);
+    assert.equal(JSON.stringify(used.body).includes(IP), false);
+    assert.equal(JSON.stringify(used.body).includes(IP_HASH), false);
+    assert.equal(usedGuard.lines.join('\n').includes(IP), false);
+
+    const sameIp = await full.guard.status(statusRequest('203.0.113.21'));
+    assert.equal(sameIp.body.busy, true);
+    assert.equal(sameIp.body.reason, 'used');
   });
 
   it('rate-limits status polls per IP and does not log the raw address', async () => {

@@ -102,6 +102,7 @@ See `.env.example` — key ones:
 - `DEMO_OPUS` (default off; only `on` accepts Opus on `/ws/demo`. Otherwise the socket speaks PCM)
 - `DEMO_RECORD` (read and ignored. The demo session does not record)
 - `DEMO_ALLOWED_ORIGINS` (comma-separated exact origins), `DEMO_TOKEN_SECRET`, `DEMO_IP_SALT`, `TURNSTILE_SECRET_KEY` (names only; values stay in env), `DEMO_MAX_CONCURRENT` (default 5)
+- `DEMO_SESSIONS_PER_VISITOR` (default 1), `DEMO_VISITOR_WINDOW_HOURS` (default 24). A hashed IP or device past that count gets `POST /demo/token` 429 `{reason: used}`. `GET /demo/status` reports `used` for that hashed IP. One open session per IP stays 429 `rate` when the visitor still has a session left. The raw IP is not stored.
 - `DEMO_DAILY_CAP_USD` (default 2), `DEMO_MONTHLY_CAP_USD` (default 50). `DEMO_SPEND_PERSIST` (default off; only `on` reloads `demo_spend` after a restart. The SQL file is not applied by Voice.)
 - Soniox endpointing: `SONIOX_MAX_ENDPOINT_DELAY_MS`, `SONIOX_ENDPOINT_SENSITIVITY`, …
 
