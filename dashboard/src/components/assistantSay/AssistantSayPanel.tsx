@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ChevronRightIcon,
@@ -20,6 +21,7 @@ import type { LookupPreviewSamples } from "@/lib/assistantSayVoice.server";
 import type { AssistantSayRow, AssistantSayState } from "@/lib/assistantSayTypes";
 import {
   ASSISTANT_SAY_PAGE_TITLE,
+  rowIsReady,
   sortAssistantSayRows,
   topicFixHref,
   topicLookupKind,
@@ -81,31 +83,40 @@ export function AssistantSayPanel({
   }, [initialTopic]);
 
   const progress = state.total > 0 ? Math.round((state.readyCount / state.total) * 100) : 0;
+  const missing = rows.find((row) => !rowIsReady(row));
+  const readyLine = (
+    <>
+      <span className="font-medium text-ink">{state.readyCount}</span>
+      <span className="text-ink-2"> of {state.total} ready</span>
+    </>
+  );
 
   return (
     <div className={settingsFormBodyClass}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-body tabular-nums text-ink">
-          <span className="font-medium text-ink">{state.readyCount}</span>
-          <span className="text-ink-2"> of {state.total} ready</span>
-        </p>
+        {progress < 100 && missing ? (
+          <Link href={topicFixHref(missing)} className="inline-flex min-h-11 items-center text-body tabular-nums text-ink">
+            {readyLine}
+          </Link>
+        ) : (
+          <p className="text-body tabular-nums text-ink">{readyLine}</p>
+        )}
         <ButtonLink href={businessSettingsHref("test")} variant="tonal" size="md">
           Test a call
         </ButtonLink>
       </div>
-      <div
-        className="mt-2 h-1 overflow-hidden rounded-full bg-surface-2"
-        role="progressbar"
-        aria-valuenow={state.readyCount}
-        aria-valuemin={0}
-        aria-valuemax={state.total}
-        aria-label={`${state.readyCount} of ${state.total} topics ready`}
-      >
+      {progress < 100 ? (
         <div
-          className="h-full rounded-full bg-accent motion-reduce:transition-none transition-[width] duration-300 ease-out"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
+          className="mt-2 h-1 overflow-hidden rounded-full bg-surface-2"
+          role="progressbar"
+          aria-valuenow={state.readyCount}
+          aria-valuemin={0}
+          aria-valuemax={state.total}
+          aria-label={`${state.readyCount} of ${state.total} topics ready`}
+        >
+          <div className="h-full rounded-full bg-accent" style={{ width: `${progress}%` }} />
+        </div>
+      ) : null}
 
       <KbPendingNote pending={pending} className="mt-4" />
 
