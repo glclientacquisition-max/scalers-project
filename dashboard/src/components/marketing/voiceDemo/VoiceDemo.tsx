@@ -22,7 +22,8 @@ import {
 import { demoDeviceId } from "./device";
 import { DEMO_MAX_SEC, formatCountdown, stateForTokenFailure, type DemoState } from "./machine";
 import { captureMic, createMicMeter, stopStream, type DemoMeter } from "./meter";
-import { stateForUpgrade, type AssistantPhase } from "./protocol";
+import { readDeviceCodec, type AssistantPhase, type WireCodec } from "./protocol";
+import { readDemoStatus } from "./status";
 
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
@@ -114,6 +115,8 @@ export function VoiceDemo({
   const [notice, setNotice] = useState("");
   const [endedReason, setEndedReason] = useState(previewState === "ended" ? previewEnd : "user");
   const [failureLine, setFailureLine] = useState<string | null>(null);
+  const [startReady, setStartReady] = useState(Boolean(previewState));
+  const [wireCodec, setWireCodec] = useState<WireCodec>("pcm16");
   const [turnstile, setTurnstile] = useState("");
   const conn = useRef<DemoConnection | null>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -129,6 +132,23 @@ export function VoiceDemo({
   }, []);
 
   useEffect(() => () => release(), [release]);
+
+  useEffect(() => {
+    setWireCodec(readDeviceCodec());
+  }, []);
+
+  async function enterConsent() {
+    if (!business) return;
+    setState("consent");
+    if (previewState) return;
+    setStartReady(false);
+    const read = await readDemoStatus();
+    if (read.kind === "block") {
+      setState(read.state);
+      return;
+    }
+    setStartReady(true);
+  }
 
   const onToken = useCallback((token: string) => setTurnstile(token), []);
 
@@ -166,6 +186,7 @@ export function VoiceDemo({
       wsUrl: minted.wsUrl,
       maxSec: minted.maxSec,
       stream: mic,
+      codec: wireCodec,
     });
     conn.current = next;
     next.onLevel(setLevel);
@@ -179,9 +200,8 @@ export function VoiceDemo({
     });
     next.onUpgrade((failure) => {
       release();
-      const line = upgradeLine(failure.reason, lang);
-      setFailureLine(line);
-      setState(stateForUpgrade(failure.status, failure.reason));
+      setFailureLine(failure.state === "error" ? upgradeLine(failure.reason, lang) : null);
+      setState(failure.state);
     });
     next.onPhase(setPhase);
     next.onCaption((row) => {
@@ -191,6 +211,14 @@ export function VoiceDemo({
     next.onNotice(setNotice);
     next.onEnd((reason) => {
       release();
+      if (reason === "kill") {
+        setState("disabled");
+        return;
+      }
+      if (reason === "cap") {
+        setState("cap");
+        return;
+      }
       setEndedReason(reason);
       setState("ended");
     });
@@ -249,7 +277,7 @@ export function VoiceDemo({
             ]}
             onSelect={(key) => setLang(key === "sw" ? "sw" : "en")}
           />
-          <Button type="button" variant="primary" block disabled={!business} onClick={() => business && setState("consent")}>
+          <Button type="button" variant="primary" block disabled={!business} onClick={() => void enterConsent()}>
             {copy.continue}
           </Button>
         </div>
@@ -260,14 +288,19 @@ export function VoiceDemo({
           <p className="font-demo text-meta text-ink-2">{business ? businessLabel(business, lang) : ""}</p>
           <h3 className="font-display text-title">{copy.before}</h3>
           <p className="font-demo text-body">{copy.notice}</p>
-          <p className="font-demo text-meta text-ink-2">{copy.data}</p>
+          <p className="font-demo text-meta text-ink-2">
+            <span className="md:hidden">{copy.dataMobile}</span>
+            <span className="hidden md:inline">{copy.data}</span>
+          </p>
           <Link href="/privacy" className="font-demo inline-flex min-h-11 items-center text-body text-ink underline">
             {copy.privacy}
           </Link>
           <TurnstileBox onToken={onToken} />
-          <Button type="button" variant="primary" block onClick={() => void start()}>
-            {copy.start}
-          </Button>
+          {startReady ? (
+            <Button type="button" variant="primary" block onClick={() => void start()}>
+              {copy.start}
+            </Button>
+          ) : null}
           <Button type="button" variant="ghost" block onClick={() => setState("idle")}>
             {copy.back}
           </Button>
@@ -325,6 +358,12 @@ export function VoiceDemo({
       {state === "disabled" ? (
         <p className="font-demo mt-4 text-body" role="status">
           {copy.paused}
+        </p>
+      ) : null}
+
+      {state === "cap" ? (
+        <p className="font-demo mt-4 text-body" role="status">
+          {copy.resting}
         </p>
       ) : null}
 

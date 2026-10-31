@@ -1,6 +1,8 @@
+import type { DemoState } from "./machine";
 import { createPcmPlayer, type PcmPlayer } from "./player";
 import {
   CONNECT_MS,
+  PCM8_RATE,
   PCM16_RATE,
   acceptSession,
   demoSocketUrl,
@@ -9,11 +11,13 @@ import {
   type AssistantPhase,
   type EndReason,
   type ServerCaption,
+  type WireCodec,
 } from "./protocol";
+import { readDemoStatus } from "./status";
 
 export type DemoSocketHandlers = {
   onReady: (info: { maxSec: number }) => void;
-  onUpgrade: (failure: { status: number; reason: string }) => void;
+  onUpgrade: (failure: { state: DemoState; reason: string }) => void;
   onTick: (remainingSec: number) => void;
   onPhase: (phase: AssistantPhase) => void;
   onCaption: (caption: ServerCaption) => void;
@@ -23,39 +27,23 @@ export type DemoSocketHandlers = {
 
 const WORKLET_URL = "/voice-demo-pcm-worklet.js";
 
-function statusFromTiming(needle: string): number {
-  if (typeof performance === "undefined") return 0;
-  const entries = performance.getEntriesByType("resource") as PerformanceResourceTiming[];
-  for (let i = entries.length - 1; i >= 0; i -= 1) {
-    const entry = entries[i];
-    if (!entry || !entry.name.includes(needle)) continue;
-    return entry.responseStatus || 0;
-  }
-  return 0;
-}
-
-function reasonForStatus(status: number): string {
-  if (status === 404) return "disabled";
-  if (status === 403) return "origin";
-  if (status === 400) return "codec";
-  if (status === 401) return "rejected";
-  return "error";
-}
-
 /**
- * Real /ws/demo session. pcm16 by default. Sends {type:'end'} on visitor stop.
- * Captions stay in memory for the open socket only.
+ * Real /ws/demo session. Touch and phones send pcm8. Desktop sends pcm16.
+ * Sends {type:'end'} on visitor stop. Captions stay in memory only.
+ * A failed HTTP upgrade asks GET /demo/status once, then shows that state or a generic error.
  */
 export function openDemoSocket(
   wsUrl: string,
   stream: MediaStream | null,
   handlers: DemoSocketHandlers,
+  codec: WireCodec = "pcm16",
 ): { stop: (notify: boolean) => void } {
+  const captureRate = codec === "pcm8" ? PCM8_RATE : PCM16_RATE;
   let url = "";
   try {
-    url = demoSocketUrl(wsUrl, "pcm16");
+    url = demoSocketUrl(wsUrl, codec);
   } catch {
-    handlers.onUpgrade({ status: 0, reason: "error" });
+    handlers.onUpgrade({ state: "error", reason: "error" });
     return { stop() {} };
   }
 
@@ -63,7 +51,7 @@ export function openDemoSocket(
   try {
     socket = new WebSocket(url);
   } catch {
-    handlers.onUpgrade({ status: 0, reason: "error" });
+    handlers.onUpgrade({ state: "error", reason: "error" });
     return { stop() {} };
   }
   socket.binaryType = "arraybuffer";
@@ -72,12 +60,14 @@ export function openDemoSocket(
   let context: AudioContext | null = null;
   let worklet: AudioWorkletNode | null = null;
   let mute: GainNode | null = null;
+  let playRate = captureRate;
   let ready = false;
   let closed = false;
+  let failing = false;
   let timer = 0;
   let left = 0;
   const connectTimer = window.setTimeout(() => {
-    if (!ready && !closed) fail(0, "error");
+    if (!ready && !closed) void failHttp();
   }, CONNECT_MS);
 
   function clearClock() {
@@ -85,13 +75,19 @@ export function openDemoSocket(
     timer = 0;
   }
 
-  function fail(status: number, reason: string) {
-    if (closed) return;
+  async function failHttp() {
+    if (closed || ready || failing) return;
+    failing = true;
     closed = true;
     window.clearTimeout(connectTimer);
     clearClock();
     teardown(false);
-    handlers.onUpgrade({ status, reason });
+    const read = await readDemoStatus();
+    if (read.kind === "block") {
+      handlers.onUpgrade({ state: read.state, reason: read.state });
+      return;
+    }
+    handlers.onUpgrade({ state: "error", reason: "error" });
   }
 
   function teardown(notify: boolean) {
@@ -132,7 +128,7 @@ export function openDemoSocket(
     const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctx) return;
     try {
-      context = new Ctx({ sampleRate: PCM16_RATE });
+      context = new Ctx({ sampleRate: captureRate });
     } catch {
       context = new Ctx();
     }
@@ -140,7 +136,9 @@ export function openDemoSocket(
       await context.resume();
       await context.audioWorklet.addModule(WORKLET_URL);
       const source = context.createMediaStreamSource(stream);
-      worklet = new AudioWorkletNode(context, "pcm16-capture");
+      worklet = new AudioWorkletNode(context, "pcm-capture", {
+        processorOptions: { rate: captureRate },
+      });
       mute = context.createGain();
       mute.gain.value = 0;
       source.connect(worklet);
@@ -164,7 +162,7 @@ export function openDemoSocket(
   socket.onmessage = (event) => {
     if (closed) return;
     if (typeof event.data !== "string") {
-      if (event.data instanceof ArrayBuffer) player?.enqueue(event.data, PCM16_RATE);
+      if (event.data instanceof ArrayBuffer) player?.enqueue(event.data, playRate);
       return;
     }
     const message = parseServerMessage(event.data);
@@ -172,7 +170,11 @@ export function openDemoSocket(
     if (message.type === "session") {
       const accepted = acceptSession(message);
       if (!accepted.ok) {
-        fail(accepted.reason === "tenant" ? 401 : 0, accepted.reason === "tenant" ? "tenant" : "error");
+        closed = true;
+        window.clearTimeout(connectTimer);
+        clearClock();
+        teardown(false);
+        handlers.onUpgrade({ state: "error", reason: accepted.reason === "tenant" ? "tenant" : "error" });
         return;
       }
       ready = true;
@@ -191,6 +193,10 @@ export function openDemoSocket(
     if (message.type === "state") {
       handlers.onPhase(message.state);
       if (stopsPlayback(message.state)) player?.stopNow();
+      return;
+    }
+    if (message.type === "assistant_audio") {
+      if (message.sampleRate === PCM8_RATE || message.sampleRate === PCM16_RATE) playRate = message.sampleRate;
       return;
     }
     if (message.type === "caption") {
@@ -213,18 +219,13 @@ export function openDemoSocket(
 
   socket.onerror = () => {
     if (ready || closed) return;
-    window.setTimeout(() => {
-      if (ready || closed) return;
-      const status = statusFromTiming("/ws/demo");
-      fail(status, reasonForStatus(status));
-    }, 0);
+    void failHttp();
   };
 
   socket.onclose = () => {
     if (closed) return;
     if (!ready) {
-      const status = statusFromTiming("/ws/demo");
-      fail(status, reasonForStatus(status));
+      void failHttp();
       return;
     }
     closed = true;

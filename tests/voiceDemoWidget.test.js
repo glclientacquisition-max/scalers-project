@@ -11,6 +11,8 @@ const {
   stateForTokenFailure,
 } = require('../dashboard/src/components/marketing/voiceDemo/machine.ts');
 const { endedLine } = require('../dashboard/src/components/marketing/voiceDemo/copy.ts');
+const { blockFromStatus, readDemoStatus } = require('../dashboard/src/components/marketing/voiceDemo/status.ts');
+const { preferredDemoCodec } = require('../dashboard/src/components/marketing/voiceDemo/protocol.ts');
 const {
   DEMO_TENANT_IDS,
   acceptSession,
@@ -45,7 +47,10 @@ describe('voice demo widget states', () => {
     assert.equal(stateForTokenFailure(503, 'disabled'), 'disabled');
     assert.equal(COPY.en.paused, EXACT.disabled);
     assert.equal(stateForTokenFailure(503, 'busy'), 'busy');
-    assert.equal(stateForTokenFailure(503, 'cap'), 'busy');
+    assert.equal(stateForTokenFailure(503, 'cap'), 'cap');
+    assert.equal(COPY.en.resting, 'The demo is resting for today. Try again tomorrow.');
+    assert.equal(COPY.en.endedBy.kill, 'Demo paused.');
+    assert.equal(COPY.en.endedBy.cap, COPY.en.resting);
     assert.equal(COPY.en.busy, EXACT.busy);
     assert.equal(stateForTokenFailure(429, 'limit_daily'), 'limit');
     assert.equal(stateForTokenFailure(429, 'rate'), 'limit');
@@ -85,11 +90,39 @@ describe('voice demo widget states', () => {
     }
     assert.equal(endedLine('user', 'en'), 'Thanks. The demo has ended.');
     assert.equal(endedLine('max_time', 'en'), "That's three minutes. Thanks.");
+    assert.equal(endedLine('cap', 'en'), 'The demo is resting for today. Try again tomorrow.');
+    assert.equal(endedLine('kill', 'en'), 'Demo paused.');
+  });
+
+  it('reads demo status before start and stays quiet on a rate limit', async () => {
+    assert.equal(blockFromStatus({ enabled: false, busy: false, cap: false, reason: 'disabled' }), 'disabled');
+    assert.equal(blockFromStatus({ enabled: true, busy: false, cap: true, reason: 'cap' }), 'cap');
+    assert.equal(blockFromStatus({ enabled: true, busy: true, cap: false, reason: 'busy' }), 'busy');
+    assert.equal(blockFromStatus({ enabled: true, busy: false, cap: false, reason: null }), null);
+    const rate = await readDemoStatus(async () => ({ status: 429, json: async () => ({ reason: 'rate' }) }), '/demo/status');
+    assert.equal(rate.kind, 'quiet');
+    const paused = await readDemoStatus(async () => ({
+      status: 200,
+      ok: true,
+      json: async () => ({ enabled: false, busy: false, cap: false, reason: 'disabled' }),
+    }), '/demo/status');
+    assert.deepEqual(paused, { kind: 'block', state: 'disabled' });
+  });
+
+  it('uses pcm8 on touch or a phone and pcm16 on a desktop', () => {
+    assert.equal(preferredDemoCodec({ coarsePointer: true }), 'pcm8');
+    assert.equal(preferredDemoCodec({ touchPoints: 1 }), 'pcm8');
+    assert.equal(preferredDemoCodec({ narrow: true }), 'pcm8');
+    assert.equal(preferredDemoCodec({}), 'pcm16');
+    const mobile = framesFromFloat(new Float32Array(8000), 8000, 0, 8000);
+    assert.equal(mobile.frames.length, 50);
+    assert.equal(mobile.frames[0].byteLength, 320);
   });
 
   it('opens pcm16 by default and only accepts the three demo tenants', () => {
-    const url = demoSocketUrl('wss://voice.example/ws/demo?t=abc');
+    const url = demoSocketUrl('wss://voice.example/ws/demo?t=abc', 'pcm16');
     assert.match(url, /codec=pcm16/);
+    assert.match(demoSocketUrl('wss://voice.example/ws/demo?t=abc', 'pcm8'), /codec=pcm8/);
     assert.equal(url.includes('opus'), false);
     assert.match(url, /t=abc/);
     const fixture = require('../fixtures/demo-tenants.json');
@@ -130,9 +163,10 @@ describe('voice demo widget states', () => {
       path.join(__dirname, '../dashboard/src/components/marketing/voiceDemo/socket.ts'),
       'utf8',
     );
-    assert.match(widget, /demoSocketUrl\(wsUrl, "pcm16"\)/);
+    assert.match(widget, /demoSocketUrl\(wsUrl, codec\)/);
+    assert.match(widget, /readDemoStatus/);
     assert.match(widget, /type: "end"/);
-    assert.doesNotMatch(widget, /localStorage|MediaRecorder/);
+    assert.doesNotMatch(widget, /localStorage|MediaRecorder|getEntriesByType|responseStatus/);
   });
 
   it('does not paint orange or record audio in the widget', () => {
@@ -156,6 +190,7 @@ function textFor(state, lang) {
     ended: copy.ended,
     disabled: copy.paused,
     busy: copy.busy,
+    cap: copy.resting,
     limit: copy.limit,
     error: copy.error,
     unsupported: copy.unsupported,

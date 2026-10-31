@@ -9,6 +9,7 @@ export const DEMO_STATES = [
   "ended",
   "disabled",
   "busy",
+  "cap",
   "limit",
   "error",
   "unsupported",
@@ -35,10 +36,11 @@ export type TokenFailureReason =
   | "disabled"
   | "error";
 
-/** Map a POST /demo/token error onto a widget state. Limit is not busy. */
+/** Map a POST /demo/token error onto a widget state. Limit, busy, and cap stay apart. */
 export function stateForTokenFailure(status: number, reason: string): DemoState {
   if (status === 503 && reason === "disabled") return "disabled";
-  if (status === 503 && (reason === "busy" || reason === "cap")) return "busy";
+  if (status === 503 && reason === "cap") return "cap";
+  if (status === 503 && reason === "busy") return "busy";
   if (status === 429 && (reason === "limit_daily" || reason === "rate")) return "limit";
   return "error";
 }

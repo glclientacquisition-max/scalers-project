@@ -1,10 +1,17 @@
-const FRAME_SAMPLES = 320;
-const RATE = 16000;
+const PCM16_SAMPLES = 320;
+const PCM16_RATE = 16000;
+const PCM8_SAMPLES = 160;
+const PCM8_RATE = 8000;
 
-/** One 20 ms frame, 16 kHz, little-endian pcm16. 320 samples, 640 bytes. */
-export function encodePcm16Frame(samples: ArrayLike<number>): ArrayBuffer {
-  const bytes = new Uint8Array(FRAME_SAMPLES * 2);
-  const count = Math.min(samples.length, FRAME_SAMPLES);
+function frameSamples(rate: number): number {
+  return rate === PCM8_RATE ? PCM8_SAMPLES : PCM16_SAMPLES;
+}
+
+/** One 20 ms little-endian frame. 8 kHz is 320 bytes. 16 kHz is 640 bytes. */
+export function encodePcmFrame(samples: ArrayLike<number>, rate = PCM16_RATE): ArrayBuffer {
+  const size = frameSamples(rate);
+  const bytes = new Uint8Array(size * 2);
+  const count = Math.min(samples.length, size);
   for (let i = 0; i < count; i += 1) {
     const clamped = Math.max(-1, Math.min(1, samples[i] || 0));
     let n = Math.round(clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff);
@@ -16,16 +23,22 @@ export function encodePcm16Frame(samples: ArrayLike<number>): ArrayBuffer {
   return bytes.buffer;
 }
 
+export function encodePcm16Frame(samples: ArrayLike<number>): ArrayBuffer {
+  return encodePcmFrame(samples, PCM16_RATE);
+}
+
 /**
- * Resample mono float audio to 16 kHz and split it into 640-byte frames.
- * `carry` is the fractional read position left over from the previous block.
+ * Resample mono float audio and split it into 20 ms frames.
+ * 8 kHz frames are 320 bytes. 16 kHz frames are 640 bytes.
  */
 export function framesFromFloat(
   input: ArrayLike<number>,
   inputRate: number,
   carry = 0,
+  targetRate = PCM16_RATE,
 ): { frames: ArrayBuffer[]; carry: number } {
-  const step = inputRate / RATE;
+  const step = inputRate / targetRate;
+  const size = frameSamples(targetRate);
   const pending: number[] = [];
   let pos = carry;
   while (pos < input.length) {
@@ -38,9 +51,9 @@ export function framesFromFloat(
   }
   const frames: ArrayBuffer[] = [];
   let offset = 0;
-  while (pending.length - offset >= FRAME_SAMPLES) {
-    frames.push(encodePcm16Frame(pending.slice(offset, offset + FRAME_SAMPLES)));
-    offset += FRAME_SAMPLES;
+  while (pending.length - offset >= size) {
+    frames.push(encodePcmFrame(pending.slice(offset, offset + size), targetRate));
+    offset += size;
   }
   return { frames, carry: pos - input.length };
 }

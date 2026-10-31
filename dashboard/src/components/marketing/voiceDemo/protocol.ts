@@ -12,6 +12,9 @@ const TENANT_ID_SET = new Set<string>(Object.values(DEMO_TENANT_IDS));
 export const PCM16_FRAME_BYTES = 640;
 export const PCM16_FRAME_SAMPLES = 320;
 export const PCM16_RATE = 16000;
+export const PCM8_FRAME_BYTES = 320;
+export const PCM8_FRAME_SAMPLES = 160;
+export const PCM8_RATE = 8000;
 export const CONNECT_MS = 5000;
 
 export const END_REASONS = ["max_time", "idle", "user", "cap", "kill", "error"] as const;
@@ -21,6 +24,21 @@ export const ASSISTANT_PHASES = ["greeting", "listening", "thinking", "speaking"
 export type AssistantPhase = (typeof ASSISTANT_PHASES)[number];
 
 export type DemoCodec = "pcm16" | "pcm8" | "opus";
+export type WireCodec = "pcm16" | "pcm8";
+
+/** Touch or a narrow phone uses 8 kHz. Desktop stays 16 kHz. Opus is never chosen here. */
+export function preferredDemoCodec(hints: { coarsePointer?: boolean; touchPoints?: number; narrow?: boolean }): WireCodec {
+  if (hints.coarsePointer || (hints.touchPoints || 0) > 0 || hints.narrow) return "pcm8";
+  return "pcm16";
+}
+
+export function readDeviceCodec(): WireCodec {
+  if (typeof window === "undefined") return "pcm16";
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  const narrow = window.matchMedia("(max-width: 767px)").matches;
+  const touchPoints = typeof navigator !== "undefined" ? navigator.maxTouchPoints : 0;
+  return preferredDemoCodec({ coarsePointer: coarse, touchPoints, narrow });
+}
 
 export function isDemoTenantId(id: string): boolean {
   return TENANT_ID_SET.has(id);
@@ -34,10 +52,7 @@ export function isAssistantPhase(value: string): value is AssistantPhase {
   return (ASSISTANT_PHASES as readonly string[]).includes(value);
 }
 
-/**
- * Default wire format is pcm16. Opus is only when the caller passes it.
- * The widget does not pass opus.
- */
+/** Opus is only when the caller passes it. The widget passes pcm8 or pcm16. */
 export function demoSocketUrl(wsUrl: string, codec: DemoCodec = "pcm16"): string {
   const url = new URL(wsUrl);
   if (url.protocol === "https:") url.protocol = "wss:";

@@ -21,6 +21,8 @@ type Copy = {
   before: string;
   notice: string;
   data: string;
+  dataMobile: string;
+  resting: string;
   privacy: string;
   start: string;
   back: string;
@@ -58,6 +60,8 @@ export const COPY: Record<DemoLang, Copy> = {
     notice:
       "Your voice is used only to answer this demo. It is sent to speech providers to hear you and reply. We do not keep the audio or the words. End stops it.",
     data: "Uses about 4 MB a minute.",
+    dataMobile: "Uses about 1 MB a minute.",
+    resting: "The demo is resting for today. Try again tomorrow.",
     privacy: "Privacy",
     start: "Start demo",
     back: "Back",
@@ -75,8 +79,8 @@ export const COPY: Record<DemoLang, Copy> = {
       max_time: "That's three minutes. Thanks.",
       idle: "The line went quiet. Thanks.",
       user: "Thanks. The demo has ended.",
-      cap: "Today's demo time is used up.",
-      kill: "The demo was stopped.",
+      cap: "The demo is resting for today. Try again tomorrow.",
+      kill: "Demo paused.",
       error: "The demo stopped. Try again.",
     },
     phase: {
@@ -111,6 +115,8 @@ export const COPY: Record<DemoLang, Copy> = {
     notice:
       "Sauti yako inatumika kujibu onyesho hili tu. Inatumwa kwa watoa huduma wa sauti ili kusikia na kujibu. Hatutunzi sauti wala maneno. Maliza inasimamisha.",
     data: "Inatumia takriban MB 4 kwa dakika.",
+    dataMobile: "Inatumia takriban MB 1 kwa dakika.",
+    resting: "Onyesho linapumzika leo. Jaribu tena kesho.",
     privacy: "Faragha",
     start: "Anza onyesho",
     back: "Rudi",
@@ -128,8 +134,8 @@ export const COPY: Record<DemoLang, Copy> = {
       max_time: "Dakika tatu zimepita. Asante.",
       idle: "Laini ilinyamaza. Asante.",
       user: "Asante. Onyesho limeisha.",
-      cap: "Muda wa onyesho wa leo umeisha.",
-      kill: "Onyesho limesitishwa.",
+      cap: "Onyesho linapumzika leo. Jaribu tena kesho.",
+      kill: "Onyesho limesimamishwa.",
       error: "Onyesho limesimama. Jaribu tena.",
     },
     phase: {

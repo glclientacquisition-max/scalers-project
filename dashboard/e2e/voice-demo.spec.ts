@@ -9,6 +9,7 @@ const STATES = [
   ["ended", "Thanks. The demo has ended."],
   ["disabled", "Demo paused."],
   ["busy", "All demo lines are busy, try again in a minute."],
+  ["cap", "The demo is resting for today. Try again tomorrow."],
   ["limit", "You've used today's demos."],
   ["error", "The demo did not start. Try again."],
   ["unsupported", "Your browser can't run the live demo."],
@@ -34,8 +35,8 @@ test("each end reason has its own line", async ({ page }) => {
     ["max_time", "That's three minutes. Thanks."],
     ["idle", "The line went quiet. Thanks."],
     ["user", "Thanks. The demo has ended."],
-    ["cap", "Today's demo time is used up."],
-    ["kill", "The demo was stopped."],
+    ["cap", "The demo is resting for today. Try again tomorrow."],
+    ["kill", "Demo paused."],
     ["error", "The demo stopped. Try again."],
   ] as const;
   for (const [reason, line] of lines) {

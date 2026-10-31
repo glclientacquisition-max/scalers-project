@@ -1,7 +1,7 @@
-import { DEMO_MAX_SEC } from "./machine";
+import { DEMO_MAX_SEC, type DemoState } from "./machine";
 import type { DemoBusinessKey, DemoLang } from "./copy";
 import { NOTICE_V } from "./copy";
-import type { AssistantPhase, EndReason } from "./protocol";
+import type { AssistantPhase, EndReason, WireCodec } from "./protocol";
 import { openDemoSocket } from "./socket";
 
 /**
@@ -24,7 +24,7 @@ export type MintResult =
 export type DemoConnection = {
   stop: (notify?: boolean) => void;
   onReady: (cb: (info: { maxSec: number }) => void) => () => void;
-  onUpgrade: (cb: (failure: { status: number; reason: string }) => void) => () => void;
+  onUpgrade: (cb: (failure: { state: DemoState; reason: string }) => void) => () => void;
   onTick: (cb: (remainingSec: number) => void) => () => void;
   onLevel: (cb: (level: number) => void) => () => void;
   onPhase: (cb: (phase: AssistantPhase) => void) => () => void;
@@ -38,6 +38,7 @@ export type DemoOpen = {
   wsUrl: string;
   maxSec: number;
   stream?: MediaStream | null;
+  codec?: WireCodec;
 };
 
 export type DemoSessionAdapter = {
@@ -176,9 +177,9 @@ export function createHttpDemoAdapter(tokenUrl = "/demo/token"): DemoSessionAdap
       const notices = new Set<Listener<string>>();
       const ends = new Set<Listener<EndReason>>();
       const readies = new Set<Listener<{ maxSec: number }>>();
-      const upgrades = new Set<Listener<{ status: number; reason: string }>>();
+      const upgrades = new Set<Listener<{ state: DemoState; reason: string }>>();
       const ready = { value: undefined as { maxSec: number } | undefined };
-      const upgrade = { value: undefined as { status: number; reason: string } | undefined };
+      const upgrade = { value: undefined as { state: DemoState; reason: string } | undefined };
       const ended = { value: undefined as EndReason | undefined };
       const handle = openDemoSocket(session.wsUrl, session.stream || null, {
         onReady(info) {
@@ -205,7 +206,7 @@ export function createHttpDemoAdapter(tokenUrl = "/demo/token"): DemoSessionAdap
           ended.value = reason;
           ends.forEach((cb) => cb(reason));
         },
-      });
+      }, session.codec || "pcm16");
       return {
         stop(notify = false) {
           handle.stop(notify);
