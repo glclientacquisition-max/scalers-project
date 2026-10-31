@@ -8,7 +8,7 @@ const TONE: Record<string, "info" | "warn" | "danger"> = {
   low: "warn",
   over: "warn",
   limit: "danger",
-  usedup: "danger",
+  usedup: "warn",
 };
 
 /**

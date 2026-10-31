@@ -36,14 +36,14 @@ export function HomeUsageSection({
         {minutesLeftLabel({ left: minutesLeft, underOneMinute: minutesUnderOne })}
       </p>
       <p className="mt-0.5 text-meta text-ink-2">{packLabel}</p>
-      {minuteStatus ? <p className="mt-0.5 text-meta font-medium text-ink">{minuteStatus}</p> : null}
-      {lowNotice ? (
+      {meter ? null : minuteStatus ? <p className="mt-0.5 text-meta font-medium text-ink">{minuteStatus}</p> : null}
+      {meter || isBeta ? null : lowNotice ? (
         <p role="status" data-low-notice={isBeta ? "beta" : "warn"} className={`mt-1 text-meta font-medium ${isBeta ? "text-ink-2" : "text-warn"}`}>
           {lowNotice}
         </p>
       ) : null}
-      {lowNotice && lowNoticeNote ? <p className="mt-0.5 text-meta text-ink-2">{lowNoticeNote}</p> : null}
-      {showLink ? (
+      {!meter && !isBeta && lowNotice && lowNoticeNote ? <p className="mt-0.5 text-meta text-ink-2">{lowNoticeNote}</p> : null}
+      {!meter && showLink ? (
         <Link
           href="/wallet"
           className={`mt-1 inline-flex min-h-11 items-center text-body font-medium text-accent hover:underline ${focusRingVisible}`}

@@ -22,7 +22,12 @@ export function minutesMeterState(input: MinutesMeterInput): MinutesMeterState {
   const over = input.used > input.included;
   if (input.mode === "capped" && input.left <= 0) return "limit";
   if (input.mode === "metered" && over) return "over";
-  // Zero whole minutes left is used up, not "running low". Under 1 min still has seconds.
+  // Beta stays blue even at zero left. Calls keep working, so this is not a hard stop.
+  if (input.mode === "beta") {
+    if (input.underOne) return "under1";
+    if (input.left > 0 && input.left <= Math.max(1, Math.floor(input.included * LOW_SHARE))) return "low";
+    return "beta";
+  }
   if (input.left <= 0 && !input.underOne) return "usedup";
   if (input.underOne) return "under1";
   const low = input.left > 0 && input.left <= Math.max(1, Math.floor(input.included * LOW_SHARE));
