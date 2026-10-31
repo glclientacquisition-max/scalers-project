@@ -15,6 +15,7 @@ import {
   FORWARD_CHOICES,
   TESTED_NETWORKS,
   canTapToDial,
+  callsReachLine,
   dialHref,
   forwardOffCode,
   forwardOnCode,
@@ -58,6 +59,13 @@ describe("call forwarding codes", () => {
     for (const choice of FORWARD_CHOICES) {
       assert.doesNotMatch(forwardOnCode(choice, N, 20), /\d\*20#$/, "single-star timer puts 20 in the service slot");
     }
+  });
+
+  it("names how calls reach you from the saved setup", () => {
+    assert.equal(callsReachLine("forward", "airtel"), "Forwarded on Airtel");
+    assert.equal(callsReachLine("forward", null), "Forwarded to your phone");
+    assert.equal(callsReachLine("main_number", null), "Answered on this number");
+    assert.equal(callsReachLine(null, null), "Not set up");
   });
 
   it("each choice has its own turn-off code, and ##002# turns everything off", () => {

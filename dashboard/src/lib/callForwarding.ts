@@ -128,6 +128,18 @@ export const NETWORK_LABEL: Record<NetworkId, string> = {
   telkom: "Telkom",
 };
 
+/** What the Calls row says, from the saved setup. */
+export function callsReachLine(
+  option: "main_number" | "forward" | null | undefined,
+  network?: NetworkId | null
+): string {
+  if (option === "forward") {
+    return network ? `Forwarded on ${NETWORK_LABEL[network]}` : "Forwarded to your phone";
+  }
+  if (option === "main_number") return "Answered on this number";
+  return "Not set up";
+}
+
 export function networkHelpLine(network: NetworkId | null | undefined): string {
   if (network === "safaricom") return "Safaricom: call 100 (prepay) or 200 (postpay).";
   if (network === "airtel") return "Airtel: call customer care.";
