@@ -22,12 +22,13 @@ const row = (id, status, extra = {}) => ({ id, status, business_name: id, packag
 const ROWS = [row("a", "active"), row("w", "waiting", { sautikit_virtual_number: "pending:w" }), row("s", "suspended"), row("z", "archived")];
 
 describe("businesses views", () => {
-  it("opens on Waiting when a business waits for a number", () => {
-    assert.equal(call("m.defaultView(rows)"), "waiting");
-    assert.equal(call("m.defaultView(rows.filter(r => r.status !== 'waiting'))"), "live");
+  it("opens on All", () => {
+    assert.equal(call("m.defaultView(rows)"), "all");
+    assert.equal(call("m.defaultView(rows.filter(r => r.status !== 'waiting'))"), "all");
   });
-  it("counts each view", () => {
-    assert.deepEqual(call("m.viewCounts(rows)"), { waiting: 1, suspended: 1, live: 1, archived: 1 });
+  it("counts each view and sorts attention first", () => {
+    assert.deepEqual(call("m.viewCounts(rows)"), { all: 4, waiting: 1, suspended: 1, live: 1 });
+    assert.deepEqual(call("m.sortBusinesses(rows).map(r => r.id)"), ["w", "s", "a", "z"]);
   });
   it("matches name and local or international number forms", () => {
     assert.equal(call("m.matchesQuery(rows[0], '0709221510')"), true);
@@ -35,7 +36,7 @@ describe("businesses views", () => {
     assert.equal(call("m.matchesQuery(rows[0], 'zzz')"), false);
   });
   it("never shows a pending placeholder as a number", () => {
-    assert.equal(call("m.numberLabel(rows[1])"), "None yet");
+    assert.equal(call("m.numberLabel(rows[1])"), "");
   });
 });
 
