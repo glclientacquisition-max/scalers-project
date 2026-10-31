@@ -137,6 +137,13 @@ export function AdminNumbersV2({
   );
   const who = (r: NumberRow) =>
     r.businessName ?? (isHeld(r, now) && r.lastBusinessName ? `Was ${r.lastBusinessName}` : "—");
+  const pillFor = (r: NumberRow) => {
+    const label = statusLabel(r, now);
+    if (view === "available" && label === "Available") return false;
+    if (view === "assigned" && label === "Assigned") return false;
+    if (view === "held" && label === "On hold") return false;
+    return true;
+  };
 
   async function postPool(body: Record<string, string>) {
     setPending(true);
@@ -329,8 +336,28 @@ export function AdminNumbersV2({
           />
         }
       />
+      <section className="mb-ops-3 flex flex-col gap-2 rounded-lg border border-hairline bg-surface p-ops-3" aria-label="Pool">
+        {counts.assigned + counts.available + counts.held + counts.disabled === 0 ? (
+          <p className="text-ops-body text-ink-2">No numbers in the pool.</p>
+        ) : (
+          <>
+            <div className="flex h-2 overflow-hidden rounded-full bg-surface-2" role="img" aria-label={`${counts.assigned} assigned, ${counts.available} free, ${counts.held} on hold, ${counts.disabled} disabled`}>
+              {([
+                ["assigned", counts.assigned, "var(--status-ok-fg)"],
+                ["available", counts.available, "var(--status-info-fg)"],
+                ["held", counts.held, "var(--status-warn-fg)"],
+                ["disabled", counts.disabled, "var(--status-neutral-fg)"],
+              ] as const).filter(([, n]) => n > 0).map(([key, n, color]) => (
+                <span key={key} style={{ width: `${(n / (counts.assigned + counts.available + counts.held + counts.disabled)) * 100}%`, background: color }} />
+              ))}
+            </div>
+            <p className="text-ops-label tabular-nums text-ink-2">{counts.assigned} assigned · {counts.available} free · {counts.held} on hold · {counts.disabled} disabled</p>
+          </>
+        )}
+        {waiting.length === 0 ? <p className="text-ops-body text-ink-2">No business is waiting for a number.</p> : null}
+      </section>
       <div className="flex flex-wrap items-center gap-2 pb-ops-3" data-stepup="numbers">
-        <div role="tablist" aria-label="Views" className="flex flex-wrap gap-1">
+        <div role="tablist" aria-label="Views" className="flex w-full gap-1 overflow-x-auto md:w-auto">
           {NUMBER_VIEWS.map((v) => (
             <button
               key={v.id}
@@ -349,9 +376,9 @@ export function AdminNumbersV2({
           ))}
         </div>
         {waiting.length ? (
-          <p className="text-ops-body text-ink md:ms-auto" data-waiting="" title={waiting.map((w) => `${w.name} since ${day(w.since)}`).join(" · ")}>
-            <span className="font-semibold">{waiting.length === 1 ? "1 business waiting for a number" : `${waiting.length} businesses waiting for a number`}</span>
-            <span className="text-ink-2"> · oldest {waiting[0].name}, since {day(waiting[0].since)}</span>
+          <p className="flex flex-wrap items-center gap-2 text-ops-body text-ink md:ms-auto" data-waiting="" title={waiting.map((w) => `${w.name} since ${day(w.since)}`).join(" · ")}>
+            <StatusPill tone="warn">{waiting.length === 1 ? "1 waiting" : `${waiting.length} waiting`}</StatusPill>
+            <span className="text-ink-2">oldest {waiting[0].name}, since {day(waiting[0].since)}</span>
           </p>
         ) : null}
       </div>
@@ -379,9 +406,9 @@ export function AdminNumbersV2({
                 <button type="button" onClick={() => setSel(r.id)} className="flex min-h-ops-touch w-full flex-col items-start gap-0.5 px-ops-3 py-2 text-start">
                   <span className="flex w-full items-center justify-between gap-2">
                     <span className="tabular-nums text-ink">{formatE164(r.e164)}</span>
-                    <StatusPill tone={numberTone(r, now)}>{statusLabel(r, now)}</StatusPill>
+                    {pillFor(r) ? <StatusPill tone={numberTone(r, now)}>{statusLabel(r, now)}</StatusPill> : null}
                   </span>
-                  <span className="w-full truncate text-ops-label text-ink-2">{who(r)}</span>
+                  {who(r) !== "—" ? <span className="w-full truncate text-ops-label text-ink-2">{who(r)}</span> : null}
                 </button>
               </li>
             ))}
@@ -406,8 +433,8 @@ export function AdminNumbersV2({
                   <td className="px-ops-3 tabular-nums text-ink">
                     <button type="button" className="text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">{formatE164(r.e164)}</button>
                   </td>
-                  <td className="px-ops-3"><StatusPill tone={numberTone(r, now)}>{statusLabel(r, now)}</StatusPill></td>
-                  <td className="max-w-[14rem] truncate px-ops-3 text-ink-2">{who(r)}</td>
+                  <td className="px-ops-3">{pillFor(r) ? <StatusPill tone={numberTone(r, now)}>{statusLabel(r, now)}</StatusPill> : null}</td>
+                  <td className="max-w-[14rem] truncate px-ops-3 text-ink-2">{who(r) === "—" ? "" : who(r)}</td>
                   <td className="px-ops-3 text-end tabular-nums text-ink-2">{day(r.assignedAt ?? r.heldAt ?? r.createdAt)}</td>
                 </tr>
               ))}

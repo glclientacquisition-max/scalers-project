@@ -25,11 +25,11 @@ export type WaitingBusiness = { id: string; name: string; since: string };
 export type MoveTarget = { id: string; name: string };
 
 export type NumberView = "available" | "assigned" | "held" | "disabled" | "all";
+/** Four segments. Disabled stays inside All. */
 export const NUMBER_VIEWS: { id: NumberView; label: string }[] = [
-  { id: "available", label: "Available" },
+  { id: "available", label: "Free" },
   { id: "assigned", label: "Assigned" },
   { id: "held", label: "On hold" },
-  { id: "disabled", label: "Disabled" },
   { id: "all", label: "All" },
 ];
 
