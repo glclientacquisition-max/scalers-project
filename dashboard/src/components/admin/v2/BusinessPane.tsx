@@ -5,12 +5,15 @@ import type { AdminBusiness } from "@/lib/admin";
 import type { QualityBadge } from "@/lib/adminQualityModel";
 import { formatScore } from "@/lib/adminQualityModel";
 import { statusLabel } from "@/lib/adminBusinessUi";
-import { businessTone, callLength, chargingLabel, intentLabel, numberLabel } from "@/lib/ops/businessesView";
+import { businessTone, callLength, intentLabel, numberLabel } from "@/lib/ops/businessesView";
 import { ksh } from "@/lib/ops/invoicesView";
 import { BUSINESS_PANE_SECTIONS, usedShare, type BusinessPaneData, type BusinessPaneSection } from "@/lib/ops/businessPane";
 import { OpsConfirm, Sparkline, SplitPane, StatusPill, useOpenAdminUnlock } from "@/components/ops";
 import { MinutesMeter } from "@/components/ui/MinutesMeter";
 import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { Menu, MenuItem } from "@/components/ui/Menu";
+import { EllipsisHorizontalIcon } from "@heroicons/react/24/outline";
 import { ARCHIVE_RESTORE_DAYS } from "@/lib/adminBusinessModel";
 import { postJson } from "@/lib/ops/archiveRelease";
 import { BusinessKbBlock } from "@/components/admin/v2/BusinessKbBlock";
@@ -54,7 +57,7 @@ export function BusinessPane({
   businessId,
   seed,
   badge,
-  section = "summary",
+  section = "usage",
   onClose,
   fixture,
 }: {
@@ -99,16 +102,6 @@ export function BusinessPane({
   const m = loaded?.money ?? null;
   const share = usedShare(u);
   const blocks: Record<BusinessPaneSection, ReactNode> = {
-    summary: b ? (
-      <Facts rows={[
-        ["Status", <StatusPill key="s" tone={businessTone(b.status)}>{statusLabel(b.status)}</StatusPill>],
-        ["Package", b.package_name ? `${b.package_name}${b.package_period ? ` · ${b.package_period === "year" ? "yearly" : "monthly"}` : ""}` : "No package"],
-        ["Charging", chargingLabel(b)],
-        ["Owner alerts", b.whatsapp_notification_number || "Not set"],
-        ["Since", day(b.created_at)],
-        ...(b.archived_at ? [["Archived", day(b.archived_at)] as [string, ReactNode]] : []),
-      ]} />
-    ) : null,
     usage: wait("usage", u ? (
       <>
         <Facts rows={[
@@ -126,19 +119,13 @@ export function BusinessPane({
           ["Balance", ksh(m.balanceCents)],
           ["Open invoices", `${m.openCount}${m.overdueCount ? ` · ${m.overdueCount} overdue` : ""}`],
           ["Last paid", m.lastPaidAt ? day(m.lastPaidAt) : "Never"],
-          ["Latest invoice", m.lastInvoice ? m.lastInvoice.number : "None yet"],
-          ["Billing", u?.statusLabel || "—"],
+          ...(m.lastInvoice ? [["Latest invoice", m.lastInvoice.number] as [string, ReactNode]] : []),
+          ...(u?.statusLabel ? [["Billing", u.statusLabel] as [string, ReactNode]] : []),
         ]} />
         {b ? <Go href={`/admin/billing/invoices?business=${b.id}`}>Invoices for this business</Go> : null}
         <p className="text-ops-label text-ink-2">Package change, minutes and charging need Unlock first — use Unlock in the footer.</p>
       </>
     ) : null),
-    number: b ? (
-      <>
-        <Facts rows={[["Number", numberLabel(b)]]} />
-        <Go href={`/admin/numbers?business=${b.id}`}>Open in Numbers</Go>
-      </>
-    ) : null,
     calls: (
       <>
         <Facts rows={[["Quality", badge ? `${formatScore(badge.score)}${badge.dropping ? " · dropping" : ""}` : "Not logged"]]} />
@@ -213,7 +200,17 @@ export function BusinessPane({
           Unlock
         </Button>
         {canArchive ? (
-          <Button type="button" variant="ghost" size="sm" data-action="archive" onClick={() => { setArchiveError(""); setArchiving(true); }}>Archive</Button>
+          <Menu
+            trigger={
+              <IconButton label="More" tone="neutral">
+                <EllipsisHorizontalIcon />
+              </IconButton>
+            }
+          >
+            <MenuItem tone="attention" data-action="archive" onClick={() => { setArchiveError(""); setArchiving(true); }}>
+              Archive
+            </MenuItem>
+          </Menu>
         ) : null}
       </div>
     </div>
@@ -224,7 +221,8 @@ export function BusinessPane({
     <SplitPane open={!!businessId} onClose={onClose} title={b?.business_name || (businessId ? "Business" : "")} footer={footer}>
       <div ref={body} data-business-pane="">
         <div className="mb-ops-3 flex flex-col items-start gap-2" data-sheet-header="">
-          {b ? <StatusPill tone={businessTone(b.status)}>{statusLabel(b.status)}</StatusPill> : null}
+          {b && statusLabel(b.status) !== "Active" ? <StatusPill tone={businessTone(b.status)}>{statusLabel(b.status)}</StatusPill> : null}
+          {b && numberLabel(b) ? <p className="font-mono text-ops-body text-ink">{numberLabel(b)}</p> : null}
           {pending ? <p className="text-ops-body text-ink-2">Loading.</p> : null}
           {failed ? <p className="text-ops-body text-attention" role="alert">Could not load this business.</p> : null}
           {u ? (
@@ -262,9 +260,8 @@ export function BusinessPane({
           ))}
         </nav>
         <div className="flex flex-col divide-y divide-hairline">
-          {BUSINESS_PANE_SECTIONS.map((s) => (
+          {BUSINESS_PANE_SECTIONS.filter((s) => s.id === active).map((s) => (
             <section key={s.id} data-pane-section={s.id} className="flex scroll-mt-12 flex-col gap-ops-2 py-ops-3">
-              <h3 className="text-ops-label font-semibold uppercase tracking-wide text-ink-2">{s.label}</h3>
               {blocks[s.id]}
             </section>
           ))}

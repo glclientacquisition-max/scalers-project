@@ -3,19 +3,18 @@
  * Fixed section order; the entry point only picks which section is in view first.
  */
 export const BUSINESS_PANE_SECTIONS = [
-  { id: "summary", label: "Summary" },
   { id: "usage", label: "Usage" },
   { id: "money", label: "Money" },
-  { id: "number", label: "Number" },
-  { id: "calls", label: "Calls & quality" },
+  { id: "calls", label: "Calls" },
   { id: "history", label: "History" },
 ] as const;
 
 export type BusinessPaneSection = (typeof BUSINESS_PANE_SECTIONS)[number]["id"];
 
 export function parsePaneSection(raw: string | null | undefined): BusinessPaneSection {
+  if (raw === "summary" || raw === "number") return "usage";
   const hit = BUSINESS_PANE_SECTIONS.find((s) => s.id === raw);
-  return hit ? hit.id : "summary";
+  return hit ? hit.id : "usage";
 }
 
 /** Where a click came from decides the first section in view. */
@@ -23,15 +22,13 @@ export type PaneEntry = "businesses" | "billing" | "invoices" | "payments" | "qu
 export function sectionForEntry(entry: PaneEntry): BusinessPaneSection {
   if (entry === "billing" || entry === "invoices" || entry === "payments") return "money";
   if (entry === "quality" || entry === "insights") return "calls";
-  if (entry === "numbers") return "number";
-  if (entry === "usage") return "usage";
-  return "summary";
+  return "usage";
 }
 
 /** The one URL for "open this business". */
-export function businessPaneHref(id: string, section: BusinessPaneSection = "summary"): string {
+export function businessPaneHref(id: string, section: BusinessPaneSection = "usage"): string {
   const q = `pane=${encodeURIComponent(id)}`;
-  return `/admin/businesses?${q}${section === "summary" ? "" : `&section=${section}`}`;
+  return `/admin/businesses?${q}${section === "usage" ? "" : `&section=${section}`}`;
 }
 
 /** Old business URLs → the pane. Null when the path is not a business page. */

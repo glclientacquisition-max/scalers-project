@@ -16,7 +16,7 @@ describe("shared BusinessPane (t179u)", () => {
   });
 
   it("keeps the fixed section order", () => {
-    assert.deepEqual(bp.BUSINESS_PANE_SECTIONS.map((s) => s.id), ["summary", "usage", "money", "number", "calls", "history"]);
+    assert.deepEqual(bp.BUSINESS_PANE_SECTIONS.map((s) => s.id), ["usage", "money", "calls", "history"]);
   });
 
   it("builds one URL, opening on the entry's section", () => {
@@ -24,7 +24,9 @@ describe("shared BusinessPane (t179u)", () => {
     assert.equal(bp.businessPaneHref("b1", "money"), "/admin/businesses?pane=b1&section=money");
     assert.equal(bp.sectionForEntry("billing"), "money");
     assert.equal(bp.sectionForEntry("quality"), "calls");
-    assert.equal(bp.parsePaneSection("nope"), "summary");
+    assert.equal(bp.parsePaneSection("nope"), "usage");
+    assert.equal(bp.parsePaneSection("summary"), "usage");
+    assert.equal(bp.sectionForEntry("numbers"), "usage");
   });
 
   it("redirects the old business and billing tenant pages", () => {
