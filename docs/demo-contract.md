@@ -22,8 +22,8 @@ Errors:
 | 403 | `origin` | `Origin` is missing or not in `DEMO_ALLOWED_ORIGINS` |
 | 403 | `turnstile` | Turnstile token missing or siteverify failed |
 | 403 | `tenant` | Tenant is not home, shop, or other, or the request names Aris `+254709221536` |
-| 429 | `rate` | This IP already has a demo session in progress |
-| 429 | `limit_daily` | 4th session in the EAT day for this hashed IP or this device |
+| 429 | `used` | Either the hashed IP or the hashed device id is already marked and has no grant left. Body is `{reason: used}` |
+| 429 | `rate` | This hashed IP already has a demo session in progress, and this visitor still has a session or a grant left |
 | 503 | `busy` | Live reservations are at `DEMO_MAX_CONCURRENT` (default 5). Body includes "All demo lines are busy, try again in a minute." |
 | 503 | `disabled` | Flag off, or token secret, IP salt, or Turnstile secret missing. Body message is "Demo paused." |
 | 503 | `cap` | Today's demo spend is at `DEMO_DAILY_CAP_USD` (default 2) or this month is at `DEMO_MONTHLY_CAP_USD` (default 50). Body is `{reason: cap}` |
@@ -32,7 +32,22 @@ The token is HS256, 60 seconds, single-use (`jti`). Claims are only `tenant` (`d
 
 Logs are `demo_token_ok` and `demo_token_reject` with a `reason`. They include the hashed IP, a hash of the device id, origin, Turnstile result, tenant, `consent_ts`, and `notice_v`. They do not include the raw IP, the raw device id, the token, the Turnstile secret, or audio.
 
-The rate limiter and the concurrency counter are in memory on one instance. A second instance does not share them.
+A visitor is two salted SHA-256 hashes. The salt is `DEMO_IP_SALT`. The raw IP is not stored, and neither is the raw device id.
+
+- IP: `sha256(DEMO_IP_SALT + "|ip|" + client IP)`. The client IP is the last `X-Forwarded-For` hop, otherwise the socket address.
+- Device: `sha256(DEMO_IP_SALT + "|device|" + device_id)`.
+
+`device_id` is made in the browser, once per profile. The widget reads `localStorage["scalers-demo-device"]`. If that value is missing or is not 8 to 128 characters from `A-Za-z0-9_-`, the widget sets it to `crypto.randomUUID()` (36 characters, hyphens kept) and writes that key. The same string is sent on every `POST /demo/token`. The server does not mint it.
+
+The visitor is used if either hash has a row in `demo_visitor_use` with `grants_remaining` at 0. A blank, missing, or non-integer `DEMO_SESSIONS_PER_VISITOR` means 1. Integers 1 through 100 are kept. The first session inserts both rows. With the default of 1, `grants_remaining` starts at 0, so a second attempt is `used` even while the first session is still open. There is no daily reset and no TTL. `DEMO_VISITOR_WINDOW_HOURS` is not read. `rate` applies when this hashed IP already has a session open and the visitor still has a session or a grant left. The `used` response is 429 and the body is only `{reason: used}`.
+
+`DEMO_VISITOR_PERSIST` must be exactly `on` to load and save `docs/supabase/demo_visitor_use.sql`. Voice does not apply that file. Any other value, including unset, keeps the markers in memory on this process. A restart, a redeploy, or a second instance drops those in-memory markers. When the flag is `on` and the table cannot be read, this process starts empty and logs `demo_visitor_load`.
+
+The only intended way to allow another session is `POST /demo/grant`. One grant adds 1 to `grants_remaining` on that one hash. The next allowed session consumes one grant on each hash it touches. A grant on the IP hash does not clear a device hash that is still at 0, and the reverse is the same. An operator who wants one more demo grants each hash that is already marked. The logged `ip_hash` and `device_hash` are those visitor hashes.
+
+These still start a visitor over, because the old hashes no longer match or the marker is gone: a new IP together with a new device id (cleared site data, a private window, or another browser, including a VPN plus cleared storage), a change of `DEMO_IP_SALT`, deleting the `demo_visitor_use` row, or `DEMO_VISITOR_PERSIST` left off across a restart. A new IP alone does not reset a marked device. A new device alone does not reset a marked IP. The one-at-a-time slot releases when the token expires or the socket closes. That does not clear `used`.
+
+The one-at-a-time counter and the concurrency counter are in memory on one instance. A second instance does not share them. The used marker is shared only when `DEMO_VISITOR_PERSIST` is exactly `on` and the table is readable.
 
 ## `GET /demo/status`
 
@@ -45,9 +60,15 @@ Success: `200 {enabled, busy, cap, reason}`.
 | `enabled` | `DEMO_ENABLED` is exactly `on` |
 | `busy` | Live reservations are at `DEMO_MAX_CONCURRENT` |
 | `cap` | The daily or monthly spend cap is reached |
-| `reason` | `null`, or the first of `disabled`, `cap`, `busy` |
+| `reason` | `null`, or the first of `disabled`, `cap`, `used`, `busy` |
 
-There are no minute counts, dollar amounts, session ids, hashes, or addresses in the body.
+`used` means this request's hashed IP is marked with no grant left, or the query `device_id` is present, matches the token charset, and that device hash is marked with no grant left. Without `device_id`, a mark that only the device would trip is not reported here. There are no minute counts, dollar amounts, session ids, hashes, or addresses in the body.
+
+## `POST /demo/grant`
+
+Not a public route. No Turnstile and no origin allowlist. The header `x-voice-internal-secret` must equal `VOICE_INTERNAL_SECRET`. A missing secret, or a header that does not match, is `401 {error: Unauthorized}`.
+
+Body: `{visitor_hash, kind: ip|device, by}`. `visitor_hash` is the 64-character hex from the token log. `by` is the operator name, stored on `granted_by`. Each call adds 1 to `grants_remaining` and sets `granted_at`. Success is `200 {ok: true, grants_remaining}`. A bad hash or kind is `400 {reason: invalid}`. The response and the log do not include a raw IP or a raw device id.
 
 A missing or disallowed `Origin` is `403 {reason: origin}`. More than 30 polls from one IP in a minute is `429 {reason: rate}`. The limiter is in memory on one instance and stores only a hash of the IP. A second instance does not share it.
 

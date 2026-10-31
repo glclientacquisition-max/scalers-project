@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const { demoEnabled, maxConcurrent } = require('../src/demo/flags');
+const { demoEnabled, maxConcurrent, sessionsPerVisitor, visitorPersistOn } = require('../src/demo/flags');
 const { maxCallMs, maxCallOn, deadAirHangupOn } = require('../src/speech/callLimits');
 const { numberHoldClipEnabled, isProtectedNumber } = require('../src/sautikit/numberHold');
 const {
@@ -15,13 +15,14 @@ const {
   STATUS_MAX,
   createDemoGuard,
   handleDemoTokenRequest,
+  visitorHash,
 } = require('../src/demo/guards');
 
 const SECRET = 'test-token-secret';
 const SALT = 'test-ip-salt';
 const TURNSTILE_SECRET = '1x0000000000000000000000000000000AA';
 const IP = '203.0.113.10';
-const IP_HASH = '6e38ea0c936a2177adf40771c48c23cb7cd6299d8c46833cd5934ed407e0036c';
+const IP_HASH = visitorHash(SALT, 'ip', IP);
 const TURNSTILE_TOKEN = 'turnstile-client-token';
 
 function env(over = {}) {
@@ -57,7 +58,7 @@ function request(over = {}) {
   };
 }
 
-function harness(over = {}, fetchImpl) {
+function harness(over = {}, fetchImpl, visitorStore) {
   const clock = { t: Date.parse('2026-10-31T08:00:00Z') };
   const lines = [];
   const calls = [];
@@ -70,6 +71,7 @@ function harness(over = {}, fetchImpl) {
     now: () => clock.t,
     fetch: fetchFn,
     log: (line) => lines.push(line),
+    visitorStore,
   });
   return { guard, clock, lines, calls };
 }
@@ -92,6 +94,19 @@ describe('demo flags', () => {
     assert.equal(maxConcurrent({ DEMO_MAX_CONCURRENT: '' }), 5);
     assert.equal(maxConcurrent({ DEMO_MAX_CONCURRENT: 'nope' }), 5);
     assert.equal(maxConcurrent({ DEMO_MAX_CONCURRENT: '2' }), 2);
+  });
+
+  it('defaults to one session per visitor and keeps persistence off unless the value is on', () => {
+    assert.equal(sessionsPerVisitor({}), 1);
+    for (const value of ['', 'nope', '0', '1.5', '-1', '101']) {
+      assert.equal(sessionsPerVisitor({ DEMO_SESSIONS_PER_VISITOR: value }), 1, JSON.stringify(value));
+    }
+    assert.equal(sessionsPerVisitor({ DEMO_SESSIONS_PER_VISITOR: '2' }), 2);
+    assert.equal(visitorPersistOn({}), false);
+    for (const value of ['', 'On', 'true', '1', 'never']) {
+      assert.equal(visitorPersistOn({ DEMO_VISITOR_PERSIST: value }), false, JSON.stringify(value));
+    }
+    assert.equal(visitorPersistOn({ DEMO_VISITOR_PERSIST: 'on' }), true);
   });
 });
 
@@ -158,39 +173,55 @@ describe('demo token guards', () => {
     assert.equal(failed.lines.join('\n').includes(TURNSTILE_SECRET), false);
   });
 
-  it('rate-limits the 4th session per hashed IP', async () => {
-    const { guard, clock, calls } = harness();
-    for (let i = 0; i < 3; i += 1) {
-      const out = await guard.decide(request({ body: { device_id: `device-ip${i}x` } }));
-      assert.equal(out.status, 200, String(i));
-      clock.t += 61_000;
-    }
-    const fourth = await guard.decide(request({ body: { device_id: 'device-ip4x' } }));
-    assert.equal(fourth.status, 429);
-    assert.equal(fourth.body.reason, 'limit_daily');
-    assert.equal(calls.length, 3);
+  it('returns used after one session for this hashed IP', async () => {
+    const { guard, clock, calls, lines } = harness();
+    const first = await guard.decide(request({ body: { device_id: 'device-ip0x' } }));
+    assert.equal(first.status, 200);
+    clock.t += 61_000;
+    const second = await guard.decide(request({ body: { device_id: 'device-ip1x' } }));
+    assert.equal(second.status, 429);
+    assert.deepEqual(second.body, { reason: 'used' });
+    assert.equal(calls.length, 1);
+    const logged = JSON.parse(lines.at(-1).slice('demo_token_reject '.length));
+    assert.equal(logged.reason, 'used');
+    assert.equal(logged.ip_hash, IP_HASH);
+    assert.equal(logged.device_id, undefined);
+    const text = lines.join('\n');
+    assert.equal(text.includes(IP), false);
+    assert.equal(text.includes('device-ip1x'), false);
   });
 
-  it('rate-limits the 4th session per device', async () => {
-    const { guard, clock } = harness();
-    for (let i = 0; i < 3; i += 1) {
-      const out = await guard.decide(request({
-        ip: `198.51.100.${i + 1}`,
-        body: { device_id: 'device-same' },
-      }));
-      assert.equal(out.status, 200, String(i));
-      clock.t += 61_000;
-    }
-    const fourth = await guard.decide(request({
+  it('returns used after one session for this device', async () => {
+    const { guard, lines } = harness();
+    const first = await guard.decide(request({
+      ip: '198.51.100.1',
+      body: { device_id: 'device-same' },
+    }));
+    assert.equal(first.status, 200);
+    const second = await guard.decide(request({
       ip: '198.51.100.9',
       body: { device_id: 'device-same' },
     }));
-    assert.equal(fourth.status, 429);
-    assert.equal(fourth.body.reason, 'limit_daily');
+    assert.equal(second.status, 429);
+    assert.deepEqual(second.body, { reason: 'used' });
+    const text = lines.join('\n');
+    assert.equal(text.includes('198.51.100.9'), false);
+    assert.equal(text.includes('device-same'), false);
   });
 
-  it('allows one session at a time per IP', async () => {
-    const { guard, calls } = harness();
+  it('reads the visitor allowance from DEMO_SESSIONS_PER_VISITOR', async () => {
+    const { guard, clock } = harness({ DEMO_SESSIONS_PER_VISITOR: '2' });
+    assert.equal((await guard.decide(request({ body: { device_id: 'device-n1xx' } }))).status, 200);
+    clock.t += 61_000;
+    assert.equal((await guard.decide(request({ body: { device_id: 'device-n2xx' } }))).status, 200);
+    clock.t += 61_000;
+    const third = await guard.decide(request({ body: { device_id: 'device-n3xx' } }));
+    assert.equal(third.status, 429);
+    assert.deepEqual(third.body, { reason: 'used' });
+  });
+
+  it('allows one session at a time per IP when the visitor still has a session left', async () => {
+    const { guard, calls } = harness({ DEMO_SESSIONS_PER_VISITOR: '2' });
     const first = await guard.decide(request());
     const second = await guard.decide(request({ body: { device_id: 'device-other' } }));
     assert.equal(first.status, 200);
@@ -287,19 +318,18 @@ describe('demo token guards', () => {
     assert.equal(clock.t > 0, true);
   });
 
-  it('rolls the daily limit at the EAT day boundary', async () => {
-    const { guard, clock } = harness();
+  it('never clears a used visitor when the clock jumps', async () => {
+    const { guard, clock } = harness({ DEMO_VISITOR_WINDOW_HOURS: '1' });
     clock.t = Date.parse('2026-10-31T20:30:00Z');
-    for (let i = 0; i < 3; i += 1) {
-      const out = await guard.decide(request({ body: { device_id: `device-day${i}` } }));
-      assert.equal(out.status, 200, String(i));
-      clock.t += 61_000;
-    }
-    const blocked = await guard.decide(request({ body: { device_id: 'device-day4' } }));
-    assert.equal(blocked.body.reason, 'limit_daily');
+    assert.equal((await guard.decide(request({ body: { device_id: 'device-day0' } }))).status, 200);
     clock.t = Date.parse('2026-10-31T21:30:00Z');
-    const nextDay = await guard.decide(request({ body: { device_id: 'device-day5' } }));
-    assert.equal(nextDay.status, 200);
+    const nextEatDay = await guard.decide(request({ body: { device_id: 'device-day1' } }));
+    assert.equal(nextEatDay.status, 429);
+    assert.equal(nextEatDay.body.reason, 'used');
+    clock.t += 365 * 24 * 60 * 60 * 1000;
+    const nextYear = await guard.decide(request({ body: { device_id: 'device-year1' } }));
+    assert.equal(nextYear.status, 429);
+    assert.deepEqual(nextYear.body, { reason: 'used' });
   });
 
   it('does not call any host except Turnstile siteverify', async () => {
@@ -381,6 +411,24 @@ describe('demo status', () => {
       assert.equal(dumped.includes(secret), false, secret);
     }
     assert.equal(lines.join('\n').includes(IP), false);
+
+    const usedGuard = harness();
+    assert.equal((await usedGuard.guard.decide(request())).status, 200);
+    const used = await usedGuard.guard.status(statusRequest());
+    assert.equal(used.status, 200);
+    assert.equal(used.body.enabled, true);
+    assert.equal(used.body.cap, false);
+    assert.equal(used.body.reason, 'used');
+    assert.deepEqual(Object.keys(used.body).sort(), ['busy', 'cap', 'enabled', 'reason']);
+    const otherVisitor = await usedGuard.guard.status(statusRequest('198.51.100.77'));
+    assert.equal(otherVisitor.body.reason, null);
+    assert.equal(JSON.stringify(used.body).includes(IP), false);
+    assert.equal(JSON.stringify(used.body).includes(IP_HASH), false);
+    assert.equal(usedGuard.lines.join('\n').includes(IP), false);
+
+    const sameIp = await full.guard.status(statusRequest('203.0.113.21'));
+    assert.equal(sameIp.body.busy, true);
+    assert.equal(sameIp.body.reason, 'used');
   });
 
   it('rate-limits status polls per IP and does not log the raw address', async () => {
@@ -398,6 +446,158 @@ describe('demo status', () => {
     assert.match(text, /demo_status_reject/);
     assert.equal(text.includes(IP), false);
     assert.equal(text.includes('audio'), false);
+  });
+});
+
+describe('permanent visitor use', () => {
+  const { createMemoryVisitorStore, createSupabaseVisitorStore } = require('../src/demo/visitors');
+
+  it('reloads a used visitor from the store when persist is on', async () => {
+    const store = createMemoryVisitorStore();
+    const first = harness({ DEMO_VISITOR_PERSIST: 'on' }, null, store);
+    assert.equal((await first.guard.decide(request())).status, 200);
+    const restarted = harness({ DEMO_VISITOR_PERSIST: 'on' }, null, store);
+    const again = await restarted.guard.decide(request({ body: { device_id: 'device-restart' } }));
+    assert.equal(again.status, 429);
+    assert.deepEqual(again.body, { reason: 'used' });
+    const rows = await store.load();
+    const dumped = JSON.stringify(rows);
+    assert.equal(dumped.includes(IP), false);
+    assert.equal(dumped.includes('device-1234'), false);
+    assert.equal(rows.some((row) => row.kind === 'ip' && row.visitor_hash === IP_HASH && row.grants_remaining === 0), true);
+    assert.equal(rows.some((row) => row.kind === 'device' && row.grants_remaining === 0), true);
+  });
+
+  it('ignores the store when persist is not exactly on', async () => {
+    const store = createMemoryVisitorStore();
+    const first = harness({ DEMO_VISITOR_PERSIST: 'on' }, null, store);
+    assert.equal((await first.guard.decide(request())).status, 200);
+    const fresh = harness({ DEMO_VISITOR_PERSIST: 'true' }, null, store);
+    assert.equal((await fresh.guard.decide(request({ body: { device_id: 'device-fresh1' } }))).status, 200);
+  });
+
+  it('blocks a new IP when the device hash is marked, and status can see that device id', async () => {
+    const { guard } = harness();
+    assert.equal((await guard.decide(request({
+      ip: '198.51.100.1',
+      body: { device_id: 'device-same' },
+    }))).status, 200);
+    const moved = await guard.status({
+      method: 'GET',
+      headers: { origin: 'https://staging.example' },
+      ip: '198.51.100.9',
+    });
+    assert.equal(moved.body.reason, null);
+    const seen = await guard.status({
+      method: 'GET',
+      headers: { origin: 'https://staging.example' },
+      ip: '198.51.100.9',
+      query: { device_id: 'device-same' },
+    });
+    assert.equal(seen.status, 200);
+    assert.equal(seen.body.reason, 'used');
+    assert.equal(JSON.stringify(seen.body).includes('device-same'), false);
+    assert.equal(JSON.stringify(seen.body).includes('198.51.100.9'), false);
+  });
+
+  it('adds a grant only with the internal secret, and one grant does not clear the other hash', async () => {
+    const { guard, clock, lines } = harness({ VOICE_INTERNAL_SECRET: 'ops-secret' });
+    assert.equal((await guard.decide(request())).status, 200);
+    clock.t += 61_000;
+    const secret = 'ops-secret';
+    const denied = await guard.grant({
+      method: 'POST',
+      headers: {},
+      body: { visitor_hash: IP_HASH, kind: 'ip' },
+    });
+    assert.equal(denied.status, 401);
+    const wrong = await guard.grant({
+      method: 'POST',
+      headers: { 'x-voice-internal-secret': 'nope' },
+      body: { visitor_hash: IP_HASH, kind: 'ip' },
+    });
+    assert.equal(wrong.status, 401);
+    const ipGrant = await guard.grant({
+      method: 'POST',
+      headers: { 'x-voice-internal-secret': secret },
+      body: { visitor_hash: IP_HASH, kind: 'ip', by: 'alvin' },
+    });
+    assert.equal(ipGrant.status, 200);
+    assert.equal(ipGrant.body.grants_remaining, 1);
+    const still = await guard.decide(request({ body: { device_id: 'device-1234' } }));
+    assert.equal(still.status, 429);
+    assert.equal(still.body.reason, 'used');
+    const deviceHash = visitorHash(SALT, 'device', 'device-1234');
+    const deviceGrant = await guard.grant({
+      method: 'POST',
+      headers: { 'x-voice-internal-secret': secret },
+      body: { visitor_hash: deviceHash, kind: 'device', by: 'alvin' },
+    });
+    assert.equal(deviceGrant.body.grants_remaining, 1);
+    const next = await guard.decide(request({ body: { device_id: 'device-1234' } }));
+    assert.equal(next.status, 200);
+    clock.t += 61_000;
+    const after = await guard.decide(request({ body: { device_id: 'device-1234' } }));
+    assert.equal(after.status, 429);
+    assert.equal(after.body.reason, 'used');
+    const text = lines.join('\n');
+    assert.equal(text.includes(secret), false);
+    assert.equal(text.includes(IP), false);
+    assert.equal(text.includes('device-1234'), false);
+    assert.match(text, /demo_grant /);
+  });
+
+  it('round-trips visitor rows through the supabase store without an address', async () => {
+    const rows = new Map();
+    const client = {
+      from(table) {
+        assert.equal(table, 'demo_visitor_use');
+        return {
+          select() {
+            return Promise.resolve({ data: [...rows.values()], error: null });
+          },
+          upsert(row) {
+            assert.equal(row.ip, undefined);
+            assert.equal(row.device_id, undefined);
+            assert.equal(JSON.stringify(row).includes(IP), false);
+            rows.set(row.visitor_hash, { ...row, grants_remaining: String(row.grants_remaining) });
+            return Promise.resolve({ error: null });
+          },
+          delete() {
+            return {
+              eq(_col, hash) {
+                rows.delete(hash);
+                return Promise.resolve({ error: null });
+              },
+            };
+          },
+        };
+      },
+    };
+    const store = createSupabaseVisitorStore(client);
+    const first = harness({ DEMO_VISITOR_PERSIST: 'on' }, null, store);
+    assert.equal((await first.guard.decide(request())).status, 200);
+    const restarted = harness({ DEMO_VISITOR_PERSIST: 'on' }, null, store);
+    const again = await restarted.guard.decide(request({ body: { device_id: 'device-db1xx' } }));
+    assert.equal(again.body.reason, 'used');
+    assert.equal(rows.size, 2);
+  });
+
+  it('describes the visitor table and does not apply it from this process', () => {
+    const sql = fs.readFileSync(path.join(__dirname, '..', 'docs/supabase/demo_visitor_use.sql'), 'utf8');
+    assert.match(sql, /visitor_hash text primary key/);
+    assert.match(sql, /kind text not null/);
+    assert.match(sql, /first_used_at timestamptz/);
+    assert.match(sql, /grants_remaining integer not null default 0/);
+    assert.match(sql, /granted_by text/);
+    assert.match(sql, /granted_at timestamptz/);
+    assert.match(sql, /enable row level security/);
+    assert.match(sql, /Do not apply/);
+    const guards = fs.readFileSync(path.join(__dirname, '..', 'src/demo/guards.js'), 'utf8');
+    assert.equal(guards.includes('demo_visitor_use.sql'), false);
+    const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+    assert.equal(server.split("app.use('/demo/grant'").length - 1, 1);
+    assert.equal(server.includes("app.post('/demo/"), false);
   });
 });
 

@@ -9,7 +9,7 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (73)
+## Tables (74)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
@@ -43,6 +43,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `contacts` | `created_at`, `id`, `last_language`, `last_language_at`, `last_reason`, `metadata`, `name`, `name_confirmed`, `name_confirmed_at`, `name_confirmed_call_id`, `name_confirmed_source`, `notes`, `phone`, `tenant_id`, `updated_at` | `docs/supabase/contacts_and_requests.sql`<br>`docs/supabase/greeting_language.sql` |
 | `data_quality_snapshots` | `report`, `taken_on`, `tenant_id` | `supabase/migrations/20261011200000_structured_data_foundation.sql` |
 | `demo_spend` | `cost_usd`, `created_at`, `day`, `minutes`, `model_input_tokens`, `model_output_tokens`, `month`, `session_id`, `stt_seconds`, `tts_seconds` | `docs/supabase/demo_spend.sql` |
+| `demo_visitor_use` | `first_used_at`, `granted_at`, `granted_by`, `grants_remaining`, `kind`, `visitor_hash` | `docs/supabase/demo_visitor_use.sql` |
 | `inbox_archive_undo` | `consumed_at`, `created_at`, `created_by`, `id`, `payload`, `tenant_id` | `docs/supabase/inbox_archive_cascade.sql`<br>`supabase/migrations/20261022004500_inbox_archive_cascade.sql` |
 | `invoice_lines` | `amount_kes`, `description`, `id`, `invoice_id`, `kind`, `quantity`, `sort_order`, `tenant_id`, `unit_amount_kes` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/invoice_documents.sql` |
 | `invoice_pay_tokens` | `created_at`, `expires_at`, `id`, `invoice_id`, `revoked_at`, `tenant_id`, `token_hash` | `docs/supabase/invoice_pay.sql` |

@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-260 variables.
+262 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -75,8 +75,10 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `DEMO_OPUS` | voice | `src/demo/flags.js` |
 | `DEMO_PUBLIC_BASE_URL` | voice | `src/demo/flags.js` |
 | `DEMO_RECORD` | voice | `src/demo/flags.js` |
+| `DEMO_SESSIONS_PER_VISITOR` | voice | `src/demo/flags.js` |
 | `DEMO_SPEND_PERSIST` | voice | `src/demo/flags.js` |
 | `DEMO_TOKEN_SECRET` | voice | `src/demo/flags.js` |
+| `DEMO_VISITOR_PERSIST` | voice | `src/demo/flags.js` |
 | `DESK_ASSISTANT_SAY_PAGE` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_ATTEST_SERVICE_AREAS` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
 | `DESK_FEEL` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
@@ -241,7 +243,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `VOICE_GREETING_CACHE` | voice | `src/speech/greetingPcmCache.js` |
 | `VOICE_GREETING_MODE` | voice | `src/conversation/dynamicSpeech.js` |
 | `VOICE_GREETING_TIMEOUT_MS` | voice | `src/conversation/dynamicSpeech.js` |
-| `VOICE_INTERNAL_SECRET` | desk, voice | `dashboard/src/app/(desk)/calls/escalateActions.ts`<br>`dashboard/src/lib/kb.server.ts`<br>`dashboard/src/lib/spokenCatalogueOnSave.ts`<br>+2 more |
+| `VOICE_INTERNAL_SECRET` | desk, voice | `dashboard/src/app/(desk)/calls/escalateActions.ts`<br>`dashboard/src/lib/kb.server.ts`<br>`dashboard/src/lib/spokenCatalogueOnSave.ts`<br>+3 more |
 | `VOICE_LINE_UNAVAILABLE_CLIP_DIR` | voice | `src/sautikit/lineUnavailableAudio.js` |
 | `VOICE_LINE_UNAVAILABLE_REFRESH` | voice | `src/sautikit/lineUnavailableAudio.js` |
 | `VOICE_LINE_UNAVAILABLE_REFRESH_MS` | voice | `src/sautikit/lineUnavailableAudio.js` |

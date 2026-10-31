@@ -17,7 +17,7 @@ const ARIS_DID_DIGITS = '709221536';
 
 const TOKEN_TTL_SEC = 60;
 const MAX_SEC = 180;
-const DAILY_SESSION_LIMIT = 3;
+const DEFAULT_SESSIONS_PER_VISITOR = 1;
 const DEFAULT_MAX_CONCURRENT = 5;
 
 function processDemoEnv() {
@@ -25,6 +25,9 @@ function processDemoEnv() {
     DEMO_ENABLED: process.env.DEMO_ENABLED,
     DEMO_ALLOWED_ORIGINS: process.env.DEMO_ALLOWED_ORIGINS,
     DEMO_MAX_CONCURRENT: process.env.DEMO_MAX_CONCURRENT,
+    DEMO_SESSIONS_PER_VISITOR: process.env.DEMO_SESSIONS_PER_VISITOR,
+    DEMO_VISITOR_PERSIST: process.env.DEMO_VISITOR_PERSIST,
+    VOICE_INTERNAL_SECRET: process.env.VOICE_INTERNAL_SECRET,
     DEMO_TOKEN_SECRET: process.env.DEMO_TOKEN_SECRET,
     DEMO_IP_SALT: process.env.DEMO_IP_SALT,
     TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
@@ -40,6 +43,10 @@ function processDemoEnv() {
 
 function spendPersistOn(env = process.env) {
   return env.DEMO_SPEND_PERSIST === 'on';
+}
+
+function visitorPersistOn(env = process.env) {
+  return env.DEMO_VISITOR_PERSIST === 'on';
 }
 
 function moneyCap(env, name, dflt) {
@@ -92,6 +99,17 @@ function maxConcurrent(env = process.env) {
   return n;
 }
 
+function boundedInt(raw, fallback, max) {
+  if (raw == null || String(raw).trim() === '') return fallback;
+  const n = Number(String(raw).trim());
+  if (!Number.isInteger(n) || n < 1 || n > max) return fallback;
+  return n;
+}
+
+function sessionsPerVisitor(env = process.env) {
+  return boundedInt(env.DEMO_SESSIONS_PER_VISITOR, DEFAULT_SESSIONS_PER_VISITOR, 100);
+}
+
 function mentionsAris(value) {
   const digits = String(value ?? '').replace(/\D/g, '');
   return digits.includes(ARIS_DID_DIGITS);
@@ -103,17 +121,19 @@ module.exports = {
   ARIS_DID_DIGITS,
   TOKEN_TTL_SEC,
   MAX_SEC,
-  DAILY_SESSION_LIMIT,
+  DEFAULT_SESSIONS_PER_VISITOR,
   DEFAULT_MAX_CONCURRENT,
   processDemoEnv,
   demoEnabled,
   demoOpusOn,
   demoRecordOn,
   spendPersistOn,
+  visitorPersistOn,
   dailyCapUsd,
   monthlyCapUsd,
   allowedOrigins,
   originAllowed,
   maxConcurrent,
+  sessionsPerVisitor,
   mentionsAris,
 };
