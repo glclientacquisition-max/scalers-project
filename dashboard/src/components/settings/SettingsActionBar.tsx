@@ -51,6 +51,7 @@ export function SettingsActionBar({
         size="lg"
         pending={pending}
         disabled={clean || pending}
+        data-settings-save=""
         onClick={onSave}
       >
         {label}

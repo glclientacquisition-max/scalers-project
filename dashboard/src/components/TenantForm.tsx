@@ -153,11 +153,10 @@ import {
   settingsTableFieldClass,
   settingsTrashButtonClass,
 } from "@/components/settingsUi";
-import {
-  TenantSettingsSaveButton,
-  TENANT_SETTINGS_FORM_ID,
-} from "@/components/TenantSettingsSaveButton";
+import { TENANT_SETTINGS_FORM_ID } from "@/components/TenantSettingsSaveButton";
 import { useDirty } from "@/lib/settingsDirty";
+import { panelPostsField } from "@/lib/settingsFormFields";
+import { SettingsActionBar } from "@/components/settings/SettingsActionBar";
 import { UnknownAnswerField } from "@/components/UnknownAnswerField";
 import {
   UNKNOWN_ANSWER_DEFAULT_EN,
@@ -1035,7 +1034,8 @@ function TenantFormInner({
       onSubmit={(event) => {
         // Pronunciation saves live via its own actions. Enter inside the coach
         // must not post this form (feels like a full Settings reload).
-        if (panel === "pronunciation") {
+        const submitter = (event.nativeEvent as SubmitEvent).submitter;
+        if (panel === "pronunciation" && !submitter?.hasAttribute("data-settings-save")) {
           event.preventDefault();
           return;
         }
@@ -1055,52 +1055,43 @@ function TenantFormInner({
             title={heading}
             alert={save.error}
             onRetry={save.retry}
-            action={
-              panel === "pronunciation" ? (
-                <p className="max-w-[11rem] text-right text-meta leading-snug text-ink-2">
-                  Changes save as you go
-                </p>
-              ) : (
-                <TenantSettingsSaveButton pending={pending} saved={justSaved} changes={changes} />
-              )
-            }
           />
 
       <div className={`${settingsFormBodyClass} space-y-4`}>
       <input type="hidden" name="id" value={tenant.id} />
       <input type="hidden" name="settings_scope" value={panel} />
-      <input type="hidden" name="business_name" value={businessName} />
-      <input type="hidden" name="services_offered" value={servicesOfferedSummary} />
-      <input type="hidden" name="services_catalog" value={servicesJson} />
-      <input type="hidden" name="product_catalog" value={productsJson} />
-      <input type="hidden" name="catalog_baseline" value={catalogBaseJson} />
-      <input type="hidden" name="social_handles" value={socialJson} />
-      <input type="hidden" name="services_notes" value={servicesNotes} />
-      <input type="hidden" name="business_hours" value={businessHoursSummary} />
-      <input type="hidden" name="hours_schedule" value={hoursScheduleJson} />
-      <input type="hidden" name="location_notes" value={locationNotesField} />
-      <input type="hidden" name="after_hours_mode" value={afterHoursMode} />
-      <input type="hidden" name="vertical" value={vertical} />
-      <input type="hidden" name="handoff_mode" value={handoffMode} />
-      <input type="hidden" name="business_locations" value={locationsJson} />
-      <input type="hidden" name="no_premises" value={noPremises ? "1" : "0"} />
-      <input type="hidden" name="business_policies" value={policiesJson} />
-      <input type="hidden" name="agent_name" value={agentName} />
-      <input type="hidden" name="spoken_name" value={spokenName} />
-      <input type="hidden" name="greeting_invite" value={greetingInvite} />
-      <input type="hidden" name="agent_tone" value={tone} />
-      <input type="hidden" name="unknown_answer_fallback" value={unknownLine} />
-      <input type="hidden" name="unknown_answer_spoken_en" value={spokenEn} />
-      <input type="hidden" name="unknown_answer_spoken_sw" value={spokenSw} />
-      <input type="hidden" name="unknown_answer_spoken_touched" value={spokenTouched ? "1" : "0"} />
-      <input type="hidden" name="team_directory" value={teamJson} />
-      <input type="hidden" name="faqs" value={faqsJson} />
-      <input type="hidden" name="owner_field_paths" value={JSON.stringify(ownerPaths)} />
-      <input type="hidden" name="tool_escalate" value={agentTools.escalate ? "1" : "0"} />
-      <input type="hidden" name="tool_end_call" value={agentTools.end_call ? "1" : "0"} />
-      <input type="hidden" name="soniox_voice_id" value={sonioxVoiceId} />
-      <input type="hidden" name="soniox_voice_label" value={sonioxVoiceLabel} />
-      <input type="hidden" name="tts_lexicon" value={ttsLexiconJson} />
+      {panelPostsField(panel, "business_name") ? <input type="hidden" name="business_name" value={businessName} /> : null}
+      {panelPostsField(panel, "services_offered") ? <input type="hidden" name="services_offered" value={servicesOfferedSummary} /> : null}
+      {panelPostsField(panel, "services_catalog") ? <input type="hidden" name="services_catalog" value={servicesJson} /> : null}
+      {panelPostsField(panel, "product_catalog") ? <input type="hidden" name="product_catalog" value={productsJson} /> : null}
+      {panelPostsField(panel, "catalog_baseline") ? <input type="hidden" name="catalog_baseline" value={catalogBaseJson} /> : null}
+      {panelPostsField(panel, "social_handles") ? <input type="hidden" name="social_handles" value={socialJson} /> : null}
+      {panelPostsField(panel, "services_notes") ? <input type="hidden" name="services_notes" value={servicesNotes} /> : null}
+      {panelPostsField(panel, "business_hours") ? <input type="hidden" name="business_hours" value={businessHoursSummary} /> : null}
+      {panelPostsField(panel, "hours_schedule") ? <input type="hidden" name="hours_schedule" value={hoursScheduleJson} /> : null}
+      {panelPostsField(panel, "location_notes") ? <input type="hidden" name="location_notes" value={locationNotesField} /> : null}
+      {panelPostsField(panel, "after_hours_mode") ? <input type="hidden" name="after_hours_mode" value={afterHoursMode} /> : null}
+      {panelPostsField(panel, "vertical") ? <input type="hidden" name="vertical" value={vertical} /> : null}
+      {panelPostsField(panel, "handoff_mode") ? <input type="hidden" name="handoff_mode" value={handoffMode} /> : null}
+      {panelPostsField(panel, "business_locations") ? <input type="hidden" name="business_locations" value={locationsJson} /> : null}
+      {panelPostsField(panel, "no_premises") ? <input type="hidden" name="no_premises" value={noPremises ? "1" : "0"} /> : null}
+      {panelPostsField(panel, "business_policies") ? <input type="hidden" name="business_policies" value={policiesJson} /> : null}
+      {panelPostsField(panel, "agent_name") ? <input type="hidden" name="agent_name" value={agentName} /> : null}
+      {panelPostsField(panel, "spoken_name") ? <input type="hidden" name="spoken_name" value={spokenName} /> : null}
+      {panelPostsField(panel, "greeting_invite") ? <input type="hidden" name="greeting_invite" value={greetingInvite} /> : null}
+      {panelPostsField(panel, "agent_tone") ? <input type="hidden" name="agent_tone" value={tone} /> : null}
+      {panelPostsField(panel, "unknown_answer_fallback") ? <input type="hidden" name="unknown_answer_fallback" value={unknownLine} /> : null}
+      {panelPostsField(panel, "unknown_answer_spoken_en") ? <input type="hidden" name="unknown_answer_spoken_en" value={spokenEn} /> : null}
+      {panelPostsField(panel, "unknown_answer_spoken_sw") ? <input type="hidden" name="unknown_answer_spoken_sw" value={spokenSw} /> : null}
+      {panelPostsField(panel, "unknown_answer_spoken_touched") ? <input type="hidden" name="unknown_answer_spoken_touched" value={spokenTouched ? "1" : "0"} /> : null}
+      {panelPostsField(panel, "team_directory") ? <input type="hidden" name="team_directory" value={teamJson} /> : null}
+      {panelPostsField(panel, "faqs") ? <input type="hidden" name="faqs" value={faqsJson} /> : null}
+      {panelPostsField(panel, "owner_field_paths") ? <input type="hidden" name="owner_field_paths" value={JSON.stringify(ownerPaths)} /> : null}
+      {panelPostsField(panel, "tool_escalate") ? <input type="hidden" name="tool_escalate" value={agentTools.escalate ? "1" : "0"} /> : null}
+      {panelPostsField(panel, "tool_end_call") ? <input type="hidden" name="tool_end_call" value={agentTools.end_call ? "1" : "0"} /> : null}
+      {panelPostsField(panel, "soniox_voice_id") ? <input type="hidden" name="soniox_voice_id" value={sonioxVoiceId} /> : null}
+      {panelPostsField(panel, "soniox_voice_label") ? <input type="hidden" name="soniox_voice_label" value={sonioxVoiceLabel} /> : null}
+      {panelPostsField(panel, "tts_lexicon") ? <input type="hidden" name="tts_lexicon" value={ttsLexiconJson} /> : null}
 
       <section className={panel === "catalog" ? "space-y-4" : "hidden"}>
         {panel === "catalog" ? structuredSlot?.catalog : null}
@@ -2236,6 +2227,7 @@ function TenantFormInner({
         ) : null}
       </section>
       </div>
+      <SettingsActionBar changes={changes} pending={pending} saved={justSaved} />
 
         </div>
       </div>
