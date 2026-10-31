@@ -107,7 +107,7 @@ export const ADMIN_WRITE_ROUTES: AdminWriteRoute[] = [
   {
     file: "admin/billing", area: "billing",
     prefix: "billing",
-    risky: ["grant_minutes", "waive_overage", "assign_package", "resolve_checkout_review", "set_billing_mode"],
+    risky: ["grant_minutes", "waive_period_overage", "assign_package", "resolve_checkout_review", "set_billing_mode"],
     safe: ["unassign_package", "mint_pay_link"],
   },
   {

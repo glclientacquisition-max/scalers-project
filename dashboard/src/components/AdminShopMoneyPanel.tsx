@@ -394,7 +394,7 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
       <p className="px-4 pb-1 pt-3 text-caption font-medium uppercase tracking-wide text-ink-3">Ledger</p>
       <ListRow title="Charges" preview="Ledger lines this period" onOpen={() => openTask("charges")} />
       <ListRow title="Grant minutes" preview="Adds to included this period" onOpen={() => openTask("grant")} />
-      <ListRow title="Waive overage" preview="Clears what is owed past included" onOpen={() => openTask("waive")} />
+      <ListRow title="Waive overage" preview="This period's on-demand, off the invoice" onOpen={() => openTask("waive")} />
       <ListRow
         title="History"
         preview={historyLoaded ? `${history.length} recent lines` : "Activity and charges"}
@@ -569,7 +569,7 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
 
       <ConfirmSheet
         open={task === "waive"}
-        title="Waive overage?"
+        title="Waive this period's overage?"
         theme="admin"
         danger
         pending={busy}
@@ -585,7 +585,7 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                action: "waive_overage",
+                action: "waive_period_overage",
                 business_id: row.id,
                 note: waiveNote.trim(),
                 idempotency_key: waiveKey,
@@ -599,7 +599,11 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
               return;
             }
             const waived = Number(json.waived_kes || 0);
-            setStatus(waived > 0 ? `Waived KSh ${waived.toFixed(2)}. Logged in History.` : "Nothing owed past included. Nothing changed.");
+            setStatus(
+              waived > 0
+                ? `Waived KSh ${waived.toFixed(2)} of on-demand this period. It shows in History.`
+                : "No on-demand owed this period. Nothing changed.",
+            );
             setWaiveKey(crypto.randomUUID());
             setWaiveNote("");
             setTask(null);
@@ -612,7 +616,7 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
       >
         <SheetNote error={error} />
         <p className="pb-3 text-ops-body text-ink-2">
-          Clears the whole amount {row.business_name} owes past included this period. It is logged with your name and the reason.
+          Takes the on-demand charges {row.business_name} owes this period off the invoice. Logged with your name and the reason.
         </p>
         <Field id="shop-waive-note" label="Reason" required>
           {(props) => (

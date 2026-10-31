@@ -152,6 +152,9 @@ export function billingAuditDetail(row: BillingAuditInput): string | null {
   } else if (row.action === "set_billing_mode") {
     const mode = detail.mode;
     if (mode === "off" || mode === "soft" || mode === "hard") parts.push(`Now ${modeName(mode)}`);
+  } else if (row.action === "overage_waived") {
+    const kes = Number(detail.waived_kes);
+    if (Number.isFinite(kes) && kes > 0) parts.push(`KSh ${kes.toFixed(2)} waived`);
   } else if (row.action === "grant_package_minutes") {
     const m = detail.minutes_granted ?? detail.minutes;
     if (typeof m === "number") parts.push(`+${count(m)} min`);

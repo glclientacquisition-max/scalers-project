@@ -8,7 +8,7 @@ import {
   loadBillingHistory,
   loadCheckoutReviewReading,
   resolveCheckoutTotalReview,
-  waiveTenantOverage,
+  waivePeriodOverage,
 } from "@/lib/adminBilling";
 import { loadAdminShopInvoices, mintAdminInvoicePayLink } from "@/lib/adminBillingInvoices";
 import { bookTotalForResolve, collectedFromCheckout } from "@/lib/invoicePay/webhook";
@@ -148,7 +148,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, ...result });
     }
 
-    if (action === "waive_overage") {
+    if (action === "waive_period_overage") {
       if (body.confirm !== true) {
         return NextResponse.json({ error: "Confirm the waiver first." }, { status: 400 });
       }
@@ -159,8 +159,8 @@ export async function POST(request: Request) {
       if (!idempotencyKey) {
         return NextResponse.json({ error: "Open the waiver again and retry." }, { status: 400 });
       }
-      const result = await waiveTenantOverage({ businessId, note, actor, idempotencyKey });
-      return NextResponse.json({ ok: true, waived_kes: result.waivedKes, balance_kes: result.balanceKes });
+      const result = await waivePeriodOverage({ businessId, reason: note, actor, idempotencyKey });
+      return NextResponse.json({ ok: true, waived_kes: result.waivedKes, replay: result.replay });
     }
 
     if (action === "assign_package") {

@@ -25,7 +25,7 @@ const SELF_AUDITING = {
   adminTransferOwnership: "dashboard/src/lib/adminBusinessProfile.ts",
   // These call billing RPCs that insert into ops_audit_log themselves.
   grantTenantPackageMinutes: "rpc:grant_tenant_package_minutes",
-  waiveTenantOverage: "rpc:waive_tenant_overage",
+  waivePeriodOverage: "rpc:waive_period_overage",
   resolveCheckoutTotalReview: "rpc:resolve_checkout_total_review",
   setTenantBillingMode: "rpc:set_tenant_billing_mode",
   confirmTenantBillingMode: "rpc:admin_set_tenant_billing_mode",
