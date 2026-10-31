@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { BusinessSettingsShell } from "@/components/BusinessSettingsShell";
+import { MembersPanel } from "@/components/MembersPanel";
 import { CallsForwardingPanel } from "@/components/CallsForwardingPanel";
 import { emptyCallSetup } from "@/lib/callSetupStore";
 import { resolveCallSetupStatus } from "@/lib/callSetupStatus";
@@ -199,7 +200,37 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             { match: "Kilimani", say: "Kee-lee-mah-nee", label: "Kilimani" },
           ]
         : null;
-  const viewTenant = (pronunciationLexicon ? { ...t, tts_lexicon: pronunciationLexicon } : t) as TenantRow;
+  const viewTenant = (
+    pronunciationLexicon
+      ? { ...t, tts_lexicon: pronunciationLexicon }
+      : trainPanel === "team"
+        ? {
+            ...t,
+            team_directory: [
+              { name: "Amina Hassan", role: "Owner", phone: "+254700000001", email: "amina@chapterone.co.ke", receives_escalation: true },
+              { name: "James Otieno", role: "Owner", phone: "+254711000222", email: "james@chapterone.co.ke", receives_escalation: true },
+            ],
+          }
+        : t
+  ) as TenantRow;
+  const membersSlot =
+    trainPanel === "team" ? (
+      <MembersPanel
+        data={{
+          members: [
+            { userId: "owner", email: "amina@chapterone.co.ke", name: "Amina Hassan", role: "owner", joinedAt: "2026-01-01" },
+            { userId: "admin", email: "james@chapterone.co.ke", name: "James Otieno", role: "admin", joinedAt: "2026-02-01" },
+          ],
+          invites: [],
+          seats: { used: 2, included: 3, full: false, members: 2, pending: 0 },
+          totals: { members: 2, invites: 0 },
+          limits: { members: 50, invites: 50 },
+          seatOffer: null,
+        }}
+        viewerRole="owner"
+        viewerId="owner"
+      />
+    ) : null;
 
   return (
     <DeskRoleProvider role={role}>
@@ -221,6 +252,8 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             assistantSayPage
             businessCategory={identityState === "empty" ? null : "books_stationery"}
             pronunciationQueueFailed={suggestions === "down"}
+            membersSlot={membersSlot}
+            memberRoles={{ "amina@chapterone.co.ke": "owner", "james@chapterone.co.ke": "admin" }}
             optionStatus={settingsIndexStatuses(
               { ...viewTenant, soniox_voice_label: "Aisha", call_option: callSetup.option },
               curatedVoices,

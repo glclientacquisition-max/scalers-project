@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDownIcon, ChevronUpIcon, PlusIcon } from "@heroicons/react/20/solid";
 import type { TeamDirectoryEntry } from "@/lib/supabase";
+import { ROLE_LABELS, type Role } from "@/lib/permissions";
 import { Button } from "@/components/ui/Button";
 import { ToolSwitch, settingsDenseFieldClass, settingsGroupTitleClass } from "@/components/settingsUi";
 
@@ -27,6 +28,7 @@ export function AlertContactsList({
   onAdd,
   onRemove,
   canRemove,
+  memberRoles,
 }: {
   team: TeamDirectoryEntry[];
   flags: ReadonlyArray<{ key: FlagKey; label: string }>;
@@ -37,6 +39,8 @@ export function AlertContactsList({
   onRemove: (index: number) => void;
   /** False for the owner's own row: the owner always stays on the alert list. */
   canRemove?: (entry: TeamDirectoryEntry) => boolean;
+  /** Login role by email. Wins over a directory job so an Admin is not labelled Owner. */
+  memberRoles?: Record<string, string>;
 }) {
   // Blank rows (new contacts) open straight away; saved rows stay collapsed.
   const [open, setOpen] = useState<Set<number>>(
@@ -62,6 +66,9 @@ export function AlertContactsList({
           const name = member.name.trim();
           const who = name || `Contact ${index + 1}`;
           const contact = [member.phone.trim(), String(member.email || "").trim()].filter(Boolean).join(" · ");
+          const emailKey = String(member.email || "").trim().toLowerCase();
+          const loginRole = emailKey ? memberRoles?.[emailKey] : "";
+          const roleLabel = loginRole && loginRole in ROLE_LABELS ? ROLE_LABELS[loginRole as Role] : member.role.trim();
           const panelId = `alert-contact-${index}`;
           return (
             <li key={`team-${index}`} className="border-b border-hairline">
@@ -76,7 +83,7 @@ export function AlertContactsList({
                 <span className="min-w-0 flex-1">
                   <span className="block text-body text-ink [overflow-wrap:anywhere]">
                     {name || <span className="text-ink-3">New contact</span>}
-                    {member.role.trim() ? <span className="text-ink-2"> · {member.role.trim()}</span> : null}
+                    {roleLabel ? <span className="text-ink-2"> · {roleLabel}</span> : null}
                   </span>
                   {contact ? <span className="block text-meta text-ink-2 [overflow-wrap:anywhere]">{contact}</span> : null}
                   <span className="block text-meta text-ink-2 sm:hidden">{alertSummary(member, flags)}</span>

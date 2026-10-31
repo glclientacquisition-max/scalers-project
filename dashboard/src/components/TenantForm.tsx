@@ -395,6 +395,7 @@ function TenantFormInner({
   onSaveActivity,
   pronunciationReview = [],
   pronunciationQueueFailed = false,
+  memberRoles,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
@@ -415,6 +416,8 @@ function TenantFormInner({
   pronunciationReview?: PronunciationReviewCandidate[];
   /** The review read failed. Stored words still render. */
   pronunciationQueueFailed?: boolean;
+  /** Email to login role for alert contact labels. */
+  memberRoles?: Record<string, string>;
 }) {
   // View-only members still open place details; PlacesEditor shows them read-only.
   const canEditSettings = useCan("settings.edit");
@@ -2250,6 +2253,7 @@ function TenantFormInner({
           addLabel="Add person"
           onChange={updateTeam}
           canRemove={(m) => !isOwnerTeamRow(m.phone, tenant.whatsapp_notification_number)}
+          memberRoles={memberRoles}
           onAdd={() => setTeam((prev) => [...prev, emptyMember()])}
           onRemove={(index) => {
             const member = team[index];

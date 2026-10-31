@@ -122,12 +122,14 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
 
   // Team & access: Members (logins, paid seats). Mutations stay gated in membersActions when invites are off.
   let membersSlot = null;
+  let memberRoles: Record<string, string> | undefined;
   if (teamPanel) {
     const [role, user] = await Promise.all([currentMemberRole(), getAuthUser()]);
     if (role && user && can(role, "members.view")) {
       try {
         const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
         const data = await loadMembers(tenant.id, { members: one(params.members), invites: one(params.invites) });
+        memberRoles = Object.fromEntries(data.members.map((m) => [m.email.trim().toLowerCase(), m.role]));
         membersSlot = <MembersPanel data={data} viewerRole={role} viewerId={user.id} planEntry={teamEntry} />;
       } catch {
         membersSlot = <MembersLoadError />;
@@ -259,6 +261,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
         businessCategory={businessCategory}
         pronunciationReview={pronunciationReview}
         pronunciationQueueFailed={pronunciationQueueFailed}
+        memberRoles={memberRoles}
       />
     </Suspense>
   );
