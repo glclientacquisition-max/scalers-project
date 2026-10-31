@@ -2222,6 +2222,7 @@ function handleSautikitRootPost(req, res) {
 // Unset or any other value: 503 {reason: disabled}. Phone routes below
 // are not branched on this flag. Limits are in-memory, one instance.
 const { handleDemoTokenRequest, PAUSED_MESSAGE } = require('./src/demo/guards');
+const { handleDemoUpgrade } = require('./src/demo/upgrade');
 app.use('/demo/token', (req, res, next) => {
   if (req.method !== 'POST' && req.method !== 'OPTIONS') return next();
   Promise.resolve(handleDemoTokenRequest(req, res)).catch(() => {
@@ -2505,6 +2506,15 @@ server.on('upgrade', (req, socket, head) => {
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit('connection', ws, req);
       });
+      return;
+    }
+
+    // Browser demo. Off unless DEMO_ENABLED is exactly `on` (404, token
+    // not consumed). This branch does not share sendPcmToMedia, so phone
+    // gain, the inbound burst drain, and the drachtio subprotocol stay on
+    // /ws/media. No SautiKit REST from this path.
+    if (pathname === '/ws/demo') {
+      handleDemoUpgrade(req, socket, head);
       return;
     }
 

@@ -161,6 +161,8 @@ The full runbooks are in [`plans/kb-v2-prod-batch-2026-10-28.md`](plans/kb-v2-pr
 
 **31 Oct 2026 (EAT):** a draft adds `POST /demo/token`. It answers 503 until `DEMO_ENABLED` is exactly `on`. Limits are in memory on one instance. It does not dial, and the phone path is unchanged while the flag is off. Not merged, not deployed, no env change.
 
+**31 Oct 2026 (EAT):** a second draft adds `/ws/demo` on that token branch. The socket takes one single-use token, runs STT, Brain, and TTS for the three demo tenants, and releases the concurrency slot on close. Recording stays off. There is no telephony request. The message contract is in `docs/demo-contract.md`. Not merged, not deployed, no env change.
+
 1. **Money:** top up SautiKit prod (KES 9.29; rental 1 Nov), and fund Soniox or turn on autopay (staging is already at 402).
 2. **Grade the 01:33 EAT Grow Tech call**, then have Alvin dial prod test calls on Esga and Grow Tech (§7).
 3. **`DESK_PLAN_CHANGE=on` on Vercel prod:** Alvin hasn't confirmed this is intended. It lets owners change plans themselves.
