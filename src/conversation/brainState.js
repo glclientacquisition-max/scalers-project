@@ -686,6 +686,7 @@ function observeCallerTurn(state, input = {}) {
       text,
       state: next,
       language: next.language?.current,
+      now: input.now,
     }) || '';
   if (next.caller.name && !entityValue(next.entities.name)) {
     next.entities.name = {
