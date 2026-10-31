@@ -1,6 +1,6 @@
 ---
 owner: brain
-last_reviewed: 2026-10-07
+last_reviewed: 2026-10-18
 ---
 
 # Brain lane contract
@@ -80,6 +80,7 @@ Core runtime modules:
 11. Compiled `llm_system_prompt` is written by Desk compiler; owners do not edit raw prompt in UI. Stale compiled prompts that force name capture fight resolution-first runtime — recompile after Brain policy changes.
 12. Tool side-effects go through existing DB helpers (`saveCallerInfo`, `saveEscalation`, …). Call outcomes persist via `deriveCallResolution` / `setCallResolution`.
 13. Returning callers: load a compact phone file at call setup (`getCallerMemory` → CONTEXT HEADER). The file is a candidate keyed by phone, not the speaker. After a confirmed spoken name on this call, bind that card (shared or unique line: primary keeps the visit; alternate or a different name does not). Until that bind, do not seed `nameConfirmed`, do not greet them as the file name, and do not attach last reason or visit. After bind, CONTEXT HEADER and CALL STATE cite labeled lived rows (Speaker, Open, Last, History, Place). Instant greeting stays brand-first and local. Never dump prior transcripts.
+14. Day and hours answers (`BRAIN_TRUSTED_HOURS`, staging, off unless exactly `on`): today and tomorrow are computed in code in Africa/Nairobi and put in the CONTEXT HEADER with both days' grid hours. A day or hours ask is answered from `hours_schedule` (`hours_on` fact line); `closed` only when the grid says closed. A model open/closed claim about a day that contradicts the grid is dropped by the speech guard and replaced by that day's `hours_on`. No grid and no prose hours: `hours_unknown` ("I'll have the team confirm."), never a guess; prose-only hours keep the old path. An owner FAQ that says a day is open or closed against the grid stays out of live ground truth and the header says to ignore it (`src/conversation/trustedHours.js`, HD_49d726c3dc9b). Under the same flag, a question, function-word, feeling or state span ("Do I need", "excited", "sawa") is never a caller name, and a shared-line `Speaker:` line does not carry the file name (HD_dfd531f8b083, HD_af5868852bc7).
 14. Ticket chat wand: empty Suggests one packaged customer SMS from lived facts on that ticket (visit, hold, Want). A filled draft is Polished in place. Facts beat Gemini. Never dump the transcript. Never say booked on a requested visit or ready on an open hold. Owner Send.
 
 ## Test / verify

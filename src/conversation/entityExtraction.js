@@ -862,12 +862,85 @@ function isRejectedGoalText(text, opts = {}) {
 
 function callerGoalText(text, opts = {}) {
   if (opts.unfinished === true || opts.weak === true) return '';
+  // BRAIN_TRUSTED_HOURS (HD_49d726c3dc9b): "Tuesday at what time will you be
+  // open?" is the goal "opening hours on Tuesday"; its follow-ups ("Like at,
+  // at what time?") and a closing ("Bye.") are never the goal.
+  const trustedHours = require('./trustedHours');
+  if (trustedHours.trustedHoursEnabled()) {
+    if (trustedHours.isHoursFollowUp(text)) return '';
+    if (trustedHours.hoursAskDay(text, { now: opts.now })) return trustedHours.hoursGoalText(text, opts.now);
+  }
   const goal = usableGoalRemainder(text);
   // BRAIN_CALL_FIXES_D199 (HD_1677e57f73f9 2, 4): a closing ("That's all.",
   // "asante", "hiyo tu") or a thinking filler is never the caller's goal.
   const fixes = require('./callFixesD199');
   if (goal && fixes.callFixesD199Enabled() && (fixes.notAGoal(text) || fixes.notAGoal(goal))) return '';
+  if (goal && trustedHours.trustedHoursEnabled() && (fixes.notAGoal(text) || fixes.notAGoal(goal))) return '';
   return goal;
+}
+
+// Pronouns, auxiliaries, question words and other function words (en, sw).
+// A name span holding one of these is a sentence fragment, not a name.
+const NAME_FUNCTION_WORDS = new Set([
+  'i', "i'm", 'im', 'me', 'my', 'mine', 'you', 'your', "you're", 'we', 'our', 'us', 'they', 'them', 'their',
+  'do', 'does', 'did', "don't", 'dont', 'is', 'am', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had',
+  'can', 'could', 'should', 'would', 'shall', 'must',
+  'need', 'needs', 'want', 'wants', 'know', 'think', 'get', 'got', 'go', 'give', 'take', 'make', 'buy', 'order', 'call',
+  'what', 'where', 'when', 'why', 'how', 'which', 'who', 'whom', 'whose',
+  'a', 'an', 'to', 'of', 'in', 'on', 'at', 'if', 'or', 'but', 'so', 'not', 'any', 'some', 'there',
+  'nini', 'gani', 'wapi', 'lini', 'nani', 'je', 'ni', 'mimi', 'wewe', 'sisi', 'nyinyi',
+  'nataka', 'nahitaji', 'naomba', 'ninataka', 'unataka', 'mnauza', 'mko', 'kuna', 'iko', 'ama',
+]);
+
+/**
+ * "Do I need", "What do you", "Nataka nini": a question (ends in "?") or a
+ * span with a pronoun, auxiliary, question word or function word. Names that
+ * are also English words ("Will", "May", "Grace") pass: those are not listed.
+ */
+function isQuestionOrFunctionSpan(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return false;
+  if (/\?\s*$/.test(raw)) return true;
+  const words = raw
+    .toLowerCase()
+    .replace(/[’]/g, "'")
+    .replace(/[.,!;:]+/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  return words.some((word) => NAME_FUNCTION_WORDS.has(word));
+}
+
+// BRAIN_TRUSTED_HOURS (HD_af5868852bc7): "And I'm excited about." saved the
+// caller as "excited". "I'm X" also introduces a feeling or a state. A small
+// closed list of adjective, emotion and state words (en, sw, Sheng) is never
+// a name. This is a stop-list, not a names list: KENYA_GIVEN_NAMES is unchanged.
+const NAME_STATE_WORDS = new Set([
+  // feelings and moods
+  'excited', 'happy', 'glad', 'sad', 'angry', 'upset', 'mad', 'annoyed', 'worried', 'scared', 'afraid',
+  'nervous', 'stressed', 'confused', 'curious', 'interested', 'disappointed', 'frustrated', 'pleased',
+  'thankful', 'grateful', 'sorry', 'excite', 'bored', 'lonely', 'calm', 'serious', 'impressed', 'surprised',
+  // states and condition
+  'fine', 'good', 'great', 'well', 'okay', 'ok', 'alright', 'cool', 'tired', 'sick', 'ill', 'busy', 'free',
+  'ready', 'done', 'sure', 'late', 'early', 'new', 'back', 'here', 'there', 'around', 'outside', 'inside',
+  'home', 'away', 'driving', 'calling', 'asking', 'looking', 'wondering', 'trying', 'waiting', 'coming',
+  'going', 'leaving', 'interested', 'available', 'unavailable', 'hungry', 'lost', 'stuck', 'confused',
+  'better', 'bad', 'awesome', 'perfect', 'nice', 'right', 'wrong', 'about', 'just', 'also', 'still',
+  'really', 'very', 'so', 'too', 'kinda', 'pretty', 'quite', 'fully', 'totally',
+  // Kiswahili and Sheng states
+  'sawa', 'poa', 'fiti', 'freshi', 'safi', 'mzima', 'mzuri', 'salama', 'shwari', 'buheri', 'njema',
+  'nzuri', 'mgonjwa', 'mchovu', 'nimechoka', 'nimefurahi', 'furaha', 'radhi', 'tayari', 'bado', 'sasa',
+  'hapa', 'huku', 'kawaida', 'sana', 'tu', 'pia', 'mbaya', 'mzito', 'bize', 'niko', 'nipo', 'uko',
+]);
+
+/** Every word is a feeling, state or filler word ("excited", "fine", "sawa", "so tired"). */
+function isStateWordSpan(value) {
+  const words = String(value || '')
+    .toLowerCase()
+    .replace(/[’]/g, "'")
+    .replace(/[^a-z' ]+/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  return words.length > 0 && words.every((word) => NAME_STATE_WORDS.has(word));
 }
 
 function isPlausibleCallerName(value) {
@@ -888,6 +961,12 @@ function isPlausibleCallerName(value) {
   }
   const words = name.split(/\s+/);
   if (words.some((word) => NAME_BLOCKLIST.has(word.toLowerCase()))) return false;
+  // BRAIN_TRUSTED_HOURS (Esga prod HD_dfd531f8b083 t11): the caller asked
+  // "Do I need?" and the model saved the name "Do I need". A question or a
+  // run of function words is never a name. No name table grows for this.
+  if (require('./trustedHours').trustedHoursEnabled() && (isQuestionOrFunctionSpan(name) || isStateWordSpan(name))) {
+    return false;
+  }
   if (/^(?:impressed|amazed|delighted|grateful|thankful|pleased)$/i.test(lower)) return false;
   if (
     /\b(?:impressed|amazed|delighted|grateful|thankful|pleased|glad)\b/i.test(lower) &&
@@ -1234,5 +1313,7 @@ module.exports = {
   callerAskSpecificity,
   agentAskedPendingName,
   isPlausibleCallerName,
+  isQuestionOrFunctionSpan,
+  isStateWordSpan,
   entityValue,
 };

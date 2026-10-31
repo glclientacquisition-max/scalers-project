@@ -177,10 +177,18 @@ function buildLiveGroundTruth(profile = {}) {
     formatSocialHandlesBlock,
   } = require('./socialHandles');
   const social = normalizeSocialHandles(profile.socialHandles);
-  const faqs = factFaqs(profile.faqs, fieldMeta).map((row) => ({
-    question: row.question,
-    answer: row.answer,
-  }));
+  // BRAIN_TRUSTED_HOURS (HD_49d726c3dc9b): an FAQ that says a day is open or
+  // closed against the owner hours grid stays out; the grid is the hours.
+  const trustedHours = require('./trustedHours');
+  const faqConflicts = trustedHours.trustedHoursEnabled()
+    ? trustedHours.conflictingFaqs(profile).map((row) => String(row.question || '').trim())
+    : [];
+  const faqs = factFaqs(profile.faqs, fieldMeta)
+    .map((row) => ({
+      question: row.question,
+      answer: row.answer,
+    }))
+    .filter((row) => !faqConflicts.includes(String(row.question || '').trim()));
   const team = normalizeTeam(profile.teamDirectory);
   // BRAIN_CONFIRMED_COVERAGE: location coverage notes are not coverage; only
   // the owner-confirmed Coverage list in POLICIES is.

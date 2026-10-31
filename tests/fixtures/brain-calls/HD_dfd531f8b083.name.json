@@ -1,0 +1,36 @@
+{
+  "source": "prod voice_turn_traces + calls, read-only SELECT, 2026-10-18",
+  "callSid": "HD_dfd531f8b083",
+  "callId": "0e6b7052-0080-4f0e-bee4-038835de69ae",
+  "tenant": "esga-prod",
+  "tenantId": "c81b3480-0cc5-4224-b0e7-24c641d78db2",
+  "startedAt": "2026-10-13 12:13:27.241325+00",
+  "note": "Turn 11: the caller asked \"Do I need?\" and the model saved the caller name \"Do I need\" (save_caller_info and create_service_request). Phone numbers removed.",
+  "turns": [
+    {
+      "turn": 9,
+      "caller": "ize— halafu pia kuna nataka n",
+      "modelOutput": "Sawa, nimepata hizo. Nipe jina lako tafadhali ndio nisaidie kuandika hiyo list yote?"
+    },
+    {
+      "turn": 10,
+      "caller": "ini kingine? Na kuna pens, hizi dollar pens, nilikuwa nataka 3 boxes, and one. Also want water.",
+      "modelOutput": null
+    },
+    {
+      "turn": 11,
+      "caller": "Do I need?",
+      "modelOutput": "###TOOL###\n{\"save_caller_info\":{\"name\":\"Do I need\",\"reason\":\"Kununua vielezo mbalimbali vya stationery\"}}\n###ENDTOOL###\n###TOOL###\n{\"create_service_request\":{\"type\":\"enquiry\",\"name\":\"Do I need\",\"item\":\"Cartons 10 JK copy paper, pens za Damasa 20, erasers za Nataraj 15, counter book, dollar pens boxes 3\",\"quantity\":\"Mbalimbali\",\"when_text\":\"\",\"notes\":\"Mteja anataka kununua bidhaa hizi za stationery\"}}\n###ENDTOOL###"
+    },
+    {
+      "turn": 12,
+      "caller": "I need— I need— I need— I need—",
+      "modelOutput": null
+    }
+  ],
+  "stored": {
+    "summary_name": "Do I need",
+    "reason": "Do I need left a hold. Cartons 10 JK copy paper, pens za Damasa 20, erasers za Nataraj 15, counter book, dollar pens boxes 3, cartons 5 za big paper, na cartons 50 za Kasuku A5 notebooks",
+    "service_request_type": "enquiry"
+  }
+}

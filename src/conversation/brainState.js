@@ -395,8 +395,12 @@ function promoteCallerGoal(next, text, input, previousIntent) {
   }
   // BRAIN_CALL_FIXES_D199 (HD_b82fbfef7649 3): a bare slot answer ("1:00 PM
   // is fine") answers the goal; it does not replace it.
+  // BRAIN_TRUSTED_HOURS: "opening hours on Tuesday" is an ask, not a slot answer.
+  const hoursGoal =
+    require('./trustedHours').trustedHoursEnabled() && /^opening hours\b/.test(usable);
   if (
     fixesOn &&
+    !hoursGoal &&
     usable.split(/\s+/).length <= 5 &&
     fixesD199.isWhenSlotValue(usable) &&
     callerAskSpecificity(usable) === 0
