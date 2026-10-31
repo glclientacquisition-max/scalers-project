@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronRightIcon } from "@heroicons/react/20/solid";
 import { ButtonLink } from "@/components/ui/Button";
+import { Sheet } from "@/components/ui/Sheet";
 import { CopyCode } from "@/components/CopyCode";
 import {
   ALL_OFF_CODE,
+  callsReachLine,
   type ForwardChoice,
   NETWORK_LABEL,
   dialHref,
@@ -56,6 +59,7 @@ export function CallsForwardingPanel({
 }) {
   const [setup, setSetup] = useState<CallSetup | null>(serverSetup);
   const [phone, setPhone] = useState<PhoneKind | null>(null);
+  const [stopOpen, setStopOpen] = useState(false);
 
   useEffect(() => {
     const local = supported ? null : browserCallSetupStore().load(tenantId);
@@ -83,9 +87,7 @@ export function CallsForwardingPanel({
     <div className="grid gap-4">
       <section aria-label="Current setup" className="rounded-2xl border border-hairline bg-surface px-4 py-1">
         <dl>
-          <Row label="How calls reach you">
-            {option === "main_number" ? "Scalers number" : option === "forward" ? "Forwarding" : "Not set up"}
-          </Row>
+          <Row label="Calls">{callsReachLine(option, setup?.network)}</Row>
           <Row label="Business Assistant's number">
             <span className="tabular-nums">{pretty}</span>
           </Row>
@@ -118,13 +120,20 @@ export function CallsForwardingPanel({
         Change setup
       </ButtonLink>
 
-      <section aria-labelledby="calls-off" className="grid gap-2">
-        <h3 id="calls-off" className="text-body font-semibold text-ink">
-          Turn everything off
-        </h3>
-        <CopyCode label="Dial on your business line" code={ALL_OFF_CODE} dial={dialHref(ALL_OFF_CODE, phone)} />
-        <p className="text-meta text-ink-2">Your phone goes back to normal. You can set it up again any time.</p>
-      </section>
+      <button
+        type="button"
+        className="flex min-h-11 w-full items-center justify-between gap-3 rounded-2xl border border-hairline bg-surface px-4 text-left"
+        onClick={() => setStopOpen(true)}
+      >
+        <span className="text-body font-medium text-ink">Stop forwarding</span>
+        <ChevronRightIcon className="h-5 w-5 shrink-0 text-ink-3" aria-hidden="true" />
+      </button>
+      <Sheet open={stopOpen} onOpenChange={setStopOpen} title="Stop forwarding">
+        <div className="grid gap-3">
+          <CopyCode label="Dial on your business line" code={ALL_OFF_CODE} dial={dialHref(ALL_OFF_CODE, phone)} />
+          <p className="text-body text-ink-2">Your phone goes back to normal. You can set it up again any time.</p>
+        </div>
+      </Sheet>
     </div>
   );
 }
