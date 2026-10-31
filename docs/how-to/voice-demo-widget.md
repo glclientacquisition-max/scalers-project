@@ -25,6 +25,8 @@ The voice service owns the endpoint (Voice PR1). This widget only calls it.
 
 The site key is `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. It is public. The secret stays on the voice service.
 
+`NEXT_PUBLIC_DEMO_API_BASE` is the voice origin, with no trailing slash. The widget trims whitespace and a trailing slash. When it is set, `demoAdapterFromEnv()` posts to `${base}/demo/token` and `demoStatusUrl()` gets `${base}/demo/status`. When it is empty, those stay the relative paths `/demo/token` and `/demo/status`. Both requests use `credentials: 'omit'` so the browser makes a plain CORS call and does not send cookies. Do not rewrite `/demo/token` or `/demo/status` on Vercel. Voice keys the visitor on `X-Forwarded-For`, and a rewrite would show Vercel's address. The socket URL is `ws_url` from the token response.
+
 ## Session
 
 Before Start, the page calls `GET /demo/status?device_id=`. The same id goes on `POST /demo/token`. The widget never calls `POST /demo/grant`. The reason order is disabled, then cap, then used, then busy. `disabled` shows "Demo paused." `cap` shows "The demo is resting for today. Try again tomorrow." `used` (from that status, or `429 {reason:'used'}` on the token) replaces Start with a request-access form. The submit is a local stub until the backend exists. Token `429 {reason:'rate'}` means a session is already open and the visitor still has one left: "A demo is already open. Try again in a minute." A `429 {reason:'rate'}` on the status poll is the poll limit and is ignored.
