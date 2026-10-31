@@ -37,6 +37,8 @@ import { DeskPageGate } from "@/components/DeskPageGate";
 import { DeskPageSkeleton } from "@/components/DeskPageSkeleton";
 import { deskAssistantSayPage } from "@/lib/deskFeatureFlags";
 import { loadAssistantSayView } from "@/lib/assistantSayVoice.server";
+import { readPronunciationReviewQueue } from "@/app/(desk)/settings/pronunciationGeminiScanActions";
+import type { PronunciationReviewCandidate } from "@/lib/pronunciationGeminiScan";
 import { loadKbGreetingPreview } from "@/lib/kbCaller.server";
 import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
 import { parseUnknownAnswerByKind } from "@/lib/unknownAnswerByKindConstants";
@@ -203,6 +205,17 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     );
   }
 
+  let pronunciationReview: PronunciationReviewCandidate[] = [];
+  let pronunciationQueueFailed = false;
+  if (tab === "train" && trainPanel === "pronunciation") {
+    const read = await readPronunciationReviewQueue();
+    if (read.ok) {
+      pronunciationReview = [...read.queue, ...read.sttHints];
+    } else {
+      pronunciationQueueFailed = true;
+    }
+  }
+
   const navTargets = SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target));
   const [planRow, callSetup] = await Promise.all([planRowPromise, callSetupPromise]);
   const planStatus: Record<string, SettingsListStatus> = {
@@ -244,6 +257,8 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
         assistantSaySlot={assistantSaySlot}
         assistantSayPage={assistantSayPage}
         businessCategory={businessCategory}
+        pronunciationReview={pronunciationReview}
+        pronunciationQueueFailed={pronunciationQueueFailed}
       />
     </Suspense>
   );
