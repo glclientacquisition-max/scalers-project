@@ -59,7 +59,8 @@ describe("honest chrome P0", () => {
     assert.equal(got.todayTab, "menu");
     assert.equal(got.importTab, "import");
     assert.equal(got.navLabels.includes("Updates"), false);
-    assert.match(home, /<DailyBulletinPanel tenant=\{tenant\} \/>/);
+    assert.match(home, /<UpdateStatus tenant=\{tenant\} \/>/);
+    assert.match(read("dashboard/src/components/home/UpdateStatus.tsx"), /DailyBulletinPanel/);
     assert.doesNotMatch(shell, /DailyBulletinPanel/);
     assert.doesNotMatch(shell, /tab === "updates"/);
   });

@@ -254,7 +254,7 @@ export function BusinessSettingsShell({
                   title={heading}
                 />
                 {activeTab === "calls" ? callsSlot : null}
-                {activeTab === "assistant-say" ? assistantSaySlot : null}
+                {activeTab === "assistant-say" || activeTab === "capabilities" ? assistantSaySlot : null}
                 {activeTab === "test" ? (
                   <SettingsPanelBody tenant={tenant} curatedVoices={curatedVoices} />
                 ) : null}

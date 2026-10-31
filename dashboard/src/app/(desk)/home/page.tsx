@@ -4,53 +4,32 @@ import { RoleGate } from "@/components/DeskRole";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import {
   callsHref,
-  followUpWhatsAppMessage,
-  formatCallWhenRelative,
   nairobiDateLabel,
   nairobiDayStartIso,
 } from "@/lib/callsTriage";
-import { inboxRecordHref } from "@/lib/inboxHref";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { assessMvpAnswerReadiness } from "@/lib/mvpAnswerReadiness";
 import { lineStatusLabel, resolveLineStatus } from "@/lib/lineStatus";
 import { StatusMark, type StatusIcon, type StatusTone } from "@/components/ui/StatusMark";
-import { TodayCalls, nairobiClock, type TodayCallRow } from "@/components/home/TodayCalls";
+import { CallerCards } from "@/components/home/CallerCards";
+import { UpdateStatus } from "@/components/home/UpdateStatus";
 import { splitOutcomes } from "@/lib/todayOutcomes";
-import {
-  deskPreviewClass,
-  deskShiftClass,
-  focusRingVisible,
-} from "@/components/ui/deskChrome";
-import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
-import { liveBulletinItems } from "@/lib/dailyBulletin";
-import {
-  homeBriefing,
-  homeDigestLine,
-  homeQueueUnit,
-  summarizeInboxWork,
-  type InboxItem,
-} from "@/lib/inboxPurpose";
-import { itemIsOpenHold, itemIsToReturn, itemIsVisitToConfirm } from "@/lib/inboxCounts";
+import { focusRingVisible } from "@/components/ui/deskChrome";
+import { homeDigestLine, summarizeInboxWork } from "@/lib/inboxPurpose";
 import { loadCachedInboxItems } from "@/lib/inboxLoad";
 import { nicheCopy, showsHoldQueue, showsVisitQueue } from "@/lib/inboxNiche";
 import { visitBoardForDay } from "@/lib/runSheet";
 import { eatYmd } from "@/lib/visitCalendar";
-import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { HomeOverviewHeader } from "@/components/HomeOverviewHeader";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
-import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
-import { LivePing } from "@/components/ui/deskRow";
-import { Stamp } from "@/components/ui/Stamp";
 import { HomeCapture } from "@/components/HomeCapture";
-import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
 import { toLocal07 } from "@/lib/callForwarding";
 import { getTenantCompletenessScore, getTenantHoldGate } from "@/lib/deskProvenance";
 import { captureFilledDomains } from "@/lib/completenessStub";
 import { homeStakes, shopStakes } from "@/lib/baStakes";
 import { capabilityGates } from "@/lib/capabilityGates";
-import { CapabilityGatesPanel } from "@/components/CapabilityGatesPanel";
 import { parseHoursSchedule } from "@/lib/hoursSchedule";
 import { isBetaBilling } from "@/lib/wallet";
 import { coverageDisplayList } from "@/lib/coverageAreas";
@@ -156,31 +135,10 @@ async function HomeOverviewBody() {
   if (inbox.error) {
     return <DeskLoadError>Could not load Overview.</DeskLoadError>;
   }
-  const digest = inbox.callsTruncated
-    ? null
-    : homeDigestLine(inbox.items, dayStart, vertical);
+  void (inbox.callsTruncated ? null : homeDigestLine(inbox.items, dayStart, vertical));
 
   const todayCount = todayRes.error ? null : todayRes.count ?? 0;
   const todaySplit = factsRes.error ? null : splitOutcomes((factsRes.data || []).map((row) => row.outcome as string | null));
-  const todayRows: TodayCallRow[] = inbox.callsTruncated
-    ? []
-    : inbox.items
-        .filter((item) => item.createdAt >= dayStart)
-        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-        .slice(0, 5)
-        .map((item) => {
-          const word = item.purpose === "answered" ? "Answered" : item.purpose === "human" ? "Handed off" : item.purpose === "missed" ? "Hung up" : "Call";
-          const tone = item.purpose === "answered" ? "ok" : item.purpose === "human" ? "info" : item.purpose === "missed" ? "warn" : "neutral";
-          return {
-            id: item.id,
-            time: nairobiClock(item.createdAt),
-            word,
-            tone,
-            who: item.callerName || item.callerPhone || "Caller",
-            told: Boolean(item.lead?.notified),
-            href: item.callId ? inboxRecordHref(item.callId, { from: "home" }) : null,
-          };
-        });
   const work = summarizeInboxWork(inbox.items);
   const gates = capabilityGates(tenant, {
     holdGate: hold,
@@ -191,73 +149,11 @@ async function HomeOverviewBody() {
   const waitingCount = work.needs;
   const visitQueue = showsVisitQueue(vertical);
   const holdQueue = showsHoldQueue(vertical);
-  const briefing = homeBriefing(
-    {
-      toReturn: work.toReturn,
-      toFulfill: holdQueue ? work.toFulfill : 0,
-      toConfirm: visitQueue ? work.requested : 0,
-    },
-    vertical
-  );
-  const holdSample = work.nextHold?.hold?.when_text || null;
-  const jobSample = work.nextJob?.job?.when_text || null;
   const nextReturn = work.nextReturn || null;
-  const nextReturnWhen = nextReturn ? formatCallWhenRelative(nextReturn.createdAt) : null;
-  const nextReturnReason = nextReturn?.lead?.reason || nextReturn?.headline || null;
+  const gatesOff = gates.filter((gate) => !gate.allowed);
 
   const did = String(tenant.sautikit_virtual_number || "");
   const didDisplay = did.replace(/^\+254(\d{3})(\d{3})(\d{3})$/, "+254 $1 $2 $3");
-
-  const oldestLabel = (pred: (item: InboxItem) => boolean) => {
-    let iso: string | null = null;
-    for (const item of inbox.items) {
-      if (!pred(item)) continue;
-      if (!iso || item.createdAt < iso) iso = item.createdAt;
-    }
-    return iso ? formatCallWhenRelative(iso) : null;
-  };
-  const queues = [
-    {
-      id: "return",
-      label: copy.returnCtaMany,
-      href: callsHref({ purpose: "human" }),
-      count: work.toReturn,
-      unit: "",
-      wait: oldestLabel((item) => itemIsToReturn(item)),
-    },
-    ...(holdQueue
-      ? [
-          {
-            id: "hold",
-            label: copy.holdFilter,
-            href: callsHref({ purpose: "hold" }),
-            count: work.toFulfill,
-            unit: homeQueueUnit(work.toFulfill, copy.holdUnit, holdSample),
-            wait: oldestLabel((item) => itemIsOpenHold(item)),
-          },
-        ]
-      : []),
-    ...(visitQueue
-      ? [
-          {
-            id: "job",
-            label: copy.jobFilter,
-            href: callsHref({ purpose: "job" }),
-            count: work.toConfirm,
-            // Count is every open visit (requested + booked), the same 22 as the
-            // Inbox Visits tab. The part still to confirm is named so it matches
-            // the briefing ("21 to confirm"): "22 · 21 to confirm".
-            unit:
-              work.requested > 0 && work.requested === work.toConfirm
-                ? homeQueueUnit(work.toConfirm, copy.jobUnit, jobSample)
-                : work.requested > 0
-                  ? `· ${work.requested} ${copy.jobUnit}`
-                  : "",
-            wait: oldestLabel((item) => itemIsVisitToConfirm(item)),
-          },
-        ]
-      : []),
-  ];
 
   let ctaHref = businessSettingsHref("test");
   let ctaLabel = "Test line";
@@ -300,169 +196,98 @@ async function HomeOverviewBody() {
         </div>
       ) : null}
 
-      <div className="mt-6 grid items-start gap-6 lg:grid-cols-12 lg:gap-8">
-        <div className="min-w-0 lg:col-span-7 lg:col-start-1 lg:row-start-1">
-        <section className="min-w-0" aria-labelledby="work-heading">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2
-              id="work-heading"
-              className="font-display text-title tracking-tight text-ink"
-            >
-              Work
-            </h2>
-            <p className={`text-meta text-ink-2 ${deskPreviewClass}`}>{briefing}</p>
-          </div>
-          {digest ? (
-            <p className={`mt-1 text-meta text-ink-2 ${deskPreviewClass}`}>{digest}</p>
-          ) : null}
-
-          <ul className="mt-3 overflow-hidden rounded-2xl border border-hairline bg-surface">
-            {queues.map((queue, index) => (
-              <li
-                key={queue.id}
-                className={index === 0 ? undefined : "border-t border-hairline"}
-              >
-                <Link
-                  href={queue.href}
-                  className={[
-                    "flex min-h-12 items-center justify-between gap-3 px-4 text-body font-medium lg:min-h-11",
-                    deskShiftClass,
-                    "hover:bg-accent/[0.04] active:bg-accent/[0.08]",
-                    focusRingVisible,
-                  ].join(" ")}
-                >
-                  <span className={`flex min-w-0 items-center gap-2 ${queue.count === 0 ? "text-ink-3" : "text-ink"}`}>
-                    <span>{queue.label}</span>
-                    {queue.id === "hold" && holdsGate && !holdsGate.allowed ? (
-                      <Stamp tone="attention">Needs setup</Stamp>
-                    ) : null}
-                  </span>
-                  <span className="flex min-w-0 items-center gap-3 text-ink-2">
-                    <span className={`min-w-0 ${deskPreviewClass}`}>
-                      <span className={`tabular-nums text-body font-semibold text-ink ${queue.count === 0 ? "opacity-60" : ""}`}>
-                        {queue.count}{queue.count > 0 && queue.wait ? <span className="font-normal text-meta text-ink-2">{` · oldest ${queue.wait}`}</span> : null}{queue.unit ? <span className="font-normal text-meta text-ink-2">{` ${queue.unit}`}</span> : null}
-                      </span>
-                    </span>
-                    <svg
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      className="h-4 w-4 shrink-0"
-                      aria-hidden
-                    >
-                      <path
-                        d="M7.5 4.5 13 10l-5.5 5.5"
-                        stroke="currentColor"
-                        strokeWidth="1.75"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-
-          {nextReturn && (nextReturn.callerPhone || nextReturn.callId) ? (
-            <>
-            <section
-              id="next-return-phone"
-              aria-labelledby="next-return-heading-phone"
-              className="relative mt-3 overflow-hidden rounded-2xl border border-hairline bg-surface lg:hidden"
-            >
-              <DeskRowHit
-                href={nextReturn.callId ? inboxRecordHref(nextReturn.callId, { from: "home" }) : null}
-                label="Conversation"
-              />
-              <div className="flex min-h-12 items-center gap-3 px-4 py-2">
-                <div className="min-w-0 flex-1">
-                  <h2
-                    id="next-return-heading-phone"
-                    className={`${deskRowMutedClass} text-caption font-semibold text-ink-2`}
-                  >
-                    Next to return
-                  </h2>
-                  <p className={`${deskRowMutedClass} mt-0.5 text-body font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
-                    {nextReturn.callerName || nextReturn.callerPhone || "Caller"}
-                    {nextReturnWhen ? (
-                      <span className="font-normal text-ink-2"> · {nextReturnWhen}</span>
-                    ) : null}
-                  </p>
-                  {nextReturnReason ? (
-                    <p className={`${deskRowMutedClass} text-body text-ink-2 ${deskPreviewClass}`}>
-                      {nextReturnReason}
-                    </p>
-                  ) : null}
-                </div>
-                {nextReturn.callerPhone ? (
-                  <div className={`${deskRowActionClass} flex shrink-0 items-center`}>
-                    <WhatsAppLink
-                      number={nextReturn.callerPhone}
-                      message={followUpWhatsAppMessage({
-                        businessName: business,
-                        name: nextReturn.callerName,
-                        topic: nextReturn.lead?.topic,
-                      })}
-                      variant="icon"
-                      callId={nextReturn.callId}
-                    />
-                  </div>
-                ) : null}
-              </div>
-            </section>
-            <section
-              aria-labelledby="next-return-heading"
-              className="relative mt-6 hidden rounded-2xl border border-hairline bg-surface p-4 lg:block"
-            >
-              <DeskRowHit
-                href={nextReturn.callId ? inboxRecordHref(nextReturn.callId, { from: "home" }) : null}
-                label="Conversation"
-              />
-              <h2
-                id="next-return-heading"
-                className={`${deskRowMutedClass} text-caption font-semibold text-ink-2`}
-              >
-                Next to return
-              </h2>
-              <p className={`${deskRowMutedClass} mt-2 text-body font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
-                {nextReturn.callerName || nextReturn.callerPhone || "Caller"}
-                {nextReturnWhen ? (
-                  <span className="font-normal text-ink-2"> · {nextReturnWhen}</span>
-                ) : null}
+      <div className="mt-6 flex flex-col gap-6">
+        <div className="overflow-hidden rounded-2xl border border-hairline bg-surface">
+          <section aria-label="Line" className="px-4 py-4">
+            <h2 className="sr-only">{lineStatusLabel(line)}</h2>
+            <StatusMark tone={linePill.tone} icon={linePill.icon}>{linePill.word}</StatusMark>
+            {line === "live" ? (
+              <p className="mt-2 truncate font-mono text-body text-ink">
+                {didDisplay || tenant.sautikit_virtual_number}
               </p>
-              {nextReturnReason ? (
-                <p className={`${deskRowMutedClass} mt-0.5 text-body text-ink-2 ${deskPreviewClass}`}>
-                  {nextReturnReason}
-                </p>
-              ) : null}
-              {nextReturn.callerPhone ? (
-                <div className={`${deskRowActionClass} mt-3 flex items-center`}>
-                  <WhatsAppLink
-                    number={nextReturn.callerPhone}
-                    message={followUpWhatsAppMessage({
-                      businessName: business,
-                      name: nextReturn.callerName,
-                      topic: nextReturn.lead?.topic,
-                    })}
-                    variant="ghost"
-                    label="Reply on WhatsApp"
-                    callId={nextReturn.callId}
-                  />
-                </div>
-              ) : null}
-            </section>
-            </>
+            ) : (
+              <p className="mt-2 text-body text-ink-2">
+                {line === "pending" ? "Your number is not live yet." : "Train the line before it can answer."}
+              </p>
+            )}
+          </section>
+
+          {line === "live" ? (
+            <div className="grid grid-cols-3 gap-2 border-t border-hairline px-4 py-3" aria-label="Today">
+              {(
+                [
+                  { label: "Calls", value: todayCount, href: callsHref({ purpose: "all" }) },
+                  { label: "Need you", value: work.toReturn, href: callsHref({ purpose: "human" }) },
+                  { label: "Visits", value: visitQueue ? work.toConfirm : 0, href: callsHref({ purpose: "job" }) },
+                ] as const
+              ).map((tile) => (
+                <Link
+                  key={tile.label}
+                  href={tile.href}
+                  className={`flex min-h-12 flex-col justify-center rounded-xl bg-canvas px-2 ${focusRingVisible}`}
+                >
+                  <span className="tabular-nums text-title font-semibold text-ink">
+                    {tile.value === null ? "Failed" : tile.value}
+                  </span>
+                  <span className="text-meta text-ink-2">{tile.label}</span>
+                </Link>
+              ))}
+            </div>
           ) : null}
-        </section>
-        {/* Conditional nudges: no placeholder, so an empty slot never flashes a card. */}
+          {todayCount === null ? (
+            <Link href="/home" className={`inline-flex min-h-11 items-center px-4 text-body font-medium text-accent ${focusRingVisible}`}>Retry</Link>
+          ) : null}
+
+          {showCta ? (
+            <div className="border-t border-hairline px-4 py-4">
+              <ButtonLink href={ctaHref} className="w-full">
+                {ctaLabel}
+              </ButtonLink>
+            </div>
+          ) : null}
+        </div>
+
+        <CallerCards
+          items={inbox.callsTruncated ? [] : inbox.items}
+          dayStart={dayStart}
+          pinId={nextReturn?.id ?? null}
+          lineLive={line === "live"}
+          factsFailed={todaySplit == null}
+        />
+
+        <div className="grid grid-cols-2 items-start gap-3">
+          <RoleGate action="usage.view" mode="hide">
+            <Suspense fallback={<HomeUsageSkeleton />}>
+              <HomeUsageSlot tenant={tenant} isBeta={isBeta} />
+            </Suspense>
+          </RoleGate>
+          <Suspense fallback={<HomeInsightsSkeleton />}>
+            <HomeInsightsSlot client={client} tenant={tenant} />
+          </Suspense>
+        </div>
+
+        <UpdateStatus tenant={tenant} />
+
+        {gatesOff.length > 0 ? (
+          <section className="rounded-2xl border border-hairline bg-warn-soft px-4 py-3" aria-label="Assistant setup">
+            <p className="text-body text-ink">
+              {gatesOff.length === 1 ? `${gatesOff[0]?.title ?? "One thing"} is off.` : `${gatesOff.length} things are off.`}
+            </p>
+            <Link href={businessSettingsHref("capabilities")} className={`mt-1 inline-flex min-h-11 items-center text-body font-medium text-accent ${focusRingVisible}`}>
+              Open settings
+            </Link>
+          </section>
+        ) : null}
+
         <Suspense fallback={null}>
           <HomeCallSetupSlot tenantId={tenant.id} numberReady={numberReady} />
         </Suspense>
         <Suspense fallback={null}>
-          <HomeChecksSlot tenant={tenant} canEditSettings={canEditSettings} />
-        </Suspense>
-        <Suspense fallback={<HomeInsightsSkeleton />}>
-          <HomeInsightsSlot client={client} tenant={tenant} />
+          <HomeChecksSlot
+            tenant={tenant}
+            canEditSettings={canEditSettings}
+            review={score && line === "live" && !score.ready_badge ? { tenantId: tenant.id, vertical, score } : null}
+          />
         </Suspense>
         {score && line !== "live" && !assistantSayPage ? (
           <HomeCapture
@@ -484,8 +309,6 @@ async function HomeOverviewBody() {
                         site_visit_required: extra.site_visit_required,
                       };
                     }),
-                    // Areas served only: where the business is located is not where it goes.
-                    // Directory ids ("county:nairobi") become place names; never show the raw id.
                     coverage: coverageDisplayList(tenant.business_policies?.coverage_areas),
                     bookingSlotsAllowed: Boolean(slotsGate?.allowed),
                   })
@@ -497,95 +320,6 @@ async function HomeOverviewBody() {
             }
           />
         ) : null}
-        <TodayCalls
-          lineLive={line === "live"}
-          split={todaySplit}
-          rows={todayRows}
-          truncated={inbox.callsTruncated}
-        />
-        <CapabilityGatesPanel gates={gates} />
-        {score && line === "live" && !score.ready_badge ? (
-          <HomeReviewSettingsNudge
-            tenantId={tenant.id}
-            vertical={vertical}
-            score={score}
-          />
-        ) : null}
-        </div>
-
-        <aside className="order-first min-w-0 lg:sticky lg:top-24 lg:order-none lg:col-span-5 lg:col-start-8 lg:row-start-1">
-          <div className="overflow-hidden rounded-2xl border border-hairline bg-surface">
-            <section aria-label="Line" className="px-4 py-4">
-              <h2 className="sr-only">{lineStatusLabel(line)}</h2>
-              <StatusMark tone={linePill.tone} icon={linePill.icon}>{linePill.word}</StatusMark>
-              {line === "live" ? (
-                <p className="mt-2 truncate font-mono text-body text-ink">
-                  {didDisplay || tenant.sautikit_virtual_number}
-                </p>
-              ) : (
-                <p className="mt-2 text-body text-ink-2">
-                  {line === "pending" ? "Your number is not live yet." : "Train the line before it can answer."}
-                </p>
-              )}
-            </section>
-
-            {line === "live" ? (
-              <div className="grid grid-cols-3 gap-2 border-t border-hairline px-4 py-3" aria-label="Today">
-                {(
-                  [
-                    { label: "Calls", value: todayCount, href: callsHref({ purpose: "all" }) },
-                    { label: "Need you", value: work.toReturn, href: callsHref({ purpose: "human" }) },
-                    { label: "Visits", value: visitQueue ? work.toConfirm : 0, href: callsHref({ purpose: "job" }) },
-                  ] as const
-                ).map((tile) => (
-                  <Link
-                    key={tile.label}
-                    href={tile.href}
-                    className={`flex min-h-12 flex-col justify-center rounded-xl bg-canvas px-2 ${focusRingVisible}`}
-                  >
-                    <span className="tabular-nums text-title font-semibold text-ink">
-                      {tile.value === null ? "Failed" : tile.value}
-                    </span>
-                    <span className="text-meta text-ink-2">{tile.label}</span>
-                  </Link>
-                ))}
-              </div>
-            ) : null}
-            {todayCount === null ? (
-              <Link href="/home" className={`inline-flex min-h-11 items-center px-4 text-body font-medium text-accent ${focusRingVisible}`}>Retry</Link>
-            ) : null}
-
-            {showCta ? (
-              <div className="border-t border-hairline px-4 py-4">
-                <ButtonLink href={ctaHref} className="w-full">
-                  {ctaLabel}
-                </ButtonLink>
-              </div>
-            ) : null}
-          </div>
-        </aside>
-
-        <RoleGate action="usage.view" mode="hide">
-          <Suspense fallback={<HomeUsageSkeleton />}>
-            <HomeUsageSlot tenant={tenant} isBeta={isBeta} />
-          </Suspense>
-        </RoleGate>
-
-        <section
-          className="min-w-0 lg:col-span-7 lg:col-start-1 lg:row-start-2"
-          aria-labelledby="updates-heading"
-        >
-          <h2
-            id="updates-heading"
-            className="flex items-center gap-2 font-display text-title tracking-tight text-ink"
-          >
-            {liveBulletinItems(tenant.daily_bulletin).length > 0 ? <LivePing /> : null}
-            Updates
-          </h2>
-          <div className="mt-3">
-            <DailyBulletinPanel tenant={tenant} />
-          </div>
-        </section>
       </div>
     </div>
   );

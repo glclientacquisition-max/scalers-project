@@ -54,44 +54,29 @@ describe("home overview craft", () => {
 
   it("maps Inbox queues and does not invent Online", () => {
     assert.match(page, /purpose: "human"/);
-    assert.match(page, /purpose: "hold"/);
     assert.match(page, /purpose: "job"/);
     assert.match(page, /lineStatusLabel\(line\)/);
-    assert.match(page, />\s*Work\s*</);
-    assert.match(page, /homeBriefing/);
+    assert.match(page, /CallerCards/);
     assert.doesNotMatch(page, /DeskDataTable/);
     assert.doesNotMatch(page, /TriageLeadCard/);
     assert.doesNotMatch(page, /\bOnline\b/);
   });
 
-  it("names Work row 1 Return calls with matching href, CTA, and count", () => {
-    const queues = page.slice(page.indexOf("const queues"), page.indexOf("let ctaHref"));
-    assert.match(queues, /label: copy\.returnCtaMany/);
-    assert.match(queues, /href: callsHref\(\{ purpose: "human" \}\)/);
-    assert.match(queues, /count: work\.toReturn/);
-    assert.doesNotMatch(queues, /label: "Needs you"/);
-    assert.doesNotMatch(queues, /purpose: "needs"/);
-    assert.doesNotMatch(queues, /count: work\.needs/);
-    const note = read("docs/reference/design-system/pages/home.md");
-    assert.match(note, /Return calls/);
-    assert.match(note, /copy\.returnCtaMany/);
+  it("names the return CTA from the same copy as Inbox", () => {
     const cta = page.slice(page.indexOf("let ctaHref"), page.indexOf("const showCta"));
     assert.match(cta, /else if \(work\.toReturn > 0\) \{/);
     assert.match(cta, /callsHref\(\{ purpose: "human" \}\)/);
     assert.match(cta, /copy\.returnCtaOne/);
     assert.match(cta, /copy\.returnCtaMany/);
+    assert.match(page, /label: "Need you", value: work\.toReturn/);
   });
 
-  it("earns desktop width with a Next to return column", () => {
+  it("pins the next return as the first caller card", () => {
     assert.match(page, /nextReturn/);
-    assert.match(page, /Next to return/);
-    assert.match(page, /Reply on WhatsApp/);
-    assert.match(page, /DeskRowHit/);
-    assert.match(page, /label="Conversation"/);
-    assert.doesNotMatch(page, />\s*Conversation\s*</);
-    assert.doesNotMatch(page, /Open call/);
-    assert.match(page, /lg:col-span-7/);
-    assert.match(page, /lg:col-span-5/);
+    assert.match(page, /pinId=\{nextReturn\?\.id/);
+    assert.match(read("dashboard/src/components/home/CallerCards.tsx"), /label="Call"/);
+    assert.doesNotMatch(page, /Next to return/);
+    assert.doesNotMatch(page, /Reply on WhatsApp/);
   });
 
   it("splits the aside into Today, Line, and Usage sections", () => {
@@ -107,34 +92,27 @@ describe("home overview craft", () => {
     assert.doesNotMatch(page, /KES \{kes\.toLocaleString/);
   });
 
-  it("posts Updates with the Settings bulletin panel", () => {
-    assert.match(page, /<DailyBulletinPanel tenant=\{tenant\} \/>/);
-    // The heading carries a live ping before the word when an update is live.
-    assert.match(page, /id="updates-heading"[\s\S]{0,300}\bUpdates\s*<\/h2>/);
+  it("posts Updates from a one-line status", () => {
+    assert.match(page, /<UpdateStatus tenant=\{tenant\} \/>/);
+    assert.match(read("dashboard/src/components/home/UpdateStatus.tsx"), /DailyBulletinPanel/);
+    assert.match(read("dashboard/src/components/home/UpdateStatus.tsx"), /Callers hear:/);
     assert.doesNotMatch(page, /aria-label="Live updates"/);
     assert.doesNotMatch(page, />Manage</);
     const actions = read("dashboard/src/app/(desk)/settings/bulletinActions.ts");
     assert.match(actions, /revalidatePath\("\/home"\)/);
-    const note = read("docs/reference/design-system/pages/home.md");
-    assert.match(note, /DailyBulletinPanel/);
   });
 
-  it("keeps one blue action and shows Next to return on phone", () => {
-    assert.match(page, /variant="ghost"/);
+  it("keeps one blue action on the line card", () => {
+    assert.match(page, /<ButtonLink href=\{ctaHref\}/);
     assert.doesNotMatch(page, /variant="primary"/);
-    assert.match(page, /hidden rounded-2xl border border-hairline bg-surface p-4 lg:block/);
-    assert.match(page, /lg:hidden/);
-    assert.match(page, /next-return-phone/);
-    assert.match(page, /nextReturn\.callerPhone \|\| nextReturn\.callId/);
+    assert.doesNotMatch(page, /next-return-phone/);
   });
 
-  it("gives queue counts visual weight", () => {
-    assert.match(page, /tabular-nums text-body font-semibold text-ink/);
-    assert.match(page, /deskPreviewClass/);
+  it("gives the line counts visual weight", () => {
+    assert.match(page, /tabular-nums text-title font-semibold text-ink/);
     assert.doesNotMatch(page, /nextHold\?\.headline/);
     assert.doesNotMatch(page, /nextJob\?\.headline/);
     assert.doesNotMatch(page, /overflow-wrap:anywhere/);
-    assert.doesNotMatch(page, /line-clamp-2/);
   });
 
   it("formats the DID with spaces", () => {
@@ -147,7 +125,7 @@ describe("home overview craft", () => {
     assert.match(page, /<HomeCapture/);
     assert.match(page, /!assistantSayPage && overviewChecks\.length/);
     assert.match(page, /line === "live" && !score\.ready_badge/);
-    assert.match(page, /<HomeReviewSettingsNudge/);
+    assert.match(read("dashboard/src/components/HomeGetReadyCallsCard.tsx"), /<HomeReviewSettingsNudge/);
     const nudge = read("dashboard/src/components/HomeReviewSettingsNudge.tsx");
     assert.match(nudge, /aria-label="Settings review"/);
     assert.doesNotMatch(nudge, /ScoreRing/);
@@ -159,6 +137,7 @@ describe("home overview craft", () => {
 
   it("renders the day digest only from a complete window", () => {
     assert.match(page, /homeDigestLine\(inbox\.items, dayStart, vertical\)/);
+    assert.match(page, /inbox\.callsTruncated/);
     assert.match(page, /inbox\.callsTruncated/);
     const purpose = read("dashboard/src/lib/inboxPurpose.ts");
     assert.match(purpose, /export function homeDigestLine/);

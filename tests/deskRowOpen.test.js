@@ -28,7 +28,7 @@ describe("desk rows open the record", () => {
     assert.match(inbox, /InboxRowHit/);
     assert.match(list, /ListRow/);
     assert.match(read("dashboard/src/components/ContactsEndlessList.tsx"), /ContactPhoneRow/);
-    assert.match(home, /DeskRowHit/);
+    assert.match(read("dashboard/src/components/home/CallerCards.tsx"), /inboxRecordHref/);
     assert.match(contact, /<ContactHistory/);
     assert.match(read("dashboard/src/components/ContactHistory.tsx"), /ListRow/);
   });

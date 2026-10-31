@@ -31,7 +31,6 @@ export function minutesMeterState(input: MinutesMeterInput): MinutesMeterState {
   if (input.left <= 0 && !input.underOne) return "usedup";
   if (input.underOne) return "under1";
   const low = input.left > 0 && input.left <= Math.max(1, Math.floor(input.included * LOW_SHARE));
-  if (input.mode === "beta") return low ? "low" : "beta";
   if (low) return "low";
   return "under";
 }

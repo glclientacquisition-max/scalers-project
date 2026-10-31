@@ -43,11 +43,8 @@ describe("desk preview truncate", () => {
   it("keeps Home queue units as nouns, not hangup copy", () => {
     assert.match(purpose, /HOME_QUEUE_SAMPLE_MAX = 28/);
     assert.match(purpose, /text\.length <= HOME_QUEUE_SAMPLE_MAX/);
-    assert.match(home, /nextHold\?\.hold\?\.when_text/);
-    assert.match(home, /nextJob\?\.job\?\.when_text/);
     assert.doesNotMatch(home, /nextHold\?\.headline/);
     assert.doesNotMatch(home, /nextJob\?\.headline/);
-    assert.match(home, /deskPreviewClass/);
     assert.doesNotMatch(home, /overflow-wrap:anywhere/);
   });
 

@@ -81,19 +81,15 @@ describe("desk batch D screen fit and recovery", () => {
     assert.match(inbox, />\s*Show all\s*</);
   });
 
-  it("puts Work before the aside and Updates on the phone source order", () => {
+  it("puts the line card before callers and the update line", () => {
     const home = read("dashboard/src/app/(desk)/home/page.tsx");
-    const work = home.indexOf('id="work-heading"');
-    const aside = home.indexOf("<aside");
-    const updates = home.indexOf('id="updates-heading"');
-    assert.ok(work >= 0 && aside > work && updates > aside);
-    assert.match(home, /lg:col-span-7 lg:col-start-1 lg:row-start-1/);
-    assert.match(home, /lg:row-span-2 lg:row-start-1/);
+    const line = home.indexOf('aria-label="Line"');
+    const callers = home.indexOf("<CallerCards");
+    const updates = home.indexOf("<UpdateStatus");
+    assert.ok(line >= 0 && callers > line && updates > callers);
     assert.match(home, /returnSidebar/);
     assert.match(home, /DeskLoadError/);
     assert.match(home, /Could not load Overview/);
-    const note = read("docs/reference/design-system/pages/home.md");
-    assert.match(note, /Work, then aside, then Updates/);
   });
 
   it("retries load failures in place", () => {

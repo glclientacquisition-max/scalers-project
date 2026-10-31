@@ -147,7 +147,8 @@ describe('Overview hold count (Aris "1 Hold" while locked)', () => {
   it('Overview uses the gate model, with Needs setup instead of Locked', () => {
     const home = read('dashboard/src/app/(desk)/home/page.tsx');
     assert.match(home, /capabilityGates\(tenant/);
-    assert.match(home, /<CapabilityGatesPanel gates=\{gates\} \/>/);
+    assert.match(home, /gatesOff/);
+    assert.match(read("dashboard/src/app/(desk)/settings/page.tsx"), /<CapabilityGatesPanel gates=\{capabilityGates\(tenant/);
     assert.doesNotMatch(home, />Locked</);
     const panel = read('dashboard/src/components/CapabilityGatesPanel.tsx');
     assert.match(panel, /from "@\/components\/ui\/Sheet"/);

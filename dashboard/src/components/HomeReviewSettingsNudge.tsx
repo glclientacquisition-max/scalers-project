@@ -12,10 +12,13 @@ export function HomeReviewSettingsNudge({
   tenantId,
   vertical,
   score,
+  embedded = false,
 }: {
   tenantId: string;
   vertical: string | null | undefined;
   score: CaptureScore;
+  /** Inside Get ready: no second card. */
+  embedded?: boolean;
 }) {
   const [dismissed, setDismissed] = useState(false);
   const storageKey = `scalers.captureNudge.${tenantId}`;
@@ -52,11 +55,8 @@ export function HomeReviewSettingsNudge({
 
   if (score.ready_badge || dismissed) return null;
 
-  return (
-    <section
-      className="mt-3 rounded-2xl border border-hairline bg-surface px-4 py-3"
-      aria-label="Settings review"
-    >
+  const inner = (
+    <div className={embedded ? "px-4 py-2" : "px-4 py-3"} aria-label="Settings review">
       <div className="flex items-start justify-between gap-3">
         <p className="min-w-0 text-body text-ink-2">
           {preview}{" "}
@@ -75,6 +75,8 @@ export function HomeReviewSettingsNudge({
           Dismiss
         </Button>
       </div>
-    </section>
+    </div>
   );
+  if (embedded) return inner;
+  return <section className="mt-3 rounded-2xl border border-hairline bg-surface">{inner}</section>;
 }

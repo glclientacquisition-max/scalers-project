@@ -32,9 +32,8 @@ describe("desk density P1", () => {
     assert.match(home, /<HomeOverviewHeader today=\{today\} \/>/);
   });
 
-  it("keeps Return calls on the Work queue and skips the twin aside CTA", () => {
-    const queues = home.slice(home.indexOf("const queues"), home.indexOf("let ctaHref"));
-    assert.match(queues, /label: copy\.returnCtaMany/);
+  it("keeps Return calls on the line CTA and skips a twin button", () => {
+    assert.match(home, /copy\.returnCtaMany/);
     assert.match(home, /const returnSidebar =/);
     assert.match(home, /ctaLabel === copy\.returnCtaOne \|\| ctaLabel === copy\.returnCtaMany/);
     assert.match(home, /const showCta = !\(line === "pending" && waitingCount === 0\) && !returnSidebar/);
