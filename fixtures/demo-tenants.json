@@ -13,8 +13,8 @@
       "areas": ["Kilimani", "Kileleshwa", "Lavington", "Hurlingham"],
       "call_out_fee_kes": 500,
       "openers": {
-        "en": "Amani Visit Services, Amina speaking. We clean homes and fix small leaks around Kilimani.",
-        "sw": "Amani Visit Services, Amina hapa. Tunasafisha nyumba na kurekebisha mabomba madogo karibu na Kilimani."
+        "en": "Amani Visit Services, Amina speaking. We clean homes and fix small leaks.",
+        "sw": "Amani Visit Services, Amina hapa. Tunasafisha nyumba na kurekebisha mabomba."
       },
       "hours_schedule": {
         "timezone": "Africa/Nairobi",
@@ -123,8 +123,8 @@
       "areas": ["Ngong Road"],
       "call_out_fee_kes": null,
       "openers": {
-        "en": "Nuru Lane Electronics, Neema speaking. Ask a price and I will read it from the shelf list.",
-        "sw": "Nuru Lane Electronics, Neema hapa. Uliza bei nami nitasoma kutoka kwenye orodha ya rafu."
+        "en": "Nuru Lane Electronics, Neema speaking. Ask me the price of anything.",
+        "sw": "Nuru Lane Electronics, Neema hapa. Uliza bei ya bidhaa yoyote."
       },
       "hours_schedule": {
         "timezone": "Africa/Nairobi",
