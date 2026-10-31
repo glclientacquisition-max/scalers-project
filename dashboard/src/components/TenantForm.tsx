@@ -3,7 +3,7 @@
 import { AlertContactsList } from "@/components/AlertContactsList";
 
 import { useCan, withRoleGate } from "@/components/DeskRole";
-import { CharCount as KitCharCount, FieldCard, TextAreaField, TextField } from "@/components/ui/TextField";
+import { AutoGrowTextarea, CharCount as KitCharCount } from "@/components/ui/TextField";
 import { POLICY_TEXT_MAX } from "@/lib/lengthLimits";
 import { normalizeContactPhone } from "@/lib/teamValidation";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -85,7 +85,6 @@ import {
   FAQ_MAX,
   FAQ_QUESTION_MAX,
   clampFaq,
-  normalizeFaqKey,
 } from "@/lib/faqs";
 import { SERVICES_PASTE_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
 import { useMountedPoolPick } from "@/lib/useMountedPoolPick";
@@ -135,6 +134,9 @@ import dynamic from "next/dynamic";
 // Pronunciation is one panel of many; load it only when that panel renders.
 const PronunciationCoach = dynamic(() => import("@/components/PronunciationCoach").then((m) => m.PronunciationCoach));
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
+import { Button } from "@/components/ui/Button";
+import { Empty } from "@/components/ui/Empty";
+import { notify } from "@/components/ui/DeskNotice";
 import { useFormDraft, useFormSave } from "@/components/useFormSave";
 import { carrySavedRow, isSavedRow, markSavedRow } from "@/lib/savedRow";
 import { Pagination } from "@/components/ui/Pagination";
@@ -231,8 +233,6 @@ const TEAM_NOTIFY_FLAGS: Array<{
   { key: "receives_inbox", label: "Follow-up" },
   { key: "receives_ops", label: "Ops" },
 ];
-const emptyFaq = (): FaqEntry => ({ question: "", answer: "" });
-
 
 /** Pull location prose from legacy free-text hours when schedule.location is empty. */
 function extractLocationFallback(businessHours: string): string {
@@ -348,8 +348,6 @@ function CharCount({ value, max }: { value: string; max: number }) {
 
 const SERVICE_PAGE_SIZE = 5;
 const PRODUCT_PAGE_SIZE = 8;
-const FAQ_PAGE_SIZE = 5;
-
 function CatalogPager({
   page,
   pageSize,
@@ -449,7 +447,10 @@ function TenantFormInner({
     // Read after mount so server and first client render agree.
     if (new URLSearchParams(window.location.search).get("filter") === "unpriced") setUnpricedOnly(true);
   }, []);
-  const [faqPage, setFaqPage] = useState(0);
+  const [faqQuery, setFaqQuery] = useState("");
+  const [faqEditor, setFaqEditor] = useState<number | "new" | null>(null);
+  const [faqDraft, setFaqDraft] = useState({ question: "", answer: "" });
+  const [faqRemove, setFaqRemove] = useState<number | null>(null);
   const [unknownText, setUnknownText] = useState(() => unknownAnswerBoxText(tenant.unknown_answer_fallback));
   const unknownLine = ownerUnknownAnswer(unknownText);
   const [storedSpoken] = useState(() => {
@@ -607,22 +608,6 @@ function TenantFormInner({
     [locations]
   );
   const policiesJson = useMemo(() => JSON.stringify(policies), [policies]);
-  const faqDupIndexes = useMemo(() => {
-    const seen = new Map<string, number>();
-    const dups = new Set<number>();
-    faqs.forEach((f, i) => {
-      const key = normalizeFaqKey(f.question);
-      if (!key) return;
-      const prev = seen.get(key);
-      if (prev != null) {
-        dups.add(prev);
-        dups.add(i);
-      } else {
-        seen.set(key, i);
-      }
-    });
-    return dups;
-  }, [faqs]);
   const servicesJson = useMemo(
     () =>
       JSON.stringify(
@@ -671,20 +656,14 @@ function TenantFormInner({
   );
   const servicePageCount = Math.max(1, Math.ceil(serviceIdx.length / SERVICE_PAGE_SIZE));
   const productPageCount = Math.max(1, Math.ceil(productIdx.length / PRODUCT_PAGE_SIZE));
-  const faqPageCount = Math.max(1, Math.ceil(faqs.length / FAQ_PAGE_SIZE));
   const safeServicePage = Math.min(servicePage, servicePageCount - 1);
   const safeProductPage = Math.min(productPage, productPageCount - 1);
-  const safeFaqPage = Math.min(faqPage, faqPageCount - 1);
   const visibleServices = serviceIdx
     .slice(safeServicePage * SERVICE_PAGE_SIZE, safeServicePage * SERVICE_PAGE_SIZE + SERVICE_PAGE_SIZE)
     .map((i) => services[i]);
   const visibleProducts = productIdx
     .slice(safeProductPage * PRODUCT_PAGE_SIZE, safeProductPage * PRODUCT_PAGE_SIZE + PRODUCT_PAGE_SIZE)
     .map((i) => products[i]);
-  const visibleFaqs = faqs.slice(
-    safeFaqPage * FAQ_PAGE_SIZE,
-    safeFaqPage * FAQ_PAGE_SIZE + FAQ_PAGE_SIZE
-  );
   const socialJson = useMemo(
     () => JSON.stringify(socialHandles),
     [socialHandles]
@@ -746,35 +725,57 @@ function TenantFormInner({
     setOwnerPaths((prev) => (prev.includes(path) ? prev : [...prev, path]));
   }
 
-  function updateFaq(index: number, key: keyof FaqEntry, value: string) {
-    const current = faqs[index];
-    if (
-      current &&
-      (key === "question" || key === "answer") &&
-      current[key] !== value
-    ) {
-      queueOwnerPath(`faqs.${index + 1}`);
+  function storedFaqs(rows: FaqEntry[]) {
+    return JSON.stringify(rows.filter((f) => f.question.trim() && f.answer.trim()).map((f) => clampFaq(f)));
+  }
+
+  function commitFaqs(next: FaqEntry[]) {
+    setFaqs(next);
+    const form = document.getElementById(TENANT_SETTINGS_FORM_ID) as HTMLFormElement | null;
+    const input = form?.querySelector<HTMLInputElement>('input[name="faqs"]');
+    if (input) input.value = storedFaqs(next);
+    if (panel === "faqs") form?.requestSubmit();
+  }
+
+  function openFaqEditor(index: number | "new") {
+    if (index === "new") {
+      setFaqDraft({ question: "", answer: "" });
+    } else {
+      const row = faqs[index];
+      setFaqDraft({ question: row?.question || "", answer: row?.answer || "" });
     }
-    setFaqs((prev) =>
-      prev.map((row, i) => {
-        if (i !== index) return row;
-        if (key !== "question" && key !== "answer") {
-          return carrySavedRow({ ...row, [key]: value }, row);
-        }
-        if (row[key] === value) return row;
-        const keepGolden = row.source === "owner" && row.status === "golden";
-        return carrySavedRow(
-          {
-            ...row,
-            [key]: value,
-            source: "owner",
-            status: keepGolden ? "golden" : "confirmed",
-            confirmed: true,
-          },
-          row
-        );
-      })
-    );
+    setFaqEditor(index);
+  }
+
+  function saveFaqEditor() {
+    const question = faqDraft.question.trim();
+    const answer = faqDraft.answer.trim();
+    if (!question || !answer || faqEditor == null) return;
+    if (faqEditor === "new") {
+      commitFaqs([...faqs, { question, answer, source: "owner", status: "confirmed", confirmed: true }]);
+    } else {
+      commitFaqs(faqs.map((row, i) => (i === faqEditor ? { ...row, question, answer, source: "owner", status: row.status === "golden" ? "golden" : "confirmed", confirmed: true } : row)));
+    }
+    setFaqEditor(null);
+  }
+
+  function confirmRemoveFaq(index: number) {
+    const removed = faqs[index];
+    if (!removed) return;
+    const next = faqs.filter((_, i) => i !== index);
+    commitFaqs(next);
+    setFaqRemove(null);
+    setFaqEditor(null);
+    notify("FAQ removed", {
+      action: {
+        label: "Undo",
+        run: () => {
+          const restored = [...next];
+          restored.splice(index, 0, removed);
+          commitFaqs(restored);
+        },
+      },
+    });
   }
 
   function updateService(index: number, key: keyof ServiceItem, value: string) {
@@ -2244,90 +2245,103 @@ function TenantFormInner({
         id="golden-faqs"
         className={panel === "faqs" ? "space-y-3" : "hidden"}
       >
-        <div className="flex flex-wrap items-end justify-between gap-2 px-1">
-          <p className={settingsBlockTitleClass} aria-live="polite">
-            FAQs{" "}
-            <span className="ml-1 font-medium normal-case tracking-normal text-ink-2">
-              {filledFaqCount} of {FAQ_MAX}
-            </span>
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setFaqs((prev) => [...prev, emptyFaq()]);
-              setFaqPage(Math.floor(faqs.length / FAQ_PAGE_SIZE));
-            }}
-            disabled={faqs.length >= FAQ_MAX}
-            className={`${settingsGhostButtonClass} disabled:opacity-60`}
-          >
-            Add FAQ
-          </button>
-        </div>
-
-        {faqs.length > 0 ? (
-        <>
-        <ol className="space-y-3" aria-label="FAQs" data-faq-list="">
-          {visibleFaqs.map((faq, localIndex) => {
-            const index = safeFaqPage * FAQ_PAGE_SIZE + localIndex;
-            const dup = faqDupIndexes.has(index);
+        <label className="block px-1">
+          <span className="sr-only">Search FAQs</span>
+          <input
+            value={faqQuery}
+            onChange={(e) => setFaqQuery(e.target.value)}
+            placeholder="Search"
+            className={settingsDenseFieldClass}
+          />
+        </label>
+        {filledFaqCount === 0 ? (
+          <Empty title="No FAQs yet" line="Add the questions callers ask most." />
+        ) : null}
+        <ul className="overflow-hidden rounded-2xl border border-hairline bg-surface" aria-label="FAQs" data-faq-list="">
+          {faqs.map((faq, index) => {
+            const filled = Boolean(faq.question.trim() && faq.answer.trim());
+            if (!filled) return null;
+            const q = faqQuery.trim().toLowerCase();
+            if (q && !`${faq.question} ${faq.answer}`.toLowerCase().includes(q)) return null;
             return (
-            <li key={`faq-${index}`}>
-              <FieldCard
-                data-faq-card=""
-                title={`FAQ ${index + 1}`}
-                action={
-                  <button
-                    type="button"
-                    onClick={() =>
-                      requestRemove(
-                        faq,
-                        "Remove this FAQ?",
-                        "It leaves the list when you save.",
-                        () => setFaqs((prev) => prev.filter((_, i) => i !== index))
-                      )
-                    }
-                    className={settingsTrashButtonClass}
-                    aria-label={`Remove FAQ ${index + 1}`}
-                  >
-                    <TrashIcon className="h-5 w-5" />
-                  </button>
-                }
-              >
-                <TextField
-                  id={`faq-q-${index}`}
-                  label={<>Question<span className="sr-only"> {index + 1}</span></>}
-                  value={faq.question}
-                  maxLength={FAQ_QUESTION_MAX}
-                  placeholder="Do you deliver on Sundays?"
-                  onChange={(e) => updateFaq(index, "question", e.target.value)}
-                  error={dup ? "Same as another FAQ. Keep one clear wording." : null}
-                />
-                <TextAreaField
-                  id={`faq-a-${index}`}
-                  label={<>Answer<span className="sr-only"> to FAQ {index + 1}</span></>}
-                  value={faq.answer}
-                  maxLength={FAQ_ANSWER_MAX}
-                  rows={3}
-                  hint="Write it the way you would say it on the phone."
-                  onChange={(e) => updateFaq(index, "answer", e.target.value)}
-                />
-              </FieldCard>
-            </li>
+              <li key={`faq-${index}`} className="border-b border-hairline last:border-b-0">
+                <button
+                  type="button"
+                  onClick={() => openFaqEditor(index)}
+                  className="flex min-h-14 w-full items-center gap-3 px-4 py-2 text-start hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-body font-medium text-ink">{faq.question}</span>
+                    <span className="block truncate text-meta text-ink-2">{faq.answer}</span>
+                  </span>
+                  <ChevronRightIcon className="size-5 shrink-0 text-ink-3" aria-hidden />
+                </button>
+              </li>
             );
           })}
-        </ol>
-        {faqs.length > FAQ_PAGE_SIZE ? (
-        <Pagination
-          page={safeFaqPage + 1}
-          pageSize={FAQ_PAGE_SIZE}
-          total={faqs.length}
-          noun="FAQ"
-          onPage={(next) => setFaqPage(next - 1)}
-          className="rounded-2xl border border-hairline bg-surface px-3 py-3"
-        />
-        ) : null}
-        </>
-        ) : null}
+          <li>
+            <button
+              type="button"
+              onClick={() => openFaqEditor("new")}
+              disabled={faqs.length >= FAQ_MAX}
+              className="flex min-h-11 w-full items-center px-4 text-start text-body font-medium text-ink hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand disabled:opacity-60"
+            >
+              + Add FAQ
+            </button>
+          </li>
+        </ul>
+        <Sheet
+          open={faqEditor != null}
+          onOpenChange={(next) => { if (!next) setFaqEditor(null); }}
+          title={faqEditor === "new" ? "Add FAQ" : "FAQ"}
+          footer={
+            <Button type="button" onClick={saveFaqEditor} disabled={!faqDraft.question.trim() || !faqDraft.answer.trim()}>
+              Save
+            </Button>
+          }
+        >
+          <div className="space-y-3">
+            <label className="block text-meta text-ink-2" htmlFor="faq-sheet-q">
+              Question
+              <AutoGrowTextarea
+                id="faq-sheet-q"
+                rows={2}
+                maxLength={FAQ_QUESTION_MAX}
+                value={faqDraft.question}
+                placeholder="Do you deliver on Sundays?"
+                onChange={(e) => setFaqDraft((prev) => ({ ...prev, question: e.target.value }))}
+                className={`${settingsDenseFieldClass} mt-1`}
+              />
+            </label>
+            <label className="block text-meta text-ink-2" htmlFor="faq-sheet-a">
+              Answer
+              <AutoGrowTextarea
+                id="faq-sheet-a"
+                rows={3}
+                maxLength={FAQ_ANSWER_MAX}
+                value={faqDraft.answer}
+                placeholder="Write it the way you would say it on the phone."
+                onChange={(e) => setFaqDraft((prev) => ({ ...prev, answer: e.target.value }))}
+                className={`${settingsDenseFieldClass} mt-1`}
+              />
+            </label>
+            {typeof faqEditor === "number" ? (
+              <button type="button" className="inline-flex min-h-11 items-center text-body font-medium text-attention" onClick={() => setFaqRemove(faqEditor)}>
+                Remove
+              </button>
+            ) : null}
+          </div>
+        </Sheet>
+        <ConfirmSheet
+          open={faqRemove != null}
+          title="Remove this FAQ?"
+          confirmLabel="Remove"
+          danger
+          onClose={() => setFaqRemove(null)}
+          onConfirm={() => { if (faqRemove != null) confirmRemoveFaq(faqRemove); }}
+        >
+          It leaves the list. You can undo.
+        </ConfirmSheet>
       </section>
       </div>
       <SettingsActionBar changes={changes} pending={pending} saved={justSaved} />
