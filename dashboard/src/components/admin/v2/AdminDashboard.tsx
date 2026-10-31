@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { ChevronRightIcon } from "@heroicons/react/20/solid";
 import { HealthStrip } from "@/components/admin/v2/HealthStrip";
-import { MetricSparkline, type SparkPoint } from "@/components/admin/v2/MetricSparkline";
+import { MetricSparkline } from "@/components/admin/v2/MetricSparkline";
 import { StatusPill } from "@/components/ops";
 import { StatusMark } from "@/components/ui/StatusMark";
 import { Segmented } from "@/components/ui/Segmented";
@@ -14,7 +14,7 @@ import { loadInsightFacts } from "@/lib/adminInsightsLoad";
 import { loadInvoicesV2 } from "@/lib/adminInvoicesV2Load";
 import { readPlatformOps } from "@/lib/platformOps";
 import { buildAttention, attentionCounts, KIND_LABEL, type AttentionKind } from "@/lib/ops/attentionView";
-import { billingHomeTotals, collectedWeekPoints, lastMonthCollected } from "@/lib/ops/billingHomeView";
+import { billingHomeTotals, lastMonthCollected } from "@/lib/ops/billingHomeView";
 import { callsCardModel } from "@/lib/ops/callsCard";
 import { ksh } from "@/lib/ops/invoicesView";
 import { missedDemand } from "@/lib/ops/insightsView";
@@ -22,8 +22,6 @@ import type { OpsSignal } from "@/lib/platformOpsModel";
 
 const MONTH = new Intl.DateTimeFormat("en-KE", { month: "long", year: "numeric", timeZone: "Africa/Nairobi" });
 const CLOCK = new Intl.DateTimeFormat("en-KE", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Africa/Nairobi" });
-const WEEK = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", timeZone: "Africa/Nairobi" });
-
 function callsDelta(current: number, prior: number | null, days: number): string | null {
   if (prior == null) return null;
   const d = current - prior;
@@ -125,10 +123,6 @@ async function CallsCard({ days, now }: { days: 7 | 30; now: Date }) {
   if (model.state === "empty") {
     return <Card><h2 className="text-ops-heading text-ink">Calls</h2><p className="mt-2 text-ops-body text-ink-2">No reviewed calls in this range.</p></Card>;
   }
-  const points: SparkPoint[] = model.weeks.map((week) => ({
-    label: WEEK.format(new Date(week.ending)),
-    value: week.calls,
-  }));
   const legend = [
     { key: "resolved", n: model.split.assistant, word: "resolved", dot: "bg-accent" },
     { key: "handed", n: model.split.handed, word: "handed over", dot: "bg-ink-3" },
@@ -143,7 +137,7 @@ async function CallsCard({ days, now }: { days: 7 | 30; now: Date }) {
       </div>
       <p className="mt-1 tabular-nums text-ops-title font-semibold text-ink">{model.calls}</p>
       {delta ? <p className="text-meta tabular-nums text-ink-2">{delta}</p> : null}
-      <MetricSparkline points={points} format={(n) => `${n.toLocaleString("en-KE")} calls`} />
+      <MetricSparkline points={model.series} unit="calls" />
       <ul className="mt-2 flex flex-col gap-1" aria-label="Call outcomes">
         {legend.map((row) => (
           <li key={row.key} className="flex min-h-8 items-center gap-2 text-ops-body text-ink">
@@ -162,11 +156,18 @@ async function MoneyCard({ now }: { now: Date }) {
     const loaded = await loadInvoicesV2();
     const totals = billingHomeTotals(loaded.rows, now);
     const prior = lastMonthCollected(loaded.rows, now);
-    const weeks = collectedWeekPoints(loaded.rows, now);
     const quiet = totals.billedThisMonthCents === 0 && totals.outstandingCents === 0 && totals.collectedThisMonthCents === 0;
-    const moneyDelta = prior
-      ? `${ksh(Math.abs(totals.collectedThisMonthCents - prior.cents))} ${totals.collectedThisMonthCents >= prior.cents ? "more" : "less"} than ${prior.label}`
-      : null;
+    const moneyDelta = !prior
+      ? null
+      : totals.collectedThisMonthCents === prior.cents
+        ? `Same as ${prior.label}`
+        : `${ksh(Math.abs(totals.collectedThisMonthCents - prior.cents))} ${totals.collectedThisMonthCents > prior.cents ? "more" : "less"} than ${prior.label}`;
+    const moneySeries = prior
+      ? [
+          { label: prior.label, value: prior.cents },
+          { label: MONTH.format(now), value: totals.collectedThisMonthCents },
+        ]
+      : [];
     return (
       <Card>
         <div className="flex items-baseline justify-between gap-2">
@@ -177,8 +178,8 @@ async function MoneyCard({ now }: { now: Date }) {
         {quiet ? <p className="mt-2 text-ops-body text-ink-2">Nothing billed this month.</p> : (
           <p className="mt-1 tabular-nums text-ops-title font-semibold text-ink">{ksh(totals.collectedThisMonthCents)}</p>
         )}
-        {moneyDelta && totals.collectedThisMonthCents !== prior?.cents ? <p className="text-meta tabular-nums text-ink-2">{moneyDelta}</p> : null}
-        <MetricSparkline points={weeks} format={(cents) => ksh(cents)} />
+        {moneyDelta ? <p className="text-meta tabular-nums text-ink-2">{moneyDelta}</p> : null}
+        {prior ? <MetricSparkline points={moneySeries} unit="ksh" /> : null}
         {totals.overdueCents > 0 ? <StatusPill tone="warn">{ksh(totals.overdueCents)} overdue</StatusPill> : null}
       </Card>
     );
@@ -257,27 +258,31 @@ async function QualityCard({ days }: { days: 7 | 30 }) {
 /** Admin home: health plus five cards. Money stays on the billing month. */
 export function AdminDashboard({ days, now }: { days: 7 | 30; now: Date }) {
   return (
-    <div className="ops-theme flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-ops-title text-ink">Overview</h1>
+    <div className="ops-theme flex w-full flex-col gap-3 lg:grid lg:grid-cols-12 lg:items-start lg:gap-4">
+      <div className="flex w-full items-end justify-between gap-3 border-b border-hairline lg:col-span-12">
+        <h1 className="min-w-0 pb-2 text-ops-title text-ink">Overview</h1>
         <Segmented
+          flush
           label="Range"
-          className="w-auto"
           items={[
             { key: "7", label: "7d", href: "/admin?days=7", active: days === 7 },
             { key: "30", label: "30d", href: "/admin?days=30", active: days === 30 },
           ]}
         />
       </div>
-      <Suspense fallback={<Skel />}><HealthCard /></Suspense>
-      <Suspense fallback={<Skel />}><AttentionCard now={now} /></Suspense>
-      <Suspense fallback={<Skel />}><CallsCard days={days} now={now} /></Suspense>
-      <div className="grid grid-cols-2 gap-3">
-        <Suspense fallback={<Skel />}><MoneyCard now={now} /></Suspense>
-        <Suspense fallback={<Skel />}><BusinessesCard /></Suspense>
+      <div className="lg:col-span-12">
+        <Suspense fallback={<Skel />}><HealthCard /></Suspense>
       </div>
-      <Suspense fallback={<Skel />}><QualityCard days={days} /></Suspense>
-      <p className="text-ops-label text-ink-3">As of {CLOCK.format(now)}</p>
+      <div className="flex flex-col gap-3 lg:col-span-8 lg:grid lg:grid-cols-2 lg:items-start">
+        <Suspense fallback={<Skel />}><AttentionCard now={now} /></Suspense>
+        <Suspense fallback={<Skel />}><CallsCard days={days} now={now} /></Suspense>
+      </div>
+      <div className="flex flex-col gap-3 lg:col-span-4">
+        <Suspense fallback={<Skel />}><BusinessesCard /></Suspense>
+        <Suspense fallback={<Skel />}><MoneyCard now={now} /></Suspense>
+        <Suspense fallback={<Skel />}><QualityCard days={days} /></Suspense>
+      </div>
+      <p className="text-ops-label text-ink-3 lg:col-span-12">As of {CLOCK.format(now)}</p>
     </div>
   );
 }

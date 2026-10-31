@@ -37,24 +37,6 @@ export function nairobiMonthStart(now: Date): number {
   return Date.UTC(eat.getUTCFullYear(), eat.getUTCMonth(), 1) - 3 * 3600000;
 }
 
-/** Paid amounts this Nairobi month, one point per week that has a payment. Empty when fewer than two weeks paid. */
-export function collectedWeekPoints(rows: InvoiceRow[], now: Date): { label: string; value: number }[] {
-  const start = nairobiMonthStart(now);
-  const fmt = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", timeZone: "Africa/Nairobi" });
-  const byWeek = new Map<number, number>();
-  for (const r of rows) {
-    if (!counts(r) || !r.paidAt) continue;
-    const t = Date.parse(r.paidAt);
-    if (!Number.isFinite(t) || t < start || t > now.getTime()) continue;
-    const week = Math.floor((t - start) / (7 * 86400000));
-    byWeek.set(week, (byWeek.get(week) || 0) + r.paidCents);
-  }
-  const points = [...byWeek.entries()]
-    .toSorted((a, b) => a[0] - b[0])
-    .map(([week, value]) => ({ label: fmt.format(new Date(start + week * 7 * 86400000)), value }));
-  return points.length >= 2 ? points : [];
-}
-
 /** Collected last calendar month in Nairobi. Null when that month has no payments. */
 export function lastMonthCollected(rows: InvoiceRow[], now: Date): { cents: number; label: string } | null {
   const start = nairobiMonthStart(now);

@@ -422,8 +422,8 @@ function retapAdminTab() {
 }
 
 const phoneTabClass =
-  "flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 pt-1.5";
-const phoneLabelClass = "max-w-full truncate text-center text-caption leading-none";
+  "flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 px-0 pt-1.5";
+const phoneLabelClass = "max-w-full whitespace-nowrap text-center text-caption leading-none tracking-tighter";
 
 /**
  * Numbers, Platform, Activity, and Settings. The bar itself stays five items wide.
