@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode, type RefObject } from "react";
-import { PlusIcon, SpeakerWaveIcon, ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/20/solid";
+import { PlusIcon, SpeakerWaveIcon } from "@heroicons/react/20/solid";
 import { useCan, withRoleGate } from "@/components/DeskRole";
 import { Button } from "@/components/ui/Button";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
+import { Sheet } from "@/components/ui/Sheet";
 import { clearRowPending, markRowPending, rowIsPending } from "@/lib/rowPending";
-import { IconButton } from "@/components/ui/IconButton";
 import { Switch } from "@/components/ui/Switch";
 import { TextAreaField } from "@/components/ui/TextField";
 import { SettingsPageHeader, settingsConsoleClass, settingsPanelClass } from "@/components/settingsUi";
@@ -305,7 +306,7 @@ function CallersHearControls({
     <>
       {text ? (
         <div className="flex flex-wrap items-center gap-2" data-role-exempt="">
-          <Button variant="tonal" size="md" pending={loading} leading={<SpeakerWaveIcon aria-hidden className="size-4" />} onClick={() => void hear()}>
+          <Button variant="tonal" size="md" className="min-h-11" pending={loading} leading={<SpeakerWaveIcon aria-hidden className="size-4" />} onClick={() => void hear()}>
             Hear it
           </Button>
         </div>
@@ -335,27 +336,21 @@ function CallersHearCompact({
 }: {
   preview: ReturnType<typeof useCallersHearPreview>;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const compactLine = preview.text || (preview.lines[0] ? `${preview.lines[0].label}: ${preview.lines[0].text}` : "");
   return (
     <div
-      className={cx(
-        "sticky top-0 z-10 col-span-full border-b border-hairline bg-surface px-3 py-2 shadow-sm xl:hidden",
-        expanded ? "" : "max-h-[4.5rem] overflow-hidden",
-      )}
+      className="sticky top-0 z-10 col-span-full border-b border-hairline bg-surface px-3 py-2 shadow-sm xl:hidden"
       data-callers-hear-compact=""
     >
-      <div className="flex min-h-11 max-h-11 items-center gap-2">
-        <p
-          className="min-w-0 flex-1 truncate text-body text-ink"
-          title={compactLine || undefined}
-        >
+      <div className="flex items-start gap-2">
+        <p className="min-w-0 flex-1 line-clamp-2 text-body text-ink" title={compactLine || undefined}>
           {compactLine || "Nothing set yet."}
         </p>
         {preview.text ? (
           <Button
             variant="tonal"
-            size="sm"
+            size="md"
             pending={preview.loading}
             leading={<SpeakerWaveIcon aria-hidden className="size-4" />}
             onClick={() => void preview.hear()}
@@ -363,20 +358,15 @@ function CallersHearCompact({
             Hear it
           </Button>
         ) : null}
-        <IconButton
-          label={expanded ? "Collapse callers hear" : "Expand callers hear"}
-          onClick={() => setExpanded((open) => !open)}
-        >
-          {expanded ? <ChevronUpIcon className="size-5" aria-hidden /> : <ChevronDownIcon className="size-5" aria-hidden />}
-        </IconButton>
       </div>
-      {expanded ? (
-        <div className="mt-2 space-y-2 border-t border-hairline pt-2 pb-1">
-          <p className="text-meta font-medium text-ink-2">Callers hear</p>
-          <CallersHearLinesList lines={preview.lines} />
-          <CallersHearControls {...preview} />
-        </div>
+      {preview.lines.length > 1 ? (
+        <button type="button" className="inline-flex min-h-11 items-center text-body font-medium text-accent" onClick={() => setShowAll(true)}>
+          Show all
+        </button>
       ) : null}
+      <Sheet open={showAll} onOpenChange={setShowAll} title="What callers hear">
+        <CallersHearLinesList lines={preview.lines} />
+      </Sheet>
     </div>
   );
 }
@@ -424,6 +414,7 @@ function PoliciesSettingsInner({
   assistantSayPage?: boolean;
 }) {
   const canEdit = useCan("settings.edit");
+  const [dropNote, setDropNote] = useState<{ title: string; run: () => void } | null>(null);
   const kind: PoliciesKind = policiesKind(tenant);
   const niche = useMemo(() => policiesNiche(tenant, kind), [tenant, kind]);
   const voices = curatedVoices && curatedVoices.length ? curatedVoices : listCuratedSonioxVoicesSync();
@@ -616,16 +607,12 @@ function PoliciesSettingsInner({
                 <div className="flex items-start gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-body font-medium text-ink" id="booking-mode-label">
-                      Book a time slot directly
+                      Take booking requests
                     </p>
-                    <p className="mt-0.5 text-body text-ink-2">
-                      {readBookingMode(bp) === "confirmed_slot"
-                        ? "On. Your Business Assistant notes the time callers ask for, and you confirm it."
-                        : "Off. Callers ask for a time and you confirm it."}
-                    </p>
+                    <p className="mt-0.5 text-body text-ink-2">You confirm each time.</p>
                   </div>
                   <Switch
-                    label="Book a time slot directly"
+                    label="Take booking requests"
                     checked={readBookingMode(bp) === "confirmed_slot"}
                     disabled={!canEdit}
                     onCheckedChange={(on) => enqueue("bookings", { booking_mode: on ? "confirmed_slot" : "request" })}
@@ -683,8 +670,8 @@ function PoliciesSettingsInner({
                     <p className="text-body font-medium text-ink">Travel fee</p>
                     <p className="mt-0.5 text-body text-ink-2">Set an extra fee for far areas in Service areas.</p>
                   </div>
-                  <Link href="/settings/areas" className={linkRowClass} aria-label="Open Service areas to set a travel fee">
-                    Open
+                  <Link href="/settings/areas" className={linkRowClass} aria-label="Change the travel fee in Service areas">
+                    Change
                   </Link>
                 </div>
               ) : null}
@@ -734,8 +721,8 @@ function PoliciesSettingsInner({
                   <p className="text-meta text-ink-2">Deposits: note callers still hear</p>
                   <p className="text-body text-ink [overflow-wrap:anywhere]">{bp.deposit}</p>
                   {canEdit ? (
-                    <button type="button" className={cx(quietButtonClass, "-ms-3")} aria-label="Remove the deposits note" onClick={() => enqueue("other", { deposit: "" })}>
-                      Remove
+                    <button type="button" className={cx(quietButtonClass, "-ms-3")} onClick={() => setDropNote({ title: "Use Payment instead?", run: () => enqueue("other", { deposit: "" }) })}>
+                      Use the topic instead
                     </button>
                   ) : null}
                 </div>
@@ -748,10 +735,12 @@ function PoliciesSettingsInner({
                     <button
                       type="button"
                       className={cx(quietButtonClass, "-ms-3")}
-                      aria-label={`Remove the ${n.label.toLowerCase()} note`}
-                      onClick={() => enqueue("other", { rules: { [n.topic]: null }, text: { [TEXT_KEY[n.topic]]: "" } as PoliciesPatch["text"] })}
+                      onClick={() => setDropNote({
+                        title: n.topic === "delivery" ? "Use Service areas instead?" : `Use ${n.label} instead?`,
+                        run: () => enqueue("other", { rules: { [n.topic]: null }, text: { [TEXT_KEY[n.topic]]: "" } as PoliciesPatch["text"] }),
+                      })}
                     >
-                      Remove
+                      Use the topic instead
                     </button>
                   ) : null}
                 </div>
@@ -817,6 +806,19 @@ function PoliciesSettingsInner({
           onSave={(v) => void saveUnsure(v)}
         />
       ) : null}
+      <ConfirmSheet
+        open={dropNote != null}
+        title={dropNote?.title || "Use the topic instead?"}
+        confirmLabel="Remove the note"
+        danger
+        onClose={() => setDropNote(null)}
+        onConfirm={() => {
+          dropNote?.run();
+          setDropNote(null);
+        }}
+      >
+        Callers will hear the topic, and this note goes away.
+      </ConfirmSheet>
     </div>
   );
 }
