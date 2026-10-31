@@ -1,4 +1,4 @@
-/** Local mic level only. Frames are dropped. Nothing is recorded or uploaded. */
+/** Mic level for the meter. Frames leave through the pcm16 worklet, not from here. */
 export type DemoMeter = {
   start: (stream: MediaStream) => void;
   stop: () => void;

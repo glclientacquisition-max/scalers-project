@@ -24,6 +24,12 @@ The site key is `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. It is public. The secret stays
 
 ## Session
 
-`/ws/demo` arrives with Voice PR2. `DemoSessionAdapter` is the seam. `createHttpDemoAdapter` posts the token and then only runs the local 3:00 countdown. It does not open a socket and does not send audio. `createMockDemoAdapter` is for local preview and tests. Set `NEXT_PUBLIC_DEMO_ADAPTER=mock` to use it. Do not set that on a public deploy.
+`createHttpDemoAdapter` posts the token, then opens `ws_url` with `&codec=pcm16`. Opus is not the default. The mic is resampled in an AudioWorklet to 16 kHz little-endian pcm16, 640 bytes every 20 ms. End sends `{type:'end'}`.
 
-Preview every state at `/dev/voice-demo?state=` when `DASHBOARD_OPEN=true`. States: idle, consent, mic_denied, connecting, live, ended, disabled, busy, limit, error, unsupported.
+The server `session` message starts the countdown (`max_sec` 180, `recording` false). `state` drives Greeting, Listening, Thinking, and Speaking. A caption is shown and kept only in memory. Assistant audio plays gaplessly. `listening` stops playback at once. `end` uses its own line for `max_time`, `idle`, `user`, `cap`, `kill`, and `error`.
+
+A failed upgrade uses status and `X-Demo-Reason` when the browser reports them: 404 `disabled` is paused, 400 `codec` is unsupported, 403 `origin` and 401 `rejected`, `expired`, `reused`, or `tenant` are the error state. The tenant id must be one of `…1101`, `…1102`, or `…1103`.
+
+`createMockDemoAdapter` is for local preview and tests. Set `NEXT_PUBLIC_DEMO_ADAPTER=mock` to use it. Do not set that on a public deploy.
+
+Preview every state at `/dev/voice-demo?state=` when `DASHBOARD_OPEN=true`. Add `&end=max_time` for an ended line. States: idle, consent, mic_denied, connecting, live, ended, disabled, busy, limit, error, unsupported.

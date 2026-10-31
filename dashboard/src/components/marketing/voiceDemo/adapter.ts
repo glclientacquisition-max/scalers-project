@@ -1,11 +1,12 @@
 import { DEMO_MAX_SEC } from "./machine";
 import type { DemoBusinessKey, DemoLang } from "./copy";
 import { NOTICE_V } from "./copy";
+import type { AssistantPhase, EndReason } from "./protocol";
+import { openDemoSocket } from "./socket";
 
 /**
- * POST /demo/token, then a session.
- * Voice PR2 owns the WebSocket frames. This adapter does not open a socket
- * and does not send audio. The mock is for local preview only.
+ * POST /demo/token, then /ws/demo. The mock never opens a socket.
+ * Set NEXT_PUBLIC_DEMO_ADAPTER=mock for local preview only.
  */
 export type TokenRequest = {
   tenant: DemoBusinessKey;
@@ -21,32 +22,52 @@ export type MintResult =
   | { ok: false; status: number; reason: string };
 
 export type DemoConnection = {
-  stop: () => void;
+  stop: (notify?: boolean) => void;
+  onReady: (cb: (info: { maxSec: number }) => void) => () => void;
+  onUpgrade: (cb: (failure: { status: number; reason: string }) => void) => () => void;
   onTick: (cb: (remainingSec: number) => void) => () => void;
   onLevel: (cb: (level: number) => void) => () => void;
-  onEnd: (cb: (reason: string) => void) => () => void;
+  onPhase: (cb: (phase: AssistantPhase) => void) => () => void;
+  onCaption: (cb: (caption: { role: "caller" | "assistant"; text: string }) => void) => () => void;
+  onNotice: (cb: (text: string) => void) => () => void;
+  onEnd: (cb: (reason: EndReason) => void) => () => void;
+};
+
+export type DemoOpen = {
+  token: string;
+  wsUrl: string;
+  maxSec: number;
+  stream?: MediaStream | null;
 };
 
 export type DemoSessionAdapter = {
   mint: (body: TokenRequest) => Promise<MintResult>;
-  open: (session: { token: string; wsUrl: string; maxSec: number }) => DemoConnection;
+  open: (session: DemoOpen) => DemoConnection;
 };
 
-export const NOTICE_VERSION = NOTICE_V;
-
 type Listener<T> = (value: T) => void;
+
+function subscribe<T>(set: Set<Listener<T>>, current: { value: T | undefined }, cb: Listener<T>) {
+  set.add(cb);
+  if (current.value !== undefined) cb(current.value);
+  return () => set.delete(cb);
+}
+
+export const NOTICE_VERSION = NOTICE_V;
 
 function createCountdown(maxSec: number, levels: boolean): DemoConnection {
   const ticks = new Set<Listener<number>>();
   const levelers = new Set<Listener<number>>();
-  const ends = new Set<Listener<string>>();
+  const ends = new Set<Listener<EndReason>>();
+  const readies = new Set<Listener<{ maxSec: number }>>();
+  const ready = { value: { maxSec } as { maxSec: number } | undefined };
   let left = maxSec;
   let stopped = false;
   const finish = (reason: string) => {
     if (stopped) return;
     stopped = true;
     window.clearInterval(timer);
-    ends.forEach((cb) => cb(reason));
+    ends.forEach((cb) => cb(reason === "max_time" ? "max_time" : "error"));
   };
   const timer = window.setInterval(() => {
     if (stopped) return;
@@ -63,6 +84,21 @@ function createCountdown(maxSec: number, levels: boolean): DemoConnection {
       if (stopped) return;
       stopped = true;
       window.clearInterval(timer);
+    },
+    onReady(cb) {
+      return subscribe(readies, ready, cb);
+    },
+    onUpgrade() {
+      return () => {};
+    },
+    onPhase() {
+      return () => {};
+    },
+    onCaption() {
+      return () => {};
+    },
+    onNotice() {
+      return () => {};
     },
     onTick(cb) {
       ticks.add(cb);
@@ -134,8 +170,75 @@ export function createHttpDemoAdapter(tokenUrl = "/demo/token"): DemoSessionAdap
       };
     },
     open(session) {
-      // PR2 attaches the socket here. Until then the countdown is local and no audio leaves.
-      return createCountdown(session.maxSec || DEMO_MAX_SEC, false);
+      const ticks = new Set<Listener<number>>();
+      const phases = new Set<Listener<AssistantPhase>>();
+      const captions = new Set<Listener<{ role: "caller" | "assistant"; text: string }>>();
+      const notices = new Set<Listener<string>>();
+      const ends = new Set<Listener<EndReason>>();
+      const readies = new Set<Listener<{ maxSec: number }>>();
+      const upgrades = new Set<Listener<{ status: number; reason: string }>>();
+      const ready = { value: undefined as { maxSec: number } | undefined };
+      const upgrade = { value: undefined as { status: number; reason: string } | undefined };
+      const ended = { value: undefined as EndReason | undefined };
+      const handle = openDemoSocket(session.wsUrl, session.stream || null, {
+        onReady(info) {
+          ready.value = info;
+          readies.forEach((cb) => cb(info));
+        },
+        onUpgrade(failure) {
+          upgrade.value = failure;
+          upgrades.forEach((cb) => cb(failure));
+        },
+        onTick(remaining) {
+          ticks.forEach((cb) => cb(remaining));
+        },
+        onPhase(phase) {
+          phases.forEach((cb) => cb(phase));
+        },
+        onCaption(caption) {
+          captions.forEach((cb) => cb({ role: caption.role, text: caption.text }));
+        },
+        onNotice(text) {
+          notices.forEach((cb) => cb(text));
+        },
+        onEnd(reason) {
+          ended.value = reason;
+          ends.forEach((cb) => cb(reason));
+        },
+      });
+      return {
+        stop(notify = false) {
+          handle.stop(notify);
+        },
+        onReady(cb) {
+          return subscribe(readies, ready, cb);
+        },
+        onUpgrade(cb) {
+          return subscribe(upgrades, upgrade, cb);
+        },
+        onTick(cb) {
+          ticks.add(cb);
+          return () => ticks.delete(cb);
+        },
+        onLevel() {
+          return () => {};
+        },
+        onPhase(cb) {
+          phases.add(cb);
+          return () => phases.delete(cb);
+        },
+        onCaption(cb) {
+          captions.add(cb);
+          return () => captions.delete(cb);
+        },
+        onNotice(cb) {
+          notices.add(cb);
+          return () => notices.delete(cb);
+        },
+        onEnd(cb) {
+          return subscribe(ends, ended, cb);
+        },
+      };
     },
   };
 }

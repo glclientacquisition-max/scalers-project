@@ -29,6 +29,21 @@ test("Kiswahili busy and paused lines render", async ({ page }) => {
   await expect(page.getByText("Onyesho limesimamishwa.")).toBeVisible();
 });
 
+test("each end reason has its own line", async ({ page }) => {
+  const lines = [
+    ["max_time", "That's three minutes. Thanks."],
+    ["idle", "The line went quiet. Thanks."],
+    ["user", "Thanks. The demo has ended."],
+    ["cap", "Today's demo time is used up."],
+    ["kill", "The demo was stopped."],
+    ["error", "The demo stopped. Try again."],
+  ] as const;
+  for (const [reason, line] of lines) {
+    await page.goto(`/dev/voice-demo?state=ended&end=${reason}`);
+    await expect(page.getByText(line)).toBeVisible();
+  }
+});
+
 test("consent controls meet the 44px hit floor", async ({ page }) => {
   await page.goto("/dev/voice-demo?state=consent");
   const start = page.getByRole("button", { name: "Start demo" });

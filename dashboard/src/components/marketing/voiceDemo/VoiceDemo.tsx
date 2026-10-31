@@ -9,10 +9,20 @@ import {
   type DemoConnection,
   type DemoSessionAdapter,
 } from "./adapter";
-import { NOTICE_V, businessLabel, COPY, DEMO_BUSINESSES, type DemoBusinessKey, type DemoLang } from "./copy";
+import {
+  NOTICE_V,
+  businessLabel,
+  COPY,
+  DEMO_BUSINESSES,
+  endedLine,
+  upgradeLine,
+  type DemoBusinessKey,
+  type DemoLang,
+} from "./copy";
 import { demoDeviceId } from "./device";
 import { DEMO_MAX_SEC, formatCountdown, stateForTokenFailure, type DemoState } from "./machine";
 import { captureMic, createMicMeter, stopStream, type DemoMeter } from "./meter";
+import { stateForUpgrade, type AssistantPhase } from "./protocol";
 
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
@@ -80,10 +90,16 @@ function Meter({ level }: { level: number }) {
 export function VoiceDemo({
   previewState,
   previewLang = "en",
+  previewEnd = "user",
+  previewPhase = "listening",
+  previewCaption = "",
   adapter,
 }: {
   previewState?: DemoState;
   previewLang?: DemoLang;
+  previewEnd?: string;
+  previewPhase?: AssistantPhase;
+  previewCaption?: string;
   adapter?: DemoSessionAdapter;
 }) {
   const session = adapter ?? demoAdapterFromEnv();
@@ -92,6 +108,12 @@ export function VoiceDemo({
   const [business, setBusiness] = useState<DemoBusinessKey | null>(previewState && previewState !== "idle" ? "home" : null);
   const [remaining, setRemaining] = useState(DEMO_MAX_SEC);
   const [level, setLevel] = useState(previewState === "live" ? 0.55 : 0.2);
+  const [phase, setPhase] = useState<AssistantPhase | null>(previewState === "live" ? previewPhase : null);
+  const [caption, setCaption] = useState(previewState === "live" ? previewCaption : "");
+  const [captionRole, setCaptionRole] = useState<"caller" | "assistant" | null>(previewCaption ? "assistant" : null);
+  const [notice, setNotice] = useState("");
+  const [endedReason, setEndedReason] = useState(previewState === "ended" ? previewEnd : "user");
+  const [failureLine, setFailureLine] = useState<string | null>(null);
   const [turnstile, setTurnstile] = useState("");
   const conn = useRef<DemoConnection | null>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -99,7 +121,7 @@ export function VoiceDemo({
   const copy = COPY[lang];
 
   const release = useCallback(() => {
-    conn.current?.stop();
+    conn.current?.stop(true);
     conn.current = null;
     meter.current?.stop();
     stopStream(stream.current);
@@ -139,21 +161,49 @@ export function VoiceDemo({
       setState(stateForTokenFailure(minted.status, minted.reason));
       return;
     }
-    const next = session.open({ token: minted.token, wsUrl: minted.wsUrl, maxSec: minted.maxSec });
+    const next = session.open({
+      token: minted.token,
+      wsUrl: minted.wsUrl,
+      maxSec: minted.maxSec,
+      stream: mic,
+    });
     conn.current = next;
-    setRemaining(minted.maxSec);
-    setState("live");
-    next.onTick(setRemaining);
     next.onLevel(setLevel);
-    next.onEnd(() => {
+    next.onTick(setRemaining);
+    next.onReady((info) => {
+      setRemaining(info.maxSec);
+      setPhase("greeting");
+      setCaption("");
+      setNotice("");
+      setState("live");
+    });
+    next.onUpgrade((failure) => {
       release();
+      const line = upgradeLine(failure.reason, lang);
+      setFailureLine(line);
+      setState(stateForUpgrade(failure.status, failure.reason));
+    });
+    next.onPhase(setPhase);
+    next.onCaption((row) => {
+      setCaptionRole(row.role);
+      setCaption(row.text);
+    });
+    next.onNotice(setNotice);
+    next.onEnd((reason) => {
+      release();
+      setEndedReason(reason);
       setState("ended");
     });
   }
 
   function endLive() {
     if (previewState) return;
-    release();
+    conn.current?.stop(true);
+    conn.current = null;
+    meter.current?.stop();
+    stopStream(stream.current);
+    stream.current = null;
+    setEndedReason("user");
     setState("ended");
   }
 
@@ -243,12 +293,20 @@ export function VoiceDemo({
 
       {state === "live" ? (
         <div className="mt-4 flex flex-col gap-4">
-          <p className="font-demo text-meta text-ink-2">{copy.live}</p>
+          <p className="font-demo text-meta text-ink-2">{phase ? copy.phase[phase] : copy.live}</p>
           <p className="font-display text-display tabular-nums tracking-tight">
             <span className="sr-only">{copy.timeLeft} </span>
             {formatCountdown(remaining)}
           </p>
           <Meter level={level} />
+          {caption ? (
+            <p className="font-demo text-body">
+              <span className="text-meta text-ink-2">{captionRole === "assistant" ? copy.assistant : copy.you}</span>
+              {" "}
+              {caption}
+            </p>
+          ) : null}
+          {notice ? <p className="font-demo text-meta text-ink-2">{notice}</p> : null}
           <Button type="button" variant="primary" block onClick={endLive}>
             {copy.end}
           </Button>
@@ -257,7 +315,7 @@ export function VoiceDemo({
 
       {state === "ended" ? (
         <div className="mt-4 flex flex-col gap-4" role="status">
-          <p className="font-demo text-body">{copy.ended}</p>
+          <p className="font-demo text-body">{endedLine(endedReason, lang)}</p>
           <ButtonLink href="/signup" variant="primary" block>
             {copy.signup}
           </ButtonLink>
@@ -287,7 +345,7 @@ export function VoiceDemo({
 
       {state === "error" ? (
         <div className="mt-4 flex flex-col gap-4" role="status">
-          <p className="font-demo text-body">{copy.error}</p>
+          <p className="font-demo text-body">{failureLine || copy.error}</p>
           <Button type="button" variant="primary" block onClick={() => void start()}>
             {copy.retry}
           </Button>
