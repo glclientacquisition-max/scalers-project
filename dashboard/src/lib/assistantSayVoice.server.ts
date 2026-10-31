@@ -7,6 +7,7 @@ import {
   readyChecklistLabelForItem,
 } from "@/lib/assistantSayTopics";
 import { resolveTenantBusinessType } from "@/lib/businessType";
+import { playedGreetingFromTenant } from "@/lib/identityGreeting";
 import { loadCompileProvenance } from "@/lib/tenantFieldProvenance";
 import { requireVoice } from "@/lib/voiceRequire.server";
 import { attachKbSnapshot, loadKbPreview } from "@/lib/kbCaller.server";
@@ -47,7 +48,16 @@ export async function loadAssistantSayView(tenant: TenantRow): Promise<{ state: 
 
 export function assistantSayStateFromTenant(tenant: TenantRow): AssistantSayState {
   const bt = resolveTenantBusinessType(tenant);
-  return applyTopicTitles(readiness().evaluateAssistantSay(voiceProfileFromTenant(tenant)), bt);
+  const state = applyTopicTitles(readiness().evaluateAssistantSay(voiceProfileFromTenant(tenant)), bt);
+  const played = playedGreetingFromTenant(tenant);
+  return {
+    ...state,
+    rows: state.rows.map((row) =>
+      row.id === "greeting"
+        ? { ...row, hearPreview: played, willSay: Boolean(played), stampTone: played ? "ok" : "attention", stampLabel: played ? "Will say" : "Won't say" }
+        : row,
+    ),
+  };
 }
 
 /**

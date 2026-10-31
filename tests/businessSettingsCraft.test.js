@@ -77,7 +77,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(form, /notify\("Saved"\)/);
     assert.doesNotMatch(form, /Your assistant will use this on the next call/);
     assert.doesNotMatch(form, /Your receptionist/);
-    assert.match(test, /previewBusinessAssistantIntro/);
+    assert.match(test, /playedGreetingFromTenant/);
     assert.doesNotMatch(test, /Agent Persona/);
   });
 

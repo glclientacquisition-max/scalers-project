@@ -232,6 +232,36 @@ export function buildGreetingSentence(input: GreetingInput): GreetingSentence {
   return { ...base, text: `${opening} ${invite}`, notice };
 }
 
+export type PlayedGreetingTenant = {
+  business_name?: string | null;
+  spoken_name?: string | null;
+  agent_name?: string | null;
+  greeting_invite?: string | null;
+  greeting_text?: string | null;
+  greeting_language?: string | null;
+};
+
+/**
+ * The greeting a first caller hears on the line. Identity, What callers hear
+ * and Test read this and nothing else.
+ */
+export function playedGreetingFromTenant(tenant: PlayedGreetingTenant): string {
+  const language = resolveGreetingLanguage(
+    greetingLanguagePickFromStored(tenant.greeting_language),
+    tenant.greeting_invite,
+    tenant.greeting_text,
+  );
+  return buildGreetingSentence({
+    businessName: tenant.business_name,
+    spokenName: tenant.spoken_name,
+    agentName: tenant.agent_name,
+    greetingInvite: tenant.greeting_invite,
+    greetingText: tenant.greeting_text,
+    language,
+    recordingNotice: false,
+  }).text;
+}
+
 /**
  * Automatic greeting: no name of its own and no question of its own, so the
  * voice line builds it from the business name, the assistant name and the

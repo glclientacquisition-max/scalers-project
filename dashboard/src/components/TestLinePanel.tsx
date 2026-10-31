@@ -5,7 +5,7 @@ import {
   lexiconForStorage,
   parseTtsLexicon,
 } from "@/lib/pronunciationLexicon";
-import { previewBusinessAssistantIntro } from "@/lib/businessAssistantIntro";
+import { playedGreetingFromTenant } from "@/lib/identityGreeting";
 import {
   displaySonioxVoiceLabel,
   resolveLiveCallVoiceId,
@@ -43,8 +43,6 @@ export function TestLinePanel({
   );
   const did = String(tenant.sautikit_virtual_number || "").trim();
   const lineLive = Boolean(did) && !pendingDid;
-  const businessName = String(tenant.business_name || "").trim();
-  const agentName = String(tenant.agent_name || "").trim() || "Business Assistant";
   const sonioxVoiceId = resolveLiveCallVoiceId(
     tenant.soniox_voice_id,
     curatedVoices
@@ -55,35 +53,10 @@ export function TestLinePanel({
     [tenant.tts_lexicon]
   );
 
-  const greetingPreview = useMemo(() => {
-    if (!businessName) return "";
-    // isKbLive: the line comes from the published snapshot (kb/source.js openerLine on the server), groups only,
-    // never items or old notes, and never mixed with the stored row.
-    const kbLine = typeof tenant.kb_offering_line === "string" ? tenant.kb_offering_line : null;
-    const sample = previewBusinessAssistantIntro({
-      businessName,
-      spokenName: tenant.spoken_name,
-      greetingInvite: tenant.greeting_invite,
-      agentName,
-      ...(kbLine != null
-        ? { offeringLine: kbLine, servicesCatalog: [], servicesOffered: "" }
-        : {
-            servicesCatalog: Array.isArray(tenant.services_catalog) ? tenant.services_catalog : [],
-            servicesOffered: tenant.services_offered,
-          }),
-    });
-    // Raw greeting. The voice line applies pronunciation and tells us what it
-    // said (X-Spoken-Text), so Desk never guesses how the line reads it.
-    return sample;
-  }, [
-    businessName,
-    agentName,
-    tenant.spoken_name,
-    tenant.greeting_invite,
-    tenant.services_catalog,
-    tenant.services_offered,
-    tenant.kb_offering_line,
-  ]);
+  const greetingPreview = useMemo(
+    () => playedGreetingFromTenant(tenant),
+    [tenant],
+  );
 
   const voiceLabel = displaySonioxVoiceLabel(
     sonioxVoiceLabel,
