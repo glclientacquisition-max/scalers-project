@@ -26,7 +26,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_company` | `address`, `city`, `email`, `id`, `kra_pin`, `legal_name`, `phone`, `product`, `updated_at` | `docs/supabase/billing_company.sql` |
 | `billing_features` | `key`, `label` | `docs/supabase/billing_data_layer.sql` |
 | `billing_invoice_counters` | `last_number`, `year` | `docs/supabase/billing_data_layer.sql` |
-| `billing_lifecycle_settings` | `bachs_payments_mode`, `billing_notices_send`, `desk_plan_change_enabled`, `hold_winback_enabled`, `id`, `live_payments_master`, `new_signup_trial_enabled`, `number_hold_days`, `package_editor_enabled`, `price_change_approval_threshold_kes`, `reactivation_fee_kes`, `shadow_invoices`, `updated_at`, `voicemail_hold_days` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/billing_payment_runtime_flags.sql`<br>`docs/supabase/number_hold_winback.sql`<br>`docs/supabase/package_version_editor.sql` |
+| `billing_lifecycle_settings` | `bachs_payments_mode`, `billing_notices_send`, `desk_plan_change_enabled`, `hold_winback_enabled`, `id`, `live_payments_master`, `new_signup_trial_enabled`, `number_hold_days`, `package_editor_enabled`, `price_change_approval_threshold_kes`, `reactivation_fee_kes`, `reminder_due_soon_days`, `reminder_followup_days`, `reminder_max_followups`, `reminder_overdue_grace_days`, `reminder_quiet_end`, `reminder_quiet_start`, `reminder_suspend_day`, `reminders_enabled`, `shadow_invoices`, `updated_at`, `voicemail_hold_days` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/billing_payment_runtime_flags.sql`<br>`docs/supabase/number_hold_winback.sql`<br>`docs/supabase/package_version_editor.sql`<br>`supabase/migrations/20261031040000_billing_pg_cron_reminders.sql` |
 | `billing_live_tenants` | `enabled`, `reason`, `set_at`, `set_by`, `tenant_id` | `docs/supabase/invoice_pay_live_allowlist.sql` |
 | `billing_notices` | `audience`, `billed_to`, `body`, `channel`, `claimed_at`, `created_at`, `delivery_status`, `fallback`, `id`, `idempotency_key`, `kind`, `last_error`, `notify_send_id`, `read_at`, `recipient`, `tenant_id`, `title` | `docs/supabase/billing_data_layer.sql` |
 | `billing_owner_action_keys` | `action`, `created_at`, `idempotency_key`, `result`, `tenant_id` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
@@ -89,7 +89,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (250)
+## Functions (254)
 
 | Function | Defined in |
 | --- | --- |
@@ -193,7 +193,9 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `backfill_tenant_field_meta_seed` | `docs/supabase/tenant_field_provenance.sql` |
 | `billing_add_months` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/package_state_rules.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_audit_log_freeze` | `docs/supabase/billing_data_layer.sql` |
+| `billing_call_cron_route` | `supabase/migrations/20261031040000_billing_pg_cron_reminders.sql` |
 | `billing_grant_minutes_for_period` | `docs/supabase/package_state_rules.sql` |
+| `billing_in_quiet_hours` | `supabase/migrations/20261031040000_billing_pg_cron_reminders.sql` |
 | `billing_latest_package_version` | `docs/supabase/billing_data_layer.sql` |
 | `billing_live_tenant_allowed` | `docs/supabase/invoice_pay_live_allowlist.sql` |
 | `billing_notice_when` | `docs/supabase/billing_data_layer.sql` |
@@ -209,6 +211,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_prorate_kes` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_proration_quote` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_quarantine_placeholder_days` | `docs/supabase/billing_data_layer.sql` |
+| `billing_reconcile_daily` | `supabase/migrations/20261031040000_billing_pg_cron_reminders.sql` |
 | `billing_seats_used` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_spend_allows_charge` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_spend_limit_kes` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
@@ -297,6 +300,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `reserve_notify_send` | `docs/supabase/notify_send_reserve_settle.sql`<br>`docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `resolve_checkout_total_review` | `docs/supabase/invoice_pay_amount_paid_either.sql`<br>`docs/supabase/invoice_pay_checkout_review.sql`<br>`docs/supabase/invoice_pay_checkout_review_round8.sql`<br>`docs/supabase/invoice_pay_checkout_review_round9.sql` |
 | `roll_package_periods` | `docs/supabase/package_period_rollover.sql` |
+| `run_invoice_reminders` | `supabase/migrations/20261031040000_billing_pg_cron_reminders.sql` |
 | `sautikit_did_pool_quarantine_guard` | `docs/supabase/billing_data_layer.sql` |
 | `sautikit_did_pool_winback_guard` | `docs/supabase/number_hold_winback.sql` |
 | `save_call_setup` | `supabase/migrations/20261018130000_tenant_call_setup.sql` |

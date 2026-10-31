@@ -413,10 +413,8 @@ describe("ops alert cron", () => {
     assert.equal(opsAlertsStagingBlocked({ SUPABASE_URL: prodUrl, OPS_ALERTS_DRY_RUN: "false" }), false);
     assert.equal(opsAlertsDryRun("false"), false);
     const vercel = JSON.parse(fs.readFileSync("dashboard/vercel.json", "utf8"));
-    assert.deepEqual(vercel.crons, [
-      { path: "/api/cron/billing-payment-retry", schedule: "7 3 * * *" },
-    ]);
-    assert.doesNotMatch(JSON.stringify(vercel.crons), /ops-alerts|billing-reconcile/);
+    assert.equal(vercel.crons, undefined); // billing schedules run in pg_cron (20261031040000)
+    assert.doesNotMatch(JSON.stringify(vercel), /ops-alerts|billing-reconcile/);
     const ops = fs.readFileSync("dashboard/src/lib/opsAlerts.ts", "utf8");
     assert.match(ops, /opsAlertsStagingBlocked\(process\.env\)/);
     assert.match(ops, /if \(staging\) throw new Error\("staging"\)/);

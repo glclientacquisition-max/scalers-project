@@ -212,6 +212,8 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 
 ## 4. Open PRs
 
+**Draft PR (31 Oct 2026, EAT), billing schedules in pg_cron + invoice reminders:** branch `billing/pg-cron-reminders`. `supabase/migrations/20261031040000_billing_pg_cron_reminders.sql` adds pg_cron jobs `billing-payment-retry` (hourly :07, calls the Desk route through pg_net with the bearer secret from Vault), `billing-invoice-reminders` (hourly :15) and `billing-reconcile-daily` (03:40 UTC, logs counts and opens an ops notice on any mismatch). It drops the Vercel cron. Reminder policy columns on `billing_lifecycle_settings` default OFF: due-soon days, grace days, follow-up days, at most 2 follow-ups, a suspend-day flag (logs only, never suspends), and quiet hours 21:00–08:00 EAT. Reminders stop once the invoice is paid and skip disputed invoices. Staging test (rolled back, Test Archive Co invoice): the sequence and all the stop conditions pass. Not applied. Prod needs Alvin's GO plus the two Vault secrets, before this merges.
+
 **28 Oct 2026 clean-up:** there were 102 open PRs. The stale, superseded ones were closed with a pointer to the handover PR, and their branches were kept. Still open:
 - the parked retire-old-brain drafts #1009 and #1010
 - #975 (Brain to confirm before closing)
