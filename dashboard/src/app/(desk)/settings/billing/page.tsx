@@ -23,14 +23,14 @@ async function BillingBody({ searchParams }: { searchParams: Promise<{ from?: st
   const model = loaded.model;
   if (model.freeBeta || !model.surface.showInvoices) {
     return (
-      <SettingsPlanFrame title="Billing" optionStatus={statuses}>
+      <SettingsPlanFrame title="Billing" optionStatus={statuses} hideBilling={model.freeBeta || !model.surface.showInvoices}>
         <BetaInvoicesEmpty />
       </SettingsPlanFrame>
     );
   }
 
   return (
-    <SettingsPlanFrame title="Billing" optionStatus={statuses}>
+      <SettingsPlanFrame title="Billing" optionStatus={statuses}>
       {model.surface.showDunningBanner && model.banner ? <BillingNote banner={model.banner} /> : null}
       <BillingOpenSummary periodEndLabel={model.periodEndLabel} invoices={model.invoices} />
       <BillingHistory fromPay={fromPay && model.surface.showPayLinks} />

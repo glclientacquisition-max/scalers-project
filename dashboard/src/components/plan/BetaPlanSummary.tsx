@@ -53,7 +53,9 @@ function MinutesOverageNote({
   if (!over) return null;
   return (
     <div className="mt-2 space-y-0.5" role="status" data-plan-overage="">
-      <p className="text-body font-medium tabular-nums text-warn">{over.headline}</p>
+      <p className={mode === "on_demand" ? "text-body font-medium tabular-nums text-warn" : "text-body font-medium tabular-nums text-ink"}>
+        {over.headline}
+      </p>
       <p className="text-meta text-ink-2">{over.detail}</p>
     </div>
   );
@@ -62,6 +64,7 @@ function MinutesOverageNote({
 export function BetaPlanSummary({
   planName,
   periodEndLabel,
+  resetLabel = null,
   rows,
   freeBeta = true,
   onDemandEnabled = null,
@@ -69,6 +72,7 @@ export function BetaPlanSummary({
 }: {
   planName: string | null;
   periodEndLabel: string | null;
+  resetLabel?: string | null;
   rows: BetaPlanRow[];
   freeBeta?: boolean;
   onDemandEnabled?: boolean | null;
@@ -87,7 +91,7 @@ export function BetaPlanSummary({
               <li key={row.key}>
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-body text-ink">{row.label}</span>
-                  <span className={`text-body tabular-nums ${tone === "ok" ? "text-ink-2" : "font-medium text-warn"}`}>
+                  <span className={`text-body tabular-nums ${tone !== "ok" && overageMode === "on_demand" ? "font-medium text-warn" : "text-ink-2"}`}>
                     {count(row.used)} of {count(row.included)} used
                   </span>
                 </div>
@@ -112,9 +116,8 @@ export function BetaPlanSummary({
           })}
         </ul>
       ) : null}
-      {periodEndLabel ? (
-        <p className="mt-4 text-meta text-ink-2">Usage resets after {periodEndLabel}.</p>
-      ) : null}
+      {resetLabel ? <p className="mt-4 text-meta text-ink-2">Resets {resetLabel}.</p> : null}
+      {freeBeta ? <p className="mt-4 text-body text-ink">Invoices start when beta ends.</p> : null}
     </section>
   );
 }

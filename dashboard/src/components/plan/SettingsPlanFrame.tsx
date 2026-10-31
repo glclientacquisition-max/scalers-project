@@ -9,6 +9,7 @@ export function SettingsPlanFrame({
   meta,
   activePath,
   optionStatus,
+  hideBilling = false,
   children,
 }: {
   title: string;
@@ -16,12 +17,13 @@ export function SettingsPlanFrame({
   /** Fixture only. Live pages read the pathname. */
   activePath?: string;
   optionStatus?: Record<string, SettingsListStatus>;
+  hideBilling?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className="w-full min-w-0 overflow-x-clip" data-settings-console="" data-desk-nested="">
       <div className={settingsConsoleClass}>
-        <SettingsRail activePath={activePath} optionStatus={optionStatus} />
+        <SettingsRail activePath={activePath} optionStatus={optionStatus} hideBilling={hideBilling} />
         <div className={`${settingsPanelClass} max-w-[55rem] [&>header]:max-w-none`}>
           <SettingsPageHeader businessName="" lineLive={false} showBack title={title} />
           {meta ? <p className="text-meta text-ink-2">{meta}</p> : null}

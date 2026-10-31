@@ -590,6 +590,7 @@ export async function loadUsageBillingExtras(tenantId: string): Promise<UsageBil
 
 export type PlanRowStatus = {
   billingStatus: string;
+  freeBeta: boolean;
   row: { text: string; title: string; tone?: "quiet" | "attention" } | null;
   /** During free beta there are no invoices. Null when billing is live and unread. */
   billingRow: { text: string; title: string } | null;
@@ -597,7 +598,7 @@ export type PlanRowStatus = {
 
 /** Settings Plan row: the plan name, "Choose a plan" on trial, "Over by N min" when over. */
 export async function loadPlanRowStatus(tenantId: string): Promise<PlanRowStatus> {
-  const none: PlanRowStatus = { billingStatus: "beta", row: null, billingRow: null };
+  const none: PlanRowStatus = { billingStatus: "beta", freeBeta: true, row: null, billingRow: null };
   if (!tenantId) return none;
   try {
     const ws = await createWorkspaceDataClient();
@@ -641,11 +642,11 @@ export async function loadPlanRowStatus(tenantId: string): Promise<PlanRowStatus
     if (!name && isFreeBeta(status) && packageState === "active" && packageName) name = packageName;
     const over = planOverageRowText(minutesUsed, minutesIncluded);
     const text = over || planRowText(status, name);
-    const billingRow = isFreeBeta(status) ? { text: "No invoices", title: "No invoices" } : null;
     return {
       billingStatus: status,
-      row: text ? { text, title: text, tone: over ? "attention" : undefined } : null,
-      billingRow,
+      freeBeta: isFreeBeta(status),
+      row: text ? { text, title: text, tone: over && !isFreeBeta(status) ? "attention" : undefined } : null,
+      billingRow: null,
     };
   } catch {
     return none;
