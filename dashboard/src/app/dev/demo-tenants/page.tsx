@@ -3,7 +3,7 @@ import path from "node:path";
 import { notFound } from "next/navigation";
 import { businessTypeLabel, resolveBusinessType, type BusinessType } from "@/lib/businessType";
 
-export const dynamic = "force-dynamic";
+export const instant = false;
 
 type Hours = {
   days?: Record<string, { open: string; close: string } | null>;
