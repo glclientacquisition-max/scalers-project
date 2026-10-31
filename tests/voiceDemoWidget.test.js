@@ -12,7 +12,7 @@ const {
 } = require('../dashboard/src/components/marketing/voiceDemo/machine.ts');
 const { endedLine } = require('../dashboard/src/components/marketing/voiceDemo/copy.ts');
 const { blockFromStatus, readDemoStatus } = require('../dashboard/src/components/marketing/voiceDemo/status.ts');
-const { appendDeviceId, demoDeviceId, isDemoDeviceId } = require('../dashboard/src/components/marketing/voiceDemo/device.ts');
+const { appendDeviceId, demoDeviceId, demoStatusUrl, demoTokenUrl, isDemoDeviceId } = require('../dashboard/src/components/marketing/voiceDemo/device.ts');
 const { postDemoToken } = require('../dashboard/src/components/marketing/voiceDemo/tokenRequest.ts');
 const { REQUEST_ACCESS_COPY } = require('../dashboard/src/components/marketing/voiceDemo/requestAccessCopy.ts');
 const {
@@ -285,6 +285,61 @@ describe('voice demo widget states', () => {
     assert.equal(blob.includes('/demo/grant'), false);
     assert.match(blob, /device_id: demoDeviceId\(\)/);
     assert.match(blob, /demoStatusUrl\(\)/);
+  });
+
+  it('uses the voice origin for token and status, and relative paths when it is empty', async () => {
+    delete global.window;
+    const previous = process.env.NEXT_PUBLIC_DEMO_API_BASE;
+    try {
+      assert.equal(demoTokenUrl('https://voice.example/'), 'https://voice.example/demo/token');
+      assert.equal(demoTokenUrl('  https://voice.example///  '), 'https://voice.example/demo/token');
+      assert.equal(demoTokenUrl(''), '/demo/token');
+      assert.equal(demoTokenUrl('   '), '/demo/token');
+
+      process.env.NEXT_PUBLIC_DEMO_API_BASE = 'https://voice.example/';
+      assert.equal(demoTokenUrl(), 'https://voice.example/demo/token');
+      assert.equal(demoStatusUrl(), 'https://voice.example/demo/status');
+
+      process.env.NEXT_PUBLIC_DEMO_API_BASE = '   ';
+      assert.equal(demoTokenUrl(), '/demo/token');
+      assert.equal(demoStatusUrl(), '/demo/status');
+
+      delete process.env.NEXT_PUBLIC_DEMO_API_BASE;
+      assert.equal(demoTokenUrl(), '/demo/token');
+      assert.equal(demoStatusUrl(), '/demo/status');
+    } finally {
+      if (previous === undefined) delete process.env.NEXT_PUBLIC_DEMO_API_BASE;
+      else process.env.NEXT_PUBLIC_DEMO_API_BASE = previous;
+    }
+
+    const adapter = fs.readFileSync(
+      path.join(__dirname, '../dashboard/src/components/marketing/voiceDemo/adapter.ts'),
+      'utf8',
+    );
+    assert.match(adapter, /createHttpDemoAdapter\(demoTokenUrl\(\)\)/);
+
+    let tokenInit = null;
+    await postDemoToken('/demo/token', {
+      tenant: 'shop',
+      lang: 'en',
+      turnstile: 'turn',
+      device_id: 'device_ok',
+      consent_ts: '2026-10-31T00:00:00.000Z',
+      notice_v: '2026-10-31',
+    }, async (_url, init) => {
+      tokenInit = init;
+      return { ok: false, status: 503, json: async () => ({ reason: 'disabled' }) };
+    });
+    assert.equal(tokenInit.credentials, 'omit');
+    assert.equal(tokenInit.mode, 'cors');
+
+    let statusInit = null;
+    await readDemoStatus(async (_url, init) => {
+      statusInit = init;
+      return { status: 200, ok: true, json: async () => ({ enabled: true, busy: false, cap: false, reason: null }) };
+    }, '/demo/status');
+    assert.equal(statusInit.credentials, 'omit');
+    assert.equal(statusInit.mode, 'cors');
   });
 
   it('uses pcm8 on touch or a phone and pcm16 on a desktop', () => {
