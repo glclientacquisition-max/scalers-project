@@ -2713,6 +2713,8 @@ async function createServiceRequest({
   notes,
   idempotencyKey,
 } = {}) {
+  const { demoWriteBlocked, demoBookingSink } = require('./demo/tenants');
+  if (demoWriteBlocked({ tenantId, callSid })) return demoBookingSink('service_request', { tenantId });
   let resolvedTenantId = tenantId || null;
   let callRow = null;
   if (callSid) {
@@ -2720,6 +2722,9 @@ async function createServiceRequest({
     if (callRow?.tenant_id) resolvedTenantId = callRow.tenant_id;
   }
   if (!resolvedTenantId) return null;
+  if (demoWriteBlocked({ tenantId: resolvedTenantId, callSid })) {
+    return demoBookingSink('service_request', { tenantId: resolvedTenantId });
+  }
 
   const requestType = REQUEST_TYPES.has(String(type || '').trim().toLowerCase())
     ? String(type).trim().toLowerCase()
@@ -2871,6 +2876,8 @@ async function createAppointment({
   windowEnd,
   services,
 } = {}) {
+  const { demoWriteBlocked, demoBookingSink } = require('./demo/tenants');
+  if (demoWriteBlocked({ tenantId, callSid })) return demoBookingSink('appointment', { tenantId });
   let resolvedTenantId = tenantId || null;
   let callRow = null;
   if (callSid) {
@@ -2878,6 +2885,9 @@ async function createAppointment({
     if (callRow?.tenant_id) resolvedTenantId = callRow.tenant_id;
   }
   if (!resolvedTenantId) return null;
+  if (demoWriteBlocked({ tenantId: resolvedTenantId, callSid })) {
+    return demoBookingSink('appointment', { tenantId: resolvedTenantId });
+  }
 
   // One booking holds 1..N services (line items). service_name stays the display label every
   // reader already shows (Desk, owner alert, caller SMS); metadata.services is the item list.

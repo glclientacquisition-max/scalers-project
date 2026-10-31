@@ -310,6 +310,11 @@ function noteUnrecordedSend(key) {
 }
 
 async function beginInstanceSend(ledger, to) {
+  // Browser demo tenants never SMS, WhatsApp or email. Checked before any DB read.
+  const { demoWriteBlocked } = require('../demo/tenants');
+  if (demoWriteBlocked({ tenantId: ledger?.tenantId, callSid: ledger?.callSid })) {
+    return { ok: false, reason: 'demo_tenant', key: null };
+  }
   const closed = await closedTenantSendGate(ledger, to);
   if (closed) return closed;
   const unrecordedKey = instanceFlightKey(ledger, to);

@@ -314,7 +314,15 @@ Lane contracts: `docs/reference/lanes/{VOICE,BRAIN,DESK_UX,OPS_BILLING,PLATFORM}
 5. Ask Alvin for the top-ups, then do §5 items 1–2.
 6. When Alvin says go, start §4c step 0.
 
-## 10. Housekeeping done on 28 Oct (old account)
+## 10. Browser demo tenants (31 Oct 2026, not run)
+
+Desk draft. Not merged, not seeded, no env change, no SQL. Do not touch `+254709221536`.
+
+Three made-up tenants (`demo_home`, `demo_shop`, `demo_other`) resolve to Home services, Shop and Other business. The shop price is the catalogue row. Bookings, notifications and billing stay off for those ids. There is no `tenants.is_demo` column.
+
+Run and remove (Alvin or Chief, staging only): [`docs/how-to/demo-tenants.md`](how-to/demo-tenants.md). An agent does not execute the seed.
+
+## 11. Housekeeping done on 28 Oct (old account)
 
 - **Stale PRs closed:** superseded flag-off drafts from 13–25 Oct and the Brain v2 C-series stack. Each was closed with a comment pointing here. Their branches were kept, so any of them can be reopened.
 - **Branches deleted (691):** only those whose PR was **merged** before 28 Oct 00:00 EAT and whose tip equals the merged head. 75 branches with commits added after their merge, and 29 merged on 27–28 Oct, were kept. The list, with SHAs, is in [`plans/branch-deleted-2026-10-28.txt`](plans/branch-deleted-2026-10-28.txt). To restore one: `git push origin <sha>:refs/heads/<name>`.

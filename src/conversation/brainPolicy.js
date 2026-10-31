@@ -1,6 +1,7 @@
 // Deterministic authority and capability policy for Brain decisions.
 
 const { evaluateCapabilityGates } = require('./capabilityGates');
+const { applyDemoCapabilities } = require('../demo/tenants');
 
 const ACTIONS = Object.freeze({
   ANSWER: 'ANSWER',
@@ -18,23 +19,26 @@ function buildBrainCapabilities(profile = {}, runtime = {}) {
   const tools = profile.agentTools || {};
   // Same gate model the owner sees on Overview (Live / Needs setup).
   const gates = evaluateCapabilityGates(profile);
-  return {
-    answerFromKnowledge: true,
-    saveCallerInfo: true,
-    createServiceRequest: runtime.createServiceRequest !== false,
-    // Holds/orders need an owner-confirmed catalogue and hold rules. Enquiry stays on.
-    placeHold: gates.holds.allowed,
-    // Seed-only services cannot confirm a visit. Unmarked owner services still can.
-    confirmVisit: gates.site_visits.allowed,
-    confirmedSlot: gates.booking_slots.allowed,
-    createAppointment: runtime.createAppointment !== false,
-    updateAppointment: runtime.updateAppointment !== false,
-    notifyCallback: runtime.notifyCallback !== false,
-    escalate: tools.escalate !== false,
-    endCall: tools.end_call !== false && tools.endCall !== false,
-    // Voice sets this from liveTransferReady (env + handoff_mode + hours + directory phone).
-    liveTransfer: runtime.liveTransfer === true,
-  };
+  return applyDemoCapabilities(
+    {
+      answerFromKnowledge: true,
+      saveCallerInfo: true,
+      createServiceRequest: runtime.createServiceRequest !== false,
+      // Holds/orders need an owner-confirmed catalogue and hold rules. Enquiry stays on.
+      placeHold: gates.holds.allowed,
+      // Seed-only services cannot confirm a visit. Unmarked owner services still can.
+      confirmVisit: gates.site_visits.allowed,
+      confirmedSlot: gates.booking_slots.allowed,
+      createAppointment: runtime.createAppointment !== false,
+      updateAppointment: runtime.updateAppointment !== false,
+      notifyCallback: runtime.notifyCallback !== false,
+      escalate: tools.escalate !== false,
+      endCall: tools.end_call !== false && tools.endCall !== false,
+      // Voice sets this from liveTransferReady (env + handoff_mode + hours + directory phone).
+      liveTransfer: runtime.liveTransfer === true,
+    },
+    profile
+  );
 }
 
 function authorizeAction(action, capabilities = {}) {
