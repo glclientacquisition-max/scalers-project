@@ -1,6 +1,6 @@
 ---
 owner: platform
-last_reviewed: 2026-10-30
+last_reviewed: 2026-10-31
 ---
 
 # Scalers status and handoff (start here)
@@ -212,6 +212,7 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 
 ## 4. Open PRs
 
+- **31 Oct 2026 (EAT), draft, not merged, not restaged:** Browser demo token and guards. `POST /demo/token` is mounted and returns 503 `{reason: disabled}` unless `DEMO_ENABLED` is exactly `on`. Origin allowlist, Turnstile siteverify, 3 sessions per EAT day per hashed IP and per device, 1 at a time per IP, global cap `DEMO_MAX_CONCURRENT` default 5 (503 busy). HS256 token, 60s, single-use, demo tenants only. In-memory limits, one instance. No dial, no phone-path change, no prod tenant, Aris `+254709221536` untouched. Not deployed. No Railway or env change.
 - **30 Oct 2026, in flight (#1053):** Owner Desk per-row Save. Approving one Kiswahili name, a price, a policy starter, a lead step, a team row, or a visit/request no longer puts the other rows into a pending state or refetches the list. Add many finish is one count line. Branch `cursor/desk-row-pending-5824` into `staging/v2-c0-opening-2026-10-21`. No SQL.
 
 **28 Oct 2026 clean-up:** there were 102 open PRs. The stale, superseded ones were closed with a pointer to the handover PR, and their branches were kept. Still open:
@@ -346,6 +347,7 @@ Source: `gh pr list --state open`, 18 Oct. All drafts unless noted. `hold-stagin
 - **UI/UX sweep** across Desk and Admin.
 - **Packages**: state rules and rollover shipped (#631, #650). The billing data layer (versions, `billing_status` NOT NULL, invoices, notices, `tenant_escalation_allowed`, number quarantine) and the owner plan-change RPCs are on staging and, since 19 Oct 2026 (P1–P8, Alvin's GO), on production. Every production business stays `beta` with enforcement off. A draft invoice cannot take a number. Notice sends stay off unless `BILLING_NOTICES_SEND=on`, and a reclaimed notice reuses its idempotency key. No charges. Package catalogue UI and a pay action remain. Desk plan screens stay behind `DESK_PLAN_CHANGE` (off). The admin package version editor (#778) is on production with `package_editor_enabled` false and `new_signup_trial_enabled` false. Production has the owner-price v2 import. The pay page code is on `main` (#780). Production has not collected through `/pay`. P1 through P18 are on prod. Only P19 is outstanding, including on staging. Never re-run P5, P9, P11, P12, P14, P15, P16, P17, or P18.
 - **Landing page** (#492 parked until its turn).
+- **31 Oct 2026 (EAT): browser voice demo, not built on staging.** Draft token and guards only (`DEMO_ENABLED` default off). No widget, no `/ws/demo`, no recording, no dial. Prod and Aris untouched.
 - **Legal pack draft #653** (Terms, Privacy, DPA, call notice, beta terms). Parked; call notice ties to the recording decision.
 - **WhatsApp as the assistant doing work** (not just alerts).
 - Live call transfer: **not built** (callbacks only since #658; reviving it needs a new ADR and Alvin's yes).

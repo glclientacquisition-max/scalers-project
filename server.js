@@ -2218,6 +2218,17 @@ function handleSautikitRootPost(req, res) {
   return handleVoiceIncoming(req, res);
 }
 
+// Browser demo token. Off unless DEMO_ENABLED is exactly `on`.
+// Unset or any other value: 503 {reason: disabled}. Phone routes below
+// are not branched on this flag. Limits are in-memory, one instance.
+const { handleDemoTokenRequest, PAUSED_MESSAGE } = require('./src/demo/guards');
+app.use('/demo/token', (req, res, next) => {
+  if (req.method !== 'POST' && req.method !== 'OPTIONS') return next();
+  Promise.resolve(handleDemoTokenRequest(req, res)).catch(() => {
+    if (!res.headersSent) res.status(503).json({ reason: 'disabled', message: PAUSED_MESSAGE });
+  });
+});
+
 app.post('/', sautikitWebhookGuard, handleSautikitRootPost);
 app.post('/voice/incoming', sautikitWebhookGuard, handleVoiceIncoming);
 app.post('/voice', sautikitWebhookGuard, handleVoiceIncoming);

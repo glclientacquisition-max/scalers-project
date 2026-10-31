@@ -1,6 +1,6 @@
 ---
 owner: platform
-last_reviewed: 2026-10-28
+last_reviewed: 2026-10-31
 ---
 
 # Scalers handover (start here if you are a new account, owner or agent)
@@ -158,6 +158,8 @@ The full runbooks are in [`plans/kb-v2-prod-batch-2026-10-28.md`](plans/kb-v2-pr
 - **The GitHub "Deploy staging Voice" workflow can't run.** It's missing the `RAILWAY_STAGING_*` repo secrets. Staging deploys happen through Railway's GitHub trigger.
 
 ## 5. Open items (not parked work)
+
+**31 Oct 2026 (EAT):** a draft adds `POST /demo/token`. It answers 503 until `DEMO_ENABLED` is exactly `on`. Limits are in memory on one instance. It does not dial, and the phone path is unchanged while the flag is off. Not merged, not deployed, no env change.
 
 1. **Money:** top up SautiKit prod (KES 9.29; rental 1 Nov), and fund Soniox or turn on autopay (staging is already at 402).
 2. **Grade the 01:33 EAT Grow Tech call**, then have Alvin dial prod test calls on Esga and Grow Tech (§7).
