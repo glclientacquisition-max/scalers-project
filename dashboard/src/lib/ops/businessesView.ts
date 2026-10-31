@@ -23,7 +23,8 @@ export function inView(b: AdminBusiness, view: BusinessView): boolean {
   return b.status === view;
 }
 
-export function defaultView(_rows: AdminBusiness[]): BusinessView {
+export function defaultView(rows: AdminBusiness[]): BusinessView {
+  void rows;
   return "all";
 }
 

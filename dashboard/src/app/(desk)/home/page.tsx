@@ -80,7 +80,6 @@ async function HomeOverviewBody() {
   const client = workspace.client;
   const dayStart = nairobiDayStartIso();
   const isBeta = isBetaBilling(tenant.billing_enforcement);
-  const business = tenant.business_name?.trim() || "your workspace";
   const today = nairobiDateLabel();
 
   const assistantSayPage = deskAssistantSayPage();
