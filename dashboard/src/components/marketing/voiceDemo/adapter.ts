@@ -1,4 +1,5 @@
 import { DEMO_MAX_SEC, type DemoState } from "./machine";
+import { postDemoToken } from "./tokenRequest";
 import type { DemoBusinessKey, DemoLang } from "./copy";
 import { NOTICE_V } from "./copy";
 import type { AssistantPhase, EndReason, WireCodec } from "./protocol";
@@ -143,32 +144,7 @@ export function createMockDemoAdapter(script: MockScript = {}): DemoSessionAdapt
 export function createHttpDemoAdapter(tokenUrl = "/demo/token"): DemoSessionAdapter {
   return {
     async mint(body) {
-      let response: Response;
-      try {
-        response = await fetch(tokenUrl, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(body),
-        });
-      } catch {
-        return { ok: false, status: 0, reason: "error" };
-      }
-      let payload: { token?: string; ws_url?: string; max_sec?: number; reason?: string } = {};
-      try {
-        payload = (await response.json()) as typeof payload;
-      } catch {
-        payload = {};
-      }
-      if (!response.ok) {
-        return { ok: false, status: response.status, reason: payload.reason || "error" };
-      }
-      if (!payload.token) return { ok: false, status: response.status, reason: "error" };
-      return {
-        ok: true,
-        token: payload.token,
-        wsUrl: payload.ws_url || "",
-        maxSec: typeof payload.max_sec === "number" ? payload.max_sec : DEMO_MAX_SEC,
-      };
+      return postDemoToken(tokenUrl, body);
     },
     open(session) {
       const ticks = new Set<Listener<number>>();

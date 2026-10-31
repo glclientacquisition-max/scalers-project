@@ -33,6 +33,7 @@ export function statusUrl(tokenUrl = "/demo/token"): string {
 /**
  * GET /demo/status. A 429 rate limit is quiet: the visitor is not told.
  * Anything else that is not a block leaves the caller to show Start or a generic error.
+ * Pass a url from demoStatusUrl so the poll carries device_id.
  */
 export async function readDemoStatus(
   fetchImpl: typeof fetch = fetch,

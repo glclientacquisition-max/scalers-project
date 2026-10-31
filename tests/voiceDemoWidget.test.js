@@ -12,6 +12,8 @@ const {
 } = require('../dashboard/src/components/marketing/voiceDemo/machine.ts');
 const { endedLine } = require('../dashboard/src/components/marketing/voiceDemo/copy.ts');
 const { blockFromStatus, readDemoStatus } = require('../dashboard/src/components/marketing/voiceDemo/status.ts');
+const { appendDeviceId, demoDeviceId, isDemoDeviceId } = require('../dashboard/src/components/marketing/voiceDemo/device.ts');
+const { postDemoToken } = require('../dashboard/src/components/marketing/voiceDemo/tokenRequest.ts');
 const { REQUEST_ACCESS_COPY } = require('../dashboard/src/components/marketing/voiceDemo/requestAccessCopy.ts');
 const {
   createMockRequestAccessAdapter,
@@ -164,6 +166,125 @@ describe('voice demo widget states', () => {
       'utf8',
     );
     assert.doesNotMatch(src, /fetch\(|supabase|localStorage/);
+  });
+
+  it('keeps a browser device id and sends it on the token and the status poll', async () => {
+    assert.equal(isDemoDeviceId('short'), false);
+    assert.equal(isDemoDeviceId('abc'), false);
+    assert.equal(isDemoDeviceId('bad id'), false);
+    assert.equal(isDemoDeviceId('a'.repeat(129)), false);
+    assert.equal(isDemoDeviceId('abcd1234'), true);
+    assert.equal(isDemoDeviceId('device_id-ok'), true);
+    const sample = crypto.randomUUID();
+    assert.equal(isDemoDeviceId(sample), true);
+    assert.equal(demoDeviceId(), '');
+
+    const saved = {};
+    global.window = {
+      localStorage: {
+        getItem(key) {
+          return Object.prototype.hasOwnProperty.call(saved, key) ? saved[key] : null;
+        },
+        setItem(key, value) {
+          saved[key] = value;
+        },
+      },
+    };
+    try {
+      saved['scalers-demo-device'] = 'not valid';
+      const replaced = demoDeviceId();
+      assert.equal(isDemoDeviceId(replaced), true);
+      assert.equal(saved['scalers-demo-device'], replaced);
+      assert.equal(demoDeviceId(), replaced);
+
+      saved['scalers-demo-device'] = sample;
+      assert.equal(demoDeviceId(), sample);
+
+      delete saved['scalers-demo-device'];
+      const minted = demoDeviceId();
+      assert.equal(isDemoDeviceId(minted), true);
+      assert.equal(saved['scalers-demo-device'], minted);
+      assert.equal(demoDeviceId(), minted);
+    } finally {
+      delete global.window;
+    }
+
+    let reads = 0;
+    global.window = {
+      localStorage: {
+        getItem() {
+          reads += 1;
+          throw new Error('blocked');
+        },
+        setItem() {
+          throw new Error('blocked');
+        },
+      },
+    };
+    try {
+      const first = demoDeviceId();
+      const second = demoDeviceId();
+      assert.equal(isDemoDeviceId(first), true);
+      assert.equal(second, first);
+      assert.ok(reads >= 2);
+    } finally {
+      delete global.window;
+    }
+
+    global.window = {
+      localStorage: {
+        getItem() {
+          return null;
+        },
+        setItem() {
+          throw new Error('quota');
+        },
+      },
+    };
+    try {
+      const held = demoDeviceId();
+      assert.equal(demoDeviceId(), held);
+      assert.equal(isDemoDeviceId(held), true);
+    } finally {
+      delete global.window;
+    }
+
+    const deviceId = crypto.randomUUID();
+    let posted = null;
+    const minted = await postDemoToken('/demo/token', {
+      tenant: 'shop',
+      lang: 'en',
+      turnstile: 'turn',
+      device_id: deviceId,
+      consent_ts: '2026-10-31T00:00:00.000Z',
+      notice_v: '2026-10-31',
+    }, async (url, init) => {
+      posted = { url, body: JSON.parse(init.body) };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ token: 'tok', ws_url: 'wss://voice.example/ws/demo?t=tok', max_sec: 180 }),
+      };
+    });
+    assert.equal(minted.ok, true);
+    assert.equal(posted.url, '/demo/token');
+    assert.equal(posted.body.device_id, deviceId);
+
+    const statusTarget = appendDeviceId('/demo/status', deviceId);
+    let seen = '';
+    const status = await readDemoStatus(async (url) => {
+      seen = url;
+      return { status: 200, ok: true, json: async () => ({ enabled: true, busy: false, cap: false, reason: null }) };
+    }, statusTarget);
+    assert.equal(status.kind, 'open');
+    assert.equal(seen, statusTarget);
+    assert.equal(seen, `/demo/status?device_id=${encodeURIComponent(deviceId)}`);
+    assert.equal(appendDeviceId('/demo/status', 'bad id'), '/demo/status');
+    const dir = path.join(__dirname, '../dashboard/src/components/marketing/voiceDemo');
+    const blob = fs.readdirSync(dir).map((name) => fs.readFileSync(path.join(dir, name), 'utf8')).join('\n');
+    assert.equal(blob.includes('/demo/grant'), false);
+    assert.match(blob, /device_id: demoDeviceId\(\)/);
+    assert.match(blob, /demoStatusUrl\(\)/);
   });
 
   it('uses pcm8 on touch or a phone and pcm16 on a desktop', () => {

@@ -19,7 +19,7 @@ import {
   type DemoBusinessKey,
   type DemoLang,
 } from "./copy";
-import { demoDeviceId } from "./device";
+import { demoDeviceId, demoStatusUrl } from "./device";
 import { DEMO_MAX_SEC, formatCountdown, stateForTokenFailure, type DemoState } from "./machine";
 import { captureMic, createMicMeter, stopStream, type DemoMeter } from "./meter";
 import { readDeviceCodec, type AssistantPhase, type WireCodec } from "./protocol";
@@ -144,7 +144,7 @@ export function VoiceDemo({
     setState("consent");
     if (previewState) return;
     setStartReady(false);
-    const read = await readDemoStatus();
+    const read = await readDemoStatus(fetch, demoStatusUrl());
     if (read.kind === "block") {
       setState(read.state);
       return;

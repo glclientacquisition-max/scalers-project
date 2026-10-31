@@ -13,6 +13,7 @@ import {
   type ServerCaption,
   type WireCodec,
 } from "./protocol";
+import { demoStatusUrl } from "./device";
 import { readDemoStatus } from "./status";
 
 export type DemoSocketHandlers = {
@@ -82,7 +83,7 @@ export function openDemoSocket(
     window.clearTimeout(connectTimer);
     clearClock();
     teardown(false);
-    const read = await readDemoStatus();
+    const read = await readDemoStatus(fetch, demoStatusUrl());
     if (read.kind === "block") {
       handlers.onUpgrade({ state: read.state, reason: read.state });
       return;

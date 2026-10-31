@@ -1,32 +1,65 @@
-const STORAGE_KEY = "scalers.demo.device";
-const COOKIE = "scalers_demo_device";
+const STORAGE_KEY = "scalers-demo-device";
+const DEVICE_ID = /^[A-Za-z0-9_-]{8,128}$/;
 
-function randomId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `d_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+let memoryId: string | null = null;
+
+export function isDemoDeviceId(value: string): boolean {
+  return DEVICE_ID.test(value);
 }
 
-/** Stable device id for the token request. Called on Start, not on first paint. */
+function mintDeviceId(): string {
+  return crypto.randomUUID();
+}
+
+/** Adds ?device_id= when the id matches the token charset. */
+export function appendDeviceId(url: string, deviceId: string): string {
+  if (!isDemoDeviceId(deviceId)) return url;
+  const hashAt = url.indexOf("#");
+  const bare = hashAt === -1 ? url : url.slice(0, hashAt);
+  const queryAt = bare.indexOf("?");
+  const path = queryAt === -1 ? bare : bare.slice(0, queryAt);
+  const params = new URLSearchParams(queryAt === -1 ? "" : bare.slice(queryAt + 1));
+  params.set("device_id", deviceId);
+  return `${path}?${params.toString()}`;
+}
+
+export function demoStatusUrl(base = "/demo/status"): string {
+  return appendDeviceId(base, demoDeviceId());
+}
+
+function readStored(storage: Storage): string | null {
+  const existing = storage.getItem(STORAGE_KEY);
+  if (existing && isDemoDeviceId(existing)) return existing;
+  return null;
+}
+
+/**
+ * Browser device id for the demo token and status poll.
+ * SSR returns "" so a server render never mints a shared id.
+ * A storage failure keeps one in-memory id for this page.
+ */
 export function demoDeviceId(): string {
   if (typeof window === "undefined") return "";
+  let storage: Storage | null = null;
+  let readable = true;
   try {
-    const existing = window.localStorage.getItem(STORAGE_KEY);
+    storage = window.localStorage;
+    const existing = readStored(storage);
     if (existing) return existing;
   } catch {
-    // Private mode can throw. Fall through to a cookie or a fresh id.
+    readable = false;
+    storage = null;
   }
-  const fromCookie = document.cookie
-    .split("; ")
-    .find((part) => part.startsWith(`${COOKIE}=`))
-    ?.slice(COOKIE.length + 1);
-  const id = fromCookie || randomId();
+  if (!readable) {
+    if (!memoryId) memoryId = mintDeviceId();
+    return memoryId;
+  }
+  const id = memoryId && isDemoDeviceId(memoryId) ? memoryId : mintDeviceId();
   try {
-    window.localStorage.setItem(STORAGE_KEY, id);
+    storage?.setItem(STORAGE_KEY, id);
+    return id;
   } catch {
-    // Ignore quota and private-mode failures.
+    memoryId = id;
+    return id;
   }
-  document.cookie = `${COOKIE}=${id}; Path=/; Max-Age=31536000; SameSite=Lax`;
-  return id;
 }

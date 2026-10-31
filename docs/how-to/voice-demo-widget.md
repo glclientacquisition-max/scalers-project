@@ -15,7 +15,7 @@ The voice service owns the endpoint (Voice PR1). This widget only calls it.
 
 - Success: `200 {token, ws_url, max_sec}`.
 - `503 {reason:'disabled'}` shows "Demo paused." The service does that unless `DEMO_ENABLED` is the exact value `on`.
-- Origin is checked, then the Turnstile token, then the limits: 3 sessions a day per IP and per device, 1 at a time per IP, and 5 at once.
+- The body field is `device_id`. The widget reads `localStorage["scalers-demo-device"]`. A missing value, or one that is not 8 to 128 characters from `A-Za-z0-9_-`, is replaced with `crypto.randomUUID()` and saved. If storage throws, that id stays in memory for the page. Server render does not mint one.
 - `503 {reason:'busy'}` shows "All demo lines are busy, try again in a minute."
 - `503 {reason:'cap'}` shows "The demo is resting for today. Try again tomorrow."
 - `429 {reason:'limit_daily'}` shows "You've used today's demos."
@@ -27,7 +27,7 @@ The site key is `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. It is public. The secret stays
 
 ## Session
 
-Before Start, the page calls `GET /demo/status`. The reason order is disabled, then cap, then used, then busy. `disabled` shows "Demo paused." `cap` shows "The demo is resting for today. Try again tomorrow." `used` (from that status, or `429 {reason:'used'}` on the token) replaces Start with a request-access form. The submit is a local stub until the backend exists. Token `429 {reason:'rate'}` means a session is already open and the visitor still has one left: "A demo is already open. Try again in a minute." A `429 {reason:'rate'}` on the status poll is the poll limit and is ignored.
+Before Start, the page calls `GET /demo/status?device_id=`. The same id goes on `POST /demo/token`. The widget never calls `POST /demo/grant`. The reason order is disabled, then cap, then used, then busy. `disabled` shows "Demo paused." `cap` shows "The demo is resting for today. Try again tomorrow." `used` (from that status, or `429 {reason:'used'}` on the token) replaces Start with a request-access form. The submit is a local stub until the backend exists. Token `429 {reason:'rate'}` means a session is already open and the visitor still has one left: "A demo is already open. Try again in a minute." A `429 {reason:'rate'}` on the status poll is the poll limit and is ignored.
 
 `createHttpDemoAdapter` posts the token, then opens `ws_url` with `codec=pcm8` on a touch or phone (8 kHz, 320 bytes every 20 ms, about 1 MB a minute) and `codec=pcm16` on a desktop (16 kHz, 640 bytes, about 4 MB a minute). Opus is not used. End sends `{type:'end'}`.
 
