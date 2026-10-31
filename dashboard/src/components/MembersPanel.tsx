@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MinusIcon, PlusIcon } from "@heroicons/react/24/outline";
+import { ChevronRightIcon, MinusIcon, PlusIcon } from "@heroicons/react/24/outline";
 import {
   changeMemberRoleAction,
   inviteMemberAction,
@@ -46,6 +46,72 @@ const rowClass = "flex min-h-14 flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2
 const linkClass =
   "flex min-h-11 items-center justify-center px-4 text-body font-medium text-accent hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand";
 
+type MemberRow = MembersData["members"][number];
+
+function MemberSheetBody({
+  member,
+  viewerRole,
+  viewerId,
+  roleOptions,
+  spinning,
+  onRole,
+  onMakeOwner,
+  onRemove,
+}: {
+  member: MemberRow;
+  viewerRole: Role;
+  viewerId: string;
+  roleOptions: { value: Role; label: string; detail: string }[];
+  spinning: (key: string) => boolean;
+  onRole: (next: Role) => void;
+  onMakeOwner: () => void;
+  onRemove: () => void;
+}) {
+  const self = member.userId === viewerId;
+  const manageable = !self && canManageMember(viewerRole, member.role);
+  const display = member.name || member.email;
+  return (
+    <div className="space-y-4">
+      <p className="text-body text-ink-2">{member.email}</p>
+      {manageable ? (
+        <ChoiceSheet
+          title={`Role for ${display}`}
+          label={`Role for ${member.email}`}
+          value={member.role}
+          options={roleOptions}
+          onChange={onRole}
+        />
+      ) : (
+        <p className="text-body text-ink">{ROLE_LABELS[member.role]}</p>
+      )}
+      {spinning(`role:${member.userId}`) ? (
+        <span role="status" className="flex">
+          <span aria-hidden="true" className={pendingDotClass} />
+          <span className="sr-only">Changing role</span>
+        </span>
+      ) : null}
+      {viewerRole === "owner" && member.role === "admin" ? (
+        <Button variant="tonal" size="md" pending={spinning(`owner:${member.userId}`)} onClick={onMakeOwner}>
+          Make owner
+        </Button>
+      ) : null}
+      {manageable ? (
+        <div className="border-t border-hairline pt-4">
+          <Button
+            variant="danger"
+            size="md"
+            pending={spinning(`remove:${member.userId}`)}
+            aria-label={`Remove ${member.email}`}
+            onClick={onRemove}
+          >
+            Remove from team
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * Settings > Team & access > Members. Renders inside the Settings <form>, so there are
  * no nested forms: every action is called directly and confirmed in a drawer.
@@ -72,6 +138,7 @@ export function MembersPanel({
   const [seatOpen, setSeatOpen] = useState(false);
   const [seatQty, setSeatQty] = useState(1);
   const [seatNote, setSeatNote] = useState<string | null>(null);
+  const [sheetId, setSheetId] = useState<string | null>(null);
   const seatOffer = data.seatOffer;
   const seatPrice = seatOffer?.extraSeatMonthlyKes ?? null;
   const maxAdd = Math.max(0, 100 - (seatOffer?.extraSeats ?? 0));
@@ -166,6 +233,7 @@ export function MembersPanel({
   }
 
   const roleOptions = roles.map((r) => ({ value: r, label: ROLE_LABELS[r], detail: ROLE_BLURBS[r] }));
+  const sheetMember = data.members.find((m) => m.userId === sheetId) ?? null;
 
   return (
     <div className="space-y-6">
@@ -183,91 +251,25 @@ export function MembersPanel({
         <ul aria-label="Members">
           {data.members.map((m) => {
             const self = m.userId === viewerId;
-            const manageable = !self && canManageMember(viewerRole, m.role);
             const display = m.name || m.email;
-            const hasActions = manageable || (viewerRole === "owner" && m.role === "admin");
+            const showEmail = Boolean(m.name) || m.role === "owner";
             return (
-              <li key={m.userId} className={`${rowClass} border-b border-hairline last:border-b-0`}>
-                <div className={`min-w-0 flex-1 ${hasActions ? "basis-full sm:basis-0" : ""}`}>
-                  <p className="truncate text-body text-ink" title={m.email}>
-                    {display}
-                    {self ? <span className="text-ink-2"> (you)</span> : null}
-                  </p>
-                  {m.name ? <p className="truncate text-meta text-ink-2">{m.email}</p> : null}
-                </div>
-                <div className={`flex shrink-0 items-center justify-end gap-2 ${hasActions ? "w-full sm:w-auto" : ""}`}>
-                  {manageable ? (
-                    <div className="w-28">
-                      <ChoiceSheet
-                        title={`Role for ${display}`}
-                        label={`Role for ${m.email}`}
-                        value={m.role}
-                        options={roleOptions}
-                        onChange={(next) => {
-                          if (next !== m.role) run(() => changeMemberRoleAction(m.userId, next), { key: `role:${m.userId}` });
-                        }}
-                      />
-                      {spinning(`role:${m.userId}`) ? (
-                        <span role="status" className="mt-1 flex justify-end">
-                          <span aria-hidden="true" className={pendingDotClass} />
-                          <span className="sr-only">Changing role</span>
-                        </span>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <span className="px-1 text-body text-ink-2">{ROLE_LABELS[m.role]}</span>
-                  )}
-                  {viewerRole === "owner" && m.role === "admin" ? (
-                    <Button
-                      variant="tonal"
-                      size="md"
-                      pending={spinning(`owner:${m.userId}`)}
-                      onClick={() =>
-                        ask({
-                          key: `owner:${m.userId}`,
-                          title: `Make ${display} the owner?`,
-                          confirmLabel: "Transfer ownership",
-                          danger: true,
-                          typeToConfirm: m.email,
-                          refreshAll: true,
-                          fn: () => transferOwnershipAction(m.userId),
-                          body: (
-                            <div className="space-y-3" data-transfer-consequences="">
-                              <p>{m.email} becomes the owner straight away.</p>
-                              <ul className="list-disc space-y-1.5 pl-5">
-                                <li>You become an Admin. You keep the inbox, settings, usage and top-ups.</li>
-                                <li>You can no longer transfer ownership. Only the new owner can, including back to you.</li>
-                                <li>The new owner holds the account and its billing, and can change your role or remove you.</li>
-                              </ul>
-                            </div>
-                          ),
-                        })
-                      }
-                    >
-                      Make owner
-                    </Button>
-                  ) : null}
-                  {manageable ? (
-                    <Button
-                      variant="danger"
-                      size="md"
-                      pending={spinning(`remove:${m.userId}`)}
-                      aria-label={`Remove ${m.email}`}
-                      onClick={() =>
-                        ask({
-                          key: `remove:${m.userId}`,
-                          title: `Remove ${display}?`,
-                          confirmLabel: "Remove",
-                          danger: true,
-                          fn: () => removeMemberAction(m.userId),
-                          body: <p>They lose access straight away and their seat is freed.</p>,
-                        })
-                      }
-                    >
-                      Remove
-                    </Button>
-                  ) : null}
-                </div>
+              <li key={m.userId} className="border-b border-hairline last:border-b-0">
+                <button
+                  type="button"
+                  onClick={() => setSheetId(m.userId)}
+                  className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-start hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-body text-ink" title={m.email}>
+                      {display}
+                      {self ? <span className="text-ink-2"> (you)</span> : null}
+                    </span>
+                    {showEmail ? <span className="block truncate text-meta text-ink-2">{m.email}</span> : null}
+                  </span>
+                  <span className="shrink-0 text-body text-ink-2">{ROLE_LABELS[m.role]}</span>
+                  <ChevronRightIcon className="size-5 shrink-0 text-ink-3" aria-hidden />
+                </button>
               </li>
             );
           })}
@@ -466,6 +468,61 @@ export function MembersPanel({
             </Select>
           </div>
           {seatNote ? <p className="mt-3 text-body text-ink">{seatNote}</p> : null}
+        </Sheet>
+      ) : null}
+
+      {sheetMember ? (
+        <Sheet
+          open
+          onOpenChange={(next) => { if (!next) setSheetId(null); }}
+          title={sheetMember.name || sheetMember.email}
+        >
+          <MemberSheetBody
+            member={sheetMember}
+            viewerRole={viewerRole}
+            viewerId={viewerId}
+            roleOptions={roleOptions}
+            spinning={spinning}
+            onRole={(next) => {
+              if (next !== sheetMember.role) {
+                run(() => changeMemberRoleAction(sheetMember.userId, next), { key: `role:${sheetMember.userId}` });
+              }
+            }}
+            onMakeOwner={() => {
+              const m = sheetMember;
+              const display = m.name || m.email;
+              ask({
+                key: `owner:${m.userId}`,
+                title: `Make ${display} the owner?`,
+                confirmLabel: "Transfer ownership",
+                danger: true,
+                typeToConfirm: m.email,
+                refreshAll: true,
+                fn: () => transferOwnershipAction(m.userId),
+                body: (
+                  <div className="space-y-3" data-transfer-consequences="">
+                    <p>{m.email} becomes the owner straight away.</p>
+                    <ul className="list-disc space-y-1.5 pl-5">
+                      <li>You become an Admin. You keep the inbox, settings, usage and top-ups.</li>
+                      <li>You can no longer transfer ownership. Only the new owner can, including back to you.</li>
+                      <li>The new owner holds the account and its billing, and can change your role or remove you.</li>
+                    </ul>
+                  </div>
+                ),
+              });
+            }}
+            onRemove={() => {
+              const display = sheetMember.name || sheetMember.email;
+              ask({
+                key: `remove:${sheetMember.userId}`,
+                title: `Remove ${display}?`,
+                confirmLabel: "Remove",
+                danger: true,
+                fn: () => removeMemberAction(sheetMember.userId),
+                body: <p>They lose access straight away and their seat is freed.</p>,
+              });
+            }}
+          />
         </Sheet>
       ) : null}
 

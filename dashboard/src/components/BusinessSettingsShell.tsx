@@ -96,6 +96,7 @@ export function BusinessSettingsShell({
   businessCategory = null,
   pronunciationReview = [],
   pronunciationQueueFailed = false,
+  memberRoles,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
@@ -116,6 +117,8 @@ export function BusinessSettingsShell({
   /** Pronunciation: review queue read on the server. */
   pronunciationReview?: PronunciationReviewCandidate[];
   pronunciationQueueFailed?: boolean;
+  /** Email to login role, so alert contacts use the member record. */
+  memberRoles?: Record<string, string>;
 }) {
   const { tab: activeTab, trainPanel: activeTrainPanel } = useResolvedSettingsRoute(tab, trainPanel);
   const formPanel: SettingsPanel =
@@ -245,6 +248,7 @@ export function BusinessSettingsShell({
           structuredSlot={structuredSlot}
           pronunciationReview={pronunciationReview}
           pronunciationQueueFailed={pronunciationQueueFailed}
+          memberRoles={memberRoles}
         />
       ) : (
         <div className={settingsConsoleClass}>
