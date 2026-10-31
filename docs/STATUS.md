@@ -212,6 +212,8 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 
 ## 4. Open PRs
 
+**Draft PR (31 Oct 2026, EAT), Waive overage in Admin Billing:** branch `billing/waive-overage-button`. The Money pane gets a **Waive overage** row. It opens a confirm sheet that needs a reason, then POSTs `waive_overage` to `/api/admin/billing`. The route needs `confirm`, a reason and an idempotency key, and it runs behind the existing Super Admin and step-up gates. It calls the existing `waive_tenant_overage` (identical on prod and staging, so this needs no SQL). That function writes the `ops_audit_log` `waive_overage` row. The staging RPC test (rolled back, Test Archive Co) waives once, writes 1 audit row and 1 ledger row, waives 0 on a replay, and refuses a short reason. Open question: the function clears the negative `wallet_balance_kes` with a `trial_credit` wallet delta, which sits awkwardly with the packages-only/no-wallet policy.
+
 **28 Oct 2026 clean-up:** there were 102 open PRs. The stale, superseded ones were closed with a pointer to the handover PR, and their branches were kept. Still open:
 - the parked retire-old-brain drafts #1009 and #1010
 - #975 (Brain to confirm before closing)

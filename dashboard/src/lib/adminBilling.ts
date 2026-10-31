@@ -441,6 +441,32 @@ export async function grantTenantPackageMinutes(opts: {
   };
 }
 
+/**
+ * Clears a negative on-demand balance with waive_tenant_overage. The DB function
+ * writes the ops_audit_log row (action waive_overage) and is idempotent per key.
+ * A business that owes nothing returns waivedKes 0 and nothing changes.
+ */
+export async function waiveTenantOverage(opts: {
+  businessId: string;
+  note: string;
+  actor: string;
+  idempotencyKey: string;
+}): Promise<{ waivedKes: number; balanceKes: number }> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.rpc("waive_tenant_overage", {
+    p_tenant_id: opts.businessId,
+    p_note: opts.note,
+    p_actor: opts.actor,
+    p_idempotency_key: opts.idempotencyKey,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    waivedKes: Number(row?.waived_kes ?? 0),
+    balanceKes: Number(row?.wallet_balance_kes ?? 0),
+  };
+}
+
 export async function listOpsAuditLog(tenantId: string, limit = 40): Promise<OpsAuditRow[]> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
