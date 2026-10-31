@@ -26,6 +26,8 @@ export type CallSetupActivity = {
   firstCallAfterOpenAt: string | null;
   /** Latest call for the business, if any. */
   lastCallAt: string | null;
+  /** Id of the matched test call, for the "it answered" link. */
+  testMatchCallId?: string | null;
 };
 
 export type TestWindow = "none" | "open" | "over";
@@ -74,6 +76,22 @@ export function matchTestCall(
     if (best === null || t < best) best = t;
   }
   return best === null ? null : new Date(best).toISOString();
+}
+
+/** Id of the call `matchTestCall` picked (same rules), or null. */
+export function matchTestCallId(
+  setup: Pick<CallSetup, "test_from" | "test_started_at"> | null,
+  calls: ReadonlyArray<{ id: string | null; caller_number: string | null; created_at: string }>
+): string | null {
+  const at = matchTestCall(setup, calls);
+  if (!at) return null;
+  const t = Date.parse(at);
+  return calls.find((c) => c.id && Date.parse(c.created_at) === t && samePhone(c.caller_number, setup?.test_from ?? null))?.id ?? null;
+}
+
+/** Shown once: the test call reached the Business Assistant and the owner hasn't seen it yet. */
+export function showWinMoment(setup: Pick<CallSetup, "tested_at" | "tested_via" | "auto_seen_at">): boolean {
+  return Boolean(setup.tested_at) && setup.tested_via === "auto" && !setup.auto_seen_at;
 }
 
 export function testWindow(setup: Pick<CallSetup, "test_started_at"> | null, now: number): TestWindow {

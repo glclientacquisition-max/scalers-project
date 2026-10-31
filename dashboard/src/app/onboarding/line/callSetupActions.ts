@@ -68,7 +68,7 @@ export async function saveCallSetupAction(
 }
 
 export type CallSetupTestCheck =
-  | { ok: true; matchedAt: string | null; setup: CallSetup | null }
+  | { ok: true; matchedAt: string | null; matchedCallId?: string | null; setup: CallSetup | null }
   | { ok: false; error: string };
 
 /**
@@ -85,5 +85,6 @@ export async function checkCallSetupTestAction(tenantId: string): Promise<CallSe
   const matchedAt = state.activity?.testMatchAt ?? null;
   if (!matchedAt || state.setup.tested_at) return { ok: true, matchedAt, setup: state.setup };
   const saved = await saveCallSetupAction(tenant.id, { tested_at: matchedAt, tested_via: "auto" });
-  return { ok: true, matchedAt, setup: saved.ok ? saved.setup : state.setup };
+  const matchedCallId = state.activity?.testMatchCallId ?? null;
+  return { ok: true, matchedAt, matchedCallId, setup: saved.ok ? saved.setup : state.setup };
 }

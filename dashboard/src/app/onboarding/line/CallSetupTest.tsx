@@ -20,11 +20,13 @@ import {
 import {
   TEST_WINDOW_MINUTES,
   showFixChecklist,
+  showWinMoment,
   testWindow,
   worksTitle,
 } from "@/lib/callSetupStatus";
 import { testIncludesBusy, type CallSetup } from "@/lib/callSetupStore";
 import { checkCallSetupTestAction } from "./callSetupActions";
+import { TestWinMoment } from "./TestWinMoment";
 
 const cardBase = "rounded-2xl border border-hairline bg-surface p-4";
 const POLL_MS = 10_000;
@@ -70,6 +72,7 @@ export function CallSetupTest({
   const [error, setError] = useState<string | null>(null);
   const [saidNo, setSaidNo] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [winCallId, setWinCallId] = useState<string | null>(null);
   const win = testWindow(setup, now);
   const waiting = !tested && win === "open";
 
@@ -81,7 +84,10 @@ export function CallSetupTest({
       setNow(Date.now());
       if (!watch) return;
       const res = await checkCallSetupTestAction(tenantId).catch(() => null);
-      if (!stop && res?.ok && res.matchedAt) onLocal({ tested_at: res.matchedAt, tested_via: "auto" });
+      if (!stop && res?.ok && res.matchedAt) {
+        setWinCallId(res.matchedCallId ?? null);
+        onLocal({ tested_at: res.matchedAt, tested_via: "auto" });
+      }
     };
     const id = setInterval(tick, POLL_MS);
     void tick();
@@ -110,6 +116,16 @@ export function CallSetupTest({
   const from = kenyaMobileDisplay(setup.test_from);
   const checklist = option === "forward" && showFixChecklist({ tested, saidNo, window: win });
   const missed = !tested && win === "over";
+
+  if (tested && showWinMoment(setup)) {
+    return (
+      <TestWinMoment
+        from={from}
+        callId={winCallId}
+        onSeen={() => onSave({ auto_seen_at: new Date().toISOString() })}
+      />
+    );
+  }
 
   if (tested) {
     const auto = setup.tested_via === "auto";
