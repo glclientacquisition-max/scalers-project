@@ -551,6 +551,9 @@ async function HomeOverviewBody() {
                 ))}
               </div>
             ) : null}
+            {todayCount === null ? (
+              <Link href="/home" className={`inline-flex min-h-11 items-center px-4 text-body font-medium text-accent ${focusRingVisible}`}>Retry</Link>
+            ) : null}
 
             {showCta ? (
               <div className="border-t border-hairline px-4 py-4">

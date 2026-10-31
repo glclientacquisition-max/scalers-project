@@ -105,7 +105,12 @@ export function AdminQualityV2({
         <span className="font-semibold text-ink">{dropping ? `${dropping} dropping` : "None dropping"}</span> · worst score first · scores are out of 100
       </p>
       {rows.length === 0 ? (
-        <EmptyState title="No scored calls in this range." />
+        <EmptyState
+          title="No scored calls in this range."
+          action={range === "7d" ? (
+            <Link href={href({ range: "30d" })} className="inline-flex min-h-11 items-center text-ops-body font-medium text-accent">Last 30 days</Link>
+          ) : undefined}
+        />
       ) : (
         <>
           <ul className="divide-y divide-hairline bg-surface md:hidden" data-phone-rows="">
@@ -116,8 +121,9 @@ export function AdminQualityV2({
                     <span className="min-w-0 truncate text-ink">{r.name}</span>
                     <StatusPill tone={scoreTone(r.score)}>{formatScore(r.score)}</StatusPill>
                   </span>
-                  <span className="truncate text-ops-label text-ink-2">
-                    {callCountLabel(r.callsTraced)}{r.topFailure ? ` · ${checkLabel(r.topFailure)}` : ""}{r.dropping ? " · dropping" : ""}
+                  <span className="flex w-full items-center gap-2 truncate text-ops-label text-ink-2">
+                    <span className="min-w-0 truncate">{callCountLabel(r.callsTraced)}{r.topFailure ? ` · ${checkLabel(r.topFailure)}` : ""}{r.dropping ? " · dropping" : ""}</span>
+                    {r.trend.length >= 2 ? <Sparkline points={r.trend} label={`${r.name} trend`} height={20} width={72} /> : null}
                   </span>
                 </Link>
               </li>
