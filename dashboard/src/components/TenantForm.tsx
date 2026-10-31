@@ -157,6 +157,7 @@ import {
   TenantSettingsSaveButton,
   TENANT_SETTINGS_FORM_ID,
 } from "@/components/TenantSettingsSaveButton";
+import { useDirty } from "@/lib/settingsDirty";
 import { UnknownAnswerField } from "@/components/UnknownAnswerField";
 import {
   UNKNOWN_ANSWER_DEFAULT_EN,
@@ -1007,7 +1008,10 @@ function TenantFormInner({
     noPremises ? "1" : "0",
   ];
   // adoptsResult: a save hands back the spoken When unsure pair, synced above in render.
-  const { justSaved } = useFormDraft(save, { id: "form", values: draftValues, adoptsResult: true });
+  const { dirty, justSaved } = useFormDraft(save, { id: "form", values: draftValues, adoptsResult: true });
+  const [draftSnapshot] = useState(() => draftValues);
+  const counted = useDirty(draftSnapshot, draftValues);
+  const changes = dirty ? counted : 0;
   const [removeAsk, setRemoveAsk] = useState<{
     title: string;
     body: string;
@@ -1057,7 +1061,7 @@ function TenantFormInner({
                   Changes save as you go
                 </p>
               ) : (
-                <TenantSettingsSaveButton pending={pending} saved={justSaved} />
+                <TenantSettingsSaveButton pending={pending} saved={justSaved} changes={changes} />
               )
             }
           />

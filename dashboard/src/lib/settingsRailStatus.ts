@@ -17,5 +17,9 @@ export async function loadSettingsStatuses(
   const targets = SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target));
   const statuses = settingsIndexStatuses(tenant, voices, targets);
   const plan = await loadPlanRowStatus(tenant.id);
-  return plan.row ? { ...statuses, [PLAN_KEY]: plan.row } : statuses;
+  return {
+    ...statuses,
+    ...(plan.row ? { [PLAN_KEY]: plan.row } : {}),
+    ...(plan.billingRow ? { "/settings/billing": plan.billingRow } : {}),
+  };
 }

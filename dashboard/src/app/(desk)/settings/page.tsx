@@ -83,6 +83,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     return <DeskNoWorkspace />;
   }
   const planRowPromise = loadPlanRowStatus(tenant.id);
+  const callSetupPromise = loadCallSetupState(tenant.id);
   const tab = parseBusinessSettingsTab(tabRaw, panelRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
   // The Import tab is gone: old ?tab=import links open Add many on the Catalogue.
@@ -183,7 +184,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   let callsSlot = null;
   if (tab === "calls") {
     const number = toLocal07(tenant.sautikit_virtual_number);
-    const state = number ? await loadCallSetupState(tenant.id) : null;
+    const state = number ? await callSetupPromise : null;
     const status = resolveCallSetupStatus({
       numberReady: Boolean(number),
       setup: state?.setup ?? null,
@@ -203,8 +204,11 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   }
 
   const navTargets = SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target));
-  const planRow = await planRowPromise;
-  const planStatus: Record<string, SettingsListStatus> = planRow.row ? { "/settings/plan": planRow.row } : {};
+  const [planRow, callSetup] = await Promise.all([planRowPromise, callSetupPromise]);
+  const planStatus: Record<string, SettingsListStatus> = {
+    ...(planRow.row ? { "/settings/plan": planRow.row } : {}),
+    ...(planRow.billingRow ? { "/settings/billing": planRow.billingRow } : {}),
+  };
 
   // Test panel greeting preview and the catalogue view read kb_items when the KB tables exist (stored columns otherwise).
   // isKbLive with a readable snapshot: the Test greeting preview uses the call's snapshot greeting; else legacy reads.
@@ -220,7 +224,14 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
         tab={tab}
         trainPanel={trainPanel}
         curatedVoices={curatedVoices}
-        optionStatus={{ ...settingsIndexStatuses(tenant, curatedVoices, navTargets), ...planStatus }}
+        optionStatus={{
+          ...settingsIndexStatuses(
+            { ...tenant, call_option: callSetup.supported ? (callSetup.setup?.option ?? null) : undefined },
+            curatedVoices,
+            navTargets,
+          ),
+          ...planStatus,
+        }}
         liveTransferExecutor={deskLiveTransferExecutorEnabled()}
         membersSlot={membersSlot}
         seatNoteSlot={

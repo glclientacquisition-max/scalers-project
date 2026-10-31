@@ -33,6 +33,7 @@ import {
 import { nearbyCounties } from "@/lib/kenyaCountyAdjacency";
 import { areaLineNotes } from "@/lib/areaPicksToCoverageAreas";
 import { saveAreaPicksAction } from "@/app/(desk)/settings/areas/actions";
+import { SettingsActionBar } from "@/components/settings/SettingsActionBar";
 
 export type AreaView = "home" | "check" | "hear";
 
@@ -75,7 +76,7 @@ function Header({ title, onBack, backHref }: { title: string; onBack?: () => voi
           <ChevronLeftIcon className="h-5 w-5" />
         </button>
       ) : (
-        <Link aria-label="Back to settings" href={backHref || "/settings"} className={cls}>
+        <Link aria-label="Back to settings" href={backHref || "/settings"} className={`${cls} md:hidden`}>
           <ChevronLeftIcon className="h-5 w-5" />
         </Link>
       )}
@@ -309,19 +310,14 @@ export function AreaPicker({
         </ul>
       )}
       <div className="h-6" />
-      <Bar>
-        <span role="status" className={cx("flex-1 text-meta", msg && !msg.ok ? "text-attention" : "text-ink-2")}>
-          {msg && changes === 0 ? msg.text : msg && !msg.ok ? msg.text : changes === 0 ? "No changes" : `${changes} ${changes === 1 ? "change" : "changes"}`}
-        </span>
-        {changes > 0 ? (
-          <button type="button" className={buttonClass({ variant: "ghost", size: "lg" })} onClick={() => setPicks(saved)} disabled={pending}>
-            Undo
-          </button>
-        ) : null}
-        <button type="button" className={buttonClass({ variant: "primary", size: "lg" })} disabled={changes === 0 || pending} onClick={() => save(picks, false)}>
-          {pending ? "Saving…" : "Save"}
-        </button>
-      </Bar>
+      <SettingsActionBar
+        changes={changes}
+        pending={pending}
+        note={msg && (changes === 0 || !msg.ok) ? msg.text : null}
+        noteTone={msg && !msg.ok ? "attention" : "quiet"}
+        onUndo={() => setPicks(saved)}
+        onSave={() => save(picks, false)}
+      />
       {sheet ? (
         <AreaSheet
           key={sheet}

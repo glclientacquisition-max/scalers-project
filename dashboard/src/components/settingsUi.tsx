@@ -374,7 +374,7 @@ export const settingsGhostButtonClass =
 
 export function SettingsBackLink() {
   return (
-    <DeskBack href="/settings">
+    <DeskBack href="/settings" className="md:hidden">
       Settings
     </DeskBack>
   );

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronRightIcon } from "@heroicons/react/20/solid";
 import {
   ArrowDownTrayIcon,
@@ -20,8 +20,11 @@ import {
   QuestionMarkCircleIcon,
   ReceiptPercentIcon,
   ShoppingBagIcon,
+  SwatchIcon,
   UsersIcon,
 } from "@heroicons/react/24/outline";
+import { Sheet } from "@/components/ui/Sheet";
+import { ThemePicker, useThemeChoice } from "@/components/ThemePicker";
 import { useCan } from "@/components/DeskRole";
 import {
   settingsRailClass,
@@ -78,6 +81,49 @@ const SETTINGS_ICON: Record<string, typeof ClockIcon> = {
 
 /** Statuses that ask the owner to act get the attention colour; the rest stay quiet. */
 const needsAction = (text: string) => /^(needs|not )/i.test(text);
+
+function statusTone(status: SettingsListStatus | undefined, text: string): string {
+  if (status?.tone === "attention") return "text-attention";
+  if (status?.tone === "quiet") return "text-ink-2";
+  return needsAction(text) ? "text-attention" : "text-ink-2";
+}
+
+function AppearanceHomeRow() {
+  const { choice } = useThemeChoice();
+  const [open, setOpen] = useState(false);
+  const status = choice === "dark" ? "Dark" : "Light";
+  return (
+    <li className="border-b border-hairline last:border-b-0">
+      <button
+        type="button"
+        data-settings-appearance=""
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+        className={[
+          settingsMenuRowClass,
+          "min-h-16 w-full text-left",
+          deskShiftClass,
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand",
+          "hover:bg-surface-2 active:bg-surface-2",
+        ].join(" ")}
+      >
+        <span aria-hidden="true" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-tonal text-accent">
+          <SwatchIcon className="h-5 w-5" />
+        </span>
+        <span className="min-w-0 flex-1 py-2">
+          <span className="block truncate">Appearance</span>
+          <span className="block truncate text-meta font-normal text-ink-2">On this device</span>
+        </span>
+        <span className="max-w-[40%] shrink-0 truncate text-meta font-normal text-ink-2">{status}</span>
+        <SettingsChevron active={false} />
+      </button>
+      <Sheet open={open} onOpenChange={setOpen} title="Appearance">
+        <ThemePicker />
+      </Sheet>
+    </li>
+  );
+}
 
 function visibleSections(manageBilling: boolean, assistantSayPage: boolean): SettingsNavSection[] {
   return SETTINGS_NAV.flatMap((section) => {
@@ -190,7 +236,7 @@ export function SettingsMenu({
                     {statusText ? (
                       <span
                         title={status?.title || statusText}
-                        className={`${isRail ? "max-w-[60%]" : "max-w-[40%]"} shrink-0 truncate text-meta font-normal tabular-nums ${needsAction(statusText) ? "text-attention" : "text-ink-2"}`}
+                        className={`${isRail ? "max-w-[60%]" : "max-w-[40%]"} shrink-0 truncate text-meta font-normal tabular-nums ${statusTone(status, statusText)}`}
                       >
                         {statusText}
                       </span>
@@ -200,6 +246,7 @@ export function SettingsMenu({
                 </li>
               );
             })}
+            {section.id === "people" && !isRail ? <AppearanceHomeRow /> : null}
           </ul>
         </section>
       ))}

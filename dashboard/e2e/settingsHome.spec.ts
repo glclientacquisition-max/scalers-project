@@ -23,7 +23,8 @@ test("settings home: no auto-open, grouped list, deep links land", async ({ page
   for (const name of ["Hours", "Catalogue", "Policies", "FAQs", "Team"]) {
     await expect(home.getByRole("link", { name: new RegExp(`^${name}\\b`) })).toBeVisible();
   }
-  await expect(home.getByText("When you are open, including holidays")).toBeVisible();
+  await expect(home.getByText("When you are open")).toBeVisible();
+  await expect(home.getByRole("button", { name: /Appearance/ })).toBeVisible();
   // Home: no rail on any width, and nothing moves after paint.
   await expect(page.locator('[data-settings-menu="rail"]')).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { __cls: number }).__cls)).toBeLessThan(0.02);

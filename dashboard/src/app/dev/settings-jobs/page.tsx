@@ -134,7 +134,7 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
   const curatedVoices = [
     {
       id: "7b197f3c-84b4-4404-986f-114e4dac1432",
-      description: "Warm Kenyan receptionist tone",
+      description: "Kenyan Woman",
       default: true,
     },
     { id: "dev-voice-clear", description: "Clear and brief" },
@@ -205,7 +205,7 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             assistantSayPage
             businessCategory={identityState === "empty" ? null : "books_stationery"}
             optionStatus={settingsIndexStatuses(
-              t,
+              { ...t, soniox_voice_label: "Aisha", call_option: callSetup.option },
               curatedVoices,
               SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target))
             )}

@@ -99,4 +99,33 @@ describe("settings row status", () => {
       title: "Warm Kenyan receptionist tone",
     });
   });
+
+  it("shows the catalogue voice, not the assistant name, and a fact on every row that has one", () => {
+    assert.equal(
+      load(
+        `mod.settingsOptionStatus({ tab: "train", panel: "tools" }, { agent_name: "Shy", soniox_voice_id: "v1", soniox_voice_label: "Shy" }, [{ id: "v1", description: "Kenyan Woman" }])`
+      ),
+      "Kenyan Woman"
+    );
+    assert.equal(
+      load(
+        `mod.settingsOptionStatus({ href: "/settings/areas" }, { business_policies: { coverage_areas: ["county:nairobi", "place:kibera", "place:westlands"] } })`
+      ),
+      "Nairobi +2"
+    );
+    assert.equal(
+      load(
+        `mod.settingsOptionStatus({ tab: "train", panel: "policies" }, { business_policies: { payments: { methods: ["mpesa_till", "cash"] } } })`
+      ),
+      "2 ways to pay"
+    );
+    assert.equal(load(`mod.callsRowStatus("forward")`), "Forwarding on");
+    assert.equal(load(`mod.callsRowStatus(null)`), "");
+    assert.equal(
+      load(
+        `mod.settingsOptionStatus({ tab: "alerts" }, { notify_channels: { sms: true, whatsapp: true, email: false } })`
+      ),
+      "SMS · WhatsApp"
+    );
+  });
 });

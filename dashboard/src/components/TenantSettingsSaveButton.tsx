@@ -18,17 +18,22 @@ export function TenantSettingsSaveButton({
   pending = false,
   saved = false,
   form = TENANT_SETTINGS_FORM_ID,
+  changes,
 }: {
   pending?: boolean;
   saved?: boolean;
   form?: string;
+  /** 0 disables Save. Omit only when the caller has not measured the draft yet. */
+  changes?: number;
 }) {
+  const clean = changes === 0;
+  const label = changes != null && changes > 1 ? `Save ${changes} changes` : "Save";
   return (
     <button
       type="submit"
       form={form}
-      disabled={pending}
-      data-save-state={pending ? "saving" : saved ? "saved" : "idle"}
+      disabled={pending || clean}
+      data-save-state={pending ? "saving" : saved ? "saved" : clean ? "clean" : "idle"}
       className={[
         "inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-body",
         btnPrimaryFill,
@@ -48,7 +53,7 @@ export function TenantSettingsSaveButton({
           Saved
         </>
       ) : (
-        "Save"
+        label
       )}
     </button>
   );
