@@ -483,23 +483,28 @@ async function HomeOverviewBody() {
               )}
             </section>
 
-            <section aria-label="Today" className="border-t border-hairline px-3 py-3">
-              <Link
-                href={callsHref({ purpose: "all" })}
-                className={[
-                  `flex min-h-11 items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-body text-ink-2 ${deskShiftClass} hover:bg-accent/[0.04] hover:text-ink`,
-                  "active:bg-accent/[0.08]",
-                  focusRingVisible,
-                ].join(" ")}
-              >
-                <span>Calls today</span>
-                {todayCount === null ? (
-                  <span className="text-meta text-ink-2">Could not load</span>
-                ) : (
-                  <span className="tabular-nums text-title font-semibold text-ink">{todayCount}</span>
-                )}
-              </Link>
-            </section>
+            {line === "live" ? (
+              <div className="grid grid-cols-3 gap-2 border-t border-hairline px-4 py-3" aria-label="Today">
+                {(
+                  [
+                    { label: "Calls", value: todayCount, href: callsHref({ purpose: "all" }) },
+                    { label: "Need you", value: work.toReturn, href: callsHref({ purpose: "human" }) },
+                    { label: "Visits", value: visitQueue ? work.toConfirm : 0, href: callsHref({ purpose: "job" }) },
+                  ] as const
+                ).map((tile) => (
+                  <Link
+                    key={tile.label}
+                    href={tile.href}
+                    className={`flex min-h-12 flex-col justify-center rounded-xl bg-canvas px-2 ${focusRingVisible}`}
+                  >
+                    <span className="tabular-nums text-title font-semibold text-ink">
+                      {tile.value === null ? "Failed" : tile.value}
+                    </span>
+                    <span className="text-meta text-ink-2">{tile.label}</span>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
 
             {showCta ? (
               <div className="border-t border-hairline px-4 py-4">
