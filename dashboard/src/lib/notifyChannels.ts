@@ -149,7 +149,7 @@ export const ALERT_TYPE_META: { id: AlertTypeId; label: string; what: string }[]
 ];
 
 export const ALERT_CHANNEL_LABEL: Record<AlertChannelId, string> = {
-  push: "This phone",
+  push: "This phone (app alert)",
   sms: "SMS",
   whatsapp: "WhatsApp",
   email: "Email",

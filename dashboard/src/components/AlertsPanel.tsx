@@ -4,7 +4,9 @@ import { withRoleGate } from "@/components/DeskRole";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
-import { NotifyChannelPicker } from "@/components/NotifyChannelPicker";
+import { ChevronRightIcon } from "@heroicons/react/20/solid";
+import { Sheet } from "@/components/ui/Sheet";
+import { Button } from "@/components/ui/Button";
 import { PhoneAlertsCard } from "@/components/PhoneAlertsCard";
 import { AlertTypeRows } from "@/components/AlertTypeRows";
 import {
@@ -64,6 +66,14 @@ function AlertsPanelInner({
   const [alertSnapshot] = useState(alertDraft);
   const counted = useDirty(alertSnapshot, alertDraft);
   const changes = dirty ? counted : 0;
+  const [contactEdit, setContactEdit] = useState<null | "phone" | "email">(null);
+  const paused = !notifyChannels.sms && !notifyChannels.whatsapp && !notifyChannels.email;
+  const included = Number(tenant.sms_included_units);
+  const used = Number(tenant.sms_used_units ?? 0);
+  const creditLine =
+    Number.isFinite(included) && included > 0
+      ? `Uses message credits. ${used} of ${included} used.`
+      : "Uses message credits.";
 
   useEffect(() => {
     const phone = tenant.whatsapp_notification_number || "";
@@ -118,32 +128,46 @@ function AlertsPanelInner({
         />
 
         <SettingsGroup title="Contact">
-          <SettingsRow label="Alert phone" htmlFor="owner">
-            <input
-              id="owner"
-              value={ownerWhatsapp}
-              onChange={(e) => setOwnerWhatsapp(e.target.value)}
-              placeholder="+254 700 000 000"
-              className={settingsValueFieldClass}
-            />
-          </SettingsRow>
-          <SettingsRow label="Email" htmlFor="alert_email">
-            <input
-              id="alert_email"
-              type="email"
-              value={alertEmail}
-              onChange={(e) => setAlertEmail(e.target.value)}
-              placeholder="owner@shop.co.ke"
-              className={settingsValueFieldClass}
+          <button
+            type="button"
+            onClick={() => setContactEdit("phone")}
+            className="flex min-h-14 w-full items-center gap-3 px-4 py-2 text-start hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block text-body text-ink">Alert phone</span>
+              <span className="block truncate text-meta text-ink-2">{ownerWhatsapp || "Add a phone"}</span>
+            </span>
+            <ChevronRightIcon className="size-5 shrink-0 text-ink-3" aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={() => setContactEdit("email")}
+            className="flex min-h-14 w-full items-center gap-3 border-t border-hairline px-4 py-2 text-start hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block text-body text-ink">Email</span>
+              <span className="block truncate text-meta text-ink-2">{alertEmail || "Add an email"}</span>
+            </span>
+            <ChevronRightIcon className="size-5 shrink-0 text-ink-3" aria-hidden />
+          </button>
+        </SettingsGroup>
+
+        <SettingsGroup>
+          <SettingsRow label="Pause all alerts" control="switch">
+            <ToolSwitch
+              checked={paused}
+              label="Pause all alerts"
+              onChange={(next) =>
+                setNotifyChannels({
+                  ...notifyChannels,
+                  sms: !next,
+                  whatsapp: !next,
+                  email: !next,
+                })
+              }
             />
           </SettingsRow>
         </SettingsGroup>
-
-        <NotifyChannelPicker
-          value={notifyChannels}
-          onChange={setNotifyChannels}
-          heading="Channels"
-        />
 
         <AlertTypeRows value={notifyChannels} onChange={setNotifyChannels} />
 
@@ -157,6 +181,7 @@ function AlertsPanelInner({
               label="Text customers"
             />
           </SettingsRow>
+          <p className="px-4 pb-3 text-meta text-ink-2">Texts the caller from the desk. {creditLine}</p>
           <SettingsRow label="Text back missed calls" control="switch">
             <ToolSwitch
               checked={Boolean(notifyChannels.missed_textback)}
@@ -166,11 +191,49 @@ function AlertsPanelInner({
               label="Text back missed calls"
             />
           </SettingsRow>
+          <p className="px-4 pb-3 text-meta text-ink-2">Texts a caller you missed. {creditLine}</p>
         </SettingsGroup>
-      </form>
-      <div className={`${settingsFormBodyClass} mt-6`}>
+
         <PhoneAlertsCard />
-      </div>
+
+        <Sheet
+          open={contactEdit != null}
+          onOpenChange={(next) => {
+            if (!next) setContactEdit(null);
+          }}
+          title={contactEdit === "email" ? "Email" : "Alert phone"}
+          footer={
+            <Button type="button" onClick={() => setContactEdit(null)}>
+              Done
+            </Button>
+          }
+        >
+          {contactEdit === "email" ? (
+            <label className="block text-meta text-ink-2" htmlFor="alert_email">
+              Email
+              <input
+                id="alert_email"
+                type="email"
+                value={alertEmail}
+                onChange={(e) => setAlertEmail(e.target.value)}
+                placeholder="owner@shop.co.ke"
+                className={`${settingsValueFieldClass} mt-1 w-full`}
+              />
+            </label>
+          ) : (
+            <label className="block text-meta text-ink-2" htmlFor="owner">
+              Alert phone
+              <input
+                id="owner"
+                value={ownerWhatsapp}
+                onChange={(e) => setOwnerWhatsapp(e.target.value)}
+                placeholder="+254 700 000 000"
+                className={`${settingsValueFieldClass} mt-1 w-full`}
+              />
+            </label>
+          )}
+        </Sheet>
+      </form>
     </section>
   );
 }
