@@ -3,6 +3,8 @@
 import { businessPaneHref } from "@/lib/ops/businessPane";
 import { useEffect, useMemo, useState } from "react";
 import { Headline, SplitLayout, SplitPane, StatusPill, EmptyState } from "@/components/ops";
+import { ButtonLink } from "@/components/ui/Button";
+import { Sheet } from "@/components/ui/Sheet";
 import { MinutesMeter } from "@/components/ui/MinutesMeter";
 import type { MinutesMeterMode } from "@/lib/minutesMeter";
 import {
@@ -34,7 +36,9 @@ export function AdminUsageV2({ data, tenantId, nowIso, currentPeriod }: { data: 
   const maxSec = Math.max(60, ...v.days.map((x) => x.seconds));
   const includedSec = data.includedMinutes * 60;
   const pct = v.share == null ? null : Math.round(v.share * 100);
-  const tone = v.share == null ? "neutral" : v.share > 1 ? "danger" : v.share >= 0.8 ? "warn" : "ok";
+  const over = data.includedMinutes > 0 && v.usedMinutes > data.includedMinutes;
+  const tone = v.share == null ? "neutral" : v.share >= 0.8 ? "warn" : "ok";
+  const [about, setAbout] = useState(false);
   const dayCalls = sel ? callsOnDay(data.calls, sel) : [];
   const selDay = v.days.find((x) => x.date === sel) ?? null;
   const rowsDesc = v.days.toReversed();
@@ -45,11 +49,12 @@ export function AdminUsageV2({ data, tenantId, nowIso, currentPeriod }: { data: 
       <Headline
         label={`${data.packageName ?? "No package"} · ${d(data.periodStart)} to ${dEnd(data.periodEnd)}${currentPeriod ? "" : " (past period)"}`}
         value={<>{v.usedMinutes.toLocaleString("en-KE")} min <span className="text-ops-heading font-normal text-ink-2">of {data.includedMinutes.toLocaleString("en-KE")} included</span></>}
-        sub={<span className="inline-flex flex-wrap items-center gap-ops-2">{pct != null ? <StatusPill tone={tone}>{pct}% used</StatusPill> : null}<span>{paceLine(v, data.onDemandEnabled)}</span></span>}
-        actions={[
-          { label: "Invoices", href: `/admin/billing/invoices?business=${tenantId}` },
-          { label: "Calls", href: businessPaneHref(tenantId, "calls") },
-        ]}
+        sub={
+          <span className="inline-flex flex-wrap items-center gap-ops-2">
+            {over ? <StatusPill tone="warn">Over</StatusPill> : pct != null ? <StatusPill tone={tone}>{pct}% used</StatusPill> : null}
+            {over ? null : <span>{paceLine(v, data.onDemandEnabled)}</span>}
+          </span>
+        }
       >
         <MinutesMeter
           shape="bar"
@@ -103,7 +108,11 @@ export function AdminUsageV2({ data, tenantId, nowIso, currentPeriod }: { data: 
               </button>
             ))}
           </div>
-          <p className="text-ops-label text-ink-2">Bars are call minutes per day (EAT). Amber is after the running total passed the included minutes. The total above is the billing meter, which can differ from call time by a few seconds per call.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <ButtonLink href={`/admin/billing/invoices?business=${tenantId}`} variant="tonal" size="sm">Invoices</ButtonLink>
+            <ButtonLink href={businessPaneHref(tenantId, "calls")} variant="tonal" size="sm">Calls</ButtonLink>
+            <button type="button" onClick={() => setAbout(true)} className="inline-flex min-h-11 items-center text-ops-body font-medium text-accent">About the bars</button>
+          </div>
 
           <ul className="divide-y divide-hairline bg-surface md:hidden" data-phone-rows="">
             {rowsDesc.map((x) => (
@@ -152,6 +161,9 @@ export function AdminUsageV2({ data, tenantId, nowIso, currentPeriod }: { data: 
 
   return (
     <div className="ops-theme flex min-h-0 w-full flex-col">
+      <Sheet open={about} onOpenChange={setAbout} title="About the bars" theme="admin">
+        <p className="text-body text-ink-2">Bars are call minutes per day (EAT). Amber is after the running total passed the included minutes. The total above is the billing meter, which can differ from call time by a few seconds per call.</p>
+      </Sheet>
       <SplitLayout
         list={list}
         pane={
