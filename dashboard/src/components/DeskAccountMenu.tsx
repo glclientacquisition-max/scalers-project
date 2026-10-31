@@ -5,10 +5,8 @@ import { switchDeskTenant } from "@/app/(desk)/tenantActions";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { ThemePicker, appearanceLabel, useThemeChoice } from "@/components/ThemePicker";
 import { iconButtonClass } from "@/components/ui/IconButton";
-import { Menu, MenuGroup, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/Menu";
 import { SignOutButton } from "@/components/ui/SignOutButton";
 import { Sheet } from "@/components/ui/Sheet";
-import { useIsPhone } from "@/components/ui/useIsPhone";
 import { cx } from "@/lib/cx";
 import { deskRowInitials } from "@/components/ui/deskRow";
 
@@ -68,7 +66,7 @@ function AccountSheet({
             </ul>
           </section>
         ) : null}
-        <section aria-labelledby="account-sheet-appearance" data-account-sheet-card="" className="rounded-2xl border border-line bg-canvas p-3">
+        <section aria-labelledby="account-sheet-appearance" data-account-sheet-card="" data-account-appearance="" className="rounded-2xl border border-line bg-canvas p-3">
           <h3 id="account-sheet-appearance" className="mb-2 ps-1 text-body font-medium text-ink">
             {appearanceLabel(theme.choice)}
           </h3>
@@ -82,7 +80,7 @@ function AccountSheet({
   );
 }
 
-/** Phone mark, avatar, then Appearance and Sign out. The workspace name stays in the menu. */
+/** Phone mark, avatar, then Appearance and Sign out. The same sheet at every width. */
 export function DeskAccountMenu({
   name,
   tenantId,
@@ -92,24 +90,8 @@ export function DeskAccountMenu({
   tenantId: string;
   workspaces: Array<{ id: string; name: string }>;
 }) {
-  const [open, setOpen] = useState(false);
-  const [themeOpen, setThemeOpen] = useState(false);
-  const many = workspaces.length > 1;
-  const initials = accountInitials(name);
-  const phone = useIsPhone();
-  const theme = useThemeChoice();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const avatar = (lit: boolean) => (
-    <span
-      className={cx(
-        "inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent text-meta font-semibold text-accent-on",
-        lit ? "ring-2 ring-accent ring-offset-2 ring-offset-surface" : "",
-      )}
-    >
-      {initials}
-    </span>
-  );
-
+  const initials = accountInitials(name);
   return (
     <div
       data-account-bar=""
@@ -125,87 +107,30 @@ export function DeskAccountMenu({
           className="min-h-11 min-w-11 justify-center"
         />
       </div>
-      {phone ? (
-        <>
-          <button
-            type="button"
-            aria-label={name}
-            aria-haspopup="dialog"
-            aria-expanded={sheetOpen}
-            onClick={() => setSheetOpen(true)}
-            className={iconButtonClass()}
-          >
-            {avatar(sheetOpen)}
-          </button>
-          <AccountSheet
-            open={sheetOpen}
-            onOpenChange={setSheetOpen}
-            name={name}
-            tenantId={tenantId}
-            workspaces={workspaces}
-          />
-        </>
-      ) : (
-      <Menu
-        onOpenChange={(next) => {
-          setOpen(next);
-          if (!next) setThemeOpen(false);
-        }}
-        trigger={
-          <button type="button" aria-label={name} className={iconButtonClass()}>
-            <span
-              className={cx(
-                "inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent text-meta font-semibold text-accent-on",
-                open ? "ring-2 ring-accent ring-offset-2 ring-offset-surface" : "",
-              )}
-            >
-              {initials}
-            </span>
-          </button>
-        }
+      <button
+        type="button"
+        aria-label={name}
+        aria-haspopup="dialog"
+        aria-expanded={sheetOpen}
+        onClick={() => setSheetOpen(true)}
+        className={iconButtonClass()}
       >
-        <div data-account-menu="" role="presentation">
-          <p role="presentation" className="pointer-events-none truncate px-3 pb-1 pt-2 text-body font-semibold text-ink">{name}</p>
-          <MenuSeparator />
-          {many ? (
-            <MenuGroup>
-              <MenuLabel>Workspace</MenuLabel>
-              {workspaces.map((row) => {
-                const current = row.id === tenantId;
-                return (
-                  <form key={row.id} action={switchDeskTenant}>
-                    <input type="hidden" name="tenant_id" value={row.id} />
-                    <MenuItem
-                      nativeButton
-                      render={<button type="submit" />}
-                      aria-current={current ? "true" : undefined}
-                      className={current ? undefined : "font-normal text-ink-2"}
-                    >
-                      {row.name}
-                    </MenuItem>
-                  </form>
-                );
-              })}
-              <MenuSeparator />
-            </MenuGroup>
-          ) : null}
-          <MenuItem
-            closeOnClick={false}
-            aria-expanded={themeOpen}
-            onClick={() => setThemeOpen((current) => !current)}
-          >
-            {appearanceLabel(theme.choice)}
-          </MenuItem>
-          {themeOpen ? (
-            <div data-account-appearance="" className="px-2 pb-2">
-              <ThemePicker />
-            </div>
-          ) : null}
-          <MenuSeparator />
-          <SignOutButton layout="menu" />
-        </div>
-      </Menu>
-      )}
+        <span
+          className={cx(
+            "inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent text-meta font-semibold text-accent-on",
+            sheetOpen ? "ring-2 ring-accent ring-offset-2 ring-offset-surface" : "",
+          )}
+        >
+          {initials}
+        </span>
+      </button>
+      <AccountSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        name={name}
+        tenantId={tenantId}
+        workspaces={workspaces}
+      />
     </div>
   );
 }
