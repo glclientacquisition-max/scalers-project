@@ -23,6 +23,8 @@ export async function postDemoToken(
   try {
     response = await fetchImpl(tokenUrl, {
       method: "POST",
+      credentials: "omit",
+      mode: "cors",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });

@@ -23,8 +23,24 @@ export function appendDeviceId(url: string, deviceId: string): string {
   return `${path}?${params.toString()}`;
 }
 
-export function demoStatusUrl(base = "/demo/status"): string {
-  return appendDeviceId(base, demoDeviceId());
+/**
+ * Voice origin for the demo HTTP calls. Empty keeps /demo/token and /demo/status
+ * on this site. A trailing slash is removed.
+ */
+export function demoApiBase(override?: string): string {
+  const raw = override === undefined ? process.env.NEXT_PUBLIC_DEMO_API_BASE : override;
+  return String(raw ?? "").trim().replace(/\/+$/, "");
+}
+
+export function demoTokenUrl(override?: string): string {
+  const base = demoApiBase(override);
+  return base ? `${base}/demo/token` : "/demo/token";
+}
+
+export function demoStatusUrl(path?: string): string {
+  const base = demoApiBase();
+  const root = path ?? (base ? `${base}/demo/status` : "/demo/status");
+  return appendDeviceId(root, demoDeviceId());
 }
 
 function readStored(storage: Storage): string | null {

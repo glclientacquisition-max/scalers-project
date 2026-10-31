@@ -41,7 +41,12 @@ export async function readDemoStatus(
 ): Promise<StatusRead> {
   let response: Response;
   try {
-    response = await fetchImpl(url, { headers: { accept: "application/json" } });
+    response = await fetchImpl(url, {
+      method: "GET",
+      credentials: "omit",
+      mode: "cors",
+      headers: { accept: "application/json" },
+    });
   } catch {
     return { kind: "quiet" };
   }

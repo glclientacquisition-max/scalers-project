@@ -1,4 +1,5 @@
 import { DEMO_MAX_SEC, type DemoState } from "./machine";
+import { demoTokenUrl } from "./device";
 import { postDemoToken } from "./tokenRequest";
 import type { DemoBusinessKey, DemoLang } from "./copy";
 import { NOTICE_V } from "./copy";
@@ -222,5 +223,5 @@ export function createHttpDemoAdapter(tokenUrl = "/demo/token"): DemoSessionAdap
 
 export function demoAdapterFromEnv(): DemoSessionAdapter {
   if (process.env.NEXT_PUBLIC_DEMO_ADAPTER === "mock") return createMockDemoAdapter();
-  return createHttpDemoAdapter();
+  return createHttpDemoAdapter(demoTokenUrl());
 }
