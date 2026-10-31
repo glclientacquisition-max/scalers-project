@@ -7,7 +7,8 @@
 
 const { WebSocketServer } = require('ws');
 const { demoEnabled, demoOpusOn, originAllowed } = require('./flags');
-const { getDemoGuard } = require('./guards');
+const { getDemoGuard, hashValue } = require('./guards');
+const { getDemoLedger } = require('./meter');
 const { demoTenant } = require('./profiles');
 const { createDemoSession } = require('./session');
 
@@ -65,25 +66,40 @@ function resolveCodec(raw, env) {
   return null;
 }
 
+function refuseLog(log, env, claims, reason) {
+  if (typeof log !== 'function') return;
+  const salt = String(env.DEMO_IP_SALT || '');
+  const device = claims && claims.device_id;
+  const fields = { reason };
+  if (claims && claims.ip_hash) fields.ip_hash = claims.ip_hash;
+  if (salt && device) fields.device_hash = hashValue(salt, device);
+  try { log(`demo_ws_refuse ${JSON.stringify(fields)}`); } catch { /* ignore */ }
+}
+
 function handleDemoUpgrade(req, socket, head, opts = {}) {
   const env = opts.env || process.env;
   const guard = opts.guard || getDemoGuard();
-  if (!demoEnabled(env)) {
-    rejectUpgrade(socket, 404, 'disabled');
+  const ledger = opts.ledger === undefined ? getDemoLedger() : opts.ledger;
+  const origin = header(req, 'origin').trim();
+  const query = queryOf(req.url);
+  const token = String(query.get('t') || '').trim();
+
+  // No token: stay on HTTP. A browser cannot read X-Demo-Reason, and there
+  // is nothing to finish on a socket.
+  if (!token) {
+    rejectUpgrade(socket, demoEnabled(env) ? 401 : 404, demoEnabled(env) ? 'rejected' : 'disabled');
     return;
   }
-  const origin = header(req, 'origin').trim();
   if (!originAllowed(origin, env)) {
     rejectUpgrade(socket, 403, 'origin');
     return;
   }
-  const query = queryOf(req.url);
   const codec = resolveCodec(query.get('codec'), env);
   if (!codec) {
     rejectUpgrade(socket, 400, 'codec');
     return;
   }
-  const token = query.get('t') || '';
+
   let verified;
   try {
     verified = guard.verify(token);
@@ -109,33 +125,62 @@ function handleDemoUpgrade(req, socket, head, opts = {}) {
     try { guard.release(claims.jti); } catch { /* ignore */ }
   }
 
+  function openSession(ws) {
+    try {
+      const session = createDemoSession({
+        ws,
+        claims,
+        codec,
+        env,
+        origin,
+        ledger,
+        log: opts.log,
+        maxMs: opts.maxMs,
+        idleMs: opts.idleMs,
+        createStt: opts.createStt,
+        createTts: opts.createTts,
+        brain: opts.brain,
+        loadProfile: opts.loadProfile,
+        silenceGate: opts.silenceGate,
+      });
+      session.start().catch(() => {
+        try { ws.close(1011, 'error'); } catch { /* ignore */ }
+      });
+    } catch {
+      try { ws.close(1011, 'error'); } catch { /* ignore */ }
+      release();
+    }
+  }
+
+  // Token is valid. Accept the upgrade, then refuse on the socket. Browsers
+  // do not expose X-Demo-Reason when the handshake fails.
   try {
     demoWss.handleUpgrade(req, socket, head, (ws) => {
-      ws.on('close', release);
       ws.on('error', () => {});
-      try {
-        const session = createDemoSession({
-          ws,
-          claims,
-          codec,
-          env,
-          origin,
-          log: opts.log,
-          maxMs: opts.maxMs,
-          idleMs: opts.idleMs,
-          createStt: opts.createStt,
-          createTts: opts.createTts,
-          brain: opts.brain,
-          loadProfile: opts.loadProfile,
-          silenceGate: opts.silenceGate,
+      ws.on('close', release);
+      (async () => {
+        let reason = null;
+        if (!demoEnabled(env)) reason = 'kill';
+        else {
+          if (ledger && typeof ledger.ready === 'function') {
+            try { await ledger.ready(); } catch { /* in-memory total still applies */ }
+          }
+          if (ledger && typeof ledger.blocked === 'function' && ledger.blocked()) reason = 'cap';
+        }
+        if (!reason) {
+          openSession(ws);
+          return;
+        }
+        refuseLog(opts.log, env, claims, reason);
+        try { ws.send(JSON.stringify({ type: 'end', reason })); } catch { /* ignore */ }
+        setImmediate(() => {
+          try { ws.close(1000, String(reason).slice(0, 40)); } catch { /* ignore */ }
+          release();
         });
-        session.start().catch(() => {
-          try { ws.close(1011, 'error'); } catch { /* ignore */ }
-        });
-      } catch {
+      })().catch(() => {
         try { ws.close(1011, 'error'); } catch { /* ignore */ }
         release();
-      }
+      });
     });
   } catch {
     release();

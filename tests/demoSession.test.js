@@ -165,6 +165,7 @@ async function boot(env, lines, opts = {}) {
       env,
       guard,
       log: (line) => lines.push(line),
+      ledger: opts.ledger,
       maxMs: opts.maxMs == null ? 60000 : opts.maxMs,
       idleMs: opts.idleMs == null ? 60000 : opts.idleMs,
       silenceGate: false,
@@ -254,22 +255,67 @@ describe('demo websocket session', () => {
     return { ...serverBox, lines, audio, token, env };
   }
 
-  it('rejects the upgrade when DEMO_ENABLED is not exactly on, and does not consume the token', async () => {
+  it('ends a valid token on the socket when the flag drops, and keeps HTTP for a missing or bad token', async () => {
     const lines = [];
     const env = baseEnv();
     const audio = fakes();
     const box = await boot(env, lines, { audio });
     open.push(box.server);
     const token = await mint(box.guard);
-    const pausedEnv = baseEnv({ DEMO_ENABLED: 'On' });
-    const paused = await boot(pausedEnv, lines, { audio });
-    open.push(paused.server);
-    const refused = await connect(paused.port, token, { codec: 'pcm16' });
-    assert.equal(refused.status, 404);
-    assert.equal(refused.reason, 'disabled');
-    const ok = await connect(box.port, token, { codec: 'pcm16' });
-    assert.equal(ok.status, 101);
-    ok.ws.close();
+    env.DEMO_ENABLED = 'off';
+    const refused = await connect(box.port, token, { codec: 'pcm16' });
+    assert.equal(refused.status, 101);
+    const end = await waitFor(refused.messages, (m) => m.json && m.json.type === 'end');
+    assert.equal(end.json.reason, 'kill');
+    assert.deepEqual(Object.keys(end.json), ['type', 'reason']);
+    assert.equal(audio.spoken.length, 0);
+    const reused = await connect(box.port, token, { codec: 'pcm16' });
+    assert.equal(reused.status, 401);
+    assert.equal(reused.reason, 'reused');
+    const absent = await connect(box.port, '', { codec: 'pcm16' });
+    assert.equal(absent.status, 404);
+    assert.equal(absent.reason, 'disabled');
+    const bad = await connect(box.port, 'not-a-token', { codec: 'pcm16' });
+    assert.equal(bad.status, 401);
+    assert.equal(bad.reason, 'rejected');
+    env.DEMO_ENABLED = 'on';
+    const missing = await connect(box.port, '', { codec: 'pcm16' });
+    assert.equal(missing.status, 401);
+    assert.equal(missing.reason, 'rejected');
+  });
+
+  it('accepts a valid token at the spend cap and ends with cap before any speech', async () => {
+    const { createDemoLedger, createMemorySpendStore } = require('../src/demo/meter');
+    const lines = [];
+    const env = baseEnv();
+    const audio = fakes();
+    const ledger = createDemoLedger({
+      store: createMemorySpendStore(),
+      env,
+      now: () => Date.parse('2026-10-31T08:00:00Z'),
+    });
+    await ledger.ready();
+    await ledger.record({
+      sessionId: 'demo_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+      minutes: 1,
+      sttSeconds: 60,
+      ttsSeconds: 20,
+      modelInputTokens: 10,
+      modelOutputTokens: 20,
+      costUsd: 2,
+    });
+    const box = await boot(env, lines, { audio, ledger });
+    open.push(box.server);
+    const token = await mint(box.guard);
+    const conn = await connect(box.port, token, { codec: 'pcm16' });
+    assert.equal(conn.status, 101);
+    const end = await waitFor(conn.messages, (m) => m.json && m.json.type === 'end');
+    assert.equal(end.json.reason, 'cap');
+    assert.equal(audio.spoken.length, 0);
+    assert.equal(audio.sttSent.length, 0);
+    const text = lines.join('\n');
+    assert.equal(text.includes('203.0.113.10'), false);
+    assert.equal(text.includes('device-1234'), false);
   });
 
   it('rejects a bad origin and a reused token, and opus when DEMO_OPUS is not on', async () => {

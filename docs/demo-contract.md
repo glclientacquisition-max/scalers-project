@@ -34,6 +34,23 @@ Logs are `demo_token_ok` and `demo_token_reject` with a `reason`. They include t
 
 The rate limiter and the concurrency counter are in memory on one instance. A second instance does not share them.
 
+## `GET /demo/status`
+
+No token and no Turnstile. The widget reads this before it asks for the microphone.
+
+Success: `200 {enabled, busy, cap, reason}`.
+
+| Field | Meaning |
+| --- | --- |
+| `enabled` | `DEMO_ENABLED` is exactly `on` |
+| `busy` | Live reservations are at `DEMO_MAX_CONCURRENT` |
+| `cap` | The daily or monthly spend cap is reached |
+| `reason` | `null`, or the first of `disabled`, `cap`, `busy` |
+
+There are no minute counts, dollar amounts, session ids, hashes, or addresses in the body.
+
+A missing or disallowed `Origin` is `403 {reason: origin}`. More than 30 polls from one IP in a minute is `429 {reason: rate}`. The limiter is in memory on one instance and stores only a hash of the IP. A second instance does not share it.
+
 ## `wss://…/ws/demo?t=<token>`
 
 Widget #1091 wires to this socket. The phone path is not this socket.
@@ -45,16 +62,18 @@ Query:
 | `t` | the token from `POST /demo/token` | Required. Single use. Consumed when the upgrade is accepted |
 | `codec` | `opus`, `pcm16`, `pcm8` | Wire format. Omitted: `opus` when `DEMO_OPUS` is exactly `on`, otherwise `pcm16` |
 
-`DEMO_ENABLED` must be exactly `on`. `On`, `true`, or unset is HTTP 404 `{reason: disabled}` and the token is not consumed. There is no `Sec-WebSocket-Protocol`. `audio.drachtio.org` is not selected.
+`DEMO_ENABLED` must be exactly `on` to start a session. There is no `Sec-WebSocket-Protocol`. `audio.drachtio.org` is not selected.
 
-Failed upgrades are HTTP, not a WebSocket message. The body is JSON `{reason}` and the header `X-Demo-Reason` repeats it.
+A missing or invalid token stays an HTTP failure. The body is JSON `{reason}` and the header `X-Demo-Reason` repeats it. Browsers do not expose that header on a failed handshake.
 
 | Status | `reason` | When |
 | --- | --- | --- |
-| 404 | `disabled` | Flag is not exactly `on` |
-| 403 | `origin` | `Origin` is missing or not in `DEMO_ALLOWED_ORIGINS` |
-| 400 | `codec` | `codec=opus` while `DEMO_OPUS` is not exactly `on`, or the name is unknown |
+| 404 | `disabled` | No token, and the flag is not exactly `on` |
+| 403 | `origin` | `Origin` is missing or not in `DEMO_ALLOWED_ORIGINS`. The token is not consumed |
+| 400 | `codec` | `codec=opus` while `DEMO_OPUS` is not exactly `on`, or the name is unknown. The token is not consumed |
 | 401 | `rejected`, `expired`, `reused`, `tenant` | Token missing, bad, expired, already used, or not a demo tenant |
+
+A token that verifies, when the session is then refused, completes the upgrade. The server sends `{type: end, reason}` and closes. `kill` means the flag is no longer exactly `on`. `cap` means the spend cap was already reached. Neither one starts speech.
 
 An accepted token holds its concurrency slot until the socket closes, including a network drop. Closing the socket releases the slot. A second socket with the same token is `reused`. An unused token keeps the slot until the token expires.
 
