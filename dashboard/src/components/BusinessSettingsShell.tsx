@@ -26,6 +26,7 @@ const PoliciesSettings = dynamic(() => import("@/components/policies/PoliciesSet
   loading: () => <PoliciesSkeleton />,
 });
 import { PoliciesSettingsErrorBoundary } from "@/components/policies/PoliciesSettingsErrorBoundary";
+import type { PronunciationReviewCandidate } from "@/lib/pronunciationGeminiScan";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import {
   settingsPanelHeading,
@@ -93,6 +94,8 @@ export function BusinessSettingsShell({
   assistantSaySlot = null,
   assistantSayPage = false,
   businessCategory = null,
+  pronunciationReview = [],
+  pronunciationQueueFailed = false,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
@@ -110,6 +113,9 @@ export function BusinessSettingsShell({
   assistantSayPage?: boolean;
   /** Identity: tenants.business_category for the one "What you do" question. */
   businessCategory?: string | null;
+  /** Pronunciation: review queue read on the server. */
+  pronunciationReview?: PronunciationReviewCandidate[];
+  pronunciationQueueFailed?: boolean;
 }) {
   const { tab: activeTab, trainPanel: activeTrainPanel } = useResolvedSettingsRoute(tab, trainPanel);
   const formPanel: SettingsPanel =
@@ -237,6 +243,8 @@ export function BusinessSettingsShell({
           membersSlot={formPanel === "team" ? membersSlot : null}
           seatNoteSlot={formPanel === "team" ? seatNoteSlot : null}
           structuredSlot={structuredSlot}
+          pronunciationReview={pronunciationReview}
+          pronunciationQueueFailed={pronunciationQueueFailed}
         />
       ) : (
         <div className={settingsConsoleClass}>

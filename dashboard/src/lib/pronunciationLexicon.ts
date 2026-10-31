@@ -271,6 +271,22 @@ export function parseTtsLexicon(raw: unknown): TtsLexiconEntry[] {
   return out.slice(0, TTS_LEXICON_MAX);
 }
 
+/** Stored rows parseTtsLexicon will drop. The owner saves to remove them. */
+export function lexiconWordsToRemove(raw: unknown): number {
+  let list: unknown = raw;
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return 0;
+    try {
+      list = JSON.parse(trimmed);
+    } catch {
+      return 0;
+    }
+  }
+  if (!Array.isArray(list)) return 0;
+  return Math.max(0, list.length - parseTtsLexicon(list).length);
+}
+
 /** Upsert by normalized match; newest wins. */
 export function mergeLexiconEntry(
   existing: TtsLexiconEntry[],

@@ -173,10 +173,36 @@ async function saveHeldReviewQueue(
   return { ok: true, saved: true, queue: pending };
 }
 
+/** RSC read of the review queue. Never throws. The page renders if this fails. */
+export async function readPronunciationReviewQueue(): Promise<
+  | { ok: true; queue: PronunciationReviewCandidate[]; sttHints: PronunciationReviewCandidate[] }
+  | { ok: false; error: string }
+> {
+  try {
+    const denied = await memberDenied("overview.view");
+    if (denied) return { ok: false, error: "Couldn't load suggestions." };
+    if (!(await isAuthenticated())) return { ok: false, error: "Couldn't load suggestions." };
+    const tenant = await getCurrentTenant();
+    if (!tenant) return { ok: false, error: "Couldn't load suggestions." };
+    const fields = await readQueueFields(tenant.id);
+    if ("error" in fields) return { ok: false, error: "Couldn't load suggestions." };
+    const pending = fields.queue.filter((c) => c.status === "pending");
+    return {
+      ok: true,
+      queue: pending.filter((c) => c.type === "AGENT_MISPRONUNCIATION"),
+      sttHints: pending.filter((c) => c.type === "LIKELY_MISHEARD"),
+    };
+  } catch (err) {
+    logDeskError("pronunciation-review-load", err instanceof Error ? err.message : err);
+    return { ok: false, error: "Couldn't load suggestions." };
+  }
+}
+
 /**
  * Load pending Gemini / review candidates for the Fix tab. Read only, so it uses the shared read
  * gate (overview.view, every member role) like previewDeskLookupAction: staff are never refused
  * where viewers are let in. Approving, dismissing and saving stay settings.edit.
+ * Retry only. The page loads the queue in the server render, not on mount.
  */
 export async function loadPronunciationReviewQueueAction(
   _prev: GeminiScanQueueState,

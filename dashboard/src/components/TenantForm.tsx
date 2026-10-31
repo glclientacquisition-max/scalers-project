@@ -169,7 +169,9 @@ import {
   parseUnknownAnswerSpoken,
   unknownAnswerBoxText,
 } from "@/lib/unknownAnswerSpoken";
+import type { PronunciationReviewCandidate } from "@/lib/pronunciationGeminiScan";
 import {
+  lexiconWordsToRemove,
   parseTtsLexicon,
   lexiconForStorage,
   type TtsLexiconEntry,
@@ -391,6 +393,8 @@ function TenantFormInner({
   seatNoteSlot = null,
   structuredSlot = null,
   onSaveActivity,
+  pronunciationReview = [],
+  pronunciationQueueFailed = false,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
@@ -407,6 +411,10 @@ function TenantFormInner({
   structuredSlot?: Partial<Record<"identity" | "catalog", ReactNode>> | null;
   /** Shared save pattern: a save started or landed (BusinessSettingsShell keeps the mount). */
   onSaveActivity?: () => void;
+  /** Server-loaded pronunciation review. Empty when this panel is not open. */
+  pronunciationReview?: PronunciationReviewCandidate[];
+  /** The review read failed. Stored words still render. */
+  pronunciationQueueFailed?: boolean;
 }) {
   // View-only members still open place details; PlacesEditor shows them read-only.
   const canEditSettings = useCan("settings.edit");
@@ -1031,7 +1039,10 @@ function TenantFormInner({
   const { dirty, justSaved } = useFormDraft(save, { id: "form", values: draftValues, adoptsResult: true });
   const [draftSnapshot] = useState(() => draftValues);
   const counted = useDirty(draftSnapshot, draftValues);
-  const changes = dirty ? counted : 0;
+  const [wordsToRemove] = useState(() => lexiconWordsToRemove(tenant.tts_lexicon));
+  const pendingRemovals = justSaved ? 0 : wordsToRemove;
+  const removalOnly = panel === "pronunciation" && pendingRemovals > 0 && !dirty;
+  const changes = dirty ? counted : removalOnly ? 1 : 0;
   const [removeAsk, setRemoveAsk] = useState<{
     title: string;
     body: string;
@@ -2201,6 +2212,8 @@ function TenantFormInner({
             onLexiconChange={setTtsLexicon}
             voiceId={tenant.soniox_voice_id ?? null}
             omitLexiconField
+            initialReview={pronunciationReview}
+            initialQueueFailed={pronunciationQueueFailed}
           />
         ) : null}
       </section>
@@ -2354,7 +2367,16 @@ function TenantFormInner({
         </ConfirmSheet>
       </section>
       </div>
-      <SettingsActionBar changes={changes} pending={pending} saved={justSaved} />
+      <SettingsActionBar
+        changes={changes}
+        pending={pending}
+        saved={justSaved}
+        note={
+          removalOnly
+            ? `Remove ${pendingRemovals} ${pendingRemovals === 1 ? "word" : "words"}`
+            : null
+        }
+      />
 
         </div>
       </div>

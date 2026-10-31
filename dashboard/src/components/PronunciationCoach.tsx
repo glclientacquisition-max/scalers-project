@@ -140,6 +140,7 @@ function PronunciationCoachInner({
   omitLexiconField = false,
   initialMode = "practice",
   initialReview = [],
+  initialQueueFailed = false,
 }: {
   tenantId: string;
   businessName: string;
@@ -164,17 +165,15 @@ function PronunciationCoachInner({
   omitLexiconField?: boolean;
   /** Dev fixture only. Owner desk stays on Practice. */
   initialMode?: StudioMode;
-  /** Dev fixture queue. A signed-in load replaces it. */
+  /** Server-loaded queue. Retry is the only path that posts. */
   initialReview?: PronunciationReviewCandidate[];
+  /** The server read failed. The page still renders stored words. */
+  initialQueueFailed?: boolean;
 }) {
-  const rawInitialCount = Array.isArray(initialLexicon)
-    ? initialLexicon.length
-    : 0;
   const [lexicon, setLexicon] = useState<TtsLexiconEntry[]>(() =>
     parseTtsLexicon(initialLexicon)
   );
-  const [cleanNote, setCleanNote] = useState<string | null>(null);
-  const cleanedOnceRef = useRef(false);
+  const [suggestionsFailed, setSuggestionsFailed] = useState(initialQueueFailed);
 
   const [extraItems, setExtraItems] = useState<PronunciationSuggestion[]>([]);
   const [skippedIds, setSkippedIds] = useState<Set<string>>(() => new Set());
@@ -269,7 +268,7 @@ function PronunciationCoachInner({
     dismissGeminiScanCandidateAction,
     geminiQueueInitial
   );
-  const [loadQueueState, loadQueueAction] = useActionState(
+  const [loadQueueState, loadQueueAction, loadQueuePending] = useActionState(
     loadPronunciationReviewQueueAction,
     geminiQueueInitial
   );
@@ -278,23 +277,6 @@ function PronunciationCoachInner({
     () => JSON.stringify(lexiconForStorage(lexicon)),
     [lexicon]
   );
-
-  useEffect(() => {
-    if (cleanedOnceRef.current) return;
-    cleanedOnceRef.current = true;
-    const cleaned = parseTtsLexicon(initialLexicon);
-    setLexicon(cleaned);
-    if (rawInitialCount > cleaned.length) {
-      setCleanNote(
-        `Removed ${rawInitialCount - cleaned.length} unsafe pronunciation overrides (common words).`
-      );
-      const fd = new FormData();
-      fd.set("id", tenantId);
-      fd.set("tts_lexicon", JSON.stringify(lexiconForStorage(cleaned)));
-      startTransition(() => persistAction(fd));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     if (mineState.ok && Array.isArray(mineState.suggestions)) {
@@ -312,11 +294,11 @@ function PronunciationCoachInner({
     }
   }, [mineState]);
 
-  useEffect(() => {
+  function retrySuggestions() {
     const fd = new FormData();
     fd.set("id", tenantId);
     startTransition(() => loadQueueAction(fd));
-  }, [tenantId]);
+  }
 
   const applyPendingQueue = useCallback((queue: PronunciationReviewCandidate[]) => {
     const pending = queue.filter((c) => c.status === "pending");
@@ -327,11 +309,14 @@ function PronunciationCoachInner({
   }, []);
 
   useEffect(() => {
-    if (!loadQueueState.ok || unsavedReviewRef.current || reviewTouchedRef.current) {
+    if (loadQueueState.ok) {
+      setSuggestionsFailed(false);
+      if (unsavedReviewRef.current || reviewTouchedRef.current) return;
+      setReviewQueue(loadQueueState.queue || []);
+      setSttHints(loadQueueState.sttHints || []);
       return;
     }
-    setReviewQueue(loadQueueState.queue || []);
-    setSttHints(loadQueueState.sttHints || []);
+    if (loadQueueState.error) setSuggestionsFailed(true);
   }, [loadQueueState]);
 
   useEffect(() => {
@@ -999,10 +984,20 @@ function PronunciationCoachInner({
             Pronunciation
           </h2>
         )}
-        {cleanNote ? (
-          <p className="mt-2 text-meta text-[var(--ok)]" role="status">
-            {cleanNote}
-          </p>
+        {suggestionsFailed ? (
+          <div className="mt-3 rounded-2xl border border-hairline bg-surface-2 p-4" role="alert">
+            <p className="text-body text-ink">Couldn&apos;t load suggestions.</p>
+            <Button
+              type="button"
+              variant="tonal"
+              size="sm"
+              className="mt-3 min-h-11"
+              pending={loadQueuePending}
+              onClick={retrySuggestions}
+            >
+              Retry
+            </Button>
+          </div>
         ) : null}
       </div>
 
@@ -1421,19 +1416,11 @@ function PronunciationCoachInner({
                 {geminiNote}
               </p>
             ) : null}
-            {loadQueueState.error ? (
-              <p className="text-meta text-[var(--warn)]" role="alert">
-                {loadQueueState.error}
+            {fixReviewRows.length === 0 && !suggestionsFailed ? (
+              <p className="text-body text-ink" role="status">
+                Nothing waiting.
               </p>
-            ) : null}
-
-            {fixReviewRows.length === 0 ? (
-              loadQueueState.error ? null : (
-                <p className="text-body text-ink" role="status">
-                  Nothing waiting.
-                </p>
-              )
-            ) : (
+            ) : fixReviewRows.length === 0 ? null : (
               <ul
                 className="divide-y divide-hairline border-y border-hairline"
                 aria-label="Pronunciation review queue"

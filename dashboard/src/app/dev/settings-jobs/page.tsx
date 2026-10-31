@@ -185,6 +185,17 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
       />
     ) : null;
 
+  const suggestions = Array.isArray(params.suggestions) ? params.suggestions[0] : params.suggestions;
+  const pronunciationLexicon =
+    trainPanel === "pronunciation"
+      ? [
+          { match: "Ngong", say: "Gong", label: "Ngong" },
+          { match: "Kilimani", say: "Kee-lee-mah-nee", label: "Kilimani" },
+          { match: "the", say: "thee", label: "the" },
+        ]
+      : null;
+  const viewTenant = (pronunciationLexicon ? { ...t, tts_lexicon: pronunciationLexicon } : t) as TenantRow;
+
   return (
     <DeskRoleProvider role={role}>
     <div className={deskShellClass}>
@@ -196,7 +207,7 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             <DeskPhonePull />
           </Suspense>
           <BusinessSettingsShell
-            tenant={t}
+            tenant={viewTenant}
             tab={tab}
             trainPanel={trainPanel}
             curatedVoices={curatedVoices}
@@ -204,8 +215,9 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             assistantSaySlot={assistantSaySlot}
             assistantSayPage
             businessCategory={identityState === "empty" ? null : "books_stationery"}
+            pronunciationQueueFailed={suggestions === "down"}
             optionStatus={settingsIndexStatuses(
-              { ...t, soniox_voice_label: "Aisha", call_option: callSetup.option },
+              { ...viewTenant, soniox_voice_label: "Aisha", call_option: callSetup.option },
               curatedVoices,
               SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target))
             )}
