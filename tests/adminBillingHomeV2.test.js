@@ -61,8 +61,9 @@ test("Billing home denser: ops-tiles KPIs, catalog link, BusinessPane money", ()
   const ui = read("dashboard/src/components/admin/v2/AdminBillingHomeV2.tsx");
   assert.match(ui, /ops-tiles/);
   assert.match(ui, /data-billing-kpis/);
-  assert.match(ui, /Packages catalog/);
-  assert.match(ui, /\/admin\/billing\/packages/);
+  assert.match(ui, /As of/);
+  assert.match(ui, /0-7 days/);
+  assert.match(read("dashboard/src/lib/adminLinks.ts"), /\/admin\/billing\/packages/);
   assert.match(ui, /\/admin\/billing\/payments/);
   assert.match(ui, /businessPaneHref\([^,]+, "money"\)/);
   assert.doesNotMatch(ui, /bg-brand|ribbon/i);

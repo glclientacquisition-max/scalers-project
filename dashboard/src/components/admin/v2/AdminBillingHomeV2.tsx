@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { balanceCents, daysOverdue, displayStatus, ksh, statusTone, type InvoiceRow } from "@/lib/ops/invoicesView";
 import { billingHomeTotals, lastMonthCollected, overdueAging, owingBusinesses } from "@/lib/ops/billingHomeView";
 import { EmptyState, KpiTile, PageHeader, SplitLayout, SplitPane, StatusPill } from "@/components/ops";
-import { ButtonLink } from "@/components/ui/Button";
 import "@/styles/ops.css";
 
 const DATE = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" });
@@ -43,28 +42,18 @@ export function AdminBillingHomeV2({ rows, nowIso }: { rows: InvoiceRow[]; nowIs
 
   const list = (
     <div className="flex min-h-0 w-full flex-col pe-ops-4">
-      <PageHeader
-        title="Billing"
-        actions={
-          <>
-            <span className="text-ops-label text-ink-2">{MONTH.format(now)} so far</span>
-            <ButtonLink href="/admin/billing/invoices" variant="tonal" size="sm">
-              Invoices
-            </ButtonLink>
-            <ButtonLink href="/admin/billing/payments" variant="tonal" size="sm">
-              Payments
-            </ButtonLink>
-            <ButtonLink href="/admin/billing/packages" variant="ghost" size="sm" title="Catalog only — minutes and terms">
-              Packages catalog
-            </ButtonLink>
-          </>
-        }
-      />
+      <PageHeader title="Billing" actions={<span className="text-ops-label text-ink-2">{MONTH.format(now)}</span>} />
       <div className="ops-tiles pb-ops-3" data-billing-kpis="">
-        <KpiTile label="Billed" period="This month" asOf={asOf} href="/admin/billing/invoices" value={ksh(totals.billedThisMonthCents)} />
-        <KpiTile label="Collected" period="This month" asOf={asOf} href="/admin/billing/payments" value={ksh(totals.collectedThisMonthCents)} compare={prior ? `vs ${prior.label} ${ksh(prior.cents)}` : null} />
-        <KpiTile label="Outstanding" period="Now" asOf={asOf} href="/admin/billing/invoices" value={ksh(totals.outstandingCents)} />
-        <KpiTile label={`Overdue · ${totals.overdueCount}`} period="Now" asOf={asOf} href="/admin/billing/invoices" value={ksh(totals.overdueCents)} />
+        <KpiTile label="Billed" period="This month" href="/admin/billing/invoices" value={ksh(totals.billedThisMonthCents)} />
+        <KpiTile label="Collected" period="This month" href="/admin/billing/payments" value={ksh(totals.collectedThisMonthCents)} compare={prior ? `vs ${prior.label} ${ksh(prior.cents)}` : null} />
+        {totals.outstandingCents === totals.overdueCents ? (
+          <KpiTile label={totals.overdueCount ? `Outstanding · ${totals.overdueCount}` : "Outstanding"} period="Now" href="/admin/billing/invoices?view=overdue" value={ksh(totals.outstandingCents)} />
+        ) : (
+          <>
+            <KpiTile label="Outstanding" period="Now" href="/admin/billing/invoices" value={ksh(totals.outstandingCents)} />
+            <KpiTile label={`Overdue · ${totals.overdueCount}`} period="Now" href="/admin/billing/invoices?view=overdue" value={ksh(totals.overdueCents)} />
+          </>
+        )}
       </div>
       <section className="flex flex-col gap-2 pb-ops-3" aria-label="Collected and overdue">
         <h2 className="text-ops-heading text-ink">Collected of billed</h2>
@@ -79,13 +68,19 @@ export function AdminBillingHomeV2({ rows, nowIso }: { rows: InvoiceRow[]; nowIs
         {agingTotal === 0 ? (
           <p className="text-ops-body text-ink-2">Nothing overdue.</p>
         ) : (
-          <div className="flex h-2 overflow-hidden rounded-full bg-surface-2" role="img" aria-label="Overdue by age">
-            {([["to7", aging.to7, "var(--status-warn-fg)"], ["to30", aging.to30, "var(--status-danger-fg)"], ["over30", aging.over30, "var(--ink)"]] as const).filter(([, n]) => n > 0).map(([key, n, color]) => (
-              <span key={key} style={{ width: `${(n / agingTotal) * 100}%`, background: color }} />
-            ))}
-          </div>
+          <>
+            <a href="/admin/billing/invoices?view=overdue" className="flex h-2 overflow-hidden rounded-full bg-surface-2" role="img" aria-label="Overdue by age">
+              {([["to7", aging.to7, "var(--status-warn-fg)"], ["to30", aging.to30, "var(--status-danger-fg)"], ["over30", aging.over30, "var(--ink)"]] as const).filter(([, n]) => n > 0).map(([key, n, color]) => (
+                <span key={key} style={{ width: `${(n / agingTotal) * 100}%`, background: color }} />
+              ))}
+            </a>
+            <p className="text-ops-label tabular-nums text-ink-2">
+              {ksh(aging.to7)} in 0-7 days · {ksh(aging.to30)} in 8-30 days · {ksh(aging.over30)} over 30 days
+            </p>
+          </>
         )}
       </section>
+      <p className="pb-ops-3 text-ops-label text-ink-3">As of {asOf}</p>
       <div className="flex flex-wrap items-baseline justify-between gap-x-ops-3 pb-ops-2">
         <h2 className="text-ops-heading text-ink">
           Who owes <span className="ops-num font-normal text-ink-2">{owing.length}</span>
