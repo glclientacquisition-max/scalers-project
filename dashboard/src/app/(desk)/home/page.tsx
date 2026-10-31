@@ -28,7 +28,9 @@ import {
   homeDigestLine,
   homeQueueUnit,
   summarizeInboxWork,
+  type InboxItem,
 } from "@/lib/inboxPurpose";
+import { itemIsOpenHold, itemIsToReturn, itemIsVisitToConfirm } from "@/lib/inboxCounts";
 import { loadCachedInboxItems } from "@/lib/inboxLoad";
 import { nicheCopy, showsHoldQueue, showsVisitQueue } from "@/lib/inboxNiche";
 import { visitBoardForDay } from "@/lib/runSheet";
@@ -206,6 +208,14 @@ async function HomeOverviewBody() {
   const did = String(tenant.sautikit_virtual_number || "");
   const didDisplay = did.replace(/^\+254(\d{3})(\d{3})(\d{3})$/, "+254 $1 $2 $3");
 
+  const oldestLabel = (pred: (item: InboxItem) => boolean) => {
+    let iso: string | null = null;
+    for (const item of inbox.items) {
+      if (!pred(item)) continue;
+      if (!iso || item.createdAt < iso) iso = item.createdAt;
+    }
+    return iso ? formatCallWhenRelative(iso) : null;
+  };
   const queues = [
     {
       id: "return",
@@ -213,6 +223,7 @@ async function HomeOverviewBody() {
       href: callsHref({ purpose: "human" }),
       count: work.toReturn,
       unit: "",
+      wait: oldestLabel((item) => itemIsToReturn(item)),
     },
     ...(holdQueue
       ? [
@@ -222,6 +233,7 @@ async function HomeOverviewBody() {
             href: callsHref({ purpose: "hold" }),
             count: work.toFulfill,
             unit: homeQueueUnit(work.toFulfill, copy.holdUnit, holdSample),
+            wait: oldestLabel((item) => itemIsOpenHold(item)),
           },
         ]
       : []),
@@ -241,6 +253,7 @@ async function HomeOverviewBody() {
                 : work.requested > 0
                   ? `· ${work.requested} ${copy.jobUnit}`
                   : "",
+            wait: oldestLabel((item) => itemIsVisitToConfirm(item)),
           },
         ]
       : []),
@@ -318,7 +331,7 @@ async function HomeOverviewBody() {
                     focusRingVisible,
                   ].join(" ")}
                 >
-                  <span className="flex min-w-0 items-center gap-2 text-ink">
+                  <span className={`flex min-w-0 items-center gap-2 ${queue.count === 0 ? "text-ink-3" : "text-ink"}`}>
                     <span>{queue.label}</span>
                     {queue.id === "hold" && holdsGate && !holdsGate.allowed ? (
                       <Stamp tone="attention">Needs setup</Stamp>
@@ -326,10 +339,9 @@ async function HomeOverviewBody() {
                   </span>
                   <span className="flex min-w-0 items-center gap-3 text-ink-2">
                     <span className={`min-w-0 ${deskPreviewClass}`}>
-                      <span className="tabular-nums text-body font-semibold text-ink">
-                        {queue.count}
+                      <span className={`tabular-nums text-body font-semibold text-ink ${queue.count === 0 ? "opacity-60" : ""}`}>
+                        {queue.count}{queue.count > 0 && queue.wait ? <span className="font-normal text-meta text-ink-2">{` · oldest ${queue.wait}`}</span> : null}{queue.unit ? <span className="font-normal text-meta text-ink-2">{` ${queue.unit}`}</span> : null}
                       </span>
-                      {queue.unit ? ` ${queue.unit}` : ""}
                     </span>
                     <svg
                       viewBox="0 0 20 20"
