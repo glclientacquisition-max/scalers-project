@@ -12,6 +12,13 @@ const {
 } = require('../dashboard/src/components/marketing/voiceDemo/machine.ts');
 const { endedLine } = require('../dashboard/src/components/marketing/voiceDemo/copy.ts');
 const { blockFromStatus, readDemoStatus } = require('../dashboard/src/components/marketing/voiceDemo/status.ts');
+const { REQUEST_ACCESS_COPY } = require('../dashboard/src/components/marketing/voiceDemo/requestAccessCopy.ts');
+const {
+  createMockRequestAccessAdapter,
+  normalizeRequestPhone,
+  submitRequestAccess,
+  validateRequestAccess,
+} = require('../dashboard/src/components/marketing/voiceDemo/requestAccess.ts');
 const { preferredDemoCodec } = require('../dashboard/src/components/marketing/voiceDemo/protocol.ts');
 const {
   DEMO_TENANT_IDS,
@@ -52,6 +59,9 @@ describe('voice demo widget states', () => {
     assert.equal(COPY.en.endedBy.kill, 'Demo paused.');
     assert.equal(COPY.en.endedBy.cap, COPY.en.resting);
     assert.equal(COPY.en.busy, EXACT.busy);
+    assert.equal(stateForTokenFailure(429, 'used'), 'request');
+    assert.notEqual(stateForTokenFailure(429, 'used'), 'limit');
+    assert.notEqual(stateForTokenFailure(429, 'used'), 'busy');
     assert.equal(stateForTokenFailure(429, 'limit_daily'), 'limit');
     assert.equal(stateForTokenFailure(429, 'rate'), 'limit');
     assert.equal(COPY.en.limit, EXACT.limit);
@@ -99,6 +109,13 @@ describe('voice demo widget states', () => {
     assert.equal(blockFromStatus({ enabled: true, busy: false, cap: true, reason: 'cap' }), 'cap');
     assert.equal(blockFromStatus({ enabled: true, busy: true, cap: false, reason: 'busy' }), 'busy');
     assert.equal(blockFromStatus({ enabled: true, busy: false, cap: false, reason: null }), null);
+    assert.equal(blockFromStatus({ enabled: true, reason: 'used' }), 'request');
+    const used = await readDemoStatus(async () => ({
+      status: 200,
+      ok: true,
+      json: async () => ({ enabled: true, busy: false, cap: false, reason: 'used' }),
+    }), '/demo/status');
+    assert.deepEqual(used, { kind: 'block', state: 'request' });
     const rate = await readDemoStatus(async () => ({ status: 429, json: async () => ({ reason: 'rate' }) }), '/demo/status');
     assert.equal(rate.kind, 'quiet');
     const paused = await readDemoStatus(async () => ({
@@ -107,6 +124,37 @@ describe('voice demo widget states', () => {
       json: async () => ({ enabled: false, busy: false, cap: false, reason: 'disabled' }),
     }), '/demo/status');
     assert.deepEqual(paused, { kind: 'block', state: 'disabled' });
+  });
+
+  it('accepts a Kenya phone or an email, and the access stub does not call the network', async () => {
+    assert.equal(validateRequestAccess({ name: '  ', contact: '0712345678', consent: true }).ok, false);
+    assert.equal(validateRequestAccess({ name: 'Amina', contact: '', consent: true }).error, 'contact');
+    assert.equal(validateRequestAccess({ name: 'Amina', contact: '0712345678', consent: false }).error, 'consent');
+    assert.equal(validateRequestAccess({ name: 'Amina', contact: 'not-a-contact', consent: true }).error, 'contact_invalid');
+    const local = validateRequestAccess({ name: 'Amina', contact: '0712 345 678', consent: true });
+    assert.equal(local.ok && local.value.contact, '+254712345678');
+    assert.equal(local.ok && local.value.kind, 'phone');
+    assert.equal(normalizeRequestPhone('+254712345678'), '+254712345678');
+    assert.equal(normalizeRequestPhone('254712345678'), '+254712345678');
+    assert.equal(normalizeRequestPhone('712345678'), '+254712345678');
+    const mail = validateRequestAccess({ name: 'Amina', contact: 'Amina@Shop.co', consent: true });
+    assert.equal(mail.ok && mail.value.kind, 'email');
+    assert.equal(mail.ok && mail.value.contact, 'amina@shop.co');
+    let called = false;
+    const adapter = createMockRequestAccessAdapter();
+    const original = adapter.submitRequestAccess;
+    adapter.submitRequestAccess = async (input) => {
+      called = true;
+      assert.equal(input.name, 'Amina');
+      await original(input);
+    };
+    await submitRequestAccess(adapter, { name: 'Amina', contact: '+254712345678', kind: 'phone' });
+    assert.equal(called, true);
+    const src = fs.readFileSync(
+      path.join(__dirname, '../dashboard/src/components/marketing/voiceDemo/requestAccess.ts'),
+      'utf8',
+    );
+    assert.doesNotMatch(src, /fetch\(|supabase|localStorage/);
   });
 
   it('uses pcm8 on touch or a phone and pcm16 on a desktop', () => {
@@ -191,6 +239,8 @@ function textFor(state, lang) {
     disabled: copy.paused,
     busy: copy.busy,
     cap: copy.resting,
+    request: REQUEST_ACCESS_COPY[lang].title,
+    requested: REQUEST_ACCESS_COPY[lang].thanks,
     limit: copy.limit,
     error: copy.error,
     unsupported: copy.unsupported,

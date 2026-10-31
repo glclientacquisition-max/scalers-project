@@ -8,13 +8,14 @@ export type DemoStatusBody = {
 };
 
 export type StatusRead =
-  | { kind: "block"; state: "disabled" | "busy" | "cap" }
+  | { kind: "block"; state: "disabled" | "busy" | "cap" | "request" }
   | { kind: "open" }
   | { kind: "quiet" }
   | { kind: "error" };
 
-/** First of disabled, cap, busy. A clear line wins over a later flag. */
-export function blockFromStatus(body: DemoStatusBody): "disabled" | "busy" | "cap" | null {
+/** `used` is one demo per visitor. Then disabled, cap, busy. */
+export function blockFromStatus(body: DemoStatusBody): "disabled" | "busy" | "cap" | "request" | null {
+  if (body.reason === "used") return "request";
   if (body.reason === "disabled" || body.enabled === false) return "disabled";
   if (body.reason === "cap" || body.cap === true) return "cap";
   if (body.reason === "busy" || body.busy === true) return "busy";
@@ -40,7 +41,16 @@ export async function readDemoStatus(
   } catch {
     return { kind: "quiet" };
   }
-  if (response.status === 429) return { kind: "quiet" };
+  if (response.status === 429) {
+    let limited: DemoStatusBody = {};
+    try {
+      limited = (await response.json()) as DemoStatusBody;
+    } catch {
+      return { kind: "quiet" };
+    }
+    if (limited.reason === "used") return { kind: "block", state: "request" };
+    return { kind: "quiet" };
+  }
   if (!response.ok) return { kind: "error" };
   let body: DemoStatusBody = {};
   try {

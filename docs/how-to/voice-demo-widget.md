@@ -25,7 +25,7 @@ The site key is `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. It is public. The secret stays
 
 ## Session
 
-Before Start, the page calls `GET /demo/status`. `disabled` shows "Demo paused.", `busy` shows the busy line, and `cap` shows "The demo is resting for today. Try again tomorrow." A `429 {reason:'rate'}` is ignored. Start stays available.
+Before Start, the page calls `GET /demo/status`. `disabled` shows "Demo paused.", `busy` shows the busy line, and `cap` shows "The demo is resting for today. Try again tomorrow." `reason: used` (from that status, or `429 {reason:'used'}` on the token) replaces Start with a request-access form. The submit is a local stub until the backend exists. A `429 {reason:'rate'}` on the status poll is ignored. Start stays available when the status does not block.
 
 `createHttpDemoAdapter` posts the token, then opens `ws_url` with `codec=pcm8` on a touch or phone (8 kHz, 320 bytes every 20 ms, about 1 MB a minute) and `codec=pcm16` on a desktop (16 kHz, 640 bytes, about 4 MB a minute). Opus is not used. End sends `{type:'end'}`.
 

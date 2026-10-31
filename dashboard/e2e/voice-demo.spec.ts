@@ -10,6 +10,8 @@ const STATES = [
   ["disabled", "Demo paused."],
   ["busy", "All demo lines are busy, try again in a minute."],
   ["cap", "The demo is resting for today. Try again tomorrow."],
+  ["request", "TODO request access"],
+  ["requested", "TODO thanks"],
   ["limit", "You've used today's demos."],
   ["error", "The demo did not start. Try again."],
   ["unsupported", "Your browser can't run the live demo."],

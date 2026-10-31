@@ -23,6 +23,8 @@ import { demoDeviceId } from "./device";
 import { DEMO_MAX_SEC, formatCountdown, stateForTokenFailure, type DemoState } from "./machine";
 import { captureMic, createMicMeter, stopStream, type DemoMeter } from "./meter";
 import { readDeviceCodec, type AssistantPhase, type WireCodec } from "./protocol";
+import { RequestAccessForm } from "./RequestAccessForm";
+import { REQUEST_ACCESS_COPY } from "./requestAccessCopy";
 import { readDemoStatus } from "./status";
 
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
@@ -364,6 +366,16 @@ export function VoiceDemo({
       {state === "cap" ? (
         <p className="font-demo mt-4 text-body" role="status">
           {copy.resting}
+        </p>
+      ) : null}
+
+      {state === "request" ? (
+        <RequestAccessForm lang={lang} onDone={() => setState("requested")} />
+      ) : null}
+
+      {state === "requested" ? (
+        <p className="font-demo mt-4 text-body" role="status">
+          {REQUEST_ACCESS_COPY[lang].thanks}
         </p>
       ) : null}
 
