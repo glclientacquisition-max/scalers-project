@@ -1,4 +1,23 @@
-import { outcomeCounts, weekCounts, type FactRow, type WeekCount } from "./insightsView";
+import { outcomeCounts, weekCounts, type FactRow } from "./insightsView";
+
+const DAY = 86400_000;
+const DAY_LABEL = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", timeZone: "Africa/Nairobi" });
+
+export type CallsPoint = { label: string; value: number };
+
+/** One point per Nairobi day in the window, oldest first. Empty days stay 0. */
+export function dayCounts(rows: readonly FactRow[], days: number, nowMs: number): CallsPoint[] {
+  const out = Array.from({ length: days }, (_, i) => {
+    const ending = nowMs - (days - 1 - i) * DAY;
+    return { label: DAY_LABEL.format(new Date(ending)), value: 0 };
+  });
+  for (const row of rows) {
+    const age = Math.floor((nowMs - Date.parse(row.createdAt)) / DAY);
+    if (age < 0 || age >= days) continue;
+    out[days - 1 - age].value += 1;
+  }
+  return out;
+}
 
 export type CallsSplit = { assistant: number; handed: number; missed: number };
 
@@ -20,7 +39,8 @@ export type CallsCardModel =
       state: "ready";
       days: 7 | 30;
       calls: number;
-      weeks: WeekCount[];
+      /** Daily for 7d, weekly for 30d. Always at least two points when the card is ready. */
+      series: CallsPoint[];
       split: CallsSplit;
       /** Null when the earlier window has no rows. Never a filled zero. */
       priorCalls: number | null;
@@ -43,7 +63,10 @@ export function callsCardModel(rows: FactRow[] | null, days: 7 | 30, nowMs: numb
     state: "ready",
     days,
     calls: current.length,
-    weeks: weekCounts(current, days, nowMs).toReversed(),
+    series: days === 7 ? dayCounts(current, 7, nowMs) : weekCounts(current, days, nowMs).toReversed().map((week) => ({
+      label: DAY_LABEL.format(new Date(week.ending)),
+      value: week.calls,
+    })),
     split: callsSplit(current),
     priorCalls: prior.length > 0 ? prior.length : null,
   };

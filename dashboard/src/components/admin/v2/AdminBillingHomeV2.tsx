@@ -1,6 +1,7 @@
 "use client";
 
 import { businessPaneHref } from "@/lib/ops/businessPane";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { balanceCents, daysOverdue, displayStatus, ksh, statusTone, type InvoiceRow } from "@/lib/ops/invoicesView";
 import { billingHomeTotals, lastMonthCollected, overdueAging, owingBusinesses } from "@/lib/ops/billingHomeView";
@@ -69,11 +70,11 @@ export function AdminBillingHomeV2({ rows, nowIso }: { rows: InvoiceRow[]; nowIs
           <p className="text-ops-body text-ink-2">Nothing overdue.</p>
         ) : (
           <>
-            <a href="/admin/billing/invoices?view=overdue" className="flex h-2 overflow-hidden rounded-full bg-surface-2" role="img" aria-label="Overdue by age">
+            <Link href="/admin/billing/invoices?view=overdue" className="flex h-2 overflow-hidden rounded-full bg-surface-2" role="img" aria-label="Overdue by age">
               {([["to7", aging.to7, "var(--status-warn-fg)"], ["to30", aging.to30, "var(--status-danger-fg)"], ["over30", aging.over30, "var(--ink)"]] as const).filter(([, n]) => n > 0).map(([key, n, color]) => (
                 <span key={key} style={{ width: `${(n / agingTotal) * 100}%`, background: color }} />
               ))}
-            </a>
+            </Link>
             <p className="text-ops-label tabular-nums text-ink-2">
               {ksh(aging.to7)} in 0-7 days · {ksh(aging.to30)} in 8-30 days · {ksh(aging.over30)} over 30 days
             </p>

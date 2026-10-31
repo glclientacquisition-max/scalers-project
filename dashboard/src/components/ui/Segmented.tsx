@@ -37,6 +37,7 @@ export function Segmented({
   onNavigate,
   label,
   className,
+  flush = false,
 }: {
   items: SegmentedItem[];
   onSelect?: (key: string) => void;
@@ -48,6 +49,8 @@ export function Segmented({
   /** Accessible name for the group. */
   label: string;
   className?: string;
+  /** No side inset and no own rule, so a parent hairline can run the full width. */
+  flush?: boolean;
 }) {
   const asLinks = items.every((item) => item.href);
   const activeKey = items.find((item) => item.active)?.key ?? null;
@@ -69,7 +72,8 @@ export function Segmented({
       aria-label={label}
       data-segmented={label}
       className={cx(
-        "-mx-4 flex w-full min-w-0 max-w-full snap-x snap-mandatory overflow-x-auto border-b border-hairline px-4 [scrollbar-width:none] sm:-mx-6 sm:px-6 md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden",
+        "flex min-w-0 max-w-full snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        flush ? "w-auto" : "-mx-4 w-full border-b border-hairline px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0",
         className,
       )}
     >
