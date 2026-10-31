@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
+import { ChevronRightIcon } from "@heroicons/react/20/solid";
 import { HealthStrip } from "@/components/admin/v2/HealthStrip";
-import { Sparkline, StatusPill } from "@/components/ops";
+import { MetricSparkline, type SparkPoint } from "@/components/admin/v2/MetricSparkline";
+import { StatusPill } from "@/components/ops";
+import { StatusMark } from "@/components/ui/StatusMark";
 import { Segmented } from "@/components/ui/Segmented";
 import { getAdminOverview } from "@/lib/admin";
 import { listBusinessQuality } from "@/lib/adminQuality";
@@ -11,7 +14,7 @@ import { loadInsightFacts } from "@/lib/adminInsightsLoad";
 import { loadInvoicesV2 } from "@/lib/adminInvoicesV2Load";
 import { readPlatformOps } from "@/lib/platformOps";
 import { buildAttention, attentionCounts, KIND_LABEL, type AttentionKind } from "@/lib/ops/attentionView";
-import { billingHomeTotals } from "@/lib/ops/billingHomeView";
+import { billingHomeTotals, collectedWeekPoints, lastMonthCollected } from "@/lib/ops/billingHomeView";
 import { callsCardModel } from "@/lib/ops/callsCard";
 import { ksh } from "@/lib/ops/invoicesView";
 import { missedDemand } from "@/lib/ops/insightsView";
@@ -19,6 +22,14 @@ import type { OpsSignal } from "@/lib/platformOpsModel";
 
 const MONTH = new Intl.DateTimeFormat("en-KE", { month: "long", year: "numeric", timeZone: "Africa/Nairobi" });
 const CLOCK = new Intl.DateTimeFormat("en-KE", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Africa/Nairobi" });
+const WEEK = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", timeZone: "Africa/Nairobi" });
+
+function callsDelta(current: number, prior: number | null, days: number): string | null {
+  if (prior == null) return null;
+  const d = current - prior;
+  const signed = d > 0 ? `+${d}` : String(d);
+  return `${signed} vs prior ${days}d`;
+}
 
 function Skel() {
   return <div className="h-24 animate-pulse rounded-lg border border-hairline bg-surface" aria-hidden="true" />;
@@ -71,35 +82,32 @@ async function AttentionCard({ now }: { now: Date }) {
       now,
     });
     const counts = attentionCounts(items);
-    const kinds = (Object.keys(KIND_LABEL) as AttentionKind[]).filter((k) => counts[k] > 0).slice(0, 3);
-    const total = kinds.reduce((sum, k) => sum + counts[k], 0) || 1;
+    const kinds = (Object.keys(KIND_LABEL) as AttentionKind[])
+      .filter((k) => counts[k] > 0)
+      .toSorted((a, b) => counts[b] - counts[a] || KIND_LABEL[a].localeCompare(KIND_LABEL[b]));
     const owed = overdue ? overdue.reduce((sum, row) => sum + row.owedCents, 0) : null;
     return (
       <Card>
         <h2 className="text-ops-heading text-ink">Needs attention</h2>
+        <p className="mt-1 tabular-nums text-ops-title font-semibold text-ink">{items.length}</p>
         {items.length === 0 ? (
           <p className="mt-2 text-ops-body text-ink-2">{unavailable.length ? "Could not check every reason." : "Nothing needs attention."}</p>
         ) : (
-          <>
-            <p className="mt-1 tabular-nums text-ops-title font-semibold text-ink">{items.length}</p>
-            <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-surface-2" role="img" aria-label="Needs attention by reason">
-              {kinds.map((k) => (
-                <span key={k} className="h-full bg-warn" style={{ width: `${(counts[k] / total) * 100}%` }} />
-              ))}
-            </div>
-            <ul className="mt-2 flex flex-col">
-              {kinds.map((k) => (
-                <li key={k}>
-                  <Link href={`/admin/attention?view=${k}`} className="flex min-h-11 items-center justify-between text-ops-body text-ink">
-                    <span>{KIND_LABEL[k]}</span>
-                    <span className="tabular-nums text-ink-2">{counts[k]}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            {owed != null && owed > 0 ? <p className="text-ops-label tabular-nums text-ink-2">{ksh(owed)} owed</p> : null}
-          </>
+          <ul className="mt-2 flex flex-col">
+            {kinds.map((k) => (
+              <li key={k}>
+                <Link href={`/admin/attention?view=${k}`} className="flex min-h-11 items-center justify-between gap-2 text-ops-body text-ink">
+                  <span className="min-w-0 truncate">{KIND_LABEL[k]}</span>
+                  <span className="flex shrink-0 items-center gap-1 tabular-nums text-ink-2">
+                    {counts[k]}
+                    <ChevronRightIcon className="h-5 w-5 text-ink-3" aria-hidden="true" />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         )}
+        {owed != null && owed > 0 ? <p className="text-ops-label tabular-nums text-ink-2">{ksh(owed)} owed</p> : null}
         {unavailable.length ? <p className="mt-1 text-ops-label text-ink-2">Could not check {unavailable.join(", ")}.</p> : null}
       </Card>
     );
@@ -117,27 +125,34 @@ async function CallsCard({ days, now }: { days: 7 | 30; now: Date }) {
   if (model.state === "empty") {
     return <Card><h2 className="text-ops-heading text-ink">Calls</h2><p className="mt-2 text-ops-body text-ink-2">No reviewed calls in this range.</p></Card>;
   }
-  const splitTotal = model.split.assistant + model.split.handed + model.split.missed;
-  const parts = [
-    { key: "assistant", n: model.split.assistant, label: "Assistant", color: "var(--status-ok-fg)" },
-    { key: "handed", n: model.split.handed, label: "Handed off", color: "var(--status-info-fg)" },
-    { key: "missed", n: model.split.missed, label: "Missed", color: "var(--status-warn-fg)" },
-  ].filter((part) => part.n > 0);
+  const points: SparkPoint[] = model.weeks.map((week) => ({
+    label: WEEK.format(new Date(week.ending)),
+    value: week.calls,
+  }));
+  const legend = [
+    { key: "resolved", n: model.split.assistant, word: "resolved", dot: "bg-accent" },
+    { key: "handed", n: model.split.handed, word: "handed over", dot: "bg-ink-3" },
+    { key: "dropped", n: model.split.missed, word: "dropped", dot: "bg-warn" },
+  ];
+  const delta = callsDelta(model.calls, model.priorCalls, days);
   return (
     <Card>
-      <Link href={`/admin/quality/insights?days=${days}`} className="block">
+      <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-ops-heading text-ink">Calls</h2>
-        <p className="mt-1 tabular-nums text-ops-title font-semibold text-ink">{model.calls} <span className="text-ops-body font-normal text-ink-2">reviewed</span></p>
-        {model.priorCalls != null ? <p className="text-ops-label tabular-nums text-ink-2">vs prior {days}d · {model.priorCalls}</p> : null}
-        {model.weeks.length >= 2 ? <Sparkline points={model.weeks.map((week) => week.calls)} label="Calls by week" /> : null}
-        {splitTotal > 0 ? (
-          <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-surface-2" role="img" aria-label={parts.map((part) => `${part.n} ${part.label}`).join(", ")}>
-            {parts.map((part) => (
-              <span key={part.key} style={{ width: `${(part.n / splitTotal) * 100}%`, background: part.color }} />
-            ))}
-          </div>
-        ) : null}
-      </Link>
+        <Link href={`/admin/quality/insights?days=${days}`} className="text-ops-body font-medium text-accent">Insights</Link>
+      </div>
+      <p className="mt-1 tabular-nums text-ops-title font-semibold text-ink">{model.calls}</p>
+      {delta ? <p className="text-meta tabular-nums text-ink-2">{delta}</p> : null}
+      <MetricSparkline points={points} format={(n) => `${n.toLocaleString("en-KE")} calls`} />
+      <ul className="mt-2 flex flex-col gap-1" aria-label="Call outcomes">
+        {legend.map((row) => (
+          <li key={row.key} className="flex min-h-8 items-center gap-2 text-ops-body text-ink">
+            <span className={`h-2 w-2 shrink-0 rounded-full ${row.dot}`} aria-hidden="true" />
+            <span className="tabular-nums">{row.n.toLocaleString("en-KE")}</span>
+            <span>{row.word}</span>
+          </li>
+        ))}
+      </ul>
     </Card>
   );
 }
@@ -146,17 +161,25 @@ async function MoneyCard({ now }: { now: Date }) {
   try {
     const loaded = await loadInvoicesV2();
     const totals = billingHomeTotals(loaded.rows, now);
-    const quiet = totals.billedThisMonthCents === 0 && totals.outstandingCents === 0;
+    const prior = lastMonthCollected(loaded.rows, now);
+    const weeks = collectedWeekPoints(loaded.rows, now);
+    const quiet = totals.billedThisMonthCents === 0 && totals.outstandingCents === 0 && totals.collectedThisMonthCents === 0;
+    const moneyDelta = prior
+      ? `${ksh(Math.abs(totals.collectedThisMonthCents - prior.cents))} ${totals.collectedThisMonthCents >= prior.cents ? "more" : "less"} than ${prior.label}`
+      : null;
     return (
       <Card>
-        <Link href="/admin/billing/home" className="block">
+        <div className="flex items-baseline justify-between gap-2">
           <h2 className="text-ops-heading text-ink">Money</h2>
-          <p className="text-ops-label text-ink-2">{MONTH.format(now)}</p>
-          {quiet ? <p className="mt-2 text-ops-body text-ink-2">Nothing billed this month.</p> : (
-            <p className="mt-1 tabular-nums text-ops-title font-semibold text-ink">{ksh(totals.collectedThisMonthCents)}</p>
-          )}
-          {totals.overdueCents > 0 ? <StatusPill tone="warn">{ksh(totals.overdueCents)} overdue</StatusPill> : null}
-        </Link>
+          <Link href="/admin/billing/home" className="text-ops-body font-medium text-accent">Billing</Link>
+        </div>
+        <p className="text-ops-label text-ink-2">{MONTH.format(now)}</p>
+        {quiet ? <p className="mt-2 text-ops-body text-ink-2">Nothing billed this month.</p> : (
+          <p className="mt-1 tabular-nums text-ops-title font-semibold text-ink">{ksh(totals.collectedThisMonthCents)}</p>
+        )}
+        {moneyDelta && totals.collectedThisMonthCents !== prior?.cents ? <p className="text-meta tabular-nums text-ink-2">{moneyDelta}</p> : null}
+        <MetricSparkline points={weeks} format={(cents) => ksh(cents)} />
+        {totals.overdueCents > 0 ? <StatusPill tone="warn">{ksh(totals.overdueCents)} overdue</StatusPill> : null}
       </Card>
     );
   } catch {
@@ -168,38 +191,28 @@ async function BusinessesCard() {
   try {
     const overview = await getAdminOverview();
     const suspended = overview.businesses.filter((b) => b.status === "suspended").length;
-    const parts = [
-      { key: "live", n: overview.activeBusinesses, href: "/admin/businesses?view=live", label: "Live" },
-      { key: "waiting", n: overview.waitingForNumber, href: "/admin/businesses?view=waiting", label: "Waiting" },
-      { key: "suspended", n: suspended, href: "/admin/businesses?view=suspended", label: "Suspended" },
-    ].filter((part) => part.n > 0);
-    const sum = parts.reduce((total, part) => total + part.n, 0) || 1;
+    const pills = [
+      { key: "live", n: overview.activeBusinesses, href: "/admin/businesses?view=live", word: "Live", tone: "ok" as const },
+      { key: "waiting", n: overview.waitingForNumber, href: "/admin/businesses?view=waiting", word: "Waiting", tone: "warn" as const },
+      { key: "suspended", n: suspended, href: "/admin/businesses?view=suspended", word: "Suspended", tone: "warn" as const },
+      { key: "free", n: overview.availableDids, href: "/admin/numbers?view=available", word: "Free", tone: "neutral" as const },
+    ];
     return (
       <Card>
         <h2 className="text-ops-heading text-ink">Businesses</h2>
-        <p className="mt-1 tabular-nums text-ops-title font-semibold text-ink">{overview.activeBusinesses} <span className="text-ops-body font-normal text-ink-2">live</span></p>
-        {parts.length > 0 ? (
-          <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-surface-2" aria-hidden="true">
-            {parts.map((part) => (
-              <span key={part.key} className="h-full bg-accent" style={{ width: `${(part.n / sum) * 100}%`, opacity: part.key === "live" ? 1 : 0.45 }} />
-            ))}
-          </div>
-        ) : <p className="mt-2 text-ops-body text-ink-2">No businesses yet.</p>}
-        <ul className="mt-2">
-          {parts.map((part) => (
-            <li key={part.key}>
-              <Link href={part.href} className="flex min-h-11 items-center justify-between text-ops-body text-ink">
-                <span>{part.label}</span>
-                <span className="tabular-nums text-ink-2">{part.n}</span>
+        <p className="mt-1 tabular-nums text-ops-title font-semibold text-ink">{overview.activeBusinesses}</p>
+        <ul className="mt-2 flex flex-col">
+          {pills.map((row) => (
+            <li key={row.key}>
+              <Link href={row.href} className="flex min-h-11 items-center justify-between gap-2">
+                <StatusMark tone={row.tone}>{row.word}</StatusMark>
+                <span className="flex items-center gap-1 tabular-nums text-ops-body text-ink">
+                  {row.n.toLocaleString("en-KE")}
+                  <ChevronRightIcon className="h-5 w-5 text-ink-3" aria-hidden="true" />
+                </span>
               </Link>
             </li>
           ))}
-          <li>
-            <Link href="/admin/numbers?view=available" className="flex min-h-11 items-center justify-between text-ops-body text-ink">
-              <span>Free numbers</span>
-              <span className="tabular-nums text-ink-2">{overview.availableDids}</span>
-            </Link>
-          </li>
         </ul>
       </Card>
     );
@@ -217,16 +230,17 @@ async function QualityCard({ days }: { days: 7 | 30 }) {
     return (
       <Card>
         <h2 className="text-ops-heading text-ink">Quality</h2>
-        <p className="mt-1 text-ops-body text-ink">{dropping.length === 0 ? "None dropping" : `${dropping.length} dropping`}</p>
+        <p className="mt-1 tabular-nums text-ops-title font-semibold text-ink">{dropping.length}</p>
+        <p className="text-meta text-ink-2">{dropping.length === 0 ? "None dropping" : "dropping"}</p>
         {worst.length === 0 ? <p className="mt-2 text-ops-body text-ink-2">No scored calls in this range.</p> : (
           <ul className="mt-2 divide-y divide-hairline">
             {worst.map((row) => (
-              <li key={row.businessId}>
-                <Link href={`/admin/quality?pane=${encodeURIComponent(row.businessId)}&range=${range}`} className="flex min-h-11 items-center justify-between gap-2">
+              <li key={row.businessId} className="flex min-h-11 items-center gap-2">
+                <Link href={`/admin/quality?pane=${encodeURIComponent(row.businessId)}&range=${range}`} className="flex min-w-0 flex-1 items-center justify-between gap-2">
                   <span className="min-w-0 truncate text-ops-body text-ink">{row.name}</span>
-                  <span className="flex items-center gap-2">
-                    {row.trend.length >= 2 ? <Sparkline points={row.trend} label={`${row.name} trend`} height={16} width={56} /> : null}
+                  <span className="flex items-center gap-1">
                     <StatusPill tone={row.dropping ? "warn" : "neutral"}>{formatScore(row.score)}</StatusPill>
+                    <ChevronRightIcon className="h-5 w-5 text-ink-3" aria-hidden="true" />
                   </span>
                 </Link>
               </li>
