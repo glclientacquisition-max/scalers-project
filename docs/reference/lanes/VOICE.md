@@ -1,6 +1,6 @@
 ---
 owner: voice
-last_reviewed: 2026-10-17
+last_reviewed: 2026-10-31
 ---
 
 # Voice lane contract
@@ -98,6 +98,8 @@ See `.env.example` — key ones:
 - `VOICE_CLOSED_TENANT_GUARD` (default on; invariant 17)
 - `VOICE_ENDED_CALL_GUARD` (default off; only `on` enables; invariant 18)
 - `VOICE_NUMBER_HOLD_CLIP` (default off; only `on` enables; invariant 20)
+- `DEMO_ENABLED` (default off; only the exact value `on` enables `POST /demo/token`. `On`, `true`, and anything else stay off. No dial. Phone path unchanged while off.)
+- `DEMO_ALLOWED_ORIGINS` (comma-separated exact origins), `DEMO_TOKEN_SECRET`, `DEMO_IP_SALT`, `TURNSTILE_SECRET_KEY` (names only; values stay in env), `DEMO_MAX_CONCURRENT` (default 5)
 - Soniox endpointing: `SONIOX_MAX_ENDPOINT_DELAY_MS`, `SONIOX_ENDPOINT_SENSITIVITY`, …
 
 ## Caller file on the call

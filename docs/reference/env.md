@@ -11,7 +11,7 @@ Source: `process.env.*` reads in `server.js`, `db.js`, `src/`, `scripts/`, `dash
 
 Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (`dashboard/src`), **scripts** = one-off scripts. Meaning and per-environment values: [`operations/ENVIRONMENTS.md`](operations/ENVIRONMENTS.md).
 
-248 variables.
+255 variables.
 
 | Variable | Areas | Read in |
 | --- | --- | --- |
@@ -66,6 +66,12 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `DASHBOARD_SECRET` | desk | `dashboard/src/lib/admin-auth.ts`<br>`dashboard/src/lib/auth.ts` |
 | `DATA_QUALITY_DAILY` | voice | `src/lib/dataQualityDaily.js` |
 | `DATABASE_URL` | scripts | `scripts/verify-staging-schema.js` |
+| `DEMO_ALLOWED_ORIGINS` | voice | `src/demo/flags.js` |
+| `DEMO_ENABLED` | voice | `src/demo/flags.js` |
+| `DEMO_IP_SALT` | voice | `src/demo/flags.js` |
+| `DEMO_MAX_CONCURRENT` | voice | `src/demo/flags.js` |
+| `DEMO_PUBLIC_BASE_URL` | voice | `src/demo/flags.js` |
+| `DEMO_TOKEN_SECRET` | voice | `src/demo/flags.js` |
 | `DESK_ASSISTANT_SAY_PAGE` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
 | `DESK_ATTEST_SERVICE_AREAS` | desk, voice | `dashboard/src/lib/deskFeatureFlags.ts`<br>`src/conversation/deskFeatureFlags.js` |
 | `DESK_FEEL` | desk | `dashboard/src/lib/deskFeatureFlags.ts` |
@@ -139,7 +145,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `PR_MERGED` | scripts | `scripts/stage-pull-request-note.js`<br>`scripts/stage-pull-request.js` |
 | `PR_NUMBER` | scripts | `scripts/stage-pull-request-note.js`<br>`scripts/stage-pull-request.js` |
 | `PR_NUMBERS` | scripts | `scripts/stage-pull-request.js` |
-| `PUBLIC_BASE_URL` | desk, voice | `dashboard/src/lib/sautikit.ts`<br>`dashboard/src/lib/voicePublicBase.js`<br>`server.js` |
+| `PUBLIC_BASE_URL` | desk, voice | `dashboard/src/lib/sautikit.ts`<br>`dashboard/src/lib/voicePublicBase.js`<br>`server.js`<br>+1 more |
 | `RAILWAY_GIT_BRANCH` | voice | `server.js` |
 | `RAILWAY_GIT_COMMIT_SHA` | voice | `server.js` |
 | `RECORDING_RETENTION_DAYS` | desk, voice | `dashboard/src/lib/recordingRetentionPolicy.ts`<br>`src/lib/recordingRetention.js`<br>`src/lib/recordingRetentionPolicy.js` |
@@ -205,6 +211,7 @@ Areas: **voice** = Railway Voice (`server.js`, `src/`), **desk** = Vercel Desk (
 | `TEXTSMS_PARTNER_ID` | desk, voice | `dashboard/src/lib/callerSms.ts`<br>`src/notifications/sms.js` |
 | `TEXTSMS_SHORTCODE` | desk, voice | `dashboard/src/lib/callerSms.ts`<br>`src/notifications/sms.js` |
 | `TTS_LEXICON_OVERRIDES` | voice | `src/speech/pronunciationLexicon.js` |
+| `TURNSTILE_SECRET_KEY` | voice | `src/demo/flags.js` |
 | `VAPID_PRIVATE_KEY` | voice | `src/notifications/push.js` |
 | `VAPID_PUBLIC_KEY` | voice | `src/notifications/push.js` |
 | `VAPID_SUBJECT` | voice | `src/notifications/push.js` |
