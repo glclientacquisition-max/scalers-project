@@ -197,6 +197,20 @@ Landing marketing only: `.landing-rise`, `.landing-drift`. Desk never uses those
 
 ---
 
+## Feedback
+
+Progress, finish, undo, and save: [`FEEDBACK_PATTERNS.md`](../../explanation/frontend/FEEDBACK_PATTERNS.md).
+
+- Under ~400ms: `Button` `pending` only.
+- Over that: steps that check off when the request returns. No timer that pretends a step finished.
+- Bars and "N of M" use finished work. The end state is one sentence with a real count. No confetti.
+- Undo with the time left when the write can be reversed (`ImportUndoBar`, inbox archive toast). `ConfirmSheet` / `OpsConfirm` stay for release, void, delete, and charge.
+- Save shows when `useFormDraft` is dirty. "Saving", then "Saved", or "Nothing changed."
+
+shadcn is a pattern guide only. Build these from `dashboard/src/components/ui/`. No Progress package, no Sonner, no second toast.
+
+---
+
 ## Do not add
 
 shadcn, Radix, icon packs, Plus Jakarta, orange CTA, glass panels, purple mesh, a second nav tree, a hamburger drawer for primary destinations, fake Online, Lottie, Framer Motion, the `motion` package, GSAP, landing-rise on desk.
