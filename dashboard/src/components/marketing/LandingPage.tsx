@@ -2,6 +2,7 @@ import Image from "next/image";
 import { appEntryHref } from "@/lib/adminHost";
 import { brandAssets } from "@/components/brand/assets";
 import { HeroCall, HowStage } from "@/components/marketing/LandingStory";
+import { VoiceDemoSection } from "@/components/marketing/voiceDemo/VoiceDemoSection";
 import { AppearanceFooter } from "@/components/ThemePicker";
 import { signupCtaLabel } from "@/lib/signupMode";
 
@@ -126,6 +127,12 @@ export function LandingPage({
         <div className="mx-auto max-w-desk">
           <h2 className="font-display text-display text-ink">How it works</h2>
           <HowStage />
+        </div>
+      </section>
+
+      <section className="bg-canvas px-4 pb-4 pt-2 text-ink sm:px-8">
+        <div className="mx-auto max-w-desk">
+          <VoiceDemoSection />
         </div>
       </section>
 

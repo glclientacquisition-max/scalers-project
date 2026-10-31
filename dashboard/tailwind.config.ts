@@ -110,6 +110,7 @@ export default {
       fontFamily: {
         sans: ["var(--font-sans)"],
         display: ["var(--font-display, var(--font-sans))"],
+        demo: ["var(--font-demo)", "var(--font-sans)"],
       },
       fontSize: {
         caption: ["0.6875rem", { lineHeight: "0.875rem" }],
