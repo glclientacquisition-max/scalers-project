@@ -273,7 +273,7 @@ export function AdminDashboard({ days, now }: { days: 7 | 30; now: Date }) {
       <div className="lg:col-span-12">
         <Suspense fallback={<Skel />}><HealthCard /></Suspense>
       </div>
-      <div className="flex flex-col gap-3 lg:col-span-8 lg:grid lg:grid-cols-2 lg:items-start">
+      <div className="flex flex-col gap-3 lg:col-span-8">
         <Suspense fallback={<Skel />}><AttentionCard now={now} /></Suspense>
         <Suspense fallback={<Skel />}><CallsCard days={days} now={now} /></Suspense>
       </div>

@@ -408,6 +408,23 @@ html:has([data-admin-shell]:not([style*="display: none"], [style*="display: none
   }
 }
 
+/* Phone tab bar is 4rem. A fixed preview chip (Next dev badge, Vercel toolbar)
+   otherwise covers Billing, Numbers, and More. The host becomes the fixed
+   containing block so an inner bottom offset lands above the bar. */
+@media (max-width: 767px) {
+  nextjs-portal,
+  #vercel-toolbar,
+  vercel-live-feedback {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    bottom: calc(var(--desk-tabbar-h) + env(safe-area-inset-bottom, 0px)) !important;
+    height: auto !important;
+    transform: translateZ(0);
+  }
+}
+
 html {
   max-width: 100%;
   overflow-x: clip;

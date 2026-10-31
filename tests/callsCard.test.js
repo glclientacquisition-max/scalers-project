@@ -15,5 +15,8 @@ describe("calls card", () => {
     assert.match(ui, /unit="calls"/);
     assert.match(ui, /unit="ksh"/);
     assert.doesNotMatch(ui, /format=\{/);
+    assert.match(ui, /lg:col-span-8/);
+    assert.doesNotMatch(ui, /lg:grid-cols-2/);
+    assert.match(ui, /lg:col-span-4/);
   });
 });
