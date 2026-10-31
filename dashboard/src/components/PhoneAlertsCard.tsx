@@ -98,7 +98,7 @@ export function PhoneAlertsView({
         {state === "off" || state === "on" || state === "error" ? (
           <div className="flex min-h-14 items-center gap-3 px-4 py-2">
             <div className="min-w-0 flex-1">
-              <p className="text-body font-medium text-ink">This phone</p>
+              <p className="text-body font-medium text-ink">This phone (app alert)</p>
               <p
                 className={state === "error" ? "mt-0.5 text-meta text-attention" : "mt-0.5 text-meta text-ink-2"}
                 role={state === "error" ? "alert" : "status"}

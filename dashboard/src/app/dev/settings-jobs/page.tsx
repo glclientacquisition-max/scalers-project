@@ -200,7 +200,7 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             { match: "Kilimani", say: "Kee-lee-mah-nee", label: "Kilimani" },
           ]
         : null;
-  const viewTenant = (
+  const shapedTenant = (
     pronunciationLexicon
       ? { ...t, tts_lexicon: pronunciationLexicon }
       : trainPanel === "team"
@@ -212,6 +212,9 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
             ],
           }
         : t
+  ) as TenantRow;
+  const viewTenant = (
+    tab === "alerts" ? { ...shapedTenant, sms_included_units: 100, sms_used_units: 18 } : shapedTenant
   ) as TenantRow;
   const membersSlot =
     trainPanel === "team" ? (
