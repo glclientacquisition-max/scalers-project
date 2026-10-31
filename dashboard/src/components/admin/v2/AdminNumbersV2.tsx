@@ -137,6 +137,13 @@ export function AdminNumbersV2({
   );
   const who = (r: NumberRow) =>
     r.businessName ?? (isHeld(r, now) && r.lastBusinessName ? `Was ${r.lastBusinessName}` : "—");
+  const pillFor = (r: NumberRow) => {
+    const label = statusLabel(r, now);
+    if (view === "available" && label === "Available") return false;
+    if (view === "assigned" && label === "Assigned") return false;
+    if (view === "held" && label === "On hold") return false;
+    return true;
+  };
 
   async function postPool(body: Record<string, string>) {
     setPending(true);
@@ -350,7 +357,7 @@ export function AdminNumbersV2({
         {waiting.length === 0 ? <p className="text-ops-body text-ink-2">No business is waiting for a number.</p> : null}
       </section>
       <div className="flex flex-wrap items-center gap-2 pb-ops-3" data-stepup="numbers">
-        <div role="tablist" aria-label="Views" className="flex flex-wrap gap-1">
+        <div role="tablist" aria-label="Views" className="flex w-full gap-1 overflow-x-auto md:w-auto">
           {NUMBER_VIEWS.map((v) => (
             <button
               key={v.id}
@@ -399,9 +406,9 @@ export function AdminNumbersV2({
                 <button type="button" onClick={() => setSel(r.id)} className="flex min-h-ops-touch w-full flex-col items-start gap-0.5 px-ops-3 py-2 text-start">
                   <span className="flex w-full items-center justify-between gap-2">
                     <span className="tabular-nums text-ink">{formatE164(r.e164)}</span>
-                    <StatusPill tone={numberTone(r, now)}>{statusLabel(r, now)}</StatusPill>
+                    {pillFor(r) ? <StatusPill tone={numberTone(r, now)}>{statusLabel(r, now)}</StatusPill> : null}
                   </span>
-                  <span className="w-full truncate text-ops-label text-ink-2">{who(r)}</span>
+                  {who(r) !== "—" ? <span className="w-full truncate text-ops-label text-ink-2">{who(r)}</span> : null}
                 </button>
               </li>
             ))}
@@ -426,8 +433,8 @@ export function AdminNumbersV2({
                   <td className="px-ops-3 tabular-nums text-ink">
                     <button type="button" className="text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">{formatE164(r.e164)}</button>
                   </td>
-                  <td className="px-ops-3"><StatusPill tone={numberTone(r, now)}>{statusLabel(r, now)}</StatusPill></td>
-                  <td className="max-w-[14rem] truncate px-ops-3 text-ink-2">{who(r)}</td>
+                  <td className="px-ops-3">{pillFor(r) ? <StatusPill tone={numberTone(r, now)}>{statusLabel(r, now)}</StatusPill> : null}</td>
+                  <td className="max-w-[14rem] truncate px-ops-3 text-ink-2">{who(r) === "—" ? "" : who(r)}</td>
                   <td className="px-ops-3 text-end tabular-nums text-ink-2">{day(r.assignedAt ?? r.heldAt ?? r.createdAt)}</td>
                 </tr>
               ))}
