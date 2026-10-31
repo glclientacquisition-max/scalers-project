@@ -1,27 +1,42 @@
 import type { AdminBusiness } from "@/lib/admin";
 import type { OpsTone } from "@/components/ops/StatusPill";
 
-/** Problem views first. "Live" is the default when nothing waits for a number. */
+/** One row of four. All includes archived. Attention (waiting, suspended) sorts first. */
 export const BUSINESS_VIEWS = [
-  { id: "waiting", label: "Waiting for a number" },
-  { id: "suspended", label: "Suspended" },
+  { id: "all", label: "All" },
   { id: "live", label: "Live" },
-  { id: "archived", label: "Archived" },
+  { id: "waiting", label: "Waiting" },
+  { id: "suspended", label: "Suspended" },
 ] as const;
 export type BusinessView = (typeof BUSINESS_VIEWS)[number]["id"];
 
+const ATTENTION_RANK: Record<AdminBusiness["status"], number> = {
+  waiting: 0,
+  suspended: 1,
+  active: 2,
+  archived: 3,
+};
+
 export function inView(b: AdminBusiness, view: BusinessView): boolean {
+  if (view === "all") return true;
   if (view === "live") return b.status === "active";
   return b.status === view;
 }
 
-export function defaultView(rows: AdminBusiness[]): BusinessView {
-  return rows.some((b) => b.status === "waiting") ? "waiting" : "live";
+export function defaultView(_rows: AdminBusiness[]): BusinessView {
+  return "all";
+}
+
+/** Waiting and suspended first, then live, then archived. */
+export function sortBusinesses(rows: AdminBusiness[]): AdminBusiness[] {
+  return rows.toSorted(
+    (a, b) => ATTENTION_RANK[a.status] - ATTENTION_RANK[b.status] || a.business_name.localeCompare(b.business_name),
+  );
 }
 
 export function viewCounts(rows: AdminBusiness[]): Record<BusinessView, number> {
-  const out = { waiting: 0, suspended: 0, live: 0, archived: 0 } as Record<BusinessView, number>;
-  for (const b of rows) for (const v of BUSINESS_VIEWS) if (inView(b, v.id)) out[v.id] += 1;
+  const out = { all: rows.length, waiting: 0, suspended: 0, live: 0 } as Record<BusinessView, number>;
+  for (const b of rows) for (const v of BUSINESS_VIEWS) if (v.id !== "all" && inView(b, v.id)) out[v.id] += 1;
   return out;
 }
 
@@ -46,7 +61,7 @@ export function businessTone(status: AdminBusiness["status"]): OpsTone {
 
 export function numberLabel(b: AdminBusiness): string {
   const n = String(b.sautikit_virtual_number || "");
-  return !n || n.startsWith("pending:") ? "None yet" : n;
+  return !n || n.startsWith("pending:") ? "" : n;
 }
 
 export function chargingLabel(b: AdminBusiness): string {

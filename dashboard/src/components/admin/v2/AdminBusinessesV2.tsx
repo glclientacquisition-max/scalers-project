@@ -13,13 +13,33 @@ import {
   inView,
   matchesQuery,
   numberLabel,
+  sortBusinesses,
   viewCounts,
   type BusinessView,
 } from "@/lib/ops/businessesView";
 import { parsePaneSection, type BusinessPaneSection } from "@/lib/ops/businessPane";
-import { PageHeader, SplitLayout, StatusPill, EmptyState } from "@/components/ops";
+import { PageHeader, SplitLayout, StatusPill, EmptyState, Sparkline } from "@/components/ops";
+import type { UsageInput } from "@/lib/ops/attentionView";
 import { BusinessPane } from "./BusinessPane";
 import "@/styles/ops.css";
+
+function scoresOf(badge: QualityBadge | undefined): number[] {
+  return badge?.scores && badge.scores.length >= 2 ? badge.scores : [];
+}
+
+function UsageBit({ row }: { row?: UsageInput }) {
+  if (!row || !(row.includedMinutes > 0)) return null;
+  const used = Math.floor(Math.max(0, row.usedSeconds) / 60);
+  const fill = Math.max(0, Math.min(1, row.usedSeconds / (row.includedMinutes * 60)));
+  return (
+    <span className="ms-auto flex shrink-0 items-center gap-1">
+      <span className="relative h-1.5 w-14 overflow-hidden rounded-full bg-surface-2" aria-hidden="true">
+        <span className="block h-full w-full origin-left bg-accent" style={{ transform: `scaleX(${fill})` }} />
+      </span>
+      <span className="tabular-nums text-ink">{used} of {row.includedMinutes}</span>
+    </span>
+  );
+}
 
 const DATE = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" });
 const day = (iso: string) => (iso ? DATE.format(new Date(iso)) : "—");
@@ -28,17 +48,25 @@ const day = (iso: string) => (iso ? DATE.format(new Date(iso)) : "—");
 export function AdminBusinessesV2({
   businesses,
   badges = {},
+  usage = null,
   paneFixture,
 }: {
   businesses: AdminBusiness[];
   badges?: Record<string, QualityBadge>;
+  /** Null when the usage read failed. Missing id means that business has no included minutes. */
+  usage?: UsageInput[] | null;
   /** Dev fixture only: skips the pane read. */
   paneFixture?: ComponentProps<typeof BusinessPane>["fixture"];
 }) {
+  const usageById = useMemo(() => {
+    const map = new Map<string, UsageInput>();
+    for (const row of usage || []) map.set(row.tenantId, row);
+    return map;
+  }, [usage]);
   const [view, setView] = useState<BusinessView>(() => defaultView(businesses));
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState<string | null>(null);
-  const [section, setSection] = useState<BusinessPaneSection>("summary");
+  const [section, setSection] = useState<BusinessPaneSection>("usage");
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setSection(parsePaneSection(params.get("section")));
@@ -53,7 +81,7 @@ export function AdminBusinessesV2({
   }, [businesses]);
   const counts = useMemo(() => viewCounts(businesses), [businesses]);
   const rows = useMemo(
-    () => businesses.filter((b) => (query.trim() ? b.status !== "archived" || view === "archived" : inView(b, view)) && matchesQuery(b, query)),
+    () => sortBusinesses(businesses.filter((b) => inView(b, view) && matchesQuery(b, query))),
     [businesses, view, query],
   );
   const b = businesses.find((x) => x.id === sel) ?? null;
@@ -73,7 +101,7 @@ export function AdminBusinessesV2({
     <div className="flex min-h-0 flex-col pe-ops-4">
       <PageHeader title="Businesses" count={businesses.filter((x) => x.status !== "archived").length} />
       <div className="flex flex-wrap items-center gap-2 pb-ops-3">
-        <div role="tablist" aria-label="Views" className="flex flex-wrap gap-1">
+        <div role="tablist" aria-label="Views" className="flex w-full gap-1 overflow-x-auto md:w-auto">
           {BUSINESS_VIEWS.map((v) => (
             <button
               key={v.id}
@@ -82,7 +110,7 @@ export function AdminBusinessesV2({
               aria-selected={view === v.id && !query.trim()}
               onClick={() => { setView(v.id); setQuery(""); }}
               className={[
-                "inline-flex h-ops-touch items-center gap-1.5 rounded-sm px-ops-3 text-ops-body md:h-8",
+                "inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl px-3 text-body md:h-8",
                 view === v.id && !query.trim() ? "bg-surface-2 font-semibold text-ink" : "text-ink-2 hover:bg-surface-2",
               ].join(" ")}
             >
@@ -100,6 +128,7 @@ export function AdminBusinessesV2({
           className="ops-field ms-auto w-full text-ink md:w-auto md:min-w-0 md:flex-1 md:max-w-64"
         />
       </div>
+      {usage == null ? <p className="pb-ops-2 text-ops-label text-ink-2">Could not load usage. Minute bars may be missing.</p> : null}
       {rows.length === 0 ? (
         <EmptyState title={query.trim() ? "No business matches." : "Nothing in this view."} />
       ) : (
@@ -110,9 +139,17 @@ export function AdminBusinessesV2({
                 <button type="button" onClick={() => setSel(r.id)} className="flex min-h-ops-touch w-full flex-col items-start gap-0.5 px-ops-3 py-2 text-start">
                   <span className="flex w-full items-center justify-between gap-2">
                     <span className="min-w-0 truncate text-ink">{r.business_name}</span>
-                    <StatusPill tone={businessTone(r.status)}>{statusLabel(r.status)}</StatusPill>
+                    {statusLabel(r.status) !== "Active" && !(view === "waiting" && r.status === "waiting") && !(view === "suspended" && r.status === "suspended") ? (
+                      <StatusPill tone={businessTone(r.status)}>{statusLabel(r.status)}</StatusPill>
+                    ) : null}
                   </span>
-                  <span className="text-ops-label text-ink-2">{r.package_name || "No package"} · {numberLabel(r)}</span>
+                  <span className="flex w-full items-center gap-2 text-ops-label text-ink-2">
+                    <span className="min-w-0 truncate">{r.package_name || "No package"}{numberLabel(r) ? ` · ${numberLabel(r)}` : ""}</span>
+                    <UsageBit row={usageById.get(r.id)} />
+                    {scoresOf(badges[r.id]).length >= 2 ? (
+                      <Sparkline points={scoresOf(badges[r.id])} label={`${r.business_name} quality`} />
+                    ) : null}
+                  </span>
                 </button>
               </li>
             ))}
@@ -140,7 +177,7 @@ export function AdminBusinessesV2({
                   <td className="max-w-[16rem] truncate px-ops-3 text-ink">
                     <button type="button" className="text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">{r.business_name}</button>
                   </td>
-                  <td className="px-ops-3"><StatusPill tone={businessTone(r.status)}>{statusLabel(r.status)}</StatusPill></td>
+                  <td className="px-ops-3">{statusLabel(r.status) !== "Active" && !(view === "waiting" && r.status === "waiting") && !(view === "suspended" && r.status === "suspended") ? <StatusPill tone={businessTone(r.status)}>{statusLabel(r.status)}</StatusPill> : null}</td>
                   <td className="px-ops-3 text-ink-2">{r.package_name || "No package"}</td>
                   <td className="px-ops-3 tabular-nums text-ink-2">{numberLabel(r)}</td>
                   <td className="px-ops-3 text-ink-2">{chargingLabel(r)}</td>
