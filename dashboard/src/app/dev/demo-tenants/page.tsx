@@ -9,6 +9,8 @@ type Hours = {
   days?: Record<string, { open: string; close: string } | null>;
 };
 
+type CatalogueItem = { name: string; price?: string; price_range?: string };
+
 type Tenant = {
   slug: string;
   public_key: string;
@@ -17,8 +19,8 @@ type Tenant = {
   business_hours: string;
   hours_schedule?: Hours;
   faqs?: unknown[];
-  services_catalog?: { name: string; price_range?: string }[];
-  product_catalog?: { name: string; price?: string }[];
+  services_catalog?: CatalogueItem[];
+  product_catalog?: CatalogueItem[];
 };
 
 const DAY = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
@@ -61,9 +63,7 @@ export default function DemoTenantsPreview() {
                 {items.map((item) => (
                   <li key={item.name} className="flex items-baseline justify-between gap-3 text-body">
                     <span className="min-w-0">{item.name}</span>
-                    <span className="shrink-0 tabular-nums text-ink-2">
-                      {"price" in item ? item.price : item.price_range}
-                    </span>
+                    <span className="shrink-0 tabular-nums text-ink-2">{item.price || item.price_range}</span>
                   </li>
                 ))}
               </ul>
