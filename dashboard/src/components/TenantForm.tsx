@@ -124,7 +124,8 @@ import {
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
 import { PlacesEditor } from "@/components/structured/PlacesEditor";
-import { storedNoPremises } from "@/lib/serviceAreas";
+import { defaultNoPremises } from "@/lib/serviceAreas";
+import { SegmentedControl } from "@/components/ui/Segmented";
 import { stableRowId } from "@/lib/factHash";
 import { catalogBaseline, isUnpricedRow } from "@/lib/catalogPricing";
 import { DeskSelect } from "@/components/ui/DeskSelect";
@@ -584,7 +585,13 @@ function TenantFormInner({
     [faqs]
   );
   // Locations › Your premises. Stored as tenants.service_areas.no_premises (same key as before #964).
-  const [noPremises, setNoPremises] = useState(() => storedNoPremises(tenant.service_areas));
+  const [noPremises, setNoPremises] = useState(() => {
+    const policies = tenant.business_policies;
+    const coverage = policies && typeof policies === "object" && Array.isArray((policies as { coverage_areas?: unknown }).coverage_areas)
+      ? (policies as { coverage_areas: unknown[] }).coverage_areas.length
+      : 0;
+    return defaultNoPremises(tenant.service_areas, tenant.vertical, coverage);
+  });
   const locationsJson = useMemo(
     () =>
       JSON.stringify(
@@ -1856,14 +1863,27 @@ function TenantFormInner({
         className={panel === "locations" ? "space-y-3" : "hidden"}
       >
         <SettingsGroup title="Your premises">
-          <div data-no-premises="">
-            <SettingsRow
-              label="We come to you"
-              control="switch"
-              hint="On: no shop or office for callers to visit. Your Business Assistant never sends callers to a place."
-            >
-              <ToolSwitch checked={noPremises} label="We come to you" onChange={setNoPremises} />
-            </SettingsRow>
+          <div data-no-premises="" className="space-y-2 px-4 py-3">
+            <SegmentedControl
+              label="How customers reach you"
+              value={noPremises ? "go" : "come"}
+              onChange={(next) => setNoPremises(next === "go")}
+              className="grid w-full grid-cols-1 gap-1 sm:grid-cols-2 [&_button]:min-h-11 [&_button]:whitespace-normal"
+              items={[
+                { value: "come", label: "Customers come to us" },
+                { value: "go", label: "We go to customers" },
+              ]}
+            />
+            <p className="text-meta text-ink-2">
+              {noPremises
+                ? "No shop or office. Callers are not sent to a place."
+                : "Callers can visit you."}
+            </p>
+            {!noPremises && Array.isArray((policies as { coverage_areas?: unknown }).coverage_areas) && (policies as { coverage_areas: unknown[] }).coverage_areas.length > 0 ? (
+              <p className="text-meta text-warn">
+                <Link href="/settings/areas" className="underline">Service areas say you go to customers.</Link>
+              </p>
+            ) : null}
           </div>
         </SettingsGroup>
         <PlacesEditor

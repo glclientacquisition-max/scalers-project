@@ -164,9 +164,24 @@ export function normalizeServiceAreas(raw: unknown, vertical?: string | null): S
   return { ...value, no_premises: obj.no_premises === true };
 }
 
-/** tenants.service_areas.no_premises as stored. The Locations switch reads and writes this key. */
+/** tenants.service_areas.no_premises as stored. The Locations choice reads and writes this key. */
 export function storedNoPremises(stored: unknown): boolean {
   return Boolean(stored && typeof stored === "object" && !Array.isArray(stored) && (stored as { no_premises?: unknown }).no_premises === true);
+}
+
+/** True when the owner has saved the premises choice. Absent is not a saved Off. */
+export function noPremisesChoiceSet(stored: unknown): boolean {
+  return Boolean(stored && typeof stored === "object" && !Array.isArray(stored) && Object.prototype.hasOwnProperty.call(stored, "no_premises"));
+}
+
+/**
+ * We go to customers for a home-services business with service areas, only when
+ * the owner has never saved the choice. A saved true or false stays.
+ */
+export function defaultNoPremises(stored: unknown, vertical: string | null | undefined, areaCount: number): boolean {
+  if (noPremisesChoiceSet(stored)) return storedNoPremises(stored);
+  if (String(vertical || "").trim().toLowerCase() === "home_services" && areaCount > 0) return true;
+  return false;
 }
 
 /**
