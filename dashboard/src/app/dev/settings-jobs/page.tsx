@@ -193,7 +193,12 @@ export default async function DevSettingsJobsPage({ searchParams }: DevSettingsJ
           { match: "Kilimani", say: "Kee-lee-mah-nee", label: "Kilimani" },
           { match: "the", say: "thee", label: "the" },
         ]
-      : null;
+      : tab === "test"
+        ? [
+            { match: "Ngong", say: "Gong", label: "Ngong" },
+            { match: "Kilimani", say: "Kee-lee-mah-nee", label: "Kilimani" },
+          ]
+        : null;
   const viewTenant = (pronunciationLexicon ? { ...t, tts_lexicon: pronunciationLexicon } : t) as TenantRow;
 
   return (

@@ -108,8 +108,10 @@ describe("settings list rest", () => {
     assert.match(testLine, /Hear greeting/);
     assert.doesNotMatch(testLine, /Generate preview/);
     assert.match(testLine, /lineLive/);
-    assert.match(testLine, /settingsGhostButtonClass/);
-    assert.match(testLine, /settingsPrimaryButtonClass/);
+    assert.match(testLine, /variant="tonal"/);
+    assert.match(testLine, /formatKenyaNumber/);
+    assert.match(testLine, /set in Pronunciation/);
+    assert.doesNotMatch(testLine, /pronunciation override/);
   });
 
   it("shows only the greeting on Test Preview", () => {
