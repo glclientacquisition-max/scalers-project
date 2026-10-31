@@ -2,9 +2,13 @@
 
 // Voice-side copy of the three synthetic tenants from draft PR #1089
 // (fixtures/demo-tenants.json on desk/demo-tenants-seed).
-// Ids, slugs, and openers match that fixture. There is no DID.
+// Ids and slugs match that fixture; openers are read from it (single source). There is no DID.
 // A database row is used only when its id is one of these and policies.demo is true.
 // Anything else, including a missing row that falls back to BUSINESS_NAME, is ignored.
+
+const fixture = require('../../fixtures/demo-tenants.json');
+
+const FIXTURE_OPENERS = new Map(fixture.tenants.map((row) => [row.slug, row.openers]));
 
 const TENANTS = Object.freeze([
   {
@@ -15,10 +19,7 @@ const TENANTS = Object.freeze([
     spokenName: 'Amani Visit Services',
     agentName: 'Amina',
     businessType: 'home_services',
-    openers: {
-      en: 'Amani Visit Services, Amina speaking. We clean homes and fix small leaks around Kilimani.',
-      sw: 'Amani Visit Services, Amina hapa. Tunasafisha nyumba na kurekebisha mabomba madogo karibu na Kilimani.',
-    },
+    openers: null,
   },
   {
     slug: 'demo_shop',
@@ -28,10 +29,7 @@ const TENANTS = Object.freeze([
     spokenName: 'Nuru Lane Electronics',
     agentName: 'Neema',
     businessType: 'retail',
-    openers: {
-      en: 'Nuru Lane Electronics, Neema speaking. Ask a price and I will read it from the shelf list.',
-      sw: 'Nuru Lane Electronics, Neema hapa. Uliza bei nami nitasoma kutoka kwenye orodha ya rafu.',
-    },
+    openers: null,
   },
   {
     slug: 'demo_other',
@@ -41,12 +39,13 @@ const TENANTS = Object.freeze([
     spokenName: 'Pendo Office Help',
     agentName: 'Pendo',
     businessType: 'general',
-    openers: {
-      en: 'Pendo Office Help. I can tell you our hours and take a message.',
-      sw: 'Pendo Office Help. Naweza kukuambia saa zetu na kuchukua ujumbe.',
-    },
+    openers: null,
   },
-]);
+].map((row) => {
+  const openers = FIXTURE_OPENERS.get(row.slug);
+  if (!openers || !openers.en || !openers.sw) throw new Error(`demo fixture missing openers for ${row.slug}`);
+  return Object.freeze({ ...row, openers: Object.freeze({ en: openers.en, sw: openers.sw }) });
+}));
 
 const BY_SLUG = new Map(TENANTS.map((row) => [row.slug, row]));
 const BY_ID = new Map(TENANTS.map((row) => [row.id, row]));
