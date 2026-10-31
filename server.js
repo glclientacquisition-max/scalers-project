@@ -50,6 +50,7 @@ const {
 const { createSttSilenceGate } = require('./src/speech/sttSilenceGate');
 const { createCallLimits, limitLine } = require('./src/speech/callLimits');
 const { callMeterOn, createCallMeter, dailyMeterTotals } = require('./src/speech/callMeter');
+const { demoHealthCounts } = require('./src/demo/meter');
 const { mergeIdentityLexicon } = require('./src/speech/pronunciationLexicon');
 const {
   createInitialBurstGate,
@@ -795,6 +796,7 @@ app.get('/healthz', (_req, res) => {
       executor: envLiveTransferExecutorEnabled(),
       ignoreHours: envLiveTransferIgnoreHours(),
     },
+    demo: demoHealthCounts(),
     voiceProfile: publicVoiceProfile(),
   });
 });
@@ -2218,6 +2220,32 @@ function handleSautikitRootPost(req, res) {
   return handleVoiceIncoming(req, res);
 }
 
+// Browser demo token. Off unless DEMO_ENABLED is exactly `on`.
+// Unset or any other value: 503 {reason: disabled}. Phone routes below
+// are not branched on this flag. The used marker persists only when
+// DEMO_VISITOR_PERSIST is exactly on. /demo/grant is the internal secret.
+const { handleDemoTokenRequest, handleDemoStatusRequest, handleDemoGrantRequest, PAUSED_MESSAGE } = require('./src/demo/guards');
+const { handleDemoUpgrade } = require('./src/demo/upgrade');
+app.use('/demo/token', (req, res, next) => {
+  if (req.method !== 'POST' && req.method !== 'OPTIONS') return next();
+  Promise.resolve(handleDemoTokenRequest(req, res)).catch(() => {
+    if (!res.headersSent) res.status(503).json({ reason: 'disabled', message: PAUSED_MESSAGE });
+  });
+});
+app.use('/demo/grant', (req, res, next) => {
+  if (req.method !== 'POST') return next();
+  Promise.resolve(handleDemoGrantRequest(req, res)).catch(() => {
+    if (!res.headersSent) res.status(401).json({ error: 'Unauthorized' });
+  });
+});
+app.get('/demo/status', (req, res) => {
+  Promise.resolve(handleDemoStatusRequest(req, res)).catch(() => {
+    if (!res.headersSent) {
+      res.status(503).json({ enabled: false, busy: false, cap: false, reason: 'disabled' });
+    }
+  });
+});
+
 app.post('/', sautikitWebhookGuard, handleSautikitRootPost);
 app.post('/voice/incoming', sautikitWebhookGuard, handleVoiceIncoming);
 app.post('/voice', sautikitWebhookGuard, handleVoiceIncoming);
@@ -2494,6 +2522,15 @@ server.on('upgrade', (req, socket, head) => {
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit('connection', ws, req);
       });
+      return;
+    }
+
+    // Browser demo. Off unless DEMO_ENABLED is exactly `on` (404, token
+    // not consumed). This branch does not share sendPcmToMedia, so phone
+    // gain, the inbound burst drain, and the drachtio subprotocol stay on
+    // /ws/media. No SautiKit REST from this path.
+    if (pathname === '/ws/demo') {
+      handleDemoUpgrade(req, socket, head);
       return;
     }
 

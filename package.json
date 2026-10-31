@@ -13,6 +13,9 @@
     "test:overlap": "node tests/overlapHold.test.js",
     "test:stream": "node tests/spokenStreamBuffer.test.js",
     "test:wiring": "node tests/voiceWiring.test.js",
+    "test:demo-guards": "node --test tests/demoToken.test.js tests/demoGuards.test.js",
+    "test:demo-session": "node --test tests/demoCodec.test.js tests/demoSession.test.js",
+    "test:demo-limits": "node --test tests/demoLimits.test.js",
     "test:inactive-tenant": "node --test tests/inactiveTenantGate.test.js tests/lineUnavailableAudio.test.js tests/closedTenantGuard.test.js tests/closedTenantLineDb.test.js tests/numberHoldClip.test.js",
     "test:idle-nudge": "node --test tests/idleNudge.test.js tests/unfinishedHold.test.js",
     "test:speed-control": "node tests/speedControl.test.js",
@@ -50,7 +53,7 @@
     "test:bare-greeting": "node --test tests/bareGreetingReply.test.js tests/bareHelloE2e.test.js tests/greetingLanguage.test.js",
     "test:ops-cron": "node --experimental-strip-types --test tests/opsAlertsRun.test.js tests/walletTopUpStaging.test.js && node --experimental-strip-types --no-warnings --import ./tests/registerTs.mjs --test tests/opsWalletEmail.test.mjs",
     "test:engines-filler": "node --test tests/enginesFillerStanddown.test.js",
-    "test:voice": "npm run test:brain-v2-shadow && npm run test:tts && npm run test:voice-ops-cron && npm run test:bare-greeting && npm run test:opening && npm run test:tool-smooth && npm run test:tts-fixture && npm run test:phonetic && npm run test:stream && npm run test:turns && npm run test:overlap && npm run test:wiring && npm run test:inactive-tenant && npm run test:action-progress && npm run test:spoken-filter && npm run test:tts-cancel && npm run test:tts-boundary && npm run test:lexicon-evidence && npm run test:soniox-errors && npm run test:soniox-voice && npm run test:timing && npm run test:filler-pcm && npm run test:greeting-pcm && npm run test:soniox-spend && npm run test:dead-air && npm run test:interim && npm run test:stt-context && npm run test:request-log && npm run test:recording-events && npm run test:gemini-voice && npm run test:live-transfer && npm run test:idle-nudge && npm run test:speed-control && npm run test:naturalness && npm run test:caller-file-voice && npm run test:prompt-facts && npm run test:fact-refs && npm run test:catalogue-mouth && npm run test:call-close && npm run test:hd015b-m0 && npm run test:v2-catalogue && npm run test:voice-eval && npm run test:lookups && npm run test:ops-cron && npm run test:engines-filler",
+    "test:voice": "npm run test:brain-v2-shadow && npm run test:tts && npm run test:voice-ops-cron && npm run test:bare-greeting && npm run test:opening && npm run test:tool-smooth && npm run test:tts-fixture && npm run test:phonetic && npm run test:stream && npm run test:turns && npm run test:overlap && npm run test:wiring && npm run test:inactive-tenant && npm run test:action-progress && npm run test:spoken-filter && npm run test:tts-cancel && npm run test:tts-boundary && npm run test:lexicon-evidence && npm run test:soniox-errors && npm run test:soniox-voice && npm run test:timing && npm run test:filler-pcm && npm run test:greeting-pcm && npm run test:soniox-spend && npm run test:dead-air && npm run test:interim && npm run test:stt-context && npm run test:request-log && npm run test:recording-events && npm run test:gemini-voice && npm run test:live-transfer && npm run test:idle-nudge && npm run test:speed-control && npm run test:naturalness && npm run test:caller-file-voice && npm run test:prompt-facts && npm run test:fact-refs && npm run test:catalogue-mouth && npm run test:call-close && npm run test:hd015b-m0 && npm run test:v2-catalogue && npm run test:voice-eval && npm run test:lookups && npm run test:ops-cron && npm run test:engines-filler && npm run test:demo-guards && npm run test:demo-session && npm run test:demo-limits",
     "test:opening": "node --test tests/callOpening.test.js tests/openingStores.test.js tests/openingV2E2e.test.js tests/openingEndCallE2e.test.js tests/recordingNoticeVariant.test.js tests/recordingNoticeE2e.test.js",
     "test:tts-boundary": "node tests/ttsBoundary.test.js",
     "test:lexicon-evidence": "node --test tests/pronunciationLexiconEvidence.test.js",
@@ -110,6 +113,7 @@
     "dotenv": "^16.6.1",
     "express": "^4.21.1",
     "localtunnel": "^2.0.2",
+    "opusscript": "^0.1.1",
     "web-push": "^3.6.7",
     "ws": "^8.18.0"
   }

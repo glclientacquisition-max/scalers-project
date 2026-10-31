@@ -63,27 +63,68 @@ jobs:
           ENVIRONMENT_ID: ${{ secrets.RAILWAY_STAGING_ENVIRONMENT_ID }}
         run: |
           set -euo pipefail
+          # RAILWAY_TOKEN is a project token scoped to one environment.
+          # Project tokens authenticate with Project-Access-Token. Bearer is rejected.
           GQL=https://backboard.railway.com/graphql/v2
-          RESP=$(curl -sS "$GQL" \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            -H "User-Agent: scalers-staging-voice-deploy" \
-            -d "{\"query\":\"query(\$id: String!) { environment(id: \$id) { id name } }\",\"variables\":{\"id\":\"$ENVIRONMENT_ID\"}}")
-          echo "$RESP" | python3 -c '
-          import json, sys
+          AUTH=(-H "Project-Access-Token: $RAILWAY_TOKEN" -H "Content-Type: application/json" -H "User-Agent: scalers-staging-voice-deploy")
+
+          TOKEN=$(curl -sS "$GQL" "${AUTH[@]}" \
+            -d '{"query":"query { projectToken { projectId environmentId } }"}')
+          echo "$TOKEN" | python3 -c '
+          import json, os, sys
           body = json.load(sys.stdin)
           if body.get("errors"):
-              raise SystemExit("Railway environment lookup failed: " + json.dumps(body["errors"]))
-          name = ((body.get("data") or {}).get("environment") or {}).get("name") or ""
-          print("railway_environment=" + name)
-          if name.strip().lower() != "staging":
-              raise SystemExit("Refusing: Railway environment name is %r, expected staging" % name)
+              raise SystemExit("Railway project token lookup failed: " + json.dumps(body["errors"]))
+          token = ((body.get("data") or {}).get("projectToken") or {})
+          project_id = str(token.get("projectId") or "")
+          environment_id = str(token.get("environmentId") or "")
+          print("project_token_project=" + project_id)
+          print("project_token_environment=" + environment_id)
+          if project_id != os.environ["PROJECT_ID"]:
+              raise SystemExit("Refusing: project token projectId does not match RAILWAY_STAGING_PROJECT_ID")
+          if environment_id != os.environ["ENVIRONMENT_ID"]:
+              raise SystemExit("Refusing: project token environmentId does not match RAILWAY_STAGING_ENVIRONMENT_ID")
           '
 
-          VARS=$(curl -sS "$GQL" \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            -H "User-Agent: scalers-staging-voice-deploy" \
+          PROJECT=$(curl -sS "$GQL" "${AUTH[@]}" \
+            -d "{\"query\":\"query(\$id: String!) { project(id: \$id) { id environments { edges { node { id name } } } services { edges { node { id name } } } } }\",\"variables\":{\"id\":\"$PROJECT_ID\"}}")
+          echo "$PROJECT" | python3 -c '
+          import json, os, sys
+          body = json.load(sys.stdin)
+          if body.get("errors"):
+              raise SystemExit("Railway project lookup failed: " + json.dumps(body["errors"]))
+          project = ((body.get("data") or {}).get("project") or {})
+          if str(project.get("id") or "") != os.environ["PROJECT_ID"]:
+              raise SystemExit("Refusing: Railway project id does not match RAILWAY_STAGING_PROJECT_ID")
+
+          def nodes(connection):
+              if isinstance(connection, dict) and isinstance(connection.get("edges"), list):
+                  found = []
+                  for edge in connection["edges"]:
+                      if isinstance(edge, dict) and isinstance(edge.get("node"), dict):
+                          found.append(edge["node"])
+                  return found
+              if isinstance(connection, list):
+                  return [item for item in connection if isinstance(item, dict)]
+              return []
+
+          environment_id = os.environ["ENVIRONMENT_ID"]
+          match = next((node for node in nodes(project.get("environments")) if str(node.get("id") or "") == environment_id), None)
+          if match is None:
+              raise SystemExit("Refusing: RAILWAY_STAGING_ENVIRONMENT_ID is not an environment on this project")
+          name = str(match.get("name") or "")
+          print("railway_environment=" + name)
+          if name != "staging":
+              raise SystemExit("Refusing: Railway environment name is %r, expected staging" % name)
+
+          service_id = os.environ["SERVICE_ID"]
+          service = next((node for node in nodes(project.get("services")) if str(node.get("id") or "") == service_id), None)
+          if service is None:
+              raise SystemExit("Refusing: RAILWAY_STAGING_SERVICE_ID is not a service on this project")
+          print("railway_service=" + str(service.get("name") or service_id))
+          '
+
+          VARS=$(curl -sS "$GQL" "${AUTH[@]}" \
             -d "{\"query\":\"query(\$projectId: String!, \$environmentId: String!, \$serviceId: String) { variables(projectId: \$projectId, environmentId: \$environmentId, serviceId: \$serviceId) }\",\"variables\":{\"projectId\":\"$PROJECT_ID\",\"environmentId\":\"$ENVIRONMENT_ID\",\"serviceId\":\"$SERVICE_ID\"}}")
           echo "$VARS" | python3 -c '
           import json, sys
@@ -115,18 +156,19 @@ jobs:
 
       - name: Deploy this checkout to staging Voice
         env:
+          # Project token. The CLI reads this name. RAILWAY_API_TOKEN is an
+          # account token (Bearer) and must not be set alongside it.
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           PROJECT_ID: ${{ secrets.RAILWAY_STAGING_PROJECT_ID }}
           SERVICE_ID: ${{ secrets.RAILWAY_STAGING_SERVICE_ID }}
           ENVIRONMENT_ID: ${{ secrets.RAILWAY_STAGING_ENVIRONMENT_ID }}
         run: |
           set -euo pipefail
+          unset RAILWAY_API_TOKEN
           GQL=https://backboard.railway.com/graphql/v2
+          AUTH=(-H "Project-Access-Token: $RAILWAY_TOKEN" -H "Content-Type: application/json" -H "User-Agent: scalers-staging-voice-deploy")
           DEPLOYED=0
-          RESP=$(curl -sS "$GQL" \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            -H "User-Agent: scalers-staging-voice-deploy" \
+          RESP=$(curl -sS "$GQL" "${AUTH[@]}" \
             -d "{\"query\":\"mutation(\$serviceId: String!, \$environmentId: String!, \$commitSha: String) { serviceInstanceDeployV2(serviceId: \$serviceId, environmentId: \$environmentId, commitSha: \$commitSha) }\",\"variables\":{\"serviceId\":\"$SERVICE_ID\",\"environmentId\":\"$ENVIRONMENT_ID\",\"commitSha\":\"$GITHUB_SHA\"}}") || true
           echo "$RESP"
           DID=$(echo "$RESP" | python3 -c 'import json,sys

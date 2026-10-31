@@ -19,12 +19,26 @@ function emptyTotals(day) {
 }
 
 let daily = emptyTotals(eatDay());
+// demo_* sessions only. A phone call never lands here, and a demo session
+// never lands in `daily`. This bucket is the live process view. The restart
+// safe dollar total lives in src/demo/meter.js.
+let demoDaily = emptyTotals(eatDay());
+
+function isDemoSid(callSid) {
+  return String(callSid || '').startsWith('demo_');
+}
+
+function rolled(bucket, nowMs) {
+  const day = eatDay(nowMs);
+  return bucket.day === day ? bucket : emptyTotals(day);
+}
 
 function round(n) {
   return Math.round(n * 10) / 10;
 }
 
-function createCallMeter() {
+function createCallMeter(opts = {}) {
+  const demo = isDemoSid(opts.callSid);
   const m = { ttsChars: 0, ttsRenderedBytes: 0, cacheHits: 0, cacheMisses: 0 };
   return {
     tts(text, pcmBytes = 0) {
@@ -50,10 +64,16 @@ function createCallMeter() {
         cacheHits: m.cacheHits,
         cacheMisses: m.cacheMisses,
       };
-      const day = eatDay(nowMs);
-      if (daily.day !== day) daily = emptyTotals(day);
-      daily.calls += 1;
-      for (const k of Object.keys(summary)) daily[k] = round((daily[k] || 0) + summary[k]);
+      if (demo) {
+        demoDaily = rolled(demoDaily, nowMs);
+        demoDaily.calls += 1;
+        for (const k of Object.keys(summary)) demoDaily[k] = round((demoDaily[k] || 0) + summary[k]);
+      } else {
+        const day = eatDay(nowMs);
+        if (daily.day !== day) daily = emptyTotals(day);
+        daily.calls += 1;
+        for (const k of Object.keys(summary)) daily[k] = round((daily[k] || 0) + summary[k]);
+      }
       return summary;
     },
   };
@@ -64,8 +84,16 @@ function dailyMeterTotals(nowMs = Date.now()) {
   return { ...daily };
 }
 
-function resetDailyMeter() {
-  daily = emptyTotals(eatDay());
+function demoMeterTotals(nowMs = Date.now()) {
+  demoDaily = rolled(demoDaily, nowMs);
+  return { ...demoDaily };
 }
 
-module.exports = { callMeterOn, createCallMeter, dailyMeterTotals, resetDailyMeter, eatDay };
+function resetDailyMeter() {
+  daily = emptyTotals(eatDay());
+  demoDaily = emptyTotals(eatDay());
+}
+
+module.exports = {
+  callMeterOn, createCallMeter, dailyMeterTotals, demoMeterTotals, resetDailyMeter, eatDay, isDemoSid,
+};
