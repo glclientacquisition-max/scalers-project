@@ -296,7 +296,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `reopen_tenant_field` | `docs/supabase/tenant_field_confirm_v2.sql` |
 | `reserve_notify_send` | `docs/supabase/notify_send_reserve_settle.sql`<br>`docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `resolve_checkout_total_review` | `docs/supabase/invoice_pay_amount_paid_either.sql`<br>`docs/supabase/invoice_pay_checkout_review.sql`<br>`docs/supabase/invoice_pay_checkout_review_round8.sql`<br>`docs/supabase/invoice_pay_checkout_review_round9.sql` |
-| `roll_package_periods` | `docs/supabase/package_period_rollover.sql` |
+| `roll_package_periods` | `docs/supabase/package_period_rollover.sql`<br>`supabase/migrations/20261031050000_roll_package_periods_fault_tolerant.sql` |
 | `sautikit_did_pool_quarantine_guard` | `docs/supabase/billing_data_layer.sql` |
 | `sautikit_did_pool_winback_guard` | `docs/supabase/number_hold_winback.sql` |
 | `save_call_setup` | `supabase/migrations/20261018130000_tenant_call_setup.sql` |
