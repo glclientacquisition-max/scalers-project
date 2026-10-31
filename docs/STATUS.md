@@ -212,6 +212,8 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 
 ## 4. Open PRs
 
+**Draft PR (31 Oct 2026, EAT), rollover that tolerates one business failing:** branch `billing/rollover-fault-tolerant`. `supabase/migrations/20261031050000_roll_package_periods_fault_tolerant.sql` is the prod `roll_package_periods` with each business's roll in its own exception block. When one business fails, only its own changes roll back. The failure is written to `ops_audit_log` (`package_period_rollover_failed`, with sqlstate and error) and alerted once (`platform_ops_notices` `package_rollover_failed:<tenant_id>`), and the other businesses still roll. A later successful roll resolves that business's alert. The signature, return shape, grants and cron job are unchanged. Staging test (rolled back, Test Archive Co plus a temporary copy, with an injected failure): the old function aborted the whole run, the new one rolled the copy, logged and alerted TAC, added no second alert on a re-run, and resolved the alert once fixed. Not applied. Prod needs Alvin's GO.
+
 **28 Oct 2026 clean-up:** there were 102 open PRs. The stale, superseded ones were closed with a pointer to the handover PR, and their branches were kept. Still open:
 - the parked retire-old-brain drafts #1009 and #1010
 - #975 (Brain to confirm before closing)
