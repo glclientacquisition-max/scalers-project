@@ -9,6 +9,8 @@ import { SettingsGroup } from "@/components/settingsUi";
 import { Button, buttonClass } from "@/components/ui/Button";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import type { ReadyChecklistItem } from "@/lib/assistantSayTypes";
+import type { CaptureScore } from "@/lib/completenessStub";
+import { HomeReviewSettingsNudge } from "@/components/HomeReviewSettingsNudge";
 import type { OverviewDataCheck } from "@/components/structured/OverviewDataChecksCard";
 import { confirmCheckForReadyItem, readyItemConfirmLink } from "@/lib/overviewDataChecks";
 import {
@@ -22,10 +24,12 @@ export function HomeGetReadyCallsCard({
   items,
   checks = [],
   canEdit = true,
+  review = null,
 }: {
   items: ReadyChecklistItem[];
   checks?: OverviewDataCheck[];
   canEdit?: boolean;
+  review?: { tenantId: string; vertical: string | null | undefined; score: CaptureScore } | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState<OpenOverviewCheck>(null);
@@ -33,7 +37,8 @@ export function HomeGetReadyCallsCard({
   const readyCount = useMemo(() => items.filter((i) => i.complete).length, [items]);
   const total = items.length;
 
-  if (!items.length || items.every((i) => i.complete)) return null;
+  const reviewOn = Boolean(review && !review.score.ready_badge);
+  if ((!items.length || items.every((i) => i.complete)) && !reviewOn) return null;
 
   function finish() {
     setOpen(null);
@@ -137,6 +142,9 @@ export function HomeGetReadyCallsCard({
             );
           })}
         </ul>
+        {review ? (
+          <HomeReviewSettingsNudge tenantId={review.tenantId} vertical={review.vertical} score={review.score} embedded />
+        ) : null}
         <p className="border-t border-hairline px-4 py-3 text-meta text-ink-3">
           <Link
             href={businessSettingsHref("assistant-say")}

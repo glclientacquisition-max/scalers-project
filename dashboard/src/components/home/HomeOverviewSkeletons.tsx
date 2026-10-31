@@ -5,7 +5,7 @@ import { Skeleton, SkeletonHeader } from "@/components/ui/Skeleton";
 /** Same box as HomeUsageSection: a card under the line card on large screens. */
 export function HomeUsageSkeleton() {
   return (
-    <section aria-label="Usage" aria-busy="true" className="min-w-0 overflow-hidden rounded-2xl border border-hairline bg-surface px-4 py-4 lg:col-span-5 lg:col-start-8 lg:row-start-2">
+    <section aria-label="Usage" aria-busy="true" className="min-w-0 overflow-hidden rounded-2xl border border-hairline bg-surface px-4 py-4">
       <Skeleton className="h-5 w-32" />
       <Skeleton className="mt-1.5 h-3.5 w-24" />
     </section>

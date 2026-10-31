@@ -3,12 +3,13 @@ import { HomeCallSetupCard } from "@/components/HomeCallSetupCard";
 import { HomeGetReadyCallsCard } from "@/components/HomeGetReadyCallsCard";
 import { HomeUsageSection } from "@/components/HomeUsageSection";
 import type { MinutesMeterMode } from "@/lib/minutesMeter";
-import { CallInsights } from "@/components/insights/CallInsights";
+import { TopAsks } from "@/components/home/TopAsks";
 import { HomeInsightsError } from "@/components/home/HomeInsightsError";
 import { OverviewDataChecksCard } from "@/components/structured/OverviewDataChecksCard";
 import { dataChecksFor } from "@/components/structured/StructuredSettingsSlots";
 import { areaConfirmCheck } from "@/lib/areaConfirmCheck.server";
 import { loadReadyChecklist } from "@/lib/assistantSayVoice.server";
+import type { CaptureScore } from "@/lib/completenessStub";
 import { lowBalanceNotice } from "@/lib/billingStateModel";
 import { loadOwnerBillingView } from "@/lib/billingStateLoad";
 import { loadCallInsights } from "@/lib/callInsightsLoad";
@@ -113,7 +114,15 @@ export async function HomeCallSetupSlot({ tenantId, numberReady }: { tenantId: s
 }
 
 /** Get ready / data checks card. Area nudge only for members who can edit Settings. */
-export async function HomeChecksSlot({ tenant, canEditSettings }: { tenant: HomeTenant; canEditSettings: boolean }) {
+export async function HomeChecksSlot({
+  tenant,
+  canEditSettings,
+  review = null,
+}: {
+  tenant: HomeTenant;
+  canEditSettings: boolean;
+  review?: { tenantId: string; vertical: string | null | undefined; score: CaptureScore } | null;
+}) {
   const assistantSayPage = deskAssistantSayPage();
   const [readyChecklist, areaNudge] = await Promise.all([
     assistantSayPage ? loadReadyChecklist(tenant) : Promise.resolve(null),
@@ -125,8 +134,12 @@ export async function HomeChecksSlot({ tenant, canEditSettings }: { tenant: Home
   });
   // Brain #942 answers coverage only from confirmed picks: nudge until the owner confirms.
   if (areaNudge) overviewChecks.unshift(areaNudge);
-  if (assistantSayPage && readyChecklist && !readyChecklist.allDone) {
-    return <HomeGetReadyCallsCard items={readyChecklist.items} checks={overviewChecks} canEdit={canEditSettings} />;
+  const reviewOn = review && !review.score.ready_badge ? review : null;
+  if (assistantSayPage && readyChecklist && (!readyChecklist.allDone || reviewOn)) {
+    return <HomeGetReadyCallsCard items={readyChecklist.items} checks={overviewChecks} canEdit={canEditSettings} review={reviewOn} />;
+  }
+  if (reviewOn) {
+    return <HomeGetReadyCallsCard items={readyChecklist?.items ?? []} checks={overviewChecks} canEdit={canEditSettings} review={reviewOn} />;
   }
   if (!assistantSayPage && overviewChecks.length) {
     return <OverviewDataChecksCard checks={overviewChecks} canEdit={canEditSettings} />;
@@ -138,5 +151,5 @@ export async function HomeChecksSlot({ tenant, canEditSettings }: { tenant: Home
 export async function HomeInsightsSlot({ client, tenant }: { client: HomeClient; tenant: HomeTenant }) {
   const loaded = await loadCallInsights(client, tenant.id, 30, tenant.faqs);
   if (!loaded.ok) return <HomeInsightsError />;
-  return <CallInsights insights={loaded.insights} />;
+  return <TopAsks insights={loaded.insights} />;
 }

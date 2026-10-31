@@ -31,7 +31,6 @@ export function minutesMeterState(input: MinutesMeterInput): MinutesMeterState {
   if (input.left <= 0 && !input.underOne) return "usedup";
   if (input.underOne) return "under1";
   const low = input.left > 0 && input.left <= Math.max(1, Math.floor(input.included * LOW_SHARE));
-  if (input.mode === "beta") return low ? "low" : "beta";
   if (low) return "low";
   return "under";
 }
@@ -46,4 +45,31 @@ export function minutesMeterFill(input: MinutesMeterInput): number {
 export function minutesRingFill(input: MinutesMeterInput): number {
   if (minutesMeterState(input) === "usedup" || minutesMeterState(input) === "limit") return 0;
   return minutesMeterFill(input);
+}
+
+export type MinutesMeterTone = "info" | "warn" | "danger";
+
+/**
+ * The chip word. "Within package" sits under the minutes figure so it can wrap
+ * on a narrow card. Short enough to stay clear in Kiswahili ("Ndani ya kifurushi").
+ */
+export function minutesMeterMark(input: MinutesMeterInput): { word: string; tone: MinutesMeterTone } | null {
+  const state = minutesMeterState(input);
+  if (state === "none") return null;
+  const tone: MinutesMeterTone = state === "limit" ? "danger" : state === "under" || state === "beta" ? "info" : "warn";
+  const word =
+    state === "usedup"
+      ? "No minutes left"
+      : state === "limit"
+        ? "Limit reached"
+        : state === "over"
+          ? input.overLabel || "Over the package"
+          : state === "under1"
+            ? "Under 1 min left"
+            : state === "low"
+              ? "Low"
+              : state === "beta"
+                ? "Beta"
+                : "Within package";
+  return { word, tone };
 }

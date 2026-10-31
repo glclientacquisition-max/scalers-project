@@ -37,6 +37,10 @@ import { DeskPageGate } from "@/components/DeskPageGate";
 import { DeskPageSkeleton } from "@/components/DeskPageSkeleton";
 import { deskAssistantSayPage } from "@/lib/deskFeatureFlags";
 import { loadAssistantSayView } from "@/lib/assistantSayVoice.server";
+import { CapabilityGatesPanel } from "@/components/CapabilityGatesPanel";
+import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
+import { capabilityGates } from "@/lib/capabilityGates";
+import { getTenantHoldGate } from "@/lib/deskProvenance";
 import { loadKbGreetingPreview } from "@/lib/kbCaller.server";
 import { AssistantSayPanel } from "@/components/assistantSay/AssistantSayPanel";
 import { parseUnknownAnswerByKind } from "@/lib/unknownAnswerByKindConstants";
@@ -178,6 +182,16 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
     } catch {
       assistantSaySlot = <DeskLoadError>Could not load what callers hear.</DeskLoadError>;
     }
+  }
+
+  if (tab === "capabilities") {
+    const hold = await getTenantHoldGate(tenant.id);
+    assistantSaySlot = (
+      <div className="flex flex-col gap-6">
+        <CapabilityGatesPanel gates={capabilityGates(tenant, { holdGate: hold })} />
+        <DailyBulletinPanel tenant={tenant} />
+      </div>
+    );
   }
 
   let callsSlot = null;

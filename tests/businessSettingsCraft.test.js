@@ -105,8 +105,7 @@ describe("business settings craft", () => {
     assert.match(nav, /label: "Hours"/);
     assert.match(nav, /label: "Locations"/);
     assert.match(nav, /label: "Policies"/);
-    assert.match(nav, /label: "On calls"/);
-    assert.doesNotMatch(nav, /label: "Voice"/, "one setting called Voice (the speaking voice in Identity)");
+    assert.match(nav, /label: "What it can do"/);
     assert.match(nav, /label: "Pronunciation"/);
     assert.doesNotMatch(nav, /label: "Updates"/);
     assert.match(nav, /label: "Test"/);
@@ -132,7 +131,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(nav, /return "Appearance"/);
     assert.match(nav, /raw === "alerts"/);
     assert.doesNotMatch(nav, /raw === "appearance"/);
-    assert.match(shell, /tab === "alerts"/);
+    assert.match(shell, /activeTab === "alerts"/);
     assert.doesNotMatch(shell, /tab === "appearance"/);
     assert.match(shell, /AlertsPanel/);
     assert.doesNotMatch(shell, /AppearancePanel/);
@@ -385,9 +384,10 @@ describe("business settings craft", () => {
       "Policies",
       "Catalogue",
       "FAQs",
-      "What it will say",
-      "On calls",
+      "What callers hear",
+      "Voice",
       "Pronunciation",
+      "What it can do",
       "Test",
       "Calls & forwarding",
       "Team",
@@ -430,7 +430,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(nav, /SETTINGS_HOURS_HREF|settingsWideDefaultHref/);
     assert.match(page, /parseBusinessSettingsPanel\(panelRaw, tabRaw\)/);
     for (const item of nav.match(/\{ label: "[^"]+", description: "[^"]+"/g) || []) assert.ok(item.length < 120, item);
-    assert.equal((nav.match(/description: "/g) || []).length, 16, "one line per destination, Service areas and What it will say included");
+    assert.equal((nav.match(/description: "/g) || []).length, 17, "one line per destination, including What it can do");
     const activeFn = nav.slice(
       nav.indexOf("export function settingsNavItemActive"),
       nav.indexOf("export function settingsNavItems")
