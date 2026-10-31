@@ -168,9 +168,7 @@ describe("live tenant and reconcile routes", () => {
     assert.doesNotMatch(admin, /process\.env\./);
 
     const vercel = JSON.parse(read("dashboard/vercel.json"));
-    assert.deepEqual(vercel.crons, [
-      { path: "/api/cron/billing-payment-retry", schedule: "7 3 * * *" },
-    ]);
+    assert.equal(vercel.crons, undefined); // billing schedules run in pg_cron (20261031040000)
     assert.doesNotMatch(JSON.stringify(vercel), /billing-reconcile/);
 
     const readme = read("docs/supabase/README.md");
