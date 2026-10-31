@@ -14,6 +14,8 @@ import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { assessMvpAnswerReadiness } from "@/lib/mvpAnswerReadiness";
 import { lineStatusLabel, resolveLineStatus } from "@/lib/lineStatus";
 import { StatusMark, type StatusIcon, type StatusTone } from "@/components/ui/StatusMark";
+import { TodayCalls, nairobiClock, type TodayCallRow } from "@/components/home/TodayCalls";
+import { splitOutcomes } from "@/lib/todayOutcomes";
 import {
   deskPreviewClass,
   deskShiftClass,
@@ -131,7 +133,7 @@ async function HomeOverviewBody() {
   const copy = nicheCopy(vertical);
 
   const numberReady = toLocal07(tenant.sautikit_virtual_number) !== null;
-  const [todayRes, inbox, score, hold] = await Promise.all([
+  const [todayRes, inbox, score, hold, factsRes] = await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
@@ -140,6 +142,12 @@ async function HomeOverviewBody() {
     loadCachedInboxItems(tenant.id, vertical),
     getTenantCompletenessScore(tenant.id),
     getTenantHoldGate(tenant.id),
+    client
+      .from("call_facts")
+      .select("outcome")
+      .eq("tenant_id", tenant.id)
+      .gte("created_at", dayStart)
+      .in("source", ["review", "owner"]),
   ]);
   timer.mark("data");
   console.info(timer.line("home"));
@@ -151,6 +159,26 @@ async function HomeOverviewBody() {
     : homeDigestLine(inbox.items, dayStart, vertical);
 
   const todayCount = todayRes.error ? null : todayRes.count ?? 0;
+  const todaySplit = factsRes.error ? null : splitOutcomes((factsRes.data || []).map((row) => row.outcome as string | null));
+  const todayRows: TodayCallRow[] = inbox.callsTruncated
+    ? []
+    : inbox.items
+        .filter((item) => item.createdAt >= dayStart)
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+        .slice(0, 5)
+        .map((item) => {
+          const word = item.purpose === "answered" ? "Answered" : item.purpose === "human" ? "Handed off" : item.purpose === "missed" ? "Hung up" : "Call";
+          const tone = item.purpose === "answered" ? "ok" : item.purpose === "human" ? "info" : item.purpose === "missed" ? "warn" : "neutral";
+          return {
+            id: item.id,
+            time: nairobiClock(item.createdAt),
+            word,
+            tone,
+            who: item.callerName || item.callerPhone || "Caller",
+            told: Boolean(item.lead?.notified),
+            href: item.callId ? inboxRecordHref(item.callId, { from: "home" }) : null,
+          };
+        });
   const work = summarizeInboxWork(inbox.items);
   const gates = capabilityGates(tenant, {
     holdGate: hold,
@@ -457,6 +485,12 @@ async function HomeOverviewBody() {
             }
           />
         ) : null}
+        <TodayCalls
+          lineLive={line === "live"}
+          split={todaySplit}
+          rows={todayRows}
+          truncated={inbox.callsTruncated}
+        />
         <CapabilityGatesPanel gates={gates} />
         {score && line === "live" && !score.ready_badge ? (
           <HomeReviewSettingsNudge
