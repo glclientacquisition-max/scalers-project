@@ -97,6 +97,7 @@ export function BusinessSettingsShell({
   pronunciationReview = [],
   pronunciationQueueFailed = false,
   memberRoles,
+  hideBilling = false,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
@@ -119,6 +120,8 @@ export function BusinessSettingsShell({
   pronunciationQueueFailed?: boolean;
   /** Email to login role, so alert contacts use the member record. */
   memberRoles?: Record<string, string>;
+  /** Hide the Billing rail row. /settings/billing stays reachable. */
+  hideBilling?: boolean;
 }) {
   const { tab: activeTab, trainPanel: activeTrainPanel } = useResolvedSettingsRoute(tab, trainPanel);
   const formPanel: SettingsPanel =
@@ -172,6 +175,7 @@ export function BusinessSettingsShell({
       trainPanel={activeTrainPanel}
       optionStatus={optionStatus}
       assistantSayPage={assistantSayPage}
+      hideBilling={hideBilling}
     />
   );
 
@@ -196,6 +200,7 @@ export function BusinessSettingsShell({
               optionStatus={optionStatus}
               assistantSayPage={assistantSayPage}
               vertical={tenant.vertical}
+              hideBilling={hideBilling}
             />
           </div>
         </div>

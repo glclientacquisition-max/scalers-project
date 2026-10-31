@@ -25,10 +25,11 @@ async function PlanBody({ searchParams }: { searchParams: Promise<{ addon?: stri
     const [view, extras] = await Promise.all([loadOwnerUsageView(tenant), loadUsageBillingExtras(tenant.id)]);
     const credits = messageCreditsUsage(extras.messageCredits, extras.creditBurns, view.messageUse);
     return (
-      <SettingsPlanFrame title="Plan" optionStatus={statuses}>
+      <SettingsPlanFrame title="Plan" optionStatus={statuses} hideBilling={loaded.model.freeBeta || !loaded.model.surface.showInvoices}>
         <BetaPlanSummary
           planName={view.packageName}
           periodEndLabel={view.periodEndLabel}
+          resetLabel={view.nextResetLabel}
           rows={betaPlanRows(view, credits)}
           freeBeta={loaded.model.freeBeta}
           onDemandEnabled={tenant.on_demand_usage_enabled}

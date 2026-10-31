@@ -262,6 +262,7 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
         pronunciationReview={pronunciationReview}
         pronunciationQueueFailed={pronunciationQueueFailed}
         memberRoles={memberRoles}
+        hideBilling={planRow.freeBeta}
       />
     </Suspense>
   );

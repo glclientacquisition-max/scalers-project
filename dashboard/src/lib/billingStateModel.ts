@@ -85,6 +85,8 @@ export type OwnerBillingView = {
   /** What the on-demand switch means right now, in owner words. */
   onDemandHint: string;
   periodEndLabel: string | null;
+  /** Day usage counts from again, Nairobi. The morning after periodEndLabel. */
+  nextResetLabel?: string | null;
 };
 
 export type LowBalance = { lowNotice: string | null; lowNoticeNote: string | null };
@@ -113,6 +115,14 @@ export function periodEndLabel(periodEnd: string | null | undefined): string | n
   // period_end is exclusive (midnight EAT that starts the next month): show the last day.
   const last = new Date(end - 1000);
   return last.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Africa/Nairobi" });
+}
+
+/** The morning usage starts again, in Nairobi. Exclusive period end is that morning. */
+export function nextResetLabel(periodEnd: string | null | undefined): string | null {
+  if (!periodEnd) return null;
+  const end = Date.parse(periodEnd);
+  if (!Number.isFinite(end)) return null;
+  return new Date(end).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Africa/Nairobi" });
 }
 
 export function billingModeOf(state: TenantBillingStateRow | null): BillingMode {
@@ -251,6 +261,7 @@ export function ownerBillingView(input: OwnerBillingInput): OwnerBillingView {
     lowNoticeNote,
     onDemandHint,
     periodEndLabel: endLabel,
+    nextResetLabel: nextResetLabel(state?.period_end),
   };
 }
 

@@ -362,7 +362,7 @@ export function BillingFixture({ view }: { view: BillingPreview }) {
       const beta = betaView();
       return (
         <SettingsPlanFrame title="Plan" activePath="/settings/plan">
-          <BetaPlanSummary planName={beta.packageName} periodEndLabel={beta.periodEndLabel} rows={betaPlanRows(beta, betaCredits())} />
+          <BetaPlanSummary planName={beta.packageName} periodEndLabel={beta.periodEndLabel} resetLabel="1 Nov" rows={betaPlanRows(beta, betaCredits())} />
         </SettingsPlanFrame>
       );
     }

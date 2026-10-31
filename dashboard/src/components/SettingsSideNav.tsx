@@ -125,10 +125,11 @@ function AppearanceHomeRow() {
   );
 }
 
-function visibleSections(manageBilling: boolean, assistantSayPage: boolean): SettingsNavSection[] {
+function visibleSections(manageBilling: boolean, assistantSayPage: boolean, hideBilling: boolean): SettingsNavSection[] {
   return SETTINGS_NAV.flatMap((section) => {
     const items = section.items.filter((item) => {
       if ("tab" in item.target && item.target.tab === "assistant-say" && !assistantSayPage) return false;
+      if ("href" in item.target && item.target.href === "/settings/billing" && hideBilling) return false;
       if (!("href" in item.target)) return true;
       if (item.target.href === "/settings/areas" || item.target.href === "/settings/knowledge") return true;
       return manageBilling;
@@ -150,6 +151,7 @@ export function SettingsMenu({
   activePath,
   assistantSayPage = false,
   vertical = null,
+  hideBilling = false,
 }: {
   tab: BusinessSettingsTab;
   trainPanel: SettingsPanel;
@@ -160,11 +162,13 @@ export function SettingsMenu({
   optionStatus: Record<string, SettingsListStatus>;
   /** Live pages use the real pathname. The billing fixture passes the settings path it is standing in for. */
   activePath?: string;
+  /** Free beta, or invoices not open yet. /settings/billing stays reachable. */
+  hideBilling?: boolean;
 }) {
   const pathname = usePathname();
   const path = activePath ?? pathname;
   const manageBilling = useCan("billing.manage");
-  const sections = visibleSections(manageBilling, assistantSayPage);
+  const sections = visibleSections(manageBilling, assistantSayPage, hideBilling);
   const isRail = variant === "rail";
   const navRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -270,12 +274,14 @@ export function SettingsRail({
   optionStatus = {},
   activePath,
   assistantSayPage = false,
+  hideBilling = false,
 }: {
   tab?: BusinessSettingsTab;
   trainPanel?: SettingsPanel;
   optionStatus?: Record<string, SettingsListStatus>;
   activePath?: string;
   assistantSayPage?: boolean;
+  hideBilling?: boolean;
 }) {
   return (
     <div className={settingsRailWrapClass}>
@@ -286,6 +292,7 @@ export function SettingsRail({
         optionStatus={optionStatus}
         activePath={activePath}
         assistantSayPage={assistantSayPage}
+        hideBilling={hideBilling}
       />
     </div>
   );
