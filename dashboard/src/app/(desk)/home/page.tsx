@@ -13,6 +13,7 @@ import { inboxRecordHref } from "@/lib/inboxHref";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { assessMvpAnswerReadiness } from "@/lib/mvpAnswerReadiness";
 import { lineStatusLabel, resolveLineStatus } from "@/lib/lineStatus";
+import { StatusMark, type StatusIcon, type StatusTone } from "@/components/ui/StatusMark";
 import {
   deskPreviewClass,
   deskShiftClass,
@@ -120,6 +121,12 @@ async function HomeOverviewBody() {
     agentTools: tenant.agent_tools,
   });
   const line = resolveLineStatus(tenant.sautikit_virtual_number, readiness.ready);
+  const linePill: { tone: StatusTone; icon: StatusIcon; word: string } =
+    line === "live"
+      ? { tone: "ok", icon: "check", word: "Live" }
+      : line === "pending"
+        ? { tone: "neutral", icon: "clock", word: "Number pending" }
+        : { tone: "warn", icon: "tri", word: "Needs training" };
   const vertical = tenant.vertical;
   const copy = nicheCopy(vertical);
 
@@ -460,40 +467,44 @@ async function HomeOverviewBody() {
         ) : null}
         </div>
 
-        <aside className="min-w-0 lg:sticky lg:top-24 lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1">
+        <aside className="order-first min-w-0 lg:sticky lg:top-24 lg:order-none lg:col-span-5 lg:col-start-8 lg:row-start-1">
           <div className="overflow-hidden rounded-2xl border border-hairline bg-surface">
-            <section aria-label="Today" className="px-3 py-3">
-              <Link
-                href={callsHref({ purpose: "all" })}
-                className={[
-                  `flex min-h-11 items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-body text-ink-2 ${deskShiftClass} hover:bg-accent/[0.04] hover:text-ink`,
-                  "active:bg-accent/[0.08]",
-                  focusRingVisible,
-                ].join(" ")}
-              >
-                <span>Calls today</span>
-                {todayCount === null ? null : (
-                  <span className="tabular-nums font-medium text-ink">{todayCount}</span>
-                )}
-              </Link>
-            </section>
-
-            <section aria-label="Line" className="border-t border-hairline px-4 py-4">
-              <p className="text-body font-medium text-ink">
-                {lineStatusLabel(line)}
-              </p>
+            <section aria-label="Line" className="px-4 py-4">
+              <h2 className="sr-only">{lineStatusLabel(line)}</h2>
+              <StatusMark tone={linePill.tone} icon={linePill.icon}>{linePill.word}</StatusMark>
               {line === "live" ? (
-                <p className="mt-0.5 truncate font-mono text-meta text-ink-2">
+                <p className="mt-2 truncate font-mono text-body text-ink">
                   {didDisplay || tenant.sautikit_virtual_number}
                 </p>
-              ) : null}
+              ) : (
+                <p className="mt-2 text-body text-ink-2">
+                  {line === "pending" ? "Your number is not live yet." : "Train the line before it can answer."}
+                </p>
+              )}
             </section>
 
-            <RoleGate action="usage.view" mode="hide">
-              <Suspense fallback={<HomeUsageSkeleton />}>
-                <HomeUsageSlot tenant={tenant} isBeta={isBeta} />
-              </Suspense>
-            </RoleGate>
+            {line === "live" ? (
+              <div className="grid grid-cols-3 gap-2 border-t border-hairline px-4 py-3" aria-label="Today">
+                {(
+                  [
+                    { label: "Calls", value: todayCount, href: callsHref({ purpose: "all" }) },
+                    { label: "Need you", value: work.toReturn, href: callsHref({ purpose: "human" }) },
+                    { label: "Visits", value: visitQueue ? work.toConfirm : 0, href: callsHref({ purpose: "job" }) },
+                  ] as const
+                ).map((tile) => (
+                  <Link
+                    key={tile.label}
+                    href={tile.href}
+                    className={`flex min-h-12 flex-col justify-center rounded-xl bg-canvas px-2 ${focusRingVisible}`}
+                  >
+                    <span className="tabular-nums text-title font-semibold text-ink">
+                      {tile.value === null ? "Failed" : tile.value}
+                    </span>
+                    <span className="text-meta text-ink-2">{tile.label}</span>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
 
             {showCta ? (
               <div className="border-t border-hairline px-4 py-4">
@@ -504,6 +515,12 @@ async function HomeOverviewBody() {
             ) : null}
           </div>
         </aside>
+
+        <RoleGate action="usage.view" mode="hide">
+          <Suspense fallback={<HomeUsageSkeleton />}>
+            <HomeUsageSlot tenant={tenant} isBeta={isBeta} />
+          </Suspense>
+        </RoleGate>
 
         <section
           className="min-w-0 lg:col-span-7 lg:col-start-1 lg:row-start-2"
