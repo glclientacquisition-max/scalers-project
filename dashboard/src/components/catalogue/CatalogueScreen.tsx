@@ -22,6 +22,7 @@ import { CHECK_FIX, CHECK_LABEL, ISSUE_LINE, type KbCategory, type KbDraft, type
 import {
   PRICE_CHOICES,
   SEARCH_FROM,
+  addManyRewardLine,
   catalogueCounts,
   editDraft,
   filterItems,
@@ -48,6 +49,8 @@ import {
   type PriceChoice,
 } from "@/lib/catalogueView";
 import type { KbActionResult } from "@/app/(desk)/settings/knowledge/actions";
+import { runOptimistic, serverActionError } from "@/lib/optimisticAction";
+import { clearRowPending, markRowPending, planSwDecision, rowIsPending, rowStillShown, type SwDecision } from "@/lib/rowPending";
 
 /** The KB v2 server actions this screen calls. Injected so the dev fixture can render without a database. */
 export type CatalogueActions = {
@@ -153,6 +156,11 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
     });
   const [lang, setLang] = useState<"en" | "sw">("en");
   const [swEdit, setSwEdit] = useState<{ id: string; text: string } | null>(null);
+  // Kiswahili decisions: only the tapped row is pending. The list is not refetched.
+  const [swPending, setSwPending] = useState<ReadonlySet<string>>(new Set());
+  const [swAction, setSwAction] = useState<Record<string, SwDecision>>({});
+  const [swSettled, setSwSettled] = useState<ReadonlySet<string>>(new Set());
+  const swToken = useRef<Record<string, number>>({});
 
   const counts = useMemo(() => catalogueCounts(items), [items]);
   const list = useMemo(() => filterItems(items, categories, { query, kind, needPrice }), [items, categories, query, kind, needPrice]);
@@ -160,7 +168,7 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
   const both = counts.services > 0 && counts.products > 0 && !homeServices;
   const todo = (readiness?.checks || []).filter((c) => !c.ok);
   const failed = latest && latest.status === "failed" && latest.version !== liveVersion;
-  const waiting = items.filter((i) => i.name_sw_state === "suggested" && i.name_sw_suggested);
+  const waiting = items.filter((i) => i.name_sw_state === "suggested" && i.name_sw_suggested && rowStillShown(i.id, swSettled, swPending));
   // "No price" is the status card's job (one count, one Fix), so it is not listed twice.
   const issues = (latest?.issues || []).filter((i) => i.severity !== "info" && i.code !== "no_price");
   const hasAside = !!live?.doc?.preview?.length || (waiting.length > 0 && canEdit) || issues.length > 0;
@@ -176,6 +184,46 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
         router.refresh();
       }
     });
+
+  const decideSw = (it: KbItem, decision: SwDecision, text?: string, done?: string) => {
+    const plan = planSwDecision(it, decision, text);
+    if (!plan.fire) {
+      if (plan.reason === "empty") notify(decision === "edit" ? "Type the Kiswahili name." : "There is no suggestion to approve.", { tone: "error" });
+      return;
+    }
+    const token = (swToken.current[it.id] ?? 0) + 1;
+    swToken.current[it.id] = token;
+    void runOptimistic({
+      apply: () => {
+        setSwAction((prev) => ({ ...prev, [it.id]: decision }));
+        setSwPending((prev) => markRowPending(prev, it.id));
+        setSwSettled((prev) => markRowPending(prev, it.id));
+      },
+      commit: () => actions.decideSwName(it.id, decision, text),
+      rollback: () => {
+        if (swToken.current[it.id] !== token) return;
+        setSwPending((prev) => clearRowPending(prev, it.id));
+        setSwSettled((prev) => clearRowPending(prev, it.id));
+        setSwAction((prev) => {
+          const next = { ...prev };
+          delete next[it.id];
+          return next;
+        });
+      },
+      failed: serverActionError,
+      fallback: "Couldn't save. Nothing was changed. Try again.",
+    }).then((out) => {
+      if (swToken.current[it.id] !== token) return;
+      setSwPending((prev) => clearRowPending(prev, it.id));
+      setSwAction((prev) => {
+        const next = { ...prev };
+        delete next[it.id];
+        return next;
+      });
+      if (!out.ok) notify(out.error, { tone: "error" });
+      else if (done && out.value.ok && !out.value.unchanged) notify(done);
+    });
+  };
 
   const openFix = (afterId?: string | null, justSaved = false) => {
     const next = nextUnpriced(items, afterId);
@@ -413,8 +461,11 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
             <p className="text-meta text-ink-2">Callers only hear a Kiswahili name after you approve it.</p>
           </div>
           <ul className="mt-2 divide-y divide-hairline border-t border-hairline">
-            {waiting.slice(0, 30).map((it) => (
-              <li key={it.id} className="flex flex-wrap items-center gap-2 px-4 py-2">
+            {waiting.slice(0, 30).map((it) => {
+              const busy = rowIsPending(swPending, it.id);
+              const action = swAction[it.id];
+              return (
+              <li key={it.id} className="flex flex-wrap items-center gap-2 px-4 py-2" data-sw-row={it.id} data-row-pending={busy ? "1" : "0"}>
                 <span className="min-w-0 flex-1 text-body text-ink">
                   {it.name_en}
                   <span className="block text-meta text-ink-2">Suggested: {it.name_sw_suggested}</span>
@@ -422,25 +473,26 @@ export function CatalogueScreen(props: CatalogueScreenProps) {
                 {swEdit?.id === it.id ? (
                   <>
                     <Input aria-label={`Kiswahili name for ${it.name_en}`} value={swEdit.text} onChange={(e) => setSwEdit({ id: it.id, text: e.target.value })} className="max-w-56" />
-                    <Button size="md" variant="tonal" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "edit", swEdit.text), "Saved")}>
+                    <Button size="md" variant="tonal" pending={busy && action === "edit"} onClick={() => decideSw(it, "edit", swEdit.text, "Saved")}>
                       Save
                     </Button>
                   </>
                 ) : (
                   <>
-                    <Button size="md" variant="tonal" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "approve"), "Approved")}>
+                    <Button size="md" variant="tonal" pending={busy && action === "approve"} onClick={() => decideSw(it, "approve", undefined, "Approved")}>
                       Approve
                     </Button>
                     <Button size="md" variant="ghost" onClick={() => setSwEdit({ id: it.id, text: it.name_sw_suggested || "" })}>
                       Edit
                     </Button>
-                    <Button size="md" variant="ghost" pending={pending} onClick={() => run(() => actions.decideSwName(it.id, "reject"))}>
+                    <Button size="md" variant="ghost" pending={busy && action === "reject"} onClick={() => decideSw(it, "reject")}>
                       Reject
                     </Button>
                   </>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         </section>
       ) : null}
@@ -1256,14 +1308,9 @@ function SavingSteps({ progress }: { progress: SaveProgress }) {
   );
 }
 
-/** Calm finish: a drawn check and the real counts. No confetti. */
+/** Calm finish: a drawn check and one line of counts. Undo time lives on the undo bar. */
 function SaveRewardPanel({ reward: r, anything }: { reward: SaveReward; anything: boolean }) {
-  const lines = [
-    r.adds ? `${r.adds} ${r.adds === 1 ? "item" : "items"} ${r.replace ? "in your list" : "added"}` : "",
-    r.updates ? `${r.updates} updated` : "",
-    r.removed ? `${r.removed} removed` : "",
-    r.details ? `${r.details} ${r.details === 1 ? "detail" : "details"} saved` : "",
-  ].filter(Boolean);
+  const line = addManyRewardLine(r);
   return (
     <div className="flex flex-col items-center gap-3 py-6 text-center" role="status" data-add-many-reward="">
       {anything ? (
@@ -1272,16 +1319,8 @@ function SaveRewardPanel({ reward: r, anything }: { reward: SaveReward; anything
           <path d="M15 24.5l6 6 12-13" fill="none" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" className="desk-check-mark stroke-accent" />
         </svg>
       ) : null}
-      {lines.length ? (
-        <ul className="space-y-1">
-          {lines.map((l) => (
-            <li key={l} className="text-body font-semibold text-ink">
-              {l}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {anything ? <p className="text-meta text-ink-2">Callers hear it within a minute. You can undo for 10 minutes.</p> : null}
+      {line ? <p className="text-body font-semibold text-ink">{line}</p> : null}
+      {anything ? <p className="text-meta text-ink-2">Live on calls within a minute.</p> : null}
       {r.failed.length ? (
         <p className="text-meta text-attention">{`Couldn't save ${r.failed.join(", ")}. Set ${r.failed.length === 1 ? "it" : "them"} in Settings.`}</p>
       ) : null}

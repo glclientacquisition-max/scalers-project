@@ -1,9 +1,10 @@
 "use client";
 
 import { withRoleGate } from "@/components/DeskRole";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import type { LeadStatus } from "@/lib/supabase";
+import { pendingDotClass } from "@/components/ui/Button";
 import { deskShiftClass } from "@/components/ui/deskChrome";
 
 const TRIAGE_STEPS: { id: Exclude<LeadStatus, "archived">; label: string }[] = [
@@ -41,15 +42,21 @@ function LeadStatusToggleInner({
 }) {
   const [status, setStatus] = useState<LeadStatus>(initial);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [pendingStep, setPendingStep] = useState<LeadStatus | null>(null);
+  const [, startQuiet] = useTransition();
+  const token = useRef(0);
 
   function select(next: LeadStatus) {
-    if (next === status || pending) return;
+    if (next === status) return;
     const previous = status;
+    const mine = ++token.current;
     setStatus(next);
+    setPendingStep(next);
     setError(null);
-    startTransition(async () => {
+    startQuiet(async () => {
       const res = await updateLeadStatus(callId, next);
+      if (token.current !== mine) return;
+      setPendingStep(null);
       if (!res.ok) {
         setStatus(previous);
         setError(res.error || "Could not update.");
@@ -64,28 +71,30 @@ function LeadStatusToggleInner({
   return (
     <div>
       <div
-        className={["inline-flex flex-wrap items-center gap-1", pending ? "opacity-60" : ""].join(
-          " "
-        )}
+        className="inline-flex flex-wrap items-center gap-1"
         role="group"
         aria-label="Lead status"
       >
         {TRIAGE_STEPS.map((step) => {
           const active = activeStep === step.id;
+          const pending = pendingStep === step.id;
           return (
             <button
               key={step.id}
               type="button"
               disabled={pending}
+              aria-busy={pending || undefined}
+              data-row-pending={pending ? "1" : "0"}
               onClick={() => select(step.id)}
               aria-pressed={active}
               className={[
-                "rounded-full border font-medium",
+                "inline-flex items-center gap-1 rounded-full border font-medium",
                 deskShiftClass,
                 pad,
                 active ? STYLES[step.id].active : STYLES[step.id].idle,
               ].join(" ")}
             >
+              {pending ? <span aria-hidden="true" className={pendingDotClass} /> : null}
               {step.label}
             </button>
           );

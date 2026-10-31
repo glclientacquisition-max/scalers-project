@@ -220,6 +220,17 @@ export function sheetErrors(d: KbDraft): string[] {
   return out;
 }
 
+/** Add many finish: one line of counts. "4 items · 4 details". */
+export function addManyRewardLine(r: { adds: number; updates: number; removed: number; details: number }): string {
+  const bits = [
+    r.adds ? `${r.adds} ${r.adds === 1 ? "item" : "items"}` : "",
+    r.updates ? `${r.updates} updated` : "",
+    r.removed ? `${r.removed} removed` : "",
+    r.details ? `${r.details} ${r.details === 1 ? "detail" : "details"}` : "",
+  ].filter(Boolean);
+  return bits.join(" · ");
+}
+
 /** Saved message names what callers hear now, and never says "on calls" when it is not. */
 export function savedLine(d: KbDraft, r: { unchanged?: boolean; restamped?: boolean } = {}): string {
   if (r.unchanged) return "Nothing changed.";

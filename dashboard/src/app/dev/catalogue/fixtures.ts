@@ -40,7 +40,7 @@ export const homeItems: KbItem[] = [
   base({ id: "svc_move", name_en: "Move out clean", category_id: "home-cleaning", price_mode: "site_visit", needs_visit: true, sort: 2 }),
   base({ id: "svc_kitchen", name_en: "Kitchen deep clean", category_id: "home-cleaning", price_mode: "from", price_amount: 4000, sort: 3 }),
   base({ id: "svc_sofa", name_en: "Sofa cleaning", category_id: "upholstery", unit: "seat", price_mode: "per_unit", price_amount: 800, aliases: ["couch cleaning"], sort: 4, name_sw_state: "suggested", name_sw_suggested: "Usafi wa sofa" }),
-  base({ id: "svc_carpet", name_en: "Carpet cleaning", category_id: "upholstery", price_mode: "quote", sort: 5 }),
+  base({ id: "svc_carpet", name_en: "Carpet cleaning", category_id: "upholstery", price_mode: "quote", sort: 5, name_sw_state: "suggested", name_sw_suggested: "Usafi wa zulia" }),
   base({ id: "svc_mattress", name_en: "Mattress cleaning", category_id: "upholstery", price_mode: "fixed", price_amount: 2500, sort: 6 }),
   base({ id: "svc_office", name_en: "Office cleaning", category_id: "offices", sort: 7 }),
   base({ id: "svc_window", name_en: "Window cleaning", category_id: "home-cleaning", sort: 8 }),

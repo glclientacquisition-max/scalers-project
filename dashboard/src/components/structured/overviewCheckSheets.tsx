@@ -108,6 +108,7 @@ function OverviewPricesSheet({
   );
 
   function submit() {
+    if (unchanged && items.every((row) => row.pricing.confirmed)) return;
     startPrices(async () => {
       const payload = draft.map((row) => ({
         kind: row.kind,
@@ -167,6 +168,7 @@ function OverviewPaymentsSheet({
   const unchanged = paymentsUnchanged(payments, initial);
 
   function submit() {
+    if (unchanged && initial.confirmed) return;
     startPay(async () => {
       const res = await save(payments);
       notify(res.ok ? res.message : res.error);
