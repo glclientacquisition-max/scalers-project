@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 
 const { createCallLimits, maxCallMs, limitLine } = require('../src/speech/callLimits');
 const { createCallMeter, dailyMeterTotals, demoMeterTotals, resetDailyMeter } = require('../src/speech/callMeter');
-const { createDemoGuard, hashValue } = require('../src/demo/guards');
+const { createDemoGuard, visitorHash } = require('../src/demo/guards');
 const { GOODBYE, CAP, KILL, createDemoSession } = require('../src/demo/session');
 const {
   createDemoMeter,
@@ -23,7 +23,7 @@ const { spendPersistOn, dailyCapUsd, monthlyCapUsd } = require('../src/demo/flag
 
 const SALT = 'test-ip-salt';
 const IP = '203.0.113.10';
-const IP_HASH = '6e38ea0c936a2177adf40771c48c23cb7cd6299d8c46833cd5934ed407e0036c';
+const IP_HASH = visitorHash(SALT, 'ip', IP);
 const DEVICE = 'device-1234';
 const SID_A = 'demo_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
 const SID_B = 'demo_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
@@ -279,7 +279,7 @@ describe('demo meter', () => {
     const logged = JSON.parse(lines.at(-1).slice('demo_token_reject '.length));
     assert.equal(logged.reason, 'cap');
     assert.equal(logged.ip_hash, IP_HASH);
-    assert.equal(logged.device_hash, hashValue(SALT, DEVICE));
+    assert.equal(logged.device_hash, visitorHash(SALT, 'device', DEVICE));
     assert.equal(logged.device_id, undefined);
     const text = lines.join('\n');
     assert.equal(text.includes(IP), false);
@@ -439,7 +439,7 @@ describe('demo meter', () => {
     const endLog = lines.find((line) => line.startsWith('demo_session_end '));
     const logged = JSON.parse(endLog.slice('demo_session_end '.length));
     assert.equal(logged.reason, 'cap');
-    assert.equal(logged.device_hash, hashValue(SALT, DEVICE));
+    assert.equal(logged.device_hash, visitorHash(SALT, 'device', DEVICE));
     assert.equal(logged.device_id, undefined);
     assert.equal(endLog.includes(DEVICE), false);
     assert.equal(endLog.includes(IP), false);

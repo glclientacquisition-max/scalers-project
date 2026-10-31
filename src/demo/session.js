@@ -11,7 +11,7 @@ const { createSttSilenceGate, frameRms } = require('../speech/sttSilenceGate');
 const { createCallLimits } = require('../speech/callLimits');
 const { createCallMeter } = require('../speech/callMeter');
 const { MAX_SEC, demoRecordOn } = require('./flags');
-const { hashValue } = require('./guards');
+const { visitorHash } = require('./guards');
 const { createDemoCodec } = require('./codec');
 const { fixtureProfile, acceptStoredProfile, openerFor } = require('./profiles');
 const { createDemoMeter, getDemoLedger } = require('./meter');
@@ -56,7 +56,7 @@ function createDemoSession(opts) {
   const usage = createDemoMeter();
   const byteMeter = createCallMeter({ callSid: sessionId });
   const salt = String(env.DEMO_IP_SALT || '');
-  const deviceHash = salt && claims.device_id ? hashValue(salt, claims.device_id) : null;
+  const deviceHash = salt && claims.device_id ? visitorHash(salt, 'device', claims.device_id) : null;
 
   let lang = lang0;
   let profile = fixtureProfile(claims.tenant);

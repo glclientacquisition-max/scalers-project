@@ -18,7 +18,6 @@ const ARIS_DID_DIGITS = '709221536';
 const TOKEN_TTL_SEC = 60;
 const MAX_SEC = 180;
 const DEFAULT_SESSIONS_PER_VISITOR = 1;
-const DEFAULT_VISITOR_WINDOW_HOURS = 24;
 const DEFAULT_MAX_CONCURRENT = 5;
 
 function processDemoEnv() {
@@ -27,7 +26,8 @@ function processDemoEnv() {
     DEMO_ALLOWED_ORIGINS: process.env.DEMO_ALLOWED_ORIGINS,
     DEMO_MAX_CONCURRENT: process.env.DEMO_MAX_CONCURRENT,
     DEMO_SESSIONS_PER_VISITOR: process.env.DEMO_SESSIONS_PER_VISITOR,
-    DEMO_VISITOR_WINDOW_HOURS: process.env.DEMO_VISITOR_WINDOW_HOURS,
+    DEMO_VISITOR_PERSIST: process.env.DEMO_VISITOR_PERSIST,
+    VOICE_INTERNAL_SECRET: process.env.VOICE_INTERNAL_SECRET,
     DEMO_TOKEN_SECRET: process.env.DEMO_TOKEN_SECRET,
     DEMO_IP_SALT: process.env.DEMO_IP_SALT,
     TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
@@ -43,6 +43,10 @@ function processDemoEnv() {
 
 function spendPersistOn(env = process.env) {
   return env.DEMO_SPEND_PERSIST === 'on';
+}
+
+function visitorPersistOn(env = process.env) {
+  return env.DEMO_VISITOR_PERSIST === 'on';
 }
 
 function moneyCap(env, name, dflt) {
@@ -106,10 +110,6 @@ function sessionsPerVisitor(env = process.env) {
   return boundedInt(env.DEMO_SESSIONS_PER_VISITOR, DEFAULT_SESSIONS_PER_VISITOR, 100);
 }
 
-function visitorWindowHours(env = process.env) {
-  return boundedInt(env.DEMO_VISITOR_WINDOW_HOURS, DEFAULT_VISITOR_WINDOW_HOURS, 24 * 366);
-}
-
 function mentionsAris(value) {
   const digits = String(value ?? '').replace(/\D/g, '');
   return digits.includes(ARIS_DID_DIGITS);
@@ -122,19 +122,18 @@ module.exports = {
   TOKEN_TTL_SEC,
   MAX_SEC,
   DEFAULT_SESSIONS_PER_VISITOR,
-  DEFAULT_VISITOR_WINDOW_HOURS,
   DEFAULT_MAX_CONCURRENT,
   processDemoEnv,
   demoEnabled,
   demoOpusOn,
   demoRecordOn,
   spendPersistOn,
+  visitorPersistOn,
   dailyCapUsd,
   monthlyCapUsd,
   allowedOrigins,
   originAllowed,
   maxConcurrent,
   sessionsPerVisitor,
-  visitorWindowHours,
   mentionsAris,
 };

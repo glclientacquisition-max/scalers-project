@@ -9,18 +9,21 @@ const {
   demoEnabled,
   originAllowed,
   maxConcurrent,
-  sessionsPerVisitor,
-  visitorWindowHours,
+  visitorPersistOn,
   mentionsAris,
 } = require('./flags');
 const { createTokenStore, mintDemoToken, verifyDemoToken } = require('./token');
+const {
+  createMemoryVisitorStore,
+  createSupabaseVisitorStore,
+  createVisitorBook,
+} = require('./visitors');
 
-// In-memory visit limits for one Voice instance. A second instance does not
-// share that counter. Per hashed IP and per device id: DEMO_SESSIONS_PER_VISITOR
-// (default 1) inside DEMO_VISITOR_WINDOW_HOURS (default 24). One session at a
-// time per hashed IP. The maps store the hash and the device id, never the
-// raw IP. The spend cap is separate and can reload from demo_spend when
-// DEMO_SPEND_PERSIST is exactly on. There is no dial.
+// Visitor use does not expire. One session at a time per hashed IP. The
+// used marker is a salted hash of the IP and a salted hash of the device id.
+// DEMO_VISITOR_PERSIST=on reloads demo_visitor_use. Otherwise the marker is
+// in memory and a restart clears it. The raw IP is not stored. The spend
+// cap is separate. There is no dial.
 
 const TURNSTILE_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 const BUSY_MESSAGE = 'All demo lines are busy, try again in a minute.';
@@ -30,6 +33,10 @@ const STATUS_MAX = 30;
 
 function hashValue(salt, value) {
   return crypto.createHash('sha256').update(`${salt}|${value}`).digest('hex');
+}
+
+function visitorHash(salt, kind, value) {
+  return hashValue(salt, `${kind}|${value}`);
 }
 
 function header(req, name) {
@@ -69,11 +76,17 @@ function createDemoGuard(opts = {}) {
   const store = opts.store || createTokenStore();
   const spend = opts.spend || null;
   const reservations = new Map();
-  const ipHits = new Map();
-  const deviceHits = new Map();
   const ipActive = new Map();
   const statusHits = new Map();
   let active = 0;
+  const visitors = opts.visitors || createVisitorBook({
+    envOf,
+    now,
+    log,
+    store: visitorPersistOn(envOf())
+      ? (opts.visitorStore || createSupabaseVisitorStore(opts.supabase))
+      : createMemoryVisitorStore(),
+  });
 
   async function overCap() {
     if (!spend || typeof spend.blocked !== 'function') return false;
@@ -99,14 +112,6 @@ function createDemoGuard(opts = {}) {
     for (const [jti, row] of store) {
       if (row.expMs <= at) store.delete(jti);
     }
-    const span = windowMs(envOf());
-    for (const map of [ipHits, deviceHits]) {
-      for (const [key, list] of map) {
-        const kept = freshHits(list, at, span);
-        if (kept.length === 0) map.delete(key);
-        else if (kept.length !== list.length) map.set(key, kept);
-      }
-    }
   }
 
   function releaseReservation(jti) {
@@ -124,45 +129,29 @@ function createDemoGuard(opts = {}) {
     return true;
   }
 
-  function readHits(map, key, at, span) {
-    const kept = freshHits(map.get(key), at, span);
-    if (kept.length === 0) map.delete(key);
-    else map.set(key, kept);
-    return kept;
-  }
-
-  function bumpHit(map, key, at, span) {
-    const kept = readHits(map, key, at, span);
-    kept.push(at);
-    map.set(key, kept);
-  }
-
-  function unbumpHit(map, key) {
-    const list = map.get(key);
-    if (!list || list.length < 1) return;
-    list.pop();
-    if (list.length === 0) map.delete(key);
-  }
-
-  function limitReason(ipHash, deviceId, at, env) {
-    const span = windowMs(env);
-    const limit = sessionsPerVisitor(env);
-    if (readHits(ipHits, ipHash, at, span).length >= limit) return 'used';
-    if (deviceId && readHits(deviceHits, deviceId, at, span).length >= limit) return 'used';
+  async function limitReason(ipHash, deviceHash, env) {
+    if (await visitors.blocked(ipHash, deviceHash)) return 'used';
     if ((ipActive.get(ipHash) || 0) >= 1) return 'rate';
     if (active >= maxConcurrent(env)) return 'busy';
     return null;
   }
 
-  function commitReservation({ ipHash, deviceId, at, env }) {
-    const reason = limitReason(ipHash, deviceId, at, env);
+  async function commitReservation({ ipHash, deviceHash, at, env }) {
+    const reason = await limitReason(ipHash, deviceHash, env);
     if (reason) return { ok: false, reason };
-    const span = windowMs(env);
-    bumpHit(ipHits, ipHash, at, span);
-    bumpHit(deviceHits, deviceId, at, span);
+    const claimed = await visitors.claim(ipHash, deviceHash, at);
+    if (!claimed.ok) return claimed;
     ipActive.set(ipHash, (ipActive.get(ipHash) || 0) + 1);
     active += 1;
-    return { ok: true };
+    return { ok: true, receipt: claimed.receipt };
+  }
+
+  async function rollbackReservation(ipHash, receipt) {
+    active = Math.max(0, active - 1);
+    const left = (ipActive.get(ipHash) || 1) - 1;
+    if (left <= 0) ipActive.delete(ipHash);
+    else ipActive.set(ipHash, left);
+    try { await visitors.undo(receipt); } catch { /* the marker stays if undo fails */ }
   }
 
   function rememberReservation(jti, fields, expSec) {
@@ -269,12 +258,17 @@ function createDemoGuard(opts = {}) {
     if (!/^[A-Za-z0-9_-]{8,128}$/.test(deviceId)) return invalid(origin, env);
     if (!noticeV || noticeV.length > 32) return invalid(origin, env);
     if (!consentPresent(consent)) return invalid(origin, env);
+    const salt = String(env.DEMO_IP_SALT);
+    const ip = clientIp(req);
+    const ipHash = visitorHash(salt, 'ip', ip);
+    const deviceHash = visitorHash(salt, 'device', deviceId);
     if (!turnstile || turnstile.length > 2048) {
       writeLog('demo_token_reject', {
         reason: 'turnstile',
         origin: clip(origin),
         tenant,
-        device_hash: hashValue(String(env.DEMO_IP_SALT || ''), deviceId),
+        device_hash: deviceHash,
+        ip_hash: ipHash,
         turnstile: 'missing',
       });
       return {
@@ -286,15 +280,12 @@ function createDemoGuard(opts = {}) {
 
     const at = now();
     sweep(at);
-    const ip = clientIp(req);
-    const salt = String(env.DEMO_IP_SALT);
-    const ipHash = hashValue(salt, ip);
     if (await overCap()) {
       writeLog('demo_token_reject', {
         reason: 'cap',
         origin: clip(origin),
         tenant,
-        device_hash: hashValue(salt, deviceId),
+        device_hash: deviceHash,
         ip_hash: ipHash,
       });
       return {
@@ -303,13 +294,13 @@ function createDemoGuard(opts = {}) {
         body: { reason: 'cap' },
       };
     }
-    const blocked = limitReason(ipHash, deviceId, at, env);
+    const blocked = await limitReason(ipHash, deviceHash, env);
     if (blocked) {
       writeLog('demo_token_reject', {
         reason: blocked,
         origin: clip(origin),
         tenant,
-        device_hash: hashValue(String(env.DEMO_IP_SALT || ''), deviceId),
+        device_hash: deviceHash,
         ip_hash: ipHash,
       });
       if (blocked === 'busy') {
@@ -332,7 +323,7 @@ function createDemoGuard(opts = {}) {
         reason: 'turnstile',
         origin: clip(origin),
         tenant,
-        device_hash: hashValue(String(env.DEMO_IP_SALT || ''), deviceId),
+        device_hash: deviceHash,
         ip_hash: ipHash,
         turnstile: 'fail',
       });
@@ -348,7 +339,7 @@ function createDemoGuard(opts = {}) {
         reason: 'cap',
         origin: clip(origin),
         tenant,
-        device_hash: hashValue(salt, deviceId),
+        device_hash: deviceHash,
         ip_hash: ipHash,
       });
       return {
@@ -360,13 +351,13 @@ function createDemoGuard(opts = {}) {
 
     const again = now();
     sweep(again);
-    const reserved = commitReservation({ ipHash, deviceId, at: again, env });
+    const reserved = await commitReservation({ ipHash, deviceHash, at: again, env });
     if (!reserved.ok) {
       writeLog('demo_token_reject', {
         reason: reserved.reason,
         origin: clip(origin),
         tenant,
-        device_hash: hashValue(String(env.DEMO_IP_SALT || ''), deviceId),
+        device_hash: deviceHash,
         ip_hash: ipHash,
       });
       if (reserved.reason === 'busy') {
@@ -393,12 +384,7 @@ function createDemoGuard(opts = {}) {
       store,
     });
     if (!minted.ok) {
-      active = Math.max(0, active - 1);
-      const left = (ipActive.get(ipHash) || 1) - 1;
-      if (left <= 0) ipActive.delete(ipHash);
-      else ipActive.set(ipHash, left);
-      unbumpHit(ipHits, ipHash);
-      unbumpHit(deviceHits, deviceId);
+      await rollbackReservation(ipHash, reserved.receipt);
       writeLog('demo_token_reject', { reason: minted.reason, origin: clip(origin), tenant });
       const status = minted.reason === 'tenant' ? 403 : 503;
       return {
@@ -409,12 +395,12 @@ function createDemoGuard(opts = {}) {
           : { reason: minted.reason },
       };
     }
-    rememberReservation(minted.jti, { ipHash, deviceId }, minted.exp);
+    rememberReservation(minted.jti, { ipHash, deviceHash }, minted.exp);
     writeLog('demo_token_ok', {
       origin: clip(origin),
       tenant,
       lang,
-      device_hash: hashValue(salt, deviceId),
+      device_hash: deviceHash,
       ip_hash: ipHash,
       turnstile: 'pass',
       consent_ts: consent,
@@ -495,7 +481,7 @@ function createDemoGuard(opts = {}) {
     return true;
   }
 
-  function statusView(at, ipHash) {
+  async function statusView(ipHash, deviceHash) {
     const env = envOf();
     const enabled = demoEnabled(env);
     let cap = false;
@@ -505,7 +491,12 @@ function createDemoGuard(opts = {}) {
       cap = false;
     }
     const busy = active >= maxConcurrent(env);
-    const used = Boolean(ipHash) && readHits(ipHits, ipHash, at, windowMs(env)).length >= sessionsPerVisitor(env);
+    let used = false;
+    try {
+      used = await visitors.blocked(ipHash, deviceHash);
+    } catch {
+      used = false;
+    }
     let reason = null;
     if (!enabled) reason = 'disabled';
     else if (cap) reason = 'cap';
@@ -518,7 +509,10 @@ function createDemoGuard(opts = {}) {
     const env = envOf();
     const origin = header(req, 'origin').trim();
     const at = now();
-    const ipHash = hashValue(String(env.DEMO_IP_SALT || 'demo-status'), clientIp(req));
+    const salt = String(env.DEMO_IP_SALT || 'demo-status');
+    const ipHash = visitorHash(salt, 'ip', clientIp(req));
+    const deviceId = statusDeviceId(req);
+    const deviceHash = deviceId ? visitorHash(salt, 'device', deviceId) : '';
     if (!allowStatus(ipHash, at)) {
       writeLog('demo_status_reject', { reason: 'rate', ip_hash: ipHash });
       return {
@@ -541,24 +535,62 @@ function createDemoGuard(opts = {}) {
     return {
       status: 200,
       headers: corsHeaders(origin, env),
-      body: statusView(at, ipHash),
+      body: await statusView(ipHash, deviceHash),
     };
   }
 
-  return { decide, respond, verify, release, status, store };
-}
-
-function windowMs(env) {
-  return visitorWindowHours(env) * 60 * 60 * 1000;
-}
-
-function freshHits(list, at, span) {
-  if (!list || list.length === 0) return [];
-  const kept = [];
-  for (const ts of list) {
-    if (at - ts < span) kept.push(ts);
+  async function grant(req) {
+    const env = envOf();
+    const secret = String(env.VOICE_INTERNAL_SECRET || '').trim();
+    const presented = header(req, 'x-voice-internal-secret').trim();
+    if (!secret || presented !== secret) {
+      writeLog('demo_grant_reject', { reason: 'unauthorized' });
+      return {
+        status: 401,
+        headers: { 'cache-control': 'no-store' },
+        body: { error: 'Unauthorized' },
+      };
+    }
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const visitorHashValue = String(body.visitor_hash || '').trim().toLowerCase();
+    const kind = String(body.kind || '').trim();
+    const granted = await visitors.grant({
+      visitorHash: visitorHashValue,
+      kind,
+      by: body.by,
+      at: now(),
+    });
+    if (!granted.ok) {
+      writeLog('demo_grant_reject', { reason: 'invalid' });
+      return {
+        status: 400,
+        headers: { 'cache-control': 'no-store' },
+        body: { reason: 'invalid' },
+      };
+    }
+    writeLog('demo_grant', {
+      visitor_hash: visitorHashValue,
+      kind,
+      grants_remaining: granted.grants_remaining,
+    });
+    return {
+      status: 200,
+      headers: { 'cache-control': 'no-store' },
+      body: { ok: true, grants_remaining: granted.grants_remaining },
+    };
   }
-  return kept;
+
+  return { decide, respond, verify, release, status, grant, store };
+}
+
+const DEVICE_ID_RE = /^[A-Za-z0-9_-]{8,128}$/;
+
+function statusDeviceId(req) {
+  const query = req.query && req.query.device_id;
+  const raw = query != null ? String(query) : '';
+  const value = raw.trim();
+  if (!DEVICE_ID_RE.test(value)) return '';
+  return value;
 }
 
 function missingConfig(env) {
@@ -608,6 +640,25 @@ function handleDemoTokenRequest(req, res) {
   return getDemoGuard().respond(req, res);
 }
 
+async function handleDemoGrantRequest(req, res) {
+  let out;
+  try {
+    out = await getDemoGuard().grant(req);
+  } catch {
+    out = {
+      status: 401,
+      headers: { 'cache-control': 'no-store' },
+      body: { error: 'Unauthorized' },
+    };
+  }
+  if (res.headersSent) return out;
+  for (const [key, value] of Object.entries(out.headers || {})) res.setHeader(key, value);
+  res.status(out.status);
+  if (out.body == null) res.end();
+  else res.json(out.body);
+  return out;
+}
+
 async function handleDemoStatusRequest(req, res) {
   let out;
   try {
@@ -638,6 +689,8 @@ module.exports = {
   getDemoGuard,
   handleDemoTokenRequest,
   handleDemoStatusRequest,
+  handleDemoGrantRequest,
   hashValue,
+  visitorHash,
   clientIp,
 };
