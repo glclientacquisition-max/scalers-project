@@ -2,6 +2,7 @@ import { RoleGate } from "@/components/DeskRole";
 import { HomeCallSetupCard } from "@/components/HomeCallSetupCard";
 import { HomeGetReadyCallsCard } from "@/components/HomeGetReadyCallsCard";
 import { HomeUsageSection } from "@/components/HomeUsageSection";
+import type { MinutesMeterMode } from "@/lib/minutesMeter";
 import { CallInsights } from "@/components/insights/CallInsights";
 import { HomeInsightsError } from "@/components/home/HomeInsightsError";
 import { OverviewDataChecksCard } from "@/components/structured/OverviewDataChecksCard";
@@ -41,6 +42,16 @@ export async function HomeUsageSlot({ tenant, isBeta }: { tenant: HomeTenant; is
   const pack = billing ? null : await loadOwnerPackageMeter(tenant.id);
   const minutesIncluded = billing ? billing.minutesIncluded : pack?.minutesIncluded ?? 0;
   const packMinutes = minuteMeter(pack?.minutesIncluded ?? 0, pack?.secondsUsed ?? 0);
+  const minutesUsed = billing ? billing.minutesUsed : packMinutes.used;
+  const meterMode: MinutesMeterMode = billing
+    ? billing.mode
+    : isBeta
+      ? "beta"
+      : tenant.billing_enforcement === "hard"
+        ? "capped"
+        : tenant.billing_enforcement === "soft"
+          ? "metered"
+          : "none";
   const minutesLeft = billing ? billing.minutesLeft : packMinutes.left;
   const minutesUnderOne = billing ? billing.minutesUnderOne : packMinutes.underOneMinute;
   const packLabel = billing
@@ -71,6 +82,14 @@ export async function HomeUsageSlot({ tenant, isBeta }: { tenant: HomeTenant; is
       lowNoticeNote={lowNoticeNote}
       showLink={Boolean(lowNotice || (minuteStatus && !isBeta))}
       isBeta={isBeta}
+      meter={{
+        included: minutesIncluded,
+        used: minutesUsed,
+        left: minutesLeft,
+        underOne: minutesUnderOne,
+        mode: meterMode,
+        overLabel: billing?.minutesOverLabel ?? packMinutes.overLabel,
+      }}
     />
   );
 }
