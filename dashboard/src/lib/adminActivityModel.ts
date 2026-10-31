@@ -47,6 +47,7 @@ const ACTIONS: Record<string, string> = {
   tenant_live_payments_set: "Changed live payments",
   set_price_approval_threshold: "Changed price approval",
   waive_overage: "Waived overage",
+  overage_waived: "Overage waived",
   save_voice: "Saved voice",
   set_default_voice: "Set default voice",
   set_voice_active: "Turned voice on or off",

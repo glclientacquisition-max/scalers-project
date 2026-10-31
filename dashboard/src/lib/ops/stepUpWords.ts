@@ -23,6 +23,7 @@ export const STEP_UP_WHAT: Record<string, string> = {
   "package-versions:move_subscribers": "move subscribers",
   "package-versions:set_billing_mode": "change the billing mode",
   "billing:grant_minutes": "grant minutes",
+  "billing:waive_period_overage": "waive this period's overage",
   "billing:assign_package": "assign a package",
   "billing:resolve_checkout_review": "resolve this checkout review",
   "billing:set_billing_mode": "change the billing mode",

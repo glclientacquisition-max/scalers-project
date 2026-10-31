@@ -9,7 +9,7 @@ last_reviewed: generated
 
 Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; the live DB may differ, see `scripts/verify-staging-schema.js`).
 
-## Tables (64)
+## Tables (65)
 
 | Table | Columns | Defined in |
 | --- | --- | --- |
@@ -29,6 +29,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_lifecycle_settings` | `bachs_payments_mode`, `billing_notices_send`, `desk_plan_change_enabled`, `hold_winback_enabled`, `id`, `live_payments_master`, `new_signup_trial_enabled`, `number_hold_days`, `package_editor_enabled`, `price_change_approval_threshold_kes`, `reactivation_fee_kes`, `shadow_invoices`, `updated_at`, `voicemail_hold_days` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/billing_payment_runtime_flags.sql`<br>`docs/supabase/number_hold_winback.sql`<br>`docs/supabase/package_version_editor.sql` |
 | `billing_live_tenants` | `enabled`, `reason`, `set_at`, `set_by`, `tenant_id` | `docs/supabase/invoice_pay_live_allowlist.sql` |
 | `billing_notices` | `audience`, `billed_to`, `body`, `channel`, `claimed_at`, `created_at`, `delivery_status`, `fallback`, `id`, `idempotency_key`, `kind`, `last_error`, `notify_send_id`, `read_at`, `recipient`, `tenant_id`, `title` | `docs/supabase/billing_data_layer.sql` |
+| `billing_overage_waivers` | `actor`, `amount_kes`, `created_at`, `id`, `idempotency_key`, `invoice_id`, `on_demand_kes`, `period_end`, `period_start`, `reason`, `tenant_id` | `supabase/migrations/20261031060000_billing_overage_waivers.sql` |
 | `billing_owner_action_keys` | `action`, `created_at`, `idempotency_key`, `result`, `tenant_id` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_package_version_approvals` | `approver`, `created_at`, `id`, `package_version_id`, `price_snapshot`, `reason`, `requested_by`, `status` | `docs/supabase/package_version_editor.sql` |
 | `billing_package_version_features` | `enabled`, `feature_key`, `package_version_id` | `docs/supabase/billing_data_layer.sql` |
@@ -89,7 +90,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `tenant_billing_state` | `docs/supabase/tenant_billing_state.sql` |
 | `tenant_credit_balance` | `docs/supabase/billing_data_layer.sql` |
 
-## Functions (250)
+## Functions (253)
 
 | Function | Defined in |
 | --- | --- |
@@ -199,6 +200,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_notice_when` | `docs/supabase/billing_data_layer.sql` |
 | `billing_notices_guard` | `docs/supabase/billing_data_layer.sql` |
 | `billing_on_demand_open` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
+| `billing_overage_waivers_append_only` | `supabase/migrations/20261031060000_billing_overage_waivers.sql` |
 | `billing_package_version_approvals_freeze` | `docs/supabase/package_version_editor.sql` |
 | `billing_package_version_features_freeze` | `docs/supabase/package_version_editor.sql` |
 | `billing_package_versions_freeze` | `docs/supabase/billing_data_layer.sql`<br>`docs/supabase/package_version_editor.sql` |
@@ -206,6 +208,7 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `billing_payment_reconciliation` | `docs/supabase/invoice_pay.sql`<br>`docs/supabase/invoice_pay_session.sql` |
 | `billing_period_days` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_period_on_demand_kes` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
+| `billing_period_overage_due_kes` | `supabase/migrations/20261031060000_billing_overage_waivers.sql` |
 | `billing_prorate_kes` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_proration_quote` | `docs/supabase/owner_billing_actions.sql`<br>`docs/supabase/prod/owner_billing_actions.sql` |
 | `billing_quarantine_placeholder_days` | `docs/supabase/billing_data_layer.sql` |
@@ -341,5 +344,6 @@ Source: `supabase/migrations/*.sql` and `docs/supabase/**/*.sql` (static parse; 
 | `unassign_tenant_package` | `docs/supabase/package_state_rules.sql` |
 | `upsert_tenant_field_meta` | `docs/supabase/tenant_field_provenance.sql` |
 | `voice_platform_audio_touch` | `docs/supabase/voice_platform_audio.sql` |
+| `waive_period_overage` | `supabase/migrations/20261031060000_billing_overage_waivers.sql` |
 | `waive_tenant_overage` | `docs/supabase/admin_billing_ops.sql` |
 | `wallet_ledger_deny_mutation` | `docs/supabase/wallet_security_beta.sql` |

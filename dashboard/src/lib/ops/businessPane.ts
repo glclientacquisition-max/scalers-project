@@ -82,6 +82,7 @@ const ACTIONS: Record<string, string> = {
   assign_package: "Package changed",
   unassign_package: "Package removed",
   grant_minutes: "Minutes granted",
+  overage_waived: "Overage waived",
   set_billing_mode: "Charging changed",
   archive: "Archived",
   unarchive: "Unarchived",

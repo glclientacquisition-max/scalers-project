@@ -212,6 +212,8 @@ Staging Voice runs `aa872ade` (= `main` @ `8ee9b161` + #738, which has since mer
 
 ## 4. Open PRs
 
+**Draft PR (31 Oct 2026, EAT), Waive overage on the invoice side, no wallet (Alvin chose option c at 03:36):** branch `billing/waive-overage-button` (#1073, reworked). `supabase/migrations/20261031060000_billing_overage_waivers.sql` adds the append-only table `billing_overage_waivers`, `waive_period_overage(tenant, reason, actor, key)` (service_role only, idempotent by key, writes one `overage_waived` audit row) and `billing_period_overage_due_kes(tenant)`, which the invoice build subtracts. It never touches the wallet, credits or invoice rows. In the Money pane, the **Waive overage** confirm sheet needs a reason, runs under risky step-up, and History shows the "KSh X waived" line. The #577 no-wallet guard is unchanged and passes. Staging test (rolled back, Test Archive Co): waived 250.50, a replay returns the same waiver, and the wallet, credits and invoice are unchanged. Not applied. Prod needs Alvin's GO.
+
 **28 Oct 2026 clean-up:** there were 102 open PRs. The stale, superseded ones were closed with a pointer to the handover PR, and their branches were kept. Still open:
 - the parked retire-old-brain drafts #1009 and #1010
 - #975 (Brain to confirm before closing)

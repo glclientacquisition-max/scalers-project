@@ -25,7 +25,7 @@ import { AdminBillingShopInvoices } from "@/components/AdminBillingShopInvoices"
 import { CheckoutReviewResolve } from "@/components/CheckoutReviewResolve";
 import { ReasonedSwitch } from "@/components/ReasonedSwitch";
 
-type MoneyTask = "package" | "plan" | "grant" | "charges" | "history" | "remove";
+type MoneyTask = "package" | "plan" | "grant" | "waive" | "charges" | "history" | "remove";
 
 const PLAN_OPTIONS: { value: BillingMode; label: string }[] = [
   { value: "off", label: "Beta · Meter only" },
@@ -75,6 +75,9 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
   const [grantMinutes, setGrantMinutes] = useState("60");
   const [grantNote, setGrantNote] = useState("");
   const [grantKey, setGrantKey] = useState(() => crypto.randomUUID());
+
+  const [waiveNote, setWaiveNote] = useState("");
+  const [waiveKey, setWaiveKey] = useState(() => crypto.randomUUID());
 
   const [mode, setMode] = useState<BillingMode>(row.billing_enforcement);
   const [modeNote, setModeNote] = useState(
@@ -391,6 +394,7 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
       <p className="px-4 pb-1 pt-3 text-caption font-medium uppercase tracking-wide text-ink-3">Ledger</p>
       <ListRow title="Charges" preview="Ledger lines this period" onOpen={() => openTask("charges")} />
       <ListRow title="Grant minutes" preview="Adds to included this period" onOpen={() => openTask("grant")} />
+      <ListRow title="Waive overage" preview="This period's on-demand, off the invoice" onOpen={() => openTask("waive")} />
       <ListRow
         title="History"
         preview={historyLoaded ? `${history.length} recent lines` : "Activity and charges"}
@@ -562,6 +566,69 @@ export function AdminShopMoneyPanel({ detail }: { detail: AdminBillingClientDeta
           </Field>
         </div>
       </Sheet>
+
+      <ConfirmSheet
+        open={task === "waive"}
+        title="Waive this period's overage?"
+        theme="admin"
+        danger
+        pending={busy}
+        confirmLabel="Waive overage"
+        confirmDisabled={waiveNote.trim().length < 3}
+        onClose={() => setTask(null)}
+        onConfirm={() => {
+          void (async () => {
+            setBusy(true);
+            setError(null);
+            setStatus(null);
+            const res = await fetch("/api/admin/billing", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "waive_period_overage",
+                business_id: row.id,
+                note: waiveNote.trim(),
+                idempotency_key: waiveKey,
+                confirm: true,
+              }),
+            });
+            const json = await res.json().catch(() => ({}));
+            setBusy(false);
+            if (!res.ok) {
+              setError(requestErrorText(json));
+              return;
+            }
+            const waived = Number(json.waived_kes || 0);
+            setStatus(
+              waived > 0
+                ? `Waived KSh ${waived.toFixed(2)} of on-demand this period. It shows in History.`
+                : "No on-demand owed this period. Nothing changed.",
+            );
+            setWaiveKey(crypto.randomUUID());
+            setWaiveNote("");
+            setTask(null);
+            startTransition(() => router.refresh());
+            const histRes = await fetch(`/api/admin/billing?history_for=${encodeURIComponent(row.id)}`);
+            const histJson = await histRes.json().catch(() => ({}));
+            if (histRes.ok) setHistory(histJson.history || []);
+          })();
+        }}
+      >
+        <SheetNote error={error} />
+        <p className="pb-3 text-ops-body text-ink-2">
+          Takes the on-demand charges {row.business_name} owes this period off the invoice. Logged with your name and the reason.
+        </p>
+        <Field id="shop-waive-note" label="Reason" required>
+          {(props) => (
+            <Input
+              {...props}
+              value={waiveNote}
+              onChange={(e) => setWaiveNote(e.target.value)}
+              placeholder="Calls dropped on our side"
+            />
+          )}
+        </Field>
+      </ConfirmSheet>
 
       <Sheet
         open={task === "charges"}

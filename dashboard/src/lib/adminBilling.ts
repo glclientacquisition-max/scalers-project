@@ -441,6 +441,31 @@ export async function grantTenantPackageMinutes(opts: {
   };
 }
 
+/**
+ * Waives the current period's on-demand overage on the invoice side
+ * (waive_period_overage). It writes an append-only waiver row that the invoice
+ * build subtracts, plus one ops_audit_log row (overage_waived). It never
+ * touches the wallet or an invoice row. The key makes a retry return the same
+ * waiver.
+ */
+export async function waivePeriodOverage(opts: {
+  businessId: string;
+  reason: string;
+  actor: string;
+  idempotencyKey: string;
+}): Promise<{ waivedKes: number; replay: boolean }> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.rpc("waive_period_overage", {
+    p_tenant_id: opts.businessId,
+    p_reason: opts.reason,
+    p_actor: opts.actor,
+    p_idempotency_key: opts.idempotencyKey,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return { waivedKes: Number(row?.waived_kes ?? 0), replay: Boolean(row?.replay) };
+}
+
 export async function listOpsAuditLog(tenantId: string, limit = 40): Promise<OpsAuditRow[]> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
