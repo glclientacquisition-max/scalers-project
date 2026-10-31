@@ -41,6 +41,7 @@ import {
   SPOKEN_NAME_MAX,
   autoGreetingLanguage,
   buildGreetingSentence,
+  playedGreetingFromTenant,
   greetingInviteLine,
   greetingLanguageForStorage,
   greetingMode,
@@ -349,6 +350,14 @@ function AnswerCard({
     greetingText,
     language,
   });
+  const played = playedGreetingFromTenant({
+    business_name: businessName,
+    spoken_name: spokenName,
+    agent_name: agentName,
+    greeting_invite: greetingInvite,
+    greeting_text: greetingText,
+    greeting_language: greetingLanguageForStorage(languagePick),
+  });
 
   const save = useCardSave(
     formId,
@@ -512,8 +521,8 @@ function AnswerCard({
           className="space-y-1 rounded-xl bg-surface-2 px-3 py-2.5 [overflow-wrap:anywhere]"
         >
           <p data-greeting-sentence="" className="text-body text-ink">
-            {sentence.text ? (
-              sentence.text
+            {played ? (
+              played
             ) : (
               <span className="text-ink-2">Add your business name and callers hear it here.</span>
             )}
