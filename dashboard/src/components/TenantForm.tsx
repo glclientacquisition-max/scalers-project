@@ -2115,8 +2115,7 @@ function TenantFormInner({
       </section>
 
             <section className={panel === "tools" ? "space-y-6" : "hidden"}>
-        <SettingsGroup title="Voice">
-          {/* The voice is picked on Identity › How you answer, next to the greeting it says. */}
+        <SettingsGroup title="On a call">
           <Link
             href={businessSettingsHref("train", "identity")}
             data-voice-moved=""
@@ -2124,12 +2123,15 @@ function TenantFormInner({
           >
             <span className="shrink-0 text-body font-medium text-ink">Voice</span>
             <span className="min-w-0 flex-1 truncate text-end text-body text-ink-2">
-              {displaySonioxVoiceLabel(sonioxVoiceLabel, sonioxVoiceId, voiceOptions)}
+              {displaySonioxVoiceLabel(
+                sonioxVoiceLabel.trim().toLowerCase() === agentName.trim().toLowerCase() ? "" : sonioxVoiceLabel,
+                sonioxVoiceId,
+                voiceOptions,
+              )}
             </span>
             <span className="shrink-0 text-body font-medium text-accent">Change in Identity</span>
           </Link>
           <div className="space-y-1.5 px-4 py-3">
-            <p className="text-body font-medium text-ink">On a call</p>
             <SettingsSegmented
               label="On a call"
               value={afterHoursMode}
@@ -2139,20 +2141,19 @@ function TenantFormInner({
               }))}
               onChange={setAfterHoursMode}
             />
+            <p className="text-meta text-ink-2">
+              {afterHoursMode === "message"
+                ? "Takes a message and ends."
+                : "Answers questions, books and takes messages."}
+            </p>
           </div>
         </SettingsGroup>
         <SettingsGroup title="Tools">
           {AGENT_TOOL_OPTIONS.map((opt) => {
-            const on = agentTools[opt.id];
             return (
-              <SettingsRow
-                key={opt.id}
-                label={opt.label}
-                hint={on ? opt.onLabel : opt.offLabel}
-                control="switch"
-              >
+              <SettingsRow key={opt.id} label={opt.label} control="switch">
                 <ToolSwitch
-                  checked={on}
+                  checked={agentTools[opt.id]}
                   label={opt.label}
                   onChange={(next) =>
                     setAgentTools((prev) => ({
@@ -2164,6 +2165,15 @@ function TenantFormInner({
               </SettingsRow>
             );
           })}
+          <p className="px-4 pb-2 text-meta text-ink-2">
+            Texts your team when a caller asks for a person.{" "}
+            <Link href={businessSettingsHref("alerts")} className="font-medium text-accent">
+              How we notify
+            </Link>
+          </p>
+          <p className="px-4 pb-3 text-meta text-ink-2">
+            {agentTools.end_call ? "Ends the call after goodbye." : "Stays on the line after goodbye."}
+          </p>
         </SettingsGroup>
       </section>
 
