@@ -13,11 +13,14 @@ export type StatusRead =
   | { kind: "quiet" }
   | { kind: "error" };
 
-/** `used` is one demo per visitor. Then disabled, cap, busy. */
+/**
+ * Status reason order: disabled, then cap, then used, then busy.
+ * A later flag does not override an earlier one.
+ */
 export function blockFromStatus(body: DemoStatusBody): "disabled" | "busy" | "cap" | "request" | null {
-  if (body.reason === "used") return "request";
   if (body.reason === "disabled" || body.enabled === false) return "disabled";
   if (body.reason === "cap" || body.cap === true) return "cap";
+  if (body.reason === "used") return "request";
   if (body.reason === "busy" || body.busy === true) return "busy";
   return null;
 }

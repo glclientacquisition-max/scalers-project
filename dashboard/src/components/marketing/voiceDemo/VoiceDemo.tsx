@@ -388,6 +388,15 @@ export function VoiceDemo({
         </div>
       ) : null}
 
+      {state === "rate" ? (
+        <div className="mt-4 flex flex-col gap-4" role="status">
+          <p className="font-demo text-body">{copy.rate}</p>
+          <Button type="button" variant="primary" block onClick={() => void start()}>
+            {copy.retry}
+          </Button>
+        </div>
+      ) : null}
+
       {state === "limit" ? (
         <p className="font-demo mt-4 text-body" role="status">
           {copy.limit}

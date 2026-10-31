@@ -9,6 +9,7 @@ const STATES = [
   ["ended", "Thanks. The demo has ended."],
   ["disabled", "Demo paused."],
   ["busy", "All demo lines are busy, try again in a minute."],
+  ["rate", "A demo is already open. Try again in a minute."],
   ["cap", "The demo is resting for today. Try again tomorrow."],
   ["request", "TODO request access"],
   ["requested", "TODO thanks"],

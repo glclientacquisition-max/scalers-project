@@ -28,6 +28,7 @@ type Copy = {
   back: string;
   paused: string;
   busy: string;
+  rate: string;
   limit: string;
   denied: string;
   deniedAgain: string;
@@ -67,6 +68,7 @@ export const COPY: Record<DemoLang, Copy> = {
     back: "Back",
     paused: "Demo paused.",
     busy: "All demo lines are busy, try again in a minute.",
+    rate: "A demo is already open. Try again in a minute.",
     limit: "You've used today's demos.",
     denied: "The microphone is blocked. Allow it for this site, then try again.",
     deniedAgain: "Try again",
@@ -122,6 +124,7 @@ export const COPY: Record<DemoLang, Copy> = {
     back: "Rudi",
     paused: "Onyesho limesimamishwa.",
     busy: "Mistari yote ya onyesho inatumika, jaribu tena baada ya dakika moja.",
+    rate: "Onyesho moja liko wazi. Jaribu tena baada ya dakika moja.",
     limit: "Umetumia onyesho za leo.",
     denied: "Maikrofoni imezuiwa. Iruhusu kwa tovuti hii, kisha ujaribu tena.",
     deniedAgain: "Jaribu tena",

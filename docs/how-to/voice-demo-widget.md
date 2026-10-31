@@ -18,14 +18,16 @@ The voice service owns the endpoint (Voice PR1). This widget only calls it.
 - Origin is checked, then the Turnstile token, then the limits: 3 sessions a day per IP and per device, 1 at a time per IP, and 5 at once.
 - `503 {reason:'busy'}` shows "All demo lines are busy, try again in a minute."
 - `503 {reason:'cap'}` shows "The demo is resting for today. Try again tomorrow."
-- `429 {reason:'limit_daily'|'rate'}` is its own state: "You've used today's demos."
+- `429 {reason:'limit_daily'}` shows "You've used today's demos."
+- `429 {reason:'used'}` replaces Start with the request-access form.
+- `429 {reason:'rate'}` means a second session is already open and the visitor still has one left: "A demo is already open. Try again in a minute."
 - The token itself is HS256, 60 seconds, single use. The widget does not mint it.
 
 The site key is `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. It is public. The secret stays on the voice service.
 
 ## Session
 
-Before Start, the page calls `GET /demo/status`. `disabled` shows "Demo paused.", `busy` shows the busy line, and `cap` shows "The demo is resting for today. Try again tomorrow." `reason: used` (from that status, or `429 {reason:'used'}` on the token) replaces Start with a request-access form. The submit is a local stub until the backend exists. A `429 {reason:'rate'}` on the status poll is ignored. Start stays available when the status does not block.
+Before Start, the page calls `GET /demo/status`. The reason order is disabled, then cap, then used, then busy. `disabled` shows "Demo paused." `cap` shows "The demo is resting for today. Try again tomorrow." `used` (from that status, or `429 {reason:'used'}` on the token) replaces Start with a request-access form. The submit is a local stub until the backend exists. Token `429 {reason:'rate'}` means a session is already open and the visitor still has one left: "A demo is already open. Try again in a minute." A `429 {reason:'rate'}` on the status poll is the poll limit and is ignored.
 
 `createHttpDemoAdapter` posts the token, then opens `ws_url` with `codec=pcm8` on a touch or phone (8 kHz, 320 bytes every 20 ms, about 1 MB a minute) and `codec=pcm16` on a desktop (16 kHz, 640 bytes, about 4 MB a minute). Opus is not used. End sends `{type:'end'}`.
 
@@ -35,4 +37,4 @@ If the WebSocket upgrade fails, the page calls `GET /demo/status` once and uses 
 
 `createMockDemoAdapter` is for local preview and tests. Set `NEXT_PUBLIC_DEMO_ADAPTER=mock` to use it. Do not set that on a public deploy.
 
-Preview every state at `/dev/voice-demo?state=` when `DASHBOARD_OPEN=true`. Add `&end=max_time` for an ended line. States: idle, consent, mic_denied, connecting, live, ended, disabled, busy, limit, error, unsupported.
+Preview every state at `/dev/voice-demo?state=` when `DASHBOARD_OPEN=true`. Add `&end=max_time` for an ended line. States: idle, consent, mic_denied, connecting, live, ended, disabled, busy, rate, cap, request, requested, limit, error, unsupported.

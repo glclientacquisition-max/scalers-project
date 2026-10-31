@@ -9,6 +9,7 @@ export const DEMO_STATES = [
   "ended",
   "disabled",
   "busy",
+  "rate",
   "cap",
   "request",
   "requested",
@@ -45,7 +46,8 @@ export function stateForTokenFailure(status: number, reason: string): DemoState 
   if (status === 503 && reason === "cap") return "cap";
   if (status === 503 && reason === "busy") return "busy";
   if (status === 429 && reason === "used") return "request";
-  if (status === 429 && (reason === "limit_daily" || reason === "rate")) return "limit";
+  if (status === 429 && reason === "rate") return "rate";
+  if (status === 429 && reason === "limit_daily") return "limit";
   return "error";
 }
 

@@ -62,12 +62,17 @@ describe('voice demo widget states', () => {
     assert.equal(stateForTokenFailure(429, 'used'), 'request');
     assert.notEqual(stateForTokenFailure(429, 'used'), 'limit');
     assert.notEqual(stateForTokenFailure(429, 'used'), 'busy');
+    assert.notEqual(stateForTokenFailure(429, 'used'), 'rate');
+    assert.equal(stateForTokenFailure(429, 'rate'), 'rate');
+    assert.notEqual(stateForTokenFailure(429, 'rate'), 'request');
+    assert.notEqual(stateForTokenFailure(429, 'rate'), 'limit');
+    assert.equal(COPY.en.rate, 'A demo is already open. Try again in a minute.');
     assert.equal(stateForTokenFailure(429, 'limit_daily'), 'limit');
-    assert.equal(stateForTokenFailure(429, 'rate'), 'limit');
     assert.equal(COPY.en.limit, EXACT.limit);
     assert.notEqual(stateForTokenFailure(429, 'limit_daily'), 'busy');
     assert.equal(stateForTokenFailure(403, 'origin'), 'error');
     assert.equal(stateForTokenFailure(403, 'turnstile'), 'error');
+    assert.equal(stateForTokenFailure(403, 'tenant'), 'error');
   });
 
   it('counts down from three minutes', () => {
@@ -105,6 +110,10 @@ describe('voice demo widget states', () => {
   });
 
   it('reads demo status before start and stays quiet on a rate limit', async () => {
+    assert.equal(blockFromStatus({ enabled: false, busy: true, cap: true, reason: 'used' }), 'disabled');
+    assert.equal(blockFromStatus({ enabled: true, busy: true, cap: true, reason: 'used' }), 'cap');
+    assert.equal(blockFromStatus({ enabled: true, busy: true, cap: false, reason: 'used' }), 'request');
+    assert.equal(blockFromStatus({ enabled: true, busy: true, cap: false, reason: 'busy' }), 'busy');
     assert.equal(blockFromStatus({ enabled: false, busy: false, cap: false, reason: 'disabled' }), 'disabled');
     assert.equal(blockFromStatus({ enabled: true, busy: false, cap: true, reason: 'cap' }), 'cap');
     assert.equal(blockFromStatus({ enabled: true, busy: true, cap: false, reason: 'busy' }), 'busy');
@@ -239,6 +248,7 @@ function textFor(state, lang) {
     disabled: copy.paused,
     busy: copy.busy,
     cap: copy.resting,
+    rate: copy.rate,
     request: REQUEST_ACCESS_COPY[lang].title,
     requested: REQUEST_ACCESS_COPY[lang].thanks,
     limit: copy.limit,
