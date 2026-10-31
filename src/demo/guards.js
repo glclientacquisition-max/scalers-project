@@ -14,10 +14,11 @@ const {
 } = require('./flags');
 const { createTokenStore, mintDemoToken, verifyDemoToken } = require('./token');
 
-// In-memory limits for one Voice instance. A second instance does not
-// share this counter. Per hashed IP: 3 sessions per EAT day and 1 at a
-// time. Per device id: 3 sessions per EAT day. There is no database and
-// no dial. The spec's per-/24 burst is an estimate and is not enforced.
+// In-memory visit limits for one Voice instance. A second instance does not
+// share that counter. Per hashed IP: 3 sessions per EAT day and 1 at a
+// time. Per device id: 3 sessions per EAT day. The spend cap is separate
+// and can reload from demo_spend when DEMO_SPEND_PERSIST is exactly on.
+// There is no dial. The spec's per-/24 burst is an estimate and is not enforced.
 
 const TURNSTILE_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 const EAT_OFFSET_MS = 3 * 60 * 60 * 1000;
@@ -67,11 +68,20 @@ function createDemoGuard(opts = {}) {
   const fetchImpl = opts.fetch || globalThis.fetch;
   const log = opts.log || ((line) => console.log(line));
   const store = opts.store || createTokenStore();
+  const spend = opts.spend || null;
   const reservations = new Map();
   const ipDay = new Map();
   const deviceDay = new Map();
   const ipActive = new Map();
   let active = 0;
+
+  async function overCap() {
+    if (!spend || typeof spend.blocked !== 'function') return false;
+    if (typeof spend.ready === 'function') {
+      try { await spend.ready(); } catch { return false; }
+    }
+    try { return spend.blocked() === true; } catch { return false; }
+  }
 
   function writeLog(kind, fields) {
     const safe = {};
@@ -259,7 +269,7 @@ function createDemoGuard(opts = {}) {
         reason: 'turnstile',
         origin: clip(origin),
         tenant,
-        device_id: deviceId,
+        device_hash: hashValue(String(env.DEMO_IP_SALT || ''), deviceId),
         turnstile: 'missing',
       });
       return {
@@ -274,13 +284,27 @@ function createDemoGuard(opts = {}) {
     const ip = clientIp(req);
     const salt = String(env.DEMO_IP_SALT);
     const ipHash = hashValue(salt, ip);
+    if (await overCap()) {
+      writeLog('demo_token_reject', {
+        reason: 'cap',
+        origin: clip(origin),
+        tenant,
+        device_hash: hashValue(salt, deviceId),
+        ip_hash: ipHash,
+      });
+      return {
+        status: 503,
+        headers: corsHeaders(origin, env),
+        body: { reason: 'cap' },
+      };
+    }
     const blocked = limitReason(ipHash, deviceId, at, env);
     if (blocked) {
       writeLog('demo_token_reject', {
         reason: blocked,
         origin: clip(origin),
         tenant,
-        device_id: deviceId,
+        device_hash: hashValue(String(env.DEMO_IP_SALT || ''), deviceId),
         ip_hash: ipHash,
       });
       if (blocked === 'busy') {
@@ -303,7 +327,7 @@ function createDemoGuard(opts = {}) {
         reason: 'turnstile',
         origin: clip(origin),
         tenant,
-        device_id: deviceId,
+        device_hash: hashValue(String(env.DEMO_IP_SALT || ''), deviceId),
         ip_hash: ipHash,
         turnstile: 'fail',
       });
@@ -311,6 +335,21 @@ function createDemoGuard(opts = {}) {
         status: 403,
         headers: corsHeaders(origin, env),
         body: { reason: 'turnstile' },
+      };
+    }
+
+    if (await overCap()) {
+      writeLog('demo_token_reject', {
+        reason: 'cap',
+        origin: clip(origin),
+        tenant,
+        device_hash: hashValue(salt, deviceId),
+        ip_hash: ipHash,
+      });
+      return {
+        status: 503,
+        headers: corsHeaders(origin, env),
+        body: { reason: 'cap' },
       };
     }
 
@@ -322,7 +361,7 @@ function createDemoGuard(opts = {}) {
         reason: reserved.reason,
         origin: clip(origin),
         tenant,
-        device_id: deviceId,
+        device_hash: hashValue(String(env.DEMO_IP_SALT || ''), deviceId),
         ip_hash: ipHash,
       });
       if (reserved.reason === 'busy') {
@@ -371,7 +410,7 @@ function createDemoGuard(opts = {}) {
       origin: clip(origin),
       tenant,
       lang,
-      device_id: deviceId,
+      device_hash: hashValue(salt, deviceId),
       ip_hash: ipHash,
       turnstile: 'pass',
       consent_ts: consent,
@@ -475,7 +514,11 @@ function wsUrl(req, token, env) {
 let singleton = null;
 
 function getDemoGuard() {
-  if (!singleton) singleton = createDemoGuard();
+  if (!singleton) {
+    let spend = null;
+    try { spend = require('./meter').getDemoLedger(); } catch { spend = null; }
+    singleton = createDemoGuard({ spend });
+  }
   return singleton;
 }
 

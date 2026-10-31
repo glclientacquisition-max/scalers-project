@@ -50,6 +50,7 @@ const {
 const { createSttSilenceGate } = require('./src/speech/sttSilenceGate');
 const { createCallLimits, limitLine } = require('./src/speech/callLimits');
 const { callMeterOn, createCallMeter, dailyMeterTotals } = require('./src/speech/callMeter');
+const { demoHealthCounts } = require('./src/demo/meter');
 const { mergeIdentityLexicon } = require('./src/speech/pronunciationLexicon');
 const {
   createInitialBurstGate,
@@ -795,6 +796,7 @@ app.get('/healthz', (_req, res) => {
       executor: envLiveTransferExecutorEnabled(),
       ignoreHours: envLiveTransferIgnoreHours(),
     },
+    demo: demoHealthCounts(),
     voiceProfile: publicVoiceProfile(),
   });
 });

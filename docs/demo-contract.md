@@ -26,11 +26,11 @@ Errors:
 | 429 | `limit_daily` | 4th session in the EAT day for this hashed IP or this device |
 | 503 | `busy` | Live reservations are at `DEMO_MAX_CONCURRENT` (default 5). Body includes "All demo lines are busy, try again in a minute." |
 | 503 | `disabled` | Flag off, or token secret, IP salt, or Turnstile secret missing. Body message is "Demo paused." |
-| 503 | `cap` | Reserved for the daily minute cap. Not enforced on this endpoint yet |
+| 503 | `cap` | Today's demo spend is at `DEMO_DAILY_CAP_USD` (default 2) or this month is at `DEMO_MONTHLY_CAP_USD` (default 50). Body is `{reason: cap}` |
 
 The token is HS256, 60 seconds, single-use (`jti`). Claims are only `tenant` (`demo_home`, `demo_shop`, or `demo_other`), `lang`, `ip_hash`, `device_id`, `iat`, `exp`, `jti`. There is no dial claim.
 
-Logs are `demo_token_ok` and `demo_token_reject` with a `reason`. They include the hashed IP, device, origin, Turnstile result, tenant, `consent_ts`, and `notice_v`. They do not include the raw IP, the token, the Turnstile secret, or audio.
+Logs are `demo_token_ok` and `demo_token_reject` with a `reason`. They include the hashed IP, a hash of the device id, origin, Turnstile result, tenant, `consent_ts`, and `notice_v`. They do not include the raw IP, the raw device id, the token, the Turnstile secret, or audio.
 
 The rate limiter and the concurrency counter are in memory on one instance. A second instance does not share them.
 
@@ -89,13 +89,13 @@ Text messages are JSON. Binary messages are assistant audio in the negotiated co
 | `error` | `reason` (`audio`, `protocol`, `brain`, `stt`, `tts`, `codec`, `tenant`), `message` | Something failed. The socket may stay up |
 | `end` | `reason`: `max_time`, `idle`, `user`, `cap`, `kill`, `error` | Then the socket closes |
 
-`max_time` is 180 seconds from connect. `idle` is 30 seconds without voiced caller audio. Both play a short goodbye in the session language (`Thank you. Goodbye.` or `Asante. Kwaheri.`) and then close. `user` is the End button and closes at once. `kill` is the flag leaving `on` while the socket is open. `error` is a startup failure. `cap` is reserved for the daily minute cap.
+`max_time` is 180 seconds from connect, enforced by the server clock, not by the token `exp`. `idle` is 30 seconds without voiced caller audio. Both play a short goodbye in the session language (`Thank you. Goodbye.` or `Asante. Kwaheri.`) and then close. `user` is the End button and closes at once. `kill` is the flag leaving `on` while the socket is open. The server says the demo is paused, in English or Kiswahili, then closes. `error` is a startup failure. `cap` means the daily or monthly spend cap was reached. The server says the demo has reached its limit, in English or Kiswahili, then closes. A reconnect is a new token. There is no resume.
 
 The session language starts as the token `lang` (`en` or `sw`). The greeting is that language's opener for `demo_home`, `demo_shop`, or `demo_other`. Tenant uuids match draft PR #1089: `11111111-1111-4111-8111-111111111101`, `…102`, `…103`. A stored profile is used only when its id is one of those and it is marked demo. There is no DID lookup.
 
 Recording stays off. `DEMO_RECORD=on` does not store audio.
 
-Logs are `demo_session_start` and `demo_session_end` with the session id, tenant, language, codec, hashed IP, device id, origin, duration, and end reason. They do not include caption text, audio, or the token.
+Logs are `demo_session_start` and `demo_session_end` with the session id, tenant, language, codec, hashed IP, hashed device, origin, duration, minutes, USD, and end reason. They do not include caption text, audio, the raw device id, or the token. `/healthz` `demo` is counts only.
 
 ### Codec gap
 
