@@ -3,39 +3,36 @@
 import { businessPaneHref } from "@/lib/ops/businessPane";
 import { useEffect, useState } from "react";
 import { EmptyState, Headline, SplitLayout, SplitPane, StatusPill } from "@/components/ops";
+import { Sheet } from "@/components/ui/Sheet";
 import { BREAKDOWN_MIN, FLOOR, INSIGHT_RANGES, shown, shownShare, type GroupCount, type InsightsData } from "@/lib/ops/insightsView";
 import "@/styles/ops.css";
 
 const WEEK = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "short", timeZone: "Africa/Nairobi" });
 
-function GroupTable({ groups, total, label }: { groups: GroupCount[]; total: number; label: string }) {
+function ReasonBars({ groups, total, label }: { groups: GroupCount[]; total: number; label: string }) {
+  const rows = groups.filter((g) => g.calls > 0);
+  const max = Math.max(1, ...rows.map((g) => g.calls));
   return (
-    <table className="w-full text-ops-body" aria-label={label}>
-      <thead className="text-ops-label text-ink-2">
-        <tr className="h-ops-row border-b border-hairline">
-          <th className="px-ops-3 text-start font-normal">Reason</th>
-          <th className="px-ops-3 text-end font-normal">Calls</th>
-          <th className="px-ops-3 text-end font-normal">Share</th>
-          <th className="px-ops-3 text-end font-normal">Missed</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-hairline bg-surface">
-        {groups.map((g) => (
-          <tr key={g.id} className="h-ops-row">
-            <td className="px-ops-3 text-ink">{g.label}</td>
-            <td className="px-ops-3 text-end tabular-nums text-ink">{shown(g.calls)}</td>
-            <td className="px-ops-3 text-end tabular-nums text-ink-2">{shownShare(g.calls, total)}</td>
-            <td className="px-ops-3 text-end tabular-nums text-ink-2">{shown(g.missed)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <ul className="flex flex-col gap-2" aria-label={label}>
+      {rows.map((g) => (
+        <li key={g.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+          <span className="min-w-0">
+            <span className="block truncate text-ops-body text-ink">{g.label}</span>
+            <span className="mt-1 block h-2 overflow-hidden rounded-full bg-surface-2" aria-hidden="true">
+              <span className="block h-full w-full origin-left bg-accent" style={{ transform: `scaleX(${g.calls / max})` }} />
+            </span>
+          </span>
+          <span className="tabular-nums text-ops-body text-ink">{shown(g.calls)}{total ? ` · ${shownShare(g.calls, total)}` : ""}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 /** Call insights across all businesses (ADMIN_V2). Counts only; under 10 shows "<10". Read-only. */
 export function AdminInsightsV2({ data }: { data: InsightsData }) {
   const [sel, setSel] = useState<string | null>(null);
+  const [about, setAbout] = useState(false);
   useEffect(() => {
     const b = new URLSearchParams(window.location.search).get("business");
     if (b && data.businesses.some((x) => x.tenantId === b)) setSel(b);
@@ -60,11 +57,12 @@ export function AdminInsightsV2({ data }: { data: InsightsData }) {
       <Headline
         label={`Price and buying questions missed · last ${data.days} days`}
         value={<>{shown(data.missed)} <span className="text-ops-heading font-normal text-ink-2">of {shown(data.demand)}</span></>}
-        sub={<span className="inline-flex flex-wrap items-center gap-ops-2"><StatusPill tone={missedTone}>{shownShare(data.missed, data.demand)} missed</StatusPill><span>{shown(data.calls)} answered calls reviewed. Missed means unanswered, lost, or a callback promised.</span></span>}
-        actions={[
-          { label: "Needs attention", href: "/admin" },
-          { label: "Quality", href: "/admin/quality" },
-        ]}
+        sub={
+          <span className="inline-flex flex-wrap items-center gap-ops-2">
+            <StatusPill tone={missedTone}>{shownShare(data.missed, data.demand)} missed</StatusPill>
+            <button type="button" onClick={() => setAbout(true)} className="text-ops-body font-medium text-accent">What missed means</button>
+          </span>
+        }
       />
 
       {data.calls === 0 ? (
@@ -76,7 +74,7 @@ export function AdminInsightsV2({ data }: { data: InsightsData }) {
         />
       ) : (
         <>
-          <GroupTable groups={data.groups} total={data.calls} label="All businesses by reason" />
+          <ReasonBars groups={data.groups} total={data.calls} label="All businesses by reason" />
           <h2 className="text-ops-heading text-ink">By business</h2>
           <ul className="divide-y divide-hairline bg-surface md:hidden" data-phone-rows="">
             {data.businesses.map((b) => (
@@ -124,6 +122,9 @@ export function AdminInsightsV2({ data }: { data: InsightsData }) {
 
   return (
     <div className="ops-theme flex min-h-0 w-full flex-col">
+      <Sheet open={about} onOpenChange={setAbout} title="What missed means" theme="admin">
+        <p className="text-body text-ink-2">{shown(data.calls)} answered calls reviewed. Missed means unanswered, lost, or a callback promised.</p>
+      </Sheet>
       <SplitLayout
         list={list}
         pane={

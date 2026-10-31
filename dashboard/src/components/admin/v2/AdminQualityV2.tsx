@@ -121,8 +121,9 @@ export function AdminQualityV2({
                     <span className="min-w-0 truncate text-ink">{r.name}</span>
                     <StatusPill tone={scoreTone(r.score)}>{formatScore(r.score)}</StatusPill>
                   </span>
-                  <span className="truncate text-ops-label text-ink-2">
-                    {callCountLabel(r.callsTraced)}{r.topFailure ? ` · ${checkLabel(r.topFailure)}` : ""}{r.dropping ? " · dropping" : ""}
+                  <span className="flex w-full items-center gap-2 truncate text-ops-label text-ink-2">
+                    <span className="min-w-0 truncate">{callCountLabel(r.callsTraced)}{r.topFailure ? ` · ${checkLabel(r.topFailure)}` : ""}{r.dropping ? " · dropping" : ""}</span>
+                    {r.trend.length >= 2 ? <Sparkline points={r.trend} label={`${r.name} trend`} height={20} width={72} /> : null}
                   </span>
                 </Link>
               </li>
