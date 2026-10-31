@@ -189,7 +189,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(header, /SignOutButton/);
     assert.doesNotMatch(shell, /SignOutButton/);
     assert.doesNotMatch(shell, /SettingsSignOutRow/);
-    assert.match(account, /<SignOutButton layout="menu"/);
+    assert.match(account, /<SignOutButton layout="sheet"/);
     assert.match(account, /<ThemePicker \/>/);
     assert.match(account, /data-account-appearance=""/);
     assert.match(account, /appearanceLabel\(/);

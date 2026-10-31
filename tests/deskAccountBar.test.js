@@ -18,33 +18,27 @@ describe("desk account bar", () => {
     assert.doesNotMatch(bar, />\s*Sign out\s*</);
     assert.doesNotMatch(bar, /<p[\s>]/);
     assert.match(menu, /data-account-bar=""/);
-    assert.match(menu, /from "@\/components\/ui\/Menu"/);
-    assert.match(menu, /<button type="button" aria-label=\{name\} className=\{iconButtonClass\(\)\}>/);
+    assert.match(menu, /aria-label=\{name\}/);
     assert.match(menu, /h-7 w-7/);
     assert.match(menu, /bg-accent text-meta font-semibold text-accent-on/);
     assert.match(menu, /ring-2 ring-accent ring-offset-2 ring-offset-surface/);
-    assert.match(read("dashboard/src/components/ui/Menu.tsx"), /shadow-menu/);
     assert.match(menu, /md:hidden/);
     assert.match(menu, /markOnly/);
     assert.match(menu, /href="\/home"/);
-    assert.match(menu, /label=\{name\}/);
-    assert.match(menu, /pointer-events-none truncate[\s\S]*\{name\}/);
-    const appearance = menu.indexOf("Appearance");
-    const signOut = menu.indexOf('<SignOutButton layout="menu"');
+    assert.match(menu, /<Sheet/);
+    const appearance = menu.indexOf("data-account-appearance");
+    const signOut = menu.indexOf('<SignOutButton layout="sheet"');
     assert.doesNotMatch(menu, />\s*Profile\s*</);
     assert.ok(appearance > 0 && signOut > appearance);
-    assert.match(menu, /MenuSeparator/);
+    assert.doesNotMatch(menu, /themeOpen/);
   });
 
-  it("switches workspace inside the menu only when there is more than one", () => {
+  it("switches workspace inside the sheet only when there is more than one", () => {
     assert.match(menu, /workspaces\.length > 1/);
     assert.match(menu, /switchDeskTenant/);
     assert.match(menu, /name="tenant_id"/);
     assert.match(menu, />\s*Workspace\s*</);
-    assert.match(menu, /MenuLabel/);
-    assert.match(menu, /text-ink-[23]/);
     assert.doesNotMatch(menu, /text-gray-500/);
-    assert.match(menu, /pointer-events-none/);
   });
 
   it("shows a theme cluster on Appearance and keeps Line live off that control", () => {
@@ -66,7 +60,7 @@ describe("desk account bar", () => {
     assert.match(shell, /showLine=\{tab === "test"\}/);
     const appearance = menu.slice(
       menu.indexOf("data-account-appearance"),
-      menu.indexOf('<SignOutButton layout="menu"')
+      menu.indexOf('<SignOutButton layout="sheet"')
     );
     assert.doesNotMatch(appearance, /Line live/);
   });

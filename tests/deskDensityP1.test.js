@@ -42,7 +42,7 @@ describe("desk density P1", () => {
 
   it("signs out from the account menu only", () => {
     assert.doesNotMatch(shell, /SignOutButton/);
-    assert.match(read("dashboard/src/components/DeskAccountMenu.tsx"), /<SignOutButton layout="menu"/);
+    assert.match(read("dashboard/src/components/DeskAccountMenu.tsx"), /<SignOutButton layout="sheet"/);
     assert.doesNotMatch(read("dashboard/src/components/DeskAccountBar.tsx"), />\s*Sign out\s*</);
   });
 

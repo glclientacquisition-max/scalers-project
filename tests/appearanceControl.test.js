@@ -71,7 +71,8 @@ describe("Appearance control", () => {
       assert.doesNotMatch(src, />\s*This device\s*</, file);
     }
     const desk = read(D + "components/DeskAccountMenu.tsx");
-    assert.equal((desk.match(/appearanceLabel\(/g) || []).length >= 2, true, "menu and phone sheet");
+    assert.equal((desk.match(/appearanceLabel\(/g) || []).length >= 1, true, "sheet shows the choice");
+    assert.doesNotMatch(desk, /themeOpen/);
   });
 
   it("MASTER documents the pattern", () => {

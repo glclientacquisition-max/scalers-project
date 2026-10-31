@@ -186,7 +186,7 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(settingsUi, />Profile</);
     assert.doesNotMatch(settingsShell, /SignOutButton/);
     assert.doesNotMatch(settingsShell, /SettingsSignOutRow/);
-    assert.match(read("dashboard/src/components/DeskAccountMenu.tsx"), /<SignOutButton layout="menu"/);
+    assert.match(read("dashboard/src/components/DeskAccountMenu.tsx"), /<SignOutButton layout="sheet"/);
     assert.doesNotMatch(read("dashboard/src/components/DeskAccountBar.tsx"), />\s*Sign out\s*</);
     assert.match(settingsUi, /settingsBlockTitleClass =\s*"text-meta font-medium text-ink-2"/);
     // The Settings list moved into SettingsSideNav (SettingsMenu, SettingsRail).
