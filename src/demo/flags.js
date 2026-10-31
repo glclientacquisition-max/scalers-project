@@ -30,11 +30,22 @@ function processDemoEnv() {
     TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
     DEMO_PUBLIC_BASE_URL: process.env.DEMO_PUBLIC_BASE_URL,
     PUBLIC_BASE_URL: process.env.PUBLIC_BASE_URL,
+    DEMO_OPUS: process.env.DEMO_OPUS,
+    DEMO_RECORD: process.env.DEMO_RECORD,
   };
 }
 
 function demoEnabled(env = process.env) {
   return env.DEMO_ENABLED === 'on';
+}
+
+function demoOpusOn(env = process.env) {
+  return env.DEMO_OPUS === 'on';
+}
+
+// Read for logs only. The demo session does not record, even when this is `on`.
+function demoRecordOn(env = process.env) {
+  return env.DEMO_RECORD === 'on';
 }
 
 function allowedOrigins(env = process.env) {
@@ -73,6 +84,8 @@ module.exports = {
   DEFAULT_MAX_CONCURRENT,
   processDemoEnv,
   demoEnabled,
+  demoOpusOn,
+  demoRecordOn,
   allowedOrigins,
   originAllowed,
   maxConcurrent,
