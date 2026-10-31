@@ -21,11 +21,10 @@ import {
 } from "@/lib/previewAudio";
 import Link from "next/link";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
-import {
-  SettingsGroup,
-  settingsGhostButtonClass,
-  settingsPrimaryButtonClass,
-} from "@/components/settingsUi";
+import { formatKenyaNumber } from "@/lib/setupFlow";
+import { testLineQuestions } from "@/lib/testLineQuestions";
+import { Button, buttonClass } from "@/components/ui/Button";
+import { SettingsGroup } from "@/components/settingsUi";
 
 /**
  * Business Settings → Test
@@ -57,6 +56,17 @@ export function TestLinePanel({
     () => playedGreetingFromTenant(tenant),
     [tenant],
   );
+
+  const questions = useMemo(
+    () =>
+      testLineQuestions({
+        faqs: tenant.faqs,
+        services: tenant.services_catalog,
+        products: tenant.product_catalog,
+      }),
+    [tenant.faqs, tenant.services_catalog, tenant.product_catalog]
+  );
+  const prettyNumber = lineLive ? formatKenyaNumber(did) : "";
 
   const voiceLabel = displaySonioxVoiceLabel(
     sonioxVoiceLabel,
@@ -148,44 +158,16 @@ export function TestLinePanel({
               {voiceLabel ? (
                 <p className="text-meta text-ink-2">
                   Voice · <span className="text-ink">{voiceLabel}</span>
-                  {lexicon.length
-                    ? ` · ${lexicon.length} pronunciation override${lexicon.length === 1 ? "" : "s"}`
-                    : null}
                 </p>
               ) : null}
-              <button
-                type="button"
-                onClick={() => generatePhonePreview()}
-                disabled={phonePreviewLoading}
-                className={
-                  lineLive
-                    ? settingsGhostButtonClass
-                    : `${settingsPrimaryButtonClass} w-full sm:w-auto sm:min-w-[12rem]`
-                }
-              >
-                {phonePreviewLoading ? "Generating…" : "Hear greeting"}
-              </button>
-              {phonePreviewUrl ? (
-                <audio
-                  controls
-                  preload="metadata"
-                  className="w-full max-w-md"
-                  onError={() => {
-                    URL.revokeObjectURL(phonePreviewUrl);
-                    setPhonePreviewUrl(null);
-                    setPhonePreviewError(NO_VOICE_SAMPLE_COPY);
-                  }}
-                >
-                  <source src={phonePreviewUrl} type="audio/wav" />
-                </audio>
-              ) : null}
-              {phonePreviewUrl && spokenText && spokenText !== greetingPreview ? (
+              {lexicon.length ? (
                 <p className="text-meta text-ink-2">
-                  Callers hear: <span className="text-ink">{spokenText}</span>
-                </p>
-              ) : phonePreviewError ? (
-                <p className="text-body text-warn" role="alert">
-                  {phonePreviewError}
+                  <Link
+                    href={businessSettingsHref("train", "pronunciation")}
+                    className="font-medium text-accent"
+                  >
+                    {lexicon.length} {lexicon.length === 1 ? "word" : "words"} set in Pronunciation
+                  </Link>
                 </p>
               ) : null}
             </>
@@ -194,19 +176,68 @@ export function TestLinePanel({
       </SettingsGroup>
 
       <SettingsGroup title="Line">
-        <div className="space-y-3 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3">
           {lineLive ? (
-            <a
-              href={`tel:${did}`}
-              className={`${settingsPrimaryButtonClass} w-full sm:w-auto sm:min-w-[12rem]`}
-            >
-              Call {did}
+            <a href={`tel:${did}`} className={buttonClass({ size: "md" })}>
+              Call {prettyNumber}
             </a>
           ) : (
             <p className="text-body text-ink-2">Number pending.</p>
           )}
+          {greetingPreview ? (
+            <Button
+              type="button"
+              variant="tonal"
+              size="md"
+              pending={phonePreviewLoading}
+              onClick={() => generatePhonePreview()}
+            >
+              {phonePreviewLoading ? "Generating…" : "Hear greeting"}
+            </Button>
+          ) : null}
         </div>
+        {phonePreviewUrl ? (
+          <div className="space-y-3 px-4 pb-3">
+            <audio
+              controls
+              preload="metadata"
+              className="w-full max-w-md"
+              onError={() => {
+                URL.revokeObjectURL(phonePreviewUrl);
+                setPhonePreviewUrl(null);
+                setPhonePreviewError(NO_VOICE_SAMPLE_COPY);
+              }}
+            >
+              <source src={phonePreviewUrl} type="audio/wav" />
+            </audio>
+            {spokenText && spokenText !== greetingPreview ? (
+              <p className="text-meta text-ink-2">
+                Callers hear: <span className="text-ink">{spokenText}</span>
+              </p>
+            ) : phonePreviewError ? (
+              <p className="text-body text-warn" role="alert">
+                {phonePreviewError}
+              </p>
+            ) : null}
+          </div>
+        ) : phonePreviewError ? (
+          <p className="px-4 pb-3 text-body text-warn" role="alert">
+            {phonePreviewError}
+          </p>
+        ) : null}
       </SettingsGroup>
+
+      {questions.length ? (
+        <SettingsGroup title="Questions">
+          <ul className="divide-y divide-hairline">
+            {questions.map((question) => (
+              <li key={question} className="px-4 py-3 text-body text-ink">
+                {question}
+              </li>
+            ))}
+          </ul>
+        </SettingsGroup>
+      ) : null}
     </div>
   );
 }
