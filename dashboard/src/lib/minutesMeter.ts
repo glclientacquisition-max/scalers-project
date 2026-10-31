@@ -50,8 +50,8 @@ export function minutesRingFill(input: MinutesMeterInput): number {
 export type MinutesMeterTone = "info" | "warn" | "danger";
 
 /**
- * The chip word. "Within" stays one short word so it fits a half card
- * and a Kiswahili line of similar length ("Ndani").
+ * The chip word. "Within package" sits under the minutes figure so it can wrap
+ * on a narrow card. Short enough to stay clear in Kiswahili ("Ndani ya kifurushi").
  */
 export function minutesMeterMark(input: MinutesMeterInput): { word: string; tone: MinutesMeterTone } | null {
   const state = minutesMeterState(input);
@@ -70,6 +70,6 @@ export function minutesMeterMark(input: MinutesMeterInput): { word: string; tone
               ? "Low"
               : state === "beta"
                 ? "Beta"
-                : "Within";
+                : "Within package";
   return { word, tone };
 }

@@ -32,7 +32,7 @@ export function HomeUsageSection({
 }) {
   const mark = meter ? minutesMeterMark(meter) : null;
   return (
-    <section aria-label="Usage" className="min-w-0 overflow-hidden rounded-2xl border border-hairline bg-surface px-4 py-4 lg:col-span-5 lg:col-start-8 lg:row-start-2">
+    <section aria-label="Usage" className="min-w-0 overflow-hidden rounded-2xl border border-hairline bg-surface px-4 py-4">
       {meter ? <MinutesMeter input={meter} shape="ring" showChip={false} /> : null}
       <p className="mt-2 text-body font-medium tabular-nums text-ink">
         {minutesLeftLabel({ left: minutesLeft, underOneMinute: minutesUnderOne })}

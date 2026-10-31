@@ -196,7 +196,8 @@ async function HomeOverviewBody() {
         </div>
       ) : null}
 
-      <div className="mt-6 flex flex-col gap-6">
+      <div className="mt-6 flex w-full flex-col gap-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-8">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-8">
         <div className="overflow-hidden rounded-2xl border border-hairline bg-surface">
           <section aria-label="Line" className="px-4 py-4">
             <h2 className="sr-only">{lineStatusLabel(line)}</h2>
@@ -254,8 +255,9 @@ async function HomeOverviewBody() {
           lineLive={line === "live"}
           factsFailed={todaySplit == null}
         />
+        </div>
 
-        <div className="grid grid-cols-2 items-start gap-3">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-4">
           <RoleGate action="usage.view" mode="hide">
             <Suspense fallback={<HomeUsageSkeleton />}>
               <HomeUsageSlot tenant={tenant} isBeta={isBeta} />
@@ -265,7 +267,9 @@ async function HomeOverviewBody() {
             <HomeInsightsSlot client={client} tenant={tenant} />
           </Suspense>
         </div>
+      </div>
 
+      <div className="mt-6 flex w-full flex-col gap-6">
         <UpdateStatus tenant={tenant} />
 
         {gatesOff.length > 0 ? (
