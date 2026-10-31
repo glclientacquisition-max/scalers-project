@@ -1,28 +1,28 @@
 import type { ReactNode } from "react";
-import { cx } from "@/lib/cx";
+import { StatusMark, type StatusIcon, type StatusTone } from "@/components/ui/StatusMark";
 
 export type StampTone = "neutral" | "attention" | "ok" | "live";
 
-const dot: Record<StampTone, string> = {
-  neutral: "bg-ink-3",
-  attention: "bg-attention",
-  ok: "bg-ok",
-  live: "bg-ok",
+const tone: Record<StampTone, StatusTone> = {
+  neutral: "neutral",
+  attention: "warn",
+  ok: "ok",
+  live: "ok",
 };
 
-const text: Record<StampTone, string> = {
-  neutral: "text-ink-2",
-  attention: "text-attention",
-  ok: "text-ok",
-  live: "text-ok",
+const icon: Record<StampTone, StatusIcon> = {
+  neutral: "ring",
+  attention: "tri",
+  ok: "check",
+  live: "check",
 };
 
 /**
- * Glance state on a row: one dot, one or two words. Not a chip.
- * `live` adds the desk ping. Three tones in a viewport at most.
+ * Glance state on a row: icon, one or two words, one tone.
+ * `live` is the same check as ok. The pill itself does not pulse.
  */
 export function Stamp({
-  tone = "neutral",
+  tone: stampTone = "neutral",
   children,
   className,
   wrap = false,
@@ -30,18 +30,12 @@ export function Stamp({
   tone?: StampTone;
   children: ReactNode;
   className?: string;
-  /** Show full label on narrow rows (e.g. When unsure). */
+  /** Show the full label on a narrow row. */
   wrap?: boolean;
 }) {
   return (
-    <span className={cx("inline-flex min-w-0 items-center gap-1.5 text-meta font-medium", text[tone], className)}>
-      <span className="relative inline-flex h-2 w-2 shrink-0" aria-hidden="true">
-        {tone === "live" ? (
-          <span className={cx("desk-live-ping absolute inline-flex h-full w-full rounded-full opacity-60", dot.live)} />
-        ) : null}
-        <span className={cx("relative inline-flex h-2 w-2 rounded-full", dot[tone])} />
-      </span>
-      <span className={wrap ? "text-pretty leading-snug" : "truncate"}>{children}</span>
-    </span>
+    <StatusMark tone={tone[stampTone]} icon={icon[stampTone]} className={className} wrap={wrap}>
+      {children}
+    </StatusMark>
   );
 }

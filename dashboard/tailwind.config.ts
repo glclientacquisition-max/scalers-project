@@ -87,8 +87,8 @@ export default {
         },
         scrim: token("scrim"),
         warn: {
-          DEFAULT: token("attention"),
-          soft: token("attention-tonal"),
+          DEFAULT: token("warn"),
+          soft: token("warn-soft"),
         },
         ok: {
           DEFAULT: token("ok"),
