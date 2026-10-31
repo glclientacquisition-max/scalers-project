@@ -57,7 +57,10 @@
   --shadow-sheet: 0 12px 32px -12px rgb(10 25 47 / 0.28);
   --shadow-menu: 0 8px 24px -8px rgb(10 25 47 / 0.24);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --sheet-ms: 240ms;
+  --motion-press: 120ms;
+  --motion-enter: 160ms;
+  --motion-sheet: 200ms;
+  --sheet-ms: var(--motion-sheet);
 
   /* Legacy aliases */
   --brand-deep: var(--accent);
@@ -659,6 +662,30 @@ h3,
   opacity: 0;
   transform: translateY(8px);
   transition-timing-function: ease-in;
+}
+
+.motion-press {
+  transition: transform var(--motion-press) var(--ease-out);
+}
+.motion-press:active {
+  transform: scale(0.98);
+}
+@keyframes motion-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.motion-enter {
+  animation: motion-enter var(--motion-enter) var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-press: 0ms;
+    --motion-enter: 0ms;
+    --motion-sheet: 0ms;
+  }
+  .motion-press:active { transform: none; }
+  .motion-enter { animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
