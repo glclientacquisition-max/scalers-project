@@ -1,20 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { PencilSquareIcon, PlusIcon, SpeakerWaveIcon } from "@heroicons/react/20/solid";
+import { ChevronRightIcon, PlusIcon, SpeakerWaveIcon } from "@heroicons/react/20/solid";
 import { useCan, withRoleGate } from "@/components/DeskRole";
 import { useFormDraft, useFormSave } from "@/components/useFormSave";
 import { TenantSettingsSaveButton } from "@/components/TenantSettingsSaveButton";
 import { ChoiceSheet } from "@/components/ui/ChoiceSheet";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { DeskSelect } from "@/components/ui/DeskSelect";
-import { IconButton } from "@/components/ui/IconButton";
 import { Button } from "@/components/ui/Button";
+import { Sheet } from "@/components/ui/Sheet";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 import {
   SettingsGroup,
   SettingsPageHeader,
   SettingsRow,
   SettingsSelect,
-  TrashIcon,
   settingsConsoleClass,
   settingsDenseFieldClass,
   settingsGhostButtonClass,
@@ -213,6 +214,7 @@ function BusinessCard({
   );
   const { dirty, justSaved } = useFormDraft(save, { id: formId, values: [businessName, choice] });
   const nameMissing = !businessName.trim();
+  const [nameOpen, setNameOpen] = useState(false);
 
   return (
     <IdentityCard
@@ -232,17 +234,31 @@ function BusinessCard({
         </>
       }
     >
-      <SettingsRow label="Business name" htmlFor="identity_business_name">
+      <button
+        type="button"
+        onClick={() => canEdit && setNameOpen(true)}
+        className={`flex min-h-11 w-full items-center gap-3 px-4 py-2 text-start ${deskShiftClass} hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand`}
+      >
+        <span className="min-w-0 flex-1 md:flex md:items-center md:gap-3">
+          <span className="block text-body font-medium text-ink md:shrink-0">Business name</span>
+          <span className="mt-0.5 line-clamp-2 text-body text-ink-2 [overflow-wrap:anywhere] md:mt-0 md:min-w-0 md:flex-1 md:truncate md:text-end">
+            {businessName.trim() || "Add"}
+          </span>
+        </span>
+        <ChevronRightIcon className="size-5 shrink-0 text-ink-3" aria-hidden />
+      </button>
+      <Sheet open={nameOpen} onOpenChange={setNameOpen} title="Business name">
+        <label htmlFor="identity_business_name" className="mb-1 block text-meta text-ink-2">Business name</label>
         <input
           id="identity_business_name"
           value={businessName}
           onChange={(e) => setBusinessName(e.target.value)}
           placeholder="Westlands Books"
           aria-invalid={dirty && nameMissing ? true : undefined}
-          title={businessName || undefined}
-          className={settingsValueFieldClass}
+          title={businessName}
+          className={settingsDenseFieldClass}
         />
-      </SettingsRow>
+      </Sheet>
       <ChoiceSheet
         id="identity_category"
         title="What you do"
@@ -293,6 +309,9 @@ function AnswerCard({
 }) {
   const formId = "identity-answer-form";
   const [agentName, setAgentName] = useState(tenant.agent_name || "");
+  const [nameOpen, setNameOpen] = useState(false);
+  const [greetingOpen, setGreetingOpen] = useState(false);
+  const [confirmAuto, setConfirmAuto] = useState(false);
   // Warm is the default tone, so a first save never stops on a choice.
   const [tone, setTone] = useState<OnboardingTone | "">(
     () => canonicalizeAgentTone(String(tenant.agent_tone || "")) || "warm"
@@ -536,26 +555,25 @@ function AnswerCard({
           {canEdit && mode !== "own" ? (
             <button
               type="button"
-              aria-expanded={editingGreeting}
+              aria-expanded={greetingOpen}
               aria-controls="identity-greeting-fields"
-              onClick={() => (editingGreeting ? setEditingGreeting(false) : openGreetingEdit())}
-              className={settingsGhostButtonClass}
+              onClick={() => {
+                setGreetingOpen(true);
+                if (!editingGreeting) openGreetingEdit();
+              }}
+              className={`inline-flex min-h-11 items-center gap-1 ${settingsGhostButtonClass}`}
             >
               {editingGreeting ? "Done" : "Change greeting"}
+              <ChevronRightIcon className="size-5 shrink-0 text-ink-3" aria-hidden />
             </button>
-          ) : null}
-          {canEdit && editingGreeting ? (
-            <button type="button" onClick={cancelGreetingEdit} data-greeting-cancel="" className={settingsGhostButtonClass}>
-              Cancel
-            </button>
-          ) : null}
-          {canEdit && mode === "own" ? (
-            <button type="button" onClick={switchToAutomatic} data-go-automatic="" className={settingsGhostButtonClass}>
-              Go back to automatic
-            </button>
-          ) : canEdit && !automatic && !editingGreeting ? (
-            <button type="button" onClick={switchToAutomatic} data-use-automatic="" className={settingsGhostButtonClass}>
-              Use automatic
+          ) : canEdit ? (
+            <button
+              type="button"
+              onClick={() => setGreetingOpen(true)}
+              className={`inline-flex min-h-11 items-center gap-1 ${settingsGhostButtonClass}`}
+            >
+              Change greeting
+              <ChevronRightIcon className="size-5 shrink-0 text-ink-3" aria-hidden />
             </button>
           ) : null}
         </div>
@@ -579,6 +597,7 @@ function AnswerCard({
           </p>
         ) : null}
       </div>
+      <Sheet open={greetingOpen} onOpenChange={setGreetingOpen} title="Greeting">
       {editingGreeting && canEdit && mode !== "own" ? (
         <div id="identity-greeting-fields" data-greeting-fields="" onKeyDown={onGreetingKeyDown}>
           <SettingsRow label="Name callers hear" htmlFor="spoken_name">
@@ -602,18 +621,57 @@ function AnswerCard({
               className={settingsValueFieldClass}
             />
           </SettingsRow>
+          {canEdit && editingGreeting ? (
+            <button type="button" onClick={cancelGreetingEdit} data-greeting-cancel="" className={settingsGhostButtonClass}>
+              Cancel
+            </button>
+          ) : null}
         </div>
+      ) : (
+        <p className="px-1 text-body text-ink-2">Callers hear your own greeting.</p>
+      )}
+      {canEdit && mode === "own" ? (
+        <button type="button" onClick={() => setConfirmAuto(true)} data-go-automatic="" className={settingsGhostButtonClass}>
+          Go back to automatic
+        </button>
+      ) : canEdit && !automatic && !editingGreeting ? (
+        <button type="button" onClick={() => setConfirmAuto(true)} data-use-automatic="" className={settingsGhostButtonClass}>
+          Use automatic
+        </button>
       ) : null}
-      <SettingsRow label="Assistant name" htmlFor="agent_name">
+      </Sheet>
+      <ConfirmSheet
+        open={confirmAuto}
+        title="Use the automatic greeting?"
+        confirmLabel="Use automatic"
+        onClose={() => setConfirmAuto(false)}
+        onConfirm={() => {
+          setConfirmAuto(false);
+          switchToAutomatic();
+        }}
+      >
+        Your own words will be removed.
+      </ConfirmSheet>
+      <button
+        type="button"
+        onClick={() => canEdit && setNameOpen(true)}
+        className={`flex min-h-11 w-full items-center gap-3 px-4 text-start ${deskShiftClass} hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand`}
+      >
+        <span className="shrink-0 text-body font-medium text-ink">Assistant name</span>
+        <span className="min-w-0 flex-1 truncate text-end text-body text-ink-2">{agentName.trim() || "Add"}</span>
+        <ChevronRightIcon className="size-5 shrink-0 text-ink-3" aria-hidden />
+      </button>
+      <Sheet open={nameOpen} onOpenChange={setNameOpen} title="Assistant name">
+        <label htmlFor="agent_name" className="mb-1 block text-meta text-ink-2">Assistant name</label>
         <input
           id="agent_name"
           value={agentName}
           onChange={(e) => setAgentName(e.target.value)}
           placeholder="Aisha"
           maxLength={40}
-          className={settingsValueFieldClass}
+          className={settingsDenseFieldClass}
         />
-      </SettingsRow>
+      </Sheet>
       <SettingsSelect
         id="agent_tone"
         label="Tone"
@@ -680,6 +738,8 @@ function ContactsCard({
     () => normalizeSocialHandles(tenant.social_handles).channels
   );
   const [editing, setEditing] = useState<number | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<number | null>(null);
   const filled = channels.filter((c) => c.value.trim());
   const json = JSON.stringify({ channels: filled });
   const save = useCardSave(formId, saveAndCompileSettings, onSaveActivity);
@@ -700,20 +760,40 @@ function ContactsCard({
   }
 
   const addButtons = canEdit ? (
-    <div className="flex flex-wrap gap-2 px-1" data-contact-add="">
-      {(
-        [
-          ["phone", "Add phone"],
-          ["whatsapp", "Add WhatsApp"],
-          ["social", "Add social"],
-        ] as const
-      ).map(([kind, label]) => (
-        <button key={kind} type="button" disabled={full} onClick={() => add(kind)} className={settingsGhostButtonClass}>
-          <PlusIcon aria-hidden="true" className="mr-1 size-4" />
-          {label}
-        </button>
-      ))}
-    </div>
+    <>
+      <button
+        type="button"
+        data-contact-add=""
+        disabled={full}
+        onClick={() => setAddOpen(true)}
+        className={`flex min-h-11 w-full items-center gap-3 px-4 text-start text-body font-medium text-ink ${deskShiftClass} hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand disabled:opacity-50`}
+      >
+        <PlusIcon aria-hidden="true" className="size-5 shrink-0 text-accent" />
+        <span className="min-w-0 flex-1">Add a way to reach you</span>
+        <ChevronRightIcon className="size-5 shrink-0 text-ink-3" aria-hidden />
+      </button>
+      <Sheet open={addOpen} onOpenChange={setAddOpen} title="Add a way to reach you">
+        {(
+          [
+            ["phone", "Phone"],
+            ["whatsapp", "WhatsApp"],
+            ["social", "Social"],
+          ] as const
+        ).map(([kind, label]) => (
+          <button
+            key={kind}
+            type="button"
+            className={`flex min-h-11 w-full items-center rounded-xl px-3 text-start text-body text-ink ${deskShiftClass} hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
+            onClick={() => {
+              add(kind);
+              setAddOpen(false);
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </Sheet>
+    </>
   ) : null;
 
   return (
@@ -735,84 +815,76 @@ function ContactsCard({
         </p>
       ) : (
         <ul className="divide-y divide-hairline">
-          {channels.map((channel, index) =>
-            editing === index && canEdit ? (
-              <li key={index} className="space-y-2 px-4 py-3" data-contact-editing="">
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[10rem_minmax(0,1fr)]">
-                  {channel.kind === "phone" || channel.kind === "whatsapp" ? (
-                    <p className="flex min-h-11 items-center text-body font-medium text-ink">
-                      {contactKindLabel(channel.kind)}
-                    </p>
-                  ) : (
-                    <DeskSelect
-                      id={`contact-kind-${index}`}
-                      aria-label="Where"
-                      value={channel.kind}
-                      className={settingsDenseFieldClass}
-                      options={SOCIAL_KINDS.map((k) => ({ value: k.id, label: k.label }))}
-                      onChange={(next) => update(index, { kind: next })}
-                    />
-                  )}
-                  <div>
-                    <label className="sr-only" htmlFor={`contact-value-${index}`}>
-                      {contactKindLabel(channel.kind)}
-                    </label>
+          {channels.map((channel, index) => (
+              <li key={index} data-contact-row="">
+                <button
+                  type="button"
+                  onClick={() => canEdit && setEditing(index)}
+                  className={`flex min-h-12 w-full items-center gap-3 px-4 py-1.5 text-start ${deskShiftClass} hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand`}
+                >
+                  <p className="min-w-0 flex-1 text-body [overflow-wrap:anywhere]">
+                    <span className="font-medium text-ink">{contactRowTitle(channel)}</span>{" "}
+                    <span className="text-ink-2">
+                      {channel.value.trim() ? formatContactValue(channel.kind, channel.value) : "Not filled in"}
+                    </span>
+                  </p>
+                  <ChevronRightIcon className="size-5 shrink-0 text-ink-3" aria-hidden />
+                </button>
+                <Sheet open={editing === index} onOpenChange={(next) => { if (!next) setEditing(null); }} title={contactRowTitle(channel)}>
+                  <div className="space-y-2" data-contact-editing="">
+                    {channel.kind === "phone" || channel.kind === "whatsapp" ? (
+                      <p className="flex min-h-11 items-center text-body font-medium text-ink">{contactKindLabel(channel.kind)}</p>
+                    ) : (
+                      <DeskSelect
+                        id={`contact-kind-${index}`}
+                        aria-label="Where"
+                        value={channel.kind}
+                        className={settingsDenseFieldClass}
+                        options={SOCIAL_KINDS.map((k) => ({ value: k.id, label: k.label }))}
+                        onChange={(next) => update(index, { kind: next })}
+                      />
+                    )}
+                    <label className="sr-only" htmlFor={`contact-value-${index}`}>{contactKindLabel(channel.kind)}</label>
                     <input
                       id={`contact-value-${index}`}
                       value={channel.value}
                       onChange={(e) => update(index, { value: e.target.value })}
                       placeholder={contactPlaceholder(channel.kind)}
                       inputMode={channel.kind === "phone" || channel.kind === "whatsapp" ? "tel" : undefined}
-                      autoFocus
                       className={settingsDenseFieldClass}
                     />
+                    <label className="flex min-h-11 items-center text-body text-ink-2" htmlFor={`contact-label-${index}`}>Label (optional)</label>
+                    <input
+                      id={`contact-label-${index}`}
+                      value={channel.label}
+                      onChange={(e) => update(index, { label: e.target.value })}
+                      placeholder="Sales"
+                      maxLength={40}
+                      className={settingsDenseFieldClass}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button type="button" onClick={() => setConfirmRemove(index)} className={settingsGhostButtonClass}>Remove</button>
+                      <Button variant="tonal" onClick={() => setEditing(null)}>Done</Button>
+                    </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[10rem_minmax(0,1fr)]">
-                  <label className="flex min-h-11 items-center text-body text-ink-2" htmlFor={`contact-label-${index}`}>
-                    Label (optional)
-                  </label>
-                  <input
-                    id={`contact-label-${index}`}
-                    value={channel.label}
-                    onChange={(e) => update(index, { label: e.target.value })}
-                    placeholder="Sales"
-                    maxLength={40}
-                    className={settingsDenseFieldClass}
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button type="button" onClick={() => remove(index)} className={settingsGhostButtonClass}>
-                    Remove
-                  </button>
-                  <Button variant="tonal" onClick={() => setEditing(null)}>
-                    Done
-                  </Button>
-                </div>
+                </Sheet>
               </li>
-            ) : (
-              <li key={index} className="flex min-h-12 items-center gap-3 px-4 py-1.5" data-contact-row="">
-                <p className="min-w-0 flex-1 text-body [overflow-wrap:anywhere]">
-                  <span className="font-medium text-ink">{contactRowTitle(channel)}</span>{" "}
-                  <span className="text-ink-2">
-                    {channel.value.trim() ? formatContactValue(channel.kind, channel.value) : "Not filled in"}
-                  </span>
-                </p>
-                {canEdit ? (
-                  <span className="flex shrink-0 items-center">
-                    <IconButton size="sm" label={`Edit ${contactRowTitle(channel)}`} onClick={() => setEditing(index)}>
-                      <PencilSquareIcon aria-hidden="true" />
-                    </IconButton>
-                    <IconButton size="sm" label={`Remove ${contactRowTitle(channel)}`} onClick={() => remove(index)}>
-                      <TrashIcon />
-                    </IconButton>
-                  </span>
-                ) : null}
-              </li>
-            )
-          )}
+          ))}
         </ul>
       )}
+      <ConfirmSheet
+        open={confirmRemove != null}
+        title="Remove this contact?"
+        confirmLabel="Remove"
+        danger
+        onClose={() => setConfirmRemove(null)}
+        onConfirm={() => {
+          if (confirmRemove != null) remove(confirmRemove);
+          setConfirmRemove(null);
+        }}
+      >
+        It leaves the list when you save.
+      </ConfirmSheet>
     </IdentityCard>
   );
 }

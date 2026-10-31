@@ -74,7 +74,7 @@ describe("desk batch D screen fit and recovery", () => {
     assert.doesNotMatch(form, /No products yet/);
     assert.doesNotMatch(form, /No contacts yet/);
     assert.match(form, /Add product/);
-    assert.match(read("dashboard/src/components/identity/IdentitySettings.tsx"), /Add phone/);
+    assert.match(read("dashboard/src/components/identity/IdentitySettings.tsx"), /Add a way to reach you/);
     assert.match(history, />\s*Show all\s*</);
     assert.match(history, /No calls or jobs yet/);
     assert.match(inbox, /Inbox is empty/);
